@@ -1,0 +1,37 @@
+.userRow {
+  display: flex;
+  justify-content: flex-end;
+
+  @mixin rtl {
+    justify-content: flex-start;
+  }
+}
+
+.assistantRow {
+  display: flex;
+  justify-content: flex-start;
+
+  @mixin rtl {
+    justify-content: flex-end;
+  }
+}
+
+.assistantBubble {
+  @mixin light {
+    background-color: var(--mantine-color-gray-0);
+  }
+
+  @mixin dark {
+    background-color: var(--mantine-color-dark-6);
+  }
+}
+
+.thinking {
+  @mixin light {
+    background-color: var(--mantine-color-gray-1);
+  }
+
+  @mixin dark {
+    background-color: var(--mantine-color-dark-5);
+  }
+}
