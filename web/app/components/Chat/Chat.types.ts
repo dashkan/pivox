@@ -2,16 +2,35 @@ import type { ComponentType, RefObject } from 'react';
 import type { MessagePart, ToolCallPart, ToolResultPart } from '@tanstack/ai';
 import type { UIMessage } from '@tanstack/ai-react';
 
+export interface FileAttachment {
+  id: string;
+  file: File;
+  name: string;
+  type: string;
+  size: number;
+  previewUrl?: string;
+}
+
+export interface SerializedFile {
+  name: string;
+  type: string;
+  size: number;
+  data: string;
+}
+
 export interface ChatState {
   messages: Array<UIMessage>;
   input: string;
   isLoading: boolean;
   error: Error | undefined;
+  files: FileAttachment[];
 }
 
 export interface ChatActions {
   setInput: (value: string) => void;
   submit: () => void;
+  addFiles: (files: File[]) => void;
+  removeFile: (id: string) => void;
 }
 
 export interface ChatMeta {

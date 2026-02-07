@@ -8,11 +8,14 @@ const mockState: ChatState = {
   input: '',
   isLoading: false,
   error: undefined,
+  files: [],
 };
 
 const mockActions: ChatActions = {
   setInput: vi.fn(),
   submit: vi.fn(),
+  addFiles: vi.fn(),
+  removeFile: vi.fn(),
 };
 
 function TestChat() {
