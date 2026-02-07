@@ -1,15 +1,11 @@
 import { chat, toServerSentEventsResponse } from '@tanstack/ai';
 import { anthropicText } from '@tanstack/ai-anthropic';
-import { ollamaText } from '@tanstack/ai-ollama';
 import { getWeatherServer } from '@/ai/tools/weather';
 import { env } from '../../../env';
-
-// type Provider = 'anthropic' | 'ollama';
 
 // Define adapters with their models - autocomplete works here!
 const adapters = {
   anthropic: () => anthropicText('claude-sonnet-4-5'),
-  ollama: () => ollamaText('llama3.2'),
 };
 
 export async function POST(request: Request) {
@@ -25,8 +21,6 @@ export async function POST(request: Request) {
       }
     );
   }
-
-  // const provider: Provider = request.body?.provider || 'openai'
 
   const { messages } = await request.json();
 

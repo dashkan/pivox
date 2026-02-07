@@ -1,0 +1,85 @@
+.track {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 1px;
+  border-radius: var(--mantine-radius-xl);
+  background: var(--mantine-color-default);
+  border: 1px solid var(--mantine-color-default-border);
+}
+
+.indicator {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  height: calc(100% - 2px);
+  border-radius: var(--mantine-radius-xl);
+  background: var(--mantine-primary-color-filled);
+  transition:
+    transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    width 200ms ease;
+  z-index: 0;
+}
+
+.indicator[data-position='0'] {
+  transform: translateX(0);
+}
+
+.indicator[data-position='1'] {
+  transform: translateX(100%);
+}
+
+.indicator[data-position='2'] {
+  transform: translateX(200%);
+}
+
+.option {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--mantine-radius-xl);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--mantine-color-text);
+  opacity: 0.45;
+  transition:
+    color 200ms ease,
+    opacity 200ms ease;
+  padding: 0;
+
+  &:hover:not([data-active]) {
+    opacity: 0.75;
+  }
+
+  &[data-active] {
+    color: var(--cst-active-color);
+    opacity: 1;
+  }
+}
+
+.icon {
+  transition:
+    transform 350ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 200ms ease;
+}
+
+.option[data-active] .icon {
+  animation: pop 350ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(0.5) rotate(-90deg);
+    opacity: 0.4;
+  }
+
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}

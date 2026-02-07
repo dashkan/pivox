@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { IconAlertCircle, IconSend } from '@tabler/icons-react';
 import { fetchServerSentEvents, useChat } from '@tanstack/ai-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import {
@@ -16,7 +17,6 @@ import {
   Text,
   TextInput,
 } from '@mantine/core';
-import { IconAlertCircle, IconSend } from '@tabler/icons-react';
 import classes from './Chat.module.css';
 
 export function Chat() {
@@ -94,7 +94,13 @@ export function Chat() {
                       </div>
                     ) : (
                       <div className={classes.assistantRow}>
-                        <Paper className={classes.assistantBubble} py="sm" px="md" radius="lg" maw="75%">
+                        <Paper
+                          className={classes.assistantBubble}
+                          py="sm"
+                          px="md"
+                          radius="lg"
+                          maw="75%"
+                        >
                           {message.parts.map((part, idx) => {
                             if (part.type === 'thinking') {
                               return (

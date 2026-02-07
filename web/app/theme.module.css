@@ -1,0 +1,10 @@
+.input:hover, .input:focus-within {
+  box-shadow: 0 0 0 2px
+  color-mix(in srgb, transparent, var(--mantine-color-default-color) 28%), 0 0 1px 0 color-mix(in srgb, transparent, var(--mantine-color-default-color) 11%), 0 0 0 4px
+  color-mix(in srgb, transparent, var(--mantine-primary-color-light-color) 15%) !important;
+}
+
+.button:focus {
+  box-shadow: 0 0 0 4px
+  color-mix(in srgb, transparent, var(--mantine-primary-color-filled) 15%) !important;
+}

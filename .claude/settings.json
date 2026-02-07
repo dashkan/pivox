@@ -1,11 +1,6 @@
 {
   "permissions": {
     "allow": [
-      "Bash(echo:*)",
-      "Bash(npx tsc:*)",
-      "Bash(pnpm vitest run:*)",
-      "Bash(pnpm vitest:*)",
-      "Bash(tree:*)",
       "mcp__chrome-devtools__click",
       "mcp__chrome-devtools__close_page",
       "mcp__chrome-devtools__drag",
@@ -101,9 +96,11 @@
       "mcp__tanstack__tanstack_ecosystem",
       "mcp__tanstack__tanstack_list_libraries",
       "mcp__tanstack__tanstack_search_docs",
+      "WebFetch(domain:buf.build)",
       "WebFetch(domain:catalyst.tailwindui.com)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:mantine.dev)",
+      "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:storybook.js.org)",
       "WebFetch(domain:tanstack.com)"
     ]

@@ -8,11 +8,12 @@
   "pnpm": {
     "updateConfig": {
       "ignoreDependencies": [
-        "@types/node"
+        "@eslint/js",
+        "eslint"
       ]
     },
     "onlyBuiltDependencies": [
-      "core-js-pure",
+      "@clerk/shared",
       "esbuild",
       "sharp",
       "unrs-resolver"
