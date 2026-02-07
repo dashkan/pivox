@@ -1,16 +1,19 @@
 'use client';
 
 import { Chat } from '@/components/Chat/Chat';
-import { useChatState } from '@/components/Chat/useChatState';
+import { useChatStore } from '@/components/Chat/useChatStore';
 
 export default function Home() {
-  const { state, actions, meta } = useChatState();
+  const { state, actions, meta } = useChatStore();
 
   return (
     <Chat.Provider state={state} actions={actions} meta={meta}>
       <Chat.Frame>
         <Chat.EmptyState />
-        <Chat.MessageList />
+        <Chat.MessageList
+          parts={{ ...Chat.defaultParts }}
+          toolParts={{ ...Chat.defaultToolParts, generate_image: Chat.ImageToolResult }}
+        />
         <Chat.ErrorAlert />
         <Chat.Input />
       </Chat.Frame>

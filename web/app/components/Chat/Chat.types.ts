@@ -1,4 +1,5 @@
-import type { RefObject } from 'react';
+import type { ComponentType, RefObject } from 'react';
+import type { MessagePart, ToolCallPart, ToolResultPart } from '@tanstack/ai';
 import type { UIMessage } from '@tanstack/ai-react';
 
 export interface ChatState {
@@ -23,3 +24,23 @@ export interface ChatContextValue {
   actions: ChatActions;
   meta: ChatMeta;
 }
+
+export interface PartRendererProps<T extends MessagePart = MessagePart> {
+  part: T;
+  messageRole: 'user' | 'assistant';
+}
+
+export type PartRenderer<T extends MessagePart = MessagePart> = ComponentType<PartRendererProps<T>>;
+
+export type PartsMap = Partial<Record<MessagePart['type'], PartRenderer>>;
+
+export interface ToolPartRendererProps {
+  toolName: string;
+  callPart: ToolCallPart;
+  resultPart?: ToolResultPart;
+  messageRole: 'user' | 'assistant';
+}
+
+export type ToolPartRenderer = ComponentType<ToolPartRendererProps>;
+
+export type ToolPartsMap = Record<string, ToolPartRenderer>;

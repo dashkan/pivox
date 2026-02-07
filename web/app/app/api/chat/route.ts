@@ -1,6 +1,6 @@
 import { chat, toServerSentEventsResponse } from '@tanstack/ai';
 import { anthropicText } from '@tanstack/ai-anthropic';
-import { getWeatherServer } from '@/ai/tools/weather';
+import { generateImageServer } from '@/ai/tools/image';
 import { env } from '../../../env';
 
 // Define adapters with their models - autocomplete works here!
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     const stream = chat({
       adapter: adapters.anthropic(),
       messages,
-      tools: [getWeatherServer],
+      tools: [generateImageServer],
     });
 
     // Convert stream to HTTP response

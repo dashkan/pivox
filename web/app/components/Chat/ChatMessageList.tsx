@@ -1,12 +1,29 @@
 'use client';
 
+import { useMemo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Box, ScrollArea } from '@mantine/core';
 import { useChatContext } from './Chat.context';
+import type { PartsMap, ToolPartsMap } from './Chat.types';
 import { ChatMessageItem } from './ChatMessageItem';
+import { defaultParts } from './ChatParts';
+import { defaultToolParts } from './ChatToolParts';
 
-export function ChatMessageList() {
+interface ChatMessageListProps {
+  parts?: PartsMap;
+  toolParts?: ToolPartsMap;
+}
+
+export function ChatMessageList({
+  parts: partsProp,
+  toolParts: toolPartsProp,
+}: ChatMessageListProps) {
   const { state, meta } = useChatContext();
+  const resolvedParts = useMemo(() => ({ ...defaultParts, ...partsProp }), [partsProp]);
+  const resolvedToolParts = useMemo(
+    () => ({ ...defaultToolParts, ...toolPartsProp }),
+    [toolPartsProp]
+  );
 
   const virtualizer = useVirtualizer({
     count: state.messages.length,
@@ -43,6 +60,8 @@ export function ChatMessageList() {
               index={virtualRow.index}
               message={state.messages[virtualRow.index]}
               measureElement={virtualizer.measureElement}
+              parts={resolvedParts}
+              toolParts={resolvedToolParts}
             />
           ))}
         </div>
