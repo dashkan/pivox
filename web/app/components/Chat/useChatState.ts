@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { fetchServerSentEvents, useChat } from '@tanstack/ai-react';
+import { type ConnectionAdapter, useChat } from '@tanstack/ai-react';
 import {
   canSubmit,
   createFileAttachment,
@@ -11,7 +11,7 @@ import {
 } from './Chat.files';
 import type { ChatContextValue, FileAttachment } from './Chat.types';
 
-export function useChatState(endpoint = '/api/chat'): ChatContextValue {
+export function useChatState(connection: ConnectionAdapter): ChatContextValue {
   const [input, setInput] = useState('');
   const [files, setFiles] = useState<FileAttachment[]>([]);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -24,7 +24,7 @@ export function useChatState(endpoint = '/api/chat'): ChatContextValue {
   filesRef.current = files;
 
   const { messages, sendMessage, setMessages, stop, isLoading, error } = useChat({
-    connection: fetchServerSentEvents(endpoint),
+    connection,
   });
 
   useEffect(() => {

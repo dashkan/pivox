@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import type { AnyClientTool } from '@tanstack/ai';
-import { fetchServerSentEvents, useChat } from '@tanstack/ai-react';
+import { type ConnectionAdapter, useChat } from '@tanstack/ai-react';
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import {
@@ -62,17 +62,17 @@ const useChatUIStore = create<{
 );
 
 interface UseChatStoreOptions {
-  endpoint?: string;
+  connection: ConnectionAdapter;
   tools?: AnyClientTool[];
   initialMessages?: Array<import('@tanstack/ai-react').UIMessage>;
 }
 
-export function useChatStore({ endpoint = '/api/chat', tools, initialMessages }: UseChatStoreOptions = {}): ChatContextValue {
+export function useChatStore({ connection, tools, initialMessages }: UseChatStoreOptions): ChatContextValue {
   const { input, setInput, clearInput, files, addFiles, removeFile, clearFiles } = useChatUIStore();
   const viewportRef = useRef<HTMLDivElement>(null);
 
   const { messages, sendMessage, setMessages, stop, isLoading, error } = useChat({
-    connection: fetchServerSentEvents(endpoint),
+    connection,
     tools,
     initialMessages,
   });

@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { useMantineColorScheme } from '@mantine/core';
+import { fetchServerSentEvents } from '@tanstack/ai-react';
 import { setThemeDef } from '@/ai/tools/theme';
 import { ThemeToolResult } from '@/ai/tools/theme.result';
 import { Chat } from '@/components/Chat/Chat';
@@ -20,7 +21,7 @@ export default function Home() {
   );
 
   return (
-    <Chat.Provider tools={tools}>
+    <Chat.Provider connection={fetchServerSentEvents('/api/chat')} tools={tools}>
       <Chat.Frame>
         <Chat.EmptyState />
         <Chat.MessageList
