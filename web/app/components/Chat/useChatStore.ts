@@ -64,15 +64,17 @@ const useChatUIStore = create<{
 interface UseChatStoreOptions {
   endpoint?: string;
   tools?: AnyClientTool[];
+  initialMessages?: Array<import('@tanstack/ai-react').UIMessage>;
 }
 
-export function useChatStore({ endpoint = '/api/chat', tools }: UseChatStoreOptions = {}): ChatContextValue {
+export function useChatStore({ endpoint = '/api/chat', tools, initialMessages }: UseChatStoreOptions = {}): ChatContextValue {
   const { input, setInput, clearInput, files, addFiles, removeFile, clearFiles } = useChatUIStore();
   const viewportRef = useRef<HTMLDivElement>(null);
 
-  const { messages, sendMessage, isLoading, error } = useChat({
+  const { messages, sendMessage, setMessages, stop, isLoading, error } = useChat({
     connection: fetchServerSentEvents(endpoint),
     tools,
+    initialMessages,
   });
 
   useEffect(() => {
@@ -103,7 +105,7 @@ export function useChatStore({ endpoint = '/api/chat', tools }: UseChatStoreOpti
 
   return {
     state: { messages, input, isLoading, error, files },
-    actions: { setInput, submit, addFiles, removeFile },
+    actions: { setInput, submit, stop, setMessages, addFiles, removeFile },
     meta: { viewportRef, canSubmit: canSubmit(input, files, isLoading) },
   };
 }

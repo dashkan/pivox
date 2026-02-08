@@ -15,6 +15,8 @@ const mockState: ChatState = {
 const mockActions: ChatActions = {
   setInput: vi.fn(),
   submit: vi.fn(),
+  stop: vi.fn(),
+  setMessages: vi.fn(),
   addFiles: vi.fn(),
   removeFile: vi.fn(),
 };

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef } from 'react';
-import { IconFile, IconMicrophone, IconPaperclip, IconSend } from '@tabler/icons-react';
+import { IconFile, IconMicrophone, IconPaperclip, IconPlayerStop, IconSend } from '@tabler/icons-react';
 import {
   ActionIcon,
   Box,
@@ -72,6 +72,7 @@ function validateFiles(dropped: File[]): File[] {
 export function ChatInput() {
   const { state, actions, meta } = useChatContext();
   const openRef = useRef<() => void>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleDrop = (dropped: File[]) => {
     const valid = validateFiles(dropped);
@@ -192,7 +193,9 @@ export function ChatInput() {
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
+                  if (state.isLoading) return;
                   actions.submit();
+                  requestAnimationFrame(() => inputRef.current?.focus());
                 }}
               >
                 <Group gap="sm" align="flex-end" wrap="nowrap">
@@ -220,21 +223,32 @@ export function ChatInput() {
                     </Tooltip>
                   )}
                   <TextInput
+                    ref={inputRef}
                     value={state.input}
                     onChange={(e) => actions.setInput(e.currentTarget.value)}
                     placeholder="Send a message..."
-                    disabled={state.isLoading}
                     flex={1}
                   />
-                  <ActionIcon
-                    type="submit"
-                    variant="filled"
-                    size="input-sm"
-                    disabled={!meta.canSubmit}
-                    aria-label="Send message"
-                  >
-                    <IconSend size={16} />
-                  </ActionIcon>
+                  {state.isLoading ? (
+                    <ActionIcon
+                      variant="filled"
+                      size="input-sm"
+                      onClick={actions.stop}
+                      aria-label="Stop response"
+                    >
+                      <IconPlayerStop size={16} />
+                    </ActionIcon>
+                  ) : (
+                    <ActionIcon
+                      type="submit"
+                      variant="filled"
+                      size="input-sm"
+                      disabled={!meta.canSubmit}
+                      aria-label="Send message"
+                    >
+                      <IconSend size={16} />
+                    </ActionIcon>
+                  )}
                 </Group>
               </form>
             )}

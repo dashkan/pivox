@@ -22,6 +22,8 @@ export interface ChatState {
 export interface ChatActions {
   setInput: (value: string) => void;
   submit: () => void;
+  stop: () => void;
+  setMessages: (messages: Array<UIMessage>) => void;
   addFiles: (files: File[]) => void;
   removeFile: (id: string) => void;
 }

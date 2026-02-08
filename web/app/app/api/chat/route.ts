@@ -7,11 +7,11 @@ import { env } from '@/env';
 
 type Provider = 'anthropic' | 'ollama';
 
-const provider: Provider = 'ollama';
+const provider: Provider = 'anthropic';
 
 const adapters = {
   anthropic: () => anthropicText('claude-sonnet-4-5'),
-  ollama: () => ollamaText('llama4-xsmall-ctx'),
+  ollama: () => ollamaText('qwen3-vl'),
 };
 
 interface IncomingMessage {
@@ -60,11 +60,10 @@ export async function POST(request: Request) {
 
   const { messages } = await request.json();
 
-  const options = {
+  const options: any = {
     adapter: adapters[provider](),
     messages: stripDuplicateToolOutputs(messages) as any,
     tools: [generateImageServer, setThemeDef],
-    modelOptions: {},
   };
 
   if (provider === 'anthropic') {
@@ -77,19 +76,8 @@ export async function POST(request: Request) {
     };
   }
 
-  if (provider === 'ollama') {
-    options.modelOptions = {
-      ...options.modelOptions,
-      think: 'high',
-      options: {
-        num_ctx: 8192,
-      },
-    };
-  }
-
   try {
     const stream = chat(options);
-
     return toServerSentEventsResponse(stream);
   } catch (error) {
     return new Response(
