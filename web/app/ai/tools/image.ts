@@ -10,12 +10,17 @@ export const generateImageDef = toolDefinition({
     height: z.number().optional().default(512),
   }),
   outputSchema: z.object({
-    url: z.string(),
+    data: z.string().describe('Base64-encoded PNG image'),
+    mimeType: z.string(),
     alt: z.string(),
   }),
 });
 
 export const generateImageServer = generateImageDef.server(async ({ prompt, width, height }) => {
-  const url = `https://picsum.photos/${width}/${height}`;
-  return { url, alt: prompt };
+  // Placeholder: fetch a random image and return as base64
+  const res = await fetch(`https://picsum.photos/${width}/${height}`);
+  const buffer = await res.arrayBuffer();
+  const data = Buffer.from(buffer).toString('base64');
+  const mimeType = res.headers.get('content-type') ?? 'image/jpeg';
+  return { data, mimeType, alt: prompt };
 });

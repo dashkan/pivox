@@ -26,6 +26,23 @@
   }
 }
 
+.imageCard {
+  position: relative;
+  overflow: hidden;
+}
+
+.imageActions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.imageCard:hover .imageActions {
+  opacity: 1;
+}
+
 .thinking {
   @mixin light {
     background-color: var(--mantine-color-gray-1);
