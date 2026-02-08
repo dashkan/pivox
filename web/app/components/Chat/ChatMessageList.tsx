@@ -45,14 +45,12 @@ export function ChatMessageList({
         mx="auto"
         style={{ height: virtualizer.getTotalSize() }}
       >
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            transform: `translateY(${virtualizer.getVirtualItems()[0]?.start ?? 0}px)`,
-          }}
+        <Box
+          pos="absolute"
+          top={0}
+          left={0}
+          w="100%"
+          style={{ transform: `translateY(${virtualizer.getVirtualItems()[0]?.start ?? 0}px)` }}
         >
           {virtualizer.getVirtualItems().map((virtualRow) => (
             <ChatMessageItem
@@ -64,7 +62,7 @@ export function ChatMessageList({
               toolParts={resolvedToolParts}
             />
           ))}
-        </div>
+        </Box>
       </Box>
     </ScrollArea>
   );

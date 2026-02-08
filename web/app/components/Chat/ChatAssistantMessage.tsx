@@ -1,6 +1,6 @@
 import type { ToolCallPart, ToolResultPart } from '@tanstack/ai';
 import type { UIMessage } from '@tanstack/ai-react';
-import { Paper } from '@mantine/core';
+import { Box, Paper } from '@mantine/core';
 import type { PartsMap, ToolPartsMap } from './Chat.types';
 import { ToolCallPartRenderer } from './ChatParts';
 import { GenericToolResult } from './ChatToolParts';
@@ -27,7 +27,7 @@ function resolveToolCall(message: UIMessage, toolCallId: string): ToolCallPart |
 
 export function ChatAssistantMessage({ message, parts, toolParts }: ChatAssistantMessageProps) {
   return (
-    <div className={classes.assistantRow}>
+    <Box className={classes.assistantRow}>
       <Paper className={classes.assistantBubble} py="sm" px="md" radius="lg" maw="75%">
         {message.parts.map((part, idx) => {
           if (part.type === 'tool-call') {
@@ -58,6 +58,6 @@ export function ChatAssistantMessage({ message, parts, toolParts }: ChatAssistan
           return Renderer ? <Renderer key={idx} part={part} messageRole="assistant" /> : null;
         })}
       </Paper>
-    </div>
+    </Box>
   );
 }

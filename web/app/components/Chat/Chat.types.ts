@@ -33,9 +33,23 @@ export interface ChatActions {
   removeFile: (id: string) => void;
 }
 
+export type WaveformMode = 'bars' | 'wave';
+
+export interface VoiceInput {
+  isSupported: boolean;
+  isRecording: boolean;
+  transcript: string;
+  analyser: AnalyserNode | null;
+  waveformMode: WaveformMode;
+  start: () => void;
+  stop: () => void;
+  toggleWaveformMode: () => void;
+}
+
 export interface ChatMeta {
   viewportRef: RefObject<HTMLDivElement | null>;
   canSubmit: boolean;
+  voice?: VoiceInput;
 }
 
 export interface ChatContextValue {

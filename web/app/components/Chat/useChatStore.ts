@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import type { AnyClientTool } from '@tanstack/ai';
 import { fetchServerSentEvents, useChat } from '@tanstack/ai-react';
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
@@ -60,12 +61,18 @@ const useChatUIStore = create<{
   )
 );
 
-export function useChatStore(endpoint = '/api/chat'): ChatContextValue {
+interface UseChatStoreOptions {
+  endpoint?: string;
+  tools?: AnyClientTool[];
+}
+
+export function useChatStore({ endpoint = '/api/chat', tools }: UseChatStoreOptions = {}): ChatContextValue {
   const { input, setInput, clearInput, files, addFiles, removeFile, clearFiles } = useChatUIStore();
   const viewportRef = useRef<HTMLDivElement>(null);
 
   const { messages, sendMessage, append, isLoading, error } = useChat({
     connection: fetchServerSentEvents(endpoint),
+    tools,
   });
 
   useEffect(() => {
@@ -77,10 +84,19 @@ export function useChatStore(endpoint = '/api/chat'): ChatContextValue {
   }, [messages]);
 
   const submit = async () => {
-    const sent = await submitMessage({ input, files, isLoading, sendMessage, append });
+    // Read latest values from the store to avoid stale closure
+    // (e.g. when voice input calls setInput then submit in the same tick)
+    const { input: currentInput, files: currentFiles } = useChatUIStore.getState();
+    const sent = await submitMessage({
+      input: currentInput,
+      files: currentFiles,
+      isLoading,
+      sendMessage,
+      append,
+    });
     if (sent) {
       clearInput();
-      if (files.length > 0) {
+      if (currentFiles.length > 0) {
         clearFiles();
       }
     }

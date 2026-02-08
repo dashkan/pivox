@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { render, screen } from '@/test-utils';
 import { Chat } from './Chat';
+import { ChatContext } from './Chat.context';
 import type { ChatActions, ChatMeta, ChatState } from './Chat.types';
 
 const mockState: ChatState = {
@@ -27,14 +28,14 @@ function TestChat() {
   };
 
   return (
-    <Chat.Provider state={mockState} actions={mockActions} meta={mockMeta}>
+    <ChatContext value={{ state: mockState, actions: mockActions, meta: mockMeta }}>
       <Chat.Frame>
         <Chat.EmptyState />
         <Chat.MessageList />
         <Chat.ErrorAlert />
         <Chat.Input />
       </Chat.Frame>
-    </Chat.Provider>
+    </ChatContext>
   );
 }
 

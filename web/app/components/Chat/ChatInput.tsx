@@ -1,10 +1,11 @@
 'use client';
 
 import { useRef } from 'react';
-import { IconFile, IconPaperclip, IconSend } from '@tabler/icons-react';
+import { IconFile, IconMicrophone, IconPaperclip, IconSend } from '@tabler/icons-react';
 import {
   ActionIcon,
   Box,
+  Center,
   CloseButton,
   Divider,
   Group,
@@ -18,6 +19,7 @@ import {
 import { Dropzone, IMAGE_MIME_TYPE } from '@mantine/dropzone';
 import { notifications } from '@mantine/notifications';
 import { useChatContext } from './Chat.context';
+import { VoiceRecordingUI } from './VoiceRecordingUI';
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const MAX_PDF_SIZE = 32 * 1024 * 1024;
@@ -106,45 +108,35 @@ export function ChatInput() {
         pos="relative"
       >
         <Dropzone.Accept>
-          <Box
+          <Center
             pos="absolute"
             top={0}
             left={0}
             right={0}
             bottom={0}
-            bg="var(--mantine-color-blue-light)"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 10,
-            }}
+            bg="var(--mantine-primary-color-light)"
+            style={{ zIndex: 10 }}
           >
-            <Text size="sm" fw={500} c="blue">
+            <Text size="sm" fw={500} c="var(--mantine-primary-color-filled)">
               Drop files here
             </Text>
-          </Box>
+          </Center>
         </Dropzone.Accept>
 
         <Dropzone.Reject>
-          <Box
+          <Center
             pos="absolute"
             top={0}
             left={0}
             right={0}
             bottom={0}
             bg="var(--mantine-color-red-light)"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 10,
-            }}
+            style={{ zIndex: 10 }}
           >
             <Text size="sm" fw={500} c="red">
               File type not supported
             </Text>
-          </Box>
+          </Center>
         </Dropzone.Reject>
 
         <Box p="md">
@@ -186,41 +178,66 @@ export function ChatInput() {
               </Group>
             )}
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                actions.submit();
-              }}
-            >
-              <Group gap="sm" align="flex-end" wrap="nowrap">
-                <Tooltip label="Attach files">
-                  <ActionIcon
-                    variant="subtle"
-                    size="input-sm"
-                    onClick={() => openRef.current?.()}
-                    aria-label="Attach files"
-                  >
-                    <IconPaperclip size={16} />
-                  </ActionIcon>
-                </Tooltip>
-                <TextInput
-                  value={state.input}
-                  onChange={(e) => actions.setInput(e.currentTarget.value)}
-                  placeholder="Send a message..."
-                  disabled={state.isLoading}
-                  flex={1}
+            {meta.voice?.isRecording ? (
+              <Group gap="sm" align="center" wrap="nowrap">
+                <VoiceRecordingUI
+                  transcript={meta.voice.transcript}
+                  analyser={meta.voice.analyser}
+                  waveformMode={meta.voice.waveformMode}
+                  onToggleWaveformMode={meta.voice.toggleWaveformMode}
+                  onStop={meta.voice.stop}
                 />
-                <ActionIcon
-                  type="submit"
-                  variant="filled"
-                  size="input-sm"
-                  disabled={!meta.canSubmit}
-                  aria-label="Send message"
-                >
-                  <IconSend size={16} />
-                </ActionIcon>
               </Group>
-            </form>
+            ) : (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  actions.submit();
+                }}
+              >
+                <Group gap="sm" align="flex-end" wrap="nowrap">
+                  <Tooltip label="Attach files">
+                    <ActionIcon
+                      variant="subtle"
+                      size="input-sm"
+                      onClick={() => openRef.current?.()}
+                      aria-label="Attach files"
+                    >
+                      <IconPaperclip size={16} />
+                    </ActionIcon>
+                  </Tooltip>
+                  {meta.voice?.isSupported && (
+                    <Tooltip label="Voice input">
+                      <ActionIcon
+                        variant="subtle"
+                        size="input-sm"
+                        onClick={meta.voice.start}
+                        disabled={state.isLoading}
+                        aria-label="Voice input"
+                      >
+                        <IconMicrophone size={16} />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                  <TextInput
+                    value={state.input}
+                    onChange={(e) => actions.setInput(e.currentTarget.value)}
+                    placeholder="Send a message..."
+                    disabled={state.isLoading}
+                    flex={1}
+                  />
+                  <ActionIcon
+                    type="submit"
+                    variant="filled"
+                    size="input-sm"
+                    disabled={!meta.canSubmit}
+                    aria-label="Send message"
+                  >
+                    <IconSend size={16} />
+                  </ActionIcon>
+                </Group>
+              </form>
+            )}
           </Stack>
         </Box>
       </Dropzone>

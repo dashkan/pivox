@@ -1,6 +1,6 @@
 import { IconFile } from '@tabler/icons-react';
 import type { UIMessage } from '@tanstack/ai-react';
-import { Group, Image, Paper, Text } from '@mantine/core';
+import { Box, Group, Image, Paper, Text } from '@mantine/core';
 import type { PartsMap, SerializedFile } from './Chat.types';
 import classes from './Chat.module.css';
 
@@ -13,8 +13,8 @@ export function ChatUserMessage({ message, parts }: ChatUserMessageProps) {
   const files = (message as UIMessage & { _files?: SerializedFile[] })._files;
 
   return (
-    <div className={classes.userRow}>
-      <Paper bg="blue" c="white" py="sm" px="md" radius="lg" maw="75%">
+    <Box className={classes.userRow}>
+      <Paper bg="var(--mantine-primary-color-filled)" c="white" py="sm" px="md" radius="lg" maw="75%">
         {files && files.length > 0 && (
           <Group gap="xs" wrap="wrap" mb="xs">
             {files.map((file, idx) =>
@@ -46,6 +46,6 @@ export function ChatUserMessage({ message, parts }: ChatUserMessageProps) {
           return Renderer ? <Renderer key={idx} part={part} messageRole="user" /> : null;
         })}
       </Paper>
-    </div>
+    </Box>
   );
 }

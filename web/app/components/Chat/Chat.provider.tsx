@@ -1,16 +1,29 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useCallback, type ReactNode } from 'react';
+import type { AnyClientTool } from '@tanstack/ai';
 import { ChatContext } from './Chat.context';
-import type { ChatActions, ChatMeta, ChatState } from './Chat.types';
+import { useChatStore } from './useChatStore';
+import { useVoiceInput } from './useVoiceInput';
 
 interface ChatProviderProps {
   children: ReactNode;
-  state: ChatState;
-  actions: ChatActions;
-  meta: ChatMeta;
+  tools?: AnyClientTool[];
+  endpoint?: string;
 }
 
-export function ChatProvider({ children, state, actions, meta }: ChatProviderProps) {
-  return <ChatContext value={{ state, actions, meta }}>{children}</ChatContext>;
+export function ChatProvider({ children, tools, endpoint }: ChatProviderProps) {
+  const { state, actions, meta } = useChatStore({ tools, endpoint });
+
+  const handleVoiceTranscript = useCallback(
+    (text: string) => {
+      actions.setInput(text);
+      requestAnimationFrame(() => actions.submit());
+    },
+    [actions]
+  );
+
+  const voice = useVoiceInput({ onTranscript: handleVoiceTranscript });
+
+  return <ChatContext value={{ state, actions, meta: { ...meta, voice } }}>{children}</ChatContext>;
 }

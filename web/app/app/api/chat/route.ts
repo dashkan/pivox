@@ -6,6 +6,7 @@ import {
 } from '@tanstack/ai';
 import { anthropicText } from '@tanstack/ai-anthropic';
 import { generateImageServer } from '@/ai/tools/image';
+import { setThemeDef } from '@/ai/tools/theme';
 import { env } from '../../../env';
 
 const adapters = {
@@ -24,6 +25,36 @@ interface IncomingMessage {
   parts?: Array<{ type: string; content?: string }>;
   _files?: SerializedFile[];
   [key: string]: unknown;
+}
+
+/**
+ * Strip the redundant `output` field from tool-call parts.
+ *
+ * When a client tool executes, the StreamProcessor sets *both*
+ * `output` on the tool-call part and adds a separate tool-result part.
+ * On the continuation request the server's `convertMessagesToModelMessages`
+ * converts both into `{role:"tool"}` model messages — which Anthropic
+ * rejects as duplicate tool_result blocks.
+ *
+ * Removing `output` from tool-call parts leaves only the tool-result
+ * parts as the single source of truth.
+ */
+function stripDuplicateToolOutputs(messages: IncomingMessage[]) {
+  return messages.map((msg) => {
+    if (!msg.parts) {
+      return msg;
+    }
+    return {
+      ...msg,
+      parts: msg.parts.map((part) => {
+        if (part.type === 'tool-call' && 'output' in part) {
+          const { output: _output, ...rest } = part;
+          return rest as typeof part;
+        }
+        return part;
+      }),
+    };
+  });
 }
 
 /**
@@ -87,8 +118,14 @@ export async function POST(request: Request) {
       adapter: adapters.anthropic(),
       // Mixed UIMessages (pass-through) and ModelMessages (with files) —
       // the Anthropic adapter's constrained generics can't express this union
-      messages: transformMessages(messages) as any,
-      tools: [generateImageServer],
+      messages: transformMessages(stripDuplicateToolOutputs(messages)) as any,
+      tools: [generateImageServer, setThemeDef],
+      modelOptions: {
+        thinking: {
+          type: 'enabled',
+          budget_tokens: 2048,
+        },
+      },
     });
 
     return toServerSentEventsResponse(stream);
