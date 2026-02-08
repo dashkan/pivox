@@ -43,6 +43,29 @@
   opacity: 1;
 }
 
+.inputArea {
+  border-top: 1px solid var(--mantine-color-default-border);
+  background-color: var(--mantine-color-body) !important;
+}
+
+.inputBox {
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-lg);
+  transition: border-color 150ms ease;
+
+  @mixin light {
+    background-color: var(--mantine-color-gray-0);
+  }
+
+  @mixin dark {
+    background-color: var(--mantine-color-dark-8);
+  }
+}
+
+.inputBox:focus-within {
+  border-color: var(--mantine-color-primary-filled);
+}
+
 .thinking {
   @mixin light {
     background-color: var(--mantine-color-gray-1);

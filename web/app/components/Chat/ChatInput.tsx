@@ -1,7 +1,14 @@
 'use client';
 
 import { useRef } from 'react';
-import { IconFile, IconMicrophone, IconPaperclip, IconPlayerStop, IconSend } from '@tabler/icons-react';
+import {
+  IconArrowUp,
+  IconFile,
+  IconMicrophone,
+  IconPaperclip,
+  IconPlayerStopFilled,
+  IconSlash,
+} from '@tabler/icons-react';
 import {
   ActionIcon,
   Box,
@@ -19,6 +26,7 @@ import {
 import { Dropzone, IMAGE_MIME_TYPE } from '@mantine/dropzone';
 import { notifications } from '@mantine/notifications';
 import { useChatContext } from './Chat.context';
+import classes from './Chat.module.css';
 import { VoiceRecordingUI } from './VoiceRecordingUI';
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -82,138 +90,158 @@ export function ChatInput() {
   };
 
   return (
-    <>
-      <Divider />
-      <Dropzone
-        openRef={openRef}
-        onDrop={handleDrop}
-        onReject={(rejections) => {
-          for (const rejection of rejections) {
-            notifications.show({
-              color: 'red',
-              title: 'File rejected',
-              message: `${rejection.file.name}: ${rejection.errors[0]?.message ?? 'Invalid file'}`,
-            });
-          }
-        }}
-        maxSize={MAX_PDF_SIZE}
-        accept={ACCEPTED_MIME_TYPES}
-        maxFiles={MAX_FILES}
-        activateOnClick={false}
-        enablePointerEvents
-        multiple
-        bd="none"
-        bg="var(--mantine-color-body)"
-        p={0}
-        radius={0}
-        pos="relative"
-      >
-        <Dropzone.Accept>
-          <Center
-            pos="absolute"
-            top={0}
-            left={0}
-            right={0}
-            bottom={0}
-            bg="var(--mantine-primary-color-light)"
-            style={{ zIndex: 10 }}
-          >
-            <Text size="sm" fw={500} c="var(--mantine-primary-color-filled)">
-              Drop files here
-            </Text>
-          </Center>
-        </Dropzone.Accept>
+    <Dropzone
+      className={classes.inputArea}
+      openRef={openRef}
+      onDrop={handleDrop}
+      onReject={(rejections) => {
+        for (const rejection of rejections) {
+          notifications.show({
+            color: 'red',
+            title: 'File rejected',
+            message: `${rejection.file.name}: ${rejection.errors[0]?.message ?? 'Invalid file'}`,
+          });
+        }
+      }}
+      maxSize={MAX_PDF_SIZE}
+      accept={ACCEPTED_MIME_TYPES}
+      maxFiles={MAX_FILES}
+      activateOnClick={false}
+      enablePointerEvents
+      multiple
+      bd="none"
+      p={0}
+      radius={0}
+      pos="relative"
+    >
+      <Dropzone.Accept>
+        <Center
+          pos="absolute"
+          top={0}
+          left={0}
+          right={0}
+          bottom={0}
+          bg="var(--mantine-primary-color-light)"
+          style={{ zIndex: 10 }}
+        >
+          <Text size="sm" fw={500} c="var(--mantine-primary-color-filled)">
+            Drop files here
+          </Text>
+        </Center>
+      </Dropzone.Accept>
 
-        <Dropzone.Reject>
-          <Center
-            pos="absolute"
-            top={0}
-            left={0}
-            right={0}
-            bottom={0}
-            bg="var(--mantine-color-red-light)"
-            style={{ zIndex: 10 }}
-          >
-            <Text size="sm" fw={500} c="red">
-              File type not supported
-            </Text>
-          </Center>
-        </Dropzone.Reject>
+      <Dropzone.Reject>
+        <Center
+          pos="absolute"
+          top={0}
+          left={0}
+          right={0}
+          bottom={0}
+          bg="var(--mantine-color-red-light)"
+          style={{ zIndex: 10 }}
+        >
+          <Text size="sm" fw={500} c="red">
+            File type not supported
+          </Text>
+        </Center>
+      </Dropzone.Reject>
 
-        <Box p="md">
-          <Stack gap="sm" maw={768} mx="auto">
-            {state.files.length > 0 && (
-              <Group gap="xs" wrap="wrap">
-                {state.files.map((file) => (
-                  <Paper key={file.id} withBorder radius="md" p={4} pos="relative">
-                    <CloseButton
-                      size="xs"
-                      pos="absolute"
-                      top={-8}
-                      right={-8}
-                      bg="var(--mantine-color-body)"
-                      bd="1px solid var(--mantine-color-default-border)"
-                      radius="xl"
-                      onClick={() => actions.removeFile(file.id)}
-                      style={{ zIndex: 1 }}
+      <Box p="md">
+        <Stack gap="sm" maw={768} mx="auto">
+          {state.files.length > 0 && (
+            <Group gap="xs" wrap="wrap">
+              {state.files.map((file) => (
+                <Paper key={file.id} withBorder radius="md" p={4} pos="relative">
+                  <CloseButton
+                    size="xs"
+                    pos="absolute"
+                    top={-8}
+                    right={-8}
+                    bg="var(--mantine-color-body)"
+                    bd="1px solid var(--mantine-color-default-border)"
+                    radius="xl"
+                    onClick={() => actions.removeFile(file.id)}
+                    style={{ zIndex: 1 }}
+                  />
+                  {file.previewUrl ? (
+                    <Image
+                      src={file.previewUrl}
+                      alt={file.name}
+                      w={60}
+                      h={60}
+                      fit="cover"
+                      radius="sm"
                     />
-                    {file.previewUrl ? (
-                      <Image
-                        src={file.previewUrl}
-                        alt={file.name}
-                        w={60}
-                        h={60}
-                        fit="cover"
-                        radius="sm"
-                      />
-                    ) : (
-                      <Group gap={4} px="xs" h={40} wrap="nowrap">
-                        <IconFile size={14} />
-                        <Text size="xs" maw={80} truncate>
-                          {file.name}
-                        </Text>
-                      </Group>
-                    )}
-                  </Paper>
-                ))}
-              </Group>
-            )}
+                  ) : (
+                    <Group gap={4} px="xs" h={40} wrap="nowrap">
+                      <IconFile size={14} />
+                      <Text size="xs" maw={80} truncate>
+                        {file.name}
+                      </Text>
+                    </Group>
+                  )}
+                </Paper>
+              ))}
+            </Group>
+          )}
 
-            {meta.voice?.isRecording ? (
-              <Group gap="sm" align="center" wrap="nowrap">
-                <VoiceRecordingUI
-                  transcript={meta.voice.transcript}
-                  analyser={meta.voice.analyser}
-                  waveformMode={meta.voice.waveformMode}
-                  onToggleWaveformMode={meta.voice.toggleWaveformMode}
-                  onStop={meta.voice.stop}
+          {meta.voice?.isRecording ? (
+            <Group gap="sm" align="center" wrap="nowrap">
+              <VoiceRecordingUI
+                transcript={meta.voice.transcript}
+                analyser={meta.voice.analyser}
+                waveformMode={meta.voice.waveformMode}
+                onToggleWaveformMode={meta.voice.toggleWaveformMode}
+                onStop={meta.voice.stop}
+              />
+            </Group>
+          ) : (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (state.isLoading) {
+                  return;
+                }
+                actions.submit();
+                requestAnimationFrame(() => inputRef.current?.focus());
+              }}
+            >
+              <Box className={classes.inputBox}>
+                <TextInput
+                  ref={inputRef}
+                  value={state.input}
+                  onChange={(e) => actions.setInput(e.currentTarget.value)}
+                  placeholder={
+                    state.isLoading ? 'Queue another message...' : 'Send a message...'
+                  }
+                  variant="unstyled"
+                  px="md"
+                  pt="xs"
                 />
-              </Group>
-            ) : (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (state.isLoading) return;
-                  actions.submit();
-                  requestAnimationFrame(() => inputRef.current?.focus());
-                }}
-              >
-                <Group gap="sm" align="flex-end" wrap="nowrap">
+                <Divider />
+                <Group gap="xs" justify="flex-end" px="xs" py="xs">
                   <Tooltip label="Attach files">
                     <ActionIcon
                       variant="subtle"
-                      size="input-sm"
+                      size="md"
+                      radius="xl"
                       onClick={() => openRef.current?.()}
                       aria-label="Attach files"
                     >
                       <IconPaperclip size={16} />
                     </ActionIcon>
                   </Tooltip>
+                  <Tooltip label="Commands">
+                    <ActionIcon variant="subtle" size="md" radius="xl" aria-label="Commands">
+                      <IconSlash size={16} />
+                    </ActionIcon>
+                  </Tooltip>
                   {meta.voice?.isSupported && (
                     <Tooltip label="Voice input">
                       <ActionIcon
                         variant="subtle"
-                        size="input-sm"
+                        size="md"
+                        radius="xl"
                         onClick={meta.voice.start}
                         disabled={state.isLoading}
                         aria-label="Voice input"
@@ -222,39 +250,33 @@ export function ChatInput() {
                       </ActionIcon>
                     </Tooltip>
                   )}
-                  <TextInput
-                    ref={inputRef}
-                    value={state.input}
-                    onChange={(e) => actions.setInput(e.currentTarget.value)}
-                    placeholder="Send a message..."
-                    flex={1}
-                  />
                   {state.isLoading ? (
                     <ActionIcon
                       variant="filled"
-                      size="input-sm"
+                      size="md"
+                      radius="md"
                       onClick={actions.stop}
                       aria-label="Stop response"
                     >
-                      <IconPlayerStop size={16} />
+                      <IconPlayerStopFilled size={16} />
                     </ActionIcon>
                   ) : (
                     <ActionIcon
                       type="submit"
-                      variant="filled"
-                      size="input-sm"
+                      variant="light"
+                      size="md"
                       disabled={!meta.canSubmit}
                       aria-label="Send message"
                     >
-                      <IconSend size={16} />
+                      <IconArrowUp size={16} />
                     </ActionIcon>
                   )}
                 </Group>
-              </form>
-            )}
-          </Stack>
-        </Box>
-      </Dropzone>
-    </>
+              </Box>
+            </form>
+          )}
+        </Stack>
+      </Box>
+    </Dropzone>
   );
 }
