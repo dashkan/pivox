@@ -1,4 +1,6 @@
-import type { FileAttachment, SerializedFile } from './Chat.types';
+import type { ContentPart } from '@tanstack/ai';
+import type { MultimodalContent } from '@tanstack/ai-client';
+import type { FileAttachment } from './Chat.types';
 
 export function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -33,15 +35,23 @@ export function revokeAllFileAttachments(attachments: FileAttachment[]): void {
   attachments.forEach(revokeFileAttachment);
 }
 
-export async function serializeFiles(files: FileAttachment[]): Promise<SerializedFile[]> {
-  return Promise.all(
-    files.map(async (f) => ({
-      name: f.name,
-      type: f.type,
-      size: f.size,
-      data: await fileToBase64(f.file),
-    }))
-  );
+/**
+ * Convert file attachments to native TanStack AI ContentPart[].
+ */
+export async function filesToContentParts(files: FileAttachment[]): Promise<ContentPart[]> {
+  const parts: ContentPart[] = [];
+  for (const f of files) {
+    const base64 = await fileToBase64(f.file);
+    if (f.type.startsWith('image/')) {
+      parts.push({ type: 'image', source: { type: 'data', value: base64, mimeType: f.type } });
+    } else if (f.type === 'application/pdf') {
+      parts.push({ type: 'document', source: { type: 'data', value: base64, mimeType: f.type } });
+    } else {
+      const decoded = atob(base64);
+      parts.push({ type: 'text', content: `[File: ${f.name}]\n${decoded}` });
+    }
+  }
+  return parts;
 }
 
 /**
@@ -52,10 +62,9 @@ export async function submitMessage(params: {
   input: string;
   files: FileAttachment[];
   isLoading: boolean;
-  sendMessage: (content: string) => Promise<void>;
-  append: (message: any) => Promise<void>;
+  sendMessage: (content: string | MultimodalContent) => Promise<void>;
 }): Promise<boolean> {
-  const { input, files, isLoading, sendMessage, append } = params;
+  const { input, files, isLoading, sendMessage } = params;
   const hasText = input.trim() !== '';
   const hasFiles = files.length > 0;
 
@@ -64,13 +73,12 @@ export async function submitMessage(params: {
   }
 
   if (hasFiles) {
-    const serializedFiles = await serializeFiles(files);
-
-    await append({
-      role: 'user' as const,
-      parts: hasText ? [{ type: 'text' as const, content: input }] : [],
-      _files: serializedFiles,
-    });
+    const fileParts = await filesToContentParts(files);
+    const content: ContentPart[] = [
+      ...(hasText ? [{ type: 'text' as const, content: input }] : []),
+      ...fileParts,
+    ];
+    await sendMessage({ content });
   } else {
     await sendMessage(input);
   }

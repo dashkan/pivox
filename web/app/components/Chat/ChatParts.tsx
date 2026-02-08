@@ -1,5 +1,6 @@
-import type { TextPart, ThinkingPart, ToolCallPart } from '@tanstack/ai';
-import { Group, Loader, Paper, Text } from '@mantine/core';
+import { IconFile } from '@tabler/icons-react';
+import type { DocumentPart, ImagePart, TextPart, ThinkingPart, ToolCallPart } from '@tanstack/ai';
+import { Group, Image, Loader, Paper, Text } from '@mantine/core';
 import type { PartRendererProps, PartsMap } from './Chat.types';
 import classes from './Chat.module.css';
 
@@ -21,6 +22,27 @@ export function ThinkingPartRenderer({ part }: PartRendererProps<ThinkingPart>) 
   );
 }
 
+export function ImagePartRenderer({ part }: PartRendererProps<ImagePart>) {
+  const src =
+    part.source.type === 'data'
+      ? `data:${part.source.mimeType};base64,${part.source.value}`
+      : part.source.value;
+  return <Image src={src} alt="attached image" w={120} h={120} fit="cover" radius="sm" />;
+}
+
+export function DocumentPartRenderer({ part }: PartRendererProps<DocumentPart>) {
+  return (
+    <Paper bg="rgba(255,255,255,0.15)" radius="sm" px="xs" py={4}>
+      <Group gap={4} wrap="nowrap">
+        <IconFile size={14} />
+        <Text size="xs" c="dimmed">
+          {part.source.mimeType ?? 'Document'}
+        </Text>
+      </Group>
+    </Paper>
+  );
+}
+
 export function ToolCallPartRenderer({ part }: PartRendererProps<ToolCallPart>) {
   return (
     <Group gap="xs" py="xs">
@@ -35,4 +57,6 @@ export function ToolCallPartRenderer({ part }: PartRendererProps<ToolCallPart>) 
 export const defaultParts: PartsMap = {
   text: TextPartRenderer as PartsMap['text'],
   thinking: ThinkingPartRenderer as PartsMap['thinking'],
+  image: ImagePartRenderer as PartsMap['image'],
+  document: DocumentPartRenderer as PartsMap['document'],
 };

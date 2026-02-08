@@ -11,13 +11,6 @@ export interface FileAttachment {
   previewUrl?: string;
 }
 
-export interface SerializedFile {
-  name: string;
-  type: string;
-  size: number;
-  data: string;
-}
-
 export interface ChatState {
   messages: Array<UIMessage>;
   input: string;

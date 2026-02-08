@@ -70,7 +70,7 @@ export function useChatStore({ endpoint = '/api/chat', tools }: UseChatStoreOpti
   const { input, setInput, clearInput, files, addFiles, removeFile, clearFiles } = useChatUIStore();
   const viewportRef = useRef<HTMLDivElement>(null);
 
-  const { messages, sendMessage, append, isLoading, error } = useChat({
+  const { messages, sendMessage, isLoading, error } = useChat({
     connection: fetchServerSentEvents(endpoint),
     tools,
   });
@@ -92,7 +92,6 @@ export function useChatStore({ endpoint = '/api/chat', tools }: UseChatStoreOpti
       files: currentFiles,
       isLoading,
       sendMessage,
-      append,
     });
     if (sent) {
       clearInput();

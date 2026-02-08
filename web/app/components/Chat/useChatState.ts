@@ -23,7 +23,7 @@ export function useChatState(endpoint = '/api/chat'): ChatContextValue {
   const filesRef = useRef(files);
   filesRef.current = files;
 
-  const { messages, sendMessage, append, isLoading, error } = useChat({
+  const { messages, sendMessage, isLoading, error } = useChat({
     connection: fetchServerSentEvents(endpoint),
   });
 
@@ -64,7 +64,6 @@ export function useChatState(endpoint = '/api/chat'): ChatContextValue {
       files: currentFiles,
       isLoading,
       sendMessage,
-      append,
     });
     if (sent) {
       setInput('');
