@@ -5,12 +5,18 @@ import {
   type ModelMessage,
 } from '@tanstack/ai';
 import { anthropicText } from '@tanstack/ai-anthropic';
+import { ollamaText } from '@tanstack/ai-ollama';
 import { generateImageServer } from '@/ai/tools/image';
 import { setThemeDef } from '@/ai/tools/theme';
-import { env } from '../../../env';
+import { env } from '@/env';
+
+type Provider = 'anthropic' | 'ollama';
+
+const provider: Provider = 'ollama';
 
 const adapters = {
   anthropic: () => anthropicText('claude-sonnet-4-5'),
+  ollama: () => ollamaText('glm-4.7-flash'),
 };
 
 interface SerializedFile {
@@ -82,16 +88,12 @@ function transformMessages(messages: IncomingMessage[]) {
       if (file.type.startsWith('image/')) {
         content.push({
           type: 'image',
-          source: { type: 'data', value: file.data },
-          metadata: { mediaType: file.type },
+          source: { type: 'data', value: file.data, mimeType: file.type },
         });
       } else if (file.type === 'application/pdf') {
-        // Don't include mediaType in metadata — the adapter hardcodes
-        // media_type:'application/pdf' in the source, and spreading mediaType
-        // onto the document block causes an Anthropic API rejection.
         content.push({
           type: 'document',
-          source: { type: 'data', value: file.data },
+          source: { type: 'data', value: file.data, mimeType: file.type },
         });
       } else {
         const decoded = Buffer.from(file.data, 'base64').toString('utf-8');
@@ -115,7 +117,7 @@ export async function POST(request: Request) {
 
   try {
     const stream = chat({
-      adapter: adapters.anthropic(),
+      adapter: adapters[provider](),
       // Mixed UIMessages (pass-through) and ModelMessages (with files) —
       // the Anthropic adapter's constrained generics can't express this union
       messages: transformMessages(stripDuplicateToolOutputs(messages)) as any,
