@@ -60,6 +60,7 @@ export const Usage = () => {
   return (
     <Chat.Provider connection={mockConnection}>
       <Chat.Frame>
+        <Chat.Header />
         <Chat.EmptyState />
         <Chat.MessageList />
         <Chat.ErrorAlert />
@@ -102,6 +103,7 @@ export const WithInitialMessages = () => {
   return (
     <Chat.Provider connection={mockConnection} initialMessages={sampleMessages}>
       <Chat.Frame>
+        <Chat.Header />
         <Chat.EmptyState />
         <Chat.MessageList />
         <Chat.ErrorAlert />
@@ -262,6 +264,7 @@ export const WithClientTool = () => {
   return (
     <Chat.Provider connection={weatherToolConnection} tools={tools} initialMessages={toolCallMessages}>
       <Chat.Frame>
+        <Chat.Header />
         <Chat.EmptyState />
         <Chat.MessageList toolParts={{ get_weather: WeatherToolResult }} />
         <Chat.ErrorAlert />

@@ -73,9 +73,15 @@ export function useChatState(connection: ConnectionAdapter): ChatContextValue {
     }
   };
 
+  const clear = useCallback(() => {
+    setMessages([]);
+    setInput('');
+    clearFiles();
+  }, [setMessages, clearFiles]);
+
   return {
     state: { messages, input, isLoading, error, files },
-    actions: { setInput, submit, stop, setMessages, addFiles, removeFile },
+    actions: { setInput, submit, stop, clear, setMessages, addFiles, removeFile },
     meta: { viewportRef, canSubmit: canSubmit(input, files, isLoading) },
   };
 }

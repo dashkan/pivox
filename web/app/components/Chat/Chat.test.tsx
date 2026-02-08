@@ -16,6 +16,7 @@ const mockActions: ChatActions = {
   setInput: vi.fn(),
   submit: vi.fn(),
   stop: vi.fn(),
+  clear: vi.fn(),
   setMessages: vi.fn(),
   addFiles: vi.fn(),
   removeFile: vi.fn(),
@@ -32,6 +33,7 @@ function TestChat() {
   return (
     <ChatContext value={{ state: mockState, actions: mockActions, meta: mockMeta }}>
       <Chat.Frame>
+        <Chat.Header />
         <Chat.EmptyState />
         <Chat.MessageList />
         <Chat.ErrorAlert />

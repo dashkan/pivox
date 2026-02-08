@@ -103,9 +103,15 @@ export function useChatStore({ connection, tools, initialMessages }: UseChatStor
     }
   };
 
+  const clear = () => {
+    setMessages([]);
+    clearInput();
+    clearFiles();
+  };
+
   return {
     state: { messages, input, isLoading, error, files },
-    actions: { setInput, submit, stop, setMessages, addFiles, removeFile },
+    actions: { setInput, submit, stop, clear, setMessages, addFiles, removeFile },
     meta: { viewportRef, canSubmit: canSubmit(input, files, isLoading) },
   };
 }

@@ -23,6 +23,7 @@ export default function Home() {
   return (
     <Chat.Provider connection={fetchServerSentEvents('/api/chat')} tools={tools}>
       <Chat.Frame>
+        <Chat.Header />
         <Chat.EmptyState />
         <Chat.MessageList
           parts={{ ...Chat.defaultParts }}
