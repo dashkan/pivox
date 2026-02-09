@@ -141,20 +141,18 @@ export function ChatInput() {
                     <IconSlash size={16} />
                   </ActionIcon>
                 </Tooltip>
-                {meta.voice?.isSupported && (
-                  <Tooltip label="Voice input">
-                    <ActionIcon
-                      variant="subtle"
-                      size="md"
-                      radius="xl"
-                      onClick={meta.voice.start}
-                      disabled={state.isLoading}
-                      aria-label="Voice input"
-                    >
-                      <IconMicrophone size={16} />
-                    </ActionIcon>
-                  </Tooltip>
-                )}
+                <Tooltip label="Voice input">
+                  <ActionIcon
+                    variant="subtle"
+                    size="md"
+                    radius="xl"
+                    onClick={meta.voice?.start}
+                    disabled={!meta.voice?.isSupported || state.isLoading}
+                    aria-label="Voice input"
+                  >
+                    <IconMicrophone size={16} />
+                  </ActionIcon>
+                </Tooltip>
                 {state.isLoading ? (
                   <ActionIcon
                     variant="filled"

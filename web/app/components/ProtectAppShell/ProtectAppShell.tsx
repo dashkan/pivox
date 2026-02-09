@@ -1,9 +1,26 @@
 'use client';
 
 import { type ReactNode } from 'react';
-import { OrganizationSwitcher, Protect, SignedIn, useClerk, UserButton } from '@clerk/nextjs';
+import {
+  OrganizationSwitcher,
+  Protect,
+  SignedIn,
+  useAuth,
+  useClerk,
+  UserButton,
+} from '@clerk/nextjs';
 import { fetchServerSentEvents } from '@tanstack/ai-client';
-import { AppShell, Burger, Button, Center, Group, Stack, Text, Title } from '@mantine/core';
+import {
+  AppShell,
+  Burger,
+  Button,
+  Center,
+  Group,
+  Skeleton,
+  Stack,
+  Text,
+  Title,
+} from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useClientTools } from '@/ai/tools/useClientTools';
 import { Chat } from '@/components/Chat/Chat';
@@ -32,6 +49,7 @@ function ProtectAppShellFallback() {
 }
 export default function ProtectAppShell({ children }: { children: ReactNode }) {
   const [opened, { toggle }] = useDisclosure();
+  const { isLoaded } = useAuth();
   const { tools, toolParts } = useClientTools();
 
   return (
@@ -51,9 +69,11 @@ export default function ProtectAppShell({ children }: { children: ReactNode }) {
             </Group>
             <Group>
               <ColorSchemeToggle />
-              <SignedIn>
-                <UserButton />
-              </SignedIn>
+              <Skeleton visible={!isLoaded} circle w={28} h={28}>
+                <SignedIn>
+                  <UserButton />
+                </SignedIn>
+              </Skeleton>
             </Group>
           </Group>
         </AppShell.Header>

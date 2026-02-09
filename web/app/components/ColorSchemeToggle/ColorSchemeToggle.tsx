@@ -39,6 +39,7 @@ export function ColorSchemeToggle() {
       <div
         className={classes.indicator}
         data-position={activeIndex === -1 ? 1 : activeIndex}
+        data-hidden={!mounted || undefined}
         style={{ width: 26 }}
       />
       {options.map(({ value, icon: Icon }) => (
