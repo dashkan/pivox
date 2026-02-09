@@ -2,11 +2,11 @@ import { ChatProvider } from './Chat.provider';
 import { ChatAssistantMessage } from './ChatAssistantMessage';
 import { ChatEmptyState } from './ChatEmptyState';
 import { ChatErrorAlert } from './ChatErrorAlert';
-import { ChatRoot } from './ChatRoot';
 import { ChatHeader } from './ChatHeader';
 import { ChatInput } from './ChatInput';
 import { ChatMessageList } from './ChatMessageList';
 import { defaultParts } from './ChatParts';
+import { ChatRoot } from './ChatRoot';
 import { defaultToolParts, GenericToolResult, ImageToolResult } from './ChatToolParts';
 import { ChatUserMessage } from './ChatUserMessage';
 

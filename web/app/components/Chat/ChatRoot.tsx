@@ -48,7 +48,15 @@ export function ChatRoot({ children }: ChatRootProps) {
       pos="relative"
       display="flex"
       style={{ flexDirection: 'column' }}
-      styles={{ inner: { display: 'flex', flexDirection: 'column', flex: 1 } }}
+      styles={{
+        inner: {
+          display: 'flex',
+          flexDirection: 'column',
+          flex: 1,
+          minHeight: 0,
+          overflow: 'hidden',
+        },
+      }}
     >
       <Dropzone.Accept>
         <Center

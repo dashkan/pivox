@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { type ConnectionAdapter, useChat } from '@tanstack/ai-react';
+import { useChat, type ConnectionAdapter } from '@tanstack/ai-react';
 import {
   canSubmit,
   createFileAttachment,

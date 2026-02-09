@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import type { AnyClientTool } from '@tanstack/ai';
-import { type ConnectionAdapter, useChat } from '@tanstack/ai-react';
+import { useChat, type ConnectionAdapter } from '@tanstack/ai-react';
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import {
@@ -67,7 +67,11 @@ interface UseChatStoreOptions {
   initialMessages?: Array<import('@tanstack/ai-react').UIMessage>;
 }
 
-export function useChatStore({ connection, tools, initialMessages }: UseChatStoreOptions): ChatContextValue {
+export function useChatStore({
+  connection,
+  tools,
+  initialMessages,
+}: UseChatStoreOptions): ChatContextValue {
   const { input, setInput, clearInput, files, addFiles, removeFile, clearFiles } = useChatUIStore();
   const viewportRef = useRef<HTMLDivElement>(null);
 

@@ -1,4 +1,4 @@
-import { IconMoon, IconSun, IconDeviceLaptop } from '@tabler/icons-react';
+import { IconDeviceLaptop, IconMoon, IconSun } from '@tabler/icons-react';
 import { Group, Text, ThemeIcon } from '@mantine/core';
 import type { ToolPartRendererProps } from '@/components/Chat/Chat.types';
 

@@ -14,4 +14,3 @@ export const setThemeDef = toolDefinition({
     theme: z.enum(['light', 'dark', 'auto']),
   }),
 });
-

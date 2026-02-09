@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
 import { IconCloud, IconSun, IconTemperature } from '@tabler/icons-react';
-import { Card, Group, Stack, Text, ThemeIcon } from '@mantine/core';
 import { toolDefinition, type StreamChunk } from '@tanstack/ai';
 import type { ConnectionAdapter, UIMessage } from '@tanstack/ai-react';
 import { z } from 'zod';
+import { Card, Group, Stack, Text, ThemeIcon } from '@mantine/core';
 import { Chat } from './Chat';
 import type { ToolPartRendererProps } from './Chat.types';
 
@@ -34,22 +34,47 @@ function createMockConnection(): ConnectionAdapter {
       for (const chunk of thinkingChunks) {
         await delay(80);
         thinkingAccum += chunk;
-        yield { type: 'STEP_FINISHED', stepId, delta: chunk, content: thinkingAccum, timestamp: Date.now() } as StreamChunk;
+        yield {
+          type: 'STEP_FINISHED',
+          stepId,
+          delta: chunk,
+          content: thinkingAccum,
+          timestamp: Date.now(),
+        } as StreamChunk;
       }
 
       // Text response
-      yield { type: 'TEXT_MESSAGE_START', messageId, role: 'assistant', timestamp: Date.now() } as StreamChunk;
-      const words = 'Paris is the capital and largest city of France. It is known for the Eiffel Tower, the Louvre Museum, and Notre-Dame Cathedral.'.split(' ');
+      yield {
+        type: 'TEXT_MESSAGE_START',
+        messageId,
+        role: 'assistant',
+        timestamp: Date.now(),
+      } as StreamChunk;
+      const words =
+        'Paris is the capital and largest city of France. It is known for the Eiffel Tower, the Louvre Museum, and Notre-Dame Cathedral.'.split(
+          ' '
+        );
       let textAccum = '';
       for (const word of words) {
         await delay(40);
         const delta = (textAccum ? ' ' : '') + word;
         textAccum += delta;
-        yield { type: 'TEXT_MESSAGE_CONTENT', messageId, delta, content: textAccum, timestamp: Date.now() } as StreamChunk;
+        yield {
+          type: 'TEXT_MESSAGE_CONTENT',
+          messageId,
+          delta,
+          content: textAccum,
+          timestamp: Date.now(),
+        } as StreamChunk;
       }
       yield { type: 'TEXT_MESSAGE_END', messageId, timestamp: Date.now() } as StreamChunk;
 
-      yield { type: 'RUN_FINISHED', runId, finishReason: 'stop', timestamp: Date.now() } as StreamChunk;
+      yield {
+        type: 'RUN_FINISHED',
+        runId,
+        finishReason: 'stop',
+        timestamp: Date.now(),
+      } as StreamChunk;
     },
   };
 }
@@ -80,7 +105,11 @@ const sampleMessages: UIMessage[] = [
     id: '2',
     role: 'assistant',
     parts: [
-      { type: 'thinking', content: 'The user is asking about France\'s capital. That\'s Paris — a straightforward geography question.' },
+      {
+        type: 'thinking',
+        content:
+          "The user is asking about France's capital. That's Paris — a straightforward geography question.",
+      },
       { type: 'text', content: 'The capital of France is Paris.' },
     ],
   },
@@ -93,8 +122,16 @@ const sampleMessages: UIMessage[] = [
     id: '4',
     role: 'assistant',
     parts: [
-      { type: 'thinking', content: 'They want more detail about Paris. I\'ll mention population, landmarks, and cultural significance.' },
-      { type: 'text', content: 'Paris is the largest city in France with a population of over 2 million. It is known for landmarks like the Eiffel Tower, the Louvre Museum, and Notre-Dame Cathedral.' },
+      {
+        type: 'thinking',
+        content:
+          "They want more detail about Paris. I'll mention population, landmarks, and cultural significance.",
+      },
+      {
+        type: 'text',
+        content:
+          'Paris is the largest city in France with a population of over 2 million. It is known for landmarks like the Eiffel Tower, the Louvre Museum, and Notre-Dame Cathedral.',
+      },
     ],
   },
 ];
@@ -154,7 +191,16 @@ function WeatherToolResult({ resultPart }: ToolPartRendererProps) {
 
 // -- Client tool story --
 
-const cities = ['Paris', 'Tokyo', 'New York', 'Sydney', 'Cairo', 'Reykjavik', 'Mumbai', 'Rio de Janeiro'];
+const cities = [
+  'Paris',
+  'Tokyo',
+  'New York',
+  'Sydney',
+  'Cairo',
+  'Reykjavik',
+  'Mumbai',
+  'Rio de Janeiro',
+];
 const conditions = ['sunny', 'cloudy', 'partly cloudy', 'rainy', 'windy'];
 const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
@@ -162,7 +208,11 @@ const getWeatherDef = toolDefinition({
   name: 'get_weather',
   description: 'Get current weather for a city',
   inputSchema: z.object({ city: z.string() }),
-  outputSchema: z.object({ temperature: z.number(), condition: z.string(), unit: z.enum(['C', 'F']) }),
+  outputSchema: z.object({
+    temperature: z.number(),
+    condition: z.string(),
+    unit: z.enum(['C', 'F']),
+  }),
 });
 
 function lastMessageIsToolResult(messages: unknown[]): boolean {
@@ -194,13 +244,22 @@ async function* streamText(text: string): AsyncIterable<StreamChunk> {
     await delay(40);
     const delta = (accum ? ' ' : '') + word;
     accum += delta;
-    yield { type: 'TEXT_MESSAGE_CONTENT', messageId, delta, content: accum, timestamp: Date.now() } as StreamChunk;
+    yield {
+      type: 'TEXT_MESSAGE_CONTENT',
+      messageId,
+      delta,
+      content: accum,
+      timestamp: Date.now(),
+    } as StreamChunk;
   }
   yield { type: 'TEXT_MESSAGE_END', messageId, timestamp: Date.now() } as StreamChunk;
   yield { type: 'RUN_FINISHED', runId, finishReason: 'stop', timestamp: Date.now() } as StreamChunk;
 }
 
-async function* streamToolCall(toolName: string, args: Record<string, unknown>): AsyncIterable<StreamChunk> {
+async function* streamToolCall(
+  toolName: string,
+  args: Record<string, unknown>
+): AsyncIterable<StreamChunk> {
   const ts = Date.now();
   const runId = crypto.randomUUID();
   const toolCallId = crypto.randomUUID();
@@ -209,11 +268,33 @@ async function* streamToolCall(toolName: string, args: Record<string, unknown>):
   yield { type: 'TOOL_CALL_START', toolCallId, toolName, timestamp: ts } as StreamChunk;
   const argsJson = JSON.stringify(args);
   await delay(100);
-  yield { type: 'TOOL_CALL_ARGS', toolCallId, delta: argsJson, args: argsJson, timestamp: Date.now() } as StreamChunk;
-  yield { type: 'TOOL_CALL_END', toolCallId, toolName, input: args, timestamp: Date.now() } as StreamChunk;
+  yield {
+    type: 'TOOL_CALL_ARGS',
+    toolCallId,
+    delta: argsJson,
+    args: argsJson,
+    timestamp: Date.now(),
+  } as StreamChunk;
+  yield {
+    type: 'TOOL_CALL_END',
+    toolCallId,
+    toolName,
+    input: args,
+    timestamp: Date.now(),
+  } as StreamChunk;
   // StreamProcessor only triggers onToolCall (client tool execution) via CUSTOM events
-  yield { type: 'CUSTOM', name: 'tool-input-available', data: { toolCallId, toolName, input: args }, timestamp: Date.now() } as StreamChunk;
-  yield { type: 'RUN_FINISHED', runId, finishReason: 'tool_calls', timestamp: Date.now() } as StreamChunk;
+  yield {
+    type: 'CUSTOM',
+    name: 'tool-input-available',
+    data: { toolCallId, toolName, input: args },
+    timestamp: Date.now(),
+  } as StreamChunk;
+  yield {
+    type: 'RUN_FINISHED',
+    runId,
+    finishReason: 'tool_calls',
+    timestamp: Date.now(),
+  } as StreamChunk;
 }
 
 const weatherToolConnection: ConnectionAdapter = {
@@ -236,16 +317,25 @@ const toolCallMessages: UIMessage[] = [
     id: '2',
     role: 'assistant',
     parts: [
-      { type: 'tool-call', id: 'tc_1', name: 'get_weather', arguments: '{"city":"London"}', state: 'input-complete' },
-      { type: 'tool-result', toolCallId: 'tc_1', content: '{"temperature":15,"condition":"cloudy in London"}', state: 'complete' },
+      {
+        type: 'tool-call',
+        id: 'tc_1',
+        name: 'get_weather',
+        arguments: '{"city":"London"}',
+        state: 'input-complete',
+      },
+      {
+        type: 'tool-result',
+        toolCallId: 'tc_1',
+        content: '{"temperature":15,"condition":"cloudy in London"}',
+        state: 'complete',
+      },
     ],
   },
   {
     id: '3',
     role: 'assistant',
-    parts: [
-      { type: 'text', content: 'The weather in London is currently cloudy at 15\u00B0C.' },
-    ],
+    parts: [{ type: 'text', content: 'The weather in London is currently cloudy at 15\u00B0C.' }],
   },
 ];
 
@@ -254,7 +344,8 @@ export const WithClientTool = () => {
     () => [
       getWeatherDef.client(({ city }) => {
         const unit = pick(['C', 'F'] as const);
-        const temp = unit === 'C' ? Math.round(Math.random() * 40 - 5) : Math.round(Math.random() * 72 + 23);
+        const temp =
+          unit === 'C' ? Math.round(Math.random() * 40 - 5) : Math.round(Math.random() * 72 + 23);
         return { temperature: temp, condition: `${pick(conditions)} in ${city}`, unit };
       }),
     ],
@@ -262,7 +353,11 @@ export const WithClientTool = () => {
   );
 
   return (
-    <Chat.Provider connection={weatherToolConnection} tools={tools} initialMessages={toolCallMessages}>
+    <Chat.Provider
+      connection={weatherToolConnection}
+      tools={tools}
+      initialMessages={toolCallMessages}
+    >
       <Chat.Root>
         <Chat.Header />
         <Chat.EmptyState />
