@@ -63,7 +63,7 @@
 }
 
 .inputBox:focus-within {
-  border-color: var(--mantine-color-primary-filled);
+  border-color: var(--mantine-primary-color-filled);
 }
 
 .thinking {

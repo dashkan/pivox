@@ -68,24 +68,23 @@ export async function submitMessage(params: {
   const hasText = input.trim() !== '';
   const hasFiles = files.length > 0;
 
-  if ((!hasText && !hasFiles) || isLoading) {
+  if (!hasText || isLoading) {
     return false;
   }
 
+  const content: ContentPart[] = [{ type: 'text' as const, content: input }];
+
   if (hasFiles) {
-    const fileParts = await filesToContentParts(files);
-    const content: ContentPart[] = [
-      ...(hasText ? [{ type: 'text' as const, content: input }] : []),
-      ...fileParts,
-    ];
-    await sendMessage({ content });
-  } else {
-    await sendMessage(input);
+    content.push(...(await filesToContentParts(files)));
   }
+
+  // Fire-and-forget: sendMessage resolves only after the full SSE stream
+  // completes. State updates (messages, isLoading, error) happen reactively.
+  sendMessage({ content });
 
   return true;
 }
 
-export function canSubmit(input: string, files: FileAttachment[], isLoading: boolean): boolean {
-  return (input.trim() !== '' || files.length > 0) && !isLoading;
+export function canSubmit(input: string, _files: FileAttachment[], isLoading: boolean): boolean {
+  return input.trim() !== '' && !isLoading;
 }
