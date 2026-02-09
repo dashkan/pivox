@@ -44,7 +44,7 @@ export function ChatRoot({ children }: ChatRootProps) {
       bd="none"
       p={0}
       radius={0}
-      h="100dvh"
+      h="100%"
       pos="relative"
       display="flex"
       style={{ flexDirection: 'column' }}

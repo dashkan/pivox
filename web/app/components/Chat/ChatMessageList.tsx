@@ -37,7 +37,7 @@ export function ChatMessageList({
   }
 
   return (
-    <ScrollArea flex={1} viewportRef={meta.viewportRef} scrollbars="y">
+    <ScrollArea flex={1} mih={0} viewportRef={meta.viewportRef} scrollbars="y">
       <Box
         pos="relative"
         maw={768}

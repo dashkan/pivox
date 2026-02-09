@@ -7,6 +7,7 @@ import {
   useMantineTheme,
   type MantineColorScheme,
 } from '@mantine/core';
+import { useMounted } from '@mantine/hooks';
 import classes from './ColorSchemeToggle.module.css';
 
 const options: { value: MantineColorScheme; icon: typeof IconSun }[] = [
@@ -18,7 +19,8 @@ const options: { value: MantineColorScheme; icon: typeof IconSun }[] = [
 export function ColorSchemeToggle() {
   const { colorScheme, setColorScheme } = useMantineColorScheme();
   const theme = useMantineTheme();
-  const activeIndex = options.findIndex((o) => o.value === colorScheme);
+  const mounted = useMounted();
+  const activeIndex = mounted ? options.findIndex((o) => o.value === colorScheme) : -1;
 
   const primaryFilled =
     theme.colors[theme.primaryColor][theme.primaryShade as number] ??
@@ -44,10 +46,10 @@ export function ColorSchemeToggle() {
           key={value}
           type="button"
           role="radio"
-          aria-checked={colorScheme === value}
+          aria-checked={mounted && colorScheme === value}
           aria-label={value}
           className={classes.option}
-          data-active={colorScheme === value || undefined}
+          data-active={(mounted && colorScheme === value) || undefined}
           onClick={() => setColorScheme(value)}
         >
           <Icon size={14} stroke={1.5} className={classes.icon} />
