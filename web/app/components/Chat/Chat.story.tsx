@@ -59,13 +59,13 @@ const mockConnection = createMockConnection();
 export const Usage = () => {
   return (
     <Chat.Provider connection={mockConnection}>
-      <Chat.Frame>
+      <Chat.Root>
         <Chat.Header />
         <Chat.EmptyState />
         <Chat.MessageList />
         <Chat.ErrorAlert />
         <Chat.Input />
-      </Chat.Frame>
+      </Chat.Root>
     </Chat.Provider>
   );
 };
@@ -102,13 +102,13 @@ const sampleMessages: UIMessage[] = [
 export const WithInitialMessages = () => {
   return (
     <Chat.Provider connection={mockConnection} initialMessages={sampleMessages}>
-      <Chat.Frame>
+      <Chat.Root>
         <Chat.Header />
         <Chat.EmptyState />
         <Chat.MessageList />
         <Chat.ErrorAlert />
         <Chat.Input />
-      </Chat.Frame>
+      </Chat.Root>
     </Chat.Provider>
   );
 };
@@ -263,13 +263,13 @@ export const WithClientTool = () => {
 
   return (
     <Chat.Provider connection={weatherToolConnection} tools={tools} initialMessages={toolCallMessages}>
-      <Chat.Frame>
+      <Chat.Root>
         <Chat.Header />
         <Chat.EmptyState />
         <Chat.MessageList toolParts={{ get_weather: WeatherToolResult }} />
         <Chat.ErrorAlert />
         <Chat.Input />
-      </Chat.Frame>
+      </Chat.Root>
     </Chat.Provider>
   );
 };

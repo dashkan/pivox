@@ -32,13 +32,13 @@ function TestChat() {
 
   return (
     <ChatContext value={{ state: mockState, actions: mockActions, meta: mockMeta }}>
-      <Chat.Frame>
+      <Chat.Root>
         <Chat.Header />
         <Chat.EmptyState />
         <Chat.MessageList />
         <Chat.ErrorAlert />
         <Chat.Input />
-      </Chat.Frame>
+      </Chat.Root>
     </ChatContext>
   );
 }

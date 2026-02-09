@@ -1,37 +1,24 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useMantineColorScheme } from '@mantine/core';
 import { fetchServerSentEvents } from '@tanstack/ai-react';
-import { setThemeDef } from '@/ai/tools/theme';
-import { ThemeToolResult } from '@/ai/tools/theme.result';
+import { useClientTools } from '@/ai/tools/useClientTools';
 import { Chat } from '@/components/Chat/Chat';
 
 export default function Home() {
-  const { setColorScheme } = useMantineColorScheme();
-
-  const tools = useMemo(
-    () => [
-      setThemeDef.client(({ theme }) => {
-        setColorScheme(theme);
-        return { theme };
-      }),
-    ],
-    [setColorScheme]
-  );
+  const { tools, toolParts } = useClientTools();
 
   return (
     <Chat.Provider connection={fetchServerSentEvents('/api/chat')} tools={tools}>
-      <Chat.Frame>
+      <Chat.Root>
         <Chat.Header />
         <Chat.EmptyState />
         <Chat.MessageList
           parts={{ ...Chat.defaultParts }}
-          toolParts={{ ...Chat.defaultToolParts, set_theme: ThemeToolResult }}
+          toolParts={{ ...Chat.defaultToolParts, ...toolParts }}
         />
         <Chat.ErrorAlert />
         <Chat.Input />
-      </Chat.Frame>
+      </Chat.Root>
     </Chat.Provider>
   );
 }

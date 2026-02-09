@@ -2,8 +2,11 @@
 
 import { type ReactNode } from 'react';
 import { OrganizationSwitcher, Protect, SignedIn, useClerk, UserButton } from '@clerk/nextjs';
+import { fetchServerSentEvents } from '@tanstack/ai-client';
 import { AppShell, Burger, Button, Center, Group, Stack, Text, Title } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
+import { useClientTools } from '@/ai/tools/useClientTools';
+import { Chat } from '@/components/Chat/Chat';
 import { ColorSchemeToggle } from '@/components/ColorSchemeToggle/ColorSchemeToggle';
 
 function ProtectAppShellFallback() {
@@ -29,14 +32,15 @@ function ProtectAppShellFallback() {
 }
 export default function ProtectAppShell({ children }: { children: ReactNode }) {
   const [opened, { toggle }] = useDisclosure();
+  const { tools, toolParts } = useClientTools();
 
   return (
     <Protect fallback={<ProtectAppShellFallback />}>
       <AppShell
         header={{ height: 60 }}
-        // footer={{ height: 60 }}
+        footer={{ height: 20 }}
         navbar={{ width: 300, breakpoint: 'sm', collapsed: { mobile: !opened } }}
-        // aside={{ width: 300, breakpoint: 'md', collapsed: { desktop: false, mobile: true } }}
+        aside={{ width: 400, breakpoint: 'md', collapsed: { desktop: false, mobile: true } }}
         padding="md"
       >
         <AppShell.Header>
@@ -57,8 +61,24 @@ export default function ProtectAppShell({ children }: { children: ReactNode }) {
           <OrganizationSwitcher />
         </AppShell.Navbar>
         <AppShell.Main>{children}</AppShell.Main>
-        {/*<AppShell.Aside p="md">Aside</AppShell.Aside>*/}
-        {/*<AppShell.Footer p="md">Footer</AppShell.Footer>*/}
+        <AppShell.Aside p="0">
+          {' '}
+          <Chat.Provider connection={fetchServerSentEvents('/api/chat')} tools={tools}>
+            <Chat.Root>
+              <Chat.Header />
+              <Chat.EmptyState />
+              <Chat.MessageList
+                parts={{ ...Chat.defaultParts }}
+                toolParts={{ ...Chat.defaultToolParts, ...toolParts }}
+              />
+              <Chat.ErrorAlert />
+              <Chat.Input />
+            </Chat.Root>
+          </Chat.Provider>
+        </AppShell.Aside>
+        <AppShell.Footer px="sm" py="0" fz="xs" fw="bolder">
+          Footer
+        </AppShell.Footer>
       </AppShell>
     </Protect>
   );

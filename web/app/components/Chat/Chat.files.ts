@@ -1,6 +1,56 @@
 import type { ContentPart } from '@tanstack/ai';
 import type { MultimodalContent } from '@tanstack/ai-client';
+import { IMAGE_MIME_TYPE } from '@mantine/dropzone';
+import { notifications } from '@mantine/notifications';
 import type { FileAttachment } from './Chat.types';
+
+export const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+export const MAX_PDF_SIZE = 32 * 1024 * 1024;
+export const MAX_TEXT_SIZE = 1 * 1024 * 1024;
+export const MAX_FILES = 10;
+
+export const ACCEPTED_MIME_TYPES = [
+  ...IMAGE_MIME_TYPE,
+  'application/pdf',
+  'text/plain',
+  'text/markdown',
+  'text/csv',
+  'application/json',
+];
+
+export function validateFiles(dropped: File[]): File[] {
+  const valid: File[] = [];
+
+  for (const file of dropped) {
+    if (file.type.startsWith('image/') && file.size > MAX_IMAGE_SIZE) {
+      notifications.show({
+        color: 'red',
+        title: 'File too large',
+        message: `${file.name} exceeds the 5 MB image limit`,
+      });
+    } else if (file.type === 'application/pdf' && file.size > MAX_PDF_SIZE) {
+      notifications.show({
+        color: 'red',
+        title: 'File too large',
+        message: `${file.name} exceeds the 32 MB PDF limit`,
+      });
+    } else if (
+      !file.type.startsWith('image/') &&
+      file.type !== 'application/pdf' &&
+      file.size > MAX_TEXT_SIZE
+    ) {
+      notifications.show({
+        color: 'red',
+        title: 'File too large',
+        message: `${file.name} exceeds the 1 MB text file limit`,
+      });
+    } else {
+      valid.push(file);
+    }
+  }
+
+  return valid;
+}
 
 export function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {

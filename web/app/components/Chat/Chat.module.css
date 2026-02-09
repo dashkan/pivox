@@ -43,16 +43,7 @@
   opacity: 1;
 }
 
-.inputArea {
-  border-top: 1px solid var(--mantine-color-default-border);
-  background-color: var(--mantine-color-body) !important;
-}
-
-.inputBox {
-  border: 1px solid var(--mantine-color-default-border);
-  border-radius: var(--mantine-radius-lg);
-  transition: border-color 150ms ease;
-
+.root {
   @mixin light {
     background-color: var(--mantine-color-gray-0);
   }
@@ -62,8 +53,22 @@
   }
 }
 
+.inputArea {
+}
+
+.inputBox {
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+  transition: border-color 150ms ease;
+  background-color: var(--mantine-color-body);
+
+  @mixin dark {
+    background-color: var(--mantine-color-dark-6);
+  }
+}
+
 .inputBox:focus-within {
-  border-color: var(--mantine-primary-color-filled);
+  border-color: var(--mantine-color-bright);
 }
 
 .thinking {

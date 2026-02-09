@@ -2,7 +2,7 @@ import { ChatProvider } from './Chat.provider';
 import { ChatAssistantMessage } from './ChatAssistantMessage';
 import { ChatEmptyState } from './ChatEmptyState';
 import { ChatErrorAlert } from './ChatErrorAlert';
-import { ChatFrame } from './ChatFrame';
+import { ChatRoot } from './ChatRoot';
 import { ChatHeader } from './ChatHeader';
 import { ChatInput } from './ChatInput';
 import { ChatMessageList } from './ChatMessageList';
@@ -12,7 +12,7 @@ import { ChatUserMessage } from './ChatUserMessage';
 
 export const Chat = {
   Provider: ChatProvider,
-  Frame: ChatFrame,
+  Root: ChatRoot,
   Header: ChatHeader,
   EmptyState: ChatEmptyState,
   MessageList: ChatMessageList,

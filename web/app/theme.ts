@@ -22,6 +22,11 @@ export const theme = createTheme({
     theme: themeColor,
   },
   primaryColor: 'theme',
+  spacing: {
+    '2xs': '0.3125rem',
+    '3xs': '0.25rem',
+    '4xs': '0.125rem',
+  },
 });
 
 export const clerkLightTheme = experimental_createTheme({
