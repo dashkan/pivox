@@ -1,0 +1,1039 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "pivox/api/v1/dashboards.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "Dashboards"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/organizations/{organization}/projects/{project}/dashboards": {
+      "get": {
+        "summary": "Lists dashboards in a project.",
+        "operationId": "Dashboards_ListDashboards",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListDashboardsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Optional. Maximum number of dashboards to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. Page token from a previous ListDashboards call.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "filter",
+            "description": "Optional. An AIP-160 filter expression.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "description": "Optional. Sort order (e.g. \"display_name\", \"create_time desc\").",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Dashboards"
+        ]
+      },
+      "post": {
+        "summary": "Creates a new dashboard in a project.",
+        "operationId": "Dashboards_CreateDashboard",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Dashboard"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "dashboard",
+            "description": "Required. The dashboard to create.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1Dashboard"
+            }
+          },
+          {
+            "name": "dashboardId",
+            "description": "Optional. A client-assigned dashboard ID. If not provided, the server\nwill generate one.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "validateOnly",
+            "description": "Optional. If true, validate the request without persisting it.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "Dashboards"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/projects/{project}/dashboards/{dashboard}": {
+      "get": {
+        "summary": "Retrieves a dashboard by name.",
+        "operationId": "Dashboards_GetDashboard",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Dashboard"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "dashboard",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Dashboards"
+        ]
+      },
+      "delete": {
+        "summary": "Deletes a dashboard.",
+        "operationId": "Dashboards_DeleteDashboard",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Dashboard"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "dashboard",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "validateOnly",
+            "description": "Optional. If true, validate the request without persisting it.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "etag",
+            "description": "Optional. The etag for optimistic concurrency control.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Dashboards"
+        ]
+      },
+      "patch": {
+        "summary": "Updates an existing dashboard.",
+        "operationId": "Dashboards_UpdateDashboard",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Dashboard"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "dashboard",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "dashboard",
+            "description": "Required. The dashboard with updated fields.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "displayName": {
+                  "type": "string",
+                  "description": "Required. A human-readable name for the dashboard."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Optional. A longer description of the dashboard's purpose."
+                },
+                "gridLayout": {
+                  "$ref": "#/definitions/v1GridLayout",
+                  "description": "A grid-based layout with positioned tiles."
+                },
+                "variables": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "$ref": "#/definitions/v1DashboardVariable"
+                  },
+                  "description": "Optional. Template variables for parameterizing widget queries."
+                },
+                "createTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Creation time.",
+                  "readOnly": true
+                },
+                "updateTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Last update time.",
+                  "readOnly": true
+                },
+                "etag": {
+                  "type": "string",
+                  "description": "Output only. Entity tag for optimistic concurrency control.",
+                  "readOnly": true
+                },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "Optional. Free-form annotations for the dashboard."
+                }
+              },
+              "title": "Required. The dashboard with updated fields.",
+              "required": [
+                "displayName"
+              ]
+            }
+          },
+          {
+            "name": "allowMissing",
+            "description": "Optional. If true and the dashboard does not exist, create it.\nWhen set, update_mask is ignored.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "validateOnly",
+            "description": "Optional. If true, validate the request without persisting it.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "Dashboards"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "AxisConfigScale": {
+      "type": "string",
+      "enum": [
+        "SCALE_UNSPECIFIED",
+        "LINEAR",
+        "LOG10"
+      ],
+      "default": "SCALE_UNSPECIFIED",
+      "description": "Axis scale types.\n\n - SCALE_UNSPECIFIED: Unspecified; defaults to LINEAR.\n - LINEAR: Linear scale.\n - LOG10: Logarithmic (base 10) scale."
+    },
+    "ChartWidgetChartType": {
+      "type": "string",
+      "enum": [
+        "CHART_TYPE_UNSPECIFIED",
+        "LINE",
+        "BAR",
+        "AREA",
+        "STACKED_BAR",
+        "STACKED_AREA",
+        "SCATTER"
+      ],
+      "default": "CHART_TYPE_UNSPECIFIED",
+      "description": "Chart visualization types.\n\n - CHART_TYPE_UNSPECIFIED: Unspecified chart type; defaults to LINE.\n - LINE: Line chart.\n - BAR: Bar chart.\n - AREA: Area chart.\n - STACKED_BAR: Stacked bar chart.\n - STACKED_AREA: Stacked area chart.\n - SCATTER: Scatter plot."
+    },
+    "PieChartWidgetPieChartType": {
+      "type": "string",
+      "enum": [
+        "PIE_CHART_TYPE_UNSPECIFIED",
+        "PIE",
+        "DONUT"
+      ],
+      "default": "PIE_CHART_TYPE_UNSPECIFIED",
+      "description": "Pie chart visualization types.\n\n - PIE_CHART_TYPE_UNSPECIFIED: Unspecified; defaults to PIE.\n - PIE: Standard pie chart.\n - DONUT: Donut chart."
+    },
+    "TextWidgetFormat": {
+      "type": "string",
+      "enum": [
+        "FORMAT_UNSPECIFIED",
+        "MARKDOWN",
+        "PLAIN_TEXT"
+      ],
+      "default": "FORMAT_UNSPECIFIED",
+      "description": "Text format types.\n\n - FORMAT_UNSPECIFIED: Unspecified; defaults to MARKDOWN.\n - MARKDOWN: Markdown-formatted text.\n - PLAIN_TEXT: Plain text."
+    },
+    "ThresholdDirection": {
+      "type": "string",
+      "enum": [
+        "DIRECTION_UNSPECIFIED",
+        "ABOVE",
+        "BELOW"
+      ],
+      "default": "DIRECTION_UNSPECIFIED",
+      "description": "Direction relative to the threshold value.\n\n - DIRECTION_UNSPECIFIED: Unspecified direction.\n - ABOVE: Values above the threshold.\n - BELOW: Values below the threshold."
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string",
+          "description": "A URL/resource name that uniquely identifies the type of the serialized\nprotocol buffer message. This string must contain at least\none \"/\" character. The last segment of the URL's path must represent\nthe fully qualified name of the type (as in\n`path/google.protobuf.Duration`). The name should be in a canonical form\n(e.g., leading \".\" is not accepted).\n\nIn practice, teams usually precompile into the binary all types that they\nexpect it to use in the context of Any. However, for URLs which use the\nscheme `http`, `https`, or no scheme, one can optionally set up a type\nserver that maps type URLs to message definitions as follows:\n\n* If no scheme is provided, `https` is assumed.\n* An HTTP GET on the URL must yield a [google.protobuf.Type][]\n  value in binary format, or produce an error.\n* Applications are allowed to cache lookup results based on the\n  URL, or have them precompiled into a binary to avoid any\n  lookup. Therefore, binary compatibility needs to be preserved\n  on changes to types. (Use versioned type names to manage\n  breaking changes.)\n\nNote: this functionality is not currently available in the official\nprotobuf release, and it is not used for type URLs beginning with\ntype.googleapis.com. As of May 2023, there are no widely used type server\nimplementations and no plans to implement one.\n\nSchemes other than `http`, `https` (or the empty scheme) might be\nused with implementation specific semantics."
+        }
+      },
+      "additionalProperties": {},
+      "description": "`Any` contains an arbitrary serialized protocol buffer message along with a\nURL that describes the type of the serialized message.\n\nProtobuf library provides support to pack/unpack Any values in the form\nof utility functions or additional generated methods of the Any type.\n\nExample 1: Pack and unpack a message in C++.\n\n    Foo foo = ...;\n    Any any;\n    any.PackFrom(foo);\n    ...\n    if (any.UnpackTo(\u0026foo)) {\n      ...\n    }\n\nExample 2: Pack and unpack a message in Java.\n\n    Foo foo = ...;\n    Any any = Any.pack(foo);\n    ...\n    if (any.is(Foo.class)) {\n      foo = any.unpack(Foo.class);\n    }\n    // or ...\n    if (any.isSameTypeAs(Foo.getDefaultInstance())) {\n      foo = any.unpack(Foo.getDefaultInstance());\n    }\n\n Example 3: Pack and unpack a message in Python.\n\n    foo = Foo(...)\n    any = Any()\n    any.Pack(foo)\n    ...\n    if any.Is(Foo.DESCRIPTOR):\n      any.Unpack(foo)\n      ...\n\n Example 4: Pack and unpack a message in Go\n\n     foo := \u0026pb.Foo{...}\n     any, err := anypb.New(foo)\n     if err != nil {\n       ...\n     }\n     ...\n     foo := \u0026pb.Foo{}\n     if err := any.UnmarshalTo(foo); err != nil {\n       ...\n     }\n\nThe pack methods provided by protobuf library will by default use\n'type.googleapis.com/full.type.name' as the type URL and the unpack\nmethods only use the fully qualified type name after the last '/'\nin the type URL, for example \"foo.bar.com/x/y.z\" will yield type\nname \"y.z\".\n\nJSON\n====\nThe JSON representation of an `Any` value uses the regular\nrepresentation of the deserialized, embedded message, with an\nadditional field `@type` which contains the type URL. Example:\n\n    package google.profile;\n    message Person {\n      string first_name = 1;\n      string last_name = 2;\n    }\n\n    {\n      \"@type\": \"type.googleapis.com/google.profile.Person\",\n      \"firstName\": \u003cstring\u003e,\n      \"lastName\": \u003cstring\u003e\n    }\n\nIf the embedded message type is well-known and has a custom JSON\nrepresentation, that representation will be embedded adding a field\n`value` which holds the custom JSON in addition to the `@type`\nfield. Example (for message [google.protobuf.Duration][]):\n\n    {\n      \"@type\": \"type.googleapis.com/google.protobuf.Duration\",\n      \"value\": \"1.212s\"\n    }"
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32",
+          "description": "The status code, which should be an enum value of\n[google.rpc.Code][google.rpc.Code]."
+        },
+        "message": {
+          "type": "string",
+          "description": "A developer-facing error message, which should be in English. Any\nuser-facing error message should be localized and sent in the\n[google.rpc.Status.details][google.rpc.Status.details] field, or localized\nby the client."
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          },
+          "description": "A list of messages that carry the error details.  There is a common set of\nmessage types for APIs to use."
+        }
+      },
+      "description": "The `Status` type defines a logical error model that is suitable for\ndifferent programming environments, including REST APIs and RPC APIs. It is\nused by [gRPC](https://github.com/grpc). Each `Status` message contains\nthree pieces of data: error code, error message, and error details.\n\nYou can find out more about this error model and how to work with it in the\n[API Design Guide](https://cloud.google.com/apis/design/errors)."
+    },
+    "v1AbsoluteTimeRange": {
+      "type": "object",
+      "properties": {
+        "startTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Required. The start of the time range."
+        },
+        "endTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Required. The end of the time range."
+        }
+      },
+      "description": "AbsoluteTimeRange defines an explicit start and end time.",
+      "required": [
+        "startTime",
+        "endTime"
+      ]
+    },
+    "v1Aggregation": {
+      "type": "string",
+      "enum": [
+        "AGGREGATION_UNSPECIFIED",
+        "AGGREGATION_COUNT",
+        "AGGREGATION_SUM",
+        "AGGREGATION_AVG",
+        "AGGREGATION_MIN",
+        "AGGREGATION_MAX"
+      ],
+      "default": "AGGREGATION_UNSPECIFIED",
+      "description": "Aggregation functions that can be applied to resource queries.\n\n - AGGREGATION_UNSPECIFIED: No aggregation specified.\n - AGGREGATION_COUNT: Count of matching resources.\n - AGGREGATION_SUM: Sum of the aggregation field.\n - AGGREGATION_AVG: Average of the aggregation field.\n - AGGREGATION_MIN: Minimum value of the aggregation field.\n - AGGREGATION_MAX: Maximum value of the aggregation field."
+    },
+    "v1AxisConfig": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "Optional. The axis label."
+        },
+        "scale": {
+          "$ref": "#/definitions/AxisConfigScale",
+          "description": "Optional. The axis scale."
+        },
+        "min": {
+          "type": "number",
+          "format": "double",
+          "description": "Optional. The minimum axis value."
+        },
+        "max": {
+          "type": "number",
+          "format": "double",
+          "description": "Optional. The maximum axis value."
+        }
+      },
+      "description": "AxisConfig defines display properties for a chart axis."
+    },
+    "v1ChartDataSet": {
+      "type": "object",
+      "properties": {
+        "dataSource": {
+          "$ref": "#/definitions/v1DataSource",
+          "description": "Required. The data source for this series."
+        },
+        "label": {
+          "type": "string",
+          "description": "Optional. The display label for this series."
+        },
+        "color": {
+          "type": "string",
+          "description": "Optional. The color for this series (CSS color)."
+        }
+      },
+      "description": "ChartDataSet is a single data series within a ChartWidget.",
+      "required": [
+        "dataSource"
+      ]
+    },
+    "v1ChartWidget": {
+      "type": "object",
+      "properties": {
+        "dataSets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1ChartDataSet"
+          },
+          "description": "Required. The data sets to plot. Each data set becomes a series."
+        },
+        "chartType": {
+          "$ref": "#/definitions/ChartWidgetChartType",
+          "description": "Optional. The chart visualization type."
+        },
+        "xAxis": {
+          "$ref": "#/definitions/v1AxisConfig",
+          "description": "Optional. X-axis configuration."
+        },
+        "yAxis": {
+          "$ref": "#/definitions/v1AxisConfig",
+          "description": "Optional. Y-axis configuration."
+        },
+        "thresholds": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Threshold"
+          },
+          "description": "Optional. Threshold lines drawn on the chart."
+        }
+      },
+      "description": "ChartWidget displays time series or categorical data as an XY chart.",
+      "required": [
+        "dataSets"
+      ]
+    },
+    "v1Dashboard": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "Immutable. The resource name of the dashboard.\nFormat: `organizations/{organization}/projects/{project}/dashboards/{dashboard}`"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Required. A human-readable name for the dashboard."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional. A longer description of the dashboard's purpose."
+        },
+        "gridLayout": {
+          "$ref": "#/definitions/v1GridLayout",
+          "description": "A grid-based layout with positioned tiles."
+        },
+        "variables": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1DashboardVariable"
+          },
+          "description": "Optional. Template variables for parameterizing widget queries."
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Creation time.",
+          "readOnly": true
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Last update time.",
+          "readOnly": true
+        },
+        "etag": {
+          "type": "string",
+          "description": "Output only. Entity tag for optimistic concurrency control.",
+          "readOnly": true
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Optional. Free-form annotations for the dashboard."
+        }
+      },
+      "description": "A custom dashboard belonging to a project.",
+      "required": [
+        "displayName"
+      ]
+    },
+    "v1DashboardVariable": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "Required. The variable key (used as a template parameter in queries)."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Optional. A human-readable label for the variable."
+        },
+        "defaultValue": {
+          "type": "string",
+          "description": "Optional. The default value when no selection is made."
+        },
+        "allowedValues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional. A fixed set of allowed values. If empty, any value is accepted."
+        }
+      },
+      "description": "A template variable that can be referenced in widget queries.",
+      "required": [
+        "key"
+      ]
+    },
+    "v1DataSource": {
+      "type": "object",
+      "properties": {
+        "resourceQuery": {
+          "$ref": "#/definitions/v1ResourceQuery",
+          "description": "Query against Pivox resources."
+        },
+        "staticData": {
+          "$ref": "#/definitions/v1StaticData",
+          "description": "Hardcoded static data points."
+        }
+      },
+      "description": "DataSource defines where a widget gets its data. Extensible via the `source`\noneof — new source types (SQL, external APIs) can be added later."
+    },
+    "v1GridLayout": {
+      "type": "object",
+      "properties": {
+        "columns": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Optional. The number of columns in the grid. Defaults to 12 if unset."
+        },
+        "tiles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Tile"
+          },
+          "description": "Optional. The tiles arranged on the grid."
+        }
+      },
+      "description": "GridLayout positions tiles on a column-based grid. Maps to react-grid-layout."
+    },
+    "v1ListDashboardsResponse": {
+      "type": "object",
+      "properties": {
+        "dashboards": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Dashboard"
+          },
+          "description": "The dashboards in the project."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for the next page of results."
+        }
+      },
+      "description": "Response message for ListDashboards."
+    },
+    "v1PieChartWidget": {
+      "type": "object",
+      "properties": {
+        "dataSource": {
+          "$ref": "#/definitions/v1DataSource",
+          "description": "Required. The data source for the chart segments."
+        },
+        "pieChartType": {
+          "$ref": "#/definitions/PieChartWidgetPieChartType",
+          "description": "Optional. The pie chart visualization type."
+        },
+        "showLabels": {
+          "type": "boolean",
+          "description": "Optional. Whether to display labels on segments."
+        },
+        "showLegend": {
+          "type": "boolean",
+          "description": "Optional. Whether to display a legend."
+        }
+      },
+      "description": "PieChartWidget displays data as a pie or donut chart.",
+      "required": [
+        "dataSource"
+      ]
+    },
+    "v1RelativeTimeRange": {
+      "type": "object",
+      "properties": {
+        "duration": {
+          "type": "string",
+          "description": "Required. The duration of the time range, measured backwards from now."
+        }
+      },
+      "description": "RelativeTimeRange defines a time window relative to the current time.",
+      "required": [
+        "duration"
+      ]
+    },
+    "v1ResourceQuery": {
+      "type": "object",
+      "properties": {
+        "resourceType": {
+          "type": "string",
+          "description": "Required. The fully-qualified Pivox resource type to query\n(e.g. \"pivox.api/Proxy\")."
+        },
+        "filter": {
+          "type": "string",
+          "description": "Optional. An AIP-160 filter expression applied to the resources."
+        },
+        "aggregation": {
+          "$ref": "#/definitions/v1Aggregation",
+          "description": "Optional. The aggregation function to apply."
+        },
+        "aggregationField": {
+          "type": "string",
+          "description": "Optional. The field to aggregate on. Required when aggregation is\nSUM, AVG, MIN, or MAX."
+        },
+        "groupingFields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional. Fields to group results on."
+        },
+        "timeRange": {
+          "$ref": "#/definitions/v1TimeRange",
+          "description": "Optional. The time range for the query."
+        },
+        "timeGranularity": {
+          "type": "string",
+          "description": "Optional. The granularity for time-series bucketing."
+        },
+        "orderBy": {
+          "type": "string",
+          "description": "Optional. An ordering expression (e.g. \"create_time desc\")."
+        },
+        "limit": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Optional. Maximum number of results to return."
+        }
+      },
+      "description": "ResourceQuery describes a query against Pivox resources. It is a declarative\nDSL stored in the dashboard configuration; a future QueryDashboardData RPC\nwill resolve it server-side.",
+      "required": [
+        "resourceType"
+      ]
+    },
+    "v1SectionHeader": {
+      "type": "object",
+      "properties": {
+        "subtitle": {
+          "type": "string",
+          "description": "Optional. A subtitle displayed below the widget title."
+        },
+        "dividerBelow": {
+          "type": "boolean",
+          "description": "Optional. Whether to render a divider line below the header."
+        }
+      },
+      "description": "SectionHeader is a visual separator for organizing dashboard sections."
+    },
+    "v1StaticData": {
+      "type": "object",
+      "properties": {
+        "points": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1StaticDataPoint"
+          },
+          "description": "Optional. The data points."
+        }
+      },
+      "description": "StaticData provides hardcoded data points for a widget."
+    },
+    "v1StaticDataPoint": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "Required. The label for this data point."
+        },
+        "value": {
+          "type": "number",
+          "format": "double",
+          "description": "Required. The numeric value of this data point."
+        }
+      },
+      "description": "StaticDataPoint is a single labeled numeric value.",
+      "required": [
+        "label",
+        "value"
+      ]
+    },
+    "v1StatisticWidget": {
+      "type": "object",
+      "properties": {
+        "dataSource": {
+          "$ref": "#/definitions/v1DataSource",
+          "description": "Required. The data source for the statistic value."
+        },
+        "unit": {
+          "type": "string",
+          "description": "Optional. The unit label (e.g. \"requests/sec\", \"%\")."
+        },
+        "thresholds": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Threshold"
+          },
+          "description": "Optional. Thresholds for color-coding the value."
+        },
+        "sparkline": {
+          "type": "boolean",
+          "description": "Optional. Whether to show a sparkline trend below the value."
+        }
+      },
+      "description": "StatisticWidget displays a single KPI value with optional sparkline.",
+      "required": [
+        "dataSource"
+      ]
+    },
+    "v1TableColumn": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "type": "string",
+          "description": "Required. The field name from the data source."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Optional. The display name for the column header."
+        },
+        "visible": {
+          "type": "boolean",
+          "description": "Optional. Whether this column is visible. Defaults to true."
+        }
+      },
+      "description": "TableColumn defines a column in a TableWidget.",
+      "required": [
+        "field"
+      ]
+    },
+    "v1TableWidget": {
+      "type": "object",
+      "properties": {
+        "dataSource": {
+          "$ref": "#/definitions/v1DataSource",
+          "description": "Required. The data source for table rows."
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1TableColumn"
+          },
+          "description": "Optional. Column definitions. If empty, columns are auto-detected."
+        },
+        "rowsPerPage": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Optional. Number of rows per page. Defaults to server-chosen value."
+        }
+      },
+      "description": "TableWidget displays data in a tabular format.",
+      "required": [
+        "dataSource"
+      ]
+    },
+    "v1TextWidget": {
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": "string",
+          "description": "Required. The text content."
+        },
+        "format": {
+          "$ref": "#/definitions/TextWidgetFormat",
+          "description": "Optional. The text format."
+        }
+      },
+      "description": "TextWidget displays rich text or markdown content.",
+      "required": [
+        "content"
+      ]
+    },
+    "v1Threshold": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "number",
+          "format": "double",
+          "description": "Required. The threshold value."
+        },
+        "color": {
+          "type": "string",
+          "description": "Optional. The color to use when the threshold is triggered (CSS color)."
+        },
+        "direction": {
+          "$ref": "#/definitions/ThresholdDirection",
+          "description": "Optional. The direction relative to the threshold value."
+        },
+        "label": {
+          "type": "string",
+          "description": "Optional. A human-readable label for the threshold."
+        }
+      },
+      "description": "Threshold defines a value boundary for color-coding or reference lines.",
+      "required": [
+        "value"
+      ]
+    },
+    "v1Tile": {
+      "type": "object",
+      "properties": {
+        "xPos": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Required. The zero-indexed column position of the tile."
+        },
+        "yPos": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Required. The zero-indexed row position of the tile."
+        },
+        "width": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Required. The width of the tile in columns. Must be at least 1."
+        },
+        "height": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Required. The height of the tile in rows. Must be at least 1."
+        },
+        "widget": {
+          "$ref": "#/definitions/v1Widget",
+          "description": "Required. The widget displayed in this tile."
+        }
+      },
+      "description": "Tile represents a positioned widget within a GridLayout.",
+      "required": [
+        "xPos",
+        "yPos",
+        "width",
+        "height",
+        "widget"
+      ]
+    },
+    "v1TimeRange": {
+      "type": "object",
+      "properties": {
+        "relative": {
+          "$ref": "#/definitions/v1RelativeTimeRange",
+          "description": "A relative time range (e.g. \"last 24 hours\")."
+        },
+        "absolute": {
+          "$ref": "#/definitions/v1AbsoluteTimeRange",
+          "description": "An absolute time range with explicit start and end."
+        }
+      },
+      "description": "TimeRange specifies the time window for a query."
+    },
+    "v1Widget": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Optional. Client-assigned identifier for the widget."
+        },
+        "title": {
+          "type": "string",
+          "description": "Optional. The display title of the widget."
+        },
+        "statistic": {
+          "$ref": "#/definitions/v1StatisticWidget",
+          "description": "A single KPI / statistic value."
+        },
+        "chart": {
+          "$ref": "#/definitions/v1ChartWidget",
+          "description": "An XY chart (line, bar, area, etc.)."
+        },
+        "table": {
+          "$ref": "#/definitions/v1TableWidget",
+          "description": "A data table."
+        },
+        "pieChart": {
+          "$ref": "#/definitions/v1PieChartWidget",
+          "description": "A pie or donut chart."
+        },
+        "text": {
+          "$ref": "#/definitions/v1TextWidget",
+          "description": "Rich text or markdown content."
+        },
+        "sectionHeader": {
+          "$ref": "#/definitions/v1SectionHeader",
+          "description": "A visual section separator."
+        }
+      },
+      "description": "Widget contains a single dashboard component."
+    }
+  }
+}

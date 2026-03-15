@@ -1,0 +1,150 @@
+// Copyright 2025 Pivox
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package pivox.api.v1;
+
+import "buf/validate/validate.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "pivox/api/v1;apiv1";
+
+// DataSource defines where a widget gets its data. Extensible via the `source`
+// oneof — new source types (SQL, external APIs) can be added later.
+message DataSource {
+  // Required. The data source for the widget.
+  oneof source {
+    // Query against Pivox resources.
+    ResourceQuery resource_query = 1;
+
+    // Hardcoded static data points.
+    StaticData static_data = 2;
+  }
+}
+
+// ResourceQuery describes a query against Pivox resources. It is a declarative
+// DSL stored in the dashboard configuration; a future QueryDashboardData RPC
+// will resolve it server-side.
+message ResourceQuery {
+  // Required. The fully-qualified Pivox resource type to query
+  // (e.g. "pivox.api/Proxy").
+  string resource_type = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).string.min_len = 1
+  ];
+
+  // Optional. An AIP-160 filter expression applied to the resources.
+  string filter = 2 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. The aggregation function to apply.
+  Aggregation aggregation = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. The field to aggregate on. Required when aggregation is
+  // SUM, AVG, MIN, or MAX.
+  string aggregation_field = 4 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Fields to group results on.
+  repeated string grouping_fields = 5 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. The time range for the query.
+  TimeRange time_range = 6 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. The granularity for time-series bucketing.
+  google.protobuf.Duration time_granularity = 7
+      [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. An ordering expression (e.g. "create_time desc").
+  string order_by = 8 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Maximum number of results to return.
+  int32 limit = 9 [
+    (google.api.field_behavior) = OPTIONAL,
+    (buf.validate.field).int32.gte = 0
+  ];
+}
+
+// TimeRange specifies the time window for a query.
+message TimeRange {
+  oneof range {
+    // A relative time range (e.g. "last 24 hours").
+    RelativeTimeRange relative = 1;
+
+    // An absolute time range with explicit start and end.
+    AbsoluteTimeRange absolute = 2;
+  }
+}
+
+// RelativeTimeRange defines a time window relative to the current time.
+message RelativeTimeRange {
+  // Required. The duration of the time range, measured backwards from now.
+  google.protobuf.Duration duration = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true
+  ];
+}
+
+// AbsoluteTimeRange defines an explicit start and end time.
+message AbsoluteTimeRange {
+  // Required. The start of the time range.
+  google.protobuf.Timestamp start_time = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true
+  ];
+
+  // Required. The end of the time range.
+  google.protobuf.Timestamp end_time = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true
+  ];
+}
+
+// StaticData provides hardcoded data points for a widget.
+message StaticData {
+  // Optional. The data points.
+  repeated StaticDataPoint points = 1
+      [(google.api.field_behavior) = OPTIONAL];
+}
+
+// StaticDataPoint is a single labeled numeric value.
+message StaticDataPoint {
+  // Required. The label for this data point.
+  string label = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // Required. The numeric value of this data point.
+  double value = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+// Aggregation functions that can be applied to resource queries.
+enum Aggregation {
+  // No aggregation specified.
+  AGGREGATION_UNSPECIFIED = 0;
+
+  // Count of matching resources.
+  AGGREGATION_COUNT = 1;
+
+  // Sum of the aggregation field.
+  AGGREGATION_SUM = 2;
+
+  // Average of the aggregation field.
+  AGGREGATION_AVG = 3;
+
+  // Minimum value of the aggregation field.
+  AGGREGATION_MIN = 4;
+
+  // Maximum value of the aggregation field.
+  AGGREGATION_MAX = 5;
+}

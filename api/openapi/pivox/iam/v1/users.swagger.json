@@ -1,0 +1,223 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "pivox/iam/v1/users.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "Users"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/organizations/{organization}/users": {
+      "get": {
+        "summary": "Lists users in an organization.",
+        "operationId": "Users_ListUsers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListUsersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Optional. Maximum number of users to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. Page token from a previous ListUsers call.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "filter",
+            "description": "Optional. An AIP-160 filter expression.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "description": "Optional. Sort order (e.g. \"email\", \"display_name desc\").",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/users/{user}": {
+      "get": {
+        "summary": "Gets a user by resource name.",
+        "operationId": "Users_GetUser",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1User"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "user",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Users"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    },
+    "v1ListUsersResponse": {
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1User"
+          },
+          "description": "The users in the organization."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for the next page of results."
+        }
+      },
+      "description": "Response message for `ListUsers`."
+    },
+    "v1User": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "The resource name of the user.\nFormat: `organizations/{organization}/users/{user}`"
+        },
+        "email": {
+          "type": "string",
+          "description": "Output only. The user's email address.",
+          "readOnly": true
+        },
+        "emailVerified": {
+          "type": "boolean",
+          "description": "Output only. Whether the user's email address has been verified.",
+          "readOnly": true
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Output only. The user's display name.",
+          "readOnly": true
+        },
+        "photoUrl": {
+          "type": "string",
+          "description": "Output only. The URL of the user's profile photo.",
+          "readOnly": true
+        },
+        "disabled": {
+          "type": "boolean",
+          "description": "Output only. Whether the user account is disabled.",
+          "readOnly": true
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the user was created.",
+          "readOnly": true
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the user was last modified.",
+          "readOnly": true
+        },
+        "lastLoginTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp of the user's last login.",
+          "readOnly": true
+        },
+        "etag": {
+          "type": "string",
+          "description": "Output only. A checksum computed by the server based on the current value\nof the User resource.",
+          "readOnly": true
+        }
+      },
+      "description": "A user within an organization. Users are synced from Firebase Auth and\nare read-only through this API."
+    }
+  }
+}

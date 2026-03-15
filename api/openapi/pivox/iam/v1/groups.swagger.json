@@ -1,0 +1,629 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "pivox/iam/v1/groups.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "Groups"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/organizations/{organization}/groups": {
+      "get": {
+        "summary": "Lists groups in an organization.",
+        "operationId": "Groups_ListGroups",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListGroupsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Optional. Maximum number of groups to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. Page token from a previous ListGroups call.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "filter",
+            "description": "Optional. An AIP-160 filter expression.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "description": "Optional. Sort order (e.g. \"display_name\", \"create_time desc\").",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "showDeleted",
+            "description": "Optional. Whether to include soft-deleted groups.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "Groups"
+        ]
+      },
+      "post": {
+        "summary": "Creates a new group.",
+        "operationId": "Groups_CreateGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Group"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "group",
+            "description": "Required. The group to create.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1Group"
+            }
+          },
+          {
+            "name": "groupId",
+            "description": "Optional. The server-generated group ID. If not provided, the server\nwill generate one.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Groups"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/groups/{group}": {
+      "get": {
+        "summary": "Gets a group by resource name.",
+        "operationId": "Groups_GetGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Group"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "group",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Groups"
+        ]
+      },
+      "delete": {
+        "summary": "Soft-deletes a group.",
+        "operationId": "Groups_DeleteGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Group"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "group",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "etag",
+            "description": "Optional. The etag for optimistic concurrency control.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Groups"
+        ]
+      },
+      "patch": {
+        "summary": "Updates a group.",
+        "operationId": "Groups_UpdateGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Group"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "group",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "group",
+            "description": "Required. The group with updated fields.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "displayName": {
+                  "type": "string",
+                  "description": "Required. A human-readable name for the group."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Optional. A longer description of the group's purpose."
+                },
+                "createTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when the group was created.",
+                  "readOnly": true
+                },
+                "updateTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when the group was last modified.",
+                  "readOnly": true
+                },
+                "deleteTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when the group was soft-deleted.",
+                  "readOnly": true
+                },
+                "purgeTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when the group will be permanently purged.",
+                  "readOnly": true
+                },
+                "etag": {
+                  "type": "string",
+                  "description": "Output only. A checksum computed by the server based on the current value\nof the Group resource.",
+                  "readOnly": true
+                },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "Optional. Free-form annotations for the group."
+                }
+              },
+              "title": "Required. The group with updated fields.",
+              "required": [
+                "displayName"
+              ]
+            }
+          }
+        ],
+        "tags": [
+          "Groups"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/groups/{group}/members": {
+      "get": {
+        "summary": "Lists members of a group.",
+        "operationId": "Groups_ListGroupMembers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListGroupMembersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "group",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Optional. Maximum number of members to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. Page token from a previous ListGroupMembers call.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Groups"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/groups/{group}:addGroupMembers": {
+      "post": {
+        "summary": "Adds members to a group.",
+        "operationId": "Groups_AddGroupMembers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1AddGroupMembersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "group",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/GroupsAddGroupMembersBody"
+            }
+          }
+        ],
+        "tags": [
+          "Groups"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/groups/{group}:removeGroupMembers": {
+      "post": {
+        "summary": "Removes members from a group.",
+        "operationId": "Groups_RemoveGroupMembers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1RemoveGroupMembersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "group",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/GroupsRemoveGroupMembersBody"
+            }
+          }
+        ],
+        "tags": [
+          "Groups"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "GroupsAddGroupMembersBody": {
+      "type": "object",
+      "properties": {
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "title": "Required. The user resource names to add as members.\nFormat: `organizations/{organization}/users/{user}`"
+        }
+      },
+      "description": "Request message for `AddGroupMembers`.",
+      "required": [
+        "members"
+      ]
+    },
+    "GroupsRemoveGroupMembersBody": {
+      "type": "object",
+      "properties": {
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "title": "Required. The user resource names to remove from the group.\nFormat: `organizations/{organization}/users/{user}`"
+        }
+      },
+      "description": "Request message for `RemoveGroupMembers`.",
+      "required": [
+        "members"
+      ]
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    },
+    "v1AddGroupMembersResponse": {
+      "type": "object",
+      "description": "Response message for `AddGroupMembers`."
+    },
+    "v1Group": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "The resource name of the group.\nFormat: `organizations/{organization}/groups/{group}`"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Required. A human-readable name for the group."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional. A longer description of the group's purpose."
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the group was created.",
+          "readOnly": true
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the group was last modified.",
+          "readOnly": true
+        },
+        "deleteTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the group was soft-deleted.",
+          "readOnly": true
+        },
+        "purgeTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the group will be permanently purged.",
+          "readOnly": true
+        },
+        "etag": {
+          "type": "string",
+          "description": "Output only. A checksum computed by the server based on the current value\nof the Group resource.",
+          "readOnly": true
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Optional. Free-form annotations for the group."
+        }
+      },
+      "description": "A group of users within an organization.",
+      "required": [
+        "displayName"
+      ]
+    },
+    "v1GroupMember": {
+      "type": "object",
+      "properties": {
+        "member": {
+          "type": "string",
+          "title": "The resource name of the user member.\nFormat: `organizations/{organization}/users/{user}`"
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the membership was created.",
+          "readOnly": true
+        }
+      },
+      "description": "A membership of a user in a group.",
+      "required": [
+        "member"
+      ]
+    },
+    "v1ListGroupMembersResponse": {
+      "type": "object",
+      "properties": {
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1GroupMember"
+          },
+          "description": "The members of the group."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for the next page of results."
+        }
+      },
+      "description": "Response message for `ListGroupMembers`."
+    },
+    "v1ListGroupsResponse": {
+      "type": "object",
+      "properties": {
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Group"
+          },
+          "description": "The groups in the organization."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for the next page of results."
+        }
+      },
+      "description": "Response message for `ListGroups`."
+    },
+    "v1RemoveGroupMembersResponse": {
+      "type": "object",
+      "description": "Response message for `RemoveGroupMembers`."
+    }
+  }
+}

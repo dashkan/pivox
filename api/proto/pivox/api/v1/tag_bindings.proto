@@ -1,0 +1,336 @@
+// Copyright 2025 Pivox
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package pivox.api.v1;
+
+import "buf/validate/validate.proto";
+import "google/api/annotations.proto";
+import "google/api/client.proto";
+import "google/api/field_behavior.proto";
+
+import "google/api/resource.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "pivox/api/v1;apiv1";
+
+// Allow users to create and manage TagBindings between TagValues and
+// different Pivox resources throughout the resource hierarchy.
+service TagBindings {
+  option (google.api.default_host) = "api.pivox.io";
+
+  // Lists the TagBindings for the given Pivox resource, as specified
+  // with `parent`.
+  rpc ListTagBindings(ListTagBindingsRequest)
+      returns (ListTagBindingsResponse) {
+    option (google.api.http) = {
+      get: "/v1/{parent=organizations/*}/tagBindings"
+      additional_bindings { get: "/v1/{parent=organizations/*/projects/*}/tagBindings" }
+    };
+    option (google.api.method_signature) = "parent";
+  }
+
+  // Retrieves a TagBinding.
+  rpc GetTagBinding(GetTagBindingRequest) returns (TagBinding) {
+    option (google.api.http) = {
+      get: "/v1/{name=organizations/*/tagBindings/*}"
+      additional_bindings { get: "/v1/{name=organizations/*/projects/*/tagBindings/*}" }
+    };
+    option (google.api.method_signature) = "name";
+  }
+
+  // Creates a TagBinding between a TagValue and a Pivox resource.
+  rpc CreateTagBinding(CreateTagBindingRequest) returns (TagBinding) {
+    option (google.api.http) = {
+      post: "/v1/{parent=organizations/*}/tagBindings"
+      body: "tag_binding"
+      additional_bindings {
+        post: "/v1/{parent=organizations/*/projects/*}/tagBindings"
+        body: "tag_binding"
+      }
+    };
+    option (google.api.method_signature) = "parent,tag_binding,tag_binding_id";
+  }
+
+  // Deletes a TagBinding.
+  rpc DeleteTagBinding(DeleteTagBindingRequest)
+      returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      delete: "/v1/{name=organizations/*/tagBindings/*}"
+      additional_bindings { delete: "/v1/{name=organizations/*/projects/*/tagBindings/*}" }
+    };
+    option (google.api.method_signature) = "name";
+  }
+
+  // Return a list of effective tags for the given Pivox resource, as
+  // specified in `parent`.
+  rpc ListEffectiveTags(ListEffectiveTagsRequest)
+      returns (ListEffectiveTagsResponse) {
+    option (google.api.http) = {
+      get: "/v1/{parent=organizations/*}/effectiveTags"
+      additional_bindings { get: "/v1/{parent=organizations/*/projects/*}/effectiveTags" }
+    };
+    option (google.api.method_signature) = "parent";
+  }
+}
+
+// A TagBinding represents a connection between a TagValue and a
+// resource. Once a TagBinding is created, the TagValue is applied to all the
+// descendants of the Pivox resource.
+message TagBinding {
+  option (google.api.resource) = {
+    type: "pivox.api/TagBinding"
+    pattern: "organizations/{organization}/tagBindings/{tag_binding}"
+    pattern: "organizations/{organization}/projects/{project}/tagBindings/{tag_binding}"
+    plural: "tagBindings"
+    singular: "tagBinding"
+  };
+
+  // Output only. The name of the TagBinding. Format:
+  // `organizations/{organization}/tagBindings/{tag_binding}` or
+  // `organizations/{organization}/projects/{project}/tagBindings/{tag_binding}`.
+  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Immutable. The TagValue of the TagBinding.
+  // Must be of the form `organizations/{org}/tagKeys/{key}/tagValues/{value}`.
+  string tag_value = 3 [
+    (google.api.field_behavior) = IMMUTABLE,
+    (google.api.resource_reference) = {
+      type: "pivox.api/TagValue"
+    },
+    (buf.validate.field).cel = {
+      id: "required",
+      message: "value is required",
+      expression: "this.size() > 0"
+    }
+  ];
+
+  // Output only. Creation time.
+  google.protobuf.Timestamp create_time = 6
+      [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Update time.
+  google.protobuf.Timestamp update_time = 7
+      [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. A checksum computed by the server based on the current value
+  // of the tag binding resource. This may be sent on update and delete requests to
+  // ensure the client has an up-to-date value before proceeding.
+  string etag = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Labels associated with this tag binding.
+  // Labels are key-value pairs that can be used to organize and track resources.
+  map<string, string> annotations = 10 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// The request message to get a TagBinding.
+message GetTagBindingRequest {
+  // Required. The name of the TagBinding to retrieve. Format:
+  // `organizations/{organization}/tagBindings/{tag_binding}` or
+  // `organizations/{organization}/projects/{project}/tagBindings/{tag_binding}`.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {
+      type: "pivox.api/TagBinding"
+    },
+    (buf.validate.field).cel = {
+      id: "required",
+      message: "value is required",
+      expression: "this.size() > 0"
+    }
+  ];
+}
+
+// The request message to create a TagBinding.
+message CreateTagBindingRequest {
+  // Required. The parent resource to create the TagBinding under. Format:
+  // `organizations/{organization}` or
+  // `organizations/{organization}/projects/{project}`.
+  string parent = 4 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = { child_type: "pivox.api/TagBinding" },
+    (buf.validate.field).cel = {
+      id: "required",
+      message: "value is required",
+      expression: "this.size() > 0"
+    }
+  ];
+
+  // Required. The TagBinding to be created.
+  TagBinding tag_binding = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. A unique identifier for the tag binding. If not provided, the server will
+  // generate one.
+  string tag_binding_id = 2 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Set to true to perform the validations necessary for creating the
+  // resource, but not actually perform the action.
+  bool validate_only = 3 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// The request message to delete a TagBinding.
+message DeleteTagBindingRequest {
+  // Required. The name of the TagBinding to delete. Format:
+  // `organizations/{organization}/tagBindings/{tag_binding}` or
+  // `organizations/{organization}/projects/{project}/tagBindings/{tag_binding}`.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {
+      type: "pivox.api/TagBinding"
+    },
+    (buf.validate.field).cel = {
+      id: "required",
+      message: "value is required",
+      expression: "this.size() > 0"
+    }
+  ];
+
+  // Optional. The etag known to the client for the expected state of the tag binding.
+  // This is to be used for optimistic concurrency.
+  string etag = 2 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. If set to true, the request will only validate the request
+  // without persisting it.
+  bool validate_only = 3 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// The request message to list all TagBindings for a parent.
+message ListTagBindingsRequest {
+  // Required. The parent resource for which you want to list existing
+  // TagBindings. Format: `organizations/{organization}` or
+  // `organizations/{organization}/projects/{project}`.
+  string parent = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = { child_type: "pivox.api/TagBinding" },
+    (buf.validate.field).cel = {
+      id: "required",
+      message: "value is required",
+      expression: "this.size() > 0"
+    }
+  ];
+
+  // Optional. The maximum number of TagBindings to return in the response. The
+  // server allows a maximum of 300 TagBindings to return. If unspecified, the
+  // server will use 100 as the default.
+  int32 page_size = 2 [
+    (google.api.field_behavior) = OPTIONAL,
+    (buf.validate.field).int32 = {gte: 0, lte: 1000}
+  ];
+
+  // Optional. A pagination token returned from a previous call to
+  // `ListTagBindings` that indicates where this listing should continue from.
+  string page_token = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. An expression for filtering the results of the request.
+  string filter = 4 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Specify how the results should be sorted.
+  string order_by = 5 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// The ListTagBindings response.
+message ListTagBindingsResponse {
+  // A possibly paginated list of TagBindings for the specified resource.
+  repeated TagBinding tag_bindings = 1;
+
+  // Pagination token.
+  //
+  // If the result set is too large to fit in a single response, this token
+  // is returned. It encodes the position of the current result cursor.
+  // Feeding this value into a new list request with the `page_token` parameter
+  // gives the next page of the results.
+  //
+  // When `next_page_token` is not filled in, there is no next page and
+  // the list returned is the last page in the result set.
+  //
+  // Pagination tokens have a limited lifetime.
+  string next_page_token = 2;
+}
+
+// The request message to ListEffectiveTags
+message ListEffectiveTagsRequest {
+  // Required. The parent resource for which you want to list the effective
+  // tags. Format: `organizations/{organization}` or
+  // `organizations/{organization}/projects/{project}`.
+  string parent = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = { child_type: "pivox.api/TagBinding" },
+    (buf.validate.field).cel = {
+      id: "required",
+      message: "value is required",
+      expression: "this.size() > 0"
+    }
+  ];
+
+  // Optional. The maximum number of effective tags to return in the response.
+  // The server allows a maximum of 300 effective tags to return in a single
+  // page. If unspecified, the server will use 100 as the default.
+  int32 page_size = 2 [
+    (google.api.field_behavior) = OPTIONAL,
+    (buf.validate.field).int32 = {gte: 0, lte: 1000}
+  ];
+
+  // Optional. A pagination token returned from a previous call to
+  // `ListEffectiveTags` that indicates from where this listing should continue.
+  string page_token = 3 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// The response of ListEffectiveTags.
+message ListEffectiveTagsResponse {
+  // A possibly paginated list of effective tags for the specified resource.
+  repeated EffectiveTag effective_tags = 1;
+
+  // Pagination token.
+  //
+  // If the result set is too large to fit in a single response, this token
+  // is returned. It encodes the position of the current result cursor.
+  // Feeding this value into a new list request with the `page_token` parameter
+  // gives the next page of the results.
+  //
+  // When `next_page_token` is not filled in, there is no next page and
+  // the list returned is the last page in the result set.
+  //
+  // Pagination tokens have a limited lifetime.
+  string next_page_token = 2;
+}
+
+// An EffectiveTag represents a tag that applies to a resource during policy
+// evaluation. Tags can be either directly bound to a resource or inherited from
+// its ancestor. EffectiveTag contains the name of the tag value and tag key,
+// with an additional field of `inherited` to indicate the inheritance status
+// of the effective tag.
+message EffectiveTag {
+  // Resource name for TagValue in the format
+  // `organizations/{organization}/tagKeys/{tag_key}/tagValues/{tag_value}`.
+  string tag_value = 1 [(google.api.resource_reference) = {
+    type: "pivox.api/TagValue"
+  }];
+
+  // The name of the TagKey, in the format
+  // `organizations/{organization}/tagKeys/{tag_key}`.
+  string tag_key = 3 [(google.api.resource_reference) = {
+    type: "pivox.api/TagKey"
+  }];
+
+  // Indicates the inheritance status of a tag value
+  // attached to the given resource. If the tag value is inherited from one of
+  // the resource's ancestors, inherited will be true. If false, then the tag
+  // value is directly attached to the resource, inherited will be false.
+  bool inherited = 5;
+}

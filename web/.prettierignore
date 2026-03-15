@@ -1,0 +1,7 @@
+**/build
+**/coverage
+**/dist
+**/docs
+**/shadcn
+**/vercel
+pnpm-lock.yaml

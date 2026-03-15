@@ -1,0 +1,499 @@
+{
+  "name": "@pivox/primitives",
+  "version": "1.0.0",
+  "description": "Vendored shadcn + ai-elements primitives",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "exports": {
+    "./accordion": {
+      "types": "./dist/esm/shadcn/components/ui/accordion.d.ts",
+      "import": "./dist/esm/accordion.js"
+    },
+    "./agent": {
+      "types": "./dist/esm/vercel/ai-elements/agent.d.ts",
+      "import": "./dist/esm/agent.js"
+    },
+    "./alert": {
+      "types": "./dist/esm/shadcn/components/ui/alert.d.ts",
+      "import": "./dist/esm/alert.js"
+    },
+    "./alert-dialog": {
+      "types": "./dist/esm/shadcn/components/ui/alert-dialog.d.ts",
+      "import": "./dist/esm/alert-dialog.js"
+    },
+    "./artifact": {
+      "types": "./dist/esm/vercel/ai-elements/artifact.d.ts",
+      "import": "./dist/esm/artifact.js"
+    },
+    "./aspect-ratio": {
+      "types": "./dist/esm/shadcn/components/ui/aspect-ratio.d.ts",
+      "import": "./dist/esm/aspect-ratio.js"
+    },
+    "./attachments": {
+      "types": "./dist/esm/vercel/ai-elements/attachments.d.ts",
+      "import": "./dist/esm/attachments.js"
+    },
+    "./audio-player": {
+      "types": "./dist/esm/vercel/ai-elements/audio-player.d.ts",
+      "import": "./dist/esm/audio-player.js"
+    },
+    "./avatar": {
+      "types": "./dist/esm/shadcn/components/ui/avatar.d.ts",
+      "import": "./dist/esm/avatar.js"
+    },
+    "./badge": {
+      "types": "./dist/esm/shadcn/components/ui/badge.d.ts",
+      "import": "./dist/esm/badge.js"
+    },
+    "./breadcrumb": {
+      "types": "./dist/esm/shadcn/components/ui/breadcrumb.d.ts",
+      "import": "./dist/esm/breadcrumb.js"
+    },
+    "./button": {
+      "types": "./dist/esm/shadcn/components/ui/button.d.ts",
+      "import": "./dist/esm/button.js"
+    },
+    "./button-group": {
+      "types": "./dist/esm/shadcn/components/ui/button-group.d.ts",
+      "import": "./dist/esm/button-group.js"
+    },
+    "./calendar": {
+      "types": "./dist/esm/shadcn/components/ui/calendar.d.ts",
+      "import": "./dist/esm/calendar.js"
+    },
+    "./canvas": {
+      "types": "./dist/esm/vercel/ai-elements/canvas.d.ts",
+      "import": "./dist/esm/canvas.js"
+    },
+    "./card": {
+      "types": "./dist/esm/shadcn/components/ui/card.d.ts",
+      "import": "./dist/esm/card.js"
+    },
+    "./carousel": {
+      "types": "./dist/esm/shadcn/components/ui/carousel.d.ts",
+      "import": "./dist/esm/carousel.js"
+    },
+    "./chain-of-thought": {
+      "types": "./dist/esm/vercel/ai-elements/chain-of-thought.d.ts",
+      "import": "./dist/esm/chain-of-thought.js"
+    },
+    "./chart": {
+      "types": "./dist/esm/shadcn/components/ui/chart.d.ts",
+      "import": "./dist/esm/chart.js"
+    },
+    "./checkbox": {
+      "types": "./dist/esm/shadcn/components/ui/checkbox.d.ts",
+      "import": "./dist/esm/checkbox.js"
+    },
+    "./checkpoint": {
+      "types": "./dist/esm/vercel/ai-elements/checkpoint.d.ts",
+      "import": "./dist/esm/checkpoint.js"
+    },
+    "./code-block": {
+      "types": "./dist/esm/vercel/ai-elements/code-block.d.ts",
+      "import": "./dist/esm/code-block.js"
+    },
+    "./collapsible": {
+      "types": "./dist/esm/shadcn/components/ui/collapsible.d.ts",
+      "import": "./dist/esm/collapsible.js"
+    },
+    "./combobox": {
+      "types": "./dist/esm/shadcn/components/ui/combobox.d.ts",
+      "import": "./dist/esm/combobox.js"
+    },
+    "./command": {
+      "types": "./dist/esm/shadcn/components/ui/command.d.ts",
+      "import": "./dist/esm/command.js"
+    },
+    "./commit": {
+      "types": "./dist/esm/vercel/ai-elements/commit.d.ts",
+      "import": "./dist/esm/commit.js"
+    },
+    "./confirmation": {
+      "types": "./dist/esm/vercel/ai-elements/confirmation.d.ts",
+      "import": "./dist/esm/confirmation.js"
+    },
+    "./connection": {
+      "types": "./dist/esm/vercel/ai-elements/connection.d.ts",
+      "import": "./dist/esm/connection.js"
+    },
+    "./context": {
+      "types": "./dist/esm/vercel/ai-elements/context.d.ts",
+      "import": "./dist/esm/context.js"
+    },
+    "./context-menu": {
+      "types": "./dist/esm/shadcn/components/ui/context-menu.d.ts",
+      "import": "./dist/esm/context-menu.js"
+    },
+    "./controls": {
+      "types": "./dist/esm/vercel/ai-elements/controls.d.ts",
+      "import": "./dist/esm/controls.js"
+    },
+    "./conversation": {
+      "types": "./dist/esm/vercel/ai-elements/conversation.d.ts",
+      "import": "./dist/esm/conversation.js"
+    },
+    "./dialog": {
+      "types": "./dist/esm/shadcn/components/ui/dialog.d.ts",
+      "import": "./dist/esm/dialog.js"
+    },
+    "./direction": {
+      "types": "./dist/esm/shadcn/components/ui/direction.d.ts",
+      "import": "./dist/esm/direction.js"
+    },
+    "./drawer": {
+      "types": "./dist/esm/shadcn/components/ui/drawer.d.ts",
+      "import": "./dist/esm/drawer.js"
+    },
+    "./dropdown-menu": {
+      "types": "./dist/esm/shadcn/components/ui/dropdown-menu.d.ts",
+      "import": "./dist/esm/dropdown-menu.js"
+    },
+    "./edge": {
+      "types": "./dist/esm/vercel/ai-elements/edge.d.ts",
+      "import": "./dist/esm/edge.js"
+    },
+    "./empty": {
+      "types": "./dist/esm/shadcn/components/ui/empty.d.ts",
+      "import": "./dist/esm/empty.js"
+    },
+    "./environment-variables": {
+      "types": "./dist/esm/vercel/ai-elements/environment-variables.d.ts",
+      "import": "./dist/esm/environment-variables.js"
+    },
+    "./field": {
+      "types": "./dist/esm/shadcn/components/ui/field.d.ts",
+      "import": "./dist/esm/field.js"
+    },
+    "./file-tree": {
+      "types": "./dist/esm/vercel/ai-elements/file-tree.d.ts",
+      "import": "./dist/esm/file-tree.js"
+    },
+    "./hover-card": {
+      "types": "./dist/esm/shadcn/components/ui/hover-card.d.ts",
+      "import": "./dist/esm/hover-card.js"
+    },
+    "./image": {
+      "types": "./dist/esm/vercel/ai-elements/image.d.ts",
+      "import": "./dist/esm/image.js"
+    },
+    "./inline-citation": {
+      "types": "./dist/esm/vercel/ai-elements/inline-citation.d.ts",
+      "import": "./dist/esm/inline-citation.js"
+    },
+    "./input": {
+      "types": "./dist/esm/shadcn/components/ui/input.d.ts",
+      "import": "./dist/esm/input.js"
+    },
+    "./input-group": {
+      "types": "./dist/esm/shadcn/components/ui/input-group.d.ts",
+      "import": "./dist/esm/input-group.js"
+    },
+    "./input-otp": {
+      "types": "./dist/esm/shadcn/components/ui/input-otp.d.ts",
+      "import": "./dist/esm/input-otp.js"
+    },
+    "./item": {
+      "types": "./dist/esm/shadcn/components/ui/item.d.ts",
+      "import": "./dist/esm/item.js"
+    },
+    "./jsx-preview": {
+      "types": "./dist/esm/vercel/ai-elements/jsx-preview.d.ts",
+      "import": "./dist/esm/jsx-preview.js"
+    },
+    "./kbd": {
+      "types": "./dist/esm/shadcn/components/ui/kbd.d.ts",
+      "import": "./dist/esm/kbd.js"
+    },
+    "./label": {
+      "types": "./dist/esm/shadcn/components/ui/label.d.ts",
+      "import": "./dist/esm/label.js"
+    },
+    "./menubar": {
+      "types": "./dist/esm/shadcn/components/ui/menubar.d.ts",
+      "import": "./dist/esm/menubar.js"
+    },
+    "./message": {
+      "types": "./dist/esm/vercel/ai-elements/message.d.ts",
+      "import": "./dist/esm/message.js"
+    },
+    "./mic-selector": {
+      "types": "./dist/esm/vercel/ai-elements/mic-selector.d.ts",
+      "import": "./dist/esm/mic-selector.js"
+    },
+    "./model-selector": {
+      "types": "./dist/esm/vercel/ai-elements/model-selector.d.ts",
+      "import": "./dist/esm/model-selector.js"
+    },
+    "./native-select": {
+      "types": "./dist/esm/shadcn/components/ui/native-select.d.ts",
+      "import": "./dist/esm/native-select.js"
+    },
+    "./navigation-menu": {
+      "types": "./dist/esm/shadcn/components/ui/navigation-menu.d.ts",
+      "import": "./dist/esm/navigation-menu.js"
+    },
+    "./node": {
+      "types": "./dist/esm/vercel/ai-elements/node.d.ts",
+      "import": "./dist/esm/node.js"
+    },
+    "./open-in-chat": {
+      "types": "./dist/esm/vercel/ai-elements/open-in-chat.d.ts",
+      "import": "./dist/esm/open-in-chat.js"
+    },
+    "./package-info": {
+      "types": "./dist/esm/vercel/ai-elements/package-info.d.ts",
+      "import": "./dist/esm/package-info.js"
+    },
+    "./pagination": {
+      "types": "./dist/esm/shadcn/components/ui/pagination.d.ts",
+      "import": "./dist/esm/pagination.js"
+    },
+    "./panel": {
+      "types": "./dist/esm/vercel/ai-elements/panel.d.ts",
+      "import": "./dist/esm/panel.js"
+    },
+    "./persona": {
+      "types": "./dist/esm/vercel/ai-elements/persona.d.ts",
+      "import": "./dist/esm/persona.js"
+    },
+    "./plan": {
+      "types": "./dist/esm/vercel/ai-elements/plan.d.ts",
+      "import": "./dist/esm/plan.js"
+    },
+    "./popover": {
+      "types": "./dist/esm/shadcn/components/ui/popover.d.ts",
+      "import": "./dist/esm/popover.js"
+    },
+    "./progress": {
+      "types": "./dist/esm/shadcn/components/ui/progress.d.ts",
+      "import": "./dist/esm/progress.js"
+    },
+    "./prompt-input": {
+      "types": "./dist/esm/vercel/ai-elements/prompt-input.d.ts",
+      "import": "./dist/esm/prompt-input.js"
+    },
+    "./queue": {
+      "types": "./dist/esm/vercel/ai-elements/queue.d.ts",
+      "import": "./dist/esm/queue.js"
+    },
+    "./radio-group": {
+      "types": "./dist/esm/shadcn/components/ui/radio-group.d.ts",
+      "import": "./dist/esm/radio-group.js"
+    },
+    "./reasoning": {
+      "types": "./dist/esm/vercel/ai-elements/reasoning.d.ts",
+      "import": "./dist/esm/reasoning.js"
+    },
+    "./resizable": {
+      "types": "./dist/esm/shadcn/components/ui/resizable.d.ts",
+      "import": "./dist/esm/resizable.js"
+    },
+    "./sandbox": {
+      "types": "./dist/esm/vercel/ai-elements/sandbox.d.ts",
+      "import": "./dist/esm/sandbox.js"
+    },
+    "./schema-display": {
+      "types": "./dist/esm/vercel/ai-elements/schema-display.d.ts",
+      "import": "./dist/esm/schema-display.js"
+    },
+    "./scroll-area": {
+      "types": "./dist/esm/shadcn/components/ui/scroll-area.d.ts",
+      "import": "./dist/esm/scroll-area.js"
+    },
+    "./select": {
+      "types": "./dist/esm/shadcn/components/ui/select.d.ts",
+      "import": "./dist/esm/select.js"
+    },
+    "./separator": {
+      "types": "./dist/esm/shadcn/components/ui/separator.d.ts",
+      "import": "./dist/esm/separator.js"
+    },
+    "./sheet": {
+      "types": "./dist/esm/shadcn/components/ui/sheet.d.ts",
+      "import": "./dist/esm/sheet.js"
+    },
+    "./shimmer": {
+      "types": "./dist/esm/vercel/ai-elements/shimmer.d.ts",
+      "import": "./dist/esm/shimmer.js"
+    },
+    "./sidebar": {
+      "types": "./dist/esm/shadcn/components/ui/sidebar.d.ts",
+      "import": "./dist/esm/sidebar.js"
+    },
+    "./skeleton": {
+      "types": "./dist/esm/shadcn/components/ui/skeleton.d.ts",
+      "import": "./dist/esm/skeleton.js"
+    },
+    "./slider": {
+      "types": "./dist/esm/shadcn/components/ui/slider.d.ts",
+      "import": "./dist/esm/slider.js"
+    },
+    "./snippet": {
+      "types": "./dist/esm/vercel/ai-elements/snippet.d.ts",
+      "import": "./dist/esm/snippet.js"
+    },
+    "./sonner": {
+      "types": "./dist/esm/shadcn/components/ui/sonner.d.ts",
+      "import": "./dist/esm/sonner.js"
+    },
+    "./sources": {
+      "types": "./dist/esm/vercel/ai-elements/sources.d.ts",
+      "import": "./dist/esm/sources.js"
+    },
+    "./speech-input": {
+      "types": "./dist/esm/vercel/ai-elements/speech-input.d.ts",
+      "import": "./dist/esm/speech-input.js"
+    },
+    "./spinner": {
+      "types": "./dist/esm/shadcn/components/ui/spinner.d.ts",
+      "import": "./dist/esm/spinner.js"
+    },
+    "./stack-trace": {
+      "types": "./dist/esm/vercel/ai-elements/stack-trace.d.ts",
+      "import": "./dist/esm/stack-trace.js"
+    },
+    "./suggestion": {
+      "types": "./dist/esm/vercel/ai-elements/suggestion.d.ts",
+      "import": "./dist/esm/suggestion.js"
+    },
+    "./switch": {
+      "types": "./dist/esm/shadcn/components/ui/switch.d.ts",
+      "import": "./dist/esm/switch.js"
+    },
+    "./table": {
+      "types": "./dist/esm/shadcn/components/ui/table.d.ts",
+      "import": "./dist/esm/table.js"
+    },
+    "./tabs": {
+      "types": "./dist/esm/shadcn/components/ui/tabs.d.ts",
+      "import": "./dist/esm/tabs.js"
+    },
+    "./task": {
+      "types": "./dist/esm/vercel/ai-elements/task.d.ts",
+      "import": "./dist/esm/task.js"
+    },
+    "./terminal": {
+      "types": "./dist/esm/vercel/ai-elements/terminal.d.ts",
+      "import": "./dist/esm/terminal.js"
+    },
+    "./test-results": {
+      "types": "./dist/esm/vercel/ai-elements/test-results.d.ts",
+      "import": "./dist/esm/test-results.js"
+    },
+    "./textarea": {
+      "types": "./dist/esm/shadcn/components/ui/textarea.d.ts",
+      "import": "./dist/esm/textarea.js"
+    },
+    "./toggle": {
+      "types": "./dist/esm/shadcn/components/ui/toggle.d.ts",
+      "import": "./dist/esm/toggle.js"
+    },
+    "./toggle-group": {
+      "types": "./dist/esm/shadcn/components/ui/toggle-group.d.ts",
+      "import": "./dist/esm/toggle-group.js"
+    },
+    "./tool": {
+      "types": "./dist/esm/vercel/ai-elements/tool.d.ts",
+      "import": "./dist/esm/tool.js"
+    },
+    "./toolbar": {
+      "types": "./dist/esm/vercel/ai-elements/toolbar.d.ts",
+      "import": "./dist/esm/toolbar.js"
+    },
+    "./tooltip": {
+      "types": "./dist/esm/shadcn/components/ui/tooltip.d.ts",
+      "import": "./dist/esm/tooltip.js"
+    },
+    "./transcription": {
+      "types": "./dist/esm/vercel/ai-elements/transcription.d.ts",
+      "import": "./dist/esm/transcription.js"
+    },
+    "./use-mobile": {
+      "types": "./dist/esm/shadcn/hooks/use-mobile.d.ts",
+      "import": "./dist/esm/use-mobile.js"
+    },
+    "./utils": {
+      "types": "./dist/esm/shadcn/lib/utils.d.ts",
+      "import": "./dist/esm/utils.js"
+    },
+    "./voice-selector": {
+      "types": "./dist/esm/vercel/ai-elements/voice-selector.d.ts",
+      "import": "./dist/esm/voice-selector.js"
+    },
+    "./web-preview": {
+      "types": "./dist/esm/vercel/ai-elements/web-preview.d.ts",
+      "import": "./dist/esm/web-preview.js"
+    },
+    "./styles.css": "./dist/ui.css",
+    "./theme.css": "./src/index.css"
+  },
+  "files": [
+    "dist",
+    "src/index.css"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "clean": "premove ./build ./dist",
+    "test:build": "publint --strict",
+    "test:eslint": "eslint ./src",
+    "test:lib": "vitest --passWithNoTests",
+    "test:lib:dev": "pnpm test:lib --watch",
+    "test:types": "tsc"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0",
+    "tailwindcss": "^4.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.1",
+    "@tanstack/vite-config": "^0.5.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "shadcn": "^4.0.8",
+    "tailwindcss": "^4.2.1",
+    "vite": "^7.3.1"
+  },
+  "dependencies": {
+    "@base-ui/react": "^1.3.0",
+    "@fontsource-variable/roboto": "^5.2.10",
+    "@radix-ui/react-use-controllable-state": "^1.2.2",
+    "@rive-app/react-webgl2": "^4.27.1",
+    "@streamdown/cjk": "^1.0.2",
+    "@streamdown/code": "^1.1.0",
+    "@streamdown/math": "^1.0.2",
+    "@streamdown/mermaid": "^1.0.2",
+    "@xyflow/react": "^12.10.1",
+    "ai": "^6.0.116",
+    "ansi-to-react": "^6.2.6",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
+    "date-fns": "^4.1.0",
+    "embla-carousel-react": "^8.6.0",
+    "input-otp": "^1.4.2",
+    "lucide-react": "^0.577.0",
+    "media-chrome": "^4.18.0",
+    "motion": "^12.36.0",
+    "nanoid": "^5.1.6",
+    "next-themes": "^0.4.6",
+    "radix-ui": "^1.4.3",
+    "react-day-picker": "^9.14.0",
+    "react-jsx-parser": "^2.4.1",
+    "react-resizable-panels": "^4.7.3",
+    "recharts": "2.15.4",
+    "shiki": "^4.0.2",
+    "sonner": "^2.0.7",
+    "streamdown": "^2.4.0",
+    "tailwind-merge": "^3.5.0",
+    "tokenlens": "^1.3.1",
+    "tw-animate-css": "^1.4.0",
+    "use-stick-to-bottom": "^1.1.3",
+    "vaul": "^1.1.2"
+  }
+}

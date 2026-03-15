@@ -1,0 +1,33 @@
+version: v2
+clean: true
+managed:
+  enabled: true
+  disable:
+    - file_option: go_package
+      path: google
+    - file_option: go_package
+      path: buf
+  override:
+    - file_option: go_package_prefix
+      value: github.com/pivoxai/pivox/internal/pkg/gen
+inputs:
+  - directory: api/proto
+    paths:
+      - api/proto/pivox
+plugins:
+  - local: protoc-gen-go
+    out: internal/pkg/gen
+    opt:
+      - module=github.com/pivoxai/pivox/internal/pkg/gen
+  - local: protoc-gen-go-grpc
+    out: internal/pkg/gen
+    opt:
+      - module=github.com/pivoxai/pivox/internal/pkg/gen
+  - local: protoc-gen-grpc-gateway
+    out: internal/pkg/gen
+    opt:
+      - module=github.com/pivoxai/pivox/internal/pkg/gen
+  - local: protoc-gen-openapiv2
+    out: api/openapi
+    opt:
+      - expand_slashed_path_patterns=true

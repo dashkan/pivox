@@ -1,0 +1,1116 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "pivox/api/v1/tag_keys.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "TagKeys"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/organizations/{organization}/projects/{project}/tagKeys": {
+      "get": {
+        "summary": "Lists all TagKeys for a parent resource.",
+        "operationId": "TagKeys_ListTagKeys2",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListTagKeysResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Optional. The maximum number of TagKeys to return in the response. The\nserver allows a maximum of 300 TagKeys to return. If unspecified, the\nserver will use 100 as the default.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. A pagination token returned from a previous call to `ListTagKey`\nthat indicates where this listing should continue from.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "filter",
+            "description": "Optional. An expression for filtering the results of the request.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "description": "Optional. Specify how the results should be sorted.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "TagKeys"
+        ]
+      },
+      "post": {
+        "summary": "Creates a new TagKey. If another request with the same parameters is\nsent while the original request is in process, the second request\nwill receive an error. A maximum of 1000 TagKeys can exist under a parent\nat any given time.",
+        "operationId": "TagKeys_CreateTagKey2",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1TagKey"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "tagKey",
+            "description": "Required. The TagKey to be created. Only fields `description`\nare considered during the creation request.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1TagKey"
+            }
+          },
+          {
+            "name": "tagKeyId",
+            "description": "Required. The user-assigned short name for the TagKey.\nMust be unique for TagKeys within the same parent.",
+            "in": "query",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "validateOnly",
+            "description": "Optional. Set to true to perform validations necessary for creating the\nresource, but not actually perform the action.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "TagKeys"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/projects/{project}/tagKeys/{tagKey}": {
+      "get": {
+        "summary": "Retrieves a TagKey. This method will return `PERMISSION_DENIED` if the\nkey does not exist or the user does not have permission to view it.",
+        "operationId": "TagKeys_GetTagKey2",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1TagKey"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "tagKey",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "TagKeys"
+        ]
+      },
+      "delete": {
+        "summary": "Deletes a TagKey. The TagKey cannot be deleted if it has any child\nTagValues.",
+        "operationId": "TagKeys_DeleteTagKey2",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1TagKey"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "tagKey",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "validateOnly",
+            "description": "Optional. Set as true to perform validations necessary for deletion, but\nnot actually perform the action.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "etag",
+            "description": "Optional. The etag known to the client for the expected state of the\nTagKey. This is to be used for optimistic concurrency.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "TagKeys"
+        ]
+      },
+      "patch": {
+        "summary": "Updates the attributes of the TagKey resource.",
+        "operationId": "TagKeys_UpdateTagKey2",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1TagKey"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "tagKey",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "tagKey",
+            "description": "Required. The new definition of the TagKey. Only the `description` and\n`etag` fields can be updated by this request. If the `etag` field is not\nempty, it must match the `etag` field of the existing tag key. Otherwise,\n`ABORTED` will be returned.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "description": {
+                  "type": "string",
+                  "description": "Optional. User-assigned description of the TagKey. Must not exceed 256\ncharacters.\n\nRead-write."
+                },
+                "createTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Creation time.",
+                  "readOnly": true
+                },
+                "updateTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Update time.",
+                  "readOnly": true
+                },
+                "etag": {
+                  "type": "string",
+                  "description": "Optional. Entity tag which users can pass to prevent race conditions. This\nfield is always set in server responses. See UpdateTagKeyRequest for\ndetails."
+                },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "Optional. Labels associated with this tag key.\nLabels are key-value pairs that can be used to organize and track resources."
+                }
+              },
+              "description": "Required. The new definition of the TagKey. Only the `description` and\n`etag` fields can be updated by this request. If the `etag` field is not\nempty, it must match the `etag` field of the existing tag key. Otherwise,\n`ABORTED` will be returned."
+            }
+          },
+          {
+            "name": "allowMissing",
+            "description": "Optional. If set to true, and the tag key is not found, a new tag key will be created.\nIn this situation, update_mask is ignored.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "validateOnly",
+            "description": "Optional. Set as true to perform validations necessary for updating the resource, but\nnot actually perform the action.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "TagKeys"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/projects/{project}/tagKeys/{tagKey}:getIamPolicy": {
+      "post": {
+        "summary": "Gets the access control policy for a TagKey. The returned policy may be\nempty if no such policy or resource exists. The `resource` field should\nbe the TagKey's resource name.\nThe caller must have\n`pivox.api/tagKeys.getIamPolicy` permission on\nthe specified TagKey.",
+        "operationId": "TagKeys_GetIamPolicy2",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Policy"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "tagKey",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1TagKeysGetIamPolicyBody"
+            }
+          }
+        ],
+        "tags": [
+          "TagKeys"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/projects/{project}/tagKeys/{tagKey}:setIamPolicy": {
+      "post": {
+        "summary": "Sets the access control policy on a TagKey, replacing any existing\npolicy. The `resource` field should be the TagKey's resource name.\nThe caller must have `resourcemanager.tagKeys.setIamPolicy` permission\non the identified tagValue.",
+        "operationId": "TagKeys_SetIamPolicy2",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Policy"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "tagKey",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1TagKeysSetIamPolicyBody"
+            }
+          }
+        ],
+        "tags": [
+          "TagKeys"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/projects/{project}/tagKeys/{tagKey}:testIamPermissions": {
+      "post": {
+        "summary": "Returns permissions that a caller has on the specified TagKey.\nThe `resource` field should be the TagKey's resource name.",
+        "description": "There are no permissions required for making this API call.",
+        "operationId": "TagKeys_TestIamPermissions2",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1TestIamPermissionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "tagKey",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1TagKeysTestIamPermissionsBody"
+            }
+          }
+        ],
+        "tags": [
+          "TagKeys"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/tagKeys": {
+      "get": {
+        "summary": "Lists all TagKeys for a parent resource.",
+        "operationId": "TagKeys_ListTagKeys",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListTagKeysResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Optional. The maximum number of TagKeys to return in the response. The\nserver allows a maximum of 300 TagKeys to return. If unspecified, the\nserver will use 100 as the default.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. A pagination token returned from a previous call to `ListTagKey`\nthat indicates where this listing should continue from.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "filter",
+            "description": "Optional. An expression for filtering the results of the request.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "description": "Optional. Specify how the results should be sorted.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "TagKeys"
+        ]
+      },
+      "post": {
+        "summary": "Creates a new TagKey. If another request with the same parameters is\nsent while the original request is in process, the second request\nwill receive an error. A maximum of 1000 TagKeys can exist under a parent\nat any given time.",
+        "operationId": "TagKeys_CreateTagKey",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1TagKey"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "tagKey",
+            "description": "Required. The TagKey to be created. Only fields `description`\nare considered during the creation request.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1TagKey"
+            }
+          },
+          {
+            "name": "tagKeyId",
+            "description": "Required. The user-assigned short name for the TagKey.\nMust be unique for TagKeys within the same parent.",
+            "in": "query",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "validateOnly",
+            "description": "Optional. Set to true to perform validations necessary for creating the\nresource, but not actually perform the action.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "TagKeys"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/tagKeys/{tagKey}": {
+      "get": {
+        "summary": "Retrieves a TagKey. This method will return `PERMISSION_DENIED` if the\nkey does not exist or the user does not have permission to view it.",
+        "operationId": "TagKeys_GetTagKey",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1TagKey"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "tagKey",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "TagKeys"
+        ]
+      },
+      "delete": {
+        "summary": "Deletes a TagKey. The TagKey cannot be deleted if it has any child\nTagValues.",
+        "operationId": "TagKeys_DeleteTagKey",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1TagKey"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "tagKey",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "validateOnly",
+            "description": "Optional. Set as true to perform validations necessary for deletion, but\nnot actually perform the action.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "etag",
+            "description": "Optional. The etag known to the client for the expected state of the\nTagKey. This is to be used for optimistic concurrency.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "TagKeys"
+        ]
+      },
+      "patch": {
+        "summary": "Updates the attributes of the TagKey resource.",
+        "operationId": "TagKeys_UpdateTagKey",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1TagKey"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "tagKey",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "tagKey",
+            "description": "Required. The new definition of the TagKey. Only the `description` and\n`etag` fields can be updated by this request. If the `etag` field is not\nempty, it must match the `etag` field of the existing tag key. Otherwise,\n`ABORTED` will be returned.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "description": {
+                  "type": "string",
+                  "description": "Optional. User-assigned description of the TagKey. Must not exceed 256\ncharacters.\n\nRead-write."
+                },
+                "createTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Creation time.",
+                  "readOnly": true
+                },
+                "updateTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Update time.",
+                  "readOnly": true
+                },
+                "etag": {
+                  "type": "string",
+                  "description": "Optional. Entity tag which users can pass to prevent race conditions. This\nfield is always set in server responses. See UpdateTagKeyRequest for\ndetails."
+                },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "Optional. Labels associated with this tag key.\nLabels are key-value pairs that can be used to organize and track resources."
+                }
+              },
+              "description": "Required. The new definition of the TagKey. Only the `description` and\n`etag` fields can be updated by this request. If the `etag` field is not\nempty, it must match the `etag` field of the existing tag key. Otherwise,\n`ABORTED` will be returned."
+            }
+          },
+          {
+            "name": "allowMissing",
+            "description": "Optional. If set to true, and the tag key is not found, a new tag key will be created.\nIn this situation, update_mask is ignored.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "validateOnly",
+            "description": "Optional. Set as true to perform validations necessary for updating the resource, but\nnot actually perform the action.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "TagKeys"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/tagKeys/{tagKey}:getIamPolicy": {
+      "post": {
+        "summary": "Gets the access control policy for a TagKey. The returned policy may be\nempty if no such policy or resource exists. The `resource` field should\nbe the TagKey's resource name.\nThe caller must have\n`pivox.api/tagKeys.getIamPolicy` permission on\nthe specified TagKey.",
+        "operationId": "TagKeys_GetIamPolicy",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Policy"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "tagKey",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1TagKeysGetIamPolicyBody"
+            }
+          }
+        ],
+        "tags": [
+          "TagKeys"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/tagKeys/{tagKey}:setIamPolicy": {
+      "post": {
+        "summary": "Sets the access control policy on a TagKey, replacing any existing\npolicy. The `resource` field should be the TagKey's resource name.\nThe caller must have `resourcemanager.tagKeys.setIamPolicy` permission\non the identified tagValue.",
+        "operationId": "TagKeys_SetIamPolicy",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Policy"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "tagKey",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1TagKeysSetIamPolicyBody"
+            }
+          }
+        ],
+        "tags": [
+          "TagKeys"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/tagKeys/{tagKey}:testIamPermissions": {
+      "post": {
+        "summary": "Returns permissions that a caller has on the specified TagKey.\nThe `resource` field should be the TagKey's resource name.",
+        "description": "There are no permissions required for making this API call.",
+        "operationId": "TagKeys_TestIamPermissions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1TestIamPermissionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "tagKey",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1TagKeysTestIamPermissionsBody"
+            }
+          }
+        ],
+        "tags": [
+          "TagKeys"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string",
+          "description": "A URL/resource name that uniquely identifies the type of the serialized\nprotocol buffer message. This string must contain at least\none \"/\" character. The last segment of the URL's path must represent\nthe fully qualified name of the type (as in\n`path/google.protobuf.Duration`). The name should be in a canonical form\n(e.g., leading \".\" is not accepted).\n\nIn practice, teams usually precompile into the binary all types that they\nexpect it to use in the context of Any. However, for URLs which use the\nscheme `http`, `https`, or no scheme, one can optionally set up a type\nserver that maps type URLs to message definitions as follows:\n\n* If no scheme is provided, `https` is assumed.\n* An HTTP GET on the URL must yield a [google.protobuf.Type][]\n  value in binary format, or produce an error.\n* Applications are allowed to cache lookup results based on the\n  URL, or have them precompiled into a binary to avoid any\n  lookup. Therefore, binary compatibility needs to be preserved\n  on changes to types. (Use versioned type names to manage\n  breaking changes.)\n\nNote: this functionality is not currently available in the official\nprotobuf release, and it is not used for type URLs beginning with\ntype.googleapis.com. As of May 2023, there are no widely used type server\nimplementations and no plans to implement one.\n\nSchemes other than `http`, `https` (or the empty scheme) might be\nused with implementation specific semantics."
+        }
+      },
+      "additionalProperties": {},
+      "description": "`Any` contains an arbitrary serialized protocol buffer message along with a\nURL that describes the type of the serialized message.\n\nProtobuf library provides support to pack/unpack Any values in the form\nof utility functions or additional generated methods of the Any type.\n\nExample 1: Pack and unpack a message in C++.\n\n    Foo foo = ...;\n    Any any;\n    any.PackFrom(foo);\n    ...\n    if (any.UnpackTo(\u0026foo)) {\n      ...\n    }\n\nExample 2: Pack and unpack a message in Java.\n\n    Foo foo = ...;\n    Any any = Any.pack(foo);\n    ...\n    if (any.is(Foo.class)) {\n      foo = any.unpack(Foo.class);\n    }\n    // or ...\n    if (any.isSameTypeAs(Foo.getDefaultInstance())) {\n      foo = any.unpack(Foo.getDefaultInstance());\n    }\n\n Example 3: Pack and unpack a message in Python.\n\n    foo = Foo(...)\n    any = Any()\n    any.Pack(foo)\n    ...\n    if any.Is(Foo.DESCRIPTOR):\n      any.Unpack(foo)\n      ...\n\n Example 4: Pack and unpack a message in Go\n\n     foo := \u0026pb.Foo{...}\n     any, err := anypb.New(foo)\n     if err != nil {\n       ...\n     }\n     ...\n     foo := \u0026pb.Foo{}\n     if err := any.UnmarshalTo(foo); err != nil {\n       ...\n     }\n\nThe pack methods provided by protobuf library will by default use\n'type.googleapis.com/full.type.name' as the type URL and the unpack\nmethods only use the fully qualified type name after the last '/'\nin the type URL, for example \"foo.bar.com/x/y.z\" will yield type\nname \"y.z\".\n\nJSON\n====\nThe JSON representation of an `Any` value uses the regular\nrepresentation of the deserialized, embedded message, with an\nadditional field `@type` which contains the type URL. Example:\n\n    package google.profile;\n    message Person {\n      string first_name = 1;\n      string last_name = 2;\n    }\n\n    {\n      \"@type\": \"type.googleapis.com/google.profile.Person\",\n      \"firstName\": \u003cstring\u003e,\n      \"lastName\": \u003cstring\u003e\n    }\n\nIf the embedded message type is well-known and has a custom JSON\nrepresentation, that representation will be embedded adding a field\n`value` which holds the custom JSON in addition to the `@type`\nfield. Example (for message [google.protobuf.Duration][]):\n\n    {\n      \"@type\": \"type.googleapis.com/google.protobuf.Duration\",\n      \"value\": \"1.212s\"\n    }"
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32",
+          "description": "The status code, which should be an enum value of\n[google.rpc.Code][google.rpc.Code]."
+        },
+        "message": {
+          "type": "string",
+          "description": "A developer-facing error message, which should be in English. Any\nuser-facing error message should be localized and sent in the\n[google.rpc.Status.details][google.rpc.Status.details] field, or localized\nby the client."
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          },
+          "description": "A list of messages that carry the error details.  There is a common set of\nmessage types for APIs to use."
+        }
+      },
+      "description": "The `Status` type defines a logical error model that is suitable for\ndifferent programming environments, including REST APIs and RPC APIs. It is\nused by [gRPC](https://github.com/grpc). Each `Status` message contains\nthree pieces of data: error code, error message, and error details.\n\nYou can find out more about this error model and how to work with it in the\n[API Design Guide](https://cloud.google.com/apis/design/errors)."
+    },
+    "typeExpr": {
+      "type": "object",
+      "properties": {
+        "expression": {
+          "type": "string",
+          "description": "Textual representation of an expression in Common Expression Language\nsyntax."
+        },
+        "title": {
+          "type": "string",
+          "description": "Optional. Title for the expression, i.e. a short string describing\nits purpose. This can be used e.g. in UIs which allow to enter the\nexpression."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional. Description of the expression. This is a longer text which\ndescribes the expression, e.g. when hovered over it in a UI."
+        },
+        "location": {
+          "type": "string",
+          "description": "Optional. String indicating the location of the expression for error\nreporting, e.g. a file name and a position in the file."
+        }
+      },
+      "description": "Represents a textual expression in the Common Expression Language (CEL)\nsyntax. CEL is a C-like expression language. The syntax and semantics of CEL\nare documented at https://github.com/google/cel-spec.\n\nExample (Comparison):\n\n    title: \"Summary size limit\"\n    description: \"Determines if a summary is less than 100 chars\"\n    expression: \"document.summary.size() \u003c 100\"\n\nExample (Equality):\n\n    title: \"Requestor is owner\"\n    description: \"Determines if requestor is the document owner\"\n    expression: \"document.owner == request.auth.claims.email\"\n\nExample (Logic):\n\n    title: \"Public documents\"\n    description: \"Determine whether the document should be publicly visible\"\n    expression: \"document.type != 'private' \u0026\u0026 document.type != 'internal'\"\n\nExample (Data Manipulation):\n\n    title: \"Notification string\"\n    description: \"Create a notification string with a timestamp.\"\n    expression: \"'New message received at ' + string(document.create_time)\"\n\nThe exact variables and functions that may be referenced within an expression\nare determined by the service that evaluates it. See the service\ndocumentation for additional information."
+    },
+    "v1Binding": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string",
+          "description": "Role that is assigned to the list of `members`, or principals.\nFor example, `roles/viewer`, `roles/editor`, or `roles/owner`."
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "* `allUsers`: A special identifier that represents anyone who is\n   on the internet; with or without an account.\n\n* `allAuthenticatedUsers`: A special identifier that represents anyone\n   who is authenticated with an account or a service account.\n\n* `user:{emailid}`: An email address that represents a specific\n   account. For example, `alice@example.com`.\n\n* `serviceAccount:{emailid}`: An email address that represents a service\n   account. For example, `my-other-app@appspot.gserviceaccount.com`.\n\n* `group:{emailid}`: An email address that represents a group.\n   For example, `admins@example.com`.\n\n* `domain:{domain}`: The domain (primary) that represents all the\n   users of that domain. For example, `example.com`.",
+          "title": "Specifies the principals requesting access for a Pivox resource.\n`members` can have the following values:"
+        },
+        "condition": {
+          "$ref": "#/definitions/typeExpr",
+          "description": "Optional. The condition that is associated with this binding.\n\nIf the condition evaluates to `true`, then this binding applies to the\ncurrent request.\n\nIf the condition evaluates to `false`, then this binding does not apply to\nthe current request. However, a different role binding might grant the same\nrole to one or more of the principals in this binding."
+        }
+      },
+      "description": "Associates `members`, or principals, with a `role`."
+    },
+    "v1ListTagKeysResponse": {
+      "type": "object",
+      "properties": {
+        "tagKeys": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1TagKey"
+          },
+          "description": "List of TagKeys that live under the specified parent in the request."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "A pagination token returned from a previous call to `ListTagKeys`\nthat indicates from where listing should continue."
+        }
+      },
+      "description": "The ListTagKeys response message."
+    },
+    "v1Policy": {
+      "type": "object",
+      "properties": {
+        "bindings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Binding"
+          },
+          "description": "Associates a list of `members`, or principals, with a `role`. Optionally,\nmay specify a `condition` that determines how and when the `bindings` are\napplied. Each of the `bindings` must contain at least one principal."
+        },
+        "etag": {
+          "type": "string",
+          "description": "`etag` is used for optimistic concurrency control as a way to help\nprevent simultaneous updates of a policy from overwriting each other.\nIt is strongly suggested that systems make use of the `etag` in the\nread-modify-write cycle to perform policy updates in order to avoid race\nconditions: An `etag` is returned in the response to `getIamPolicy`, and\nsystems are expected to put that etag in the request to `setIamPolicy` to\nensure that their change will be applied to the same version of the policy."
+        }
+      },
+      "description": "An Identity and Access Management (IAM) policy, which specifies access\ncontrols for Pivox resources.\n\nA `Policy` is a collection of `bindings`. A `binding` binds one or more\n`members`, or principals, to a single `role`. Principals can be user\naccounts, service accounts, groups, and domains. A `role` is a named list\nof permissions; each `role` can be a predefined role or a user-created\ncustom role."
+    },
+    "v1TagKey": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Immutable. The resource name for a TagKey. Must be in the format\n`organizations/{organization}/tagKeys/{tag_key}` or\n`organizations/{organization}/projects/{project}/tagKeys/{tag_key}`."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional. User-assigned description of the TagKey. Must not exceed 256\ncharacters.\n\nRead-write."
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Creation time.",
+          "readOnly": true
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Update time.",
+          "readOnly": true
+        },
+        "etag": {
+          "type": "string",
+          "description": "Optional. Entity tag which users can pass to prevent race conditions. This\nfield is always set in server responses. See UpdateTagKeyRequest for\ndetails."
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Optional. Labels associated with this tag key.\nLabels are key-value pairs that can be used to organize and track resources."
+        }
+      },
+      "description": "A TagKey, used to group a set of TagValues."
+    },
+    "v1TagKeysGetIamPolicyBody": {
+      "type": "object",
+      "description": "Request message for `GetIamPolicy` method."
+    },
+    "v1TagKeysSetIamPolicyBody": {
+      "type": "object",
+      "properties": {
+        "policy": {
+          "$ref": "#/definitions/v1Policy",
+          "description": "REQUIRED: The complete policy to be applied to the `resource`. The size of\nthe policy is limited to a few 10s of KB. An empty policy is a\nvalid policy but certain Pivox services (such as Projects)\nmight reject them."
+        },
+        "updateMask": {
+          "type": "string",
+          "description": "`paths: \"bindings, etag\"`",
+          "title": "OPTIONAL: A FieldMask specifying which fields of the policy to modify. Only\nthe fields in the mask will be modified. If no mask is provided, the\nfollowing default mask is used:"
+        }
+      },
+      "description": "Request message for `SetIamPolicy` method.",
+      "required": [
+        "policy"
+      ]
+    },
+    "v1TagKeysTestIamPermissionsBody": {
+      "type": "object",
+      "properties": {
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The set of permissions to check for the `resource`. Permissions with\nwildcards (such as '*' or 'storage.*') are not allowed. For more\ninformation see\n[IAM Overview](https://cloud.google.com/iam/docs/overview#permissions)."
+        }
+      },
+      "description": "Request message for `TestIamPermissions` method.",
+      "required": [
+        "permissions"
+      ]
+    },
+    "v1TestIamPermissionsResponse": {
+      "type": "object",
+      "properties": {
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "A subset of `TestPermissionsRequest.permissions` that the caller is\nallowed."
+        }
+      },
+      "description": "Response message for `TestIamPermissions` method."
+    }
+  }
+}

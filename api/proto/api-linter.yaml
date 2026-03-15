@@ -1,0 +1,11 @@
+---
+- disabled_rules:
+    - 'core::0191::proto-package'
+    - 'core::0191::java-package'
+    - 'core::0191::java-multiple-files'
+    - 'core::0191::java-outer-classname'
+- included_paths:
+    - 'api/proto/pivox/api/v1/watch.proto'
+  disabled_rules:
+    - 'all'
+

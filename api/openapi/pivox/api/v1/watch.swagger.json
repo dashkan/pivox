@@ -1,0 +1,162 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "pivox/api/v1/watch.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "Watcher"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/watch": {
+      "get": {
+        "summary": "Start a streaming RPC to get watch information from the server.",
+        "operationId": "Watcher_Watch",
+        "responses": {
+          "200": {
+            "description": "A successful response.(streaming responses)",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "result": {
+                  "$ref": "#/definitions/v1ChangeBatch"
+                },
+                "error": {
+                  "$ref": "#/definitions/rpcStatus"
+                }
+              },
+              "title": "Stream result of v1ChangeBatch"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "targets",
+            "description": "Each target value **must** be a valid URL path pointing to an entity\nto watch. At least one target is required. Note that the service name\n**must** be removed from each target (e.g., the target must say\n\"/foo/bar\", not \"myservice.googleapis.com/foo/bar\"). A client is\nalso allowed to pass system-specific parameters in the URL that\nare only obeyed by some implementations. Some parameters will be\nimplementation-specific. However, some have predefined meaning\nand are listed here:\n\n* recursive = true|false [default=false]\n   If set to true, indicates that the client wants to watch all elements\n   of entities in the subtree rooted at the entity's name in the target.\n   For descendants that are not the immediate children of the target, the\n   `Change.element` will contain slashes.\n\n   Note that some namespaces and entities will not support recursive\n   watching. When watching such an entity, a client must not set recursive\n   to true. Otherwise, it will receive an `UNIMPLEMENTED` error.\n\nNormal URL encoding must be used inside each target. For example, if a\nquery parameter name or value, or the non-query parameter portion of the\ntarget contains a special character, it must be %-encoded. We recommend\nthat clients and servers use their runtime's URL library to produce and\nconsume target values.",
+            "in": "query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi"
+          },
+          {
+            "name": "resumeMarker",
+            "description": "The `resume_marker` specifies how much of the existing underlying state is\ndelivered to the client when the watch request is received by the\nsystem. The client can set this marker in one of the following ways to get\ndifferent semantics:\n\n*   Parameter is not specified or has the value \"\".\n    Semantics: Fetch initial state.\n    The client wants the entity's initial state to be delivered. See the\n    description in \"Initial State\".\n\n*   Parameter is set to the string \"now\" (UTF-8 encoding).\n    Semantics: Fetch new changes only.\n    The client just wants to get the changes received by the system after\n    the watch point. The system may deliver changes from before the watch\n    point as well.\n\n*   Parameter is set to a value received in an earlier\n    `Change.resume_marker` field while watching the same entity.\n    Semantics: Resume from a specific point.\n    The client wants to receive the changes from a specific point; this\n    value must correspond to a value received in the `Change.resume_marker`\n    field. The system may deliver changes from before the `resume_marker`\n    as well. If the system cannot resume the stream from this point (e.g.,\n    if it is too far behind in the stream), it can raise the\n    `FAILED_PRECONDITION` error.\n\nAn implementation MUST support an unspecified parameter and the\nempty string \"\" marker (initial state fetching) and the \"now\" marker.\nIt need not support resuming from a specific point.",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "byte"
+          }
+        ],
+        "tags": [
+          "Watcher"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string",
+          "description": "A URL/resource name that uniquely identifies the type of the serialized\nprotocol buffer message. This string must contain at least\none \"/\" character. The last segment of the URL's path must represent\nthe fully qualified name of the type (as in\n`path/google.protobuf.Duration`). The name should be in a canonical form\n(e.g., leading \".\" is not accepted).\n\nIn practice, teams usually precompile into the binary all types that they\nexpect it to use in the context of Any. However, for URLs which use the\nscheme `http`, `https`, or no scheme, one can optionally set up a type\nserver that maps type URLs to message definitions as follows:\n\n* If no scheme is provided, `https` is assumed.\n* An HTTP GET on the URL must yield a [google.protobuf.Type][]\n  value in binary format, or produce an error.\n* Applications are allowed to cache lookup results based on the\n  URL, or have them precompiled into a binary to avoid any\n  lookup. Therefore, binary compatibility needs to be preserved\n  on changes to types. (Use versioned type names to manage\n  breaking changes.)\n\nNote: this functionality is not currently available in the official\nprotobuf release, and it is not used for type URLs beginning with\ntype.googleapis.com. As of May 2023, there are no widely used type server\nimplementations and no plans to implement one.\n\nSchemes other than `http`, `https` (or the empty scheme) might be\nused with implementation specific semantics."
+        }
+      },
+      "additionalProperties": {},
+      "description": "`Any` contains an arbitrary serialized protocol buffer message along with a\nURL that describes the type of the serialized message.\n\nProtobuf library provides support to pack/unpack Any values in the form\nof utility functions or additional generated methods of the Any type.\n\nExample 1: Pack and unpack a message in C++.\n\n    Foo foo = ...;\n    Any any;\n    any.PackFrom(foo);\n    ...\n    if (any.UnpackTo(\u0026foo)) {\n      ...\n    }\n\nExample 2: Pack and unpack a message in Java.\n\n    Foo foo = ...;\n    Any any = Any.pack(foo);\n    ...\n    if (any.is(Foo.class)) {\n      foo = any.unpack(Foo.class);\n    }\n    // or ...\n    if (any.isSameTypeAs(Foo.getDefaultInstance())) {\n      foo = any.unpack(Foo.getDefaultInstance());\n    }\n\n Example 3: Pack and unpack a message in Python.\n\n    foo = Foo(...)\n    any = Any()\n    any.Pack(foo)\n    ...\n    if any.Is(Foo.DESCRIPTOR):\n      any.Unpack(foo)\n      ...\n\n Example 4: Pack and unpack a message in Go\n\n     foo := \u0026pb.Foo{...}\n     any, err := anypb.New(foo)\n     if err != nil {\n       ...\n     }\n     ...\n     foo := \u0026pb.Foo{}\n     if err := any.UnmarshalTo(foo); err != nil {\n       ...\n     }\n\nThe pack methods provided by protobuf library will by default use\n'type.googleapis.com/full.type.name' as the type URL and the unpack\nmethods only use the fully qualified type name after the last '/'\nin the type URL, for example \"foo.bar.com/x/y.z\" will yield type\nname \"y.z\".\n\nJSON\n====\nThe JSON representation of an `Any` value uses the regular\nrepresentation of the deserialized, embedded message, with an\nadditional field `@type` which contains the type URL. Example:\n\n    package google.profile;\n    message Person {\n      string first_name = 1;\n      string last_name = 2;\n    }\n\n    {\n      \"@type\": \"type.googleapis.com/google.profile.Person\",\n      \"firstName\": \u003cstring\u003e,\n      \"lastName\": \u003cstring\u003e\n    }\n\nIf the embedded message type is well-known and has a custom JSON\nrepresentation, that representation will be embedded adding a field\n`value` which holds the custom JSON in addition to the `@type`\nfield. Example (for message [google.protobuf.Duration][]):\n\n    {\n      \"@type\": \"type.googleapis.com/google.protobuf.Duration\",\n      \"value\": \"1.212s\"\n    }"
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32",
+          "description": "The status code, which should be an enum value of\n[google.rpc.Code][google.rpc.Code]."
+        },
+        "message": {
+          "type": "string",
+          "description": "A developer-facing error message, which should be in English. Any\nuser-facing error message should be localized and sent in the\n[google.rpc.Status.details][google.rpc.Status.details] field, or localized\nby the client."
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          },
+          "description": "A list of messages that carry the error details.  There is a common set of\nmessage types for APIs to use."
+        }
+      },
+      "description": "The `Status` type defines a logical error model that is suitable for\ndifferent programming environments, including REST APIs and RPC APIs. It is\nused by [gRPC](https://github.com/grpc). Each `Status` message contains\nthree pieces of data: error code, error message, and error details.\n\nYou can find out more about this error model and how to work with it in the\n[API Design Guide](https://cloud.google.com/apis/design/errors)."
+    },
+    "v1Change": {
+      "type": "object",
+      "properties": {
+        "element": {
+          "type": "string",
+          "description": "Name of the element, interpreted relative to the entity's actual\nname. \"\" refers to the entity itself. The element name is a valid\nUTF-8 string."
+        },
+        "state": {
+          "$ref": "#/definitions/v1ChangeState",
+          "description": "The state of the `element`."
+        },
+        "data": {
+          "$ref": "#/definitions/protobufAny",
+          "description": "The actual change data. This field is present only when `state() == EXISTS`\nor `state() == ERROR`. Please see\n[google.protobuf.Any][google.protobuf.Any] about how to use the Any type."
+        },
+        "resumeMarker": {
+          "type": "string",
+          "format": "byte",
+          "description": "If present, provides a compact representation of all the messages that have\nbeen received by the caller for the given entity, e.g., it could be a\nsequence number or a multi-part timestamp/version vector. This marker can\nbe provided in the Request message, allowing the caller to resume the\nstream watching at a specific point without fetching the initial state."
+        },
+        "continued": {
+          "type": "boolean",
+          "description": "If true, this Change is followed by more Changes that are in the same group\nas this Change."
+        }
+      },
+      "description": "A Change indicates the most recent state of an element."
+    },
+    "v1ChangeBatch": {
+      "type": "object",
+      "properties": {
+        "changes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Change"
+          },
+          "description": "A list of Change messages."
+        }
+      },
+      "description": "A batch of Change messages."
+    },
+    "v1ChangeState": {
+      "type": "string",
+      "enum": [
+        "EXISTS",
+        "DOES_NOT_EXIST",
+        "INITIAL_STATE_SKIPPED",
+        "ERROR"
+      ],
+      "default": "EXISTS",
+      "description": "- EXISTS: The element exists and its full value is included in data.\n - DOES_NOT_EXIST: The element does not exist.\n - INITIAL_STATE_SKIPPED: Element may or may not exist. Used only for initial state delivery when\nthe client is not interested in fetching the initial state. See the\n\"Initial State\" section above.\n - ERROR: The element may exist, but some error has occurred. More information is\navailable in the data field - the value is a serialized Status\nproto (from [google.rpc.Status][])",
+      "title": "A reported value can be in one of the following states:"
+    }
+  }
+}

@@ -1,8 +1,18 @@
 .claude/*.local.*
 .playwright-mcp
+.firebase-data
 
-# Created by https://www.toptal.com/developers/gitignore/api/go,node,linux,macos,windows,jetbrains+all,visualstudiocode,nextjs
-# Edit at https://www.toptal.com/developers/gitignore?templates=go,node,linux,macos,windows,jetbrains+all,visualstudiocode,nextjs
+# Created by https://www.toptal.com/developers/gitignore/api/go,node,linux,macos,nextjs,windows,jetbrains+all,visualstudiocode,firebase
+# Edit at https://www.toptal.com/developers/gitignore?templates=go,node,linux,macos,nextjs,windows,jetbrains+all,visualstudiocode,firebase
+
+### Firebase ###
+.idea
+**/node_modules/*
+**/.firebaserc
+
+### Firebase Patch ###
+.runtimeconfig.json
+.firebase/
 
 ### Go ###
 # If you prefer the allow list template instead of the deny list, see community template:
@@ -378,4 +388,4 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
-# End of https://www.toptal.com/developers/gitignore/api/go,node,linux,macos,windows,jetbrains+all,visualstudiocode,nextjs
+# End of https://www.toptal.com/developers/gitignore/api/go,node,linux,macos,nextjs,windows,jetbrains+all,visualstudiocode,firebase

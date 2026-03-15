@@ -1,0 +1,1471 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "pivox/api/v1/organizations.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "Organizations"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/organizations": {
+      "get": {
+        "summary": "Lists organization resources that are visible to the user and satisfy\nthe specified filter.",
+        "description": "This will only return organizations on which the user has the permission\n`resourcemanager.organizations.get`",
+        "operationId": "Organizations_ListOrganizations",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListOrganizationsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pageSize",
+            "description": "Optional. The maximum number of organizations to return in the response.\nThe server can return fewer organizations than requested. If unspecified,\nserver picks an appropriate default.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. A pagination token returned from a previous call to\n`ListOrganizations` that indicates from where listing should continue.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "showDeleted",
+            "description": "Optional. Controls whether organizations in the DELETE_REQUESTED state\nshould be returned. Defaults to false.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "filter",
+            "description": "Optional. An expression for filtering the results of the request.\nFilter rules are case insensitive. Some eligible fields for filtering are:\n\n+ `displayName`\n+ `directoryCustomerId`\n+ `state`\n+ `createTime`",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "description": "Optional. Specify how the results should be sorted.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      },
+      "post": {
+        "summary": "Creates a new organization resource.",
+        "description": "The caller must have `resourcemanager.organizations.create` permission.",
+        "operationId": "Organizations_CreateOrganization",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Organization"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "description": "Required. The Organization to create.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1Organization"
+            }
+          },
+          {
+            "name": "organizationId",
+            "description": "Optional. A unique identifier for the organization. If not provided, the\nserver will generate one. Must consist of lowercase letters, numbers,\nand hyphens.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "validateOnly",
+            "description": "Optional. If set to true, the request will only validate the request\nwithout persisting it.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}": {
+      "get": {
+        "summary": "Fetches an organization resource identified by the specified resource name.",
+        "operationId": "Organizations_GetOrganization",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Organization"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      },
+      "patch": {
+        "summary": "Updates an organization resource. Only the `display_name` and\n`annotations` fields can be updated. Use the field mask to specify which\nfields to update. Omitting the field mask updates all mutable fields.",
+        "description": "The caller must have `resourcemanager.organizations.update` permission\non the specified organization.",
+        "operationId": "Organizations_UpdateOrganization",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Organization"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "organization",
+            "description": "Required. The new definition of the organization. The `name` field must\nbe populated to identify the organization to update.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "displayName": {
+                  "type": "string",
+                  "description": "Output only. A human-readable string that refers to the organization in the\nPivox Console. This string is set by the server and cannot be\nchanged. The string will be set to the primary domain (for example,\n\"acme.com\") of the customer that owns the organization.",
+                  "readOnly": true
+                },
+                "state": {
+                  "$ref": "#/definitions/v1OrganizationState",
+                  "description": "Output only. The organization's current lifecycle state.",
+                  "readOnly": true
+                },
+                "createTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when the Organization was created.",
+                  "readOnly": true
+                },
+                "updateTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when the Organization was last modified.",
+                  "readOnly": true
+                },
+                "deleteTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when the Organization was requested for deletion.",
+                  "readOnly": true
+                },
+                "purgeTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. The time at which this organization will be purged.\nApproximately 30 days after deletion.",
+                  "readOnly": true
+                },
+                "etag": {
+                  "type": "string",
+                  "description": "Output only. A checksum computed by the server based on the current value\nof the Organization resource. This may be sent on update and delete\nrequests to ensure the client has an up-to-date value before proceeding.",
+                  "readOnly": true
+                },
+                "owner": {
+                  "type": "string",
+                  "title": "Output only. The resource name of the organization owner.\nFormat: `organizations/{organization}/users/{user}`",
+                  "readOnly": true
+                },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "Optional. Labels associated with this organization.\nLabels are key-value pairs that can be used to organize and track resources."
+                }
+              },
+              "description": "Required. The new definition of the organization. The `name` field must\nbe populated to identify the organization to update."
+            }
+          },
+          {
+            "name": "validateOnly",
+            "description": "Optional. If set to true, the request will only validate the request\nwithout persisting it.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/customDomains": {
+      "get": {
+        "summary": "Lists custom domains associated with an organization.",
+        "operationId": "Organizations_ListCustomDomains",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListCustomDomainsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Optional. The maximum number of custom domains to return in the response.\nThe server can return fewer custom domains than requested. If unspecified,\nthe server picks an appropriate default.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. A pagination token returned from a previous call to\n`ListCustomDomains` that indicates from where listing should continue.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      },
+      "post": {
+        "summary": "Creates a custom domain for an organization. Once created, the domain\nenters the `PENDING` state and the response includes the DNS records\nthat the domain owner must configure. After DNS verification succeeds,\nthe server automatically provisions a TLS certificate and transitions\nthe domain to `ACTIVE`.",
+        "description": "The caller must have `resourcemanager.customDomains.create` permission\non the parent organization.",
+        "operationId": "Organizations_CreateCustomDomain",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/longrunningOperation"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "customDomain",
+            "description": "Required. The custom domain to create. The `domain` field must be set.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1CustomDomain"
+            }
+          },
+          {
+            "name": "customDomainId",
+            "description": "Optional. A unique identifier for the custom domain. If not provided,\nthe server will generate one.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "validateOnly",
+            "description": "Optional. If set to true, the request will only validate the request\nwithout persisting it.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/customDomains/{customDomain}": {
+      "get": {
+        "summary": "Retrieves a custom domain associated with an organization.",
+        "operationId": "Organizations_GetCustomDomain",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1CustomDomain"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "customDomain",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      },
+      "delete": {
+        "summary": "Deletes a custom domain from an organization, including TLS certificate\nrevocation and routing removal.",
+        "description": "The caller must have `resourcemanager.customDomains.delete` permission\non the parent organization.",
+        "operationId": "Organizations_DeleteCustomDomain",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/longrunningOperation"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "customDomain",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "etag",
+            "description": "Optional. The etag known to the client for the expected state of the\ncustom domain. This is to be used for optimistic concurrency.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "validateOnly",
+            "description": "Optional. If set to true, the request will only validate the request\nwithout persisting it.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/invitationPolicy": {
+      "get": {
+        "summary": "Gets the invitation policy for an organization.",
+        "operationId": "Organizations_GetInvitationPolicy",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1InvitationPolicy"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      },
+      "patch": {
+        "summary": "Updates the invitation policy for an organization.",
+        "operationId": "Organizations_UpdateInvitationPolicy",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1InvitationPolicy"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "invitationPolicy",
+            "description": "Required. The invitation policy with updated fields.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "disablePublicEmailAddresses": {
+                  "type": "boolean",
+                  "description": "Optional. When true, invitations to public email addresses (gmail.com,\nyahoo.com, etc.) are rejected. The server maintains the list of\npublic email domains."
+                },
+                "allowedDomains": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Optional. If non-empty, only email addresses from these domains are\nallowed. This is the strictest check and takes precedence over other\nsettings."
+                },
+                "disallowedDomains": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Optional. Email addresses from these domains are always rejected,\neven if they pass other checks."
+                },
+                "updateTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when the policy was last modified.",
+                  "readOnly": true
+                },
+                "etag": {
+                  "type": "string",
+                  "description": "Output only. A checksum for optimistic concurrency control.",
+                  "readOnly": true
+                }
+              },
+              "title": "Required. The invitation policy with updated fields."
+            }
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/invitations": {
+      "get": {
+        "summary": "Lists invitations for the organization.",
+        "operationId": "Organizations_ListInvitations",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListInvitationsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Optional. Maximum number of invitations to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. Page token from a previous ListInvitations call.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "filter",
+            "description": "Optional. An AIP-160 filter expression. Supports filtering by\n`state`, `email`, `create_time`.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "description": "Optional. Sort order (e.g. \"create_time desc\").",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      },
+      "post": {
+        "summary": "Creates an invitation to join the organization.",
+        "description": "The server validates the email against the organization's invitation\npolicy before creating the invitation.",
+        "operationId": "Organizations_CreateInvitation",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Invitation"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "invitation",
+            "description": "Required. The invitation to create.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1Invitation"
+            }
+          },
+          {
+            "name": "invitationId",
+            "description": "Optional. A server-generated invitation ID. If not provided, the server\nwill generate one.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/invitations/{invitation}": {
+      "get": {
+        "summary": "Gets an invitation by resource name.",
+        "operationId": "Organizations_GetInvitation",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Invitation"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "invitation",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      },
+      "delete": {
+        "summary": "Revokes a pending invitation. Only org admins can revoke invitations.",
+        "operationId": "Organizations_DeleteInvitation",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Invitation"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "invitation",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "etag",
+            "description": "Optional. The etag for optimistic concurrency control.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/invitations/{invitation}:accept": {
+      "post": {
+        "summary": "Accepts a pending invitation. The caller must be authenticated and\ntheir email must match the invitation's email. On success, a user\nmembership is created in the organization and the specified role is\nassigned.",
+        "operationId": "Organizations_AcceptInvitation",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1AcceptInvitationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "invitation",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/OrganizationsAcceptInvitationBody"
+            }
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/invitations/{invitation}:decline": {
+      "post": {
+        "summary": "Declines a pending invitation. The caller must be authenticated and\ntheir email must match the invitation's email.",
+        "operationId": "Organizations_DeclineInvitation",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1DeclineInvitationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "invitation",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/OrganizationsDeclineInvitationBody"
+            }
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}:getIamPolicy": {
+      "post": {
+        "summary": "Gets the access control policy for an organization resource. The policy may\nbe empty if no such policy or resource exists. The `resource` field should\nbe the organization's resource name, for example: \"organizations/123\".",
+        "description": "Authorization requires the IAM permission\n`resourcemanager.organizations.getIamPolicy` on the specified organization.",
+        "operationId": "Organizations_GetIamPolicy",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Policy"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1OrganizationsGetIamPolicyBody"
+            }
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}:setIamPolicy": {
+      "post": {
+        "summary": "Sets the access control policy on an organization resource. Replaces any\nexisting policy. The `resource` field should be the organization's resource\nname, for example: \"organizations/123\".",
+        "description": "Authorization requires the IAM permission\n`resourcemanager.organizations.setIamPolicy` on the specified organization.",
+        "operationId": "Organizations_SetIamPolicy",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Policy"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1OrganizationsSetIamPolicyBody"
+            }
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}:testIamPermissions": {
+      "post": {
+        "summary": "Returns the permissions that a caller has on the specified organization.\nThe `resource` field should be the organization's resource name,\nfor example: \"organizations/123\".",
+        "description": "There are no permissions required for making this API call.",
+        "operationId": "Organizations_TestIamPermissions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1TestIamPermissionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1OrganizationsTestIamPermissionsBody"
+            }
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "OrganizationsAcceptInvitationBody": {
+      "type": "object",
+      "description": "Request message for `AcceptInvitation`."
+    },
+    "OrganizationsDeclineInvitationBody": {
+      "type": "object",
+      "description": "Request message for `DeclineInvitation`."
+    },
+    "longrunningOperation": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The server-assigned name, which is only unique within the same service that\noriginally returns it. If you use the default HTTP mapping, the\n`name` should be a resource name ending with `operations/{unique_id}`."
+        },
+        "metadata": {
+          "$ref": "#/definitions/protobufAny",
+          "description": "Service-specific metadata associated with the operation.  It typically\ncontains progress information and common metadata such as create time.\nSome services might not provide such metadata.  Any method that returns a\nlong-running operation should document the metadata type, if any."
+        },
+        "done": {
+          "type": "boolean",
+          "description": "If the value is `false`, it means the operation is still in progress.\nIf `true`, the operation is completed, and either `error` or `response` is\navailable."
+        },
+        "error": {
+          "$ref": "#/definitions/rpcStatus",
+          "description": "The error result of the operation in case of failure or cancellation."
+        },
+        "response": {
+          "$ref": "#/definitions/protobufAny",
+          "description": "The normal, successful response of the operation.  If the original\nmethod returns no data on success, such as `Delete`, the response is\n`google.protobuf.Empty`.  If the original method is standard\n`Get`/`Create`/`Update`, the response should be the resource.  For other\nmethods, the response should have the type `XxxResponse`, where `Xxx`\nis the original method name.  For example, if the original method name\nis `TakeSnapshot()`, the inferred response type is\n`TakeSnapshotResponse`."
+        }
+      },
+      "description": "This resource represents a long-running operation that is the result of a\nnetwork API call."
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string",
+          "description": "A URL/resource name that uniquely identifies the type of the serialized\nprotocol buffer message. This string must contain at least\none \"/\" character. The last segment of the URL's path must represent\nthe fully qualified name of the type (as in\n`path/google.protobuf.Duration`). The name should be in a canonical form\n(e.g., leading \".\" is not accepted).\n\nIn practice, teams usually precompile into the binary all types that they\nexpect it to use in the context of Any. However, for URLs which use the\nscheme `http`, `https`, or no scheme, one can optionally set up a type\nserver that maps type URLs to message definitions as follows:\n\n* If no scheme is provided, `https` is assumed.\n* An HTTP GET on the URL must yield a [google.protobuf.Type][]\n  value in binary format, or produce an error.\n* Applications are allowed to cache lookup results based on the\n  URL, or have them precompiled into a binary to avoid any\n  lookup. Therefore, binary compatibility needs to be preserved\n  on changes to types. (Use versioned type names to manage\n  breaking changes.)\n\nNote: this functionality is not currently available in the official\nprotobuf release, and it is not used for type URLs beginning with\ntype.googleapis.com. As of May 2023, there are no widely used type server\nimplementations and no plans to implement one.\n\nSchemes other than `http`, `https` (or the empty scheme) might be\nused with implementation specific semantics."
+        }
+      },
+      "additionalProperties": {},
+      "description": "`Any` contains an arbitrary serialized protocol buffer message along with a\nURL that describes the type of the serialized message.\n\nProtobuf library provides support to pack/unpack Any values in the form\nof utility functions or additional generated methods of the Any type.\n\nExample 1: Pack and unpack a message in C++.\n\n    Foo foo = ...;\n    Any any;\n    any.PackFrom(foo);\n    ...\n    if (any.UnpackTo(\u0026foo)) {\n      ...\n    }\n\nExample 2: Pack and unpack a message in Java.\n\n    Foo foo = ...;\n    Any any = Any.pack(foo);\n    ...\n    if (any.is(Foo.class)) {\n      foo = any.unpack(Foo.class);\n    }\n    // or ...\n    if (any.isSameTypeAs(Foo.getDefaultInstance())) {\n      foo = any.unpack(Foo.getDefaultInstance());\n    }\n\n Example 3: Pack and unpack a message in Python.\n\n    foo = Foo(...)\n    any = Any()\n    any.Pack(foo)\n    ...\n    if any.Is(Foo.DESCRIPTOR):\n      any.Unpack(foo)\n      ...\n\n Example 4: Pack and unpack a message in Go\n\n     foo := \u0026pb.Foo{...}\n     any, err := anypb.New(foo)\n     if err != nil {\n       ...\n     }\n     ...\n     foo := \u0026pb.Foo{}\n     if err := any.UnmarshalTo(foo); err != nil {\n       ...\n     }\n\nThe pack methods provided by protobuf library will by default use\n'type.googleapis.com/full.type.name' as the type URL and the unpack\nmethods only use the fully qualified type name after the last '/'\nin the type URL, for example \"foo.bar.com/x/y.z\" will yield type\nname \"y.z\".\n\nJSON\n====\nThe JSON representation of an `Any` value uses the regular\nrepresentation of the deserialized, embedded message, with an\nadditional field `@type` which contains the type URL. Example:\n\n    package google.profile;\n    message Person {\n      string first_name = 1;\n      string last_name = 2;\n    }\n\n    {\n      \"@type\": \"type.googleapis.com/google.profile.Person\",\n      \"firstName\": \u003cstring\u003e,\n      \"lastName\": \u003cstring\u003e\n    }\n\nIf the embedded message type is well-known and has a custom JSON\nrepresentation, that representation will be embedded adding a field\n`value` which holds the custom JSON in addition to the `@type`\nfield. Example (for message [google.protobuf.Duration][]):\n\n    {\n      \"@type\": \"type.googleapis.com/google.protobuf.Duration\",\n      \"value\": \"1.212s\"\n    }"
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32",
+          "description": "The status code, which should be an enum value of\n[google.rpc.Code][google.rpc.Code]."
+        },
+        "message": {
+          "type": "string",
+          "description": "A developer-facing error message, which should be in English. Any\nuser-facing error message should be localized and sent in the\n[google.rpc.Status.details][google.rpc.Status.details] field, or localized\nby the client."
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          },
+          "description": "A list of messages that carry the error details.  There is a common set of\nmessage types for APIs to use."
+        }
+      },
+      "description": "The `Status` type defines a logical error model that is suitable for\ndifferent programming environments, including REST APIs and RPC APIs. It is\nused by [gRPC](https://github.com/grpc). Each `Status` message contains\nthree pieces of data: error code, error message, and error details.\n\nYou can find out more about this error model and how to work with it in the\n[API Design Guide](https://cloud.google.com/apis/design/errors)."
+    },
+    "typeExpr": {
+      "type": "object",
+      "properties": {
+        "expression": {
+          "type": "string",
+          "description": "Textual representation of an expression in Common Expression Language\nsyntax."
+        },
+        "title": {
+          "type": "string",
+          "description": "Optional. Title for the expression, i.e. a short string describing\nits purpose. This can be used e.g. in UIs which allow to enter the\nexpression."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional. Description of the expression. This is a longer text which\ndescribes the expression, e.g. when hovered over it in a UI."
+        },
+        "location": {
+          "type": "string",
+          "description": "Optional. String indicating the location of the expression for error\nreporting, e.g. a file name and a position in the file."
+        }
+      },
+      "description": "Represents a textual expression in the Common Expression Language (CEL)\nsyntax. CEL is a C-like expression language. The syntax and semantics of CEL\nare documented at https://github.com/google/cel-spec.\n\nExample (Comparison):\n\n    title: \"Summary size limit\"\n    description: \"Determines if a summary is less than 100 chars\"\n    expression: \"document.summary.size() \u003c 100\"\n\nExample (Equality):\n\n    title: \"Requestor is owner\"\n    description: \"Determines if requestor is the document owner\"\n    expression: \"document.owner == request.auth.claims.email\"\n\nExample (Logic):\n\n    title: \"Public documents\"\n    description: \"Determine whether the document should be publicly visible\"\n    expression: \"document.type != 'private' \u0026\u0026 document.type != 'internal'\"\n\nExample (Data Manipulation):\n\n    title: \"Notification string\"\n    description: \"Create a notification string with a timestamp.\"\n    expression: \"'New message received at ' + string(document.create_time)\"\n\nThe exact variables and functions that may be referenced within an expression\nare determined by the service that evaluates it. See the service\ndocumentation for additional information."
+    },
+    "v1AcceptInvitationResponse": {
+      "type": "object",
+      "properties": {
+        "invitation": {
+          "$ref": "#/definitions/v1Invitation",
+          "description": "The accepted invitation."
+        }
+      },
+      "description": "Response message for `AcceptInvitation`."
+    },
+    "v1Binding": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string",
+          "description": "Role that is assigned to the list of `members`, or principals.\nFor example, `roles/viewer`, `roles/editor`, or `roles/owner`."
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "* `allUsers`: A special identifier that represents anyone who is\n   on the internet; with or without an account.\n\n* `allAuthenticatedUsers`: A special identifier that represents anyone\n   who is authenticated with an account or a service account.\n\n* `user:{emailid}`: An email address that represents a specific\n   account. For example, `alice@example.com`.\n\n* `serviceAccount:{emailid}`: An email address that represents a service\n   account. For example, `my-other-app@appspot.gserviceaccount.com`.\n\n* `group:{emailid}`: An email address that represents a group.\n   For example, `admins@example.com`.\n\n* `domain:{domain}`: The domain (primary) that represents all the\n   users of that domain. For example, `example.com`.",
+          "title": "Specifies the principals requesting access for a Pivox resource.\n`members` can have the following values:"
+        },
+        "condition": {
+          "$ref": "#/definitions/typeExpr",
+          "description": "Optional. The condition that is associated with this binding.\n\nIf the condition evaluates to `true`, then this binding applies to the\ncurrent request.\n\nIf the condition evaluates to `false`, then this binding does not apply to\nthe current request. However, a different role binding might grant the same\nrole to one or more of the principals in this binding."
+        }
+      },
+      "description": "Associates `members`, or principals, with a `role`."
+    },
+    "v1CustomDomain": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "Output only. The resource name of the custom domain. Format:\n`organizations/{organization}/customDomains/{custom_domain}`",
+          "readOnly": true
+        },
+        "domain": {
+          "type": "string",
+          "description": "Immutable. The fully qualified domain name, for example\n`pivox.acme.com`. Cannot be changed after creation — delete and\nrecreate the resource to use a different domain."
+        },
+        "state": {
+          "$ref": "#/definitions/v1CustomDomainState",
+          "description": "Output only. The current lifecycle state of the custom domain.",
+          "readOnly": true
+        },
+        "requiredDnsRecords": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1DnsRecord"
+          },
+          "description": "Output only. The DNS records that the domain owner must create to verify\nownership and route traffic. Typically includes a `TXT` record for\nverification and a `CNAME` record for routing.",
+          "readOnly": true
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the custom domain was created.",
+          "readOnly": true
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the custom domain was last modified.",
+          "readOnly": true
+        },
+        "deleteTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the custom domain was requested for deletion.",
+          "readOnly": true
+        },
+        "verifyTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when DNS verification was last confirmed.",
+          "readOnly": true
+        },
+        "etag": {
+          "type": "string",
+          "description": "Output only. A checksum computed by the server based on the current value\nof the CustomDomain resource. This may be sent on delete requests to\nensure the client has an up-to-date value before proceeding.",
+          "readOnly": true
+        }
+      },
+      "description": "A custom domain associated with an organization. Custom domains allow\norganizations to serve Pivox services under their own domain name\n(for example, `pivox.acme.com`). The server handles DNS verification\nand TLS certificate provisioning automatically."
+    },
+    "v1CustomDomainState": {
+      "type": "string",
+      "enum": [
+        "STATE_UNSPECIFIED",
+        "PENDING",
+        "PROVISIONING",
+        "ACTIVE",
+        "FAILED",
+        "DEACTIVATED"
+      ],
+      "default": "STATE_UNSPECIFIED",
+      "description": "The lifecycle state of a custom domain.\n\n - STATE_UNSPECIFIED: Unspecified state. This is only useful for distinguishing unset values.\n - PENDING: The domain has been created and is waiting for the owner to configure\nthe required DNS records.\n - PROVISIONING: The DNS records have been verified. The server is provisioning a TLS\ncertificate via the ACME protocol.\n - ACTIVE: The domain is fully verified, the TLS certificate has been issued, and\ntraffic is being served.\n - FAILED: DNS verification or TLS certificate provisioning failed. Inspect the\n`required_dns_records` to ensure records are configured correctly.\n - DEACTIVATED: The domain was previously active but has been deactivated because DNS\nrecords were removed or the TLS certificate could not be renewed."
+    },
+    "v1DeclineInvitationResponse": {
+      "type": "object",
+      "properties": {
+        "invitation": {
+          "$ref": "#/definitions/v1Invitation",
+          "description": "The declined invitation."
+        }
+      },
+      "description": "Response message for `DeclineInvitation`."
+    },
+    "v1DnsRecord": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "The DNS record type, for example `CNAME`, `TXT`, or `A`.",
+          "readOnly": true
+        },
+        "host": {
+          "type": "string",
+          "description": "The hostname to create the record on, for example\n`_pivox.acme.com` or `pivox.acme.com`.",
+          "readOnly": true
+        },
+        "value": {
+          "type": "string",
+          "description": "The value for the DNS record, for example\n`pivox-verify=abc123` or `custom.pivox.io`.",
+          "readOnly": true
+        }
+      },
+      "description": "A DNS record that a domain owner must configure in their DNS provider\nto verify ownership or route traffic."
+    },
+    "v1Invitation": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "Output only. The resource name of the invitation.\nFormat: `organizations/{organization}/invitations/{invitation}`",
+          "readOnly": true
+        },
+        "email": {
+          "type": "string",
+          "description": "Required. The email address of the user being invited."
+        },
+        "role": {
+          "type": "string",
+          "title": "Optional. The role to assign when the invitation is accepted.\nFormat: `organizations/{organization}/roles/{role}`"
+        },
+        "state": {
+          "$ref": "#/definitions/v1InvitationState",
+          "description": "Output only. The current state of the invitation.",
+          "readOnly": true
+        },
+        "inviter": {
+          "type": "string",
+          "description": "Output only. The resource name of the user who created the invitation.",
+          "readOnly": true
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the invitation was created.",
+          "readOnly": true
+        },
+        "expireTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the invitation expires.",
+          "readOnly": true
+        },
+        "acceptTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the invitation was accepted.",
+          "readOnly": true
+        },
+        "etag": {
+          "type": "string",
+          "description": "Output only. A checksum computed by the server based on the current value\nof the Invitation resource.",
+          "readOnly": true
+        }
+      },
+      "description": "An invitation to join an organization. Invitations are created by org\nadmins and sent to users by email. The recipient can accept or decline.",
+      "required": [
+        "email"
+      ]
+    },
+    "v1InvitationPolicy": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "Output only. The resource name of the invitation policy.\nFormat: `organizations/{organization}/invitationPolicy`",
+          "readOnly": true
+        },
+        "disablePublicEmailAddresses": {
+          "type": "boolean",
+          "description": "Optional. When true, invitations to public email addresses (gmail.com,\nyahoo.com, etc.) are rejected. The server maintains the list of\npublic email domains."
+        },
+        "allowedDomains": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional. If non-empty, only email addresses from these domains are\nallowed. This is the strictest check and takes precedence over other\nsettings."
+        },
+        "disallowedDomains": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional. Email addresses from these domains are always rejected,\neven if they pass other checks."
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the policy was last modified.",
+          "readOnly": true
+        },
+        "etag": {
+          "type": "string",
+          "description": "Output only. A checksum for optimistic concurrency control.",
+          "readOnly": true
+        }
+      },
+      "description": "The invitation policy for an organization. Controls which email\naddresses can be invited to join the organization."
+    },
+    "v1InvitationState": {
+      "type": "string",
+      "enum": [
+        "STATE_UNSPECIFIED",
+        "PENDING",
+        "ACCEPTED",
+        "DECLINED",
+        "REVOKED",
+        "EXPIRED"
+      ],
+      "default": "STATE_UNSPECIFIED",
+      "description": "Invitation lifecycle states.\n\n - STATE_UNSPECIFIED: Unspecified state.\n - PENDING: The invitation is pending acceptance.\n - ACCEPTED: The invitation has been accepted and a user membership was created.\n - DECLINED: The invitation was declined by the recipient.\n - REVOKED: The invitation was revoked by an org admin.\n - EXPIRED: The invitation expired before being accepted or declined."
+    },
+    "v1ListCustomDomainsResponse": {
+      "type": "object",
+      "properties": {
+        "customDomains": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1CustomDomain"
+          },
+          "description": "The list of custom domains for the specified organization."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "A pagination token to be used to retrieve the next page of results.\nIf empty, this response contains the last page of results."
+        }
+      },
+      "description": "The response returned from the\n[ListCustomDomains][pivox.api.v1.Organizations.ListCustomDomains]\nmethod."
+    },
+    "v1ListInvitationsResponse": {
+      "type": "object",
+      "properties": {
+        "invitations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Invitation"
+          },
+          "description": "The invitations in the organization."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for the next page of results."
+        }
+      },
+      "description": "Response message for `ListInvitations`."
+    },
+    "v1ListOrganizationsResponse": {
+      "type": "object",
+      "properties": {
+        "organizations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Organization"
+          },
+          "description": "The list of Organizations that matched the list request, possibly\npaginated."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "A pagination token to be used to retrieve the next page of results. If the\nresult is too large to fit within the page size specified in the request,\nthis field will be set with a token that can be used to fetch the next page\nof results. If this field is empty, it indicates that this response\ncontains the last page of results."
+        }
+      },
+      "description": "The response returned from the `ListOrganizations` method."
+    },
+    "v1Organization": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Output only. The resource name of the organization. This is the\norganization's relative path in the API. Its format is\n\"organizations/[organization_id]\". For example, \"organizations/1234\".",
+          "readOnly": true
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Output only. A human-readable string that refers to the organization in the\nPivox Console. This string is set by the server and cannot be\nchanged. The string will be set to the primary domain (for example,\n\"acme.com\") of the customer that owns the organization.",
+          "readOnly": true
+        },
+        "state": {
+          "$ref": "#/definitions/v1OrganizationState",
+          "description": "Output only. The organization's current lifecycle state.",
+          "readOnly": true
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the Organization was created.",
+          "readOnly": true
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the Organization was last modified.",
+          "readOnly": true
+        },
+        "deleteTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the Organization was requested for deletion.",
+          "readOnly": true
+        },
+        "purgeTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. The time at which this organization will be purged.\nApproximately 30 days after deletion.",
+          "readOnly": true
+        },
+        "etag": {
+          "type": "string",
+          "description": "Output only. A checksum computed by the server based on the current value\nof the Organization resource. This may be sent on update and delete\nrequests to ensure the client has an up-to-date value before proceeding.",
+          "readOnly": true
+        },
+        "owner": {
+          "type": "string",
+          "title": "Output only. The resource name of the organization owner.\nFormat: `organizations/{organization}/users/{user}`",
+          "readOnly": true
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Optional. Labels associated with this organization.\nLabels are key-value pairs that can be used to organize and track resources."
+        }
+      },
+      "description": "The root node in the resource hierarchy to which a particular entity's\n(a company, for example) resources belong."
+    },
+    "v1OrganizationState": {
+      "type": "string",
+      "enum": [
+        "STATE_UNSPECIFIED",
+        "ACTIVE",
+        "DELETE_REQUESTED"
+      ],
+      "default": "STATE_UNSPECIFIED",
+      "description": "Organization lifecycle states.\n\n - STATE_UNSPECIFIED: Unspecified state.  This is only useful for distinguishing unset values.\n - ACTIVE: The normal and active state.\n - DELETE_REQUESTED: The organization has been marked for deletion by the user."
+    },
+    "v1OrganizationsGetIamPolicyBody": {
+      "type": "object",
+      "description": "Request message for `GetIamPolicy` method."
+    },
+    "v1OrganizationsSetIamPolicyBody": {
+      "type": "object",
+      "properties": {
+        "policy": {
+          "$ref": "#/definitions/v1Policy",
+          "description": "REQUIRED: The complete policy to be applied to the `resource`. The size of\nthe policy is limited to a few 10s of KB. An empty policy is a\nvalid policy but certain Pivox services (such as Projects)\nmight reject them."
+        },
+        "updateMask": {
+          "type": "string",
+          "description": "`paths: \"bindings, etag\"`",
+          "title": "OPTIONAL: A FieldMask specifying which fields of the policy to modify. Only\nthe fields in the mask will be modified. If no mask is provided, the\nfollowing default mask is used:"
+        }
+      },
+      "description": "Request message for `SetIamPolicy` method.",
+      "required": [
+        "policy"
+      ]
+    },
+    "v1OrganizationsTestIamPermissionsBody": {
+      "type": "object",
+      "properties": {
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The set of permissions to check for the `resource`. Permissions with\nwildcards (such as '*' or 'storage.*') are not allowed. For more\ninformation see\n[IAM Overview](https://cloud.google.com/iam/docs/overview#permissions)."
+        }
+      },
+      "description": "Request message for `TestIamPermissions` method.",
+      "required": [
+        "permissions"
+      ]
+    },
+    "v1Policy": {
+      "type": "object",
+      "properties": {
+        "bindings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Binding"
+          },
+          "description": "Associates a list of `members`, or principals, with a `role`. Optionally,\nmay specify a `condition` that determines how and when the `bindings` are\napplied. Each of the `bindings` must contain at least one principal."
+        },
+        "etag": {
+          "type": "string",
+          "description": "`etag` is used for optimistic concurrency control as a way to help\nprevent simultaneous updates of a policy from overwriting each other.\nIt is strongly suggested that systems make use of the `etag` in the\nread-modify-write cycle to perform policy updates in order to avoid race\nconditions: An `etag` is returned in the response to `getIamPolicy`, and\nsystems are expected to put that etag in the request to `setIamPolicy` to\nensure that their change will be applied to the same version of the policy."
+        }
+      },
+      "description": "An Identity and Access Management (IAM) policy, which specifies access\ncontrols for Pivox resources.\n\nA `Policy` is a collection of `bindings`. A `binding` binds one or more\n`members`, or principals, to a single `role`. Principals can be user\naccounts, service accounts, groups, and domains. A `role` is a named list\nof permissions; each `role` can be a predefined role or a user-created\ncustom role."
+    },
+    "v1TestIamPermissionsResponse": {
+      "type": "object",
+      "properties": {
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "A subset of `TestPermissionsRequest.permissions` that the caller is\nallowed."
+        }
+      },
+      "description": "Response message for `TestIamPermissions` method."
+    }
+  }
+}

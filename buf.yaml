@@ -1,0 +1,12 @@
+version: v2
+lint:
+  use:
+    - STANDARD
+  except:
+    - IMPORT_USED
+    - RPC_REQUEST_RESPONSE_UNIQUE
+    - RPC_RESPONSE_STANDARD_NAME
+    - SERVICE_SUFFIX
+modules:
+  - path: api/proto
+    name: buf.build/pivox/googleapis

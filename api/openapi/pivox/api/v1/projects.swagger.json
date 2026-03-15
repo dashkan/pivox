@@ -1,0 +1,763 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "pivox/api/v1/projects.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "Projects"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/organizations/{organization}/projects": {
+      "get": {
+        "summary": "Lists projects that are direct children of the specified organization\nresource. `list()` provides a strongly consistent view of the\nprojects underneath the specified parent resource. `list()` returns\nprojects sorted based upon the (ascending) lexical ordering of their\n`display_name`. The caller must have `resourcemanager.projects.list`\npermission on the identified parent.",
+        "operationId": "Projects_ListProjects",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListProjectsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. A pagination token returned from a previous call to\n[ListProjects] [pivox.api.v1.Projects.ListProjects] that\nindicates from where listing should continue.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Optional. The maximum number of projects to return in the response.\nThe server can return fewer projects than requested.\nIf unspecified, server picks an appropriate default.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "showDeleted",
+            "description": "Optional. Indicate that projects in the `DELETE_REQUESTED` state should\nalso be returned. Normally only `ACTIVE` projects are returned.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "filter",
+            "description": "Optional. An expression for filtering the results of the request.\nFilter rules are case insensitive. Some eligible fields for filtering are:\n\n+ `displayName`\n+ `state`\n+ `labels` (supports key and key=value matching)\n+ `createTime` (supports comparison operators)\n\nSome examples of filter strings:\n\n+ `displayName = \"My Project\"` - returns projects with display name\n  \"My Project\".\n+ `displayName = \"My*\"` - returns projects whose display name starts\n  with \"My\".\n+ `state = ACTIVE` - returns only active projects.\n+ `labels.color:*` - returns projects that have the label \"color\".\n+ `labels.color = red` - returns projects where label \"color\" is \"red\".\n+ `createTime \u003e \"2024-01-01T00:00:00Z\"` - returns projects created\n  after the given timestamp.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "description": "Optional. A comma-separated list of fields to order by. The default\norder is ascending. Use \"desc\" after a field name for descending.\nSupported fields:\n\n+ `displayName`\n+ `createTime`\n+ `name`\n\nExample: `createTime desc, displayName`\n\nIf not specified, the results are ordered by `name` ascending.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Projects"
+        ]
+      },
+      "post": {
+        "summary": "Creates a new project under the specified organization.",
+        "operationId": "Projects_CreateProject",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Project"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "description": "Required. The Project to create.\n\nProject ID is required. If the requested ID is unavailable, the request\nfails.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1Project"
+            }
+          },
+          {
+            "name": "projectId",
+            "description": "Optional. A unique identifier for the project. If not provided, the server will\ngenerate one.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "validateOnly",
+            "description": "Optional. If set to true, the request will only validate the request\nwithout persisting it.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "Projects"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/projects/{project}": {
+      "get": {
+        "summary": "Retrieves the project identified by the specified `name` (for example,\n`organizations/123/projects/my-project`).",
+        "description": "The caller must have `resourcemanager.projects.get` permission\nfor this project.",
+        "operationId": "Projects_GetProject",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Project"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Projects"
+        ]
+      },
+      "delete": {
+        "summary": "Marks the project identified by the specified\n`name` (for example, `organizations/123/projects/my-project`) for deletion.",
+        "description": "This method will only affect the project if it has a lifecycle state of\n[ACTIVE][pivox.api.v1.Project.State.ACTIVE].\n\nThis method changes the Project's lifecycle state from\n[ACTIVE][pivox.api.v1.Project.State.ACTIVE]\nto\n[DELETE_REQUESTED][pivox.api.v1.Project.State.DELETE_REQUESTED].\nThe deletion starts at an unspecified time,\nat which point the Project is no longer accessible.\n\nUntil the deletion completes, you can check the lifecycle state\nchecked by retrieving the project with [GetProject]\n[pivox.api.v1.Projects.GetProject],\nand the project remains visible to [ListProjects]\n[pivox.api.v1.Projects.ListProjects].\nHowever, you cannot update the project.\n\nAfter the deletion completes, the project is not retrievable by\nthe [GetProject]\n[pivox.api.v1.Projects.GetProject] and\n[ListProjects]\n[pivox.api.v1.Projects.ListProjects] method.\n\nThis method behaves idempotently, such that deleting a `DELETE_REQUESTED`\nproject will not cause an error, but also won't do anything.\n\nThe caller must have `resourcemanager.projects.delete` permissions for this\nproject.",
+        "operationId": "Projects_DeleteProject",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Project"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "etag",
+            "description": "Optional. The etag known to the client for the expected state of the project.\nThis is to be used for optimistic concurrency.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "validateOnly",
+            "description": "Optional. If set to true, the request will only validate the request\nwithout persisting it.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "Projects"
+        ]
+      },
+      "patch": {
+        "summary": "Updates the `display_name` and labels of the project identified by the\nspecified `name` (for example, `organizations/123/projects/my-project`).\nDeleting all labels requires an update mask for labels field.",
+        "description": "The caller must have `resourcemanager.projects.update` permission for this\nproject.",
+        "operationId": "Projects_UpdateProject",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Project"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "description": "Required. The new definition of the project.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "state": {
+                  "$ref": "#/definitions/v1ProjectState",
+                  "description": "Output only. The project lifecycle state.",
+                  "readOnly": true
+                },
+                "displayName": {
+                  "type": "string",
+                  "description": "Optional. A user-assigned display name of the project.\nWhen present it must be between 4 to 30 characters.\nAllowed characters are: lowercase and uppercase letters, numbers,\nhyphen, single-quote, double-quote, space, and exclamation point.\n\nExample: `My Project`"
+                },
+                "createTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Creation time.",
+                  "readOnly": true
+                },
+                "updateTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. The most recent time this resource was modified.",
+                  "readOnly": true
+                },
+                "deleteTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. The time at which this resource was requested for deletion.",
+                  "readOnly": true
+                },
+                "purgeTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. The time at which this project will be purged.\nApproximately 30 days after deletion.",
+                  "readOnly": true
+                },
+                "etag": {
+                  "type": "string",
+                  "description": "Output only. A checksum computed by the server based on the current value\nof the Project resource. This may be sent on update and delete requests to\nensure the client has an up-to-date value before proceeding.",
+                  "readOnly": true
+                },
+                "labels": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "Optional. The labels associated with this project.\n\nLabel keys must be between 1 and 63 characters long and must conform\nto the following regular expression: \\[a-z\\](\\[-a-z0-9\\]*\\[a-z0-9\\])?.\n\nLabel values must be between 0 and 63 characters long and must conform\nto the regular expression (\\[a-z\\](\\[-a-z0-9\\]*\\[a-z0-9\\])?)?.\n\nNo more than 64 labels can be associated with a given resource.\n\nClients should store labels in a representation such as JSON that does not\ndepend on specific characters being disallowed.\n\nExample: `\"myBusinessDimension\" : \"businessValue\"`"
+                }
+              },
+              "title": "Required. The new definition of the project."
+            }
+          },
+          {
+            "name": "allowMissing",
+            "description": "Optional. If set to true, and the project is not found, a new project will be created.\nIn this situation, update_mask is ignored.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "validateOnly",
+            "description": "Optional. If set to true, the request will only validate the request\nwithout persisting it.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "Projects"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/projects/{project}:getIamPolicy": {
+      "post": {
+        "summary": "Returns the IAM access control policy for the specified project.\nPermission is denied if the policy or the resource do not exist.",
+        "operationId": "Projects_GetIamPolicy",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Policy"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1ProjectsGetIamPolicyBody"
+            }
+          }
+        ],
+        "tags": [
+          "Projects"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/projects/{project}:setIamPolicy": {
+      "post": {
+        "summary": "Sets the IAM access control policy for the specified project.",
+        "description": "CAUTION: This method will replace the existing policy, and cannot be used\nto append additional IAM settings.\n\nNote: Removing service accounts from policies or changing their roles can\nrender services completely inoperable. It is important to understand how\nthe service account is being used before removing or updating its roles.\n\nThe following constraints apply when using `setIamPolicy()`:\n\n+ Project does not support `allUsers` and `allAuthenticatedUsers` as\n`members` in a `Binding` of a `Policy`.\n\n+ The owner role can be granted to a `user`, `serviceAccount`, or a group\nthat is part of an organization. For example,\ngroup@myownpersonaldomain.com could be added as an owner to a project in\nthe myownpersonaldomain.com organization, but not the examplepetstore.com\norganization.\n\n+ Service accounts can be made owners of a project directly\nwithout any restrictions. However, to be added as an owner, a user must be\ninvited using the Pivox Console and must accept the invitation.\n\n+ A user cannot be granted the owner role using `setIamPolicy()`. The user\nmust be granted the owner role using the Pivox Console and must\nexplicitly accept the invitation.\n\n+ Invitations to grant the owner role cannot be sent using\n`setIamPolicy()`;\nthey must be sent only using the Pivox Console.\n\n+ If the project is not part of an organization, there must be at least\none owner who has accepted the Terms of Service (ToS) agreement in the\npolicy. Calling `setIamPolicy()` to remove the last ToS-accepted owner\nfrom the policy will fail. This restriction also applies to legacy\nprojects that no longer have owners who have accepted the ToS. Edits to\nIAM policies will be rejected until the lack of a ToS-accepting owner is\nrectified. If the project is part of an organization, you can remove all\nowners, potentially making the organization inaccessible.",
+        "operationId": "Projects_SetIamPolicy",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Policy"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1ProjectsSetIamPolicyBody"
+            }
+          }
+        ],
+        "tags": [
+          "Projects"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/projects/{project}:testIamPermissions": {
+      "post": {
+        "summary": "Returns permissions that a caller has on the specified project.",
+        "operationId": "Projects_TestIamPermissions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1TestIamPermissionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1ProjectsTestIamPermissionsBody"
+            }
+          }
+        ],
+        "tags": [
+          "Projects"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/projects/{project}:undelete": {
+      "post": {
+        "summary": "Restores the project identified by the specified\n`name` (for example, `organizations/123/projects/my-project`).\nYou can only use this method for a project that has a lifecycle state of\n[DELETE_REQUESTED]\n[Projects.State.DELETE_REQUESTED].\nAfter deletion starts, the project cannot be restored.",
+        "description": "The caller must have `resourcemanager.projects.undelete` permission for\nthis project.",
+        "operationId": "Projects_UndeleteProject",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Project"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ProjectsUndeleteProjectBody"
+            }
+          }
+        ],
+        "tags": [
+          "Projects"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "ProjectsUndeleteProjectBody": {
+      "type": "object",
+      "properties": {
+        "etag": {
+          "type": "string",
+          "description": "Optional. The etag known to the client for the expected state of the project.\nThis is to be used for optimistic concurrency."
+        },
+        "validateOnly": {
+          "type": "boolean",
+          "description": "Optional. If set to true, the request will only validate the request\nwithout persisting it."
+        }
+      },
+      "description": "The request sent to the [UndeleteProject]\n[pivox.api.v1.Projects.UndeleteProject]\nmethod."
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string",
+          "description": "A URL/resource name that uniquely identifies the type of the serialized\nprotocol buffer message. This string must contain at least\none \"/\" character. The last segment of the URL's path must represent\nthe fully qualified name of the type (as in\n`path/google.protobuf.Duration`). The name should be in a canonical form\n(e.g., leading \".\" is not accepted).\n\nIn practice, teams usually precompile into the binary all types that they\nexpect it to use in the context of Any. However, for URLs which use the\nscheme `http`, `https`, or no scheme, one can optionally set up a type\nserver that maps type URLs to message definitions as follows:\n\n* If no scheme is provided, `https` is assumed.\n* An HTTP GET on the URL must yield a [google.protobuf.Type][]\n  value in binary format, or produce an error.\n* Applications are allowed to cache lookup results based on the\n  URL, or have them precompiled into a binary to avoid any\n  lookup. Therefore, binary compatibility needs to be preserved\n  on changes to types. (Use versioned type names to manage\n  breaking changes.)\n\nNote: this functionality is not currently available in the official\nprotobuf release, and it is not used for type URLs beginning with\ntype.googleapis.com. As of May 2023, there are no widely used type server\nimplementations and no plans to implement one.\n\nSchemes other than `http`, `https` (or the empty scheme) might be\nused with implementation specific semantics."
+        }
+      },
+      "additionalProperties": {},
+      "description": "`Any` contains an arbitrary serialized protocol buffer message along with a\nURL that describes the type of the serialized message.\n\nProtobuf library provides support to pack/unpack Any values in the form\nof utility functions or additional generated methods of the Any type.\n\nExample 1: Pack and unpack a message in C++.\n\n    Foo foo = ...;\n    Any any;\n    any.PackFrom(foo);\n    ...\n    if (any.UnpackTo(\u0026foo)) {\n      ...\n    }\n\nExample 2: Pack and unpack a message in Java.\n\n    Foo foo = ...;\n    Any any = Any.pack(foo);\n    ...\n    if (any.is(Foo.class)) {\n      foo = any.unpack(Foo.class);\n    }\n    // or ...\n    if (any.isSameTypeAs(Foo.getDefaultInstance())) {\n      foo = any.unpack(Foo.getDefaultInstance());\n    }\n\n Example 3: Pack and unpack a message in Python.\n\n    foo = Foo(...)\n    any = Any()\n    any.Pack(foo)\n    ...\n    if any.Is(Foo.DESCRIPTOR):\n      any.Unpack(foo)\n      ...\n\n Example 4: Pack and unpack a message in Go\n\n     foo := \u0026pb.Foo{...}\n     any, err := anypb.New(foo)\n     if err != nil {\n       ...\n     }\n     ...\n     foo := \u0026pb.Foo{}\n     if err := any.UnmarshalTo(foo); err != nil {\n       ...\n     }\n\nThe pack methods provided by protobuf library will by default use\n'type.googleapis.com/full.type.name' as the type URL and the unpack\nmethods only use the fully qualified type name after the last '/'\nin the type URL, for example \"foo.bar.com/x/y.z\" will yield type\nname \"y.z\".\n\nJSON\n====\nThe JSON representation of an `Any` value uses the regular\nrepresentation of the deserialized, embedded message, with an\nadditional field `@type` which contains the type URL. Example:\n\n    package google.profile;\n    message Person {\n      string first_name = 1;\n      string last_name = 2;\n    }\n\n    {\n      \"@type\": \"type.googleapis.com/google.profile.Person\",\n      \"firstName\": \u003cstring\u003e,\n      \"lastName\": \u003cstring\u003e\n    }\n\nIf the embedded message type is well-known and has a custom JSON\nrepresentation, that representation will be embedded adding a field\n`value` which holds the custom JSON in addition to the `@type`\nfield. Example (for message [google.protobuf.Duration][]):\n\n    {\n      \"@type\": \"type.googleapis.com/google.protobuf.Duration\",\n      \"value\": \"1.212s\"\n    }"
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32",
+          "description": "The status code, which should be an enum value of\n[google.rpc.Code][google.rpc.Code]."
+        },
+        "message": {
+          "type": "string",
+          "description": "A developer-facing error message, which should be in English. Any\nuser-facing error message should be localized and sent in the\n[google.rpc.Status.details][google.rpc.Status.details] field, or localized\nby the client."
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          },
+          "description": "A list of messages that carry the error details.  There is a common set of\nmessage types for APIs to use."
+        }
+      },
+      "description": "The `Status` type defines a logical error model that is suitable for\ndifferent programming environments, including REST APIs and RPC APIs. It is\nused by [gRPC](https://github.com/grpc). Each `Status` message contains\nthree pieces of data: error code, error message, and error details.\n\nYou can find out more about this error model and how to work with it in the\n[API Design Guide](https://cloud.google.com/apis/design/errors)."
+    },
+    "typeExpr": {
+      "type": "object",
+      "properties": {
+        "expression": {
+          "type": "string",
+          "description": "Textual representation of an expression in Common Expression Language\nsyntax."
+        },
+        "title": {
+          "type": "string",
+          "description": "Optional. Title for the expression, i.e. a short string describing\nits purpose. This can be used e.g. in UIs which allow to enter the\nexpression."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional. Description of the expression. This is a longer text which\ndescribes the expression, e.g. when hovered over it in a UI."
+        },
+        "location": {
+          "type": "string",
+          "description": "Optional. String indicating the location of the expression for error\nreporting, e.g. a file name and a position in the file."
+        }
+      },
+      "description": "Represents a textual expression in the Common Expression Language (CEL)\nsyntax. CEL is a C-like expression language. The syntax and semantics of CEL\nare documented at https://github.com/google/cel-spec.\n\nExample (Comparison):\n\n    title: \"Summary size limit\"\n    description: \"Determines if a summary is less than 100 chars\"\n    expression: \"document.summary.size() \u003c 100\"\n\nExample (Equality):\n\n    title: \"Requestor is owner\"\n    description: \"Determines if requestor is the document owner\"\n    expression: \"document.owner == request.auth.claims.email\"\n\nExample (Logic):\n\n    title: \"Public documents\"\n    description: \"Determine whether the document should be publicly visible\"\n    expression: \"document.type != 'private' \u0026\u0026 document.type != 'internal'\"\n\nExample (Data Manipulation):\n\n    title: \"Notification string\"\n    description: \"Create a notification string with a timestamp.\"\n    expression: \"'New message received at ' + string(document.create_time)\"\n\nThe exact variables and functions that may be referenced within an expression\nare determined by the service that evaluates it. See the service\ndocumentation for additional information."
+    },
+    "v1Binding": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string",
+          "description": "Role that is assigned to the list of `members`, or principals.\nFor example, `roles/viewer`, `roles/editor`, or `roles/owner`."
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "* `allUsers`: A special identifier that represents anyone who is\n   on the internet; with or without an account.\n\n* `allAuthenticatedUsers`: A special identifier that represents anyone\n   who is authenticated with an account or a service account.\n\n* `user:{emailid}`: An email address that represents a specific\n   account. For example, `alice@example.com`.\n\n* `serviceAccount:{emailid}`: An email address that represents a service\n   account. For example, `my-other-app@appspot.gserviceaccount.com`.\n\n* `group:{emailid}`: An email address that represents a group.\n   For example, `admins@example.com`.\n\n* `domain:{domain}`: The domain (primary) that represents all the\n   users of that domain. For example, `example.com`.",
+          "title": "Specifies the principals requesting access for a Pivox resource.\n`members` can have the following values:"
+        },
+        "condition": {
+          "$ref": "#/definitions/typeExpr",
+          "description": "Optional. The condition that is associated with this binding.\n\nIf the condition evaluates to `true`, then this binding applies to the\ncurrent request.\n\nIf the condition evaluates to `false`, then this binding does not apply to\nthe current request. However, a different role binding might grant the same\nrole to one or more of the principals in this binding."
+        }
+      },
+      "description": "Associates `members`, or principals, with a `role`."
+    },
+    "v1ListProjectsResponse": {
+      "type": "object",
+      "properties": {
+        "projects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Project"
+          },
+          "description": "The list of Projects under the parent. This list can be paginated."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Pagination token.\n\nIf the result set is too large to fit in a single response, this token\nis returned. It encodes the position of the current result cursor.\nFeeding this value into a new list request with the `page_token` parameter\ngives the next page of the results.\n\nWhen `next_page_token` is not filled in, there is no next page and\nthe list returned is the last page in the result set.\n\nPagination tokens have a limited lifetime."
+        }
+      },
+      "description": "A page of the response received from the\n[ListProjects][pivox.api.v1.Projects.ListProjects]\nmethod.\n\nA paginated response where more pages are available has\n`next_page_token` set. This token can be used in a subsequent request to\nretrieve the next request page.\n\nNOTE: A response may contain fewer elements than the request `page_size` and\nstill have a `next_page_token`."
+    },
+    "v1Policy": {
+      "type": "object",
+      "properties": {
+        "bindings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Binding"
+          },
+          "description": "Associates a list of `members`, or principals, with a `role`. Optionally,\nmay specify a `condition` that determines how and when the `bindings` are\napplied. Each of the `bindings` must contain at least one principal."
+        },
+        "etag": {
+          "type": "string",
+          "description": "`etag` is used for optimistic concurrency control as a way to help\nprevent simultaneous updates of a policy from overwriting each other.\nIt is strongly suggested that systems make use of the `etag` in the\nread-modify-write cycle to perform policy updates in order to avoid race\nconditions: An `etag` is returned in the response to `getIamPolicy`, and\nsystems are expected to put that etag in the request to `setIamPolicy` to\nensure that their change will be applied to the same version of the policy."
+        }
+      },
+      "description": "An Identity and Access Management (IAM) policy, which specifies access\ncontrols for Pivox resources.\n\nA `Policy` is a collection of `bindings`. A `binding` binds one or more\n`members`, or principals, to a single `role`. Principals can be user\naccounts, service accounts, groups, and domains. A `role` is a named list\nof permissions; each `role` can be a predefined role or a user-created\ncustom role."
+    },
+    "v1Project": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Output only. The unique resource name of the project.\n\nExample: `organizations/123/projects/my-project`",
+          "readOnly": true
+        },
+        "state": {
+          "$ref": "#/definitions/v1ProjectState",
+          "description": "Output only. The project lifecycle state.",
+          "readOnly": true
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Optional. A user-assigned display name of the project.\nWhen present it must be between 4 to 30 characters.\nAllowed characters are: lowercase and uppercase letters, numbers,\nhyphen, single-quote, double-quote, space, and exclamation point.\n\nExample: `My Project`"
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Creation time.",
+          "readOnly": true
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. The most recent time this resource was modified.",
+          "readOnly": true
+        },
+        "deleteTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. The time at which this resource was requested for deletion.",
+          "readOnly": true
+        },
+        "purgeTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. The time at which this project will be purged.\nApproximately 30 days after deletion.",
+          "readOnly": true
+        },
+        "etag": {
+          "type": "string",
+          "description": "Output only. A checksum computed by the server based on the current value\nof the Project resource. This may be sent on update and delete requests to\nensure the client has an up-to-date value before proceeding.",
+          "readOnly": true
+        },
+        "labels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Optional. The labels associated with this project.\n\nLabel keys must be between 1 and 63 characters long and must conform\nto the following regular expression: \\[a-z\\](\\[-a-z0-9\\]*\\[a-z0-9\\])?.\n\nLabel values must be between 0 and 63 characters long and must conform\nto the regular expression (\\[a-z\\](\\[-a-z0-9\\]*\\[a-z0-9\\])?)?.\n\nNo more than 64 labels can be associated with a given resource.\n\nClients should store labels in a representation such as JSON that does not\ndepend on specific characters being disallowed.\n\nExample: `\"myBusinessDimension\" : \"businessValue\"`"
+        }
+      },
+      "description": "A project is a high-level Pivox entity. It is a\ncontainer for ACLs, APIs, and other Pivox resources."
+    },
+    "v1ProjectState": {
+      "type": "string",
+      "enum": [
+        "STATE_UNSPECIFIED",
+        "ACTIVE",
+        "DELETE_REQUESTED"
+      ],
+      "default": "STATE_UNSPECIFIED",
+      "description": "Project lifecycle states.\n\n - STATE_UNSPECIFIED: Unspecified state.  This is only used/useful for distinguishing\nunset values.\n - ACTIVE: The normal and active state.\n - DELETE_REQUESTED: The project has been marked for deletion by the user\n(by invoking\n[DeleteProject][pivox.api.v1.Projects.DeleteProject])\nor by the system (Pivox).\nThis can generally be reversed by invoking [UndeleteProject]\n[pivox.api.v1.Projects.UndeleteProject]."
+    },
+    "v1ProjectsGetIamPolicyBody": {
+      "type": "object",
+      "description": "Request message for `GetIamPolicy` method."
+    },
+    "v1ProjectsSetIamPolicyBody": {
+      "type": "object",
+      "properties": {
+        "policy": {
+          "$ref": "#/definitions/v1Policy",
+          "description": "REQUIRED: The complete policy to be applied to the `resource`. The size of\nthe policy is limited to a few 10s of KB. An empty policy is a\nvalid policy but certain Pivox services (such as Projects)\nmight reject them."
+        },
+        "updateMask": {
+          "type": "string",
+          "description": "`paths: \"bindings, etag\"`",
+          "title": "OPTIONAL: A FieldMask specifying which fields of the policy to modify. Only\nthe fields in the mask will be modified. If no mask is provided, the\nfollowing default mask is used:"
+        }
+      },
+      "description": "Request message for `SetIamPolicy` method.",
+      "required": [
+        "policy"
+      ]
+    },
+    "v1ProjectsTestIamPermissionsBody": {
+      "type": "object",
+      "properties": {
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The set of permissions to check for the `resource`. Permissions with\nwildcards (such as '*' or 'storage.*') are not allowed. For more\ninformation see\n[IAM Overview](https://cloud.google.com/iam/docs/overview#permissions)."
+        }
+      },
+      "description": "Request message for `TestIamPermissions` method.",
+      "required": [
+        "permissions"
+      ]
+    },
+    "v1TestIamPermissionsResponse": {
+      "type": "object",
+      "properties": {
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "A subset of `TestPermissionsRequest.permissions` that the caller is\nallowed."
+        }
+      },
+      "description": "Response message for `TestIamPermissions` method."
+    }
+  }
+}

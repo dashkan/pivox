@@ -1,0 +1,427 @@
+// Copyright 2025 Pivox
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package pivox.iam.v1;
+
+import "buf/validate/validate.proto";
+import "google/api/annotations.proto";
+import "google/api/client.proto";
+import "google/api/field_behavior.proto";
+import "google/api/resource.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "pivox/iam/v1;iampb";
+
+// Manages roles within an organization.
+service Roles {
+  option (google.api.default_host) = "api.pivox.io";
+
+  // Gets a role by resource name.
+  rpc GetRole(GetRoleRequest) returns (Role) {
+    option (google.api.http) = {get: "/v1/{name=organizations/*/roles/*}"};
+    option (google.api.method_signature) = "name";
+  }
+
+  // Lists roles in an organization.
+  rpc ListRoles(ListRolesRequest) returns (ListRolesResponse) {
+    option (google.api.http) = {get: "/v1/{parent=organizations/*}/roles"};
+    option (google.api.method_signature) = "parent";
+  }
+
+  // Creates a new custom role.
+  rpc CreateRole(CreateRoleRequest) returns (Role) {
+    option (google.api.http) = {
+      post: "/v1/{parent=organizations/*}/roles"
+      body: "role"
+    };
+    option (google.api.method_signature) = "parent,role,role_id";
+  }
+
+  // Updates a role.
+  rpc UpdateRole(UpdateRoleRequest) returns (Role) {
+    option (google.api.http) = {
+      patch: "/v1/{role.name=organizations/*/roles/*}"
+      body: "role"
+    };
+    option (google.api.method_signature) = "role,update_mask";
+  }
+
+  // Soft-deletes a role. System roles cannot be deleted.
+  rpc DeleteRole(DeleteRoleRequest) returns (Role) {
+    option (google.api.http) = {
+      delete: "/v1/{name=organizations/*/roles/*}"
+    };
+    option (google.api.method_signature) = "name";
+  }
+
+  // Adds members (users or groups) to a role.
+  rpc AddRoleMembers(AddRoleMembersRequest)
+      returns (AddRoleMembersResponse) {
+    option (google.api.http) = {
+      post: "/v1/{role=organizations/*/roles/*}:addRoleMembers"
+      body: "*"
+    };
+    option (google.api.method_signature) = "role,members";
+  }
+
+  // Removes members from a role.
+  rpc RemoveRoleMembers(RemoveRoleMembersRequest)
+      returns (RemoveRoleMembersResponse) {
+    option (google.api.http) = {
+      post: "/v1/{role=organizations/*/roles/*}:removeRoleMembers"
+      body: "*"
+    };
+    option (google.api.method_signature) = "role,members";
+  }
+
+  // Lists members of a role.
+  rpc ListRoleMembers(ListRoleMembersRequest)
+      returns (ListRoleMembersResponse) {
+    option (google.api.http) = {
+      get: "/v1/{role=organizations/*/roles/*}/members"
+    };
+    option (google.api.method_signature) = "role";
+  }
+
+  // Lists all available system-defined permissions.
+  rpc ListPermissions(ListPermissionsRequest)
+      returns (ListPermissionsResponse) {
+    option (google.api.http) = {get: "/v1/permissions"};
+  }
+}
+
+// A role within an organization. Roles can be system-defined (owner, admin,
+// editor, viewer) or custom. System roles are seeded per-org at creation time.
+message Role {
+  option (google.api.resource) = {
+    type: "pivox.iam/Role"
+    pattern: "organizations/{organization}/roles/{role}"
+    plural: "roles"
+    singular: "role"
+  };
+
+  // The resource name of the role.
+  // Format: `organizations/{organization}/roles/{role}`
+  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Required. A human-readable name for the role.
+  string display_name = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).string = {min_len: 1, max_len: 63}
+  ];
+
+  // Optional. A longer description of the role's purpose.
+  string description = 3 [
+    (google.api.field_behavior) = OPTIONAL,
+    (buf.validate.field).string.max_len = 256
+  ];
+
+  // Output only. The permissions granted by this role, resolved from the
+  // role_permissions join table.
+  repeated string permissions = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Whether this is a system-defined role (owner, admin, editor,
+  // viewer). System roles cannot be deleted or have their permissions changed.
+  bool system = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Timestamp when the role was created.
+  google.protobuf.Timestamp create_time = 6
+      [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Timestamp when the role was last modified.
+  google.protobuf.Timestamp update_time = 7
+      [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Timestamp when the role was soft-deleted.
+  google.protobuf.Timestamp delete_time = 8
+      [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Timestamp when the role will be permanently purged.
+  google.protobuf.Timestamp purge_time = 9
+      [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. A checksum computed by the server based on the current value
+  // of the Role resource.
+  string etag = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Free-form annotations for the role.
+  map<string, string> annotations = 11
+      [(google.api.field_behavior) = OPTIONAL];
+}
+
+// A membership of a user or group in a role.
+message RoleMember {
+  // The resource name of the member. Can be a user or group resource name.
+  // Format: `organizations/{organization}/users/{user}` or
+  //         `organizations/{organization}/groups/{group}`
+  string member = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // Output only. Timestamp when the membership was created.
+  google.protobuf.Timestamp create_time = 2
+      [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Request message for `GetRole`.
+message GetRoleRequest {
+  // Required. The resource name of the role.
+  // Format: `organizations/{organization}/roles/{role}`
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.iam/Role"},
+    (buf.validate.field).cel = {
+      id: "required"
+      message: "value is required"
+      expression: "this.size() > 0"
+    }
+  ];
+}
+
+// Request message for `ListRoles`.
+message ListRolesRequest {
+  // Required. The parent organization.
+  // Format: `organizations/{organization}`
+  string parent = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {child_type: "pivox.iam/Role"},
+    (buf.validate.field).cel = {
+      id: "required"
+      message: "value is required"
+      expression: "this.size() > 0"
+    }
+  ];
+
+  // Optional. Maximum number of roles to return.
+  int32 page_size = 2 [
+    (google.api.field_behavior) = OPTIONAL,
+    (buf.validate.field).int32 = {gte: 0, lte: 1000}
+  ];
+
+  // Optional. Page token from a previous ListRoles call.
+  string page_token = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. An AIP-160 filter expression.
+  string filter = 4 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Sort order (e.g. "display_name", "create_time desc").
+  string order_by = 5 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Whether to include soft-deleted roles.
+  bool show_deleted = 6 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// Response message for `ListRoles`.
+message ListRolesResponse {
+  // The roles in the organization.
+  repeated Role roles = 1;
+
+  // Token for the next page of results.
+  string next_page_token = 2;
+}
+
+// Request message for `CreateRole`.
+message CreateRoleRequest {
+  // Required. The parent organization.
+  // Format: `organizations/{organization}`
+  string parent = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {child_type: "pivox.iam/Role"},
+    (buf.validate.field).cel = {
+      id: "required"
+      message: "value is required"
+      expression: "this.size() > 0"
+    }
+  ];
+
+  // Required. The role to create.
+  Role role = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. The server-generated role ID. If not provided, the server
+  // will generate one.
+  string role_id = 3 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// Request message for `UpdateRole`.
+message UpdateRoleRequest {
+  // Required. The role with updated fields.
+  Role role = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. The fields to update. If omitted, all mutable fields are updated.
+  google.protobuf.FieldMask update_mask = 2
+      [(google.api.field_behavior) = OPTIONAL];
+}
+
+// Request message for `DeleteRole`.
+message DeleteRoleRequest {
+  // Required. The resource name of the role to delete.
+  // Format: `organizations/{organization}/roles/{role}`
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.iam/Role"},
+    (buf.validate.field).cel = {
+      id: "required"
+      message: "value is required"
+      expression: "this.size() > 0"
+    }
+  ];
+
+  // Optional. The etag for optimistic concurrency control.
+  string etag = 2 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// Request message for `AddRoleMembers`.
+message AddRoleMembersRequest {
+  // Required. The resource name of the role.
+  // Format: `organizations/{organization}/roles/{role}`
+  string role = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.iam/Role"},
+    (buf.validate.field).cel = {
+      id: "required"
+      message: "value is required"
+      expression: "this.size() > 0"
+    }
+  ];
+
+  // Required. The resource names of users or groups to add.
+  // Format: `organizations/{organization}/users/{user}` or
+  //         `organizations/{organization}/groups/{group}`
+  repeated string members = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).repeated = {min_items: 1, max_items: 100}
+  ];
+}
+
+// Response message for `AddRoleMembers`.
+message AddRoleMembersResponse {}
+
+// Request message for `RemoveRoleMembers`.
+message RemoveRoleMembersRequest {
+  // Required. The resource name of the role.
+  // Format: `organizations/{organization}/roles/{role}`
+  string role = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.iam/Role"},
+    (buf.validate.field).cel = {
+      id: "required"
+      message: "value is required"
+      expression: "this.size() > 0"
+    }
+  ];
+
+  // Required. The resource names of users or groups to remove.
+  repeated string members = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).repeated = {min_items: 1, max_items: 100}
+  ];
+}
+
+// Response message for `RemoveRoleMembers`.
+message RemoveRoleMembersResponse {}
+
+// Request message for `ListRoleMembers`.
+// (-- api-linter: core::0132::request-parent-required=disabled
+//     aip.dev/not-precedent: ListRoleMembers uses `role` as the parent-like field. --)
+// (-- api-linter: core::0132::request-required-fields=disabled
+//     aip.dev/not-precedent: ListRoleMembers uses `role` as the parent-like field. --)
+// (-- api-linter: core::0132::request-unknown-fields=disabled
+//     aip.dev/not-precedent: ListRoleMembers uses `role` as the parent-like field. --)
+message ListRoleMembersRequest {
+  // Required. The resource name of the role.
+  // Format: `organizations/{organization}/roles/{role}`
+  string role = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.iam/Role"},
+    (buf.validate.field).cel = {
+      id: "required"
+      message: "value is required"
+      expression: "this.size() > 0"
+    }
+  ];
+
+  // Optional. Maximum number of members to return.
+  int32 page_size = 2 [
+    (google.api.field_behavior) = OPTIONAL,
+    (buf.validate.field).int32 = {gte: 0, lte: 1000}
+  ];
+
+  // Optional. Page token from a previous ListRoleMembers call.
+  string page_token = 3 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// Response message for `ListRoleMembers`.
+// (-- api-linter: core::0132::response-unknown-fields=disabled
+//     aip.dev/not-precedent: Response contains RoleMember, a custom sub-resource. --)
+message ListRoleMembersResponse {
+  // The members of the role.
+  repeated RoleMember members = 1;
+
+  // Token for the next page of results.
+  string next_page_token = 2;
+}
+
+// A system-defined permission that can be assigned to roles.
+message Permission {
+  option (google.api.resource) = {
+    type: "pivox.iam/Permission"
+    pattern: "permissions/{permission}"
+    plural: "permissions"
+    singular: "permission"
+  };
+
+  // The resource name of the permission.
+  // Format: `permissions/{permission}` (e.g. `permissions/projects.create`)
+  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // A human-readable name for the permission.
+  string display_name = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // A description of what the permission allows.
+  string description = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Request message for `ListPermissions`.
+// (-- api-linter: core::0132::request-parent-required=disabled
+//     aip.dev/not-precedent: Permissions are global, not scoped to a parent. --)
+// (-- api-linter: core::0132::request-required-fields=disabled
+//     aip.dev/not-precedent: Permissions are global, not scoped to a parent. --)
+message ListPermissionsRequest {
+  // Optional. Maximum number of permissions to return.
+  int32 page_size = 1 [
+    (google.api.field_behavior) = OPTIONAL,
+    (buf.validate.field).int32 = {gte: 0, lte: 1000}
+  ];
+
+  // Optional. Page token from a previous ListPermissions call.
+  string page_token = 2 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// Response message for `ListPermissions`.
+// (-- api-linter: core::0132::response-unknown-fields=disabled
+//     aip.dev/not-precedent: Permission is a lightweight message, not a full resource. --)
+message ListPermissionsResponse {
+  // The available permissions.
+  repeated Permission permissions = 1;
+
+  // Token for the next page of results.
+  string next_page_token = 2;
+}

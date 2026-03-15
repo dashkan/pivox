@@ -1,0 +1,733 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "pivox/iam/v1/roles.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "Roles"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/organizations/{organization}/roles": {
+      "get": {
+        "summary": "Lists roles in an organization.",
+        "operationId": "Roles_ListRoles",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListRolesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Optional. Maximum number of roles to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. Page token from a previous ListRoles call.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "filter",
+            "description": "Optional. An AIP-160 filter expression.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "description": "Optional. Sort order (e.g. \"display_name\", \"create_time desc\").",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "showDeleted",
+            "description": "Optional. Whether to include soft-deleted roles.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "Roles"
+        ]
+      },
+      "post": {
+        "summary": "Creates a new custom role.",
+        "operationId": "Roles_CreateRole",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Role"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "role",
+            "description": "Required. The role to create.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1Role"
+            }
+          },
+          {
+            "name": "roleId",
+            "description": "Optional. The server-generated role ID. If not provided, the server\nwill generate one.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Roles"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/roles/{role}": {
+      "get": {
+        "summary": "Gets a role by resource name.",
+        "operationId": "Roles_GetRole",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Role"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "role",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Roles"
+        ]
+      },
+      "delete": {
+        "summary": "Soft-deletes a role. System roles cannot be deleted.",
+        "operationId": "Roles_DeleteRole",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Role"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "role",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "etag",
+            "description": "Optional. The etag for optimistic concurrency control.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Roles"
+        ]
+      },
+      "patch": {
+        "summary": "Updates a role.",
+        "operationId": "Roles_UpdateRole",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Role"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "role",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "role",
+            "description": "Required. The role with updated fields.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "displayName": {
+                  "type": "string",
+                  "description": "Required. A human-readable name for the role."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Optional. A longer description of the role's purpose."
+                },
+                "permissions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Output only. The permissions granted by this role, resolved from the\nrole_permissions join table.",
+                  "readOnly": true
+                },
+                "system": {
+                  "type": "boolean",
+                  "description": "Output only. Whether this is a system-defined role (owner, admin, editor,\nviewer). System roles cannot be deleted or have their permissions changed.",
+                  "readOnly": true
+                },
+                "createTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when the role was created.",
+                  "readOnly": true
+                },
+                "updateTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when the role was last modified.",
+                  "readOnly": true
+                },
+                "deleteTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when the role was soft-deleted.",
+                  "readOnly": true
+                },
+                "purgeTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when the role will be permanently purged.",
+                  "readOnly": true
+                },
+                "etag": {
+                  "type": "string",
+                  "description": "Output only. A checksum computed by the server based on the current value\nof the Role resource.",
+                  "readOnly": true
+                },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "Optional. Free-form annotations for the role."
+                }
+              },
+              "title": "Required. The role with updated fields.",
+              "required": [
+                "displayName"
+              ]
+            }
+          }
+        ],
+        "tags": [
+          "Roles"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/roles/{role}/members": {
+      "get": {
+        "summary": "Lists members of a role.",
+        "operationId": "Roles_ListRoleMembers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListRoleMembersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "role",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Optional. Maximum number of members to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. Page token from a previous ListRoleMembers call.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Roles"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/roles/{role}:addRoleMembers": {
+      "post": {
+        "summary": "Adds members (users or groups) to a role.",
+        "operationId": "Roles_AddRoleMembers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1AddRoleMembersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "role",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/RolesAddRoleMembersBody"
+            }
+          }
+        ],
+        "tags": [
+          "Roles"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/roles/{role}:removeRoleMembers": {
+      "post": {
+        "summary": "Removes members from a role.",
+        "operationId": "Roles_RemoveRoleMembers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1RemoveRoleMembersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "role",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/RolesRemoveRoleMembersBody"
+            }
+          }
+        ],
+        "tags": [
+          "Roles"
+        ]
+      }
+    },
+    "/v1/permissions": {
+      "get": {
+        "summary": "Lists all available system-defined permissions.",
+        "operationId": "Roles_ListPermissions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListPermissionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pageSize",
+            "description": "Optional. Maximum number of permissions to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. Page token from a previous ListPermissions call.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Roles"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "RolesAddRoleMembersBody": {
+      "type": "object",
+      "properties": {
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "title": "Required. The resource names of users or groups to add.\nFormat: `organizations/{organization}/users/{user}` or\n        `organizations/{organization}/groups/{group}`"
+        }
+      },
+      "description": "Request message for `AddRoleMembers`.",
+      "required": [
+        "members"
+      ]
+    },
+    "RolesRemoveRoleMembersBody": {
+      "type": "object",
+      "properties": {
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Required. The resource names of users or groups to remove."
+        }
+      },
+      "description": "Request message for `RemoveRoleMembers`.",
+      "required": [
+        "members"
+      ]
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    },
+    "v1AddRoleMembersResponse": {
+      "type": "object",
+      "description": "Response message for `AddRoleMembers`."
+    },
+    "v1ListPermissionsResponse": {
+      "type": "object",
+      "properties": {
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Permission"
+          },
+          "description": "The available permissions."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for the next page of results."
+        }
+      },
+      "description": "Response message for `ListPermissions`."
+    },
+    "v1ListRoleMembersResponse": {
+      "type": "object",
+      "properties": {
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1RoleMember"
+          },
+          "description": "The members of the role."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for the next page of results."
+        }
+      },
+      "description": "Response message for `ListRoleMembers`."
+    },
+    "v1ListRolesResponse": {
+      "type": "object",
+      "properties": {
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Role"
+          },
+          "description": "The roles in the organization."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for the next page of results."
+        }
+      },
+      "description": "Response message for `ListRoles`."
+    },
+    "v1Permission": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "The resource name of the permission.\nFormat: `permissions/{permission}` (e.g. `permissions/projects.create`)"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "A human-readable name for the permission.",
+          "readOnly": true
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of what the permission allows.",
+          "readOnly": true
+        }
+      },
+      "description": "A system-defined permission that can be assigned to roles."
+    },
+    "v1RemoveRoleMembersResponse": {
+      "type": "object",
+      "description": "Response message for `RemoveRoleMembers`."
+    },
+    "v1Role": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "The resource name of the role.\nFormat: `organizations/{organization}/roles/{role}`"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Required. A human-readable name for the role."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional. A longer description of the role's purpose."
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Output only. The permissions granted by this role, resolved from the\nrole_permissions join table.",
+          "readOnly": true
+        },
+        "system": {
+          "type": "boolean",
+          "description": "Output only. Whether this is a system-defined role (owner, admin, editor,\nviewer). System roles cannot be deleted or have their permissions changed.",
+          "readOnly": true
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the role was created.",
+          "readOnly": true
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the role was last modified.",
+          "readOnly": true
+        },
+        "deleteTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the role was soft-deleted.",
+          "readOnly": true
+        },
+        "purgeTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the role will be permanently purged.",
+          "readOnly": true
+        },
+        "etag": {
+          "type": "string",
+          "description": "Output only. A checksum computed by the server based on the current value\nof the Role resource.",
+          "readOnly": true
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Optional. Free-form annotations for the role."
+        }
+      },
+      "description": "A role within an organization. Roles can be system-defined (owner, admin,\neditor, viewer) or custom. System roles are seeded per-org at creation time.",
+      "required": [
+        "displayName"
+      ]
+    },
+    "v1RoleMember": {
+      "type": "object",
+      "properties": {
+        "member": {
+          "type": "string",
+          "title": "The resource name of the member. Can be a user or group resource name.\nFormat: `organizations/{organization}/users/{user}` or\n        `organizations/{organization}/groups/{group}`"
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the membership was created.",
+          "readOnly": true
+        }
+      },
+      "description": "A membership of a user or group in a role.",
+      "required": [
+        "member"
+      ]
+    }
+  }
+}

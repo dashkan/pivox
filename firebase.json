@@ -1,0 +1,41 @@
+{
+  "functions": [
+    {
+      "source": "deployments/firebase/functions",
+      "codebase": "default",
+      "disallowLegacyRuntimeConfig": true,
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "pnpm --dir \"$RESOURCE_DIR\" lint",
+        "pnpm --dir \"$RESOURCE_DIR\" build"
+      ]
+    }
+  ],
+  "emulators": {
+    "auth": {
+      "port": 9099
+    },
+    "functions": {
+      "port": 5001
+    },
+    "ui": {
+      "enabled": true
+    },
+    "singleProjectMode": true
+  },
+  "auth": {
+    "providers": {
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Pivox",
+        "supportEmail": "support@pivox.app"
+      }
+    }
+  }
+}
