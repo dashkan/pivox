@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  transpilePackages: ["@pivox/primitives", "@pivox/ui", "@pivox/features"],
 };
 
 export default nextConfig;
