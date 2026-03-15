@@ -40,7 +40,7 @@ importers:
         specifier: ^4.1.0
         version: 4.1.0(@opentelemetry/api@1.9.0)(@types/node@22.19.15)(msw@2.12.11(@types/node@22.19.15)(typescript@5.9.3))(vite@7.3.1(@types/node@22.19.15)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0))
 
-  apps/pivox-electron:
+  apps/electron:
     dependencies:
       '@electron-toolkit/preload':
         specifier: ^3.0.2
@@ -122,7 +122,7 @@ importers:
         specifier: ^7.2.6
         version: 7.3.1(@types/node@22.19.15)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)
 
-  apps/pivox-web:
+  apps/web:
     dependencies:
       '@pivox/features':
         specifier: workspace:*
