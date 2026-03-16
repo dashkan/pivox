@@ -8,8 +8,28 @@
   "type": "module",
   "exports": {
     "./login": {
-      "types": "./dist/esm/login/index.d.ts",
-      "import": "./dist/esm/index.js"
+      "types": "./dist/esm/login.d.ts",
+      "import": "./dist/esm/login.js"
+    },
+    "./registration": {
+      "types": "./dist/esm/registration.d.ts",
+      "import": "./dist/esm/registration.js"
+    },
+    "./forgot-password": {
+      "types": "./dist/esm/forgot-password.d.ts",
+      "import": "./dist/esm/forgot-password.js"
+    },
+    "./reset-password": {
+      "types": "./dist/esm/reset-password.d.ts",
+      "import": "./dist/esm/reset-password.js"
+    },
+    "./auth": {
+      "types": "./dist/esm/auth.d.ts",
+      "import": "./dist/esm/auth.js"
+    },
+    "./verify-email": {
+      "types": "./dist/esm/verify-email.d.ts",
+      "import": "./dist/esm/verify-email.js"
     }
   },
   "files": [

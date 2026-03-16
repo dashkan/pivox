@@ -9,23 +9,23 @@ function LoginPage() {
 
   return (
     <LoginFeature onSuccess={() => router.navigate({ to: '/' })}>
-      <LoginCard.Frame>
+      <LoginCard.Root>
         <LoginCard.Header />
         <LoginCard.EmailField />
         <LoginCard.PasswordField />
         <div className="flex items-center justify-between px-4">
           <LoginCard.RememberMe />
           <LoginCard.ForgotPassword
-            onClick={() => router.navigate({ to: '/forgot-password' as string })}
+            onClick={() => router.navigate({ to: '/forgot-password'  })}
           />
         </div>
         <LoginCard.SubmitButton />
         <LoginCard.Separator />
         <LoginCard.SocialButtons providers={['google']} />
         <LoginCard.Footer
-          onClick={() => router.navigate({ to: '/register' as string })}
+          onClick={() => router.navigate({ to: '/register'  })}
         />
-      </LoginCard.Frame>
+      </LoginCard.Root>
     </LoginFeature>
   )
 }

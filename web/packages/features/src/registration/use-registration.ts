@@ -5,16 +5,18 @@ import {
   GithubAuthProvider,
   GoogleAuthProvider,
   OAuthProvider,
+  createUserWithEmailAndPassword,
   getAuth,
-  signInWithEmailAndPassword,
+  sendEmailVerification,
   signInWithPopup,
+  updateProfile,
 } from "firebase/auth"
 import type {
-  LoginActions,
-  LoginContextValue,
-  LoginMeta,
-  LoginState,
-} from "@pivox/ui/login-card"
+  RegistrationActions,
+  RegistrationContextValue,
+  RegistrationMeta,
+  RegistrationState,
+} from "@pivox/ui/registration-card"
 import type { User } from "firebase/auth"
 import { firebaseErrorMessage } from "@/shared/firebase-error"
 
@@ -24,16 +26,28 @@ const socialProviders = {
   apple: () => new OAuthProvider("apple.com"),
 } as const
 
-export function useLogin(onSuccess?: (user: User) => void): LoginContextValue {
+export function useRegistration(
+  onSuccess?: (user: User) => void,
+): RegistrationContextValue {
   const emailRef = useRef<HTMLInputElement | null>(null)
   const [email, setEmail] = useState("")
+  const [displayName, setDisplayName] = useState("")
   const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
 
   const [formState, formAction] = useActionState(
     async (_prev: { error: string | null }) => {
+      if (password !== confirmPassword) {
+        return { error: "Passwords do not match" }
+      }
+      if (!displayName.trim()) {
+        return { error: "Display name is required" }
+      }
       try {
         const auth = getAuth()
-        const credential = await signInWithEmailAndPassword(auth, email, password)
+        const credential = await createUserWithEmailAndPassword(auth, email, password)
+        await updateProfile(credential.user, { displayName: displayName.trim() })
+        await sendEmailVerification(credential.user)
         onSuccess?.(credential.user)
         return { error: null }
       } catch (e) {
@@ -43,15 +57,19 @@ export function useLogin(onSuccess?: (user: User) => void): LoginContextValue {
     { error: null },
   )
 
-  const state: LoginState = {
+  const state: RegistrationState = {
     email,
+    displayName,
     password,
+    confirmPassword,
     error: formState.error,
   }
 
-  const actions: LoginActions = {
+  const actions: RegistrationActions = {
     updateEmail: setEmail,
+    updateDisplayName: setDisplayName,
     updatePassword: setPassword,
+    updateConfirmPassword: setConfirmPassword,
     formAction,
 
     socialLogin: async (provider) => {
@@ -60,23 +78,12 @@ export function useLogin(onSuccess?: (user: User) => void): LoginContextValue {
         const result = await signInWithPopup(auth, socialProviders[provider]())
         onSuccess?.(result.user)
       } catch {
-        // social login errors are shown via popup, not inline
-      }
-    },
-
-    ssoLogin: async () => {
-      try {
-        const auth = getAuth()
-        const ssoProvider = new OAuthProvider("oidc.pivox")
-        const result = await signInWithPopup(auth, ssoProvider)
-        onSuccess?.(result.user)
-      } catch {
-        // SSO errors are shown via popup
+        // social login errors shown via popup
       }
     },
   }
 
-  const meta: LoginMeta = { emailRef }
+  const meta: RegistrationMeta = { emailRef }
 
   return { state, actions, meta }
 }

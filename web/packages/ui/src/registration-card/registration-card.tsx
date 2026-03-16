@@ -12,39 +12,37 @@ import {
 } from "@pivox/primitives/card"
 import { Input } from "@pivox/primitives/input"
 import { Field, FieldError, FieldLabel } from "@pivox/primitives/field"
-import { Checkbox } from "@pivox/primitives/checkbox"
-import { Label } from "@pivox/primitives/label"
 import { Separator } from "@pivox/primitives/separator"
-import { LoginContext, useLoginContext } from "./login-card.context"
-import type { LoginContextValue } from "./login-card.types"
+import { RegistrationContext, useRegistrationContext } from "./registration-card.context"
+import type { RegistrationContextValue } from "./registration-card.types"
 import { AppleIcon, GitHubIcon, GoogleIcon } from "@/shared/social-icons"
 
 /* ------------------------------------------------------------------ */
 /*  Provider                                                          */
 /* ------------------------------------------------------------------ */
 
-function LoginCardProvider({
+function RegistrationCardProvider({
   value,
   children,
 }: {
-  value: LoginContextValue
+  value: RegistrationContextValue
   children: React.ReactNode
 }) {
-  return <LoginContext value={value}>{children}</LoginContext>
+  return <RegistrationContext value={value}>{children}</RegistrationContext>
 }
 
 /* ------------------------------------------------------------------ */
 /*  Frame                                                             */
 /* ------------------------------------------------------------------ */
 
-function LoginCardRoot({
+function RegistrationCardRoot({
   className,
   children,
 }: {
   className?: string
   children: React.ReactNode
 }) {
-  const { actions } = useLoginContext()
+  const { actions } = useRegistrationContext()
   return (
     <div className={cn("flex min-h-screen items-center justify-center p-4", className)}>
       <Card className="w-full max-w-sm">
@@ -60,11 +58,11 @@ function LoginCardRoot({
 /*  Header                                                            */
 /* ------------------------------------------------------------------ */
 
-function LoginCardHeader({ className }: { className?: string }) {
+function RegistrationCardHeader({ className }: { className?: string }) {
   return (
     <CardHeader className={cn("text-center", className)}>
-      <CardTitle className="text-xl">Sign in</CardTitle>
-      <CardDescription>Sign in to your account</CardDescription>
+      <CardTitle className="text-xl">Create account</CardTitle>
+      <CardDescription>Sign up for a new account</CardDescription>
     </CardHeader>
   )
 }
@@ -73,8 +71,8 @@ function LoginCardHeader({ className }: { className?: string }) {
 /*  EmailField                                                        */
 /* ------------------------------------------------------------------ */
 
-function LoginCardEmailField({ className }: { className?: string }) {
-  const { state, actions, meta } = useLoginContext()
+function RegistrationCardEmailField({ className }: { className?: string }) {
+  const { state, actions, meta } = useRegistrationContext()
   const { pending } = useFormStatus()
   return (
     <Field className={cn("px-4", className)}>
@@ -94,11 +92,34 @@ function LoginCardEmailField({ className }: { className?: string }) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  DisplayNameField                                                  */
+/* ------------------------------------------------------------------ */
+
+function RegistrationCardDisplayNameField({ className }: { className?: string }) {
+  const { state, actions } = useRegistrationContext()
+  const { pending } = useFormStatus()
+  return (
+    <Field className={cn("px-4", className)}>
+      <FieldLabel>Display name</FieldLabel>
+      <Input
+        name="displayName"
+        type="text"
+        placeholder="John Doe"
+        autoComplete="name"
+        value={state.displayName}
+        onChange={(e) => actions.updateDisplayName(e.target.value)}
+        disabled={pending}
+      />
+    </Field>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /*  PasswordField                                                     */
 /* ------------------------------------------------------------------ */
 
-function LoginCardPasswordField({ className }: { className?: string }) {
-  const { state, actions } = useLoginContext()
+function RegistrationCardPasswordField({ className }: { className?: string }) {
+  const { state, actions } = useRegistrationContext()
   const { pending } = useFormStatus()
   return (
     <Field className={cn("px-4", className)}>
@@ -106,7 +127,7 @@ function LoginCardPasswordField({ className }: { className?: string }) {
       <Input
         name="password"
         type="password"
-        autoComplete="current-password"
+        autoComplete="new-password"
         value={state.password}
         onChange={(e) => actions.updatePassword(e.target.value)}
         disabled={pending}
@@ -116,42 +137,24 @@ function LoginCardPasswordField({ className }: { className?: string }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  RememberMe                                                        */
+/*  ConfirmPasswordField                                              */
 /* ------------------------------------------------------------------ */
 
-function LoginCardRememberMe({ className }: { className?: string }) {
+function RegistrationCardConfirmPasswordField({ className }: { className?: string }) {
+  const { state, actions } = useRegistrationContext()
+  const { pending } = useFormStatus()
   return (
-    <div className={cn("flex items-center gap-2", className)}>
-      <Checkbox id="remember" />
-      <Label htmlFor="remember" className="text-sm font-normal">
-        Remember me
-      </Label>
-    </div>
-  )
-}
-
-/* ------------------------------------------------------------------ */
-/*  ForgotPassword                                                    */
-/* ------------------------------------------------------------------ */
-
-function LoginCardForgotPassword({
-  onClick,
-  className,
-}: {
-  onClick: () => void
-  className?: string
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "text-sm text-muted-foreground underline-offset-4 hover:text-primary hover:underline",
-        className,
-      )}
-    >
-      Forgot password?
-    </button>
+    <Field className={cn("px-4", className)}>
+      <FieldLabel>Confirm password</FieldLabel>
+      <Input
+        name="confirmPassword"
+        type="password"
+        autoComplete="new-password"
+        value={state.confirmPassword}
+        onChange={(e) => actions.updateConfirmPassword(e.target.value)}
+        disabled={pending}
+      />
+    </Field>
   )
 }
 
@@ -159,14 +162,14 @@ function LoginCardForgotPassword({
 /*  SubmitButton                                                      */
 /* ------------------------------------------------------------------ */
 
-function LoginCardSubmitButton({ className }: { className?: string }) {
-  const { state } = useLoginContext()
+function RegistrationCardSubmitButton({ className }: { className?: string }) {
+  const { state } = useRegistrationContext()
   const { pending } = useFormStatus()
   return (
     <div className={cn("flex flex-col gap-4 px-4", className)}>
       {state.error && <FieldError>{state.error}</FieldError>}
       <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? "Please wait…" : "Sign in"}
+        {pending ? "Please wait…" : "Create account"}
       </Button>
     </div>
   )
@@ -176,7 +179,7 @@ function LoginCardSubmitButton({ className }: { className?: string }) {
 /*  Separator                                                         */
 /* ------------------------------------------------------------------ */
 
-function LoginCardSeparator({ className }: { className?: string }) {
+function RegistrationCardSeparator({ className }: { className?: string }) {
   return (
     <div className={cn("relative px-4", className)}>
       <div className="absolute inset-x-4 inset-y-0 flex items-center">
@@ -193,14 +196,14 @@ function LoginCardSeparator({ className }: { className?: string }) {
 /*  SocialButtons                                                     */
 /* ------------------------------------------------------------------ */
 
-function LoginCardSocialButtons({
+function RegistrationCardSocialButtons({
   providers,
   className,
 }: {
   providers: Array<"google" | "github" | "apple">
   className?: string
 }) {
-  const { actions } = useLoginContext()
+  const { actions } = useRegistrationContext()
   const { pending } = useFormStatus()
 
   return (
@@ -214,7 +217,7 @@ function LoginCardSocialButtons({
           onClick={() => actions.socialLogin("google")}
         >
           <GoogleIcon />
-          Sign in with Google
+          Sign up with Google
         </Button>
       )}
       {providers.includes("github") && (
@@ -226,7 +229,7 @@ function LoginCardSocialButtons({
           onClick={() => actions.socialLogin("github")}
         >
           <GitHubIcon />
-          Sign in with GitHub
+          Sign up with GitHub
         </Button>
       )}
       {providers.includes("apple") && (
@@ -238,7 +241,7 @@ function LoginCardSocialButtons({
           onClick={() => actions.socialLogin("apple")}
         >
           <AppleIcon />
-          Sign in with Apple
+          Sign up with Apple
         </Button>
       )}
     </div>
@@ -246,30 +249,10 @@ function LoginCardSocialButtons({
 }
 
 /* ------------------------------------------------------------------ */
-/*  SSOButton                                                         */
-/* ------------------------------------------------------------------ */
-
-function LoginCardSSOButton({ className }: { className?: string }) {
-  const { actions } = useLoginContext()
-  const { pending } = useFormStatus()
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      className={cn("mx-4 w-auto", className)}
-      disabled={pending}
-      onClick={actions.ssoLogin}
-    >
-      Sign in with SSO
-    </Button>
-  )
-}
-
-/* ------------------------------------------------------------------ */
 /*  Footer                                                            */
 /* ------------------------------------------------------------------ */
 
-function LoginCardFooter({
+function RegistrationCardFooter({
   onClick,
   className,
 }: {
@@ -279,13 +262,13 @@ function LoginCardFooter({
   return (
     <CardFooter className={cn("justify-center", className)}>
       <p className="text-sm text-muted-foreground">
-        Don&apos;t have an account?{" "}
+        Already have an account?{" "}
         <button
           type="button"
           className="text-primary underline-offset-4 hover:underline"
           onClick={onClick}
         >
-          Sign up
+          Sign in
         </button>
       </p>
     </CardFooter>
@@ -296,18 +279,17 @@ function LoginCardFooter({
 /*  Compound export                                                   */
 /* ------------------------------------------------------------------ */
 
-export const LoginCard = {
-  Provider: LoginCardProvider,
-  Root: LoginCardRoot,
-  Header: LoginCardHeader,
-  EmailField: LoginCardEmailField,
-  PasswordField: LoginCardPasswordField,
-  RememberMe: LoginCardRememberMe,
-  ForgotPassword: LoginCardForgotPassword,
-  SubmitButton: LoginCardSubmitButton,
-  Separator: LoginCardSeparator,
-  SocialButtons: LoginCardSocialButtons,
-  SSOButton: LoginCardSSOButton,
-  Footer: LoginCardFooter,
-  Context: LoginContext,
+export const RegistrationCard = {
+  Provider: RegistrationCardProvider,
+  Root: RegistrationCardRoot,
+  Header: RegistrationCardHeader,
+  EmailField: RegistrationCardEmailField,
+  DisplayNameField: RegistrationCardDisplayNameField,
+  PasswordField: RegistrationCardPasswordField,
+  ConfirmPasswordField: RegistrationCardConfirmPasswordField,
+  SubmitButton: RegistrationCardSubmitButton,
+  Separator: RegistrationCardSeparator,
+  SocialButtons: RegistrationCardSocialButtons,
+  Footer: RegistrationCardFooter,
+  Context: RegistrationContext,
 }
