@@ -13,6 +13,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@pivox/primitives/dialog"
+import { ScrollArea } from "@pivox/primitives/scroll-area"
 import { UserProfileContext, useUserProfileContext } from "./user-profile-card.context"
 import type { UserProfileContextValue } from "./user-profile-card.types"
 import { UserAvatar } from "@/user-avatar/user-avatar"
@@ -112,9 +113,11 @@ function UserProfileCardContentArea({
   children: React.ReactNode
 }) {
   return (
-    <div className={cn("flex flex-1 flex-col overflow-y-auto", className)}>
-      {children}
-    </div>
+    <ScrollArea className={cn("flex-1", className)}>
+      <div className="flex flex-col">
+        {children}
+      </div>
+    </ScrollArea>
   )
 }
 
