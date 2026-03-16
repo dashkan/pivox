@@ -42,6 +42,10 @@
     "./app-layout": {
       "types": "./dist/esm/app-layout.d.ts",
       "import": "./dist/esm/app-layout.js"
+    },
+    "./theme-switcher": {
+      "types": "./dist/esm/theme-switcher.d.ts",
+      "import": "./dist/esm/theme-switcher.js"
     }
   },
   "files": [

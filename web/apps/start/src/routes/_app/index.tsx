@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from '@pivox/primitives/card'
 
-export const Route = createFileRoute('/')({ component: HomePage })
+export const Route = createFileRoute('/_app/')({ component: HomePage })
 
 function HomePage() {
   return (

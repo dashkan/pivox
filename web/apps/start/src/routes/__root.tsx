@@ -3,13 +3,8 @@ import {
   Outlet,
   Scripts,
   createRootRoute,
-  useRouter,
 } from '@tanstack/react-router'
 import { AuthProvider } from '@pivox/features/auth'
-import { AppLayoutFeature } from '@pivox/features/app-layout'
-import { UserProfileFeature } from '@pivox/features/user-profile'
-import { AppLayout, useAppLayoutContext  } from '@pivox/ui/app-layout'
-import { UserProfileCard } from '@pivox/ui/user-profile-card'
 
 import appCss from '../styles.css?url'
 
@@ -27,44 +22,10 @@ export const Route = createRootRoute({
 })
 
 function RootComponent() {
-  const router = useRouter()
-
   return (
     <AuthProvider>
-      <AppLayoutFeature
-        onNavigateToLogin={() => router.navigate({ to: '/auth/login' })}
-      >
-        <AppLayout.Root>
-          <AppLayout.Header>
-            <AppLayout.HeaderTitle>Pivox</AppLayout.HeaderTitle>
-            <AppLayout.HeaderNav>
-              <AppLayout.HeaderAvatar />
-            </AppLayout.HeaderNav>
-          </AppLayout.Header>
-          <AppLayout.Content>
-            <Outlet />
-          </AppLayout.Content>
-        </AppLayout.Root>
-        <ProfileDialog />
-      </AppLayoutFeature>
+      <Outlet />
     </AuthProvider>
-  )
-}
-
-function ProfileDialog() {
-  const { state, actions } = useAppLayoutContext()
-
-  return (
-    <UserProfileFeature>
-      <UserProfileCard.Root
-        open={state.profileOpen}
-        onOpenChange={actions.setProfileOpen}
-      >
-        <UserProfileCard.Sidebar />
-        <UserProfileCard.AccountPage />
-        <UserProfileCard.SecurityPage />
-      </UserProfileCard.Root>
-    </UserProfileFeature>
   )
 }
 
