@@ -21,7 +21,7 @@ default:
 
 [doc("Build the server binary")]
 build:
-    go build -o server ./cmd/server
+    go build -o bin/server ./cmd/server
 
 [doc("Run the server")]
 run:
@@ -115,6 +115,20 @@ db-create:
 [doc("Start Firebase emulators (auth + functions)")]
 emulators:
     firebase emulators:start --import=.firebase-data --export-on-exit=.firebase-data
+
+# Proxy / Tunnel
+
+[doc("Start nginx reverse proxy on :8081")]
+nginx:
+    nginx -c {{justfile_directory()}}/configs/nginx.conf -e stderr
+
+[doc("Stop nginx reverse proxy")]
+nginx-stop:
+    nginx -c {{justfile_directory()}}/configs/nginx.conf -s stop
+
+[doc("Start ngrok tunnel pointing to nginx proxy")]
+ngrok:
+    ngrok start --config configs/ngrok.yml proxy
 
 # Docker
 

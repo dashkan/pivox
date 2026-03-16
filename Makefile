@@ -22,7 +22,7 @@ help: ## Show this help
 
 .PHONY: build
 build: ## Build the server binary
-	go build -o server ./cmd/server
+	go build -o bin/server ./cmd/server
 
 .PHONY: run
 run: ## Run the server
@@ -116,6 +116,20 @@ db-drop: ## Drop the database
 .PHONY: db-create
 db-create: ## Create the database
 	just db-create
+
+##@ Proxy / Tunnel
+
+.PHONY: nginx
+nginx: ## Start nginx reverse proxy on :8081
+	nginx -c $(CURDIR)/configs/nginx.conf -e stderr
+
+.PHONY: nginx-stop
+nginx-stop: ## Stop nginx reverse proxy
+	nginx -c $(CURDIR)/configs/nginx.conf -s stop
+
+.PHONY: ngrok
+ngrok: ## Start ngrok tunnel pointing to nginx proxy
+	ngrok start --config configs/ngrok.yml proxy
 
 ##@ Firebase
 
