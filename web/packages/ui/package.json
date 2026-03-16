@@ -30,6 +30,18 @@
     "./link-account-card": {
       "types": "./dist/esm/link-account-card.d.ts",
       "import": "./dist/esm/link-account-card.js"
+    },
+    "./user-avatar": {
+      "types": "./dist/esm/user-avatar.d.ts",
+      "import": "./dist/esm/user-avatar.js"
+    },
+    "./user-profile-card": {
+      "types": "./dist/esm/user-profile-card.d.ts",
+      "import": "./dist/esm/user-profile-card.js"
+    },
+    "./app-layout": {
+      "types": "./dist/esm/app-layout.d.ts",
+      "import": "./dist/esm/app-layout.js"
     }
   },
   "files": [

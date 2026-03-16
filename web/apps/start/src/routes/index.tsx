@@ -13,7 +13,7 @@ export const Route = createFileRoute('/')({ component: HomePage })
 
 function HomePage() {
   return (
-    <div className="flex min-h-screen items-center justify-center p-8">
+    <div className="flex flex-1 items-center justify-center p-8">
       <Card className="w-full max-w-md">
         <CardHeader>
           <div className="flex items-center gap-2">
