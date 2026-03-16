@@ -54,6 +54,11 @@ function UserProfileCardRoot({
           "sm:max-w-3xl gap-0 overflow-hidden p-0",
           className,
         )}
+        onEscapeKeyDown={(e) => {
+          if (document.activeElement?.closest("[data-inline-edit]")) {
+            e.preventDefault()
+          }
+        }}
       >
         <DialogTitle className="sr-only">Profile settings</DialogTitle>
         <DialogDescription className="sr-only">
@@ -197,7 +202,7 @@ function ProfileSubsection() {
         <UserAvatar src={state.photoURL} name={state.displayName} size="lg" />
         <div className="flex flex-1 flex-col gap-0.5">
           {editing ? (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2" data-inline-edit>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -207,6 +212,9 @@ function ProfileSubsection() {
                     void handleSave()
                   }
                   if (e.key === "Escape") {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    e.nativeEvent.stopImmediatePropagation()
                     setName(state.displayName ?? "")
                     setEditing(false)
                   }
