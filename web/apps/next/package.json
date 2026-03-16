@@ -1,5 +1,5 @@
 {
-  "name": "pivox-web",
+  "name": "@pivox/next",
   "version": "0.1.0",
   "private": true,
   "scripts": {

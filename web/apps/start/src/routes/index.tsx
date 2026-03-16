@@ -1,0 +1,40 @@
+import { createFileRoute } from '@tanstack/react-router'
+import { Button } from '@pivox/primitives/button'
+import { Badge } from '@pivox/primitives/badge'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@pivox/primitives/card'
+
+export const Route = createFileRoute('/')({ component: HomePage })
+
+function HomePage() {
+  return (
+    <div className="flex min-h-screen items-center justify-center p-8">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-2xl">Pivox</CardTitle>
+            <Badge variant="secondary">TanStack Start</Badge>
+          </div>
+          <CardDescription>Observability Platform</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <p className="text-sm text-muted-foreground">
+            Shared UI components working across Next.js, Electron, and TanStack
+            Start.
+          </p>
+          <div className="flex gap-2">
+            <Button>Get Started</Button>
+            <Button variant="outline" asChild>
+              <a href="/about">About</a>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
