@@ -129,7 +129,7 @@ nginx-stop: ## Stop nginx reverse proxy
 
 .PHONY: ngrok
 ngrok: ## Start ngrok tunnel pointing to nginx proxy
-	ngrok start --config configs/ngrok.yml proxy
+	ngrok start --config configs/ngrok.yml --all
 
 ##@ Firebase
 

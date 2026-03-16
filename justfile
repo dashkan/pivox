@@ -128,7 +128,7 @@ nginx-stop:
 
 [doc("Start ngrok tunnel pointing to nginx proxy")]
 ngrok:
-    ngrok start --config configs/ngrok.yml proxy
+    ngrok start --config configs/ngrok.yml --all
 
 # Docker
 

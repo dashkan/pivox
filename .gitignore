@@ -1,6 +1,7 @@
 .claude/*.local.*
 .playwright-mcp
 .firebase-data
+bin/
 
 # Created by https://www.toptal.com/developers/gitignore/api/go,node,linux,macos,nextjs,windows,jetbrains+all,visualstudiocode,firebase
 # Edit at https://www.toptal.com/developers/gitignore?templates=go,node,linux,macos,nextjs,windows,jetbrains+all,visualstudiocode,firebase
