@@ -37,7 +37,7 @@ function ProfileDialog() {
   const { state, actions } = useAppLayoutContext()
 
   return (
-    <UserProfileFeature>
+    <UserProfileFeature onClose={() => actions.setProfileOpen(false)}>
       <UserProfileCard.Root
         open={state.profileOpen}
         onOpenChange={actions.setProfileOpen}

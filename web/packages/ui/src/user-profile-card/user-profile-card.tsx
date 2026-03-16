@@ -198,7 +198,18 @@ function ProfileSubsection() {
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault()
+                    void handleSave()
+                  }
+                  if (e.key === "Escape") {
+                    setName(state.displayName ?? "")
+                    setEditing(false)
+                  }
+                }}
                 className="h-7 text-sm"
+                autoFocus
               />
               <Button size="sm" onClick={handleSave}>Save</Button>
               <Button

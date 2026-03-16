@@ -16,7 +16,7 @@ import type {
 import { useAuth } from "@/auth/use-auth"
 import { firebaseErrorMessage } from "@/shared/firebase-error"
 
-export function useUserProfile(): UserProfileContextValue {
+export function useUserProfile(onClose?: () => void): UserProfileContextValue {
   const { user, signOut } = useAuth()
   const [activePage, setActivePage] = useState<"account" | "security">("account")
   const [error, setError] = useState<string | null>(null)
@@ -98,12 +98,16 @@ export function useUserProfile(): UserProfileContextValue {
         if (!user) throw new Error("Not signed in")
         // TODO: May need reauthentication — handle auth/requires-recent-login
         await deleteUser(user)
+        onClose?.()
       } catch (e) {
         setError(firebaseErrorMessage(e))
       }
     },
 
-    signOut,
+    signOut: async () => {
+      onClose?.()
+      await signOut()
+    },
   }
 
   return { state, actions }
