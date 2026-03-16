@@ -6,12 +6,14 @@ import type { User } from "firebase/auth"
 
 export function RegistrationFeature({
   onSuccess,
+  onLinkRequired,
   children,
 }: {
   onSuccess?: (user: User) => void
+  onLinkRequired?: (email: string) => void
   children: React.ReactNode
 }) {
-  const value = useRegistration(onSuccess)
+  const value = useRegistration(onSuccess, onLinkRequired)
 
   return (
     <RegistrationCard.Provider value={value}>

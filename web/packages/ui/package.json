@@ -26,6 +26,10 @@
     "./verify-email-card": {
       "types": "./dist/esm/verify-email-card.d.ts",
       "import": "./dist/esm/verify-email-card.js"
+    },
+    "./link-account-card": {
+      "types": "./dist/esm/link-account-card.d.ts",
+      "import": "./dist/esm/link-account-card.js"
     }
   },
   "files": [

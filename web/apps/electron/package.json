@@ -27,7 +27,8 @@
     "@pivox/primitives": "workspace:*",
     "@pivox/ui": "workspace:*",
     "@tanstack/react-router": "^1.167.1",
-    "electron-updater": "^6.3.9"
+    "electron-updater": "^6.3.9",
+    "firebase": "^12.10.0"
   },
   "devDependencies": {
     "@electron-toolkit/tsconfig": "^2.0.0",

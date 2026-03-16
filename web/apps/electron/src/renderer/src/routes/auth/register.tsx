@@ -2,13 +2,18 @@ import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { RegistrationFeature } from '@pivox/features/registration'
 import { RegistrationCard } from '@pivox/ui/registration-card'
 
-export const Route = createFileRoute('/register')({ component: RegisterPage })
+export const Route = createFileRoute('/auth/register')({
+  component: RegisterPage,
+})
 
 function RegisterPage() {
   const router = useRouter()
 
   return (
-    <RegistrationFeature onSuccess={() => router.navigate({ to: '/verify-email' as string })}>
+    <RegistrationFeature
+      onSuccess={() => router.navigate({ to: '/auth/verify-email' })}
+      onLinkRequired={() => router.navigate({ to: '/auth/link-account' })}
+    >
       <RegistrationCard.Root>
         <RegistrationCard.Header />
         <RegistrationCard.EmailField />
@@ -19,7 +24,7 @@ function RegisterPage() {
         <RegistrationCard.Separator />
         <RegistrationCard.SocialButtons providers={['google']} />
         <RegistrationCard.Footer
-          onClick={() => router.navigate({ to: '/login' })}
+          onClick={() => router.navigate({ to: '/auth/login' })}
         />
       </RegistrationCard.Root>
     </RegistrationFeature>

@@ -53,6 +53,7 @@ export default mergeConfig(
       "./src/reset-password.ts",
       "./src/auth.ts",
       "./src/verify-email.ts",
+      "./src/link-account.ts",
     ],
     srcDir: "./src",
     cjs: false,

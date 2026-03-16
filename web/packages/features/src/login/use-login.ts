@@ -16,7 +16,9 @@ import type {
   LoginState,
 } from "@pivox/ui/login-card"
 import type { User } from "firebase/auth"
+import type { FirebaseError } from "firebase/app"
 import { firebaseErrorMessage } from "@/shared/firebase-error"
+import { setPendingLink } from "@/shared/pending-link"
 
 const socialProviders = {
   google: () => new GoogleAuthProvider(),
@@ -24,7 +26,16 @@ const socialProviders = {
   apple: () => new OAuthProvider("apple.com"),
 } as const
 
-export function useLogin(onSuccess?: (user: User) => void): LoginContextValue {
+const providerNames: Record<string, string> = {
+  google: "Google",
+  github: "GitHub",
+  apple: "Apple",
+}
+
+export function useLogin(
+  onSuccess?: (user: User) => void,
+  onLinkRequired?: (email: string) => void,
+): LoginContextValue {
   const emailRef = useRef<HTMLInputElement | null>(null)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -59,8 +70,22 @@ export function useLogin(onSuccess?: (user: User) => void): LoginContextValue {
         const auth = getAuth()
         const result = await signInWithPopup(auth, socialProviders[provider]())
         onSuccess?.(result.user)
-      } catch {
-        // social login errors are shown via popup, not inline
+      } catch (e) {
+        const err = e as FirebaseError
+        if (
+          err.code === "auth/account-exists-with-different-credential" &&
+          err.customData?.email
+        ) {
+          const credential = OAuthProvider.credentialFromError(err)
+          if (credential) {
+            setPendingLink({
+              email: err.customData.email as string,
+              credential,
+              providerName: providerNames[provider] ?? provider,
+            })
+            onLinkRequired?.(err.customData.email as string)
+          }
+        }
       }
     },
 
@@ -70,8 +95,22 @@ export function useLogin(onSuccess?: (user: User) => void): LoginContextValue {
         const ssoProvider = new OAuthProvider("oidc.pivox")
         const result = await signInWithPopup(auth, ssoProvider)
         onSuccess?.(result.user)
-      } catch {
-        // SSO errors are shown via popup
+      } catch (e) {
+        const err = e as FirebaseError
+        if (
+          err.code === "auth/account-exists-with-different-credential" &&
+          err.customData?.email
+        ) {
+          const credential = OAuthProvider.credentialFromError(err)
+          if (credential) {
+            setPendingLink({
+              email: err.customData.email as string,
+              credential,
+              providerName: "SSO",
+            })
+            onLinkRequired?.(err.customData.email as string)
+          }
+        }
       }
     },
   }

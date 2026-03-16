@@ -6,7 +6,7 @@ type ResetPasswordSearch = {
   oobCode: string
 }
 
-export const Route = createFileRoute('/reset-password')({
+export const Route = createFileRoute('/auth/reset-password')({
   validateSearch: (search: Record<string, unknown>): ResetPasswordSearch => ({
     oobCode: (search.oobCode as string) || '',
   }),
@@ -20,7 +20,7 @@ function ResetPasswordPage() {
   return (
     <ResetPasswordFeature
       oobCode={oobCode}
-      onSuccess={() => router.navigate({ to: '/login' })}
+      onSuccess={() => router.navigate({ to: '/auth/login' })}
     >
       <ResetPasswordCard.Root>
         <ResetPasswordCard.Header />
@@ -29,7 +29,7 @@ function ResetPasswordPage() {
         <ResetPasswordCard.SuccessMessage />
         <ResetPasswordCard.SubmitButton />
         <ResetPasswordCard.Footer
-          onClick={() => router.navigate({ to: '/login' })}
+          onClick={() => router.navigate({ to: '/auth/login' })}
         />
       </ResetPasswordCard.Root>
     </ResetPasswordFeature>

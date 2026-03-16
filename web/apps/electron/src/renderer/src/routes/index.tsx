@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { Button } from '@pivox/primitives/button'
 import { Badge } from '@pivox/primitives/badge'
 import {
@@ -30,12 +30,15 @@ function HomePage() {
           <p className="text-sm text-muted-foreground">
             Shared UI components working across Next.js and Electron.
           </p>
-          <div className="flex gap-2">
-            <Button onClick={ipcHandle}>Send IPC</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild>
+              <Link to="/auth/login">Sign in</Link>
+            </Button>
             <Button variant="outline" asChild>
-              <a href="https://electron-vite.org/" target="_blank" rel="noreferrer">
-                Documentation
-              </a>
+              <Link to="/auth/register">Sign up</Link>
+            </Button>
+            <Button variant="ghost" onClick={ipcHandle}>
+              Send IPC
             </Button>
           </div>
         </CardContent>

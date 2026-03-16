@@ -30,6 +30,10 @@
     "./verify-email": {
       "types": "./dist/esm/verify-email.d.ts",
       "import": "./dist/esm/verify-email.js"
+    },
+    "./link-account": {
+      "types": "./dist/esm/link-account.d.ts",
+      "import": "./dist/esm/link-account.js"
     }
   },
   "files": [

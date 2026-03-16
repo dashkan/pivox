@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { Button } from '@pivox/primitives/button'
 import { Badge } from '@pivox/primitives/badge'
 import {
@@ -28,9 +28,11 @@ function HomePage() {
             Start.
           </p>
           <div className="flex gap-2">
-            <Button>Get Started</Button>
+            <Button asChild>
+              <Link to="/auth/login">Sign in</Link>
+            </Button>
             <Button variant="outline" asChild>
-              <a href="/about">About</a>
+              <Link to="/auth/register">Sign up</Link>
             </Button>
           </div>
         </CardContent>

@@ -22,6 +22,16 @@ function createWindow(): void {
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
+    const url = new URL(details.url)
+    // Allow Firebase auth popups to open as child windows
+    if (
+      url.hostname === 'accounts.google.com' ||
+      url.hostname.endsWith('.firebaseapp.com') ||
+      url.hostname === 'localhost' ||
+      url.hostname === '127.0.0.1'
+    ) {
+      return { action: 'allow' }
+    }
     shell.openExternal(details.url)
     return { action: 'deny' }
   })

@@ -18,7 +18,9 @@ import type {
   RegistrationState,
 } from "@pivox/ui/registration-card"
 import type { User } from "firebase/auth"
+import type { FirebaseError } from "firebase/app"
 import { firebaseErrorMessage } from "@/shared/firebase-error"
+import { setPendingLink } from "@/shared/pending-link"
 
 const socialProviders = {
   google: () => new GoogleAuthProvider(),
@@ -26,8 +28,15 @@ const socialProviders = {
   apple: () => new OAuthProvider("apple.com"),
 } as const
 
+const providerNames: Record<string, string> = {
+  google: "Google",
+  github: "GitHub",
+  apple: "Apple",
+}
+
 export function useRegistration(
   onSuccess?: (user: User) => void,
+  onLinkRequired?: (email: string) => void,
 ): RegistrationContextValue {
   const emailRef = useRef<HTMLInputElement | null>(null)
   const [email, setEmail] = useState("")
@@ -77,8 +86,22 @@ export function useRegistration(
         const auth = getAuth()
         const result = await signInWithPopup(auth, socialProviders[provider]())
         onSuccess?.(result.user)
-      } catch {
-        // social login errors shown via popup
+      } catch (e) {
+        const err = e as FirebaseError
+        if (
+          err.code === "auth/account-exists-with-different-credential" &&
+          err.customData?.email
+        ) {
+          const credential = OAuthProvider.credentialFromError(err)
+          if (credential) {
+            setPendingLink({
+              email: err.customData.email as string,
+              credential,
+              providerName: providerNames[provider] ?? provider,
+            })
+            onLinkRequired?.(err.customData.email as string)
+          }
+        }
       }
     },
   }
