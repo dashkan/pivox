@@ -6,7 +6,12 @@
   "author": "",
   "license": "ISC",
   "type": "module",
-  "exports": {},
+  "exports": {
+    "./login": {
+      "types": "./dist/esm/login/index.d.ts",
+      "import": "./dist/esm/index.js"
+    }
+  },
   "files": [
     "dist"
   ],
@@ -36,6 +41,7 @@
   },
   "dependencies": {
     "@pivox/primitives": "workspace:*",
-    "@pivox/ui": "workspace:*"
+    "@pivox/ui": "workspace:*",
+    "firebase": "^11.0.0"
   }
 }

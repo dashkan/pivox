@@ -46,7 +46,7 @@ const config = defineConfig({
 export default mergeConfig(
   config,
   tanstackViteConfig({
-    entry: ["./src/index.ts"],
+    entry: ["./src/login-card/index.ts"],
     srcDir: "./src",
     cjs: false,
   }),

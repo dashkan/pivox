@@ -10,7 +10,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint ./src",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:eslint": "eslint ./src",
+    "test:types": "tsc"
   },
   "dependencies": {
     "@pivox/features": "workspace:*",
@@ -23,6 +25,7 @@
     "@tanstack/react-router-ssr-query": "latest",
     "@tanstack/react-start": "latest",
     "@tanstack/router-plugin": "^1.132.0",
+    "firebase": "^11.10.0",
     "lucide-react": "^0.545.0",
     "nitro": "npm:nitro-nightly@latest",
     "react": "^19.2.0",
