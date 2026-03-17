@@ -1,5 +1,6 @@
-@import "tailwindcss";
-@import "@pivox/primitives/theme.css";
+@import 'tailwindcss';
+@import '@pivox/primitives/theme.css';
+@import '@pivox/ui/colors.css';
 
 @source "../node_modules/@pivox/primitives/src/**/*.tsx";
 @source "../node_modules/@pivox/ui/src/**/*.tsx";

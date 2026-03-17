@@ -46,10 +46,12 @@
     "./theme-switcher": {
       "types": "./dist/esm/theme-switcher.d.ts",
       "import": "./dist/esm/theme-switcher.js"
-    }
+    },
+    "./colors.css": "./src/colors.css"
   },
   "files": [
-    "dist"
+    "dist",
+    "src/colors.css"
   ],
   "scripts": {
     "build": "vite build",
@@ -77,6 +79,7 @@
     "vite": "^7.3.1"
   },
   "dependencies": {
-    "@pivox/primitives": "workspace:*"
+    "@pivox/primitives": "workspace:*",
+    "qrcode.react": "^4.2.0"
   }
 }
