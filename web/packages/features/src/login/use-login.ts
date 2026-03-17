@@ -39,25 +39,26 @@ export function useLogin(
   const emailRef = useRef<HTMLInputElement | null>(null)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [error, setError] = useState<string | null>(null)
 
-  const [formState, formAction] = useActionState(
-    async (_prev: { error: string | null }) => {
+  const [, formAction] = useActionState(
+    async () => {
+      setError(null)
       try {
         const auth = getAuth()
         const credential = await signInWithEmailAndPassword(auth, email, password)
         onSuccess?.(credential.user)
-        return { error: null }
       } catch (e) {
-        return { error: firebaseErrorMessage(e) }
+        setError(firebaseErrorMessage(e))
       }
     },
-    { error: null },
+    null,
   )
 
   const state: LoginState = {
     email,
     password,
-    error: formState.error,
+    error,
   }
 
   const actions: LoginActions = {
@@ -66,6 +67,7 @@ export function useLogin(
     formAction,
 
     socialLogin: async (provider) => {
+      setError(null)
       try {
         const auth = getAuth()
         const result = await signInWithPopup(auth, socialProviders[provider]())
@@ -84,12 +86,17 @@ export function useLogin(
               providerName: providerNames[provider] ?? provider,
             })
             onLinkRequired?.(err.customData.email as string)
+            return
           }
+        }
+        if (err.code !== "auth/popup-closed-by-user") {
+          setError(firebaseErrorMessage(e))
         }
       }
     },
 
     ssoLogin: async () => {
+      setError(null)
       try {
         const auth = getAuth()
         const ssoProvider = new OAuthProvider("oidc.pivox")
@@ -109,7 +116,11 @@ export function useLogin(
               providerName: "SSO",
             })
             onLinkRequired?.(err.customData.email as string)
+            return
           }
+        }
+        if (err.code !== "auth/popup-closed-by-user") {
+          setError(firebaseErrorMessage(e))
         }
       }
     },

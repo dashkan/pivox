@@ -7,6 +7,7 @@ export interface AuthContextValue {
   user: User | null
   loading: boolean
   signOut: () => Promise<void>
+  refreshUser: () => Promise<void>
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null)

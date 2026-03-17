@@ -9,7 +9,11 @@ function RegisterPage() {
 
   return (
     <RegistrationFeature
-      onSuccess={() => router.navigate({ to: '/auth/verify-email' })}
+      onSuccess={(user) =>
+        router.navigate({
+          to: user.emailVerified ? '/' : '/auth/verify-email',
+        })
+      }
       onLinkRequired={() => router.navigate({ to: '/auth/link-account' })}
     >
       <RegistrationCard.Root>

@@ -47,8 +47,15 @@ function UserProfileCardRoot({
   className?: string
   children: React.ReactNode
 }) {
+  const { actions } = useUserProfileContext()
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(value) => {
+        actions.clearStatus()
+        onOpenChange(value)
+      }}
+    >
       <DialogContent
         className={cn(
           "sm:max-w-3xl gap-0 overflow-hidden p-0",
@@ -107,26 +114,6 @@ function UserProfileCardSidebar({ className }: { className?: string }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  ContentArea                                                       */
-/* ------------------------------------------------------------------ */
-
-function UserProfileCardContentArea({
-  className,
-  children,
-}: {
-  className?: string
-  children: React.ReactNode
-}) {
-  return (
-    <ScrollArea className={cn("flex-1", className)}>
-      <div className="flex flex-col">
-        {children}
-      </div>
-    </ScrollArea>
-  )
-}
-
-/* ------------------------------------------------------------------ */
 /*  AccountPage                                                       */
 /* ------------------------------------------------------------------ */
 
@@ -134,24 +121,26 @@ function UserProfileCardAccountPage({ className }: { className?: string }) {
   const { state } = useUserProfileContext()
   if (state.activePage !== "account") return null
   return (
-    <UserProfileCardContentArea className={className}>
+    <div className={cn("flex flex-1 flex-col", className)}>
       <div className="border-b px-6 py-4">
         <h2 className="text-lg font-semibold">Account</h2>
         <p className="text-sm text-muted-foreground">
           Manage your account information
         </p>
       </div>
-      <div className="flex flex-col">
-        <ProfileSubsection />
-        <Separator />
-        <EmailSubsection />
-        <Separator />
-        <ConnectedAccountsSubsection />
-        <Separator />
-        <DangerSubsection />
-      </div>
       <StatusSubsection />
-    </UserProfileCardContentArea>
+      <ScrollArea className="flex-1">
+        <div className="flex flex-col">
+          <ProfileSubsection />
+          <Separator />
+          <EmailSubsection />
+          <Separator />
+          <ConnectedAccountsSubsection />
+          <Separator />
+          <DangerSubsection />
+        </div>
+      </ScrollArea>
+    </div>
   )
 }
 
@@ -163,21 +152,24 @@ function UserProfileCardSecurityPage({ className }: { className?: string }) {
   const { state } = useUserProfileContext()
   if (state.activePage !== "security") return null
   return (
-    <UserProfileCardContentArea className={className}>
+    <div className={cn("flex flex-1 flex-col", className)}>
       <div className="border-b px-6 py-4">
         <h2 className="text-lg font-semibold">Security</h2>
         <p className="text-sm text-muted-foreground">
           Manage your security settings
         </p>
       </div>
-      <div className="flex flex-col">
-        <PasswordSubsection />
-        <Separator />
-        <MFASubsection />
-        <Separator />
-        <ActiveSessionsSubsection />
-      </div>
-    </UserProfileCardContentArea>
+      <StatusSubsection />
+      <ScrollArea className="flex-1">
+        <div className="flex flex-col">
+          <PasswordSubsection />
+          <Separator />
+          <MFASubsection />
+          <Separator />
+          <ActiveSessionsSubsection />
+        </div>
+      </ScrollArea>
+    </div>
   )
 }
 
@@ -190,8 +182,8 @@ function ProfileSubsection() {
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(state.displayName ?? "")
 
-  const handleSave = async () => {
-    await actions.updateDisplayName(name)
+  const handleCancel = () => {
+    setName(state.displayName ?? "")
     setEditing(false)
   }
 
@@ -202,38 +194,28 @@ function ProfileSubsection() {
         <UserAvatar src={state.photoURL} name={state.displayName} size="lg" />
         <div className="flex flex-1 flex-col gap-0.5">
           {editing ? (
-            <div className="flex items-center gap-2" data-inline-edit>
+            <form
+              data-inline-edit
+              className="flex items-center gap-2"
+              onSubmit={async (e) => {
+                e.preventDefault()
+                await actions.updateDisplayName(name)
+                setEditing(false)
+              }}
+              onReset={handleCancel}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") { e.stopPropagation(); handleCancel() }
+              }}
+            >
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault()
-                    void handleSave()
-                  }
-                  if (e.key === "Escape") {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    e.nativeEvent.stopImmediatePropagation()
-                    setName(state.displayName ?? "")
-                    setEditing(false)
-                  }
-                }}
                 className="h-7 text-sm"
                 autoFocus
               />
-              <Button size="sm" onClick={handleSave}>Save</Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  setName(state.displayName ?? "")
-                  setEditing(false)
-                }}
-              >
-                Cancel
-              </Button>
-            </div>
+              <Button type="submit" size="sm">Save</Button>
+              <Button type="reset" size="sm" variant="ghost">Cancel</Button>
+            </form>
           ) : (
             <button
               type="button"
@@ -253,7 +235,7 @@ function ProfileSubsection() {
 }
 
 function EmailSubsection() {
-  const { state } = useUserProfileContext()
+  const { state, actions } = useUserProfileContext()
   return (
     <div className="px-6 py-4">
       <h3 className="mb-3 text-sm font-medium">Email addresses</h3>
@@ -267,6 +249,15 @@ function EmailSubsection() {
             <Badge variant="outline" className="text-xs text-destructive">Unverified</Badge>
           )}
         </div>
+        {!state.emailVerified && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={actions.sendVerificationEmail}
+          >
+            Resend verification
+          </Button>
+        )}
       </div>
       {/* TODO: + Add an email address */}
     </div>
@@ -281,7 +272,7 @@ const providerLabels: Record<string, string> = {
 }
 
 function ConnectedAccountsSubsection() {
-  const { state } = useUserProfileContext()
+  const { state, actions } = useUserProfileContext()
   return (
     <div className="px-6 py-4">
       <h3 className="mb-3 text-sm font-medium">Connected accounts</h3>
@@ -299,7 +290,16 @@ function ConnectedAccountsSubsection() {
                 <span className="text-xs text-muted-foreground">{provider.email}</span>
               )}
             </div>
-            {/* TODO: Unlink button */}
+            {/* TODO: Remove unlink for password provider — manage via password section instead */}
+            {state.providers.length > 1 && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => actions.unlinkProvider(provider.providerId)}
+              >
+                Unlink
+              </Button>
+            )}
           </div>
         ))}
       </div>
@@ -348,6 +348,85 @@ function DangerSubsection() {
   )
 }
 
+function SetPasswordSubsection() {
+  const { actions } = useUserProfileContext()
+  const [setting, setSetting] = useState(false)
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [error, setError] = useState<string | null>(null)
+
+  const handleCancel = () => {
+    setSetting(false)
+    setNewPassword("")
+    setConfirmPassword("")
+    setError(null)
+  }
+
+  return (
+    <div className="px-6 py-4">
+      <div className="mb-3 flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-medium">Password</h3>
+          {!setting && (
+            <p className="text-xs text-muted-foreground">
+              No password set. Add one to sign in with email and password.
+            </p>
+          )}
+        </div>
+        {!setting && (
+          <Button size="sm" variant="outline" onClick={() => setSetting(true)}>
+            Set password
+          </Button>
+        )}
+      </div>
+      {setting && (
+        <form
+          data-inline-edit
+          className="flex flex-col gap-3"
+          onSubmit={async (e) => {
+            e.preventDefault()
+            setError(null)
+            if (newPassword.length < 6) {
+              setError("Password must be at least 6 characters")
+              return
+            }
+            if (newPassword !== confirmPassword) {
+              setError("Passwords do not match")
+              return
+            }
+            try {
+              await actions.setPassword(newPassword)
+              setSetting(false)
+              setNewPassword("")
+              setConfirmPassword("")
+            } catch {
+              // error surfaced via context
+            }
+          }}
+          onReset={handleCancel}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") { e.stopPropagation(); handleCancel() }
+          }}
+        >
+          <Field>
+            <FieldLabel>Password</FieldLabel>
+            <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoFocus />
+          </Field>
+          <Field>
+            <FieldLabel>Confirm password</FieldLabel>
+            <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+          </Field>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <div className="flex gap-2">
+            <Button type="submit" size="sm">Set password</Button>
+            <Button type="reset" size="sm" variant="ghost">Cancel</Button>
+          </div>
+        </form>
+      )}
+    </div>
+  )
+}
+
 function PasswordSubsection() {
   const { state, actions } = useUserProfileContext()
   const [changing, setChanging] = useState(false)
@@ -358,32 +437,16 @@ function PasswordSubsection() {
 
   const hasPasswordProvider = state.providers.some((p) => p.providerId === "password")
 
-  if (!hasPasswordProvider) {
-    return (
-      <div className="px-6 py-4">
-        <h3 className="mb-3 text-sm font-medium">Password</h3>
-        <p className="text-sm text-muted-foreground">
-          No password set. You sign in with a connected account.
-        </p>
-      </div>
-    )
+  const handleCancel = () => {
+    setChanging(false)
+    setCurrentPassword("")
+    setNewPassword("")
+    setConfirmPassword("")
+    setError(null)
   }
 
-  const handleSave = async () => {
-    setError(null)
-    if (newPassword !== confirmPassword) {
-      setError("Passwords do not match")
-      return
-    }
-    try {
-      await actions.changePassword(currentPassword, newPassword)
-      setChanging(false)
-      setCurrentPassword("")
-      setNewPassword("")
-      setConfirmPassword("")
-    } catch {
-      setError("Failed to change password")
-    }
+  if (!hasPasswordProvider) {
+    return <SetPasswordSubsection />
   }
 
   return (
@@ -397,10 +460,31 @@ function PasswordSubsection() {
         )}
       </div>
       {changing && (
-        <div className="flex flex-col gap-3">
+        <form
+          data-inline-edit
+          className="flex flex-col gap-3"
+          onSubmit={async (e) => {
+            e.preventDefault()
+            setError(null)
+            if (newPassword !== confirmPassword) {
+              setError("Passwords do not match")
+              return
+            }
+            try {
+              await actions.changePassword(currentPassword, newPassword)
+              handleCancel()
+            } catch {
+              setError("Failed to change password")
+            }
+          }}
+          onReset={handleCancel}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") { e.stopPropagation(); handleCancel() }
+          }}
+        >
           <Field>
             <FieldLabel>Current password</FieldLabel>
-            <Input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
+            <Input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} autoFocus />
           </Field>
           <Field>
             <FieldLabel>New password</FieldLabel>
@@ -412,9 +496,23 @@ function PasswordSubsection() {
           </Field>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex gap-2">
-            <Button size="sm" onClick={handleSave}>Update password</Button>
-            <Button size="sm" variant="ghost" onClick={() => { setChanging(false); setError(null) }}>Cancel</Button>
+            <Button type="submit" size="sm">Update password</Button>
+            <Button type="reset" size="sm" variant="ghost">Cancel</Button>
           </div>
+        </form>
+      )}
+      {!state.emailVerified && !changing && (
+        <div className="mt-3 flex items-center justify-between rounded-lg border border-destructive/20 bg-destructive/5 p-3">
+          <p className="text-sm text-muted-foreground">
+            Your email is not verified.
+          </p>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={actions.sendVerificationEmail}
+          >
+            Resend verification
+          </Button>
         </div>
       )}
     </div>
@@ -453,7 +551,7 @@ function StatusSubsection() {
   const { state } = useUserProfileContext()
   if (!state.error && !state.success) return null
   return (
-    <div className="border-t px-6 py-3">
+    <div className="mx-6 my-3 rounded-lg border px-4 py-3">
       {state.error && <p className="text-sm text-destructive">{state.error}</p>}
       {state.success && <p className="text-sm text-muted-foreground">{state.success}</p>}
     </div>

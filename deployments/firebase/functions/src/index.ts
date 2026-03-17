@@ -12,11 +12,13 @@ setGlobalOptions({ maxInstances: 10 });
 const pivoxApiUrl = defineString("PIVOX_API_URL", {
   description: "Base URL of the Pivox API server",
   default: "http://localhost:8080",
+  label: "API URL",
 });
 
-const pivoxInternalSecret = defineString("PIVOX_INTERNAL_SECRET", {
+const pivoxInternalSecret = defineString("PIVOX_SHARED_SECRET", {
   description: "Shared secret for internal API calls",
   default: "dev-secret",
+  label: "Shared secret",
 });
 
 /**

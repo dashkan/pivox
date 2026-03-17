@@ -16,6 +16,7 @@ export interface UserProfileState {
 
 export interface UserProfileActions {
   setActivePage: (page: "account" | "security") => void
+  clearStatus: () => void
 
   // Profile
   updateDisplayName: (name: string) => Promise<void>
@@ -23,13 +24,16 @@ export interface UserProfileActions {
   removePhoto: () => Promise<void>
 
   // Password
+  setPassword: (newPassword: string) => Promise<void>
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>
 
   // Email
-  // TODO: addEmail, removeEmail, setPrimaryEmail, sendVerification
+  sendVerificationEmail: () => Promise<void>
+  // TODO: addEmail, removeEmail, setPrimaryEmail
 
   // Providers
-  // TODO: linkProvider, unlinkProvider
+  unlinkProvider: (providerId: string) => Promise<void>
+  // TODO: linkProvider
 
   // MFA
   // TODO: enrollMfa, unenrollMfa

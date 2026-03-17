@@ -43,14 +43,18 @@ export function useRegistration(
   const [displayName, setDisplayName] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [error, setError] = useState<string | null>(null)
 
-  const [formState, formAction] = useActionState(
-    async (_prev: { error: string | null }) => {
+  const [, formAction] = useActionState(
+    async () => {
+      setError(null)
       if (password !== confirmPassword) {
-        return { error: "Passwords do not match" }
+        setError("Passwords do not match")
+        return
       }
       if (!displayName.trim()) {
-        return { error: "Display name is required" }
+        setError("Display name is required")
+        return
       }
       try {
         const auth = getAuth()
@@ -58,12 +62,11 @@ export function useRegistration(
         await updateProfile(credential.user, { displayName: displayName.trim() })
         await sendEmailVerification(credential.user)
         onSuccess?.(credential.user)
-        return { error: null }
       } catch (e) {
-        return { error: firebaseErrorMessage(e) }
+        setError(firebaseErrorMessage(e))
       }
     },
-    { error: null },
+    null,
   )
 
   const state: RegistrationState = {
@@ -71,7 +74,7 @@ export function useRegistration(
     displayName,
     password,
     confirmPassword,
-    error: formState.error,
+    error,
   }
 
   const actions: RegistrationActions = {
@@ -82,6 +85,7 @@ export function useRegistration(
     formAction,
 
     socialLogin: async (provider) => {
+      setError(null)
       try {
         const auth = getAuth()
         const result = await signInWithPopup(auth, socialProviders[provider]())
@@ -100,7 +104,11 @@ export function useRegistration(
               providerName: providerNames[provider] ?? provider,
             })
             onLinkRequired?.(err.customData.email as string)
+            return
           }
+        }
+        if (err.code !== "auth/popup-closed-by-user") {
+          setError(firebaseErrorMessage(e))
         }
       }
     },

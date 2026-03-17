@@ -4,7 +4,10 @@ import { useState } from "react"
 import {
   EmailAuthProvider,
   deleteUser,
+  linkWithCredential,
   reauthenticateWithCredential,
+  sendEmailVerification,
+  unlink,
   updatePassword,
   updateProfile,
 } from "firebase/auth"
@@ -46,6 +49,7 @@ export function useUserProfile(onClose?: () => void): UserProfileContextValue {
 
   const actions: UserProfileActions = {
     setActivePage,
+    clearStatus,
     updateDisplayName: async (name) => {
       clearStatus()
       try {
@@ -75,6 +79,32 @@ export function useUserProfile(onClose?: () => void): UserProfileContextValue {
       }
     },
 
+    setPassword: async (newPassword) => {
+      clearStatus()
+      try {
+        if (!user || !user.email) throw new Error("Not signed in")
+        const credential = EmailAuthProvider.credential(user.email, newPassword)
+        await linkWithCredential(user, credential)
+        await sendEmailVerification(user)
+        setSuccess(
+          "Password set. Check your email to verify your account.",
+        )
+      } catch (e) {
+        setError(firebaseErrorMessage(e))
+      }
+    },
+
+    sendVerificationEmail: async () => {
+      clearStatus()
+      try {
+        if (!user) throw new Error("Not signed in")
+        await sendEmailVerification(user)
+        setSuccess("Verification email sent. Check your inbox.")
+      } catch (e) {
+        setError(firebaseErrorMessage(e))
+      }
+    },
+
     changePassword: async (currentPassword, newPassword) => {
       clearStatus()
       try {
@@ -89,6 +119,17 @@ export function useUserProfile(onClose?: () => void): UserProfileContextValue {
       } catch (e) {
         setError(firebaseErrorMessage(e))
         throw e
+      }
+    },
+
+    unlinkProvider: async (providerId) => {
+      clearStatus()
+      try {
+        if (!user) throw new Error("Not signed in")
+        await unlink(user, providerId)
+        setSuccess(`Provider unlinked`)
+      } catch (e) {
+        setError(firebaseErrorMessage(e))
       }
     },
 

@@ -3,8 +3,12 @@
 .firebase-data
 bin/
 
-# Created by https://www.toptal.com/developers/gitignore/api/go,node,linux,macos,nextjs,windows,jetbrains+all,visualstudiocode,firebase
-# Edit at https://www.toptal.com/developers/gitignore?templates=go,node,linux,macos,nextjs,windows,jetbrains+all,visualstudiocode,firebase
+# Created by https://www.toptal.com/developers/gitignore/api/go,node,linux,macos,nextjs,windows,firebase,jetbrains+all,visualstudiocode,direnv
+# Edit at https://www.toptal.com/developers/gitignore?templates=go,node,linux,macos,nextjs,windows,firebase,jetbrains+all,visualstudiocode,direnv
+
+### direnv ###
+.direnv
+.envrc
 
 ### Firebase ###
 .idea
@@ -389,4 +393,4 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
-# End of https://www.toptal.com/developers/gitignore/api/go,node,linux,macos,nextjs,windows,jetbrains+all,visualstudiocode,firebase
+# End of https://www.toptal.com/developers/gitignore/api/go,node,linux,macos,nextjs,windows,firebase,jetbrains+all,visualstudiocode,direnv
