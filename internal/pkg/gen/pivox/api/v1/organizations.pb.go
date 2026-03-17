@@ -516,8 +516,9 @@ type CreateOrganizationRequest struct {
 	// Required. The Organization to create.
 	Organization *Organization `protobuf:"bytes,1,opt,name=organization,proto3" json:"organization,omitempty"`
 	// Optional. A unique identifier for the organization. If not provided, the
-	// server will generate one. Must consist of lowercase letters, numbers,
-	// and hyphens.
+	// server will generate one. Must start with a letter, contain only lowercase
+	// letters, digits, and hyphens, and be between 4 and 20 characters long.
+	// This value is also used as the Firebase Auth tenant display name.
 	OrganizationId string `protobuf:"bytes,2,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
 	// Optional. If set to true, the request will only validate the request
 	// without persisting it.
@@ -2163,10 +2164,10 @@ const file_pivox_api_v1_organizations_proto_rawDesc = "" +
 	"page_token\x18\x02 \x01(\tB\x03\xe0A\x01R\tpageToken\x12&\n" +
 	"\fshow_deleted\x18\x03 \x01(\bB\x03\xe0A\x01R\vshowDeleted\x12\x1b\n" +
 	"\x06filter\x18\x04 \x01(\tB\x03\xe0A\x01R\x06filter\x12\x1e\n" +
-	"\border_by\x18\x05 \x01(\tB\x03\xe0A\x01R\aorderBy\"\xd1\x01\n" +
+	"\border_by\x18\x05 \x01(\tB\x03\xe0A\x01R\aorderBy\"\xdb\x01\n" +
 	"\x19CreateOrganizationRequest\x12I\n" +
-	"\forganization\x18\x01 \x01(\v2\x1a.pivox.api.v1.OrganizationB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\forganization\x12?\n" +
-	"\x0forganization_id\x18\x02 \x01(\tB\x16\xe0A\x01\xbaH\x10r\x0e2\f^[a-z0-9-]+$R\x0eorganizationId\x12(\n" +
+	"\forganization\x18\x01 \x01(\v2\x1a.pivox.api.v1.OrganizationB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\forganization\x12I\n" +
+	"\x0forganization_id\x18\x02 \x01(\tB \xe0A\x01\xbaH\x1ar\x182\x16^[a-z][a-z0-9-]{3,19}$R\x0eorganizationId\x12(\n" +
 	"\rvalidate_only\x18\x03 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\xd2\x01\n" +
 	"\x19UpdateOrganizationRequest\x12I\n" +
 	"\forganization\x18\x01 \x01(\v2\x1a.pivox.api.v1.OrganizationB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\forganization\x12@\n" +

@@ -380,11 +380,12 @@ message CreateOrganizationRequest {
   ];
 
   // Optional. A unique identifier for the organization. If not provided, the
-  // server will generate one. Must consist of lowercase letters, numbers,
-  // and hyphens.
+  // server will generate one. Must start with a letter, contain only lowercase
+  // letters, digits, and hyphens, and be between 4 and 20 characters long.
+  // This value is also used as the Firebase Auth tenant display name.
   string organization_id = 2 [
     (google.api.field_behavior) = OPTIONAL,
-    (buf.validate.field).string = {pattern: "^[a-z0-9-]+$"}
+    (buf.validate.field).string = {pattern: "^[a-z][a-z0-9-]{3,19}$"}
   ];
 
   // Optional. If set to true, the request will only validate the request

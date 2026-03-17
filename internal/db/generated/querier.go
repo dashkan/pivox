@@ -50,6 +50,7 @@ type Querier interface {
 	ListOperations(ctx context.Context, arg ListOperationsParams) ([]Operation, error)
 	ListPendingOperations(ctx context.Context) ([]Operation, error)
 	LookupApiKeyByKeyString(ctx context.Context, keyString string) (ApiKey, error)
+	SetOrganizationTenantID(ctx context.Context, arg SetOrganizationTenantIDParams) error
 	SoftDeleteApiKey(ctx context.Context, arg SoftDeleteApiKeyParams) (ApiKey, error)
 	SoftDeleteProject(ctx context.Context, arg SoftDeleteProjectParams) (Project, error)
 	UndeleteApiKey(ctx context.Context, arg UndeleteApiKeyParams) (ApiKey, error)

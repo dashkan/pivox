@@ -2,7 +2,10 @@ package server
 
 import (
 	"context"
+	"log/slog"
 
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	iampb "github.com/pivoxai/pivox/internal/pkg/gen/pivox/iam/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -10,6 +13,7 @@ import (
 	"github.com/pivoxai/pivox/internal/convert"
 	db "github.com/pivoxai/pivox/internal/db/generated"
 	"github.com/pivoxai/pivox/internal/filter"
+	"github.com/pivoxai/pivox/internal/firebase"
 	"github.com/pivoxai/pivox/internal/iam"
 	apiv1 "github.com/pivoxai/pivox/internal/pkg/gen/pivox/api/v1"
 	"github.com/pivoxai/pivox/internal/resource"
@@ -18,16 +22,20 @@ import (
 type OrganizationsServer struct {
 	apiv1.UnimplementedOrganizationsServer
 	db      db.DBTX
+	pool    *pgxpool.Pool
 	queries *db.Queries
 	iam     *iam.Helper
+	tenants *firebase.TenantService
 	filter  *filter.ResourceFilter
 }
 
-func NewOrganizationsServer(pool db.DBTX, queries *db.Queries, iam *iam.Helper) *OrganizationsServer {
+func NewOrganizationsServer(pool *pgxpool.Pool, queries *db.Queries, iam *iam.Helper, tenants *firebase.TenantService) *OrganizationsServer {
 	return &OrganizationsServer{
 		db:      pool,
+		pool:    pool,
 		queries: queries,
 		iam:     iam,
+		tenants: tenants,
 		filter:  filter.OrganizationFilter(),
 	}
 }
@@ -86,6 +94,59 @@ func (s *OrganizationsServer) ListOrganizations(ctx context.Context, req *apiv1.
 		Organizations: orgs,
 		NextPageToken: nextPageToken,
 	}, nil
+}
+
+func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1.CreateOrganizationRequest) (*apiv1.Organization, error) {
+	orgSlug := req.GetOrganizationId()
+	if orgSlug == "" {
+		orgSlug = uuid.New().String()[:8]
+	}
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "begin transaction: %v", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	qtx := s.queries.WithTx(tx)
+
+	org, err := qtx.CreateOrganization(ctx, db.CreateOrganizationParams{
+		ID:          uuid.New(),
+		Name:        orgSlug,
+		DisplayName: req.GetOrganization().GetDisplayName(),
+		CreatedBy:   "",
+	})
+	if err != nil {
+		return nil, handleResourceError(err, "Organization", orgSlug)
+	}
+
+	tenantID, err := s.tenants.CreateTenant(ctx, orgSlug)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to create Firebase tenant", "org", orgSlug, "error", err)
+		return nil, status.Errorf(codes.Internal, "create auth tenant: %v", err)
+	}
+
+	if err := qtx.SetOrganizationTenantID(ctx, db.SetOrganizationTenantIDParams{
+		ID:       org.ID,
+		TenantID: tenantID,
+	}); err != nil {
+		// Clean up the Firebase tenant we just created.
+		if delErr := s.tenants.DeleteTenant(ctx, tenantID); delErr != nil {
+			slog.ErrorContext(ctx, "failed to clean up Firebase tenant", "tenantID", tenantID, "error", delErr)
+		}
+		return nil, status.Errorf(codes.Internal, "set tenant id: %v", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		// Clean up the Firebase tenant since the commit failed.
+		if delErr := s.tenants.DeleteTenant(ctx, tenantID); delErr != nil {
+			slog.ErrorContext(ctx, "failed to clean up Firebase tenant after commit failure", "tenantID", tenantID, "error", delErr)
+		}
+		return nil, status.Errorf(codes.Internal, "commit transaction: %v", err)
+	}
+
+	org.TenantID = tenantID
+	return convert.OrganizationToProto(org), nil
 }
 
 func (s *OrganizationsServer) GetIamPolicy(ctx context.Context, req *iampb.GetIamPolicyRequest) (*iampb.Policy, error) {

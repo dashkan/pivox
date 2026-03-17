@@ -108,3 +108,17 @@ func (q *Queries) GetOrganizationByName(ctx context.Context, name string) (Organ
 	)
 	return i, err
 }
+
+const setOrganizationTenantID = `-- name: SetOrganizationTenantID :exec
+UPDATE organizations SET tenant_id = $2, update_time = now() WHERE id = $1
+`
+
+type SetOrganizationTenantIDParams struct {
+	ID       uuid.UUID `json:"id"`
+	TenantID string    `json:"tenant_id"`
+}
+
+func (q *Queries) SetOrganizationTenantID(ctx context.Context, arg SetOrganizationTenantIDParams) error {
+	_, err := q.db.Exec(ctx, setOrganizationTenantID, arg.ID, arg.TenantID)
+	return err
+}

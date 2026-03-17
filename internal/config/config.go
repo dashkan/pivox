@@ -6,24 +6,24 @@ import (
 )
 
 type Config struct {
-	DatabaseURL    string
-	GRPCPort       string
-	RESTPort       string
-	DebugPort      string
-	WorkerCount    int
-	LogLevel       string
-	InternalSecret string
+	DatabaseURL  string
+	GRPCPort     string
+	RESTPort     string
+	DebugPort    string
+	WorkerCount  int
+	LogLevel     string
+	SharedSecret string
 }
 
 func Load() *Config {
 	return &Config{
-		DatabaseURL:    getEnv("DATABASE_URL", "postgres://localhost:5432/pivox?sslmode=disable"),
-		GRPCPort:       getEnv("GRPC_PORT", ":50051"),
-		RESTPort:       getEnv("REST_PORT", ":8080"),
-		DebugPort:      getEnv("DEBUG_PORT", ":9090"),
-		WorkerCount:    getEnvInt("WORKER_COUNT", 5),
-		LogLevel:       getEnv("LOG_LEVEL", "info"),
-		InternalSecret: getEnv("INTERNAL_SECRET", "dev-secret"),
+		DatabaseURL:  getEnv("DATABASE_URL", "postgres://localhost:5432/pivox?sslmode=disable"),
+		GRPCPort:     getEnv("GRPC_PORT", ":50051"),
+		RESTPort:     getEnv("REST_PORT", ":8080"),
+		DebugPort:    getEnv("DEBUG_PORT", ":9090"),
+		WorkerCount:  getEnvInt("WORKER_COUNT", 5),
+		LogLevel:     getEnv("LOG_LEVEL", "info"),
+		SharedSecret: getEnv("SHARED_SECRET", "dev-secret"),
 	}
 }
 

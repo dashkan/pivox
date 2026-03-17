@@ -8,3 +8,6 @@ SELECT * FROM organizations WHERE name = $1 AND delete_time IS NULL;
 INSERT INTO organizations (id, name, display_name, created_by, updated_by)
 VALUES ($1, $2, $3, $4, $4)
 RETURNING *;
+
+-- name: SetOrganizationTenantID :exec
+UPDATE organizations SET tenant_id = $2, update_time = now() WHERE id = $1;

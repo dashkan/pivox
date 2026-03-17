@@ -107,7 +107,7 @@
           },
           {
             "name": "organizationId",
-            "description": "Optional. A unique identifier for the organization. If not provided, the\nserver will generate one. Must consist of lowercase letters, numbers,\nand hyphens.",
+            "description": "Optional. A unique identifier for the organization. If not provided, the\nserver will generate one. Must start with a letter, contain only lowercase\nletters, digits, and hyphens, and be between 4 and 20 characters long.\nThis value is also used as the Firebase Auth tenant display name.",
             "in": "query",
             "required": false,
             "type": "string"
