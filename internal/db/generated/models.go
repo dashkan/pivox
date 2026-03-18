@@ -305,6 +305,14 @@ type ApiKey struct {
 	PurgeTime    pgtype.Timestamptz `json:"purge_time"`
 }
 
+type AuthTokenCode struct {
+	Code       uuid.UUID `json:"code"`
+	IDToken    string    `json:"id_token"`
+	Consumed   bool      `json:"consumed"`
+	CreateTime time.Time `json:"create_time"`
+	ExpireTime time.Time `json:"expire_time"`
+}
+
 type CustomDomain struct {
 	ID         uuid.UUID          `json:"id"`
 	OrgID      uuid.UUID          `json:"org_id"`

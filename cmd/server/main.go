@@ -96,7 +96,13 @@ func main() {
 		os.Exit(1)
 	}
 	grpcServer := grpc.NewServer(
-		grpc.UnaryInterceptor(server.FieldMaskAwareValidationInterceptor(validator)),
+		grpc.ChainUnaryInterceptor(
+			server.AuthInterceptor(authSvc),
+			server.FieldMaskAwareValidationInterceptor(validator),
+		),
+		grpc.ChainStreamInterceptor(
+			server.AuthStreamInterceptor(authSvc),
+		),
 	)
 
 	// Register all services

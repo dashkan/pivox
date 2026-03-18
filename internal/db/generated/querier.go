@@ -13,15 +13,22 @@ import (
 type Querier interface {
 	CancelOperation(ctx context.Context, id uuid.UUID) (Operation, error)
 	CompleteOperation(ctx context.Context, arg CompleteOperationParams) (Operation, error)
+	// Atomically consumes a code and returns the ID token.
+	// Returns no rows if the code doesn't exist, is expired, or was already consumed.
+	ConsumeAuthTokenCode(ctx context.Context, code uuid.UUID) (AuthTokenCode, error)
 	CountTagBindingsByTagValue(ctx context.Context, tagValueID uuid.UUID) (int64, error)
 	CountTagValuesByTagKey(ctx context.Context, tagKeyID uuid.UUID) (int64, error)
 	CreateApiKey(ctx context.Context, arg CreateApiKeyParams) (ApiKey, error)
+	// Stores a Firebase ID token behind a short-lived opaque code.
+	CreateAuthTokenCode(ctx context.Context, idToken string) (AuthTokenCode, error)
 	CreateOperation(ctx context.Context, arg CreateOperationParams) (Operation, error)
 	CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error)
 	CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error)
 	CreateTagBinding(ctx context.Context, arg CreateTagBindingParams) (TagBinding, error)
 	CreateTagKey(ctx context.Context, arg CreateTagKeyParams) (TagKey, error)
 	CreateTagValue(ctx context.Context, arg CreateTagValueParams) (TagValue, error)
+	// Cleanup: remove codes older than 10 minutes (all should be expired by then).
+	DeleteExpiredAuthTokenCodes(ctx context.Context) error
 	DeleteExpiredOperations(ctx context.Context) error
 	DeleteIamPolicy(ctx context.Context, resourceID uuid.UUID) error
 	DeleteOperation(ctx context.Context, id uuid.UUID) error

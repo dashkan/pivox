@@ -8,9 +8,9 @@
 
 ## Executive Summary
 
-The authentication system is well-architected around Firebase Auth with proper separation of concerns. The Electron OAuth flow via custom protocol deep linking is a sound design choice. However, the audit identified **2 High**, **4 Medium**, and **4 Low** severity findings that should be addressed before production hardening.
+The authentication system is well-architected around Firebase Auth with proper separation of concerns. The Electron OAuth flow via custom protocol deep linking is a sound design choice. The audit identified **2 High**, **4 Medium**, and **4 Low** severity findings — **all 10 have been remediated**.
 
-**Overall posture**: Good foundation — no critical vulnerabilities found, but several gaps in defense-in-depth and hardening need attention.
+**Overall posture**: All findings addressed. Production-ready pending integration testing.
 
 ---
 
@@ -23,7 +23,7 @@ The authentication system is well-architected around Firebase Auth with proper s
 | **Severity** | High |
 | **CWE** | CWE-798 (Use of Hard-Coded Credentials) |
 | **Location** | `internal/config/config.go:44`, `deployments/firebase/functions/.env.example` |
-| **Status** | Open |
+| **Status** | ✅ Fixed |
 
 **Description**: The `SHARED_SECRET` environment variable falls back to `"dev-secret"` if unset. This static secret protects the internal `/internal/v1/accounts:sync` endpoint that can create/modify any user account. If a production deployment fails to set this variable, the endpoint is effectively unprotected — any attacker who discovers it can upsert arbitrary accounts.
 
@@ -48,7 +48,7 @@ Additionally, consider replacing the static shared secret with a more robust mec
 |-------|-------|
 | **Severity** | High |
 | **Location** | `cmd/server/main.go:98-109` |
-| **Status** | Open |
+| **Status** | ✅ Fixed |
 
 **Description**: The gRPC server is created with only a validation interceptor — no authentication interceptor. All registered services (`Projects`, `Organizations`, `TagKeys`, `TagValues`, `TagBindings`, `ApiKeys`) appear to be accessible without verifying a Firebase ID token or any other credential. The REST gateway inherits this — it connects to gRPC via insecure local transport with no auth layer.
 
@@ -82,7 +82,7 @@ Exempt public endpoints (if any) via a method allowlist.
 | **Severity** | Medium |
 | **CWE** | CWE-693 (Protection Mechanism Failure) |
 | **Location** | `web/apps/electron/src/main/index.ts:102` |
-| **Status** | Open |
+| **Status** | ✅ Fixed |
 
 **Description**: The BrowserWindow is created with `sandbox: false`:
 
@@ -108,7 +108,7 @@ Disabling the sandbox allows the renderer process to access Node.js APIs even th
 | **Severity** | Medium |
 | **CWE** | CWE-598 (Use of GET Request Method With Sensitive Query Strings) |
 | **Location** | `web/apps/electron/src/main/index.ts:86` |
-| **Status** | Open |
+| **Status** | ✅ Fixed |
 
 **Description**: The `auth:start-link-provider` IPC handler passes the Firebase ID token as a URL query parameter:
 
@@ -141,7 +141,7 @@ Alternatively, if the architecture requires it, use `POST` with the token in the
 | **Severity** | Medium |
 | **CWE** | CWE-400 (Uncontrolled Resource Consumption) |
 | **Location** | `internal/server/internal_hooks.go:54` |
-| **Status** | Open |
+| **Status** | ✅ Fixed |
 
 **Description**: The `syncAccount` handler decodes the request body directly without limiting its size:
 
@@ -170,7 +170,7 @@ Apply this to all HTTP handlers that read request bodies.
 | **Severity** | Medium |
 | **CWE** | CWE-307 (Improper Restriction of Excessive Authentication Attempts) |
 | **Location** | `internal/server/internal_hooks.go:92-118` |
-| **Status** | Open |
+| **Status** | ✅ Fixed |
 
 **Description**: The `POST /internal/v1/auth:exchangeToken` endpoint verifies a Firebase ID token and returns a custom token. It has no rate limiting and is not protected by the shared secret (by design — it uses token-based auth). This makes it a potential target for token-oracle abuse: an attacker with a valid ID token could generate unlimited custom tokens.
 
@@ -191,7 +191,7 @@ While the ID token verification itself provides authentication, the lack of rate
 | **Severity** | Low |
 | **CWE** | CWE-204 (Observable Response Discrepancy) |
 | **Location** | `web/packages/features/src/shared/firebase-error.ts:9-10` |
-| **Status** | Open |
+| **Status** | ✅ Fixed |
 
 **Description**: The error message mapping returns different messages for `auth/user-not-found` ("No account found with this email") vs. `auth/wrong-password` ("Incorrect password"). This allows an attacker to enumerate valid email addresses by observing which error is returned.
 
@@ -226,7 +226,7 @@ Also verify that Firebase project settings have **Email Enumeration Protection**
 | **Severity** | Low |
 | **CWE** | CWE-362 (Race Condition) |
 | **Location** | `web/apps/electron/src/main/index.ts:10` |
-| **Status** | Open |
+| **Status** | ✅ Fixed |
 
 **Description**: The Electron main process stores only one `pendingAuthState` at a time:
 
@@ -263,7 +263,7 @@ pendingAuthStates.delete(state);
 | **Severity** | Low |
 | **CWE** | CWE-922 (Insecure Storage of Sensitive Information) |
 | **Location** | `web/packages/features/src/shared/pending-link.ts` |
-| **Status** | Open |
+| **Status** | ✅ Fixed |
 
 **Description**: When an OAuth login encounters `auth/account-exists-with-different-credential`, the credential is stored in a module-scoped variable:
 
@@ -296,7 +296,7 @@ export function setPendingLink(link: PendingLink) {
 | **Severity** | Low |
 | **CWE** | CWE-489 (Active Debug Code) |
 | **Location** | `web/apps/electron/src/main/index.ts:109-113` |
-| **Status** | Open |
+| **Status** | ✅ Fixed |
 
 **Description**: The production Electron build allows opening DevTools via `Cmd+Option+I`:
 
@@ -347,15 +347,15 @@ These aspects of the authentication system are well-implemented:
 
 ## Risk Matrix
 
-| ID | Finding | Severity | Effort to Fix | Priority |
-|----|---------|----------|---------------|----------|
-| AUTHN-02 | No auth on gRPC/REST API | High | Medium | **P0 — Fix before production** |
-| AUTHN-01 | Shared secret defaults to `dev-secret` | High | Low | **P0 — Fix before production** |
-| AUTHN-04 | ID token in URL query parameter | Medium | Medium | P1 — Next sprint |
-| AUTHN-03 | Electron `sandbox: false` | Medium | Low | P1 — Next sprint |
-| AUTHN-06 | No rate limiting on token exchange | Medium | Medium | P1 — Next sprint |
-| AUTHN-05 | No request body size limit | Medium | Low | P1 — Next sprint |
-| AUTHN-07 | User enumeration via error messages | Low | Low | P2 — Backlog |
-| AUTHN-08 | Single pending auth state variable | Low | Low | P2 — Backlog |
-| AUTHN-09 | Pending credential no TTL | Low | Low | P2 — Backlog |
-| AUTHN-10 | DevTools in production builds | Low | Low | P2 — Backlog |
+| ID | Finding | Severity | Effort to Fix | Status |
+|----|---------|----------|---------------|--------|
+| AUTHN-02 | No auth on gRPC/REST API | High | Medium | ✅ Fixed |
+| AUTHN-01 | Shared secret defaults to `dev-secret` | High | Low | ✅ Fixed |
+| AUTHN-04 | ID token in URL query parameter | Medium | Medium | ✅ Fixed |
+| AUTHN-03 | Electron `sandbox: false` | Medium | Low | ✅ Fixed |
+| AUTHN-06 | No rate limiting on token exchange | Medium | Medium | ✅ Fixed |
+| AUTHN-05 | No request body size limit | Medium | Low | ✅ Fixed |
+| AUTHN-07 | User enumeration via error messages | Low | Low | ✅ Fixed |
+| AUTHN-08 | Single pending auth state variable | Low | Low | ✅ Fixed |
+| AUTHN-09 | Pending credential no TTL | Low | Low | ✅ Fixed |
+| AUTHN-10 | DevTools in production builds | Low | Low | ✅ Fixed |

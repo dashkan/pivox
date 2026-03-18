@@ -17,7 +17,6 @@ const pivoxApiUrl = defineString("PIVOX_API_URL", {
 
 const pivoxInternalSecret = defineString("PIVOX_SHARED_SECRET", {
   description: "Shared secret for internal API calls",
-  default: "dev-secret",
   label: "Shared secret",
 });
 

@@ -1,13 +1,19 @@
 import { join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { BrowserWindow, app, ipcMain, shell } from 'electron'
+import { BrowserWindow, app, ipcMain, net, shell } from 'electron'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 
 const BASE_URL = process.env.PIVOX_WEB_URL || 'https://pivox.ngrok.app'
 
 let mainWindow: BrowserWindow | null = null
-let pendingAuthState: string | null = null
+
+// AUTHN-08: Use a Map with TTL instead of a single global variable.
+// Each entry stores the timestamp it was created.
+const pendingAuthStates = new Map<string, number>()
+
+// Maximum age for a pending auth state (5 minutes).
+const AUTH_STATE_MAX_AGE_MS = 5 * 60 * 1000
 
 // --- Single instance lock + protocol registration ---
 
@@ -34,14 +40,19 @@ function handleDeepLink(url: string): void {
     const error = parsed.searchParams.get('error')
     const linked = parsed.searchParams.get('linked')
 
-    if (state && state !== pendingAuthState) {
-      mainWindow.webContents.send('auth:deep-link', {
-        error: 'State mismatch — possible CSRF attack. Please try again.',
-      })
-      return
+    // AUTHN-08: Validate against the Map and check expiry.
+    if (state) {
+      const timestamp = pendingAuthStates.get(state)
+      if (!timestamp || Date.now() - timestamp > AUTH_STATE_MAX_AGE_MS) {
+        pendingAuthStates.delete(state ?? '')
+        mainWindow.webContents.send('auth:deep-link', {
+          error: 'State mismatch or expired — possible CSRF attack. Please try again.',
+        })
+        return
+      }
+      pendingAuthStates.delete(state)
     }
 
-    pendingAuthState = null
     console.log('deep-link received:', { hasToken: !!token, state, linked, error })
     mainWindow.webContents.send('auth:deep-link', { token, state, linked, error })
   } catch {
@@ -74,16 +85,33 @@ app.on('second-instance', (_event, argv) => {
 
 ipcMain.handle('auth:start-social-login', (_event, provider: string) => {
   const state = randomUUID()
-  pendingAuthState = state
+  pendingAuthStates.set(state, Date.now())
   const url = `${BASE_URL}/auth/electron-login?provider=${encodeURIComponent(provider)}&state=${encodeURIComponent(state)}`
   shell.openExternal(url)
   return state
 })
 
-ipcMain.handle('auth:start-link-provider', (_event, provider: string, idToken: string) => {
+// AUTHN-04: Deposit the ID token server-side and pass only an opaque code in the URL.
+ipcMain.handle('auth:start-link-provider', async (_event, provider: string, idToken: string) => {
   const state = randomUUID()
-  pendingAuthState = state
-  const url = `${BASE_URL}/auth/electron-link?provider=${encodeURIComponent(provider)}&state=${encodeURIComponent(state)}&token=${encodeURIComponent(idToken)}`
+  pendingAuthStates.set(state, Date.now())
+
+  // Deposit the ID token on the backend and receive a single-use code.
+  const res = await net.fetch(`${BASE_URL}/internal/v1/auth:depositToken`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id_token: idToken }),
+  })
+
+  if (!res.ok) {
+    pendingAuthStates.delete(state)
+    throw new Error(`Failed to deposit token: ${res.status}`)
+  }
+
+  const { code } = (await res.json()) as { code: string }
+
+  // The URL contains only the opaque code — the raw ID token never appears in a URL.
+  const url = `${BASE_URL}/auth/electron-link?provider=${encodeURIComponent(provider)}&state=${encodeURIComponent(state)}&code=${encodeURIComponent(code)}`
   shell.openExternal(url)
   return state
 })
@@ -99,19 +127,23 @@ function createWindow(): void {
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
+      sandbox: true, // AUTHN-03: Enable sandbox for renderer process isolation.
     },
   })
 
   mainWindow.on('ready-to-show', () => {
     mainWindow!.show()
-    // Allow Cmd+Option+I to open devtools in production builds for debugging
-    mainWindow!.webContents.on('before-input-event', (event, input) => {
-      if (input.meta && input.alt && input.key === 'i') {
-        mainWindow!.webContents.toggleDevTools()
-        event.preventDefault()
-      }
-    })
+
+    // AUTHN-10: Only allow DevTools in development or when explicitly enabled
+    // via PIVOX_ENABLE_DEVTOOLS=1 (for diagnosing production builds).
+    if (is.dev || process.env.PIVOX_ENABLE_DEVTOOLS === '1') {
+      mainWindow!.webContents.on('before-input-event', (event, input) => {
+        if (input.meta && input.alt && input.key === 'i') {
+          mainWindow!.webContents.toggleDevTools()
+          event.preventDefault()
+        }
+      })
+    }
   })
 
   mainWindow.on('closed', () => {

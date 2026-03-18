@@ -7,9 +7,15 @@ export interface PendingLink {
 }
 
 let pendingLink: PendingLink | null = null
+let pendingLinkTimeout: ReturnType<typeof setTimeout> | null = null
+
+// AUTHN-09: Auto-clear after 5 minutes to minimize credential lifetime.
+const PENDING_LINK_TTL_MS = 5 * 60 * 1000
 
 export function setPendingLink(link: PendingLink) {
+  clearPendingLink()
   pendingLink = link
+  pendingLinkTimeout = setTimeout(clearPendingLink, PENDING_LINK_TTL_MS)
 }
 
 export function getPendingLink(): PendingLink | null {
@@ -18,4 +24,8 @@ export function getPendingLink(): PendingLink | null {
 
 export function clearPendingLink() {
   pendingLink = null
+  if (pendingLinkTimeout) {
+    clearTimeout(pendingLinkTimeout)
+    pendingLinkTimeout = null
+  }
 }

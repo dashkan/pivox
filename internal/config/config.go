@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 )
@@ -41,7 +42,7 @@ func Load() *Config {
 		DebugPort:    getEnv("DEBUG_PORT", ":9090"),
 		WorkerCount:  getEnvInt("WORKER_COUNT", 5),
 		LogLevel:     getEnv("LOG_LEVEL", "info"),
-		SharedSecret: getEnv("SHARED_SECRET", "dev-secret"),
+		SharedSecret: getEnvRequired("SHARED_SECRET"),
 		GoogleCloud: GoogleCloudConfig{
 			ProjectID:          getEnv("GOOGLE_CLOUD_PROJECT_ID", ""),
 			ServiceAccountKey:  getEnv("GOOGLE_CLOUD_SERVICE_ACCOUNT_KEY", ""),
@@ -55,6 +56,14 @@ func getEnv(key, defaultVal string) string {
 		return v
 	}
 	return defaultVal
+}
+
+func getEnvRequired(key string) string {
+	v := os.Getenv(key)
+	if v == "" {
+		panic(fmt.Sprintf("required environment variable %s is not set", key))
+	}
+	return v
 }
 
 func getEnvInt(key string, defaultVal int) int {
