@@ -24,7 +24,7 @@ function RegisterPage() {
         <RegistrationCard.ConfirmPasswordField />
         <RegistrationCard.SubmitButton />
         <RegistrationCard.Separator />
-        <RegistrationCard.SocialButtons providers={['google']} />
+        <RegistrationCard.SocialButtons />
         <RegistrationCard.Footer
           onClick={() => router.navigate({ to: '/auth/login' })}
         />

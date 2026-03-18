@@ -24,7 +24,7 @@ function LoginPage() {
         </div>
         <LoginCard.SubmitButton />
         <LoginCard.Separator />
-        <LoginCard.SocialButtons providers={['google']} />
+        <LoginCard.SocialButtons />
         <LoginCard.Footer
           onClick={() => router.navigate({ to: '/auth/register'  })}
         />

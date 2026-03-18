@@ -25,11 +25,11 @@ type OrganizationsServer struct {
 	pool    *pgxpool.Pool
 	queries *db.Queries
 	iam     *iam.Helper
-	tenants *firebase.TenantService
+	tenants *firebase.AuthService
 	filter  *filter.ResourceFilter
 }
 
-func NewOrganizationsServer(pool *pgxpool.Pool, queries *db.Queries, iam *iam.Helper, tenants *firebase.TenantService) *OrganizationsServer {
+func NewOrganizationsServer(pool *pgxpool.Pool, queries *db.Queries, iam *iam.Helper, tenants *firebase.AuthService) *OrganizationsServer {
 	return &OrganizationsServer{
 		db:      pool,
 		pool:    pool,

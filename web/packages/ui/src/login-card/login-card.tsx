@@ -194,10 +194,10 @@ function LoginCardSeparator({ className }: { className?: string }) {
 /* ------------------------------------------------------------------ */
 
 function LoginCardSocialButtons({
-  providers,
+  providers = ["google", "github"],
   className,
 }: {
-  providers: Array<"google" | "github" | "apple">
+  providers?: Array<"google" | "github" | "apple">
   className?: string
 }) {
   const { actions } = useLoginContext()

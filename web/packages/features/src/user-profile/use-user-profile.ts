@@ -5,7 +5,6 @@ import {
   EmailAuthProvider,
   GithubAuthProvider,
   GoogleAuthProvider,
-  OAuthProvider,
   TotpMultiFactorGenerator,
   deleteUser,
   linkWithCredential,
@@ -41,7 +40,6 @@ const oauthProviders: Record<
     },
   },
   'github.com': { label: 'GitHub', create: () => new GithubAuthProvider() },
-  'apple.com': { label: 'Apple', create: () => new OAuthProvider('apple.com') },
 };
 
 async function reauthenticate(user: User): Promise<void> {

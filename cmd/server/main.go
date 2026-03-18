@@ -83,9 +83,9 @@ func main() {
 	}()
 
 	// Firebase
-	tenantSvc, err := firebase.NewTenantService(ctx)
+	authSvc, err := firebase.NewAuthService(ctx, cfg.GoogleCloud)
 	if err != nil {
-		logger.Error("failed to initialize Firebase tenant service", "error", err)
+		logger.Error("failed to initialize Firebase auth service", "error", err)
 		os.Exit(1)
 	}
 
@@ -102,7 +102,7 @@ func main() {
 	// Register all services
 	longrunningpb.RegisterOperationsServer(grpcServer, server.NewOperationsServer(lroManager))
 	apiv1.RegisterProjectsServer(grpcServer, server.NewProjectsServer(pool, queries, iamHelper))
-	apiv1.RegisterOrganizationsServer(grpcServer, server.NewOrganizationsServer(pool, queries, iamHelper, tenantSvc))
+	apiv1.RegisterOrganizationsServer(grpcServer, server.NewOrganizationsServer(pool, queries, iamHelper, authSvc))
 	apiv1.RegisterTagKeysServer(grpcServer, server.NewTagKeysServer(pool, queries, iamHelper))
 	apiv1.RegisterTagValuesServer(grpcServer, server.NewTagValuesServer(pool, queries, iamHelper))
 	apiv1.RegisterTagBindingsServer(grpcServer, server.NewTagBindingsServer(pool, queries))
@@ -145,7 +145,7 @@ func main() {
 
 	// HTTP mux: internal hooks + gRPC gateway (fallback)
 	httpMux := http.NewServeMux()
-	hooks := server.NewInternalHooks(queries, cfg.SharedSecret, logger)
+	hooks := server.NewInternalHooks(queries, cfg.SharedSecret, logger, authSvc)
 	hooks.Register(httpMux)
 	httpMux.Handle("/", gwMux) // gRPC gateway handles everything else
 

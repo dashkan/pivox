@@ -1,6 +1,6 @@
 import { createFileRoute, useRouter } from '@tanstack/react-router'
-import { LoginFeature } from '@pivox/features/login'
 import { LoginCard } from '@pivox/ui/login-card'
+import { ElectronLoginFeature } from '../../components/electron-login-feature'
 
 export const Route = createFileRoute('/auth/login')({ component: LoginPage })
 
@@ -8,7 +8,7 @@ function LoginPage() {
   const router = useRouter()
 
   return (
-    <LoginFeature
+    <ElectronLoginFeature
       onSuccess={() => router.navigate({ to: '/' })}
       onLinkRequired={() => router.navigate({ to: '/auth/link-account' })}
     >
@@ -24,11 +24,11 @@ function LoginPage() {
         </div>
         <LoginCard.SubmitButton />
         <LoginCard.Separator />
-        <LoginCard.SocialButtons providers={['google']} />
+        <LoginCard.SocialButtons />
         <LoginCard.Footer
           onClick={() => router.navigate({ to: '/auth/register' })}
         />
       </LoginCard.Root>
-    </LoginFeature>
+    </ElectronLoginFeature>
   )
 }

@@ -11,7 +11,8 @@ export default defineConfig({
     resolve: {
       alias: {
         '@renderer': resolve('src/renderer/src')
-      }
+      },
+      dedupe: ['react', 'react-dom', 'firebase', 'firebase/app', 'firebase/auth']
     },
     plugins: [
       tailwindcss(),

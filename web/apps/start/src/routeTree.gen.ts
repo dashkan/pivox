@@ -18,6 +18,9 @@ import { Route as AuthRedirectRouteImport } from './routes/auth/redirect'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as AuthLinkAccountRouteImport } from './routes/auth/link-account'
 import { Route as AuthForgotPasswordRouteImport } from './routes/auth/forgot-password'
+import { Route as AuthElectronLoginRouteImport } from './routes/auth/electron-login'
+import { Route as AuthElectronLinkRouteImport } from './routes/auth/electron-link'
+import { Route as AuthDoneRouteImport } from './routes/auth/done'
 import { Route as AuthActionRouteImport } from './routes/auth/action'
 import { Route as AppAboutRouteImport } from './routes/_app/about'
 
@@ -65,6 +68,21 @@ const AuthForgotPasswordRoute = AuthForgotPasswordRouteImport.update({
   path: '/auth/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthElectronLoginRoute = AuthElectronLoginRouteImport.update({
+  id: '/auth/electron-login',
+  path: '/auth/electron-login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthElectronLinkRoute = AuthElectronLinkRouteImport.update({
+  id: '/auth/electron-link',
+  path: '/auth/electron-link',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthDoneRoute = AuthDoneRouteImport.update({
+  id: '/auth/done',
+  path: '/auth/done',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthActionRoute = AuthActionRouteImport.update({
   id: '/auth/action',
   path: '/auth/action',
@@ -80,6 +98,9 @@ export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/about': typeof AppAboutRoute
   '/auth/action': typeof AuthActionRoute
+  '/auth/done': typeof AuthDoneRoute
+  '/auth/electron-link': typeof AuthElectronLinkRoute
+  '/auth/electron-login': typeof AuthElectronLoginRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/link-account': typeof AuthLinkAccountRoute
   '/auth/login': typeof AuthLoginRoute
@@ -91,6 +112,9 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/about': typeof AppAboutRoute
   '/auth/action': typeof AuthActionRoute
+  '/auth/done': typeof AuthDoneRoute
+  '/auth/electron-link': typeof AuthElectronLinkRoute
+  '/auth/electron-login': typeof AuthElectronLoginRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/link-account': typeof AuthLinkAccountRoute
   '/auth/login': typeof AuthLoginRoute
@@ -105,6 +129,9 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/_app/about': typeof AppAboutRoute
   '/auth/action': typeof AuthActionRoute
+  '/auth/done': typeof AuthDoneRoute
+  '/auth/electron-link': typeof AuthElectronLinkRoute
+  '/auth/electron-login': typeof AuthElectronLoginRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/link-account': typeof AuthLinkAccountRoute
   '/auth/login': typeof AuthLoginRoute
@@ -120,6 +147,9 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/auth/action'
+    | '/auth/done'
+    | '/auth/electron-link'
+    | '/auth/electron-login'
     | '/auth/forgot-password'
     | '/auth/link-account'
     | '/auth/login'
@@ -131,6 +161,9 @@ export interface FileRouteTypes {
   to:
     | '/about'
     | '/auth/action'
+    | '/auth/done'
+    | '/auth/electron-link'
+    | '/auth/electron-login'
     | '/auth/forgot-password'
     | '/auth/link-account'
     | '/auth/login'
@@ -144,6 +177,9 @@ export interface FileRouteTypes {
     | '/_app'
     | '/_app/about'
     | '/auth/action'
+    | '/auth/done'
+    | '/auth/electron-link'
+    | '/auth/electron-login'
     | '/auth/forgot-password'
     | '/auth/link-account'
     | '/auth/login'
@@ -157,6 +193,9 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   AuthActionRoute: typeof AuthActionRoute
+  AuthDoneRoute: typeof AuthDoneRoute
+  AuthElectronLinkRoute: typeof AuthElectronLinkRoute
+  AuthElectronLoginRoute: typeof AuthElectronLoginRoute
   AuthForgotPasswordRoute: typeof AuthForgotPasswordRoute
   AuthLinkAccountRoute: typeof AuthLinkAccountRoute
   AuthLoginRoute: typeof AuthLoginRoute
@@ -231,6 +270,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth/electron-login': {
+      id: '/auth/electron-login'
+      path: '/auth/electron-login'
+      fullPath: '/auth/electron-login'
+      preLoaderRoute: typeof AuthElectronLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/electron-link': {
+      id: '/auth/electron-link'
+      path: '/auth/electron-link'
+      fullPath: '/auth/electron-link'
+      preLoaderRoute: typeof AuthElectronLinkRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/done': {
+      id: '/auth/done'
+      path: '/auth/done'
+      fullPath: '/auth/done'
+      preLoaderRoute: typeof AuthDoneRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth/action': {
       id: '/auth/action'
       path: '/auth/action'
@@ -263,6 +323,9 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   AuthActionRoute: AuthActionRoute,
+  AuthDoneRoute: AuthDoneRoute,
+  AuthElectronLinkRoute: AuthElectronLinkRoute,
+  AuthElectronLoginRoute: AuthElectronLoginRoute,
   AuthForgotPasswordRoute: AuthForgotPasswordRoute,
   AuthLinkAccountRoute: AuthLinkAccountRoute,
   AuthLoginRoute: AuthLoginRoute,

@@ -197,10 +197,10 @@ function RegistrationCardSeparator({ className }: { className?: string }) {
 /* ------------------------------------------------------------------ */
 
 function RegistrationCardSocialButtons({
-  providers,
+  providers = ["google", "github"],
   className,
 }: {
-  providers: Array<"google" | "github" | "apple">
+  providers?: Array<"google" | "github" | "apple">
   className?: string
 }) {
   const { actions } = useRegistrationContext()

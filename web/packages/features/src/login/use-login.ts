@@ -21,7 +21,11 @@ import { firebaseErrorMessage } from "@/shared/firebase-error"
 import { setPendingLink } from "@/shared/pending-link"
 
 const socialProviders = {
-  google: () => new GoogleAuthProvider(),
+  google: () => {
+    const p = new GoogleAuthProvider()
+    p.setCustomParameters({ prompt: "select_account" })
+    return p
+  },
   github: () => new GithubAuthProvider(),
   apple: () => new OAuthProvider("apple.com"),
 } as const
