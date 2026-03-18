@@ -2,7 +2,7 @@
   "name": "pivox",
   "version": "1.0.0",
   "private": true,
-  "description": "Pivox Observability Platform",
+  "description": "Pivox Platform",
   "scripts": {
     "dev": "concurrently -n prims,ui,feat,web,server,nginx,ngrok -c cyan,cyan,cyan,blue,red,green,yellow,magenta \"pnpm web:build:primitives -- --watch\" \"pnpm web:build:ui -- --watch\" \"pnpm web:build:features -- --watch\" \"pnpm web:start\" \"pnpm server:run\" \"pnpm proxy:nginx\" \"pnpm proxy:ngrok\"",
     "dev:electron": "concurrently -n prims,ui,feat,web,electron,server,nginx,ngrok -c cyan,cyan,cyan,blue,red,green,yellow,magenta \"pnpm web:build:primitives -- --watch\" \"pnpm web:build:ui -- --watch\" \"pnpm web:build:features -- --watch\" \"pnpm web:start\" \"pnpm electron:start\" \"pnpm server:run\" \"pnpm proxy:nginx\" \"pnpm proxy:ngrok\"",

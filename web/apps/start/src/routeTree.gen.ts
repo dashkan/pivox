@@ -18,8 +18,8 @@ import { Route as AuthRedirectRouteImport } from './routes/auth/redirect'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as AuthLinkAccountRouteImport } from './routes/auth/link-account'
 import { Route as AuthForgotPasswordRouteImport } from './routes/auth/forgot-password'
-import { Route as AuthElectronLoginRouteImport } from './routes/auth/electron-login'
-import { Route as AuthElectronLinkRouteImport } from './routes/auth/electron-link'
+import { Route as AuthExternalLoginRouteImport } from './routes/auth/external-login'
+import { Route as AuthExternalLinkRouteImport } from './routes/auth/external-link'
 import { Route as AuthDoneRouteImport } from './routes/auth/done'
 import { Route as AuthActionRouteImport } from './routes/auth/action'
 import { Route as AppAboutRouteImport } from './routes/_app/about'
@@ -68,14 +68,14 @@ const AuthForgotPasswordRoute = AuthForgotPasswordRouteImport.update({
   path: '/auth/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthElectronLoginRoute = AuthElectronLoginRouteImport.update({
-  id: '/auth/electron-login',
-  path: '/auth/electron-login',
+const AuthExternalLoginRoute = AuthExternalLoginRouteImport.update({
+  id: '/auth/external-login',
+  path: '/auth/external-login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthElectronLinkRoute = AuthElectronLinkRouteImport.update({
-  id: '/auth/electron-link',
-  path: '/auth/electron-link',
+const AuthExternalLinkRoute = AuthExternalLinkRouteImport.update({
+  id: '/auth/external-link',
+  path: '/auth/external-link',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthDoneRoute = AuthDoneRouteImport.update({
@@ -99,8 +99,8 @@ export interface FileRoutesByFullPath {
   '/about': typeof AppAboutRoute
   '/auth/action': typeof AuthActionRoute
   '/auth/done': typeof AuthDoneRoute
-  '/auth/electron-link': typeof AuthElectronLinkRoute
-  '/auth/electron-login': typeof AuthElectronLoginRoute
+  '/auth/external-link': typeof AuthExternalLinkRoute
+  '/auth/external-login': typeof AuthExternalLoginRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/link-account': typeof AuthLinkAccountRoute
   '/auth/login': typeof AuthLoginRoute
@@ -113,8 +113,8 @@ export interface FileRoutesByTo {
   '/about': typeof AppAboutRoute
   '/auth/action': typeof AuthActionRoute
   '/auth/done': typeof AuthDoneRoute
-  '/auth/electron-link': typeof AuthElectronLinkRoute
-  '/auth/electron-login': typeof AuthElectronLoginRoute
+  '/auth/external-link': typeof AuthExternalLinkRoute
+  '/auth/external-login': typeof AuthExternalLoginRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/link-account': typeof AuthLinkAccountRoute
   '/auth/login': typeof AuthLoginRoute
@@ -130,8 +130,8 @@ export interface FileRoutesById {
   '/_app/about': typeof AppAboutRoute
   '/auth/action': typeof AuthActionRoute
   '/auth/done': typeof AuthDoneRoute
-  '/auth/electron-link': typeof AuthElectronLinkRoute
-  '/auth/electron-login': typeof AuthElectronLoginRoute
+  '/auth/external-link': typeof AuthExternalLinkRoute
+  '/auth/external-login': typeof AuthExternalLoginRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/link-account': typeof AuthLinkAccountRoute
   '/auth/login': typeof AuthLoginRoute
@@ -148,8 +148,8 @@ export interface FileRouteTypes {
     | '/about'
     | '/auth/action'
     | '/auth/done'
-    | '/auth/electron-link'
-    | '/auth/electron-login'
+    | '/auth/external-link'
+    | '/auth/external-login'
     | '/auth/forgot-password'
     | '/auth/link-account'
     | '/auth/login'
@@ -162,8 +162,8 @@ export interface FileRouteTypes {
     | '/about'
     | '/auth/action'
     | '/auth/done'
-    | '/auth/electron-link'
-    | '/auth/electron-login'
+    | '/auth/external-link'
+    | '/auth/external-login'
     | '/auth/forgot-password'
     | '/auth/link-account'
     | '/auth/login'
@@ -178,8 +178,8 @@ export interface FileRouteTypes {
     | '/_app/about'
     | '/auth/action'
     | '/auth/done'
-    | '/auth/electron-link'
-    | '/auth/electron-login'
+    | '/auth/external-link'
+    | '/auth/external-login'
     | '/auth/forgot-password'
     | '/auth/link-account'
     | '/auth/login'
@@ -194,8 +194,8 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   AuthActionRoute: typeof AuthActionRoute
   AuthDoneRoute: typeof AuthDoneRoute
-  AuthElectronLinkRoute: typeof AuthElectronLinkRoute
-  AuthElectronLoginRoute: typeof AuthElectronLoginRoute
+  AuthExternalLinkRoute: typeof AuthExternalLinkRoute
+  AuthExternalLoginRoute: typeof AuthExternalLoginRoute
   AuthForgotPasswordRoute: typeof AuthForgotPasswordRoute
   AuthLinkAccountRoute: typeof AuthLinkAccountRoute
   AuthLoginRoute: typeof AuthLoginRoute
@@ -270,18 +270,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/auth/electron-login': {
-      id: '/auth/electron-login'
-      path: '/auth/electron-login'
-      fullPath: '/auth/electron-login'
-      preLoaderRoute: typeof AuthElectronLoginRouteImport
+    '/auth/external-login': {
+      id: '/auth/external-login'
+      path: '/auth/external-login'
+      fullPath: '/auth/external-login'
+      preLoaderRoute: typeof AuthExternalLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/auth/electron-link': {
-      id: '/auth/electron-link'
-      path: '/auth/electron-link'
-      fullPath: '/auth/electron-link'
-      preLoaderRoute: typeof AuthElectronLinkRouteImport
+    '/auth/external-link': {
+      id: '/auth/external-link'
+      path: '/auth/external-link'
+      fullPath: '/auth/external-link'
+      preLoaderRoute: typeof AuthExternalLinkRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth/done': {
@@ -324,8 +324,8 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   AuthActionRoute: AuthActionRoute,
   AuthDoneRoute: AuthDoneRoute,
-  AuthElectronLinkRoute: AuthElectronLinkRoute,
-  AuthElectronLoginRoute: AuthElectronLoginRoute,
+  AuthExternalLinkRoute: AuthExternalLinkRoute,
+  AuthExternalLoginRoute: AuthExternalLoginRoute,
   AuthForgotPasswordRoute: AuthForgotPasswordRoute,
   AuthLinkAccountRoute: AuthLinkAccountRoute,
   AuthLoginRoute: AuthLoginRoute,

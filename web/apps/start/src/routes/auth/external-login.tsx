@@ -22,7 +22,7 @@ type ElectronLoginSearch = {
   state: string;
 };
 
-export const Route = createFileRoute('/auth/electron-login')({
+export const Route = createFileRoute('/auth/external-login')({
   validateSearch: (search: Record<string, unknown>): ElectronLoginSearch => ({
     provider: (search.provider as ElectronLoginSearch['provider']) || 'google',
     state: (search.state as string) || '',
@@ -55,7 +55,7 @@ async function exchangeToken(idToken: string): Promise<string> {
   return data.custom_token;
 }
 
-const REDIRECT_KEY = 'pivox:electron-login-pending';
+const REDIRECT_KEY = 'pivox:external-login-pending';
 
 function ElectronLoginPage() {
   const { provider, state } = Route.useSearch();

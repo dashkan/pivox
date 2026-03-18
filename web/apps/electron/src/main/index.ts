@@ -86,7 +86,7 @@ app.on('second-instance', (_event, argv) => {
 ipcMain.handle('auth:start-social-login', (_event, provider: string) => {
   const state = randomUUID()
   pendingAuthStates.set(state, Date.now())
-  const url = `${BASE_URL}/auth/electron-login?provider=${encodeURIComponent(provider)}&state=${encodeURIComponent(state)}`
+  const url = `${BASE_URL}/auth/external-login?provider=${encodeURIComponent(provider)}&state=${encodeURIComponent(state)}`
   shell.openExternal(url)
   return state
 })
@@ -111,7 +111,7 @@ ipcMain.handle('auth:start-link-provider', async (_event, provider: string, idTo
   const { code } = (await res.json()) as { code: string }
 
   // The URL contains only the opaque code — the raw ID token never appears in a URL.
-  const url = `${BASE_URL}/auth/electron-link?provider=${encodeURIComponent(provider)}&state=${encodeURIComponent(state)}&code=${encodeURIComponent(code)}`
+  const url = `${BASE_URL}/auth/external-link?provider=${encodeURIComponent(provider)}&state=${encodeURIComponent(state)}&code=${encodeURIComponent(code)}`
   shell.openExternal(url)
   return state
 })

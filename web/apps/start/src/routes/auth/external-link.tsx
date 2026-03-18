@@ -19,14 +19,14 @@ import {
 type ElectronLinkSearch = {
   provider: string;
   state: string;
-  token: string;
+  code: string;
 };
 
-export const Route = createFileRoute('/auth/electron-link')({
+export const Route = createFileRoute('/auth/external-link')({
   validateSearch: (search: Record<string, unknown>): ElectronLinkSearch => ({
     provider: (search.provider as string) || '',
     state: (search.state as string) || '',
-    token: (search.token as string) || '',
+    code: (search.code as string) || '',
   }),
   component: ElectronLinkPage,
 });
@@ -40,6 +40,19 @@ const providers: Record<string, () => GoogleAuthProvider | GithubAuthProvider | 
   'github.com': () => new GithubAuthProvider(),
   'apple.com': () => new OAuthProvider('apple.com'),
 };
+
+async function consumeTokenCode(code: string): Promise<string> {
+  const res = await fetch('/internal/v1/auth:consumeToken', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code }),
+  });
+  if (!res.ok) {
+    throw new Error(`Code exchange failed: ${res.status}`);
+  }
+  const data = await res.json();
+  return data.id_token;
+}
 
 async function exchangeToken(idToken: string): Promise<string> {
   const res = await fetch('/internal/v1/auth:exchangeToken', {
@@ -56,10 +69,10 @@ async function exchangeToken(idToken: string): Promise<string> {
   return data.custom_token;
 }
 
-const REDIRECT_KEY = 'pivox:electron-link-pending';
+const REDIRECT_KEY = 'pivox:external-link-pending';
 
 function ElectronLinkPage() {
-  const { provider, state, token } = Route.useSearch();
+  const { provider, state, code } = Route.useSearch();
   const [status, setStatus] = useState<'loading' | 'redirecting' | 'error'>(
     'loading',
   );
@@ -94,7 +107,7 @@ function ElectronLinkPage() {
         }
 
         // Phase 1: Sign in as the current user, then link the new provider
-        if (!provider || !state || !token) {
+        if (!provider || !state || !code) {
           setError('Missing required parameters.');
           setStatus('error');
           return;
@@ -107,8 +120,9 @@ function ElectronLinkPage() {
           return;
         }
 
-        // Exchange the ID token for a custom token, then sign in as the Electron user
-        const customToken = await exchangeToken(token);
+        // Consume the opaque code to retrieve the ID token, then exchange for a custom token
+        const idToken = await consumeTokenCode(code);
+        const customToken = await exchangeToken(idToken);
         const credential = await signInWithCustomToken(auth, customToken);
 
         // Now link the new provider via redirect
@@ -125,7 +139,7 @@ function ElectronLinkPage() {
         );
         setStatus('error');
       });
-  }, [provider, state, token]);
+  }, [provider, state, code]);
 
   if (status === 'error') {
     return (

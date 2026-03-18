@@ -1,6 +1,7 @@
 -- 000001_init.down.sql
 -- Drop all tables in reverse dependency order.
 
+DROP TABLE IF EXISTS auth_token_codes;
 DROP TABLE IF EXISTS public_email_domains;
 DROP TABLE IF EXISTS invitation_policies;
 DROP TABLE IF EXISTS invitations;
