@@ -848,41 +848,41 @@ This saves emulator state (users, tokens, etc.) to `.firebase-data/` on exit and
 
 ---
 
-## Planned: OIDC Service-to-Service Auth for `accounts:sync`
+## OIDC Service-to-Service Auth for `accounts:sync`
 
-Replace the static `SHARED_SECRET` on the `POST /internal/v1/accounts:sync` endpoint with Google Cloud OIDC identity tokens. This eliminates the shared secret as a credential to manage, deploy, and rotate.
+The static `SHARED_SECRET` on the `POST /internal/v1/accounts:sync` endpoint has been replaced with Google Cloud OIDC identity tokens. No shared secret to manage, deploy, or rotate.
 
-### Current state
+### How it works
 
-Firebase Functions authenticate to the Go backend with `Authorization: Bearer <SHARED_SECRET>`. The secret is a static string, required at startup (no default), identical on both sides.
-
-### Target state
-
-Firebase Functions mint a Google Cloud OIDC identity token using the Functions' default service account. The Go backend verifies the token's cryptographic signature, audience, and caller identity — no shared secret involved.
-
-### Implementation plan
+Firebase Functions mint a Google Cloud OIDC identity token using the Functions' default service account (`45920224787-compute@developer.gserviceaccount.com`). The Go backend verifies the token's cryptographic signature, audience, and caller identity via `google.golang.org/api/idtoken`.
 
 **Go server (production, `//go:build !dev`):**
-- Use `google.golang.org/api/idtoken` to verify OIDC tokens
-- Validate audience matches the backend's URL
-- Validate `email` claim is in the configured allowlist (`ALLOWED_SERVICE_ACCOUNTS` env var)
+- `requireGoogleIdentity` middleware verifies OIDC tokens via Google's JWKS endpoint
+- Validates audience matches the configured `AUDIENCE` env var
+- Validates `email` claim is in the `ALLOWED_SERVICE_ACCOUNTS` allowlist
 
 **Go server (dev, `//go:build dev`):**
-- Fall back to shared secret (`SHARED_SECRET` env var) for pure localhost mode where the Firebase Functions emulator can't mint OIDC tokens
+- Falls back to `requireSecret` middleware using `SHARED_SECRET` env var for pure localhost mode where the Firebase Functions emulator can't mint OIDC tokens
 
 **Firebase Functions:**
-- Use `google-auth-library`'s `GoogleAuth.getIdTokenClient(targetAudience)` to mint OIDC tokens
-- Remove `PIVOX_SHARED_SECRET` config parameter
+- Uses `google-auth-library`'s `GoogleAuth.getIdTokenClient(targetAudience)` to mint OIDC tokens automatically from the function's service account
+- No secrets to configure — `PIVOX_SHARED_SECRET` has been removed
 
-**Config changes:**
+**Config:**
 
 | Env var | Mode | Purpose |
 |---------|------|---------|
 | `ALLOWED_SERVICE_ACCOUNTS` | Production | Comma-separated list of allowed service account emails |
-| `AUDIENCE` | Production | Expected audience in OIDC tokens (backend URL) |
-| `SHARED_SECRET` | Dev only | Shared secret for localhost mode |
+| `AUDIENCE` | Production | Expected audience in OIDC tokens (backend URL, e.g., `https://pivox.ngrok.app`) |
+| `SHARED_SECRET` | Dev only | Shared secret for localhost mode (build tag `dev`) |
 
-The service account email (e.g., `pivox-cloud@appspot.gserviceaccount.com`) is a public identifier, not a secret. It is safe to store in env vars, config files, and documentation.
+The service account email is a public identifier, not a secret. Safe to store in env vars and documentation.
+
+**Files:**
+- `internal/server/internal_hooks_sync_auth.go` — production OIDC middleware (`//go:build !dev`)
+- `internal/server/internal_hooks_sync_auth_dev.go` — dev shared secret middleware (`//go:build dev`)
+- `internal/config/sync_auth.go` / `sync_auth_dev.go` — build-tagged config loading
+- `deployments/firebase/functions/src/index.ts` — OIDC token minting
 
 ### Why not Firebase Custom Tokens
 
