@@ -1,19 +1,22 @@
-"use client"
+'use client';
 
-import { useFormStatus } from "react-dom"
-import { cn } from "@pivox/primitives/utils"
-import { Button } from "@pivox/primitives/button"
+import { useFormStatus } from 'react-dom';
+import { cn } from '@pivox/primitives/utils';
+import { Button } from '@pivox/primitives/button';
 import {
   Card,
   CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@pivox/primitives/card"
-import { Input } from "@pivox/primitives/input"
-import { Field, FieldError, FieldLabel } from "@pivox/primitives/field"
-import { ForgotPasswordContext, useForgotPasswordContext } from "./forgot-password-card.context"
-import type { ForgotPasswordContextValue } from "./forgot-password-card.types"
+} from '@pivox/primitives/card';
+import { Input } from '@pivox/primitives/input';
+import { Field, FieldError, FieldLabel } from '@pivox/primitives/field';
+import {
+  ForgotPasswordContext,
+  useForgotPasswordContext,
+} from './forgot-password-card.context';
+import type { ForgotPasswordContextValue } from './forgot-password-card.types';
 
 /* ------------------------------------------------------------------ */
 /*  Provider                                                          */
@@ -23,10 +26,12 @@ function ForgotPasswordCardProvider({
   value,
   children,
 }: {
-  value: ForgotPasswordContextValue
-  children: React.ReactNode
+  value: ForgotPasswordContextValue;
+  children: React.ReactNode;
 }) {
-  return <ForgotPasswordContext value={value}>{children}</ForgotPasswordContext>
+  return (
+    <ForgotPasswordContext value={value}>{children}</ForgotPasswordContext>
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -37,19 +42,24 @@ function ForgotPasswordCardRoot({
   className,
   children,
 }: {
-  className?: string
-  children: React.ReactNode
+  className?: string;
+  children: React.ReactNode;
 }) {
-  const { actions } = useForgotPasswordContext()
+  const { actions } = useForgotPasswordContext();
   return (
-    <div className={cn("flex min-h-screen items-center justify-center p-4", className)}>
+    <div
+      className={cn(
+        'flex min-h-screen items-center justify-center p-4',
+        className,
+      )}
+    >
       <Card className="w-full max-w-sm">
         <form action={actions.formAction} className="flex flex-col gap-4">
           {children}
         </form>
       </Card>
     </div>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -58,13 +68,13 @@ function ForgotPasswordCardRoot({
 
 function ForgotPasswordCardHeader({ className }: { className?: string }) {
   return (
-    <CardHeader className={cn("text-center", className)}>
+    <CardHeader className={cn('text-center', className)}>
       <CardTitle className="text-xl">Reset password</CardTitle>
       <CardDescription>
         Enter your email and we&apos;ll send you a reset link
       </CardDescription>
     </CardHeader>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -72,10 +82,10 @@ function ForgotPasswordCardHeader({ className }: { className?: string }) {
 /* ------------------------------------------------------------------ */
 
 function ForgotPasswordCardEmailField({ className }: { className?: string }) {
-  const { state, actions, meta } = useForgotPasswordContext()
-  const { pending } = useFormStatus()
+  const { state, actions, meta } = useForgotPasswordContext();
+  const { pending } = useFormStatus();
   return (
-    <Field className={cn("px-4", className)}>
+    <Field className={cn('px-4', className)}>
       <FieldLabel>Email</FieldLabel>
       <Input
         ref={meta.emailRef}
@@ -88,7 +98,7 @@ function ForgotPasswordCardEmailField({ className }: { className?: string }) {
         disabled={pending}
       />
     </Field>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -96,31 +106,40 @@ function ForgotPasswordCardEmailField({ className }: { className?: string }) {
 /* ------------------------------------------------------------------ */
 
 function ForgotPasswordCardSubmitButton({ className }: { className?: string }) {
-  const { state } = useForgotPasswordContext()
-  const { pending } = useFormStatus()
+  const { state } = useForgotPasswordContext();
+  const { pending } = useFormStatus();
   return (
-    <div className={cn("flex flex-col gap-4 px-4", className)}>
+    <div className={cn('flex flex-col gap-4 px-4', className)}>
       {state.error && <FieldError>{state.error}</FieldError>}
       <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? "Sending…" : "Send reset link"}
+        {pending ? 'Sending…' : 'Send reset link'}
       </Button>
     </div>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
 /*  SuccessMessage                                                    */
 /* ------------------------------------------------------------------ */
 
-function ForgotPasswordCardSuccessMessage({ className }: { className?: string }) {
-  const { state } = useForgotPasswordContext()
-  if (!state.success) return null
+function ForgotPasswordCardSuccessMessage({
+  className,
+}: {
+  className?: string;
+}) {
+  const { state } = useForgotPasswordContext();
+  if (!state.success) return null;
   return (
-    <div className={cn("px-4 text-center text-sm text-muted-foreground", className)}>
-      Check your email for a password reset link. If you don&apos;t see it, check
-      your spam folder.
+    <div
+      className={cn(
+        'px-4 text-center text-sm text-muted-foreground',
+        className,
+      )}
+    >
+      Check your email for a password reset link. If you don&apos;t see it,
+      check your spam folder.
     </div>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -131,13 +150,13 @@ function ForgotPasswordCardFooter({
   onClick,
   className,
 }: {
-  onClick: () => void
-  className?: string
+  onClick: () => void;
+  className?: string;
 }) {
   return (
-    <CardFooter className={cn("justify-center", className)}>
+    <CardFooter className={cn('justify-center', className)}>
       <p className="text-sm text-muted-foreground">
-        Remember your password?{" "}
+        Remember your password?{' '}
         <button
           type="button"
           className="text-primary underline-offset-4 hover:underline"
@@ -147,7 +166,7 @@ function ForgotPasswordCardFooter({
         </button>
       </p>
     </CardFooter>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -163,4 +182,4 @@ export const ForgotPasswordCard = {
   SuccessMessage: ForgotPasswordCardSuccessMessage,
   Footer: ForgotPasswordCardFooter,
   Context: ForgotPasswordContext,
-}
+};

@@ -1,15 +1,15 @@
-import { Link, createFileRoute } from '@tanstack/react-router'
-import { Button } from '@pivox/primitives/button'
-import { Badge } from '@pivox/primitives/badge'
+import { Link, createFileRoute } from '@tanstack/react-router';
+import { Button } from '@pivox/primitives/button';
+import { Badge } from '@pivox/primitives/badge';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@pivox/primitives/card'
+} from '@pivox/primitives/card';
 
-export const Route = createFileRoute('/_app/')({ component: HomePage })
+export const Route = createFileRoute('/_app/')({ component: HomePage });
 
 function HomePage() {
   return (
@@ -38,5 +38,5 @@ function HomePage() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

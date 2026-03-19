@@ -3,10 +3,10 @@ import {
   Outlet,
   Scripts,
   createRootRoute,
-} from '@tanstack/react-router'
-import { AuthProvider } from '@pivox/features/auth'
+} from '@tanstack/react-router';
+import { AuthProvider } from '@pivox/features/auth';
 
-import appCss from '../styles.css?url'
+import appCss from '../styles.css?url';
 
 export const Route = createRootRoute({
   head: () => ({
@@ -19,14 +19,14 @@ export const Route = createRootRoute({
   }),
   component: RootComponent,
   shellComponent: RootDocument,
-})
+});
 
 function RootComponent() {
   return (
     <AuthProvider>
       <Outlet />
     </AuthProvider>
-  )
+  );
 }
 
 function RootDocument({ children }: { children: React.ReactNode }) {
@@ -45,5 +45,5 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <Scripts />
       </body>
     </html>
-  )
+  );
 }

@@ -1,14 +1,14 @@
-"use client"
+'use client';
 
-import { useState } from "react"
-import type { AppLayoutContextValue } from "@pivox/ui/app-layout"
-import { useAuth } from "@/auth/use-auth"
+import { useState } from 'react';
+import type { AppLayoutContextValue } from '@pivox/ui/app-layout';
+import { useAuth } from '@/auth/use-auth';
 
 export function useAppLayout(
   onNavigateToLogin: () => void,
 ): AppLayoutContextValue {
-  const { user, loading, signOut } = useAuth()
-  const [profileOpen, setProfileOpen] = useState(false)
+  const { user, loading, signOut } = useAuth();
+  const [profileOpen, setProfileOpen] = useState(false);
 
   return {
     state: {
@@ -25,10 +25,10 @@ export function useAppLayout(
     actions: {
       setProfileOpen,
       signOut: async () => {
-        setProfileOpen(false)
-        await signOut()
+        setProfileOpen(false);
+        await signOut();
       },
       navigateToLogin: onNavigateToLogin,
     },
-  }
+  };
 }

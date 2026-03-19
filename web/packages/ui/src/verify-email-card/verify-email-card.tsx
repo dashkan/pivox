@@ -1,17 +1,20 @@
-"use client"
+'use client';
 
-import { cn } from "@pivox/primitives/utils"
-import { Button } from "@pivox/primitives/button"
+import { cn } from '@pivox/primitives/utils';
+import { Button } from '@pivox/primitives/button';
 import {
   Card,
   CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@pivox/primitives/card"
-import { FieldError } from "@pivox/primitives/field"
-import { VerifyEmailContext, useVerifyEmailContext } from "./verify-email-card.context"
-import type { VerifyEmailContextValue } from "./verify-email-card.types"
+} from '@pivox/primitives/card';
+import { FieldError } from '@pivox/primitives/field';
+import {
+  VerifyEmailContext,
+  useVerifyEmailContext,
+} from './verify-email-card.context';
+import type { VerifyEmailContextValue } from './verify-email-card.types';
 
 /* ------------------------------------------------------------------ */
 /*  Provider                                                          */
@@ -21,10 +24,10 @@ function VerifyEmailCardProvider({
   value,
   children,
 }: {
-  value: VerifyEmailContextValue
-  children: React.ReactNode
+  value: VerifyEmailContextValue;
+  children: React.ReactNode;
 }) {
-  return <VerifyEmailContext value={value}>{children}</VerifyEmailContext>
+  return <VerifyEmailContext value={value}>{children}</VerifyEmailContext>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -35,16 +38,21 @@ function VerifyEmailCardRoot({
   className,
   children,
 }: {
-  className?: string
-  children: React.ReactNode
+  className?: string;
+  children: React.ReactNode;
 }) {
   return (
-    <div className={cn("flex min-h-screen items-center justify-center p-4", className)}>
+    <div
+      className={cn(
+        'flex min-h-screen items-center justify-center p-4',
+        className,
+      )}
+    >
       <Card className="w-full max-w-sm">
         <div className="flex flex-col gap-4">{children}</div>
       </Card>
     </div>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -53,13 +61,11 @@ function VerifyEmailCardRoot({
 
 function VerifyEmailCardHeader({ className }: { className?: string }) {
   return (
-    <CardHeader className={cn("text-center", className)}>
+    <CardHeader className={cn('text-center', className)}>
       <CardTitle className="text-xl">Check your email</CardTitle>
-      <CardDescription>
-        We sent you a verification link
-      </CardDescription>
+      <CardDescription>We sent you a verification link</CardDescription>
     </CardHeader>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -67,20 +73,25 @@ function VerifyEmailCardHeader({ className }: { className?: string }) {
 /* ------------------------------------------------------------------ */
 
 function VerifyEmailCardMessage({ className }: { className?: string }) {
-  const { state } = useVerifyEmailContext()
+  const { state } = useVerifyEmailContext();
   return (
-    <div className={cn("px-4 text-center text-sm text-muted-foreground", className)}>
+    <div
+      className={cn(
+        'px-4 text-center text-sm text-muted-foreground',
+        className,
+      )}
+    >
       {state.email ? (
         <>
-          We sent a verification email to{" "}
+          We sent a verification email to{' '}
           <span className="font-medium text-foreground">{state.email}</span>.
           Click the link in the email to verify your account.
         </>
       ) : (
-        "Click the link in the email to verify your account."
+        'Click the link in the email to verify your account.'
       )}
     </div>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -88,9 +99,9 @@ function VerifyEmailCardMessage({ className }: { className?: string }) {
 /* ------------------------------------------------------------------ */
 
 function VerifyEmailCardResendButton({ className }: { className?: string }) {
-  const { state, actions } = useVerifyEmailContext()
+  const { state, actions } = useVerifyEmailContext();
   return (
-    <div className={cn("flex flex-col gap-4 px-4", className)}>
+    <div className={cn('flex flex-col gap-4 px-4', className)}>
       {state.error && <FieldError>{state.error}</FieldError>}
       {state.resent && (
         <p className="text-center text-sm text-muted-foreground">
@@ -106,7 +117,7 @@ function VerifyEmailCardResendButton({ className }: { className?: string }) {
         Resend verification email
       </Button>
     </div>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -117,11 +128,11 @@ function VerifyEmailCardFooter({
   onClick,
   className,
 }: {
-  onClick: () => void
-  className?: string
+  onClick: () => void;
+  className?: string;
 }) {
   return (
-    <CardFooter className={cn("justify-center", className)}>
+    <CardFooter className={cn('justify-center', className)}>
       <button
         type="button"
         className="text-sm text-primary underline-offset-4 hover:underline"
@@ -130,7 +141,7 @@ function VerifyEmailCardFooter({
         Back to sign in
       </button>
     </CardFooter>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -145,4 +156,4 @@ export const VerifyEmailCard = {
   ResendButton: VerifyEmailCardResendButton,
   Footer: VerifyEmailCardFooter,
   Context: VerifyEmailContext,
-}
+};

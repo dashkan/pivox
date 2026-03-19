@@ -1,2 +1,2 @@
-export { UserProfileFeature } from "./user-profile-feature"
-export { useUserProfile } from "./use-user-profile"
+export { UserProfileFeature } from './user-profile-feature';
+export { useUserProfile } from './use-user-profile';

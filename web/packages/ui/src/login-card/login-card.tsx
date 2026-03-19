@@ -1,23 +1,23 @@
-"use client"
+'use client';
 
-import { useFormStatus } from "react-dom"
-import { cn } from "@pivox/primitives/utils"
-import { Button } from "@pivox/primitives/button"
+import { useFormStatus } from 'react-dom';
+import { cn } from '@pivox/primitives/utils';
+import { Button } from '@pivox/primitives/button';
 import {
   Card,
   CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@pivox/primitives/card"
-import { Input } from "@pivox/primitives/input"
-import { Field, FieldError, FieldLabel } from "@pivox/primitives/field"
-import { Checkbox } from "@pivox/primitives/checkbox"
-import { Label } from "@pivox/primitives/label"
-import { Separator } from "@pivox/primitives/separator"
-import { LoginContext, useLoginContext } from "./login-card.context"
-import type { LoginContextValue } from "./login-card.types"
-import { AppleIcon, GitHubIcon, GoogleIcon } from "@/shared/social-icons"
+} from '@pivox/primitives/card';
+import { Input } from '@pivox/primitives/input';
+import { Field, FieldError, FieldLabel } from '@pivox/primitives/field';
+import { Checkbox } from '@pivox/primitives/checkbox';
+import { Label } from '@pivox/primitives/label';
+import { Separator } from '@pivox/primitives/separator';
+import { LoginContext, useLoginContext } from './login-card.context';
+import type { LoginContextValue } from './login-card.types';
+import { AppleIcon, GitHubIcon, GoogleIcon } from '@/shared/social-icons';
 
 /* ------------------------------------------------------------------ */
 /*  Provider                                                          */
@@ -27,10 +27,10 @@ function LoginCardProvider({
   value,
   children,
 }: {
-  value: LoginContextValue
-  children: React.ReactNode
+  value: LoginContextValue;
+  children: React.ReactNode;
 }) {
-  return <LoginContext value={value}>{children}</LoginContext>
+  return <LoginContext value={value}>{children}</LoginContext>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -41,19 +41,24 @@ function LoginCardRoot({
   className,
   children,
 }: {
-  className?: string
-  children: React.ReactNode
+  className?: string;
+  children: React.ReactNode;
 }) {
-  const { actions } = useLoginContext()
+  const { actions } = useLoginContext();
   return (
-    <div className={cn("flex min-h-screen items-center justify-center p-4", className)}>
+    <div
+      className={cn(
+        'flex min-h-screen items-center justify-center p-4',
+        className,
+      )}
+    >
       <Card className="w-full max-w-sm">
         <form action={actions.formAction} className="flex flex-col gap-4">
           {children}
         </form>
       </Card>
     </div>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -62,11 +67,11 @@ function LoginCardRoot({
 
 function LoginCardHeader({ className }: { className?: string }) {
   return (
-    <CardHeader className={cn("text-center", className)}>
+    <CardHeader className={cn('text-center', className)}>
       <CardTitle className="text-xl">Sign in</CardTitle>
       <CardDescription>Sign in to your account</CardDescription>
     </CardHeader>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -74,10 +79,10 @@ function LoginCardHeader({ className }: { className?: string }) {
 /* ------------------------------------------------------------------ */
 
 function LoginCardEmailField({ className }: { className?: string }) {
-  const { state, actions, meta } = useLoginContext()
-  const { pending } = useFormStatus()
+  const { state, actions, meta } = useLoginContext();
+  const { pending } = useFormStatus();
   return (
-    <Field className={cn("px-4", className)}>
+    <Field className={cn('px-4', className)}>
       <FieldLabel>Email</FieldLabel>
       <Input
         ref={meta.emailRef}
@@ -90,7 +95,7 @@ function LoginCardEmailField({ className }: { className?: string }) {
         disabled={pending}
       />
     </Field>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -98,10 +103,10 @@ function LoginCardEmailField({ className }: { className?: string }) {
 /* ------------------------------------------------------------------ */
 
 function LoginCardPasswordField({ className }: { className?: string }) {
-  const { state, actions } = useLoginContext()
-  const { pending } = useFormStatus()
+  const { state, actions } = useLoginContext();
+  const { pending } = useFormStatus();
   return (
-    <Field className={cn("px-4", className)}>
+    <Field className={cn('px-4', className)}>
       <FieldLabel>Password</FieldLabel>
       <Input
         name="password"
@@ -112,7 +117,7 @@ function LoginCardPasswordField({ className }: { className?: string }) {
         disabled={pending}
       />
     </Field>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -121,13 +126,13 @@ function LoginCardPasswordField({ className }: { className?: string }) {
 
 function LoginCardRememberMe({ className }: { className?: string }) {
   return (
-    <div className={cn("flex items-center gap-2", className)}>
+    <div className={cn('flex items-center gap-2', className)}>
       <Checkbox id="remember" />
       <Label htmlFor="remember" className="text-sm font-normal">
         Remember me
       </Label>
     </div>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -138,21 +143,21 @@ function LoginCardForgotPassword({
   onClick,
   className,
 }: {
-  onClick: () => void
-  className?: string
+  onClick: () => void;
+  className?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        "text-sm text-muted-foreground underline-offset-4 hover:text-primary hover:underline",
+        'text-sm text-muted-foreground underline-offset-4 hover:text-primary hover:underline',
         className,
       )}
     >
       Forgot password?
     </button>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -160,16 +165,16 @@ function LoginCardForgotPassword({
 /* ------------------------------------------------------------------ */
 
 function LoginCardSubmitButton({ className }: { className?: string }) {
-  const { state } = useLoginContext()
-  const { pending } = useFormStatus()
+  const { state } = useLoginContext();
+  const { pending } = useFormStatus();
   return (
-    <div className={cn("flex flex-col gap-4 px-4", className)}>
+    <div className={cn('flex flex-col gap-4 px-4', className)}>
       {state.error && <FieldError>{state.error}</FieldError>}
       <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? "Please wait…" : "Sign in"}
+        {pending ? 'Please wait…' : 'Sign in'}
       </Button>
     </div>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -178,7 +183,7 @@ function LoginCardSubmitButton({ className }: { className?: string }) {
 
 function LoginCardSeparator({ className }: { className?: string }) {
   return (
-    <div className={cn("relative px-4", className)}>
+    <div className={cn('relative px-4', className)}>
       <div className="absolute inset-x-4 inset-y-0 flex items-center">
         <Separator className="w-full" />
       </div>
@@ -186,7 +191,7 @@ function LoginCardSeparator({ className }: { className?: string }) {
         <span className="bg-card px-2 text-muted-foreground">or</span>
       </div>
     </div>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -194,55 +199,55 @@ function LoginCardSeparator({ className }: { className?: string }) {
 /* ------------------------------------------------------------------ */
 
 function LoginCardSocialButtons({
-  providers = ["google", "github"],
+  providers = ['google', 'github'],
   className,
 }: {
-  providers?: Array<"google" | "github" | "apple">
-  className?: string
+  providers?: Array<'google' | 'github' | 'apple'>;
+  className?: string;
 }) {
-  const { actions } = useLoginContext()
-  const { pending } = useFormStatus()
+  const { actions } = useLoginContext();
+  const { pending } = useFormStatus();
 
   return (
-    <div className={cn("flex flex-col gap-2 px-4", className)}>
-      {providers.includes("google") && (
+    <div className={cn('flex flex-col gap-2 px-4', className)}>
+      {providers.includes('google') && (
         <Button
           type="button"
           variant="outline"
           className="w-full"
           disabled={pending}
-          onClick={() => actions.socialLogin("google")}
+          onClick={() => actions.socialLogin('google')}
         >
           <GoogleIcon />
           Sign in with Google
         </Button>
       )}
-      {providers.includes("github") && (
+      {providers.includes('github') && (
         <Button
           type="button"
           variant="outline"
           className="w-full"
           disabled={pending}
-          onClick={() => actions.socialLogin("github")}
+          onClick={() => actions.socialLogin('github')}
         >
           <GitHubIcon />
           Sign in with GitHub
         </Button>
       )}
-      {providers.includes("apple") && (
+      {providers.includes('apple') && (
         <Button
           type="button"
           variant="outline"
           className="w-full"
           disabled={pending}
-          onClick={() => actions.socialLogin("apple")}
+          onClick={() => actions.socialLogin('apple')}
         >
           <AppleIcon />
           Sign in with Apple
         </Button>
       )}
     </div>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -250,19 +255,19 @@ function LoginCardSocialButtons({
 /* ------------------------------------------------------------------ */
 
 function LoginCardSSOButton({ className }: { className?: string }) {
-  const { actions } = useLoginContext()
-  const { pending } = useFormStatus()
+  const { actions } = useLoginContext();
+  const { pending } = useFormStatus();
   return (
     <Button
       type="button"
       variant="outline"
-      className={cn("mx-4 w-auto", className)}
+      className={cn('mx-4 w-auto', className)}
       disabled={pending}
       onClick={actions.ssoLogin}
     >
       Sign in with SSO
     </Button>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -273,13 +278,13 @@ function LoginCardFooter({
   onClick,
   className,
 }: {
-  onClick: () => void
-  className?: string
+  onClick: () => void;
+  className?: string;
 }) {
   return (
-    <CardFooter className={cn("justify-center", className)}>
+    <CardFooter className={cn('justify-center', className)}>
       <p className="text-sm text-muted-foreground">
-        Don&apos;t have an account?{" "}
+        Don&apos;t have an account?{' '}
         <button
           type="button"
           className="text-primary underline-offset-4 hover:underline"
@@ -289,7 +294,7 @@ function LoginCardFooter({
         </button>
       </p>
     </CardFooter>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -310,4 +315,4 @@ export const LoginCard = {
   SSOButton: LoginCardSSOButton,
   Footer: LoginCardFooter,
   Context: LoginContext,
-}
+};

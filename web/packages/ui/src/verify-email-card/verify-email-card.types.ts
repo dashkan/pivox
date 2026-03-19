@@ -1,14 +1,14 @@
 export interface VerifyEmailState {
-  email: string | null
-  resent: boolean
-  error: string | null
+  email: string | null;
+  resent: boolean;
+  error: string | null;
 }
 
 export interface VerifyEmailActions {
-  resendVerification: () => void
+  resendVerification: () => void;
 }
 
 export interface VerifyEmailContextValue {
-  state: VerifyEmailState
-  actions: VerifyEmailActions
+  state: VerifyEmailState;
+  actions: VerifyEmailActions;
 }

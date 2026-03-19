@@ -1,21 +1,21 @@
-import { createFileRoute, useRouter } from '@tanstack/react-router'
-import { ResetPasswordFeature } from '@pivox/features/reset-password'
-import { ResetPasswordCard } from '@pivox/ui/reset-password-card'
+import { createFileRoute, useRouter } from '@tanstack/react-router';
+import { ResetPasswordFeature } from '@pivox/features/reset-password';
+import { ResetPasswordCard } from '@pivox/ui/reset-password-card';
 
 type ResetPasswordSearch = {
-  oobCode: string
-}
+  oobCode: string;
+};
 
 export const Route = createFileRoute('/auth/reset-password')({
   validateSearch: (search: Record<string, unknown>): ResetPasswordSearch => ({
     oobCode: (search.oobCode as string) || '',
   }),
   component: ResetPasswordPage,
-})
+});
 
 function ResetPasswordPage() {
-  const router = useRouter()
-  const { oobCode } = Route.useSearch()
+  const router = useRouter();
+  const { oobCode } = Route.useSearch();
 
   return (
     <ResetPasswordFeature
@@ -33,5 +33,5 @@ function ResetPasswordPage() {
         />
       </ResetPasswordCard.Root>
     </ResetPasswordFeature>
-  )
+  );
 }

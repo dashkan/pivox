@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useRouter } from '@tanstack/react-router';
+import { Link, createFileRoute, useRouter } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { applyActionCode, checkActionCode, getAuth } from 'firebase/auth';
 import { Button } from '@pivox/primitives/button';

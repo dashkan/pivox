@@ -1,1 +1,1 @@
-export * from "./forgot-password/index"
+export * from './forgot-password/index';

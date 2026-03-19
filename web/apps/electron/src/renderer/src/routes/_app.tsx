@@ -1,16 +1,16 @@
-import { Outlet, createFileRoute, useRouter } from '@tanstack/react-router'
-import { AppLayoutFeature } from '@pivox/features/app-layout'
-import { ElectronUserProfileFeature } from '../components/electron-user-profile-feature'
-import { AppLayout, useAppLayoutContext } from '@pivox/ui/app-layout'
-import { UserProfileCard } from '@pivox/ui/user-profile-card'
-import { ThemeSwitcher } from '@pivox/ui/theme-switcher'
+import { Outlet, createFileRoute, useRouter } from '@tanstack/react-router';
+import { AppLayoutFeature } from '@pivox/features/app-layout';
+import { AppLayout, useAppLayoutContext } from '@pivox/ui/app-layout';
+import { UserProfileCard } from '@pivox/ui/user-profile-card';
+import { ThemeSwitcher } from '@pivox/ui/theme-switcher';
+import { ElectronUserProfileFeature } from '../components/electron-user-profile-feature';
 
 export const Route = createFileRoute('/_app')({
   component: AppLayoutRoute,
-})
+});
 
 function AppLayoutRoute() {
-  const router = useRouter()
+  const router = useRouter();
 
   return (
     <AppLayoutFeature
@@ -30,14 +30,17 @@ function AppLayoutRoute() {
       </AppLayout.Root>
       <ProfileDialog />
     </AppLayoutFeature>
-  )
+  );
 }
 
 function ProfileDialog() {
-  const { state, actions } = useAppLayoutContext()
+  const { state, actions } = useAppLayoutContext();
 
   return (
-    <ElectronUserProfileFeature onClose={() => actions.setProfileOpen(false)} open={state.profileOpen}>
+    <ElectronUserProfileFeature
+      onClose={() => actions.setProfileOpen(false)}
+      open={state.profileOpen}
+    >
       <UserProfileCard.Root
         open={state.profileOpen}
         onOpenChange={actions.setProfileOpen}
@@ -47,5 +50,5 @@ function ProfileDialog() {
         <UserProfileCard.SecurityPage />
       </UserProfileCard.Root>
     </ElectronUserProfileFeature>
-  )
+  );
 }

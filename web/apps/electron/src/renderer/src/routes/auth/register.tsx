@@ -1,13 +1,13 @@
-import { createFileRoute, useRouter } from '@tanstack/react-router'
-import { RegistrationFeature } from '@pivox/features/registration'
-import { RegistrationCard } from '@pivox/ui/registration-card'
+import { createFileRoute, useRouter } from '@tanstack/react-router';
+import { RegistrationFeature } from '@pivox/features/registration';
+import { RegistrationCard } from '@pivox/ui/registration-card';
 
 export const Route = createFileRoute('/auth/register')({
   component: RegisterPage,
-})
+});
 
 function RegisterPage() {
-  const router = useRouter()
+  const router = useRouter();
 
   return (
     <RegistrationFeature
@@ -28,5 +28,5 @@ function RegisterPage() {
         />
       </RegistrationCard.Root>
     </RegistrationFeature>
-  )
+  );
 }

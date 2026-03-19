@@ -7,7 +7,7 @@ import { Input } from '@pivox/primitives/input';
 import { Field, FieldLabel } from '@pivox/primitives/field';
 import { Separator } from '@pivox/primitives/separator';
 import { Badge } from '@pivox/primitives/badge';
-import { Alert, AlertDescription, AlertAction } from '@pivox/primitives/alert';
+import { Alert, AlertAction, AlertDescription } from '@pivox/primitives/alert';
 import {
   InputOTP,
   InputOTPGroup,
@@ -32,7 +32,7 @@ import {
 } from './user-profile-card.context';
 import type { UserProfileContextValue } from './user-profile-card.types';
 import { UserAvatar } from '@/user-avatar/user-avatar';
-import { GoogleIcon, GitHubIcon, AppleIcon } from '@/shared/social-icons';
+import { AppleIcon, GitHubIcon, GoogleIcon } from '@/shared/social-icons';
 
 /* ------------------------------------------------------------------ */
 /*  Provider                                                          */
@@ -481,8 +481,8 @@ function ConnectedAccountsSubsection() {
   const linking = state.linkingProvider;
   const linkingDisplayName = linking
     ? (state.availableProviders.find((p) => p.providerId === linking)?.label ??
-       state.providers.find((p) => p.providerId === linking)?.providerId ??
-       linking)
+      state.providers.find((p) => p.providerId === linking)?.providerId ??
+      linking)
     : null;
 
   return (
@@ -516,9 +516,7 @@ function ConnectedAccountsSubsection() {
               disabled={!!linking}
               className={cn(
                 'flex items-center justify-between rounded-lg border border-dashed p-3 text-muted-foreground',
-                linking
-                  ? 'cursor-not-allowed opacity-50'
-                  : 'hover:bg-muted/50',
+                linking ? 'cursor-not-allowed opacity-50' : 'hover:bg-muted/50',
               )}
               onClick={() => actions.linkProvider(provider.providerId)}
             >

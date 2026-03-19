@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router';
 
 // TODO: Configure Google Cloud Console with a Desktop OAuth client ID
 // and set the redirect URI to https://pivox.app/auth/redirect
@@ -8,10 +8,10 @@ import { createFileRoute } from '@tanstack/react-router'
 //       the auth code to the renderer via IPC
 
 type RedirectSearch = {
-  code?: string
-  state?: string
-  error?: string
-}
+  code?: string;
+  state?: string;
+  error?: string;
+};
 
 export const Route = createFileRoute('/auth/redirect')({
   validateSearch: (search: Record<string, unknown>): RedirectSearch => ({
@@ -20,23 +20,23 @@ export const Route = createFileRoute('/auth/redirect')({
     error: (search.error as string) || undefined,
   }),
   component: RedirectPage,
-})
+});
 
 function RedirectPage() {
-  const { code, state, error } = Route.useSearch()
+  const { code, state, error } = Route.useSearch();
 
   // When accessed from the web (non-Electron), show a message
   // When the OAuth provider redirects here, forward to the Electron custom protocol
   if (typeof window !== 'undefined') {
-    const params = new URLSearchParams()
-    if (code) params.set('code', code)
-    if (state) params.set('state', state)
-    if (error) params.set('error', error)
-    const query = params.toString()
-    const deepLink = `pivox://auth/callback${query ? `?${query}` : ''}`
+    const params = new URLSearchParams();
+    if (code) params.set('code', code);
+    if (state) params.set('state', state);
+    if (error) params.set('error', error);
+    const query = params.toString();
+    const deepLink = `pivox://auth/callback${query ? `?${query}` : ''}`;
 
     // Attempt redirect to Electron app
-    window.location.href = deepLink
+    window.location.href = deepLink;
   }
 
   return (
@@ -49,12 +49,12 @@ function RedirectPage() {
             type="button"
             className="text-primary underline-offset-4 hover:underline"
             onClick={() => {
-              const params = new URLSearchParams()
-              if (code) params.set('code', code)
-              if (state) params.set('state', state)
-              if (error) params.set('error', error)
-              const query = params.toString()
-              window.location.href = `pivox://auth/callback${query ? `?${query}` : ''}`
+              const params = new URLSearchParams();
+              if (code) params.set('code', code);
+              if (state) params.set('state', state);
+              if (error) params.set('error', error);
+              const query = params.toString();
+              window.location.href = `pivox://auth/callback${query ? `?${query}` : ''}`;
             }}
           >
             click here to try again
@@ -63,5 +63,5 @@ function RedirectPage() {
         </p>
       </div>
     </div>
-  )
+  );
 }

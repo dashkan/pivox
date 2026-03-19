@@ -1,11 +1,11 @@
-import { createFileRoute, useRouter } from '@tanstack/react-router'
-import { LoginFeature } from '@pivox/features/login'
-import { LoginCard } from '@pivox/ui/login-card'
+import { createFileRoute, useRouter } from '@tanstack/react-router';
+import { LoginFeature } from '@pivox/features/login';
+import { LoginCard } from '@pivox/ui/login-card';
 
-export const Route = createFileRoute('/auth/login')({ component: LoginPage })
+export const Route = createFileRoute('/auth/login')({ component: LoginPage });
 
 function LoginPage() {
-  const router = useRouter()
+  const router = useRouter();
 
   return (
     <LoginFeature
@@ -19,16 +19,16 @@ function LoginPage() {
         <div className="flex items-center justify-between px-4">
           <LoginCard.RememberMe />
           <LoginCard.ForgotPassword
-            onClick={() => router.navigate({ to: '/auth/forgot-password'  })}
+            onClick={() => router.navigate({ to: '/auth/forgot-password' })}
           />
         </div>
         <LoginCard.SubmitButton />
         <LoginCard.Separator />
         <LoginCard.SocialButtons />
         <LoginCard.Footer
-          onClick={() => router.navigate({ to: '/auth/register'  })}
+          onClick={() => router.navigate({ to: '/auth/register' })}
         />
       </LoginCard.Root>
     </LoginFeature>
-  )
+  );
 }

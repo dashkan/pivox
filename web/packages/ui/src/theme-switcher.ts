@@ -1,1 +1,1 @@
-export * from "./theme-switcher/index"
+export * from './theme-switcher/index';

@@ -1,35 +1,35 @@
-import { globalIgnores } from "eslint/config";
-import eslintPluginReact from "eslint-plugin-react";
-import eslintPluginReactHooks from "eslint-plugin-react-hooks";
-import eslintPluginReactRefresh from "eslint-plugin-react-refresh";
-import rootConfig from "../../eslint.config.js";
+import { globalIgnores } from 'eslint/config';
+import eslintPluginReact from 'eslint-plugin-react';
+import eslintPluginReactHooks from 'eslint-plugin-react-hooks';
+import eslintPluginReactRefresh from 'eslint-plugin-react-refresh';
+import rootConfig from '../../eslint.config.js';
 
 export default [
   ...rootConfig,
   eslintPluginReact.configs.flat.recommended,
-  eslintPluginReact.configs.flat["jsx-runtime"],
+  eslintPluginReact.configs.flat['jsx-runtime'],
   {
     settings: {
       react: {
-        version: "detect",
+        version: 'detect',
       },
     },
   },
   {
-    files: ["**/*.{ts,tsx}"],
+    files: ['**/*.{ts,tsx}'],
     languageOptions: {
       parserOptions: {
-        project: ["./tsconfig.node.json", "./tsconfig.web.json"],
+        project: ['./tsconfig.node.json', './tsconfig.web.json'],
       },
     },
     plugins: {
-      "react-hooks": eslintPluginReactHooks,
-      "react-refresh": eslintPluginReactRefresh,
+      'react-hooks': eslintPluginReactHooks,
+      'react-refresh': eslintPluginReactRefresh,
     },
     rules: {
       ...eslintPluginReactHooks.configs.recommended.rules,
       ...eslintPluginReactRefresh.configs.vite.rules,
     },
   },
-  globalIgnores(["**/node_modules", "**/dist", "**/out"]),
+  globalIgnores(['**/node_modules', '**/dist', '**/out']),
 ];

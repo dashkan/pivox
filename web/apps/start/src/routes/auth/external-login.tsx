@@ -1,12 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
-import { initializeApp, getApps, deleteApp } from 'firebase/app';
+import { deleteApp, getApps, initializeApp } from 'firebase/app';
 import {
+  GithubAuthProvider,
+  GoogleAuthProvider,
+  OAuthProvider,
   getAuth,
   getRedirectResult,
-  GoogleAuthProvider,
-  GithubAuthProvider,
-  OAuthProvider,
   signInWithRedirect,
 } from 'firebase/auth';
 import { Button } from '@pivox/primitives/button';
@@ -18,19 +18,21 @@ import {
 } from '@pivox/primitives/card';
 
 type ElectronLoginSearch = {
-  provider: 'google' | 'github' | 'apple';
+  provider: string;
   state: string;
 };
 
 export const Route = createFileRoute('/auth/external-login')({
   validateSearch: (search: Record<string, unknown>): ElectronLoginSearch => ({
-    provider: (search.provider as ElectronLoginSearch['provider']) || 'google',
-    state: (search.state as string) || '',
+    provider: String(search.provider || 'google'),
+    state: String(search.state || ''),
   }),
   component: ElectronLoginPage,
 });
 
-const providers = {
+const providers: Partial<
+  Record<string, () => GoogleAuthProvider | GithubAuthProvider | OAuthProvider>
+> = {
   google: () => {
     const p = new GoogleAuthProvider();
     p.setCustomParameters({ prompt: 'select_account' });
@@ -38,7 +40,7 @@ const providers = {
   },
   github: () => new GithubAuthProvider(),
   apple: () => new OAuthProvider('apple.com'),
-} as const;
+};
 
 async function exchangeToken(idToken: string): Promise<string> {
   const res = await fetch('/internal/v1/auth:exchangeToken', {
@@ -64,19 +66,22 @@ function getIsolatedAuth() {
   const name = 'external-login';
   const existing = getApps().find((a) => a.name === name);
   if (existing) deleteApp(existing);
-  const app = initializeApp({
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  }, name);
+  const app = initializeApp(
+    {
+      apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    },
+    name,
+  );
   return getAuth(app);
 }
 
 function ElectronLoginPage() {
   const { provider, state } = Route.useSearch();
-  const [status, setStatus] = useState<
-    'loading' | 'redirecting' | 'error'
-  >('loading');
+  const [status, setStatus] = useState<'loading' | 'redirecting' | 'error'>(
+    'loading',
+  );
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -98,7 +103,9 @@ function ElectronLoginPage() {
 
           window.location.href = deepLink;
           // Navigate to done page after launching the deep link
-          setTimeout(() => { window.location.href = '/auth/done'; }, 500);
+          setTimeout(() => {
+            window.location.href = '/auth/done';
+          }, 500);
           return;
         }
 
@@ -129,7 +136,9 @@ function ElectronLoginPage() {
         sessionStorage.removeItem(REDIRECT_KEY);
         console.error('Electron login error:', e);
         setError(
-          e instanceof Error ? e.message : 'Something went wrong. Please try again.',
+          e instanceof Error
+            ? e.message
+            : 'Something went wrong. Please try again.',
         );
         setStatus('error');
       });
@@ -178,7 +187,11 @@ function ElectronLoginPage() {
               className="text-primary underline-offset-4 hover:underline"
               onClick={() => {
                 const params = new URLSearchParams();
-                params.set('token', new URLSearchParams(window.location.search).get('token') || '');
+                params.set(
+                  'token',
+                  new URLSearchParams(window.location.search).get('token') ||
+                    '',
+                );
                 params.set('state', state);
                 window.location.href = `pivox://auth/callback?${params.toString()}`;
               }}

@@ -376,9 +376,7 @@ export function useUserProfile(
         linkingTimerRef.current = setTimeout(() => {
           setLinkingProvider(null);
           linkingTimerRef.current = null;
-          setError(
-            `Linking ${entry.label} timed out. Please try again.`,
-          );
+          setError(`Linking ${entry.label} timed out. Please try again.`);
         }, LINK_TIMEOUT_MS);
 
         await linkWithPopup(user, entry.create());

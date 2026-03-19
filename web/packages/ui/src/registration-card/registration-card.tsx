@@ -1,21 +1,24 @@
-"use client"
+'use client';
 
-import { useFormStatus } from "react-dom"
-import { cn } from "@pivox/primitives/utils"
-import { Button } from "@pivox/primitives/button"
+import { useFormStatus } from 'react-dom';
+import { cn } from '@pivox/primitives/utils';
+import { Button } from '@pivox/primitives/button';
 import {
   Card,
   CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@pivox/primitives/card"
-import { Input } from "@pivox/primitives/input"
-import { Field, FieldError, FieldLabel } from "@pivox/primitives/field"
-import { Separator } from "@pivox/primitives/separator"
-import { RegistrationContext, useRegistrationContext } from "./registration-card.context"
-import type { RegistrationContextValue } from "./registration-card.types"
-import { AppleIcon, GitHubIcon, GoogleIcon } from "@/shared/social-icons"
+} from '@pivox/primitives/card';
+import { Input } from '@pivox/primitives/input';
+import { Field, FieldError, FieldLabel } from '@pivox/primitives/field';
+import { Separator } from '@pivox/primitives/separator';
+import {
+  RegistrationContext,
+  useRegistrationContext,
+} from './registration-card.context';
+import type { RegistrationContextValue } from './registration-card.types';
+import { AppleIcon, GitHubIcon, GoogleIcon } from '@/shared/social-icons';
 
 /* ------------------------------------------------------------------ */
 /*  Provider                                                          */
@@ -25,10 +28,10 @@ function RegistrationCardProvider({
   value,
   children,
 }: {
-  value: RegistrationContextValue
-  children: React.ReactNode
+  value: RegistrationContextValue;
+  children: React.ReactNode;
 }) {
-  return <RegistrationContext value={value}>{children}</RegistrationContext>
+  return <RegistrationContext value={value}>{children}</RegistrationContext>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -39,19 +42,24 @@ function RegistrationCardRoot({
   className,
   children,
 }: {
-  className?: string
-  children: React.ReactNode
+  className?: string;
+  children: React.ReactNode;
 }) {
-  const { actions } = useRegistrationContext()
+  const { actions } = useRegistrationContext();
   return (
-    <div className={cn("flex min-h-screen items-center justify-center p-4", className)}>
+    <div
+      className={cn(
+        'flex min-h-screen items-center justify-center p-4',
+        className,
+      )}
+    >
       <Card className="w-full max-w-sm">
         <form action={actions.formAction} className="flex flex-col gap-4">
           {children}
         </form>
       </Card>
     </div>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -60,11 +68,11 @@ function RegistrationCardRoot({
 
 function RegistrationCardHeader({ className }: { className?: string }) {
   return (
-    <CardHeader className={cn("text-center", className)}>
+    <CardHeader className={cn('text-center', className)}>
       <CardTitle className="text-xl">Create account</CardTitle>
       <CardDescription>Sign up for a new account</CardDescription>
     </CardHeader>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -72,10 +80,10 @@ function RegistrationCardHeader({ className }: { className?: string }) {
 /* ------------------------------------------------------------------ */
 
 function RegistrationCardEmailField({ className }: { className?: string }) {
-  const { state, actions, meta } = useRegistrationContext()
-  const { pending } = useFormStatus()
+  const { state, actions, meta } = useRegistrationContext();
+  const { pending } = useFormStatus();
   return (
-    <Field className={cn("px-4", className)}>
+    <Field className={cn('px-4', className)}>
       <FieldLabel>Email</FieldLabel>
       <Input
         ref={meta.emailRef}
@@ -88,18 +96,22 @@ function RegistrationCardEmailField({ className }: { className?: string }) {
         disabled={pending}
       />
     </Field>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
 /*  DisplayNameField                                                  */
 /* ------------------------------------------------------------------ */
 
-function RegistrationCardDisplayNameField({ className }: { className?: string }) {
-  const { state, actions } = useRegistrationContext()
-  const { pending } = useFormStatus()
+function RegistrationCardDisplayNameField({
+  className,
+}: {
+  className?: string;
+}) {
+  const { state, actions } = useRegistrationContext();
+  const { pending } = useFormStatus();
   return (
-    <Field className={cn("px-4", className)}>
+    <Field className={cn('px-4', className)}>
       <FieldLabel>Display name</FieldLabel>
       <Input
         name="displayName"
@@ -111,7 +123,7 @@ function RegistrationCardDisplayNameField({ className }: { className?: string })
         disabled={pending}
       />
     </Field>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -119,10 +131,10 @@ function RegistrationCardDisplayNameField({ className }: { className?: string })
 /* ------------------------------------------------------------------ */
 
 function RegistrationCardPasswordField({ className }: { className?: string }) {
-  const { state, actions } = useRegistrationContext()
-  const { pending } = useFormStatus()
+  const { state, actions } = useRegistrationContext();
+  const { pending } = useFormStatus();
   return (
-    <Field className={cn("px-4", className)}>
+    <Field className={cn('px-4', className)}>
       <FieldLabel>Password</FieldLabel>
       <Input
         name="password"
@@ -133,18 +145,22 @@ function RegistrationCardPasswordField({ className }: { className?: string }) {
         disabled={pending}
       />
     </Field>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
 /*  ConfirmPasswordField                                              */
 /* ------------------------------------------------------------------ */
 
-function RegistrationCardConfirmPasswordField({ className }: { className?: string }) {
-  const { state, actions } = useRegistrationContext()
-  const { pending } = useFormStatus()
+function RegistrationCardConfirmPasswordField({
+  className,
+}: {
+  className?: string;
+}) {
+  const { state, actions } = useRegistrationContext();
+  const { pending } = useFormStatus();
   return (
-    <Field className={cn("px-4", className)}>
+    <Field className={cn('px-4', className)}>
       <FieldLabel>Confirm password</FieldLabel>
       <Input
         name="confirmPassword"
@@ -155,7 +171,7 @@ function RegistrationCardConfirmPasswordField({ className }: { className?: strin
         disabled={pending}
       />
     </Field>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -163,16 +179,16 @@ function RegistrationCardConfirmPasswordField({ className }: { className?: strin
 /* ------------------------------------------------------------------ */
 
 function RegistrationCardSubmitButton({ className }: { className?: string }) {
-  const { state } = useRegistrationContext()
-  const { pending } = useFormStatus()
+  const { state } = useRegistrationContext();
+  const { pending } = useFormStatus();
   return (
-    <div className={cn("flex flex-col gap-4 px-4", className)}>
+    <div className={cn('flex flex-col gap-4 px-4', className)}>
       {state.error && <FieldError>{state.error}</FieldError>}
       <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? "Please wait…" : "Create account"}
+        {pending ? 'Please wait…' : 'Create account'}
       </Button>
     </div>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -181,7 +197,7 @@ function RegistrationCardSubmitButton({ className }: { className?: string }) {
 
 function RegistrationCardSeparator({ className }: { className?: string }) {
   return (
-    <div className={cn("relative px-4", className)}>
+    <div className={cn('relative px-4', className)}>
       <div className="absolute inset-x-4 inset-y-0 flex items-center">
         <Separator className="w-full" />
       </div>
@@ -189,7 +205,7 @@ function RegistrationCardSeparator({ className }: { className?: string }) {
         <span className="bg-card px-2 text-muted-foreground">or</span>
       </div>
     </div>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -197,55 +213,55 @@ function RegistrationCardSeparator({ className }: { className?: string }) {
 /* ------------------------------------------------------------------ */
 
 function RegistrationCardSocialButtons({
-  providers = ["google", "github"],
+  providers = ['google', 'github'],
   className,
 }: {
-  providers?: Array<"google" | "github" | "apple">
-  className?: string
+  providers?: Array<'google' | 'github' | 'apple'>;
+  className?: string;
 }) {
-  const { actions } = useRegistrationContext()
-  const { pending } = useFormStatus()
+  const { actions } = useRegistrationContext();
+  const { pending } = useFormStatus();
 
   return (
-    <div className={cn("flex flex-col gap-2 px-4", className)}>
-      {providers.includes("google") && (
+    <div className={cn('flex flex-col gap-2 px-4', className)}>
+      {providers.includes('google') && (
         <Button
           type="button"
           variant="outline"
           className="w-full"
           disabled={pending}
-          onClick={() => actions.socialLogin("google")}
+          onClick={() => actions.socialLogin('google')}
         >
           <GoogleIcon />
           Sign up with Google
         </Button>
       )}
-      {providers.includes("github") && (
+      {providers.includes('github') && (
         <Button
           type="button"
           variant="outline"
           className="w-full"
           disabled={pending}
-          onClick={() => actions.socialLogin("github")}
+          onClick={() => actions.socialLogin('github')}
         >
           <GitHubIcon />
           Sign up with GitHub
         </Button>
       )}
-      {providers.includes("apple") && (
+      {providers.includes('apple') && (
         <Button
           type="button"
           variant="outline"
           className="w-full"
           disabled={pending}
-          onClick={() => actions.socialLogin("apple")}
+          onClick={() => actions.socialLogin('apple')}
         >
           <AppleIcon />
           Sign up with Apple
         </Button>
       )}
     </div>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -256,13 +272,13 @@ function RegistrationCardFooter({
   onClick,
   className,
 }: {
-  onClick: () => void
-  className?: string
+  onClick: () => void;
+  className?: string;
 }) {
   return (
-    <CardFooter className={cn("justify-center", className)}>
+    <CardFooter className={cn('justify-center', className)}>
       <p className="text-sm text-muted-foreground">
-        Already have an account?{" "}
+        Already have an account?{' '}
         <button
           type="button"
           className="text-primary underline-offset-4 hover:underline"
@@ -272,7 +288,7 @@ function RegistrationCardFooter({
         </button>
       </p>
     </CardFooter>
-  )
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -292,4 +308,4 @@ export const RegistrationCard = {
   SocialButtons: RegistrationCardSocialButtons,
   Footer: RegistrationCardFooter,
   Context: RegistrationContext,
-}
+};

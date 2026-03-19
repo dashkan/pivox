@@ -1,8 +1,8 @@
-import { resolve } from 'node:path'
-import { defineConfig } from 'electron-vite'
-import { tanstackRouter } from '@tanstack/router-plugin/vite'
-import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
+import { resolve } from 'node:path';
+import { defineConfig } from 'electron-vite';
+import { tanstackRouter } from '@tanstack/router-plugin/vite';
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   main: {},
@@ -10,9 +10,15 @@ export default defineConfig({
   renderer: {
     resolve: {
       alias: {
-        '@renderer': resolve('src/renderer/src')
+        '@renderer': resolve('src/renderer/src'),
       },
-      dedupe: ['react', 'react-dom', 'firebase', 'firebase/app', 'firebase/auth']
+      dedupe: [
+        'react',
+        'react-dom',
+        'firebase',
+        'firebase/app',
+        'firebase/auth',
+      ],
     },
     plugins: [
       tailwindcss(),
@@ -20,9 +26,9 @@ export default defineConfig({
         target: 'react',
         autoCodeSplitting: true,
         routesDirectory: resolve('src/renderer/src/routes'),
-        generatedRouteTree: resolve('src/renderer/src/routeTree.gen.ts')
+        generatedRouteTree: resolve('src/renderer/src/routeTree.gen.ts'),
       }),
-      react()
-    ]
-  }
-})
+      react(),
+    ],
+  },
+});

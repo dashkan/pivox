@@ -1,9 +1,9 @@
-import { UserProfileFeature } from '@pivox/features/user-profile'
-import { useAppLayoutContext } from '@pivox/ui/app-layout'
-import { UserProfileCard } from '@pivox/ui/user-profile-card'
+import { UserProfileFeature } from '@pivox/features/user-profile';
+import { useAppLayoutContext } from '@pivox/ui/app-layout';
+import { UserProfileCard } from '@pivox/ui/user-profile-card';
 
 export default function ProfileDialog() {
-  const { state, actions } = useAppLayoutContext()
+  const { state, actions } = useAppLayoutContext();
 
   return (
     <UserProfileFeature
@@ -19,5 +19,5 @@ export default function ProfileDialog() {
         <UserProfileCard.SecurityPage />
       </UserProfileCard.Root>
     </UserProfileFeature>
-  )
+  );
 }

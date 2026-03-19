@@ -1,11 +1,11 @@
-import { createFileRoute, useRouter } from '@tanstack/react-router'
-import { LoginCard } from '@pivox/ui/login-card'
-import { ElectronLoginFeature } from '../../components/electron-login-feature'
+import { createFileRoute, useRouter } from '@tanstack/react-router';
+import { LoginCard } from '@pivox/ui/login-card';
+import { ElectronLoginFeature } from '../../components/electron-login-feature';
 
-export const Route = createFileRoute('/auth/login')({ component: LoginPage })
+export const Route = createFileRoute('/auth/login')({ component: LoginPage });
 
 function LoginPage() {
-  const router = useRouter()
+  const router = useRouter();
 
   return (
     <ElectronLoginFeature
@@ -30,5 +30,5 @@ function LoginPage() {
         />
       </LoginCard.Root>
     </ElectronLoginFeature>
-  )
+  );
 }

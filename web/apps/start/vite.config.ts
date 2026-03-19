@@ -17,7 +17,9 @@ const config = defineConfig({
     nitro({
       rollupConfig: { external: [/^@sentry\//] },
       routeRules: {
-        '/__/auth/**': { proxy: 'https://pivox-cloud.firebaseapp.com/__/auth/**' },
+        '/__/auth/**': {
+          proxy: 'https://pivox-cloud.firebaseapp.com/__/auth/**',
+        },
       },
     }),
     tsconfigPaths({ projects: ['./tsconfig.json'] }),

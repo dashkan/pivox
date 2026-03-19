@@ -1,19 +1,19 @@
-"use client"
+'use client';
 
-import { UserAvatar } from "@pivox/ui/user-avatar"
-import { useAuth } from "@/auth/use-auth"
+import { UserAvatar } from '@pivox/ui/user-avatar';
+import { useAuth } from '@/auth/use-auth';
 
 export function AuthAvatar({
   size,
   className,
 }: {
-  size?: "sm" | "default" | "lg"
-  className?: string
+  size?: 'sm' | 'default' | 'lg';
+  className?: string;
 }) {
-  const { user, loading } = useAuth()
+  const { user, loading } = useAuth();
 
   if (loading) {
-    return <UserAvatar name={null} size={size} className={className} />
+    return <UserAvatar name={null} size={size} className={className} />;
   }
 
   return (
@@ -23,5 +23,5 @@ export function AuthAvatar({
       size={size}
       className={className}
     />
-  )
+  );
 }

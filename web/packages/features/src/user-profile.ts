@@ -1,1 +1,1 @@
-export * from "./user-profile/index"
+export * from './user-profile/index';

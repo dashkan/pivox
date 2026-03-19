@@ -1,75 +1,75 @@
-"use client"
+'use client';
 
-import { useEffect, useState } from "react"
-import { cn } from "@pivox/primitives/utils"
-import { Button } from "@pivox/primitives/button"
+import { useEffect, useState } from 'react';
+import { cn } from '@pivox/primitives/utils';
+import { Button } from '@pivox/primitives/button';
 
-type Theme = "light" | "system" | "dark"
+type Theme = 'light' | 'system' | 'dark';
 
-const STORAGE_KEY = "pivox-theme"
+const STORAGE_KEY = 'pivox-theme';
 
-const themes: Array<Theme> = ["light", "system", "dark"]
+const themes: Array<Theme> = ['light', 'system', 'dark'];
 
 function getStoredTheme(): Theme {
-  if (typeof window === "undefined") return "system"
-  return (localStorage.getItem(STORAGE_KEY) as Theme | null) ?? "system"
+  if (typeof window === 'undefined') return 'system';
+  return (localStorage.getItem(STORAGE_KEY) as Theme | null) ?? 'system';
 }
 
-function getSystemPreference(): "light" | "dark" {
-  if (typeof window === "undefined") return "light"
-  return window.matchMedia("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light"
+function getSystemPreference(): 'light' | 'dark' {
+  if (typeof window === 'undefined') return 'light';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light';
 }
 
 function applyTheme(theme: Theme) {
-  const resolved = theme === "system" ? getSystemPreference() : theme
-  document.documentElement.classList.toggle("dark", resolved === "dark")
+  const resolved = theme === 'system' ? getSystemPreference() : theme;
+  document.documentElement.classList.toggle('dark', resolved === 'dark');
 }
 
 export function ThemeSwitcher({ className }: { className?: string }) {
-  const [theme, setTheme] = useState<Theme>("system")
-  const [mounted, setMounted] = useState(false)
+  const [theme, setTheme] = useState<Theme>('system');
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setTheme(getStoredTheme())
-    setMounted(true)
-  }, [])
+    setTheme(getStoredTheme());
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
-    if (!mounted) return
-    applyTheme(theme)
-    localStorage.setItem(STORAGE_KEY, theme)
-  }, [theme, mounted])
+    if (!mounted) return;
+    applyTheme(theme);
+    localStorage.setItem(STORAGE_KEY, theme);
+  }, [theme, mounted]);
 
   useEffect(() => {
-    const mql = window.matchMedia("(prefers-color-scheme: dark)")
+    const mql = window.matchMedia('(prefers-color-scheme: dark)');
     const handler = () => {
-      if (getStoredTheme() === "system") applyTheme("system")
-    }
-    mql.addEventListener("change", handler)
-    return () => mql.removeEventListener("change", handler)
-  }, [])
+      if (getStoredTheme() === 'system') applyTheme('system');
+    };
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
 
   const cycle = () => {
-    const idx = themes.indexOf(theme)
-    const next = themes[(idx + 1) % themes.length]
-    if (next) setTheme(next)
-  }
+    const idx = themes.indexOf(theme);
+    const next = themes[(idx + 1) % themes.length];
+    if (next) setTheme(next);
+  };
 
   if (!mounted) {
     return (
       <Button variant="ghost" size="icon" className={className} disabled>
         <span className="size-4" />
       </Button>
-    )
+    );
   }
 
   return (
     <Button
       variant="ghost"
       size="icon"
-      className={cn("relative", className)}
+      className={cn('relative', className)}
       onClick={cycle}
       aria-label={`Theme: ${theme}`}
     >
@@ -77,10 +77,10 @@ export function ThemeSwitcher({ className }: { className?: string }) {
         {/* Sun */}
         <svg
           className={cn(
-            "absolute inset-0 size-4 transition-all duration-300",
-            theme === "light"
-              ? "scale-100 rotate-0 opacity-100"
-              : "scale-0 rotate-90 opacity-0",
+            'absolute inset-0 size-4 transition-all duration-300',
+            theme === 'light'
+              ? 'scale-100 rotate-0 opacity-100'
+              : 'scale-0 rotate-90 opacity-0',
           )}
           viewBox="0 0 24 24"
           fill="none"
@@ -104,10 +104,10 @@ export function ThemeSwitcher({ className }: { className?: string }) {
         {/* Monitor (system) */}
         <svg
           className={cn(
-            "absolute inset-0 size-4 transition-all duration-300",
-            theme === "system"
-              ? "scale-100 rotate-0 opacity-100"
-              : "scale-0 -rotate-90 opacity-0",
+            'absolute inset-0 size-4 transition-all duration-300',
+            theme === 'system'
+              ? 'scale-100 rotate-0 opacity-100'
+              : 'scale-0 -rotate-90 opacity-0',
           )}
           viewBox="0 0 24 24"
           fill="none"
@@ -125,10 +125,10 @@ export function ThemeSwitcher({ className }: { className?: string }) {
         {/* Moon */}
         <svg
           className={cn(
-            "absolute inset-0 size-4 transition-all duration-300",
-            theme === "dark"
-              ? "scale-100 rotate-0 opacity-100"
-              : "scale-0 rotate-90 opacity-0",
+            'absolute inset-0 size-4 transition-all duration-300',
+            theme === 'dark'
+              ? 'scale-100 rotate-0 opacity-100'
+              : 'scale-0 rotate-90 opacity-0',
           )}
           viewBox="0 0 24 24"
           fill="none"
@@ -142,5 +142,5 @@ export function ThemeSwitcher({ className }: { className?: string }) {
         </svg>
       </span>
     </Button>
-  )
+  );
 }

@@ -1,1 +1,1 @@
-export * from "./app-layout/index"
+export * from './app-layout/index';

@@ -1,9 +1,9 @@
-import { Outlet, createRootRoute } from '@tanstack/react-router'
-import { AuthProvider } from '@pivox/features/auth'
+import { Outlet, createRootRoute } from '@tanstack/react-router';
+import { AuthProvider } from '@pivox/features/auth';
 
 export const Route = createRootRoute({
   component: RootComponent,
-})
+});
 
 function RootComponent() {
   return (
@@ -12,5 +12,5 @@ function RootComponent() {
         <Outlet />
       </div>
     </AuthProvider>
-  )
+  );
 }

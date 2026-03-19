@@ -1,1 +1,1 @@
-export * from "./auth-avatar/index"
+export * from './auth-avatar/index';

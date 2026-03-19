@@ -1,1 +1,1 @@
-export * from "./login-card/index"
+export * from './login-card/index';

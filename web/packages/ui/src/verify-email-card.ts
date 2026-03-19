@@ -1,1 +1,1 @@
-export * from "./verify-email-card/index"
+export * from './verify-email-card/index';

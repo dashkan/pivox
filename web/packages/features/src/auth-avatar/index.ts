@@ -1,1 +1,1 @@
-export { AuthAvatar } from "./auth-avatar"
+export { AuthAvatar } from './auth-avatar';

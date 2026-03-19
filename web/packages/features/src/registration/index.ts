@@ -1,2 +1,2 @@
-export { RegistrationFeature } from "./registration-feature"
-export { useRegistration } from "./use-registration"
+export { RegistrationFeature } from './registration-feature';
+export { useRegistration } from './use-registration';

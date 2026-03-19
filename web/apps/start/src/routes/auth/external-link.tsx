@@ -1,14 +1,14 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
-import { initializeApp, getApps, deleteApp } from 'firebase/app';
+import { deleteApp, getApps, initializeApp } from 'firebase/app';
 import {
+  GithubAuthProvider,
+  GoogleAuthProvider,
+  OAuthProvider,
   getAuth,
   getRedirectResult,
-  GoogleAuthProvider,
-  GithubAuthProvider,
-  OAuthProvider,
-  signInWithCustomToken,
   linkWithRedirect,
+  signInWithCustomToken,
 } from 'firebase/auth';
 import {
   Card,
@@ -24,11 +24,14 @@ function getIsolatedAuth() {
   const name = 'external-link';
   const existing = getApps().find((a) => a.name === name);
   if (existing) deleteApp(existing);
-  const app = initializeApp({
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  }, name);
+  const app = initializeApp(
+    {
+      apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    },
+    name,
+  );
   return getAuth(app);
 }
 
@@ -47,7 +50,9 @@ export const Route = createFileRoute('/auth/external-link')({
   component: ElectronLinkPage,
 });
 
-const providers: Record<string, () => GoogleAuthProvider | GithubAuthProvider | OAuthProvider> = {
+const providers: Partial<
+  Record<string, () => GoogleAuthProvider | GithubAuthProvider | OAuthProvider>
+> = {
   'google.com': () => {
     const p = new GoogleAuthProvider();
     p.setCustomParameters({ prompt: 'select_account' });
@@ -111,7 +116,9 @@ function ElectronLinkPage() {
 
           window.location.href = deepLink;
           // Navigate to done page after launching the deep link
-          setTimeout(() => { window.location.href = '/auth/done'; }, 500);
+          setTimeout(() => {
+            window.location.href = '/auth/done';
+          }, 500);
           return;
         }
 
@@ -198,9 +205,7 @@ function ElectronLinkPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
-      <p className="text-sm text-muted-foreground">
-        Linking account...
-      </p>
+      <p className="text-sm text-muted-foreground">Linking account...</p>
     </div>
   );
 }
