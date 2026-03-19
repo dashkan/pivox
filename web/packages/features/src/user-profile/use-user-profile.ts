@@ -59,6 +59,14 @@ async function reauthenticate(user: User): Promise<void> {
 
 export function useUserProfile(onClose?: () => void): UserProfileContextValue {
   const { user, signOut, refreshUser } = useAuth();
+
+  // Reload the user from Firebase when the profile page opens to pick up
+  // changes made on other clients (linked/unlinked providers, email
+  // verification, display name changes, etc.).
+  useEffect(() => {
+    refreshUser();
+  }, [refreshUser]);
+
   const [activePage, setActivePage] = useState<'account' | 'security'>(
     'account',
   );
