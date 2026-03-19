@@ -151,7 +151,11 @@ func main() {
 
 	// HTTP mux: internal hooks + gRPC gateway (fallback)
 	httpMux := http.NewServeMux()
-	hooks := server.NewInternalHooks(queries, cfg.SharedSecret, logger, authSvc)
+	hooks, err := server.NewInternalHooks(queries, cfg.SyncAuth, logger, authSvc)
+	if err != nil {
+		logger.Error("failed to initialize internal hooks", "error", err)
+		os.Exit(1)
+	}
 	hooks.Register(httpMux)
 	httpMux.Handle("/", gwMux) // gRPC gateway handles everything else
 

@@ -7,14 +7,14 @@ import (
 )
 
 type Config struct {
-	DatabaseURL  string
-	GRPCPort     string
-	RESTPort     string
-	DebugPort    string
-	WorkerCount  int
-	LogLevel     string
-	SharedSecret string
-	GoogleCloud  GoogleCloudConfig
+	DatabaseURL string
+	GRPCPort    string
+	RESTPort    string
+	DebugPort   string
+	WorkerCount int
+	LogLevel    string
+	GoogleCloud GoogleCloudConfig
+	SyncAuth    SyncAuthConfig
 }
 
 // GoogleCloudConfig holds Google Cloud / Firebase configuration.
@@ -36,18 +36,18 @@ type GoogleCloudConfig struct {
 
 func Load() *Config {
 	return &Config{
-		DatabaseURL:  getEnv("DATABASE_URL", "postgres://localhost:5432/pivox?sslmode=disable"),
-		GRPCPort:     getEnv("GRPC_PORT", ":50051"),
-		RESTPort:     getEnv("REST_PORT", ":8080"),
-		DebugPort:    getEnv("DEBUG_PORT", ":9090"),
-		WorkerCount:  getEnvInt("WORKER_COUNT", 5),
-		LogLevel:     getEnv("LOG_LEVEL", "info"),
-		SharedSecret: getEnvRequired("SHARED_SECRET"),
+		DatabaseURL: getEnv("DATABASE_URL", "postgres://localhost:5432/pivox?sslmode=disable"),
+		GRPCPort:    getEnv("GRPC_PORT", ":50051"),
+		RESTPort:    getEnv("REST_PORT", ":8080"),
+		DebugPort:   getEnv("DEBUG_PORT", ":9090"),
+		WorkerCount: getEnvInt("WORKER_COUNT", 5),
+		LogLevel:    getEnv("LOG_LEVEL", "info"),
 		GoogleCloud: GoogleCloudConfig{
 			ProjectID:          getEnv("GOOGLE_CLOUD_PROJECT_ID", ""),
 			ServiceAccountKey:  getEnv("GOOGLE_CLOUD_SERVICE_ACCOUNT_KEY", ""),
 			ServiceAccountFile: getEnv("GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE", ""),
 		},
+		SyncAuth: loadSyncAuthConfig(),
 	}
 }
 

@@ -6,6 +6,7 @@ import {
 } from "firebase-functions/v2/identity";
 import { logger } from "firebase-functions/v2";
 import { defineString } from "firebase-functions/params";
+import { GoogleAuth } from "google-auth-library";
 
 setGlobalOptions({ maxInstances: 10 });
 
@@ -15,10 +16,27 @@ const pivoxApiUrl = defineString("PIVOX_API_URL", {
   label: "API URL",
 });
 
-const pivoxInternalSecret = defineString("PIVOX_SHARED_SECRET", {
-  description: "Shared secret for internal API calls",
-  label: "Shared secret",
-});
+// Google Auth client for minting OIDC identity tokens. The Cloud Functions
+// runtime provides default credentials via the function's service account.
+const auth = new GoogleAuth();
+
+/**
+ * Returns an Authorization header value ("Bearer <token>") containing an
+ * OIDC identity token for the given target audience. The token is signed
+ * by the Cloud Function's service account and verified by the Go backend
+ * against Google's JWKS.
+ */
+async function getAuthorizationHeader(
+  targetAudience: string,
+): Promise<string> {
+  const client = await auth.getIdTokenClient(targetAudience);
+  const headers = await client.getRequestHeaders();
+  const bearer = headers.get("Authorization");
+  if (!bearer) {
+    throw new Error("Failed to obtain OIDC identity token");
+  }
+  return bearer;
+}
 
 /**
  * Calls the Pivox internal sync endpoint to upsert an account.
@@ -37,11 +55,14 @@ async function syncAccount(
   const url = `${pivoxApiUrl.value()}/internal/v1/accounts:sync`;
   const payload = { firebase_uid: firebaseUid, ...fields };
 
+  // The audience for the OIDC token is the base URL of the API server.
+  const authorization = await getAuthorizationHeader(pivoxApiUrl.value());
+
   const res = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${pivoxInternalSecret.value()}`,
+      Authorization: authorization,
     },
     body: JSON.stringify(payload),
   });

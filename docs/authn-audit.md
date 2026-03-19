@@ -23,7 +23,7 @@ The authentication system is well-architected around Firebase Auth with proper s
 | **Severity** | High |
 | **CWE** | CWE-798 (Use of Hard-Coded Credentials) |
 | **Location** | `internal/config/config.go:44`, `deployments/firebase/functions/.env.example` |
-| **Status** | ✅ Fixed |
+| **Status** | ✅ Eliminated |
 
 **Description**: The `SHARED_SECRET` environment variable falls back to `"dev-secret"` if unset. This static secret protects the internal `/internal/v1/accounts:sync` endpoint that can create/modify any user account. If a production deployment fails to set this variable, the endpoint is effectively unprotected — any attacker who discovers it can upsert arbitrary accounts.
 
@@ -31,14 +31,9 @@ The Firebase Functions side mirrors this with `defineString("PIVOX_SHARED_SECRET
 
 **Impact**: An attacker could call `POST /internal/v1/accounts:sync` with `Authorization: Bearer dev-secret` to create or modify any account in the database, set `disabled: false` on locked accounts, or change email/verification status.
 
-**Remediation**:
-```go
-// internal/config/config.go — remove the default, require explicit config
-SharedSecret: getEnvRequired("SHARED_SECRET"),
-```
-Add a `getEnvRequired()` helper that panics or returns an error at startup if the variable is missing. Do the same for the Firebase Functions config — remove the `default` on `PIVOX_SHARED_SECRET`.
+**Remediation**: The static shared secret has been fully replaced with Google Cloud OIDC identity tokens in production. Firebase Functions mint an OIDC token using the default service account, and the Go backend verifies it cryptographically via `google.golang.org/api/idtoken` against Google's JWKS endpoint. The backend validates both the token's audience and the caller's service account email against a configured allowlist (`ALLOWED_SERVICE_ACCOUNTS`).
 
-Additionally, consider replacing the static shared secret with a more robust mechanism such as OIDC service account tokens or IAM-based authentication between Cloud Functions and the backend.
+The shared secret is retained only for the dev build tag (`//go:build dev`) to support pure localhost development with the Firebase emulator, which cannot mint OIDC tokens. The dev code path is excluded from production binaries at compile time.
 
 ---
 
@@ -350,7 +345,7 @@ These aspects of the authentication system are well-implemented:
 | ID | Finding | Severity | Effort to Fix | Status |
 |----|---------|----------|---------------|--------|
 | AUTHN-02 | No auth on gRPC/REST API | High | Medium | ✅ Fixed |
-| AUTHN-01 | Shared secret defaults to `dev-secret` | High | Low | ✅ Fixed |
+| AUTHN-01 | Shared secret defaults to `dev-secret` | High | Low | ✅ Eliminated (OIDC) |
 | AUTHN-04 | ID token in URL query parameter | Medium | Medium | ✅ Fixed |
 | AUTHN-03 | Electron `sandbox: false` | Medium | Low | ✅ Fixed |
 | AUTHN-06 | No rate limiting on token exchange | Medium | Medium | ✅ Fixed |

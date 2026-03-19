@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -21,29 +20,22 @@ import (
 // internal services.
 type InternalHooks struct {
 	queries  *db.Queries
-	secret   string
 	logger   *slog.Logger
 	firebase *firebase.AuthService
+
+	// syncAuth protects the accounts:sync endpoint. The implementation is
+	// selected at compile time via build tags:
+	//   - Production (default): Google Cloud OIDC identity token verification
+	//   - Dev (go build -tags dev): static shared secret
+	syncAuth func(http.HandlerFunc) http.HandlerFunc
 
 	// Per-IP rate limiter for the token exchange endpoint (AUTHN-06).
 	exchangeLimiter *ipRateLimiter
 }
 
-// NewInternalHooks creates a new internal hooks handler.
-func NewInternalHooks(queries *db.Queries, secret string, logger *slog.Logger, firebase *firebase.AuthService) *InternalHooks {
-	return &InternalHooks{
-		queries:  queries,
-		secret:   secret,
-		logger:   logger,
-		firebase: firebase,
-		// Allow 10 requests per minute per IP with a burst of 10.
-		exchangeLimiter: newIPRateLimiter(rate.Every(6*time.Second), 10),
-	}
-}
-
 // Register mounts the internal endpoints on the given mux.
 func (h *InternalHooks) Register(mux *http.ServeMux) {
-	mux.HandleFunc("POST /internal/v1/accounts:sync", h.requireSecret(h.syncAccount))
+	mux.HandleFunc("POST /internal/v1/accounts:sync", h.syncAuth(h.syncAccount))
 	mux.HandleFunc("POST /internal/v1/auth:exchangeToken", h.rateLimit(h.exchangeToken))
 	mux.HandleFunc("POST /internal/v1/auth:depositToken", h.depositToken)
 	mux.HandleFunc("POST /internal/v1/auth:consumeToken", h.consumeToken)
@@ -213,18 +205,6 @@ func (h *InternalHooks) consumeToken(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{
 		"id_token": tokenCode.IDToken,
 	})
-}
-
-// requireSecret validates the Authorization bearer token against the configured secret.
-func (h *InternalHooks) requireSecret(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		token := r.Header.Get("Authorization")
-		if token != "Bearer "+h.secret {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-		next(w, r)
-	}
 }
 
 // rateLimit wraps a handler with per-IP rate limiting using the exchange limiter.
