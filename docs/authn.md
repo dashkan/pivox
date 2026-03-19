@@ -512,7 +512,8 @@ This launches (via `concurrently`):
 | `/internal/*` | REST → `:8080` |
 | `/v1/*` | REST → `:8080` |
 | `/healthz`, `/readyz` | Debug → `:9090` |
-| `/*` | Vite → `:3001` |
+| `/__tsd/*` | Vite → `:3001` (SSE, no buffering, 24h timeout) |
+| `/*` | Vite → `:3001` (WebSocket upgrade for HMR) |
 
 **Auth behavior:**
 - Start app uses **real Firebase Auth** (`VITE_FIREBASE_AUTH_DOMAIN=pivox.ngrok.app`, emulator URL commented out)
