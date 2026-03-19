@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   EmailAuthProvider,
   GithubAuthProvider,
@@ -66,6 +66,26 @@ export function useUserProfile(onClose?: () => void): UserProfileContextValue {
   const [success, setSuccess] = useState<string | null>(null);
   const [totpSecret, setTotpSecret] = useState<TotpSecret | null>(null);
   const [totpStep, setTotpStep] = useState<'qr' | 'verify' | null>(null);
+  const [linkingProvider, setLinkingProvider] = useState<string | null>(null);
+  const linkingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // How long the user has to complete a link flow before it times out.
+  const LINK_TIMEOUT_MS = 2 * 60 * 1000;
+
+  const clearLinking = useCallback(() => {
+    if (linkingTimerRef.current) {
+      clearTimeout(linkingTimerRef.current);
+      linkingTimerRef.current = null;
+    }
+    setLinkingProvider(null);
+  }, []);
+
+  // Clean up timer on unmount.
+  useEffect(() => {
+    return () => {
+      if (linkingTimerRef.current) clearTimeout(linkingTimerRef.current);
+    };
+  }, []);
 
   const clearStatus = () => {
     setError(null);
@@ -115,6 +135,7 @@ export function useUserProfile(onClose?: () => void): UserProfileContextValue {
             secret: totpSecret.secretKey,
           }
         : null,
+    linkingProvider,
   };
 
   const actions: UserProfileActions = {
@@ -336,12 +357,30 @@ export function useUserProfile(onClose?: () => void): UserProfileContextValue {
         if (!user) throw new Error('Not signed in');
         const entry = oauthProviders[providerId];
         if (!entry) throw new Error('Unsupported provider');
+
+        setLinkingProvider(providerId);
+        linkingTimerRef.current = setTimeout(() => {
+          setLinkingProvider(null);
+          linkingTimerRef.current = null;
+          setError(
+            `Linking ${entry.label} timed out. Please try again.`,
+          );
+        }, LINK_TIMEOUT_MS);
+
         await linkWithPopup(user, entry.create());
-        // linkWithPopup updates the user object in place and triggers
-        // onIdTokenChanged, so no manual refresh needed
+        clearLinking();
         setSuccess(`${entry.label} account linked`);
       } catch (e) {
+        clearLinking();
         setError(firebaseErrorMessage(e));
+      }
+    },
+
+    setLinkingProvider: (providerId: string | null) => {
+      if (providerId) {
+        setLinkingProvider(providerId);
+      } else {
+        clearLinking();
       }
     },
 

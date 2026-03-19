@@ -21,6 +21,8 @@ export interface UserProfileState {
   success: string | null;
   mfaEnrolled: boolean;
   totpEnrollment: TotpEnrollment | null;
+  /** Provider ID currently being linked, or null if no link flow is active. */
+  linkingProvider: string | null;
 }
 
 export interface UserProfileActions {
@@ -47,6 +49,8 @@ export interface UserProfileActions {
   // Providers
   linkProvider: (providerId: string) => Promise<void>;
   unlinkProvider: (providerId: string) => Promise<void>;
+  /** Set the provider currently being linked (used by Electron override). */
+  setLinkingProvider: (providerId: string | null) => void;
 
   // MFA
   startTotpEnrollment: () => Promise<void>;

@@ -478,16 +478,31 @@ function ProviderRow({
 
 function ConnectedAccountsSubsection() {
   const { state, actions } = useUserProfileContext();
+  const linking = state.linkingProvider;
+  const linkingDisplayName = linking
+    ? (state.availableProviders.find((p) => p.providerId === linking)?.label ??
+       state.providers.find((p) => p.providerId === linking)?.providerId ??
+       linking)
+    : null;
+
   return (
     <div className="px-6 py-4">
       <h3 className="mb-3 text-sm font-medium">Connected accounts</h3>
+      {linking && (
+        <p className="mb-3 text-xs text-muted-foreground">
+          Linking {linkingDisplayName} — complete the sign-in in your browser to
+          finish. This will expire in 2 minutes.
+        </p>
+      )}
       <div className="flex flex-col gap-2">
         {state.providers.map((provider) => (
           <ProviderRow
             key={provider.providerId}
             provider={provider}
             canUnlink={
-              provider.providerId !== 'password' && state.providers.length > 1
+              !linking &&
+              provider.providerId !== 'password' &&
+              state.providers.length > 1
             }
             onUnlink={() => actions.unlinkProvider(provider.providerId)}
           />
@@ -498,7 +513,13 @@ function ConnectedAccountsSubsection() {
             <button
               key={provider.providerId}
               type="button"
-              className="flex items-center justify-between rounded-lg border border-dashed p-3 text-muted-foreground hover:bg-muted/50"
+              disabled={!!linking}
+              className={cn(
+                'flex items-center justify-between rounded-lg border border-dashed p-3 text-muted-foreground',
+                linking
+                  ? 'cursor-not-allowed opacity-50'
+                  : 'hover:bg-muted/50',
+              )}
               onClick={() => actions.linkProvider(provider.providerId)}
             >
               <div className="flex items-center gap-3">
