@@ -909,6 +909,98 @@ Multi-tenant SSO using Firebase Auth tenants and custom OIDC providers. The `sso
 
 ---
 
+## Planned: Real-Time Session Management via Watch API + SSE
+
+### Problem
+
+Firebase Auth provides no server-side mechanism to observe user state changes in real time. The only Cloud Functions triggers are:
+
+| Trigger | Type | Fires on |
+|---------|------|----------|
+| `beforeUserCreated` | Blocking | User creation |
+| `beforeUserSignedIn` | Blocking | Every sign-in |
+| `onCreate` | Non-blocking (v1) | User created |
+| `onDelete` | Non-blocking (v1) | User deleted |
+
+There are **no triggers** for: provider linked/unlinked, profile updated, email changed, password changed, MFA enrolled/unenrolled, or session revoked. The Admin SDK is request-response only — no subscriptions or watches.
+
+This means clients have no way to learn about changes made on other devices without polling. The current workaround (`patchProviderData()` calling the REST API on profile dialog open) is functional but not real-time.
+
+### Solution: Watch API with SSE
+
+The Watch API (`pivox.api.v1.Watcher`) will expose user resources as watchable entities. Providers will be a sub-message of the user resource. Clients subscribe via SSE (Server-Sent Events) over the REST gateway and receive change events in real time.
+
+#### Architecture
+
+```
+Client A (web)                    Server                     Client B (Electron)
+─────────────                    ──────                     ───────────────────
+1. Unlinks Google
+   → unlink() succeeds locally
+   → POST /v1/users/{uid}:notify
+     { change: "providers" }
+                              2. Server emits Watch
+                                 Change event for
+                                 user/{uid}
+                                                          3. SSE delivers change
+                                                          4. Client refreshes
+                                                             provider list
+```
+
+#### Event types
+
+| Event | Trigger | Client action |
+|-------|---------|---------------|
+| `providers_changed` | `linkProvider` / `unlinkProvider` succeeds on any client | Call `refreshUser()` to sync `providerData` |
+| `profile_changed` | `updateDisplayName`, `updatePhoto`, `changeEmail` | Call `refreshUser()` to sync display name, email, photo |
+| `mfa_changed` | TOTP enrolled/unenrolled | Call `refreshUser()` to sync `mfaEnrolled` |
+| `session_revoked` | Admin action or security policy | Call `signOut()` — user is kicked out of this session |
+
+#### Session invalidation
+
+The SSE stream gives per-client targeting for free — each connection is a specific client. To invalidate a specific session:
+
+1. Server sends `session_revoked` event to that client's SSE stream
+2. Client receives it and calls `signOut()` locally
+3. Optionally call `auth.revokeRefreshTokens(uid)` server-side as a backstop — but this revokes **all** sessions for the user, not just the targeted one
+
+Firebase's `revokeRefreshTokens(uid)` is all-or-nothing. For targeted revocation, the Watch stream is the only mechanism — it's client-cooperative (the client has to obey), but the server can also reject the revoked token on protected endpoints by checking `validSince` against the token's `auth_time`.
+
+#### Client integration
+
+When the Watch API is implemented, the `AuthProvider` will subscribe to the user's Watch stream on sign-in:
+
+```tsx
+// Pseudocode — replaces patchProviderData() workaround
+useEffect(() => {
+  if (!user) return;
+  const eventSource = new EventSource(`/v1/watch?target=/users/${user.uid}`);
+  eventSource.onmessage = (event) => {
+    const change = JSON.parse(event.data);
+    if (change.state === 'EXISTS') {
+      refreshUser(); // picks up provider/profile/MFA changes
+    }
+    if (change.type === 'session_revoked') {
+      signOut();
+    }
+  };
+  return () => eventSource.close();
+}, [user?.uid]);
+```
+
+This eliminates the `patchProviderData()` REST API workaround, the profile-dialog-open polling, and the entire class of cross-session sync issues.
+
+#### What needs to be built
+
+1. Implement `Watcher.Watch` gRPC server streaming RPC
+2. Expose user resources with providers as a sub-message
+3. Wire up SSE on the REST gateway (`grpc-gateway` supports server streaming → SSE)
+4. Add `/v1/users/{uid}:notify` endpoint (called by clients after successful link/unlink/profile changes)
+5. Subscribe in `AuthProvider` on sign-in
+6. Remove `patchProviderData()` workaround
+
+---
+
 ## Firebase Auth SDK Methods Reference
 
 ### Authentication
