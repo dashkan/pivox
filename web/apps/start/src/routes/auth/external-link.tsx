@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
+import { initializeApp, getApps, deleteApp } from 'firebase/app';
 import {
   getAuth,
   getRedirectResult,
@@ -15,6 +16,21 @@ import {
   CardHeader,
   CardTitle,
 } from '@pivox/primitives/card';
+
+// Create an isolated Firebase app for this page so it doesn't share
+// IndexedDB state with other tabs. This prevents stale redirect/user
+// data from previous external-link runs from causing hangs.
+function getIsolatedAuth() {
+  const name = 'external-link';
+  const existing = getApps().find((a) => a.name === name);
+  if (existing) deleteApp(existing);
+  const app = initializeApp({
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  }, name);
+  return getAuth(app);
+}
 
 type ElectronLinkSearch = {
   provider: string;
@@ -79,7 +95,7 @@ function ElectronLinkPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const auth = getAuth();
+    const auth = getIsolatedAuth();
     const redirectPending = sessionStorage.getItem(REDIRECT_KEY);
 
     getRedirectResult(auth)

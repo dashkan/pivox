@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
+import { initializeApp, getApps, deleteApp } from 'firebase/app';
 import {
   getAuth,
   getRedirectResult,
@@ -7,7 +8,6 @@ import {
   GithubAuthProvider,
   OAuthProvider,
   signInWithRedirect,
-  signOut,
 } from 'firebase/auth';
 import { Button } from '@pivox/primitives/button';
 import {
@@ -57,6 +57,21 @@ async function exchangeToken(idToken: string): Promise<string> {
 
 const REDIRECT_KEY = 'pivox:external-login-pending';
 
+// Create an isolated Firebase app for this page so it doesn't share
+// IndexedDB state with other tabs. This prevents stale redirect/user
+// data from previous external-login runs from causing hangs.
+function getIsolatedAuth() {
+  const name = 'external-login';
+  const existing = getApps().find((a) => a.name === name);
+  if (existing) deleteApp(existing);
+  const app = initializeApp({
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  }, name);
+  return getAuth(app);
+}
+
 function ElectronLoginPage() {
   const { provider, state } = Route.useSearch();
   const [status, setStatus] = useState<
@@ -65,7 +80,7 @@ function ElectronLoginPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const auth = getAuth();
+    const auth = getIsolatedAuth();
     const redirectPending = sessionStorage.getItem(REDIRECT_KEY);
 
     getRedirectResult(auth)
@@ -107,9 +122,6 @@ function ElectronLoginPage() {
           return;
         }
 
-        // Sign out any existing session so the OAuth flow starts clean
-        // and doesn't accidentally link accounts.
-        await signOut(auth);
         sessionStorage.setItem(REDIRECT_KEY, '1');
         await signInWithRedirect(auth, authProvider());
       })
@@ -138,7 +150,7 @@ function ElectronLoginPage() {
               onClick={() => {
                 setStatus('loading');
                 setError('');
-                const auth = getAuth();
+                const auth = getIsolatedAuth();
                 const authProvider = providers[provider];
                 if (authProvider) {
                   sessionStorage.setItem(REDIRECT_KEY, '1');
