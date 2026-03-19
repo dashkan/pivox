@@ -1,14 +1,16 @@
 'use client';
 
-import { useCallback, useEffect, useReducer, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AuthContext } from './use-auth';
 import type { User } from 'firebase/auth';
+
+// Ensures the startup reload only runs once per page load, not on every
+// AuthProvider mount (e.g., React Strict Mode double-mount).
+let didReloadOnStartup = false;
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  // Incrementing a counter forces a re-render while keeping the real User reference
-  const [, forceUpdate] = useReducer((c: number) => c + 1, 0);
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
@@ -20,6 +22,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       unsubscribe = onIdTokenChanged(auth, (firebaseUser) => {
         setUser(firebaseUser);
         setLoading(false);
+
+        // On app startup, reload the user from the server to pick up
+        // changes made on other clients (e.g., provider linked/unlinked
+        // on the web while Electron was closed). After reload(), we must
+        // re-read auth.currentUser to get a fresh object — the old
+        // reference keeps stale providerData.
+        if (!didReloadOnStartup && firebaseUser) {
+          didReloadOnStartup = true;
+          firebaseUser.reload().then(() => {
+            setUser(auth.currentUser);
+          }).catch(() => {
+            // Reload failed (offline, etc.) — stale data is better than
+            // no data, so silently continue.
+          });
+        }
       });
     });
 
@@ -28,13 +45,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshUser = useCallback(async () => {
     const { getAuth } = await import('firebase/auth');
-    const currentUser = getAuth().currentUser;
-    if (currentUser) {
-      await currentUser.reload();
-      // Keep the real User object (with all methods intact) and
-      // force a re-render so consumers pick up the updated properties
-      setUser(currentUser);
-      forceUpdate();
+    const auth = getAuth();
+    if (auth.currentUser) {
+      await auth.currentUser.reload();
+      // Re-read currentUser after reload — the old reference keeps stale
+      // providerData even though reload() updates the internal auth state.
+      setUser(auth.currentUser);
     }
   }, []);
 
