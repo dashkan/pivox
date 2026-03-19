@@ -37,7 +37,7 @@ function ProfileDialog() {
   const { state, actions } = useAppLayoutContext()
 
   return (
-    <ElectronUserProfileFeature onClose={() => actions.setProfileOpen(false)}>
+    <ElectronUserProfileFeature onClose={() => actions.setProfileOpen(false)} open={state.profileOpen}>
       <UserProfileCard.Root
         open={state.profileOpen}
         onOpenChange={actions.setProfileOpen}

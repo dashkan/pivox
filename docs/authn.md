@@ -112,7 +112,13 @@ Each feature exports a hook and a wrapper component. The hook calls Firebase Aut
 | `AuthProvider` | Listens to `onIdTokenChanged`, provides user state |
 | `useAuth()` | Returns `{ user, loading, signOut, refreshUser }` |
 
-`refreshUser()` calls `user.reload()` then forces a re-render so consumers pick up updated `providerData`, `emailVerified`, etc.
+`refreshUser()` calls `user.reload()` to fetch fresh user properties from Firebase, then calls a `patchProviderData()` workaround to fix the SDK's stale `providerData`. Called automatically each time the user profile dialog opens (not on mount — the dialog stays mounted when closed, so a mount-based effect would only run once).
+
+**Firebase SDK `providerData` bug:** The SDK's internal `mergeProviderData()` function (in `_reloadWithoutSaving`) merges old + new providers instead of replacing. Unlinked providers are absent from the server response, so they survive the merge and are never removed. The `patchProviderData()` workaround calls the `accounts:lookup` REST API directly and splices out providers that the server no longer returns. This is necessary because `reload()`, `getIdToken(true)`, and re-reading `auth.currentUser` all fail to remove unlinked providers from the cached `providerData` array. See `mergeProviderData()` in `@firebase/auth` ESM bundle (~line 1545).
+
+**Why Firebase can't notify us of provider changes:** Firebase Auth provides only four Cloud Functions triggers: `beforeUserCreated` (blocking), `beforeUserSignedIn` (blocking), `onCreate` (v1, non-blocking), and `onDelete` (v1, non-blocking). There are no triggers for provider link/unlink, profile updates, email changes, or MFA enrollment. The Admin SDK is request-response only — no subscriptions or watches. This means there is no server-side way to reactively detect when a user's providers change.
+
+**Planned replacement:** The Watch API (`pivox.api.v1.Watcher`) will expose user resources (with providers as a sub-message) as watchable entities with real-time change events streamed via SSE. When `linkProvider` or `unlinkProvider` succeeds on the client, it will notify the backend to emit a Watch change event. Other clients subscribed to that user's stream receive the update in real-time — no polling, no REST API workaround.
 
 #### `login` — Sign-in logic
 
@@ -140,6 +146,8 @@ Google provider configured with `prompt: 'select_account'` for explicit account 
 | `UserProfileFeature` | Wraps children with `UserProfileCard.Provider` |
 
 Reauthentication helper: tries OAuth providers first (`reauthenticateWithPopup`), then falls back to email/password prompt (`reauthenticateWithCredential`). Required for: password change, email change, account deletion, MFA changes.
+
+**Linking timeout:** When the user starts linking a provider, all link/unlink buttons are disabled until the flow completes or times out after 2 minutes. An info message is shown in the Connected Accounts section. The timeout applies to both web (`linkWithPopup`) and Electron (`startLinkProvider` deep link flow). State is tracked via `linkingProvider` in `UserProfileState`.
 
 #### Other features
 
@@ -173,8 +181,8 @@ All routes in `web/apps/start/src/routes/auth/`:
 | `/auth/verify-email` | `VerifyEmailFeature` + `VerifyEmailCard` | Email verification prompt |
 | `/auth/link-account` | `LinkAccountFeature` + `LinkAccountCard` | Resolve credential conflicts |
 | `/auth/action` | Custom handler | Firebase email actions (verify email, change email, recover email, revert 2FA) |
-| `/auth/electron-login` | Custom | Electron OAuth bridge (see below) |
-| `/auth/electron-link` | Custom | Electron provider linking bridge (see below) |
+| `/auth/external-login` | Custom | Electron OAuth bridge (see below) |
+| `/auth/external-link` | Custom | Electron provider linking bridge (see below) |
 | `/auth/done` | Static | "You can close this browser tab" |
 | `/auth/redirect` | Custom | Deep link forwarder (placeholder for future PKCE flow) |
 
@@ -209,7 +217,7 @@ Wraps `useLogin` but overrides behavior in production:
 
 Wraps `useUserProfile` but overrides `linkProvider` in production:
 - **Dev**: Delegates to standard `useUserProfile` (popup flow)
-- **Prod**: Overrides `linkProvider` → gets current user's ID token, calls `window.api.startLinkProvider(providerId, idToken)` to open browser. Listens for `auth:deep-link` with `linked=true`, then calls `refreshUser()` to update the UI.
+- **Prod**: Overrides `linkProvider` → sets `linkingProvider` state, gets current user's ID token, calls `window.api.startLinkProvider(providerId, idToken)` to open browser. Listens for `auth:deep-link` with `linked=true`, then clears `linkingProvider` and calls `refreshUser()` to update the UI. Times out after 2 minutes if the deep link never arrives.
 
 ### Electron Main Process
 
@@ -302,6 +310,10 @@ Electron                      Browser (Safari)                Go Server
 17. refreshUser()
 18. Provider list updates
 ```
+
+### Isolated Firebase App on External Pages
+
+The `external-login` and `external-link` pages each create a **named Firebase app instance** (e.g., `initializeApp(config, 'external-link')`) instead of using the default app. This isolates their IndexedDB state from other tabs. Without this, stale redirect/user data from a previous run causes the Firebase SDK to hang indefinitely on initialization, blocking the entire OAuth flow. Each run deletes and recreates the named app to start fresh.
 
 ### Self-Hosted Firebase Auth Handler
 

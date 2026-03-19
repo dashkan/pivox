@@ -8,9 +8,9 @@
 
 ## Executive Summary
 
-The authentication system is well-architected around Firebase Auth with proper separation of concerns. The Electron OAuth flow via custom protocol deep linking is a sound design choice. The audit identified **2 High**, **4 Medium**, and **4 Low** severity findings — **all 10 have been remediated**.
+The authentication system is well-architected around Firebase Auth with proper separation of concerns. The Electron OAuth flow via custom protocol deep linking is a sound design choice. The audit identified **2 High**, **6 Medium**, and **5 Low** severity findings — **all 13 have been remediated** (1 via workaround for a Firebase SDK bug).
 
-**Overall posture**: All findings addressed. Production-ready pending integration testing.
+**Overall posture**: All findings addressed. AUTHN-11 (stale `providerData` after cross-session unlink) is a Firebase SDK bug with a REST API workaround — should be revisited if Firebase fixes `mergeProviderData()`. Production-ready pending integration testing.
 
 ---
 
@@ -321,6 +321,61 @@ if (is.dev) {
 
 ---
 
+### AUTHN-11 — Firebase SDK `providerData` not updated on `reload()` for unlinked providers
+
+| Field | Value |
+|-------|-------|
+| **Severity** | Medium |
+| **CWE** | CWE-1104 (Use of Unmaintained Third-Party Components) |
+| **Location** | `@firebase/auth` internal `mergeProviderData()` (~line 1545 of ESM bundle) |
+| **Status** | ✅ Workaround applied |
+
+**Description**: The Firebase Auth SDK's `user.reload()` calls an internal `mergeProviderData(original, newData)` function that merges old and new providers instead of replacing. When a provider is unlinked on another client, it is absent from the server response (`newData`), but the merge preserves it from the `original` array. This means `user.providerData` never reflects cross-session unlinking — only linking.
+
+The `unlink()` method correctly handles this by filtering `providerData` to only keep providers present in the server response. But `reload()` does not use the same logic.
+
+**Impact**: Users see "ghost" linked providers that were unlinked on another device/browser. The profile page shows incorrect connected accounts until a full sign-out and sign-in.
+
+**Remediation**: Applied a `patchProviderData()` workaround in `AuthProvider.refreshUser()` that calls the `accounts:lookup` REST API directly after `reload()` and splices out providers from `user.providerData` that the server no longer returns. Called each time the profile dialog opens.
+
+This is a Firebase SDK bug, not an application bug. The workaround should be replaced when the Watch API (`pivox.api.v1.Watcher`) is implemented — user providers will be exposed as watchable resources with real-time change events streamed via SSE, eliminating the need for polling or REST API workarounds. Until then, the `patchProviderData()` approach is correct and contained.
+
+---
+
+### AUTHN-12 — External OAuth pages shared IndexedDB state causing redirect hangs
+
+| Field | Value |
+|-------|-------|
+| **Severity** | Medium |
+| **CWE** | CWE-459 (Incomplete Cleanup) |
+| **Location** | `web/apps/start/src/routes/auth/external-login.tsx`, `external-link.tsx` |
+| **Status** | ✅ Fixed |
+
+**Description**: The `external-login` and `external-link` pages (opened by Electron in the default browser for OAuth) used the default Firebase app instance, sharing IndexedDB state with all other tabs on the same origin. On repeated runs, stale redirect metadata and user data from a previous tab caused the Firebase SDK to hang indefinitely during initialization, blocking the OAuth flow entirely.
+
+**Impact**: Second and subsequent OAuth flows from Electron would hang for 30+ seconds or never complete. Required quitting the browser to reset.
+
+**Remediation**: Each external page now creates a named Firebase app instance (e.g., `initializeApp(config, 'external-link')`) so its IndexedDB namespace is isolated. No shared state between runs, no cross-tab interference with the web app's session.
+
+---
+
+### AUTHN-13 — No timeout or concurrent-flow protection on provider linking
+
+| Field | Value |
+|-------|-------|
+| **Severity** | Low |
+| **CWE** | CWE-367 (Time-of-check Time-of-use Race Condition) |
+| **Location** | `web/packages/features/src/user-profile/use-user-profile.ts` |
+| **Status** | ✅ Fixed |
+
+**Description**: When a user started linking a provider (via popup or Electron deep link), all other link/unlink buttons remained enabled. The user could start multiple concurrent link flows, leading to confusing or broken states. There was no timeout — if the user abandoned the flow, the UI gave no feedback.
+
+**Impact**: Confusing UX. Potential for race conditions if multiple providers are linked simultaneously.
+
+**Remediation**: Added `linkingProvider` state that disables all link/unlink buttons while a flow is active. A 2-minute timeout auto-clears the state and shows an error message if the flow is abandoned. An info message is shown while linking is in progress.
+
+---
+
 ## Positive Findings
 
 These aspects of the authentication system are well-implemented:
@@ -333,7 +388,8 @@ These aspects of the authentication system are well-implemented:
 | **Account sync via blocking functions** | `beforeUserCreated` / `beforeUserSignedIn` ensure the backend database is always in sync with Firebase Auth. Sync failure blocks the auth operation — no orphaned accounts. |
 | **Error handling** | Generic error messages for most cases. Firebase error codes are mapped to user-friendly messages without exposing internal details. |
 | **Context isolation in Electron** | `contextBridge` is used correctly to expose a minimal API surface to the renderer. IPC channels are well-scoped. |
-| **Token exchange endpoint** | Cryptographic verification of ID tokens (not shared secret) — correct design for a public-facing token exchange. |
+| **Isolated Firebase apps on external pages** | External OAuth pages use named Firebase app instances to prevent cross-tab IndexedDB state leaks and redirect hangs. |
+| **Token exchange endpoint** | Cryptographic verification via Google Cloud OIDC identity tokens (replaced static shared secret) — no credentials to manage, automatic key rotation. |
 | **Session management** | Relies on Firebase SDK's built-in token lifecycle (`onIdTokenChanged`) rather than custom session handling — less surface area for bugs. |
 | **Email change flow** | Uses `verifyBeforeUpdateEmail()` which requires clicking a verification link before the change takes effect. Old email receives a recovery link. |
 | **No passwords stored server-side** | All password handling is delegated to Firebase Auth — the backend only stores non-sensitive profile data. |
@@ -354,3 +410,6 @@ These aspects of the authentication system are well-implemented:
 | AUTHN-08 | Single pending auth state variable | Low | Low | ✅ Fixed |
 | AUTHN-09 | Pending credential no TTL | Low | Low | ✅ Fixed |
 | AUTHN-10 | DevTools in production builds | Low | Low | ✅ Fixed |
+| AUTHN-11 | Firebase SDK `providerData` stale after unlink | Medium | Medium | ✅ Workaround |
+| AUTHN-12 | External OAuth pages shared IndexedDB causing hangs | Medium | Medium | ✅ Fixed |
+| AUTHN-13 | No timeout/concurrent protection on provider linking | Low | Low | ✅ Fixed |

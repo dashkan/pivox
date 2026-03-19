@@ -1,9 +1,12 @@
+import { lazy, Suspense } from 'react'
 import { Outlet, createFileRoute, useRouter } from '@tanstack/react-router'
 import { AppLayoutFeature } from '@pivox/features/app-layout'
-import { UserProfileFeature } from '@pivox/features/user-profile'
-import { AppLayout, useAppLayoutContext } from '@pivox/ui/app-layout'
-import { UserProfileCard } from '@pivox/ui/user-profile-card'
+import { AppLayout } from '@pivox/ui/app-layout'
 import { ThemeSwitcher } from '@pivox/ui/theme-switcher'
+
+// Lazy-load the profile dialog so it's client-only — it depends on
+// auth context which isn't available during SSR.
+const ProfileDialog = lazy(() => import('./_app/-profile-dialog'))
 
 export const Route = createFileRoute('/_app')({
   component: AppLayoutRoute,
@@ -28,24 +31,9 @@ function AppLayoutRoute() {
           <Outlet />
         </AppLayout.Content>
       </AppLayout.Root>
-      <ProfileDialog />
+      <Suspense>
+        <ProfileDialog />
+      </Suspense>
     </AppLayoutFeature>
-  )
-}
-
-function ProfileDialog() {
-  const { state, actions } = useAppLayoutContext()
-
-  return (
-    <UserProfileFeature onClose={() => actions.setProfileOpen(false)}>
-      <UserProfileCard.Root
-        open={state.profileOpen}
-        onOpenChange={actions.setProfileOpen}
-      >
-        <UserProfileCard.Sidebar />
-        <UserProfileCard.AccountPage />
-        <UserProfileCard.SecurityPage />
-      </UserProfileCard.Root>
-    </UserProfileFeature>
   )
 }

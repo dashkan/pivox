@@ -5,12 +5,14 @@ import { useUserProfile } from "./use-user-profile"
 
 export function UserProfileFeature({
   onClose,
+  open,
   children,
 }: {
   onClose?: () => void
+  open?: boolean
   children: React.ReactNode
 }) {
-  const value = useUserProfile(onClose)
+  const value = useUserProfile(onClose, { open })
 
   return (
     <UserProfileCard.Provider value={value}>

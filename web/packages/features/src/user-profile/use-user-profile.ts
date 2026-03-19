@@ -57,15 +57,21 @@ async function reauthenticate(user: User): Promise<void> {
   });
 }
 
-export function useUserProfile(onClose?: () => void): UserProfileContextValue {
+export function useUserProfile(
+  onClose?: () => void,
+  options?: { open?: boolean },
+): UserProfileContextValue {
   const { user, signOut, refreshUser } = useAuth();
 
-  // Reload the user from Firebase when the profile page opens to pick up
-  // changes made on other clients (linked/unlinked providers, email
-  // verification, display name changes, etc.).
+  // Refresh user data each time the profile opens to pick up cross-session
+  // changes (e.g., provider unlinked on another device). Runs in the feature
+  // layer so both web and Electron benefit without duplicating the logic.
+  const open = options?.open;
   useEffect(() => {
-    refreshUser();
-  }, [refreshUser]);
+    if (open) {
+      refreshUser();
+    }
+  }, [open, refreshUser]);
 
   const [activePage, setActivePage] = useState<'account' | 'security'>(
     'account',

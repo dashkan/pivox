@@ -67,17 +67,17 @@
     "tailwindcss": "^4.0.0"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.2.1",
-    "@tanstack/vite-config": "^0.5.1",
+    "@tailwindcss/vite": "^4.2.2",
+    "@tanstack/vite-config": "^0.5.2",
     "@types/react": "^19.2.7",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3",
-    "tailwindcss": "^4.2.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "tailwindcss": "^4.2.2",
     "vite": "^7.3.1"
   },
   "dependencies": {
     "@pivox/primitives": "workspace:*",
     "@pivox/ui": "workspace:*",
-    "firebase": "^11.0.0"
+    "firebase": "^12.10.0"
   }
 }

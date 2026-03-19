@@ -1,42 +1,67 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useReducer, useState } from 'react';
 import { AuthContext } from './use-auth';
 import type { User } from 'firebase/auth';
 
-// Ensures the startup reload only runs once per page load, not on every
-// AuthProvider mount (e.g., React Strict Mode double-mount).
-let didReloadOnStartup = false;
+/**
+ * Workaround for Firebase SDK bug: `user.reload()` calls an internal
+ * `mergeProviderData()` that merges old + new providers instead of replacing.
+ * Unlinked providers are never removed because they're absent from the server
+ * response and survive the merge. This function patches providerData after
+ * reload() by fetching the truth from the REST API and replacing the stale array.
+ *
+ * See: `mergeProviderData()` in @firebase/auth — line ~1545 of the ESM bundle.
+ */
+async function patchProviderData(user: User): Promise<void> {
+  const idToken = await user.getIdToken();
+  const apiKey = (user as unknown as { auth: { config: { apiKey: string } } })
+    .auth.config.apiKey;
+  const res = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken }),
+    },
+  );
+  if (!res.ok) return;
+  const data = await res.json();
+  const serverProviders: Array<{
+    providerId: string;
+    displayName?: string;
+    email?: string;
+    photoUrl?: string;
+    rawId?: string;
+  }> = data.users?.[0]?.providerUserInfo;
+  if (!Array.isArray(serverProviders)) return;
+
+  // Build the correct provider list from the server response.
+  const serverProviderIds = new Set(serverProviders.map((p) => p.providerId));
+
+  // Mutate the user's providerData in place — remove providers the server
+  // doesn't have, preserving the SDK's internal array reference.
+  const pd = user.providerData;
+  for (let i = pd.length - 1; i >= 0; i--) {
+    if (!serverProviderIds.has(pd[i]!.providerId)) {
+      pd.splice(i, 1);
+    }
+  }
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [, forceUpdate] = useReducer((c: number) => c + 1, 0);
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
 
     import('firebase/auth').then(({ getAuth, onIdTokenChanged }) => {
       const auth = getAuth();
-      // onIdTokenChanged fires on sign-in, sign-out, and token refresh
-      // (covers more cases than onAuthStateChanged)
       unsubscribe = onIdTokenChanged(auth, (firebaseUser) => {
         setUser(firebaseUser);
         setLoading(false);
-
-        // On app startup, reload the user from the server to pick up
-        // changes made on other clients (e.g., provider linked/unlinked
-        // on the web while Electron was closed). After reload(), we must
-        // re-read auth.currentUser to get a fresh object — the old
-        // reference keeps stale providerData.
-        if (!didReloadOnStartup && firebaseUser) {
-          didReloadOnStartup = true;
-          firebaseUser.reload().then(() => {
-            setUser(auth.currentUser);
-          }).catch(() => {
-            // Reload failed (offline, etc.) — stale data is better than
-            // no data, so silently continue.
-          });
-        }
       });
     });
 
@@ -47,10 +72,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { getAuth } = await import('firebase/auth');
     const auth = getAuth();
     if (auth.currentUser) {
+      // reload() fetches fresh user properties (displayName, emailVerified, etc.)
+      // but its internal mergeProviderData() is buggy — it never removes
+      // unlinked providers. patchProviderData() fixes this by pruning
+      // providers that the server no longer returns.
       await auth.currentUser.reload();
-      // Re-read currentUser after reload — the old reference keeps stale
-      // providerData even though reload() updates the internal auth state.
+      await patchProviderData(auth.currentUser);
       setUser(auth.currentUser);
+      forceUpdate();
     }
   }, []);
 

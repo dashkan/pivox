@@ -8,12 +8,14 @@ const LINK_TIMEOUT_MS = 2 * 60 * 1000
 
 export function ElectronUserProfileFeature({
   onClose,
+  open,
   children,
 }: {
   onClose?: () => void
+  open?: boolean
   children: React.ReactNode
 }) {
-  const value = useUserProfile(onClose)
+  const value = useUserProfile(onClose, { open })
   const { refreshUser } = useAuth()
   const linkingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
