@@ -9,8 +9,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/pivoxai/pivox/internal/apierr"
-	db "github.com/pivoxai/pivox/internal/db/generated"
+	"github.com/dashkan/pivox-server/internal/apierr"
+	db "github.com/dashkan/pivox-server/internal/db/generated"
 )
 
 // ParseSegment extracts the segment after the collection prefix.

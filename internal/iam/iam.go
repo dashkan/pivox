@@ -5,14 +5,14 @@ import (
 	"encoding/json"
 	"strings"
 
-	iampb "github.com/pivoxai/pivox/internal/pkg/gen/pivox/iam/v1"
+	iampb "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/iam/v1"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/encoding/protojson"
 
-	"github.com/pivoxai/pivox/internal/apierr"
-	db "github.com/pivoxai/pivox/internal/db/generated"
-	"github.com/pivoxai/pivox/internal/resource"
+	"github.com/dashkan/pivox-server/internal/apierr"
+	db "github.com/dashkan/pivox-server/internal/db/generated"
+	"github.com/dashkan/pivox-server/internal/resource"
 )
 
 // Helper provides reusable IAM operations for any resource type.

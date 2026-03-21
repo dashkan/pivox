@@ -17,8 +17,8 @@ import (
 	grpcstatus "google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/pivoxai/pivox/internal/apierr"
-	db "github.com/pivoxai/pivox/internal/db/generated"
+	"github.com/dashkan/pivox-server/internal/apierr"
+	db "github.com/dashkan/pivox-server/internal/db/generated"
 )
 
 // WorkFunc performs the actual work for an operation.

@@ -648,7 +648,7 @@ const file_pivox_api_v1_data_sources_proto_rawDesc = "" +
 	"\x0fAGGREGATION_AVG\x10\x03\x12\x13\n" +
 	"\x0fAGGREGATION_MIN\x10\x04\x12\x13\n" +
 	"\x0fAGGREGATION_MAX\x10\x05B\xb4\x01\n" +
-	"\x10com.pivox.api.v1B\x10DataSourcesProtoP\x01Z<github.com/pivoxai/pivox/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
+	"\x10com.pivox.api.v1B\x10DataSourcesProtoP\x01Z<github.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
 
 var (
 	file_pivox_api_v1_data_sources_proto_rawDescOnce sync.Once

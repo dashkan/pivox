@@ -1371,7 +1371,7 @@ const file_pivox_api_v1_apikeys_proto_rawDesc = "" +
 	"\tDeleteKey\x12\x1e.pivox.api.v1.DeleteKeyRequest\x1a\x11.pivox.api.v1.Key\"0\xdaA\x04name\x82\xd3\xe4\x93\x02#*!/v1/{name=organizations/*/keys/*}\x12\x80\x01\n" +
 	"\vUndeleteKey\x12 .pivox.api.v1.UndeleteKeyRequest\x1a\x11.pivox.api.v1.Key\"<\xdaA\x04name\x82\xd3\xe4\x93\x02/:\x01*\"*/v1/{name=organizations/*/keys/*}:undelete\x12h\n" +
 	"\tLookupKey\x12\x1e.pivox.api.v1.LookupKeyRequest\x1a\x1f.pivox.api.v1.LookupKeyResponse\"\x1a\x82\xd3\xe4\x93\x02\x14\x12\x12/v1/keys:lookupKey\x1a\x0f\xcaA\fapi.pivox.ioB\xb0\x01\n" +
-	"\x10com.pivox.api.v1B\fApikeysProtoP\x01Z<github.com/pivoxai/pivox/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
+	"\x10com.pivox.api.v1B\fApikeysProtoP\x01Z<github.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
 
 var (
 	file_pivox_api_v1_apikeys_proto_rawDescOnce sync.Once

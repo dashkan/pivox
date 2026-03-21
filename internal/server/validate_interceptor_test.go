@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
-	apiv1 "github.com/pivoxai/pivox/internal/pkg/gen/pivox/api/v1"
+	apiv1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1"
 )
 
 func newValidator(t *testing.T) protovalidate.Validator {

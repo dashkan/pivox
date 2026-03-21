@@ -5,7 +5,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/pivoxai/pivox/internal/apierr"
+	"github.com/dashkan/pivox-server/internal/apierr"
 )
 
 // handleResourceError translates common database errors into gRPC status errors.

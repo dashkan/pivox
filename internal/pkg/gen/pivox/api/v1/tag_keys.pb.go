@@ -22,7 +22,7 @@ package apiv1
 
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
-	v1 "github.com/pivoxai/pivox/internal/pkg/gen/pivox/iam/v1"
+	v1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/iam/v1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -616,7 +616,7 @@ const file_pivox_api_v1_tag_keys_proto_rawDesc = "" +
 	"\fGetIamPolicy\x12!.pivox.iam.v1.GetIamPolicyRequest\x1a\x14.pivox.iam.v1.Policy\"\x86\x01\xdaA\x04name\x82\xd3\xe4\x93\x02y:\x01*ZA:\x01*\"</v1/{name=organizations/*/projects/*/tagKeys/*}:getIamPolicy\"1/v1/{name=organizations/*/tagKeys/*}:getIamPolicy\x12\xe4\x01\n" +
 	"\fSetIamPolicy\x12!.pivox.iam.v1.SetIamPolicyRequest\x1a\x14.pivox.iam.v1.Policy\"\x9a\x01\xdaA\x0fresource,policy\x82\xd3\xe4\x93\x02\x81\x01:\x01*ZE:\x01*\"@/v1/{resource=organizations/*/projects/*/tagKeys/*}:setIamPolicy\"5/v1/{resource=organizations/*/tagKeys/*}:setIamPolicy\x12\x95\x02\n" +
 	"\x12TestIamPermissions\x12'.pivox.iam.v1.TestIamPermissionsRequest\x1a(.pivox.iam.v1.TestIamPermissionsResponse\"\xab\x01\xdaA\x14resource,permissions\x82\xd3\xe4\x93\x02\x8d\x01:\x01*ZK:\x01*\"F/v1/{resource=organizations/*/projects/*/tagKeys/*}:testIamPermissions\";/v1/{resource=organizations/*/tagKeys/*}:testIamPermissions\x1a\x0f\xcaA\fapi.pivox.ioB\xb0\x01\n" +
-	"\x10com.pivox.api.v1B\fTagKeysProtoP\x01Z<github.com/pivoxai/pivox/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
+	"\x10com.pivox.api.v1B\fTagKeysProtoP\x01Z<github.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
 
 var (
 	file_pivox_api_v1_tag_keys_proto_rawDescOnce sync.Once

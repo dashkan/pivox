@@ -9,8 +9,8 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 
-	db "github.com/pivoxai/pivox/internal/db/generated"
-	apiv1 "github.com/pivoxai/pivox/internal/pkg/gen/pivox/api/v1"
+	db "github.com/dashkan/pivox-server/internal/db/generated"
+	apiv1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1"
 )
 
 func TestProjectToProto(t *testing.T) {

@@ -7,7 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	db "github.com/pivoxai/pivox/internal/db/generated"
+	db "github.com/dashkan/pivox-server/internal/db/generated"
 )
 
 // QueryParams holds input for a filtered query.

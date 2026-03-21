@@ -392,7 +392,7 @@ const file_pivox_iam_v1_users_proto_rawDesc = "" +
 	"\aGetUser\x12\x1c.pivox.iam.v1.GetUserRequest\x1a\x12.pivox.iam.v1.User\"1\xdaA\x04name\x82\xd3\xe4\x93\x02$\x12\"/v1/{name=organizations/*/users/*}\x12\x81\x01\n" +
 	"\tListUsers\x12\x1e.pivox.iam.v1.ListUsersRequest\x1a\x1f.pivox.iam.v1.ListUsersResponse\"3\xdaA\x06parent\x82\xd3\xe4\x93\x02$\x12\"/v1/{parent=organizations/*}/users\x1a\x0f\xcaA\fapi.pivox.ioB\xae\x01\n" +
 	"\x10com.pivox.iam.v1B\n" +
-	"UsersProtoP\x01Z<github.com/pivoxai/pivox/internal/pkg/gen/pivox/iam/v1;iamv1\xa2\x02\x03PIX\xaa\x02\fPivox.Iam.V1\xca\x02\fPivox\\Iam\\V1\xe2\x02\x18Pivox\\Iam\\V1\\GPBMetadata\xea\x02\x0ePivox::Iam::V1b\x06proto3"
+	"UsersProtoP\x01Z<github.com/dashkan/pivox-server/internal/pkg/gen/pivox/iam/v1;iamv1\xa2\x02\x03PIX\xaa\x02\fPivox.Iam.V1\xca\x02\fPivox\\Iam\\V1\xe2\x02\x18Pivox\\Iam\\V1\\GPBMetadata\xea\x02\x0ePivox::Iam::V1b\x06proto3"
 
 var (
 	file_pivox_iam_v1_users_proto_rawDescOnce sync.Once

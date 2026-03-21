@@ -367,7 +367,7 @@ const file_pivox_api_v1_watch_proto_rawDesc = "" +
 	"\aWatcher\x12S\n" +
 	"\x05Watch\x12\x1a.pivox.api.v1.WatchRequest\x1a\x19.pivox.api.v1.ChangeBatch\"\x11\x82\xd3\xe4\x93\x02\v\x12\t/v1/watch0\x01B\xae\x01\n" +
 	"\x10com.pivox.api.v1B\n" +
-	"WatchProtoP\x01Z<github.com/pivoxai/pivox/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
+	"WatchProtoP\x01Z<github.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
 
 var (
 	file_pivox_api_v1_watch_proto_rawDescOnce sync.Once

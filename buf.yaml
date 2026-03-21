@@ -3,10 +3,14 @@ lint:
   use:
     - STANDARD
   except:
+    - ENUM_VALUE_PREFIX
     - IMPORT_USED
     - RPC_REQUEST_RESPONSE_UNIQUE
     - RPC_RESPONSE_STANDARD_NAME
     - SERVICE_SUFFIX
+  ignore:
+    - api/proto/buf
+    - api/proto/google
 modules:
   - path: api/proto
     name: buf.build/pivox/googleapis

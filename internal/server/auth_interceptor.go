@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"github.com/pivoxai/pivox/internal/firebase"
+	"github.com/dashkan/pivox-server/internal/firebase"
 )
 
 // authContextKey is the context key for the authenticated Firebase UID.

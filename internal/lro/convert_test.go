@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/structpb"
 
-	db "github.com/pivoxai/pivox/internal/db/generated"
+	db "github.com/dashkan/pivox-server/internal/db/generated"
 )
 
 func TestDbToProto_Pending(t *testing.T) {

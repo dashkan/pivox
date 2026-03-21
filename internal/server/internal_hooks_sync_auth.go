@@ -12,9 +12,9 @@ import (
 	"golang.org/x/time/rate"
 	"google.golang.org/api/idtoken"
 
-	"github.com/pivoxai/pivox/internal/config"
-	db "github.com/pivoxai/pivox/internal/db/generated"
-	"github.com/pivoxai/pivox/internal/firebase"
+	"github.com/dashkan/pivox-server/internal/config"
+	db "github.com/dashkan/pivox-server/internal/db/generated"
+	"github.com/dashkan/pivox-server/internal/firebase"
 )
 
 // NewInternalHooks creates a new internal hooks handler with Google Cloud OIDC

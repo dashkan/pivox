@@ -9,7 +9,7 @@ import (
 	"firebase.google.com/go/v4/auth"
 	"google.golang.org/api/option"
 
-	"github.com/pivoxai/pivox/internal/config"
+	"github.com/dashkan/pivox-server/internal/config"
 )
 
 // AuthService wraps Firebase Auth operations including tenant management,

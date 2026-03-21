@@ -998,7 +998,7 @@ const file_pivox_iam_v1_groups_proto_rawDesc = "" +
 	"\x0fAddGroupMembers\x12$.pivox.iam.v1.AddGroupMembersRequest\x1a%.pivox.iam.v1.AddGroupMembersResponse\"O\xdaA\rgroup,members\x82\xd3\xe4\x93\x029:\x01*\"4/v1/{group=organizations/*/groups/*}:addGroupMembers\x12\xbb\x01\n" +
 	"\x12RemoveGroupMembers\x12'.pivox.iam.v1.RemoveGroupMembersRequest\x1a(.pivox.iam.v1.RemoveGroupMembersResponse\"R\xdaA\rgroup,members\x82\xd3\xe4\x93\x02<:\x01*\"7/v1/{group=organizations/*/groups/*}:removeGroupMembers\x12\x9f\x01\n" +
 	"\x10ListGroupMembers\x12%.pivox.iam.v1.ListGroupMembersRequest\x1a&.pivox.iam.v1.ListGroupMembersResponse\"<\xdaA\x05group\x82\xd3\xe4\x93\x02.\x12,/v1/{group=organizations/*/groups/*}/members\x1a\x0f\xcaA\fapi.pivox.ioB\xaf\x01\n" +
-	"\x10com.pivox.iam.v1B\vGroupsProtoP\x01Z<github.com/pivoxai/pivox/internal/pkg/gen/pivox/iam/v1;iamv1\xa2\x02\x03PIX\xaa\x02\fPivox.Iam.V1\xca\x02\fPivox\\Iam\\V1\xe2\x02\x18Pivox\\Iam\\V1\\GPBMetadata\xea\x02\x0ePivox::Iam::V1b\x06proto3"
+	"\x10com.pivox.iam.v1B\vGroupsProtoP\x01Z<github.com/dashkan/pivox-server/internal/pkg/gen/pivox/iam/v1;iamv1\xa2\x02\x03PIX\xaa\x02\fPivox.Iam.V1\xca\x02\fPivox\\Iam\\V1\xe2\x02\x18Pivox\\Iam\\V1\\GPBMetadata\xea\x02\x0ePivox::Iam::V1b\x06proto3"
 
 var (
 	file_pivox_iam_v1_groups_proto_rawDescOnce sync.Once

@@ -14,10 +14,10 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
 
-	db "github.com/pivoxai/pivox/internal/db/generated"
-	"github.com/pivoxai/pivox/internal/iam"
-	"github.com/pivoxai/pivox/internal/lro"
-	apiv1 "github.com/pivoxai/pivox/internal/pkg/gen/pivox/api/v1"
+	db "github.com/dashkan/pivox-server/internal/db/generated"
+	"github.com/dashkan/pivox-server/internal/iam"
+	"github.com/dashkan/pivox-server/internal/lro"
+	apiv1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1"
 )
 
 const bufSize = 1024 * 1024

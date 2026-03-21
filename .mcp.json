@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "postgres": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@anthropic-ai/postgres-mcp",
+        "postgresql://localhost:5432/pivox"
+      ]
+    }
+  }
+}

@@ -19,14 +19,14 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
-	"github.com/pivoxai/pivox/internal/config"
-	db "github.com/pivoxai/pivox/internal/db/generated"
-	"github.com/pivoxai/pivox/internal/firebase"
-	"github.com/pivoxai/pivox/internal/iam"
-	"github.com/pivoxai/pivox/internal/lro"
-	"github.com/pivoxai/pivox/internal/server"
+	"github.com/dashkan/pivox-server/internal/config"
+	db "github.com/dashkan/pivox-server/internal/db/generated"
+	"github.com/dashkan/pivox-server/internal/firebase"
+	"github.com/dashkan/pivox-server/internal/iam"
+	"github.com/dashkan/pivox-server/internal/lro"
+	"github.com/dashkan/pivox-server/internal/server"
 
-	apiv1 "github.com/pivoxai/pivox/internal/pkg/gen/pivox/api/v1"
+	apiv1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1"
 )
 
 func main() {

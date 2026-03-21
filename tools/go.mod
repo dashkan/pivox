@@ -1,4 +1,4 @@
-module github.com/pivoxai/pivox/tools
+module github.com/dashkan/pivox-server/tools
 
 go 1.25.6
 

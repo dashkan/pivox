@@ -240,6 +240,7 @@ message Change {
   // A reported value can be in one of the following states:
   enum State {
     // The element exists and its full value is included in data.
+    // buf:lint:ignore ENUM_ZERO_VALUE_SUFFIX
     EXISTS = 0;
 
     // The element does not exist.
