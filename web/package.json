@@ -28,10 +28,8 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "@firebase/util",
-      "electron-winstaller",
       "esbuild",
-      "protobufjs",
+      "msw",
       "sharp",
       "unrs-resolver"
     ]
