@@ -24,11 +24,11 @@ import "google/longrunning/operations.proto";
 import "google/monitoring/metricsscope/v1/metrics_scope.proto";
 import "google/protobuf/timestamp.proto";
 
+option csharp_namespace = "Google.Cloud.Monitoring.MetricsScope.V1";
 option go_package = "cloud.google.com/go/monitoring/metricsscope/apiv1/metricsscopepb;metricsscopepb";
 option java_multiple_files = true;
 option java_outer_classname = "MetricsScopesProto";
 option java_package = "com.google.monitoring.metricsscope.v1";
-option csharp_namespace = "Google.Cloud.Monitoring.MetricsScope.V1";
 option php_namespace = "Google\\Cloud\\Monitoring\\MetricsScope\\V1";
 option ruby_package = "Google::Cloud::Monitoring::MetricsScope::V1";
 
@@ -37,16 +37,14 @@ option ruby_package = "Google::Cloud::Monitoring::MetricsScope::V1";
 service MetricsScopes {
   option (google.api.default_host) = "monitoring.googleapis.com";
   option (google.api.oauth_scopes) =
-      "https://www.googleapis.com/auth/cloud-platform,"
-      "https://www.googleapis.com/auth/monitoring,"
-      "https://www.googleapis.com/auth/monitoring.read,"
-      "https://www.googleapis.com/auth/monitoring.write";
+    "https://www.googleapis.com/auth/cloud-platform,"
+    "https://www.googleapis.com/auth/monitoring,"
+    "https://www.googleapis.com/auth/monitoring.read,"
+    "https://www.googleapis.com/auth/monitoring.write";
 
   // Returns a specific `Metrics Scope`.
   rpc GetMetricsScope(GetMetricsScopeRequest) returns (MetricsScope) {
-    option (google.api.http) = {
-      get: "/v1/{name=locations/global/metricsScopes/*}"
-    };
+    option (google.api.http) = {get: "/v1/{name=locations/global/metricsScopes/*}"};
     option (google.api.method_signature) = "name";
   }
 
@@ -54,9 +52,7 @@ service MetricsScopes {
   // has been added to. The metrics scope representing the specified monitored
   // project will always be the first entry in the response.
   rpc ListMetricsScopesByMonitoredProject(ListMetricsScopesByMonitoredProjectRequest) returns (ListMetricsScopesByMonitoredProjectResponse) {
-    option (google.api.http) = {
-      get: "/v1/locations/global/metricsScopes:listMetricsScopesByMonitoredProject"
-    };
+    option (google.api.http) = {get: "/v1/locations/global/metricsScopes:listMetricsScopesByMonitoredProject"};
   }
 
   // Adds a `MonitoredProject` with the given project ID
@@ -75,9 +71,7 @@ service MetricsScopes {
 
   // Deletes a `MonitoredProject` from the specified `Metrics Scope`.
   rpc DeleteMonitoredProject(DeleteMonitoredProjectRequest) returns (google.longrunning.Operation) {
-    option (google.api.http) = {
-      delete: "/v1/{name=locations/global/metricsScopes/*/projects/*}"
-    };
+    option (google.api.http) = {delete: "/v1/{name=locations/global/metricsScopes/*/projects/*}"};
     option (google.api.method_signature) = "name";
     option (google.longrunning.operation_info) = {
       response_type: "google.protobuf.Empty"
@@ -93,9 +87,7 @@ message GetMetricsScopeRequest {
   // `locations/global/metricsScopes/{SCOPING_PROJECT_ID_OR_NUMBER}`
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {
-      type: "monitoring.googleapis.com/MetricsScope"
-    }
+    (google.api.resource_reference) = {type: "monitoring.googleapis.com/MetricsScope"}
   ];
 }
 
@@ -122,9 +114,7 @@ message CreateMonitoredProjectRequest {
   // `locations/global/metricsScopes/{SCOPING_PROJECT_ID_OR_NUMBER}`
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {
-      type: "monitoring.googleapis.com/MetricsScope"
-    }
+    (google.api.resource_reference) = {type: "monitoring.googleapis.com/MetricsScope"}
   ];
 
   // Required. The initial `MonitoredProject` configuration.
@@ -145,9 +135,7 @@ message DeleteMonitoredProjectRequest {
   // and on the `MonitoredProject`: `monitoring.metricsScopes.link`
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {
-      type: "monitoring.googleapis.com/MonitoredProject"
-    }
+    (google.api.resource_reference) = {type: "monitoring.googleapis.com/MonitoredProject"}
   ];
 }
 

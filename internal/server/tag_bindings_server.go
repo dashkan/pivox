@@ -3,14 +3,15 @@ package server
 import (
 	"context"
 
+	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/dashkan/pivox-server/internal/convert"
 	db "github.com/dashkan/pivox-server/internal/db/generated"
 	"github.com/dashkan/pivox-server/internal/filter"
+	"github.com/dashkan/pivox-server/internal/lro"
 	apiv1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1"
 	"github.com/dashkan/pivox-server/internal/resource"
 )
@@ -96,7 +97,7 @@ func (s *TagBindingsServer) GetTagBinding(ctx context.Context, req *apiv1.GetTag
 	return convert.TagBindingToProto(tb, tv), nil
 }
 
-func (s *TagBindingsServer) CreateTagBinding(ctx context.Context, req *apiv1.CreateTagBindingRequest) (*apiv1.TagBinding, error) {
+func (s *TagBindingsServer) CreateTagBinding(ctx context.Context, req *apiv1.CreateTagBindingRequest) (*longrunningpb.Operation, error) {
 	tb := req.GetTagBinding()
 
 	// Parse tag value name: "tagKeys/{uuid}/tagValues/{uuid}"
@@ -118,10 +119,10 @@ func (s *TagBindingsServer) CreateTagBinding(ctx context.Context, req *apiv1.Cre
 	if err != nil {
 		return nil, handleResourceError(err, "TagBinding", "")
 	}
-	return convert.TagBindingToProto(created, tagValue), nil
+	return lro.DoneOperation(convert.TagBindingToProto(created, tagValue))
 }
 
-func (s *TagBindingsServer) DeleteTagBinding(ctx context.Context, req *apiv1.DeleteTagBindingRequest) (*emptypb.Empty, error) {
+func (s *TagBindingsServer) DeleteTagBinding(ctx context.Context, req *apiv1.DeleteTagBindingRequest) (*longrunningpb.Operation, error) {
 	segment, err := resource.ParseSegment(req.GetName())
 	if err != nil {
 		return nil, handleResourceError(err, "TagBinding", req.GetName())
@@ -138,7 +139,7 @@ func (s *TagBindingsServer) DeleteTagBinding(ctx context.Context, req *apiv1.Del
 	if err := s.queries.DeleteTagBinding(ctx, existing.ID); err != nil {
 		return nil, handleResourceError(err, "TagBinding", req.GetName())
 	}
-	return &emptypb.Empty{}, nil
+	return lro.DoneOperation(&apiv1.TagBinding{Name: req.GetName()})
 }
 
 func (s *TagBindingsServer) ListEffectiveTags(ctx context.Context, req *apiv1.ListEffectiveTagsRequest) (*apiv1.ListEffectiveTagsResponse, error) {

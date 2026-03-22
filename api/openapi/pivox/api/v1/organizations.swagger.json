@@ -85,7 +85,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/v1Organization"
+              "$ref": "#/definitions/longrunningOperation"
             }
           },
           "default": {
@@ -163,7 +163,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/v1Organization"
+              "$ref": "#/definitions/longrunningOperation"
             }
           },
           "default": {

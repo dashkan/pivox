@@ -34,8 +34,7 @@ message PieChart {
   message PieChartDataSet {
     // Required. The query for the PieChart. See,
     // `google.monitoring.dashboard.v1.TimeSeriesQuery`.
-    TimeSeriesQuery time_series_query = 1
-        [(google.api.field_behavior) = REQUIRED];
+    TimeSeriesQuery time_series_query = 1 [(google.api.field_behavior) = REQUIRED];
 
     // Optional. A template for the name of the slice. This name will be
     // displayed in the legend and the tooltip of the pie chart. It replaces the
@@ -50,8 +49,7 @@ message PieChart {
     // series query. For example, if the data is published once every 10
     // minutes, the `min_alignment_period` should be at least 10 minutes. It
     // would not make sense to fetch and align data at one minute intervals.
-    google.protobuf.Duration min_alignment_period = 3
-        [(google.api.field_behavior) = OPTIONAL];
+    google.protobuf.Duration min_alignment_period = 3 [(google.api.field_behavior) = OPTIONAL];
   }
 
   // Types for the pie chart.
@@ -67,8 +65,7 @@ message PieChart {
   }
 
   // Required. The queries for the chart's data.
-  repeated PieChartDataSet data_sets = 1
-      [(google.api.field_behavior) = REQUIRED];
+  repeated PieChartDataSet data_sets = 1 [(google.api.field_behavior) = REQUIRED];
 
   // Required. Indicates the visualization type for the PieChart.
   PieChartType chart_type = 2 [(google.api.field_behavior) = REQUIRED];

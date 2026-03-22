@@ -4,9 +4,10 @@ import (
 	"context"
 	"log/slog"
 
+	"cloud.google.com/go/longrunning/autogen/longrunningpb"
+	iampb "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/iam/v1"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
-	iampb "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/iam/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/dashkan/pivox-server/internal/filter"
 	"github.com/dashkan/pivox-server/internal/firebase"
 	"github.com/dashkan/pivox-server/internal/iam"
+	"github.com/dashkan/pivox-server/internal/lro"
 	apiv1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1"
 	"github.com/dashkan/pivox-server/internal/resource"
 )
@@ -96,7 +98,7 @@ func (s *OrganizationsServer) ListOrganizations(ctx context.Context, req *apiv1.
 	}, nil
 }
 
-func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1.CreateOrganizationRequest) (*apiv1.Organization, error) {
+func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1.CreateOrganizationRequest) (*longrunningpb.Operation, error) {
 	orgSlug := req.GetOrganizationId()
 	if orgSlug == "" {
 		orgSlug = uuid.New().String()[:8]
@@ -146,7 +148,7 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 	}
 
 	org.TenantID = tenantID
-	return convert.OrganizationToProto(org), nil
+	return lro.DoneOperation(convert.OrganizationToProto(org))
 }
 
 func (s *OrganizationsServer) GetIamPolicy(ctx context.Context, req *iampb.GetIamPolicyRequest) (*iampb.Policy, error) {

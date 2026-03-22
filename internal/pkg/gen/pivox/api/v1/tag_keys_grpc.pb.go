@@ -21,6 +21,7 @@
 package apiv1
 
 import (
+	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
 	context "context"
 	v1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/iam/v1"
 	grpc "google.golang.org/grpc"
@@ -59,12 +60,12 @@ type TagKeysClient interface {
 	// sent while the original request is in process, the second request
 	// will receive an error. A maximum of 1000 TagKeys can exist under a parent
 	// at any given time.
-	CreateTagKey(ctx context.Context, in *CreateTagKeyRequest, opts ...grpc.CallOption) (*TagKey, error)
+	CreateTagKey(ctx context.Context, in *CreateTagKeyRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
 	// Updates the attributes of the TagKey resource.
-	UpdateTagKey(ctx context.Context, in *UpdateTagKeyRequest, opts ...grpc.CallOption) (*TagKey, error)
+	UpdateTagKey(ctx context.Context, in *UpdateTagKeyRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
 	// Deletes a TagKey. The TagKey cannot be deleted if it has any child
 	// TagValues.
-	DeleteTagKey(ctx context.Context, in *DeleteTagKeyRequest, opts ...grpc.CallOption) (*TagKey, error)
+	DeleteTagKey(ctx context.Context, in *DeleteTagKeyRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
 	// Gets the access control policy for a TagKey. The returned policy may be
 	// empty if no such policy or resource exists. The `resource` field should
 	// be the TagKey's resource name.
@@ -115,9 +116,9 @@ func (c *tagKeysClient) GetTagKey(ctx context.Context, in *GetTagKeyRequest, opt
 	return out, nil
 }
 
-func (c *tagKeysClient) CreateTagKey(ctx context.Context, in *CreateTagKeyRequest, opts ...grpc.CallOption) (*TagKey, error) {
+func (c *tagKeysClient) CreateTagKey(ctx context.Context, in *CreateTagKeyRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(TagKey)
+	out := new(longrunningpb.Operation)
 	err := c.cc.Invoke(ctx, TagKeys_CreateTagKey_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -125,9 +126,9 @@ func (c *tagKeysClient) CreateTagKey(ctx context.Context, in *CreateTagKeyReques
 	return out, nil
 }
 
-func (c *tagKeysClient) UpdateTagKey(ctx context.Context, in *UpdateTagKeyRequest, opts ...grpc.CallOption) (*TagKey, error) {
+func (c *tagKeysClient) UpdateTagKey(ctx context.Context, in *UpdateTagKeyRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(TagKey)
+	out := new(longrunningpb.Operation)
 	err := c.cc.Invoke(ctx, TagKeys_UpdateTagKey_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -135,9 +136,9 @@ func (c *tagKeysClient) UpdateTagKey(ctx context.Context, in *UpdateTagKeyReques
 	return out, nil
 }
 
-func (c *tagKeysClient) DeleteTagKey(ctx context.Context, in *DeleteTagKeyRequest, opts ...grpc.CallOption) (*TagKey, error) {
+func (c *tagKeysClient) DeleteTagKey(ctx context.Context, in *DeleteTagKeyRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(TagKey)
+	out := new(longrunningpb.Operation)
 	err := c.cc.Invoke(ctx, TagKeys_DeleteTagKey_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -190,12 +191,12 @@ type TagKeysServer interface {
 	// sent while the original request is in process, the second request
 	// will receive an error. A maximum of 1000 TagKeys can exist under a parent
 	// at any given time.
-	CreateTagKey(context.Context, *CreateTagKeyRequest) (*TagKey, error)
+	CreateTagKey(context.Context, *CreateTagKeyRequest) (*longrunningpb.Operation, error)
 	// Updates the attributes of the TagKey resource.
-	UpdateTagKey(context.Context, *UpdateTagKeyRequest) (*TagKey, error)
+	UpdateTagKey(context.Context, *UpdateTagKeyRequest) (*longrunningpb.Operation, error)
 	// Deletes a TagKey. The TagKey cannot be deleted if it has any child
 	// TagValues.
-	DeleteTagKey(context.Context, *DeleteTagKeyRequest) (*TagKey, error)
+	DeleteTagKey(context.Context, *DeleteTagKeyRequest) (*longrunningpb.Operation, error)
 	// Gets the access control policy for a TagKey. The returned policy may be
 	// empty if no such policy or resource exists. The `resource` field should
 	// be the TagKey's resource name.
@@ -232,13 +233,13 @@ func (UnimplementedTagKeysServer) ListTagKeys(context.Context, *ListTagKeysReque
 func (UnimplementedTagKeysServer) GetTagKey(context.Context, *GetTagKeyRequest) (*TagKey, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetTagKey not implemented")
 }
-func (UnimplementedTagKeysServer) CreateTagKey(context.Context, *CreateTagKeyRequest) (*TagKey, error) {
+func (UnimplementedTagKeysServer) CreateTagKey(context.Context, *CreateTagKeyRequest) (*longrunningpb.Operation, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateTagKey not implemented")
 }
-func (UnimplementedTagKeysServer) UpdateTagKey(context.Context, *UpdateTagKeyRequest) (*TagKey, error) {
+func (UnimplementedTagKeysServer) UpdateTagKey(context.Context, *UpdateTagKeyRequest) (*longrunningpb.Operation, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateTagKey not implemented")
 }
-func (UnimplementedTagKeysServer) DeleteTagKey(context.Context, *DeleteTagKeyRequest) (*TagKey, error) {
+func (UnimplementedTagKeysServer) DeleteTagKey(context.Context, *DeleteTagKeyRequest) (*longrunningpb.Operation, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteTagKey not implemented")
 }
 func (UnimplementedTagKeysServer) GetIamPolicy(context.Context, *v1.GetIamPolicyRequest) (*v1.Policy, error) {

@@ -1,0 +1,414 @@
+// Copyright 2025 Pivox
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package pivox.agent.v1;
+
+import "google/api/client.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "pivox/agent/v1;agentv1";
+
+// AgentService defines the bidirectional streaming protocol between a storage
+// gateway agent and the Pivox control plane. The agent opens a single
+// long-lived Connect stream, authenticates via a Handshake, and then
+// continuously exchanges status updates (agent -> control plane) and
+// configuration / lifecycle commands (control plane -> agent).
+//
+// This is NOT a standard AIP resource service; AIP linting is disabled.
+service AgentService {
+  option (google.api.default_host) = "api.pivox.io";
+
+  // Connect establishes a persistent bidirectional stream between an agent and
+  // the control plane. The agent MUST send a Handshake as the first message.
+  // The control plane responds with a HandshakeAck containing TLS credentials
+  // and initial configuration. After the handshake the agent sends periodic
+  // heartbeats, health checks, and telemetry while the control plane pushes
+  // configuration updates, certificate rotations, and upgrade commands.
+  rpc Connect(stream AgentMessage) returns (stream ControlMessage);
+}
+
+// ---------------------------------------------------------------------------
+// Agent -> Control Plane
+// ---------------------------------------------------------------------------
+
+// AgentMessage wraps every message the agent sends to the control plane over
+// the Connect stream.
+message AgentMessage {
+  oneof message {
+    // Initial authentication and capability advertisement.
+    Handshake handshake = 1;
+
+    // Periodic liveness signal with current agent state.
+    Heartbeat heartbeat = 2;
+
+    // Per-endpoint reachability and latency report.
+    EndpointHealth endpoint_health = 3;
+
+    // Progress of the local write-back sync queue.
+    SyncStatus sync_status = 4;
+
+    // Progress of an in-flight binary upgrade.
+    UpgradeStatus upgrade_status = 5;
+
+    // Optional performance and resource telemetry (only sent when
+    // the agent is started with --telemetry=true).
+    Telemetry telemetry = 6;
+  }
+}
+
+// Handshake is the first message an agent MUST send after opening the Connect
+// stream. It carries a one-time registration token and basic host metadata so
+// the control plane can authenticate and register the agent.
+message Handshake {
+  // One-time token obtained from the Pivox console or CLI during agent
+  // provisioning. The control plane validates and invalidates the token on
+  // first use.
+  string registration_token = 1;
+
+  // Semantic version of the agent binary (e.g. "1.4.2").
+  string agent_version = 2;
+
+  // Public IP address of the agent host as observed by the agent itself.
+  string ip_address = 3;
+
+  // Hostname of the machine running the agent.
+  string hostname = 4;
+
+  // Operating system identifier (e.g. "linux", "darwin").
+  string os = 5;
+
+  // CPU architecture (e.g. "amd64", "arm64").
+  string arch = 6;
+}
+
+// Heartbeat is sent periodically by the agent to signal liveness and report
+// its current operational state.
+message Heartbeat {
+  // Human-readable state label (e.g. "ready", "draining", "upgrading").
+  string state = 1;
+
+  // Wall-clock time since the agent process started.
+  google.protobuf.Duration uptime = 2;
+}
+
+// EndpointHealth reports the reachability and latency of a single configured
+// storage endpoint as measured by the agent.
+message EndpointHealth {
+  // Name of the endpoint as defined in EndpointConfig.
+  string endpoint_name = 1;
+
+  // Whether the endpoint responded to the latest health probe.
+  bool reachable = 2;
+
+  // Round-trip latency of the health probe in milliseconds.
+  int64 latency_ms = 3;
+
+  // Non-empty when the probe failed; contains the error message.
+  string error = 4;
+}
+
+// SyncStatus reports progress of the local write-back queue that buffers
+// mutations before they are flushed to the remote storage endpoint.
+message SyncStatus {
+  // Number of writes queued locally but not yet confirmed by the remote.
+  int64 pending_writes = 1;
+
+  // Cumulative number of writes successfully synced since agent start.
+  int64 synced_writes = 2;
+
+  // Non-empty when the sync pipeline has encountered an error.
+  string error = 3;
+}
+
+// UpgradePhase enumerates the stages of a self-upgrade lifecycle.
+enum UpgradePhase {
+  UPGRADE_PHASE_UNSPECIFIED = 0;
+
+  // The agent is downloading the new binary from the provided URL.
+  DOWNLOADING = 1;
+
+  // The download is complete and verified; the agent is ready to apply.
+  READY = 2;
+
+  // The agent has finished draining in-flight requests.
+  DRAINED = 3;
+
+  // The agent is replacing the running binary.
+  APPLYING = 4;
+
+  // The upgrade completed successfully; the agent is now running the new
+  // version.
+  COMPLETED = 5;
+
+  // The upgrade failed; see UpgradeStatus.error for details.
+  FAILED = 6;
+}
+
+// UpgradeStatus reports the current phase of an in-progress agent upgrade.
+message UpgradeStatus {
+  // Current phase of the upgrade.
+  UpgradePhase phase = 1;
+
+  // Target version being upgraded to (e.g. "1.5.0").
+  string version = 2;
+
+  // Non-empty when the upgrade has failed; contains the error message.
+  string error = 3;
+
+  // Download progress as a percentage (0-100).
+  int32 download_percent = 4;
+}
+
+// Telemetry carries optional performance and resource usage data. It is only
+// sent when the agent is started with the --telemetry=true flag.
+message Telemetry {
+  oneof data {
+    // Local cache hit/miss/eviction statistics.
+    CacheStats cache_stats = 1;
+
+    // Aggregated request throughput and latency metrics.
+    RequestMetrics request_metrics = 2;
+
+    // Host-level CPU, memory, disk, and network utilization.
+    SystemMetrics system_metrics = 3;
+  }
+}
+
+// CacheStats reports hit/miss ratios and eviction pressure for the local
+// object cache maintained by the agent.
+message CacheStats {
+  // Current cache usage in gigabytes.
+  int32 used_gb = 1;
+
+  // Cumulative cache hit count since agent start.
+  int64 hit_count = 2;
+
+  // Cumulative cache miss count since agent start.
+  int64 miss_count = 3;
+
+  // Cumulative number of objects evicted since agent start.
+  int64 eviction_count = 4;
+}
+
+// RequestMetrics reports aggregated request throughput, bandwidth, and latency
+// for the reporting interval.
+message RequestMetrics {
+  // Total number of client requests handled.
+  int64 total_requests = 1;
+
+  // Total bytes served to clients.
+  int64 bytes_served = 2;
+
+  // Total number of requests that resulted in an error.
+  int64 error_count = 3;
+
+  // Median (p50) request latency in milliseconds.
+  double latency_p50_ms = 4;
+
+  // 99th-percentile request latency in milliseconds.
+  double latency_p99_ms = 5;
+}
+
+// SystemMetrics reports host-level resource utilization of the machine running
+// the agent.
+message SystemMetrics {
+  // CPU utilization as a percentage (0.0 - 100.0).
+  double cpu_percent = 1;
+
+  // Bytes of memory currently in use by the agent process.
+  int64 memory_used_bytes = 2;
+
+  // Total physical memory available on the host.
+  int64 memory_total_bytes = 3;
+
+  // Cumulative bytes read from disk since agent start.
+  int64 disk_read_bytes = 4;
+
+  // Cumulative bytes written to disk since agent start.
+  int64 disk_write_bytes = 5;
+
+  // Cumulative bytes received from the network since agent start.
+  int64 network_rx_bytes = 6;
+
+  // Cumulative bytes transmitted over the network since agent start.
+  int64 network_tx_bytes = 7;
+}
+
+// ---------------------------------------------------------------------------
+// Control Plane -> Agent
+// ---------------------------------------------------------------------------
+
+// ControlMessage wraps every message the control plane sends to the agent over
+// the Connect stream.
+message ControlMessage {
+  oneof message {
+    // Response to the agent's initial Handshake, carrying credentials and
+    // configuration.
+    HandshakeAck handshake_ack = 1;
+
+    // Rotated TLS certificate and private key.
+    CertDelivery cert_delivery = 2;
+
+    // Request the agent to drain in-flight traffic (e.g. before maintenance).
+    DrainRequest drain_request = 3;
+
+    // Command the agent to download, apply, or rollback a binary upgrade.
+    UpgradeRequest upgrade_request = 4;
+
+    // Push updated endpoint or cache configuration to the agent.
+    ConfigUpdate config_update = 5;
+
+    // Server-side keep-alive to detect dead streams.
+    ServerHeartbeat server_heartbeat = 6;
+  }
+}
+
+// HandshakeAck is sent by the control plane in response to a valid Handshake.
+// It provides the agent with its assigned identity, initial TLS credentials,
+// and the full endpoint and cache configuration.
+message HandshakeAck {
+  // Unique agent name assigned by the control plane (e.g. "agent-us-east-1a").
+  string agent_name = 1;
+
+  // PEM-encoded TLS certificate for the agent to serve client traffic.
+  bytes tls_cert = 2;
+
+  // PEM-encoded TLS private key corresponding to tls_cert.
+  bytes tls_key = 3;
+
+  // Initial set of storage endpoint configurations the agent should connect
+  // to.
+  repeated EndpointConfig endpoints = 4;
+
+  // Initial local cache configuration.
+  CacheConfig cache_config = 5;
+}
+
+// CertDelivery pushes a rotated TLS certificate and key to the agent. The
+// agent MUST perform a graceful TLS reload without dropping in-flight
+// connections.
+message CertDelivery {
+  // PEM-encoded replacement TLS certificate.
+  bytes tls_cert = 1;
+
+  // PEM-encoded replacement TLS private key.
+  bytes tls_key = 2;
+
+  // Expiry timestamp of the new certificate, used by the agent to schedule
+  // renewal reminders.
+  google.protobuf.Timestamp expiry = 3;
+}
+
+// DrainRequest instructs the agent to stop accepting new requests and finish
+// processing in-flight traffic. The agent should report DRAINED via
+// UpgradeStatus once draining is complete.
+message DrainRequest {
+  // Human-readable reason for the drain (e.g. "scheduled-maintenance").
+  string reason = 1;
+}
+
+// UpgradeCommand enumerates the lifecycle commands the control plane can issue
+// for a binary upgrade.
+enum UpgradeCommand {
+  UPGRADE_COMMAND_UNSPECIFIED = 0;
+
+  // Begin downloading the target version from the provided URL.
+  DOWNLOAD = 1;
+
+  // Apply the previously downloaded binary (requires a prior DOWNLOAD that
+  // reached READY phase).
+  APPLY = 2;
+
+  // Rollback to the previous binary version.
+  ROLLBACK = 3;
+}
+
+// UpgradeRequest commands the agent to perform a specific step of the binary
+// upgrade lifecycle.
+message UpgradeRequest {
+  // The upgrade action to perform.
+  UpgradeCommand command = 1;
+
+  // Semantic version to upgrade to (e.g. "1.5.0").
+  string target_version = 2;
+
+  // HTTPS URL from which the agent should download the new binary.
+  string download_url = 3;
+
+  // SHA-256 hex digest of the expected binary, used for integrity
+  // verification.
+  string checksum_sha256 = 4;
+
+  // Ed25519 signature of the binary, used for authenticity verification.
+  string signature_ed25519 = 5;
+}
+
+// ConfigUpdate pushes updated endpoint and cache configuration to the agent.
+// The agent MUST apply the new configuration without restarting.
+message ConfigUpdate {
+  // Full replacement set of endpoint configurations. Endpoints not present in
+  // this list should be removed.
+  repeated EndpointConfig endpoints = 1;
+
+  // Updated local cache configuration.
+  CacheConfig cache_config = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Shared configuration types
+// ---------------------------------------------------------------------------
+
+// EndpointConfig describes a single remote storage backend that the agent
+// should connect to for read and write operations.
+message EndpointConfig {
+  // Logical name of the endpoint (e.g. "primary-us-east").
+  string name = 1;
+
+  // Storage engine type (e.g. "s3", "gcs", "azure-blob").
+  string engine = 2;
+
+  // URI of the storage endpoint (e.g. "https://s3.amazonaws.com").
+  string endpoint_uri = 3;
+
+  // Bucket or container name.
+  string bucket = 4;
+
+  // Cloud region where the bucket resides (e.g. "us-east-1").
+  string region = 5;
+
+  // Access key ID for authenticating with the storage backend.
+  string access_key_id = 6;
+
+  // Secret access key for authenticating with the storage backend.
+  string secret_access_key = 7;
+}
+
+// CacheConfig controls the local object cache maintained by the agent.
+message CacheConfig {
+  // Maximum cache size in gigabytes.
+  int32 max_size_gb = 1;
+
+  // Eviction policy identifier (e.g. "lru", "lfu", "arc").
+  string eviction_policy = 2;
+
+  // Default time-to-live for cached objects in hours.
+  int32 ttl_hours = 3;
+}
+
+// ServerHeartbeat is an empty keep-alive message sent by the control plane to
+// detect dead streams. The agent does not need to respond to this message.
+message ServerHeartbeat {}

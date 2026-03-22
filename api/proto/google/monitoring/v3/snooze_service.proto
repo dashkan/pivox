@@ -37,9 +37,9 @@ option ruby_package = "Google::Cloud::Monitoring::V3";
 service SnoozeService {
   option (google.api.default_host) = "monitoring.googleapis.com";
   option (google.api.oauth_scopes) =
-      "https://www.googleapis.com/auth/cloud-platform,"
-      "https://www.googleapis.com/auth/monitoring,"
-      "https://www.googleapis.com/auth/monitoring.read";
+    "https://www.googleapis.com/auth/cloud-platform,"
+    "https://www.googleapis.com/auth/monitoring,"
+    "https://www.googleapis.com/auth/monitoring.read";
 
   // Creates a `Snooze` that will prevent alerts, which match the provided
   // criteria, from being opened. The `Snooze` applies for a specific time
@@ -55,17 +55,13 @@ service SnoozeService {
   // Lists the `Snooze`s associated with a project. Can optionally pass in
   // `filter`, which specifies predicates to match `Snooze`s.
   rpc ListSnoozes(ListSnoozesRequest) returns (ListSnoozesResponse) {
-    option (google.api.http) = {
-      get: "/v3/{parent=projects/*}/snoozes"
-    };
+    option (google.api.http) = {get: "/v3/{parent=projects/*}/snoozes"};
     option (google.api.method_signature) = "parent";
   }
 
   // Retrieves a `Snooze` by `name`.
   rpc GetSnooze(GetSnoozeRequest) returns (Snooze) {
-    option (google.api.http) = {
-      get: "/v3/{name=projects/*/snoozes/*}"
-    };
+    option (google.api.http) = {get: "/v3/{name=projects/*/snoozes/*}"};
     option (google.api.method_signature) = "name";
   }
 
@@ -90,9 +86,7 @@ message CreateSnoozeRequest {
   //     projects/[PROJECT_ID_OR_NUMBER]
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {
-      child_type: "monitoring.googleapis.com/Snooze"
-    }
+    (google.api.resource_reference) = {child_type: "monitoring.googleapis.com/Snooze"}
   ];
 
   // Required. The `Snooze` to create. Omit the `name` field, as it will be
@@ -110,9 +104,7 @@ message ListSnoozesRequest {
   //     projects/[PROJECT_ID_OR_NUMBER]
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {
-      child_type: "monitoring.googleapis.com/Snooze"
-    }
+    (google.api.resource_reference) = {child_type: "monitoring.googleapis.com/Snooze"}
   ];
 
   // Optional. Optional filter to restrict results to the given criteria. The
@@ -158,9 +150,7 @@ message GetSnoozeRequest {
   //     projects/[PROJECT_ID_OR_NUMBER]/snoozes/[SNOOZE_ID]
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {
-      type: "monitoring.googleapis.com/Snooze"
-    }
+    (google.api.resource_reference) = {type: "monitoring.googleapis.com/Snooze"}
   ];
 }
 
@@ -203,6 +193,5 @@ message UpdateSnoozeRequest {
   // fields can legally be updated. Before attempting an update, users should
   // consult the documentation for `UpdateSnoozeRequest`, which talks about
   // which fields can be updated.
-  google.protobuf.FieldMask update_mask = 2
-      [(google.api.field_behavior) = REQUIRED];
+  google.protobuf.FieldMask update_mask = 2 [(google.api.field_behavior) = REQUIRED];
 }

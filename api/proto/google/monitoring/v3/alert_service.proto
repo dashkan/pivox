@@ -44,24 +44,19 @@ option ruby_package = "Google::Cloud::Monitoring::V3";
 service AlertPolicyService {
   option (google.api.default_host) = "monitoring.googleapis.com";
   option (google.api.oauth_scopes) =
-      "https://www.googleapis.com/auth/cloud-platform,"
-      "https://www.googleapis.com/auth/monitoring,"
-      "https://www.googleapis.com/auth/monitoring.read";
+    "https://www.googleapis.com/auth/cloud-platform,"
+    "https://www.googleapis.com/auth/monitoring,"
+    "https://www.googleapis.com/auth/monitoring.read";
 
   // Lists the existing alerting policies for the workspace.
-  rpc ListAlertPolicies(ListAlertPoliciesRequest)
-      returns (ListAlertPoliciesResponse) {
-    option (google.api.http) = {
-      get: "/v3/{name=projects/*}/alertPolicies"
-    };
+  rpc ListAlertPolicies(ListAlertPoliciesRequest) returns (ListAlertPoliciesResponse) {
+    option (google.api.http) = {get: "/v3/{name=projects/*}/alertPolicies"};
     option (google.api.method_signature) = "name";
   }
 
   // Gets a single alerting policy.
   rpc GetAlertPolicy(GetAlertPolicyRequest) returns (AlertPolicy) {
-    option (google.api.http) = {
-      get: "/v3/{name=projects/*/alertPolicies/*}"
-    };
+    option (google.api.http) = {get: "/v3/{name=projects/*/alertPolicies/*}"};
     option (google.api.method_signature) = "name";
   }
 
@@ -83,11 +78,8 @@ service AlertPolicyService {
   // Design your application to single-thread API calls that modify the state of
   // alerting policies in a single project. This includes calls to
   // CreateAlertPolicy, DeleteAlertPolicy and UpdateAlertPolicy.
-  rpc DeleteAlertPolicy(DeleteAlertPolicyRequest)
-      returns (google.protobuf.Empty) {
-    option (google.api.http) = {
-      delete: "/v3/{name=projects/*/alertPolicies/*}"
-    };
+  rpc DeleteAlertPolicy(DeleteAlertPolicyRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/v3/{name=projects/*/alertPolicies/*}"};
     option (google.api.method_signature) = "name";
   }
 
@@ -125,9 +117,7 @@ message CreateAlertPolicyRequest {
   // container.
   string name = 3 [
     (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {
-      child_type: "monitoring.googleapis.com/AlertPolicy"
-    }
+    (google.api.resource_reference) = {child_type: "monitoring.googleapis.com/AlertPolicy"}
   ];
 
   // Required. The requested alerting policy. You should omit the `name` field
@@ -143,9 +133,7 @@ message GetAlertPolicyRequest {
   //     projects/[PROJECT_ID_OR_NUMBER]/alertPolicies/[ALERT_POLICY_ID]
   string name = 3 [
     (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {
-      type: "monitoring.googleapis.com/AlertPolicy"
-    }
+    (google.api.resource_reference) = {type: "monitoring.googleapis.com/AlertPolicy"}
   ];
 }
 
@@ -164,9 +152,7 @@ message ListAlertPoliciesRequest {
   // operation, instead.
   string name = 4 [
     (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {
-      child_type: "monitoring.googleapis.com/AlertPolicy"
-    }
+    (google.api.resource_reference) = {child_type: "monitoring.googleapis.com/AlertPolicy"}
   ];
 
   // Optional. If provided, this field specifies the criteria that must be met
@@ -232,8 +218,7 @@ message UpdateAlertPolicyRequest {
   //     the supplied condition includes the `name` field with that
   //     `[CONDITION_ID]`. If the supplied condition omits the `name` field,
   //     then a new `[CONDITION_ID]` is created.
-  google.protobuf.FieldMask update_mask = 2
-      [(google.api.field_behavior) = OPTIONAL];
+  google.protobuf.FieldMask update_mask = 2 [(google.api.field_behavior) = OPTIONAL];
 
   // Required. The updated alerting policy or the updated values for the
   // fields listed in `update_mask`.
@@ -251,8 +236,6 @@ message DeleteAlertPolicyRequest {
   // For more information, see [AlertPolicy][google.monitoring.v3.AlertPolicy].
   string name = 3 [
     (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {
-      type: "monitoring.googleapis.com/AlertPolicy"
-    }
+    (google.api.resource_reference) = {type: "monitoring.googleapis.com/AlertPolicy"}
   ];
 }

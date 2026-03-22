@@ -21,6 +21,7 @@
 package apiv1
 
 import (
+	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
 	context "context"
 	v1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/iam/v1"
 	grpc "google.golang.org/grpc"
@@ -59,12 +60,12 @@ type TagValuesClient interface {
 	// request with the same parameters is sent while the original request is in
 	// process the second request will receive an error. A maximum of 1000
 	// TagValues can exist under a TagKey at any given time.
-	CreateTagValue(ctx context.Context, in *CreateTagValueRequest, opts ...grpc.CallOption) (*TagValue, error)
+	CreateTagValue(ctx context.Context, in *CreateTagValueRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
 	// Updates the attributes of the TagValue resource.
-	UpdateTagValue(ctx context.Context, in *UpdateTagValueRequest, opts ...grpc.CallOption) (*TagValue, error)
+	UpdateTagValue(ctx context.Context, in *UpdateTagValueRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
 	// Deletes a TagValue. The TagValue cannot have any bindings when it is
 	// deleted.
-	DeleteTagValue(ctx context.Context, in *DeleteTagValueRequest, opts ...grpc.CallOption) (*TagValue, error)
+	DeleteTagValue(ctx context.Context, in *DeleteTagValueRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
 	// Gets the access control policy for a TagValue. The returned policy may be
 	// empty if no such policy or resource exists. The `resource` field should
 	// be the TagValue's resource name.
@@ -115,9 +116,9 @@ func (c *tagValuesClient) GetTagValue(ctx context.Context, in *GetTagValueReques
 	return out, nil
 }
 
-func (c *tagValuesClient) CreateTagValue(ctx context.Context, in *CreateTagValueRequest, opts ...grpc.CallOption) (*TagValue, error) {
+func (c *tagValuesClient) CreateTagValue(ctx context.Context, in *CreateTagValueRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(TagValue)
+	out := new(longrunningpb.Operation)
 	err := c.cc.Invoke(ctx, TagValues_CreateTagValue_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -125,9 +126,9 @@ func (c *tagValuesClient) CreateTagValue(ctx context.Context, in *CreateTagValue
 	return out, nil
 }
 
-func (c *tagValuesClient) UpdateTagValue(ctx context.Context, in *UpdateTagValueRequest, opts ...grpc.CallOption) (*TagValue, error) {
+func (c *tagValuesClient) UpdateTagValue(ctx context.Context, in *UpdateTagValueRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(TagValue)
+	out := new(longrunningpb.Operation)
 	err := c.cc.Invoke(ctx, TagValues_UpdateTagValue_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -135,9 +136,9 @@ func (c *tagValuesClient) UpdateTagValue(ctx context.Context, in *UpdateTagValue
 	return out, nil
 }
 
-func (c *tagValuesClient) DeleteTagValue(ctx context.Context, in *DeleteTagValueRequest, opts ...grpc.CallOption) (*TagValue, error) {
+func (c *tagValuesClient) DeleteTagValue(ctx context.Context, in *DeleteTagValueRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(TagValue)
+	out := new(longrunningpb.Operation)
 	err := c.cc.Invoke(ctx, TagValues_DeleteTagValue_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -190,12 +191,12 @@ type TagValuesServer interface {
 	// request with the same parameters is sent while the original request is in
 	// process the second request will receive an error. A maximum of 1000
 	// TagValues can exist under a TagKey at any given time.
-	CreateTagValue(context.Context, *CreateTagValueRequest) (*TagValue, error)
+	CreateTagValue(context.Context, *CreateTagValueRequest) (*longrunningpb.Operation, error)
 	// Updates the attributes of the TagValue resource.
-	UpdateTagValue(context.Context, *UpdateTagValueRequest) (*TagValue, error)
+	UpdateTagValue(context.Context, *UpdateTagValueRequest) (*longrunningpb.Operation, error)
 	// Deletes a TagValue. The TagValue cannot have any bindings when it is
 	// deleted.
-	DeleteTagValue(context.Context, *DeleteTagValueRequest) (*TagValue, error)
+	DeleteTagValue(context.Context, *DeleteTagValueRequest) (*longrunningpb.Operation, error)
 	// Gets the access control policy for a TagValue. The returned policy may be
 	// empty if no such policy or resource exists. The `resource` field should
 	// be the TagValue's resource name.
@@ -232,13 +233,13 @@ func (UnimplementedTagValuesServer) ListTagValues(context.Context, *ListTagValue
 func (UnimplementedTagValuesServer) GetTagValue(context.Context, *GetTagValueRequest) (*TagValue, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetTagValue not implemented")
 }
-func (UnimplementedTagValuesServer) CreateTagValue(context.Context, *CreateTagValueRequest) (*TagValue, error) {
+func (UnimplementedTagValuesServer) CreateTagValue(context.Context, *CreateTagValueRequest) (*longrunningpb.Operation, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateTagValue not implemented")
 }
-func (UnimplementedTagValuesServer) UpdateTagValue(context.Context, *UpdateTagValueRequest) (*TagValue, error) {
+func (UnimplementedTagValuesServer) UpdateTagValue(context.Context, *UpdateTagValueRequest) (*longrunningpb.Operation, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateTagValue not implemented")
 }
-func (UnimplementedTagValuesServer) DeleteTagValue(context.Context, *DeleteTagValueRequest) (*TagValue, error) {
+func (UnimplementedTagValuesServer) DeleteTagValue(context.Context, *DeleteTagValueRequest) (*longrunningpb.Operation, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteTagValue not implemented")
 }
 func (UnimplementedTagValuesServer) GetIamPolicy(context.Context, *v1.GetIamPolicyRequest) (*v1.Policy, error) {

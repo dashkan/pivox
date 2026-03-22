@@ -155,7 +155,7 @@
         "ERROR"
       ],
       "default": "EXISTS",
-      "description": "- EXISTS: The element exists and its full value is included in data.\n - DOES_NOT_EXIST: The element does not exist.\n - INITIAL_STATE_SKIPPED: Element may or may not exist. Used only for initial state delivery when\nthe client is not interested in fetching the initial state. See the\n\"Initial State\" section above.\n - ERROR: The element may exist, but some error has occurred. More information is\navailable in the data field - the value is a serialized Status\nproto (from [google.rpc.Status][])",
+      "description": "- EXISTS: The element exists and its full value is included in data.\nbuf:lint:ignore ENUM_ZERO_VALUE_SUFFIX\n - DOES_NOT_EXIST: The element does not exist.\n - INITIAL_STATE_SKIPPED: Element may or may not exist. Used only for initial state delivery when\nthe client is not interested in fetching the initial state. See the\n\"Initial State\" section above.\n - ERROR: The element may exist, but some error has occurred. More information is\navailable in the data field - the value is a serialized Status\nproto (from [google.rpc.Status][])",
       "title": "A reported value can be in one of the following states:"
     }
   }

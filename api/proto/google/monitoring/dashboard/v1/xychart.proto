@@ -73,8 +73,7 @@ message XyChart {
 
     // Required. Fields for querying time series data from the
     // Stackdriver metrics API.
-    TimeSeriesQuery time_series_query = 1
-        [(google.api.field_behavior) = REQUIRED];
+    TimeSeriesQuery time_series_query = 1 [(google.api.field_behavior) = REQUIRED];
 
     // How this data should be plotted on the chart.
     PlotType plot_type = 2;
@@ -89,8 +88,7 @@ message XyChart {
     // series query For example, if the data is published once every 10 minutes,
     // the `min_alignment_period` should be at least 10 minutes. It would not
     // make sense to fetch and align data at one minute intervals.
-    google.protobuf.Duration min_alignment_period = 4
-        [(google.api.field_behavior) = OPTIONAL];
+    google.protobuf.Duration min_alignment_period = 4 [(google.api.field_behavior) = OPTIONAL];
 
     // Optional. The target axis to use for plotting the metric.
     TargetAxis target_axis = 5 [(google.api.field_behavior) = OPTIONAL];

@@ -72,16 +72,13 @@ message User {
   bool disabled = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when the user was created.
-  google.protobuf.Timestamp create_time = 7
-      [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when the user was last modified.
-  google.protobuf.Timestamp update_time = 8
-      [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp of the user's last login.
-  google.protobuf.Timestamp last_login_time = 9
-      [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp last_login_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. A checksum computed by the server based on the current value
   // of the User resource.
@@ -120,7 +117,10 @@ message ListUsersRequest {
   // Optional. Maximum number of users to return.
   int32 page_size = 2 [
     (google.api.field_behavior) = OPTIONAL,
-    (buf.validate.field).int32 = {gte: 0, lte: 1000}
+    (buf.validate.field).int32 = {
+      gte: 0
+      lte: 1000
+    }
   ];
 
   // Optional. Page token from a previous ListUsers call.

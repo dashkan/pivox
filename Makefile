@@ -3,18 +3,28 @@
        db-up db-down db-migrate db-force db-seed db-clear db-drop db-create \
        docker-up docker-down
 
-DATABASE_URL ?= postgres://localhost:5432/pivox?sslmode=disable
+DATABASE_URL ?= postgresql://localhost:5432/pivox?sslmode=disable
 DATABASE_NAME ?= pivox
 
 TOOL = go tool -modfile=./tools/go.mod
 
-# Server
+# Build
 
 build:
-	go build -o bin/server ./cmd/server
+	go build -o bin/pivox-server ./cmd/pivox-server
+	go build -o bin/pivox-agent ./cmd/pivox-agent
+
+build-server:
+	go build -o bin/pivox-server ./cmd/pivox-server
+
+build-agent:
+	go build -o bin/pivox-agent ./cmd/pivox-agent
 
 run:
-	go run ./cmd/server
+	go run ./cmd/pivox-server
+
+run-agent:
+	go run ./cmd/pivox-agent
 
 test:
 	go test ./...
@@ -51,18 +61,18 @@ api-lint:
 # Database
 
 db-up:
-	$(TOOL) migrate -path internal/db/migrations -database "$(DATABASE_URL)" up
+	migrate -path internal/db/migrations -database "$(DATABASE_URL)" up
 
 db-down:
-	$(TOOL) migrate -path internal/db/migrations -database "$(DATABASE_URL)" down 1
+	migrate -path internal/db/migrations -database "$(DATABASE_URL)" down 1
 
 db-migrate:
 	@test -n "$(NAME)" || (echo "Usage: make db-migrate NAME=create_users" && exit 1)
-	$(TOOL) migrate create -ext sql -dir internal/db/migrations -seq $(NAME)
+	migrate create -ext sql -dir internal/db/migrations -seq $(NAME)
 
 db-force:
 	@test -n "$(VERSION)" || (echo "Usage: make db-force VERSION=1" && exit 1)
-	$(TOOL) migrate -path internal/db/migrations -database "$(DATABASE_URL)" force $(VERSION)
+	migrate -path internal/db/migrations -database "$(DATABASE_URL)" force $(VERSION)
 
 db-seed:
 	psql "$(DATABASE_URL)" -f scripts/seed.sql

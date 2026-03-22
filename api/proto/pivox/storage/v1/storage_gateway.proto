@@ -1,0 +1,625 @@
+// Copyright 2025 Pivox
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package pivox.storage.v1;
+
+import "buf/validate/validate.proto";
+import "google/api/annotations.proto";
+import "google/api/client.proto";
+import "google/api/field_behavior.proto";
+import "google/api/resource.proto";
+import "google/longrunning/operations.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "pivox/storage/v1;storagev1";
+
+// Manages storage gateway resources within an organization.
+service StorageGateways {
+  option (google.api.default_host) = "api.pivox.io";
+
+  // Creates a new storage gateway in the specified organization.
+  //
+  // The caller must have `storage.storageGateways.create` permission on the
+  // parent organization.
+  rpc CreateStorageGateway(CreateStorageGatewayRequest) returns (google.longrunning.Operation) {
+    option (google.api.http) = {
+      post: "/v1/{parent=organizations/*}/storageGateways"
+      body: "storage_gateway"
+    };
+    option (google.api.method_signature) = "parent,storage_gateway,storage_gateway_id";
+    option (google.longrunning.operation_info) = {
+      response_type: "StorageGateway"
+      metadata_type: "CreateStorageGatewayMetadata"
+    };
+  }
+
+  // Fetches a storage gateway resource identified by the specified resource
+  // name.
+  rpc GetStorageGateway(GetStorageGatewayRequest) returns (StorageGateway) {
+    option (google.api.http) = {get: "/v1/{name=organizations/*/storageGateways/*}"};
+    option (google.api.method_signature) = "name";
+  }
+
+  // Lists storage gateways in the specified organization.
+  rpc ListStorageGateways(ListStorageGatewaysRequest) returns (ListStorageGatewaysResponse) {
+    option (google.api.http) = {get: "/v1/{parent=organizations/*}/storageGateways"};
+    option (google.api.method_signature) = "parent";
+  }
+
+  // Updates a storage gateway resource. Use the field mask to specify which
+  // fields to update. Omitting the field mask updates all mutable fields.
+  //
+  // The caller must have `storage.storageGateways.update` permission on the
+  // specified storage gateway.
+  rpc UpdateStorageGateway(UpdateStorageGatewayRequest) returns (google.longrunning.Operation) {
+    option (google.api.http) = {
+      patch: "/v1/{storage_gateway.name=organizations/*/storageGateways/*}"
+      body: "storage_gateway"
+    };
+    option (google.api.method_signature) = "storage_gateway,update_mask";
+    option (google.longrunning.operation_info) = {
+      response_type: "StorageGateway"
+      metadata_type: "UpdateStorageGatewayMetadata"
+    };
+  }
+
+  // Deletes a storage gateway resource.
+  //
+  // The caller must have `storage.storageGateways.delete` permission on the
+  // specified storage gateway.
+  rpc DeleteStorageGateway(DeleteStorageGatewayRequest) returns (google.longrunning.Operation) {
+    option (google.api.http) = {delete: "/v1/{name=organizations/*/storageGateways/*}"};
+    option (google.api.method_signature) = "name";
+    option (google.longrunning.operation_info) = {
+      response_type: "StorageGateway"
+      metadata_type: "DeleteStorageGatewayMetadata"
+    };
+  }
+
+  // Rotates the registration token for a storage gateway. The previous token
+  // is immediately invalidated and a new token is generated.
+  rpc RotateRegistrationToken(RotateRegistrationTokenRequest) returns (StorageGateway) {
+    option (google.api.http) = {
+      post: "/v1/{name=organizations/*/storageGateways/*}:rotateRegistrationToken"
+      body: "*"
+    };
+    option (google.api.method_signature) = "name";
+  }
+
+  // Returns an install script for the specified storage gateway. The script
+  // is customised with the provided configuration parameters.
+  //
+  // (-- api-linter: core::0131::request-unknown-fields=disabled
+  //     aip.dev/not-precedent: GetInstallScript is a custom action, not a standard Get. --)
+  // (-- api-linter: core::0131::response-message-name=disabled
+  //     aip.dev/not-precedent: GetInstallScript is a custom action, not a standard Get. --)
+  rpc GetInstallScript(GetInstallScriptRequest) returns (GetInstallScriptResponse) {
+    option (google.api.http) = {get: "/v1/{name=organizations/*/storageGateways/*}:installScript"};
+    option (google.api.method_signature) = "name";
+  }
+
+  // Returns an uninstall script for the specified storage gateway.
+  //
+  // (-- api-linter: core::0131::request-unknown-fields=disabled
+  //     aip.dev/not-precedent: GetUninstallScript is a custom action, not a standard Get. --)
+  // (-- api-linter: core::0131::response-message-name=disabled
+  //     aip.dev/not-precedent: GetUninstallScript is a custom action, not a standard Get. --)
+  rpc GetUninstallScript(GetUninstallScriptRequest) returns (GetUninstallScriptResponse) {
+    option (google.api.http) = {get: "/v1/{name=organizations/*/storageGateways/*}:uninstallScript"};
+    option (google.api.method_signature) = "name";
+  }
+
+  // Initiates an upgrade of the storage gateway to the specified target
+  // version. The upgrade is performed as a rolling update across all agents.
+  rpc UpgradeGateway(UpgradeGatewayRequest) returns (google.longrunning.Operation) {
+    option (google.api.http) = {
+      post: "/v1/{name=organizations/*/storageGateways/*}:upgrade"
+      body: "*"
+    };
+    option (google.api.method_signature) = "name,target_version";
+    option (google.longrunning.operation_info) = {
+      response_type: "StorageGateway"
+      metadata_type: "UpgradeGatewayMetadata"
+    };
+  }
+}
+
+// A storage gateway deployed within an organization. Storage gateways act
+// as caching proxies that accelerate access to remote storage backends.
+message StorageGateway {
+  option (google.api.resource) = {
+    type: "pivox.storage/StorageGateway"
+    pattern: "organizations/{organization}/storageGateways/{storage_gateway}"
+    plural: "storageGateways"
+    singular: "storageGateway"
+  };
+
+  // Storage gateway lifecycle states.
+  enum State {
+    // Unspecified state. This is only useful for distinguishing unset values.
+    STATE_UNSPECIFIED = 0;
+
+    // The gateway is being provisioned and is not yet ready to serve traffic.
+    PROVISIONING = 1;
+
+    // The gateway is active and serving traffic normally.
+    ACTIVE = 2;
+
+    // The gateway is operating in a degraded state. Some functionality may
+    // be unavailable.
+    DEGRADED = 3;
+
+    // The gateway is offline and not serving traffic.
+    OFFLINE = 4;
+  }
+
+  // TLS certificate lifecycle states.
+  enum CertState {
+    // Unspecified certificate state.
+    CERT_STATE_UNSPECIFIED = 0;
+
+    // The certificate is being provisioned.
+    PENDING = 1;
+
+    // The certificate is active and valid.
+    CERT_ACTIVE = 2;
+
+    // The certificate is approaching its expiration date.
+    EXPIRING = 3;
+
+    // The certificate has expired.
+    EXPIRED = 4;
+  }
+
+  // Output only. The resource name of the storage gateway. Format:
+  // `organizations/{organization}/storageGateways/{storage_gateway}`
+  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Required. A human-readable name for the storage gateway. Must be at
+  // most 60 characters long.
+  string display_name = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).string.max_len = 60
+  ];
+
+  // Output only. The current lifecycle state of the storage gateway.
+  State state = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The hostname assigned to this storage gateway, for example
+  // `{name}.storage.pivox.app`.
+  string hostname = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. The IP addresses that the storage gateway listens on.
+  // At least one IP address must be provided.
+  repeated string ip_addresses = 5 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).repeated = {
+      min_items: 1
+      items: {
+        string: {ip: true}
+      }
+    }
+  ];
+
+  // Output only. The registration token used to register agents with this
+  // storage gateway.
+  string registration_token = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. The desired software version for the storage gateway.
+  string target_version = 7 [(google.api.field_behavior) = OPTIONAL];
+
+  // Output only. The currently running software version of the storage
+  // gateway.
+  string current_version = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Cache configuration for the storage gateway.
+  CacheConfig cache_config = 9 [(google.api.field_behavior) = OPTIONAL];
+
+  // Output only. The current state of the TLS certificate.
+  CertState cert_state = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The expiration time of the TLS certificate.
+  google.protobuf.Timestamp cert_expiry_time = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. Annotations associated with this storage gateway.
+  // Annotations are key-value pairs that can be used to organize and track
+  // resources.
+  map<string, string> annotations = 12 [(google.api.field_behavior) = OPTIONAL];
+
+  // Output only. A checksum computed by the server based on the current value
+  // of the StorageGateway resource. This may be sent on update and delete
+  // requests to ensure the client has an up-to-date value before proceeding.
+  string etag = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The resource name of the user who created the storage
+  // gateway.
+  string creator = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The resource name of the user who last updated the storage
+  // gateway.
+  string updater = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Timestamp when the storage gateway was created.
+  google.protobuf.Timestamp create_time = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Timestamp when the storage gateway was last modified.
+  google.protobuf.Timestamp update_time = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Cache configuration for a storage gateway.
+message CacheConfig {
+  // The eviction policy used when the cache reaches its maximum size.
+  enum EvictionPolicy {
+    // Unspecified eviction policy.
+    EVICTION_POLICY_UNSPECIFIED = 0;
+
+    // Least Recently Used: evicts the least recently accessed items first.
+    LRU = 1;
+
+    // Least Frequently Used: evicts the least frequently accessed items first.
+    LFU = 2;
+  }
+
+  // Optional. The maximum cache size in gigabytes. Must be positive.
+  int32 max_size_gb = 1 [
+    (google.api.field_behavior) = OPTIONAL,
+    (buf.validate.field).int32.gte = 0
+  ];
+
+  // Optional. The eviction policy to use when the cache is full.
+  EvictionPolicy eviction_policy = 2 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. The time-to-live for cached items, in hours. Must be positive.
+  int32 ttl_hours = 3 [
+    (google.api.field_behavior) = OPTIONAL,
+    (buf.validate.field).int32.gte = 0
+  ];
+}
+
+// The request sent to the
+// [CreateStorageGateway][pivox.storage.v1.StorageGateways.CreateStorageGateway]
+// method.
+message CreateStorageGatewayRequest {
+  // Required. The parent organization where the storage gateway will be
+  // created. Format: `organizations/{organization}`
+  string parent = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {child_type: "pivox.storage/StorageGateway"},
+    (buf.validate.field).cel = {
+      id: "required"
+      message: "value is required"
+      expression: "this.size() > 0"
+    }
+  ];
+
+  // Required. The storage gateway to create.
+  StorageGateway storage_gateway = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. A unique identifier for the storage gateway. If not provided,
+  // the server will generate one.
+  string storage_gateway_id = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. If set to true, the request will only validate the request
+  // without persisting it.
+  bool validate_only = 4 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// A status object which is used as the `metadata` field for the Operation
+// returned by CreateStorageGateway.
+message CreateStorageGatewayMetadata {}
+
+// The request sent to the
+// [GetStorageGateway][pivox.storage.v1.StorageGateways.GetStorageGateway]
+// method.
+message GetStorageGatewayRequest {
+  // Required. The resource name of the storage gateway to retrieve. Format:
+  // `organizations/{organization}/storageGateways/{storage_gateway}`
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.storage/StorageGateway"},
+    (buf.validate.field).cel = {
+      id: "required"
+      message: "value is required"
+      expression: "this.size() > 0"
+    }
+  ];
+}
+
+// The request sent to the
+// [ListStorageGateways][pivox.storage.v1.StorageGateways.ListStorageGateways]
+// method.
+message ListStorageGatewaysRequest {
+  // Required. The parent organization whose storage gateways are being listed.
+  // Format: `organizations/{organization}`
+  string parent = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {child_type: "pivox.storage/StorageGateway"},
+    (buf.validate.field).cel = {
+      id: "required"
+      message: "value is required"
+      expression: "this.size() > 0"
+    }
+  ];
+
+  // Optional. The maximum number of storage gateways to return in the
+  // response. The server can return fewer storage gateways than requested.
+  // If unspecified, the server picks an appropriate default.
+  int32 page_size = 2 [
+    (google.api.field_behavior) = OPTIONAL,
+    (buf.validate.field).int32 = {
+      gte: 0
+      lte: 1000
+    }
+  ];
+
+  // Optional. A pagination token returned from a previous call to
+  // `ListStorageGateways` that indicates from where listing should continue.
+  string page_token = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. An AIP-160 filter expression. Supports filtering by
+  // `state`, `display_name`, `create_time`.
+  string filter = 4 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Sort order (e.g. "create_time desc").
+  string order_by = 5 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// The response returned from the
+// [ListStorageGateways][pivox.storage.v1.StorageGateways.ListStorageGateways]
+// method.
+message ListStorageGatewaysResponse {
+  // The list of storage gateways for the specified organization.
+  repeated StorageGateway storage_gateways = 1;
+
+  // A pagination token to be used to retrieve the next page of results.
+  // If empty, this response contains the last page of results.
+  string next_page_token = 2;
+}
+
+// The request sent to the
+// [UpdateStorageGateway][pivox.storage.v1.StorageGateways.UpdateStorageGateway]
+// method.
+message UpdateStorageGatewayRequest {
+  // Required. The new definition of the storage gateway. The `name` field
+  // must be populated to identify the storage gateway to update.
+  StorageGateway storage_gateway = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. An update mask to selectively update fields. If not provided,
+  // all mutable fields will be updated. See
+  // [FieldMask](https://protobuf.dev/reference/protobuf/google.protobuf/#field-mask)
+  // for more details.
+  google.protobuf.FieldMask update_mask = 2 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. If set to true, the request will only validate the request
+  // without persisting it.
+  bool validate_only = 3 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// A status object which is used as the `metadata` field for the Operation
+// returned by UpdateStorageGateway.
+message UpdateStorageGatewayMetadata {}
+
+// The request sent to the
+// [DeleteStorageGateway][pivox.storage.v1.StorageGateways.DeleteStorageGateway]
+// method.
+message DeleteStorageGatewayRequest {
+  // Required. The resource name of the storage gateway to delete. Format:
+  // `organizations/{organization}/storageGateways/{storage_gateway}`
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.storage/StorageGateway"},
+    (buf.validate.field).cel = {
+      id: "required"
+      message: "value is required"
+      expression: "this.size() > 0"
+    }
+  ];
+
+  // Optional. The etag known to the client for the expected state of the
+  // storage gateway. This is to be used for optimistic concurrency.
+  string etag = 2 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. If set to true, the request will only validate the request
+  // without persisting it.
+  bool validate_only = 3 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// A status object which is used as the `metadata` field for the Operation
+// returned by DeleteStorageGateway.
+message DeleteStorageGatewayMetadata {}
+
+// The request sent to the
+// [RotateRegistrationToken][pivox.storage.v1.StorageGateways.RotateRegistrationToken]
+// method.
+message RotateRegistrationTokenRequest {
+  // Required. The resource name of the storage gateway whose registration
+  // token should be rotated. Format:
+  // `organizations/{organization}/storageGateways/{storage_gateway}`
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.storage/StorageGateway"},
+    (buf.validate.field).cel = {
+      id: "required"
+      message: "value is required"
+      expression: "this.size() > 0"
+    }
+  ];
+}
+
+// The request sent to the
+// [GetInstallScript][pivox.storage.v1.StorageGateways.GetInstallScript]
+// method.
+//
+// (-- api-linter: core::0131::request-unknown-fields=disabled
+//     aip.dev/not-precedent: GetInstallScript is a custom action, not a standard Get. --)
+message GetInstallScriptRequest {
+  // Required. The resource name of the storage gateway to generate an install
+  // script for. Format:
+  // `organizations/{organization}/storageGateways/{storage_gateway}`
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.storage/StorageGateway"},
+    (buf.validate.field).cel = {
+      id: "required"
+      message: "value is required"
+      expression: "this.size() > 0"
+    }
+  ];
+
+  // Optional. The directory to use for caching.
+  string cache_dir = 2 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. The cache size in gigabytes.
+  int32 cache_size_gb = 3 [
+    (google.api.field_behavior) = OPTIONAL,
+    (buf.validate.field).int32.gte = 0
+  ];
+
+  // Optional. The port the gateway agent should listen on (1-65535).
+  int32 port = 4 [
+    (google.api.field_behavior) = OPTIONAL,
+    (buf.validate.field).int32 = {
+      gte: 1
+      lte: 65535
+    }
+  ];
+
+  // Optional. The IP address the gateway agent should bind to.
+  string bind_address = 5 [
+    (google.api.field_behavior) = OPTIONAL,
+    (buf.validate.field).string.ip = true
+  ];
+
+  // Optional. HTTP proxy URL for outbound connections.
+  string http_proxy = 6 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. HTTPS proxy URL for outbound connections.
+  string https_proxy = 7 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Comma-separated list of hosts that should bypass the proxy.
+  string no_proxy = 8 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Whether to enable telemetry collection.
+  bool telemetry = 9 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// The response returned from the
+// [GetInstallScript][pivox.storage.v1.StorageGateways.GetInstallScript]
+// method.
+message GetInstallScriptResponse {
+  // The install script content.
+  string script = 1;
+}
+
+// The request sent to the
+// [GetUninstallScript][pivox.storage.v1.StorageGateways.GetUninstallScript]
+// method.
+message GetUninstallScriptRequest {
+  // Required. The resource name of the storage gateway to generate an
+  // uninstall script for. Format:
+  // `organizations/{organization}/storageGateways/{storage_gateway}`
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.storage/StorageGateway"},
+    (buf.validate.field).cel = {
+      id: "required"
+      message: "value is required"
+      expression: "this.size() > 0"
+    }
+  ];
+}
+
+// The response returned from the
+// [GetUninstallScript][pivox.storage.v1.StorageGateways.GetUninstallScript]
+// method.
+message GetUninstallScriptResponse {
+  // The uninstall script content.
+  string script = 1;
+}
+
+// The request sent to the
+// [UpgradeGateway][pivox.storage.v1.StorageGateways.UpgradeGateway]
+// method.
+message UpgradeGatewayRequest {
+  // Required. The resource name of the storage gateway to upgrade. Format:
+  // `organizations/{organization}/storageGateways/{storage_gateway}`
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.storage/StorageGateway"},
+    (buf.validate.field).cel = {
+      id: "required"
+      message: "value is required"
+      expression: "this.size() > 0"
+    }
+  ];
+
+  // Required. The target version to upgrade to.
+  string target_version = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).cel = {
+      id: "required"
+      message: "value is required"
+      expression: "this.size() > 0"
+    }
+  ];
+}
+
+// A status object which is used as the `metadata` field for the Operation
+// returned by UpgradeGateway. Reports progress of the rolling upgrade.
+message UpgradeGatewayMetadata {
+  // The phases of a gateway upgrade operation.
+  enum UpgradeGatewayPhase {
+    // Unspecified phase.
+    UPGRADE_GATEWAY_PHASE_UNSPECIFIED = 0;
+
+    // The upgrade is being prepared.
+    PREPARING = 1;
+
+    // The new version is being downloaded.
+    DOWNLOADING = 2;
+
+    // The upgrade is being rolled out across agents.
+    ROLLING = 3;
+
+    // The upgrade has completed.
+    DONE = 4;
+  }
+
+  // The current phase of the upgrade operation.
+  UpgradeGatewayPhase phase = 1;
+
+  // The total number of agents in the gateway.
+  int32 agents_total = 2;
+
+  // The number of agents that are ready.
+  int32 agents_ready = 3;
+
+  // The number of agents that have been upgraded.
+  int32 agents_upgraded = 4;
+
+  // The agent currently being upgraded.
+  string current_agent = 5;
+
+  // The target version being upgraded to.
+  string target_version = 6;
+}

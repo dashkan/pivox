@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	iampb "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/iam/v1"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -17,6 +18,7 @@ import (
 	db "github.com/dashkan/pivox-server/internal/db/generated"
 	"github.com/dashkan/pivox-server/internal/filter"
 	"github.com/dashkan/pivox-server/internal/iam"
+	"github.com/dashkan/pivox-server/internal/lro"
 	apiv1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1"
 	"github.com/dashkan/pivox-server/internal/resource"
 )
@@ -114,7 +116,7 @@ func (s *ProjectsServer) ListProjects(ctx context.Context, req *apiv1.ListProjec
 	}, nil
 }
 
-func (s *ProjectsServer) CreateProject(ctx context.Context, req *apiv1.CreateProjectRequest) (*apiv1.Project, error) {
+func (s *ProjectsServer) CreateProject(ctx context.Context, req *apiv1.CreateProjectRequest) (*longrunningpb.Operation, error) {
 	project := req.GetProject()
 
 	orgID, err := resource.ResolveOrgParent(ctx, s.queries, req.GetParent())
@@ -147,10 +149,10 @@ func (s *ProjectsServer) CreateProject(ctx context.Context, req *apiv1.CreatePro
 		return nil, handleResourceError(err, "Project", "")
 	}
 
-	return convert.ProjectToProto(result, orgName), nil
+	return lro.DoneOperation(convert.ProjectToProto(result, orgName))
 }
 
-func (s *ProjectsServer) UpdateProject(ctx context.Context, req *apiv1.UpdateProjectRequest) (*apiv1.Project, error) {
+func (s *ProjectsServer) UpdateProject(ctx context.Context, req *apiv1.UpdateProjectRequest) (*longrunningpb.Operation, error) {
 	project := req.GetProject()
 	orgName, projectName, err := parseProjectName(project.GetName())
 	if err != nil {
@@ -200,10 +202,10 @@ func (s *ProjectsServer) UpdateProject(ctx context.Context, req *apiv1.UpdatePro
 		return nil, handleResourceError(err, "Project", project.GetName())
 	}
 
-	return convert.ProjectToProto(result, orgName), nil
+	return lro.DoneOperation(convert.ProjectToProto(result, orgName))
 }
 
-func (s *ProjectsServer) DeleteProject(ctx context.Context, req *apiv1.DeleteProjectRequest) (*apiv1.Project, error) {
+func (s *ProjectsServer) DeleteProject(ctx context.Context, req *apiv1.DeleteProjectRequest) (*longrunningpb.Operation, error) {
 	orgName, projectName, err := parseProjectName(req.GetName())
 	if err != nil {
 		return nil, handleResourceError(err, "Project", req.GetName())
@@ -225,10 +227,10 @@ func (s *ProjectsServer) DeleteProject(ctx context.Context, req *apiv1.DeletePro
 	if err != nil {
 		return nil, handleResourceError(err, "Project", req.GetName())
 	}
-	return convert.ProjectToProto(result, orgName), nil
+	return lro.DoneOperation(convert.ProjectToProto(result, orgName))
 }
 
-func (s *ProjectsServer) UndeleteProject(ctx context.Context, req *apiv1.UndeleteProjectRequest) (*apiv1.Project, error) {
+func (s *ProjectsServer) UndeleteProject(ctx context.Context, req *apiv1.UndeleteProjectRequest) (*longrunningpb.Operation, error) {
 	orgName, projectName, err := parseProjectName(req.GetName())
 	if err != nil {
 		return nil, handleResourceError(err, "Project", req.GetName())
@@ -250,7 +252,7 @@ func (s *ProjectsServer) UndeleteProject(ctx context.Context, req *apiv1.Undelet
 	if err != nil {
 		return nil, handleResourceError(err, "Project", req.GetName())
 	}
-	return convert.ProjectToProto(result, orgName), nil
+	return lro.DoneOperation(convert.ProjectToProto(result, orgName))
 }
 
 func (s *ProjectsServer) GetIamPolicy(ctx context.Context, req *iampb.GetIamPolicyRequest) (*iampb.Policy, error) {

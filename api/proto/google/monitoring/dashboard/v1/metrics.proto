@@ -87,8 +87,7 @@ message TimeSeriesFilter {
 
     // Statistics based time series filter.
     // Note: This field is deprecated and completely ignored by the API.
-    StatisticalTimeSeriesFilter statistical_time_series_filter = 5
-        [deprecated = true];
+    StatisticalTimeSeriesFilter statistical_time_series_filter = 5 [deprecated = true];
   }
 }
 
@@ -127,8 +126,7 @@ message TimeSeriesFilterRatio {
 
     // Statistics based time series filter.
     // Note: This field is deprecated and completely ignored by the API.
-    StatisticalTimeSeriesFilter statistical_time_series_filter = 5
-        [deprecated = true];
+    StatisticalTimeSeriesFilter statistical_time_series_filter = 5 [deprecated = true];
   }
 }
 

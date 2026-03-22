@@ -47,7 +47,7 @@ func Load() *Config {
 			ServiceAccountKey:  getEnv("GOOGLE_CLOUD_SERVICE_ACCOUNT_KEY", ""),
 			ServiceAccountFile: getEnv("GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE", ""),
 		},
-		SyncAuth: loadSyncAuthConfig(),
+		SyncAuth: LoadSyncAuthConfig(),
 	}
 }
 

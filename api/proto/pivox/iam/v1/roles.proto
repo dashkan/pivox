@@ -62,15 +62,12 @@ service Roles {
 
   // Soft-deletes a role. System roles cannot be deleted.
   rpc DeleteRole(DeleteRoleRequest) returns (Role) {
-    option (google.api.http) = {
-      delete: "/v1/{name=organizations/*/roles/*}"
-    };
+    option (google.api.http) = {delete: "/v1/{name=organizations/*/roles/*}"};
     option (google.api.method_signature) = "name";
   }
 
   // Adds members (users or groups) to a role.
-  rpc AddRoleMembers(AddRoleMembersRequest)
-      returns (AddRoleMembersResponse) {
+  rpc AddRoleMembers(AddRoleMembersRequest) returns (AddRoleMembersResponse) {
     option (google.api.http) = {
       post: "/v1/{role=organizations/*/roles/*}:addRoleMembers"
       body: "*"
@@ -79,8 +76,7 @@ service Roles {
   }
 
   // Removes members from a role.
-  rpc RemoveRoleMembers(RemoveRoleMembersRequest)
-      returns (RemoveRoleMembersResponse) {
+  rpc RemoveRoleMembers(RemoveRoleMembersRequest) returns (RemoveRoleMembersResponse) {
     option (google.api.http) = {
       post: "/v1/{role=organizations/*/roles/*}:removeRoleMembers"
       body: "*"
@@ -89,17 +85,13 @@ service Roles {
   }
 
   // Lists members of a role.
-  rpc ListRoleMembers(ListRoleMembersRequest)
-      returns (ListRoleMembersResponse) {
-    option (google.api.http) = {
-      get: "/v1/{role=organizations/*/roles/*}/members"
-    };
+  rpc ListRoleMembers(ListRoleMembersRequest) returns (ListRoleMembersResponse) {
+    option (google.api.http) = {get: "/v1/{role=organizations/*/roles/*}/members"};
     option (google.api.method_signature) = "role";
   }
 
   // Lists all available system-defined permissions.
-  rpc ListPermissions(ListPermissionsRequest)
-      returns (ListPermissionsResponse) {
+  rpc ListPermissions(ListPermissionsRequest) returns (ListPermissionsResponse) {
     option (google.api.http) = {get: "/v1/permissions"};
   }
 }
@@ -121,7 +113,10 @@ message Role {
   // Required. A human-readable name for the role.
   string display_name = 2 [
     (google.api.field_behavior) = REQUIRED,
-    (buf.validate.field).string = {min_len: 1, max_len: 63}
+    (buf.validate.field).string = {
+      min_len: 1
+      max_len: 63
+    }
   ];
 
   // Optional. A longer description of the role's purpose.
@@ -139,28 +134,23 @@ message Role {
   bool system = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when the role was created.
-  google.protobuf.Timestamp create_time = 6
-      [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when the role was last modified.
-  google.protobuf.Timestamp update_time = 7
-      [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when the role was soft-deleted.
-  google.protobuf.Timestamp delete_time = 8
-      [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp delete_time = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when the role will be permanently purged.
-  google.protobuf.Timestamp purge_time = 9
-      [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp purge_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. A checksum computed by the server based on the current value
   // of the Role resource.
   string etag = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Optional. Free-form annotations for the role.
-  map<string, string> annotations = 11
-      [(google.api.field_behavior) = OPTIONAL];
+  map<string, string> annotations = 11 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // A membership of a user or group in a role.
@@ -171,8 +161,7 @@ message RoleMember {
   string member = 1 [(google.api.field_behavior) = REQUIRED];
 
   // Output only. Timestamp when the membership was created.
-  google.protobuf.Timestamp create_time = 2
-      [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Request message for `GetRole`.
@@ -207,7 +196,10 @@ message ListRolesRequest {
   // Optional. Maximum number of roles to return.
   int32 page_size = 2 [
     (google.api.field_behavior) = OPTIONAL,
-    (buf.validate.field).int32 = {gte: 0, lte: 1000}
+    (buf.validate.field).int32 = {
+      gte: 0
+      lte: 1000
+    }
   ];
 
   // Optional. Page token from a previous ListRoles call.
@@ -266,8 +258,7 @@ message UpdateRoleRequest {
   ];
 
   // Optional. The fields to update. If omitted, all mutable fields are updated.
-  google.protobuf.FieldMask update_mask = 2
-      [(google.api.field_behavior) = OPTIONAL];
+  google.protobuf.FieldMask update_mask = 2 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // Request message for `DeleteRole`.
@@ -307,7 +298,10 @@ message AddRoleMembersRequest {
   //         `organizations/{organization}/groups/{group}`
   repeated string members = 2 [
     (google.api.field_behavior) = REQUIRED,
-    (buf.validate.field).repeated = {min_items: 1, max_items: 100}
+    (buf.validate.field).repeated = {
+      min_items: 1
+      max_items: 100
+    }
   ];
 }
 
@@ -331,7 +325,10 @@ message RemoveRoleMembersRequest {
   // Required. The resource names of users or groups to remove.
   repeated string members = 2 [
     (google.api.field_behavior) = REQUIRED,
-    (buf.validate.field).repeated = {min_items: 1, max_items: 100}
+    (buf.validate.field).repeated = {
+      min_items: 1
+      max_items: 100
+    }
   ];
 }
 
@@ -361,7 +358,10 @@ message ListRoleMembersRequest {
   // Optional. Maximum number of members to return.
   int32 page_size = 2 [
     (google.api.field_behavior) = OPTIONAL,
-    (buf.validate.field).int32 = {gte: 0, lte: 1000}
+    (buf.validate.field).int32 = {
+      gte: 0
+      lte: 1000
+    }
   ];
 
   // Optional. Page token from a previous ListRoleMembers call.
@@ -408,7 +408,10 @@ message ListPermissionsRequest {
   // Optional. Maximum number of permissions to return.
   int32 page_size = 1 [
     (google.api.field_behavior) = OPTIONAL,
-    (buf.validate.field).int32 = {gte: 0, lte: 1000}
+    (buf.validate.field).int32 = {
+      gte: 0
+      lte: 1000
+    }
   ];
 
   // Optional. Page token from a previous ListPermissions call.

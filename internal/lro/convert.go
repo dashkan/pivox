@@ -36,6 +36,23 @@ func unmarshalAny(data []byte) (*anypb.Any, error) {
 	return a, nil
 }
 
+// DoneOperation creates an already-completed Operation proto wrapping the
+// given response. Use this for mutations that complete synchronously but
+// whose proto return type is google.longrunning.Operation.
+func DoneOperation(response proto.Message) (*longrunningpb.Operation, error) {
+	a, err := anypb.New(response)
+	if err != nil {
+		return nil, fmt.Errorf("marshal response to Any: %w", err)
+	}
+	return &longrunningpb.Operation{
+		Name: fmt.Sprintf("operations/%s", response.ProtoReflect().Descriptor().FullName()),
+		Done: true,
+		Result: &longrunningpb.Operation_Response{
+			Response: a,
+		},
+	}, nil
+}
+
 func dbToProto(op db.Operation) (*longrunningpb.Operation, error) {
 	// Construct operation name: "operations/{prefix}/{uuid}"
 	name := fmt.Sprintf("operations/%s/%s", op.Prefix, op.ID.String())

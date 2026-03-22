@@ -73,14 +73,14 @@ type OrganizationsClient interface {
 	// Creates a new organization resource.
 	//
 	// The caller must have `resourcemanager.organizations.create` permission.
-	CreateOrganization(ctx context.Context, in *CreateOrganizationRequest, opts ...grpc.CallOption) (*Organization, error)
+	CreateOrganization(ctx context.Context, in *CreateOrganizationRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
 	// Updates an organization resource. Only the `display_name` and
 	// `annotations` fields can be updated. Use the field mask to specify which
 	// fields to update. Omitting the field mask updates all mutable fields.
 	//
 	// The caller must have `resourcemanager.organizations.update` permission
 	// on the specified organization.
-	UpdateOrganization(ctx context.Context, in *UpdateOrganizationRequest, opts ...grpc.CallOption) (*Organization, error)
+	UpdateOrganization(ctx context.Context, in *UpdateOrganizationRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
 	// Gets the access control policy for an organization resource. The policy may
 	// be empty if no such policy or resource exists. The `resource` field should
 	// be the organization's resource name, for example: "organizations/123".
@@ -179,9 +179,9 @@ func (c *organizationsClient) ListOrganizations(ctx context.Context, in *ListOrg
 	return out, nil
 }
 
-func (c *organizationsClient) CreateOrganization(ctx context.Context, in *CreateOrganizationRequest, opts ...grpc.CallOption) (*Organization, error) {
+func (c *organizationsClient) CreateOrganization(ctx context.Context, in *CreateOrganizationRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Organization)
+	out := new(longrunningpb.Operation)
 	err := c.cc.Invoke(ctx, Organizations_CreateOrganization_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -189,9 +189,9 @@ func (c *organizationsClient) CreateOrganization(ctx context.Context, in *Create
 	return out, nil
 }
 
-func (c *organizationsClient) UpdateOrganization(ctx context.Context, in *UpdateOrganizationRequest, opts ...grpc.CallOption) (*Organization, error) {
+func (c *organizationsClient) UpdateOrganization(ctx context.Context, in *UpdateOrganizationRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Organization)
+	out := new(longrunningpb.Operation)
 	err := c.cc.Invoke(ctx, Organizations_UpdateOrganization_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -366,14 +366,14 @@ type OrganizationsServer interface {
 	// Creates a new organization resource.
 	//
 	// The caller must have `resourcemanager.organizations.create` permission.
-	CreateOrganization(context.Context, *CreateOrganizationRequest) (*Organization, error)
+	CreateOrganization(context.Context, *CreateOrganizationRequest) (*longrunningpb.Operation, error)
 	// Updates an organization resource. Only the `display_name` and
 	// `annotations` fields can be updated. Use the field mask to specify which
 	// fields to update. Omitting the field mask updates all mutable fields.
 	//
 	// The caller must have `resourcemanager.organizations.update` permission
 	// on the specified organization.
-	UpdateOrganization(context.Context, *UpdateOrganizationRequest) (*Organization, error)
+	UpdateOrganization(context.Context, *UpdateOrganizationRequest) (*longrunningpb.Operation, error)
 	// Gets the access control policy for an organization resource. The policy may
 	// be empty if no such policy or resource exists. The `resource` field should
 	// be the organization's resource name, for example: "organizations/123".
@@ -458,10 +458,10 @@ func (UnimplementedOrganizationsServer) GetOrganization(context.Context, *GetOrg
 func (UnimplementedOrganizationsServer) ListOrganizations(context.Context, *ListOrganizationsRequest) (*ListOrganizationsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListOrganizations not implemented")
 }
-func (UnimplementedOrganizationsServer) CreateOrganization(context.Context, *CreateOrganizationRequest) (*Organization, error) {
+func (UnimplementedOrganizationsServer) CreateOrganization(context.Context, *CreateOrganizationRequest) (*longrunningpb.Operation, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateOrganization not implemented")
 }
-func (UnimplementedOrganizationsServer) UpdateOrganization(context.Context, *UpdateOrganizationRequest) (*Organization, error) {
+func (UnimplementedOrganizationsServer) UpdateOrganization(context.Context, *UpdateOrganizationRequest) (*longrunningpb.Operation, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateOrganization not implemented")
 }
 func (UnimplementedOrganizationsServer) GetIamPolicy(context.Context, *v1.GetIamPolicyRequest) (*v1.Policy, error) {

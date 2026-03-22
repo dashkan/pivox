@@ -11,7 +11,7 @@ type SyncAuthConfig struct {
 	SharedSecret string
 }
 
-func loadSyncAuthConfig() SyncAuthConfig {
+func LoadSyncAuthConfig() SyncAuthConfig {
 	return SyncAuthConfig{
 		SharedSecret: getEnvRequired("SHARED_SECRET"),
 	}

@@ -21,11 +21,11 @@
 package apiv1
 
 import (
+	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
 	context "context"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -54,9 +54,9 @@ type TagBindingsClient interface {
 	// Retrieves a TagBinding.
 	GetTagBinding(ctx context.Context, in *GetTagBindingRequest, opts ...grpc.CallOption) (*TagBinding, error)
 	// Creates a TagBinding between a TagValue and a Pivox resource.
-	CreateTagBinding(ctx context.Context, in *CreateTagBindingRequest, opts ...grpc.CallOption) (*TagBinding, error)
+	CreateTagBinding(ctx context.Context, in *CreateTagBindingRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
 	// Deletes a TagBinding.
-	DeleteTagBinding(ctx context.Context, in *DeleteTagBindingRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	DeleteTagBinding(ctx context.Context, in *DeleteTagBindingRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
 	// Return a list of effective tags for the given Pivox resource, as
 	// specified in `parent`.
 	ListEffectiveTags(ctx context.Context, in *ListEffectiveTagsRequest, opts ...grpc.CallOption) (*ListEffectiveTagsResponse, error)
@@ -90,9 +90,9 @@ func (c *tagBindingsClient) GetTagBinding(ctx context.Context, in *GetTagBinding
 	return out, nil
 }
 
-func (c *tagBindingsClient) CreateTagBinding(ctx context.Context, in *CreateTagBindingRequest, opts ...grpc.CallOption) (*TagBinding, error) {
+func (c *tagBindingsClient) CreateTagBinding(ctx context.Context, in *CreateTagBindingRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(TagBinding)
+	out := new(longrunningpb.Operation)
 	err := c.cc.Invoke(ctx, TagBindings_CreateTagBinding_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -100,9 +100,9 @@ func (c *tagBindingsClient) CreateTagBinding(ctx context.Context, in *CreateTagB
 	return out, nil
 }
 
-func (c *tagBindingsClient) DeleteTagBinding(ctx context.Context, in *DeleteTagBindingRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *tagBindingsClient) DeleteTagBinding(ctx context.Context, in *DeleteTagBindingRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(emptypb.Empty)
+	out := new(longrunningpb.Operation)
 	err := c.cc.Invoke(ctx, TagBindings_DeleteTagBinding_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -133,9 +133,9 @@ type TagBindingsServer interface {
 	// Retrieves a TagBinding.
 	GetTagBinding(context.Context, *GetTagBindingRequest) (*TagBinding, error)
 	// Creates a TagBinding between a TagValue and a Pivox resource.
-	CreateTagBinding(context.Context, *CreateTagBindingRequest) (*TagBinding, error)
+	CreateTagBinding(context.Context, *CreateTagBindingRequest) (*longrunningpb.Operation, error)
 	// Deletes a TagBinding.
-	DeleteTagBinding(context.Context, *DeleteTagBindingRequest) (*emptypb.Empty, error)
+	DeleteTagBinding(context.Context, *DeleteTagBindingRequest) (*longrunningpb.Operation, error)
 	// Return a list of effective tags for the given Pivox resource, as
 	// specified in `parent`.
 	ListEffectiveTags(context.Context, *ListEffectiveTagsRequest) (*ListEffectiveTagsResponse, error)
@@ -155,10 +155,10 @@ func (UnimplementedTagBindingsServer) ListTagBindings(context.Context, *ListTagB
 func (UnimplementedTagBindingsServer) GetTagBinding(context.Context, *GetTagBindingRequest) (*TagBinding, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetTagBinding not implemented")
 }
-func (UnimplementedTagBindingsServer) CreateTagBinding(context.Context, *CreateTagBindingRequest) (*TagBinding, error) {
+func (UnimplementedTagBindingsServer) CreateTagBinding(context.Context, *CreateTagBindingRequest) (*longrunningpb.Operation, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateTagBinding not implemented")
 }
-func (UnimplementedTagBindingsServer) DeleteTagBinding(context.Context, *DeleteTagBindingRequest) (*emptypb.Empty, error) {
+func (UnimplementedTagBindingsServer) DeleteTagBinding(context.Context, *DeleteTagBindingRequest) (*longrunningpb.Operation, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteTagBinding not implemented")
 }
 func (UnimplementedTagBindingsServer) ListEffectiveTags(context.Context, *ListEffectiveTagsRequest) (*ListEffectiveTagsResponse, error) {

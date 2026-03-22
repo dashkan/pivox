@@ -20,11 +20,11 @@ import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
 import "google/protobuf/timestamp.proto";
 
+option csharp_namespace = "Google.Cloud.Monitoring.MetricsScope.V1";
 option go_package = "cloud.google.com/go/monitoring/metricsscope/apiv1/metricsscopepb;metricsscopepb";
 option java_multiple_files = true;
 option java_outer_classname = "MetricsScopeProto";
 option java_package = "com.google.monitoring.metricsscope.v1";
-option csharp_namespace = "Google.Cloud.Monitoring.MetricsScope.V1";
 option php_namespace = "Google\\Cloud\\Monitoring\\MetricsScope\\V1";
 option ruby_package = "Google::Cloud::Monitoring::MetricsScope::V1";
 

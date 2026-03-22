@@ -166,9 +166,7 @@ option java_package = "com.google.watcher.v1";
 service Watcher {
   // Start a streaming RPC to get watch information from the server.
   rpc Watch(Request) returns (stream ChangeBatch) {
-    option (google.api.http) = {
-      get: "/v1/watch"
-    };
+    option (google.api.http) = {get: "/v1/watch"};
   }
 }
 

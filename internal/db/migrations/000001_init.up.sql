@@ -30,6 +30,19 @@ CREATE TYPE project_member_type AS ENUM ('user', 'group');
 CREATE TYPE invitation_state AS ENUM (
     'PENDING', 'ACCEPTED', 'DECLINED', 'REVOKED', 'EXPIRED'
 );
+CREATE TYPE storage_gateway_state AS ENUM (
+    'PROVISIONING', 'ACTIVE', 'DEGRADED', 'OFFLINE'
+);
+CREATE TYPE cert_state AS ENUM (
+    'PENDING', 'ACTIVE', 'EXPIRING', 'EXPIRED'
+);
+CREATE TYPE eviction_policy AS ENUM ('LRU', 'LFU');
+CREATE TYPE agent_state AS ENUM (
+    'CONNECTING', 'CONNECTED', 'DRAINING', 'UPGRADING', 'DISCONNECTED'
+);
+CREATE TYPE endpoint_engine AS ENUM ('S3', 'RUSTFS', 'GCS', 'MINIO');
+CREATE TYPE endpoint_state AS ENUM ('ACTIVE', 'INACTIVE', 'UNREACHABLE');
+CREATE TYPE credential_state AS ENUM ('UNSET', 'SET', 'INVALID');
 
 -- ============================================================================
 -- operations (LRO storage)
@@ -140,6 +153,103 @@ CREATE TABLE projects (
     UNIQUE(org_id, name)
 );
 CREATE INDEX idx_projects_org ON projects (org_id) WHERE delete_time IS NULL;
+
+-- ============================================================================
+-- storage_gateways (per-org, on-prem S3 reverse proxy + cache cluster)
+-- ============================================================================
+CREATE TABLE storage_gateways (
+    id                  UUID PRIMARY KEY DEFAULT uuidv7(),
+    -- relationships
+    org_id              UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    -- identity
+    name                TEXT NOT NULL,
+    -- domain
+    display_name        TEXT NOT NULL DEFAULT '',
+    ip_addresses        TEXT[] NOT NULL DEFAULT '{}',
+    registration_token  TEXT NOT NULL,
+    target_version      TEXT NOT NULL DEFAULT '',
+    current_version     TEXT NOT NULL DEFAULT '',
+    hostname            TEXT NOT NULL DEFAULT '',
+    cache_max_size_gb   INTEGER NOT NULL DEFAULT 0,
+    cache_eviction      eviction_policy NOT NULL DEFAULT 'LRU',
+    cache_ttl_hours     INTEGER NOT NULL DEFAULT 0,
+    annotations         JSONB NOT NULL DEFAULT '{}',
+    -- state
+    state               storage_gateway_state NOT NULL DEFAULT 'PROVISIONING',
+    cert_state          cert_state NOT NULL DEFAULT 'PENDING',
+    cert_expiry_time    TIMESTAMPTZ,
+    -- versioning
+    etag                TEXT NOT NULL DEFAULT md5(now()::text),
+    revision            INTEGER NOT NULL DEFAULT 1,
+    -- audit
+    created_by          TEXT NOT NULL DEFAULT '',
+    updated_by          TEXT NOT NULL DEFAULT '',
+    -- timestamps
+    create_time         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    update_time         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- constraints
+    UNIQUE(org_id, name)
+);
+CREATE INDEX idx_storage_gateways_org ON storage_gateways (org_id);
+CREATE UNIQUE INDEX idx_storage_gateways_token
+  ON storage_gateways (registration_token);
+
+-- ============================================================================
+-- agents (per-gateway, server-managed via bidi gRPC)
+-- ============================================================================
+CREATE TABLE agents (
+    id              UUID PRIMARY KEY DEFAULT uuidv7(),
+    -- relationships
+    gateway_id      UUID NOT NULL REFERENCES storage_gateways(id) ON DELETE CASCADE,
+    -- domain
+    ip_address      TEXT NOT NULL DEFAULT '',
+    hostname        TEXT NOT NULL DEFAULT '',
+    version         TEXT NOT NULL DEFAULT '',
+    cache_used_gb   INTEGER NOT NULL DEFAULT 0,
+    -- state
+    state           agent_state NOT NULL DEFAULT 'CONNECTING',
+    cert_expiry_time TIMESTAMPTZ,
+    -- timestamps
+    join_time       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_seen_time  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_agents_gateway ON agents (gateway_id);
+CREATE UNIQUE INDEX idx_agents_gateway_ip
+  ON agents (gateway_id, ip_address);
+
+-- ============================================================================
+-- endpoints (S3-compatible bucket per gateway)
+-- ============================================================================
+CREATE TABLE endpoints (
+    id                UUID PRIMARY KEY DEFAULT uuidv7(),
+    -- relationships
+    gateway_id        UUID NOT NULL REFERENCES storage_gateways(id) ON DELETE CASCADE,
+    -- identity
+    name              TEXT NOT NULL,
+    -- domain
+    display_name      TEXT NOT NULL DEFAULT '',
+    engine            endpoint_engine NOT NULL,
+    endpoint_uri      TEXT NOT NULL,
+    bucket            TEXT NOT NULL,
+    region            TEXT NOT NULL DEFAULT '',
+    credentials       JSONB,  -- encrypted at rest, never returned via API
+    annotations       JSONB NOT NULL DEFAULT '{}',
+    -- state
+    state             endpoint_state NOT NULL DEFAULT 'ACTIVE',
+    credential_state  credential_state NOT NULL DEFAULT 'UNSET',
+    -- versioning
+    etag              TEXT NOT NULL DEFAULT md5(now()::text),
+    revision          INTEGER NOT NULL DEFAULT 1,
+    -- audit
+    created_by        TEXT NOT NULL DEFAULT '',
+    updated_by        TEXT NOT NULL DEFAULT '',
+    -- timestamps
+    create_time       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    update_time       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- constraints
+    UNIQUE(gateway_id, name)
+);
+CREATE INDEX idx_endpoints_gateway ON endpoints (gateway_id);
 
 -- ============================================================================
 -- tag_keys
@@ -567,7 +677,20 @@ INSERT INTO permissions (permission_id, display_name, description) VALUES
   ('apikeys.create', 'Create API Key', 'Create API keys'),
   ('apikeys.get', 'Get API Key', 'View API key details'),
   ('apikeys.update', 'Update API Key', 'Modify API keys'),
-  ('apikeys.delete', 'Delete API Key', 'Delete API keys');
+  ('apikeys.delete', 'Delete API Key', 'Delete API keys'),
+  -- Storage gateway management
+  ('storage.gateways.create', 'Create Storage Gateway', 'Create storage gateways'),
+  ('storage.gateways.get', 'Get Storage Gateway', 'View storage gateway details'),
+  ('storage.gateways.update', 'Update Storage Gateway', 'Modify storage gateways'),
+  ('storage.gateways.delete', 'Delete Storage Gateway', 'Delete storage gateways'),
+  ('storage.gateways.upgrade', 'Upgrade Storage Gateway', 'Trigger gateway upgrades'),
+  ('storage.endpoints.create', 'Create Storage Endpoint', 'Create storage endpoints'),
+  ('storage.endpoints.get', 'Get Storage Endpoint', 'View storage endpoint details'),
+  ('storage.endpoints.update', 'Update Storage Endpoint', 'Modify storage endpoints'),
+  ('storage.endpoints.delete', 'Delete Storage Endpoint', 'Delete storage endpoints'),
+  ('storage.agents.get', 'Get Agent', 'View agent details'),
+  ('storage.agents.drain', 'Drain Agent', 'Drain agents for maintenance'),
+  ('storage.agents.remove', 'Remove Agent', 'Remove agents from gateway pool');
 
 -- ============================================================================
 -- auth_token_codes (short-lived opaque codes for Electron provider linking)

@@ -33,8 +33,7 @@ message IncidentList {
   // The resource doesn't need to be fully specified. That is, you can specify
   // the resource type but not the values of the resource labels.
   // The resource type and labels are used for filtering.
-  repeated google.api.MonitoredResource monitored_resources = 1
-      [(google.api.field_behavior) = OPTIONAL];
+  repeated google.api.MonitoredResource monitored_resources = 1 [(google.api.field_behavior) = OPTIONAL];
 
   // Optional. A list of alert policy names to filter the incident list by.
   // Don't include the project ID prefix in the policy name. For

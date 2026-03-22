@@ -22,6 +22,7 @@ package apiv1
 
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
+	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
 	v1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/iam/v1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -554,11 +555,125 @@ func (x *DeleteTagValueRequest) GetEtag() string {
 	return ""
 }
 
+// A status object which is used as the `metadata` field for the Operation
+// returned by CreateTagValue.
+type CreateTagValueMetadata struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateTagValueMetadata) Reset() {
+	*x = CreateTagValueMetadata{}
+	mi := &file_pivox_api_v1_tag_values_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateTagValueMetadata) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateTagValueMetadata) ProtoMessage() {}
+
+func (x *CreateTagValueMetadata) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_api_v1_tag_values_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateTagValueMetadata.ProtoReflect.Descriptor instead.
+func (*CreateTagValueMetadata) Descriptor() ([]byte, []int) {
+	return file_pivox_api_v1_tag_values_proto_rawDescGZIP(), []int{7}
+}
+
+// A status object which is used as the `metadata` field for the Operation
+// returned by UpdateTagValue.
+type UpdateTagValueMetadata struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateTagValueMetadata) Reset() {
+	*x = UpdateTagValueMetadata{}
+	mi := &file_pivox_api_v1_tag_values_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateTagValueMetadata) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateTagValueMetadata) ProtoMessage() {}
+
+func (x *UpdateTagValueMetadata) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_api_v1_tag_values_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateTagValueMetadata.ProtoReflect.Descriptor instead.
+func (*UpdateTagValueMetadata) Descriptor() ([]byte, []int) {
+	return file_pivox_api_v1_tag_values_proto_rawDescGZIP(), []int{8}
+}
+
+// A status object which is used as the `metadata` field for the Operation
+// returned by DeleteTagValue.
+type DeleteTagValueMetadata struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteTagValueMetadata) Reset() {
+	*x = DeleteTagValueMetadata{}
+	mi := &file_pivox_api_v1_tag_values_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteTagValueMetadata) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteTagValueMetadata) ProtoMessage() {}
+
+func (x *DeleteTagValueMetadata) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_api_v1_tag_values_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteTagValueMetadata.ProtoReflect.Descriptor instead.
+func (*DeleteTagValueMetadata) Descriptor() ([]byte, []int) {
+	return file_pivox_api_v1_tag_values_proto_rawDescGZIP(), []int{9}
+}
+
 var File_pivox_api_v1_tag_values_proto protoreflect.FileDescriptor
 
 const file_pivox_api_v1_tag_values_proto_rawDesc = "" +
 	"\n" +
-	"\x1dpivox/api/v1/tag_values.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1dpivox/iam/v1/iam_policy.proto\x1a\x19pivox/iam/v1/policy.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xce\x04\n" +
+	"\x1dpivox/api/v1/tag_values.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1dpivox/iam/v1/iam_policy.proto\x1a\x19pivox/iam/v1/policy.proto\"\xce\x04\n" +
 	"\bTagValue\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12-\n" +
 	"\vdescription\x18\x05 \x01(\tB\v\xe0A\x01\xbaH\x05r\x03\x18\x80\x02R\vdescription\x12@\n" +
@@ -606,17 +721,23 @@ const file_pivox_api_v1_tag_values_proto_rawDesc = "" +
 	"\x12pivox.api/TagValue\xbaH1\xba\x01.\n" +
 	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\x12(\n" +
 	"\rvalidate_only\x18\x02 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\x12\x17\n" +
-	"\x04etag\x18\x03 \x01(\tB\x03\xe0A\x01R\x04etag2\xbd\x0f\n" +
+	"\x04etag\x18\x03 \x01(\tB\x03\xe0A\x01R\x04etag\"\x18\n" +
+	"\x16CreateTagValueMetadata\"\x18\n" +
+	"\x16UpdateTagValueMetadata\"\x18\n" +
+	"\x16DeleteTagValueMetadata2\xc2\x10\n" +
 	"\tTagValues\x12\xdb\x01\n" +
 	"\rListTagValues\x12\".pivox.api.v1.ListTagValuesRequest\x1a#.pivox.api.v1.ListTagValuesResponse\"\x80\x01\xdaA\x06parent\x82\xd3\xe4\x93\x02qZ=\x12;/v1/{parent=organizations/*/projects/*/tagKeys/*}/tagValues\x120/v1/{parent=organizations/*/tagKeys/*}/tagValues\x12\xc7\x01\n" +
-	"\vGetTagValue\x12 .pivox.api.v1.GetTagValueRequest\x1a\x16.pivox.api.v1.TagValue\"~\xdaA\x04name\x82\xd3\xe4\x93\x02qZ=\x12;/v1/{name=organizations/*/projects/*/tagKeys/*/tagValues/*}\x120/v1/{name=organizations/*/tagKeys/*/tagValues/*}\x12\xfe\x01\n" +
-	"\x0eCreateTagValue\x12#.pivox.api.v1.CreateTagValueRequest\x1a\x16.pivox.api.v1.TagValue\"\xae\x01\xdaA\x1dparent,tag_value,tag_value_id\x82\xd3\xe4\x93\x02\x87\x01:\ttag_valueZH:\ttag_value\";/v1/{parent=organizations/*/projects/*/tagKeys/*}/tagValues\"0/v1/{parent=organizations/*/tagKeys/*}/tagValues\x12\x8a\x02\n" +
-	"\x0eUpdateTagValue\x12#.pivox.api.v1.UpdateTagValueRequest\x1a\x16.pivox.api.v1.TagValue\"\xba\x01\xdaA\x15tag_value,update_mask\x82\xd3\xe4\x93\x02\x9b\x01:\ttag_valueZR:\ttag_value2E/v1/{tag_value.name=organizations/*/projects/*/tagKeys/*/tagValues/*}2:/v1/{tag_value.name=organizations/*/tagKeys/*/tagValues/*}\x12\xcd\x01\n" +
-	"\x0eDeleteTagValue\x12#.pivox.api.v1.DeleteTagValueRequest\x1a\x16.pivox.api.v1.TagValue\"~\xdaA\x04name\x82\xd3\xe4\x93\x02qZ=*;/v1/{name=organizations/*/projects/*/tagKeys/*/tagValues/*}*0/v1/{name=organizations/*/tagKeys/*/tagValues/*}\x12\xe9\x01\n" +
+	"\vGetTagValue\x12 .pivox.api.v1.GetTagValueRequest\x1a\x16.pivox.api.v1.TagValue\"~\xdaA\x04name\x82\xd3\xe4\x93\x02qZ=\x12;/v1/{name=organizations/*/projects/*/tagKeys/*/tagValues/*}\x120/v1/{name=organizations/*/tagKeys/*/tagValues/*}\x12\xaa\x02\n" +
+	"\x0eCreateTagValue\x12#.pivox.api.v1.CreateTagValueRequest\x1a\x1d.google.longrunning.Operation\"\xd3\x01\xcaA\"\n" +
+	"\bTagValue\x12\x16CreateTagValueMetadata\xdaA\x1dparent,tag_value,tag_value_id\x82\xd3\xe4\x93\x02\x87\x01:\ttag_valueZH:\ttag_value\";/v1/{parent=organizations/*/projects/*/tagKeys/*}/tagValues\"0/v1/{parent=organizations/*/tagKeys/*}/tagValues\x12\xb6\x02\n" +
+	"\x0eUpdateTagValue\x12#.pivox.api.v1.UpdateTagValueRequest\x1a\x1d.google.longrunning.Operation\"\xdf\x01\xcaA\"\n" +
+	"\bTagValue\x12\x16UpdateTagValueMetadata\xdaA\x15tag_value,update_mask\x82\xd3\xe4\x93\x02\x9b\x01:\ttag_valueZR:\ttag_value2E/v1/{tag_value.name=organizations/*/projects/*/tagKeys/*/tagValues/*}2:/v1/{tag_value.name=organizations/*/tagKeys/*/tagValues/*}\x12\xfa\x01\n" +
+	"\x0eDeleteTagValue\x12#.pivox.api.v1.DeleteTagValueRequest\x1a\x1d.google.longrunning.Operation\"\xa3\x01\xcaA\"\n" +
+	"\bTagValue\x12\x16DeleteTagValueMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02qZ=*;/v1/{name=organizations/*/projects/*/tagKeys/*/tagValues/*}*0/v1/{name=organizations/*/tagKeys/*/tagValues/*}\x12\xe9\x01\n" +
 	"\fGetIamPolicy\x12!.pivox.iam.v1.GetIamPolicyRequest\x1a\x14.pivox.iam.v1.Policy\"\x9f\x01\xdaA\x04name\x82\xd3\xe4\x93\x02\x91\x01:\x01*ZM:\x01*\"H/v1/{name=organizations/*/projects/*/tagKeys/*/tagValues/*}:getIamPolicy\"=/v1/{name=organizations/*/tagKeys/*/tagValues/*}:getIamPolicy\x12\xfc\x01\n" +
 	"\fSetIamPolicy\x12!.pivox.iam.v1.SetIamPolicyRequest\x1a\x14.pivox.iam.v1.Policy\"\xb2\x01\xdaA\x0fresource,policy\x82\xd3\xe4\x93\x02\x99\x01:\x01*ZQ:\x01*\"L/v1/{resource=organizations/*/projects/*/tagKeys/*/tagValues/*}:setIamPolicy\"A/v1/{resource=organizations/*/tagKeys/*/tagValues/*}:setIamPolicy\x12\xad\x02\n" +
-	"\x12TestIamPermissions\x12'.pivox.iam.v1.TestIamPermissionsRequest\x1a(.pivox.iam.v1.TestIamPermissionsResponse\"\xc3\x01\xdaA\x14resource,permissions\x82\xd3\xe4\x93\x02\xa5\x01:\x01*ZW:\x01*\"R/v1/{resource=organizations/*/projects/*/tagKeys/*/tagValues/*}:testIamPermissions\"G/v1/{resource=organizations/*/tagKeys/*/tagValues/*}:testIamPermissions\x1a\x0f\xcaA\fapi.pivox.ioB\xb2\x01\n" +
-	"\x10com.pivox.api.v1B\x0eTagValuesProtoP\x01Z<github.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
+	"\x12TestIamPermissions\x12'.pivox.iam.v1.TestIamPermissionsRequest\x1a(.pivox.iam.v1.TestIamPermissionsResponse\"\xc3\x01\xdaA\x14resource,permissions\x82\xd3\xe4\x93\x02\xa5\x01:\x01*ZW:\x01*\"R/v1/{resource=organizations/*/projects/*/tagKeys/*/tagValues/*}:testIamPermissions\"G/v1/{resource=organizations/*/tagKeys/*/tagValues/*}:testIamPermissions\x1a\x0f\xcaA\fapi.pivox.ioB\xb9\x01\n" +
+	"\x10com.pivox.api.v1B\x0eTagValuesProtoP\x01ZCgithub.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
 
 var (
 	file_pivox_api_v1_tag_values_proto_rawDescOnce sync.Once
@@ -630,7 +751,7 @@ func file_pivox_api_v1_tag_values_proto_rawDescGZIP() []byte {
 	return file_pivox_api_v1_tag_values_proto_rawDescData
 }
 
-var file_pivox_api_v1_tag_values_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_pivox_api_v1_tag_values_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_pivox_api_v1_tag_values_proto_goTypes = []any{
 	(*TagValue)(nil),                      // 0: pivox.api.v1.TagValue
 	(*ListTagValuesRequest)(nil),          // 1: pivox.api.v1.ListTagValuesRequest
@@ -639,39 +760,43 @@ var file_pivox_api_v1_tag_values_proto_goTypes = []any{
 	(*CreateTagValueRequest)(nil),         // 4: pivox.api.v1.CreateTagValueRequest
 	(*UpdateTagValueRequest)(nil),         // 5: pivox.api.v1.UpdateTagValueRequest
 	(*DeleteTagValueRequest)(nil),         // 6: pivox.api.v1.DeleteTagValueRequest
-	nil,                                   // 7: pivox.api.v1.TagValue.AnnotationsEntry
-	(*timestamppb.Timestamp)(nil),         // 8: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),         // 9: google.protobuf.FieldMask
-	(*v1.GetIamPolicyRequest)(nil),        // 10: pivox.iam.v1.GetIamPolicyRequest
-	(*v1.SetIamPolicyRequest)(nil),        // 11: pivox.iam.v1.SetIamPolicyRequest
-	(*v1.TestIamPermissionsRequest)(nil),  // 12: pivox.iam.v1.TestIamPermissionsRequest
-	(*v1.Policy)(nil),                     // 13: pivox.iam.v1.Policy
-	(*v1.TestIamPermissionsResponse)(nil), // 14: pivox.iam.v1.TestIamPermissionsResponse
+	(*CreateTagValueMetadata)(nil),        // 7: pivox.api.v1.CreateTagValueMetadata
+	(*UpdateTagValueMetadata)(nil),        // 8: pivox.api.v1.UpdateTagValueMetadata
+	(*DeleteTagValueMetadata)(nil),        // 9: pivox.api.v1.DeleteTagValueMetadata
+	nil,                                   // 10: pivox.api.v1.TagValue.AnnotationsEntry
+	(*timestamppb.Timestamp)(nil),         // 11: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),         // 12: google.protobuf.FieldMask
+	(*v1.GetIamPolicyRequest)(nil),        // 13: pivox.iam.v1.GetIamPolicyRequest
+	(*v1.SetIamPolicyRequest)(nil),        // 14: pivox.iam.v1.SetIamPolicyRequest
+	(*v1.TestIamPermissionsRequest)(nil),  // 15: pivox.iam.v1.TestIamPermissionsRequest
+	(*longrunningpb.Operation)(nil),       // 16: google.longrunning.Operation
+	(*v1.Policy)(nil),                     // 17: pivox.iam.v1.Policy
+	(*v1.TestIamPermissionsResponse)(nil), // 18: pivox.iam.v1.TestIamPermissionsResponse
 }
 var file_pivox_api_v1_tag_values_proto_depIdxs = []int32{
-	8,  // 0: pivox.api.v1.TagValue.create_time:type_name -> google.protobuf.Timestamp
-	8,  // 1: pivox.api.v1.TagValue.update_time:type_name -> google.protobuf.Timestamp
-	7,  // 2: pivox.api.v1.TagValue.annotations:type_name -> pivox.api.v1.TagValue.AnnotationsEntry
+	11, // 0: pivox.api.v1.TagValue.create_time:type_name -> google.protobuf.Timestamp
+	11, // 1: pivox.api.v1.TagValue.update_time:type_name -> google.protobuf.Timestamp
+	10, // 2: pivox.api.v1.TagValue.annotations:type_name -> pivox.api.v1.TagValue.AnnotationsEntry
 	0,  // 3: pivox.api.v1.ListTagValuesResponse.tag_values:type_name -> pivox.api.v1.TagValue
 	0,  // 4: pivox.api.v1.CreateTagValueRequest.tag_value:type_name -> pivox.api.v1.TagValue
 	0,  // 5: pivox.api.v1.UpdateTagValueRequest.tag_value:type_name -> pivox.api.v1.TagValue
-	9,  // 6: pivox.api.v1.UpdateTagValueRequest.update_mask:type_name -> google.protobuf.FieldMask
+	12, // 6: pivox.api.v1.UpdateTagValueRequest.update_mask:type_name -> google.protobuf.FieldMask
 	1,  // 7: pivox.api.v1.TagValues.ListTagValues:input_type -> pivox.api.v1.ListTagValuesRequest
 	3,  // 8: pivox.api.v1.TagValues.GetTagValue:input_type -> pivox.api.v1.GetTagValueRequest
 	4,  // 9: pivox.api.v1.TagValues.CreateTagValue:input_type -> pivox.api.v1.CreateTagValueRequest
 	5,  // 10: pivox.api.v1.TagValues.UpdateTagValue:input_type -> pivox.api.v1.UpdateTagValueRequest
 	6,  // 11: pivox.api.v1.TagValues.DeleteTagValue:input_type -> pivox.api.v1.DeleteTagValueRequest
-	10, // 12: pivox.api.v1.TagValues.GetIamPolicy:input_type -> pivox.iam.v1.GetIamPolicyRequest
-	11, // 13: pivox.api.v1.TagValues.SetIamPolicy:input_type -> pivox.iam.v1.SetIamPolicyRequest
-	12, // 14: pivox.api.v1.TagValues.TestIamPermissions:input_type -> pivox.iam.v1.TestIamPermissionsRequest
+	13, // 12: pivox.api.v1.TagValues.GetIamPolicy:input_type -> pivox.iam.v1.GetIamPolicyRequest
+	14, // 13: pivox.api.v1.TagValues.SetIamPolicy:input_type -> pivox.iam.v1.SetIamPolicyRequest
+	15, // 14: pivox.api.v1.TagValues.TestIamPermissions:input_type -> pivox.iam.v1.TestIamPermissionsRequest
 	2,  // 15: pivox.api.v1.TagValues.ListTagValues:output_type -> pivox.api.v1.ListTagValuesResponse
 	0,  // 16: pivox.api.v1.TagValues.GetTagValue:output_type -> pivox.api.v1.TagValue
-	0,  // 17: pivox.api.v1.TagValues.CreateTagValue:output_type -> pivox.api.v1.TagValue
-	0,  // 18: pivox.api.v1.TagValues.UpdateTagValue:output_type -> pivox.api.v1.TagValue
-	0,  // 19: pivox.api.v1.TagValues.DeleteTagValue:output_type -> pivox.api.v1.TagValue
-	13, // 20: pivox.api.v1.TagValues.GetIamPolicy:output_type -> pivox.iam.v1.Policy
-	13, // 21: pivox.api.v1.TagValues.SetIamPolicy:output_type -> pivox.iam.v1.Policy
-	14, // 22: pivox.api.v1.TagValues.TestIamPermissions:output_type -> pivox.iam.v1.TestIamPermissionsResponse
+	16, // 17: pivox.api.v1.TagValues.CreateTagValue:output_type -> google.longrunning.Operation
+	16, // 18: pivox.api.v1.TagValues.UpdateTagValue:output_type -> google.longrunning.Operation
+	16, // 19: pivox.api.v1.TagValues.DeleteTagValue:output_type -> google.longrunning.Operation
+	17, // 20: pivox.api.v1.TagValues.GetIamPolicy:output_type -> pivox.iam.v1.Policy
+	17, // 21: pivox.api.v1.TagValues.SetIamPolicy:output_type -> pivox.iam.v1.Policy
+	18, // 22: pivox.api.v1.TagValues.TestIamPermissions:output_type -> pivox.iam.v1.TestIamPermissionsResponse
 	15, // [15:23] is the sub-list for method output_type
 	7,  // [7:15] is the sub-list for method input_type
 	7,  // [7:7] is the sub-list for extension type_name
@@ -690,7 +815,7 @@ func file_pivox_api_v1_tag_values_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pivox_api_v1_tag_values_proto_rawDesc), len(file_pivox_api_v1_tag_values_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

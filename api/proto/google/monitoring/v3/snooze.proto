@@ -51,9 +51,7 @@ message Snooze {
     // snooze creation.
     // Exactly 1 alert policy is required if `filter` is specified at the same
     // time.
-    repeated string policies = 1 [(google.api.resource_reference) = {
-      type: "monitoring.googleapis.com/AlertPolicy"
-    }];
+    repeated string policies = 1 [(google.api.resource_reference) = {type: "monitoring.googleapis.com/AlertPolicy"}];
 
     // Optional. The filter string to match on Alert fields when silencing the
     // alerts. It follows the standard https://google.aip.dev/160 syntax.

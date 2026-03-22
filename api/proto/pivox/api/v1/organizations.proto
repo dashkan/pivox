@@ -20,13 +20,12 @@ import "buf/validate/validate.proto";
 import "google/api/annotations.proto";
 import "google/api/client.proto";
 import "google/api/field_behavior.proto";
-
 import "google/api/resource.proto";
-import "pivox/iam/v1/iam_policy.proto";
-import "pivox/iam/v1/policy.proto";
 import "google/longrunning/operations.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
+import "pivox/iam/v1/iam_policy.proto";
+import "pivox/iam/v1/policy.proto";
 
 option go_package = "pivox/api/v1;apiv1";
 
@@ -52,12 +51,16 @@ service Organizations {
   // Creates a new organization resource.
   //
   // The caller must have `resourcemanager.organizations.create` permission.
-  rpc CreateOrganization(CreateOrganizationRequest) returns (Organization) {
+  rpc CreateOrganization(CreateOrganizationRequest) returns (google.longrunning.Operation) {
     option (google.api.http) = {
       post: "/v1/organizations"
       body: "organization"
     };
     option (google.api.method_signature) = "organization,organization_id";
+    option (google.longrunning.operation_info) = {
+      response_type: "Organization"
+      metadata_type: "CreateOrganizationMetadata"
+    };
   }
 
   // Updates an organization resource. Only the `display_name` and
@@ -66,13 +69,17 @@ service Organizations {
   //
   // The caller must have `resourcemanager.organizations.update` permission
   // on the specified organization.
-  rpc UpdateOrganization(UpdateOrganizationRequest) returns (Organization) {
+  rpc UpdateOrganization(UpdateOrganizationRequest) returns (google.longrunning.Operation) {
     option (google.api.http) = {
       patch: "/v1/{organization.name=organizations/*}"
       body: "organization"
     };
     option (google.api.method_signature) = "organization,update_mask";
     option (google.api.method_signature) = "organization";
+    option (google.longrunning.operation_info) = {
+      response_type: "Organization"
+      metadata_type: "UpdateOrganizationMetadata"
+    };
   }
 
   // Gets the access control policy for an organization resource. The policy may
@@ -132,17 +139,13 @@ service Organizations {
 
   // Lists invitations for the organization.
   rpc ListInvitations(ListInvitationsRequest) returns (ListInvitationsResponse) {
-    option (google.api.http) = {
-      get: "/v1/{parent=organizations/*}/invitations"
-    };
+    option (google.api.http) = {get: "/v1/{parent=organizations/*}/invitations"};
     option (google.api.method_signature) = "parent";
   }
 
   // Gets an invitation by resource name.
   rpc GetInvitation(GetInvitationRequest) returns (Invitation) {
-    option (google.api.http) = {
-      get: "/v1/{name=organizations/*/invitations/*}"
-    };
+    option (google.api.http) = {get: "/v1/{name=organizations/*/invitations/*}"};
     option (google.api.method_signature) = "name";
   }
 
@@ -150,8 +153,7 @@ service Organizations {
   // their email must match the invitation's email. On success, a user
   // membership is created in the organization and the specified role is
   // assigned.
-  rpc AcceptInvitation(AcceptInvitationRequest)
-      returns (AcceptInvitationResponse) {
+  rpc AcceptInvitation(AcceptInvitationRequest) returns (AcceptInvitationResponse) {
     option (google.api.http) = {
       post: "/v1/{name=organizations/*/invitations/*}:accept"
       body: "*"
@@ -161,8 +163,7 @@ service Organizations {
 
   // Declines a pending invitation. The caller must be authenticated and
   // their email must match the invitation's email.
-  rpc DeclineInvitation(DeclineInvitationRequest)
-      returns (DeclineInvitationResponse) {
+  rpc DeclineInvitation(DeclineInvitationRequest) returns (DeclineInvitationResponse) {
     option (google.api.http) = {
       post: "/v1/{name=organizations/*/invitations/*}:decline"
       body: "*"
@@ -172,26 +173,20 @@ service Organizations {
 
   // Revokes a pending invitation. Only org admins can revoke invitations.
   rpc DeleteInvitation(DeleteInvitationRequest) returns (Invitation) {
-    option (google.api.http) = {
-      delete: "/v1/{name=organizations/*/invitations/*}"
-    };
+    option (google.api.http) = {delete: "/v1/{name=organizations/*/invitations/*}"};
     option (google.api.method_signature) = "name";
   }
 
   // Gets the invitation policy for an organization.
-  rpc GetInvitationPolicy(GetInvitationPolicyRequest)
-      returns (InvitationPolicy) {
-    option (google.api.http) = {
-      get: "/v1/{name=organizations/*/invitationPolicy}"
-    };
+  rpc GetInvitationPolicy(GetInvitationPolicyRequest) returns (InvitationPolicy) {
+    option (google.api.http) = {get: "/v1/{name=organizations/*/invitationPolicy}"};
     option (google.api.method_signature) = "name";
   }
 
   // Updates the invitation policy for an organization.
   // (-- api-linter: core::0134::response-message-name=disabled
   //     aip.dev/not-precedent: UpdateInvitationPolicy is a singleton sub-resource update. --)
-  rpc UpdateInvitationPolicy(UpdateInvitationPolicyRequest)
-      returns (InvitationPolicy) {
+  rpc UpdateInvitationPolicy(UpdateInvitationPolicyRequest) returns (InvitationPolicy) {
     option (google.api.http) = {
       patch: "/v1/{invitation_policy.name=organizations/*/invitationPolicy}"
       body: "invitation_policy"
@@ -201,17 +196,13 @@ service Organizations {
 
   // Retrieves a custom domain associated with an organization.
   rpc GetCustomDomain(GetCustomDomainRequest) returns (CustomDomain) {
-    option (google.api.http) = {
-      get: "/v1/{name=organizations/*/customDomains/*}"
-    };
+    option (google.api.http) = {get: "/v1/{name=organizations/*/customDomains/*}"};
     option (google.api.method_signature) = "name";
   }
 
   // Lists custom domains associated with an organization.
   rpc ListCustomDomains(ListCustomDomainsRequest) returns (ListCustomDomainsResponse) {
-    option (google.api.http) = {
-      get: "/v1/{parent=organizations/*}/customDomains"
-    };
+    option (google.api.http) = {get: "/v1/{parent=organizations/*}/customDomains"};
     option (google.api.method_signature) = "parent";
   }
 
@@ -241,9 +232,7 @@ service Organizations {
   // The caller must have `resourcemanager.customDomains.delete` permission
   // on the parent organization.
   rpc DeleteCustomDomain(DeleteCustomDomainRequest) returns (google.longrunning.Operation) {
-    option (google.api.http) = {
-      delete: "/v1/{name=organizations/*/customDomains/*}"
-    };
+    option (google.api.http) = {delete: "/v1/{name=organizations/*/customDomains/*}"};
     option (google.api.method_signature) = "name";
     option (google.longrunning.operation_info) = {
       response_type: "CustomDomain"
@@ -649,6 +638,14 @@ message DeleteCustomDomainRequest {
 }
 
 // A status object which is used as the `metadata` field for the Operation
+// returned by CreateOrganization.
+message CreateOrganizationMetadata {}
+
+// A status object which is used as the `metadata` field for the Operation
+// returned by UpdateOrganization.
+message UpdateOrganizationMetadata {}
+
+// A status object which is used as the `metadata` field for the Operation
 // returned by DeleteCustomDomain.
 message DeleteCustomDomainMetadata {}
 
@@ -712,16 +709,13 @@ message Invitation {
   string inviter = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when the invitation was created.
-  google.protobuf.Timestamp create_time = 6
-      [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when the invitation expires.
-  google.protobuf.Timestamp expire_time = 7
-      [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp expire_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when the invitation was accepted.
-  google.protobuf.Timestamp accept_time = 8
-      [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp accept_time = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. A checksum computed by the server based on the current value
   // of the Invitation resource.
@@ -745,23 +739,19 @@ message InvitationPolicy {
   // Optional. When true, invitations to public email addresses (gmail.com,
   // yahoo.com, etc.) are rejected. The server maintains the list of
   // public email domains.
-  bool disable_public_email_addresses = 2
-      [(google.api.field_behavior) = OPTIONAL];
+  bool disable_public_email_addresses = 2 [(google.api.field_behavior) = OPTIONAL];
 
   // Optional. If non-empty, only email addresses from these domains are
   // allowed. This is the strictest check and takes precedence over other
   // settings.
-  repeated string allowed_domains = 3
-      [(google.api.field_behavior) = OPTIONAL];
+  repeated string allowed_domains = 3 [(google.api.field_behavior) = OPTIONAL];
 
   // Optional. Email addresses from these domains are always rejected,
   // even if they pass other checks.
-  repeated string disallowed_domains = 4
-      [(google.api.field_behavior) = OPTIONAL];
+  repeated string disallowed_domains = 4 [(google.api.field_behavior) = OPTIONAL];
 
   // Output only. Timestamp when the policy was last modified.
-  google.protobuf.Timestamp update_time = 5
-      [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. A checksum for optimistic concurrency control.
   string etag = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
@@ -809,7 +799,10 @@ message ListInvitationsRequest {
   // Optional. Maximum number of invitations to return.
   int32 page_size = 2 [
     (google.api.field_behavior) = OPTIONAL,
-    (buf.validate.field).int32 = {gte: 0, lte: 1000}
+    (buf.validate.field).int32 = {
+      gte: 0
+      lte: 1000
+    }
   ];
 
   // Optional. Page token from a previous ListInvitations call.
@@ -931,6 +924,5 @@ message UpdateInvitationPolicyRequest {
   ];
 
   // Optional. The fields to update. If omitted, all mutable fields are updated.
-  google.protobuf.FieldMask update_mask = 2
-      [(google.api.field_behavior) = OPTIONAL];
+  google.protobuf.FieldMask update_mask = 2 [(google.api.field_behavior) = OPTIONAL];
 }

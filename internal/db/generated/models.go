@@ -14,6 +14,138 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AgentState string
+
+const (
+	AgentStateCONNECTING   AgentState = "CONNECTING"
+	AgentStateCONNECTED    AgentState = "CONNECTED"
+	AgentStateDRAINING     AgentState = "DRAINING"
+	AgentStateUPGRADING    AgentState = "UPGRADING"
+	AgentStateDISCONNECTED AgentState = "DISCONNECTED"
+)
+
+func (e *AgentState) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AgentState(s)
+	case string:
+		*e = AgentState(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AgentState: %T", src)
+	}
+	return nil
+}
+
+type NullAgentState struct {
+	AgentState AgentState `json:"agent_state"`
+	Valid      bool       `json:"valid"` // Valid is true if AgentState is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAgentState) Scan(value interface{}) error {
+	if value == nil {
+		ns.AgentState, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AgentState.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAgentState) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AgentState), nil
+}
+
+type CertState string
+
+const (
+	CertStatePENDING  CertState = "PENDING"
+	CertStateACTIVE   CertState = "ACTIVE"
+	CertStateEXPIRING CertState = "EXPIRING"
+	CertStateEXPIRED  CertState = "EXPIRED"
+)
+
+func (e *CertState) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = CertState(s)
+	case string:
+		*e = CertState(s)
+	default:
+		return fmt.Errorf("unsupported scan type for CertState: %T", src)
+	}
+	return nil
+}
+
+type NullCertState struct {
+	CertState CertState `json:"cert_state"`
+	Valid     bool      `json:"valid"` // Valid is true if CertState is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullCertState) Scan(value interface{}) error {
+	if value == nil {
+		ns.CertState, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.CertState.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullCertState) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.CertState), nil
+}
+
+type CredentialState string
+
+const (
+	CredentialStateUNSET   CredentialState = "UNSET"
+	CredentialStateSET     CredentialState = "SET"
+	CredentialStateINVALID CredentialState = "INVALID"
+)
+
+func (e *CredentialState) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = CredentialState(s)
+	case string:
+		*e = CredentialState(s)
+	default:
+		return fmt.Errorf("unsupported scan type for CredentialState: %T", src)
+	}
+	return nil
+}
+
+type NullCredentialState struct {
+	CredentialState CredentialState `json:"credential_state"`
+	Valid           bool            `json:"valid"` // Valid is true if CredentialState is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullCredentialState) Scan(value interface{}) error {
+	if value == nil {
+		ns.CredentialState, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.CredentialState.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullCredentialState) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.CredentialState), nil
+}
+
 type CustomDomainState string
 
 const (
@@ -57,6 +189,135 @@ func (ns NullCustomDomainState) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.CustomDomainState), nil
+}
+
+type EndpointEngine string
+
+const (
+	EndpointEngineS3     EndpointEngine = "S3"
+	EndpointEngineRUSTFS EndpointEngine = "RUSTFS"
+	EndpointEngineGCS    EndpointEngine = "GCS"
+	EndpointEngineMINIO  EndpointEngine = "MINIO"
+)
+
+func (e *EndpointEngine) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = EndpointEngine(s)
+	case string:
+		*e = EndpointEngine(s)
+	default:
+		return fmt.Errorf("unsupported scan type for EndpointEngine: %T", src)
+	}
+	return nil
+}
+
+type NullEndpointEngine struct {
+	EndpointEngine EndpointEngine `json:"endpoint_engine"`
+	Valid          bool           `json:"valid"` // Valid is true if EndpointEngine is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullEndpointEngine) Scan(value interface{}) error {
+	if value == nil {
+		ns.EndpointEngine, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.EndpointEngine.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullEndpointEngine) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.EndpointEngine), nil
+}
+
+type EndpointState string
+
+const (
+	EndpointStateACTIVE      EndpointState = "ACTIVE"
+	EndpointStateINACTIVE    EndpointState = "INACTIVE"
+	EndpointStateUNREACHABLE EndpointState = "UNREACHABLE"
+)
+
+func (e *EndpointState) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = EndpointState(s)
+	case string:
+		*e = EndpointState(s)
+	default:
+		return fmt.Errorf("unsupported scan type for EndpointState: %T", src)
+	}
+	return nil
+}
+
+type NullEndpointState struct {
+	EndpointState EndpointState `json:"endpoint_state"`
+	Valid         bool          `json:"valid"` // Valid is true if EndpointState is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullEndpointState) Scan(value interface{}) error {
+	if value == nil {
+		ns.EndpointState, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.EndpointState.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullEndpointState) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.EndpointState), nil
+}
+
+type EvictionPolicy string
+
+const (
+	EvictionPolicyLRU EvictionPolicy = "LRU"
+	EvictionPolicyLFU EvictionPolicy = "LFU"
+)
+
+func (e *EvictionPolicy) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = EvictionPolicy(s)
+	case string:
+		*e = EvictionPolicy(s)
+	default:
+		return fmt.Errorf("unsupported scan type for EvictionPolicy: %T", src)
+	}
+	return nil
+}
+
+type NullEvictionPolicy struct {
+	EvictionPolicy EvictionPolicy `json:"eviction_policy"`
+	Valid          bool           `json:"valid"` // Valid is true if EvictionPolicy is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullEvictionPolicy) Scan(value interface{}) error {
+	if value == nil {
+		ns.EvictionPolicy, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.EvictionPolicy.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullEvictionPolicy) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.EvictionPolicy), nil
 }
 
 type InvitationState string
@@ -273,6 +534,50 @@ func (ns NullRoleMemberType) Value() (driver.Value, error) {
 	return string(ns.RoleMemberType), nil
 }
 
+type StorageGatewayState string
+
+const (
+	StorageGatewayStatePROVISIONING StorageGatewayState = "PROVISIONING"
+	StorageGatewayStateACTIVE       StorageGatewayState = "ACTIVE"
+	StorageGatewayStateDEGRADED     StorageGatewayState = "DEGRADED"
+	StorageGatewayStateOFFLINE      StorageGatewayState = "OFFLINE"
+)
+
+func (e *StorageGatewayState) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = StorageGatewayState(s)
+	case string:
+		*e = StorageGatewayState(s)
+	default:
+		return fmt.Errorf("unsupported scan type for StorageGatewayState: %T", src)
+	}
+	return nil
+}
+
+type NullStorageGatewayState struct {
+	StorageGatewayState StorageGatewayState `json:"storage_gateway_state"`
+	Valid               bool                `json:"valid"` // Valid is true if StorageGatewayState is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullStorageGatewayState) Scan(value interface{}) error {
+	if value == nil {
+		ns.StorageGatewayState, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.StorageGatewayState.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullStorageGatewayState) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.StorageGatewayState), nil
+}
+
 type Account struct {
 	ID            uuid.UUID          `json:"id"`
 	FirebaseUid   string             `json:"firebase_uid"`
@@ -284,6 +589,19 @@ type Account struct {
 	CreateTime    time.Time          `json:"create_time"`
 	UpdateTime    time.Time          `json:"update_time"`
 	LastLoginTime pgtype.Timestamptz `json:"last_login_time"`
+}
+
+type Agent struct {
+	ID             uuid.UUID          `json:"id"`
+	GatewayID      uuid.UUID          `json:"gateway_id"`
+	IpAddress      string             `json:"ip_address"`
+	Hostname       string             `json:"hostname"`
+	Version        string             `json:"version"`
+	CacheUsedGb    int32              `json:"cache_used_gb"`
+	State          AgentState         `json:"state"`
+	CertExpiryTime pgtype.Timestamptz `json:"cert_expiry_time"`
+	JoinTime       time.Time          `json:"join_time"`
+	LastSeenTime   time.Time          `json:"last_seen_time"`
 }
 
 type ApiKey struct {
@@ -325,6 +643,27 @@ type CustomDomain struct {
 	UpdateTime time.Time          `json:"update_time"`
 	DeleteTime pgtype.Timestamptz `json:"delete_time"`
 	VerifyTime pgtype.Timestamptz `json:"verify_time"`
+}
+
+type Endpoint struct {
+	ID              uuid.UUID       `json:"id"`
+	GatewayID       uuid.UUID       `json:"gateway_id"`
+	Name            string          `json:"name"`
+	DisplayName     string          `json:"display_name"`
+	Engine          EndpointEngine  `json:"engine"`
+	EndpointUri     string          `json:"endpoint_uri"`
+	Bucket          string          `json:"bucket"`
+	Region          string          `json:"region"`
+	Credentials     []byte          `json:"credentials"`
+	Annotations     json.RawMessage `json:"annotations"`
+	State           EndpointState   `json:"state"`
+	CredentialState CredentialState `json:"credential_state"`
+	Etag            string          `json:"etag"`
+	Revision        int32           `json:"revision"`
+	CreatedBy       string          `json:"created_by"`
+	UpdatedBy       string          `json:"updated_by"`
+	CreateTime      time.Time       `json:"create_time"`
+	UpdateTime      time.Time       `json:"update_time"`
 }
 
 type Group struct {
@@ -489,6 +828,31 @@ type RoleMember struct {
 type RolePermission struct {
 	RoleID       uuid.UUID `json:"role_id"`
 	PermissionID uuid.UUID `json:"permission_id"`
+}
+
+type StorageGateway struct {
+	ID                uuid.UUID           `json:"id"`
+	OrgID             uuid.UUID           `json:"org_id"`
+	Name              string              `json:"name"`
+	DisplayName       string              `json:"display_name"`
+	IpAddresses       []string            `json:"ip_addresses"`
+	RegistrationToken string              `json:"registration_token"`
+	TargetVersion     string              `json:"target_version"`
+	CurrentVersion    string              `json:"current_version"`
+	Hostname          string              `json:"hostname"`
+	CacheMaxSizeGb    int32               `json:"cache_max_size_gb"`
+	CacheEviction     EvictionPolicy      `json:"cache_eviction"`
+	CacheTtlHours     int32               `json:"cache_ttl_hours"`
+	Annotations       json.RawMessage     `json:"annotations"`
+	State             StorageGatewayState `json:"state"`
+	CertState         CertState           `json:"cert_state"`
+	CertExpiryTime    pgtype.Timestamptz  `json:"cert_expiry_time"`
+	Etag              string              `json:"etag"`
+	Revision          int32               `json:"revision"`
+	CreatedBy         string              `json:"created_by"`
+	UpdatedBy         string              `json:"updated_by"`
+	CreateTime        time.Time           `json:"create_time"`
+	UpdateTime        time.Time           `json:"update_time"`
 }
 
 type TagBinding struct {

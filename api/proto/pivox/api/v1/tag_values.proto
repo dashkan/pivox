@@ -20,12 +20,12 @@ import "buf/validate/validate.proto";
 import "google/api/annotations.proto";
 import "google/api/client.proto";
 import "google/api/field_behavior.proto";
-
 import "google/api/resource.proto";
-import "pivox/iam/v1/iam_policy.proto";
-import "pivox/iam/v1/policy.proto";
+import "google/longrunning/operations.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
+import "pivox/iam/v1/iam_policy.proto";
+import "pivox/iam/v1/policy.proto";
 
 option go_package = "pivox/api/v1;apiv1";
 
@@ -37,7 +37,7 @@ service TagValues {
   rpc ListTagValues(ListTagValuesRequest) returns (ListTagValuesResponse) {
     option (google.api.http) = {
       get: "/v1/{parent=organizations/*/tagKeys/*}/tagValues"
-      additional_bindings { get: "/v1/{parent=organizations/*/projects/*/tagKeys/*}/tagValues" }
+      additional_bindings: {get: "/v1/{parent=organizations/*/projects/*/tagKeys/*}/tagValues"}
     };
     option (google.api.method_signature) = "parent";
   }
@@ -47,7 +47,7 @@ service TagValues {
   rpc GetTagValue(GetTagValueRequest) returns (TagValue) {
     option (google.api.http) = {
       get: "/v1/{name=organizations/*/tagKeys/*/tagValues/*}"
-      additional_bindings { get: "/v1/{name=organizations/*/projects/*/tagKeys/*/tagValues/*}" }
+      additional_bindings: {get: "/v1/{name=organizations/*/projects/*/tagKeys/*/tagValues/*}"}
     };
     option (google.api.method_signature) = "name";
   }
@@ -56,39 +56,51 @@ service TagValues {
   // request with the same parameters is sent while the original request is in
   // process the second request will receive an error. A maximum of 1000
   // TagValues can exist under a TagKey at any given time.
-  rpc CreateTagValue(CreateTagValueRequest) returns (TagValue) {
+  rpc CreateTagValue(CreateTagValueRequest) returns (google.longrunning.Operation) {
     option (google.api.http) = {
       post: "/v1/{parent=organizations/*/tagKeys/*}/tagValues"
       body: "tag_value"
-      additional_bindings {
+      additional_bindings: {
         post: "/v1/{parent=organizations/*/projects/*/tagKeys/*}/tagValues"
         body: "tag_value"
       }
     };
     option (google.api.method_signature) = "parent,tag_value,tag_value_id";
+    option (google.longrunning.operation_info) = {
+      response_type: "TagValue"
+      metadata_type: "CreateTagValueMetadata"
+    };
   }
 
   // Updates the attributes of the TagValue resource.
-  rpc UpdateTagValue(UpdateTagValueRequest) returns (TagValue) {
+  rpc UpdateTagValue(UpdateTagValueRequest) returns (google.longrunning.Operation) {
     option (google.api.http) = {
       patch: "/v1/{tag_value.name=organizations/*/tagKeys/*/tagValues/*}"
       body: "tag_value"
-      additional_bindings {
+      additional_bindings: {
         patch: "/v1/{tag_value.name=organizations/*/projects/*/tagKeys/*/tagValues/*}"
         body: "tag_value"
       }
     };
     option (google.api.method_signature) = "tag_value,update_mask";
+    option (google.longrunning.operation_info) = {
+      response_type: "TagValue"
+      metadata_type: "UpdateTagValueMetadata"
+    };
   }
 
   // Deletes a TagValue. The TagValue cannot have any bindings when it is
   // deleted.
-  rpc DeleteTagValue(DeleteTagValueRequest) returns (TagValue) {
+  rpc DeleteTagValue(DeleteTagValueRequest) returns (google.longrunning.Operation) {
     option (google.api.http) = {
       delete: "/v1/{name=organizations/*/tagKeys/*/tagValues/*}"
-      additional_bindings { delete: "/v1/{name=organizations/*/projects/*/tagKeys/*/tagValues/*}" }
+      additional_bindings: {delete: "/v1/{name=organizations/*/projects/*/tagKeys/*/tagValues/*}"}
     };
     option (google.api.method_signature) = "name";
+    option (google.longrunning.operation_info) = {
+      response_type: "TagValue"
+      metadata_type: "DeleteTagValueMetadata"
+    };
   }
 
   // Gets the access control policy for a TagValue. The returned policy may be
@@ -97,12 +109,11 @@ service TagValues {
   // The caller must have the
   // `pivox.api/tagValues.getIamPolicy` permission on
   // the identified TagValue to get the access control policy.
-  rpc GetIamPolicy(pivox.iam.v1.GetIamPolicyRequest)
-      returns (pivox.iam.v1.Policy) {
+  rpc GetIamPolicy(pivox.iam.v1.GetIamPolicyRequest) returns (pivox.iam.v1.Policy) {
     option (google.api.http) = {
       post: "/v1/{name=organizations/*/tagKeys/*/tagValues/*}:getIamPolicy"
       body: "*"
-      additional_bindings {
+      additional_bindings: {
         post: "/v1/{name=organizations/*/projects/*/tagKeys/*/tagValues/*}:getIamPolicy"
         body: "*"
       }
@@ -116,12 +127,11 @@ service TagValues {
   // on the identified tagValue.
   // (-- api-linter: core::0136::response-message-name=disabled
   //     aip.dev/not-precedent: SetIamPolicy returns Policy per IAM convention. --)
-  rpc SetIamPolicy(pivox.iam.v1.SetIamPolicyRequest)
-      returns (pivox.iam.v1.Policy) {
+  rpc SetIamPolicy(pivox.iam.v1.SetIamPolicyRequest) returns (pivox.iam.v1.Policy) {
     option (google.api.http) = {
       post: "/v1/{resource=organizations/*/tagKeys/*/tagValues/*}:setIamPolicy"
       body: "*"
-      additional_bindings {
+      additional_bindings: {
         post: "/v1/{resource=organizations/*/projects/*/tagKeys/*/tagValues/*}:setIamPolicy"
         body: "*"
       }
@@ -133,12 +143,11 @@ service TagValues {
   // The `resource` field should be the TagValue's resource name.
   //
   // There are no permissions required for making this API call.
-  rpc TestIamPermissions(pivox.iam.v1.TestIamPermissionsRequest)
-      returns (pivox.iam.v1.TestIamPermissionsResponse) {
+  rpc TestIamPermissions(pivox.iam.v1.TestIamPermissionsRequest) returns (pivox.iam.v1.TestIamPermissionsResponse) {
     option (google.api.http) = {
       post: "/v1/{resource=organizations/*/tagKeys/*/tagValues/*}:testIamPermissions"
       body: "*"
-      additional_bindings {
+      additional_bindings: {
         post: "/v1/{resource=organizations/*/projects/*/tagKeys/*/tagValues/*}:testIamPermissions"
         body: "*"
       }
@@ -172,12 +181,10 @@ message TagValue {
   ];
 
   // Output only. Creation time.
-  google.protobuf.Timestamp create_time = 6
-      [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Update time.
-  google.protobuf.Timestamp update_time = 7
-      [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Optional. Entity tag which users can pass to prevent race conditions. This
   // field is always set in server responses. See UpdateTagValueRequest for
@@ -196,10 +203,10 @@ message ListTagValuesRequest {
   // `organizations/{org_id}/projects/{project}/tagKeys/{tag_key}`.
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = { child_type: "pivox.api/TagValue" },
+    (google.api.resource_reference) = {child_type: "pivox.api/TagValue"},
     (buf.validate.field).cel = {
-      id: "required",
-      message: "value is required",
+      id: "required"
+      message: "value is required"
       expression: "this.size() > 0"
     }
   ];
@@ -209,7 +216,10 @@ message ListTagValuesRequest {
   // server will use 100 as the default.
   int32 page_size = 2 [
     (google.api.field_behavior) = OPTIONAL,
-    (buf.validate.field).int32 = {gte: 0, lte: 1000}
+    (buf.validate.field).int32 = {
+      gte: 0
+      lte: 1000
+    }
   ];
 
   // Optional. A pagination token returned from a previous call to
@@ -241,12 +251,10 @@ message GetTagValueRequest {
   // `organizations/{organization}/tagKeys/{tag_key}/tagValues/{tag_value}`.
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {
-      type: "pivox.api/TagValue"
-    },
+    (google.api.resource_reference) = {type: "pivox.api/TagValue"},
     (buf.validate.field).cel = {
-      id: "required",
-      message: "value is required",
+      id: "required"
+      message: "value is required"
       expression: "this.size() > 0"
     }
   ];
@@ -259,10 +267,10 @@ message CreateTagValueRequest {
   // `organizations/{org_id}/projects/{project}/tagKeys/{tag_key}`.
   string parent = 4 [
     (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = { child_type: "pivox.api/TagValue" },
+    (google.api.resource_reference) = {child_type: "pivox.api/TagValue"},
     (buf.validate.field).cel = {
-      id: "required",
-      message: "value is required",
+      id: "required"
+      message: "value is required"
       expression: "this.size() > 0"
     }
   ];
@@ -312,12 +320,10 @@ message DeleteTagValueRequest {
   // `organizations/{organization}/tagKeys/{tag_key}/tagValues/{tag_value}`.
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {
-      type: "pivox.api/TagValue"
-    },
+    (google.api.resource_reference) = {type: "pivox.api/TagValue"},
     (buf.validate.field).cel = {
-      id: "required",
-      message: "value is required",
+      id: "required"
+      message: "value is required"
       expression: "this.size() > 0"
     }
   ];
@@ -330,3 +336,15 @@ message DeleteTagValueRequest {
   // TagValue. This is to be used for optimistic concurrency.
   string etag = 3 [(google.api.field_behavior) = OPTIONAL];
 }
+
+// A status object which is used as the `metadata` field for the Operation
+// returned by CreateTagValue.
+message CreateTagValueMetadata {}
+
+// A status object which is used as the `metadata` field for the Operation
+// returned by UpdateTagValue.
+message UpdateTagValueMetadata {}
+
+// A status object which is used as the `metadata` field for the Operation
+// returned by DeleteTagValue.
+message DeleteTagValueMetadata {}

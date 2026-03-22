@@ -27,7 +27,10 @@ message GridLayout {
   // Optional. The number of columns in the grid. Defaults to 12 if unset.
   int32 columns = 1 [
     (google.api.field_behavior) = OPTIONAL,
-    (buf.validate.field).int32 = {gte: 0, lte: 24}
+    (buf.validate.field).int32 = {
+      gte: 0
+      lte: 24
+    }
   ];
 
   // Optional. The tiles arranged on the grid.

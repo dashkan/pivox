@@ -99,17 +99,14 @@ message SyntheticMonitorTarget {
     // Required.
     string name = 1 [
       (google.api.field_behavior) = REQUIRED,
-      (google.api.resource_reference) = {
-        type: "cloudfunctions.googleapis.com/Function"
-      }
+      (google.api.resource_reference) = {type: "cloudfunctions.googleapis.com/Function"}
     ];
 
     // Output only. The `cloud_run_revision` Monitored Resource associated with
     // the GCFv2. The Synthetic Monitor execution results (metrics, logs, and
     // spans) are reported against this Monitored Resource. This field is output
     // only.
-    google.api.MonitoredResource cloud_run_revision = 2
-        [(google.api.field_behavior) = OUTPUT_ONLY];
+    google.api.MonitoredResource cloud_run_revision = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
   }
 
   // Specifies a Synthetic Monitor's execution stack.

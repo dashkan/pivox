@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 
+	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	iampb "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/iam/v1"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -14,6 +15,7 @@ import (
 	db "github.com/dashkan/pivox-server/internal/db/generated"
 	"github.com/dashkan/pivox-server/internal/filter"
 	"github.com/dashkan/pivox-server/internal/iam"
+	"github.com/dashkan/pivox-server/internal/lro"
 	apiv1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1"
 	"github.com/dashkan/pivox-server/internal/resource"
 )
@@ -98,7 +100,7 @@ func (s *TagKeysServer) GetTagKey(ctx context.Context, req *apiv1.GetTagKeyReque
 	return convert.TagKeyToProto(tagKey), nil
 }
 
-func (s *TagKeysServer) CreateTagKey(ctx context.Context, req *apiv1.CreateTagKeyRequest) (*apiv1.TagKey, error) {
+func (s *TagKeysServer) CreateTagKey(ctx context.Context, req *apiv1.CreateTagKeyRequest) (*longrunningpb.Operation, error) {
 	tagKey := req.GetTagKey()
 
 	orgID, err := resource.ResolveOrgParent(ctx, s.queries, req.GetParent())
@@ -123,10 +125,10 @@ func (s *TagKeysServer) CreateTagKey(ctx context.Context, req *apiv1.CreateTagKe
 		return nil, handleResourceError(err, "TagKey", "")
 	}
 
-	return convert.TagKeyToProto(result), nil
+	return lro.DoneOperation(convert.TagKeyToProto(result))
 }
 
-func (s *TagKeysServer) UpdateTagKey(ctx context.Context, req *apiv1.UpdateTagKeyRequest) (*apiv1.TagKey, error) {
+func (s *TagKeysServer) UpdateTagKey(ctx context.Context, req *apiv1.UpdateTagKeyRequest) (*longrunningpb.Operation, error) {
 	tagKey := req.GetTagKey()
 	segment, err := resource.ParseSegment(tagKey.GetName())
 	if err != nil {
@@ -164,10 +166,10 @@ func (s *TagKeysServer) UpdateTagKey(ctx context.Context, req *apiv1.UpdateTagKe
 		return nil, handleResourceError(err, "TagKey", tagKey.GetName())
 	}
 
-	return convert.TagKeyToProto(result), nil
+	return lro.DoneOperation(convert.TagKeyToProto(result))
 }
 
-func (s *TagKeysServer) DeleteTagKey(ctx context.Context, req *apiv1.DeleteTagKeyRequest) (*apiv1.TagKey, error) {
+func (s *TagKeysServer) DeleteTagKey(ctx context.Context, req *apiv1.DeleteTagKeyRequest) (*longrunningpb.Operation, error) {
 	segment, err := resource.ParseSegment(req.GetName())
 	if err != nil {
 		return nil, handleResourceError(err, "TagKey", req.GetName())
@@ -195,7 +197,7 @@ func (s *TagKeysServer) DeleteTagKey(ctx context.Context, req *apiv1.DeleteTagKe
 		return nil, handleResourceError(err, "TagKey", req.GetName())
 	}
 
-	return &apiv1.TagKey{}, nil
+	return lro.DoneOperation(&apiv1.TagKey{})
 }
 
 func (s *TagKeysServer) GetIamPolicy(ctx context.Context, req *iampb.GetIamPolicyRequest) (*iampb.Policy, error) {

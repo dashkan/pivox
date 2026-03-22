@@ -17,7 +17,7 @@ type SyncAuthConfig struct {
 	Audience string
 }
 
-func loadSyncAuthConfig() SyncAuthConfig {
+func LoadSyncAuthConfig() SyncAuthConfig {
 	raw := getEnvRequired("ALLOWED_SERVICE_ACCOUNTS")
 	accounts := strings.Split(raw, ",")
 	for i := range accounts {

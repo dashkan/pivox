@@ -725,8 +725,8 @@ const file_pivox_api_v1_dashboards_proto_rawDesc = "" +
 	"\fGetDashboard\x12!.pivox.api.v1.GetDashboardRequest\x1a\x17.pivox.api.v1.Dashboard\"A\xdaA\x04name\x82\xd3\xe4\x93\x024\x122/v1/{name=organizations/*/projects/*/dashboards/*}\x12\xb7\x01\n" +
 	"\x0fCreateDashboard\x12$.pivox.api.v1.CreateDashboardRequest\x1a\x17.pivox.api.v1.Dashboard\"e\xdaA\x1dparent,dashboard,dashboard_id\x82\xd3\xe4\x93\x02?:\tdashboard\"2/v1/{parent=organizations/*/projects/*}/dashboards\x12\xb9\x01\n" +
 	"\x0fUpdateDashboard\x12$.pivox.api.v1.UpdateDashboardRequest\x1a\x17.pivox.api.v1.Dashboard\"g\xdaA\x15dashboard,update_mask\x82\xd3\xe4\x93\x02I:\tdashboard2</v1/{dashboard.name=organizations/*/projects/*/dashboards/*}\x12\x93\x01\n" +
-	"\x0fDeleteDashboard\x12$.pivox.api.v1.DeleteDashboardRequest\x1a\x17.pivox.api.v1.Dashboard\"A\xdaA\x04name\x82\xd3\xe4\x93\x024*2/v1/{name=organizations/*/projects/*/dashboards/*}\x1a\x0f\xcaA\fapi.pivox.ioB\xb3\x01\n" +
-	"\x10com.pivox.api.v1B\x0fDashboardsProtoP\x01Z<github.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
+	"\x0fDeleteDashboard\x12$.pivox.api.v1.DeleteDashboardRequest\x1a\x17.pivox.api.v1.Dashboard\"A\xdaA\x04name\x82\xd3\xe4\x93\x024*2/v1/{name=organizations/*/projects/*/dashboards/*}\x1a\x0f\xcaA\fapi.pivox.ioB\xba\x01\n" +
+	"\x10com.pivox.api.v1B\x0fDashboardsProtoP\x01ZCgithub.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
 
 var (
 	file_pivox_api_v1_dashboards_proto_rawDescOnce sync.Once

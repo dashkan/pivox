@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	iampb "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/iam/v1"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -17,6 +18,7 @@ import (
 	db "github.com/dashkan/pivox-server/internal/db/generated"
 	"github.com/dashkan/pivox-server/internal/filter"
 	"github.com/dashkan/pivox-server/internal/iam"
+	"github.com/dashkan/pivox-server/internal/lro"
 	apiv1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1"
 )
 
@@ -118,7 +120,7 @@ func (s *TagValuesServer) GetTagValue(ctx context.Context, req *apiv1.GetTagValu
 	return convert.TagValueToProto(tagValue), nil
 }
 
-func (s *TagValuesServer) CreateTagValue(ctx context.Context, req *apiv1.CreateTagValueRequest) (*apiv1.TagValue, error) {
+func (s *TagValuesServer) CreateTagValue(ctx context.Context, req *apiv1.CreateTagValueRequest) (*longrunningpb.Operation, error) {
 	tagValue := req.GetTagValue()
 	parent := req.GetParent()
 
@@ -153,10 +155,10 @@ func (s *TagValuesServer) CreateTagValue(ctx context.Context, req *apiv1.CreateT
 		return nil, handleResourceError(err, "TagValue", "")
 	}
 
-	return convert.TagValueToProto(result), nil
+	return lro.DoneOperation(convert.TagValueToProto(result))
 }
 
-func (s *TagValuesServer) UpdateTagValue(ctx context.Context, req *apiv1.UpdateTagValueRequest) (*apiv1.TagValue, error) {
+func (s *TagValuesServer) UpdateTagValue(ctx context.Context, req *apiv1.UpdateTagValueRequest) (*longrunningpb.Operation, error) {
 	tagValue := req.GetTagValue()
 	id, err := parseTagValueName(tagValue.GetName())
 	if err != nil {
@@ -190,10 +192,10 @@ func (s *TagValuesServer) UpdateTagValue(ctx context.Context, req *apiv1.UpdateT
 		return nil, handleResourceError(err, "TagValue", tagValue.GetName())
 	}
 
-	return convert.TagValueToProto(result), nil
+	return lro.DoneOperation(convert.TagValueToProto(result))
 }
 
-func (s *TagValuesServer) DeleteTagValue(ctx context.Context, req *apiv1.DeleteTagValueRequest) (*apiv1.TagValue, error) {
+func (s *TagValuesServer) DeleteTagValue(ctx context.Context, req *apiv1.DeleteTagValueRequest) (*longrunningpb.Operation, error) {
 	id, err := parseTagValueName(req.GetName())
 	if err != nil {
 		return nil, handleResourceError(err, "TagValue", req.GetName())
@@ -217,7 +219,7 @@ func (s *TagValuesServer) DeleteTagValue(ctx context.Context, req *apiv1.DeleteT
 		return nil, handleResourceError(err, "TagValue", req.GetName())
 	}
 
-	return &apiv1.TagValue{}, nil
+	return lro.DoneOperation(&apiv1.TagValue{})
 }
 
 func (s *TagValuesServer) GetIamPolicy(ctx context.Context, req *iampb.GetIamPolicyRequest) (*iampb.Policy, error) {

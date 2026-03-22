@@ -15,6 +15,7 @@ import (
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
@@ -27,10 +28,58 @@ import (
 	"github.com/dashkan/pivox-server/internal/server"
 
 	apiv1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1"
+	storagev1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/storage/v1"
 )
 
+var version = "dev"
+
 func main() {
-	cfg := config.Load()
+	rootCmd := &cobra.Command{
+		Use:     "pivox-server",
+		Short:   "Pivox control plane server",
+		Version: version,
+		RunE:    serve,
+	}
+
+	f := rootCmd.Flags()
+	f.String("database-url", envOrDefault("DATABASE_URL", "postgres://localhost:5432/pivox?sslmode=disable"), "PostgreSQL connection URL")
+	f.String("grpc-port", envOrDefault("GRPC_PORT", ":50051"), "gRPC listen address")
+	f.String("rest-port", envOrDefault("REST_PORT", ":8080"), "REST gateway listen address")
+	f.String("debug-port", envOrDefault("DEBUG_PORT", ":9090"), "Debug/health listen address")
+	f.String("log-level", envOrDefault("LOG_LEVEL", "info"), "Log level (debug, info, warn, error)")
+	f.String("gcp-project-id", envOrDefault("GOOGLE_CLOUD_PROJECT_ID", ""), "Google Cloud project ID")
+	f.String("gcp-service-account-key", envOrDefault("GOOGLE_CLOUD_SERVICE_ACCOUNT_KEY", ""), "Google Cloud service account key (inline JSON)")
+	f.String("gcp-service-account-file", envOrDefault("GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE", ""), "Google Cloud service account key file path")
+
+	if err := rootCmd.Execute(); err != nil {
+		os.Exit(1)
+	}
+}
+
+func envOrDefault(key, defaultVal string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return defaultVal
+}
+
+func must(s string, _ error) string { return s }
+
+func serve(cmd *cobra.Command, args []string) error {
+	f := cmd.Flags()
+	cfg := &config.Config{
+		DatabaseURL: must(f.GetString("database-url")),
+		GRPCPort:    must(f.GetString("grpc-port")),
+		RESTPort:    must(f.GetString("rest-port")),
+		DebugPort:   must(f.GetString("debug-port")),
+		LogLevel:    must(f.GetString("log-level")),
+		GoogleCloud: config.GoogleCloudConfig{
+			ProjectID:          must(f.GetString("gcp-project-id")),
+			ServiceAccountKey:  must(f.GetString("gcp-service-account-key")),
+			ServiceAccountFile: must(f.GetString("gcp-service-account-file")),
+		},
+		SyncAuth: config.LoadSyncAuthConfig(),
+	}
 
 	var level slog.Level
 	switch cfg.LogLevel {
@@ -52,14 +101,12 @@ func main() {
 	// Database
 	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
-		logger.Error("failed to connect to database", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("connect to database: %w", err)
 	}
 	defer pool.Close()
 
 	if err := pool.Ping(ctx); err != nil {
-		logger.Error("failed to ping database", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("ping database: %w", err)
 	}
 	logger.Info("connected to database")
 
@@ -85,15 +132,13 @@ func main() {
 	// Firebase
 	authSvc, err := firebase.NewAuthService(ctx, cfg.GoogleCloud)
 	if err != nil {
-		logger.Error("failed to initialize Firebase auth service", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("initialize Firebase auth: %w", err)
 	}
 
 	// gRPC server
 	validator, err := protovalidate.New()
 	if err != nil {
-		logger.Error("failed to create validator", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("create validator: %w", err)
 	}
 	grpcServer := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
@@ -114,13 +159,17 @@ func main() {
 	apiv1.RegisterTagBindingsServer(grpcServer, server.NewTagBindingsServer(pool, queries))
 	apiv1.RegisterApiKeysServer(grpcServer, server.NewApiKeysServer(pool, queries))
 
+	// Storage services
+	storagev1.RegisterStorageGatewaysServer(grpcServer, server.NewStorageGatewaysServer(pool, queries))
+	storagev1.RegisterAgentsServer(grpcServer, server.NewAgentsServer(queries))
+	storagev1.RegisterEndpointsServer(grpcServer, server.NewEndpointsServer(pool, queries))
+
 	reflection.Register(grpcServer)
 
 	// Start gRPC listener
 	grpcLis, err := net.Listen("tcp", cfg.GRPCPort)
 	if err != nil {
-		logger.Error("failed to listen on gRPC port", "port", cfg.GRPCPort, "error", err)
-		os.Exit(1)
+		return fmt.Errorf("listen on gRPC port %s: %w", cfg.GRPCPort, err)
 	}
 
 	go func() {
@@ -142,10 +191,12 @@ func main() {
 		apiv1.RegisterTagValuesHandlerFromEndpoint,
 		apiv1.RegisterTagBindingsHandlerFromEndpoint,
 		apiv1.RegisterApiKeysHandlerFromEndpoint,
+		storagev1.RegisterStorageGatewaysHandlerFromEndpoint,
+		storagev1.RegisterAgentsHandlerFromEndpoint,
+		storagev1.RegisterEndpointsHandlerFromEndpoint,
 	} {
 		if err := reg(ctx, gwMux, grpcEndpoint, dialOpts); err != nil {
-			logger.Error("failed to register REST gateway", "error", err)
-			os.Exit(1)
+			return fmt.Errorf("register REST gateway: %w", err)
 		}
 	}
 
@@ -153,11 +204,10 @@ func main() {
 	httpMux := http.NewServeMux()
 	hooks, err := server.NewInternalHooks(queries, cfg.SyncAuth, logger, authSvc)
 	if err != nil {
-		logger.Error("failed to initialize internal hooks", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("initialize internal hooks: %w", err)
 	}
 	hooks.Register(httpMux)
-	httpMux.Handle("/", gwMux) // gRPC gateway handles everything else
+	httpMux.Handle("/", gwMux)
 
 	restServer := &http.Server{
 		Addr:    cfg.RESTPort,
@@ -209,4 +259,5 @@ func main() {
 	_ = debugServer.Shutdown(shutdownCtx)
 
 	logger.Info("server stopped")
+	return nil
 }

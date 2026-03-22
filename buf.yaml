@@ -11,6 +11,7 @@ lint:
   ignore:
     - api/proto/buf
     - api/proto/google
+    - api/proto/pivox/agent
 modules:
   - path: api/proto
     name: buf.build/pivox/googleapis

@@ -1,0 +1,234 @@
+// Copyright 2025 Pivox
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package pivox.storage.v1;
+
+import "buf/validate/validate.proto";
+import "google/api/annotations.proto";
+import "google/api/client.proto";
+import "google/api/field_behavior.proto";
+import "google/api/field_info.proto";
+import "google/api/resource.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "pivox/storage/v1;storagev1";
+
+// Manages agents that self-register with storage gateways via
+// bidirectional streaming. Agents cannot be created through this
+// service; they appear automatically when they connect.
+service Agents {
+  option (google.api.default_host) = "api.pivox.io";
+
+  // Fetches an agent resource identified by the specified resource name.
+  rpc GetAgent(GetAgentRequest) returns (Agent) {
+    option (google.api.http) = {get: "/v1/{name=organizations/*/storageGateways/*/agents/*}"};
+    option (google.api.method_signature) = "name";
+  }
+
+  // Lists agents belonging to a storage gateway that satisfy the specified
+  // filter.
+  rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse) {
+    option (google.api.http) = {get: "/v1/{parent=organizations/*/storageGateways/*}/agents"};
+    option (google.api.method_signature) = "parent";
+  }
+
+  // Initiates a graceful drain of the specified agent. The agent stops
+  // accepting new work and finishes in-flight operations before
+  // transitioning to the DISCONNECTED state.
+  rpc DrainAgent(DrainAgentRequest) returns (Agent) {
+    option (google.api.http) = {
+      post: "/v1/{name=organizations/*/storageGateways/*/agents/*}:drain"
+      body: "*"
+    };
+    option (google.api.method_signature) = "name";
+  }
+
+  // Removes an agent from the storage gateway. The agent is immediately
+  // disconnected and its resource is deleted.
+  rpc RemoveAgent(RemoveAgentRequest) returns (Agent) {
+    option (google.api.http) = {
+      post: "/v1/{name=organizations/*/storageGateways/*/agents/*}:remove"
+      body: "*"
+    };
+    option (google.api.method_signature) = "name";
+  }
+}
+
+// An agent represents a process that has connected to a storage gateway
+// and is available to serve storage operations. Agents self-register via
+// bidirectional streaming and cannot be created through the API.
+message Agent {
+  option (google.api.resource) = {
+    type: "pivox.storage/Agent"
+    pattern: "organizations/{organization}/storageGateways/{storage_gateway}/agents/{agent}"
+    plural: "agents"
+    singular: "agent"
+  };
+
+  // Agent lifecycle states.
+  enum State {
+    // Unspecified state. This is only useful for distinguishing unset values.
+    STATE_UNSPECIFIED = 0;
+
+    // The agent is in the process of establishing a connection.
+    CONNECTING = 1;
+
+    // The agent is connected and actively serving requests.
+    CONNECTED = 2;
+
+    // The agent is draining: it stops accepting new work and finishes
+    // in-flight operations.
+    DRAINING = 3;
+
+    // The agent is upgrading to a newer version.
+    UPGRADING = 4;
+
+    // The agent has disconnected from the storage gateway.
+    DISCONNECTED = 5;
+  }
+
+  // Output only. The resource name of the agent. Format:
+  // `organizations/{organization}/storageGateways/{storage_gateway}/agents/{agent}`
+  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Output only. The IP address of the agent.
+  string ip_address = 2 [
+    (google.api.field_behavior) = OUTPUT_ONLY,
+    (google.api.field_info).format = IPV4_OR_IPV6
+  ];
+
+  // Output only. The hostname of the machine running the agent.
+  string hostname = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The current lifecycle state of the agent.
+  State state = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The version of the agent software.
+  string version = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The expiry time of the agent's TLS certificate.
+  google.protobuf.Timestamp cert_expiry_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The amount of cache storage used by the agent, in
+  // gigabytes.
+  int32 cache_used_gb = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Timestamp when the agent first joined the storage gateway.
+  google.protobuf.Timestamp join_time = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Timestamp when the agent last reported its status.
+  google.protobuf.Timestamp last_seen_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// The request sent to the
+// [GetAgent][pivox.storage.v1.Agents.GetAgent] method.
+message GetAgentRequest {
+  // Required. The resource name of the agent to retrieve. Format:
+  // `organizations/{organization}/storageGateways/{storage_gateway}/agents/{agent}`
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.storage/Agent"},
+    (buf.validate.field).cel = {
+      id: "required"
+      message: "value is required"
+      expression: "this.size() > 0"
+    }
+  ];
+}
+
+// The request sent to the
+// [ListAgents][pivox.storage.v1.Agents.ListAgents] method.
+message ListAgentsRequest {
+  // Required. The parent storage gateway whose agents are being listed.
+  // Format: `organizations/{organization}/storageGateways/{storage_gateway}`
+  string parent = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {child_type: "pivox.storage/Agent"},
+    (buf.validate.field).cel = {
+      id: "required"
+      message: "value is required"
+      expression: "this.size() > 0"
+    }
+  ];
+
+  // Optional. The maximum number of agents to return in the response.
+  // The server can return fewer agents than requested. If unspecified,
+  // the server picks an appropriate default.
+  int32 page_size = 2 [
+    (google.api.field_behavior) = OPTIONAL,
+    (buf.validate.field).int32 = {
+      gte: 0
+      lte: 1000
+    }
+  ];
+
+  // Optional. A pagination token returned from a previous call to
+  // `ListAgents` that indicates from where listing should continue.
+  string page_token = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. An AIP-160 filter expression. Supports filtering by
+  // `state`, `version`, `hostname`.
+  string filter = 4 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Sort order (e.g. "join_time desc").
+  string order_by = 5 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// The response returned from the
+// [ListAgents][pivox.storage.v1.Agents.ListAgents] method.
+message ListAgentsResponse {
+  // The agents belonging to the specified storage gateway.
+  repeated Agent agents = 1;
+
+  // A pagination token to be used to retrieve the next page of results.
+  // If empty, this response contains the last page of results.
+  string next_page_token = 2;
+}
+
+// The request sent to the
+// [DrainAgent][pivox.storage.v1.Agents.DrainAgent] method.
+message DrainAgentRequest {
+  // Required. The resource name of the agent to drain. Format:
+  // `organizations/{organization}/storageGateways/{storage_gateway}/agents/{agent}`
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.storage/Agent"},
+    (buf.validate.field).cel = {
+      id: "required"
+      message: "value is required"
+      expression: "this.size() > 0"
+    }
+  ];
+
+  // Optional. A human-readable reason for draining the agent.
+  string reason = 2 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// The request sent to the
+// [RemoveAgent][pivox.storage.v1.Agents.RemoveAgent] method.
+message RemoveAgentRequest {
+  // Required. The resource name of the agent to remove. Format:
+  // `organizations/{organization}/storageGateways/{storage_gateway}/agents/{agent}`
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.storage/Agent"},
+    (buf.validate.field).cel = {
+      id: "required"
+      message: "value is required"
+      expression: "this.size() > 0"
+    }
+  ];
+}

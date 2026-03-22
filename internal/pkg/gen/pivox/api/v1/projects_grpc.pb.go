@@ -21,6 +21,7 @@
 package apiv1
 
 import (
+	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
 	context "context"
 	v1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/iam/v1"
 	grpc "google.golang.org/grpc"
@@ -65,14 +66,14 @@ type ProjectsClient interface {
 	// permission on the identified parent.
 	ListProjects(ctx context.Context, in *ListProjectsRequest, opts ...grpc.CallOption) (*ListProjectsResponse, error)
 	// Creates a new project under the specified organization.
-	CreateProject(ctx context.Context, in *CreateProjectRequest, opts ...grpc.CallOption) (*Project, error)
+	CreateProject(ctx context.Context, in *CreateProjectRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
 	// Updates the `display_name` and labels of the project identified by the
 	// specified `name` (for example, `organizations/123/projects/my-project`).
 	// Deleting all labels requires an update mask for labels field.
 	//
 	// The caller must have `resourcemanager.projects.update` permission for this
 	// project.
-	UpdateProject(ctx context.Context, in *UpdateProjectRequest, opts ...grpc.CallOption) (*Project, error)
+	UpdateProject(ctx context.Context, in *UpdateProjectRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
 	// Marks the project identified by the specified
 	// `name` (for example, `organizations/123/projects/my-project`) for deletion.
 	//
@@ -104,7 +105,7 @@ type ProjectsClient interface {
 	//
 	// The caller must have `resourcemanager.projects.delete` permissions for this
 	// project.
-	DeleteProject(ctx context.Context, in *DeleteProjectRequest, opts ...grpc.CallOption) (*Project, error)
+	DeleteProject(ctx context.Context, in *DeleteProjectRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
 	// Restores the project identified by the specified
 	// `name` (for example, `organizations/123/projects/my-project`).
 	// You can only use this method for a project that has a lifecycle state of
@@ -114,7 +115,7 @@ type ProjectsClient interface {
 	//
 	// The caller must have `resourcemanager.projects.undelete` permission for
 	// this project.
-	UndeleteProject(ctx context.Context, in *UndeleteProjectRequest, opts ...grpc.CallOption) (*Project, error)
+	UndeleteProject(ctx context.Context, in *UndeleteProjectRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
 	// Returns the IAM access control policy for the specified project.
 	// Permission is denied if the policy or the resource do not exist.
 	GetIamPolicy(ctx context.Context, in *v1.GetIamPolicyRequest, opts ...grpc.CallOption) (*v1.Policy, error)
@@ -194,9 +195,9 @@ func (c *projectsClient) ListProjects(ctx context.Context, in *ListProjectsReque
 	return out, nil
 }
 
-func (c *projectsClient) CreateProject(ctx context.Context, in *CreateProjectRequest, opts ...grpc.CallOption) (*Project, error) {
+func (c *projectsClient) CreateProject(ctx context.Context, in *CreateProjectRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Project)
+	out := new(longrunningpb.Operation)
 	err := c.cc.Invoke(ctx, Projects_CreateProject_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -204,9 +205,9 @@ func (c *projectsClient) CreateProject(ctx context.Context, in *CreateProjectReq
 	return out, nil
 }
 
-func (c *projectsClient) UpdateProject(ctx context.Context, in *UpdateProjectRequest, opts ...grpc.CallOption) (*Project, error) {
+func (c *projectsClient) UpdateProject(ctx context.Context, in *UpdateProjectRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Project)
+	out := new(longrunningpb.Operation)
 	err := c.cc.Invoke(ctx, Projects_UpdateProject_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -214,9 +215,9 @@ func (c *projectsClient) UpdateProject(ctx context.Context, in *UpdateProjectReq
 	return out, nil
 }
 
-func (c *projectsClient) DeleteProject(ctx context.Context, in *DeleteProjectRequest, opts ...grpc.CallOption) (*Project, error) {
+func (c *projectsClient) DeleteProject(ctx context.Context, in *DeleteProjectRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Project)
+	out := new(longrunningpb.Operation)
 	err := c.cc.Invoke(ctx, Projects_DeleteProject_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -224,9 +225,9 @@ func (c *projectsClient) DeleteProject(ctx context.Context, in *DeleteProjectReq
 	return out, nil
 }
 
-func (c *projectsClient) UndeleteProject(ctx context.Context, in *UndeleteProjectRequest, opts ...grpc.CallOption) (*Project, error) {
+func (c *projectsClient) UndeleteProject(ctx context.Context, in *UndeleteProjectRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Project)
+	out := new(longrunningpb.Operation)
 	err := c.cc.Invoke(ctx, Projects_UndeleteProject_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -284,14 +285,14 @@ type ProjectsServer interface {
 	// permission on the identified parent.
 	ListProjects(context.Context, *ListProjectsRequest) (*ListProjectsResponse, error)
 	// Creates a new project under the specified organization.
-	CreateProject(context.Context, *CreateProjectRequest) (*Project, error)
+	CreateProject(context.Context, *CreateProjectRequest) (*longrunningpb.Operation, error)
 	// Updates the `display_name` and labels of the project identified by the
 	// specified `name` (for example, `organizations/123/projects/my-project`).
 	// Deleting all labels requires an update mask for labels field.
 	//
 	// The caller must have `resourcemanager.projects.update` permission for this
 	// project.
-	UpdateProject(context.Context, *UpdateProjectRequest) (*Project, error)
+	UpdateProject(context.Context, *UpdateProjectRequest) (*longrunningpb.Operation, error)
 	// Marks the project identified by the specified
 	// `name` (for example, `organizations/123/projects/my-project`) for deletion.
 	//
@@ -323,7 +324,7 @@ type ProjectsServer interface {
 	//
 	// The caller must have `resourcemanager.projects.delete` permissions for this
 	// project.
-	DeleteProject(context.Context, *DeleteProjectRequest) (*Project, error)
+	DeleteProject(context.Context, *DeleteProjectRequest) (*longrunningpb.Operation, error)
 	// Restores the project identified by the specified
 	// `name` (for example, `organizations/123/projects/my-project`).
 	// You can only use this method for a project that has a lifecycle state of
@@ -333,7 +334,7 @@ type ProjectsServer interface {
 	//
 	// The caller must have `resourcemanager.projects.undelete` permission for
 	// this project.
-	UndeleteProject(context.Context, *UndeleteProjectRequest) (*Project, error)
+	UndeleteProject(context.Context, *UndeleteProjectRequest) (*longrunningpb.Operation, error)
 	// Returns the IAM access control policy for the specified project.
 	// Permission is denied if the policy or the resource do not exist.
 	GetIamPolicy(context.Context, *v1.GetIamPolicyRequest) (*v1.Policy, error)
@@ -399,16 +400,16 @@ func (UnimplementedProjectsServer) GetProject(context.Context, *GetProjectReques
 func (UnimplementedProjectsServer) ListProjects(context.Context, *ListProjectsRequest) (*ListProjectsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListProjects not implemented")
 }
-func (UnimplementedProjectsServer) CreateProject(context.Context, *CreateProjectRequest) (*Project, error) {
+func (UnimplementedProjectsServer) CreateProject(context.Context, *CreateProjectRequest) (*longrunningpb.Operation, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateProject not implemented")
 }
-func (UnimplementedProjectsServer) UpdateProject(context.Context, *UpdateProjectRequest) (*Project, error) {
+func (UnimplementedProjectsServer) UpdateProject(context.Context, *UpdateProjectRequest) (*longrunningpb.Operation, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateProject not implemented")
 }
-func (UnimplementedProjectsServer) DeleteProject(context.Context, *DeleteProjectRequest) (*Project, error) {
+func (UnimplementedProjectsServer) DeleteProject(context.Context, *DeleteProjectRequest) (*longrunningpb.Operation, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteProject not implemented")
 }
-func (UnimplementedProjectsServer) UndeleteProject(context.Context, *UndeleteProjectRequest) (*Project, error) {
+func (UnimplementedProjectsServer) UndeleteProject(context.Context, *UndeleteProjectRequest) (*longrunningpb.Operation, error) {
 	return nil, status.Error(codes.Unimplemented, "method UndeleteProject not implemented")
 }
 func (UnimplementedProjectsServer) GetIamPolicy(context.Context, *v1.GetIamPolicyRequest) (*v1.Policy, error) {

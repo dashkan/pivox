@@ -64,8 +64,7 @@ message ResourceQuery {
   TimeRange time_range = 6 [(google.api.field_behavior) = OPTIONAL];
 
   // Optional. The granularity for time-series bucketing.
-  google.protobuf.Duration time_granularity = 7
-      [(google.api.field_behavior) = OPTIONAL];
+  google.protobuf.Duration time_granularity = 7 [(google.api.field_behavior) = OPTIONAL];
 
   // Optional. An ordering expression (e.g. "create_time desc").
   string order_by = 8 [(google.api.field_behavior) = OPTIONAL];
@@ -115,8 +114,7 @@ message AbsoluteTimeRange {
 // StaticData provides hardcoded data points for a widget.
 message StaticData {
   // Optional. The data points.
-  repeated StaticDataPoint points = 1
-      [(google.api.field_behavior) = OPTIONAL];
+  repeated StaticDataPoint points = 1 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // StaticDataPoint is a single labeled numeric value.

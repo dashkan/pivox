@@ -62,15 +62,12 @@ service Groups {
 
   // Soft-deletes a group.
   rpc DeleteGroup(DeleteGroupRequest) returns (Group) {
-    option (google.api.http) = {
-      delete: "/v1/{name=organizations/*/groups/*}"
-    };
+    option (google.api.http) = {delete: "/v1/{name=organizations/*/groups/*}"};
     option (google.api.method_signature) = "name";
   }
 
   // Adds members to a group.
-  rpc AddGroupMembers(AddGroupMembersRequest)
-      returns (AddGroupMembersResponse) {
+  rpc AddGroupMembers(AddGroupMembersRequest) returns (AddGroupMembersResponse) {
     option (google.api.http) = {
       post: "/v1/{group=organizations/*/groups/*}:addGroupMembers"
       body: "*"
@@ -79,8 +76,7 @@ service Groups {
   }
 
   // Removes members from a group.
-  rpc RemoveGroupMembers(RemoveGroupMembersRequest)
-      returns (RemoveGroupMembersResponse) {
+  rpc RemoveGroupMembers(RemoveGroupMembersRequest) returns (RemoveGroupMembersResponse) {
     option (google.api.http) = {
       post: "/v1/{group=organizations/*/groups/*}:removeGroupMembers"
       body: "*"
@@ -89,11 +85,8 @@ service Groups {
   }
 
   // Lists members of a group.
-  rpc ListGroupMembers(ListGroupMembersRequest)
-      returns (ListGroupMembersResponse) {
-    option (google.api.http) = {
-      get: "/v1/{group=organizations/*/groups/*}/members"
-    };
+  rpc ListGroupMembers(ListGroupMembersRequest) returns (ListGroupMembersResponse) {
+    option (google.api.http) = {get: "/v1/{group=organizations/*/groups/*}/members"};
     option (google.api.method_signature) = "group";
   }
 }
@@ -114,7 +107,10 @@ message Group {
   // Required. A human-readable name for the group.
   string display_name = 2 [
     (google.api.field_behavior) = REQUIRED,
-    (buf.validate.field).string = {min_len: 1, max_len: 63}
+    (buf.validate.field).string = {
+      min_len: 1
+      max_len: 63
+    }
   ];
 
   // Optional. A longer description of the group's purpose.
@@ -124,20 +120,16 @@ message Group {
   ];
 
   // Output only. Timestamp when the group was created.
-  google.protobuf.Timestamp create_time = 4
-      [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when the group was last modified.
-  google.protobuf.Timestamp update_time = 5
-      [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when the group was soft-deleted.
-  google.protobuf.Timestamp delete_time = 6
-      [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp delete_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when the group will be permanently purged.
-  google.protobuf.Timestamp purge_time = 7
-      [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp purge_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. A checksum computed by the server based on the current value
   // of the Group resource.
@@ -157,8 +149,7 @@ message GroupMember {
   ];
 
   // Output only. Timestamp when the membership was created.
-  google.protobuf.Timestamp create_time = 2
-      [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Request message for `GetGroup`.
@@ -193,7 +184,10 @@ message ListGroupsRequest {
   // Optional. Maximum number of groups to return.
   int32 page_size = 2 [
     (google.api.field_behavior) = OPTIONAL,
-    (buf.validate.field).int32 = {gte: 0, lte: 1000}
+    (buf.validate.field).int32 = {
+      gte: 0
+      lte: 1000
+    }
   ];
 
   // Optional. Page token from a previous ListGroups call.
@@ -252,8 +246,7 @@ message UpdateGroupRequest {
   ];
 
   // Optional. The fields to update. If omitted, all mutable fields are updated.
-  google.protobuf.FieldMask update_mask = 2
-      [(google.api.field_behavior) = OPTIONAL];
+  google.protobuf.FieldMask update_mask = 2 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // Request message for `DeleteGroup`.
@@ -292,7 +285,10 @@ message AddGroupMembersRequest {
   // Format: `organizations/{organization}/users/{user}`
   repeated string members = 2 [
     (google.api.field_behavior) = REQUIRED,
-    (buf.validate.field).repeated = {min_items: 1, max_items: 100}
+    (buf.validate.field).repeated = {
+      min_items: 1
+      max_items: 100
+    }
   ];
 }
 
@@ -317,7 +313,10 @@ message RemoveGroupMembersRequest {
   // Format: `organizations/{organization}/users/{user}`
   repeated string members = 2 [
     (google.api.field_behavior) = REQUIRED,
-    (buf.validate.field).repeated = {min_items: 1, max_items: 100}
+    (buf.validate.field).repeated = {
+      min_items: 1
+      max_items: 100
+    }
   ];
 }
 
@@ -347,7 +346,10 @@ message ListGroupMembersRequest {
   // Optional. Maximum number of members to return.
   int32 page_size = 2 [
     (google.api.field_behavior) = OPTIONAL,
-    (buf.validate.field).int32 = {gte: 0, lte: 1000}
+    (buf.validate.field).int32 = {
+      gte: 0
+      lte: 1000
+    }
   ];
 
   // Optional. Page token from a previous ListGroupMembers call.

@@ -22,10 +22,11 @@ package apiv1
 
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
+	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
+	_ "google.golang.org/protobuf/types/known/emptypb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
@@ -690,11 +691,87 @@ func (x *EffectiveTag) GetInherited() bool {
 	return false
 }
 
+// A status object which is used as the `metadata` field for the Operation
+// returned by CreateTagBinding.
+type CreateTagBindingMetadata struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateTagBindingMetadata) Reset() {
+	*x = CreateTagBindingMetadata{}
+	mi := &file_pivox_api_v1_tag_bindings_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateTagBindingMetadata) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateTagBindingMetadata) ProtoMessage() {}
+
+func (x *CreateTagBindingMetadata) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_api_v1_tag_bindings_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateTagBindingMetadata.ProtoReflect.Descriptor instead.
+func (*CreateTagBindingMetadata) Descriptor() ([]byte, []int) {
+	return file_pivox_api_v1_tag_bindings_proto_rawDescGZIP(), []int{9}
+}
+
+// A status object which is used as the `metadata` field for the Operation
+// returned by DeleteTagBinding.
+type DeleteTagBindingMetadata struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteTagBindingMetadata) Reset() {
+	*x = DeleteTagBindingMetadata{}
+	mi := &file_pivox_api_v1_tag_bindings_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteTagBindingMetadata) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteTagBindingMetadata) ProtoMessage() {}
+
+func (x *DeleteTagBindingMetadata) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_api_v1_tag_bindings_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteTagBindingMetadata.ProtoReflect.Descriptor instead.
+func (*DeleteTagBindingMetadata) Descriptor() ([]byte, []int) {
+	return file_pivox_api_v1_tag_bindings_proto_rawDescGZIP(), []int{10}
+}
+
 var File_pivox_api_v1_tag_bindings_proto protoreflect.FileDescriptor
 
 const file_pivox_api_v1_tag_bindings_proto_rawDesc = "" +
 	"\n" +
-	"\x1fpivox/api/v1/tag_bindings.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xfa\x04\n" +
+	"\x1fpivox/api/v1/tag_bindings.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xfa\x04\n" +
 	"\n" +
 	"TagBinding\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12k\n" +
@@ -755,14 +832,20 @@ const file_pivox_api_v1_tag_bindings_proto_rawDesc = "" +
 	"\x12pivox.api/TagValueR\btagValue\x12.\n" +
 	"\atag_key\x18\x03 \x01(\tB\x15\xfaA\x12\n" +
 	"\x10pivox.api/TagKeyR\x06tagKey\x12\x1c\n" +
-	"\tinherited\x18\x05 \x01(\bR\tinherited2\xd0\b\n" +
+	"\tinherited\x18\x05 \x01(\bR\tinherited\"\x1a\n" +
+	"\x18CreateTagBindingMetadata\"\x1a\n" +
+	"\x18DeleteTagBindingMetadata2\xaf\t\n" +
 	"\vTagBindings\x12\xd0\x01\n" +
 	"\x0fListTagBindings\x12$.pivox.api.v1.ListTagBindingsRequest\x1a%.pivox.api.v1.ListTagBindingsResponse\"p\xdaA\x06parent\x82\xd3\xe4\x93\x02aZ5\x123/v1/{parent=organizations/*/projects/*}/tagBindings\x12(/v1/{parent=organizations/*}/tagBindings\x12\xbd\x01\n" +
-	"\rGetTagBinding\x12\".pivox.api.v1.GetTagBindingRequest\x1a\x18.pivox.api.v1.TagBinding\"n\xdaA\x04name\x82\xd3\xe4\x93\x02aZ5\x123/v1/{name=organizations/*/projects/*/tagBindings/*}\x12(/v1/{name=organizations/*/tagBindings/*}\x12\xfb\x01\n" +
-	"\x10CreateTagBinding\x12%.pivox.api.v1.CreateTagBindingRequest\x1a\x18.pivox.api.v1.TagBinding\"\xa5\x01\xdaA!parent,tag_binding,tag_binding_id\x82\xd3\xe4\x93\x02{:\vtag_bindingZB:\vtag_binding\"3/v1/{parent=organizations/*/projects/*}/tagBindings\"(/v1/{parent=organizations/*}/tagBindings\x12\xc1\x01\n" +
-	"\x10DeleteTagBinding\x12%.pivox.api.v1.DeleteTagBindingRequest\x1a\x16.google.protobuf.Empty\"n\xdaA\x04name\x82\xd3\xe4\x93\x02aZ5*3/v1/{name=organizations/*/projects/*/tagBindings/*}*(/v1/{name=organizations/*/tagBindings/*}\x12\xda\x01\n" +
-	"\x11ListEffectiveTags\x12&.pivox.api.v1.ListEffectiveTagsRequest\x1a'.pivox.api.v1.ListEffectiveTagsResponse\"t\xdaA\x06parent\x82\xd3\xe4\x93\x02eZ7\x125/v1/{parent=organizations/*/projects/*}/effectiveTags\x12*/v1/{parent=organizations/*}/effectiveTags\x1a\x0f\xcaA\fapi.pivox.ioB\xb4\x01\n" +
-	"\x10com.pivox.api.v1B\x10TagBindingsProtoP\x01Z<github.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
+	"\rGetTagBinding\x12\".pivox.api.v1.GetTagBindingRequest\x1a\x18.pivox.api.v1.TagBinding\"n\xdaA\x04name\x82\xd3\xe4\x93\x02aZ5\x123/v1/{name=organizations/*/projects/*/tagBindings/*}\x12(/v1/{name=organizations/*/tagBindings/*}\x12\xa9\x02\n" +
+	"\x10CreateTagBinding\x12%.pivox.api.v1.CreateTagBindingRequest\x1a\x1d.google.longrunning.Operation\"\xce\x01\xcaA&\n" +
+	"\n" +
+	"TagBinding\x12\x18CreateTagBindingMetadata\xdaA!parent,tag_binding,tag_binding_id\x82\xd3\xe4\x93\x02{:\vtag_bindingZB:\vtag_binding\"3/v1/{parent=organizations/*/projects/*}/tagBindings\"(/v1/{parent=organizations/*}/tagBindings\x12\xf2\x01\n" +
+	"\x10DeleteTagBinding\x12%.pivox.api.v1.DeleteTagBindingRequest\x1a\x1d.google.longrunning.Operation\"\x97\x01\xcaA&\n" +
+	"\n" +
+	"TagBinding\x12\x18DeleteTagBindingMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02aZ5*3/v1/{name=organizations/*/projects/*/tagBindings/*}*(/v1/{name=organizations/*/tagBindings/*}\x12\xda\x01\n" +
+	"\x11ListEffectiveTags\x12&.pivox.api.v1.ListEffectiveTagsRequest\x1a'.pivox.api.v1.ListEffectiveTagsResponse\"t\xdaA\x06parent\x82\xd3\xe4\x93\x02eZ7\x125/v1/{parent=organizations/*/projects/*}/effectiveTags\x12*/v1/{parent=organizations/*}/effectiveTags\x1a\x0f\xcaA\fapi.pivox.ioB\xbb\x01\n" +
+	"\x10com.pivox.api.v1B\x10TagBindingsProtoP\x01ZCgithub.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
 
 var (
 	file_pivox_api_v1_tag_bindings_proto_rawDescOnce sync.Once
@@ -776,7 +859,7 @@ func file_pivox_api_v1_tag_bindings_proto_rawDescGZIP() []byte {
 	return file_pivox_api_v1_tag_bindings_proto_rawDescData
 }
 
-var file_pivox_api_v1_tag_bindings_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_pivox_api_v1_tag_bindings_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_pivox_api_v1_tag_bindings_proto_goTypes = []any{
 	(*TagBinding)(nil),                // 0: pivox.api.v1.TagBinding
 	(*GetTagBindingRequest)(nil),      // 1: pivox.api.v1.GetTagBindingRequest
@@ -787,14 +870,16 @@ var file_pivox_api_v1_tag_bindings_proto_goTypes = []any{
 	(*ListEffectiveTagsRequest)(nil),  // 6: pivox.api.v1.ListEffectiveTagsRequest
 	(*ListEffectiveTagsResponse)(nil), // 7: pivox.api.v1.ListEffectiveTagsResponse
 	(*EffectiveTag)(nil),              // 8: pivox.api.v1.EffectiveTag
-	nil,                               // 9: pivox.api.v1.TagBinding.AnnotationsEntry
-	(*timestamppb.Timestamp)(nil),     // 10: google.protobuf.Timestamp
-	(*emptypb.Empty)(nil),             // 11: google.protobuf.Empty
+	(*CreateTagBindingMetadata)(nil),  // 9: pivox.api.v1.CreateTagBindingMetadata
+	(*DeleteTagBindingMetadata)(nil),  // 10: pivox.api.v1.DeleteTagBindingMetadata
+	nil,                               // 11: pivox.api.v1.TagBinding.AnnotationsEntry
+	(*timestamppb.Timestamp)(nil),     // 12: google.protobuf.Timestamp
+	(*longrunningpb.Operation)(nil),   // 13: google.longrunning.Operation
 }
 var file_pivox_api_v1_tag_bindings_proto_depIdxs = []int32{
-	10, // 0: pivox.api.v1.TagBinding.create_time:type_name -> google.protobuf.Timestamp
-	10, // 1: pivox.api.v1.TagBinding.update_time:type_name -> google.protobuf.Timestamp
-	9,  // 2: pivox.api.v1.TagBinding.annotations:type_name -> pivox.api.v1.TagBinding.AnnotationsEntry
+	12, // 0: pivox.api.v1.TagBinding.create_time:type_name -> google.protobuf.Timestamp
+	12, // 1: pivox.api.v1.TagBinding.update_time:type_name -> google.protobuf.Timestamp
+	11, // 2: pivox.api.v1.TagBinding.annotations:type_name -> pivox.api.v1.TagBinding.AnnotationsEntry
 	0,  // 3: pivox.api.v1.CreateTagBindingRequest.tag_binding:type_name -> pivox.api.v1.TagBinding
 	0,  // 4: pivox.api.v1.ListTagBindingsResponse.tag_bindings:type_name -> pivox.api.v1.TagBinding
 	8,  // 5: pivox.api.v1.ListEffectiveTagsResponse.effective_tags:type_name -> pivox.api.v1.EffectiveTag
@@ -805,8 +890,8 @@ var file_pivox_api_v1_tag_bindings_proto_depIdxs = []int32{
 	6,  // 10: pivox.api.v1.TagBindings.ListEffectiveTags:input_type -> pivox.api.v1.ListEffectiveTagsRequest
 	5,  // 11: pivox.api.v1.TagBindings.ListTagBindings:output_type -> pivox.api.v1.ListTagBindingsResponse
 	0,  // 12: pivox.api.v1.TagBindings.GetTagBinding:output_type -> pivox.api.v1.TagBinding
-	0,  // 13: pivox.api.v1.TagBindings.CreateTagBinding:output_type -> pivox.api.v1.TagBinding
-	11, // 14: pivox.api.v1.TagBindings.DeleteTagBinding:output_type -> google.protobuf.Empty
+	13, // 13: pivox.api.v1.TagBindings.CreateTagBinding:output_type -> google.longrunning.Operation
+	13, // 14: pivox.api.v1.TagBindings.DeleteTagBinding:output_type -> google.longrunning.Operation
 	7,  // 15: pivox.api.v1.TagBindings.ListEffectiveTags:output_type -> pivox.api.v1.ListEffectiveTagsResponse
 	11, // [11:16] is the sub-list for method output_type
 	6,  // [6:11] is the sub-list for method input_type
@@ -826,7 +911,7 @@ func file_pivox_api_v1_tag_bindings_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pivox_api_v1_tag_bindings_proto_rawDesc), len(file_pivox_api_v1_tag_bindings_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

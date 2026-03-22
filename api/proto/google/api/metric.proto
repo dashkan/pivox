@@ -112,8 +112,7 @@ message MetricDescriptor {
     google.protobuf.Duration ingest_delay = 3;
 
     // The scope of the timeseries data of the metric.
-    repeated TimeSeriesResourceHierarchyLevel
-        time_series_resource_hierarchy_level = 4;
+    repeated TimeSeriesResourceHierarchyLevel time_series_resource_hierarchy_level = 4;
   }
 
   // The resource name of the metric descriptor.

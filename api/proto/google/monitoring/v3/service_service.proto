@@ -39,9 +39,9 @@ option ruby_package = "Google::Cloud::Monitoring::V3";
 service ServiceMonitoringService {
   option (google.api.default_host) = "monitoring.googleapis.com";
   option (google.api.oauth_scopes) =
-      "https://www.googleapis.com/auth/cloud-platform,"
-      "https://www.googleapis.com/auth/monitoring,"
-      "https://www.googleapis.com/auth/monitoring.read";
+    "https://www.googleapis.com/auth/cloud-platform,"
+    "https://www.googleapis.com/auth/monitoring,"
+    "https://www.googleapis.com/auth/monitoring.read";
 
   // Create a `Service`.
   rpc CreateService(CreateServiceRequest) returns (Service) {
@@ -54,17 +54,13 @@ service ServiceMonitoringService {
 
   // Get the named `Service`.
   rpc GetService(GetServiceRequest) returns (Service) {
-    option (google.api.http) = {
-      get: "/v3/{name=*/*/services/*}"
-    };
+    option (google.api.http) = {get: "/v3/{name=*/*/services/*}"};
     option (google.api.method_signature) = "name";
   }
 
   // List `Service`s for this Metrics Scope.
   rpc ListServices(ListServicesRequest) returns (ListServicesResponse) {
-    option (google.api.http) = {
-      get: "/v3/{parent=*/*}/services"
-    };
+    option (google.api.http) = {get: "/v3/{parent=*/*}/services"};
     option (google.api.method_signature) = "parent";
   }
 
@@ -79,15 +75,12 @@ service ServiceMonitoringService {
 
   // Soft delete this `Service`.
   rpc DeleteService(DeleteServiceRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {
-      delete: "/v3/{name=*/*/services/*}"
-    };
+    option (google.api.http) = {delete: "/v3/{name=*/*/services/*}"};
     option (google.api.method_signature) = "name";
   }
 
   // Create a `ServiceLevelObjective` for the given `Service`.
-  rpc CreateServiceLevelObjective(CreateServiceLevelObjectiveRequest)
-      returns (ServiceLevelObjective) {
+  rpc CreateServiceLevelObjective(CreateServiceLevelObjectiveRequest) returns (ServiceLevelObjective) {
     option (google.api.http) = {
       post: "/v3/{parent=*/*/services/*}/serviceLevelObjectives"
       body: "service_level_objective"
@@ -96,26 +89,19 @@ service ServiceMonitoringService {
   }
 
   // Get a `ServiceLevelObjective` by name.
-  rpc GetServiceLevelObjective(GetServiceLevelObjectiveRequest)
-      returns (ServiceLevelObjective) {
-    option (google.api.http) = {
-      get: "/v3/{name=*/*/services/*/serviceLevelObjectives/*}"
-    };
+  rpc GetServiceLevelObjective(GetServiceLevelObjectiveRequest) returns (ServiceLevelObjective) {
+    option (google.api.http) = {get: "/v3/{name=*/*/services/*/serviceLevelObjectives/*}"};
     option (google.api.method_signature) = "name";
   }
 
   // List the `ServiceLevelObjective`s for the given `Service`.
-  rpc ListServiceLevelObjectives(ListServiceLevelObjectivesRequest)
-      returns (ListServiceLevelObjectivesResponse) {
-    option (google.api.http) = {
-      get: "/v3/{parent=*/*/services/*}/serviceLevelObjectives"
-    };
+  rpc ListServiceLevelObjectives(ListServiceLevelObjectivesRequest) returns (ListServiceLevelObjectivesResponse) {
+    option (google.api.http) = {get: "/v3/{parent=*/*/services/*}/serviceLevelObjectives"};
     option (google.api.method_signature) = "parent";
   }
 
   // Update the given `ServiceLevelObjective`.
-  rpc UpdateServiceLevelObjective(UpdateServiceLevelObjectiveRequest)
-      returns (ServiceLevelObjective) {
+  rpc UpdateServiceLevelObjective(UpdateServiceLevelObjectiveRequest) returns (ServiceLevelObjective) {
     option (google.api.http) = {
       patch: "/v3/{service_level_objective.name=*/*/services/*/serviceLevelObjectives/*}"
       body: "service_level_objective"
@@ -124,11 +110,8 @@ service ServiceMonitoringService {
   }
 
   // Delete the given `ServiceLevelObjective`.
-  rpc DeleteServiceLevelObjective(DeleteServiceLevelObjectiveRequest)
-      returns (google.protobuf.Empty) {
-    option (google.api.http) = {
-      delete: "/v3/{name=*/*/services/*/serviceLevelObjectives/*}"
-    };
+  rpc DeleteServiceLevelObjective(DeleteServiceLevelObjectiveRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/v3/{name=*/*/services/*/serviceLevelObjectives/*}"};
     option (google.api.method_signature) = "name";
   }
 }
@@ -142,9 +125,7 @@ message CreateServiceRequest {
   //     projects/[PROJECT_ID_OR_NUMBER]
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {
-      child_type: "monitoring.googleapis.com/Service"
-    }
+    (google.api.resource_reference) = {child_type: "monitoring.googleapis.com/Service"}
   ];
 
   // Optional. The Service id to use for this Service. If omitted, an id will be
@@ -162,9 +143,7 @@ message GetServiceRequest {
   //     projects/[PROJECT_ID_OR_NUMBER]/services/[SERVICE_ID]
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {
-      type: "monitoring.googleapis.com/Service"
-    }
+    (google.api.resource_reference) = {type: "monitoring.googleapis.com/Service"}
   ];
 }
 
@@ -178,9 +157,7 @@ message ListServicesRequest {
   //     workspaces/[HOST_PROJECT_ID_OR_NUMBER]
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {
-      child_type: "monitoring.googleapis.com/Service"
-    }
+    (google.api.resource_reference) = {child_type: "monitoring.googleapis.com/Service"}
   ];
 
   // A filter specifying what `Service`s to return. The filter supports
@@ -241,9 +218,7 @@ message DeleteServiceRequest {
   //     projects/[PROJECT_ID_OR_NUMBER]/services/[SERVICE_ID]
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {
-      type: "monitoring.googleapis.com/Service"
-    }
+    (google.api.resource_reference) = {type: "monitoring.googleapis.com/Service"}
   ];
 }
 
@@ -254,9 +229,7 @@ message CreateServiceLevelObjectiveRequest {
   //     projects/[PROJECT_ID_OR_NUMBER]/services/[SERVICE_ID]
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {
-      type: "monitoring.googleapis.com/Service"
-    }
+    (google.api.resource_reference) = {type: "monitoring.googleapis.com/Service"}
   ];
 
   // Optional. The ServiceLevelObjective id to use for this
@@ -267,8 +240,7 @@ message CreateServiceLevelObjectiveRequest {
   // Required. The `ServiceLevelObjective` to create.
   // The provided `name` will be respected if no `ServiceLevelObjective` exists
   // with this name.
-  ServiceLevelObjective service_level_objective = 2
-      [(google.api.field_behavior) = REQUIRED];
+  ServiceLevelObjective service_level_objective = 2 [(google.api.field_behavior) = REQUIRED];
 }
 
 // The `GetServiceLevelObjective` request.
@@ -279,9 +251,7 @@ message GetServiceLevelObjectiveRequest {
   //     projects/[PROJECT_ID_OR_NUMBER]/services/[SERVICE_ID]/serviceLevelObjectives/[SLO_NAME]
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {
-      type: "monitoring.googleapis.com/ServiceLevelObjective"
-    }
+    (google.api.resource_reference) = {type: "monitoring.googleapis.com/ServiceLevelObjective"}
   ];
 
   // View of the `ServiceLevelObjective` to return. If `DEFAULT`, return the
@@ -300,9 +270,7 @@ message ListServiceLevelObjectivesRequest {
   //     workspaces/[HOST_PROJECT_ID_OR_NUMBER]/services/-
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {
-      type: "monitoring.googleapis.com/Service"
-    }
+    (google.api.resource_reference) = {type: "monitoring.googleapis.com/Service"}
   ];
 
   // A filter specifying what `ServiceLevelObjective`s to return.
@@ -339,8 +307,7 @@ message ListServiceLevelObjectivesResponse {
 message UpdateServiceLevelObjectiveRequest {
   // Required. The `ServiceLevelObjective` to draw updates from.
   // The given `name` specifies the resource to update.
-  ServiceLevelObjective service_level_objective = 1
-      [(google.api.field_behavior) = REQUIRED];
+  ServiceLevelObjective service_level_objective = 1 [(google.api.field_behavior) = REQUIRED];
 
   // A set of field paths defining which fields to use for the update.
   google.protobuf.FieldMask update_mask = 2;
@@ -354,8 +321,6 @@ message DeleteServiceLevelObjectiveRequest {
   //     projects/[PROJECT_ID_OR_NUMBER]/services/[SERVICE_ID]/serviceLevelObjectives/[SLO_NAME]
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {
-      type: "monitoring.googleapis.com/ServiceLevelObjective"
-    }
+    (google.api.resource_reference) = {type: "monitoring.googleapis.com/ServiceLevelObjective"}
   ];
 }

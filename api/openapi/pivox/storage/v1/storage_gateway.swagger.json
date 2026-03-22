@@ -1,0 +1,855 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "pivox/storage/v1/storage_gateway.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "StorageGateways"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/organizations/{organization}/storageGateways": {
+      "get": {
+        "summary": "Lists storage gateways in the specified organization.",
+        "operationId": "StorageGateways_ListStorageGateways",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListStorageGatewaysResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Optional. The maximum number of storage gateways to return in the\nresponse. The server can return fewer storage gateways than requested.\nIf unspecified, the server picks an appropriate default.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. A pagination token returned from a previous call to\n`ListStorageGateways` that indicates from where listing should continue.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "filter",
+            "description": "Optional. An AIP-160 filter expression. Supports filtering by\n`state`, `display_name`, `create_time`.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "description": "Optional. Sort order (e.g. \"create_time desc\").",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "StorageGateways"
+        ]
+      },
+      "post": {
+        "summary": "Creates a new storage gateway in the specified organization.",
+        "description": "The caller must have `storage.storageGateways.create` permission on the\nparent organization.",
+        "operationId": "StorageGateways_CreateStorageGateway",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/longrunningOperation"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "storageGateway",
+            "description": "Required. The storage gateway to create.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1StorageGateway"
+            }
+          },
+          {
+            "name": "storageGatewayId",
+            "description": "Optional. A unique identifier for the storage gateway. If not provided,\nthe server will generate one.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "validateOnly",
+            "description": "Optional. If set to true, the request will only validate the request\nwithout persisting it.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "StorageGateways"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/storageGateways/{storageGateway}": {
+      "get": {
+        "summary": "Fetches a storage gateway resource identified by the specified resource\nname.",
+        "operationId": "StorageGateways_GetStorageGateway",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1StorageGateway"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "storageGateway",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "StorageGateways"
+        ]
+      },
+      "delete": {
+        "summary": "Deletes a storage gateway resource.",
+        "description": "The caller must have `storage.storageGateways.delete` permission on the\nspecified storage gateway.",
+        "operationId": "StorageGateways_DeleteStorageGateway",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/longrunningOperation"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "storageGateway",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "etag",
+            "description": "Optional. The etag known to the client for the expected state of the\nstorage gateway. This is to be used for optimistic concurrency.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "validateOnly",
+            "description": "Optional. If set to true, the request will only validate the request\nwithout persisting it.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "StorageGateways"
+        ]
+      },
+      "patch": {
+        "summary": "Updates a storage gateway resource. Use the field mask to specify which\nfields to update. Omitting the field mask updates all mutable fields.",
+        "description": "The caller must have `storage.storageGateways.update` permission on the\nspecified storage gateway.",
+        "operationId": "StorageGateways_UpdateStorageGateway",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/longrunningOperation"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "storageGateway",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "storageGateway",
+            "description": "Required. The new definition of the storage gateway. The `name` field\nmust be populated to identify the storage gateway to update.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "displayName": {
+                  "type": "string",
+                  "description": "Required. A human-readable name for the storage gateway. Must be at\nmost 60 characters long."
+                },
+                "state": {
+                  "$ref": "#/definitions/v1StorageGatewayState",
+                  "description": "Output only. The current lifecycle state of the storage gateway.",
+                  "readOnly": true
+                },
+                "hostname": {
+                  "type": "string",
+                  "description": "Output only. The hostname assigned to this storage gateway, for example\n`{name}.storage.pivox.app`.",
+                  "readOnly": true
+                },
+                "ipAddresses": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Required. The IP addresses that the storage gateway listens on.\nAt least one IP address must be provided."
+                },
+                "registrationToken": {
+                  "type": "string",
+                  "description": "Output only. The registration token used to register agents with this\nstorage gateway.",
+                  "readOnly": true
+                },
+                "targetVersion": {
+                  "type": "string",
+                  "description": "Optional. The desired software version for the storage gateway."
+                },
+                "currentVersion": {
+                  "type": "string",
+                  "description": "Output only. The currently running software version of the storage\ngateway.",
+                  "readOnly": true
+                },
+                "cacheConfig": {
+                  "$ref": "#/definitions/v1CacheConfig",
+                  "description": "Optional. Cache configuration for the storage gateway."
+                },
+                "certState": {
+                  "$ref": "#/definitions/StorageGatewayCertState",
+                  "description": "Output only. The current state of the TLS certificate.",
+                  "readOnly": true
+                },
+                "certExpiryTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. The expiration time of the TLS certificate.",
+                  "readOnly": true
+                },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "Optional. Annotations associated with this storage gateway.\nAnnotations are key-value pairs that can be used to organize and track\nresources."
+                },
+                "etag": {
+                  "type": "string",
+                  "description": "Output only. A checksum computed by the server based on the current value\nof the StorageGateway resource. This may be sent on update and delete\nrequests to ensure the client has an up-to-date value before proceeding.",
+                  "readOnly": true
+                },
+                "creator": {
+                  "type": "string",
+                  "description": "Output only. The resource name of the user who created the storage\ngateway.",
+                  "readOnly": true
+                },
+                "updater": {
+                  "type": "string",
+                  "description": "Output only. The resource name of the user who last updated the storage\ngateway.",
+                  "readOnly": true
+                },
+                "createTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when the storage gateway was created.",
+                  "readOnly": true
+                },
+                "updateTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when the storage gateway was last modified.",
+                  "readOnly": true
+                }
+              },
+              "description": "Required. The new definition of the storage gateway. The `name` field\nmust be populated to identify the storage gateway to update.",
+              "required": [
+                "displayName",
+                "ipAddresses"
+              ]
+            }
+          },
+          {
+            "name": "validateOnly",
+            "description": "Optional. If set to true, the request will only validate the request\nwithout persisting it.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "StorageGateways"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/storageGateways/{storageGateway}:installScript": {
+      "get": {
+        "summary": "Returns an install script for the specified storage gateway. The script\nis customised with the provided configuration parameters.",
+        "operationId": "StorageGateways_GetInstallScript",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1GetInstallScriptResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "storageGateway",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "cacheDir",
+            "description": "Optional. The directory to use for caching.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "cacheSizeGb",
+            "description": "Optional. The cache size in gigabytes.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "port",
+            "description": "Optional. The port the gateway agent should listen on (1-65535).",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "bindAddress",
+            "description": "Optional. The IP address the gateway agent should bind to.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "httpProxy",
+            "description": "Optional. HTTP proxy URL for outbound connections.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "httpsProxy",
+            "description": "Optional. HTTPS proxy URL for outbound connections.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "noProxy",
+            "description": "Optional. Comma-separated list of hosts that should bypass the proxy.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "telemetry",
+            "description": "Optional. Whether to enable telemetry collection.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "StorageGateways"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/storageGateways/{storageGateway}:rotateRegistrationToken": {
+      "post": {
+        "summary": "Rotates the registration token for a storage gateway. The previous token\nis immediately invalidated and a new token is generated.",
+        "operationId": "StorageGateways_RotateRegistrationToken",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1StorageGateway"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "storageGateway",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/StorageGatewaysRotateRegistrationTokenBody"
+            }
+          }
+        ],
+        "tags": [
+          "StorageGateways"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/storageGateways/{storageGateway}:uninstallScript": {
+      "get": {
+        "summary": "Returns an uninstall script for the specified storage gateway.",
+        "operationId": "StorageGateways_GetUninstallScript",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1GetUninstallScriptResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "storageGateway",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "StorageGateways"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/storageGateways/{storageGateway}:upgrade": {
+      "post": {
+        "summary": "Initiates an upgrade of the storage gateway to the specified target\nversion. The upgrade is performed as a rolling update across all agents.",
+        "operationId": "StorageGateways_UpgradeGateway",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/longrunningOperation"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "storageGateway",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/StorageGatewaysUpgradeGatewayBody"
+            }
+          }
+        ],
+        "tags": [
+          "StorageGateways"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "CacheConfigEvictionPolicy": {
+      "type": "string",
+      "enum": [
+        "EVICTION_POLICY_UNSPECIFIED",
+        "LRU",
+        "LFU"
+      ],
+      "default": "EVICTION_POLICY_UNSPECIFIED",
+      "description": "The eviction policy used when the cache reaches its maximum size.\n\n - EVICTION_POLICY_UNSPECIFIED: Unspecified eviction policy.\n - LRU: Least Recently Used: evicts the least recently accessed items first.\n - LFU: Least Frequently Used: evicts the least frequently accessed items first."
+    },
+    "StorageGatewayCertState": {
+      "type": "string",
+      "enum": [
+        "CERT_STATE_UNSPECIFIED",
+        "PENDING",
+        "CERT_ACTIVE",
+        "EXPIRING",
+        "EXPIRED"
+      ],
+      "default": "CERT_STATE_UNSPECIFIED",
+      "description": "TLS certificate lifecycle states.\n\n - CERT_STATE_UNSPECIFIED: Unspecified certificate state.\n - PENDING: The certificate is being provisioned.\n - CERT_ACTIVE: The certificate is active and valid.\n - EXPIRING: The certificate is approaching its expiration date.\n - EXPIRED: The certificate has expired."
+    },
+    "StorageGatewaysRotateRegistrationTokenBody": {
+      "type": "object",
+      "description": "The request sent to the\n[RotateRegistrationToken][pivox.storage.v1.StorageGateways.RotateRegistrationToken]\nmethod."
+    },
+    "StorageGatewaysUpgradeGatewayBody": {
+      "type": "object",
+      "properties": {
+        "targetVersion": {
+          "type": "string",
+          "description": "Required. The target version to upgrade to."
+        }
+      },
+      "description": "The request sent to the\n[UpgradeGateway][pivox.storage.v1.StorageGateways.UpgradeGateway]\nmethod.",
+      "required": [
+        "targetVersion"
+      ]
+    },
+    "longrunningOperation": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The server-assigned name, which is only unique within the same service that\noriginally returns it. If you use the default HTTP mapping, the\n`name` should be a resource name ending with `operations/{unique_id}`."
+        },
+        "metadata": {
+          "$ref": "#/definitions/protobufAny",
+          "description": "Service-specific metadata associated with the operation.  It typically\ncontains progress information and common metadata such as create time.\nSome services might not provide such metadata.  Any method that returns a\nlong-running operation should document the metadata type, if any."
+        },
+        "done": {
+          "type": "boolean",
+          "description": "If the value is `false`, it means the operation is still in progress.\nIf `true`, the operation is completed, and either `error` or `response` is\navailable."
+        },
+        "error": {
+          "$ref": "#/definitions/rpcStatus",
+          "description": "The error result of the operation in case of failure or cancellation."
+        },
+        "response": {
+          "$ref": "#/definitions/protobufAny",
+          "description": "The normal, successful response of the operation.  If the original\nmethod returns no data on success, such as `Delete`, the response is\n`google.protobuf.Empty`.  If the original method is standard\n`Get`/`Create`/`Update`, the response should be the resource.  For other\nmethods, the response should have the type `XxxResponse`, where `Xxx`\nis the original method name.  For example, if the original method name\nis `TakeSnapshot()`, the inferred response type is\n`TakeSnapshotResponse`."
+        }
+      },
+      "description": "This resource represents a long-running operation that is the result of a\nnetwork API call."
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string",
+          "description": "A URL/resource name that uniquely identifies the type of the serialized\nprotocol buffer message. This string must contain at least\none \"/\" character. The last segment of the URL's path must represent\nthe fully qualified name of the type (as in\n`path/google.protobuf.Duration`). The name should be in a canonical form\n(e.g., leading \".\" is not accepted).\n\nIn practice, teams usually precompile into the binary all types that they\nexpect it to use in the context of Any. However, for URLs which use the\nscheme `http`, `https`, or no scheme, one can optionally set up a type\nserver that maps type URLs to message definitions as follows:\n\n* If no scheme is provided, `https` is assumed.\n* An HTTP GET on the URL must yield a [google.protobuf.Type][]\n  value in binary format, or produce an error.\n* Applications are allowed to cache lookup results based on the\n  URL, or have them precompiled into a binary to avoid any\n  lookup. Therefore, binary compatibility needs to be preserved\n  on changes to types. (Use versioned type names to manage\n  breaking changes.)\n\nNote: this functionality is not currently available in the official\nprotobuf release, and it is not used for type URLs beginning with\ntype.googleapis.com. As of May 2023, there are no widely used type server\nimplementations and no plans to implement one.\n\nSchemes other than `http`, `https` (or the empty scheme) might be\nused with implementation specific semantics."
+        }
+      },
+      "additionalProperties": {},
+      "description": "`Any` contains an arbitrary serialized protocol buffer message along with a\nURL that describes the type of the serialized message.\n\nProtobuf library provides support to pack/unpack Any values in the form\nof utility functions or additional generated methods of the Any type.\n\nExample 1: Pack and unpack a message in C++.\n\n    Foo foo = ...;\n    Any any;\n    any.PackFrom(foo);\n    ...\n    if (any.UnpackTo(\u0026foo)) {\n      ...\n    }\n\nExample 2: Pack and unpack a message in Java.\n\n    Foo foo = ...;\n    Any any = Any.pack(foo);\n    ...\n    if (any.is(Foo.class)) {\n      foo = any.unpack(Foo.class);\n    }\n    // or ...\n    if (any.isSameTypeAs(Foo.getDefaultInstance())) {\n      foo = any.unpack(Foo.getDefaultInstance());\n    }\n\n Example 3: Pack and unpack a message in Python.\n\n    foo = Foo(...)\n    any = Any()\n    any.Pack(foo)\n    ...\n    if any.Is(Foo.DESCRIPTOR):\n      any.Unpack(foo)\n      ...\n\n Example 4: Pack and unpack a message in Go\n\n     foo := \u0026pb.Foo{...}\n     any, err := anypb.New(foo)\n     if err != nil {\n       ...\n     }\n     ...\n     foo := \u0026pb.Foo{}\n     if err := any.UnmarshalTo(foo); err != nil {\n       ...\n     }\n\nThe pack methods provided by protobuf library will by default use\n'type.googleapis.com/full.type.name' as the type URL and the unpack\nmethods only use the fully qualified type name after the last '/'\nin the type URL, for example \"foo.bar.com/x/y.z\" will yield type\nname \"y.z\".\n\nJSON\n====\nThe JSON representation of an `Any` value uses the regular\nrepresentation of the deserialized, embedded message, with an\nadditional field `@type` which contains the type URL. Example:\n\n    package google.profile;\n    message Person {\n      string first_name = 1;\n      string last_name = 2;\n    }\n\n    {\n      \"@type\": \"type.googleapis.com/google.profile.Person\",\n      \"firstName\": \u003cstring\u003e,\n      \"lastName\": \u003cstring\u003e\n    }\n\nIf the embedded message type is well-known and has a custom JSON\nrepresentation, that representation will be embedded adding a field\n`value` which holds the custom JSON in addition to the `@type`\nfield. Example (for message [google.protobuf.Duration][]):\n\n    {\n      \"@type\": \"type.googleapis.com/google.protobuf.Duration\",\n      \"value\": \"1.212s\"\n    }"
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32",
+          "description": "The status code, which should be an enum value of\n[google.rpc.Code][google.rpc.Code]."
+        },
+        "message": {
+          "type": "string",
+          "description": "A developer-facing error message, which should be in English. Any\nuser-facing error message should be localized and sent in the\n[google.rpc.Status.details][google.rpc.Status.details] field, or localized\nby the client."
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          },
+          "description": "A list of messages that carry the error details.  There is a common set of\nmessage types for APIs to use."
+        }
+      },
+      "description": "The `Status` type defines a logical error model that is suitable for\ndifferent programming environments, including REST APIs and RPC APIs. It is\nused by [gRPC](https://github.com/grpc). Each `Status` message contains\nthree pieces of data: error code, error message, and error details.\n\nYou can find out more about this error model and how to work with it in the\n[API Design Guide](https://cloud.google.com/apis/design/errors)."
+    },
+    "v1CacheConfig": {
+      "type": "object",
+      "properties": {
+        "maxSizeGb": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Optional. The maximum cache size in gigabytes. Must be positive."
+        },
+        "evictionPolicy": {
+          "$ref": "#/definitions/CacheConfigEvictionPolicy",
+          "description": "Optional. The eviction policy to use when the cache is full."
+        },
+        "ttlHours": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Optional. The time-to-live for cached items, in hours. Must be positive."
+        }
+      },
+      "description": "Cache configuration for a storage gateway."
+    },
+    "v1GetInstallScriptResponse": {
+      "type": "object",
+      "properties": {
+        "script": {
+          "type": "string",
+          "description": "The install script content."
+        }
+      },
+      "description": "The response returned from the\n[GetInstallScript][pivox.storage.v1.StorageGateways.GetInstallScript]\nmethod."
+    },
+    "v1GetUninstallScriptResponse": {
+      "type": "object",
+      "properties": {
+        "script": {
+          "type": "string",
+          "description": "The uninstall script content."
+        }
+      },
+      "description": "The response returned from the\n[GetUninstallScript][pivox.storage.v1.StorageGateways.GetUninstallScript]\nmethod."
+    },
+    "v1ListStorageGatewaysResponse": {
+      "type": "object",
+      "properties": {
+        "storageGateways": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1StorageGateway"
+          },
+          "description": "The list of storage gateways for the specified organization."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "A pagination token to be used to retrieve the next page of results.\nIf empty, this response contains the last page of results."
+        }
+      },
+      "description": "The response returned from the\n[ListStorageGateways][pivox.storage.v1.StorageGateways.ListStorageGateways]\nmethod."
+    },
+    "v1StorageGateway": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "Output only. The resource name of the storage gateway. Format:\n`organizations/{organization}/storageGateways/{storage_gateway}`",
+          "readOnly": true
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Required. A human-readable name for the storage gateway. Must be at\nmost 60 characters long."
+        },
+        "state": {
+          "$ref": "#/definitions/v1StorageGatewayState",
+          "description": "Output only. The current lifecycle state of the storage gateway.",
+          "readOnly": true
+        },
+        "hostname": {
+          "type": "string",
+          "description": "Output only. The hostname assigned to this storage gateway, for example\n`{name}.storage.pivox.app`.",
+          "readOnly": true
+        },
+        "ipAddresses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Required. The IP addresses that the storage gateway listens on.\nAt least one IP address must be provided."
+        },
+        "registrationToken": {
+          "type": "string",
+          "description": "Output only. The registration token used to register agents with this\nstorage gateway.",
+          "readOnly": true
+        },
+        "targetVersion": {
+          "type": "string",
+          "description": "Optional. The desired software version for the storage gateway."
+        },
+        "currentVersion": {
+          "type": "string",
+          "description": "Output only. The currently running software version of the storage\ngateway.",
+          "readOnly": true
+        },
+        "cacheConfig": {
+          "$ref": "#/definitions/v1CacheConfig",
+          "description": "Optional. Cache configuration for the storage gateway."
+        },
+        "certState": {
+          "$ref": "#/definitions/StorageGatewayCertState",
+          "description": "Output only. The current state of the TLS certificate.",
+          "readOnly": true
+        },
+        "certExpiryTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. The expiration time of the TLS certificate.",
+          "readOnly": true
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Optional. Annotations associated with this storage gateway.\nAnnotations are key-value pairs that can be used to organize and track\nresources."
+        },
+        "etag": {
+          "type": "string",
+          "description": "Output only. A checksum computed by the server based on the current value\nof the StorageGateway resource. This may be sent on update and delete\nrequests to ensure the client has an up-to-date value before proceeding.",
+          "readOnly": true
+        },
+        "creator": {
+          "type": "string",
+          "description": "Output only. The resource name of the user who created the storage\ngateway.",
+          "readOnly": true
+        },
+        "updater": {
+          "type": "string",
+          "description": "Output only. The resource name of the user who last updated the storage\ngateway.",
+          "readOnly": true
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the storage gateway was created.",
+          "readOnly": true
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the storage gateway was last modified.",
+          "readOnly": true
+        }
+      },
+      "description": "A storage gateway deployed within an organization. Storage gateways act\nas caching proxies that accelerate access to remote storage backends.",
+      "required": [
+        "displayName",
+        "ipAddresses"
+      ]
+    },
+    "v1StorageGatewayState": {
+      "type": "string",
+      "enum": [
+        "STATE_UNSPECIFIED",
+        "PROVISIONING",
+        "ACTIVE",
+        "DEGRADED",
+        "OFFLINE"
+      ],
+      "default": "STATE_UNSPECIFIED",
+      "description": "Storage gateway lifecycle states.\n\n - STATE_UNSPECIFIED: Unspecified state. This is only useful for distinguishing unset values.\n - PROVISIONING: The gateway is being provisioned and is not yet ready to serve traffic.\n - ACTIVE: The gateway is active and serving traffic normally.\n - DEGRADED: The gateway is operating in a degraded state. Some functionality may\nbe unavailable.\n - OFFLINE: The gateway is offline and not serving traffic."
+    }
+  }
+}
