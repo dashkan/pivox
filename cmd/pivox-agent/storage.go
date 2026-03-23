@@ -67,7 +67,7 @@ func runStorage(cmd *cobra.Command, args []string) error {
 	slog.SetDefault(logger)
 
 	logger.Info("starting storage agent",
-		"control_plane", controlPlaneAddr,
+		"server", controlPlaneAddr,
 		"bind", fmt.Sprintf("%s:%d", bind, port),
 		"cache_dir", cacheDir,
 		"cache_size_gb", cacheSize,

@@ -7,5 +7,5 @@ import "github.com/spf13/pflag"
 var controlPlaneAddr = "localhost:50051"
 
 func addControlPlaneFlag(f *pflag.FlagSet) {
-	f.StringVar(&controlPlaneAddr, "control-plane", envOrDefault("PIVOX_CONTROL_PLANE", "localhost:50051"), "Control plane gRPC address (dev only)")
+	f.StringVar(&controlPlaneAddr, "server", envOrDefault("PIVOX_SERVER", "localhost:50051"), "Pivox server gRPC address (dev only)")
 }
