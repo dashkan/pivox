@@ -430,14 +430,31 @@ type ListOrganizationsRequest struct {
 	// should be returned. Defaults to false.
 	ShowDeleted bool `protobuf:"varint,3,opt,name=show_deleted,json=showDeleted,proto3" json:"show_deleted,omitempty"`
 	// Optional. An expression for filtering the results of the request.
-	// Filter rules are case insensitive. Some eligible fields for filtering are:
+	// Filter rules are case insensitive. Filterable fields:
 	//
 	// + `displayName`
-	// + `directoryCustomerId`
 	// + `state`
-	// + `createTime`
+	// + `createTime` (supports comparison operators)
+	//
+	// Examples:
+	//
+	// + `displayName = "Acme Corp"` — exact match on display name.
+	// + `state = ACTIVE` — only active organizations.
+	// + `createTime > "2025-01-01T00:00:00Z"` — created after date.
+	//
+	// For more information, see [AIP-160](https://aip.dev/160).
 	Filter string `protobuf:"bytes,4,opt,name=filter,proto3" json:"filter,omitempty"`
-	// Optional. Specify how the results should be sorted.
+	// Optional. A comma-separated list of fields to order by. The default
+	// order is ascending. Use "desc" after a field name for descending.
+	// Supported fields:
+	//
+	// + `displayName`
+	// + `createTime`
+	// + `name`
+	//
+	// Example: `createTime desc, displayName`
+	//
+	// If not specified, the results are ordered by `name` ascending.
 	OrderBy       string `protobuf:"bytes,5,opt,name=order_by,json=orderBy,proto3" json:"order_by,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1679,10 +1696,31 @@ type ListInvitationsRequest struct {
 	PageSize int32 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	// Optional. Page token from a previous ListInvitations call.
 	PageToken string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
-	// Optional. An AIP-160 filter expression. Supports filtering by
-	// `state`, `email`, `create_time`.
+	// Optional. An expression for filtering the results of the request.
+	// Filter rules are case insensitive. Filterable fields:
+	//
+	// + `state`
+	// + `email`
+	// + `createTime` (supports comparison operators)
+	//
+	// Examples:
+	//
+	// + `state = PENDING` — only pending invitations.
+	// + `email = "alice@example.com"` — invitations for a specific email.
+	// + `createTime > "2025-01-01T00:00:00Z"` — created after date.
+	//
+	// For more information, see [AIP-160](https://aip.dev/160).
 	Filter string `protobuf:"bytes,4,opt,name=filter,proto3" json:"filter,omitempty"`
-	// Optional. Sort order (e.g. "create_time desc").
+	// Optional. A comma-separated list of fields to order by. The default
+	// order is ascending. Use "desc" after a field name for descending.
+	// Supported fields:
+	//
+	// + `createTime`
+	// + `email`
+	//
+	// Example: `createTime desc, email`
+	//
+	// If not specified, the results are ordered by `createTime` descending.
 	OrderBy       string `protobuf:"bytes,5,opt,name=order_by,json=orderBy,proto3" json:"order_by,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

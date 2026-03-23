@@ -58,14 +58,14 @@
           },
           {
             "name": "filter",
-            "description": "Optional. An AIP-160 filter expression.",
+            "description": "Optional. An expression for filtering the results of the request.\nFilter rules are case insensitive. Filterable fields:\n\n+ `state`\n+ `displayName`\n+ `isSystem`\n\nExamples:\n\n+ `displayName = \"Editor\"` — exact match on display name.\n+ `state = ACTIVE` — only active roles.\n+ `isSystem = true` — only system-defined roles.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
             "in": "query",
             "required": false,
             "type": "string"
           },
           {
             "name": "orderBy",
-            "description": "Optional. Sort order (e.g. \"display_name\", \"create_time desc\").",
+            "description": "Optional. A comma-separated list of fields to order by. The default\norder is ascending. Use \"desc\" after a field name for descending.\nSupported fields:\n\n+ `displayName`\n+ `createTime`\n\nExample: `createTime desc, displayName`\n\nIf not specified, the results are ordered by `displayName` ascending.",
             "in": "query",
             "required": false,
             "type": "string"

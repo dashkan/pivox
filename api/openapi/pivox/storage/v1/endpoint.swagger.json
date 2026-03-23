@@ -64,14 +64,14 @@
           },
           {
             "name": "filter",
-            "description": "Optional. An AIP-160 filter expression.",
+            "description": "Optional. An expression for filtering the results of the request.\nFilter rules are case insensitive. Filterable fields:\n\n+ `state`\n+ `displayName`\n\nExamples:\n\n+ `state = ACTIVE` — only active endpoints.\n+ `displayName = \"My Endpoint\"` — exact match on display name.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
             "in": "query",
             "required": false,
             "type": "string"
           },
           {
             "name": "orderBy",
-            "description": "Optional. Sort order (e.g. \"create_time desc\").",
+            "description": "Optional. A comma-separated list of fields to order by. The default\norder is ascending. Use \"desc\" after a field name for descending.\nSupported fields:\n\n+ `displayName`\n+ `createTime`\n+ `name`\n\nExample: `createTime desc, displayName`\n\nIf not specified, the results are ordered by `createTime` ascending.",
             "in": "query",
             "required": false,
             "type": "string"

@@ -225,9 +225,30 @@ type ListUsersRequest struct {
 	PageSize int32 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	// Optional. Page token from a previous ListUsers call.
 	PageToken string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
-	// Optional. An AIP-160 filter expression.
+	// Optional. An expression for filtering the results of the request.
+	// Filter rules are case insensitive. Filterable fields:
+	//
+	// + `email`
+	// + `displayName`
+	//
+	// Examples:
+	//
+	// + `email = "alice@example.com"` — exact match on email.
+	// + `displayName = "Alice"` — exact match on display name.
+	//
+	// For more information, see [AIP-160](https://aip.dev/160).
 	Filter string `protobuf:"bytes,4,opt,name=filter,proto3" json:"filter,omitempty"`
-	// Optional. Sort order (e.g. "email", "display_name desc").
+	// Optional. A comma-separated list of fields to order by. The default
+	// order is ascending. Use "desc" after a field name for descending.
+	// Supported fields:
+	//
+	// + `email`
+	// + `displayName`
+	// + `createTime`
+	//
+	// Example: `createTime desc, email`
+	//
+	// If not specified, the results are ordered by `createTime` ascending.
 	OrderBy       string `protobuf:"bytes,5,opt,name=order_by,json=orderBy,proto3" json:"order_by,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

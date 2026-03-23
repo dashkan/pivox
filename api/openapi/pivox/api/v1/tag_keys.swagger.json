@@ -64,14 +64,14 @@
           },
           {
             "name": "filter",
-            "description": "Optional. An expression for filtering the results of the request.",
+            "description": "Optional. An expression for filtering the results of the request.\nFilter rules are case insensitive. Filterable fields:\n\n+ `shortName`\n+ `description`\n\nExamples:\n\n+ `shortName = \"environment\"` — exact match on short name.\n+ `description = \"Environment*\"` — description starts with prefix.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
             "in": "query",
             "required": false,
             "type": "string"
           },
           {
             "name": "orderBy",
-            "description": "Optional. Specify how the results should be sorted.",
+            "description": "Optional. A comma-separated list of fields to order by. The default\norder is ascending. Use \"desc\" after a field name for descending.\nSupported fields:\n\n+ `shortName`\n+ `createTime`\n\nExample: `shortName`\n\nIf not specified, the results are ordered by `shortName` ascending.",
             "in": "query",
             "required": false,
             "type": "string"
@@ -528,14 +528,14 @@
           },
           {
             "name": "filter",
-            "description": "Optional. An expression for filtering the results of the request.",
+            "description": "Optional. An expression for filtering the results of the request.\nFilter rules are case insensitive. Filterable fields:\n\n+ `shortName`\n+ `description`\n\nExamples:\n\n+ `shortName = \"environment\"` — exact match on short name.\n+ `description = \"Environment*\"` — description starts with prefix.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
             "in": "query",
             "required": false,
             "type": "string"
           },
           {
             "name": "orderBy",
-            "description": "Optional. Specify how the results should be sorted.",
+            "description": "Optional. A comma-separated list of fields to order by. The default\norder is ascending. Use \"desc\" after a field name for descending.\nSupported fields:\n\n+ `shortName`\n+ `createTime`\n\nExample: `shortName`\n\nIf not specified, the results are ordered by `shortName` ascending.",
             "in": "query",
             "required": false,
             "type": "string"

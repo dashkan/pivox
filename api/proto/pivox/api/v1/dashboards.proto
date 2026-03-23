@@ -159,10 +159,30 @@ message ListDashboardsRequest {
   // Optional. Page token from a previous ListDashboards call.
   string page_token = 3 [(google.api.field_behavior) = OPTIONAL];
 
-  // Optional. An AIP-160 filter expression.
+  // Optional. An expression for filtering the results of the request.
+  // Filter rules are case insensitive. Filterable fields:
+  //
+  // + `displayName`
+  // + `createTime` (supports comparison operators)
+  //
+  // Examples:
+  //
+  // + `displayName = "Overview"` — exact match on display name.
+  // + `createTime > "2025-01-01T00:00:00Z"` — created after date.
+  //
+  // For more information, see [AIP-160](https://aip.dev/160).
   string filter = 4 [(google.api.field_behavior) = OPTIONAL];
 
-  // Optional. Sort order (e.g. "display_name", "create_time desc").
+  // Optional. A comma-separated list of fields to order by. The default
+  // order is ascending. Use "desc" after a field name for descending.
+  // Supported fields:
+  //
+  // + `displayName`
+  // + `createTime`
+  //
+  // Example: `createTime desc, displayName`
+  //
+  // If not specified, the results are ordered by `createTime` descending.
   string order_by = 5 [(google.api.field_behavior) = OPTIONAL];
 }
 

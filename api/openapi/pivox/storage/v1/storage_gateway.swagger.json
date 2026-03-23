@@ -58,14 +58,14 @@
           },
           {
             "name": "filter",
-            "description": "Optional. An AIP-160 filter expression. Supports filtering by\n`state`, `display_name`, `create_time`.",
+            "description": "Optional. An expression for filtering the results of the request.\nFilter rules are case insensitive. Filterable fields:\n\n+ `state`\n+ `displayName`\n+ `createTime` (supports comparison operators)\n\nExamples:\n\n+ `state = ACTIVE` — only active storage gateways.\n+ `displayName = \"My Gateway\"` — exact match on display name.\n+ `createTime \u003e \"2025-01-01T00:00:00Z\"` — created after date.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
             "in": "query",
             "required": false,
             "type": "string"
           },
           {
             "name": "orderBy",
-            "description": "Optional. Sort order (e.g. \"create_time desc\").",
+            "description": "Optional. A comma-separated list of fields to order by. The default\norder is ascending. Use \"desc\" after a field name for descending.\nSupported fields:\n\n+ `displayName`\n+ `createTime`\n+ `name`\n\nExample: `createTime desc, displayName`\n\nIf not specified, the results are ordered by `name` ascending.",
             "in": "query",
             "required": false,
             "type": "string"

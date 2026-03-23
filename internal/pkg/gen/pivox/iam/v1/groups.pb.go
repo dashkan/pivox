@@ -272,9 +272,31 @@ type ListGroupsRequest struct {
 	PageSize int32 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	// Optional. Page token from a previous ListGroups call.
 	PageToken string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
-	// Optional. An AIP-160 filter expression.
+	// Optional. An expression for filtering the results of the request.
+	// Filter rules are case insensitive. Filterable fields:
+	//
+	// + `state`
+	// + `displayName`
+	// + `createTime` (supports comparison operators)
+	//
+	// Examples:
+	//
+	// + `displayName = "Engineering"` — exact match on display name.
+	// + `state = ACTIVE` — only active groups.
+	// + `createTime > "2025-01-01T00:00:00Z"` — created after date.
+	//
+	// For more information, see [AIP-160](https://aip.dev/160).
 	Filter string `protobuf:"bytes,4,opt,name=filter,proto3" json:"filter,omitempty"`
-	// Optional. Sort order (e.g. "display_name", "create_time desc").
+	// Optional. A comma-separated list of fields to order by. The default
+	// order is ascending. Use "desc" after a field name for descending.
+	// Supported fields:
+	//
+	// + `displayName`
+	// + `createTime`
+	//
+	// Example: `createTime desc, displayName`
+	//
+	// If not specified, the results are ordered by `displayName` ascending.
 	OrderBy string `protobuf:"bytes,5,opt,name=order_by,json=orderBy,proto3" json:"order_by,omitempty"`
 	// Optional. Whether to include soft-deleted groups.
 	ShowDeleted   bool `protobuf:"varint,6,opt,name=show_deleted,json=showDeleted,proto3" json:"show_deleted,omitempty"`

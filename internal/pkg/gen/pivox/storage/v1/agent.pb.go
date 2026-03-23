@@ -288,10 +288,32 @@ type ListAgentsRequest struct {
 	// Optional. A pagination token returned from a previous call to
 	// `ListAgents` that indicates from where listing should continue.
 	PageToken string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
-	// Optional. An AIP-160 filter expression. Supports filtering by
-	// `state`, `version`, `hostname`.
+	// Optional. An expression for filtering the results of the request.
+	// Filter rules are case insensitive. Filterable fields:
+	//
+	// + `state`
+	// + `hostname`
+	// + `version`
+	//
+	// Examples:
+	//
+	// + `state = CONNECTED` — only connected agents.
+	// + `hostname = "node-01.example.com"` — exact match on hostname.
+	// + `version = "1.2.3"` — agents running a specific version.
+	//
+	// For more information, see [AIP-160](https://aip.dev/160).
 	Filter string `protobuf:"bytes,4,opt,name=filter,proto3" json:"filter,omitempty"`
-	// Optional. Sort order (e.g. "join_time desc").
+	// Optional. A comma-separated list of fields to order by. The default
+	// order is ascending. Use "desc" after a field name for descending.
+	// Supported fields:
+	//
+	// + `joinTime`
+	// + `lastSeenTime`
+	// + `hostname`
+	//
+	// Example: `lastSeenTime desc, hostname`
+	//
+	// If not specified, the results are ordered by `joinTime` ascending.
 	OrderBy       string `protobuf:"bytes,5,opt,name=order_by,json=orderBy,proto3" json:"order_by,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

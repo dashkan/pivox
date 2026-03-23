@@ -64,14 +64,14 @@
           },
           {
             "name": "filter",
-            "description": "Optional. An AIP-160 filter expression. Supports filtering by\n`state`, `version`, `hostname`.",
+            "description": "Optional. An expression for filtering the results of the request.\nFilter rules are case insensitive. Filterable fields:\n\n+ `state`\n+ `hostname`\n+ `version`\n\nExamples:\n\n+ `state = CONNECTED` — only connected agents.\n+ `hostname = \"node-01.example.com\"` — exact match on hostname.\n+ `version = \"1.2.3\"` — agents running a specific version.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
             "in": "query",
             "required": false,
             "type": "string"
           },
           {
             "name": "orderBy",
-            "description": "Optional. Sort order (e.g. \"join_time desc\").",
+            "description": "Optional. A comma-separated list of fields to order by. The default\norder is ascending. Use \"desc\" after a field name for descending.\nSupported fields:\n\n+ `joinTime`\n+ `lastSeenTime`\n+ `hostname`\n\nExample: `lastSeenTime desc, hostname`\n\nIf not specified, the results are ordered by `joinTime` ascending.",
             "in": "query",
             "required": false,
             "type": "string"

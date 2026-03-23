@@ -223,9 +223,29 @@ message ListTagValuesRequest {
   string page_token = 3 [(google.api.field_behavior) = OPTIONAL];
 
   // Optional. An expression for filtering the results of the request.
+  // Filter rules are case insensitive. Filterable fields:
+  //
+  // + `shortName`
+  // + `description`
+  //
+  // Examples:
+  //
+  // + `shortName = "production"` — exact match on short name.
+  // + `description = "Production*"` — description starts with prefix.
+  //
+  // For more information, see [AIP-160](https://aip.dev/160).
   string filter = 4 [(google.api.field_behavior) = OPTIONAL];
 
-  // Optional. Specify how the results should be sorted.
+  // Optional. A comma-separated list of fields to order by. The default
+  // order is ascending. Use "desc" after a field name for descending.
+  // Supported fields:
+  //
+  // + `shortName`
+  // + `createTime`
+  //
+  // Example: `shortName`
+  //
+  // If not specified, the results are ordered by `shortName` ascending.
   string order_by = 5 [(google.api.field_behavior) = OPTIONAL];
 }
 

@@ -58,14 +58,14 @@
           },
           {
             "name": "filter",
-            "description": "Optional. An AIP-160 filter expression.",
+            "description": "Optional. An expression for filtering the results of the request.\nFilter rules are case insensitive. Filterable fields:\n\n+ `email`\n+ `displayName`\n\nExamples:\n\n+ `email = \"alice@example.com\"` — exact match on email.\n+ `displayName = \"Alice\"` — exact match on display name.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
             "in": "query",
             "required": false,
             "type": "string"
           },
           {
             "name": "orderBy",
-            "description": "Optional. Sort order (e.g. \"email\", \"display_name desc\").",
+            "description": "Optional. A comma-separated list of fields to order by. The default\norder is ascending. Use \"desc\" after a field name for descending.\nSupported fields:\n\n+ `email`\n+ `displayName`\n+ `createTime`\n\nExample: `createTime desc, email`\n\nIf not specified, the results are ordered by `createTime` ascending.",
             "in": "query",
             "required": false,
             "type": "string"

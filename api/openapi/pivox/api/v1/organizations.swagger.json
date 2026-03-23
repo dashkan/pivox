@@ -60,14 +60,14 @@
           },
           {
             "name": "filter",
-            "description": "Optional. An expression for filtering the results of the request.\nFilter rules are case insensitive. Some eligible fields for filtering are:\n\n+ `displayName`\n+ `directoryCustomerId`\n+ `state`\n+ `createTime`",
+            "description": "Optional. An expression for filtering the results of the request.\nFilter rules are case insensitive. Filterable fields:\n\n+ `displayName`\n+ `state`\n+ `createTime` (supports comparison operators)\n\nExamples:\n\n+ `displayName = \"Acme Corp\"` — exact match on display name.\n+ `state = ACTIVE` — only active organizations.\n+ `createTime \u003e \"2025-01-01T00:00:00Z\"` — created after date.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
             "in": "query",
             "required": false,
             "type": "string"
           },
           {
             "name": "orderBy",
-            "description": "Optional. Specify how the results should be sorted.",
+            "description": "Optional. A comma-separated list of fields to order by. The default\norder is ascending. Use \"desc\" after a field name for descending.\nSupported fields:\n\n+ `displayName`\n+ `createTime`\n+ `name`\n\nExample: `createTime desc, displayName`\n\nIf not specified, the results are ordered by `name` ascending.",
             "in": "query",
             "required": false,
             "type": "string"
@@ -585,14 +585,14 @@
           },
           {
             "name": "filter",
-            "description": "Optional. An AIP-160 filter expression. Supports filtering by\n`state`, `email`, `create_time`.",
+            "description": "Optional. An expression for filtering the results of the request.\nFilter rules are case insensitive. Filterable fields:\n\n+ `state`\n+ `email`\n+ `createTime` (supports comparison operators)\n\nExamples:\n\n+ `state = PENDING` — only pending invitations.\n+ `email = \"alice@example.com\"` — invitations for a specific email.\n+ `createTime \u003e \"2025-01-01T00:00:00Z\"` — created after date.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
             "in": "query",
             "required": false,
             "type": "string"
           },
           {
             "name": "orderBy",
-            "description": "Optional. Sort order (e.g. \"create_time desc\").",
+            "description": "Optional. A comma-separated list of fields to order by. The default\norder is ascending. Use \"desc\" after a field name for descending.\nSupported fields:\n\n+ `createTime`\n+ `email`\n\nExample: `createTime desc, email`\n\nIf not specified, the results are ordered by `createTime` descending.",
             "in": "query",
             "required": false,
             "type": "string"

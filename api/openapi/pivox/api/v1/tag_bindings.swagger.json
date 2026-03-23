@@ -162,14 +162,14 @@
           },
           {
             "name": "filter",
-            "description": "Optional. An expression for filtering the results of the request.",
+            "description": "Optional. An expression for filtering the results of the request.\nFilter rules are case insensitive. Filterable fields:\n\n+ `parentResource`\n\nExamples:\n\n+ `parentResource = \"organizations/123/projects/my-project\"` —\n  bindings for a specific resource.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
             "in": "query",
             "required": false,
             "type": "string"
           },
           {
             "name": "orderBy",
-            "description": "Optional. Specify how the results should be sorted.",
+            "description": "Optional. A comma-separated list of fields to order by. The default\norder is ascending. Use \"desc\" after a field name for descending.\nSupported fields:\n\n+ `createTime`\n\nExample: `createTime desc`\n\nIf not specified, the results are ordered by `createTime` ascending.",
             "in": "query",
             "required": false,
             "type": "string"
@@ -378,14 +378,14 @@
           },
           {
             "name": "filter",
-            "description": "Optional. An expression for filtering the results of the request.",
+            "description": "Optional. An expression for filtering the results of the request.\nFilter rules are case insensitive. Filterable fields:\n\n+ `parentResource`\n\nExamples:\n\n+ `parentResource = \"organizations/123/projects/my-project\"` —\n  bindings for a specific resource.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
             "in": "query",
             "required": false,
             "type": "string"
           },
           {
             "name": "orderBy",
-            "description": "Optional. Specify how the results should be sorted.",
+            "description": "Optional. A comma-separated list of fields to order by. The default\norder is ascending. Use \"desc\" after a field name for descending.\nSupported fields:\n\n+ `createTime`\n\nExample: `createTime desc`\n\nIf not specified, the results are ordered by `createTime` ascending.",
             "in": "query",
             "required": false,
             "type": "string"

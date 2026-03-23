@@ -347,8 +347,26 @@ type ListTagBindingsRequest struct {
 	// `ListTagBindings` that indicates where this listing should continue from.
 	PageToken string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
 	// Optional. An expression for filtering the results of the request.
+	// Filter rules are case insensitive. Filterable fields:
+	//
+	// + `parentResource`
+	//
+	// Examples:
+	//
+	//   - `parentResource = "organizations/123/projects/my-project"` —
+	//     bindings for a specific resource.
+	//
+	// For more information, see [AIP-160](https://aip.dev/160).
 	Filter string `protobuf:"bytes,4,opt,name=filter,proto3" json:"filter,omitempty"`
-	// Optional. Specify how the results should be sorted.
+	// Optional. A comma-separated list of fields to order by. The default
+	// order is ascending. Use "desc" after a field name for descending.
+	// Supported fields:
+	//
+	// + `createTime`
+	//
+	// Example: `createTime desc`
+	//
+	// If not specified, the results are ordered by `createTime` ascending.
 	OrderBy       string `protobuf:"bytes,5,opt,name=order_by,json=orderBy,proto3" json:"order_by,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
