@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/dashkan/pivox-server/internal/convert"
+	"github.com/dashkan/pivox-server/internal/crypto"
 	db "github.com/dashkan/pivox-server/internal/db/generated"
 	"github.com/dashkan/pivox-server/internal/lro"
 	storagev1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/storage/v1"
@@ -22,14 +23,16 @@ import (
 
 type StorageGatewaysServer struct {
 	storagev1.UnimplementedStorageGatewaysServer
-	pool    *pgxpool.Pool
-	queries *db.Queries
+	pool      *pgxpool.Pool
+	queries   *db.Queries
+	encryptor crypto.Encryptor
 }
 
-func NewStorageGatewaysServer(pool *pgxpool.Pool, queries *db.Queries) *StorageGatewaysServer {
+func NewStorageGatewaysServer(pool *pgxpool.Pool, queries *db.Queries, enc crypto.Encryptor) *StorageGatewaysServer {
 	return &StorageGatewaysServer{
-		pool:    pool,
-		queries: queries,
+		pool:      pool,
+		queries:   queries,
+		encryptor: enc,
 	}
 }
 

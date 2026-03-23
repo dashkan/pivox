@@ -15,6 +15,7 @@ import (
 
 	"github.com/dashkan/pivox-server/internal/apierr"
 	"github.com/dashkan/pivox-server/internal/convert"
+	"github.com/dashkan/pivox-server/internal/crypto"
 	db "github.com/dashkan/pivox-server/internal/db/generated"
 	"github.com/dashkan/pivox-server/internal/lro"
 	storagev1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/storage/v1"
@@ -22,14 +23,16 @@ import (
 
 type EndpointsServer struct {
 	storagev1.UnimplementedEndpointsServer
-	pool    *pgxpool.Pool
-	queries *db.Queries
+	pool      *pgxpool.Pool
+	queries   *db.Queries
+	encryptor crypto.Encryptor
 }
 
-func NewEndpointsServer(pool *pgxpool.Pool, queries *db.Queries) *EndpointsServer {
+func NewEndpointsServer(pool *pgxpool.Pool, queries *db.Queries, enc crypto.Encryptor) *EndpointsServer {
 	return &EndpointsServer{
-		pool:    pool,
-		queries: queries,
+		pool:      pool,
+		queries:   queries,
+		encryptor: enc,
 	}
 }
 

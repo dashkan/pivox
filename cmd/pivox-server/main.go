@@ -21,6 +21,7 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	"github.com/dashkan/pivox-server/internal/config"
+	"github.com/dashkan/pivox-server/internal/crypto"
 	db "github.com/dashkan/pivox-server/internal/db/generated"
 	"github.com/dashkan/pivox-server/internal/firebase"
 	"github.com/dashkan/pivox-server/internal/iam"
@@ -113,6 +114,10 @@ func serve(cmd *cobra.Command, args []string) error {
 	queries := db.New(pool)
 
 	// Shared services
+	enc, err := crypto.NewEncryptor()
+	if err != nil {
+		return fmt.Errorf("initialize encryptor: %w", err)
+	}
 	lroManager := lro.NewManager(pool, queries, logger)
 	iamHelper := iam.NewHelper(queries)
 
@@ -160,9 +165,9 @@ func serve(cmd *cobra.Command, args []string) error {
 	apiv1.RegisterApiKeysServer(grpcServer, server.NewApiKeysServer(pool, queries))
 
 	// Storage services
-	storagev1.RegisterStorageGatewaysServer(grpcServer, server.NewStorageGatewaysServer(pool, queries))
+	storagev1.RegisterStorageGatewaysServer(grpcServer, server.NewStorageGatewaysServer(pool, queries, enc))
 	storagev1.RegisterAgentsServer(grpcServer, server.NewAgentsServer(queries))
-	storagev1.RegisterEndpointsServer(grpcServer, server.NewEndpointsServer(pool, queries))
+	storagev1.RegisterEndpointsServer(grpcServer, server.NewEndpointsServer(pool, queries, enc))
 
 	reflection.Register(grpcServer)
 
