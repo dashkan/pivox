@@ -57,22 +57,38 @@ func (s *EndpointsServer) resolveEndpointGateway(ctx context.Context, orgName, g
 	return gw, nil
 }
 
-// s3ConfigToJSON serializes the S3Configuration proto to the JSONB shape
-// stored in the database. Credentials are included (encrypted at rest).
-func s3ConfigToJSON(s3 *storagev1.S3Configuration) (json.RawMessage, error) {
-	cfg := map[string]interface{}{
-		"type":         "s3",
-		"endpoint_uri": s3.GetEndpointUri(),
-		"bucket":       s3.GetBucket(),
-		"region":       s3.GetRegion(),
-	}
-	if ak := s3.GetAccessKey(); ak != nil {
-		cfg["access_key"] = map[string]string{
-			"access_key_id":     ak.GetAccessKeyId(),
-			"secret_access_key": ak.GetSecretAccessKey(),
+// configToJSON serializes the endpoint configuration proto to the JSONB shape
+// stored in the database.
+func configToJSON(endpoint *storagev1.Endpoint) (json.RawMessage, error) {
+	switch cfg := endpoint.GetConfiguration().(type) {
+	case *storagev1.Endpoint_S3:
+		if cfg.S3 == nil {
+			return nil, fmt.Errorf("S3 configuration is required")
 		}
+		m := map[string]interface{}{
+			"type":         "s3",
+			"endpoint_uri": cfg.S3.GetEndpointUri(),
+			"bucket":       cfg.S3.GetBucket(),
+			"region":       cfg.S3.GetRegion(),
+		}
+		if ak := cfg.S3.GetAccessKey(); ak != nil {
+			m["access_key"] = map[string]string{
+				"access_key_id":     ak.GetAccessKeyId(),
+				"secret_access_key": ak.GetSecretAccessKey(),
+			}
+		}
+		return json.Marshal(m)
+	case *storagev1.Endpoint_Filesystem:
+		if cfg.Filesystem == nil {
+			return nil, fmt.Errorf("filesystem configuration is required")
+		}
+		return json.Marshal(map[string]string{
+			"type": "filesystem",
+			"path": cfg.Filesystem.GetPath(),
+		})
+	default:
+		return nil, fmt.Errorf("configuration is required")
 	}
-	return json.Marshal(cfg)
 }
 
 func (s *EndpointsServer) CreateEndpoint(ctx context.Context, req *storagev1.CreateEndpointRequest) (*longrunningpb.Operation, error) {
@@ -93,18 +109,9 @@ func (s *EndpointsServer) CreateEndpoint(ctx context.Context, req *storagev1.Cre
 	}
 
 	// Serialize configuration to JSONB.
-	var configJSON json.RawMessage
-	switch cfg := endpoint.GetConfiguration().(type) {
-	case *storagev1.Endpoint_S3:
-		if cfg.S3 == nil {
-			return nil, apierr.InvalidArgument(apierr.FieldViolation("configuration.s3", "S3 configuration is required"))
-		}
-		configJSON, err = s3ConfigToJSON(cfg.S3)
-		if err != nil {
-			return nil, apierr.Internal("failed to marshal configuration")
-		}
-	default:
-		return nil, apierr.InvalidArgument(apierr.FieldViolation("configuration", "configuration is required"))
+	configJSON, err := configToJSON(endpoint)
+	if err != nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("configuration", err.Error()))
 	}
 
 	var annotationsJSON json.RawMessage
@@ -213,15 +220,12 @@ func (s *EndpointsServer) UpdateEndpoint(ctx context.Context, req *storagev1.Upd
 			case "display_name":
 				updateParams.DisplayName.String = endpoint.GetDisplayName()
 				updateParams.DisplayName.Valid = true
-			case "s3.credentials", "configuration":
-				// Update the configuration JSONB (merge credentials into existing config).
-				if s3 := endpoint.GetS3(); s3 != nil {
-					configJSON, mergeErr := s3ConfigToJSON(s3)
-					if mergeErr != nil {
-						return nil, apierr.Internal("failed to marshal configuration")
-					}
-					updateParams.Configuration = configJSON
+			case "s3.credentials", "s3", "filesystem", "configuration":
+				configJSON, cfgErr := configToJSON(endpoint)
+				if cfgErr != nil {
+					return nil, apierr.InvalidArgument(apierr.FieldViolation("configuration", cfgErr.Error()))
 				}
+				updateParams.Configuration = configJSON
 			case "annotations":
 				annotationsJSON, marshalErr := json.Marshal(endpoint.GetAnnotations())
 				if marshalErr != nil {
@@ -233,8 +237,8 @@ func (s *EndpointsServer) UpdateEndpoint(ctx context.Context, req *storagev1.Upd
 	} else {
 		updateParams.DisplayName.String = endpoint.GetDisplayName()
 		updateParams.DisplayName.Valid = true
-		if s3 := endpoint.GetS3(); s3 != nil {
-			configJSON, _ := s3ConfigToJSON(s3)
+		if endpoint.GetConfiguration() != nil {
+			configJSON, _ := configToJSON(endpoint)
 			updateParams.Configuration = configJSON
 		}
 		if annotations := endpoint.GetAnnotations(); annotations != nil {

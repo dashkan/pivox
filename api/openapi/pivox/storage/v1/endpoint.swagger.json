@@ -295,7 +295,11 @@
                 },
                 "s3": {
                   "$ref": "#/definitions/v1S3Configuration",
-                  "description": "S3-compatible storage backend configuration."
+                  "description": "S3-compatible storage backend (rustfs, AWS S3, etc.)."
+                },
+                "filesystem": {
+                  "$ref": "#/definitions/v1FileSystemConfiguration",
+                  "description": "Local or network-mounted filesystem (NFS, CIFS, etc.)."
                 },
                 "annotations": {
                   "type": "object",
@@ -432,7 +436,11 @@
         },
         "s3": {
           "$ref": "#/definitions/v1S3Configuration",
-          "description": "S3-compatible storage backend configuration."
+          "description": "S3-compatible storage backend (rustfs, AWS S3, etc.)."
+        },
+        "filesystem": {
+          "$ref": "#/definitions/v1FileSystemConfiguration",
+          "description": "Local or network-mounted filesystem (NFS, CIFS, etc.)."
         },
         "annotations": {
           "type": "object",
@@ -484,6 +492,19 @@
       ],
       "default": "STATE_UNSPECIFIED",
       "description": "Endpoint lifecycle states.\n\n - STATE_UNSPECIFIED: Unspecified state. This is only useful for distinguishing unset values.\n - ACTIVE: The endpoint is active and serving requests.\n - INACTIVE: The endpoint has been deactivated and is not serving requests.\n - UNREACHABLE: The endpoint's storage backend is unreachable."
+    },
+    "v1FileSystemConfiguration": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Required. Immutable. The mount point path on the agent server\n(e.g. `/mnt/nfs/pivox-assets`). Must be accessible by the pivox\nuser on all agents in the gateway pool."
+        }
+      },
+      "description": "Configuration for a local or network-mounted filesystem endpoint.\nThe path must be mounted on all agents in the gateway pool before\nadding the endpoint. The agent validates shared access by writing\na marker file during endpoint creation.\n\nAssets are stored as immutable versioned files:\n  {path}/{org_id}/{project_id}/assets/{asset_id}/v1.ext\n\nNo credentials are needed — the agent accesses files using the\npivox system user's permissions on the mounted filesystem.",
+      "required": [
+        "path"
+      ]
     },
     "v1ListEndpointsResponse": {
       "type": "object",

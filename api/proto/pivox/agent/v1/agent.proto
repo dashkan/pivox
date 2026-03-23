@@ -372,29 +372,45 @@ message ConfigUpdate {
 // Shared configuration types
 // ---------------------------------------------------------------------------
 
-// EndpointConfig describes a single remote storage backend that the agent
-// should connect to for read and write operations.
+// EndpointConfig describes a storage backend that the agent should serve.
+// The configuration is type-specific via a oneof.
 message EndpointConfig {
-  // Logical name of the endpoint (e.g. "primary-us-east").
+  // Logical name of the endpoint (matches the Endpoint resource name).
   string name = 1;
 
-  // Storage engine type (e.g. "s3", "gcs", "azure-blob").
-  string engine = 2;
+  // The storage backend configuration.
+  oneof configuration {
+    // S3-compatible storage backend.
+    S3EndpointConfig s3 = 2;
 
-  // URI of the storage endpoint (e.g. "https://s3.amazonaws.com").
-  string endpoint_uri = 3;
+    // Local or network-mounted filesystem.
+    FileSystemEndpointConfig filesystem = 3;
+  }
+}
 
-  // Bucket or container name.
-  string bucket = 4;
+// S3 endpoint configuration delivered to the agent via bidi stream.
+// Includes credentials (encrypted in transit over the bidi gRPC connection).
+message S3EndpointConfig {
+  // URI of the S3-compatible endpoint (e.g. "http://localhost:9000").
+  string endpoint_uri = 1;
 
-  // Cloud region where the bucket resides (e.g. "us-east-1").
-  string region = 5;
+  // Bucket name.
+  string bucket = 2;
+
+  // Cloud region (e.g. "us-east-1"). May be empty.
+  string region = 3;
 
   // Access key ID for authenticating with the storage backend.
-  string access_key_id = 6;
+  string access_key_id = 4;
 
   // Secret access key for authenticating with the storage backend.
-  string secret_access_key = 7;
+  string secret_access_key = 5;
+}
+
+// Filesystem endpoint configuration delivered to the agent via bidi stream.
+message FileSystemEndpointConfig {
+  // Mount point path on the agent server (e.g. "/mnt/nfs/pivox-assets").
+  string path = 1;
 }
 
 // CacheConfig controls the local object cache maintained by the agent.

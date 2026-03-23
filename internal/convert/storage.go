@@ -86,20 +86,38 @@ func EndpointToProto(ep db.StorageEndpoint, gatewayName string) *storagev1.Endpo
 	// Parse configuration JSONB and map to proto oneof.
 	// Credentials are stripped (INPUT_ONLY).
 	if len(ep.Configuration) > 0 {
-		var cfg struct {
-			Type        string `json:"type"`
-			EndpointURI string `json:"endpoint_uri"`
-			Bucket      string `json:"bucket"`
-			Region      string `json:"region"`
+		var base struct {
+			Type string `json:"type"`
 		}
-		if err := json.Unmarshal(ep.Configuration, &cfg); err == nil && cfg.Type == "s3" {
-			pb.Configuration = &storagev1.Endpoint_S3{
-				S3: &storagev1.S3Configuration{
-					EndpointUri: cfg.EndpointURI,
-					Bucket:      cfg.Bucket,
-					Region:      cfg.Region,
-					// Credentials intentionally omitted — INPUT_ONLY
-				},
+		if err := json.Unmarshal(ep.Configuration, &base); err == nil {
+			switch base.Type {
+			case "s3":
+				var cfg struct {
+					EndpointURI string `json:"endpoint_uri"`
+					Bucket      string `json:"bucket"`
+					Region      string `json:"region"`
+				}
+				if err := json.Unmarshal(ep.Configuration, &cfg); err == nil {
+					pb.Configuration = &storagev1.Endpoint_S3{
+						S3: &storagev1.S3Configuration{
+							EndpointUri: cfg.EndpointURI,
+							Bucket:      cfg.Bucket,
+							Region:      cfg.Region,
+							// Credentials intentionally omitted — INPUT_ONLY
+						},
+					}
+				}
+			case "filesystem":
+				var cfg struct {
+					Path string `json:"path"`
+				}
+				if err := json.Unmarshal(ep.Configuration, &cfg); err == nil {
+					pb.Configuration = &storagev1.Endpoint_Filesystem{
+						Filesystem: &storagev1.FileSystemConfiguration{
+							Path: cfg.Path,
+						},
+					}
+				}
 			}
 		}
 	}

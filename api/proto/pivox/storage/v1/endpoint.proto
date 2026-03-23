@@ -137,11 +137,14 @@ message Endpoint {
   State state = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Required. The storage backend configuration. Must be provided at
-  // creation time. The endpoint URI and bucket are immutable after creation.
-  // Credentials can be updated via UpdateEndpoint.
+  // creation time. Immutable fields within each configuration type
+  // cannot be changed after creation — delete and recreate the endpoint.
   oneof configuration {
-    // S3-compatible storage backend configuration.
+    // S3-compatible storage backend (rustfs, AWS S3, etc.).
     S3Configuration s3 = 4;
+
+    // Local or network-mounted filesystem (NFS, CIFS, etc.).
+    FileSystemConfiguration filesystem = 11;
   }
 
   // Optional. Annotations associated with this endpoint.
@@ -206,6 +209,27 @@ message S3AccessKeyCredentials {
   // Required. The secret access key.
   string secret_access_key = 2 [
     (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true
+  ];
+}
+
+// Configuration for a local or network-mounted filesystem endpoint.
+// The path must be mounted on all agents in the gateway pool before
+// adding the endpoint. The agent validates shared access by writing
+// a marker file during endpoint creation.
+//
+// Assets are stored as immutable versioned files:
+//   {path}/{org_id}/{project_id}/assets/{asset_id}/v1.ext
+//
+// No credentials are needed — the agent accesses files using the
+// pivox system user's permissions on the mounted filesystem.
+message FileSystemConfiguration {
+  // Required. Immutable. The mount point path on the agent server
+  // (e.g. `/mnt/nfs/pivox-assets`). Must be accessible by the pivox
+  // user on all agents in the gateway pool.
+  string path = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_behavior) = IMMUTABLE,
     (buf.validate.field).required = true
   ];
 }
