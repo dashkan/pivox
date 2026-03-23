@@ -18,22 +18,24 @@ import (
 // messages (handshake) use a UUID-based correlation id so the caller can
 // block until the server responds.
 type Stream struct {
-	stream  agentv1.AgentService_ConnectClient
-	pending map[string]chan *agentv1.ControlMessage
-	mu      sync.Mutex
-	timeout time.Duration
-	logger  *slog.Logger
+	stream   agentv1.AgentService_ConnectClient
+	pending  map[string]chan *agentv1.ControlMessage
+	mu       sync.Mutex
+	timeout  time.Duration
+	sessions *SessionStore
+	logger   *slog.Logger
 }
 
 // NewStream creates a Stream wrapper around the given bidi gRPC stream.
 // The caller must start ReceiveLoop in a separate goroutine before calling
 // any request/response method (e.g. Handshake).
-func NewStream(stream agentv1.AgentService_ConnectClient, timeout time.Duration, logger *slog.Logger) *Stream {
+func NewStream(stream agentv1.AgentService_ConnectClient, timeout time.Duration, sessions *SessionStore, logger *slog.Logger) *Stream {
 	return &Stream{
-		stream:  stream,
-		pending: make(map[string]chan *agentv1.ControlMessage),
-		timeout: timeout,
-		logger:  logger,
+		stream:   stream,
+		pending:  make(map[string]chan *agentv1.ControlMessage),
+		timeout:  timeout,
+		sessions: sessions,
+		logger:   logger,
 	}
 }
 
@@ -185,6 +187,13 @@ func (s *Stream) handleServerMessage(msg *agentv1.ControlMessage) {
 			"command", m.UpgradeRequest.GetCommand().String(),
 			"target_version", m.UpgradeRequest.GetTargetVersion(),
 		)
+	case *agentv1.ControlMessage_SessionGrant:
+		grant := m.SessionGrant
+		s.sessions.Grant(grant.Token, grant.Patterns, grant.Expiry.AsTime())
+		s.logger.Info("session granted", "token", grant.Token[:8]+"...", "patterns", len(grant.Patterns))
+	case *agentv1.ControlMessage_SessionRevoke:
+		s.sessions.Revoke(m.SessionRevoke.Token)
+		s.logger.Info("session revoked", "token", m.SessionRevoke.Token[:8]+"...")
 	case *agentv1.ControlMessage_ServerHeartbeat:
 		s.logger.Debug("received server heartbeat")
 	default:

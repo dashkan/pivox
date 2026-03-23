@@ -24,7 +24,7 @@ const (
 // given registration token, and runs the heartbeat loop until the context is
 // cancelled or the stream encounters an error. The caller is responsible for
 // reconnection with backoff.
-func Connect(ctx context.Context, addr string, token string, logger *slog.Logger) error {
+func Connect(ctx context.Context, addr string, token string, sessions *SessionStore, logger *slog.Logger) error {
 	conn, err := grpc.NewClient(addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
@@ -40,7 +40,7 @@ func Connect(ctx context.Context, addr string, token string, logger *slog.Logger
 		return fmt.Errorf("open stream: %w", err)
 	}
 
-	stream := NewStream(bidi, handshakeTimeout, logger)
+	stream := NewStream(bidi, handshakeTimeout, sessions, logger)
 
 	// Start the receive loop in the background. It will return when the
 	// stream is closed or errors out.

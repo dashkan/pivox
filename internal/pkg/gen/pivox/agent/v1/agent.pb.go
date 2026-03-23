@@ -1072,6 +1072,8 @@ type ControlMessage struct {
 	//	*ControlMessage_UpgradeRequest
 	//	*ControlMessage_ConfigUpdate
 	//	*ControlMessage_ServerHeartbeat
+	//	*ControlMessage_SessionGrant
+	//	*ControlMessage_SessionRevoke
 	Message       isControlMessage_Message `protobuf_oneof:"message"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1175,6 +1177,24 @@ func (x *ControlMessage) GetServerHeartbeat() *ServerHeartbeat {
 	return nil
 }
 
+func (x *ControlMessage) GetSessionGrant() *SessionGrant {
+	if x != nil {
+		if x, ok := x.Message.(*ControlMessage_SessionGrant); ok {
+			return x.SessionGrant
+		}
+	}
+	return nil
+}
+
+func (x *ControlMessage) GetSessionRevoke() *SessionRevoke {
+	if x != nil {
+		if x, ok := x.Message.(*ControlMessage_SessionRevoke); ok {
+			return x.SessionRevoke
+		}
+	}
+	return nil
+}
+
 type isControlMessage_Message interface {
 	isControlMessage_Message()
 }
@@ -1210,6 +1230,16 @@ type ControlMessage_ServerHeartbeat struct {
 	ServerHeartbeat *ServerHeartbeat `protobuf:"bytes,6,opt,name=server_heartbeat,json=serverHeartbeat,proto3,oneof"`
 }
 
+type ControlMessage_SessionGrant struct {
+	// Grant a user session with access patterns for this gateway.
+	SessionGrant *SessionGrant `protobuf:"bytes,8,opt,name=session_grant,json=sessionGrant,proto3,oneof"`
+}
+
+type ControlMessage_SessionRevoke struct {
+	// Revoke a previously granted session.
+	SessionRevoke *SessionRevoke `protobuf:"bytes,9,opt,name=session_revoke,json=sessionRevoke,proto3,oneof"`
+}
+
 func (*ControlMessage_HandshakeAck) isControlMessage_Message() {}
 
 func (*ControlMessage_CertDelivery) isControlMessage_Message() {}
@@ -1221,6 +1251,10 @@ func (*ControlMessage_UpgradeRequest) isControlMessage_Message() {}
 func (*ControlMessage_ConfigUpdate) isControlMessage_Message() {}
 
 func (*ControlMessage_ServerHeartbeat) isControlMessage_Message() {}
+
+func (*ControlMessage_SessionGrant) isControlMessage_Message() {}
+
+func (*ControlMessage_SessionRevoke) isControlMessage_Message() {}
 
 // HandshakeAck is sent by the control plane in response to a valid Handshake.
 // It provides the agent with its assigned identity, initial TLS credentials,
@@ -1235,7 +1269,14 @@ type HandshakeAck struct {
 	TlsKey []byte `protobuf:"bytes,3,opt,name=tls_key,json=tlsKey,proto3" json:"tls_key,omitempty"`
 	// Initial set of storage endpoint configurations the agent should connect
 	// to. Each endpoint includes its own cache configuration.
-	Endpoints     []*EndpointConfig `protobuf:"bytes,4,rep,name=endpoints,proto3" json:"endpoints,omitempty"`
+	Endpoints []*EndpointConfig `protobuf:"bytes,4,rep,name=endpoints,proto3" json:"endpoints,omitempty"`
+	// HMAC signing key used to validate session JWTs in cookie-based auth.
+	// The control plane mints JWTs signed with this key; the agent validates
+	// incoming cookies using the same key.
+	SessionSigningKey []byte `protobuf:"bytes,5,opt,name=session_signing_key,json=sessionSigningKey,proto3" json:"session_signing_key,omitempty"`
+	// The allowed CORS origin for the HTTP server (e.g. "https://app.pivox.app").
+	// Dev builds may use "*".
+	CorsOrigin    string `protobuf:"bytes,6,opt,name=cors_origin,json=corsOrigin,proto3" json:"cors_origin,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1298,6 +1339,139 @@ func (x *HandshakeAck) GetEndpoints() []*EndpointConfig {
 	return nil
 }
 
+func (x *HandshakeAck) GetSessionSigningKey() []byte {
+	if x != nil {
+		return x.SessionSigningKey
+	}
+	return nil
+}
+
+func (x *HandshakeAck) GetCorsOrigin() string {
+	if x != nil {
+		return x.CorsOrigin
+	}
+	return ""
+}
+
+// SessionGrant pushes a user session to the agent. The agent stores the
+// opaque token and access patterns in memory. When a request arrives with
+// a JWT cookie containing this token, the agent glob-matches the request
+// path against the patterns.
+type SessionGrant struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Opaque session token (matches the "token" claim in the JWT cookie).
+	Token string `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	// URL path patterns the session has access to. Uses glob syntax:
+	//
+	//	/local-corp/local/primary/news/*
+	//	/local-corp/local/archive/*
+	Patterns []string `protobuf:"bytes,2,rep,name=patterns,proto3" json:"patterns,omitempty"`
+	// When this session expires. The agent flushes expired sessions
+	// periodically.
+	Expiry        *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=expiry,proto3" json:"expiry,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SessionGrant) Reset() {
+	*x = SessionGrant{}
+	mi := &file_pivox_agent_v1_agent_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SessionGrant) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SessionGrant) ProtoMessage() {}
+
+func (x *SessionGrant) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_agent_v1_agent_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SessionGrant.ProtoReflect.Descriptor instead.
+func (*SessionGrant) Descriptor() ([]byte, []int) {
+	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *SessionGrant) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+func (x *SessionGrant) GetPatterns() []string {
+	if x != nil {
+		return x.Patterns
+	}
+	return nil
+}
+
+func (x *SessionGrant) GetExpiry() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Expiry
+	}
+	return nil
+}
+
+// SessionRevoke removes a previously granted session from the agent's
+// in-memory store. Takes effect immediately — the next request with
+// this token is rejected.
+type SessionRevoke struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The opaque session token to revoke.
+	Token         string `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SessionRevoke) Reset() {
+	*x = SessionRevoke{}
+	mi := &file_pivox_agent_v1_agent_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SessionRevoke) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SessionRevoke) ProtoMessage() {}
+
+func (x *SessionRevoke) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_agent_v1_agent_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SessionRevoke.ProtoReflect.Descriptor instead.
+func (*SessionRevoke) Descriptor() ([]byte, []int) {
+	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *SessionRevoke) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
 // CertDelivery pushes a rotated TLS certificate and key to the agent. The
 // agent MUST perform a graceful TLS reload without dropping in-flight
 // connections.
@@ -1316,7 +1490,7 @@ type CertDelivery struct {
 
 func (x *CertDelivery) Reset() {
 	*x = CertDelivery{}
-	mi := &file_pivox_agent_v1_agent_proto_msgTypes[12]
+	mi := &file_pivox_agent_v1_agent_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1328,7 +1502,7 @@ func (x *CertDelivery) String() string {
 func (*CertDelivery) ProtoMessage() {}
 
 func (x *CertDelivery) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_agent_v1_agent_proto_msgTypes[12]
+	mi := &file_pivox_agent_v1_agent_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1341,7 +1515,7 @@ func (x *CertDelivery) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CertDelivery.ProtoReflect.Descriptor instead.
 func (*CertDelivery) Descriptor() ([]byte, []int) {
-	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{12}
+	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *CertDelivery) GetTlsCert() []byte {
@@ -1378,7 +1552,7 @@ type DrainRequest struct {
 
 func (x *DrainRequest) Reset() {
 	*x = DrainRequest{}
-	mi := &file_pivox_agent_v1_agent_proto_msgTypes[13]
+	mi := &file_pivox_agent_v1_agent_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1390,7 +1564,7 @@ func (x *DrainRequest) String() string {
 func (*DrainRequest) ProtoMessage() {}
 
 func (x *DrainRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_agent_v1_agent_proto_msgTypes[13]
+	mi := &file_pivox_agent_v1_agent_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1403,7 +1577,7 @@ func (x *DrainRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DrainRequest.ProtoReflect.Descriptor instead.
 func (*DrainRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{13}
+	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *DrainRequest) GetReason() string {
@@ -1434,7 +1608,7 @@ type UpgradeRequest struct {
 
 func (x *UpgradeRequest) Reset() {
 	*x = UpgradeRequest{}
-	mi := &file_pivox_agent_v1_agent_proto_msgTypes[14]
+	mi := &file_pivox_agent_v1_agent_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1446,7 +1620,7 @@ func (x *UpgradeRequest) String() string {
 func (*UpgradeRequest) ProtoMessage() {}
 
 func (x *UpgradeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_agent_v1_agent_proto_msgTypes[14]
+	mi := &file_pivox_agent_v1_agent_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1459,7 +1633,7 @@ func (x *UpgradeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpgradeRequest.ProtoReflect.Descriptor instead.
 func (*UpgradeRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{14}
+	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *UpgradeRequest) GetCommand() UpgradeCommand {
@@ -1510,7 +1684,7 @@ type ConfigUpdate struct {
 
 func (x *ConfigUpdate) Reset() {
 	*x = ConfigUpdate{}
-	mi := &file_pivox_agent_v1_agent_proto_msgTypes[15]
+	mi := &file_pivox_agent_v1_agent_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1522,7 +1696,7 @@ func (x *ConfigUpdate) String() string {
 func (*ConfigUpdate) ProtoMessage() {}
 
 func (x *ConfigUpdate) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_agent_v1_agent_proto_msgTypes[15]
+	mi := &file_pivox_agent_v1_agent_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1535,7 +1709,7 @@ func (x *ConfigUpdate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConfigUpdate.ProtoReflect.Descriptor instead.
 func (*ConfigUpdate) Descriptor() ([]byte, []int) {
-	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{15}
+	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ConfigUpdate) GetEndpoints() []*EndpointConfig {
@@ -1567,7 +1741,7 @@ type EndpointConfig struct {
 
 func (x *EndpointConfig) Reset() {
 	*x = EndpointConfig{}
-	mi := &file_pivox_agent_v1_agent_proto_msgTypes[16]
+	mi := &file_pivox_agent_v1_agent_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1579,7 +1753,7 @@ func (x *EndpointConfig) String() string {
 func (*EndpointConfig) ProtoMessage() {}
 
 func (x *EndpointConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_agent_v1_agent_proto_msgTypes[16]
+	mi := &file_pivox_agent_v1_agent_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1592,7 +1766,7 @@ func (x *EndpointConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EndpointConfig.ProtoReflect.Descriptor instead.
 func (*EndpointConfig) Descriptor() ([]byte, []int) {
-	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{16}
+	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *EndpointConfig) GetName() string {
@@ -1672,7 +1846,7 @@ type S3EndpointConfig struct {
 
 func (x *S3EndpointConfig) Reset() {
 	*x = S3EndpointConfig{}
-	mi := &file_pivox_agent_v1_agent_proto_msgTypes[17]
+	mi := &file_pivox_agent_v1_agent_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1684,7 +1858,7 @@ func (x *S3EndpointConfig) String() string {
 func (*S3EndpointConfig) ProtoMessage() {}
 
 func (x *S3EndpointConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_agent_v1_agent_proto_msgTypes[17]
+	mi := &file_pivox_agent_v1_agent_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1697,7 +1871,7 @@ func (x *S3EndpointConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use S3EndpointConfig.ProtoReflect.Descriptor instead.
 func (*S3EndpointConfig) Descriptor() ([]byte, []int) {
-	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{17}
+	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *S3EndpointConfig) GetEndpointUri() string {
@@ -1746,7 +1920,7 @@ type FileSystemEndpointConfig struct {
 
 func (x *FileSystemEndpointConfig) Reset() {
 	*x = FileSystemEndpointConfig{}
-	mi := &file_pivox_agent_v1_agent_proto_msgTypes[18]
+	mi := &file_pivox_agent_v1_agent_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1758,7 +1932,7 @@ func (x *FileSystemEndpointConfig) String() string {
 func (*FileSystemEndpointConfig) ProtoMessage() {}
 
 func (x *FileSystemEndpointConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_agent_v1_agent_proto_msgTypes[18]
+	mi := &file_pivox_agent_v1_agent_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1771,7 +1945,7 @@ func (x *FileSystemEndpointConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FileSystemEndpointConfig.ProtoReflect.Descriptor instead.
 func (*FileSystemEndpointConfig) Descriptor() ([]byte, []int) {
-	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{18}
+	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *FileSystemEndpointConfig) GetPath() string {
@@ -1798,7 +1972,7 @@ type EndpointCacheConfig struct {
 
 func (x *EndpointCacheConfig) Reset() {
 	*x = EndpointCacheConfig{}
-	mi := &file_pivox_agent_v1_agent_proto_msgTypes[19]
+	mi := &file_pivox_agent_v1_agent_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1810,7 +1984,7 @@ func (x *EndpointCacheConfig) String() string {
 func (*EndpointCacheConfig) ProtoMessage() {}
 
 func (x *EndpointCacheConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_agent_v1_agent_proto_msgTypes[19]
+	mi := &file_pivox_agent_v1_agent_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1823,7 +1997,7 @@ func (x *EndpointCacheConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EndpointCacheConfig.ProtoReflect.Descriptor instead.
 func (*EndpointCacheConfig) Descriptor() ([]byte, []int) {
-	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{19}
+	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *EndpointCacheConfig) GetEnabled() bool {
@@ -1864,7 +2038,7 @@ type ServerHeartbeat struct {
 
 func (x *ServerHeartbeat) Reset() {
 	*x = ServerHeartbeat{}
-	mi := &file_pivox_agent_v1_agent_proto_msgTypes[20]
+	mi := &file_pivox_agent_v1_agent_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1876,7 +2050,7 @@ func (x *ServerHeartbeat) String() string {
 func (*ServerHeartbeat) ProtoMessage() {}
 
 func (x *ServerHeartbeat) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_agent_v1_agent_proto_msgTypes[20]
+	mi := &file_pivox_agent_v1_agent_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1889,7 +2063,7 @@ func (x *ServerHeartbeat) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ServerHeartbeat.ProtoReflect.Descriptor instead.
 func (*ServerHeartbeat) Descriptor() ([]byte, []int) {
-	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{20}
+	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{22}
 }
 
 var File_pivox_agent_v1_agent_proto protoreflect.FileDescriptor
@@ -1962,7 +2136,7 @@ const file_pivox_agent_v1_agent_proto_rawDesc = "" +
 	"\x0fdisk_read_bytes\x18\x04 \x01(\x03R\rdiskReadBytes\x12(\n" +
 	"\x10disk_write_bytes\x18\x05 \x01(\x03R\x0ediskWriteBytes\x12(\n" +
 	"\x10network_rx_bytes\x18\x06 \x01(\x03R\x0enetworkRxBytes\x12(\n" +
-	"\x10network_tx_bytes\x18\a \x01(\x03R\x0enetworkTxBytes\"\xd8\x03\n" +
+	"\x10network_tx_bytes\x18\a \x01(\x03R\x0enetworkTxBytes\"\xe5\x04\n" +
 	"\x0eControlMessage\x12\x0e\n" +
 	"\x02id\x18\a \x01(\tR\x02id\x12C\n" +
 	"\rhandshake_ack\x18\x01 \x01(\v2\x1c.pivox.agent.v1.HandshakeAckH\x00R\fhandshakeAck\x12C\n" +
@@ -1970,14 +2144,25 @@ const file_pivox_agent_v1_agent_proto_rawDesc = "" +
 	"\rdrain_request\x18\x03 \x01(\v2\x1c.pivox.agent.v1.DrainRequestH\x00R\fdrainRequest\x12I\n" +
 	"\x0fupgrade_request\x18\x04 \x01(\v2\x1e.pivox.agent.v1.UpgradeRequestH\x00R\x0eupgradeRequest\x12C\n" +
 	"\rconfig_update\x18\x05 \x01(\v2\x1c.pivox.agent.v1.ConfigUpdateH\x00R\fconfigUpdate\x12L\n" +
-	"\x10server_heartbeat\x18\x06 \x01(\v2\x1f.pivox.agent.v1.ServerHeartbeatH\x00R\x0fserverHeartbeatB\t\n" +
-	"\amessage\"\x9f\x01\n" +
+	"\x10server_heartbeat\x18\x06 \x01(\v2\x1f.pivox.agent.v1.ServerHeartbeatH\x00R\x0fserverHeartbeat\x12C\n" +
+	"\rsession_grant\x18\b \x01(\v2\x1c.pivox.agent.v1.SessionGrantH\x00R\fsessionGrant\x12F\n" +
+	"\x0esession_revoke\x18\t \x01(\v2\x1d.pivox.agent.v1.SessionRevokeH\x00R\rsessionRevokeB\t\n" +
+	"\amessage\"\xf0\x01\n" +
 	"\fHandshakeAck\x12\x1d\n" +
 	"\n" +
 	"agent_name\x18\x01 \x01(\tR\tagentName\x12\x19\n" +
 	"\btls_cert\x18\x02 \x01(\fR\atlsCert\x12\x17\n" +
 	"\atls_key\x18\x03 \x01(\fR\x06tlsKey\x12<\n" +
-	"\tendpoints\x18\x04 \x03(\v2\x1e.pivox.agent.v1.EndpointConfigR\tendpoints\"v\n" +
+	"\tendpoints\x18\x04 \x03(\v2\x1e.pivox.agent.v1.EndpointConfigR\tendpoints\x12.\n" +
+	"\x13session_signing_key\x18\x05 \x01(\fR\x11sessionSigningKey\x12\x1f\n" +
+	"\vcors_origin\x18\x06 \x01(\tR\n" +
+	"corsOrigin\"t\n" +
+	"\fSessionGrant\x12\x14\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\x12\x1a\n" +
+	"\bpatterns\x18\x02 \x03(\tR\bpatterns\x122\n" +
+	"\x06expiry\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x06expiry\"%\n" +
+	"\rSessionRevoke\x12\x14\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\"v\n" +
 	"\fCertDelivery\x12\x19\n" +
 	"\btls_cert\x18\x01 \x01(\fR\atlsCert\x12\x17\n" +
 	"\atls_key\x18\x02 \x01(\fR\x06tlsKey\x122\n" +
@@ -2046,7 +2231,7 @@ func file_pivox_agent_v1_agent_proto_rawDescGZIP() []byte {
 }
 
 var file_pivox_agent_v1_agent_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_pivox_agent_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
+var file_pivox_agent_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
 var file_pivox_agent_v1_agent_proto_goTypes = []any{
 	(UpgradePhase)(0),                // 0: pivox.agent.v1.UpgradePhase
 	(UpgradeCommand)(0),              // 1: pivox.agent.v1.UpgradeCommand
@@ -2062,17 +2247,19 @@ var file_pivox_agent_v1_agent_proto_goTypes = []any{
 	(*SystemMetrics)(nil),            // 11: pivox.agent.v1.SystemMetrics
 	(*ControlMessage)(nil),           // 12: pivox.agent.v1.ControlMessage
 	(*HandshakeAck)(nil),             // 13: pivox.agent.v1.HandshakeAck
-	(*CertDelivery)(nil),             // 14: pivox.agent.v1.CertDelivery
-	(*DrainRequest)(nil),             // 15: pivox.agent.v1.DrainRequest
-	(*UpgradeRequest)(nil),           // 16: pivox.agent.v1.UpgradeRequest
-	(*ConfigUpdate)(nil),             // 17: pivox.agent.v1.ConfigUpdate
-	(*EndpointConfig)(nil),           // 18: pivox.agent.v1.EndpointConfig
-	(*S3EndpointConfig)(nil),         // 19: pivox.agent.v1.S3EndpointConfig
-	(*FileSystemEndpointConfig)(nil), // 20: pivox.agent.v1.FileSystemEndpointConfig
-	(*EndpointCacheConfig)(nil),      // 21: pivox.agent.v1.EndpointCacheConfig
-	(*ServerHeartbeat)(nil),          // 22: pivox.agent.v1.ServerHeartbeat
-	(*durationpb.Duration)(nil),      // 23: google.protobuf.Duration
-	(*timestamppb.Timestamp)(nil),    // 24: google.protobuf.Timestamp
+	(*SessionGrant)(nil),             // 14: pivox.agent.v1.SessionGrant
+	(*SessionRevoke)(nil),            // 15: pivox.agent.v1.SessionRevoke
+	(*CertDelivery)(nil),             // 16: pivox.agent.v1.CertDelivery
+	(*DrainRequest)(nil),             // 17: pivox.agent.v1.DrainRequest
+	(*UpgradeRequest)(nil),           // 18: pivox.agent.v1.UpgradeRequest
+	(*ConfigUpdate)(nil),             // 19: pivox.agent.v1.ConfigUpdate
+	(*EndpointConfig)(nil),           // 20: pivox.agent.v1.EndpointConfig
+	(*S3EndpointConfig)(nil),         // 21: pivox.agent.v1.S3EndpointConfig
+	(*FileSystemEndpointConfig)(nil), // 22: pivox.agent.v1.FileSystemEndpointConfig
+	(*EndpointCacheConfig)(nil),      // 23: pivox.agent.v1.EndpointCacheConfig
+	(*ServerHeartbeat)(nil),          // 24: pivox.agent.v1.ServerHeartbeat
+	(*durationpb.Duration)(nil),      // 25: google.protobuf.Duration
+	(*timestamppb.Timestamp)(nil),    // 26: google.protobuf.Timestamp
 }
 var file_pivox_agent_v1_agent_proto_depIdxs = []int32{
 	3,  // 0: pivox.agent.v1.AgentMessage.handshake:type_name -> pivox.agent.v1.Handshake
@@ -2081,31 +2268,34 @@ var file_pivox_agent_v1_agent_proto_depIdxs = []int32{
 	6,  // 3: pivox.agent.v1.AgentMessage.sync_status:type_name -> pivox.agent.v1.SyncStatus
 	7,  // 4: pivox.agent.v1.AgentMessage.upgrade_status:type_name -> pivox.agent.v1.UpgradeStatus
 	8,  // 5: pivox.agent.v1.AgentMessage.telemetry:type_name -> pivox.agent.v1.Telemetry
-	23, // 6: pivox.agent.v1.Heartbeat.uptime:type_name -> google.protobuf.Duration
+	25, // 6: pivox.agent.v1.Heartbeat.uptime:type_name -> google.protobuf.Duration
 	0,  // 7: pivox.agent.v1.UpgradeStatus.phase:type_name -> pivox.agent.v1.UpgradePhase
 	9,  // 8: pivox.agent.v1.Telemetry.cache_stats:type_name -> pivox.agent.v1.CacheStats
 	10, // 9: pivox.agent.v1.Telemetry.request_metrics:type_name -> pivox.agent.v1.RequestMetrics
 	11, // 10: pivox.agent.v1.Telemetry.system_metrics:type_name -> pivox.agent.v1.SystemMetrics
 	13, // 11: pivox.agent.v1.ControlMessage.handshake_ack:type_name -> pivox.agent.v1.HandshakeAck
-	14, // 12: pivox.agent.v1.ControlMessage.cert_delivery:type_name -> pivox.agent.v1.CertDelivery
-	15, // 13: pivox.agent.v1.ControlMessage.drain_request:type_name -> pivox.agent.v1.DrainRequest
-	16, // 14: pivox.agent.v1.ControlMessage.upgrade_request:type_name -> pivox.agent.v1.UpgradeRequest
-	17, // 15: pivox.agent.v1.ControlMessage.config_update:type_name -> pivox.agent.v1.ConfigUpdate
-	22, // 16: pivox.agent.v1.ControlMessage.server_heartbeat:type_name -> pivox.agent.v1.ServerHeartbeat
-	18, // 17: pivox.agent.v1.HandshakeAck.endpoints:type_name -> pivox.agent.v1.EndpointConfig
-	24, // 18: pivox.agent.v1.CertDelivery.expiry:type_name -> google.protobuf.Timestamp
-	1,  // 19: pivox.agent.v1.UpgradeRequest.command:type_name -> pivox.agent.v1.UpgradeCommand
-	18, // 20: pivox.agent.v1.ConfigUpdate.endpoints:type_name -> pivox.agent.v1.EndpointConfig
-	19, // 21: pivox.agent.v1.EndpointConfig.s3:type_name -> pivox.agent.v1.S3EndpointConfig
-	20, // 22: pivox.agent.v1.EndpointConfig.filesystem:type_name -> pivox.agent.v1.FileSystemEndpointConfig
-	21, // 23: pivox.agent.v1.EndpointConfig.cache_config:type_name -> pivox.agent.v1.EndpointCacheConfig
-	2,  // 24: pivox.agent.v1.AgentService.Connect:input_type -> pivox.agent.v1.AgentMessage
-	12, // 25: pivox.agent.v1.AgentService.Connect:output_type -> pivox.agent.v1.ControlMessage
-	25, // [25:26] is the sub-list for method output_type
-	24, // [24:25] is the sub-list for method input_type
-	24, // [24:24] is the sub-list for extension type_name
-	24, // [24:24] is the sub-list for extension extendee
-	0,  // [0:24] is the sub-list for field type_name
+	16, // 12: pivox.agent.v1.ControlMessage.cert_delivery:type_name -> pivox.agent.v1.CertDelivery
+	17, // 13: pivox.agent.v1.ControlMessage.drain_request:type_name -> pivox.agent.v1.DrainRequest
+	18, // 14: pivox.agent.v1.ControlMessage.upgrade_request:type_name -> pivox.agent.v1.UpgradeRequest
+	19, // 15: pivox.agent.v1.ControlMessage.config_update:type_name -> pivox.agent.v1.ConfigUpdate
+	24, // 16: pivox.agent.v1.ControlMessage.server_heartbeat:type_name -> pivox.agent.v1.ServerHeartbeat
+	14, // 17: pivox.agent.v1.ControlMessage.session_grant:type_name -> pivox.agent.v1.SessionGrant
+	15, // 18: pivox.agent.v1.ControlMessage.session_revoke:type_name -> pivox.agent.v1.SessionRevoke
+	20, // 19: pivox.agent.v1.HandshakeAck.endpoints:type_name -> pivox.agent.v1.EndpointConfig
+	26, // 20: pivox.agent.v1.SessionGrant.expiry:type_name -> google.protobuf.Timestamp
+	26, // 21: pivox.agent.v1.CertDelivery.expiry:type_name -> google.protobuf.Timestamp
+	1,  // 22: pivox.agent.v1.UpgradeRequest.command:type_name -> pivox.agent.v1.UpgradeCommand
+	20, // 23: pivox.agent.v1.ConfigUpdate.endpoints:type_name -> pivox.agent.v1.EndpointConfig
+	21, // 24: pivox.agent.v1.EndpointConfig.s3:type_name -> pivox.agent.v1.S3EndpointConfig
+	22, // 25: pivox.agent.v1.EndpointConfig.filesystem:type_name -> pivox.agent.v1.FileSystemEndpointConfig
+	23, // 26: pivox.agent.v1.EndpointConfig.cache_config:type_name -> pivox.agent.v1.EndpointCacheConfig
+	2,  // 27: pivox.agent.v1.AgentService.Connect:input_type -> pivox.agent.v1.AgentMessage
+	12, // 28: pivox.agent.v1.AgentService.Connect:output_type -> pivox.agent.v1.ControlMessage
+	28, // [28:29] is the sub-list for method output_type
+	27, // [27:28] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_pivox_agent_v1_agent_proto_init() }
@@ -2133,8 +2323,10 @@ func file_pivox_agent_v1_agent_proto_init() {
 		(*ControlMessage_UpgradeRequest)(nil),
 		(*ControlMessage_ConfigUpdate)(nil),
 		(*ControlMessage_ServerHeartbeat)(nil),
+		(*ControlMessage_SessionGrant)(nil),
+		(*ControlMessage_SessionRevoke)(nil),
 	}
-	file_pivox_agent_v1_agent_proto_msgTypes[16].OneofWrappers = []any{
+	file_pivox_agent_v1_agent_proto_msgTypes[18].OneofWrappers = []any{
 		(*EndpointConfig_S3)(nil),
 		(*EndpointConfig_Filesystem)(nil),
 	}
@@ -2144,7 +2336,7 @@ func file_pivox_agent_v1_agent_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pivox_agent_v1_agent_proto_rawDesc), len(file_pivox_agent_v1_agent_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   21,
+			NumMessages:   23,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

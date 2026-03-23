@@ -285,6 +285,12 @@ message ControlMessage {
 
     // Server-side keep-alive to detect dead streams.
     ServerHeartbeat server_heartbeat = 6;
+
+    // Grant a user session with access patterns for this gateway.
+    SessionGrant session_grant = 8;
+
+    // Revoke a previously granted session.
+    SessionRevoke session_revoke = 9;
   }
 }
 
@@ -304,6 +310,41 @@ message HandshakeAck {
   // Initial set of storage endpoint configurations the agent should connect
   // to. Each endpoint includes its own cache configuration.
   repeated EndpointConfig endpoints = 4;
+
+  // HMAC signing key used to validate session JWTs in cookie-based auth.
+  // The control plane mints JWTs signed with this key; the agent validates
+  // incoming cookies using the same key.
+  bytes session_signing_key = 5;
+
+  // The allowed CORS origin for the HTTP server (e.g. "https://app.pivox.app").
+  // Dev builds may use "*".
+  string cors_origin = 6;
+}
+
+// SessionGrant pushes a user session to the agent. The agent stores the
+// opaque token and access patterns in memory. When a request arrives with
+// a JWT cookie containing this token, the agent glob-matches the request
+// path against the patterns.
+message SessionGrant {
+  // Opaque session token (matches the "token" claim in the JWT cookie).
+  string token = 1;
+
+  // URL path patterns the session has access to. Uses glob syntax:
+  //   /local-corp/local/primary/news/*
+  //   /local-corp/local/archive/*
+  repeated string patterns = 2;
+
+  // When this session expires. The agent flushes expired sessions
+  // periodically.
+  google.protobuf.Timestamp expiry = 3;
+}
+
+// SessionRevoke removes a previously granted session from the agent's
+// in-memory store. Takes effect immediately — the next request with
+// this token is rejected.
+message SessionRevoke {
+  // The opaque session token to revoke.
+  string token = 1;
 }
 
 // CertDelivery pushes a rotated TLS certificate and key to the agent. The
