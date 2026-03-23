@@ -52,6 +52,8 @@ func main() {
 	f.String("gcp-service-account-key", envOrDefault("GOOGLE_CLOUD_SERVICE_ACCOUNT_KEY", ""), "Google Cloud service account key (inline JSON)")
 	f.String("gcp-service-account-file", envOrDefault("GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE", ""), "Google Cloud service account key file path")
 
+	addSyncAuthFlags(rootCmd)
+
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
@@ -79,7 +81,7 @@ func serve(cmd *cobra.Command, args []string) error {
 			ServiceAccountKey:  must(f.GetString("gcp-service-account-key")),
 			ServiceAccountFile: must(f.GetString("gcp-service-account-file")),
 		},
-		SyncAuth: config.LoadSyncAuthConfig(),
+		SyncAuth: loadSyncAuthConfig(cmd),
 	}
 
 	var level slog.Level

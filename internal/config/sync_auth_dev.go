@@ -10,9 +10,3 @@ type SyncAuthConfig struct {
 	// from the Firebase Functions emulator to internal endpoints.
 	SharedSecret string
 }
-
-func LoadSyncAuthConfig() SyncAuthConfig {
-	return SyncAuthConfig{
-		SharedSecret: getEnvRequired("SHARED_SECRET"),
-	}
-}

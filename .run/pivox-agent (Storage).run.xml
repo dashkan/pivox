@@ -3,7 +3,7 @@
     <module name="pivox-server" />
     <working_directory value="$PROJECT_DIR$" />
     <go_parameters value="-tags dev" />
-    <parameters value="storage" />
+    <parameters value="storage --token dev-token-meridian-hq" />
     <kind value="DIRECTORY" />
     <package value="github.com/dashkan/pivox-server" />
     <directory value="$PROJECT_DIR$/cmd/pivox-agent" />
