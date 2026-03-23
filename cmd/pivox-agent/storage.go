@@ -32,7 +32,7 @@ the cloud.`,
 	f.Int("cache-size", 0, "Cache size in GB (0 = auto-detect, 80% of available disk)")
 	f.Int("port", 443, "HTTPS listen port")
 	f.String("bind", envOrDefault("PIVOX_BIND", "0.0.0.0"), "Bind address")
-	f.String("control-plane", envOrDefault("PIVOX_CONTROL_PLANE", "api.pivox.io:443"), "Control plane gRPC address")
+	addControlPlaneFlag(f)
 	f.Bool("telemetry", true, "Enable telemetry reporting to Pivox Cloud")
 	f.String("log-level", envOrDefault("PIVOX_LOG_LEVEL", "info"), "Log level (debug, info, warn, error)")
 
@@ -49,7 +49,6 @@ func runStorage(cmd *cobra.Command, args []string) error {
 	cacheSize, _ := f.GetInt("cache-size")
 	port, _ := f.GetInt("port")
 	bind, _ := f.GetString("bind")
-	controlPlane, _ := f.GetString("control-plane")
 	telemetry, _ := f.GetBool("telemetry")
 	logLevel, _ := f.GetString("log-level")
 
@@ -68,7 +67,7 @@ func runStorage(cmd *cobra.Command, args []string) error {
 	slog.SetDefault(logger)
 
 	logger.Info("starting storage agent",
-		"control_plane", controlPlane,
+		"control_plane", controlPlaneAddr,
 		"bind", fmt.Sprintf("%s:%d", bind, port),
 		"cache_dir", cacheDir,
 		"cache_size_gb", cacheSize,

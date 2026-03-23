@@ -11,20 +11,24 @@ TOOL = go tool -modfile=./tools/go.mod
 # Build
 
 build:
-	go build -o bin/pivox-server ./cmd/pivox-server
-	go build -o bin/pivox-agent ./cmd/pivox-agent
+	go build -tags dev -o bin/pivox-server ./cmd/pivox-server
+	go build -tags dev -o bin/pivox-agent ./cmd/pivox-agent
 
 build-server:
-	go build -o bin/pivox-server ./cmd/pivox-server
+	go build -tags dev -o bin/pivox-server ./cmd/pivox-server
 
 build-agent:
+	go build -tags dev -o bin/pivox-agent ./cmd/pivox-agent
+
+build-release:
+	go build -o bin/pivox-server ./cmd/pivox-server
 	go build -o bin/pivox-agent ./cmd/pivox-agent
 
 run:
-	go run ./cmd/pivox-server
+	go run -tags dev ./cmd/pivox-server
 
 run-agent:
-	go run ./cmd/pivox-agent
+	go run -tags dev ./cmd/pivox-agent
 
 test:
 	go test ./...
