@@ -591,19 +591,6 @@ type Account struct {
 	LastLoginTime pgtype.Timestamptz `json:"last_login_time"`
 }
 
-type Agent struct {
-	ID             uuid.UUID          `json:"id"`
-	GatewayID      uuid.UUID          `json:"gateway_id"`
-	IpAddress      string             `json:"ip_address"`
-	Hostname       string             `json:"hostname"`
-	Version        string             `json:"version"`
-	CacheUsedGb    int32              `json:"cache_used_gb"`
-	State          AgentState         `json:"state"`
-	CertExpiryTime pgtype.Timestamptz `json:"cert_expiry_time"`
-	JoinTime       time.Time          `json:"join_time"`
-	LastSeenTime   time.Time          `json:"last_seen_time"`
-}
-
 type ApiKey struct {
 	ID           uuid.UUID          `json:"id"`
 	OrgID        uuid.UUID          `json:"org_id"`
@@ -643,27 +630,6 @@ type CustomDomain struct {
 	UpdateTime time.Time          `json:"update_time"`
 	DeleteTime pgtype.Timestamptz `json:"delete_time"`
 	VerifyTime pgtype.Timestamptz `json:"verify_time"`
-}
-
-type Endpoint struct {
-	ID              uuid.UUID       `json:"id"`
-	GatewayID       uuid.UUID       `json:"gateway_id"`
-	Name            string          `json:"name"`
-	DisplayName     string          `json:"display_name"`
-	Engine          EndpointEngine  `json:"engine"`
-	EndpointUri     string          `json:"endpoint_uri"`
-	Bucket          string          `json:"bucket"`
-	Region          string          `json:"region"`
-	Credentials     []byte          `json:"credentials"`
-	Annotations     json.RawMessage `json:"annotations"`
-	State           EndpointState   `json:"state"`
-	CredentialState CredentialState `json:"credential_state"`
-	Etag            string          `json:"etag"`
-	Revision        int32           `json:"revision"`
-	CreatedBy       string          `json:"created_by"`
-	UpdatedBy       string          `json:"updated_by"`
-	CreateTime      time.Time       `json:"create_time"`
-	UpdateTime      time.Time       `json:"update_time"`
 }
 
 type Group struct {
@@ -828,6 +794,40 @@ type RoleMember struct {
 type RolePermission struct {
 	RoleID       uuid.UUID `json:"role_id"`
 	PermissionID uuid.UUID `json:"permission_id"`
+}
+
+type StorageAgent struct {
+	ID             uuid.UUID          `json:"id"`
+	GatewayID      uuid.UUID          `json:"gateway_id"`
+	IpAddress      string             `json:"ip_address"`
+	Hostname       string             `json:"hostname"`
+	Version        string             `json:"version"`
+	CacheUsedGb    int32              `json:"cache_used_gb"`
+	State          AgentState         `json:"state"`
+	CertExpiryTime pgtype.Timestamptz `json:"cert_expiry_time"`
+	JoinTime       time.Time          `json:"join_time"`
+	LastSeenTime   time.Time          `json:"last_seen_time"`
+}
+
+type StorageEndpoint struct {
+	ID              uuid.UUID       `json:"id"`
+	GatewayID       uuid.UUID       `json:"gateway_id"`
+	Name            string          `json:"name"`
+	DisplayName     string          `json:"display_name"`
+	Engine          EndpointEngine  `json:"engine"`
+	EndpointUri     string          `json:"endpoint_uri"`
+	Bucket          string          `json:"bucket"`
+	Region          string          `json:"region"`
+	Credentials     []byte          `json:"credentials"`
+	Annotations     json.RawMessage `json:"annotations"`
+	State           EndpointState   `json:"state"`
+	CredentialState CredentialState `json:"credential_state"`
+	Etag            string          `json:"etag"`
+	Revision        int32           `json:"revision"`
+	CreatedBy       string          `json:"created_by"`
+	UpdatedBy       string          `json:"updated_by"`
+	CreateTime      time.Time       `json:"create_time"`
+	UpdateTime      time.Time       `json:"update_time"`
 }
 
 type StorageGateway struct {

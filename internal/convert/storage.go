@@ -48,7 +48,7 @@ func StorageGatewayToProto(gw db.StorageGateway, orgName string) *storagev1.Stor
 // AgentToProto converts a DB agent to proto.
 // gatewayName is the full resource name of the parent storage gateway
 // (e.g. "organizations/acme/storageGateways/gw-1").
-func AgentToProto(a db.Agent, gatewayName string) *storagev1.Agent {
+func AgentToProto(a db.StorageAgent, gatewayName string) *storagev1.Agent {
 	pb := &storagev1.Agent{
 		Name:         fmt.Sprintf("%s/agents/%s", gatewayName, a.ID.String()),
 		IpAddress:    a.IpAddress,
@@ -68,7 +68,7 @@ func AgentToProto(a db.Agent, gatewayName string) *storagev1.Agent {
 // EndpointToProto converts a DB endpoint to proto.
 // gatewayName is the full resource name of the parent storage gateway
 // (e.g. "organizations/acme/storageGateways/gw-1").
-func EndpointToProto(ep db.Endpoint, gatewayName string) *storagev1.Endpoint {
+func EndpointToProto(ep db.StorageEndpoint, gatewayName string) *storagev1.Endpoint {
 	pb := &storagev1.Endpoint{
 		Name:            fmt.Sprintf("%s/endpoints/%s", gatewayName, ep.Name),
 		DisplayName:     ep.DisplayName,

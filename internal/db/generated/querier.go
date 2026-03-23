@@ -16,43 +16,39 @@ type Querier interface {
 	// Atomically consumes a code and returns the ID token.
 	// Returns no rows if the code doesn't exist, is expired, or was already consumed.
 	ConsumeAuthTokenCode(ctx context.Context, code uuid.UUID) (AuthTokenCode, error)
-	CountAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) (int64, error)
-	CountConnectedAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) (int64, error)
+	CountConnectedStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) (int64, error)
+	CountStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) (int64, error)
 	CountTagBindingsByTagValue(ctx context.Context, tagValueID uuid.UUID) (int64, error)
 	CountTagValuesByTagKey(ctx context.Context, tagKeyID uuid.UUID) (int64, error)
-	CreateAgent(ctx context.Context, arg CreateAgentParams) (Agent, error)
 	CreateApiKey(ctx context.Context, arg CreateApiKeyParams) (ApiKey, error)
 	// Stores a Firebase ID token behind a short-lived opaque code.
 	CreateAuthTokenCode(ctx context.Context, idToken string) (AuthTokenCode, error)
-	CreateEndpoint(ctx context.Context, arg CreateEndpointParams) (Endpoint, error)
 	CreateOperation(ctx context.Context, arg CreateOperationParams) (Operation, error)
 	CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error)
 	CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error)
+	CreateStorageAgent(ctx context.Context, arg CreateStorageAgentParams) (StorageAgent, error)
+	CreateStorageEndpoint(ctx context.Context, arg CreateStorageEndpointParams) (StorageEndpoint, error)
 	CreateStorageGateway(ctx context.Context, arg CreateStorageGatewayParams) (StorageGateway, error)
 	CreateTagBinding(ctx context.Context, arg CreateTagBindingParams) (TagBinding, error)
 	CreateTagKey(ctx context.Context, arg CreateTagKeyParams) (TagKey, error)
 	CreateTagValue(ctx context.Context, arg CreateTagValueParams) (TagValue, error)
-	DeleteAgent(ctx context.Context, id uuid.UUID) error
-	DeleteEndpoint(ctx context.Context, id uuid.UUID) error
 	// Cleanup: remove codes older than 10 minutes (all should be expired by then).
 	DeleteExpiredAuthTokenCodes(ctx context.Context) error
 	DeleteExpiredOperations(ctx context.Context) error
 	DeleteIamPolicy(ctx context.Context, resourceID uuid.UUID) error
 	DeleteOperation(ctx context.Context, id uuid.UUID) error
+	DeleteStorageAgent(ctx context.Context, id uuid.UUID) error
+	DeleteStorageEndpoint(ctx context.Context, id uuid.UUID) error
 	DeleteStorageGateway(ctx context.Context, id uuid.UUID) error
 	DeleteTagBinding(ctx context.Context, id uuid.UUID) error
 	DeleteTagKey(ctx context.Context, id uuid.UUID) error
 	DeleteTagValue(ctx context.Context, id uuid.UUID) error
 	FailOperation(ctx context.Context, arg FailOperationParams) (Operation, error)
 	GetAccountByFirebaseUID(ctx context.Context, firebaseUid string) (Account, error)
-	GetAgent(ctx context.Context, id uuid.UUID) (Agent, error)
-	GetAgentByGatewayAndIP(ctx context.Context, arg GetAgentByGatewayAndIPParams) (Agent, error)
 	GetApiKey(ctx context.Context, id uuid.UUID) (ApiKey, error)
 	GetApiKeyByOrgAndKeyID(ctx context.Context, arg GetApiKeyByOrgAndKeyIDParams) (ApiKey, error)
 	GetApiKeyIncludingDeleted(ctx context.Context, id uuid.UUID) (ApiKey, error)
 	GetApiKeyString(ctx context.Context, id uuid.UUID) (string, error)
-	GetEndpoint(ctx context.Context, id uuid.UUID) (Endpoint, error)
-	GetEndpointByName(ctx context.Context, arg GetEndpointByNameParams) (Endpoint, error)
 	GetIamPolicy(ctx context.Context, resourceID uuid.UUID) (IamPolicy, error)
 	GetOperation(ctx context.Context, id uuid.UUID) (Operation, error)
 	GetOrganization(ctx context.Context, id uuid.UUID) (Organization, error)
@@ -60,6 +56,10 @@ type Querier interface {
 	GetProject(ctx context.Context, id uuid.UUID) (Project, error)
 	GetProjectByName(ctx context.Context, arg GetProjectByNameParams) (Project, error)
 	GetProjectIncludingDeleted(ctx context.Context, id uuid.UUID) (Project, error)
+	GetStorageAgent(ctx context.Context, id uuid.UUID) (StorageAgent, error)
+	GetStorageAgentByGatewayAndIP(ctx context.Context, arg GetStorageAgentByGatewayAndIPParams) (StorageAgent, error)
+	GetStorageEndpoint(ctx context.Context, id uuid.UUID) (StorageEndpoint, error)
+	GetStorageEndpointByName(ctx context.Context, arg GetStorageEndpointByNameParams) (StorageEndpoint, error)
 	GetStorageGateway(ctx context.Context, id uuid.UUID) (StorageGateway, error)
 	GetStorageGatewayByName(ctx context.Context, arg GetStorageGatewayByNameParams) (StorageGateway, error)
 	GetStorageGatewayByToken(ctx context.Context, registrationToken string) (StorageGateway, error)
@@ -68,29 +68,29 @@ type Querier interface {
 	GetTagKeyByNamespacedName(ctx context.Context, namespacedName string) (TagKey, error)
 	GetTagValue(ctx context.Context, id uuid.UUID) (TagValue, error)
 	GetTagValueByNamespacedName(ctx context.Context, namespacedName string) (TagValue, error)
-	ListAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]Agent, error)
 	ListEffectiveTags(ctx context.Context, parentResource string) ([]ListEffectiveTagsRow, error)
-	ListEndpointsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]Endpoint, error)
 	ListOperations(ctx context.Context, arg ListOperationsParams) ([]Operation, error)
 	ListPendingOperations(ctx context.Context) ([]Operation, error)
+	ListStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageAgent, error)
+	ListStorageEndpointsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageEndpoint, error)
 	LookupApiKeyByKeyString(ctx context.Context, keyString string) (ApiKey, error)
 	RotateRegistrationToken(ctx context.Context, arg RotateRegistrationTokenParams) (StorageGateway, error)
-	SetEndpointCredentials(ctx context.Context, arg SetEndpointCredentialsParams) (Endpoint, error)
 	SetOrganizationTenantID(ctx context.Context, arg SetOrganizationTenantIDParams) error
+	SetStorageEndpointCredentials(ctx context.Context, arg SetStorageEndpointCredentialsParams) (StorageEndpoint, error)
 	SoftDeleteApiKey(ctx context.Context, arg SoftDeleteApiKeyParams) (ApiKey, error)
 	SoftDeleteProject(ctx context.Context, arg SoftDeleteProjectParams) (Project, error)
 	UndeleteApiKey(ctx context.Context, arg UndeleteApiKeyParams) (ApiKey, error)
 	UndeleteProject(ctx context.Context, arg UndeleteProjectParams) (Project, error)
-	UpdateAgentCacheUsed(ctx context.Context, arg UpdateAgentCacheUsedParams) error
-	UpdateAgentCert(ctx context.Context, arg UpdateAgentCertParams) error
-	UpdateAgentHeartbeat(ctx context.Context, id uuid.UUID) error
-	UpdateAgentState(ctx context.Context, arg UpdateAgentStateParams) (Agent, error)
-	UpdateAgentVersion(ctx context.Context, arg UpdateAgentVersionParams) error
 	UpdateApiKey(ctx context.Context, arg UpdateApiKeyParams) (ApiKey, error)
-	UpdateEndpoint(ctx context.Context, arg UpdateEndpointParams) (Endpoint, error)
-	UpdateEndpointState(ctx context.Context, arg UpdateEndpointStateParams) error
 	UpdateOperationMetadata(ctx context.Context, arg UpdateOperationMetadataParams) error
 	UpdateProject(ctx context.Context, arg UpdateProjectParams) (Project, error)
+	UpdateStorageAgentCacheUsed(ctx context.Context, arg UpdateStorageAgentCacheUsedParams) error
+	UpdateStorageAgentCert(ctx context.Context, arg UpdateStorageAgentCertParams) error
+	UpdateStorageAgentHeartbeat(ctx context.Context, id uuid.UUID) error
+	UpdateStorageAgentState(ctx context.Context, arg UpdateStorageAgentStateParams) (StorageAgent, error)
+	UpdateStorageAgentVersion(ctx context.Context, arg UpdateStorageAgentVersionParams) error
+	UpdateStorageEndpoint(ctx context.Context, arg UpdateStorageEndpointParams) (StorageEndpoint, error)
+	UpdateStorageEndpointState(ctx context.Context, arg UpdateStorageEndpointStateParams) error
 	UpdateStorageGateway(ctx context.Context, arg UpdateStorageGatewayParams) (StorageGateway, error)
 	UpdateStorageGatewayCert(ctx context.Context, arg UpdateStorageGatewayCertParams) error
 	UpdateStorageGatewayState(ctx context.Context, arg UpdateStorageGatewayStateParams) error

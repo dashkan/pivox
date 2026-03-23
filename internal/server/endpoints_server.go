@@ -106,7 +106,7 @@ func (s *EndpointsServer) CreateEndpoint(ctx context.Context, req *storagev1.Cre
 		credentialState = db.CredentialStateSET
 	}
 
-	result, err := s.queries.CreateEndpoint(ctx, db.CreateEndpointParams{
+	result, err := s.queries.CreateStorageEndpoint(ctx, db.CreateStorageEndpointParams{
 		ID:              uuid.New(),
 		GatewayID:       gw.ID,
 		Name:            endpointID,
@@ -139,7 +139,7 @@ func (s *EndpointsServer) GetEndpoint(ctx context.Context, req *storagev1.GetEnd
 		return nil, err
 	}
 
-	endpoint, err := s.queries.GetEndpointByName(ctx, db.GetEndpointByNameParams{
+	endpoint, err := s.queries.GetStorageEndpointByName(ctx, db.GetStorageEndpointByNameParams{
 		GatewayID: gw.ID,
 		Name:      endpointName,
 	})
@@ -162,7 +162,7 @@ func (s *EndpointsServer) ListEndpoints(ctx context.Context, req *storagev1.List
 		return nil, err
 	}
 
-	endpoints, err := s.queries.ListEndpointsByGateway(ctx, gw.ID)
+	endpoints, err := s.queries.ListStorageEndpointsByGateway(ctx, gw.ID)
 	if err != nil {
 		return nil, apierr.Internal("failed to list endpoints")
 	}
@@ -190,7 +190,7 @@ func (s *EndpointsServer) UpdateEndpoint(ctx context.Context, req *storagev1.Upd
 		return nil, err
 	}
 
-	existing, err := s.queries.GetEndpointByName(ctx, db.GetEndpointByNameParams{
+	existing, err := s.queries.GetStorageEndpointByName(ctx, db.GetStorageEndpointByNameParams{
 		GatewayID: gw.ID,
 		Name:      endpointName,
 	})
@@ -198,7 +198,7 @@ func (s *EndpointsServer) UpdateEndpoint(ctx context.Context, req *storagev1.Upd
 		return nil, handleResourceError(err, "Endpoint", endpoint.GetName())
 	}
 
-	updateParams := db.UpdateEndpointParams{
+	updateParams := db.UpdateStorageEndpointParams{
 		ID:        existing.ID,
 		UpdatedBy: "",
 	}
@@ -236,7 +236,7 @@ func (s *EndpointsServer) UpdateEndpoint(ctx context.Context, req *storagev1.Upd
 		}
 	}
 
-	result, err := s.queries.UpdateEndpoint(ctx, updateParams)
+	result, err := s.queries.UpdateStorageEndpoint(ctx, updateParams)
 	if err != nil {
 		return nil, handleResourceError(err, "Endpoint", endpoint.GetName())
 	}
@@ -256,7 +256,7 @@ func (s *EndpointsServer) DeleteEndpoint(ctx context.Context, req *storagev1.Del
 		return nil, err
 	}
 
-	existing, err := s.queries.GetEndpointByName(ctx, db.GetEndpointByNameParams{
+	existing, err := s.queries.GetStorageEndpointByName(ctx, db.GetStorageEndpointByNameParams{
 		GatewayID: gw.ID,
 		Name:      endpointName,
 	})
@@ -264,7 +264,7 @@ func (s *EndpointsServer) DeleteEndpoint(ctx context.Context, req *storagev1.Del
 		return nil, handleResourceError(err, "Endpoint", req.GetName())
 	}
 
-	err = s.queries.DeleteEndpoint(ctx, existing.ID)
+	err = s.queries.DeleteStorageEndpoint(ctx, existing.ID)
 	if err != nil {
 		return nil, handleResourceError(err, "Endpoint", req.GetName())
 	}
@@ -285,7 +285,7 @@ func (s *EndpointsServer) SetEndpointCredentials(ctx context.Context, req *stora
 		return nil, err
 	}
 
-	existing, err := s.queries.GetEndpointByName(ctx, db.GetEndpointByNameParams{
+	existing, err := s.queries.GetStorageEndpointByName(ctx, db.GetStorageEndpointByNameParams{
 		GatewayID: gw.ID,
 		Name:      endpointName,
 	})
@@ -298,7 +298,7 @@ func (s *EndpointsServer) SetEndpointCredentials(ctx context.Context, req *stora
 		return nil, apierr.Internal("failed to marshal credentials")
 	}
 
-	result, err := s.queries.SetEndpointCredentials(ctx, db.SetEndpointCredentialsParams{
+	result, err := s.queries.SetStorageEndpointCredentials(ctx, db.SetStorageEndpointCredentialsParams{
 		ID:          existing.ID,
 		Credentials: credentialsJSON,
 	})

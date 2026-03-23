@@ -195,9 +195,9 @@ CREATE UNIQUE INDEX idx_storage_gateways_token
   ON storage_gateways (registration_token);
 
 -- ============================================================================
--- agents (per-gateway, server-managed via bidi gRPC)
+-- storage_agents (per-gateway, server-managed via bidi gRPC)
 -- ============================================================================
-CREATE TABLE agents (
+CREATE TABLE storage_agents (
     id              UUID PRIMARY KEY DEFAULT uuidv7(),
     -- relationships
     gateway_id      UUID NOT NULL REFERENCES storage_gateways(id) ON DELETE CASCADE,
@@ -213,14 +213,14 @@ CREATE TABLE agents (
     join_time       TIMESTAMPTZ NOT NULL DEFAULT now(),
     last_seen_time  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_agents_gateway ON agents (gateway_id);
-CREATE UNIQUE INDEX idx_agents_gateway_ip
-  ON agents (gateway_id, ip_address);
+CREATE INDEX idx_storage_agents_gateway ON storage_agents (gateway_id);
+CREATE UNIQUE INDEX idx_storage_agents_gateway_ip
+  ON storage_agents (gateway_id, ip_address);
 
 -- ============================================================================
--- endpoints (S3-compatible bucket per gateway)
+-- storage_endpoints (S3-compatible bucket per gateway)
 -- ============================================================================
-CREATE TABLE endpoints (
+CREATE TABLE storage_endpoints (
     id                UUID PRIMARY KEY DEFAULT uuidv7(),
     -- relationships
     gateway_id        UUID NOT NULL REFERENCES storage_gateways(id) ON DELETE CASCADE,
@@ -249,7 +249,7 @@ CREATE TABLE endpoints (
     -- constraints
     UNIQUE(gateway_id, name)
 );
-CREATE INDEX idx_endpoints_gateway ON endpoints (gateway_id);
+CREATE INDEX idx_storage_endpoints_gateway ON storage_endpoints (gateway_id);
 
 -- ============================================================================
 -- tag_keys

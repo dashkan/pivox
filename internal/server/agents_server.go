@@ -70,7 +70,7 @@ func (s *AgentsServer) GetAgent(ctx context.Context, req *storagev1.GetAgentRequ
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("name", fmt.Sprintf("invalid agent ID %q", agentIDStr)))
 	}
 
-	agent, err := s.queries.GetAgent(ctx, agentID)
+	agent, err := s.queries.GetStorageAgent(ctx, agentID)
 	if err != nil {
 		return nil, handleResourceError(err, "Agent", req.GetName())
 	}
@@ -90,7 +90,7 @@ func (s *AgentsServer) ListAgents(ctx context.Context, req *storagev1.ListAgents
 		return nil, err
 	}
 
-	agents, err := s.queries.ListAgentsByGateway(ctx, gw.ID)
+	agents, err := s.queries.ListStorageAgentsByGateway(ctx, gw.ID)
 	if err != nil {
 		return nil, apierr.Internal("failed to list agents")
 	}
@@ -116,7 +116,7 @@ func (s *AgentsServer) DrainAgent(ctx context.Context, req *storagev1.DrainAgent
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("name", fmt.Sprintf("invalid agent ID %q", agentIDStr)))
 	}
 
-	agent, err := s.queries.UpdateAgentState(ctx, db.UpdateAgentStateParams{
+	agent, err := s.queries.UpdateStorageAgentState(ctx, db.UpdateStorageAgentStateParams{
 		ID:    agentID,
 		State: db.AgentStateDRAINING,
 	})
@@ -138,7 +138,7 @@ func (s *AgentsServer) RemoveAgent(ctx context.Context, req *storagev1.RemoveAge
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("name", fmt.Sprintf("invalid agent ID %q", agentIDStr)))
 	}
 
-	err = s.queries.DeleteAgent(ctx, agentID)
+	err = s.queries.DeleteStorageAgent(ctx, agentID)
 	if err != nil {
 		return nil, handleResourceError(err, "Agent", req.GetName())
 	}
