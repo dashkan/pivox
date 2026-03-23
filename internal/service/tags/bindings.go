@@ -1,4 +1,4 @@
-package server
+package tags
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/dashkan/pivox-server/internal/apierr"
 	"github.com/dashkan/pivox-server/internal/convert"
 	db "github.com/dashkan/pivox-server/internal/db/generated"
 	"github.com/dashkan/pivox-server/internal/filter"
@@ -80,19 +81,19 @@ func (s *TagBindingsServer) ListTagBindings(ctx context.Context, req *apiv1.List
 func (s *TagBindingsServer) GetTagBinding(ctx context.Context, req *apiv1.GetTagBindingRequest) (*apiv1.TagBinding, error) {
 	segment, err := resource.ParseSegment(req.GetName())
 	if err != nil {
-		return nil, handleResourceError(err, "TagBinding", req.GetName())
+		return nil, apierr.HandleResourceError(err, "TagBinding", req.GetName())
 	}
 	id, err := uuid.Parse(segment)
 	if err != nil {
-		return nil, handleResourceError(err, "TagBinding", req.GetName())
+		return nil, apierr.HandleResourceError(err, "TagBinding", req.GetName())
 	}
 	tb, err := s.queries.GetTagBinding(ctx, id)
 	if err != nil {
-		return nil, handleResourceError(err, "TagBinding", req.GetName())
+		return nil, apierr.HandleResourceError(err, "TagBinding", req.GetName())
 	}
 	tv, err := s.queries.GetTagValue(ctx, tb.TagValueID)
 	if err != nil {
-		return nil, handleResourceError(err, "TagValue", "")
+		return nil, apierr.HandleResourceError(err, "TagValue", "")
 	}
 	return convert.TagBindingToProto(tb, tv), nil
 }
@@ -103,11 +104,11 @@ func (s *TagBindingsServer) CreateTagBinding(ctx context.Context, req *apiv1.Cre
 	// Parse tag value name: "tagKeys/{uuid}/tagValues/{uuid}"
 	tvID, err := parseTagValueName(tb.GetTagValue())
 	if err != nil {
-		return nil, handleResourceError(err, "TagValue", tb.GetTagValue())
+		return nil, apierr.HandleResourceError(err, "TagValue", tb.GetTagValue())
 	}
 	tagValue, err := s.queries.GetTagValue(ctx, tvID)
 	if err != nil {
-		return nil, handleResourceError(err, "TagValue", tb.GetTagValue())
+		return nil, apierr.HandleResourceError(err, "TagValue", tb.GetTagValue())
 	}
 
 	created, err := s.queries.CreateTagBinding(ctx, db.CreateTagBindingParams{
@@ -117,7 +118,7 @@ func (s *TagBindingsServer) CreateTagBinding(ctx context.Context, req *apiv1.Cre
 		CreatedBy:      "",
 	})
 	if err != nil {
-		return nil, handleResourceError(err, "TagBinding", "")
+		return nil, apierr.HandleResourceError(err, "TagBinding", "")
 	}
 	return lro.DoneOperation(convert.TagBindingToProto(created, tagValue))
 }
@@ -125,19 +126,19 @@ func (s *TagBindingsServer) CreateTagBinding(ctx context.Context, req *apiv1.Cre
 func (s *TagBindingsServer) DeleteTagBinding(ctx context.Context, req *apiv1.DeleteTagBindingRequest) (*longrunningpb.Operation, error) {
 	segment, err := resource.ParseSegment(req.GetName())
 	if err != nil {
-		return nil, handleResourceError(err, "TagBinding", req.GetName())
+		return nil, apierr.HandleResourceError(err, "TagBinding", req.GetName())
 	}
 	id, err := uuid.Parse(segment)
 	if err != nil {
-		return nil, handleResourceError(err, "TagBinding", req.GetName())
+		return nil, apierr.HandleResourceError(err, "TagBinding", req.GetName())
 	}
 
 	existing, err := s.queries.GetTagBinding(ctx, id)
 	if err != nil {
-		return nil, handleResourceError(err, "TagBinding", req.GetName())
+		return nil, apierr.HandleResourceError(err, "TagBinding", req.GetName())
 	}
 	if err := s.queries.DeleteTagBinding(ctx, existing.ID); err != nil {
-		return nil, handleResourceError(err, "TagBinding", req.GetName())
+		return nil, apierr.HandleResourceError(err, "TagBinding", req.GetName())
 	}
 	return lro.DoneOperation(&apiv1.TagBinding{Name: req.GetName()})
 }
@@ -157,5 +158,3 @@ func (s *TagBindingsServer) ListEffectiveTags(ctx context.Context, req *apiv1.Li
 		EffectiveTags: effectiveTags,
 	}, nil
 }
-
-// parseTagValueName is imported from tag_values_server.go (same package).

@@ -1,4 +1,4 @@
-package server
+package projects
 
 import (
 	"context"
@@ -52,15 +52,15 @@ func parseProjectName(name string) (string, string, error) {
 func (s *ProjectsServer) GetProject(ctx context.Context, req *apiv1.GetProjectRequest) (*apiv1.Project, error) {
 	orgName, projectName, err := parseProjectName(req.GetName())
 	if err != nil {
-		return nil, handleResourceError(err, "Project", req.GetName())
+		return nil, apierr.HandleResourceError(err, "Project", req.GetName())
 	}
 	org, err := s.queries.GetOrganizationByName(ctx, orgName)
 	if err != nil {
-		return nil, handleResourceError(err, "Organization", orgName)
+		return nil, apierr.HandleResourceError(err, "Organization", orgName)
 	}
 	project, err := s.queries.GetProjectByName(ctx, db.GetProjectByNameParams{OrgID: org.ID, Name: projectName})
 	if err != nil {
-		return nil, handleResourceError(err, "Project", req.GetName())
+		return nil, apierr.HandleResourceError(err, "Project", req.GetName())
 	}
 	return convert.ProjectToProto(project, orgName), nil
 }
@@ -146,7 +146,7 @@ func (s *ProjectsServer) CreateProject(ctx context.Context, req *apiv1.CreatePro
 		CreatedBy:   "",
 	})
 	if err != nil {
-		return nil, handleResourceError(err, "Project", "")
+		return nil, apierr.HandleResourceError(err, "Project", "")
 	}
 
 	return lro.DoneOperation(convert.ProjectToProto(result, orgName))
@@ -156,16 +156,16 @@ func (s *ProjectsServer) UpdateProject(ctx context.Context, req *apiv1.UpdatePro
 	project := req.GetProject()
 	orgName, projectName, err := parseProjectName(project.GetName())
 	if err != nil {
-		return nil, handleResourceError(err, "Project", project.GetName())
+		return nil, apierr.HandleResourceError(err, "Project", project.GetName())
 	}
 	org, err := s.queries.GetOrganizationByName(ctx, orgName)
 	if err != nil {
-		return nil, handleResourceError(err, "Organization", orgName)
+		return nil, apierr.HandleResourceError(err, "Organization", orgName)
 	}
 
 	existing, err := s.queries.GetProjectByName(ctx, db.GetProjectByNameParams{OrgID: org.ID, Name: projectName})
 	if err != nil {
-		return nil, handleResourceError(err, "Project", project.GetName())
+		return nil, apierr.HandleResourceError(err, "Project", project.GetName())
 	}
 
 	updateParams := db.UpdateProjectParams{
@@ -199,7 +199,7 @@ func (s *ProjectsServer) UpdateProject(ctx context.Context, req *apiv1.UpdatePro
 
 	result, err := s.queries.UpdateProject(ctx, updateParams)
 	if err != nil {
-		return nil, handleResourceError(err, "Project", project.GetName())
+		return nil, apierr.HandleResourceError(err, "Project", project.GetName())
 	}
 
 	return lro.DoneOperation(convert.ProjectToProto(result, orgName))
@@ -208,16 +208,16 @@ func (s *ProjectsServer) UpdateProject(ctx context.Context, req *apiv1.UpdatePro
 func (s *ProjectsServer) DeleteProject(ctx context.Context, req *apiv1.DeleteProjectRequest) (*longrunningpb.Operation, error) {
 	orgName, projectName, err := parseProjectName(req.GetName())
 	if err != nil {
-		return nil, handleResourceError(err, "Project", req.GetName())
+		return nil, apierr.HandleResourceError(err, "Project", req.GetName())
 	}
 	org, err := s.queries.GetOrganizationByName(ctx, orgName)
 	if err != nil {
-		return nil, handleResourceError(err, "Organization", orgName)
+		return nil, apierr.HandleResourceError(err, "Organization", orgName)
 	}
 
 	existing, err := s.queries.GetProjectByName(ctx, db.GetProjectByNameParams{OrgID: org.ID, Name: projectName})
 	if err != nil {
-		return nil, handleResourceError(err, "Project", req.GetName())
+		return nil, apierr.HandleResourceError(err, "Project", req.GetName())
 	}
 
 	result, err := s.queries.SoftDeleteProject(ctx, db.SoftDeleteProjectParams{
@@ -225,7 +225,7 @@ func (s *ProjectsServer) DeleteProject(ctx context.Context, req *apiv1.DeletePro
 		DeletedBy: "",
 	})
 	if err != nil {
-		return nil, handleResourceError(err, "Project", req.GetName())
+		return nil, apierr.HandleResourceError(err, "Project", req.GetName())
 	}
 	return lro.DoneOperation(convert.ProjectToProto(result, orgName))
 }
@@ -233,16 +233,16 @@ func (s *ProjectsServer) DeleteProject(ctx context.Context, req *apiv1.DeletePro
 func (s *ProjectsServer) UndeleteProject(ctx context.Context, req *apiv1.UndeleteProjectRequest) (*longrunningpb.Operation, error) {
 	orgName, projectName, err := parseProjectName(req.GetName())
 	if err != nil {
-		return nil, handleResourceError(err, "Project", req.GetName())
+		return nil, apierr.HandleResourceError(err, "Project", req.GetName())
 	}
 	org, err := s.queries.GetOrganizationByName(ctx, orgName)
 	if err != nil {
-		return nil, handleResourceError(err, "Organization", orgName)
+		return nil, apierr.HandleResourceError(err, "Organization", orgName)
 	}
 
 	existing, err := s.queries.GetProjectByName(ctx, db.GetProjectByNameParams{OrgID: org.ID, Name: projectName})
 	if err != nil {
-		return nil, handleResourceError(err, "Project", req.GetName())
+		return nil, apierr.HandleResourceError(err, "Project", req.GetName())
 	}
 
 	result, err := s.queries.UndeleteProject(ctx, db.UndeleteProjectParams{
@@ -250,7 +250,7 @@ func (s *ProjectsServer) UndeleteProject(ctx context.Context, req *apiv1.Undelet
 		UpdatedBy: "",
 	})
 	if err != nil {
-		return nil, handleResourceError(err, "Project", req.GetName())
+		return nil, apierr.HandleResourceError(err, "Project", req.GetName())
 	}
 	return lro.DoneOperation(convert.ProjectToProto(result, orgName))
 }

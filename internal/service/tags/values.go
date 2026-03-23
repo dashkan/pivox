@@ -1,4 +1,4 @@
-package server
+package tags
 
 import (
 	"context"
@@ -60,11 +60,11 @@ func parseTagValueName(name string) (uuid.UUID, error) {
 func (s *TagValuesServer) ListTagValues(ctx context.Context, req *apiv1.ListTagValuesRequest) (*apiv1.ListTagValuesResponse, error) {
 	tagKeyID, err := parseTagKeyParent(req.GetParent())
 	if err != nil {
-		return nil, handleResourceError(err, "TagKey", req.GetParent())
+		return nil, apierr.HandleResourceError(err, "TagKey", req.GetParent())
 	}
 	// Verify the tag key exists.
 	if _, err := s.queries.GetTagKey(ctx, tagKeyID); err != nil {
-		return nil, handleResourceError(err, "TagKey", req.GetParent())
+		return nil, apierr.HandleResourceError(err, "TagKey", req.GetParent())
 	}
 
 	rows, err := filter.Query(ctx, s.db, s.filter, filter.QueryParams{
@@ -111,11 +111,11 @@ func (s *TagValuesServer) ListTagValues(ctx context.Context, req *apiv1.ListTagV
 func (s *TagValuesServer) GetTagValue(ctx context.Context, req *apiv1.GetTagValueRequest) (*apiv1.TagValue, error) {
 	id, err := parseTagValueName(req.GetName())
 	if err != nil {
-		return nil, handleResourceError(err, "TagValue", req.GetName())
+		return nil, apierr.HandleResourceError(err, "TagValue", req.GetName())
 	}
 	tagValue, err := s.queries.GetTagValue(ctx, id)
 	if err != nil {
-		return nil, handleResourceError(err, "TagValue", req.GetName())
+		return nil, apierr.HandleResourceError(err, "TagValue", req.GetName())
 	}
 	return convert.TagValueToProto(tagValue), nil
 }
@@ -126,7 +126,7 @@ func (s *TagValuesServer) CreateTagValue(ctx context.Context, req *apiv1.CreateT
 
 	tagKeyID, err := parseTagKeyParent(parent)
 	if err != nil {
-		return nil, handleResourceError(err, "TagKey", parent)
+		return nil, apierr.HandleResourceError(err, "TagKey", parent)
 	}
 
 	parentKey, err := s.queries.GetTagKey(ctx, tagKeyID)
@@ -152,7 +152,7 @@ func (s *TagValuesServer) CreateTagValue(ctx context.Context, req *apiv1.CreateT
 		CreatedBy:      "",
 	})
 	if err != nil {
-		return nil, handleResourceError(err, "TagValue", "")
+		return nil, apierr.HandleResourceError(err, "TagValue", "")
 	}
 
 	return lro.DoneOperation(convert.TagValueToProto(result))
@@ -162,12 +162,12 @@ func (s *TagValuesServer) UpdateTagValue(ctx context.Context, req *apiv1.UpdateT
 	tagValue := req.GetTagValue()
 	id, err := parseTagValueName(tagValue.GetName())
 	if err != nil {
-		return nil, handleResourceError(err, "TagValue", tagValue.GetName())
+		return nil, apierr.HandleResourceError(err, "TagValue", tagValue.GetName())
 	}
 
 	existing, err := s.queries.GetTagValue(ctx, id)
 	if err != nil {
-		return nil, handleResourceError(err, "TagValue", tagValue.GetName())
+		return nil, apierr.HandleResourceError(err, "TagValue", tagValue.GetName())
 	}
 
 	updateParams := db.UpdateTagValueParams{
@@ -189,7 +189,7 @@ func (s *TagValuesServer) UpdateTagValue(ctx context.Context, req *apiv1.UpdateT
 
 	result, err := s.queries.UpdateTagValue(ctx, updateParams)
 	if err != nil {
-		return nil, handleResourceError(err, "TagValue", tagValue.GetName())
+		return nil, apierr.HandleResourceError(err, "TagValue", tagValue.GetName())
 	}
 
 	return lro.DoneOperation(convert.TagValueToProto(result))
@@ -198,12 +198,12 @@ func (s *TagValuesServer) UpdateTagValue(ctx context.Context, req *apiv1.UpdateT
 func (s *TagValuesServer) DeleteTagValue(ctx context.Context, req *apiv1.DeleteTagValueRequest) (*longrunningpb.Operation, error) {
 	id, err := parseTagValueName(req.GetName())
 	if err != nil {
-		return nil, handleResourceError(err, "TagValue", req.GetName())
+		return nil, apierr.HandleResourceError(err, "TagValue", req.GetName())
 	}
 
 	existing, err := s.queries.GetTagValue(ctx, id)
 	if err != nil {
-		return nil, handleResourceError(err, "TagValue", req.GetName())
+		return nil, apierr.HandleResourceError(err, "TagValue", req.GetName())
 	}
 
 	bindingCount, err := s.queries.CountTagBindingsByTagValue(ctx, existing.ID)
@@ -216,7 +216,7 @@ func (s *TagValuesServer) DeleteTagValue(ctx context.Context, req *apiv1.DeleteT
 
 	err = s.queries.DeleteTagValue(ctx, existing.ID)
 	if err != nil {
-		return nil, handleResourceError(err, "TagValue", req.GetName())
+		return nil, apierr.HandleResourceError(err, "TagValue", req.GetName())
 	}
 
 	return lro.DoneOperation(&apiv1.TagValue{})

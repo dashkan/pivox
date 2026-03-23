@@ -2,8 +2,10 @@ package apierr
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -101,6 +103,17 @@ func QuotaExceeded(subject, description string, retryDelay time.Duration) error 
 		},
 	)
 	return st.Err()
+}
+
+// HandleResourceError translates common database errors into gRPC status errors.
+func HandleResourceError(err error, resourceType, resourceName string) error {
+	if err == pgx.ErrNoRows {
+		return NotFound(resourceType, resourceName)
+	}
+	if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
+		return AlreadyExists(resourceType, resourceName)
+	}
+	return Internal("database error")
 }
 
 func Aborted(resourceType, resourceName, reason string) error {

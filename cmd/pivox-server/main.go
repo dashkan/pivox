@@ -27,6 +27,12 @@ import (
 	"github.com/dashkan/pivox-server/internal/iam"
 	"github.com/dashkan/pivox-server/internal/lro"
 	"github.com/dashkan/pivox-server/internal/server"
+	"github.com/dashkan/pivox-server/internal/service/apikeys"
+	"github.com/dashkan/pivox-server/internal/service/operations"
+	"github.com/dashkan/pivox-server/internal/service/organizations"
+	"github.com/dashkan/pivox-server/internal/service/projects"
+	"github.com/dashkan/pivox-server/internal/service/storage"
+	"github.com/dashkan/pivox-server/internal/service/tags"
 
 	agentv1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/agent/v1"
 	apiv1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1"
@@ -159,21 +165,21 @@ func serve(cmd *cobra.Command, args []string) error {
 	)
 
 	// Register all services
-	longrunningpb.RegisterOperationsServer(grpcServer, server.NewOperationsServer(lroManager))
-	apiv1.RegisterProjectsServer(grpcServer, server.NewProjectsServer(pool, queries, iamHelper))
-	apiv1.RegisterOrganizationsServer(grpcServer, server.NewOrganizationsServer(pool, queries, iamHelper, authSvc))
-	apiv1.RegisterTagKeysServer(grpcServer, server.NewTagKeysServer(pool, queries, iamHelper))
-	apiv1.RegisterTagValuesServer(grpcServer, server.NewTagValuesServer(pool, queries, iamHelper))
-	apiv1.RegisterTagBindingsServer(grpcServer, server.NewTagBindingsServer(pool, queries))
-	apiv1.RegisterApiKeysServer(grpcServer, server.NewApiKeysServer(pool, queries))
+	longrunningpb.RegisterOperationsServer(grpcServer, operations.NewOperationsServer(lroManager))
+	apiv1.RegisterProjectsServer(grpcServer, projects.NewProjectsServer(pool, queries, iamHelper))
+	apiv1.RegisterOrganizationsServer(grpcServer, organizations.NewOrganizationsServer(pool, queries, iamHelper, authSvc))
+	apiv1.RegisterTagKeysServer(grpcServer, tags.NewTagKeysServer(pool, queries, iamHelper))
+	apiv1.RegisterTagValuesServer(grpcServer, tags.NewTagValuesServer(pool, queries, iamHelper))
+	apiv1.RegisterTagBindingsServer(grpcServer, tags.NewTagBindingsServer(pool, queries))
+	apiv1.RegisterApiKeysServer(grpcServer, apikeys.NewApiKeysServer(pool, queries))
 
 	// Storage services
-	storagev1.RegisterStorageGatewaysServer(grpcServer, server.NewStorageGatewaysServer(pool, queries, enc))
-	storagev1.RegisterAgentsServer(grpcServer, server.NewAgentsServer(queries))
-	storagev1.RegisterEndpointsServer(grpcServer, server.NewEndpointsServer(pool, queries, enc))
+	storagev1.RegisterStorageGatewaysServer(grpcServer, storage.NewStorageGatewaysServer(pool, queries, enc))
+	storagev1.RegisterAgentsServer(grpcServer, storage.NewAgentsServer(queries))
+	storagev1.RegisterEndpointsServer(grpcServer, storage.NewEndpointsServer(pool, queries, enc))
 
 	// Agent bidi streaming service (agents authenticate via registration token, not Firebase)
-	agentv1.RegisterAgentServiceServer(grpcServer, server.NewAgentServiceServer(pool, queries, logger))
+	agentv1.RegisterAgentServiceServer(grpcServer, storage.NewAgentServiceServer(pool, queries, logger))
 
 	reflection.Register(grpcServer)
 

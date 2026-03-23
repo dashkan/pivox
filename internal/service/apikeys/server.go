@@ -1,4 +1,4 @@
-package server
+package apikeys
 
 import (
 	"context"
@@ -42,11 +42,11 @@ func (s *ApiKeysServer) CreateKey(ctx context.Context, req *apiv1.CreateKeyReque
 
 	orgName, err := parseOrgParent(parent)
 	if err != nil {
-		return nil, handleResourceError(err, "Organization", parent)
+		return nil, apierr.HandleResourceError(err, "Organization", parent)
 	}
 	org, err := s.queries.GetOrganizationByName(ctx, orgName)
 	if err != nil {
-		return nil, handleResourceError(err, "Organization", parent)
+		return nil, apierr.HandleResourceError(err, "Organization", parent)
 	}
 
 	keyID := req.GetKeyId()
@@ -78,7 +78,7 @@ func (s *ApiKeysServer) CreateKey(ctx context.Context, req *apiv1.CreateKeyReque
 		CreatedBy:    "",
 	})
 	if err != nil {
-		return nil, handleResourceError(err, "Key", "")
+		return nil, apierr.HandleResourceError(err, "Key", "")
 	}
 	return convert.ApiKeyToProto(created, orgName), nil
 }
@@ -86,11 +86,11 @@ func (s *ApiKeysServer) CreateKey(ctx context.Context, req *apiv1.CreateKeyReque
 func (s *ApiKeysServer) ListKeys(ctx context.Context, req *apiv1.ListKeysRequest) (*apiv1.ListKeysResponse, error) {
 	orgName, err := parseOrgParent(req.GetParent())
 	if err != nil {
-		return nil, handleResourceError(err, "Organization", req.GetParent())
+		return nil, apierr.HandleResourceError(err, "Organization", req.GetParent())
 	}
 	org, err := s.queries.GetOrganizationByName(ctx, orgName)
 	if err != nil {
-		return nil, handleResourceError(err, "Organization", req.GetParent())
+		return nil, apierr.HandleResourceError(err, "Organization", req.GetParent())
 	}
 
 	rows, err := filter.Query(ctx, s.db, s.filter, filter.QueryParams{
@@ -138,15 +138,15 @@ func (s *ApiKeysServer) ListKeys(ctx context.Context, req *apiv1.ListKeysRequest
 func (s *ApiKeysServer) GetKey(ctx context.Context, req *apiv1.GetKeyRequest) (*apiv1.Key, error) {
 	orgName, keyID, err := parseApiKeyName(req.GetName())
 	if err != nil {
-		return nil, handleResourceError(err, "Key", req.GetName())
+		return nil, apierr.HandleResourceError(err, "Key", req.GetName())
 	}
 	org, err := s.queries.GetOrganizationByName(ctx, orgName)
 	if err != nil {
-		return nil, handleResourceError(err, "Organization", orgName)
+		return nil, apierr.HandleResourceError(err, "Organization", orgName)
 	}
 	key, err := s.queries.GetApiKeyByOrgAndKeyID(ctx, db.GetApiKeyByOrgAndKeyIDParams{OrgID: org.ID, KeyID: keyID})
 	if err != nil {
-		return nil, handleResourceError(err, "Key", req.GetName())
+		return nil, apierr.HandleResourceError(err, "Key", req.GetName())
 	}
 	return convert.ApiKeyToProto(key, orgName), nil
 }
@@ -154,15 +154,15 @@ func (s *ApiKeysServer) GetKey(ctx context.Context, req *apiv1.GetKeyRequest) (*
 func (s *ApiKeysServer) GetKeyString(ctx context.Context, req *apiv1.GetKeyStringRequest) (*apiv1.GetKeyStringResponse, error) {
 	orgName, keyID, err := parseApiKeyName(req.GetName())
 	if err != nil {
-		return nil, handleResourceError(err, "Key", req.GetName())
+		return nil, apierr.HandleResourceError(err, "Key", req.GetName())
 	}
 	org, err := s.queries.GetOrganizationByName(ctx, orgName)
 	if err != nil {
-		return nil, handleResourceError(err, "Organization", orgName)
+		return nil, apierr.HandleResourceError(err, "Organization", orgName)
 	}
 	key, err := s.queries.GetApiKeyByOrgAndKeyID(ctx, db.GetApiKeyByOrgAndKeyIDParams{OrgID: org.ID, KeyID: keyID})
 	if err != nil {
-		return nil, handleResourceError(err, "Key", req.GetName())
+		return nil, apierr.HandleResourceError(err, "Key", req.GetName())
 	}
 	return &apiv1.GetKeyStringResponse{
 		KeyString: key.KeyString,
@@ -173,16 +173,16 @@ func (s *ApiKeysServer) UpdateKey(ctx context.Context, req *apiv1.UpdateKeyReque
 	key := req.GetKey()
 	orgName, keyID, err := parseApiKeyName(key.GetName())
 	if err != nil {
-		return nil, handleResourceError(err, "Key", key.GetName())
+		return nil, apierr.HandleResourceError(err, "Key", key.GetName())
 	}
 	org, err := s.queries.GetOrganizationByName(ctx, orgName)
 	if err != nil {
-		return nil, handleResourceError(err, "Organization", orgName)
+		return nil, apierr.HandleResourceError(err, "Organization", orgName)
 	}
 
 	existing, err := s.queries.GetApiKeyByOrgAndKeyID(ctx, db.GetApiKeyByOrgAndKeyIDParams{OrgID: org.ID, KeyID: keyID})
 	if err != nil {
-		return nil, handleResourceError(err, "Key", key.GetName())
+		return nil, apierr.HandleResourceError(err, "Key", key.GetName())
 	}
 
 	updateParams := db.UpdateApiKeyParams{
@@ -226,7 +226,7 @@ func (s *ApiKeysServer) UpdateKey(ctx context.Context, req *apiv1.UpdateKeyReque
 
 	updated, err := s.queries.UpdateApiKey(ctx, updateParams)
 	if err != nil {
-		return nil, handleResourceError(err, "Key", key.GetName())
+		return nil, apierr.HandleResourceError(err, "Key", key.GetName())
 	}
 
 	return convert.ApiKeyToProto(updated, orgName), nil
@@ -235,19 +235,19 @@ func (s *ApiKeysServer) UpdateKey(ctx context.Context, req *apiv1.UpdateKeyReque
 func (s *ApiKeysServer) DeleteKey(ctx context.Context, req *apiv1.DeleteKeyRequest) (*apiv1.Key, error) {
 	orgName, keyID, err := parseApiKeyName(req.GetName())
 	if err != nil {
-		return nil, handleResourceError(err, "Key", req.GetName())
+		return nil, apierr.HandleResourceError(err, "Key", req.GetName())
 	}
 	org, err := s.queries.GetOrganizationByName(ctx, orgName)
 	if err != nil {
-		return nil, handleResourceError(err, "Organization", orgName)
+		return nil, apierr.HandleResourceError(err, "Organization", orgName)
 	}
 	existing, err := s.queries.GetApiKeyByOrgAndKeyID(ctx, db.GetApiKeyByOrgAndKeyIDParams{OrgID: org.ID, KeyID: keyID})
 	if err != nil {
-		return nil, handleResourceError(err, "Key", req.GetName())
+		return nil, apierr.HandleResourceError(err, "Key", req.GetName())
 	}
 	result, err := s.queries.SoftDeleteApiKey(ctx, db.SoftDeleteApiKeyParams{ID: existing.ID, DeletedBy: ""})
 	if err != nil {
-		return nil, handleResourceError(err, "Key", req.GetName())
+		return nil, apierr.HandleResourceError(err, "Key", req.GetName())
 	}
 	return convert.ApiKeyToProto(result, orgName), nil
 }
@@ -255,20 +255,20 @@ func (s *ApiKeysServer) DeleteKey(ctx context.Context, req *apiv1.DeleteKeyReque
 func (s *ApiKeysServer) UndeleteKey(ctx context.Context, req *apiv1.UndeleteKeyRequest) (*apiv1.Key, error) {
 	orgName, keyID, err := parseApiKeyName(req.GetName())
 	if err != nil {
-		return nil, handleResourceError(err, "Key", req.GetName())
+		return nil, apierr.HandleResourceError(err, "Key", req.GetName())
 	}
 	org, err := s.queries.GetOrganizationByName(ctx, orgName)
 	if err != nil {
-		return nil, handleResourceError(err, "Organization", orgName)
+		return nil, apierr.HandleResourceError(err, "Organization", orgName)
 	}
-	// Use GetApiKeyIncludingDeleted via org+keyID — need to look up by ID first.
+	// Use GetApiKeyIncludingDeleted via org+keyID -- need to look up by ID first.
 	existing, err := s.queries.GetApiKeyByOrgAndKeyID(ctx, db.GetApiKeyByOrgAndKeyIDParams{OrgID: org.ID, KeyID: keyID})
 	if err != nil {
-		return nil, handleResourceError(err, "Key", req.GetName())
+		return nil, apierr.HandleResourceError(err, "Key", req.GetName())
 	}
 	result, err := s.queries.UndeleteApiKey(ctx, db.UndeleteApiKeyParams{ID: existing.ID, UpdatedBy: ""})
 	if err != nil {
-		return nil, handleResourceError(err, "Key", req.GetName())
+		return nil, apierr.HandleResourceError(err, "Key", req.GetName())
 	}
 	return convert.ApiKeyToProto(result, orgName), nil
 }
@@ -276,11 +276,11 @@ func (s *ApiKeysServer) UndeleteKey(ctx context.Context, req *apiv1.UndeleteKeyR
 func (s *ApiKeysServer) LookupKey(ctx context.Context, req *apiv1.LookupKeyRequest) (*apiv1.LookupKeyResponse, error) {
 	row, err := s.queries.LookupApiKeyByKeyString(ctx, req.GetKeyString())
 	if err != nil {
-		return nil, handleResourceError(err, "Key", req.GetKeyString())
+		return nil, apierr.HandleResourceError(err, "Key", req.GetKeyString())
 	}
 	org, err := s.queries.GetOrganization(ctx, row.OrgID)
 	if err != nil {
-		return nil, handleResourceError(err, "Organization", "")
+		return nil, apierr.HandleResourceError(err, "Organization", "")
 	}
 	return &apiv1.LookupKeyResponse{
 		Parent: "organizations/" + org.Name,

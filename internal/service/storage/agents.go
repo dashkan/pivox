@@ -1,4 +1,4 @@
-package server
+package storage
 
 import (
 	"context"
@@ -48,14 +48,14 @@ func parseGatewayParent(parent string) (string, string, error) {
 func (s *AgentsServer) resolveGateway(ctx context.Context, orgName, gwName string) (db.StorageGateway, error) {
 	org, err := s.queries.GetOrganizationByName(ctx, orgName)
 	if err != nil {
-		return db.StorageGateway{}, handleResourceError(err, "Organization", orgName)
+		return db.StorageGateway{}, apierr.HandleResourceError(err, "Organization", orgName)
 	}
 	gw, err := s.queries.GetStorageGatewayByName(ctx, db.GetStorageGatewayByNameParams{
 		OrgID: org.ID,
 		Name:  gwName,
 	})
 	if err != nil {
-		return db.StorageGateway{}, handleResourceError(err, "StorageGateway", fmt.Sprintf("organizations/%s/storageGateways/%s", orgName, gwName))
+		return db.StorageGateway{}, apierr.HandleResourceError(err, "StorageGateway", fmt.Sprintf("organizations/%s/storageGateways/%s", orgName, gwName))
 	}
 	return gw, nil
 }
@@ -72,7 +72,7 @@ func (s *AgentsServer) GetAgent(ctx context.Context, req *storagev1.GetAgentRequ
 
 	agent, err := s.queries.GetStorageAgent(ctx, agentID)
 	if err != nil {
-		return nil, handleResourceError(err, "Agent", req.GetName())
+		return nil, apierr.HandleResourceError(err, "Agent", req.GetName())
 	}
 
 	gatewayName := fmt.Sprintf("organizations/%s/storageGateways/%s", orgName, gwName)
@@ -121,7 +121,7 @@ func (s *AgentsServer) DrainAgent(ctx context.Context, req *storagev1.DrainAgent
 		State: db.AgentStateDRAINING,
 	})
 	if err != nil {
-		return nil, handleResourceError(err, "Agent", req.GetName())
+		return nil, apierr.HandleResourceError(err, "Agent", req.GetName())
 	}
 
 	gatewayName := fmt.Sprintf("organizations/%s/storageGateways/%s", orgName, gwName)
@@ -140,7 +140,7 @@ func (s *AgentsServer) RemoveAgent(ctx context.Context, req *storagev1.RemoveAge
 
 	err = s.queries.DeleteStorageAgent(ctx, agentID)
 	if err != nil {
-		return nil, handleResourceError(err, "Agent", req.GetName())
+		return nil, apierr.HandleResourceError(err, "Agent", req.GetName())
 	}
 
 	return &storagev1.Agent{

@@ -1,4 +1,4 @@
-package server
+package organizations
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/dashkan/pivox-server/internal/apierr"
 	"github.com/dashkan/pivox-server/internal/convert"
 	db "github.com/dashkan/pivox-server/internal/db/generated"
 	"github.com/dashkan/pivox-server/internal/filter"
@@ -45,12 +46,12 @@ func NewOrganizationsServer(pool *pgxpool.Pool, queries *db.Queries, iam *iam.He
 func (s *OrganizationsServer) GetOrganization(ctx context.Context, req *apiv1.GetOrganizationRequest) (*apiv1.Organization, error) {
 	segment, err := resource.ParseSegment(req.GetName())
 	if err != nil {
-		return nil, handleResourceError(err, "Organization", req.GetName())
+		return nil, apierr.HandleResourceError(err, "Organization", req.GetName())
 	}
 
 	org, err := s.queries.GetOrganizationByName(ctx, segment)
 	if err != nil {
-		return nil, handleResourceError(err, "Organization", req.GetName())
+		return nil, apierr.HandleResourceError(err, "Organization", req.GetName())
 	}
 
 	return convert.OrganizationToProto(org), nil
@@ -119,7 +120,7 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 		CreatedBy:   "",
 	})
 	if err != nil {
-		return nil, handleResourceError(err, "Organization", orgSlug)
+		return nil, apierr.HandleResourceError(err, "Organization", orgSlug)
 	}
 
 	tenantID, err := s.tenants.CreateTenant(ctx, orgSlug)

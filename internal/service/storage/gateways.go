@@ -1,4 +1,4 @@
-package server
+package storage
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/dashkan/pivox-server/internal/apierr"
 	"github.com/dashkan/pivox-server/internal/convert"
 	"github.com/dashkan/pivox-server/internal/crypto"
 	db "github.com/dashkan/pivox-server/internal/db/generated"
@@ -81,7 +82,7 @@ func (s *StorageGatewaysServer) CreateStorageGateway(ctx context.Context, req *s
 		CreatedBy:         "",
 	})
 	if err != nil {
-		return nil, handleResourceError(err, "StorageGateway", gwName)
+		return nil, apierr.HandleResourceError(err, "StorageGateway", gwName)
 	}
 
 	return lro.DoneOperation(convert.StorageGatewayToProto(result, orgName))
@@ -90,12 +91,12 @@ func (s *StorageGatewaysServer) CreateStorageGateway(ctx context.Context, req *s
 func (s *StorageGatewaysServer) GetStorageGateway(ctx context.Context, req *storagev1.GetStorageGatewayRequest) (*storagev1.StorageGateway, error) {
 	orgName, gwName, err := parseStorageGatewayName(req.GetName())
 	if err != nil {
-		return nil, handleResourceError(err, "StorageGateway", req.GetName())
+		return nil, apierr.HandleResourceError(err, "StorageGateway", req.GetName())
 	}
 
 	org, err := s.queries.GetOrganizationByName(ctx, orgName)
 	if err != nil {
-		return nil, handleResourceError(err, "Organization", orgName)
+		return nil, apierr.HandleResourceError(err, "Organization", orgName)
 	}
 
 	gw, err := s.queries.GetStorageGatewayByName(ctx, db.GetStorageGatewayByNameParams{
@@ -103,7 +104,7 @@ func (s *StorageGatewaysServer) GetStorageGateway(ctx context.Context, req *stor
 		Name:  gwName,
 	})
 	if err != nil {
-		return nil, handleResourceError(err, "StorageGateway", req.GetName())
+		return nil, apierr.HandleResourceError(err, "StorageGateway", req.GetName())
 	}
 
 	return convert.StorageGatewayToProto(gw, orgName), nil
@@ -117,12 +118,12 @@ func (s *StorageGatewaysServer) UpdateStorageGateway(ctx context.Context, req *s
 	gw := req.GetStorageGateway()
 	orgName, gwName, err := parseStorageGatewayName(gw.GetName())
 	if err != nil {
-		return nil, handleResourceError(err, "StorageGateway", gw.GetName())
+		return nil, apierr.HandleResourceError(err, "StorageGateway", gw.GetName())
 	}
 
 	org, err := s.queries.GetOrganizationByName(ctx, orgName)
 	if err != nil {
-		return nil, handleResourceError(err, "Organization", orgName)
+		return nil, apierr.HandleResourceError(err, "Organization", orgName)
 	}
 
 	existing, err := s.queries.GetStorageGatewayByName(ctx, db.GetStorageGatewayByNameParams{
@@ -130,7 +131,7 @@ func (s *StorageGatewaysServer) UpdateStorageGateway(ctx context.Context, req *s
 		Name:  gwName,
 	})
 	if err != nil {
-		return nil, handleResourceError(err, "StorageGateway", gw.GetName())
+		return nil, apierr.HandleResourceError(err, "StorageGateway", gw.GetName())
 	}
 
 	updateParams := db.UpdateStorageGatewayParams{
@@ -169,7 +170,7 @@ func (s *StorageGatewaysServer) UpdateStorageGateway(ctx context.Context, req *s
 
 	result, err := s.queries.UpdateStorageGateway(ctx, updateParams)
 	if err != nil {
-		return nil, handleResourceError(err, "StorageGateway", gw.GetName())
+		return nil, apierr.HandleResourceError(err, "StorageGateway", gw.GetName())
 	}
 
 	return lro.DoneOperation(convert.StorageGatewayToProto(result, orgName))
@@ -178,12 +179,12 @@ func (s *StorageGatewaysServer) UpdateStorageGateway(ctx context.Context, req *s
 func (s *StorageGatewaysServer) DeleteStorageGateway(ctx context.Context, req *storagev1.DeleteStorageGatewayRequest) (*longrunningpb.Operation, error) {
 	orgName, gwName, err := parseStorageGatewayName(req.GetName())
 	if err != nil {
-		return nil, handleResourceError(err, "StorageGateway", req.GetName())
+		return nil, apierr.HandleResourceError(err, "StorageGateway", req.GetName())
 	}
 
 	org, err := s.queries.GetOrganizationByName(ctx, orgName)
 	if err != nil {
-		return nil, handleResourceError(err, "Organization", orgName)
+		return nil, apierr.HandleResourceError(err, "Organization", orgName)
 	}
 
 	existing, err := s.queries.GetStorageGatewayByName(ctx, db.GetStorageGatewayByNameParams{
@@ -191,11 +192,11 @@ func (s *StorageGatewaysServer) DeleteStorageGateway(ctx context.Context, req *s
 		Name:  gwName,
 	})
 	if err != nil {
-		return nil, handleResourceError(err, "StorageGateway", req.GetName())
+		return nil, apierr.HandleResourceError(err, "StorageGateway", req.GetName())
 	}
 
 	if err := s.queries.DeleteStorageGateway(ctx, existing.ID); err != nil {
-		return nil, handleResourceError(err, "StorageGateway", req.GetName())
+		return nil, apierr.HandleResourceError(err, "StorageGateway", req.GetName())
 	}
 
 	return lro.DoneOperation(&storagev1.StorageGateway{Name: req.GetName()})
@@ -204,12 +205,12 @@ func (s *StorageGatewaysServer) DeleteStorageGateway(ctx context.Context, req *s
 func (s *StorageGatewaysServer) RotateRegistrationToken(ctx context.Context, req *storagev1.RotateRegistrationTokenRequest) (*storagev1.StorageGateway, error) {
 	orgName, gwName, err := parseStorageGatewayName(req.GetName())
 	if err != nil {
-		return nil, handleResourceError(err, "StorageGateway", req.GetName())
+		return nil, apierr.HandleResourceError(err, "StorageGateway", req.GetName())
 	}
 
 	org, err := s.queries.GetOrganizationByName(ctx, orgName)
 	if err != nil {
-		return nil, handleResourceError(err, "Organization", orgName)
+		return nil, apierr.HandleResourceError(err, "Organization", orgName)
 	}
 
 	existing, err := s.queries.GetStorageGatewayByName(ctx, db.GetStorageGatewayByNameParams{
@@ -217,7 +218,7 @@ func (s *StorageGatewaysServer) RotateRegistrationToken(ctx context.Context, req
 		Name:  gwName,
 	})
 	if err != nil {
-		return nil, handleResourceError(err, "StorageGateway", req.GetName())
+		return nil, apierr.HandleResourceError(err, "StorageGateway", req.GetName())
 	}
 
 	newToken := uuid.New().String()
@@ -227,7 +228,7 @@ func (s *StorageGatewaysServer) RotateRegistrationToken(ctx context.Context, req
 		RegistrationToken: newToken,
 	})
 	if err != nil {
-		return nil, handleResourceError(err, "StorageGateway", req.GetName())
+		return nil, apierr.HandleResourceError(err, "StorageGateway", req.GetName())
 	}
 
 	return convert.StorageGatewayToProto(result, orgName), nil
@@ -236,12 +237,12 @@ func (s *StorageGatewaysServer) RotateRegistrationToken(ctx context.Context, req
 func (s *StorageGatewaysServer) GetInstallScript(ctx context.Context, req *storagev1.GetInstallScriptRequest) (*storagev1.GetInstallScriptResponse, error) {
 	orgName, gwName, err := parseStorageGatewayName(req.GetName())
 	if err != nil {
-		return nil, handleResourceError(err, "StorageGateway", req.GetName())
+		return nil, apierr.HandleResourceError(err, "StorageGateway", req.GetName())
 	}
 
 	org, err := s.queries.GetOrganizationByName(ctx, orgName)
 	if err != nil {
-		return nil, handleResourceError(err, "Organization", orgName)
+		return nil, apierr.HandleResourceError(err, "Organization", orgName)
 	}
 
 	gw, err := s.queries.GetStorageGatewayByName(ctx, db.GetStorageGatewayByNameParams{
@@ -249,7 +250,7 @@ func (s *StorageGatewaysServer) GetInstallScript(ctx context.Context, req *stora
 		Name:  gwName,
 	})
 	if err != nil {
-		return nil, handleResourceError(err, "StorageGateway", req.GetName())
+		return nil, apierr.HandleResourceError(err, "StorageGateway", req.GetName())
 	}
 
 	var flags []string
@@ -292,12 +293,12 @@ func (s *StorageGatewaysServer) GetUninstallScript(ctx context.Context, req *sto
 	// Validate the resource name exists.
 	orgName, gwName, err := parseStorageGatewayName(req.GetName())
 	if err != nil {
-		return nil, handleResourceError(err, "StorageGateway", req.GetName())
+		return nil, apierr.HandleResourceError(err, "StorageGateway", req.GetName())
 	}
 
 	org, err := s.queries.GetOrganizationByName(ctx, orgName)
 	if err != nil {
-		return nil, handleResourceError(err, "Organization", orgName)
+		return nil, apierr.HandleResourceError(err, "Organization", orgName)
 	}
 
 	_, err = s.queries.GetStorageGatewayByName(ctx, db.GetStorageGatewayByNameParams{
@@ -305,7 +306,7 @@ func (s *StorageGatewaysServer) GetUninstallScript(ctx context.Context, req *sto
 		Name:  gwName,
 	})
 	if err != nil {
-		return nil, handleResourceError(err, "StorageGateway", req.GetName())
+		return nil, apierr.HandleResourceError(err, "StorageGateway", req.GetName())
 	}
 
 	script := "curl -sSL https://get.pivox.app/agent/uninstall | bash"

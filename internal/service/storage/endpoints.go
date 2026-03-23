@@ -1,4 +1,4 @@
-package server
+package storage
 
 import (
 	"context"
@@ -46,14 +46,14 @@ func parseEndpointName(name string) (orgName, gwName, endpointName string, err e
 func (s *EndpointsServer) resolveEndpointGateway(ctx context.Context, orgName, gwName string) (db.StorageGateway, error) {
 	org, err := s.queries.GetOrganizationByName(ctx, orgName)
 	if err != nil {
-		return db.StorageGateway{}, handleResourceError(err, "Organization", orgName)
+		return db.StorageGateway{}, apierr.HandleResourceError(err, "Organization", orgName)
 	}
 	gw, err := s.queries.GetStorageGatewayByName(ctx, db.GetStorageGatewayByNameParams{
 		OrgID: org.ID,
 		Name:  gwName,
 	})
 	if err != nil {
-		return db.StorageGateway{}, handleResourceError(err, "StorageGateway", fmt.Sprintf("organizations/%s/storageGateways/%s", orgName, gwName))
+		return db.StorageGateway{}, apierr.HandleResourceError(err, "StorageGateway", fmt.Sprintf("organizations/%s/storageGateways/%s", orgName, gwName))
 	}
 	return gw, nil
 }
@@ -153,7 +153,7 @@ func (s *EndpointsServer) CreateEndpoint(ctx context.Context, req *storagev1.Cre
 		CreatedBy:      "",
 	})
 	if err != nil {
-		return nil, handleResourceError(err, "Endpoint", "")
+		return nil, apierr.HandleResourceError(err, "Endpoint", "")
 	}
 
 	gatewayName := fmt.Sprintf("organizations/%s/storageGateways/%s", orgName, gwName)
@@ -176,7 +176,7 @@ func (s *EndpointsServer) GetEndpoint(ctx context.Context, req *storagev1.GetEnd
 		Name:      endpointName,
 	})
 	if err != nil {
-		return nil, handleResourceError(err, "Endpoint", req.GetName())
+		return nil, apierr.HandleResourceError(err, "Endpoint", req.GetName())
 	}
 
 	gatewayName := fmt.Sprintf("organizations/%s/storageGateways/%s", orgName, gwName)
@@ -227,7 +227,7 @@ func (s *EndpointsServer) UpdateEndpoint(ctx context.Context, req *storagev1.Upd
 		Name:      endpointName,
 	})
 	if err != nil {
-		return nil, handleResourceError(err, "Endpoint", endpoint.GetName())
+		return nil, apierr.HandleResourceError(err, "Endpoint", endpoint.GetName())
 	}
 
 	updateParams := db.UpdateStorageEndpointParams{
@@ -294,7 +294,7 @@ func (s *EndpointsServer) UpdateEndpoint(ctx context.Context, req *storagev1.Upd
 
 	result, err := s.queries.UpdateStorageEndpoint(ctx, updateParams)
 	if err != nil {
-		return nil, handleResourceError(err, "Endpoint", endpoint.GetName())
+		return nil, apierr.HandleResourceError(err, "Endpoint", endpoint.GetName())
 	}
 
 	gatewayName := fmt.Sprintf("organizations/%s/storageGateways/%s", orgName, gwName)
@@ -317,12 +317,12 @@ func (s *EndpointsServer) DeleteEndpoint(ctx context.Context, req *storagev1.Del
 		Name:      endpointName,
 	})
 	if err != nil {
-		return nil, handleResourceError(err, "Endpoint", req.GetName())
+		return nil, apierr.HandleResourceError(err, "Endpoint", req.GetName())
 	}
 
 	err = s.queries.DeleteStorageEndpoint(ctx, existing.ID)
 	if err != nil {
-		return nil, handleResourceError(err, "Endpoint", req.GetName())
+		return nil, apierr.HandleResourceError(err, "Endpoint", req.GetName())
 	}
 
 	return lro.DoneOperation(&storagev1.Endpoint{

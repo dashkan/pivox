@@ -18,6 +18,10 @@ import (
 	"github.com/dashkan/pivox-server/internal/iam"
 	"github.com/dashkan/pivox-server/internal/lro"
 	apiv1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1"
+	"github.com/dashkan/pivox-server/internal/service/apikeys"
+	"github.com/dashkan/pivox-server/internal/service/organizations"
+	"github.com/dashkan/pivox-server/internal/service/projects"
+	"github.com/dashkan/pivox-server/internal/service/tags"
 )
 
 const bufSize = 1024 * 1024
@@ -59,12 +63,12 @@ func setupTestServer(t *testing.T) *grpc.ClientConn {
 	t.Cleanup(func() { grpcServer.Stop() })
 
 	// Register all servers.
-	apiv1.RegisterProjectsServer(grpcServer, NewProjectsServer(pool, queries, iamHelper))
-	apiv1.RegisterOrganizationsServer(grpcServer, NewOrganizationsServer(pool, queries, iamHelper, nil))
-	apiv1.RegisterTagKeysServer(grpcServer, NewTagKeysServer(pool, queries, iamHelper))
-	apiv1.RegisterTagValuesServer(grpcServer, NewTagValuesServer(pool, queries, iamHelper))
-	apiv1.RegisterTagBindingsServer(grpcServer, NewTagBindingsServer(pool, queries))
-	apiv1.RegisterApiKeysServer(grpcServer, NewApiKeysServer(pool, queries))
+	apiv1.RegisterProjectsServer(grpcServer, projects.NewProjectsServer(pool, queries, iamHelper))
+	apiv1.RegisterOrganizationsServer(grpcServer, organizations.NewOrganizationsServer(pool, queries, iamHelper, nil))
+	apiv1.RegisterTagKeysServer(grpcServer, tags.NewTagKeysServer(pool, queries, iamHelper))
+	apiv1.RegisterTagValuesServer(grpcServer, tags.NewTagValuesServer(pool, queries, iamHelper))
+	apiv1.RegisterTagBindingsServer(grpcServer, tags.NewTagBindingsServer(pool, queries))
+	apiv1.RegisterApiKeysServer(grpcServer, apikeys.NewApiKeysServer(pool, queries))
 
 	go func() {
 		if err := grpcServer.Serve(lis); err != nil {

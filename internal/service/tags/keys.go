@@ -1,4 +1,4 @@
-package server
+package tags
 
 import (
 	"context"
@@ -87,15 +87,15 @@ func (s *TagKeysServer) ListTagKeys(ctx context.Context, req *apiv1.ListTagKeysR
 func (s *TagKeysServer) GetTagKey(ctx context.Context, req *apiv1.GetTagKeyRequest) (*apiv1.TagKey, error) {
 	segment, err := resource.ParseSegment(req.GetName())
 	if err != nil {
-		return nil, handleResourceError(err, "TagKey", req.GetName())
+		return nil, apierr.HandleResourceError(err, "TagKey", req.GetName())
 	}
 	id, err := uuid.Parse(segment)
 	if err != nil {
-		return nil, handleResourceError(err, "TagKey", req.GetName())
+		return nil, apierr.HandleResourceError(err, "TagKey", req.GetName())
 	}
 	tagKey, err := s.queries.GetTagKey(ctx, id)
 	if err != nil {
-		return nil, handleResourceError(err, "TagKey", req.GetName())
+		return nil, apierr.HandleResourceError(err, "TagKey", req.GetName())
 	}
 	return convert.TagKeyToProto(tagKey), nil
 }
@@ -122,7 +122,7 @@ func (s *TagKeysServer) CreateTagKey(ctx context.Context, req *apiv1.CreateTagKe
 		CreatedBy:      "",
 	})
 	if err != nil {
-		return nil, handleResourceError(err, "TagKey", "")
+		return nil, apierr.HandleResourceError(err, "TagKey", "")
 	}
 
 	return lro.DoneOperation(convert.TagKeyToProto(result))
@@ -132,16 +132,16 @@ func (s *TagKeysServer) UpdateTagKey(ctx context.Context, req *apiv1.UpdateTagKe
 	tagKey := req.GetTagKey()
 	segment, err := resource.ParseSegment(tagKey.GetName())
 	if err != nil {
-		return nil, handleResourceError(err, "TagKey", tagKey.GetName())
+		return nil, apierr.HandleResourceError(err, "TagKey", tagKey.GetName())
 	}
 	id, err := uuid.Parse(segment)
 	if err != nil {
-		return nil, handleResourceError(err, "TagKey", tagKey.GetName())
+		return nil, apierr.HandleResourceError(err, "TagKey", tagKey.GetName())
 	}
 
 	existing, err := s.queries.GetTagKey(ctx, id)
 	if err != nil {
-		return nil, handleResourceError(err, "TagKey", tagKey.GetName())
+		return nil, apierr.HandleResourceError(err, "TagKey", tagKey.GetName())
 	}
 
 	updateParams := db.UpdateTagKeyParams{
@@ -163,7 +163,7 @@ func (s *TagKeysServer) UpdateTagKey(ctx context.Context, req *apiv1.UpdateTagKe
 
 	result, err := s.queries.UpdateTagKey(ctx, updateParams)
 	if err != nil {
-		return nil, handleResourceError(err, "TagKey", tagKey.GetName())
+		return nil, apierr.HandleResourceError(err, "TagKey", tagKey.GetName())
 	}
 
 	return lro.DoneOperation(convert.TagKeyToProto(result))
@@ -172,16 +172,16 @@ func (s *TagKeysServer) UpdateTagKey(ctx context.Context, req *apiv1.UpdateTagKe
 func (s *TagKeysServer) DeleteTagKey(ctx context.Context, req *apiv1.DeleteTagKeyRequest) (*longrunningpb.Operation, error) {
 	segment, err := resource.ParseSegment(req.GetName())
 	if err != nil {
-		return nil, handleResourceError(err, "TagKey", req.GetName())
+		return nil, apierr.HandleResourceError(err, "TagKey", req.GetName())
 	}
 	id, err := uuid.Parse(segment)
 	if err != nil {
-		return nil, handleResourceError(err, "TagKey", req.GetName())
+		return nil, apierr.HandleResourceError(err, "TagKey", req.GetName())
 	}
 
 	existing, err := s.queries.GetTagKey(ctx, id)
 	if err != nil {
-		return nil, handleResourceError(err, "TagKey", req.GetName())
+		return nil, apierr.HandleResourceError(err, "TagKey", req.GetName())
 	}
 
 	count, err := s.queries.CountTagValuesByTagKey(ctx, existing.ID)
@@ -194,7 +194,7 @@ func (s *TagKeysServer) DeleteTagKey(ctx context.Context, req *apiv1.DeleteTagKe
 
 	err = s.queries.DeleteTagKey(ctx, existing.ID)
 	if err != nil {
-		return nil, handleResourceError(err, "TagKey", req.GetName())
+		return nil, apierr.HandleResourceError(err, "TagKey", req.GetName())
 	}
 
 	return lro.DoneOperation(&apiv1.TagKey{})
