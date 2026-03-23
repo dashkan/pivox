@@ -191,10 +191,10 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 
 		switch m := msg.GetMessage().(type) {
 		case *agentv1.AgentMessage_Heartbeat:
-			// Update last_seen_time, DO NOT audit.
 			if err := s.queries.UpdateStorageAgentHeartbeat(ctx, agent.ID); err != nil {
 				s.logger.ErrorContext(ctx, "failed to update agent heartbeat", "error", err)
 			}
+			s.auditMessage(ctx, gateway.ID, agent.ID, msg.GetId(), "inbound", "heartbeat", msg)
 
 		case *agentv1.AgentMessage_EndpointHealth:
 			// Audit and log.
