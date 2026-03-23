@@ -1,14 +1,24 @@
 services:
   postgres:
-    image: postgres:17
+    image: postgres:18
     environment:
-      POSTGRES_USER: pivox
-      POSTGRES_PASSWORD: pivox
-      POSTGRES_DB: pivox
+      POSTGRES_USER: ${USER}
+      POSTGRES_DB: ${USER}
+      POSTGRES_HOST_AUTH_METHOD: trust
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - ./.docker/postgres:/var/lib/postgresql
+      - ./scripts/initdb:/docker-entrypoint-initdb.d
 
-volumes:
-  pgdata:
+  rustfs:
+    image: rustfs/rustfs:latest
+    command: server /data
+    environment:
+      RUSTFS_ACCESS_KEY: rustfsadmin
+      RUSTFS_SECRET_KEY: rustfsadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - ./.docker/rustfs:/data

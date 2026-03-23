@@ -1,0 +1,9 @@
+.docker/
+.git/
+.github/
+.claude/
+.agents/
+.vscode/
+.idea/
+bin/
+node_modules/

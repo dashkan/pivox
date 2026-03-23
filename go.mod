@@ -14,7 +14,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
-	go.einride.tech/aip v0.83.1
+	go.einride.tech/aip v0.84.0
 	golang.org/x/time v0.15.0
 	google.golang.org/api v0.272.0
 	google.golang.org/genproto v0.0.0-20260319201613-d00831a3d3e7
@@ -27,7 +27,7 @@ require (
 require (
 	cel.dev/expr v0.25.1 // indirect
 	cloud.google.com/go v0.123.0 // indirect
-	cloud.google.com/go/auth v0.18.2 // indirect
+	cloud.google.com/go/auth v0.19.0 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	cloud.google.com/go/firestore v1.21.0 // indirect
