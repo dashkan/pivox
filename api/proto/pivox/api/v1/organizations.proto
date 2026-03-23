@@ -316,11 +316,7 @@ message GetOrganizationRequest {
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.api/Organization"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 }
 
@@ -525,11 +521,7 @@ message GetCustomDomainRequest {
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.api/CustomDomain"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 }
 
@@ -542,11 +534,7 @@ message ListCustomDomainsRequest {
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {child_type: "pivox.api/CustomDomain"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 
   // Optional. The maximum number of custom domains to return in the response.
@@ -586,11 +574,7 @@ message CreateCustomDomainRequest {
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {child_type: "pivox.api/CustomDomain"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 
   // Required. The custom domain to create. The `domain` field must be set.
@@ -621,11 +605,7 @@ message DeleteCustomDomainRequest {
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.api/CustomDomain"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 
   // Optional. The etag known to the client for the expected state of the
@@ -764,11 +744,7 @@ message CreateInvitationRequest {
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {child_type: "pivox.api/Invitation"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 
   // Required. The invitation to create.
@@ -789,11 +765,7 @@ message ListInvitationsRequest {
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {child_type: "pivox.api/Invitation"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 
   // Optional. Maximum number of invitations to return.
@@ -832,11 +804,7 @@ message GetInvitationRequest {
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.api/Invitation"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 }
 
@@ -847,11 +815,7 @@ message AcceptInvitationRequest {
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.api/Invitation"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 }
 
@@ -868,11 +832,7 @@ message DeclineInvitationRequest {
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.api/Invitation"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 }
 
@@ -889,11 +849,7 @@ message DeleteInvitationRequest {
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.api/Invitation"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 
   // Optional. The etag for optimistic concurrency control.
@@ -907,11 +863,7 @@ message GetInvitationPolicyRequest {
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.api/InvitationPolicy"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 }
 

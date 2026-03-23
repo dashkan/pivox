@@ -975,14 +975,12 @@ const file_pivox_api_v1_projects_proto_rawDesc = "" +
 	"\n" +
 	"\x06ACTIVE\x10\x01\x12\x14\n" +
 	"\x10DELETE_REQUESTED\x10\x02:Z\xeaAW\n" +
-	"\x11pivox.api/Project\x12/organizations/{organization}/projects/{project}*\bprojects2\aproject\"v\n" +
-	"\x11GetProjectRequest\x12a\n" +
-	"\x04name\x18\x01 \x01(\tBM\xe0A\x02\xfaA\x13\n" +
-	"\x11pivox.api/Project\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\"\xb1\x02\n" +
-	"\x13ListProjectsRequest\x12e\n" +
-	"\x06parent\x18\x01 \x01(\tBM\xe0A\x02\xfaA\x13\x12\x11pivox.api/Project\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x06parent\x12\"\n" +
+	"\x11pivox.api/Project\x12/organizations/{organization}/projects/{project}*\bprojects2\aproject\"H\n" +
+	"\x11GetProjectRequest\x123\n" +
+	"\x04name\x18\x01 \x01(\tB\x1f\xe0A\x02\xfaA\x13\n" +
+	"\x11pivox.api/Project\xbaH\x03\xc8\x01\x01R\x04name\"\x83\x02\n" +
+	"\x13ListProjectsRequest\x127\n" +
+	"\x06parent\x18\x01 \x01(\tB\x1f\xe0A\x02\xfaA\x13\x12\x11pivox.api/Project\xbaH\x03\xc8\x01\x01R\x06parent\x12\"\n" +
 	"\n" +
 	"page_token\x18\x02 \x01(\tB\x03\xe0A\x01R\tpageToken\x12*\n" +
 	"\tpage_size\x18\x03 \x01(\x05B\r\xe0A\x01\xbaH\a\x1a\x05\x18\xe8\a(\x00R\bpageSize\x12&\n" +
@@ -991,10 +989,9 @@ const file_pivox_api_v1_projects_proto_rawDesc = "" +
 	"\border_by\x18\x06 \x01(\tB\x03\xe0A\x01R\aorderBy\"q\n" +
 	"\x14ListProjectsResponse\x121\n" +
 	"\bprojects\x18\x01 \x03(\v2\x15.pivox.api.v1.ProjectR\bprojects\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\x87\x02\n" +
-	"\x14CreateProjectRequest\x12e\n" +
-	"\x06parent\x18\x04 \x01(\tBM\xe0A\x02\xfaA\x13\x12\x11pivox.api/Project\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x06parent\x12:\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xd9\x01\n" +
+	"\x14CreateProjectRequest\x127\n" +
+	"\x06parent\x18\x04 \x01(\tB\x1f\xe0A\x02\xfaA\x13\x12\x11pivox.api/Project\xbaH\x03\xc8\x01\x01R\x06parent\x12:\n" +
 	"\aproject\x18\x01 \x01(\v2\x15.pivox.api.v1.ProjectB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\aproject\x12\"\n" +
 	"\n" +
 	"project_id\x18\x02 \x01(\tB\x03\xe0A\x01R\tprojectId\x12(\n" +
@@ -1004,17 +1001,15 @@ const file_pivox_api_v1_projects_proto_rawDesc = "" +
 	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskB\x03\xe0A\x01R\n" +
 	"updateMask\x12(\n" +
 	"\rallow_missing\x18\x03 \x01(\bB\x03\xe0A\x01R\fallowMissing\x12(\n" +
-	"\rvalidate_only\x18\x04 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\xbc\x01\n" +
-	"\x14DeleteProjectRequest\x12a\n" +
-	"\x04name\x18\x01 \x01(\tBM\xe0A\x02\xfaA\x13\n" +
-	"\x11pivox.api/Project\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\x12\x17\n" +
+	"\rvalidate_only\x18\x04 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\x8e\x01\n" +
+	"\x14DeleteProjectRequest\x123\n" +
+	"\x04name\x18\x01 \x01(\tB\x1f\xe0A\x02\xfaA\x13\n" +
+	"\x11pivox.api/Project\xbaH\x03\xc8\x01\x01R\x04name\x12\x17\n" +
 	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x01R\x04etag\x12(\n" +
-	"\rvalidate_only\x18\x03 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\xbe\x01\n" +
-	"\x16UndeleteProjectRequest\x12a\n" +
-	"\x04name\x18\x01 \x01(\tBM\xe0A\x02\xfaA\x13\n" +
-	"\x11pivox.api/Project\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\x12\x17\n" +
+	"\rvalidate_only\x18\x03 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\x90\x01\n" +
+	"\x16UndeleteProjectRequest\x123\n" +
+	"\x04name\x18\x01 \x01(\tB\x1f\xe0A\x02\xfaA\x13\n" +
+	"\x11pivox.api/Project\xbaH\x03\xc8\x01\x01R\x04name\x12\x17\n" +
 	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x01R\x04etag\x12(\n" +
 	"\rvalidate_only\x18\x03 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\x17\n" +
 	"\x15CreateProjectMetadata\"\x17\n" +

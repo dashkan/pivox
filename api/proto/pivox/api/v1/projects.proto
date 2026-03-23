@@ -307,11 +307,7 @@ message GetProjectRequest {
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.api/Project"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 }
 
@@ -327,11 +323,7 @@ message ListProjectsRequest {
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {child_type: "pivox.api/Project"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 
   // Optional. A pagination token returned from a previous call to
@@ -428,11 +420,7 @@ message CreateProjectRequest {
   string parent = 4 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {child_type: "pivox.api/Project"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 
   // Required. The Project to create.
@@ -485,11 +473,7 @@ message DeleteProjectRequest {
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.api/Project"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 
   // Optional. The etag known to the client for the expected state of the project.
@@ -510,11 +494,7 @@ message UndeleteProjectRequest {
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.api/Project"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 
   // Optional. The etag known to the client for the expected state of the project.

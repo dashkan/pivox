@@ -548,14 +548,12 @@ const file_pivox_storage_v1_agent_proto_rawDesc = "" +
 	"\bDRAINING\x10\x03\x12\r\n" +
 	"\tUPGRADING\x10\x04\x12\x10\n" +
 	"\fDISCONNECTED\x10\x05:v\xeaAs\n" +
-	"\x13pivox.storage/Agent\x12Morganizations/{organization}/storageGateways/{storage_gateway}/agents/{agent}*\x06agents2\x05agent\"v\n" +
-	"\x0fGetAgentRequest\x12c\n" +
-	"\x04name\x18\x01 \x01(\tBO\xe0A\x02\xfaA\x15\n" +
-	"\x13pivox.storage/Agent\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\"\x89\x02\n" +
-	"\x11ListAgentsRequest\x12g\n" +
-	"\x06parent\x18\x01 \x01(\tBO\xe0A\x02\xfaA\x15\x12\x13pivox.storage/Agent\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x06parent\x12*\n" +
+	"\x13pivox.storage/Agent\x12Morganizations/{organization}/storageGateways/{storage_gateway}/agents/{agent}*\x06agents2\x05agent\"H\n" +
+	"\x0fGetAgentRequest\x125\n" +
+	"\x04name\x18\x01 \x01(\tB!\xe0A\x02\xfaA\x15\n" +
+	"\x13pivox.storage/Agent\xbaH\x03\xc8\x01\x01R\x04name\"\xdb\x01\n" +
+	"\x11ListAgentsRequest\x129\n" +
+	"\x06parent\x18\x01 \x01(\tB!\xe0A\x02\xfaA\x15\x12\x13pivox.storage/Agent\xbaH\x03\xc8\x01\x01R\x06parent\x12*\n" +
 	"\tpage_size\x18\x02 \x01(\x05B\r\xe0A\x01\xbaH\a\x1a\x05\x18\xe8\a(\x00R\bpageSize\x12\"\n" +
 	"\n" +
 	"page_token\x18\x03 \x01(\tB\x03\xe0A\x01R\tpageToken\x12\x1b\n" +
@@ -563,16 +561,14 @@ const file_pivox_storage_v1_agent_proto_rawDesc = "" +
 	"\border_by\x18\x05 \x01(\tB\x03\xe0A\x01R\aorderBy\"m\n" +
 	"\x12ListAgentsResponse\x12/\n" +
 	"\x06agents\x18\x01 \x03(\v2\x17.pivox.storage.v1.AgentR\x06agents\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\x95\x01\n" +
-	"\x11DrainAgentRequest\x12c\n" +
-	"\x04name\x18\x01 \x01(\tBO\xe0A\x02\xfaA\x15\n" +
-	"\x13pivox.storage/Agent\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\x12\x1b\n" +
-	"\x06reason\x18\x02 \x01(\tB\x03\xe0A\x01R\x06reason\"y\n" +
-	"\x12RemoveAgentRequest\x12c\n" +
-	"\x04name\x18\x01 \x01(\tBO\xe0A\x02\xfaA\x15\n" +
-	"\x13pivox.storage/Agent\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name2\x85\x05\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"g\n" +
+	"\x11DrainAgentRequest\x125\n" +
+	"\x04name\x18\x01 \x01(\tB!\xe0A\x02\xfaA\x15\n" +
+	"\x13pivox.storage/Agent\xbaH\x03\xc8\x01\x01R\x04name\x12\x1b\n" +
+	"\x06reason\x18\x02 \x01(\tB\x03\xe0A\x01R\x06reason\"K\n" +
+	"\x12RemoveAgentRequest\x125\n" +
+	"\x04name\x18\x01 \x01(\tB!\xe0A\x02\xfaA\x15\n" +
+	"\x13pivox.storage/Agent\xbaH\x03\xc8\x01\x01R\x04name2\x85\x05\n" +
 	"\x06Agents\x12\x8c\x01\n" +
 	"\bGetAgent\x12!.pivox.storage.v1.GetAgentRequest\x1a\x17.pivox.storage.v1.Agent\"D\xdaA\x04name\x82\xd3\xe4\x93\x027\x125/v1/{name=organizations/*/storageGateways/*/agents/*}\x12\x9f\x01\n" +
 	"\n" +

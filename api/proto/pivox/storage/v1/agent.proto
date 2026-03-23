@@ -141,11 +141,7 @@ message GetAgentRequest {
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.storage/Agent"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 }
 
@@ -157,11 +153,7 @@ message ListAgentsRequest {
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {child_type: "pivox.storage/Agent"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 
   // Optional. The maximum number of agents to return in the response.
@@ -206,11 +198,7 @@ message DrainAgentRequest {
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.storage/Agent"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 
   // Optional. A human-readable reason for draining the agent.
@@ -225,10 +213,6 @@ message RemoveAgentRequest {
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.storage/Agent"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 }

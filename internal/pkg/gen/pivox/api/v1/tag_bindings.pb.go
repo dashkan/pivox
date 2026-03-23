@@ -771,13 +771,12 @@ var File_pivox_api_v1_tag_bindings_proto protoreflect.FileDescriptor
 
 const file_pivox_api_v1_tag_bindings_proto_rawDesc = "" +
 	"\n" +
-	"\x1fpivox/api/v1/tag_bindings.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xfa\x04\n" +
+	"\x1fpivox/api/v1/tag_bindings.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xcc\x04\n" +
 	"\n" +
 	"TagBinding\x12\x17\n" +
-	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12k\n" +
-	"\ttag_value\x18\x03 \x01(\tBN\xe0A\x05\xfaA\x14\n" +
-	"\x12pivox.api/TagValue\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\btagValue\x12@\n" +
+	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12=\n" +
+	"\ttag_value\x18\x03 \x01(\tB \xe0A\x05\xfaA\x14\n" +
+	"\x12pivox.api/TagValue\xbaH\x03\xc8\x01\x01R\btagValue\x12@\n" +
 	"\vcreate_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"createTime\x12@\n" +
 	"\vupdate_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
@@ -789,27 +788,23 @@ const file_pivox_api_v1_tag_bindings_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01:\xb6\x01\xeaA\xb2\x01\n" +
 	"\x14pivox.api/TagBinding\x126organizations/{organization}/tagBindings/{tag_binding}\x12Iorganizations/{organization}/projects/{project}/tagBindings/{tag_binding}*\vtagBindings2\n" +
-	"tagBinding\"|\n" +
-	"\x14GetTagBindingRequest\x12d\n" +
-	"\x04name\x18\x01 \x01(\tBP\xe0A\x02\xfaA\x16\n" +
-	"\x14pivox.api/TagBinding\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\"\x9e\x02\n" +
-	"\x17CreateTagBindingRequest\x12h\n" +
-	"\x06parent\x18\x04 \x01(\tBP\xe0A\x02\xfaA\x16\x12\x14pivox.api/TagBinding\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x06parent\x12D\n" +
+	"tagBinding\"N\n" +
+	"\x14GetTagBindingRequest\x126\n" +
+	"\x04name\x18\x01 \x01(\tB\"\xe0A\x02\xfaA\x16\n" +
+	"\x14pivox.api/TagBinding\xbaH\x03\xc8\x01\x01R\x04name\"\xf0\x01\n" +
+	"\x17CreateTagBindingRequest\x12:\n" +
+	"\x06parent\x18\x04 \x01(\tB\"\xe0A\x02\xfaA\x16\x12\x14pivox.api/TagBinding\xbaH\x03\xc8\x01\x01R\x06parent\x12D\n" +
 	"\vtag_binding\x18\x01 \x01(\v2\x18.pivox.api.v1.TagBindingB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\n" +
 	"tagBinding\x12)\n" +
 	"\x0etag_binding_id\x18\x02 \x01(\tB\x03\xe0A\x01R\ftagBindingId\x12(\n" +
-	"\rvalidate_only\x18\x03 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\xc2\x01\n" +
-	"\x17DeleteTagBindingRequest\x12d\n" +
-	"\x04name\x18\x01 \x01(\tBP\xe0A\x02\xfaA\x16\n" +
-	"\x14pivox.api/TagBinding\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\x12\x17\n" +
+	"\rvalidate_only\x18\x03 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\x94\x01\n" +
+	"\x17DeleteTagBindingRequest\x126\n" +
+	"\x04name\x18\x01 \x01(\tB\"\xe0A\x02\xfaA\x16\n" +
+	"\x14pivox.api/TagBinding\xbaH\x03\xc8\x01\x01R\x04name\x12\x17\n" +
 	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x01R\x04etag\x12(\n" +
-	"\rvalidate_only\x18\x03 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\x8f\x02\n" +
-	"\x16ListTagBindingsRequest\x12h\n" +
-	"\x06parent\x18\x01 \x01(\tBP\xe0A\x02\xfaA\x16\x12\x14pivox.api/TagBinding\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x06parent\x12*\n" +
+	"\rvalidate_only\x18\x03 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\xe1\x01\n" +
+	"\x16ListTagBindingsRequest\x12:\n" +
+	"\x06parent\x18\x01 \x01(\tB\"\xe0A\x02\xfaA\x16\x12\x14pivox.api/TagBinding\xbaH\x03\xc8\x01\x01R\x06parent\x12*\n" +
 	"\tpage_size\x18\x02 \x01(\x05B\r\xe0A\x01\xbaH\a\x1a\x05\x18\xe8\a(\x00R\bpageSize\x12\"\n" +
 	"\n" +
 	"page_token\x18\x03 \x01(\tB\x03\xe0A\x01R\tpageToken\x12\x1b\n" +
@@ -817,10 +812,9 @@ const file_pivox_api_v1_tag_bindings_proto_rawDesc = "" +
 	"\border_by\x18\x05 \x01(\tB\x03\xe0A\x01R\aorderBy\"~\n" +
 	"\x17ListTagBindingsResponse\x12;\n" +
 	"\ftag_bindings\x18\x01 \x03(\v2\x18.pivox.api.v1.TagBindingR\vtagBindings\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xd4\x01\n" +
-	"\x18ListEffectiveTagsRequest\x12h\n" +
-	"\x06parent\x18\x01 \x01(\tBP\xe0A\x02\xfaA\x16\x12\x14pivox.api/TagBinding\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x06parent\x12*\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xa6\x01\n" +
+	"\x18ListEffectiveTagsRequest\x12:\n" +
+	"\x06parent\x18\x01 \x01(\tB\"\xe0A\x02\xfaA\x16\x12\x14pivox.api/TagBinding\xbaH\x03\xc8\x01\x01R\x06parent\x12*\n" +
 	"\tpage_size\x18\x02 \x01(\x05B\r\xe0A\x01\xbaH\a\x1a\x05\x18\xe8\a(\x00R\bpageSize\x12\"\n" +
 	"\n" +
 	"page_token\x18\x03 \x01(\tB\x03\xe0A\x01R\tpageToken\"\x86\x01\n" +

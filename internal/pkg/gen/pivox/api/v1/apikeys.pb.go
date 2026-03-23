@@ -1312,16 +1312,14 @@ const file_pivox_api_v1_apikeys_proto_rawDesc = "" +
 	"\x12allowed_bundle_ids\x18\x01 \x03(\tB\x03\xe0A\x01R\x10allowedBundleIds\"I\n" +
 	"\tApiTarget\x12\x1d\n" +
 	"\aservice\x18\x01 \x01(\tB\x03\xe0A\x01R\aservice\x12\x1d\n" +
-	"\amethods\x18\x02 \x03(\tB\x03\xe0A\x01R\amethods\"\x98\x02\n" +
-	"\x10CreateKeyRequest\x12a\n" +
-	"\x06parent\x18\x01 \x01(\tBI\xe0A\x02\xfaA\x0f\x12\rpivox.api/Key\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x06parent\x12.\n" +
+	"\amethods\x18\x02 \x03(\tB\x03\xe0A\x01R\amethods\"\xea\x01\n" +
+	"\x10CreateKeyRequest\x123\n" +
+	"\x06parent\x18\x01 \x01(\tB\x1b\xe0A\x02\xfaA\x0f\x12\rpivox.api/Key\xbaH\x03\xc8\x01\x01R\x06parent\x12.\n" +
 	"\x03key\x18\x02 \x01(\v2\x11.pivox.api.v1.KeyB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\x03key\x12G\n" +
 	"\x06key_id\x18\x03 \x01(\tB0\xe0A\x01\xbaH*r(\x18?2$^$|^[a-z]([a-z0-9-]{0,61}[a-z0-9])?$R\x05keyId\x12(\n" +
-	"\rvalidate_only\x18\x04 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\xa9\x02\n" +
-	"\x0fListKeysRequest\x12a\n" +
-	"\x06parent\x18\x01 \x01(\tBI\xe0A\x02\xfaA\x0f\x12\rpivox.api/Key\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x06parent\x12*\n" +
+	"\rvalidate_only\x18\x04 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\xfb\x01\n" +
+	"\x0fListKeysRequest\x123\n" +
+	"\x06parent\x18\x01 \x01(\tB\x1b\xe0A\x02\xfaA\x0f\x12\rpivox.api/Key\xbaH\x03\xc8\x01\x01R\x06parent\x12*\n" +
 	"\tpage_size\x18\x02 \x01(\x05B\r\xe0A\x01\xbaH\a\x1a\x05\x18\xe8\a(\x00R\bpageSize\x12\"\n" +
 	"\n" +
 	"page_token\x18\x03 \x01(\tB\x03\xe0A\x01R\tpageToken\x12&\n" +
@@ -1330,35 +1328,30 @@ const file_pivox_api_v1_apikeys_proto_rawDesc = "" +
 	"\border_by\x18\b \x01(\tB\x03\xe0A\x01R\aorderBy\"a\n" +
 	"\x10ListKeysResponse\x12%\n" +
 	"\x04keys\x18\x01 \x03(\v2\x11.pivox.api.v1.KeyR\x04keys\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"n\n" +
-	"\rGetKeyRequest\x12]\n" +
-	"\x04name\x18\x01 \x01(\tBI\xe0A\x02\xfaA\x0f\n" +
-	"\rpivox.api/Key\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\"t\n" +
-	"\x13GetKeyStringRequest\x12]\n" +
-	"\x04name\x18\x01 \x01(\tBI\xe0A\x02\xfaA\x0f\n" +
-	"\rpivox.api/Key\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\"5\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"@\n" +
+	"\rGetKeyRequest\x12/\n" +
+	"\x04name\x18\x01 \x01(\tB\x1b\xe0A\x02\xfaA\x0f\n" +
+	"\rpivox.api/Key\xbaH\x03\xc8\x01\x01R\x04name\"F\n" +
+	"\x13GetKeyStringRequest\x12/\n" +
+	"\x04name\x18\x01 \x01(\tB\x1b\xe0A\x02\xfaA\x0f\n" +
+	"\rpivox.api/Key\xbaH\x03\xc8\x01\x01R\x04name\"5\n" +
 	"\x14GetKeyStringResponse\x12\x1d\n" +
 	"\n" +
 	"key_string\x18\x01 \x01(\tR\tkeyString\"\x84\x01\n" +
 	"\x10UpdateKeyRequest\x12.\n" +
 	"\x03key\x18\x01 \x01(\v2\x11.pivox.api.v1.KeyB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\x03key\x12@\n" +
 	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskB\x03\xe0A\x01R\n" +
-	"updateMask\"\x8a\x01\n" +
-	"\x10DeleteKeyRequest\x12]\n" +
-	"\x04name\x18\x01 \x01(\tBI\xe0A\x02\xfaA\x0f\n" +
-	"\rpivox.api/Key\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\x12\x17\n" +
-	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x01R\x04etag\"s\n" +
-	"\x12UndeleteKeyRequest\x12]\n" +
-	"\x04name\x18\x01 \x01(\tBI\xe0A\x02\xfaA\x0f\n" +
-	"\rpivox.api/Key\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\"j\n" +
-	"\x10LookupKeyRequest\x12V\n" +
+	"updateMask\"\\\n" +
+	"\x10DeleteKeyRequest\x12/\n" +
+	"\x04name\x18\x01 \x01(\tB\x1b\xe0A\x02\xfaA\x0f\n" +
+	"\rpivox.api/Key\xbaH\x03\xc8\x01\x01R\x04name\x12\x17\n" +
+	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x01R\x04etag\"E\n" +
+	"\x12UndeleteKeyRequest\x12/\n" +
+	"\x04name\x18\x01 \x01(\tB\x1b\xe0A\x02\xfaA\x0f\n" +
+	"\rpivox.api/Key\xbaH\x03\xc8\x01\x01R\x04name\"<\n" +
+	"\x10LookupKeyRequest\x12(\n" +
 	"\n" +
-	"key_string\x18\x01 \x01(\tB7\xe0A\x02\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\tkeyString\"?\n" +
+	"key_string\x18\x01 \x01(\tB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\tkeyString\"?\n" +
 	"\x11LookupKeyResponse\x12\x16\n" +
 	"\x06parent\x18\x01 \x01(\tR\x06parent\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name2\x84\b\n" +

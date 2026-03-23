@@ -686,10 +686,9 @@ const file_pivox_api_v1_tag_values_proto_rawDesc = "" +
 	"\x10AnnotationsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01:\xcc\x01\xeaA\xc8\x01\n" +
-	"\x12pivox.api/TagValue\x12Dorganizations/{organization}/tagKeys/{tag_key}/tagValues/{tag_value}\x12Worganizations/{organization}/projects/{project}/tagKeys/{tag_key}/tagValues/{tag_value}*\ttagValues2\btagValue\"\x8b\x02\n" +
-	"\x14ListTagValuesRequest\x12f\n" +
-	"\x06parent\x18\x01 \x01(\tBN\xe0A\x02\xfaA\x14\x12\x12pivox.api/TagValue\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x06parent\x12*\n" +
+	"\x12pivox.api/TagValue\x12Dorganizations/{organization}/tagKeys/{tag_key}/tagValues/{tag_value}\x12Worganizations/{organization}/projects/{project}/tagKeys/{tag_key}/tagValues/{tag_value}*\ttagValues2\btagValue\"\xdd\x01\n" +
+	"\x14ListTagValuesRequest\x128\n" +
+	"\x06parent\x18\x01 \x01(\tB \xe0A\x02\xfaA\x14\x12\x12pivox.api/TagValue\xbaH\x03\xc8\x01\x01R\x06parent\x12*\n" +
 	"\tpage_size\x18\x02 \x01(\x05B\r\xe0A\x01\xbaH\a\x1a\x05\x18\xe8\a(\x00R\bpageSize\x12\"\n" +
 	"\n" +
 	"page_token\x18\x03 \x01(\tB\x03\xe0A\x01R\tpageToken\x12\x1b\n" +
@@ -698,14 +697,12 @@ const file_pivox_api_v1_tag_values_proto_rawDesc = "" +
 	"\x15ListTagValuesResponse\x125\n" +
 	"\n" +
 	"tag_values\x18\x01 \x03(\v2\x16.pivox.api.v1.TagValueR\ttagValues\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"x\n" +
-	"\x12GetTagValueRequest\x12b\n" +
-	"\x04name\x18\x01 \x01(\tBN\xe0A\x02\xfaA\x14\n" +
-	"\x12pivox.api/TagValue\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\"\x90\x02\n" +
-	"\x15CreateTagValueRequest\x12f\n" +
-	"\x06parent\x18\x04 \x01(\tBN\xe0A\x02\xfaA\x14\x12\x12pivox.api/TagValue\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x06parent\x12>\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"J\n" +
+	"\x12GetTagValueRequest\x124\n" +
+	"\x04name\x18\x01 \x01(\tB \xe0A\x02\xfaA\x14\n" +
+	"\x12pivox.api/TagValue\xbaH\x03\xc8\x01\x01R\x04name\"\xe2\x01\n" +
+	"\x15CreateTagValueRequest\x128\n" +
+	"\x06parent\x18\x04 \x01(\tB \xe0A\x02\xfaA\x14\x12\x12pivox.api/TagValue\xbaH\x03\xc8\x01\x01R\x06parent\x12>\n" +
 	"\ttag_value\x18\x01 \x01(\v2\x16.pivox.api.v1.TagValueB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\btagValue\x12%\n" +
 	"\ftag_value_id\x18\x03 \x01(\tB\x03\xe0A\x02R\n" +
 	"tagValueId\x12(\n" +
@@ -715,11 +712,10 @@ const file_pivox_api_v1_tag_values_proto_rawDesc = "" +
 	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskB\x03\xe0A\x01R\n" +
 	"updateMask\x12(\n" +
 	"\rallow_missing\x18\x03 \x01(\bB\x03\xe0A\x01R\fallowMissing\x12(\n" +
-	"\rvalidate_only\x18\x04 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\xbe\x01\n" +
-	"\x15DeleteTagValueRequest\x12b\n" +
-	"\x04name\x18\x01 \x01(\tBN\xe0A\x02\xfaA\x14\n" +
-	"\x12pivox.api/TagValue\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\x12(\n" +
+	"\rvalidate_only\x18\x04 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\x90\x01\n" +
+	"\x15DeleteTagValueRequest\x124\n" +
+	"\x04name\x18\x01 \x01(\tB \xe0A\x02\xfaA\x14\n" +
+	"\x12pivox.api/TagValue\xbaH\x03\xc8\x01\x01R\x04name\x12(\n" +
 	"\rvalidate_only\x18\x02 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\x12\x17\n" +
 	"\x04etag\x18\x03 \x01(\tB\x03\xe0A\x01R\x04etag\"\x18\n" +
 	"\x16CreateTagValueMetadata\"\x18\n" +

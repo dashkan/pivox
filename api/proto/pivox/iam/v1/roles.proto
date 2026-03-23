@@ -171,11 +171,7 @@ message GetRoleRequest {
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.iam/Role"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 }
 
@@ -186,11 +182,7 @@ message ListRolesRequest {
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {child_type: "pivox.iam/Role"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 
   // Optional. Maximum number of roles to return.
@@ -231,11 +223,7 @@ message CreateRoleRequest {
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {child_type: "pivox.iam/Role"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 
   // Required. The role to create.
@@ -268,11 +256,7 @@ message DeleteRoleRequest {
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.iam/Role"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 
   // Optional. The etag for optimistic concurrency control.
@@ -286,11 +270,7 @@ message AddRoleMembersRequest {
   string role = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.iam/Role"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 
   // Required. The resource names of users or groups to add.
@@ -315,11 +295,7 @@ message RemoveRoleMembersRequest {
   string role = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.iam/Role"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 
   // Required. The resource names of users or groups to remove.
@@ -348,11 +324,7 @@ message ListRoleMembersRequest {
   string role = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.iam/Role"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 
   // Optional. Maximum number of members to return.

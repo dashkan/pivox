@@ -204,11 +204,7 @@ message ListTagValuesRequest {
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {child_type: "pivox.api/TagValue"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 
   // Optional. The maximum number of TagValues to return in the response. The
@@ -252,11 +248,7 @@ message GetTagValueRequest {
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.api/TagValue"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 }
 
@@ -268,11 +260,7 @@ message CreateTagValueRequest {
   string parent = 4 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {child_type: "pivox.api/TagValue"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 
   // Required. The TagValue to be created. Only fields `description`
@@ -321,11 +309,7 @@ message DeleteTagValueRequest {
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.api/TagValue"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
+    (buf.validate.field).required = true
   ];
 
   // Optional. Set as true to perform the validations necessary for deletion,

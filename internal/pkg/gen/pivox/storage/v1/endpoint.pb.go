@@ -958,35 +958,29 @@ const file_pivox_storage_v1_endpoint_proto_rawDesc = "" +
 	"\bINACTIVE\x10\x02\x12\x0f\n" +
 	"\vUNREACHABLE\x10\x03:\x86\x01\xeaA\x82\x01\n" +
 	"\x16pivox.storage/Endpoint\x12Sorganizations/{organization}/storageGateways/{storage_gateway}/endpoints/{endpoint}*\tendpoints2\bendpointB\x0f\n" +
-	"\rconfiguration\"\x8f\x02\n" +
+	"\rconfiguration\"\xe1\x01\n" +
 	"\x0fS3Configuration\x121\n" +
-	"\fendpoint_uri\x18\x01 \x01(\tB\x0e\xe0A\x02\xe0A\x05\xbaH\x05r\x03\x88\x01\x01R\vendpointUri\x12R\n" +
-	"\x06bucket\x18\x02 \x01(\tB:\xe0A\x02\xe0A\x05\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x06bucket\x12\x1b\n" +
+	"\fendpoint_uri\x18\x01 \x01(\tB\x0e\xe0A\x02\xe0A\x05\xbaH\x05r\x03\x88\x01\x01R\vendpointUri\x12$\n" +
+	"\x06bucket\x18\x02 \x01(\tB\f\xe0A\x02\xe0A\x05\xbaH\x03\xc8\x01\x01R\x06bucket\x12\x1b\n" +
 	"\x06region\x18\x03 \x01(\tB\x03\xe0A\x01R\x06region\x12I\n" +
 	"\n" +
 	"access_key\x18\x04 \x01(\v2(.pivox.storage.v1.S3AccessKeyCredentialsH\x00R\taccessKeyB\r\n" +
-	"\vcredentials\"\xda\x01\n" +
-	"\x16S3AccessKeyCredentials\x12[\n" +
-	"\raccess_key_id\x18\x01 \x01(\tB7\xe0A\x02\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\vaccessKeyId\x12c\n" +
-	"\x11secret_access_key\x18\x02 \x01(\tB7\xe0A\x02\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x0fsecretAccessKey\"\x96\x02\n" +
-	"\x15CreateEndpointRequest\x12j\n" +
-	"\x06parent\x18\x01 \x01(\tBR\xe0A\x02\xfaA\x18\x12\x16pivox.storage/Endpoint\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x06parent\x12A\n" +
+	"\vcredentials\"~\n" +
+	"\x16S3AccessKeyCredentials\x12-\n" +
+	"\raccess_key_id\x18\x01 \x01(\tB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\vaccessKeyId\x125\n" +
+	"\x11secret_access_key\x18\x02 \x01(\tB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\x0fsecretAccessKey\"\xe8\x01\n" +
+	"\x15CreateEndpointRequest\x12<\n" +
+	"\x06parent\x18\x01 \x01(\tB$\xe0A\x02\xfaA\x18\x12\x16pivox.storage/Endpoint\xbaH\x03\xc8\x01\x01R\x06parent\x12A\n" +
 	"\bendpoint\x18\x02 \x01(\v2\x1a.pivox.storage.v1.EndpointB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\bendpoint\x12$\n" +
 	"\vendpoint_id\x18\x03 \x01(\tB\x03\xe0A\x01R\n" +
 	"endpointId\x12(\n" +
 	"\rvalidate_only\x18\x04 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\x18\n" +
-	"\x16CreateEndpointMetadata\"|\n" +
-	"\x12GetEndpointRequest\x12f\n" +
-	"\x04name\x18\x01 \x01(\tBR\xe0A\x02\xfaA\x18\n" +
-	"\x16pivox.storage/Endpoint\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\"\x8f\x02\n" +
-	"\x14ListEndpointsRequest\x12j\n" +
-	"\x06parent\x18\x01 \x01(\tBR\xe0A\x02\xfaA\x18\x12\x16pivox.storage/Endpoint\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x06parent\x12*\n" +
+	"\x16CreateEndpointMetadata\"N\n" +
+	"\x12GetEndpointRequest\x128\n" +
+	"\x04name\x18\x01 \x01(\tB$\xe0A\x02\xfaA\x18\n" +
+	"\x16pivox.storage/Endpoint\xbaH\x03\xc8\x01\x01R\x04name\"\xe1\x01\n" +
+	"\x14ListEndpointsRequest\x12<\n" +
+	"\x06parent\x18\x01 \x01(\tB$\xe0A\x02\xfaA\x18\x12\x16pivox.storage/Endpoint\xbaH\x03\xc8\x01\x01R\x06parent\x12*\n" +
 	"\tpage_size\x18\x02 \x01(\x05B\r\xe0A\x01\xbaH\a\x1a\x05\x18\xe8\a(\x00R\bpageSize\x12\"\n" +
 	"\n" +
 	"page_token\x18\x03 \x01(\tB\x03\xe0A\x01R\tpageToken\x12\x1b\n" +
@@ -1000,11 +994,10 @@ const file_pivox_storage_v1_endpoint_proto_rawDesc = "" +
 	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskB\x03\xe0A\x01R\n" +
 	"updateMask\x12(\n" +
 	"\rvalidate_only\x18\x03 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\x18\n" +
-	"\x16UpdateEndpointMetadata\"\xc2\x01\n" +
-	"\x15DeleteEndpointRequest\x12f\n" +
-	"\x04name\x18\x01 \x01(\tBR\xe0A\x02\xfaA\x18\n" +
-	"\x16pivox.storage/Endpoint\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\x12\x17\n" +
+	"\x16UpdateEndpointMetadata\"\x94\x01\n" +
+	"\x15DeleteEndpointRequest\x128\n" +
+	"\x04name\x18\x01 \x01(\tB$\xe0A\x02\xfaA\x18\n" +
+	"\x16pivox.storage/Endpoint\xbaH\x03\xc8\x01\x01R\x04name\x12\x17\n" +
 	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x01R\x04etag\x12(\n" +
 	"\rvalidate_only\x18\x03 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\x18\n" +
 	"\x16DeleteEndpointMetadata2\x86\b\n" +

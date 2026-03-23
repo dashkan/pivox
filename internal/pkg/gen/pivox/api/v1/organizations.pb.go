@@ -2229,11 +2229,10 @@ const file_pivox_api_v1_organizations_proto_rawDesc = "" +
 	"\n" +
 	"\x06ACTIVE\x10\x01\x12\x14\n" +
 	"\x10DELETE_REQUESTED\x10\x02:V\xeaAS\n" +
-	"\x16pivox.api/Organization\x12\x1corganizations/{organization}*\rorganizations2\forganization\"\x80\x01\n" +
-	"\x16GetOrganizationRequest\x12f\n" +
-	"\x04name\x18\x01 \x01(\tBR\xe0A\x02\xfaA\x18\n" +
-	"\x16pivox.api/Organization\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\"\xcf\x01\n" +
+	"\x16pivox.api/Organization\x12\x1corganizations/{organization}*\rorganizations2\forganization\"R\n" +
+	"\x16GetOrganizationRequest\x128\n" +
+	"\x04name\x18\x01 \x01(\tB$\xe0A\x02\xfaA\x18\n" +
+	"\x16pivox.api/Organization\xbaH\x03\xc8\x01\x01R\x04name\"\xcf\x01\n" +
 	"\x18ListOrganizationsRequest\x12*\n" +
 	"\tpage_size\x18\x01 \x01(\x05B\r\xe0A\x01\xbaH\a\x1a\x05\x18\xe8\a(\x00R\bpageSize\x12\"\n" +
 	"\n" +
@@ -2282,31 +2281,27 @@ const file_pivox_api_v1_organizations_proto_rawDesc = "" +
 	"\tDnsRecord\x12\x17\n" +
 	"\x04type\x18\x01 \x01(\tB\x03\xe0A\x03R\x04type\x12\x17\n" +
 	"\x04host\x18\x02 \x01(\tB\x03\xe0A\x03R\x04host\x12\x19\n" +
-	"\x05value\x18\x03 \x01(\tB\x03\xe0A\x03R\x05value\"\x80\x01\n" +
-	"\x16GetCustomDomainRequest\x12f\n" +
-	"\x04name\x18\x01 \x01(\tBR\xe0A\x02\xfaA\x18\n" +
-	"\x16pivox.api/CustomDomain\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\"\xd6\x01\n" +
-	"\x18ListCustomDomainsRequest\x12j\n" +
-	"\x06parent\x18\x01 \x01(\tBR\xe0A\x02\xfaA\x18\x12\x16pivox.api/CustomDomain\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x06parent\x12*\n" +
+	"\x05value\x18\x03 \x01(\tB\x03\xe0A\x03R\x05value\"R\n" +
+	"\x16GetCustomDomainRequest\x128\n" +
+	"\x04name\x18\x01 \x01(\tB$\xe0A\x02\xfaA\x18\n" +
+	"\x16pivox.api/CustomDomain\xbaH\x03\xc8\x01\x01R\x04name\"\xa8\x01\n" +
+	"\x18ListCustomDomainsRequest\x12<\n" +
+	"\x06parent\x18\x01 \x01(\tB$\xe0A\x02\xfaA\x18\x12\x16pivox.api/CustomDomain\xbaH\x03\xc8\x01\x01R\x06parent\x12*\n" +
 	"\tpage_size\x18\x02 \x01(\x05B\r\xe0A\x01\xbaH\a\x1a\x05\x18\xe8\a(\x00R\bpageSize\x12\"\n" +
 	"\n" +
 	"page_token\x18\x03 \x01(\tB\x03\xe0A\x01R\tpageToken\"\x86\x01\n" +
 	"\x19ListCustomDomainsResponse\x12A\n" +
 	"\x0ecustom_domains\x18\x01 \x03(\v2\x1a.pivox.api.v1.CustomDomainR\rcustomDomains\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xac\x02\n" +
-	"\x19CreateCustomDomainRequest\x12j\n" +
-	"\x06parent\x18\x01 \x01(\tBR\xe0A\x02\xfaA\x18\x12\x16pivox.api/CustomDomain\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x06parent\x12J\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xfe\x01\n" +
+	"\x19CreateCustomDomainRequest\x12<\n" +
+	"\x06parent\x18\x01 \x01(\tB$\xe0A\x02\xfaA\x18\x12\x16pivox.api/CustomDomain\xbaH\x03\xc8\x01\x01R\x06parent\x12J\n" +
 	"\rcustom_domain\x18\x02 \x01(\v2\x1a.pivox.api.v1.CustomDomainB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\fcustomDomain\x12-\n" +
 	"\x10custom_domain_id\x18\x03 \x01(\tB\x03\xe0A\x01R\x0ecustomDomainId\x12(\n" +
 	"\rvalidate_only\x18\x04 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\x1c\n" +
-	"\x1aCreateCustomDomainMetadata\"\xc6\x01\n" +
-	"\x19DeleteCustomDomainRequest\x12f\n" +
-	"\x04name\x18\x01 \x01(\tBR\xe0A\x02\xfaA\x18\n" +
-	"\x16pivox.api/CustomDomain\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\x12\x17\n" +
+	"\x1aCreateCustomDomainMetadata\"\x98\x01\n" +
+	"\x19DeleteCustomDomainRequest\x128\n" +
+	"\x04name\x18\x01 \x01(\tB$\xe0A\x02\xfaA\x18\n" +
+	"\x16pivox.api/CustomDomain\xbaH\x03\xc8\x01\x01R\x04name\x12\x17\n" +
 	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x01R\x04etag\x12(\n" +
 	"\rvalidate_only\x18\x03 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\x1c\n" +
 	"\x1aCreateOrganizationMetadata\"\x1c\n" +
@@ -2344,17 +2339,15 @@ const file_pivox_api_v1_organizations_proto_rawDesc = "" +
 	"\vupdate_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"updateTime\x12\x17\n" +
 	"\x04etag\x18\x06 \x01(\tB\x03\xe0A\x03R\x04etag:t\xeaAq\n" +
-	"\x1apivox.api/InvitationPolicy\x12-organizations/{organization}/invitationPolicy*\x12invitationPolicies2\x10invitationPolicy\"\xf2\x01\n" +
-	"\x17CreateInvitationRequest\x12h\n" +
-	"\x06parent\x18\x01 \x01(\tBP\xe0A\x02\xfaA\x16\x12\x14pivox.api/Invitation\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x06parent\x12C\n" +
+	"\x1apivox.api/InvitationPolicy\x12-organizations/{organization}/invitationPolicy*\x12invitationPolicies2\x10invitationPolicy\"\xc4\x01\n" +
+	"\x17CreateInvitationRequest\x12:\n" +
+	"\x06parent\x18\x01 \x01(\tB\"\xe0A\x02\xfaA\x16\x12\x14pivox.api/Invitation\xbaH\x03\xc8\x01\x01R\x06parent\x12C\n" +
 	"\n" +
 	"invitation\x18\x02 \x01(\v2\x18.pivox.api.v1.InvitationB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\n" +
 	"invitation\x12(\n" +
-	"\rinvitation_id\x18\x03 \x01(\tB\x03\xe0A\x01R\finvitationId\"\x8f\x02\n" +
-	"\x16ListInvitationsRequest\x12h\n" +
-	"\x06parent\x18\x01 \x01(\tBP\xe0A\x02\xfaA\x16\x12\x14pivox.api/Invitation\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x06parent\x12*\n" +
+	"\rinvitation_id\x18\x03 \x01(\tB\x03\xe0A\x01R\finvitationId\"\xe1\x01\n" +
+	"\x16ListInvitationsRequest\x12:\n" +
+	"\x06parent\x18\x01 \x01(\tB\"\xe0A\x02\xfaA\x16\x12\x14pivox.api/Invitation\xbaH\x03\xc8\x01\x01R\x06parent\x12*\n" +
 	"\tpage_size\x18\x02 \x01(\x05B\r\xe0A\x01\xbaH\a\x1a\x05\x18\xe8\a(\x00R\bpageSize\x12\"\n" +
 	"\n" +
 	"page_token\x18\x03 \x01(\tB\x03\xe0A\x01R\tpageToken\x12\x1b\n" +
@@ -2362,36 +2355,31 @@ const file_pivox_api_v1_organizations_proto_rawDesc = "" +
 	"\border_by\x18\x05 \x01(\tB\x03\xe0A\x01R\aorderBy\"}\n" +
 	"\x17ListInvitationsResponse\x12:\n" +
 	"\vinvitations\x18\x01 \x03(\v2\x18.pivox.api.v1.InvitationR\vinvitations\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"|\n" +
-	"\x14GetInvitationRequest\x12d\n" +
-	"\x04name\x18\x01 \x01(\tBP\xe0A\x02\xfaA\x16\n" +
-	"\x14pivox.api/Invitation\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\"\x7f\n" +
-	"\x17AcceptInvitationRequest\x12d\n" +
-	"\x04name\x18\x01 \x01(\tBP\xe0A\x02\xfaA\x16\n" +
-	"\x14pivox.api/Invitation\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\"T\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"N\n" +
+	"\x14GetInvitationRequest\x126\n" +
+	"\x04name\x18\x01 \x01(\tB\"\xe0A\x02\xfaA\x16\n" +
+	"\x14pivox.api/Invitation\xbaH\x03\xc8\x01\x01R\x04name\"Q\n" +
+	"\x17AcceptInvitationRequest\x126\n" +
+	"\x04name\x18\x01 \x01(\tB\"\xe0A\x02\xfaA\x16\n" +
+	"\x14pivox.api/Invitation\xbaH\x03\xc8\x01\x01R\x04name\"T\n" +
 	"\x18AcceptInvitationResponse\x128\n" +
 	"\n" +
 	"invitation\x18\x01 \x01(\v2\x18.pivox.api.v1.InvitationR\n" +
-	"invitation\"\x80\x01\n" +
-	"\x18DeclineInvitationRequest\x12d\n" +
-	"\x04name\x18\x01 \x01(\tBP\xe0A\x02\xfaA\x16\n" +
-	"\x14pivox.api/Invitation\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\"U\n" +
+	"invitation\"R\n" +
+	"\x18DeclineInvitationRequest\x126\n" +
+	"\x04name\x18\x01 \x01(\tB\"\xe0A\x02\xfaA\x16\n" +
+	"\x14pivox.api/Invitation\xbaH\x03\xc8\x01\x01R\x04name\"U\n" +
 	"\x19DeclineInvitationResponse\x128\n" +
 	"\n" +
 	"invitation\x18\x01 \x01(\v2\x18.pivox.api.v1.InvitationR\n" +
-	"invitation\"\x98\x01\n" +
-	"\x17DeleteInvitationRequest\x12d\n" +
-	"\x04name\x18\x01 \x01(\tBP\xe0A\x02\xfaA\x16\n" +
-	"\x14pivox.api/Invitation\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\x12\x17\n" +
-	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x01R\x04etag\"\x88\x01\n" +
-	"\x1aGetInvitationPolicyRequest\x12j\n" +
-	"\x04name\x18\x01 \x01(\tBV\xe0A\x02\xfaA\x1c\n" +
-	"\x1apivox.api/InvitationPolicy\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\"\xb9\x01\n" +
+	"invitation\"j\n" +
+	"\x17DeleteInvitationRequest\x126\n" +
+	"\x04name\x18\x01 \x01(\tB\"\xe0A\x02\xfaA\x16\n" +
+	"\x14pivox.api/Invitation\xbaH\x03\xc8\x01\x01R\x04name\x12\x17\n" +
+	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x01R\x04etag\"Z\n" +
+	"\x1aGetInvitationPolicyRequest\x12<\n" +
+	"\x04name\x18\x01 \x01(\tB(\xe0A\x02\xfaA\x1c\n" +
+	"\x1apivox.api/InvitationPolicy\xbaH\x03\xc8\x01\x01R\x04name\"\xb9\x01\n" +
 	"\x1dUpdateInvitationPolicyRequest\x12V\n" +
 	"\x11invitation_policy\x18\x01 \x01(\v2\x1e.pivox.api.v1.InvitationPolicyB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\x10invitationPolicy\x12@\n" +
 	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskB\x03\xe0A\x01R\n" +

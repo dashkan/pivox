@@ -372,14 +372,12 @@ const file_pivox_iam_v1_users_proto_rawDesc = "" +
 	"\x0flast_login_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\rlastLoginTime\x12\x17\n" +
 	"\x04etag\x18\n" +
 	" \x01(\tB\x03\xe0A\x03R\x04etag:K\xeaAH\n" +
-	"\x0epivox.iam/User\x12)organizations/{organization}/users/{user}*\x05users2\x04user\"p\n" +
-	"\x0eGetUserRequest\x12^\n" +
-	"\x04name\x18\x01 \x01(\tBJ\xe0A\x02\xfaA\x10\n" +
-	"\x0epivox.iam/User\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\"\x83\x02\n" +
-	"\x10ListUsersRequest\x12b\n" +
-	"\x06parent\x18\x01 \x01(\tBJ\xe0A\x02\xfaA\x10\x12\x0epivox.iam/User\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x06parent\x12*\n" +
+	"\x0epivox.iam/User\x12)organizations/{organization}/users/{user}*\x05users2\x04user\"B\n" +
+	"\x0eGetUserRequest\x120\n" +
+	"\x04name\x18\x01 \x01(\tB\x1c\xe0A\x02\xfaA\x10\n" +
+	"\x0epivox.iam/User\xbaH\x03\xc8\x01\x01R\x04name\"\xd5\x01\n" +
+	"\x10ListUsersRequest\x124\n" +
+	"\x06parent\x18\x01 \x01(\tB\x1c\xe0A\x02\xfaA\x10\x12\x0epivox.iam/User\xbaH\x03\xc8\x01\x01R\x06parent\x12*\n" +
 	"\tpage_size\x18\x02 \x01(\x05B\r\xe0A\x01\xbaH\a\x1a\x05\x18\xe8\a(\x00R\bpageSize\x12\"\n" +
 	"\n" +
 	"page_token\x18\x03 \x01(\tB\x03\xe0A\x01R\tpageToken\x12\x1b\n" +

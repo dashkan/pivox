@@ -1599,21 +1599,18 @@ const file_pivox_storage_v1_storage_gateway_proto_rawDesc = "" +
 	"\x0eEvictionPolicy\x12\x1f\n" +
 	"\x1bEVICTION_POLICY_UNSPECIFIED\x10\x00\x12\a\n" +
 	"\x03LRU\x10\x01\x12\a\n" +
-	"\x03LFU\x10\x02\"\xc2\x02\n" +
-	"\x1bCreateStorageGatewayRequest\x12p\n" +
-	"\x06parent\x18\x01 \x01(\tBX\xe0A\x02\xfaA\x1e\x12\x1cpivox.storage/StorageGateway\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x06parent\x12T\n" +
+	"\x03LFU\x10\x02\"\x94\x02\n" +
+	"\x1bCreateStorageGatewayRequest\x12B\n" +
+	"\x06parent\x18\x01 \x01(\tB*\xe0A\x02\xfaA\x1e\x12\x1cpivox.storage/StorageGateway\xbaH\x03\xc8\x01\x01R\x06parent\x12T\n" +
 	"\x0fstorage_gateway\x18\x02 \x01(\v2 .pivox.storage.v1.StorageGatewayB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\x0estorageGateway\x121\n" +
 	"\x12storage_gateway_id\x18\x03 \x01(\tB\x03\xe0A\x01R\x10storageGatewayId\x12(\n" +
 	"\rvalidate_only\x18\x04 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\x1e\n" +
-	"\x1cCreateStorageGatewayMetadata\"\x88\x01\n" +
-	"\x18GetStorageGatewayRequest\x12l\n" +
-	"\x04name\x18\x01 \x01(\tBX\xe0A\x02\xfaA\x1e\n" +
-	"\x1cpivox.storage/StorageGateway\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\"\x9b\x02\n" +
-	"\x1aListStorageGatewaysRequest\x12p\n" +
-	"\x06parent\x18\x01 \x01(\tBX\xe0A\x02\xfaA\x1e\x12\x1cpivox.storage/StorageGateway\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x06parent\x12*\n" +
+	"\x1cCreateStorageGatewayMetadata\"Z\n" +
+	"\x18GetStorageGatewayRequest\x12>\n" +
+	"\x04name\x18\x01 \x01(\tB*\xe0A\x02\xfaA\x1e\n" +
+	"\x1cpivox.storage/StorageGateway\xbaH\x03\xc8\x01\x01R\x04name\"\xed\x01\n" +
+	"\x1aListStorageGatewaysRequest\x12B\n" +
+	"\x06parent\x18\x01 \x01(\tB*\xe0A\x02\xfaA\x1e\x12\x1cpivox.storage/StorageGateway\xbaH\x03\xc8\x01\x01R\x06parent\x12*\n" +
 	"\tpage_size\x18\x02 \x01(\x05B\r\xe0A\x01\xbaH\a\x1a\x05\x18\xe8\a(\x00R\bpageSize\x12\"\n" +
 	"\n" +
 	"page_token\x18\x03 \x01(\tB\x03\xe0A\x01R\tpageToken\x12\x1b\n" +
@@ -1627,22 +1624,19 @@ const file_pivox_storage_v1_storage_gateway_proto_rawDesc = "" +
 	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskB\x03\xe0A\x01R\n" +
 	"updateMask\x12(\n" +
 	"\rvalidate_only\x18\x03 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\x1e\n" +
-	"\x1cUpdateStorageGatewayMetadata\"\xce\x01\n" +
-	"\x1bDeleteStorageGatewayRequest\x12l\n" +
-	"\x04name\x18\x01 \x01(\tBX\xe0A\x02\xfaA\x1e\n" +
-	"\x1cpivox.storage/StorageGateway\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\x12\x17\n" +
+	"\x1cUpdateStorageGatewayMetadata\"\xa0\x01\n" +
+	"\x1bDeleteStorageGatewayRequest\x12>\n" +
+	"\x04name\x18\x01 \x01(\tB*\xe0A\x02\xfaA\x1e\n" +
+	"\x1cpivox.storage/StorageGateway\xbaH\x03\xc8\x01\x01R\x04name\x12\x17\n" +
 	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x01R\x04etag\x12(\n" +
 	"\rvalidate_only\x18\x03 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\x1e\n" +
-	"\x1cDeleteStorageGatewayMetadata\"\x8e\x01\n" +
-	"\x1eRotateRegistrationTokenRequest\x12l\n" +
-	"\x04name\x18\x01 \x01(\tBX\xe0A\x02\xfaA\x1e\n" +
-	"\x1cpivox.storage/StorageGateway\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\"\xb9\x03\n" +
-	"\x17GetInstallScriptRequest\x12l\n" +
-	"\x04name\x18\x01 \x01(\tBX\xe0A\x02\xfaA\x1e\n" +
-	"\x1cpivox.storage/StorageGateway\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\x12 \n" +
+	"\x1cDeleteStorageGatewayMetadata\"`\n" +
+	"\x1eRotateRegistrationTokenRequest\x12>\n" +
+	"\x04name\x18\x01 \x01(\tB*\xe0A\x02\xfaA\x1e\n" +
+	"\x1cpivox.storage/StorageGateway\xbaH\x03\xc8\x01\x01R\x04name\"\x8b\x03\n" +
+	"\x17GetInstallScriptRequest\x12>\n" +
+	"\x04name\x18\x01 \x01(\tB*\xe0A\x02\xfaA\x1e\n" +
+	"\x1cpivox.storage/StorageGateway\xbaH\x03\xc8\x01\x01R\x04name\x12 \n" +
 	"\tcache_dir\x18\x02 \x01(\tB\x03\xe0A\x01R\bcacheDir\x12.\n" +
 	"\rcache_size_gb\x18\x03 \x01(\x05B\n" +
 	"\xe0A\x01\xbaH\x04\x1a\x02(\x00R\vcacheSizeGb\x12\"\n" +
@@ -1656,19 +1650,16 @@ const file_pivox_storage_v1_storage_gateway_proto_rawDesc = "" +
 	"\bno_proxy\x18\b \x01(\tB\x03\xe0A\x01R\anoProxy\x12!\n" +
 	"\ttelemetry\x18\t \x01(\bB\x03\xe0A\x01R\ttelemetry\"2\n" +
 	"\x18GetInstallScriptResponse\x12\x16\n" +
-	"\x06script\x18\x01 \x01(\tR\x06script\"\x89\x01\n" +
-	"\x19GetUninstallScriptRequest\x12l\n" +
-	"\x04name\x18\x01 \x01(\tBX\xe0A\x02\xfaA\x1e\n" +
-	"\x1cpivox.storage/StorageGateway\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\"4\n" +
+	"\x06script\x18\x01 \x01(\tR\x06script\"[\n" +
+	"\x19GetUninstallScriptRequest\x12>\n" +
+	"\x04name\x18\x01 \x01(\tB*\xe0A\x02\xfaA\x1e\n" +
+	"\x1cpivox.storage/StorageGateway\xbaH\x03\xc8\x01\x01R\x04name\"4\n" +
 	"\x1aGetUninstallScriptResponse\x12\x16\n" +
-	"\x06script\x18\x01 \x01(\tR\x06script\"\xe5\x01\n" +
-	"\x15UpgradeGatewayRequest\x12l\n" +
-	"\x04name\x18\x01 \x01(\tBX\xe0A\x02\xfaA\x1e\n" +
-	"\x1cpivox.storage/StorageGateway\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\x12^\n" +
-	"\x0etarget_version\x18\x02 \x01(\tB7\xe0A\x02\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\rtargetVersion\"\x9c\x03\n" +
+	"\x06script\x18\x01 \x01(\tR\x06script\"\x89\x01\n" +
+	"\x15UpgradeGatewayRequest\x12>\n" +
+	"\x04name\x18\x01 \x01(\tB*\xe0A\x02\xfaA\x1e\n" +
+	"\x1cpivox.storage/StorageGateway\xbaH\x03\xc8\x01\x01R\x04name\x120\n" +
+	"\x0etarget_version\x18\x02 \x01(\tB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\rtargetVersion\"\x9c\x03\n" +
 	"\x16UpgradeGatewayMetadata\x12R\n" +
 	"\x05phase\x18\x01 \x01(\x0e2<.pivox.storage.v1.UpgradeGatewayMetadata.UpgradeGatewayPhaseR\x05phase\x12!\n" +
 	"\fagents_total\x18\x02 \x01(\x05R\vagentsTotal\x12!\n" +

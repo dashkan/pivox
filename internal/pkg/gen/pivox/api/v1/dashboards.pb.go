@@ -683,10 +683,9 @@ const file_pivox_api_v1_dashboards_proto_rawDesc = "" +
 	"\xe0A\x02\xbaH\x04r\x02\x10\x01R\x03key\x12&\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\x03\xe0A\x01R\vdisplayName\x12(\n" +
 	"\rdefault_value\x18\x03 \x01(\tB\x03\xe0A\x01R\fdefaultValue\x12*\n" +
-	"\x0eallowed_values\x18\x04 \x03(\tB\x03\xe0A\x01R\rallowedValues\"\x8d\x02\n" +
-	"\x15ListDashboardsRequest\x12g\n" +
-	"\x06parent\x18\x01 \x01(\tBO\xe0A\x02\xfaA\x15\x12\x13pivox.api/Dashboard\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x06parent\x12*\n" +
+	"\x0eallowed_values\x18\x04 \x03(\tB\x03\xe0A\x01R\rallowedValues\"\xdf\x01\n" +
+	"\x15ListDashboardsRequest\x129\n" +
+	"\x06parent\x18\x01 \x01(\tB!\xe0A\x02\xfaA\x15\x12\x13pivox.api/Dashboard\xbaH\x03\xc8\x01\x01R\x06parent\x12*\n" +
 	"\tpage_size\x18\x02 \x01(\x05B\r\xe0A\x01\xbaH\a\x1a\x05\x18\xe8\a(\x00R\bpageSize\x12\"\n" +
 	"\n" +
 	"page_token\x18\x03 \x01(\tB\x03\xe0A\x01R\tpageToken\x12\x1b\n" +
@@ -696,14 +695,12 @@ const file_pivox_api_v1_dashboards_proto_rawDesc = "" +
 	"\n" +
 	"dashboards\x18\x01 \x03(\v2\x17.pivox.api.v1.DashboardR\n" +
 	"dashboards\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"z\n" +
-	"\x13GetDashboardRequest\x12c\n" +
-	"\x04name\x18\x01 \x01(\tBO\xe0A\x02\xfaA\x15\n" +
-	"\x13pivox.api/Dashboard\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\"\x95\x02\n" +
-	"\x16CreateDashboardRequest\x12g\n" +
-	"\x06parent\x18\x01 \x01(\tBO\xe0A\x02\xfaA\x15\x12\x13pivox.api/Dashboard\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x06parent\x12@\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"L\n" +
+	"\x13GetDashboardRequest\x125\n" +
+	"\x04name\x18\x01 \x01(\tB!\xe0A\x02\xfaA\x15\n" +
+	"\x13pivox.api/Dashboard\xbaH\x03\xc8\x01\x01R\x04name\"\xe7\x01\n" +
+	"\x16CreateDashboardRequest\x129\n" +
+	"\x06parent\x18\x01 \x01(\tB!\xe0A\x02\xfaA\x15\x12\x13pivox.api/Dashboard\xbaH\x03\xc8\x01\x01R\x06parent\x12@\n" +
 	"\tdashboard\x18\x02 \x01(\v2\x17.pivox.api.v1.DashboardB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\tdashboard\x12&\n" +
 	"\fdashboard_id\x18\x03 \x01(\tB\x03\xe0A\x01R\vdashboardId\x12(\n" +
 	"\rvalidate_only\x18\x04 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\xf0\x01\n" +
@@ -712,11 +709,10 @@ const file_pivox_api_v1_dashboards_proto_rawDesc = "" +
 	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskB\x03\xe0A\x01R\n" +
 	"updateMask\x12(\n" +
 	"\rallow_missing\x18\x03 \x01(\bB\x03\xe0A\x01R\fallowMissing\x12(\n" +
-	"\rvalidate_only\x18\x04 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\xc0\x01\n" +
-	"\x16DeleteDashboardRequest\x12c\n" +
-	"\x04name\x18\x01 \x01(\tBO\xe0A\x02\xfaA\x15\n" +
-	"\x13pivox.api/Dashboard\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\x12(\n" +
+	"\rvalidate_only\x18\x04 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\x92\x01\n" +
+	"\x16DeleteDashboardRequest\x125\n" +
+	"\x04name\x18\x01 \x01(\tB!\xe0A\x02\xfaA\x15\n" +
+	"\x13pivox.api/Dashboard\xbaH\x03\xc8\x01\x01R\x04name\x12(\n" +
 	"\rvalidate_only\x18\x02 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\x12\x17\n" +
 	"\x04etag\x18\x03 \x01(\tB\x03\xe0A\x01R\x04etag2\xdc\x06\n" +
 	"\n" +
