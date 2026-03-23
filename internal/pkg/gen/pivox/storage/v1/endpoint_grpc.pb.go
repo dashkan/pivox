@@ -34,12 +34,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Endpoints_CreateEndpoint_FullMethodName         = "/pivox.storage.v1.Endpoints/CreateEndpoint"
-	Endpoints_GetEndpoint_FullMethodName            = "/pivox.storage.v1.Endpoints/GetEndpoint"
-	Endpoints_ListEndpoints_FullMethodName          = "/pivox.storage.v1.Endpoints/ListEndpoints"
-	Endpoints_UpdateEndpoint_FullMethodName         = "/pivox.storage.v1.Endpoints/UpdateEndpoint"
-	Endpoints_DeleteEndpoint_FullMethodName         = "/pivox.storage.v1.Endpoints/DeleteEndpoint"
-	Endpoints_TestEndpointConnection_FullMethodName = "/pivox.storage.v1.Endpoints/TestEndpointConnection"
+	Endpoints_CreateEndpoint_FullMethodName = "/pivox.storage.v1.Endpoints/CreateEndpoint"
+	Endpoints_GetEndpoint_FullMethodName    = "/pivox.storage.v1.Endpoints/GetEndpoint"
+	Endpoints_ListEndpoints_FullMethodName  = "/pivox.storage.v1.Endpoints/ListEndpoints"
+	Endpoints_UpdateEndpoint_FullMethodName = "/pivox.storage.v1.Endpoints/UpdateEndpoint"
+	Endpoints_DeleteEndpoint_FullMethodName = "/pivox.storage.v1.Endpoints/DeleteEndpoint"
 )
 
 // EndpointsClient is the client API for Endpoints service.
@@ -74,9 +73,6 @@ type EndpointsClient interface {
 	// The caller must have `storage.endpoints.delete` permission on the
 	// specified endpoint.
 	DeleteEndpoint(ctx context.Context, in *DeleteEndpointRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
-	// Tests connectivity to the storage backend. Returns reachability
-	// status, latency, and any error encountered.
-	TestEndpointConnection(ctx context.Context, in *TestEndpointConnectionRequest, opts ...grpc.CallOption) (*TestEndpointConnectionResponse, error)
 }
 
 type endpointsClient struct {
@@ -137,16 +133,6 @@ func (c *endpointsClient) DeleteEndpoint(ctx context.Context, in *DeleteEndpoint
 	return out, nil
 }
 
-func (c *endpointsClient) TestEndpointConnection(ctx context.Context, in *TestEndpointConnectionRequest, opts ...grpc.CallOption) (*TestEndpointConnectionResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(TestEndpointConnectionResponse)
-	err := c.cc.Invoke(ctx, Endpoints_TestEndpointConnection_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // EndpointsServer is the server API for Endpoints service.
 // All implementations must embed UnimplementedEndpointsServer
 // for forward compatibility.
@@ -179,9 +165,6 @@ type EndpointsServer interface {
 	// The caller must have `storage.endpoints.delete` permission on the
 	// specified endpoint.
 	DeleteEndpoint(context.Context, *DeleteEndpointRequest) (*longrunningpb.Operation, error)
-	// Tests connectivity to the storage backend. Returns reachability
-	// status, latency, and any error encountered.
-	TestEndpointConnection(context.Context, *TestEndpointConnectionRequest) (*TestEndpointConnectionResponse, error)
 	mustEmbedUnimplementedEndpointsServer()
 }
 
@@ -206,9 +189,6 @@ func (UnimplementedEndpointsServer) UpdateEndpoint(context.Context, *UpdateEndpo
 }
 func (UnimplementedEndpointsServer) DeleteEndpoint(context.Context, *DeleteEndpointRequest) (*longrunningpb.Operation, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteEndpoint not implemented")
-}
-func (UnimplementedEndpointsServer) TestEndpointConnection(context.Context, *TestEndpointConnectionRequest) (*TestEndpointConnectionResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method TestEndpointConnection not implemented")
 }
 func (UnimplementedEndpointsServer) mustEmbedUnimplementedEndpointsServer() {}
 func (UnimplementedEndpointsServer) testEmbeddedByValue()                   {}
@@ -321,24 +301,6 @@ func _Endpoints_DeleteEndpoint_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Endpoints_TestEndpointConnection_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(TestEndpointConnectionRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(EndpointsServer).TestEndpointConnection(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Endpoints_TestEndpointConnection_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EndpointsServer).TestEndpointConnection(ctx, req.(*TestEndpointConnectionRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // Endpoints_ServiceDesc is the grpc.ServiceDesc for Endpoints service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -365,10 +327,6 @@ var Endpoints_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteEndpoint",
 			Handler:    _Endpoints_DeleteEndpoint_Handler,
-		},
-		{
-			MethodName: "TestEndpointConnection",
-			Handler:    _Endpoints_TestEndpointConnection_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

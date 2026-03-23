@@ -9,8 +9,6 @@ import (
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/dashkan/pivox-server/internal/apierr"
 	"github.com/dashkan/pivox-server/internal/convert"
@@ -281,8 +279,4 @@ func (s *EndpointsServer) DeleteEndpoint(ctx context.Context, req *storagev1.Del
 	return lro.DoneOperation(&storagev1.Endpoint{
 		Name: req.GetName(),
 	})
-}
-
-func (s *EndpointsServer) TestEndpointConnection(ctx context.Context, req *storagev1.TestEndpointConnectionRequest) (*storagev1.TestEndpointConnectionResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "TestEndpointConnection is not yet implemented")
 }

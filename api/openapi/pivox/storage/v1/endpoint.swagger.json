@@ -350,64 +350,9 @@
           "Endpoints"
         ]
       }
-    },
-    "/v1/organizations/{organization}/storageGateways/{storageGateway}/endpoints/{endpoint}:testConnection": {
-      "post": {
-        "summary": "Tests connectivity to the storage backend. Returns reachability\nstatus, latency, and any error encountered.",
-        "operationId": "Endpoints_TestEndpointConnection",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/v1TestEndpointConnectionResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "organization",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "storageGateway",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "endpoint",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/EndpointsTestEndpointConnectionBody"
-            }
-          }
-        ],
-        "tags": [
-          "Endpoints"
-        ]
-      }
     }
   },
   "definitions": {
-    "EndpointsTestEndpointConnectionBody": {
-      "type": "object",
-      "description": "The request sent to the\n[TestEndpointConnection][pivox.storage.v1.Endpoints.TestEndpointConnection]\nmethod."
-    },
     "longrunningOperation": {
       "type": "object",
       "properties": {
@@ -601,24 +546,6 @@
         "endpointUri",
         "bucket"
       ]
-    },
-    "v1TestEndpointConnectionResponse": {
-      "type": "object",
-      "properties": {
-        "reachable": {
-          "type": "boolean",
-          "description": "Whether the storage backend is reachable."
-        },
-        "latency": {
-          "type": "string",
-          "description": "The round-trip latency to the storage backend."
-        },
-        "error": {
-          "type": "string",
-          "description": "An error message if the connection test failed. Empty on success."
-        }
-      },
-      "description": "The response returned from the\n[TestEndpointConnection][pivox.storage.v1.Endpoints.TestEndpointConnection]\nmethod."
     }
   }
 }

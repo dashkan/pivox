@@ -22,7 +22,6 @@ import "google/api/client.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
 import "google/longrunning/operations.proto";
-import "google/protobuf/duration.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 
@@ -94,16 +93,6 @@ service Endpoints {
       response_type: "Endpoint"
       metadata_type: "DeleteEndpointMetadata"
     };
-  }
-
-  // Tests connectivity to the storage backend. Returns reachability
-  // status, latency, and any error encountered.
-  rpc TestEndpointConnection(TestEndpointConnectionRequest) returns (TestEndpointConnectionResponse) {
-    option (google.api.http) = {
-      post: "/v1/{name=organizations/*/storageGateways/*/endpoints/*}:testConnection"
-      body: "*"
-    };
-    option (google.api.method_signature) = "name";
   }
 }
 
@@ -380,34 +369,3 @@ message DeleteEndpointRequest {
 // A status object which is used as the `metadata` field for the Operation
 // returned by DeleteEndpoint.
 message DeleteEndpointMetadata {}
-
-// The request sent to the
-// [TestEndpointConnection][pivox.storage.v1.Endpoints.TestEndpointConnection]
-// method.
-message TestEndpointConnectionRequest {
-  // Required. The resource name of the endpoint to test. Format:
-  // `organizations/{organization}/storageGateways/{storage_gateway}/endpoints/{endpoint}`
-  string name = 1 [
-    (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {type: "pivox.storage/Endpoint"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
-  ];
-}
-
-// The response returned from the
-// [TestEndpointConnection][pivox.storage.v1.Endpoints.TestEndpointConnection]
-// method.
-message TestEndpointConnectionResponse {
-  // Whether the storage backend is reachable.
-  bool reachable = 1;
-
-  // The round-trip latency to the storage backend.
-  google.protobuf.Duration latency = 2;
-
-  // An error message if the connection test failed. Empty on success.
-  string error = 3;
-}

@@ -26,7 +26,6 @@ import (
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	durationpb "google.golang.org/protobuf/types/known/durationpb"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
@@ -929,126 +928,11 @@ func (*DeleteEndpointMetadata) Descriptor() ([]byte, []int) {
 	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{11}
 }
 
-// The request sent to the
-// [TestEndpointConnection][pivox.storage.v1.Endpoints.TestEndpointConnection]
-// method.
-type TestEndpointConnectionRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Required. The resource name of the endpoint to test. Format:
-	// `organizations/{organization}/storageGateways/{storage_gateway}/endpoints/{endpoint}`
-	Name          string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *TestEndpointConnectionRequest) Reset() {
-	*x = TestEndpointConnectionRequest{}
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[12]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *TestEndpointConnectionRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*TestEndpointConnectionRequest) ProtoMessage() {}
-
-func (x *TestEndpointConnectionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[12]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use TestEndpointConnectionRequest.ProtoReflect.Descriptor instead.
-func (*TestEndpointConnectionRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{12}
-}
-
-func (x *TestEndpointConnectionRequest) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-// The response returned from the
-// [TestEndpointConnection][pivox.storage.v1.Endpoints.TestEndpointConnection]
-// method.
-type TestEndpointConnectionResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Whether the storage backend is reachable.
-	Reachable bool `protobuf:"varint,1,opt,name=reachable,proto3" json:"reachable,omitempty"`
-	// The round-trip latency to the storage backend.
-	Latency *durationpb.Duration `protobuf:"bytes,2,opt,name=latency,proto3" json:"latency,omitempty"`
-	// An error message if the connection test failed. Empty on success.
-	Error         string `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *TestEndpointConnectionResponse) Reset() {
-	*x = TestEndpointConnectionResponse{}
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[13]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *TestEndpointConnectionResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*TestEndpointConnectionResponse) ProtoMessage() {}
-
-func (x *TestEndpointConnectionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[13]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use TestEndpointConnectionResponse.ProtoReflect.Descriptor instead.
-func (*TestEndpointConnectionResponse) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{13}
-}
-
-func (x *TestEndpointConnectionResponse) GetReachable() bool {
-	if x != nil {
-		return x.Reachable
-	}
-	return false
-}
-
-func (x *TestEndpointConnectionResponse) GetLatency() *durationpb.Duration {
-	if x != nil {
-		return x.Latency
-	}
-	return nil
-}
-
-func (x *TestEndpointConnectionResponse) GetError() string {
-	if x != nil {
-		return x.Error
-	}
-	return ""
-}
-
 var File_pivox_storage_v1_endpoint_proto protoreflect.FileDescriptor
 
 const file_pivox_storage_v1_endpoint_proto_rawDesc = "" +
 	"\n" +
-	"\x1fpivox/storage/v1/endpoint.proto\x12\x10pivox.storage.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x98\x06\n" +
+	"\x1fpivox/storage/v1/endpoint.proto\x12\x10pivox.storage.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x98\x06\n" +
 	"\bEndpoint\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12-\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\n" +
@@ -1123,15 +1007,7 @@ const file_pivox_storage_v1_endpoint_proto_rawDesc = "" +
 	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\x12\x17\n" +
 	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x01R\x04etag\x12(\n" +
 	"\rvalidate_only\x18\x03 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\x18\n" +
-	"\x16DeleteEndpointMetadata\"\x87\x01\n" +
-	"\x1dTestEndpointConnectionRequest\x12f\n" +
-	"\x04name\x18\x01 \x01(\tBR\xe0A\x02\xfaA\x18\n" +
-	"\x16pivox.storage/Endpoint\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\"\x89\x01\n" +
-	"\x1eTestEndpointConnectionResponse\x12\x1c\n" +
-	"\treachable\x18\x01 \x01(\bR\treachable\x123\n" +
-	"\alatency\x18\x02 \x01(\v2\x19.google.protobuf.DurationR\alatency\x12\x14\n" +
-	"\x05error\x18\x03 \x01(\tR\x05error2\xdf\t\n" +
+	"\x16DeleteEndpointMetadata2\x86\b\n" +
 	"\tEndpoints\x12\xe8\x01\n" +
 	"\x0eCreateEndpoint\x12'.pivox.storage.v1.CreateEndpointRequest\x1a\x1d.google.longrunning.Operation\"\x8d\x01\xcaA\"\n" +
 	"\bEndpoint\x12\x16CreateEndpointMetadata\xdaA\x1bparent,endpoint,endpoint_id\x82\xd3\xe4\x93\x02D:\bendpoint\"8/v1/{parent=organizations/*/storageGateways/*}/endpoints\x12\x98\x01\n" +
@@ -1140,8 +1016,7 @@ const file_pivox_storage_v1_endpoint_proto_rawDesc = "" +
 	"\x0eUpdateEndpoint\x12'.pivox.storage.v1.UpdateEndpointRequest\x1a\x1d.google.longrunning.Operation\"\x8f\x01\xcaA\"\n" +
 	"\bEndpoint\x12\x16UpdateEndpointMetadata\xdaA\x14endpoint,update_mask\x82\xd3\xe4\x93\x02M:\bendpoint2A/v1/{endpoint.name=organizations/*/storageGateways/*/endpoints/*}\x12\xc6\x01\n" +
 	"\x0eDeleteEndpoint\x12'.pivox.storage.v1.DeleteEndpointRequest\x1a\x1d.google.longrunning.Operation\"l\xcaA\"\n" +
-	"\bEndpoint\x12\x16DeleteEndpointMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02:*8/v1/{name=organizations/*/storageGateways/*/endpoints/*}\x12\xd6\x01\n" +
-	"\x16TestEndpointConnection\x12/.pivox.storage.v1.TestEndpointConnectionRequest\x1a0.pivox.storage.v1.TestEndpointConnectionResponse\"Y\xdaA\x04name\x82\xd3\xe4\x93\x02L:\x01*\"G/v1/{name=organizations/*/storageGateways/*/endpoints/*}:testConnection\x1a\x0f\xcaA\fapi.pivox.ioB\xd4\x01\n" +
+	"\bEndpoint\x12\x16DeleteEndpointMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02:*8/v1/{name=organizations/*/storageGateways/*/endpoints/*}\x1a\x0f\xcaA\fapi.pivox.ioB\xd4\x01\n" +
 	"\x14com.pivox.storage.v1B\rEndpointProtoP\x01ZKgithub.com/dashkan/pivox-server/internal/pkg/gen/pivox/storage/v1;storagev1\xa2\x02\x03PSX\xaa\x02\x10Pivox.Storage.V1\xca\x02\x10Pivox\\Storage\\V1\xe2\x02\x1cPivox\\Storage\\V1\\GPBMetadata\xea\x02\x12Pivox::Storage::V1b\x06proto3"
 
 var (
@@ -1157,58 +1032,52 @@ func file_pivox_storage_v1_endpoint_proto_rawDescGZIP() []byte {
 }
 
 var file_pivox_storage_v1_endpoint_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_pivox_storage_v1_endpoint_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_pivox_storage_v1_endpoint_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_pivox_storage_v1_endpoint_proto_goTypes = []any{
-	(Endpoint_State)(0),                    // 0: pivox.storage.v1.Endpoint.State
-	(*Endpoint)(nil),                       // 1: pivox.storage.v1.Endpoint
-	(*S3Configuration)(nil),                // 2: pivox.storage.v1.S3Configuration
-	(*S3AccessKeyCredentials)(nil),         // 3: pivox.storage.v1.S3AccessKeyCredentials
-	(*CreateEndpointRequest)(nil),          // 4: pivox.storage.v1.CreateEndpointRequest
-	(*CreateEndpointMetadata)(nil),         // 5: pivox.storage.v1.CreateEndpointMetadata
-	(*GetEndpointRequest)(nil),             // 6: pivox.storage.v1.GetEndpointRequest
-	(*ListEndpointsRequest)(nil),           // 7: pivox.storage.v1.ListEndpointsRequest
-	(*ListEndpointsResponse)(nil),          // 8: pivox.storage.v1.ListEndpointsResponse
-	(*UpdateEndpointRequest)(nil),          // 9: pivox.storage.v1.UpdateEndpointRequest
-	(*UpdateEndpointMetadata)(nil),         // 10: pivox.storage.v1.UpdateEndpointMetadata
-	(*DeleteEndpointRequest)(nil),          // 11: pivox.storage.v1.DeleteEndpointRequest
-	(*DeleteEndpointMetadata)(nil),         // 12: pivox.storage.v1.DeleteEndpointMetadata
-	(*TestEndpointConnectionRequest)(nil),  // 13: pivox.storage.v1.TestEndpointConnectionRequest
-	(*TestEndpointConnectionResponse)(nil), // 14: pivox.storage.v1.TestEndpointConnectionResponse
-	nil,                                    // 15: pivox.storage.v1.Endpoint.AnnotationsEntry
-	(*timestamppb.Timestamp)(nil),          // 16: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),          // 17: google.protobuf.FieldMask
-	(*durationpb.Duration)(nil),            // 18: google.protobuf.Duration
-	(*longrunningpb.Operation)(nil),        // 19: google.longrunning.Operation
+	(Endpoint_State)(0),             // 0: pivox.storage.v1.Endpoint.State
+	(*Endpoint)(nil),                // 1: pivox.storage.v1.Endpoint
+	(*S3Configuration)(nil),         // 2: pivox.storage.v1.S3Configuration
+	(*S3AccessKeyCredentials)(nil),  // 3: pivox.storage.v1.S3AccessKeyCredentials
+	(*CreateEndpointRequest)(nil),   // 4: pivox.storage.v1.CreateEndpointRequest
+	(*CreateEndpointMetadata)(nil),  // 5: pivox.storage.v1.CreateEndpointMetadata
+	(*GetEndpointRequest)(nil),      // 6: pivox.storage.v1.GetEndpointRequest
+	(*ListEndpointsRequest)(nil),    // 7: pivox.storage.v1.ListEndpointsRequest
+	(*ListEndpointsResponse)(nil),   // 8: pivox.storage.v1.ListEndpointsResponse
+	(*UpdateEndpointRequest)(nil),   // 9: pivox.storage.v1.UpdateEndpointRequest
+	(*UpdateEndpointMetadata)(nil),  // 10: pivox.storage.v1.UpdateEndpointMetadata
+	(*DeleteEndpointRequest)(nil),   // 11: pivox.storage.v1.DeleteEndpointRequest
+	(*DeleteEndpointMetadata)(nil),  // 12: pivox.storage.v1.DeleteEndpointMetadata
+	nil,                             // 13: pivox.storage.v1.Endpoint.AnnotationsEntry
+	(*timestamppb.Timestamp)(nil),   // 14: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),   // 15: google.protobuf.FieldMask
+	(*longrunningpb.Operation)(nil), // 16: google.longrunning.Operation
 }
 var file_pivox_storage_v1_endpoint_proto_depIdxs = []int32{
 	0,  // 0: pivox.storage.v1.Endpoint.state:type_name -> pivox.storage.v1.Endpoint.State
 	2,  // 1: pivox.storage.v1.Endpoint.s3:type_name -> pivox.storage.v1.S3Configuration
-	15, // 2: pivox.storage.v1.Endpoint.annotations:type_name -> pivox.storage.v1.Endpoint.AnnotationsEntry
-	16, // 3: pivox.storage.v1.Endpoint.create_time:type_name -> google.protobuf.Timestamp
-	16, // 4: pivox.storage.v1.Endpoint.update_time:type_name -> google.protobuf.Timestamp
+	13, // 2: pivox.storage.v1.Endpoint.annotations:type_name -> pivox.storage.v1.Endpoint.AnnotationsEntry
+	14, // 3: pivox.storage.v1.Endpoint.create_time:type_name -> google.protobuf.Timestamp
+	14, // 4: pivox.storage.v1.Endpoint.update_time:type_name -> google.protobuf.Timestamp
 	3,  // 5: pivox.storage.v1.S3Configuration.access_key:type_name -> pivox.storage.v1.S3AccessKeyCredentials
 	1,  // 6: pivox.storage.v1.CreateEndpointRequest.endpoint:type_name -> pivox.storage.v1.Endpoint
 	1,  // 7: pivox.storage.v1.ListEndpointsResponse.endpoints:type_name -> pivox.storage.v1.Endpoint
 	1,  // 8: pivox.storage.v1.UpdateEndpointRequest.endpoint:type_name -> pivox.storage.v1.Endpoint
-	17, // 9: pivox.storage.v1.UpdateEndpointRequest.update_mask:type_name -> google.protobuf.FieldMask
-	18, // 10: pivox.storage.v1.TestEndpointConnectionResponse.latency:type_name -> google.protobuf.Duration
-	4,  // 11: pivox.storage.v1.Endpoints.CreateEndpoint:input_type -> pivox.storage.v1.CreateEndpointRequest
-	6,  // 12: pivox.storage.v1.Endpoints.GetEndpoint:input_type -> pivox.storage.v1.GetEndpointRequest
-	7,  // 13: pivox.storage.v1.Endpoints.ListEndpoints:input_type -> pivox.storage.v1.ListEndpointsRequest
-	9,  // 14: pivox.storage.v1.Endpoints.UpdateEndpoint:input_type -> pivox.storage.v1.UpdateEndpointRequest
-	11, // 15: pivox.storage.v1.Endpoints.DeleteEndpoint:input_type -> pivox.storage.v1.DeleteEndpointRequest
-	13, // 16: pivox.storage.v1.Endpoints.TestEndpointConnection:input_type -> pivox.storage.v1.TestEndpointConnectionRequest
-	19, // 17: pivox.storage.v1.Endpoints.CreateEndpoint:output_type -> google.longrunning.Operation
-	1,  // 18: pivox.storage.v1.Endpoints.GetEndpoint:output_type -> pivox.storage.v1.Endpoint
-	8,  // 19: pivox.storage.v1.Endpoints.ListEndpoints:output_type -> pivox.storage.v1.ListEndpointsResponse
-	19, // 20: pivox.storage.v1.Endpoints.UpdateEndpoint:output_type -> google.longrunning.Operation
-	19, // 21: pivox.storage.v1.Endpoints.DeleteEndpoint:output_type -> google.longrunning.Operation
-	14, // 22: pivox.storage.v1.Endpoints.TestEndpointConnection:output_type -> pivox.storage.v1.TestEndpointConnectionResponse
-	17, // [17:23] is the sub-list for method output_type
-	11, // [11:17] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	15, // 9: pivox.storage.v1.UpdateEndpointRequest.update_mask:type_name -> google.protobuf.FieldMask
+	4,  // 10: pivox.storage.v1.Endpoints.CreateEndpoint:input_type -> pivox.storage.v1.CreateEndpointRequest
+	6,  // 11: pivox.storage.v1.Endpoints.GetEndpoint:input_type -> pivox.storage.v1.GetEndpointRequest
+	7,  // 12: pivox.storage.v1.Endpoints.ListEndpoints:input_type -> pivox.storage.v1.ListEndpointsRequest
+	9,  // 13: pivox.storage.v1.Endpoints.UpdateEndpoint:input_type -> pivox.storage.v1.UpdateEndpointRequest
+	11, // 14: pivox.storage.v1.Endpoints.DeleteEndpoint:input_type -> pivox.storage.v1.DeleteEndpointRequest
+	16, // 15: pivox.storage.v1.Endpoints.CreateEndpoint:output_type -> google.longrunning.Operation
+	1,  // 16: pivox.storage.v1.Endpoints.GetEndpoint:output_type -> pivox.storage.v1.Endpoint
+	8,  // 17: pivox.storage.v1.Endpoints.ListEndpoints:output_type -> pivox.storage.v1.ListEndpointsResponse
+	16, // 18: pivox.storage.v1.Endpoints.UpdateEndpoint:output_type -> google.longrunning.Operation
+	16, // 19: pivox.storage.v1.Endpoints.DeleteEndpoint:output_type -> google.longrunning.Operation
+	15, // [15:20] is the sub-list for method output_type
+	10, // [10:15] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_pivox_storage_v1_endpoint_proto_init() }
@@ -1228,7 +1097,7 @@ func file_pivox_storage_v1_endpoint_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pivox_storage_v1_endpoint_proto_rawDesc), len(file_pivox_storage_v1_endpoint_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   15,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
