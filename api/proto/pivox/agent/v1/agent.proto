@@ -48,6 +48,11 @@ service AgentService {
 // AgentMessage wraps every message the agent sends to the control plane over
 // the Connect stream.
 message AgentMessage {
+  // Unique message identifier. Set by the sender. Echoed back in the
+  // corresponding ControlMessage response for request/response correlation.
+  // Empty for fire-and-forget messages (heartbeat, telemetry).
+  string id = 7;
+
   oneof message {
     // Initial authentication and capability advertisement.
     Handshake handshake = 1;
@@ -255,6 +260,12 @@ message SystemMetrics {
 // ControlMessage wraps every message the control plane sends to the agent over
 // the Connect stream.
 message ControlMessage {
+  // Message identifier. For responses to agent requests, this echoes
+  // the id from the corresponding AgentMessage. For server-initiated
+  // messages (config updates, cert delivery, drain/upgrade), this is
+  // a new unique id set by the server.
+  string id = 7;
+
   oneof message {
     // Response to the agent's initial Handshake, carrying credentials and
     // configuration.

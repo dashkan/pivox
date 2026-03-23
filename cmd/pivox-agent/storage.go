@@ -7,8 +7,11 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
+
+	"github.com/dashkan/pivox-server/internal/agent"
 )
 
 func storageCmd() *cobra.Command {
@@ -77,18 +80,21 @@ func runStorage(cmd *cobra.Command, args []string) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	// TODO: Implement storage agent
-	// 1. Dial control plane with registration token
-	// 2. Establish bidi gRPC stream (AgentService.Connect)
-	// 3. Receive HandshakeAck with TLS cert + endpoint configs
-	// 4. Start HTTPS reverse proxy server
-	// 5. Start cache manager
-	// 6. Send periodic heartbeats
-	// 7. Handle control plane messages (config updates, cert renewals, upgrades)
-	_ = token
+	// Connect to control plane with reconnect loop.
+	for {
+		logger.Info("connecting to server", "addr", controlPlaneAddr)
+		err := agent.Connect(ctx, controlPlaneAddr, token, logger)
+		if ctx.Err() != nil {
+			logger.Info("storage agent shutting down...")
+			return nil
+		}
+		logger.Error("disconnected from server", "error", err)
 
-	<-ctx.Done()
-	logger.Info("storage agent shutting down...")
-
-	return nil
+		// Back off before reconnecting.
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(5 * time.Second):
+		}
+	}
 }

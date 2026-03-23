@@ -722,6 +722,17 @@ type StorageAgent struct {
 	LastSeenTime   time.Time          `json:"last_seen_time"`
 }
 
+type StorageAgentAudit struct {
+	ID          uuid.UUID   `json:"id"`
+	GatewayID   uuid.UUID   `json:"gateway_id"`
+	AgentID     pgtype.UUID `json:"agent_id"`
+	MessageID   string      `json:"message_id"`
+	Direction   string      `json:"direction"`
+	MessageType string      `json:"message_type"`
+	Payload     []byte      `json:"payload"`
+	CreateTime  time.Time   `json:"create_time"`
+}
+
 type StorageEndpoint struct {
 	ID            uuid.UUID       `json:"id"`
 	GatewayID     uuid.UUID       `json:"gateway_id"`

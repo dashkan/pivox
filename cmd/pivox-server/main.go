@@ -28,6 +28,7 @@ import (
 	"github.com/dashkan/pivox-server/internal/lro"
 	"github.com/dashkan/pivox-server/internal/server"
 
+	agentv1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/agent/v1"
 	apiv1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1"
 	storagev1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/storage/v1"
 )
@@ -170,6 +171,9 @@ func serve(cmd *cobra.Command, args []string) error {
 	storagev1.RegisterStorageGatewaysServer(grpcServer, server.NewStorageGatewaysServer(pool, queries, enc))
 	storagev1.RegisterAgentsServer(grpcServer, server.NewAgentsServer(queries))
 	storagev1.RegisterEndpointsServer(grpcServer, server.NewEndpointsServer(pool, queries, enc))
+
+	// Agent bidi streaming service (agents authenticate via registration token, not Firebase)
+	agentv1.RegisterAgentServiceServer(grpcServer, server.NewAgentServiceServer(pool, queries, logger))
 
 	reflection.Register(grpcServer)
 

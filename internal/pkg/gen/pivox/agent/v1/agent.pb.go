@@ -169,6 +169,10 @@ func (UpgradeCommand) EnumDescriptor() ([]byte, []int) {
 // the Connect stream.
 type AgentMessage struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
+	// Unique message identifier. Set by the sender. Echoed back in the
+	// corresponding ControlMessage response for request/response correlation.
+	// Empty for fire-and-forget messages (heartbeat, telemetry).
+	Id string `protobuf:"bytes,7,opt,name=id,proto3" json:"id,omitempty"`
 	// Types that are valid to be assigned to Message:
 	//
 	//	*AgentMessage_Handshake
@@ -210,6 +214,13 @@ func (x *AgentMessage) ProtoReflect() protoreflect.Message {
 // Deprecated: Use AgentMessage.ProtoReflect.Descriptor instead.
 func (*AgentMessage) Descriptor() ([]byte, []int) {
 	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *AgentMessage) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
 }
 
 func (x *AgentMessage) GetMessage() isAgentMessage_Message {
@@ -1048,6 +1059,11 @@ func (x *SystemMetrics) GetNetworkTxBytes() int64 {
 // the Connect stream.
 type ControlMessage struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
+	// Message identifier. For responses to agent requests, this echoes
+	// the id from the corresponding AgentMessage. For server-initiated
+	// messages (config updates, cert delivery, drain/upgrade), this is
+	// a new unique id set by the server.
+	Id string `protobuf:"bytes,7,opt,name=id,proto3" json:"id,omitempty"`
 	// Types that are valid to be assigned to Message:
 	//
 	//	*ControlMessage_HandshakeAck
@@ -1089,6 +1105,13 @@ func (x *ControlMessage) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ControlMessage.ProtoReflect.Descriptor instead.
 func (*ControlMessage) Descriptor() ([]byte, []int) {
 	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ControlMessage) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
 }
 
 func (x *ControlMessage) GetMessage() isControlMessage_Message {
@@ -1872,8 +1895,9 @@ var File_pivox_agent_v1_agent_proto protoreflect.FileDescriptor
 
 const file_pivox_agent_v1_agent_proto_rawDesc = "" +
 	"\n" +
-	"\x1apivox/agent/v1/agent.proto\x12\x0epivox.agent.v1\x1a\x17google/api/client.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9c\x03\n" +
-	"\fAgentMessage\x129\n" +
+	"\x1apivox/agent/v1/agent.proto\x12\x0epivox.agent.v1\x1a\x17google/api/client.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xac\x03\n" +
+	"\fAgentMessage\x12\x0e\n" +
+	"\x02id\x18\a \x01(\tR\x02id\x129\n" +
 	"\thandshake\x18\x01 \x01(\v2\x19.pivox.agent.v1.HandshakeH\x00R\thandshake\x129\n" +
 	"\theartbeat\x18\x02 \x01(\v2\x19.pivox.agent.v1.HeartbeatH\x00R\theartbeat\x12I\n" +
 	"\x0fendpoint_health\x18\x03 \x01(\v2\x1e.pivox.agent.v1.EndpointHealthH\x00R\x0eendpointHealth\x12=\n" +
@@ -1937,8 +1961,9 @@ const file_pivox_agent_v1_agent_proto_rawDesc = "" +
 	"\x0fdisk_read_bytes\x18\x04 \x01(\x03R\rdiskReadBytes\x12(\n" +
 	"\x10disk_write_bytes\x18\x05 \x01(\x03R\x0ediskWriteBytes\x12(\n" +
 	"\x10network_rx_bytes\x18\x06 \x01(\x03R\x0enetworkRxBytes\x12(\n" +
-	"\x10network_tx_bytes\x18\a \x01(\x03R\x0enetworkTxBytes\"\xc8\x03\n" +
-	"\x0eControlMessage\x12C\n" +
+	"\x10network_tx_bytes\x18\a \x01(\x03R\x0enetworkTxBytes\"\xd8\x03\n" +
+	"\x0eControlMessage\x12\x0e\n" +
+	"\x02id\x18\a \x01(\tR\x02id\x12C\n" +
 	"\rhandshake_ack\x18\x01 \x01(\v2\x1c.pivox.agent.v1.HandshakeAckH\x00R\fhandshakeAck\x12C\n" +
 	"\rcert_delivery\x18\x02 \x01(\v2\x1c.pivox.agent.v1.CertDeliveryH\x00R\fcertDelivery\x12C\n" +
 	"\rdrain_request\x18\x03 \x01(\v2\x1c.pivox.agent.v1.DrainRequestH\x00R\fdrainRequest\x12I\n" +

@@ -27,6 +27,7 @@ type Querier interface {
 	CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error)
 	CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error)
 	CreateStorageAgent(ctx context.Context, arg CreateStorageAgentParams) (StorageAgent, error)
+	CreateStorageAgentAudit(ctx context.Context, arg CreateStorageAgentAuditParams) error
 	CreateStorageEndpoint(ctx context.Context, arg CreateStorageEndpointParams) (StorageEndpoint, error)
 	CreateStorageGateway(ctx context.Context, arg CreateStorageGatewayParams) (StorageGateway, error)
 	CreateTagBinding(ctx context.Context, arg CreateTagBindingParams) (TagBinding, error)
@@ -35,6 +36,7 @@ type Querier interface {
 	// Cleanup: remove codes older than 10 minutes (all should be expired by then).
 	DeleteExpiredAuthTokenCodes(ctx context.Context) error
 	DeleteExpiredOperations(ctx context.Context) error
+	DeleteExpiredStorageAgentAudit(ctx context.Context) (int64, error)
 	DeleteIamPolicy(ctx context.Context, resourceID uuid.UUID) error
 	DeleteOperation(ctx context.Context, id uuid.UUID) error
 	DeleteStorageAgent(ctx context.Context, id uuid.UUID) error
@@ -71,6 +73,8 @@ type Querier interface {
 	ListEffectiveTags(ctx context.Context, parentResource string) ([]ListEffectiveTagsRow, error)
 	ListOperations(ctx context.Context, arg ListOperationsParams) ([]Operation, error)
 	ListPendingOperations(ctx context.Context) ([]Operation, error)
+	ListStorageAgentAuditByAgent(ctx context.Context, arg ListStorageAgentAuditByAgentParams) ([]StorageAgentAudit, error)
+	ListStorageAgentAuditByGateway(ctx context.Context, arg ListStorageAgentAuditByGatewayParams) ([]StorageAgentAudit, error)
 	ListStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageAgent, error)
 	ListStorageEndpointsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageEndpoint, error)
 	LookupApiKeyByKeyString(ctx context.Context, keyString string) (ApiKey, error)

@@ -245,6 +245,26 @@ CREATE TABLE storage_endpoints (
 CREATE INDEX idx_storage_endpoints_gateway ON storage_endpoints (gateway_id);
 
 -- ============================================================================
+-- storage_agent_audit (bidi message audit log, excludes heartbeat/telemetry)
+-- ============================================================================
+CREATE TABLE storage_agent_audit (
+    id           UUID PRIMARY KEY DEFAULT uuidv7(),
+    -- relationships
+    gateway_id   UUID NOT NULL REFERENCES storage_gateways(id) ON DELETE CASCADE,
+    agent_id     UUID,  -- NULL for pre-handshake messages
+    -- message
+    message_id   TEXT NOT NULL,
+    direction    TEXT NOT NULL,  -- 'inbound' or 'outbound'
+    message_type TEXT NOT NULL,  -- 'handshake', 'handshake_ack', 'config_update', etc.
+    payload      JSONB,          -- message content (secrets redacted)
+    -- timestamps
+    create_time  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_storage_agent_audit_gateway ON storage_agent_audit (gateway_id, create_time DESC);
+CREATE INDEX idx_storage_agent_audit_agent ON storage_agent_audit (agent_id, create_time DESC);
+CREATE INDEX idx_storage_agent_audit_time ON storage_agent_audit (create_time);
+
+-- ============================================================================
 -- tag_keys
 -- ============================================================================
 CREATE TABLE tag_keys (

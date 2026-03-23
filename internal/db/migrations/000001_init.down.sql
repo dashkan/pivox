@@ -21,6 +21,7 @@ DROP TABLE IF EXISTS api_keys;
 DROP TABLE IF EXISTS tag_bindings;
 DROP TABLE IF EXISTS tag_values;
 DROP TABLE IF EXISTS tag_keys;
+DROP TABLE IF EXISTS storage_agent_audit;
 DROP TABLE IF EXISTS storage_endpoints;
 DROP TABLE IF EXISTS storage_agents;
 DROP TABLE IF EXISTS storage_gateways;

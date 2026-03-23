@@ -37,9 +37,9 @@ func MustAuthenticatedUID(ctx context.Context) string {
 // publicMethods lists gRPC full method names that skip authentication.
 // Reflection and health checks are handled separately by gRPC itself.
 var publicMethods = map[string]bool{
-	// Add unauthenticated endpoints here as needed, e.g.:
-	// "/grpc.reflection.v1.ServerReflection/ServerReflectionInfo": true,
-	// "/grpc.reflection.v1alpha.ServerReflection/ServerReflectionInfo": true,
+	// AgentService.Connect authenticates via registration_token in the
+	// Handshake message, not via Firebase bearer tokens.
+	"/pivox.agent.v1.AgentService/Connect": true,
 }
 
 // AuthInterceptor returns a gRPC unary server interceptor that verifies
