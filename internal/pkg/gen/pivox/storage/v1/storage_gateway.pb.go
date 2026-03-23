@@ -163,59 +163,6 @@ func (StorageGateway_CertState) EnumDescriptor() ([]byte, []int) {
 	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{0, 1}
 }
 
-// The eviction policy used when the cache reaches its maximum size.
-type CacheConfig_EvictionPolicy int32
-
-const (
-	// Unspecified eviction policy.
-	CacheConfig_EVICTION_POLICY_UNSPECIFIED CacheConfig_EvictionPolicy = 0
-	// Least Recently Used: evicts the least recently accessed items first.
-	CacheConfig_LRU CacheConfig_EvictionPolicy = 1
-	// Least Frequently Used: evicts the least frequently accessed items first.
-	CacheConfig_LFU CacheConfig_EvictionPolicy = 2
-)
-
-// Enum value maps for CacheConfig_EvictionPolicy.
-var (
-	CacheConfig_EvictionPolicy_name = map[int32]string{
-		0: "EVICTION_POLICY_UNSPECIFIED",
-		1: "LRU",
-		2: "LFU",
-	}
-	CacheConfig_EvictionPolicy_value = map[string]int32{
-		"EVICTION_POLICY_UNSPECIFIED": 0,
-		"LRU":                         1,
-		"LFU":                         2,
-	}
-)
-
-func (x CacheConfig_EvictionPolicy) Enum() *CacheConfig_EvictionPolicy {
-	p := new(CacheConfig_EvictionPolicy)
-	*p = x
-	return p
-}
-
-func (x CacheConfig_EvictionPolicy) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (CacheConfig_EvictionPolicy) Descriptor() protoreflect.EnumDescriptor {
-	return file_pivox_storage_v1_storage_gateway_proto_enumTypes[2].Descriptor()
-}
-
-func (CacheConfig_EvictionPolicy) Type() protoreflect.EnumType {
-	return &file_pivox_storage_v1_storage_gateway_proto_enumTypes[2]
-}
-
-func (x CacheConfig_EvictionPolicy) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use CacheConfig_EvictionPolicy.Descriptor instead.
-func (CacheConfig_EvictionPolicy) EnumDescriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{1, 0}
-}
-
 // The phases of a gateway upgrade operation.
 type UpgradeGatewayMetadata_UpgradeGatewayPhase int32
 
@@ -261,11 +208,11 @@ func (x UpgradeGatewayMetadata_UpgradeGatewayPhase) String() string {
 }
 
 func (UpgradeGatewayMetadata_UpgradeGatewayPhase) Descriptor() protoreflect.EnumDescriptor {
-	return file_pivox_storage_v1_storage_gateway_proto_enumTypes[3].Descriptor()
+	return file_pivox_storage_v1_storage_gateway_proto_enumTypes[2].Descriptor()
 }
 
 func (UpgradeGatewayMetadata_UpgradeGatewayPhase) Type() protoreflect.EnumType {
-	return &file_pivox_storage_v1_storage_gateway_proto_enumTypes[3]
+	return &file_pivox_storage_v1_storage_gateway_proto_enumTypes[2]
 }
 
 func (x UpgradeGatewayMetadata_UpgradeGatewayPhase) Number() protoreflect.EnumNumber {
@@ -274,7 +221,7 @@ func (x UpgradeGatewayMetadata_UpgradeGatewayPhase) Number() protoreflect.EnumNu
 
 // Deprecated: Use UpgradeGatewayMetadata_UpgradeGatewayPhase.Descriptor instead.
 func (UpgradeGatewayMetadata_UpgradeGatewayPhase) EnumDescriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{17, 0}
+	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{16, 0}
 }
 
 // A storage gateway deployed within an organization. Storage gateways act
@@ -303,8 +250,6 @@ type StorageGateway struct {
 	// Output only. The currently running software version of the storage
 	// gateway.
 	CurrentVersion string `protobuf:"bytes,8,opt,name=current_version,json=currentVersion,proto3" json:"current_version,omitempty"`
-	// Optional. Cache configuration for the storage gateway.
-	CacheConfig *CacheConfig `protobuf:"bytes,9,opt,name=cache_config,json=cacheConfig,proto3" json:"cache_config,omitempty"`
 	// Output only. The current state of the TLS certificate.
 	CertState StorageGateway_CertState `protobuf:"varint,10,opt,name=cert_state,json=certState,proto3,enum=pivox.storage.v1.StorageGateway_CertState" json:"cert_state,omitempty"`
 	// Output only. The expiration time of the TLS certificate.
@@ -417,13 +362,6 @@ func (x *StorageGateway) GetCurrentVersion() string {
 	return ""
 }
 
-func (x *StorageGateway) GetCacheConfig() *CacheConfig {
-	if x != nil {
-		return x.CacheConfig
-	}
-	return nil
-}
-
 func (x *StorageGateway) GetCertState() StorageGateway_CertState {
 	if x != nil {
 		return x.CertState
@@ -480,70 +418,6 @@ func (x *StorageGateway) GetUpdateTime() *timestamppb.Timestamp {
 	return nil
 }
 
-// Cache configuration for a storage gateway.
-type CacheConfig struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Optional. The maximum cache size in gigabytes. Must be positive.
-	MaxSizeGb int32 `protobuf:"varint,1,opt,name=max_size_gb,json=maxSizeGb,proto3" json:"max_size_gb,omitempty"`
-	// Optional. The eviction policy to use when the cache is full.
-	EvictionPolicy CacheConfig_EvictionPolicy `protobuf:"varint,2,opt,name=eviction_policy,json=evictionPolicy,proto3,enum=pivox.storage.v1.CacheConfig_EvictionPolicy" json:"eviction_policy,omitempty"`
-	// Optional. The time-to-live for cached items, in hours. Must be positive.
-	TtlHours      int32 `protobuf:"varint,3,opt,name=ttl_hours,json=ttlHours,proto3" json:"ttl_hours,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CacheConfig) Reset() {
-	*x = CacheConfig{}
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[1]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CacheConfig) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CacheConfig) ProtoMessage() {}
-
-func (x *CacheConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[1]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CacheConfig.ProtoReflect.Descriptor instead.
-func (*CacheConfig) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *CacheConfig) GetMaxSizeGb() int32 {
-	if x != nil {
-		return x.MaxSizeGb
-	}
-	return 0
-}
-
-func (x *CacheConfig) GetEvictionPolicy() CacheConfig_EvictionPolicy {
-	if x != nil {
-		return x.EvictionPolicy
-	}
-	return CacheConfig_EVICTION_POLICY_UNSPECIFIED
-}
-
-func (x *CacheConfig) GetTtlHours() int32 {
-	if x != nil {
-		return x.TtlHours
-	}
-	return 0
-}
-
 // The request sent to the
 // [CreateStorageGateway][pivox.storage.v1.StorageGateways.CreateStorageGateway]
 // method.
@@ -566,7 +440,7 @@ type CreateStorageGatewayRequest struct {
 
 func (x *CreateStorageGatewayRequest) Reset() {
 	*x = CreateStorageGatewayRequest{}
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[2]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -578,7 +452,7 @@ func (x *CreateStorageGatewayRequest) String() string {
 func (*CreateStorageGatewayRequest) ProtoMessage() {}
 
 func (x *CreateStorageGatewayRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[2]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -591,7 +465,7 @@ func (x *CreateStorageGatewayRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateStorageGatewayRequest.ProtoReflect.Descriptor instead.
 func (*CreateStorageGatewayRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{2}
+	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *CreateStorageGatewayRequest) GetParent() string {
@@ -632,7 +506,7 @@ type CreateStorageGatewayMetadata struct {
 
 func (x *CreateStorageGatewayMetadata) Reset() {
 	*x = CreateStorageGatewayMetadata{}
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[3]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -644,7 +518,7 @@ func (x *CreateStorageGatewayMetadata) String() string {
 func (*CreateStorageGatewayMetadata) ProtoMessage() {}
 
 func (x *CreateStorageGatewayMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[3]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -657,7 +531,7 @@ func (x *CreateStorageGatewayMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateStorageGatewayMetadata.ProtoReflect.Descriptor instead.
 func (*CreateStorageGatewayMetadata) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{3}
+	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{2}
 }
 
 // The request sent to the
@@ -674,7 +548,7 @@ type GetStorageGatewayRequest struct {
 
 func (x *GetStorageGatewayRequest) Reset() {
 	*x = GetStorageGatewayRequest{}
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[4]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -686,7 +560,7 @@ func (x *GetStorageGatewayRequest) String() string {
 func (*GetStorageGatewayRequest) ProtoMessage() {}
 
 func (x *GetStorageGatewayRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[4]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -699,7 +573,7 @@ func (x *GetStorageGatewayRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetStorageGatewayRequest.ProtoReflect.Descriptor instead.
 func (*GetStorageGatewayRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{4}
+	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GetStorageGatewayRequest) GetName() string {
@@ -757,7 +631,7 @@ type ListStorageGatewaysRequest struct {
 
 func (x *ListStorageGatewaysRequest) Reset() {
 	*x = ListStorageGatewaysRequest{}
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[5]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -769,7 +643,7 @@ func (x *ListStorageGatewaysRequest) String() string {
 func (*ListStorageGatewaysRequest) ProtoMessage() {}
 
 func (x *ListStorageGatewaysRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[5]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -782,7 +656,7 @@ func (x *ListStorageGatewaysRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListStorageGatewaysRequest.ProtoReflect.Descriptor instead.
 func (*ListStorageGatewaysRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{5}
+	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ListStorageGatewaysRequest) GetParent() string {
@@ -836,7 +710,7 @@ type ListStorageGatewaysResponse struct {
 
 func (x *ListStorageGatewaysResponse) Reset() {
 	*x = ListStorageGatewaysResponse{}
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[6]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -848,7 +722,7 @@ func (x *ListStorageGatewaysResponse) String() string {
 func (*ListStorageGatewaysResponse) ProtoMessage() {}
 
 func (x *ListStorageGatewaysResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[6]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -861,7 +735,7 @@ func (x *ListStorageGatewaysResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListStorageGatewaysResponse.ProtoReflect.Descriptor instead.
 func (*ListStorageGatewaysResponse) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{6}
+	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ListStorageGatewaysResponse) GetStorageGateways() []*StorageGateway {
@@ -900,7 +774,7 @@ type UpdateStorageGatewayRequest struct {
 
 func (x *UpdateStorageGatewayRequest) Reset() {
 	*x = UpdateStorageGatewayRequest{}
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[7]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -912,7 +786,7 @@ func (x *UpdateStorageGatewayRequest) String() string {
 func (*UpdateStorageGatewayRequest) ProtoMessage() {}
 
 func (x *UpdateStorageGatewayRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[7]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -925,7 +799,7 @@ func (x *UpdateStorageGatewayRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateStorageGatewayRequest.ProtoReflect.Descriptor instead.
 func (*UpdateStorageGatewayRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{7}
+	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *UpdateStorageGatewayRequest) GetStorageGateway() *StorageGateway {
@@ -959,7 +833,7 @@ type UpdateStorageGatewayMetadata struct {
 
 func (x *UpdateStorageGatewayMetadata) Reset() {
 	*x = UpdateStorageGatewayMetadata{}
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[8]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -971,7 +845,7 @@ func (x *UpdateStorageGatewayMetadata) String() string {
 func (*UpdateStorageGatewayMetadata) ProtoMessage() {}
 
 func (x *UpdateStorageGatewayMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[8]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -984,7 +858,7 @@ func (x *UpdateStorageGatewayMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateStorageGatewayMetadata.ProtoReflect.Descriptor instead.
 func (*UpdateStorageGatewayMetadata) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{8}
+	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{7}
 }
 
 // The request sent to the
@@ -1007,7 +881,7 @@ type DeleteStorageGatewayRequest struct {
 
 func (x *DeleteStorageGatewayRequest) Reset() {
 	*x = DeleteStorageGatewayRequest{}
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[9]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1019,7 +893,7 @@ func (x *DeleteStorageGatewayRequest) String() string {
 func (*DeleteStorageGatewayRequest) ProtoMessage() {}
 
 func (x *DeleteStorageGatewayRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[9]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1032,7 +906,7 @@ func (x *DeleteStorageGatewayRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteStorageGatewayRequest.ProtoReflect.Descriptor instead.
 func (*DeleteStorageGatewayRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{9}
+	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *DeleteStorageGatewayRequest) GetName() string {
@@ -1066,7 +940,7 @@ type DeleteStorageGatewayMetadata struct {
 
 func (x *DeleteStorageGatewayMetadata) Reset() {
 	*x = DeleteStorageGatewayMetadata{}
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[10]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1078,7 +952,7 @@ func (x *DeleteStorageGatewayMetadata) String() string {
 func (*DeleteStorageGatewayMetadata) ProtoMessage() {}
 
 func (x *DeleteStorageGatewayMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[10]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1091,7 +965,7 @@ func (x *DeleteStorageGatewayMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteStorageGatewayMetadata.ProtoReflect.Descriptor instead.
 func (*DeleteStorageGatewayMetadata) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{10}
+	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{9}
 }
 
 // The request sent to the
@@ -1109,7 +983,7 @@ type RotateRegistrationTokenRequest struct {
 
 func (x *RotateRegistrationTokenRequest) Reset() {
 	*x = RotateRegistrationTokenRequest{}
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[11]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1121,7 +995,7 @@ func (x *RotateRegistrationTokenRequest) String() string {
 func (*RotateRegistrationTokenRequest) ProtoMessage() {}
 
 func (x *RotateRegistrationTokenRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[11]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1134,7 +1008,7 @@ func (x *RotateRegistrationTokenRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RotateRegistrationTokenRequest.ProtoReflect.Descriptor instead.
 func (*RotateRegistrationTokenRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{11}
+	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *RotateRegistrationTokenRequest) GetName() string {
@@ -1179,7 +1053,7 @@ type GetInstallScriptRequest struct {
 
 func (x *GetInstallScriptRequest) Reset() {
 	*x = GetInstallScriptRequest{}
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[12]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1191,7 +1065,7 @@ func (x *GetInstallScriptRequest) String() string {
 func (*GetInstallScriptRequest) ProtoMessage() {}
 
 func (x *GetInstallScriptRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[12]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1204,7 +1078,7 @@ func (x *GetInstallScriptRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetInstallScriptRequest.ProtoReflect.Descriptor instead.
 func (*GetInstallScriptRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{12}
+	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetInstallScriptRequest) GetName() string {
@@ -1283,7 +1157,7 @@ type GetInstallScriptResponse struct {
 
 func (x *GetInstallScriptResponse) Reset() {
 	*x = GetInstallScriptResponse{}
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[13]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1295,7 +1169,7 @@ func (x *GetInstallScriptResponse) String() string {
 func (*GetInstallScriptResponse) ProtoMessage() {}
 
 func (x *GetInstallScriptResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[13]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1308,7 +1182,7 @@ func (x *GetInstallScriptResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetInstallScriptResponse.ProtoReflect.Descriptor instead.
 func (*GetInstallScriptResponse) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{13}
+	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetInstallScriptResponse) GetScript() string {
@@ -1333,7 +1207,7 @@ type GetUninstallScriptRequest struct {
 
 func (x *GetUninstallScriptRequest) Reset() {
 	*x = GetUninstallScriptRequest{}
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[14]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1345,7 +1219,7 @@ func (x *GetUninstallScriptRequest) String() string {
 func (*GetUninstallScriptRequest) ProtoMessage() {}
 
 func (x *GetUninstallScriptRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[14]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1358,7 +1232,7 @@ func (x *GetUninstallScriptRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUninstallScriptRequest.ProtoReflect.Descriptor instead.
 func (*GetUninstallScriptRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{14}
+	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GetUninstallScriptRequest) GetName() string {
@@ -1381,7 +1255,7 @@ type GetUninstallScriptResponse struct {
 
 func (x *GetUninstallScriptResponse) Reset() {
 	*x = GetUninstallScriptResponse{}
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[15]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1393,7 +1267,7 @@ func (x *GetUninstallScriptResponse) String() string {
 func (*GetUninstallScriptResponse) ProtoMessage() {}
 
 func (x *GetUninstallScriptResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[15]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1406,7 +1280,7 @@ func (x *GetUninstallScriptResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUninstallScriptResponse.ProtoReflect.Descriptor instead.
 func (*GetUninstallScriptResponse) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{15}
+	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *GetUninstallScriptResponse) GetScript() string {
@@ -1432,7 +1306,7 @@ type UpgradeGatewayRequest struct {
 
 func (x *UpgradeGatewayRequest) Reset() {
 	*x = UpgradeGatewayRequest{}
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[16]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1444,7 +1318,7 @@ func (x *UpgradeGatewayRequest) String() string {
 func (*UpgradeGatewayRequest) ProtoMessage() {}
 
 func (x *UpgradeGatewayRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[16]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1457,7 +1331,7 @@ func (x *UpgradeGatewayRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpgradeGatewayRequest.ProtoReflect.Descriptor instead.
 func (*UpgradeGatewayRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{16}
+	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *UpgradeGatewayRequest) GetName() string {
@@ -1496,7 +1370,7 @@ type UpgradeGatewayMetadata struct {
 
 func (x *UpgradeGatewayMetadata) Reset() {
 	*x = UpgradeGatewayMetadata{}
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[17]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1508,7 +1382,7 @@ func (x *UpgradeGatewayMetadata) String() string {
 func (*UpgradeGatewayMetadata) ProtoMessage() {}
 
 func (x *UpgradeGatewayMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[17]
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1521,7 +1395,7 @@ func (x *UpgradeGatewayMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpgradeGatewayMetadata.ProtoReflect.Descriptor instead.
 func (*UpgradeGatewayMetadata) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{17}
+	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *UpgradeGatewayMetadata) GetPhase() UpgradeGatewayMetadata_UpgradeGatewayPhase {
@@ -1570,8 +1444,7 @@ var File_pivox_storage_v1_storage_gateway_proto protoreflect.FileDescriptor
 
 const file_pivox_storage_v1_storage_gateway_proto_rawDesc = "" +
 	"\n" +
-	"&pivox/storage/v1/storage_gateway.proto\x12\x10pivox.storage.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x97\n" +
-	"\n" +
+	"&pivox/storage/v1/storage_gateway.proto\x12\x10pivox.storage.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xd0\t\n" +
 	"\x0eStorageGateway\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12-\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\n" +
@@ -1581,8 +1454,7 @@ const file_pivox_storage_v1_storage_gateway_proto_rawDesc = "" +
 	"\fip_addresses\x18\x05 \x03(\tB\x11\xe0A\x02\xbaH\v\x92\x01\b\b\x01\"\x04r\x02p\x01R\vipAddresses\x122\n" +
 	"\x12registration_token\x18\x06 \x01(\tB\x03\xe0A\x03R\x11registrationToken\x12*\n" +
 	"\x0etarget_version\x18\a \x01(\tB\x03\xe0A\x01R\rtargetVersion\x12,\n" +
-	"\x0fcurrent_version\x18\b \x01(\tB\x03\xe0A\x03R\x0ecurrentVersion\x12E\n" +
-	"\fcache_config\x18\t \x01(\v2\x1d.pivox.storage.v1.CacheConfigB\x03\xe0A\x01R\vcacheConfig\x12N\n" +
+	"\x0fcurrent_version\x18\b \x01(\tB\x03\xe0A\x03R\x0ecurrentVersion\x12N\n" +
 	"\n" +
 	"cert_state\x18\n" +
 	" \x01(\x0e2*.pivox.storage.v1.StorageGateway.CertStateB\x03\xe0A\x03R\tcertState\x12I\n" +
@@ -1611,17 +1483,7 @@ const file_pivox_storage_v1_storage_gateway_proto_rawDesc = "" +
 	"\vCERT_ACTIVE\x10\x02\x12\f\n" +
 	"\bEXPIRING\x10\x03\x12\v\n" +
 	"\aEXPIRED\x10\x04:\x82\x01\xeaA\x7f\n" +
-	"\x1cpivox.storage/StorageGateway\x12>organizations/{organization}/storageGateways/{storage_gateway}*\x0fstorageGateways2\x0estorageGateway\"\x83\x02\n" +
-	"\vCacheConfig\x12*\n" +
-	"\vmax_size_gb\x18\x01 \x01(\x05B\n" +
-	"\xe0A\x01\xbaH\x04\x1a\x02(\x00R\tmaxSizeGb\x12Z\n" +
-	"\x0feviction_policy\x18\x02 \x01(\x0e2,.pivox.storage.v1.CacheConfig.EvictionPolicyB\x03\xe0A\x01R\x0eevictionPolicy\x12'\n" +
-	"\tttl_hours\x18\x03 \x01(\x05B\n" +
-	"\xe0A\x01\xbaH\x04\x1a\x02(\x00R\bttlHours\"C\n" +
-	"\x0eEvictionPolicy\x12\x1f\n" +
-	"\x1bEVICTION_POLICY_UNSPECIFIED\x10\x00\x12\a\n" +
-	"\x03LRU\x10\x01\x12\a\n" +
-	"\x03LFU\x10\x02\"\x94\x02\n" +
+	"\x1cpivox.storage/StorageGateway\x12>organizations/{organization}/storageGateways/{storage_gateway}*\x0fstorageGateways2\x0estorageGateway\"\x94\x02\n" +
 	"\x1bCreateStorageGatewayRequest\x12B\n" +
 	"\x06parent\x18\x01 \x01(\tB*\xe0A\x02\xfaA\x1e\x12\x1cpivox.storage/StorageGateway\xbaH\x03\xc8\x01\x01R\x06parent\x12T\n" +
 	"\x0fstorage_gateway\x18\x02 \x01(\v2 .pivox.storage.v1.StorageGatewayB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\x0estorageGateway\x121\n" +
@@ -1723,73 +1585,69 @@ func file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP() []byte {
 	return file_pivox_storage_v1_storage_gateway_proto_rawDescData
 }
 
-var file_pivox_storage_v1_storage_gateway_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_pivox_storage_v1_storage_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_pivox_storage_v1_storage_gateway_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_pivox_storage_v1_storage_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_pivox_storage_v1_storage_gateway_proto_goTypes = []any{
 	(StorageGateway_State)(0),                       // 0: pivox.storage.v1.StorageGateway.State
 	(StorageGateway_CertState)(0),                   // 1: pivox.storage.v1.StorageGateway.CertState
-	(CacheConfig_EvictionPolicy)(0),                 // 2: pivox.storage.v1.CacheConfig.EvictionPolicy
-	(UpgradeGatewayMetadata_UpgradeGatewayPhase)(0), // 3: pivox.storage.v1.UpgradeGatewayMetadata.UpgradeGatewayPhase
-	(*StorageGateway)(nil),                          // 4: pivox.storage.v1.StorageGateway
-	(*CacheConfig)(nil),                             // 5: pivox.storage.v1.CacheConfig
-	(*CreateStorageGatewayRequest)(nil),             // 6: pivox.storage.v1.CreateStorageGatewayRequest
-	(*CreateStorageGatewayMetadata)(nil),            // 7: pivox.storage.v1.CreateStorageGatewayMetadata
-	(*GetStorageGatewayRequest)(nil),                // 8: pivox.storage.v1.GetStorageGatewayRequest
-	(*ListStorageGatewaysRequest)(nil),              // 9: pivox.storage.v1.ListStorageGatewaysRequest
-	(*ListStorageGatewaysResponse)(nil),             // 10: pivox.storage.v1.ListStorageGatewaysResponse
-	(*UpdateStorageGatewayRequest)(nil),             // 11: pivox.storage.v1.UpdateStorageGatewayRequest
-	(*UpdateStorageGatewayMetadata)(nil),            // 12: pivox.storage.v1.UpdateStorageGatewayMetadata
-	(*DeleteStorageGatewayRequest)(nil),             // 13: pivox.storage.v1.DeleteStorageGatewayRequest
-	(*DeleteStorageGatewayMetadata)(nil),            // 14: pivox.storage.v1.DeleteStorageGatewayMetadata
-	(*RotateRegistrationTokenRequest)(nil),          // 15: pivox.storage.v1.RotateRegistrationTokenRequest
-	(*GetInstallScriptRequest)(nil),                 // 16: pivox.storage.v1.GetInstallScriptRequest
-	(*GetInstallScriptResponse)(nil),                // 17: pivox.storage.v1.GetInstallScriptResponse
-	(*GetUninstallScriptRequest)(nil),               // 18: pivox.storage.v1.GetUninstallScriptRequest
-	(*GetUninstallScriptResponse)(nil),              // 19: pivox.storage.v1.GetUninstallScriptResponse
-	(*UpgradeGatewayRequest)(nil),                   // 20: pivox.storage.v1.UpgradeGatewayRequest
-	(*UpgradeGatewayMetadata)(nil),                  // 21: pivox.storage.v1.UpgradeGatewayMetadata
-	nil,                                             // 22: pivox.storage.v1.StorageGateway.AnnotationsEntry
-	(*timestamppb.Timestamp)(nil),                   // 23: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),                   // 24: google.protobuf.FieldMask
-	(*longrunningpb.Operation)(nil),                 // 25: google.longrunning.Operation
+	(UpgradeGatewayMetadata_UpgradeGatewayPhase)(0), // 2: pivox.storage.v1.UpgradeGatewayMetadata.UpgradeGatewayPhase
+	(*StorageGateway)(nil),                          // 3: pivox.storage.v1.StorageGateway
+	(*CreateStorageGatewayRequest)(nil),             // 4: pivox.storage.v1.CreateStorageGatewayRequest
+	(*CreateStorageGatewayMetadata)(nil),            // 5: pivox.storage.v1.CreateStorageGatewayMetadata
+	(*GetStorageGatewayRequest)(nil),                // 6: pivox.storage.v1.GetStorageGatewayRequest
+	(*ListStorageGatewaysRequest)(nil),              // 7: pivox.storage.v1.ListStorageGatewaysRequest
+	(*ListStorageGatewaysResponse)(nil),             // 8: pivox.storage.v1.ListStorageGatewaysResponse
+	(*UpdateStorageGatewayRequest)(nil),             // 9: pivox.storage.v1.UpdateStorageGatewayRequest
+	(*UpdateStorageGatewayMetadata)(nil),            // 10: pivox.storage.v1.UpdateStorageGatewayMetadata
+	(*DeleteStorageGatewayRequest)(nil),             // 11: pivox.storage.v1.DeleteStorageGatewayRequest
+	(*DeleteStorageGatewayMetadata)(nil),            // 12: pivox.storage.v1.DeleteStorageGatewayMetadata
+	(*RotateRegistrationTokenRequest)(nil),          // 13: pivox.storage.v1.RotateRegistrationTokenRequest
+	(*GetInstallScriptRequest)(nil),                 // 14: pivox.storage.v1.GetInstallScriptRequest
+	(*GetInstallScriptResponse)(nil),                // 15: pivox.storage.v1.GetInstallScriptResponse
+	(*GetUninstallScriptRequest)(nil),               // 16: pivox.storage.v1.GetUninstallScriptRequest
+	(*GetUninstallScriptResponse)(nil),              // 17: pivox.storage.v1.GetUninstallScriptResponse
+	(*UpgradeGatewayRequest)(nil),                   // 18: pivox.storage.v1.UpgradeGatewayRequest
+	(*UpgradeGatewayMetadata)(nil),                  // 19: pivox.storage.v1.UpgradeGatewayMetadata
+	nil,                                             // 20: pivox.storage.v1.StorageGateway.AnnotationsEntry
+	(*timestamppb.Timestamp)(nil),                   // 21: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),                   // 22: google.protobuf.FieldMask
+	(*longrunningpb.Operation)(nil),                 // 23: google.longrunning.Operation
 }
 var file_pivox_storage_v1_storage_gateway_proto_depIdxs = []int32{
 	0,  // 0: pivox.storage.v1.StorageGateway.state:type_name -> pivox.storage.v1.StorageGateway.State
-	5,  // 1: pivox.storage.v1.StorageGateway.cache_config:type_name -> pivox.storage.v1.CacheConfig
-	1,  // 2: pivox.storage.v1.StorageGateway.cert_state:type_name -> pivox.storage.v1.StorageGateway.CertState
-	23, // 3: pivox.storage.v1.StorageGateway.cert_expiry_time:type_name -> google.protobuf.Timestamp
-	22, // 4: pivox.storage.v1.StorageGateway.annotations:type_name -> pivox.storage.v1.StorageGateway.AnnotationsEntry
-	23, // 5: pivox.storage.v1.StorageGateway.create_time:type_name -> google.protobuf.Timestamp
-	23, // 6: pivox.storage.v1.StorageGateway.update_time:type_name -> google.protobuf.Timestamp
-	2,  // 7: pivox.storage.v1.CacheConfig.eviction_policy:type_name -> pivox.storage.v1.CacheConfig.EvictionPolicy
-	4,  // 8: pivox.storage.v1.CreateStorageGatewayRequest.storage_gateway:type_name -> pivox.storage.v1.StorageGateway
-	4,  // 9: pivox.storage.v1.ListStorageGatewaysResponse.storage_gateways:type_name -> pivox.storage.v1.StorageGateway
-	4,  // 10: pivox.storage.v1.UpdateStorageGatewayRequest.storage_gateway:type_name -> pivox.storage.v1.StorageGateway
-	24, // 11: pivox.storage.v1.UpdateStorageGatewayRequest.update_mask:type_name -> google.protobuf.FieldMask
-	3,  // 12: pivox.storage.v1.UpgradeGatewayMetadata.phase:type_name -> pivox.storage.v1.UpgradeGatewayMetadata.UpgradeGatewayPhase
-	6,  // 13: pivox.storage.v1.StorageGateways.CreateStorageGateway:input_type -> pivox.storage.v1.CreateStorageGatewayRequest
-	8,  // 14: pivox.storage.v1.StorageGateways.GetStorageGateway:input_type -> pivox.storage.v1.GetStorageGatewayRequest
-	9,  // 15: pivox.storage.v1.StorageGateways.ListStorageGateways:input_type -> pivox.storage.v1.ListStorageGatewaysRequest
-	11, // 16: pivox.storage.v1.StorageGateways.UpdateStorageGateway:input_type -> pivox.storage.v1.UpdateStorageGatewayRequest
-	13, // 17: pivox.storage.v1.StorageGateways.DeleteStorageGateway:input_type -> pivox.storage.v1.DeleteStorageGatewayRequest
-	15, // 18: pivox.storage.v1.StorageGateways.RotateRegistrationToken:input_type -> pivox.storage.v1.RotateRegistrationTokenRequest
-	16, // 19: pivox.storage.v1.StorageGateways.GetInstallScript:input_type -> pivox.storage.v1.GetInstallScriptRequest
-	18, // 20: pivox.storage.v1.StorageGateways.GetUninstallScript:input_type -> pivox.storage.v1.GetUninstallScriptRequest
-	20, // 21: pivox.storage.v1.StorageGateways.UpgradeGateway:input_type -> pivox.storage.v1.UpgradeGatewayRequest
-	25, // 22: pivox.storage.v1.StorageGateways.CreateStorageGateway:output_type -> google.longrunning.Operation
-	4,  // 23: pivox.storage.v1.StorageGateways.GetStorageGateway:output_type -> pivox.storage.v1.StorageGateway
-	10, // 24: pivox.storage.v1.StorageGateways.ListStorageGateways:output_type -> pivox.storage.v1.ListStorageGatewaysResponse
-	25, // 25: pivox.storage.v1.StorageGateways.UpdateStorageGateway:output_type -> google.longrunning.Operation
-	25, // 26: pivox.storage.v1.StorageGateways.DeleteStorageGateway:output_type -> google.longrunning.Operation
-	4,  // 27: pivox.storage.v1.StorageGateways.RotateRegistrationToken:output_type -> pivox.storage.v1.StorageGateway
-	17, // 28: pivox.storage.v1.StorageGateways.GetInstallScript:output_type -> pivox.storage.v1.GetInstallScriptResponse
-	19, // 29: pivox.storage.v1.StorageGateways.GetUninstallScript:output_type -> pivox.storage.v1.GetUninstallScriptResponse
-	25, // 30: pivox.storage.v1.StorageGateways.UpgradeGateway:output_type -> google.longrunning.Operation
-	22, // [22:31] is the sub-list for method output_type
-	13, // [13:22] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	1,  // 1: pivox.storage.v1.StorageGateway.cert_state:type_name -> pivox.storage.v1.StorageGateway.CertState
+	21, // 2: pivox.storage.v1.StorageGateway.cert_expiry_time:type_name -> google.protobuf.Timestamp
+	20, // 3: pivox.storage.v1.StorageGateway.annotations:type_name -> pivox.storage.v1.StorageGateway.AnnotationsEntry
+	21, // 4: pivox.storage.v1.StorageGateway.create_time:type_name -> google.protobuf.Timestamp
+	21, // 5: pivox.storage.v1.StorageGateway.update_time:type_name -> google.protobuf.Timestamp
+	3,  // 6: pivox.storage.v1.CreateStorageGatewayRequest.storage_gateway:type_name -> pivox.storage.v1.StorageGateway
+	3,  // 7: pivox.storage.v1.ListStorageGatewaysResponse.storage_gateways:type_name -> pivox.storage.v1.StorageGateway
+	3,  // 8: pivox.storage.v1.UpdateStorageGatewayRequest.storage_gateway:type_name -> pivox.storage.v1.StorageGateway
+	22, // 9: pivox.storage.v1.UpdateStorageGatewayRequest.update_mask:type_name -> google.protobuf.FieldMask
+	2,  // 10: pivox.storage.v1.UpgradeGatewayMetadata.phase:type_name -> pivox.storage.v1.UpgradeGatewayMetadata.UpgradeGatewayPhase
+	4,  // 11: pivox.storage.v1.StorageGateways.CreateStorageGateway:input_type -> pivox.storage.v1.CreateStorageGatewayRequest
+	6,  // 12: pivox.storage.v1.StorageGateways.GetStorageGateway:input_type -> pivox.storage.v1.GetStorageGatewayRequest
+	7,  // 13: pivox.storage.v1.StorageGateways.ListStorageGateways:input_type -> pivox.storage.v1.ListStorageGatewaysRequest
+	9,  // 14: pivox.storage.v1.StorageGateways.UpdateStorageGateway:input_type -> pivox.storage.v1.UpdateStorageGatewayRequest
+	11, // 15: pivox.storage.v1.StorageGateways.DeleteStorageGateway:input_type -> pivox.storage.v1.DeleteStorageGatewayRequest
+	13, // 16: pivox.storage.v1.StorageGateways.RotateRegistrationToken:input_type -> pivox.storage.v1.RotateRegistrationTokenRequest
+	14, // 17: pivox.storage.v1.StorageGateways.GetInstallScript:input_type -> pivox.storage.v1.GetInstallScriptRequest
+	16, // 18: pivox.storage.v1.StorageGateways.GetUninstallScript:input_type -> pivox.storage.v1.GetUninstallScriptRequest
+	18, // 19: pivox.storage.v1.StorageGateways.UpgradeGateway:input_type -> pivox.storage.v1.UpgradeGatewayRequest
+	23, // 20: pivox.storage.v1.StorageGateways.CreateStorageGateway:output_type -> google.longrunning.Operation
+	3,  // 21: pivox.storage.v1.StorageGateways.GetStorageGateway:output_type -> pivox.storage.v1.StorageGateway
+	8,  // 22: pivox.storage.v1.StorageGateways.ListStorageGateways:output_type -> pivox.storage.v1.ListStorageGatewaysResponse
+	23, // 23: pivox.storage.v1.StorageGateways.UpdateStorageGateway:output_type -> google.longrunning.Operation
+	23, // 24: pivox.storage.v1.StorageGateways.DeleteStorageGateway:output_type -> google.longrunning.Operation
+	3,  // 25: pivox.storage.v1.StorageGateways.RotateRegistrationToken:output_type -> pivox.storage.v1.StorageGateway
+	15, // 26: pivox.storage.v1.StorageGateways.GetInstallScript:output_type -> pivox.storage.v1.GetInstallScriptResponse
+	17, // 27: pivox.storage.v1.StorageGateways.GetUninstallScript:output_type -> pivox.storage.v1.GetUninstallScriptResponse
+	23, // 28: pivox.storage.v1.StorageGateways.UpgradeGateway:output_type -> google.longrunning.Operation
+	20, // [20:29] is the sub-list for method output_type
+	11, // [11:20] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_pivox_storage_v1_storage_gateway_proto_init() }
@@ -1802,8 +1660,8 @@ func file_pivox_storage_v1_storage_gateway_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pivox_storage_v1_storage_gateway_proto_rawDesc), len(file_pivox_storage_v1_storage_gateway_proto_rawDesc)),
-			NumEnums:      4,
-			NumMessages:   19,
+			NumEnums:      3,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

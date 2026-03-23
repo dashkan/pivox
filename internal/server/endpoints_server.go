@@ -8,6 +8,7 @@ import (
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/dashkan/pivox-server/internal/apierr"
@@ -121,14 +122,35 @@ func (s *EndpointsServer) CreateEndpoint(ctx context.Context, req *storagev1.Cre
 		annotationsJSON = json.RawMessage("{}")
 	}
 
+	// Map cache config from proto to DB fields.
+	var cacheEnabled bool
+	var cacheMaxSizeGb int32
+	var cacheEviction db.EvictionPolicy = db.EvictionPolicyLRU
+	var cacheTtlHours int32
+	if cc := endpoint.GetCacheConfig(); cc != nil {
+		cacheEnabled = cc.GetEnabled()
+		cacheMaxSizeGb = cc.GetMaxSizeGb()
+		cacheTtlHours = cc.GetTtlHours()
+		switch cc.GetEvictionPolicy() {
+		case storagev1.CacheConfig_LFU:
+			cacheEviction = db.EvictionPolicyLFU
+		default:
+			cacheEviction = db.EvictionPolicyLRU
+		}
+	}
+
 	result, err := s.queries.CreateStorageEndpoint(ctx, db.CreateStorageEndpointParams{
-		ID:            uuid.New(),
-		GatewayID:     gw.ID,
-		Name:          endpointID,
-		DisplayName:   endpoint.GetDisplayName(),
-		Configuration: configJSON,
-		Annotations:   annotationsJSON,
-		CreatedBy:     "",
+		ID:             uuid.New(),
+		GatewayID:      gw.ID,
+		Name:           endpointID,
+		DisplayName:    endpoint.GetDisplayName(),
+		Configuration:  configJSON,
+		CacheEnabled:   cacheEnabled,
+		CacheMaxSizeGb: cacheMaxSizeGb,
+		CacheEviction:  cacheEviction,
+		CacheTtlHours:  cacheTtlHours,
+		Annotations:    annotationsJSON,
+		CreatedBy:      "",
 	})
 	if err != nil {
 		return nil, handleResourceError(err, "Endpoint", "")
@@ -226,6 +248,18 @@ func (s *EndpointsServer) UpdateEndpoint(ctx context.Context, req *storagev1.Upd
 					return nil, apierr.InvalidArgument(apierr.FieldViolation("configuration", cfgErr.Error()))
 				}
 				updateParams.Configuration = configJSON
+			case "cache_config", "cache_config.enabled", "cache_config.max_size_gb", "cache_config.eviction_policy", "cache_config.ttl_hours":
+				if cc := endpoint.GetCacheConfig(); cc != nil {
+					updateParams.CacheEnabled = pgtype.Bool{Bool: cc.GetEnabled(), Valid: true}
+					updateParams.CacheMaxSizeGb = pgtype.Int4{Int32: cc.GetMaxSizeGb(), Valid: true}
+					updateParams.CacheTtlHours = pgtype.Int4{Int32: cc.GetTtlHours(), Valid: true}
+					switch cc.GetEvictionPolicy() {
+					case storagev1.CacheConfig_LFU:
+						updateParams.CacheEviction = db.NullEvictionPolicy{EvictionPolicy: db.EvictionPolicyLFU, Valid: true}
+					default:
+						updateParams.CacheEviction = db.NullEvictionPolicy{EvictionPolicy: db.EvictionPolicyLRU, Valid: true}
+					}
+				}
 			case "annotations":
 				annotationsJSON, marshalErr := json.Marshal(endpoint.GetAnnotations())
 				if marshalErr != nil {
@@ -240,6 +274,17 @@ func (s *EndpointsServer) UpdateEndpoint(ctx context.Context, req *storagev1.Upd
 		if endpoint.GetConfiguration() != nil {
 			configJSON, _ := configToJSON(endpoint)
 			updateParams.Configuration = configJSON
+		}
+		if cc := endpoint.GetCacheConfig(); cc != nil {
+			updateParams.CacheEnabled = pgtype.Bool{Bool: cc.GetEnabled(), Valid: true}
+			updateParams.CacheMaxSizeGb = pgtype.Int4{Int32: cc.GetMaxSizeGb(), Valid: true}
+			updateParams.CacheTtlHours = pgtype.Int4{Int32: cc.GetTtlHours(), Valid: true}
+			switch cc.GetEvictionPolicy() {
+			case storagev1.CacheConfig_LFU:
+				updateParams.CacheEviction = db.NullEvictionPolicy{EvictionPolicy: db.EvictionPolicyLFU, Valid: true}
+			default:
+				updateParams.CacheEviction = db.NullEvictionPolicy{EvictionPolicy: db.EvictionPolicyLRU, Valid: true}
+			}
 		}
 		if annotations := endpoint.GetAnnotations(); annotations != nil {
 			annotationsJSON, _ := json.Marshal(annotations)

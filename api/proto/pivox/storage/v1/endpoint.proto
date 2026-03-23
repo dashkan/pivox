@@ -147,6 +147,11 @@ message Endpoint {
     FileSystemConfiguration filesystem = 11;
   }
 
+  // Optional. Cache configuration for this endpoint. Controls how agents
+  // cache assets fetched from this backend. Typically enabled for S3
+  // endpoints (especially remote/cloud), disabled for local filesystem mounts.
+  CacheConfig cache_config = 12 [(google.api.field_behavior) = OPTIONAL];
+
   // Optional. Annotations associated with this endpoint.
   map<string, string> annotations = 5 [(google.api.field_behavior) = OPTIONAL];
 
@@ -231,6 +236,41 @@ message FileSystemConfiguration {
     (google.api.field_behavior) = REQUIRED,
     (google.api.field_behavior) = IMMUTABLE,
     (buf.validate.field).required = true
+  ];
+}
+
+// Cache configuration for an endpoint. Controls how agents cache assets
+// fetched from this storage backend on their local SSD.
+message CacheConfig {
+  // The eviction policy used when the cache reaches its maximum size.
+  enum EvictionPolicy {
+    // Unspecified eviction policy.
+    EVICTION_POLICY_UNSPECIFIED = 0;
+
+    // Least Recently Used: evicts the least recently accessed items first.
+    LRU = 1;
+
+    // Least Frequently Used: evicts the least frequently accessed items first.
+    LFU = 2;
+  }
+
+  // Optional. Whether caching is enabled for this endpoint. Defaults to
+  // true for S3 endpoints, false for filesystem endpoints.
+  bool enabled = 1 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. The maximum cache size in gigabytes per agent.
+  int32 max_size_gb = 2 [
+    (google.api.field_behavior) = OPTIONAL,
+    (buf.validate.field).int32.gte = 0
+  ];
+
+  // Optional. The eviction policy to use when the cache is full.
+  EvictionPolicy eviction_policy = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. The time-to-live for cached items, in hours.
+  int32 ttl_hours = 4 [
+    (google.api.field_behavior) = OPTIONAL,
+    (buf.validate.field).int32.gte = 0
   ];
 }
 

@@ -8,7 +8,6 @@ import (
 	"io"
 	"log/slog"
 	"regexp"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -139,11 +138,6 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 			HandshakeAck: &agentv1.HandshakeAck{
 				AgentName: fmt.Sprintf("agent-%s-%s", gateway.Name, hs.GetIpAddress()),
 				Endpoints: endpointConfigs,
-				CacheConfig: &agentv1.CacheConfig{
-					MaxSizeGb:      gateway.CacheMaxSizeGb,
-					EvictionPolicy: strings.ToLower(string(gateway.CacheEviction)),
-					TtlHours:       gateway.CacheTtlHours,
-				},
 			},
 		},
 	}
@@ -355,6 +349,12 @@ func parseEndpointConfig(ep db.StorageEndpoint) (*agentv1.EndpointConfig, error)
 
 	cfg := &agentv1.EndpointConfig{
 		Name: ep.Name,
+		CacheConfig: &agentv1.EndpointCacheConfig{
+			Enabled:        ep.CacheEnabled,
+			MaxSizeGb:      ep.CacheMaxSizeGb,
+			EvictionPolicy: string(ep.CacheEviction),
+			TtlHours:       ep.CacheTtlHours,
+		},
 	}
 
 	switch raw.Type {

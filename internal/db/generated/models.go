@@ -734,19 +734,23 @@ type StorageAgentAudit struct {
 }
 
 type StorageEndpoint struct {
-	ID            uuid.UUID       `json:"id"`
-	GatewayID     uuid.UUID       `json:"gateway_id"`
-	Name          string          `json:"name"`
-	DisplayName   string          `json:"display_name"`
-	Configuration json.RawMessage `json:"configuration"`
-	Annotations   json.RawMessage `json:"annotations"`
-	State         EndpointState   `json:"state"`
-	Etag          string          `json:"etag"`
-	Revision      int32           `json:"revision"`
-	CreatedBy     string          `json:"created_by"`
-	UpdatedBy     string          `json:"updated_by"`
-	CreateTime    time.Time       `json:"create_time"`
-	UpdateTime    time.Time       `json:"update_time"`
+	ID             uuid.UUID       `json:"id"`
+	GatewayID      uuid.UUID       `json:"gateway_id"`
+	Name           string          `json:"name"`
+	DisplayName    string          `json:"display_name"`
+	Configuration  json.RawMessage `json:"configuration"`
+	CacheEnabled   bool            `json:"cache_enabled"`
+	CacheMaxSizeGb int32           `json:"cache_max_size_gb"`
+	CacheEviction  EvictionPolicy  `json:"cache_eviction"`
+	CacheTtlHours  int32           `json:"cache_ttl_hours"`
+	Annotations    json.RawMessage `json:"annotations"`
+	State          EndpointState   `json:"state"`
+	Etag           string          `json:"etag"`
+	Revision       int32           `json:"revision"`
+	CreatedBy      string          `json:"created_by"`
+	UpdatedBy      string          `json:"updated_by"`
+	CreateTime     time.Time       `json:"create_time"`
+	UpdateTime     time.Time       `json:"update_time"`
 }
 
 type StorageGateway struct {
@@ -759,9 +763,6 @@ type StorageGateway struct {
 	TargetVersion     string              `json:"target_version"`
 	CurrentVersion    string              `json:"current_version"`
 	Hostname          string              `json:"hostname"`
-	CacheMaxSizeGb    int32               `json:"cache_max_size_gb"`
-	CacheEviction     EvictionPolicy      `json:"cache_eviction"`
-	CacheTtlHours     int32               `json:"cache_ttl_hours"`
 	Annotations       json.RawMessage     `json:"annotations"`
 	State             StorageGatewayState `json:"state"`
 	CertState         CertState           `json:"cert_state"`

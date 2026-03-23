@@ -97,6 +97,59 @@ func (Endpoint_State) EnumDescriptor() ([]byte, []int) {
 	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{0, 0}
 }
 
+// The eviction policy used when the cache reaches its maximum size.
+type CacheConfig_EvictionPolicy int32
+
+const (
+	// Unspecified eviction policy.
+	CacheConfig_EVICTION_POLICY_UNSPECIFIED CacheConfig_EvictionPolicy = 0
+	// Least Recently Used: evicts the least recently accessed items first.
+	CacheConfig_LRU CacheConfig_EvictionPolicy = 1
+	// Least Frequently Used: evicts the least frequently accessed items first.
+	CacheConfig_LFU CacheConfig_EvictionPolicy = 2
+)
+
+// Enum value maps for CacheConfig_EvictionPolicy.
+var (
+	CacheConfig_EvictionPolicy_name = map[int32]string{
+		0: "EVICTION_POLICY_UNSPECIFIED",
+		1: "LRU",
+		2: "LFU",
+	}
+	CacheConfig_EvictionPolicy_value = map[string]int32{
+		"EVICTION_POLICY_UNSPECIFIED": 0,
+		"LRU":                         1,
+		"LFU":                         2,
+	}
+)
+
+func (x CacheConfig_EvictionPolicy) Enum() *CacheConfig_EvictionPolicy {
+	p := new(CacheConfig_EvictionPolicy)
+	*p = x
+	return p
+}
+
+func (x CacheConfig_EvictionPolicy) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (CacheConfig_EvictionPolicy) Descriptor() protoreflect.EnumDescriptor {
+	return file_pivox_storage_v1_endpoint_proto_enumTypes[1].Descriptor()
+}
+
+func (CacheConfig_EvictionPolicy) Type() protoreflect.EnumType {
+	return &file_pivox_storage_v1_endpoint_proto_enumTypes[1]
+}
+
+func (x CacheConfig_EvictionPolicy) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use CacheConfig_EvictionPolicy.Descriptor instead.
+func (CacheConfig_EvictionPolicy) EnumDescriptor() ([]byte, []int) {
+	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{4, 0}
+}
+
 // An endpoint represents a storage backend attached to a storage gateway.
 // Agents use endpoint configuration to serve storage operations. The
 // configuration is type-specific — currently only S3-compatible backends
@@ -119,6 +172,10 @@ type Endpoint struct {
 	//	*Endpoint_S3
 	//	*Endpoint_Filesystem
 	Configuration isEndpoint_Configuration `protobuf_oneof:"configuration"`
+	// Optional. Cache configuration for this endpoint. Controls how agents
+	// cache assets fetched from this backend. Typically enabled for S3
+	// endpoints (especially remote/cloud), disabled for local filesystem mounts.
+	CacheConfig *CacheConfig `protobuf:"bytes,12,opt,name=cache_config,json=cacheConfig,proto3" json:"cache_config,omitempty"`
 	// Optional. Annotations associated with this endpoint.
 	Annotations map[string]string `protobuf:"bytes,5,rep,name=annotations,proto3" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Output only. A checksum computed by the server based on the current
@@ -208,6 +265,13 @@ func (x *Endpoint) GetFilesystem() *FileSystemConfiguration {
 		if x, ok := x.Configuration.(*Endpoint_Filesystem); ok {
 			return x.Filesystem
 		}
+	}
+	return nil
+}
+
+func (x *Endpoint) GetCacheConfig() *CacheConfig {
+	if x != nil {
+		return x.CacheConfig
 	}
 	return nil
 }
@@ -485,6 +549,81 @@ func (x *FileSystemConfiguration) GetPath() string {
 	return ""
 }
 
+// Cache configuration for an endpoint. Controls how agents cache assets
+// fetched from this storage backend on their local SSD.
+type CacheConfig struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Optional. Whether caching is enabled for this endpoint. Defaults to
+	// true for S3 endpoints, false for filesystem endpoints.
+	Enabled bool `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	// Optional. The maximum cache size in gigabytes per agent.
+	MaxSizeGb int32 `protobuf:"varint,2,opt,name=max_size_gb,json=maxSizeGb,proto3" json:"max_size_gb,omitempty"`
+	// Optional. The eviction policy to use when the cache is full.
+	EvictionPolicy CacheConfig_EvictionPolicy `protobuf:"varint,3,opt,name=eviction_policy,json=evictionPolicy,proto3,enum=pivox.storage.v1.CacheConfig_EvictionPolicy" json:"eviction_policy,omitempty"`
+	// Optional. The time-to-live for cached items, in hours.
+	TtlHours      int32 `protobuf:"varint,4,opt,name=ttl_hours,json=ttlHours,proto3" json:"ttl_hours,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CacheConfig) Reset() {
+	*x = CacheConfig{}
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CacheConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CacheConfig) ProtoMessage() {}
+
+func (x *CacheConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CacheConfig.ProtoReflect.Descriptor instead.
+func (*CacheConfig) Descriptor() ([]byte, []int) {
+	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *CacheConfig) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *CacheConfig) GetMaxSizeGb() int32 {
+	if x != nil {
+		return x.MaxSizeGb
+	}
+	return 0
+}
+
+func (x *CacheConfig) GetEvictionPolicy() CacheConfig_EvictionPolicy {
+	if x != nil {
+		return x.EvictionPolicy
+	}
+	return CacheConfig_EVICTION_POLICY_UNSPECIFIED
+}
+
+func (x *CacheConfig) GetTtlHours() int32 {
+	if x != nil {
+		return x.TtlHours
+	}
+	return 0
+}
+
 // The request sent to the
 // [CreateEndpoint][pivox.storage.v1.Endpoints.CreateEndpoint] method.
 type CreateEndpointRequest struct {
@@ -508,7 +647,7 @@ type CreateEndpointRequest struct {
 
 func (x *CreateEndpointRequest) Reset() {
 	*x = CreateEndpointRequest{}
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[4]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -520,7 +659,7 @@ func (x *CreateEndpointRequest) String() string {
 func (*CreateEndpointRequest) ProtoMessage() {}
 
 func (x *CreateEndpointRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[4]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -533,7 +672,7 @@ func (x *CreateEndpointRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateEndpointRequest.ProtoReflect.Descriptor instead.
 func (*CreateEndpointRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{4}
+	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *CreateEndpointRequest) GetParent() string {
@@ -574,7 +713,7 @@ type CreateEndpointMetadata struct {
 
 func (x *CreateEndpointMetadata) Reset() {
 	*x = CreateEndpointMetadata{}
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[5]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -586,7 +725,7 @@ func (x *CreateEndpointMetadata) String() string {
 func (*CreateEndpointMetadata) ProtoMessage() {}
 
 func (x *CreateEndpointMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[5]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -599,7 +738,7 @@ func (x *CreateEndpointMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateEndpointMetadata.ProtoReflect.Descriptor instead.
 func (*CreateEndpointMetadata) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{5}
+	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{6}
 }
 
 // The request sent to the
@@ -615,7 +754,7 @@ type GetEndpointRequest struct {
 
 func (x *GetEndpointRequest) Reset() {
 	*x = GetEndpointRequest{}
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[6]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -627,7 +766,7 @@ func (x *GetEndpointRequest) String() string {
 func (*GetEndpointRequest) ProtoMessage() {}
 
 func (x *GetEndpointRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[6]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -640,7 +779,7 @@ func (x *GetEndpointRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetEndpointRequest.ProtoReflect.Descriptor instead.
 func (*GetEndpointRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{6}
+	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetEndpointRequest) GetName() string {
@@ -693,7 +832,7 @@ type ListEndpointsRequest struct {
 
 func (x *ListEndpointsRequest) Reset() {
 	*x = ListEndpointsRequest{}
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[7]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -705,7 +844,7 @@ func (x *ListEndpointsRequest) String() string {
 func (*ListEndpointsRequest) ProtoMessage() {}
 
 func (x *ListEndpointsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[7]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -718,7 +857,7 @@ func (x *ListEndpointsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListEndpointsRequest.ProtoReflect.Descriptor instead.
 func (*ListEndpointsRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{7}
+	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ListEndpointsRequest) GetParent() string {
@@ -770,7 +909,7 @@ type ListEndpointsResponse struct {
 
 func (x *ListEndpointsResponse) Reset() {
 	*x = ListEndpointsResponse{}
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[8]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -782,7 +921,7 @@ func (x *ListEndpointsResponse) String() string {
 func (*ListEndpointsResponse) ProtoMessage() {}
 
 func (x *ListEndpointsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[8]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -795,7 +934,7 @@ func (x *ListEndpointsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListEndpointsResponse.ProtoReflect.Descriptor instead.
 func (*ListEndpointsResponse) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{8}
+	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ListEndpointsResponse) GetEndpoints() []*Endpoint {
@@ -831,7 +970,7 @@ type UpdateEndpointRequest struct {
 
 func (x *UpdateEndpointRequest) Reset() {
 	*x = UpdateEndpointRequest{}
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[9]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -843,7 +982,7 @@ func (x *UpdateEndpointRequest) String() string {
 func (*UpdateEndpointRequest) ProtoMessage() {}
 
 func (x *UpdateEndpointRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[9]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -856,7 +995,7 @@ func (x *UpdateEndpointRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateEndpointRequest.ProtoReflect.Descriptor instead.
 func (*UpdateEndpointRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{9}
+	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *UpdateEndpointRequest) GetEndpoint() *Endpoint {
@@ -890,7 +1029,7 @@ type UpdateEndpointMetadata struct {
 
 func (x *UpdateEndpointMetadata) Reset() {
 	*x = UpdateEndpointMetadata{}
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[10]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -902,7 +1041,7 @@ func (x *UpdateEndpointMetadata) String() string {
 func (*UpdateEndpointMetadata) ProtoMessage() {}
 
 func (x *UpdateEndpointMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[10]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -915,7 +1054,7 @@ func (x *UpdateEndpointMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateEndpointMetadata.ProtoReflect.Descriptor instead.
 func (*UpdateEndpointMetadata) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{10}
+	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{11}
 }
 
 // The request sent to the
@@ -937,7 +1076,7 @@ type DeleteEndpointRequest struct {
 
 func (x *DeleteEndpointRequest) Reset() {
 	*x = DeleteEndpointRequest{}
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[11]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -949,7 +1088,7 @@ func (x *DeleteEndpointRequest) String() string {
 func (*DeleteEndpointRequest) ProtoMessage() {}
 
 func (x *DeleteEndpointRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[11]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -962,7 +1101,7 @@ func (x *DeleteEndpointRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteEndpointRequest.ProtoReflect.Descriptor instead.
 func (*DeleteEndpointRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{11}
+	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *DeleteEndpointRequest) GetName() string {
@@ -996,7 +1135,7 @@ type DeleteEndpointMetadata struct {
 
 func (x *DeleteEndpointMetadata) Reset() {
 	*x = DeleteEndpointMetadata{}
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[12]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1008,7 +1147,7 @@ func (x *DeleteEndpointMetadata) String() string {
 func (*DeleteEndpointMetadata) ProtoMessage() {}
 
 func (x *DeleteEndpointMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[12]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1021,14 +1160,14 @@ func (x *DeleteEndpointMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteEndpointMetadata.ProtoReflect.Descriptor instead.
 func (*DeleteEndpointMetadata) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{12}
+	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{13}
 }
 
 var File_pivox_storage_v1_endpoint_proto protoreflect.FileDescriptor
 
 const file_pivox_storage_v1_endpoint_proto_rawDesc = "" +
 	"\n" +
-	"\x1fpivox/storage/v1/endpoint.proto\x12\x10pivox.storage.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe5\x06\n" +
+	"\x1fpivox/storage/v1/endpoint.proto\x12\x10pivox.storage.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xac\a\n" +
 	"\bEndpoint\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12-\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\n" +
@@ -1037,7 +1176,8 @@ const file_pivox_storage_v1_endpoint_proto_rawDesc = "" +
 	"\x02s3\x18\x04 \x01(\v2!.pivox.storage.v1.S3ConfigurationH\x00R\x02s3\x12K\n" +
 	"\n" +
 	"filesystem\x18\v \x01(\v2).pivox.storage.v1.FileSystemConfigurationH\x00R\n" +
-	"filesystem\x12R\n" +
+	"filesystem\x12E\n" +
+	"\fcache_config\x18\f \x01(\v2\x1d.pivox.storage.v1.CacheConfigB\x03\xe0A\x01R\vcacheConfig\x12R\n" +
 	"\vannotations\x18\x05 \x03(\v2+.pivox.storage.v1.Endpoint.AnnotationsEntryB\x03\xe0A\x01R\vannotations\x12\x17\n" +
 	"\x04etag\x18\x06 \x01(\tB\x03\xe0A\x03R\x04etag\x12\x1d\n" +
 	"\acreator\x18\a \x01(\tB\x03\xe0A\x03R\acreator\x12\x1d\n" +
@@ -1069,7 +1209,18 @@ const file_pivox_storage_v1_endpoint_proto_rawDesc = "" +
 	"\raccess_key_id\x18\x01 \x01(\tB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\vaccessKeyId\x125\n" +
 	"\x11secret_access_key\x18\x02 \x01(\tB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\x0fsecretAccessKey\";\n" +
 	"\x17FileSystemConfiguration\x12 \n" +
-	"\x04path\x18\x01 \x01(\tB\f\xe0A\x02\xe0A\x05\xbaH\x03\xc8\x01\x01R\x04path\"\xe8\x01\n" +
+	"\x04path\x18\x01 \x01(\tB\f\xe0A\x02\xe0A\x05\xbaH\x03\xc8\x01\x01R\x04path\"\xa2\x02\n" +
+	"\vCacheConfig\x12\x1d\n" +
+	"\aenabled\x18\x01 \x01(\bB\x03\xe0A\x01R\aenabled\x12*\n" +
+	"\vmax_size_gb\x18\x02 \x01(\x05B\n" +
+	"\xe0A\x01\xbaH\x04\x1a\x02(\x00R\tmaxSizeGb\x12Z\n" +
+	"\x0feviction_policy\x18\x03 \x01(\x0e2,.pivox.storage.v1.CacheConfig.EvictionPolicyB\x03\xe0A\x01R\x0eevictionPolicy\x12'\n" +
+	"\tttl_hours\x18\x04 \x01(\x05B\n" +
+	"\xe0A\x01\xbaH\x04\x1a\x02(\x00R\bttlHours\"C\n" +
+	"\x0eEvictionPolicy\x12\x1f\n" +
+	"\x1bEVICTION_POLICY_UNSPECIFIED\x10\x00\x12\a\n" +
+	"\x03LRU\x10\x01\x12\a\n" +
+	"\x03LFU\x10\x02\"\xe8\x01\n" +
 	"\x15CreateEndpointRequest\x12<\n" +
 	"\x06parent\x18\x01 \x01(\tB$\xe0A\x02\xfaA\x18\x12\x16pivox.storage/Endpoint\xbaH\x03\xc8\x01\x01R\x06parent\x12A\n" +
 	"\bendpoint\x18\x02 \x01(\v2\x1a.pivox.storage.v1.EndpointB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\bendpoint\x12$\n" +
@@ -1125,55 +1276,59 @@ func file_pivox_storage_v1_endpoint_proto_rawDescGZIP() []byte {
 	return file_pivox_storage_v1_endpoint_proto_rawDescData
 }
 
-var file_pivox_storage_v1_endpoint_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_pivox_storage_v1_endpoint_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_pivox_storage_v1_endpoint_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_pivox_storage_v1_endpoint_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_pivox_storage_v1_endpoint_proto_goTypes = []any{
 	(Endpoint_State)(0),             // 0: pivox.storage.v1.Endpoint.State
-	(*Endpoint)(nil),                // 1: pivox.storage.v1.Endpoint
-	(*S3Configuration)(nil),         // 2: pivox.storage.v1.S3Configuration
-	(*S3AccessKeyCredentials)(nil),  // 3: pivox.storage.v1.S3AccessKeyCredentials
-	(*FileSystemConfiguration)(nil), // 4: pivox.storage.v1.FileSystemConfiguration
-	(*CreateEndpointRequest)(nil),   // 5: pivox.storage.v1.CreateEndpointRequest
-	(*CreateEndpointMetadata)(nil),  // 6: pivox.storage.v1.CreateEndpointMetadata
-	(*GetEndpointRequest)(nil),      // 7: pivox.storage.v1.GetEndpointRequest
-	(*ListEndpointsRequest)(nil),    // 8: pivox.storage.v1.ListEndpointsRequest
-	(*ListEndpointsResponse)(nil),   // 9: pivox.storage.v1.ListEndpointsResponse
-	(*UpdateEndpointRequest)(nil),   // 10: pivox.storage.v1.UpdateEndpointRequest
-	(*UpdateEndpointMetadata)(nil),  // 11: pivox.storage.v1.UpdateEndpointMetadata
-	(*DeleteEndpointRequest)(nil),   // 12: pivox.storage.v1.DeleteEndpointRequest
-	(*DeleteEndpointMetadata)(nil),  // 13: pivox.storage.v1.DeleteEndpointMetadata
-	nil,                             // 14: pivox.storage.v1.Endpoint.AnnotationsEntry
-	(*timestamppb.Timestamp)(nil),   // 15: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),   // 16: google.protobuf.FieldMask
-	(*longrunningpb.Operation)(nil), // 17: google.longrunning.Operation
+	(CacheConfig_EvictionPolicy)(0), // 1: pivox.storage.v1.CacheConfig.EvictionPolicy
+	(*Endpoint)(nil),                // 2: pivox.storage.v1.Endpoint
+	(*S3Configuration)(nil),         // 3: pivox.storage.v1.S3Configuration
+	(*S3AccessKeyCredentials)(nil),  // 4: pivox.storage.v1.S3AccessKeyCredentials
+	(*FileSystemConfiguration)(nil), // 5: pivox.storage.v1.FileSystemConfiguration
+	(*CacheConfig)(nil),             // 6: pivox.storage.v1.CacheConfig
+	(*CreateEndpointRequest)(nil),   // 7: pivox.storage.v1.CreateEndpointRequest
+	(*CreateEndpointMetadata)(nil),  // 8: pivox.storage.v1.CreateEndpointMetadata
+	(*GetEndpointRequest)(nil),      // 9: pivox.storage.v1.GetEndpointRequest
+	(*ListEndpointsRequest)(nil),    // 10: pivox.storage.v1.ListEndpointsRequest
+	(*ListEndpointsResponse)(nil),   // 11: pivox.storage.v1.ListEndpointsResponse
+	(*UpdateEndpointRequest)(nil),   // 12: pivox.storage.v1.UpdateEndpointRequest
+	(*UpdateEndpointMetadata)(nil),  // 13: pivox.storage.v1.UpdateEndpointMetadata
+	(*DeleteEndpointRequest)(nil),   // 14: pivox.storage.v1.DeleteEndpointRequest
+	(*DeleteEndpointMetadata)(nil),  // 15: pivox.storage.v1.DeleteEndpointMetadata
+	nil,                             // 16: pivox.storage.v1.Endpoint.AnnotationsEntry
+	(*timestamppb.Timestamp)(nil),   // 17: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),   // 18: google.protobuf.FieldMask
+	(*longrunningpb.Operation)(nil), // 19: google.longrunning.Operation
 }
 var file_pivox_storage_v1_endpoint_proto_depIdxs = []int32{
 	0,  // 0: pivox.storage.v1.Endpoint.state:type_name -> pivox.storage.v1.Endpoint.State
-	2,  // 1: pivox.storage.v1.Endpoint.s3:type_name -> pivox.storage.v1.S3Configuration
-	4,  // 2: pivox.storage.v1.Endpoint.filesystem:type_name -> pivox.storage.v1.FileSystemConfiguration
-	14, // 3: pivox.storage.v1.Endpoint.annotations:type_name -> pivox.storage.v1.Endpoint.AnnotationsEntry
-	15, // 4: pivox.storage.v1.Endpoint.create_time:type_name -> google.protobuf.Timestamp
-	15, // 5: pivox.storage.v1.Endpoint.update_time:type_name -> google.protobuf.Timestamp
-	3,  // 6: pivox.storage.v1.S3Configuration.access_key:type_name -> pivox.storage.v1.S3AccessKeyCredentials
-	1,  // 7: pivox.storage.v1.CreateEndpointRequest.endpoint:type_name -> pivox.storage.v1.Endpoint
-	1,  // 8: pivox.storage.v1.ListEndpointsResponse.endpoints:type_name -> pivox.storage.v1.Endpoint
-	1,  // 9: pivox.storage.v1.UpdateEndpointRequest.endpoint:type_name -> pivox.storage.v1.Endpoint
-	16, // 10: pivox.storage.v1.UpdateEndpointRequest.update_mask:type_name -> google.protobuf.FieldMask
-	5,  // 11: pivox.storage.v1.Endpoints.CreateEndpoint:input_type -> pivox.storage.v1.CreateEndpointRequest
-	7,  // 12: pivox.storage.v1.Endpoints.GetEndpoint:input_type -> pivox.storage.v1.GetEndpointRequest
-	8,  // 13: pivox.storage.v1.Endpoints.ListEndpoints:input_type -> pivox.storage.v1.ListEndpointsRequest
-	10, // 14: pivox.storage.v1.Endpoints.UpdateEndpoint:input_type -> pivox.storage.v1.UpdateEndpointRequest
-	12, // 15: pivox.storage.v1.Endpoints.DeleteEndpoint:input_type -> pivox.storage.v1.DeleteEndpointRequest
-	17, // 16: pivox.storage.v1.Endpoints.CreateEndpoint:output_type -> google.longrunning.Operation
-	1,  // 17: pivox.storage.v1.Endpoints.GetEndpoint:output_type -> pivox.storage.v1.Endpoint
-	9,  // 18: pivox.storage.v1.Endpoints.ListEndpoints:output_type -> pivox.storage.v1.ListEndpointsResponse
-	17, // 19: pivox.storage.v1.Endpoints.UpdateEndpoint:output_type -> google.longrunning.Operation
-	17, // 20: pivox.storage.v1.Endpoints.DeleteEndpoint:output_type -> google.longrunning.Operation
-	16, // [16:21] is the sub-list for method output_type
-	11, // [11:16] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	3,  // 1: pivox.storage.v1.Endpoint.s3:type_name -> pivox.storage.v1.S3Configuration
+	5,  // 2: pivox.storage.v1.Endpoint.filesystem:type_name -> pivox.storage.v1.FileSystemConfiguration
+	6,  // 3: pivox.storage.v1.Endpoint.cache_config:type_name -> pivox.storage.v1.CacheConfig
+	16, // 4: pivox.storage.v1.Endpoint.annotations:type_name -> pivox.storage.v1.Endpoint.AnnotationsEntry
+	17, // 5: pivox.storage.v1.Endpoint.create_time:type_name -> google.protobuf.Timestamp
+	17, // 6: pivox.storage.v1.Endpoint.update_time:type_name -> google.protobuf.Timestamp
+	4,  // 7: pivox.storage.v1.S3Configuration.access_key:type_name -> pivox.storage.v1.S3AccessKeyCredentials
+	1,  // 8: pivox.storage.v1.CacheConfig.eviction_policy:type_name -> pivox.storage.v1.CacheConfig.EvictionPolicy
+	2,  // 9: pivox.storage.v1.CreateEndpointRequest.endpoint:type_name -> pivox.storage.v1.Endpoint
+	2,  // 10: pivox.storage.v1.ListEndpointsResponse.endpoints:type_name -> pivox.storage.v1.Endpoint
+	2,  // 11: pivox.storage.v1.UpdateEndpointRequest.endpoint:type_name -> pivox.storage.v1.Endpoint
+	18, // 12: pivox.storage.v1.UpdateEndpointRequest.update_mask:type_name -> google.protobuf.FieldMask
+	7,  // 13: pivox.storage.v1.Endpoints.CreateEndpoint:input_type -> pivox.storage.v1.CreateEndpointRequest
+	9,  // 14: pivox.storage.v1.Endpoints.GetEndpoint:input_type -> pivox.storage.v1.GetEndpointRequest
+	10, // 15: pivox.storage.v1.Endpoints.ListEndpoints:input_type -> pivox.storage.v1.ListEndpointsRequest
+	12, // 16: pivox.storage.v1.Endpoints.UpdateEndpoint:input_type -> pivox.storage.v1.UpdateEndpointRequest
+	14, // 17: pivox.storage.v1.Endpoints.DeleteEndpoint:input_type -> pivox.storage.v1.DeleteEndpointRequest
+	19, // 18: pivox.storage.v1.Endpoints.CreateEndpoint:output_type -> google.longrunning.Operation
+	2,  // 19: pivox.storage.v1.Endpoints.GetEndpoint:output_type -> pivox.storage.v1.Endpoint
+	11, // 20: pivox.storage.v1.Endpoints.ListEndpoints:output_type -> pivox.storage.v1.ListEndpointsResponse
+	19, // 21: pivox.storage.v1.Endpoints.UpdateEndpoint:output_type -> google.longrunning.Operation
+	19, // 22: pivox.storage.v1.Endpoints.DeleteEndpoint:output_type -> google.longrunning.Operation
+	18, // [18:23] is the sub-list for method output_type
+	13, // [13:18] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_pivox_storage_v1_endpoint_proto_init() }
@@ -1193,8 +1348,8 @@ func file_pivox_storage_v1_endpoint_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pivox_storage_v1_endpoint_proto_rawDesc), len(file_pivox_storage_v1_endpoint_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   14,
+			NumEnums:      2,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -301,6 +301,10 @@
                   "$ref": "#/definitions/v1FileSystemConfiguration",
                   "description": "Local or network-mounted filesystem (NFS, CIFS, etc.)."
                 },
+                "cacheConfig": {
+                  "$ref": "#/definitions/v1CacheConfig",
+                  "description": "Optional. Cache configuration for this endpoint. Controls how agents\ncache assets fetched from this backend. Typically enabled for S3\nendpoints (especially remote/cloud), disabled for local filesystem mounts."
+                },
                 "annotations": {
                   "type": "object",
                   "additionalProperties": {
@@ -357,6 +361,16 @@
     }
   },
   "definitions": {
+    "CacheConfigEvictionPolicy": {
+      "type": "string",
+      "enum": [
+        "EVICTION_POLICY_UNSPECIFIED",
+        "LRU",
+        "LFU"
+      ],
+      "default": "EVICTION_POLICY_UNSPECIFIED",
+      "description": "The eviction policy used when the cache reaches its maximum size.\n\n - EVICTION_POLICY_UNSPECIFIED: Unspecified eviction policy.\n - LRU: Least Recently Used: evicts the least recently accessed items first.\n - LFU: Least Frequently Used: evicts the least frequently accessed items first."
+    },
     "longrunningOperation": {
       "type": "object",
       "properties": {
@@ -417,6 +431,30 @@
       },
       "description": "The `Status` type defines a logical error model that is suitable for\ndifferent programming environments, including REST APIs and RPC APIs. It is\nused by [gRPC](https://github.com/grpc). Each `Status` message contains\nthree pieces of data: error code, error message, and error details.\n\nYou can find out more about this error model and how to work with it in the\n[API Design Guide](https://cloud.google.com/apis/design/errors)."
     },
+    "v1CacheConfig": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Optional. Whether caching is enabled for this endpoint. Defaults to\ntrue for S3 endpoints, false for filesystem endpoints."
+        },
+        "maxSizeGb": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Optional. The maximum cache size in gigabytes per agent."
+        },
+        "evictionPolicy": {
+          "$ref": "#/definitions/CacheConfigEvictionPolicy",
+          "description": "Optional. The eviction policy to use when the cache is full."
+        },
+        "ttlHours": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Optional. The time-to-live for cached items, in hours."
+        }
+      },
+      "description": "Cache configuration for an endpoint. Controls how agents cache assets\nfetched from this storage backend on their local SSD."
+    },
     "v1Endpoint": {
       "type": "object",
       "properties": {
@@ -441,6 +479,10 @@
         "filesystem": {
           "$ref": "#/definitions/v1FileSystemConfiguration",
           "description": "Local or network-mounted filesystem (NFS, CIFS, etc.)."
+        },
+        "cacheConfig": {
+          "$ref": "#/definitions/v1CacheConfig",
+          "description": "Optional. Cache configuration for this endpoint. Controls how agents\ncache assets fetched from this backend. Typically enabled for S3\nendpoints (especially remote/cloud), disabled for local filesystem mounts."
         },
         "annotations": {
           "type": "object",

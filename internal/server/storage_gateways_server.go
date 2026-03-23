@@ -69,27 +69,6 @@ func (s *StorageGatewaysServer) CreateStorageGateway(ctx context.Context, req *s
 		annotationsJSON = json.RawMessage("{}")
 	}
 
-	var cacheEviction db.EvictionPolicy
-	if cc := gw.GetCacheConfig(); cc != nil {
-		switch cc.GetEvictionPolicy() {
-		case storagev1.CacheConfig_LRU:
-			cacheEviction = db.EvictionPolicyLRU
-		case storagev1.CacheConfig_LFU:
-			cacheEviction = db.EvictionPolicyLFU
-		default:
-			cacheEviction = db.EvictionPolicyLRU
-		}
-	} else {
-		cacheEviction = db.EvictionPolicyLRU
-	}
-
-	var cacheMaxSizeGb int32
-	var cacheTtlHours int32
-	if cc := gw.GetCacheConfig(); cc != nil {
-		cacheMaxSizeGb = cc.GetMaxSizeGb()
-		cacheTtlHours = cc.GetTtlHours()
-	}
-
 	result, err := s.queries.CreateStorageGateway(ctx, db.CreateStorageGatewayParams{
 		ID:                uuid.New(),
 		OrgID:             orgID,
@@ -98,9 +77,6 @@ func (s *StorageGatewaysServer) CreateStorageGateway(ctx context.Context, req *s
 		IpAddresses:       gw.GetIpAddresses(),
 		RegistrationToken: registrationToken,
 		Hostname:          hostname,
-		CacheMaxSizeGb:    cacheMaxSizeGb,
-		CacheEviction:     cacheEviction,
-		CacheTtlHours:     cacheTtlHours,
 		Annotations:       annotationsJSON,
 		CreatedBy:         "",
 	})
@@ -172,18 +148,6 @@ func (s *StorageGatewaysServer) UpdateStorageGateway(ctx context.Context, req *s
 				updateParams.IpAddresses = gw.GetIpAddresses()
 			case "target_version":
 				updateParams.TargetVersion = pgtype.Text{String: gw.GetTargetVersion(), Valid: true}
-			case "cache_config.max_size_gb":
-				updateParams.CacheMaxSizeGb = pgtype.Int4{Int32: gw.GetCacheConfig().GetMaxSizeGb(), Valid: true}
-			case "cache_config.eviction_policy":
-				ep := gw.GetCacheConfig().GetEvictionPolicy()
-				switch ep {
-				case storagev1.CacheConfig_LRU:
-					updateParams.CacheEviction = db.NullEvictionPolicy{EvictionPolicy: db.EvictionPolicyLRU, Valid: true}
-				case storagev1.CacheConfig_LFU:
-					updateParams.CacheEviction = db.NullEvictionPolicy{EvictionPolicy: db.EvictionPolicyLFU, Valid: true}
-				}
-			case "cache_config.ttl_hours":
-				updateParams.CacheTtlHours = pgtype.Int4{Int32: gw.GetCacheConfig().GetTtlHours(), Valid: true}
 			case "annotations":
 				annotationsJSON, err := json.Marshal(gw.GetAnnotations())
 				if err != nil {
@@ -197,16 +161,6 @@ func (s *StorageGatewaysServer) UpdateStorageGateway(ctx context.Context, req *s
 		updateParams.DisplayName = pgtype.Text{String: gw.GetDisplayName(), Valid: true}
 		updateParams.IpAddresses = gw.GetIpAddresses()
 		updateParams.TargetVersion = pgtype.Text{String: gw.GetTargetVersion(), Valid: true}
-		if cc := gw.GetCacheConfig(); cc != nil {
-			updateParams.CacheMaxSizeGb = pgtype.Int4{Int32: cc.GetMaxSizeGb(), Valid: true}
-			switch cc.GetEvictionPolicy() {
-			case storagev1.CacheConfig_LRU:
-				updateParams.CacheEviction = db.NullEvictionPolicy{EvictionPolicy: db.EvictionPolicyLRU, Valid: true}
-			case storagev1.CacheConfig_LFU:
-				updateParams.CacheEviction = db.NullEvictionPolicy{EvictionPolicy: db.EvictionPolicyLFU, Valid: true}
-			}
-			updateParams.CacheTtlHours = pgtype.Int4{Int32: cc.GetTtlHours(), Valid: true}
-		}
 		if annotations := gw.GetAnnotations(); annotations != nil {
 			annotationsJSON, _ := json.Marshal(annotations)
 			updateParams.Annotations = annotationsJSON

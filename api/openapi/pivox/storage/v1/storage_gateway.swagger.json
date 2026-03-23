@@ -289,10 +289,6 @@
                   "description": "Output only. The currently running software version of the storage\ngateway.",
                   "readOnly": true
                 },
-                "cacheConfig": {
-                  "$ref": "#/definitions/v1CacheConfig",
-                  "description": "Optional. Cache configuration for the storage gateway."
-                },
                 "certState": {
                   "$ref": "#/definitions/StorageGatewayCertState",
                   "description": "Output only. The current state of the TLS certificate.",
@@ -583,16 +579,6 @@
     }
   },
   "definitions": {
-    "CacheConfigEvictionPolicy": {
-      "type": "string",
-      "enum": [
-        "EVICTION_POLICY_UNSPECIFIED",
-        "LRU",
-        "LFU"
-      ],
-      "default": "EVICTION_POLICY_UNSPECIFIED",
-      "description": "The eviction policy used when the cache reaches its maximum size.\n\n - EVICTION_POLICY_UNSPECIFIED: Unspecified eviction policy.\n - LRU: Least Recently Used: evicts the least recently accessed items first.\n - LFU: Least Frequently Used: evicts the least frequently accessed items first."
-    },
     "StorageGatewayCertState": {
       "type": "string",
       "enum": [
@@ -682,26 +668,6 @@
       },
       "description": "The `Status` type defines a logical error model that is suitable for\ndifferent programming environments, including REST APIs and RPC APIs. It is\nused by [gRPC](https://github.com/grpc). Each `Status` message contains\nthree pieces of data: error code, error message, and error details.\n\nYou can find out more about this error model and how to work with it in the\n[API Design Guide](https://cloud.google.com/apis/design/errors)."
     },
-    "v1CacheConfig": {
-      "type": "object",
-      "properties": {
-        "maxSizeGb": {
-          "type": "integer",
-          "format": "int32",
-          "description": "Optional. The maximum cache size in gigabytes. Must be positive."
-        },
-        "evictionPolicy": {
-          "$ref": "#/definitions/CacheConfigEvictionPolicy",
-          "description": "Optional. The eviction policy to use when the cache is full."
-        },
-        "ttlHours": {
-          "type": "integer",
-          "format": "int32",
-          "description": "Optional. The time-to-live for cached items, in hours. Must be positive."
-        }
-      },
-      "description": "Cache configuration for a storage gateway."
-    },
     "v1GetInstallScriptResponse": {
       "type": "object",
       "properties": {
@@ -782,10 +748,6 @@
           "type": "string",
           "description": "Output only. The currently running software version of the storage\ngateway.",
           "readOnly": true
-        },
-        "cacheConfig": {
-          "$ref": "#/definitions/v1CacheConfig",
-          "description": "Optional. Cache configuration for the storage gateway."
         },
         "certState": {
           "$ref": "#/definitions/StorageGatewayCertState",

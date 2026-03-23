@@ -302,11 +302,8 @@ message HandshakeAck {
   bytes tls_key = 3;
 
   // Initial set of storage endpoint configurations the agent should connect
-  // to.
+  // to. Each endpoint includes its own cache configuration.
   repeated EndpointConfig endpoints = 4;
-
-  // Initial local cache configuration.
-  CacheConfig cache_config = 5;
 }
 
 // CertDelivery pushes a rotated TLS certificate and key to the agent. The
@@ -368,15 +365,12 @@ message UpgradeRequest {
   string signature_ed25519 = 5;
 }
 
-// ConfigUpdate pushes updated endpoint and cache configuration to the agent.
+// ConfigUpdate pushes updated endpoint configuration to the agent.
 // The agent MUST apply the new configuration without restarting.
 message ConfigUpdate {
   // Full replacement set of endpoint configurations. Endpoints not present in
-  // this list should be removed.
+  // this list should be removed. Each endpoint includes its own cache config.
   repeated EndpointConfig endpoints = 1;
-
-  // Updated local cache configuration.
-  CacheConfig cache_config = 2;
 }
 
 // ---------------------------------------------------------------------------
@@ -384,7 +378,8 @@ message ConfigUpdate {
 // ---------------------------------------------------------------------------
 
 // EndpointConfig describes a storage backend that the agent should serve.
-// The configuration is type-specific via a oneof.
+// The configuration is type-specific via a oneof, and includes per-endpoint
+// cache settings.
 message EndpointConfig {
   // Logical name of the endpoint (matches the Endpoint resource name).
   string name = 1;
@@ -397,6 +392,9 @@ message EndpointConfig {
     // Local or network-mounted filesystem.
     FileSystemEndpointConfig filesystem = 3;
   }
+
+  // Cache configuration for this endpoint.
+  EndpointCacheConfig cache_config = 4;
 }
 
 // S3 endpoint configuration delivered to the agent via bidi stream.
@@ -424,16 +422,19 @@ message FileSystemEndpointConfig {
   string path = 1;
 }
 
-// CacheConfig controls the local object cache maintained by the agent.
-message CacheConfig {
-  // Maximum cache size in gigabytes.
-  int32 max_size_gb = 1;
+// EndpointCacheConfig controls per-endpoint caching on the agent's local SSD.
+message EndpointCacheConfig {
+  // Whether caching is enabled for this endpoint.
+  bool enabled = 1;
 
-  // Eviction policy identifier (e.g. "lru", "lfu", "arc").
-  string eviction_policy = 2;
+  // Maximum cache size in gigabytes for this endpoint.
+  int32 max_size_gb = 2;
 
-  // Default time-to-live for cached objects in hours.
-  int32 ttl_hours = 3;
+  // Eviction policy identifier (e.g. "lru", "lfu").
+  string eviction_policy = 3;
+
+  // Time-to-live for cached objects in hours.
+  int32 ttl_hours = 4;
 }
 
 // ServerHeartbeat is an empty keep-alive message sent by the control plane to

@@ -226,9 +226,6 @@ message StorageGateway {
   // gateway.
   string current_version = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  // Optional. Cache configuration for the storage gateway.
-  CacheConfig cache_config = 9 [(google.api.field_behavior) = OPTIONAL];
-
   // Output only. The current state of the TLS certificate.
   CertState cert_state = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
 
@@ -258,36 +255,6 @@ message StorageGateway {
 
   // Output only. Timestamp when the storage gateway was last modified.
   google.protobuf.Timestamp update_time = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
-}
-
-// Cache configuration for a storage gateway.
-message CacheConfig {
-  // The eviction policy used when the cache reaches its maximum size.
-  enum EvictionPolicy {
-    // Unspecified eviction policy.
-    EVICTION_POLICY_UNSPECIFIED = 0;
-
-    // Least Recently Used: evicts the least recently accessed items first.
-    LRU = 1;
-
-    // Least Frequently Used: evicts the least frequently accessed items first.
-    LFU = 2;
-  }
-
-  // Optional. The maximum cache size in gigabytes. Must be positive.
-  int32 max_size_gb = 1 [
-    (google.api.field_behavior) = OPTIONAL,
-    (buf.validate.field).int32.gte = 0
-  ];
-
-  // Optional. The eviction policy to use when the cache is full.
-  EvictionPolicy eviction_policy = 2 [(google.api.field_behavior) = OPTIONAL];
-
-  // Optional. The time-to-live for cached items, in hours. Must be positive.
-  int32 ttl_hours = 3 [
-    (google.api.field_behavior) = OPTIONAL,
-    (buf.validate.field).int32.gte = 0
-  ];
 }
 
 // The request sent to the

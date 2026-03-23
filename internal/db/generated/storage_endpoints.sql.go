@@ -14,19 +14,23 @@ import (
 )
 
 const createStorageEndpoint = `-- name: CreateStorageEndpoint :one
-INSERT INTO storage_endpoints (id, gateway_id, name, display_name, configuration, annotations, created_by, updated_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
-RETURNING id, gateway_id, name, display_name, configuration, annotations, state, etag, revision, created_by, updated_by, create_time, update_time
+INSERT INTO storage_endpoints (id, gateway_id, name, display_name, configuration, cache_enabled, cache_max_size_gb, cache_eviction, cache_ttl_hours, annotations, created_by, updated_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11)
+RETURNING id, gateway_id, name, display_name, configuration, cache_enabled, cache_max_size_gb, cache_eviction, cache_ttl_hours, annotations, state, etag, revision, created_by, updated_by, create_time, update_time
 `
 
 type CreateStorageEndpointParams struct {
-	ID            uuid.UUID       `json:"id"`
-	GatewayID     uuid.UUID       `json:"gateway_id"`
-	Name          string          `json:"name"`
-	DisplayName   string          `json:"display_name"`
-	Configuration json.RawMessage `json:"configuration"`
-	Annotations   json.RawMessage `json:"annotations"`
-	CreatedBy     string          `json:"created_by"`
+	ID             uuid.UUID       `json:"id"`
+	GatewayID      uuid.UUID       `json:"gateway_id"`
+	Name           string          `json:"name"`
+	DisplayName    string          `json:"display_name"`
+	Configuration  json.RawMessage `json:"configuration"`
+	CacheEnabled   bool            `json:"cache_enabled"`
+	CacheMaxSizeGb int32           `json:"cache_max_size_gb"`
+	CacheEviction  EvictionPolicy  `json:"cache_eviction"`
+	CacheTtlHours  int32           `json:"cache_ttl_hours"`
+	Annotations    json.RawMessage `json:"annotations"`
+	CreatedBy      string          `json:"created_by"`
 }
 
 func (q *Queries) CreateStorageEndpoint(ctx context.Context, arg CreateStorageEndpointParams) (StorageEndpoint, error) {
@@ -36,6 +40,10 @@ func (q *Queries) CreateStorageEndpoint(ctx context.Context, arg CreateStorageEn
 		arg.Name,
 		arg.DisplayName,
 		arg.Configuration,
+		arg.CacheEnabled,
+		arg.CacheMaxSizeGb,
+		arg.CacheEviction,
+		arg.CacheTtlHours,
 		arg.Annotations,
 		arg.CreatedBy,
 	)
@@ -46,6 +54,10 @@ func (q *Queries) CreateStorageEndpoint(ctx context.Context, arg CreateStorageEn
 		&i.Name,
 		&i.DisplayName,
 		&i.Configuration,
+		&i.CacheEnabled,
+		&i.CacheMaxSizeGb,
+		&i.CacheEviction,
+		&i.CacheTtlHours,
 		&i.Annotations,
 		&i.State,
 		&i.Etag,
@@ -68,7 +80,7 @@ func (q *Queries) DeleteStorageEndpoint(ctx context.Context, id uuid.UUID) error
 }
 
 const getStorageEndpoint = `-- name: GetStorageEndpoint :one
-SELECT id, gateway_id, name, display_name, configuration, annotations, state, etag, revision, created_by, updated_by, create_time, update_time FROM storage_endpoints WHERE id = $1
+SELECT id, gateway_id, name, display_name, configuration, cache_enabled, cache_max_size_gb, cache_eviction, cache_ttl_hours, annotations, state, etag, revision, created_by, updated_by, create_time, update_time FROM storage_endpoints WHERE id = $1
 `
 
 func (q *Queries) GetStorageEndpoint(ctx context.Context, id uuid.UUID) (StorageEndpoint, error) {
@@ -80,6 +92,10 @@ func (q *Queries) GetStorageEndpoint(ctx context.Context, id uuid.UUID) (Storage
 		&i.Name,
 		&i.DisplayName,
 		&i.Configuration,
+		&i.CacheEnabled,
+		&i.CacheMaxSizeGb,
+		&i.CacheEviction,
+		&i.CacheTtlHours,
 		&i.Annotations,
 		&i.State,
 		&i.Etag,
@@ -93,7 +109,7 @@ func (q *Queries) GetStorageEndpoint(ctx context.Context, id uuid.UUID) (Storage
 }
 
 const getStorageEndpointByName = `-- name: GetStorageEndpointByName :one
-SELECT id, gateway_id, name, display_name, configuration, annotations, state, etag, revision, created_by, updated_by, create_time, update_time FROM storage_endpoints WHERE gateway_id = $1 AND name = $2
+SELECT id, gateway_id, name, display_name, configuration, cache_enabled, cache_max_size_gb, cache_eviction, cache_ttl_hours, annotations, state, etag, revision, created_by, updated_by, create_time, update_time FROM storage_endpoints WHERE gateway_id = $1 AND name = $2
 `
 
 type GetStorageEndpointByNameParams struct {
@@ -110,6 +126,10 @@ func (q *Queries) GetStorageEndpointByName(ctx context.Context, arg GetStorageEn
 		&i.Name,
 		&i.DisplayName,
 		&i.Configuration,
+		&i.CacheEnabled,
+		&i.CacheMaxSizeGb,
+		&i.CacheEviction,
+		&i.CacheTtlHours,
 		&i.Annotations,
 		&i.State,
 		&i.Etag,
@@ -123,7 +143,7 @@ func (q *Queries) GetStorageEndpointByName(ctx context.Context, arg GetStorageEn
 }
 
 const listStorageEndpointsByGateway = `-- name: ListStorageEndpointsByGateway :many
-SELECT id, gateway_id, name, display_name, configuration, annotations, state, etag, revision, created_by, updated_by, create_time, update_time FROM storage_endpoints WHERE gateway_id = $1 ORDER BY create_time
+SELECT id, gateway_id, name, display_name, configuration, cache_enabled, cache_max_size_gb, cache_eviction, cache_ttl_hours, annotations, state, etag, revision, created_by, updated_by, create_time, update_time FROM storage_endpoints WHERE gateway_id = $1 ORDER BY create_time
 `
 
 func (q *Queries) ListStorageEndpointsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageEndpoint, error) {
@@ -141,6 +161,10 @@ func (q *Queries) ListStorageEndpointsByGateway(ctx context.Context, gatewayID u
 			&i.Name,
 			&i.DisplayName,
 			&i.Configuration,
+			&i.CacheEnabled,
+			&i.CacheMaxSizeGb,
+			&i.CacheEviction,
+			&i.CacheTtlHours,
 			&i.Annotations,
 			&i.State,
 			&i.Etag,
@@ -164,21 +188,29 @@ const updateStorageEndpoint = `-- name: UpdateStorageEndpoint :one
 UPDATE storage_endpoints
 SET display_name = COALESCE($3, display_name),
     configuration = COALESCE($4, configuration),
-    annotations = COALESCE($5, annotations),
+    cache_enabled = COALESCE($5, cache_enabled),
+    cache_max_size_gb = COALESCE($6, cache_max_size_gb),
+    cache_eviction = COALESCE($7, cache_eviction),
+    cache_ttl_hours = COALESCE($8, cache_ttl_hours),
+    annotations = COALESCE($9, annotations),
     revision = revision + 1,
     updated_by = $2,
     update_time = now(),
     etag = md5(now()::text)
 WHERE id = $1
-RETURNING id, gateway_id, name, display_name, configuration, annotations, state, etag, revision, created_by, updated_by, create_time, update_time
+RETURNING id, gateway_id, name, display_name, configuration, cache_enabled, cache_max_size_gb, cache_eviction, cache_ttl_hours, annotations, state, etag, revision, created_by, updated_by, create_time, update_time
 `
 
 type UpdateStorageEndpointParams struct {
-	ID            uuid.UUID   `json:"id"`
-	UpdatedBy     string      `json:"updated_by"`
-	DisplayName   pgtype.Text `json:"display_name"`
-	Configuration []byte      `json:"configuration"`
-	Annotations   []byte      `json:"annotations"`
+	ID             uuid.UUID          `json:"id"`
+	UpdatedBy      string             `json:"updated_by"`
+	DisplayName    pgtype.Text        `json:"display_name"`
+	Configuration  []byte             `json:"configuration"`
+	CacheEnabled   pgtype.Bool        `json:"cache_enabled"`
+	CacheMaxSizeGb pgtype.Int4        `json:"cache_max_size_gb"`
+	CacheEviction  NullEvictionPolicy `json:"cache_eviction"`
+	CacheTtlHours  pgtype.Int4        `json:"cache_ttl_hours"`
+	Annotations    []byte             `json:"annotations"`
 }
 
 func (q *Queries) UpdateStorageEndpoint(ctx context.Context, arg UpdateStorageEndpointParams) (StorageEndpoint, error) {
@@ -187,6 +219,10 @@ func (q *Queries) UpdateStorageEndpoint(ctx context.Context, arg UpdateStorageEn
 		arg.UpdatedBy,
 		arg.DisplayName,
 		arg.Configuration,
+		arg.CacheEnabled,
+		arg.CacheMaxSizeGb,
+		arg.CacheEviction,
+		arg.CacheTtlHours,
 		arg.Annotations,
 	)
 	var i StorageEndpoint
@@ -196,6 +232,10 @@ func (q *Queries) UpdateStorageEndpoint(ctx context.Context, arg UpdateStorageEn
 		&i.Name,
 		&i.DisplayName,
 		&i.Configuration,
+		&i.CacheEnabled,
+		&i.CacheMaxSizeGb,
+		&i.CacheEviction,
+		&i.CacheTtlHours,
 		&i.Annotations,
 		&i.State,
 		&i.Etag,

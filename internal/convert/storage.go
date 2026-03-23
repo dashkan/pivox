@@ -22,17 +22,12 @@ func StorageGatewayToProto(gw db.StorageGateway, orgName string) *storagev1.Stor
 		RegistrationToken: gw.RegistrationToken,
 		TargetVersion:     gw.TargetVersion,
 		CurrentVersion:    gw.CurrentVersion,
-		CacheConfig: &storagev1.CacheConfig{
-			MaxSizeGb:      gw.CacheMaxSizeGb,
-			EvictionPolicy: cacheEvictionPolicy(gw.CacheEviction),
-			TtlHours:       gw.CacheTtlHours,
-		},
-		CertState:  certState(gw.CertState),
-		Etag:       gw.Etag,
-		Creator:    gw.CreatedBy,
-		Updater:    gw.UpdatedBy,
-		CreateTime: timestamppb.New(gw.CreateTime),
-		UpdateTime: timestamppb.New(gw.UpdateTime),
+		CertState:         certState(gw.CertState),
+		Etag:              gw.Etag,
+		Creator:           gw.CreatedBy,
+		Updater:           gw.UpdatedBy,
+		CreateTime:        timestamppb.New(gw.CreateTime),
+		UpdateTime:        timestamppb.New(gw.UpdateTime),
 	}
 	if gw.CertExpiryTime.Valid {
 		pb.CertExpiryTime = timestamppb.New(gw.CertExpiryTime.Time)
@@ -76,11 +71,17 @@ func EndpointToProto(ep db.StorageEndpoint, gatewayName string) *storagev1.Endpo
 		Name:        fmt.Sprintf("%s/endpoints/%s", gatewayName, ep.Name),
 		DisplayName: ep.DisplayName,
 		State:       endpointState(ep.State),
-		Etag:        ep.Etag,
-		Creator:     ep.CreatedBy,
-		Updater:     ep.UpdatedBy,
-		CreateTime:  timestamppb.New(ep.CreateTime),
-		UpdateTime:  timestamppb.New(ep.UpdateTime),
+		CacheConfig: &storagev1.CacheConfig{
+			Enabled:        ep.CacheEnabled,
+			MaxSizeGb:      ep.CacheMaxSizeGb,
+			EvictionPolicy: cacheEvictionPolicy(ep.CacheEviction),
+			TtlHours:       ep.CacheTtlHours,
+		},
+		Etag:       ep.Etag,
+		Creator:    ep.CreatedBy,
+		Updater:    ep.UpdatedBy,
+		CreateTime: timestamppb.New(ep.CreateTime),
+		UpdateTime: timestamppb.New(ep.UpdateTime),
 	}
 
 	// Parse configuration JSONB and map to proto oneof.

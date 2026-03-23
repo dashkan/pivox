@@ -168,9 +168,6 @@ CREATE TABLE storage_gateways (
     target_version      TEXT NOT NULL DEFAULT '',
     current_version     TEXT NOT NULL DEFAULT '',
     hostname            TEXT NOT NULL DEFAULT '',
-    cache_max_size_gb   INTEGER NOT NULL DEFAULT 0,
-    cache_eviction      eviction_policy NOT NULL DEFAULT 'LRU',
-    cache_ttl_hours     INTEGER NOT NULL DEFAULT 0,
     annotations         JSONB NOT NULL DEFAULT '{}',
     -- state
     state               storage_gateway_state NOT NULL DEFAULT 'PROVISIONING',
@@ -227,6 +224,11 @@ CREATE TABLE storage_endpoints (
     -- domain
     display_name      TEXT NOT NULL DEFAULT '',
     configuration     JSONB NOT NULL,  -- type-specific config (S3Configuration, etc.)
+    -- cache
+    cache_enabled     BOOLEAN NOT NULL DEFAULT true,
+    cache_max_size_gb INTEGER NOT NULL DEFAULT 0,
+    cache_eviction    eviction_policy NOT NULL DEFAULT 'LRU',
+    cache_ttl_hours   INTEGER NOT NULL DEFAULT 0,
     annotations       JSONB NOT NULL DEFAULT '{}',
     -- state
     state             endpoint_state NOT NULL DEFAULT 'ACTIVE',

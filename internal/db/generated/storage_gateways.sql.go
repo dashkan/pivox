@@ -14,9 +14,9 @@ import (
 )
 
 const createStorageGateway = `-- name: CreateStorageGateway :one
-INSERT INTO storage_gateways (id, org_id, name, display_name, ip_addresses, registration_token, hostname, cache_max_size_gb, cache_eviction, cache_ttl_hours, annotations, created_by, updated_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $12)
-RETURNING id, org_id, name, display_name, ip_addresses, registration_token, target_version, current_version, hostname, cache_max_size_gb, cache_eviction, cache_ttl_hours, annotations, state, cert_state, cert_expiry_time, etag, revision, created_by, updated_by, create_time, update_time
+INSERT INTO storage_gateways (id, org_id, name, display_name, ip_addresses, registration_token, hostname, annotations, created_by, updated_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
+RETURNING id, org_id, name, display_name, ip_addresses, registration_token, target_version, current_version, hostname, annotations, state, cert_state, cert_expiry_time, etag, revision, created_by, updated_by, create_time, update_time
 `
 
 type CreateStorageGatewayParams struct {
@@ -27,9 +27,6 @@ type CreateStorageGatewayParams struct {
 	IpAddresses       []string        `json:"ip_addresses"`
 	RegistrationToken string          `json:"registration_token"`
 	Hostname          string          `json:"hostname"`
-	CacheMaxSizeGb    int32           `json:"cache_max_size_gb"`
-	CacheEviction     EvictionPolicy  `json:"cache_eviction"`
-	CacheTtlHours     int32           `json:"cache_ttl_hours"`
 	Annotations       json.RawMessage `json:"annotations"`
 	CreatedBy         string          `json:"created_by"`
 }
@@ -43,9 +40,6 @@ func (q *Queries) CreateStorageGateway(ctx context.Context, arg CreateStorageGat
 		arg.IpAddresses,
 		arg.RegistrationToken,
 		arg.Hostname,
-		arg.CacheMaxSizeGb,
-		arg.CacheEviction,
-		arg.CacheTtlHours,
 		arg.Annotations,
 		arg.CreatedBy,
 	)
@@ -60,9 +54,6 @@ func (q *Queries) CreateStorageGateway(ctx context.Context, arg CreateStorageGat
 		&i.TargetVersion,
 		&i.CurrentVersion,
 		&i.Hostname,
-		&i.CacheMaxSizeGb,
-		&i.CacheEviction,
-		&i.CacheTtlHours,
 		&i.Annotations,
 		&i.State,
 		&i.CertState,
@@ -87,7 +78,7 @@ func (q *Queries) DeleteStorageGateway(ctx context.Context, id uuid.UUID) error 
 }
 
 const getStorageGateway = `-- name: GetStorageGateway :one
-SELECT id, org_id, name, display_name, ip_addresses, registration_token, target_version, current_version, hostname, cache_max_size_gb, cache_eviction, cache_ttl_hours, annotations, state, cert_state, cert_expiry_time, etag, revision, created_by, updated_by, create_time, update_time FROM storage_gateways WHERE id = $1
+SELECT id, org_id, name, display_name, ip_addresses, registration_token, target_version, current_version, hostname, annotations, state, cert_state, cert_expiry_time, etag, revision, created_by, updated_by, create_time, update_time FROM storage_gateways WHERE id = $1
 `
 
 func (q *Queries) GetStorageGateway(ctx context.Context, id uuid.UUID) (StorageGateway, error) {
@@ -103,9 +94,6 @@ func (q *Queries) GetStorageGateway(ctx context.Context, id uuid.UUID) (StorageG
 		&i.TargetVersion,
 		&i.CurrentVersion,
 		&i.Hostname,
-		&i.CacheMaxSizeGb,
-		&i.CacheEviction,
-		&i.CacheTtlHours,
 		&i.Annotations,
 		&i.State,
 		&i.CertState,
@@ -121,7 +109,7 @@ func (q *Queries) GetStorageGateway(ctx context.Context, id uuid.UUID) (StorageG
 }
 
 const getStorageGatewayByName = `-- name: GetStorageGatewayByName :one
-SELECT id, org_id, name, display_name, ip_addresses, registration_token, target_version, current_version, hostname, cache_max_size_gb, cache_eviction, cache_ttl_hours, annotations, state, cert_state, cert_expiry_time, etag, revision, created_by, updated_by, create_time, update_time FROM storage_gateways WHERE org_id = $1 AND name = $2
+SELECT id, org_id, name, display_name, ip_addresses, registration_token, target_version, current_version, hostname, annotations, state, cert_state, cert_expiry_time, etag, revision, created_by, updated_by, create_time, update_time FROM storage_gateways WHERE org_id = $1 AND name = $2
 `
 
 type GetStorageGatewayByNameParams struct {
@@ -142,9 +130,6 @@ func (q *Queries) GetStorageGatewayByName(ctx context.Context, arg GetStorageGat
 		&i.TargetVersion,
 		&i.CurrentVersion,
 		&i.Hostname,
-		&i.CacheMaxSizeGb,
-		&i.CacheEviction,
-		&i.CacheTtlHours,
 		&i.Annotations,
 		&i.State,
 		&i.CertState,
@@ -160,7 +145,7 @@ func (q *Queries) GetStorageGatewayByName(ctx context.Context, arg GetStorageGat
 }
 
 const getStorageGatewayByToken = `-- name: GetStorageGatewayByToken :one
-SELECT id, org_id, name, display_name, ip_addresses, registration_token, target_version, current_version, hostname, cache_max_size_gb, cache_eviction, cache_ttl_hours, annotations, state, cert_state, cert_expiry_time, etag, revision, created_by, updated_by, create_time, update_time FROM storage_gateways WHERE registration_token = $1
+SELECT id, org_id, name, display_name, ip_addresses, registration_token, target_version, current_version, hostname, annotations, state, cert_state, cert_expiry_time, etag, revision, created_by, updated_by, create_time, update_time FROM storage_gateways WHERE registration_token = $1
 `
 
 func (q *Queries) GetStorageGatewayByToken(ctx context.Context, registrationToken string) (StorageGateway, error) {
@@ -176,9 +161,6 @@ func (q *Queries) GetStorageGatewayByToken(ctx context.Context, registrationToke
 		&i.TargetVersion,
 		&i.CurrentVersion,
 		&i.Hostname,
-		&i.CacheMaxSizeGb,
-		&i.CacheEviction,
-		&i.CacheTtlHours,
 		&i.Annotations,
 		&i.State,
 		&i.CertState,
@@ -197,7 +179,7 @@ const rotateRegistrationToken = `-- name: RotateRegistrationToken :one
 UPDATE storage_gateways
 SET registration_token = $2, update_time = now(), etag = md5(now()::text)
 WHERE id = $1
-RETURNING id, org_id, name, display_name, ip_addresses, registration_token, target_version, current_version, hostname, cache_max_size_gb, cache_eviction, cache_ttl_hours, annotations, state, cert_state, cert_expiry_time, etag, revision, created_by, updated_by, create_time, update_time
+RETURNING id, org_id, name, display_name, ip_addresses, registration_token, target_version, current_version, hostname, annotations, state, cert_state, cert_expiry_time, etag, revision, created_by, updated_by, create_time, update_time
 `
 
 type RotateRegistrationTokenParams struct {
@@ -218,9 +200,6 @@ func (q *Queries) RotateRegistrationToken(ctx context.Context, arg RotateRegistr
 		&i.TargetVersion,
 		&i.CurrentVersion,
 		&i.Hostname,
-		&i.CacheMaxSizeGb,
-		&i.CacheEviction,
-		&i.CacheTtlHours,
 		&i.Annotations,
 		&i.State,
 		&i.CertState,
@@ -240,28 +219,22 @@ UPDATE storage_gateways
 SET display_name = COALESCE($3, display_name),
     ip_addresses = COALESCE($4, ip_addresses),
     target_version = COALESCE($5, target_version),
-    cache_max_size_gb = COALESCE($6, cache_max_size_gb),
-    cache_eviction = COALESCE($7, cache_eviction),
-    cache_ttl_hours = COALESCE($8, cache_ttl_hours),
-    annotations = COALESCE($9, annotations),
+    annotations = COALESCE($6, annotations),
     revision = revision + 1,
     updated_by = $2,
     update_time = now(),
     etag = md5(now()::text)
 WHERE id = $1
-RETURNING id, org_id, name, display_name, ip_addresses, registration_token, target_version, current_version, hostname, cache_max_size_gb, cache_eviction, cache_ttl_hours, annotations, state, cert_state, cert_expiry_time, etag, revision, created_by, updated_by, create_time, update_time
+RETURNING id, org_id, name, display_name, ip_addresses, registration_token, target_version, current_version, hostname, annotations, state, cert_state, cert_expiry_time, etag, revision, created_by, updated_by, create_time, update_time
 `
 
 type UpdateStorageGatewayParams struct {
-	ID             uuid.UUID          `json:"id"`
-	UpdatedBy      string             `json:"updated_by"`
-	DisplayName    pgtype.Text        `json:"display_name"`
-	IpAddresses    []string           `json:"ip_addresses"`
-	TargetVersion  pgtype.Text        `json:"target_version"`
-	CacheMaxSizeGb pgtype.Int4        `json:"cache_max_size_gb"`
-	CacheEviction  NullEvictionPolicy `json:"cache_eviction"`
-	CacheTtlHours  pgtype.Int4        `json:"cache_ttl_hours"`
-	Annotations    []byte             `json:"annotations"`
+	ID            uuid.UUID   `json:"id"`
+	UpdatedBy     string      `json:"updated_by"`
+	DisplayName   pgtype.Text `json:"display_name"`
+	IpAddresses   []string    `json:"ip_addresses"`
+	TargetVersion pgtype.Text `json:"target_version"`
+	Annotations   []byte      `json:"annotations"`
 }
 
 func (q *Queries) UpdateStorageGateway(ctx context.Context, arg UpdateStorageGatewayParams) (StorageGateway, error) {
@@ -271,9 +244,6 @@ func (q *Queries) UpdateStorageGateway(ctx context.Context, arg UpdateStorageGat
 		arg.DisplayName,
 		arg.IpAddresses,
 		arg.TargetVersion,
-		arg.CacheMaxSizeGb,
-		arg.CacheEviction,
-		arg.CacheTtlHours,
 		arg.Annotations,
 	)
 	var i StorageGateway
@@ -287,9 +257,6 @@ func (q *Queries) UpdateStorageGateway(ctx context.Context, arg UpdateStorageGat
 		&i.TargetVersion,
 		&i.CurrentVersion,
 		&i.Hostname,
-		&i.CacheMaxSizeGb,
-		&i.CacheEviction,
-		&i.CacheTtlHours,
 		&i.Annotations,
 		&i.State,
 		&i.CertState,

@@ -1234,10 +1234,8 @@ type HandshakeAck struct {
 	// PEM-encoded TLS private key corresponding to tls_cert.
 	TlsKey []byte `protobuf:"bytes,3,opt,name=tls_key,json=tlsKey,proto3" json:"tls_key,omitempty"`
 	// Initial set of storage endpoint configurations the agent should connect
-	// to.
-	Endpoints []*EndpointConfig `protobuf:"bytes,4,rep,name=endpoints,proto3" json:"endpoints,omitempty"`
-	// Initial local cache configuration.
-	CacheConfig   *CacheConfig `protobuf:"bytes,5,opt,name=cache_config,json=cacheConfig,proto3" json:"cache_config,omitempty"`
+	// to. Each endpoint includes its own cache configuration.
+	Endpoints     []*EndpointConfig `protobuf:"bytes,4,rep,name=endpoints,proto3" json:"endpoints,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1296,13 +1294,6 @@ func (x *HandshakeAck) GetTlsKey() []byte {
 func (x *HandshakeAck) GetEndpoints() []*EndpointConfig {
 	if x != nil {
 		return x.Endpoints
-	}
-	return nil
-}
-
-func (x *HandshakeAck) GetCacheConfig() *CacheConfig {
-	if x != nil {
-		return x.CacheConfig
 	}
 	return nil
 }
@@ -1506,15 +1497,13 @@ func (x *UpgradeRequest) GetSignatureEd25519() string {
 	return ""
 }
 
-// ConfigUpdate pushes updated endpoint and cache configuration to the agent.
+// ConfigUpdate pushes updated endpoint configuration to the agent.
 // The agent MUST apply the new configuration without restarting.
 type ConfigUpdate struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Full replacement set of endpoint configurations. Endpoints not present in
-	// this list should be removed.
-	Endpoints []*EndpointConfig `protobuf:"bytes,1,rep,name=endpoints,proto3" json:"endpoints,omitempty"`
-	// Updated local cache configuration.
-	CacheConfig   *CacheConfig `protobuf:"bytes,2,opt,name=cache_config,json=cacheConfig,proto3" json:"cache_config,omitempty"`
+	// this list should be removed. Each endpoint includes its own cache config.
+	Endpoints     []*EndpointConfig `protobuf:"bytes,1,rep,name=endpoints,proto3" json:"endpoints,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1556,15 +1545,9 @@ func (x *ConfigUpdate) GetEndpoints() []*EndpointConfig {
 	return nil
 }
 
-func (x *ConfigUpdate) GetCacheConfig() *CacheConfig {
-	if x != nil {
-		return x.CacheConfig
-	}
-	return nil
-}
-
 // EndpointConfig describes a storage backend that the agent should serve.
-// The configuration is type-specific via a oneof.
+// The configuration is type-specific via a oneof, and includes per-endpoint
+// cache settings.
 type EndpointConfig struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Logical name of the endpoint (matches the Endpoint resource name).
@@ -1576,6 +1559,8 @@ type EndpointConfig struct {
 	//	*EndpointConfig_S3
 	//	*EndpointConfig_Filesystem
 	Configuration isEndpointConfig_Configuration `protobuf_oneof:"configuration"`
+	// Cache configuration for this endpoint.
+	CacheConfig   *EndpointCacheConfig `protobuf:"bytes,4,opt,name=cache_config,json=cacheConfig,proto3" json:"cache_config,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1638,6 +1623,13 @@ func (x *EndpointConfig) GetFilesystem() *FileSystemEndpointConfig {
 		if x, ok := x.Configuration.(*EndpointConfig_Filesystem); ok {
 			return x.Filesystem
 		}
+	}
+	return nil
+}
+
+func (x *EndpointConfig) GetCacheConfig() *EndpointCacheConfig {
+	if x != nil {
+		return x.CacheConfig
 	}
 	return nil
 }
@@ -1789,33 +1781,35 @@ func (x *FileSystemEndpointConfig) GetPath() string {
 	return ""
 }
 
-// CacheConfig controls the local object cache maintained by the agent.
-type CacheConfig struct {
+// EndpointCacheConfig controls per-endpoint caching on the agent's local SSD.
+type EndpointCacheConfig struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Maximum cache size in gigabytes.
-	MaxSizeGb int32 `protobuf:"varint,1,opt,name=max_size_gb,json=maxSizeGb,proto3" json:"max_size_gb,omitempty"`
-	// Eviction policy identifier (e.g. "lru", "lfu", "arc").
-	EvictionPolicy string `protobuf:"bytes,2,opt,name=eviction_policy,json=evictionPolicy,proto3" json:"eviction_policy,omitempty"`
-	// Default time-to-live for cached objects in hours.
-	TtlHours      int32 `protobuf:"varint,3,opt,name=ttl_hours,json=ttlHours,proto3" json:"ttl_hours,omitempty"`
+	// Whether caching is enabled for this endpoint.
+	Enabled bool `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	// Maximum cache size in gigabytes for this endpoint.
+	MaxSizeGb int32 `protobuf:"varint,2,opt,name=max_size_gb,json=maxSizeGb,proto3" json:"max_size_gb,omitempty"`
+	// Eviction policy identifier (e.g. "lru", "lfu").
+	EvictionPolicy string `protobuf:"bytes,3,opt,name=eviction_policy,json=evictionPolicy,proto3" json:"eviction_policy,omitempty"`
+	// Time-to-live for cached objects in hours.
+	TtlHours      int32 `protobuf:"varint,4,opt,name=ttl_hours,json=ttlHours,proto3" json:"ttl_hours,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CacheConfig) Reset() {
-	*x = CacheConfig{}
+func (x *EndpointCacheConfig) Reset() {
+	*x = EndpointCacheConfig{}
 	mi := &file_pivox_agent_v1_agent_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CacheConfig) String() string {
+func (x *EndpointCacheConfig) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CacheConfig) ProtoMessage() {}
+func (*EndpointCacheConfig) ProtoMessage() {}
 
-func (x *CacheConfig) ProtoReflect() protoreflect.Message {
+func (x *EndpointCacheConfig) ProtoReflect() protoreflect.Message {
 	mi := &file_pivox_agent_v1_agent_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1827,26 +1821,33 @@ func (x *CacheConfig) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CacheConfig.ProtoReflect.Descriptor instead.
-func (*CacheConfig) Descriptor() ([]byte, []int) {
+// Deprecated: Use EndpointCacheConfig.ProtoReflect.Descriptor instead.
+func (*EndpointCacheConfig) Descriptor() ([]byte, []int) {
 	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{19}
 }
 
-func (x *CacheConfig) GetMaxSizeGb() int32 {
+func (x *EndpointCacheConfig) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *EndpointCacheConfig) GetMaxSizeGb() int32 {
 	if x != nil {
 		return x.MaxSizeGb
 	}
 	return 0
 }
 
-func (x *CacheConfig) GetEvictionPolicy() string {
+func (x *EndpointCacheConfig) GetEvictionPolicy() string {
 	if x != nil {
 		return x.EvictionPolicy
 	}
 	return ""
 }
 
-func (x *CacheConfig) GetTtlHours() int32 {
+func (x *EndpointCacheConfig) GetTtlHours() int32 {
 	if x != nil {
 		return x.TtlHours
 	}
@@ -1970,14 +1971,13 @@ const file_pivox_agent_v1_agent_proto_rawDesc = "" +
 	"\x0fupgrade_request\x18\x04 \x01(\v2\x1e.pivox.agent.v1.UpgradeRequestH\x00R\x0eupgradeRequest\x12C\n" +
 	"\rconfig_update\x18\x05 \x01(\v2\x1c.pivox.agent.v1.ConfigUpdateH\x00R\fconfigUpdate\x12L\n" +
 	"\x10server_heartbeat\x18\x06 \x01(\v2\x1f.pivox.agent.v1.ServerHeartbeatH\x00R\x0fserverHeartbeatB\t\n" +
-	"\amessage\"\xdf\x01\n" +
+	"\amessage\"\x9f\x01\n" +
 	"\fHandshakeAck\x12\x1d\n" +
 	"\n" +
 	"agent_name\x18\x01 \x01(\tR\tagentName\x12\x19\n" +
 	"\btls_cert\x18\x02 \x01(\fR\atlsCert\x12\x17\n" +
 	"\atls_key\x18\x03 \x01(\fR\x06tlsKey\x12<\n" +
-	"\tendpoints\x18\x04 \x03(\v2\x1e.pivox.agent.v1.EndpointConfigR\tendpoints\x12>\n" +
-	"\fcache_config\x18\x05 \x01(\v2\x1b.pivox.agent.v1.CacheConfigR\vcacheConfig\"v\n" +
+	"\tendpoints\x18\x04 \x03(\v2\x1e.pivox.agent.v1.EndpointConfigR\tendpoints\"v\n" +
 	"\fCertDelivery\x12\x19\n" +
 	"\btls_cert\x18\x01 \x01(\fR\atlsCert\x12\x17\n" +
 	"\atls_key\x18\x02 \x01(\fR\x06tlsKey\x122\n" +
@@ -1989,16 +1989,16 @@ const file_pivox_agent_v1_agent_proto_rawDesc = "" +
 	"\x0etarget_version\x18\x02 \x01(\tR\rtargetVersion\x12!\n" +
 	"\fdownload_url\x18\x03 \x01(\tR\vdownloadUrl\x12'\n" +
 	"\x0fchecksum_sha256\x18\x04 \x01(\tR\x0echecksumSha256\x12+\n" +
-	"\x11signature_ed25519\x18\x05 \x01(\tR\x10signatureEd25519\"\x8c\x01\n" +
+	"\x11signature_ed25519\x18\x05 \x01(\tR\x10signatureEd25519\"L\n" +
 	"\fConfigUpdate\x12<\n" +
-	"\tendpoints\x18\x01 \x03(\v2\x1e.pivox.agent.v1.EndpointConfigR\tendpoints\x12>\n" +
-	"\fcache_config\x18\x02 \x01(\v2\x1b.pivox.agent.v1.CacheConfigR\vcacheConfig\"\xb5\x01\n" +
+	"\tendpoints\x18\x01 \x03(\v2\x1e.pivox.agent.v1.EndpointConfigR\tendpoints\"\xfd\x01\n" +
 	"\x0eEndpointConfig\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x122\n" +
 	"\x02s3\x18\x02 \x01(\v2 .pivox.agent.v1.S3EndpointConfigH\x00R\x02s3\x12J\n" +
 	"\n" +
 	"filesystem\x18\x03 \x01(\v2(.pivox.agent.v1.FileSystemEndpointConfigH\x00R\n" +
-	"filesystemB\x0f\n" +
+	"filesystem\x12F\n" +
+	"\fcache_config\x18\x04 \x01(\v2#.pivox.agent.v1.EndpointCacheConfigR\vcacheConfigB\x0f\n" +
 	"\rconfiguration\"\xb5\x01\n" +
 	"\x10S3EndpointConfig\x12!\n" +
 	"\fendpoint_uri\x18\x01 \x01(\tR\vendpointUri\x12\x16\n" +
@@ -2007,11 +2007,12 @@ const file_pivox_agent_v1_agent_proto_rawDesc = "" +
 	"\raccess_key_id\x18\x04 \x01(\tR\vaccessKeyId\x12*\n" +
 	"\x11secret_access_key\x18\x05 \x01(\tR\x0fsecretAccessKey\".\n" +
 	"\x18FileSystemEndpointConfig\x12\x12\n" +
-	"\x04path\x18\x01 \x01(\tR\x04path\"s\n" +
-	"\vCacheConfig\x12\x1e\n" +
-	"\vmax_size_gb\x18\x01 \x01(\x05R\tmaxSizeGb\x12'\n" +
-	"\x0feviction_policy\x18\x02 \x01(\tR\x0eevictionPolicy\x12\x1b\n" +
-	"\tttl_hours\x18\x03 \x01(\x05R\bttlHours\"\x11\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\"\x95\x01\n" +
+	"\x13EndpointCacheConfig\x12\x18\n" +
+	"\aenabled\x18\x01 \x01(\bR\aenabled\x12\x1e\n" +
+	"\vmax_size_gb\x18\x02 \x01(\x05R\tmaxSizeGb\x12'\n" +
+	"\x0feviction_policy\x18\x03 \x01(\tR\x0eevictionPolicy\x12\x1b\n" +
+	"\tttl_hours\x18\x04 \x01(\x05R\bttlHours\"\x11\n" +
 	"\x0fServerHeartbeat*\x7f\n" +
 	"\fUpgradePhase\x12\x1d\n" +
 	"\x19UPGRADE_PHASE_UNSPECIFIED\x10\x00\x12\x0f\n" +
@@ -2068,7 +2069,7 @@ var file_pivox_agent_v1_agent_proto_goTypes = []any{
 	(*EndpointConfig)(nil),           // 18: pivox.agent.v1.EndpointConfig
 	(*S3EndpointConfig)(nil),         // 19: pivox.agent.v1.S3EndpointConfig
 	(*FileSystemEndpointConfig)(nil), // 20: pivox.agent.v1.FileSystemEndpointConfig
-	(*CacheConfig)(nil),              // 21: pivox.agent.v1.CacheConfig
+	(*EndpointCacheConfig)(nil),      // 21: pivox.agent.v1.EndpointCacheConfig
 	(*ServerHeartbeat)(nil),          // 22: pivox.agent.v1.ServerHeartbeat
 	(*durationpb.Duration)(nil),      // 23: google.protobuf.Duration
 	(*timestamppb.Timestamp)(nil),    // 24: google.protobuf.Timestamp
@@ -2092,20 +2093,19 @@ var file_pivox_agent_v1_agent_proto_depIdxs = []int32{
 	17, // 15: pivox.agent.v1.ControlMessage.config_update:type_name -> pivox.agent.v1.ConfigUpdate
 	22, // 16: pivox.agent.v1.ControlMessage.server_heartbeat:type_name -> pivox.agent.v1.ServerHeartbeat
 	18, // 17: pivox.agent.v1.HandshakeAck.endpoints:type_name -> pivox.agent.v1.EndpointConfig
-	21, // 18: pivox.agent.v1.HandshakeAck.cache_config:type_name -> pivox.agent.v1.CacheConfig
-	24, // 19: pivox.agent.v1.CertDelivery.expiry:type_name -> google.protobuf.Timestamp
-	1,  // 20: pivox.agent.v1.UpgradeRequest.command:type_name -> pivox.agent.v1.UpgradeCommand
-	18, // 21: pivox.agent.v1.ConfigUpdate.endpoints:type_name -> pivox.agent.v1.EndpointConfig
-	21, // 22: pivox.agent.v1.ConfigUpdate.cache_config:type_name -> pivox.agent.v1.CacheConfig
-	19, // 23: pivox.agent.v1.EndpointConfig.s3:type_name -> pivox.agent.v1.S3EndpointConfig
-	20, // 24: pivox.agent.v1.EndpointConfig.filesystem:type_name -> pivox.agent.v1.FileSystemEndpointConfig
-	2,  // 25: pivox.agent.v1.AgentService.Connect:input_type -> pivox.agent.v1.AgentMessage
-	12, // 26: pivox.agent.v1.AgentService.Connect:output_type -> pivox.agent.v1.ControlMessage
-	26, // [26:27] is the sub-list for method output_type
-	25, // [25:26] is the sub-list for method input_type
-	25, // [25:25] is the sub-list for extension type_name
-	25, // [25:25] is the sub-list for extension extendee
-	0,  // [0:25] is the sub-list for field type_name
+	24, // 18: pivox.agent.v1.CertDelivery.expiry:type_name -> google.protobuf.Timestamp
+	1,  // 19: pivox.agent.v1.UpgradeRequest.command:type_name -> pivox.agent.v1.UpgradeCommand
+	18, // 20: pivox.agent.v1.ConfigUpdate.endpoints:type_name -> pivox.agent.v1.EndpointConfig
+	19, // 21: pivox.agent.v1.EndpointConfig.s3:type_name -> pivox.agent.v1.S3EndpointConfig
+	20, // 22: pivox.agent.v1.EndpointConfig.filesystem:type_name -> pivox.agent.v1.FileSystemEndpointConfig
+	21, // 23: pivox.agent.v1.EndpointConfig.cache_config:type_name -> pivox.agent.v1.EndpointCacheConfig
+	2,  // 24: pivox.agent.v1.AgentService.Connect:input_type -> pivox.agent.v1.AgentMessage
+	12, // 25: pivox.agent.v1.AgentService.Connect:output_type -> pivox.agent.v1.ControlMessage
+	25, // [25:26] is the sub-list for method output_type
+	24, // [24:25] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_pivox_agent_v1_agent_proto_init() }

@@ -14,5 +14,6 @@ BEGIN;
 \i scripts/seeds/08_tag_values.sql
 \i scripts/seeds/09_tag_bindings.sql
 \i scripts/seeds/10_storage_gateways.sql
+\i scripts/seeds/11_local_corp.sql
 
 COMMIT;
