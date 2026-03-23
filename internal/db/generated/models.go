@@ -103,49 +103,6 @@ func (ns NullCertState) Value() (driver.Value, error) {
 	return string(ns.CertState), nil
 }
 
-type CredentialState string
-
-const (
-	CredentialStateUNSET   CredentialState = "UNSET"
-	CredentialStateSET     CredentialState = "SET"
-	CredentialStateINVALID CredentialState = "INVALID"
-)
-
-func (e *CredentialState) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = CredentialState(s)
-	case string:
-		*e = CredentialState(s)
-	default:
-		return fmt.Errorf("unsupported scan type for CredentialState: %T", src)
-	}
-	return nil
-}
-
-type NullCredentialState struct {
-	CredentialState CredentialState `json:"credential_state"`
-	Valid           bool            `json:"valid"` // Valid is true if CredentialState is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullCredentialState) Scan(value interface{}) error {
-	if value == nil {
-		ns.CredentialState, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.CredentialState.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullCredentialState) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.CredentialState), nil
-}
-
 type CustomDomainState string
 
 const (
@@ -189,50 +146,6 @@ func (ns NullCustomDomainState) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.CustomDomainState), nil
-}
-
-type EndpointEngine string
-
-const (
-	EndpointEngineS3     EndpointEngine = "S3"
-	EndpointEngineRUSTFS EndpointEngine = "RUSTFS"
-	EndpointEngineGCS    EndpointEngine = "GCS"
-	EndpointEngineMINIO  EndpointEngine = "MINIO"
-)
-
-func (e *EndpointEngine) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = EndpointEngine(s)
-	case string:
-		*e = EndpointEngine(s)
-	default:
-		return fmt.Errorf("unsupported scan type for EndpointEngine: %T", src)
-	}
-	return nil
-}
-
-type NullEndpointEngine struct {
-	EndpointEngine EndpointEngine `json:"endpoint_engine"`
-	Valid          bool           `json:"valid"` // Valid is true if EndpointEngine is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullEndpointEngine) Scan(value interface{}) error {
-	if value == nil {
-		ns.EndpointEngine, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.EndpointEngine.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullEndpointEngine) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.EndpointEngine), nil
 }
 
 type EndpointState string
@@ -810,24 +723,19 @@ type StorageAgent struct {
 }
 
 type StorageEndpoint struct {
-	ID              uuid.UUID       `json:"id"`
-	GatewayID       uuid.UUID       `json:"gateway_id"`
-	Name            string          `json:"name"`
-	DisplayName     string          `json:"display_name"`
-	Engine          EndpointEngine  `json:"engine"`
-	EndpointUri     string          `json:"endpoint_uri"`
-	Bucket          string          `json:"bucket"`
-	Region          string          `json:"region"`
-	Credentials     []byte          `json:"credentials"`
-	Annotations     json.RawMessage `json:"annotations"`
-	State           EndpointState   `json:"state"`
-	CredentialState CredentialState `json:"credential_state"`
-	Etag            string          `json:"etag"`
-	Revision        int32           `json:"revision"`
-	CreatedBy       string          `json:"created_by"`
-	UpdatedBy       string          `json:"updated_by"`
-	CreateTime      time.Time       `json:"create_time"`
-	UpdateTime      time.Time       `json:"update_time"`
+	ID            uuid.UUID       `json:"id"`
+	GatewayID     uuid.UUID       `json:"gateway_id"`
+	Name          string          `json:"name"`
+	DisplayName   string          `json:"display_name"`
+	Configuration json.RawMessage `json:"configuration"`
+	Annotations   json.RawMessage `json:"annotations"`
+	State         EndpointState   `json:"state"`
+	Etag          string          `json:"etag"`
+	Revision      int32           `json:"revision"`
+	CreatedBy     string          `json:"created_by"`
+	UpdatedBy     string          `json:"updated_by"`
+	CreateTime    time.Time       `json:"create_time"`
+	UpdateTime    time.Time       `json:"update_time"`
 }
 
 type StorageGateway struct {

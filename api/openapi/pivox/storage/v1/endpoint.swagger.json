@@ -18,7 +18,7 @@
   "paths": {
     "/v1/organizations/{organization}/storageGateways/{storageGateway}/endpoints": {
       "get": {
-        "summary": "Lists endpoints belonging to a storage gateway that satisfy the\nspecified filter.",
+        "summary": "Lists endpoints belonging to a storage gateway.",
         "operationId": "Endpoints_ListEndpoints",
         "responses": {
           "200": {
@@ -49,7 +49,7 @@
           },
           {
             "name": "pageSize",
-            "description": "Optional. The maximum number of endpoints to return in the response.\nThe server can return fewer endpoints than requested. If unspecified,\nthe server picks an appropriate default.",
+            "description": "Optional. The maximum number of endpoints to return in the response.",
             "in": "query",
             "required": false,
             "type": "integer",
@@ -64,7 +64,7 @@
           },
           {
             "name": "filter",
-            "description": "Optional. An AIP-160 filter expression. Supports filtering by\n`state`, `engine`, `display_name`.",
+            "description": "Optional. An AIP-160 filter expression.",
             "in": "query",
             "required": false,
             "type": "string"
@@ -82,7 +82,7 @@
         ]
       },
       "post": {
-        "summary": "Creates a new endpoint resource under the specified storage gateway.",
+        "summary": "Creates a new endpoint resource under the specified storage gateway.\nConfiguration (including credentials) must be provided at creation time.",
         "description": "The caller must have `storage.endpoints.create` permission on the\nparent storage gateway.",
         "operationId": "Endpoints_CreateEndpoint",
         "responses": {
@@ -114,7 +114,7 @@
           },
           {
             "name": "endpoint",
-            "description": "Required. The endpoint to create.",
+            "description": "Required. The endpoint to create. Must include configuration with\ncredentials.",
             "in": "body",
             "required": true,
             "schema": {
@@ -240,7 +240,7 @@
         ]
       },
       "patch": {
-        "summary": "Updates an endpoint resource. Use the field mask to specify which\nfields to update. Omitting the field mask updates all mutable fields.",
+        "summary": "Updates an endpoint resource. Use the field mask to specify which\nfields to update. Credentials can be updated via the configuration\nfield. Endpoint URI and bucket are immutable after creation.",
         "description": "The caller must have `storage.endpoints.update` permission on the\nspecified endpoint.",
         "operationId": "Endpoints_UpdateEndpoint",
         "responses": {
@@ -288,46 +288,25 @@
                   "type": "string",
                   "description": "Required. A human-readable name for the endpoint."
                 },
-                "engine": {
-                  "$ref": "#/definitions/EndpointEngine",
-                  "description": "Required. Immutable. The storage engine type. Cannot be changed after\ncreation -- delete and recreate the resource to use a different engine."
-                },
-                "endpointUri": {
-                  "type": "string",
-                  "description": "Required. The URI of the storage backend (e.g.\n`https://s3.us-east-1.amazonaws.com`)."
-                },
-                "bucket": {
-                  "type": "string",
-                  "description": "Required. The bucket or container name on the storage backend."
-                },
-                "region": {
-                  "type": "string",
-                  "description": "Optional. The cloud region of the storage backend (e.g. `us-east-1`)."
-                },
                 "state": {
                   "$ref": "#/definitions/v1EndpointState",
                   "description": "Output only. The current lifecycle state of the endpoint.",
                   "readOnly": true
                 },
-                "credentials": {
-                  "$ref": "#/definitions/v1EndpointCredentials",
-                  "description": "Input only. Credentials used to access the storage backend. This field\nis never returned in responses; use `credential_state` to check\nwhether credentials have been set."
-                },
-                "credentialState": {
-                  "$ref": "#/definitions/EndpointCredentialState",
-                  "description": "Output only. Indicates whether credentials are configured and valid.",
-                  "readOnly": true
+                "s3": {
+                  "$ref": "#/definitions/v1S3Configuration",
+                  "description": "S3-compatible storage backend configuration."
                 },
                 "annotations": {
                   "type": "object",
                   "additionalProperties": {
                     "type": "string"
                   },
-                  "description": "Optional. Annotations associated with this endpoint.\nAnnotations are key-value pairs that can be used to organize and\ntrack resources."
+                  "description": "Optional. Annotations associated with this endpoint."
                 },
                 "etag": {
                   "type": "string",
-                  "description": "Output only. A checksum computed by the server based on the current\nvalue of the Endpoint resource. This may be sent on update and delete\nrequests to ensure the client has an up-to-date value before\nproceeding.",
+                  "description": "Output only. A checksum computed by the server based on the current\nvalue of the Endpoint resource.",
                   "readOnly": true
                 },
                 "creator": {
@@ -337,7 +316,7 @@
                 },
                 "updater": {
                   "type": "string",
-                  "description": "Output only. The resource name of the user who last updated the\nendpoint.",
+                  "description": "Output only. The resource name of the user who last updated the endpoint.",
                   "readOnly": true
                 },
                 "createTime": {
@@ -355,10 +334,7 @@
               },
               "description": "Required. The endpoint with updated fields. The `name` field must be\npopulated to identify the endpoint to update.",
               "required": [
-                "displayName",
-                "engine",
-                "endpointUri",
-                "bucket"
+                "displayName"
               ]
             }
           },
@@ -368,57 +344,6 @@
             "in": "query",
             "required": false,
             "type": "boolean"
-          }
-        ],
-        "tags": [
-          "Endpoints"
-        ]
-      }
-    },
-    "/v1/organizations/{organization}/storageGateways/{storageGateway}/endpoints/{endpoint}:setCredentials": {
-      "post": {
-        "summary": "Sets or replaces the credentials used to access the storage backend.\nThe previous credentials are overwritten.",
-        "operationId": "Endpoints_SetEndpointCredentials",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/v1Endpoint"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "organization",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "storageGateway",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "endpoint",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/EndpointsSetEndpointCredentialsBody"
-            }
           }
         ],
         "tags": [
@@ -479,42 +404,6 @@
     }
   },
   "definitions": {
-    "EndpointCredentialState": {
-      "type": "string",
-      "enum": [
-        "CREDENTIAL_STATE_UNSPECIFIED",
-        "UNSET",
-        "SET",
-        "INVALID"
-      ],
-      "default": "CREDENTIAL_STATE_UNSPECIFIED",
-      "description": "The state of the endpoint's stored credentials.\n\n - CREDENTIAL_STATE_UNSPECIFIED: Unspecified credential state.\n - UNSET: No credentials have been configured for this endpoint.\n - SET: Credentials have been configured and are valid.\n - INVALID: Credentials have been configured but are invalid or expired."
-    },
-    "EndpointEngine": {
-      "type": "string",
-      "enum": [
-        "ENGINE_UNSPECIFIED",
-        "S3",
-        "RUSTFS",
-        "GCS",
-        "MINIO"
-      ],
-      "default": "ENGINE_UNSPECIFIED",
-      "description": "The storage engine type of the endpoint.\n\n - ENGINE_UNSPECIFIED: Unspecified engine. This is only useful for distinguishing unset values.\n - S3: Amazon S3 or S3-compatible storage.\n - RUSTFS: Pivox RustFS distributed storage engine.\n - GCS: Google Cloud Storage.\n - MINIO: MinIO object storage."
-    },
-    "EndpointsSetEndpointCredentialsBody": {
-      "type": "object",
-      "properties": {
-        "credentials": {
-          "$ref": "#/definitions/v1EndpointCredentials",
-          "description": "Required. The credentials to set on the endpoint."
-        }
-      },
-      "description": "The request sent to the\n[SetEndpointCredentials][pivox.storage.v1.Endpoints.SetEndpointCredentials]\nmethod.",
-      "required": [
-        "credentials"
-      ]
-    },
     "EndpointsTestEndpointConnectionBody": {
       "type": "object",
       "description": "The request sent to the\n[TestEndpointConnection][pivox.storage.v1.Endpoints.TestEndpointConnection]\nmethod."
@@ -579,24 +468,6 @@
       },
       "description": "The `Status` type defines a logical error model that is suitable for\ndifferent programming environments, including REST APIs and RPC APIs. It is\nused by [gRPC](https://github.com/grpc). Each `Status` message contains\nthree pieces of data: error code, error message, and error details.\n\nYou can find out more about this error model and how to work with it in the\n[API Design Guide](https://cloud.google.com/apis/design/errors)."
     },
-    "v1AccessKeyCredentials": {
-      "type": "object",
-      "properties": {
-        "accessKeyId": {
-          "type": "string",
-          "description": "Required. The access key ID."
-        },
-        "secretAccessKey": {
-          "type": "string",
-          "description": "Required. The secret access key."
-        }
-      },
-      "description": "Access key credentials consisting of an access key ID and secret.",
-      "required": [
-        "accessKeyId",
-        "secretAccessKey"
-      ]
-    },
     "v1Endpoint": {
       "type": "object",
       "properties": {
@@ -609,46 +480,25 @@
           "type": "string",
           "description": "Required. A human-readable name for the endpoint."
         },
-        "engine": {
-          "$ref": "#/definitions/EndpointEngine",
-          "description": "Required. Immutable. The storage engine type. Cannot be changed after\ncreation -- delete and recreate the resource to use a different engine."
-        },
-        "endpointUri": {
-          "type": "string",
-          "description": "Required. The URI of the storage backend (e.g.\n`https://s3.us-east-1.amazonaws.com`)."
-        },
-        "bucket": {
-          "type": "string",
-          "description": "Required. The bucket or container name on the storage backend."
-        },
-        "region": {
-          "type": "string",
-          "description": "Optional. The cloud region of the storage backend (e.g. `us-east-1`)."
-        },
         "state": {
           "$ref": "#/definitions/v1EndpointState",
           "description": "Output only. The current lifecycle state of the endpoint.",
           "readOnly": true
         },
-        "credentials": {
-          "$ref": "#/definitions/v1EndpointCredentials",
-          "description": "Input only. Credentials used to access the storage backend. This field\nis never returned in responses; use `credential_state` to check\nwhether credentials have been set."
-        },
-        "credentialState": {
-          "$ref": "#/definitions/EndpointCredentialState",
-          "description": "Output only. Indicates whether credentials are configured and valid.",
-          "readOnly": true
+        "s3": {
+          "$ref": "#/definitions/v1S3Configuration",
+          "description": "S3-compatible storage backend configuration."
         },
         "annotations": {
           "type": "object",
           "additionalProperties": {
             "type": "string"
           },
-          "description": "Optional. Annotations associated with this endpoint.\nAnnotations are key-value pairs that can be used to organize and\ntrack resources."
+          "description": "Optional. Annotations associated with this endpoint."
         },
         "etag": {
           "type": "string",
-          "description": "Output only. A checksum computed by the server based on the current\nvalue of the Endpoint resource. This may be sent on update and delete\nrequests to ensure the client has an up-to-date value before\nproceeding.",
+          "description": "Output only. A checksum computed by the server based on the current\nvalue of the Endpoint resource.",
           "readOnly": true
         },
         "creator": {
@@ -658,7 +508,7 @@
         },
         "updater": {
           "type": "string",
-          "description": "Output only. The resource name of the user who last updated the\nendpoint.",
+          "description": "Output only. The resource name of the user who last updated the endpoint.",
           "readOnly": true
         },
         "createTime": {
@@ -674,27 +524,10 @@
           "readOnly": true
         }
       },
-      "description": "An endpoint represents an external storage backend attached to a\nstorage gateway. Agents use endpoint configuration and credentials\nto serve storage operations against the backend.",
+      "description": "An endpoint represents a storage backend attached to a storage gateway.\nAgents use endpoint configuration to serve storage operations. The\nconfiguration is type-specific — currently only S3-compatible backends\nare supported.",
       "required": [
-        "displayName",
-        "engine",
-        "endpointUri",
-        "bucket"
+        "displayName"
       ]
-    },
-    "v1EndpointCredentials": {
-      "type": "object",
-      "properties": {
-        "accessKey": {
-          "$ref": "#/definitions/v1AccessKeyCredentials",
-          "description": "Access key credentials (e.g. for S3 or MinIO)."
-        },
-        "iamRole": {
-          "$ref": "#/definitions/v1IamRoleCredentials",
-          "description": "IAM role credentials (e.g. for cross-account S3 access)."
-        }
-      },
-      "description": "Credentials used to authenticate with a storage backend."
     },
     "v1EndpointState": {
       "type": "string",
@@ -706,19 +539,6 @@
       ],
       "default": "STATE_UNSPECIFIED",
       "description": "Endpoint lifecycle states.\n\n - STATE_UNSPECIFIED: Unspecified state. This is only useful for distinguishing unset values.\n - ACTIVE: The endpoint is active and serving requests.\n - INACTIVE: The endpoint has been deactivated and is not serving requests.\n - UNREACHABLE: The endpoint's storage backend is unreachable."
-    },
-    "v1IamRoleCredentials": {
-      "type": "object",
-      "properties": {
-        "roleArn": {
-          "type": "string",
-          "description": "Required. The ARN of the IAM role to assume."
-        }
-      },
-      "description": "IAM role credentials for assuming a role in another account.",
-      "required": [
-        "roleArn"
-      ]
     },
     "v1ListEndpointsResponse": {
       "type": "object",
@@ -733,10 +553,54 @@
         },
         "nextPageToken": {
           "type": "string",
-          "description": "A pagination token to be used to retrieve the next page of results.\nIf empty, this response contains the last page of results."
+          "description": "A pagination token to be used to retrieve the next page of results."
         }
       },
       "description": "The response returned from the\n[ListEndpoints][pivox.storage.v1.Endpoints.ListEndpoints] method."
+    },
+    "v1S3AccessKeyCredentials": {
+      "type": "object",
+      "properties": {
+        "accessKeyId": {
+          "type": "string",
+          "description": "Required. The access key ID."
+        },
+        "secretAccessKey": {
+          "type": "string",
+          "description": "Required. The secret access key."
+        }
+      },
+      "description": "Static access key credentials for an S3-compatible backend.",
+      "required": [
+        "accessKeyId",
+        "secretAccessKey"
+      ]
+    },
+    "v1S3Configuration": {
+      "type": "object",
+      "properties": {
+        "endpointUri": {
+          "type": "string",
+          "description": "Required. Immutable. The URI of the S3-compatible endpoint\n(e.g. `http://localhost:9000` or `https://s3.us-east-1.amazonaws.com`)."
+        },
+        "bucket": {
+          "type": "string",
+          "description": "Required. Immutable. The bucket name on the storage backend."
+        },
+        "region": {
+          "type": "string",
+          "description": "Optional. The cloud region of the storage backend (e.g. `us-east-1`)."
+        },
+        "accessKey": {
+          "$ref": "#/definitions/v1S3AccessKeyCredentials",
+          "description": "Static access key credentials.\n\nFuture: S3OAuthCredentials oauth = 5;\n Future: S3AssumeRoleCredentials assume_role = 6;"
+        }
+      },
+      "description": "Configuration for an S3-compatible storage backend.",
+      "required": [
+        "endpointUri",
+        "bucket"
+      ]
     },
     "v1TestEndpointConnectionResponse": {
       "type": "object",

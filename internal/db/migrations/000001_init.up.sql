@@ -40,9 +40,7 @@ CREATE TYPE eviction_policy AS ENUM ('LRU', 'LFU');
 CREATE TYPE agent_state AS ENUM (
     'CONNECTING', 'CONNECTED', 'DRAINING', 'UPGRADING', 'DISCONNECTED'
 );
-CREATE TYPE endpoint_engine AS ENUM ('S3', 'RUSTFS', 'GCS', 'MINIO');
 CREATE TYPE endpoint_state AS ENUM ('ACTIVE', 'INACTIVE', 'UNREACHABLE');
-CREATE TYPE credential_state AS ENUM ('UNSET', 'SET', 'INVALID');
 
 -- ============================================================================
 -- operations (LRO storage)
@@ -228,15 +226,10 @@ CREATE TABLE storage_endpoints (
     name              TEXT NOT NULL,
     -- domain
     display_name      TEXT NOT NULL DEFAULT '',
-    engine            endpoint_engine NOT NULL,
-    endpoint_uri      TEXT NOT NULL,
-    bucket            TEXT NOT NULL,
-    region            TEXT NOT NULL DEFAULT '',
-    credentials       JSONB,  -- encrypted at rest, never returned via API
+    configuration     JSONB NOT NULL,  -- type-specific config (S3Configuration, etc.)
     annotations       JSONB NOT NULL DEFAULT '{}',
     -- state
     state             endpoint_state NOT NULL DEFAULT 'ACTIVE',
-    credential_state  credential_state NOT NULL DEFAULT 'UNSET',
     -- versioning
     etag              TEXT NOT NULL DEFAULT md5(now()::text),
     revision          INTEGER NOT NULL DEFAULT 1,

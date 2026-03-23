@@ -29,9 +29,7 @@ DROP TABLE IF EXISTS custom_domains;
 DROP TABLE IF EXISTS organizations;
 DROP TABLE IF EXISTS operations;
 
-DROP TYPE IF EXISTS credential_state;
 DROP TYPE IF EXISTS endpoint_state;
-DROP TYPE IF EXISTS endpoint_engine;
 DROP TYPE IF EXISTS agent_state;
 DROP TYPE IF EXISTS eviction_policy;
 DROP TYPE IF EXISTS cert_state;

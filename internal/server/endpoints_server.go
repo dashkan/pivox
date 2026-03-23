@@ -8,7 +8,6 @@ import (
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -36,17 +35,15 @@ func NewEndpointsServer(pool *pgxpool.Pool, queries *db.Queries, enc crypto.Encr
 	}
 }
 
-// parseEndpointName parses "organizations/{org}/storageGateways/{gw}/endpoints/{endpoint}"
-// and returns (orgName, gwName, endpointName).
-func parseEndpointName(name string) (string, string, string, error) {
+func parseEndpointName(name string) (orgName, gwName, endpointName string, err error) {
+	// organizations/{org}/storageGateways/{gw}/endpoints/{endpoint}
 	parts := strings.Split(name, "/")
 	if len(parts) != 6 || parts[0] != "organizations" || parts[2] != "storageGateways" || parts[4] != "endpoints" {
-		return "", "", "", fmt.Errorf("invalid endpoint name %q: expected organizations/*/storageGateways/*/endpoints/*", name)
+		return "", "", "", fmt.Errorf("invalid endpoint name %q", name)
 	}
 	return parts[1], parts[3], parts[5], nil
 }
 
-// resolveEndpointGateway looks up a storage gateway by org name and gateway name.
 func (s *EndpointsServer) resolveEndpointGateway(ctx context.Context, orgName, gwName string) (db.StorageGateway, error) {
 	org, err := s.queries.GetOrganizationByName(ctx, orgName)
 	if err != nil {
@@ -62,20 +59,22 @@ func (s *EndpointsServer) resolveEndpointGateway(ctx context.Context, orgName, g
 	return gw, nil
 }
 
-// protoEngineToDB converts a proto Endpoint_Engine to a DB EndpointEngine.
-func protoEngineToDB(e storagev1.Endpoint_Engine) db.EndpointEngine {
-	switch e {
-	case storagev1.Endpoint_S3:
-		return db.EndpointEngineS3
-	case storagev1.Endpoint_RUSTFS:
-		return db.EndpointEngineRUSTFS
-	case storagev1.Endpoint_GCS:
-		return db.EndpointEngineGCS
-	case storagev1.Endpoint_MINIO:
-		return db.EndpointEngineMINIO
-	default:
-		return db.EndpointEngineS3
+// s3ConfigToJSON serializes the S3Configuration proto to the JSONB shape
+// stored in the database. Credentials are included (encrypted at rest).
+func s3ConfigToJSON(s3 *storagev1.S3Configuration) (json.RawMessage, error) {
+	cfg := map[string]interface{}{
+		"type":         "s3",
+		"endpoint_uri": s3.GetEndpointUri(),
+		"bucket":       s3.GetBucket(),
+		"region":       s3.GetRegion(),
 	}
+	if ak := s3.GetAccessKey(); ak != nil {
+		cfg["access_key"] = map[string]string{
+			"access_key_id":     ak.GetAccessKeyId(),
+			"secret_access_key": ak.GetSecretAccessKey(),
+		}
+	}
+	return json.Marshal(cfg)
 }
 
 func (s *EndpointsServer) CreateEndpoint(ctx context.Context, req *storagev1.CreateEndpointRequest) (*longrunningpb.Operation, error) {
@@ -95,6 +94,21 @@ func (s *EndpointsServer) CreateEndpoint(ctx context.Context, req *storagev1.Cre
 		endpointID = uuid.New().String()[:8]
 	}
 
+	// Serialize configuration to JSONB.
+	var configJSON json.RawMessage
+	switch cfg := endpoint.GetConfiguration().(type) {
+	case *storagev1.Endpoint_S3:
+		if cfg.S3 == nil {
+			return nil, apierr.InvalidArgument(apierr.FieldViolation("configuration.s3", "S3 configuration is required"))
+		}
+		configJSON, err = s3ConfigToJSON(cfg.S3)
+		if err != nil {
+			return nil, apierr.Internal("failed to marshal configuration")
+		}
+	default:
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("configuration", "configuration is required"))
+	}
+
 	var annotationsJSON json.RawMessage
 	if annotations := endpoint.GetAnnotations(); annotations != nil {
 		annotationsJSON, _ = json.Marshal(annotations)
@@ -102,26 +116,14 @@ func (s *EndpointsServer) CreateEndpoint(ctx context.Context, req *storagev1.Cre
 		annotationsJSON = json.RawMessage("{}")
 	}
 
-	var credentialsJSON []byte
-	credentialState := db.CredentialStateUNSET
-	if creds := endpoint.GetCredentials(); creds != nil {
-		credentialsJSON, _ = json.Marshal(creds)
-		credentialState = db.CredentialStateSET
-	}
-
 	result, err := s.queries.CreateStorageEndpoint(ctx, db.CreateStorageEndpointParams{
-		ID:              uuid.New(),
-		GatewayID:       gw.ID,
-		Name:            endpointID,
-		DisplayName:     endpoint.GetDisplayName(),
-		Engine:          protoEngineToDB(endpoint.GetEngine()),
-		EndpointUri:     endpoint.GetEndpointUri(),
-		Bucket:          endpoint.GetBucket(),
-		Region:          endpoint.GetRegion(),
-		Credentials:     credentialsJSON,
-		CredentialState: credentialState,
-		Annotations:     annotationsJSON,
-		CreatedBy:       "",
+		ID:            uuid.New(),
+		GatewayID:     gw.ID,
+		Name:          endpointID,
+		DisplayName:   endpoint.GetDisplayName(),
+		Configuration: configJSON,
+		Annotations:   annotationsJSON,
+		CreatedBy:     "",
 	})
 	if err != nil {
 		return nil, handleResourceError(err, "Endpoint", "")
@@ -211,31 +213,35 @@ func (s *EndpointsServer) UpdateEndpoint(ctx context.Context, req *storagev1.Upd
 		for _, path := range mask.GetPaths() {
 			switch path {
 			case "display_name":
-				updateParams.DisplayName = pgtype.Text{String: endpoint.GetDisplayName(), Valid: true}
-			case "endpoint_uri":
-				updateParams.EndpointUri = pgtype.Text{String: endpoint.GetEndpointUri(), Valid: true}
-			case "bucket":
-				updateParams.Bucket = pgtype.Text{String: endpoint.GetBucket(), Valid: true}
-			case "region":
-				updateParams.Region = pgtype.Text{String: endpoint.GetRegion(), Valid: true}
+				updateParams.DisplayName.String = endpoint.GetDisplayName()
+				updateParams.DisplayName.Valid = true
+			case "s3.credentials", "configuration":
+				// Update the configuration JSONB (merge credentials into existing config).
+				if s3 := endpoint.GetS3(); s3 != nil {
+					configJSON, mergeErr := s3ConfigToJSON(s3)
+					if mergeErr != nil {
+						return nil, apierr.Internal("failed to marshal configuration")
+					}
+					updateParams.Configuration = configJSON
+				}
 			case "annotations":
-				annotationsJSON, err := json.Marshal(endpoint.GetAnnotations())
-				if err != nil {
+				annotationsJSON, marshalErr := json.Marshal(endpoint.GetAnnotations())
+				if marshalErr != nil {
 					return nil, apierr.Internal("failed to marshal annotations")
 				}
 				updateParams.Annotations = annotationsJSON
 			}
 		}
 	} else {
-		updateParams.DisplayName = pgtype.Text{String: endpoint.GetDisplayName(), Valid: true}
-		updateParams.EndpointUri = pgtype.Text{String: endpoint.GetEndpointUri(), Valid: true}
-		updateParams.Bucket = pgtype.Text{String: endpoint.GetBucket(), Valid: true}
-		updateParams.Region = pgtype.Text{String: endpoint.GetRegion(), Valid: true}
+		updateParams.DisplayName.String = endpoint.GetDisplayName()
+		updateParams.DisplayName.Valid = true
+		if s3 := endpoint.GetS3(); s3 != nil {
+			configJSON, _ := s3ConfigToJSON(s3)
+			updateParams.Configuration = configJSON
+		}
 		if annotations := endpoint.GetAnnotations(); annotations != nil {
 			annotationsJSON, _ := json.Marshal(annotations)
 			updateParams.Annotations = annotationsJSON
-		} else {
-			updateParams.Annotations = existing.Annotations
 		}
 	}
 
@@ -275,42 +281,6 @@ func (s *EndpointsServer) DeleteEndpoint(ctx context.Context, req *storagev1.Del
 	return lro.DoneOperation(&storagev1.Endpoint{
 		Name: req.GetName(),
 	})
-}
-
-func (s *EndpointsServer) SetEndpointCredentials(ctx context.Context, req *storagev1.SetEndpointCredentialsRequest) (*storagev1.Endpoint, error) {
-	orgName, gwName, endpointName, err := parseEndpointName(req.GetName())
-	if err != nil {
-		return nil, apierr.InvalidArgument(apierr.FieldViolation("name", err.Error()))
-	}
-
-	gw, err := s.resolveEndpointGateway(ctx, orgName, gwName)
-	if err != nil {
-		return nil, err
-	}
-
-	existing, err := s.queries.GetStorageEndpointByName(ctx, db.GetStorageEndpointByNameParams{
-		GatewayID: gw.ID,
-		Name:      endpointName,
-	})
-	if err != nil {
-		return nil, handleResourceError(err, "Endpoint", req.GetName())
-	}
-
-	credentialsJSON, err := json.Marshal(req.GetCredentials())
-	if err != nil {
-		return nil, apierr.Internal("failed to marshal credentials")
-	}
-
-	result, err := s.queries.SetStorageEndpointCredentials(ctx, db.SetStorageEndpointCredentialsParams{
-		ID:          existing.ID,
-		Credentials: credentialsJSON,
-	})
-	if err != nil {
-		return nil, handleResourceError(err, "Endpoint", req.GetName())
-	}
-
-	gatewayName := fmt.Sprintf("organizations/%s/storageGateways/%s", orgName, gwName)
-	return convert.EndpointToProto(result, gatewayName), nil
 }
 
 func (s *EndpointsServer) TestEndpointConnection(ctx context.Context, req *storagev1.TestEndpointConnectionRequest) (*storagev1.TestEndpointConnectionResponse, error) {

@@ -68,22 +68,42 @@ func AgentToProto(a db.StorageAgent, gatewayName string) *storagev1.Agent {
 // EndpointToProto converts a DB endpoint to proto.
 // gatewayName is the full resource name of the parent storage gateway
 // (e.g. "organizations/acme/storageGateways/gw-1").
+//
+// Note: credentials inside the configuration are stripped — they are
+// INPUT_ONLY and never returned in responses.
 func EndpointToProto(ep db.StorageEndpoint, gatewayName string) *storagev1.Endpoint {
 	pb := &storagev1.Endpoint{
-		Name:            fmt.Sprintf("%s/endpoints/%s", gatewayName, ep.Name),
-		DisplayName:     ep.DisplayName,
-		Engine:          endpointEngine(ep.Engine),
-		EndpointUri:     ep.EndpointUri,
-		Bucket:          ep.Bucket,
-		Region:          ep.Region,
-		State:           endpointState(ep.State),
-		CredentialState: credentialState(ep.CredentialState),
-		Etag:            ep.Etag,
-		Creator:         ep.CreatedBy,
-		Updater:         ep.UpdatedBy,
-		CreateTime:      timestamppb.New(ep.CreateTime),
-		UpdateTime:      timestamppb.New(ep.UpdateTime),
+		Name:        fmt.Sprintf("%s/endpoints/%s", gatewayName, ep.Name),
+		DisplayName: ep.DisplayName,
+		State:       endpointState(ep.State),
+		Etag:        ep.Etag,
+		Creator:     ep.CreatedBy,
+		Updater:     ep.UpdatedBy,
+		CreateTime:  timestamppb.New(ep.CreateTime),
+		UpdateTime:  timestamppb.New(ep.UpdateTime),
 	}
+
+	// Parse configuration JSONB and map to proto oneof.
+	// Credentials are stripped (INPUT_ONLY).
+	if len(ep.Configuration) > 0 {
+		var cfg struct {
+			Type        string `json:"type"`
+			EndpointURI string `json:"endpoint_uri"`
+			Bucket      string `json:"bucket"`
+			Region      string `json:"region"`
+		}
+		if err := json.Unmarshal(ep.Configuration, &cfg); err == nil && cfg.Type == "s3" {
+			pb.Configuration = &storagev1.Endpoint_S3{
+				S3: &storagev1.S3Configuration{
+					EndpointUri: cfg.EndpointURI,
+					Bucket:      cfg.Bucket,
+					Region:      cfg.Region,
+					// Credentials intentionally omitted — INPUT_ONLY
+				},
+			}
+		}
+	}
+
 	if len(ep.Annotations) > 0 {
 		annotations := make(map[string]string)
 		_ = json.Unmarshal(ep.Annotations, &annotations)
@@ -150,21 +170,6 @@ func agentState(s db.AgentState) storagev1.Agent_State {
 	}
 }
 
-func endpointEngine(e db.EndpointEngine) storagev1.Endpoint_Engine {
-	switch e {
-	case db.EndpointEngineS3:
-		return storagev1.Endpoint_S3
-	case db.EndpointEngineRUSTFS:
-		return storagev1.Endpoint_RUSTFS
-	case db.EndpointEngineGCS:
-		return storagev1.Endpoint_GCS
-	case db.EndpointEngineMINIO:
-		return storagev1.Endpoint_MINIO
-	default:
-		return storagev1.Endpoint_ENGINE_UNSPECIFIED
-	}
-}
-
 func endpointState(s db.EndpointState) storagev1.Endpoint_State {
 	switch s {
 	case db.EndpointStateACTIVE:
@@ -175,18 +180,5 @@ func endpointState(s db.EndpointState) storagev1.Endpoint_State {
 		return storagev1.Endpoint_UNREACHABLE
 	default:
 		return storagev1.Endpoint_STATE_UNSPECIFIED
-	}
-}
-
-func credentialState(s db.CredentialState) storagev1.Endpoint_CredentialState {
-	switch s {
-	case db.CredentialStateUNSET:
-		return storagev1.Endpoint_UNSET
-	case db.CredentialStateSET:
-		return storagev1.Endpoint_SET
-	case db.CredentialStateINVALID:
-		return storagev1.Endpoint_INVALID
-	default:
-		return storagev1.Endpoint_CREDENTIAL_STATE_UNSPECIFIED
 	}
 }

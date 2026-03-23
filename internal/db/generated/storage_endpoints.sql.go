@@ -14,24 +14,19 @@ import (
 )
 
 const createStorageEndpoint = `-- name: CreateStorageEndpoint :one
-INSERT INTO storage_endpoints (id, gateway_id, name, display_name, engine, endpoint_uri, bucket, region, credentials, credential_state, annotations, created_by, updated_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $12)
-RETURNING id, gateway_id, name, display_name, engine, endpoint_uri, bucket, region, credentials, annotations, state, credential_state, etag, revision, created_by, updated_by, create_time, update_time
+INSERT INTO storage_endpoints (id, gateway_id, name, display_name, configuration, annotations, created_by, updated_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
+RETURNING id, gateway_id, name, display_name, configuration, annotations, state, etag, revision, created_by, updated_by, create_time, update_time
 `
 
 type CreateStorageEndpointParams struct {
-	ID              uuid.UUID       `json:"id"`
-	GatewayID       uuid.UUID       `json:"gateway_id"`
-	Name            string          `json:"name"`
-	DisplayName     string          `json:"display_name"`
-	Engine          EndpointEngine  `json:"engine"`
-	EndpointUri     string          `json:"endpoint_uri"`
-	Bucket          string          `json:"bucket"`
-	Region          string          `json:"region"`
-	Credentials     []byte          `json:"credentials"`
-	CredentialState CredentialState `json:"credential_state"`
-	Annotations     json.RawMessage `json:"annotations"`
-	CreatedBy       string          `json:"created_by"`
+	ID            uuid.UUID       `json:"id"`
+	GatewayID     uuid.UUID       `json:"gateway_id"`
+	Name          string          `json:"name"`
+	DisplayName   string          `json:"display_name"`
+	Configuration json.RawMessage `json:"configuration"`
+	Annotations   json.RawMessage `json:"annotations"`
+	CreatedBy     string          `json:"created_by"`
 }
 
 func (q *Queries) CreateStorageEndpoint(ctx context.Context, arg CreateStorageEndpointParams) (StorageEndpoint, error) {
@@ -40,12 +35,7 @@ func (q *Queries) CreateStorageEndpoint(ctx context.Context, arg CreateStorageEn
 		arg.GatewayID,
 		arg.Name,
 		arg.DisplayName,
-		arg.Engine,
-		arg.EndpointUri,
-		arg.Bucket,
-		arg.Region,
-		arg.Credentials,
-		arg.CredentialState,
+		arg.Configuration,
 		arg.Annotations,
 		arg.CreatedBy,
 	)
@@ -55,14 +45,9 @@ func (q *Queries) CreateStorageEndpoint(ctx context.Context, arg CreateStorageEn
 		&i.GatewayID,
 		&i.Name,
 		&i.DisplayName,
-		&i.Engine,
-		&i.EndpointUri,
-		&i.Bucket,
-		&i.Region,
-		&i.Credentials,
+		&i.Configuration,
 		&i.Annotations,
 		&i.State,
-		&i.CredentialState,
 		&i.Etag,
 		&i.Revision,
 		&i.CreatedBy,
@@ -83,7 +68,7 @@ func (q *Queries) DeleteStorageEndpoint(ctx context.Context, id uuid.UUID) error
 }
 
 const getStorageEndpoint = `-- name: GetStorageEndpoint :one
-SELECT id, gateway_id, name, display_name, engine, endpoint_uri, bucket, region, credentials, annotations, state, credential_state, etag, revision, created_by, updated_by, create_time, update_time FROM storage_endpoints WHERE id = $1
+SELECT id, gateway_id, name, display_name, configuration, annotations, state, etag, revision, created_by, updated_by, create_time, update_time FROM storage_endpoints WHERE id = $1
 `
 
 func (q *Queries) GetStorageEndpoint(ctx context.Context, id uuid.UUID) (StorageEndpoint, error) {
@@ -94,14 +79,9 @@ func (q *Queries) GetStorageEndpoint(ctx context.Context, id uuid.UUID) (Storage
 		&i.GatewayID,
 		&i.Name,
 		&i.DisplayName,
-		&i.Engine,
-		&i.EndpointUri,
-		&i.Bucket,
-		&i.Region,
-		&i.Credentials,
+		&i.Configuration,
 		&i.Annotations,
 		&i.State,
-		&i.CredentialState,
 		&i.Etag,
 		&i.Revision,
 		&i.CreatedBy,
@@ -113,7 +93,7 @@ func (q *Queries) GetStorageEndpoint(ctx context.Context, id uuid.UUID) (Storage
 }
 
 const getStorageEndpointByName = `-- name: GetStorageEndpointByName :one
-SELECT id, gateway_id, name, display_name, engine, endpoint_uri, bucket, region, credentials, annotations, state, credential_state, etag, revision, created_by, updated_by, create_time, update_time FROM storage_endpoints WHERE gateway_id = $1 AND name = $2
+SELECT id, gateway_id, name, display_name, configuration, annotations, state, etag, revision, created_by, updated_by, create_time, update_time FROM storage_endpoints WHERE gateway_id = $1 AND name = $2
 `
 
 type GetStorageEndpointByNameParams struct {
@@ -129,14 +109,9 @@ func (q *Queries) GetStorageEndpointByName(ctx context.Context, arg GetStorageEn
 		&i.GatewayID,
 		&i.Name,
 		&i.DisplayName,
-		&i.Engine,
-		&i.EndpointUri,
-		&i.Bucket,
-		&i.Region,
-		&i.Credentials,
+		&i.Configuration,
 		&i.Annotations,
 		&i.State,
-		&i.CredentialState,
 		&i.Etag,
 		&i.Revision,
 		&i.CreatedBy,
@@ -148,7 +123,7 @@ func (q *Queries) GetStorageEndpointByName(ctx context.Context, arg GetStorageEn
 }
 
 const listStorageEndpointsByGateway = `-- name: ListStorageEndpointsByGateway :many
-SELECT id, gateway_id, name, display_name, engine, endpoint_uri, bucket, region, credentials, annotations, state, credential_state, etag, revision, created_by, updated_by, create_time, update_time FROM storage_endpoints WHERE gateway_id = $1 ORDER BY create_time
+SELECT id, gateway_id, name, display_name, configuration, annotations, state, etag, revision, created_by, updated_by, create_time, update_time FROM storage_endpoints WHERE gateway_id = $1 ORDER BY create_time
 `
 
 func (q *Queries) ListStorageEndpointsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageEndpoint, error) {
@@ -165,14 +140,9 @@ func (q *Queries) ListStorageEndpointsByGateway(ctx context.Context, gatewayID u
 			&i.GatewayID,
 			&i.Name,
 			&i.DisplayName,
-			&i.Engine,
-			&i.EndpointUri,
-			&i.Bucket,
-			&i.Region,
-			&i.Credentials,
+			&i.Configuration,
 			&i.Annotations,
 			&i.State,
-			&i.CredentialState,
 			&i.Etag,
 			&i.Revision,
 			&i.CreatedBy,
@@ -190,70 +160,25 @@ func (q *Queries) ListStorageEndpointsByGateway(ctx context.Context, gatewayID u
 	return items, nil
 }
 
-const setStorageEndpointCredentials = `-- name: SetStorageEndpointCredentials :one
-UPDATE storage_endpoints
-SET credentials = $2,
-    credential_state = 'SET',
-    update_time = now(),
-    etag = md5(now()::text)
-WHERE id = $1
-RETURNING id, gateway_id, name, display_name, engine, endpoint_uri, bucket, region, credentials, annotations, state, credential_state, etag, revision, created_by, updated_by, create_time, update_time
-`
-
-type SetStorageEndpointCredentialsParams struct {
-	ID          uuid.UUID `json:"id"`
-	Credentials []byte    `json:"credentials"`
-}
-
-func (q *Queries) SetStorageEndpointCredentials(ctx context.Context, arg SetStorageEndpointCredentialsParams) (StorageEndpoint, error) {
-	row := q.db.QueryRow(ctx, setStorageEndpointCredentials, arg.ID, arg.Credentials)
-	var i StorageEndpoint
-	err := row.Scan(
-		&i.ID,
-		&i.GatewayID,
-		&i.Name,
-		&i.DisplayName,
-		&i.Engine,
-		&i.EndpointUri,
-		&i.Bucket,
-		&i.Region,
-		&i.Credentials,
-		&i.Annotations,
-		&i.State,
-		&i.CredentialState,
-		&i.Etag,
-		&i.Revision,
-		&i.CreatedBy,
-		&i.UpdatedBy,
-		&i.CreateTime,
-		&i.UpdateTime,
-	)
-	return i, err
-}
-
 const updateStorageEndpoint = `-- name: UpdateStorageEndpoint :one
 UPDATE storage_endpoints
 SET display_name = COALESCE($3, display_name),
-    endpoint_uri = COALESCE($4, endpoint_uri),
-    bucket = COALESCE($5, bucket),
-    region = COALESCE($6, region),
-    annotations = COALESCE($7, annotations),
+    configuration = COALESCE($4, configuration),
+    annotations = COALESCE($5, annotations),
     revision = revision + 1,
     updated_by = $2,
     update_time = now(),
     etag = md5(now()::text)
 WHERE id = $1
-RETURNING id, gateway_id, name, display_name, engine, endpoint_uri, bucket, region, credentials, annotations, state, credential_state, etag, revision, created_by, updated_by, create_time, update_time
+RETURNING id, gateway_id, name, display_name, configuration, annotations, state, etag, revision, created_by, updated_by, create_time, update_time
 `
 
 type UpdateStorageEndpointParams struct {
-	ID          uuid.UUID   `json:"id"`
-	UpdatedBy   string      `json:"updated_by"`
-	DisplayName pgtype.Text `json:"display_name"`
-	EndpointUri pgtype.Text `json:"endpoint_uri"`
-	Bucket      pgtype.Text `json:"bucket"`
-	Region      pgtype.Text `json:"region"`
-	Annotations []byte      `json:"annotations"`
+	ID            uuid.UUID   `json:"id"`
+	UpdatedBy     string      `json:"updated_by"`
+	DisplayName   pgtype.Text `json:"display_name"`
+	Configuration []byte      `json:"configuration"`
+	Annotations   []byte      `json:"annotations"`
 }
 
 func (q *Queries) UpdateStorageEndpoint(ctx context.Context, arg UpdateStorageEndpointParams) (StorageEndpoint, error) {
@@ -261,9 +186,7 @@ func (q *Queries) UpdateStorageEndpoint(ctx context.Context, arg UpdateStorageEn
 		arg.ID,
 		arg.UpdatedBy,
 		arg.DisplayName,
-		arg.EndpointUri,
-		arg.Bucket,
-		arg.Region,
+		arg.Configuration,
 		arg.Annotations,
 	)
 	var i StorageEndpoint
@@ -272,14 +195,9 @@ func (q *Queries) UpdateStorageEndpoint(ctx context.Context, arg UpdateStorageEn
 		&i.GatewayID,
 		&i.Name,
 		&i.DisplayName,
-		&i.Engine,
-		&i.EndpointUri,
-		&i.Bucket,
-		&i.Region,
-		&i.Credentials,
+		&i.Configuration,
 		&i.Annotations,
 		&i.State,
-		&i.CredentialState,
 		&i.Etag,
 		&i.Revision,
 		&i.CreatedBy,

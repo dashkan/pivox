@@ -41,67 +41,6 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// The storage engine type of the endpoint.
-type Endpoint_Engine int32
-
-const (
-	// Unspecified engine. This is only useful for distinguishing unset values.
-	Endpoint_ENGINE_UNSPECIFIED Endpoint_Engine = 0
-	// Amazon S3 or S3-compatible storage.
-	Endpoint_S3 Endpoint_Engine = 1
-	// Pivox RustFS distributed storage engine.
-	Endpoint_RUSTFS Endpoint_Engine = 2
-	// Google Cloud Storage.
-	Endpoint_GCS Endpoint_Engine = 3
-	// MinIO object storage.
-	Endpoint_MINIO Endpoint_Engine = 4
-)
-
-// Enum value maps for Endpoint_Engine.
-var (
-	Endpoint_Engine_name = map[int32]string{
-		0: "ENGINE_UNSPECIFIED",
-		1: "S3",
-		2: "RUSTFS",
-		3: "GCS",
-		4: "MINIO",
-	}
-	Endpoint_Engine_value = map[string]int32{
-		"ENGINE_UNSPECIFIED": 0,
-		"S3":                 1,
-		"RUSTFS":             2,
-		"GCS":                3,
-		"MINIO":              4,
-	}
-)
-
-func (x Endpoint_Engine) Enum() *Endpoint_Engine {
-	p := new(Endpoint_Engine)
-	*p = x
-	return p
-}
-
-func (x Endpoint_Engine) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (Endpoint_Engine) Descriptor() protoreflect.EnumDescriptor {
-	return file_pivox_storage_v1_endpoint_proto_enumTypes[0].Descriptor()
-}
-
-func (Endpoint_Engine) Type() protoreflect.EnumType {
-	return &file_pivox_storage_v1_endpoint_proto_enumTypes[0]
-}
-
-func (x Endpoint_Engine) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use Endpoint_Engine.Descriptor instead.
-func (Endpoint_Engine) EnumDescriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{0, 0}
-}
-
 // Endpoint lifecycle states.
 type Endpoint_State int32
 
@@ -143,11 +82,11 @@ func (x Endpoint_State) String() string {
 }
 
 func (Endpoint_State) Descriptor() protoreflect.EnumDescriptor {
-	return file_pivox_storage_v1_endpoint_proto_enumTypes[1].Descriptor()
+	return file_pivox_storage_v1_endpoint_proto_enumTypes[0].Descriptor()
 }
 
 func (Endpoint_State) Type() protoreflect.EnumType {
-	return &file_pivox_storage_v1_endpoint_proto_enumTypes[1]
+	return &file_pivox_storage_v1_endpoint_proto_enumTypes[0]
 }
 
 func (x Endpoint_State) Number() protoreflect.EnumNumber {
@@ -156,69 +95,13 @@ func (x Endpoint_State) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Endpoint_State.Descriptor instead.
 func (Endpoint_State) EnumDescriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{0, 1}
+	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{0, 0}
 }
 
-// The state of the endpoint's stored credentials.
-type Endpoint_CredentialState int32
-
-const (
-	// Unspecified credential state.
-	Endpoint_CREDENTIAL_STATE_UNSPECIFIED Endpoint_CredentialState = 0
-	// No credentials have been configured for this endpoint.
-	Endpoint_UNSET Endpoint_CredentialState = 1
-	// Credentials have been configured and are valid.
-	Endpoint_SET Endpoint_CredentialState = 2
-	// Credentials have been configured but are invalid or expired.
-	Endpoint_INVALID Endpoint_CredentialState = 3
-)
-
-// Enum value maps for Endpoint_CredentialState.
-var (
-	Endpoint_CredentialState_name = map[int32]string{
-		0: "CREDENTIAL_STATE_UNSPECIFIED",
-		1: "UNSET",
-		2: "SET",
-		3: "INVALID",
-	}
-	Endpoint_CredentialState_value = map[string]int32{
-		"CREDENTIAL_STATE_UNSPECIFIED": 0,
-		"UNSET":                        1,
-		"SET":                          2,
-		"INVALID":                      3,
-	}
-)
-
-func (x Endpoint_CredentialState) Enum() *Endpoint_CredentialState {
-	p := new(Endpoint_CredentialState)
-	*p = x
-	return p
-}
-
-func (x Endpoint_CredentialState) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (Endpoint_CredentialState) Descriptor() protoreflect.EnumDescriptor {
-	return file_pivox_storage_v1_endpoint_proto_enumTypes[2].Descriptor()
-}
-
-func (Endpoint_CredentialState) Type() protoreflect.EnumType {
-	return &file_pivox_storage_v1_endpoint_proto_enumTypes[2]
-}
-
-func (x Endpoint_CredentialState) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use Endpoint_CredentialState.Descriptor instead.
-func (Endpoint_CredentialState) EnumDescriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{0, 2}
-}
-
-// An endpoint represents an external storage backend attached to a
-// storage gateway. Agents use endpoint configuration and credentials
-// to serve storage operations against the backend.
+// An endpoint represents a storage backend attached to a storage gateway.
+// Agents use endpoint configuration to serve storage operations. The
+// configuration is type-specific — currently only S3-compatible backends
+// are supported.
 type Endpoint struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Output only. The resource name of the endpoint. Format:
@@ -226,42 +109,29 @@ type Endpoint struct {
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Required. A human-readable name for the endpoint.
 	DisplayName string `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
-	// Required. Immutable. The storage engine type. Cannot be changed after
-	// creation -- delete and recreate the resource to use a different engine.
-	Engine Endpoint_Engine `protobuf:"varint,3,opt,name=engine,proto3,enum=pivox.storage.v1.Endpoint_Engine" json:"engine,omitempty"`
-	// Required. The URI of the storage backend (e.g.
-	// `https://s3.us-east-1.amazonaws.com`).
-	EndpointUri string `protobuf:"bytes,4,opt,name=endpoint_uri,json=endpointUri,proto3" json:"endpoint_uri,omitempty"`
-	// Required. The bucket or container name on the storage backend.
-	Bucket string `protobuf:"bytes,5,opt,name=bucket,proto3" json:"bucket,omitempty"`
-	// Optional. The cloud region of the storage backend (e.g. `us-east-1`).
-	Region string `protobuf:"bytes,6,opt,name=region,proto3" json:"region,omitempty"`
 	// Output only. The current lifecycle state of the endpoint.
-	State Endpoint_State `protobuf:"varint,7,opt,name=state,proto3,enum=pivox.storage.v1.Endpoint_State" json:"state,omitempty"`
-	// Input only. Credentials used to access the storage backend. This field
-	// is never returned in responses; use `credential_state` to check
-	// whether credentials have been set.
-	Credentials *EndpointCredentials `protobuf:"bytes,8,opt,name=credentials,proto3" json:"credentials,omitempty"`
-	// Output only. Indicates whether credentials are configured and valid.
-	CredentialState Endpoint_CredentialState `protobuf:"varint,9,opt,name=credential_state,json=credentialState,proto3,enum=pivox.storage.v1.Endpoint_CredentialState" json:"credential_state,omitempty"`
+	State Endpoint_State `protobuf:"varint,3,opt,name=state,proto3,enum=pivox.storage.v1.Endpoint_State" json:"state,omitempty"`
+	// Required. The storage backend configuration. Must be provided at
+	// creation time. The endpoint URI and bucket are immutable after creation.
+	// Credentials can be updated via UpdateEndpoint.
+	//
+	// Types that are valid to be assigned to Configuration:
+	//
+	//	*Endpoint_S3
+	Configuration isEndpoint_Configuration `protobuf_oneof:"configuration"`
 	// Optional. Annotations associated with this endpoint.
-	// Annotations are key-value pairs that can be used to organize and
-	// track resources.
-	Annotations map[string]string `protobuf:"bytes,10,rep,name=annotations,proto3" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Annotations map[string]string `protobuf:"bytes,5,rep,name=annotations,proto3" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Output only. A checksum computed by the server based on the current
-	// value of the Endpoint resource. This may be sent on update and delete
-	// requests to ensure the client has an up-to-date value before
-	// proceeding.
-	Etag string `protobuf:"bytes,11,opt,name=etag,proto3" json:"etag,omitempty"`
+	// value of the Endpoint resource.
+	Etag string `protobuf:"bytes,6,opt,name=etag,proto3" json:"etag,omitempty"`
 	// Output only. The resource name of the user who created the endpoint.
-	Creator string `protobuf:"bytes,12,opt,name=creator,proto3" json:"creator,omitempty"`
-	// Output only. The resource name of the user who last updated the
-	// endpoint.
-	Updater string `protobuf:"bytes,13,opt,name=updater,proto3" json:"updater,omitempty"`
+	Creator string `protobuf:"bytes,7,opt,name=creator,proto3" json:"creator,omitempty"`
+	// Output only. The resource name of the user who last updated the endpoint.
+	Updater string `protobuf:"bytes,8,opt,name=updater,proto3" json:"updater,omitempty"`
 	// Output only. Timestamp when the endpoint was created.
-	CreateTime *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	CreateTime *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
 	// Output only. Timestamp when the endpoint was last modified.
-	UpdateTime    *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	UpdateTime    *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -310,34 +180,6 @@ func (x *Endpoint) GetDisplayName() string {
 	return ""
 }
 
-func (x *Endpoint) GetEngine() Endpoint_Engine {
-	if x != nil {
-		return x.Engine
-	}
-	return Endpoint_ENGINE_UNSPECIFIED
-}
-
-func (x *Endpoint) GetEndpointUri() string {
-	if x != nil {
-		return x.EndpointUri
-	}
-	return ""
-}
-
-func (x *Endpoint) GetBucket() string {
-	if x != nil {
-		return x.Bucket
-	}
-	return ""
-}
-
-func (x *Endpoint) GetRegion() string {
-	if x != nil {
-		return x.Region
-	}
-	return ""
-}
-
 func (x *Endpoint) GetState() Endpoint_State {
 	if x != nil {
 		return x.State
@@ -345,18 +187,20 @@ func (x *Endpoint) GetState() Endpoint_State {
 	return Endpoint_STATE_UNSPECIFIED
 }
 
-func (x *Endpoint) GetCredentials() *EndpointCredentials {
+func (x *Endpoint) GetConfiguration() isEndpoint_Configuration {
 	if x != nil {
-		return x.Credentials
+		return x.Configuration
 	}
 	return nil
 }
 
-func (x *Endpoint) GetCredentialState() Endpoint_CredentialState {
+func (x *Endpoint) GetS3() *S3Configuration {
 	if x != nil {
-		return x.CredentialState
+		if x, ok := x.Configuration.(*Endpoint_S3); ok {
+			return x.S3
+		}
 	}
-	return Endpoint_CREDENTIAL_STATE_UNSPECIFIED
+	return nil
 }
 
 func (x *Endpoint) GetAnnotations() map[string]string {
@@ -401,32 +245,53 @@ func (x *Endpoint) GetUpdateTime() *timestamppb.Timestamp {
 	return nil
 }
 
-// Credentials used to authenticate with a storage backend.
-type EndpointCredentials struct {
+type isEndpoint_Configuration interface {
+	isEndpoint_Configuration()
+}
+
+type Endpoint_S3 struct {
+	// S3-compatible storage backend configuration.
+	S3 *S3Configuration `protobuf:"bytes,4,opt,name=s3,proto3,oneof"`
+}
+
+func (*Endpoint_S3) isEndpoint_Configuration() {}
+
+// Configuration for an S3-compatible storage backend.
+type S3Configuration struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
+	// Required. Immutable. The URI of the S3-compatible endpoint
+	// (e.g. `http://localhost:9000` or `https://s3.us-east-1.amazonaws.com`).
+	EndpointUri string `protobuf:"bytes,1,opt,name=endpoint_uri,json=endpointUri,proto3" json:"endpoint_uri,omitempty"`
+	// Required. Immutable. The bucket name on the storage backend.
+	Bucket string `protobuf:"bytes,2,opt,name=bucket,proto3" json:"bucket,omitempty"`
+	// Optional. The cloud region of the storage backend (e.g. `us-east-1`).
+	Region string `protobuf:"bytes,3,opt,name=region,proto3" json:"region,omitempty"`
+	// Input only. Credentials for accessing the bucket. Required on create.
+	// Never returned in responses. Updatable via UpdateEndpoint with field
+	// mask on `s3.credentials`.
+	//
 	// Types that are valid to be assigned to Credentials:
 	//
-	//	*EndpointCredentials_AccessKey
-	//	*EndpointCredentials_IamRole
-	Credentials   isEndpointCredentials_Credentials `protobuf_oneof:"credentials"`
+	//	*S3Configuration_AccessKey
+	Credentials   isS3Configuration_Credentials `protobuf_oneof:"credentials"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *EndpointCredentials) Reset() {
-	*x = EndpointCredentials{}
+func (x *S3Configuration) Reset() {
+	*x = S3Configuration{}
 	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *EndpointCredentials) String() string {
+func (x *S3Configuration) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*EndpointCredentials) ProtoMessage() {}
+func (*S3Configuration) ProtoMessage() {}
 
-func (x *EndpointCredentials) ProtoReflect() protoreflect.Message {
+func (x *S3Configuration) ProtoReflect() protoreflect.Message {
 	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -438,56 +303,61 @@ func (x *EndpointCredentials) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use EndpointCredentials.ProtoReflect.Descriptor instead.
-func (*EndpointCredentials) Descriptor() ([]byte, []int) {
+// Deprecated: Use S3Configuration.ProtoReflect.Descriptor instead.
+func (*S3Configuration) Descriptor() ([]byte, []int) {
 	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *EndpointCredentials) GetCredentials() isEndpointCredentials_Credentials {
+func (x *S3Configuration) GetEndpointUri() string {
+	if x != nil {
+		return x.EndpointUri
+	}
+	return ""
+}
+
+func (x *S3Configuration) GetBucket() string {
+	if x != nil {
+		return x.Bucket
+	}
+	return ""
+}
+
+func (x *S3Configuration) GetRegion() string {
+	if x != nil {
+		return x.Region
+	}
+	return ""
+}
+
+func (x *S3Configuration) GetCredentials() isS3Configuration_Credentials {
 	if x != nil {
 		return x.Credentials
 	}
 	return nil
 }
 
-func (x *EndpointCredentials) GetAccessKey() *AccessKeyCredentials {
+func (x *S3Configuration) GetAccessKey() *S3AccessKeyCredentials {
 	if x != nil {
-		if x, ok := x.Credentials.(*EndpointCredentials_AccessKey); ok {
+		if x, ok := x.Credentials.(*S3Configuration_AccessKey); ok {
 			return x.AccessKey
 		}
 	}
 	return nil
 }
 
-func (x *EndpointCredentials) GetIamRole() *IamRoleCredentials {
-	if x != nil {
-		if x, ok := x.Credentials.(*EndpointCredentials_IamRole); ok {
-			return x.IamRole
-		}
-	}
-	return nil
+type isS3Configuration_Credentials interface {
+	isS3Configuration_Credentials()
 }
 
-type isEndpointCredentials_Credentials interface {
-	isEndpointCredentials_Credentials()
+type S3Configuration_AccessKey struct {
+	// Static access key credentials.
+	AccessKey *S3AccessKeyCredentials `protobuf:"bytes,4,opt,name=access_key,json=accessKey,proto3,oneof"`
 }
 
-type EndpointCredentials_AccessKey struct {
-	// Access key credentials (e.g. for S3 or MinIO).
-	AccessKey *AccessKeyCredentials `protobuf:"bytes,1,opt,name=access_key,json=accessKey,proto3,oneof"`
-}
+func (*S3Configuration_AccessKey) isS3Configuration_Credentials() {}
 
-type EndpointCredentials_IamRole struct {
-	// IAM role credentials (e.g. for cross-account S3 access).
-	IamRole *IamRoleCredentials `protobuf:"bytes,2,opt,name=iam_role,json=iamRole,proto3,oneof"`
-}
-
-func (*EndpointCredentials_AccessKey) isEndpointCredentials_Credentials() {}
-
-func (*EndpointCredentials_IamRole) isEndpointCredentials_Credentials() {}
-
-// Access key credentials consisting of an access key ID and secret.
-type AccessKeyCredentials struct {
+// Static access key credentials for an S3-compatible backend.
+type S3AccessKeyCredentials struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The access key ID.
 	AccessKeyId string `protobuf:"bytes,1,opt,name=access_key_id,json=accessKeyId,proto3" json:"access_key_id,omitempty"`
@@ -497,20 +367,20 @@ type AccessKeyCredentials struct {
 	sizeCache       protoimpl.SizeCache
 }
 
-func (x *AccessKeyCredentials) Reset() {
-	*x = AccessKeyCredentials{}
+func (x *S3AccessKeyCredentials) Reset() {
+	*x = S3AccessKeyCredentials{}
 	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *AccessKeyCredentials) String() string {
+func (x *S3AccessKeyCredentials) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*AccessKeyCredentials) ProtoMessage() {}
+func (*S3AccessKeyCredentials) ProtoMessage() {}
 
-func (x *AccessKeyCredentials) ProtoReflect() protoreflect.Message {
+func (x *S3AccessKeyCredentials) ProtoReflect() protoreflect.Message {
 	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -522,67 +392,21 @@ func (x *AccessKeyCredentials) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use AccessKeyCredentials.ProtoReflect.Descriptor instead.
-func (*AccessKeyCredentials) Descriptor() ([]byte, []int) {
+// Deprecated: Use S3AccessKeyCredentials.ProtoReflect.Descriptor instead.
+func (*S3AccessKeyCredentials) Descriptor() ([]byte, []int) {
 	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *AccessKeyCredentials) GetAccessKeyId() string {
+func (x *S3AccessKeyCredentials) GetAccessKeyId() string {
 	if x != nil {
 		return x.AccessKeyId
 	}
 	return ""
 }
 
-func (x *AccessKeyCredentials) GetSecretAccessKey() string {
+func (x *S3AccessKeyCredentials) GetSecretAccessKey() string {
 	if x != nil {
 		return x.SecretAccessKey
-	}
-	return ""
-}
-
-// IAM role credentials for assuming a role in another account.
-type IamRoleCredentials struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Required. The ARN of the IAM role to assume.
-	RoleArn       string `protobuf:"bytes,1,opt,name=role_arn,json=roleArn,proto3" json:"role_arn,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *IamRoleCredentials) Reset() {
-	*x = IamRoleCredentials{}
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[3]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *IamRoleCredentials) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*IamRoleCredentials) ProtoMessage() {}
-
-func (x *IamRoleCredentials) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[3]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use IamRoleCredentials.ProtoReflect.Descriptor instead.
-func (*IamRoleCredentials) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{3}
-}
-
-func (x *IamRoleCredentials) GetRoleArn() string {
-	if x != nil {
-		return x.RoleArn
 	}
 	return ""
 }
@@ -595,7 +419,8 @@ type CreateEndpointRequest struct {
 	// created. Format:
 	// `organizations/{organization}/storageGateways/{storage_gateway}`
 	Parent string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
-	// Required. The endpoint to create.
+	// Required. The endpoint to create. Must include configuration with
+	// credentials.
 	Endpoint *Endpoint `protobuf:"bytes,2,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
 	// Optional. A unique identifier for the endpoint. If not provided, the
 	// server will generate one.
@@ -609,7 +434,7 @@ type CreateEndpointRequest struct {
 
 func (x *CreateEndpointRequest) Reset() {
 	*x = CreateEndpointRequest{}
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[4]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -621,7 +446,7 @@ func (x *CreateEndpointRequest) String() string {
 func (*CreateEndpointRequest) ProtoMessage() {}
 
 func (x *CreateEndpointRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[4]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -634,7 +459,7 @@ func (x *CreateEndpointRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateEndpointRequest.ProtoReflect.Descriptor instead.
 func (*CreateEndpointRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{4}
+	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *CreateEndpointRequest) GetParent() string {
@@ -675,7 +500,7 @@ type CreateEndpointMetadata struct {
 
 func (x *CreateEndpointMetadata) Reset() {
 	*x = CreateEndpointMetadata{}
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[5]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -687,7 +512,7 @@ func (x *CreateEndpointMetadata) String() string {
 func (*CreateEndpointMetadata) ProtoMessage() {}
 
 func (x *CreateEndpointMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[5]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -700,7 +525,7 @@ func (x *CreateEndpointMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateEndpointMetadata.ProtoReflect.Descriptor instead.
 func (*CreateEndpointMetadata) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{5}
+	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{4}
 }
 
 // The request sent to the
@@ -716,7 +541,7 @@ type GetEndpointRequest struct {
 
 func (x *GetEndpointRequest) Reset() {
 	*x = GetEndpointRequest{}
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[6]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -728,7 +553,7 @@ func (x *GetEndpointRequest) String() string {
 func (*GetEndpointRequest) ProtoMessage() {}
 
 func (x *GetEndpointRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[6]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -741,7 +566,7 @@ func (x *GetEndpointRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetEndpointRequest.ProtoReflect.Descriptor instead.
 func (*GetEndpointRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{6}
+	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *GetEndpointRequest) GetName() string {
@@ -759,14 +584,11 @@ type ListEndpointsRequest struct {
 	// Format: `organizations/{organization}/storageGateways/{storage_gateway}`
 	Parent string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
 	// Optional. The maximum number of endpoints to return in the response.
-	// The server can return fewer endpoints than requested. If unspecified,
-	// the server picks an appropriate default.
 	PageSize int32 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	// Optional. A pagination token returned from a previous call to
 	// `ListEndpoints` that indicates from where listing should continue.
 	PageToken string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
-	// Optional. An AIP-160 filter expression. Supports filtering by
-	// `state`, `engine`, `display_name`.
+	// Optional. An AIP-160 filter expression.
 	Filter string `protobuf:"bytes,4,opt,name=filter,proto3" json:"filter,omitempty"`
 	// Optional. Sort order (e.g. "create_time desc").
 	OrderBy       string `protobuf:"bytes,5,opt,name=order_by,json=orderBy,proto3" json:"order_by,omitempty"`
@@ -776,7 +598,7 @@ type ListEndpointsRequest struct {
 
 func (x *ListEndpointsRequest) Reset() {
 	*x = ListEndpointsRequest{}
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[7]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -788,7 +610,7 @@ func (x *ListEndpointsRequest) String() string {
 func (*ListEndpointsRequest) ProtoMessage() {}
 
 func (x *ListEndpointsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[7]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -801,7 +623,7 @@ func (x *ListEndpointsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListEndpointsRequest.ProtoReflect.Descriptor instead.
 func (*ListEndpointsRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{7}
+	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ListEndpointsRequest) GetParent() string {
@@ -846,7 +668,6 @@ type ListEndpointsResponse struct {
 	// The endpoints belonging to the specified storage gateway.
 	Endpoints []*Endpoint `protobuf:"bytes,1,rep,name=endpoints,proto3" json:"endpoints,omitempty"`
 	// A pagination token to be used to retrieve the next page of results.
-	// If empty, this response contains the last page of results.
 	NextPageToken string `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -854,7 +675,7 @@ type ListEndpointsResponse struct {
 
 func (x *ListEndpointsResponse) Reset() {
 	*x = ListEndpointsResponse{}
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[8]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -866,7 +687,7 @@ func (x *ListEndpointsResponse) String() string {
 func (*ListEndpointsResponse) ProtoMessage() {}
 
 func (x *ListEndpointsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[8]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -879,7 +700,7 @@ func (x *ListEndpointsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListEndpointsResponse.ProtoReflect.Descriptor instead.
 func (*ListEndpointsResponse) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{8}
+	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ListEndpointsResponse) GetEndpoints() []*Endpoint {
@@ -904,9 +725,7 @@ type UpdateEndpointRequest struct {
 	// populated to identify the endpoint to update.
 	Endpoint *Endpoint `protobuf:"bytes,1,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
 	// Optional. An update mask to selectively update fields. If not provided,
-	// all mutable fields will be updated. See
-	// [FieldMask](https://protobuf.dev/reference/protobuf/google.protobuf/#field-mask)
-	// for more details.
+	// all mutable fields will be updated.
 	UpdateMask *fieldmaskpb.FieldMask `protobuf:"bytes,2,opt,name=update_mask,json=updateMask,proto3" json:"update_mask,omitempty"`
 	// Optional. If set to true, the request will only validate the request
 	// without persisting it.
@@ -917,7 +736,7 @@ type UpdateEndpointRequest struct {
 
 func (x *UpdateEndpointRequest) Reset() {
 	*x = UpdateEndpointRequest{}
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[9]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -929,7 +748,7 @@ func (x *UpdateEndpointRequest) String() string {
 func (*UpdateEndpointRequest) ProtoMessage() {}
 
 func (x *UpdateEndpointRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[9]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -942,7 +761,7 @@ func (x *UpdateEndpointRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateEndpointRequest.ProtoReflect.Descriptor instead.
 func (*UpdateEndpointRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{9}
+	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *UpdateEndpointRequest) GetEndpoint() *Endpoint {
@@ -976,7 +795,7 @@ type UpdateEndpointMetadata struct {
 
 func (x *UpdateEndpointMetadata) Reset() {
 	*x = UpdateEndpointMetadata{}
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[10]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -988,7 +807,7 @@ func (x *UpdateEndpointMetadata) String() string {
 func (*UpdateEndpointMetadata) ProtoMessage() {}
 
 func (x *UpdateEndpointMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[10]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1001,7 +820,7 @@ func (x *UpdateEndpointMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateEndpointMetadata.ProtoReflect.Descriptor instead.
 func (*UpdateEndpointMetadata) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{10}
+	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{9}
 }
 
 // The request sent to the
@@ -1023,7 +842,7 @@ type DeleteEndpointRequest struct {
 
 func (x *DeleteEndpointRequest) Reset() {
 	*x = DeleteEndpointRequest{}
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[11]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1035,7 +854,7 @@ func (x *DeleteEndpointRequest) String() string {
 func (*DeleteEndpointRequest) ProtoMessage() {}
 
 func (x *DeleteEndpointRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[11]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1048,7 +867,7 @@ func (x *DeleteEndpointRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteEndpointRequest.ProtoReflect.Descriptor instead.
 func (*DeleteEndpointRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{11}
+	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *DeleteEndpointRequest) GetName() string {
@@ -1082,7 +901,7 @@ type DeleteEndpointMetadata struct {
 
 func (x *DeleteEndpointMetadata) Reset() {
 	*x = DeleteEndpointMetadata{}
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[12]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1094,7 +913,7 @@ func (x *DeleteEndpointMetadata) String() string {
 func (*DeleteEndpointMetadata) ProtoMessage() {}
 
 func (x *DeleteEndpointMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[12]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1107,66 +926,7 @@ func (x *DeleteEndpointMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteEndpointMetadata.ProtoReflect.Descriptor instead.
 func (*DeleteEndpointMetadata) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{12}
-}
-
-// The request sent to the
-// [SetEndpointCredentials][pivox.storage.v1.Endpoints.SetEndpointCredentials]
-// method.
-type SetEndpointCredentialsRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Required. The resource name of the endpoint whose credentials are
-	// being set. Format:
-	// `organizations/{organization}/storageGateways/{storage_gateway}/endpoints/{endpoint}`
-	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	// Required. The credentials to set on the endpoint.
-	Credentials   *EndpointCredentials `protobuf:"bytes,2,opt,name=credentials,proto3" json:"credentials,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SetEndpointCredentialsRequest) Reset() {
-	*x = SetEndpointCredentialsRequest{}
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[13]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SetEndpointCredentialsRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SetEndpointCredentialsRequest) ProtoMessage() {}
-
-func (x *SetEndpointCredentialsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[13]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SetEndpointCredentialsRequest.ProtoReflect.Descriptor instead.
-func (*SetEndpointCredentialsRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{13}
-}
-
-func (x *SetEndpointCredentialsRequest) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *SetEndpointCredentialsRequest) GetCredentials() *EndpointCredentials {
-	if x != nil {
-		return x.Credentials
-	}
-	return nil
+	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{11}
 }
 
 // The request sent to the
@@ -1183,7 +943,7 @@ type TestEndpointConnectionRequest struct {
 
 func (x *TestEndpointConnectionRequest) Reset() {
 	*x = TestEndpointConnectionRequest{}
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[14]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1195,7 +955,7 @@ func (x *TestEndpointConnectionRequest) String() string {
 func (*TestEndpointConnectionRequest) ProtoMessage() {}
 
 func (x *TestEndpointConnectionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[14]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1208,7 +968,7 @@ func (x *TestEndpointConnectionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TestEndpointConnectionRequest.ProtoReflect.Descriptor instead.
 func (*TestEndpointConnectionRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{14}
+	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *TestEndpointConnectionRequest) GetName() string {
@@ -1235,7 +995,7 @@ type TestEndpointConnectionResponse struct {
 
 func (x *TestEndpointConnectionResponse) Reset() {
 	*x = TestEndpointConnectionResponse{}
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[15]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1247,7 +1007,7 @@ func (x *TestEndpointConnectionResponse) String() string {
 func (*TestEndpointConnectionResponse) ProtoMessage() {}
 
 func (x *TestEndpointConnectionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[15]
+	mi := &file_pivox_storage_v1_endpoint_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1260,7 +1020,7 @@ func (x *TestEndpointConnectionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TestEndpointConnectionResponse.ProtoReflect.Descriptor instead.
 func (*TestEndpointConnectionResponse) Descriptor() ([]byte, []int) {
-	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{15}
+	return file_pivox_storage_v1_endpoint_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *TestEndpointConnectionResponse) GetReachable() bool {
@@ -1288,61 +1048,46 @@ var File_pivox_storage_v1_endpoint_proto protoreflect.FileDescriptor
 
 const file_pivox_storage_v1_endpoint_proto_rawDesc = "" +
 	"\n" +
-	"\x1fpivox/storage/v1/endpoint.proto\x12\x10pivox.storage.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x80\n" +
-	"\n" +
+	"\x1fpivox/storage/v1/endpoint.proto\x12\x10pivox.storage.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x98\x06\n" +
 	"\bEndpoint\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12-\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\n" +
-	"\xe0A\x02\xbaH\x04r\x02\x18<R\vdisplayName\x12A\n" +
-	"\x06engine\x18\x03 \x01(\x0e2!.pivox.storage.v1.Endpoint.EngineB\x06\xe0A\x02\xe0A\x05R\x06engine\x12.\n" +
-	"\fendpoint_uri\x18\x04 \x01(\tB\v\xe0A\x02\xbaH\x05r\x03\x88\x01\x01R\vendpointUri\x12O\n" +
-	"\x06bucket\x18\x05 \x01(\tB7\xe0A\x02\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x06bucket\x12\x1b\n" +
-	"\x06region\x18\x06 \x01(\tB\x03\xe0A\x01R\x06region\x12;\n" +
-	"\x05state\x18\a \x01(\x0e2 .pivox.storage.v1.Endpoint.StateB\x03\xe0A\x03R\x05state\x12O\n" +
-	"\vcredentials\x18\b \x01(\v2%.pivox.storage.v1.EndpointCredentialsB\x06\xe0A\x04\xe0A\x01R\vcredentials\x12Z\n" +
-	"\x10credential_state\x18\t \x01(\x0e2*.pivox.storage.v1.Endpoint.CredentialStateB\x03\xe0A\x03R\x0fcredentialState\x12R\n" +
-	"\vannotations\x18\n" +
-	" \x03(\v2+.pivox.storage.v1.Endpoint.AnnotationsEntryB\x03\xe0A\x01R\vannotations\x12\x17\n" +
-	"\x04etag\x18\v \x01(\tB\x03\xe0A\x03R\x04etag\x12\x1d\n" +
-	"\acreator\x18\f \x01(\tB\x03\xe0A\x03R\acreator\x12\x1d\n" +
-	"\aupdater\x18\r \x01(\tB\x03\xe0A\x03R\aupdater\x12@\n" +
-	"\vcreate_time\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"\xe0A\x02\xbaH\x04r\x02\x18<R\vdisplayName\x12;\n" +
+	"\x05state\x18\x03 \x01(\x0e2 .pivox.storage.v1.Endpoint.StateB\x03\xe0A\x03R\x05state\x123\n" +
+	"\x02s3\x18\x04 \x01(\v2!.pivox.storage.v1.S3ConfigurationH\x00R\x02s3\x12R\n" +
+	"\vannotations\x18\x05 \x03(\v2+.pivox.storage.v1.Endpoint.AnnotationsEntryB\x03\xe0A\x01R\vannotations\x12\x17\n" +
+	"\x04etag\x18\x06 \x01(\tB\x03\xe0A\x03R\x04etag\x12\x1d\n" +
+	"\acreator\x18\a \x01(\tB\x03\xe0A\x03R\acreator\x12\x1d\n" +
+	"\aupdater\x18\b \x01(\tB\x03\xe0A\x03R\aupdater\x12@\n" +
+	"\vcreate_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"createTime\x12@\n" +
-	"\vupdate_time\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"\vupdate_time\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"updateTime\x1a>\n" +
 	"\x10AnnotationsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"H\n" +
-	"\x06Engine\x12\x16\n" +
-	"\x12ENGINE_UNSPECIFIED\x10\x00\x12\x06\n" +
-	"\x02S3\x10\x01\x12\n" +
-	"\n" +
-	"\x06RUSTFS\x10\x02\x12\a\n" +
-	"\x03GCS\x10\x03\x12\t\n" +
-	"\x05MINIO\x10\x04\"I\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"I\n" +
 	"\x05State\x12\x15\n" +
 	"\x11STATE_UNSPECIFIED\x10\x00\x12\n" +
 	"\n" +
 	"\x06ACTIVE\x10\x01\x12\f\n" +
 	"\bINACTIVE\x10\x02\x12\x0f\n" +
-	"\vUNREACHABLE\x10\x03\"T\n" +
-	"\x0fCredentialState\x12 \n" +
-	"\x1cCREDENTIAL_STATE_UNSPECIFIED\x10\x00\x12\t\n" +
-	"\x05UNSET\x10\x01\x12\a\n" +
-	"\x03SET\x10\x02\x12\v\n" +
-	"\aINVALID\x10\x03:\x86\x01\xeaA\x82\x01\n" +
-	"\x16pivox.storage/Endpoint\x12Sorganizations/{organization}/storageGateways/{storage_gateway}/endpoints/{endpoint}*\tendpoints2\bendpoint\"\xb0\x01\n" +
-	"\x13EndpointCredentials\x12G\n" +
+	"\vUNREACHABLE\x10\x03:\x86\x01\xeaA\x82\x01\n" +
+	"\x16pivox.storage/Endpoint\x12Sorganizations/{organization}/storageGateways/{storage_gateway}/endpoints/{endpoint}*\tendpoints2\bendpointB\x0f\n" +
+	"\rconfiguration\"\x8f\x02\n" +
+	"\x0fS3Configuration\x121\n" +
+	"\fendpoint_uri\x18\x01 \x01(\tB\x0e\xe0A\x02\xe0A\x05\xbaH\x05r\x03\x88\x01\x01R\vendpointUri\x12R\n" +
+	"\x06bucket\x18\x02 \x01(\tB:\xe0A\x02\xe0A\x05\xbaH1\xba\x01.\n" +
+	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x06bucket\x12\x1b\n" +
+	"\x06region\x18\x03 \x01(\tB\x03\xe0A\x01R\x06region\x12I\n" +
 	"\n" +
-	"access_key\x18\x01 \x01(\v2&.pivox.storage.v1.AccessKeyCredentialsH\x00R\taccessKey\x12A\n" +
-	"\biam_role\x18\x02 \x01(\v2$.pivox.storage.v1.IamRoleCredentialsH\x00R\aiamRoleB\r\n" +
-	"\vcredentials\"p\n" +
-	"\x14AccessKeyCredentials\x12'\n" +
-	"\raccess_key_id\x18\x01 \x01(\tB\x03\xe0A\x02R\vaccessKeyId\x12/\n" +
-	"\x11secret_access_key\x18\x02 \x01(\tB\x03\xe0A\x02R\x0fsecretAccessKey\"4\n" +
-	"\x12IamRoleCredentials\x12\x1e\n" +
-	"\brole_arn\x18\x01 \x01(\tB\x03\xe0A\x02R\aroleArn\"\x96\x02\n" +
+	"access_key\x18\x04 \x01(\v2(.pivox.storage.v1.S3AccessKeyCredentialsH\x00R\taccessKeyB\r\n" +
+	"\vcredentials\"\xda\x01\n" +
+	"\x16S3AccessKeyCredentials\x12[\n" +
+	"\raccess_key_id\x18\x01 \x01(\tB7\xe0A\x02\xbaH1\xba\x01.\n" +
+	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\vaccessKeyId\x12c\n" +
+	"\x11secret_access_key\x18\x02 \x01(\tB7\xe0A\x02\xbaH1\xba\x01.\n" +
+	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x0fsecretAccessKey\"\x96\x02\n" +
 	"\x15CreateEndpointRequest\x12j\n" +
 	"\x06parent\x18\x01 \x01(\tBR\xe0A\x02\xfaA\x18\x12\x16pivox.storage/Endpoint\xbaH1\xba\x01.\n" +
 	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x06parent\x12A\n" +
@@ -1378,12 +1123,7 @@ const file_pivox_storage_v1_endpoint_proto_rawDesc = "" +
 	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\x12\x17\n" +
 	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x01R\x04etag\x12(\n" +
 	"\rvalidate_only\x18\x03 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\x18\n" +
-	"\x16DeleteEndpointMetadata\"\xdb\x01\n" +
-	"\x1dSetEndpointCredentialsRequest\x12f\n" +
-	"\x04name\x18\x01 \x01(\tBR\xe0A\x02\xfaA\x18\n" +
-	"\x16pivox.storage/Endpoint\xbaH1\xba\x01.\n" +
-	"\brequired\x12\x11value is required\x1a\x0fthis.size() > 0R\x04name\x12R\n" +
-	"\vcredentials\x18\x02 \x01(\v2%.pivox.storage.v1.EndpointCredentialsB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\vcredentials\"\x87\x01\n" +
+	"\x16DeleteEndpointMetadata\"\x87\x01\n" +
 	"\x1dTestEndpointConnectionRequest\x12f\n" +
 	"\x04name\x18\x01 \x01(\tBR\xe0A\x02\xfaA\x18\n" +
 	"\x16pivox.storage/Endpoint\xbaH1\xba\x01.\n" +
@@ -1391,7 +1131,7 @@ const file_pivox_storage_v1_endpoint_proto_rawDesc = "" +
 	"\x1eTestEndpointConnectionResponse\x12\x1c\n" +
 	"\treachable\x18\x01 \x01(\bR\treachable\x123\n" +
 	"\alatency\x18\x02 \x01(\v2\x19.google.protobuf.DurationR\alatency\x12\x14\n" +
-	"\x05error\x18\x03 \x01(\tR\x05error2\xae\v\n" +
+	"\x05error\x18\x03 \x01(\tR\x05error2\xdf\t\n" +
 	"\tEndpoints\x12\xe8\x01\n" +
 	"\x0eCreateEndpoint\x12'.pivox.storage.v1.CreateEndpointRequest\x1a\x1d.google.longrunning.Operation\"\x8d\x01\xcaA\"\n" +
 	"\bEndpoint\x12\x16CreateEndpointMetadata\xdaA\x1bparent,endpoint,endpoint_id\x82\xd3\xe4\x93\x02D:\bendpoint\"8/v1/{parent=organizations/*/storageGateways/*}/endpoints\x12\x98\x01\n" +
@@ -1400,8 +1140,7 @@ const file_pivox_storage_v1_endpoint_proto_rawDesc = "" +
 	"\x0eUpdateEndpoint\x12'.pivox.storage.v1.UpdateEndpointRequest\x1a\x1d.google.longrunning.Operation\"\x8f\x01\xcaA\"\n" +
 	"\bEndpoint\x12\x16UpdateEndpointMetadata\xdaA\x14endpoint,update_mask\x82\xd3\xe4\x93\x02M:\bendpoint2A/v1/{endpoint.name=organizations/*/storageGateways/*/endpoints/*}\x12\xc6\x01\n" +
 	"\x0eDeleteEndpoint\x12'.pivox.storage.v1.DeleteEndpointRequest\x1a\x1d.google.longrunning.Operation\"l\xcaA\"\n" +
-	"\bEndpoint\x12\x16DeleteEndpointMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02:*8/v1/{name=organizations/*/storageGateways/*/endpoints/*}\x12\xcc\x01\n" +
-	"\x16SetEndpointCredentials\x12/.pivox.storage.v1.SetEndpointCredentialsRequest\x1a\x1a.pivox.storage.v1.Endpoint\"e\xdaA\x10name,credentials\x82\xd3\xe4\x93\x02L:\x01*\"G/v1/{name=organizations/*/storageGateways/*/endpoints/*}:setCredentials\x12\xd6\x01\n" +
+	"\bEndpoint\x12\x16DeleteEndpointMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02:*8/v1/{name=organizations/*/storageGateways/*/endpoints/*}\x12\xd6\x01\n" +
 	"\x16TestEndpointConnection\x12/.pivox.storage.v1.TestEndpointConnectionRequest\x1a0.pivox.storage.v1.TestEndpointConnectionResponse\"Y\xdaA\x04name\x82\xd3\xe4\x93\x02L:\x01*\"G/v1/{name=organizations/*/storageGateways/*/endpoints/*}:testConnection\x1a\x0f\xcaA\fapi.pivox.ioB\xd4\x01\n" +
 	"\x14com.pivox.storage.v1B\rEndpointProtoP\x01ZKgithub.com/dashkan/pivox-server/internal/pkg/gen/pivox/storage/v1;storagev1\xa2\x02\x03PSX\xaa\x02\x10Pivox.Storage.V1\xca\x02\x10Pivox\\Storage\\V1\xe2\x02\x1cPivox\\Storage\\V1\\GPBMetadata\xea\x02\x12Pivox::Storage::V1b\x06proto3"
 
@@ -1417,69 +1156,59 @@ func file_pivox_storage_v1_endpoint_proto_rawDescGZIP() []byte {
 	return file_pivox_storage_v1_endpoint_proto_rawDescData
 }
 
-var file_pivox_storage_v1_endpoint_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_pivox_storage_v1_endpoint_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_pivox_storage_v1_endpoint_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_pivox_storage_v1_endpoint_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_pivox_storage_v1_endpoint_proto_goTypes = []any{
-	(Endpoint_Engine)(0),                   // 0: pivox.storage.v1.Endpoint.Engine
-	(Endpoint_State)(0),                    // 1: pivox.storage.v1.Endpoint.State
-	(Endpoint_CredentialState)(0),          // 2: pivox.storage.v1.Endpoint.CredentialState
-	(*Endpoint)(nil),                       // 3: pivox.storage.v1.Endpoint
-	(*EndpointCredentials)(nil),            // 4: pivox.storage.v1.EndpointCredentials
-	(*AccessKeyCredentials)(nil),           // 5: pivox.storage.v1.AccessKeyCredentials
-	(*IamRoleCredentials)(nil),             // 6: pivox.storage.v1.IamRoleCredentials
-	(*CreateEndpointRequest)(nil),          // 7: pivox.storage.v1.CreateEndpointRequest
-	(*CreateEndpointMetadata)(nil),         // 8: pivox.storage.v1.CreateEndpointMetadata
-	(*GetEndpointRequest)(nil),             // 9: pivox.storage.v1.GetEndpointRequest
-	(*ListEndpointsRequest)(nil),           // 10: pivox.storage.v1.ListEndpointsRequest
-	(*ListEndpointsResponse)(nil),          // 11: pivox.storage.v1.ListEndpointsResponse
-	(*UpdateEndpointRequest)(nil),          // 12: pivox.storage.v1.UpdateEndpointRequest
-	(*UpdateEndpointMetadata)(nil),         // 13: pivox.storage.v1.UpdateEndpointMetadata
-	(*DeleteEndpointRequest)(nil),          // 14: pivox.storage.v1.DeleteEndpointRequest
-	(*DeleteEndpointMetadata)(nil),         // 15: pivox.storage.v1.DeleteEndpointMetadata
-	(*SetEndpointCredentialsRequest)(nil),  // 16: pivox.storage.v1.SetEndpointCredentialsRequest
-	(*TestEndpointConnectionRequest)(nil),  // 17: pivox.storage.v1.TestEndpointConnectionRequest
-	(*TestEndpointConnectionResponse)(nil), // 18: pivox.storage.v1.TestEndpointConnectionResponse
-	nil,                                    // 19: pivox.storage.v1.Endpoint.AnnotationsEntry
-	(*timestamppb.Timestamp)(nil),          // 20: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),          // 21: google.protobuf.FieldMask
-	(*durationpb.Duration)(nil),            // 22: google.protobuf.Duration
-	(*longrunningpb.Operation)(nil),        // 23: google.longrunning.Operation
+	(Endpoint_State)(0),                    // 0: pivox.storage.v1.Endpoint.State
+	(*Endpoint)(nil),                       // 1: pivox.storage.v1.Endpoint
+	(*S3Configuration)(nil),                // 2: pivox.storage.v1.S3Configuration
+	(*S3AccessKeyCredentials)(nil),         // 3: pivox.storage.v1.S3AccessKeyCredentials
+	(*CreateEndpointRequest)(nil),          // 4: pivox.storage.v1.CreateEndpointRequest
+	(*CreateEndpointMetadata)(nil),         // 5: pivox.storage.v1.CreateEndpointMetadata
+	(*GetEndpointRequest)(nil),             // 6: pivox.storage.v1.GetEndpointRequest
+	(*ListEndpointsRequest)(nil),           // 7: pivox.storage.v1.ListEndpointsRequest
+	(*ListEndpointsResponse)(nil),          // 8: pivox.storage.v1.ListEndpointsResponse
+	(*UpdateEndpointRequest)(nil),          // 9: pivox.storage.v1.UpdateEndpointRequest
+	(*UpdateEndpointMetadata)(nil),         // 10: pivox.storage.v1.UpdateEndpointMetadata
+	(*DeleteEndpointRequest)(nil),          // 11: pivox.storage.v1.DeleteEndpointRequest
+	(*DeleteEndpointMetadata)(nil),         // 12: pivox.storage.v1.DeleteEndpointMetadata
+	(*TestEndpointConnectionRequest)(nil),  // 13: pivox.storage.v1.TestEndpointConnectionRequest
+	(*TestEndpointConnectionResponse)(nil), // 14: pivox.storage.v1.TestEndpointConnectionResponse
+	nil,                                    // 15: pivox.storage.v1.Endpoint.AnnotationsEntry
+	(*timestamppb.Timestamp)(nil),          // 16: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),          // 17: google.protobuf.FieldMask
+	(*durationpb.Duration)(nil),            // 18: google.protobuf.Duration
+	(*longrunningpb.Operation)(nil),        // 19: google.longrunning.Operation
 }
 var file_pivox_storage_v1_endpoint_proto_depIdxs = []int32{
-	0,  // 0: pivox.storage.v1.Endpoint.engine:type_name -> pivox.storage.v1.Endpoint.Engine
-	1,  // 1: pivox.storage.v1.Endpoint.state:type_name -> pivox.storage.v1.Endpoint.State
-	4,  // 2: pivox.storage.v1.Endpoint.credentials:type_name -> pivox.storage.v1.EndpointCredentials
-	2,  // 3: pivox.storage.v1.Endpoint.credential_state:type_name -> pivox.storage.v1.Endpoint.CredentialState
-	19, // 4: pivox.storage.v1.Endpoint.annotations:type_name -> pivox.storage.v1.Endpoint.AnnotationsEntry
-	20, // 5: pivox.storage.v1.Endpoint.create_time:type_name -> google.protobuf.Timestamp
-	20, // 6: pivox.storage.v1.Endpoint.update_time:type_name -> google.protobuf.Timestamp
-	5,  // 7: pivox.storage.v1.EndpointCredentials.access_key:type_name -> pivox.storage.v1.AccessKeyCredentials
-	6,  // 8: pivox.storage.v1.EndpointCredentials.iam_role:type_name -> pivox.storage.v1.IamRoleCredentials
-	3,  // 9: pivox.storage.v1.CreateEndpointRequest.endpoint:type_name -> pivox.storage.v1.Endpoint
-	3,  // 10: pivox.storage.v1.ListEndpointsResponse.endpoints:type_name -> pivox.storage.v1.Endpoint
-	3,  // 11: pivox.storage.v1.UpdateEndpointRequest.endpoint:type_name -> pivox.storage.v1.Endpoint
-	21, // 12: pivox.storage.v1.UpdateEndpointRequest.update_mask:type_name -> google.protobuf.FieldMask
-	4,  // 13: pivox.storage.v1.SetEndpointCredentialsRequest.credentials:type_name -> pivox.storage.v1.EndpointCredentials
-	22, // 14: pivox.storage.v1.TestEndpointConnectionResponse.latency:type_name -> google.protobuf.Duration
-	7,  // 15: pivox.storage.v1.Endpoints.CreateEndpoint:input_type -> pivox.storage.v1.CreateEndpointRequest
-	9,  // 16: pivox.storage.v1.Endpoints.GetEndpoint:input_type -> pivox.storage.v1.GetEndpointRequest
-	10, // 17: pivox.storage.v1.Endpoints.ListEndpoints:input_type -> pivox.storage.v1.ListEndpointsRequest
-	12, // 18: pivox.storage.v1.Endpoints.UpdateEndpoint:input_type -> pivox.storage.v1.UpdateEndpointRequest
-	14, // 19: pivox.storage.v1.Endpoints.DeleteEndpoint:input_type -> pivox.storage.v1.DeleteEndpointRequest
-	16, // 20: pivox.storage.v1.Endpoints.SetEndpointCredentials:input_type -> pivox.storage.v1.SetEndpointCredentialsRequest
-	17, // 21: pivox.storage.v1.Endpoints.TestEndpointConnection:input_type -> pivox.storage.v1.TestEndpointConnectionRequest
-	23, // 22: pivox.storage.v1.Endpoints.CreateEndpoint:output_type -> google.longrunning.Operation
-	3,  // 23: pivox.storage.v1.Endpoints.GetEndpoint:output_type -> pivox.storage.v1.Endpoint
-	11, // 24: pivox.storage.v1.Endpoints.ListEndpoints:output_type -> pivox.storage.v1.ListEndpointsResponse
-	23, // 25: pivox.storage.v1.Endpoints.UpdateEndpoint:output_type -> google.longrunning.Operation
-	23, // 26: pivox.storage.v1.Endpoints.DeleteEndpoint:output_type -> google.longrunning.Operation
-	3,  // 27: pivox.storage.v1.Endpoints.SetEndpointCredentials:output_type -> pivox.storage.v1.Endpoint
-	18, // 28: pivox.storage.v1.Endpoints.TestEndpointConnection:output_type -> pivox.storage.v1.TestEndpointConnectionResponse
-	22, // [22:29] is the sub-list for method output_type
-	15, // [15:22] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	0,  // 0: pivox.storage.v1.Endpoint.state:type_name -> pivox.storage.v1.Endpoint.State
+	2,  // 1: pivox.storage.v1.Endpoint.s3:type_name -> pivox.storage.v1.S3Configuration
+	15, // 2: pivox.storage.v1.Endpoint.annotations:type_name -> pivox.storage.v1.Endpoint.AnnotationsEntry
+	16, // 3: pivox.storage.v1.Endpoint.create_time:type_name -> google.protobuf.Timestamp
+	16, // 4: pivox.storage.v1.Endpoint.update_time:type_name -> google.protobuf.Timestamp
+	3,  // 5: pivox.storage.v1.S3Configuration.access_key:type_name -> pivox.storage.v1.S3AccessKeyCredentials
+	1,  // 6: pivox.storage.v1.CreateEndpointRequest.endpoint:type_name -> pivox.storage.v1.Endpoint
+	1,  // 7: pivox.storage.v1.ListEndpointsResponse.endpoints:type_name -> pivox.storage.v1.Endpoint
+	1,  // 8: pivox.storage.v1.UpdateEndpointRequest.endpoint:type_name -> pivox.storage.v1.Endpoint
+	17, // 9: pivox.storage.v1.UpdateEndpointRequest.update_mask:type_name -> google.protobuf.FieldMask
+	18, // 10: pivox.storage.v1.TestEndpointConnectionResponse.latency:type_name -> google.protobuf.Duration
+	4,  // 11: pivox.storage.v1.Endpoints.CreateEndpoint:input_type -> pivox.storage.v1.CreateEndpointRequest
+	6,  // 12: pivox.storage.v1.Endpoints.GetEndpoint:input_type -> pivox.storage.v1.GetEndpointRequest
+	7,  // 13: pivox.storage.v1.Endpoints.ListEndpoints:input_type -> pivox.storage.v1.ListEndpointsRequest
+	9,  // 14: pivox.storage.v1.Endpoints.UpdateEndpoint:input_type -> pivox.storage.v1.UpdateEndpointRequest
+	11, // 15: pivox.storage.v1.Endpoints.DeleteEndpoint:input_type -> pivox.storage.v1.DeleteEndpointRequest
+	13, // 16: pivox.storage.v1.Endpoints.TestEndpointConnection:input_type -> pivox.storage.v1.TestEndpointConnectionRequest
+	19, // 17: pivox.storage.v1.Endpoints.CreateEndpoint:output_type -> google.longrunning.Operation
+	1,  // 18: pivox.storage.v1.Endpoints.GetEndpoint:output_type -> pivox.storage.v1.Endpoint
+	8,  // 19: pivox.storage.v1.Endpoints.ListEndpoints:output_type -> pivox.storage.v1.ListEndpointsResponse
+	19, // 20: pivox.storage.v1.Endpoints.UpdateEndpoint:output_type -> google.longrunning.Operation
+	19, // 21: pivox.storage.v1.Endpoints.DeleteEndpoint:output_type -> google.longrunning.Operation
+	14, // 22: pivox.storage.v1.Endpoints.TestEndpointConnection:output_type -> pivox.storage.v1.TestEndpointConnectionResponse
+	17, // [17:23] is the sub-list for method output_type
+	11, // [11:17] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_pivox_storage_v1_endpoint_proto_init() }
@@ -1487,17 +1216,19 @@ func file_pivox_storage_v1_endpoint_proto_init() {
 	if File_pivox_storage_v1_endpoint_proto != nil {
 		return
 	}
+	file_pivox_storage_v1_endpoint_proto_msgTypes[0].OneofWrappers = []any{
+		(*Endpoint_S3)(nil),
+	}
 	file_pivox_storage_v1_endpoint_proto_msgTypes[1].OneofWrappers = []any{
-		(*EndpointCredentials_AccessKey)(nil),
-		(*EndpointCredentials_IamRole)(nil),
+		(*S3Configuration_AccessKey)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pivox_storage_v1_endpoint_proto_rawDesc), len(file_pivox_storage_v1_endpoint_proto_rawDesc)),
-			NumEnums:      3,
-			NumMessages:   17,
+			NumEnums:      1,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

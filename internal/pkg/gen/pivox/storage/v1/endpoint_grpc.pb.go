@@ -39,7 +39,6 @@ const (
 	Endpoints_ListEndpoints_FullMethodName          = "/pivox.storage.v1.Endpoints/ListEndpoints"
 	Endpoints_UpdateEndpoint_FullMethodName         = "/pivox.storage.v1.Endpoints/UpdateEndpoint"
 	Endpoints_DeleteEndpoint_FullMethodName         = "/pivox.storage.v1.Endpoints/DeleteEndpoint"
-	Endpoints_SetEndpointCredentials_FullMethodName = "/pivox.storage.v1.Endpoints/SetEndpointCredentials"
 	Endpoints_TestEndpointConnection_FullMethodName = "/pivox.storage.v1.Endpoints/TestEndpointConnection"
 )
 
@@ -48,22 +47,23 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
 // Manages storage endpoints attached to a storage gateway. An endpoint
-// represents an external storage backend (such as S3, Cloud Storage, or MinIO)
-// that agents use to serve storage operations. All mutation RPCs return
-// long-running operations.
+// represents a storage backend that agents use to serve storage operations.
+// Configuration is provided via a type-specific oneof (currently S3 only).
+// All mutation RPCs return long-running operations.
 type EndpointsClient interface {
 	// Creates a new endpoint resource under the specified storage gateway.
+	// Configuration (including credentials) must be provided at creation time.
 	//
 	// The caller must have `storage.endpoints.create` permission on the
 	// parent storage gateway.
 	CreateEndpoint(ctx context.Context, in *CreateEndpointRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
 	// Fetches an endpoint resource identified by the specified resource name.
 	GetEndpoint(ctx context.Context, in *GetEndpointRequest, opts ...grpc.CallOption) (*Endpoint, error)
-	// Lists endpoints belonging to a storage gateway that satisfy the
-	// specified filter.
+	// Lists endpoints belonging to a storage gateway.
 	ListEndpoints(ctx context.Context, in *ListEndpointsRequest, opts ...grpc.CallOption) (*ListEndpointsResponse, error)
 	// Updates an endpoint resource. Use the field mask to specify which
-	// fields to update. Omitting the field mask updates all mutable fields.
+	// fields to update. Credentials can be updated via the configuration
+	// field. Endpoint URI and bucket are immutable after creation.
 	//
 	// The caller must have `storage.endpoints.update` permission on the
 	// specified endpoint.
@@ -74,13 +74,6 @@ type EndpointsClient interface {
 	// The caller must have `storage.endpoints.delete` permission on the
 	// specified endpoint.
 	DeleteEndpoint(ctx context.Context, in *DeleteEndpointRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
-	// Sets or replaces the credentials used to access the storage backend.
-	// The previous credentials are overwritten.
-	//
-	// (-- api-linter: core::0134::synonyms=disabled
-	//
-	//	aip.dev/not-precedent: SetEndpointCredentials is a credential rotation action, not a standard Update. --)
-	SetEndpointCredentials(ctx context.Context, in *SetEndpointCredentialsRequest, opts ...grpc.CallOption) (*Endpoint, error)
 	// Tests connectivity to the storage backend. Returns reachability
 	// status, latency, and any error encountered.
 	TestEndpointConnection(ctx context.Context, in *TestEndpointConnectionRequest, opts ...grpc.CallOption) (*TestEndpointConnectionResponse, error)
@@ -144,16 +137,6 @@ func (c *endpointsClient) DeleteEndpoint(ctx context.Context, in *DeleteEndpoint
 	return out, nil
 }
 
-func (c *endpointsClient) SetEndpointCredentials(ctx context.Context, in *SetEndpointCredentialsRequest, opts ...grpc.CallOption) (*Endpoint, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Endpoint)
-	err := c.cc.Invoke(ctx, Endpoints_SetEndpointCredentials_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *endpointsClient) TestEndpointConnection(ctx context.Context, in *TestEndpointConnectionRequest, opts ...grpc.CallOption) (*TestEndpointConnectionResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(TestEndpointConnectionResponse)
@@ -169,22 +152,23 @@ func (c *endpointsClient) TestEndpointConnection(ctx context.Context, in *TestEn
 // for forward compatibility.
 //
 // Manages storage endpoints attached to a storage gateway. An endpoint
-// represents an external storage backend (such as S3, Cloud Storage, or MinIO)
-// that agents use to serve storage operations. All mutation RPCs return
-// long-running operations.
+// represents a storage backend that agents use to serve storage operations.
+// Configuration is provided via a type-specific oneof (currently S3 only).
+// All mutation RPCs return long-running operations.
 type EndpointsServer interface {
 	// Creates a new endpoint resource under the specified storage gateway.
+	// Configuration (including credentials) must be provided at creation time.
 	//
 	// The caller must have `storage.endpoints.create` permission on the
 	// parent storage gateway.
 	CreateEndpoint(context.Context, *CreateEndpointRequest) (*longrunningpb.Operation, error)
 	// Fetches an endpoint resource identified by the specified resource name.
 	GetEndpoint(context.Context, *GetEndpointRequest) (*Endpoint, error)
-	// Lists endpoints belonging to a storage gateway that satisfy the
-	// specified filter.
+	// Lists endpoints belonging to a storage gateway.
 	ListEndpoints(context.Context, *ListEndpointsRequest) (*ListEndpointsResponse, error)
 	// Updates an endpoint resource. Use the field mask to specify which
-	// fields to update. Omitting the field mask updates all mutable fields.
+	// fields to update. Credentials can be updated via the configuration
+	// field. Endpoint URI and bucket are immutable after creation.
 	//
 	// The caller must have `storage.endpoints.update` permission on the
 	// specified endpoint.
@@ -195,13 +179,6 @@ type EndpointsServer interface {
 	// The caller must have `storage.endpoints.delete` permission on the
 	// specified endpoint.
 	DeleteEndpoint(context.Context, *DeleteEndpointRequest) (*longrunningpb.Operation, error)
-	// Sets or replaces the credentials used to access the storage backend.
-	// The previous credentials are overwritten.
-	//
-	// (-- api-linter: core::0134::synonyms=disabled
-	//
-	//	aip.dev/not-precedent: SetEndpointCredentials is a credential rotation action, not a standard Update. --)
-	SetEndpointCredentials(context.Context, *SetEndpointCredentialsRequest) (*Endpoint, error)
 	// Tests connectivity to the storage backend. Returns reachability
 	// status, latency, and any error encountered.
 	TestEndpointConnection(context.Context, *TestEndpointConnectionRequest) (*TestEndpointConnectionResponse, error)
@@ -229,9 +206,6 @@ func (UnimplementedEndpointsServer) UpdateEndpoint(context.Context, *UpdateEndpo
 }
 func (UnimplementedEndpointsServer) DeleteEndpoint(context.Context, *DeleteEndpointRequest) (*longrunningpb.Operation, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteEndpoint not implemented")
-}
-func (UnimplementedEndpointsServer) SetEndpointCredentials(context.Context, *SetEndpointCredentialsRequest) (*Endpoint, error) {
-	return nil, status.Error(codes.Unimplemented, "method SetEndpointCredentials not implemented")
 }
 func (UnimplementedEndpointsServer) TestEndpointConnection(context.Context, *TestEndpointConnectionRequest) (*TestEndpointConnectionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method TestEndpointConnection not implemented")
@@ -347,24 +321,6 @@ func _Endpoints_DeleteEndpoint_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Endpoints_SetEndpointCredentials_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SetEndpointCredentialsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(EndpointsServer).SetEndpointCredentials(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Endpoints_SetEndpointCredentials_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EndpointsServer).SetEndpointCredentials(ctx, req.(*SetEndpointCredentialsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _Endpoints_TestEndpointConnection_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(TestEndpointConnectionRequest)
 	if err := dec(in); err != nil {
@@ -409,10 +365,6 @@ var Endpoints_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteEndpoint",
 			Handler:    _Endpoints_DeleteEndpoint_Handler,
-		},
-		{
-			MethodName: "SetEndpointCredentials",
-			Handler:    _Endpoints_SetEndpointCredentials_Handler,
 		},
 		{
 			MethodName: "TestEndpointConnection",

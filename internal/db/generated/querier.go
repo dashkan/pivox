@@ -76,7 +76,6 @@ type Querier interface {
 	LookupApiKeyByKeyString(ctx context.Context, keyString string) (ApiKey, error)
 	RotateRegistrationToken(ctx context.Context, arg RotateRegistrationTokenParams) (StorageGateway, error)
 	SetOrganizationTenantID(ctx context.Context, arg SetOrganizationTenantIDParams) error
-	SetStorageEndpointCredentials(ctx context.Context, arg SetStorageEndpointCredentialsParams) (StorageEndpoint, error)
 	SoftDeleteApiKey(ctx context.Context, arg SoftDeleteApiKeyParams) (ApiKey, error)
 	SoftDeleteProject(ctx context.Context, arg SoftDeleteProjectParams) (Project, error)
 	UndeleteApiKey(ctx context.Context, arg UndeleteApiKeyParams) (ApiKey, error)

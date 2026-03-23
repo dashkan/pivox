@@ -29,13 +29,14 @@ import "google/protobuf/timestamp.proto";
 option go_package = "pivox/storage/v1;storagev1";
 
 // Manages storage endpoints attached to a storage gateway. An endpoint
-// represents an external storage backend (such as S3, Cloud Storage, or MinIO)
-// that agents use to serve storage operations. All mutation RPCs return
-// long-running operations.
+// represents a storage backend that agents use to serve storage operations.
+// Configuration is provided via a type-specific oneof (currently S3 only).
+// All mutation RPCs return long-running operations.
 service Endpoints {
   option (google.api.default_host) = "api.pivox.io";
 
   // Creates a new endpoint resource under the specified storage gateway.
+  // Configuration (including credentials) must be provided at creation time.
   //
   // The caller must have `storage.endpoints.create` permission on the
   // parent storage gateway.
@@ -57,15 +58,15 @@ service Endpoints {
     option (google.api.method_signature) = "name";
   }
 
-  // Lists endpoints belonging to a storage gateway that satisfy the
-  // specified filter.
+  // Lists endpoints belonging to a storage gateway.
   rpc ListEndpoints(ListEndpointsRequest) returns (ListEndpointsResponse) {
     option (google.api.http) = {get: "/v1/{parent=organizations/*/storageGateways/*}/endpoints"};
     option (google.api.method_signature) = "parent";
   }
 
   // Updates an endpoint resource. Use the field mask to specify which
-  // fields to update. Omitting the field mask updates all mutable fields.
+  // fields to update. Credentials can be updated via the configuration
+  // field. Endpoint URI and bucket are immutable after creation.
   //
   // The caller must have `storage.endpoints.update` permission on the
   // specified endpoint.
@@ -95,19 +96,6 @@ service Endpoints {
     };
   }
 
-  // Sets or replaces the credentials used to access the storage backend.
-  // The previous credentials are overwritten.
-  //
-  // (-- api-linter: core::0134::synonyms=disabled
-  //     aip.dev/not-precedent: SetEndpointCredentials is a credential rotation action, not a standard Update. --)
-  rpc SetEndpointCredentials(SetEndpointCredentialsRequest) returns (Endpoint) {
-    option (google.api.http) = {
-      post: "/v1/{name=organizations/*/storageGateways/*/endpoints/*}:setCredentials"
-      body: "*"
-    };
-    option (google.api.method_signature) = "name,credentials";
-  }
-
   // Tests connectivity to the storage backend. Returns reachability
   // status, latency, and any error encountered.
   rpc TestEndpointConnection(TestEndpointConnectionRequest) returns (TestEndpointConnectionResponse) {
@@ -119,9 +107,10 @@ service Endpoints {
   }
 }
 
-// An endpoint represents an external storage backend attached to a
-// storage gateway. Agents use endpoint configuration and credentials
-// to serve storage operations against the backend.
+// An endpoint represents a storage backend attached to a storage gateway.
+// Agents use endpoint configuration to serve storage operations. The
+// configuration is type-specific — currently only S3-compatible backends
+// are supported.
 message Endpoint {
   option (google.api.resource) = {
     type: "pivox.storage/Endpoint"
@@ -129,24 +118,6 @@ message Endpoint {
     plural: "endpoints"
     singular: "endpoint"
   };
-
-  // The storage engine type of the endpoint.
-  enum Engine {
-    // Unspecified engine. This is only useful for distinguishing unset values.
-    ENGINE_UNSPECIFIED = 0;
-
-    // Amazon S3 or S3-compatible storage.
-    S3 = 1;
-
-    // Pivox RustFS distributed storage engine.
-    RUSTFS = 2;
-
-    // Google Cloud Storage.
-    GCS = 3;
-
-    // MinIO object storage.
-    MINIO = 4;
-  }
 
   // Endpoint lifecycle states.
   enum State {
@@ -163,21 +134,6 @@ message Endpoint {
     UNREACHABLE = 3;
   }
 
-  // The state of the endpoint's stored credentials.
-  enum CredentialState {
-    // Unspecified credential state.
-    CREDENTIAL_STATE_UNSPECIFIED = 0;
-
-    // No credentials have been configured for this endpoint.
-    UNSET = 1;
-
-    // Credentials have been configured and are valid.
-    SET = 2;
-
-    // Credentials have been configured but are invalid or expired.
-    INVALID = 3;
-  }
-
   // Output only. The resource name of the endpoint. Format:
   // `organizations/{organization}/storageGateways/{storage_gateway}/endpoints/{endpoint}`
   string name = 1 [(google.api.field_behavior) = IDENTIFIER];
@@ -188,23 +144,51 @@ message Endpoint {
     (buf.validate.field).string = {max_len: 60}
   ];
 
-  // Required. Immutable. The storage engine type. Cannot be changed after
-  // creation -- delete and recreate the resource to use a different engine.
-  Engine engine = 3 [
-    (google.api.field_behavior) = REQUIRED,
-    (google.api.field_behavior) = IMMUTABLE
-  ];
+  // Output only. The current lifecycle state of the endpoint.
+  State state = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  // Required. The URI of the storage backend (e.g.
-  // `https://s3.us-east-1.amazonaws.com`).
-  string endpoint_uri = 4 [
+  // Required. The storage backend configuration. Must be provided at
+  // creation time. The endpoint URI and bucket are immutable after creation.
+  // Credentials can be updated via UpdateEndpoint.
+  oneof configuration {
+    // S3-compatible storage backend configuration.
+    S3Configuration s3 = 4;
+  }
+
+  // Optional. Annotations associated with this endpoint.
+  map<string, string> annotations = 5 [(google.api.field_behavior) = OPTIONAL];
+
+  // Output only. A checksum computed by the server based on the current
+  // value of the Endpoint resource.
+  string etag = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The resource name of the user who created the endpoint.
+  string creator = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The resource name of the user who last updated the endpoint.
+  string updater = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Timestamp when the endpoint was created.
+  google.protobuf.Timestamp create_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Timestamp when the endpoint was last modified.
+  google.protobuf.Timestamp update_time = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Configuration for an S3-compatible storage backend.
+message S3Configuration {
+  // Required. Immutable. The URI of the S3-compatible endpoint
+  // (e.g. `http://localhost:9000` or `https://s3.us-east-1.amazonaws.com`).
+  string endpoint_uri = 1 [
     (google.api.field_behavior) = REQUIRED,
+    (google.api.field_behavior) = IMMUTABLE,
     (buf.validate.field).string.uri = true
   ];
 
-  // Required. The bucket or container name on the storage backend.
-  string bucket = 5 [
+  // Required. Immutable. The bucket name on the storage backend.
+  string bucket = 2 [
     (google.api.field_behavior) = REQUIRED,
+    (google.api.field_behavior) = IMMUTABLE,
     (buf.validate.field).cel = {
       id: "required"
       message: "value is required"
@@ -213,71 +197,40 @@ message Endpoint {
   ];
 
   // Optional. The cloud region of the storage backend (e.g. `us-east-1`).
-  string region = 6 [(google.api.field_behavior) = OPTIONAL];
+  string region = 3 [(google.api.field_behavior) = OPTIONAL];
 
-  // Output only. The current lifecycle state of the endpoint.
-  State state = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // Input only. Credentials used to access the storage backend. This field
-  // is never returned in responses; use `credential_state` to check
-  // whether credentials have been set.
-  EndpointCredentials credentials = 8 [
-    (google.api.field_behavior) = INPUT_ONLY,
-    (google.api.field_behavior) = OPTIONAL
-  ];
-
-  // Output only. Indicates whether credentials are configured and valid.
-  CredentialState credential_state = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // Optional. Annotations associated with this endpoint.
-  // Annotations are key-value pairs that can be used to organize and
-  // track resources.
-  map<string, string> annotations = 10 [(google.api.field_behavior) = OPTIONAL];
-
-  // Output only. A checksum computed by the server based on the current
-  // value of the Endpoint resource. This may be sent on update and delete
-  // requests to ensure the client has an up-to-date value before
-  // proceeding.
-  string etag = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // Output only. The resource name of the user who created the endpoint.
-  string creator = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // Output only. The resource name of the user who last updated the
-  // endpoint.
-  string updater = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // Output only. Timestamp when the endpoint was created.
-  google.protobuf.Timestamp create_time = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // Output only. Timestamp when the endpoint was last modified.
-  google.protobuf.Timestamp update_time = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
-}
-
-// Credentials used to authenticate with a storage backend.
-message EndpointCredentials {
+  // Input only. Credentials for accessing the bucket. Required on create.
+  // Never returned in responses. Updatable via UpdateEndpoint with field
+  // mask on `s3.credentials`.
   oneof credentials {
-    // Access key credentials (e.g. for S3 or MinIO).
-    AccessKeyCredentials access_key = 1;
-
-    // IAM role credentials (e.g. for cross-account S3 access).
-    IamRoleCredentials iam_role = 2;
+    // Static access key credentials.
+    S3AccessKeyCredentials access_key = 4;
+    // Future: S3OAuthCredentials oauth = 5;
+    // Future: S3AssumeRoleCredentials assume_role = 6;
   }
 }
 
-// Access key credentials consisting of an access key ID and secret.
-message AccessKeyCredentials {
+// Static access key credentials for an S3-compatible backend.
+message S3AccessKeyCredentials {
   // Required. The access key ID.
-  string access_key_id = 1 [(google.api.field_behavior) = REQUIRED];
+  string access_key_id = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).cel = {
+      id: "required"
+      message: "value is required"
+      expression: "this.size() > 0"
+    }
+  ];
 
   // Required. The secret access key.
-  string secret_access_key = 2 [(google.api.field_behavior) = REQUIRED];
-}
-
-// IAM role credentials for assuming a role in another account.
-message IamRoleCredentials {
-  // Required. The ARN of the IAM role to assume.
-  string role_arn = 1 [(google.api.field_behavior) = REQUIRED];
+  string secret_access_key = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).cel = {
+      id: "required"
+      message: "value is required"
+      expression: "this.size() > 0"
+    }
+  ];
 }
 
 // The request sent to the
@@ -296,7 +249,8 @@ message CreateEndpointRequest {
     }
   ];
 
-  // Required. The endpoint to create.
+  // Required. The endpoint to create. Must include configuration with
+  // credentials.
   Endpoint endpoint = 2 [
     (google.api.field_behavior) = REQUIRED,
     (buf.validate.field).required = true
@@ -347,8 +301,6 @@ message ListEndpointsRequest {
   ];
 
   // Optional. The maximum number of endpoints to return in the response.
-  // The server can return fewer endpoints than requested. If unspecified,
-  // the server picks an appropriate default.
   int32 page_size = 2 [
     (google.api.field_behavior) = OPTIONAL,
     (buf.validate.field).int32 = {
@@ -361,8 +313,7 @@ message ListEndpointsRequest {
   // `ListEndpoints` that indicates from where listing should continue.
   string page_token = 3 [(google.api.field_behavior) = OPTIONAL];
 
-  // Optional. An AIP-160 filter expression. Supports filtering by
-  // `state`, `engine`, `display_name`.
+  // Optional. An AIP-160 filter expression.
   string filter = 4 [(google.api.field_behavior) = OPTIONAL];
 
   // Optional. Sort order (e.g. "create_time desc").
@@ -376,7 +327,6 @@ message ListEndpointsResponse {
   repeated Endpoint endpoints = 1;
 
   // A pagination token to be used to retrieve the next page of results.
-  // If empty, this response contains the last page of results.
   string next_page_token = 2;
 }
 
@@ -391,9 +341,7 @@ message UpdateEndpointRequest {
   ];
 
   // Optional. An update mask to selectively update fields. If not provided,
-  // all mutable fields will be updated. See
-  // [FieldMask](https://protobuf.dev/reference/protobuf/google.protobuf/#field-mask)
-  // for more details.
+  // all mutable fields will be updated.
   google.protobuf.FieldMask update_mask = 2 [(google.api.field_behavior) = OPTIONAL];
 
   // Optional. If set to true, the request will only validate the request
@@ -432,30 +380,6 @@ message DeleteEndpointRequest {
 // A status object which is used as the `metadata` field for the Operation
 // returned by DeleteEndpoint.
 message DeleteEndpointMetadata {}
-
-// The request sent to the
-// [SetEndpointCredentials][pivox.storage.v1.Endpoints.SetEndpointCredentials]
-// method.
-message SetEndpointCredentialsRequest {
-  // Required. The resource name of the endpoint whose credentials are
-  // being set. Format:
-  // `organizations/{organization}/storageGateways/{storage_gateway}/endpoints/{endpoint}`
-  string name = 1 [
-    (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {type: "pivox.storage/Endpoint"},
-    (buf.validate.field).cel = {
-      id: "required"
-      message: "value is required"
-      expression: "this.size() > 0"
-    }
-  ];
-
-  // Required. The credentials to set on the endpoint.
-  EndpointCredentials credentials = 2 [
-    (google.api.field_behavior) = REQUIRED,
-    (buf.validate.field).required = true
-  ];
-}
 
 // The request sent to the
 // [TestEndpointConnection][pivox.storage.v1.Endpoints.TestEndpointConnection]

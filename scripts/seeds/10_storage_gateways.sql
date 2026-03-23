@@ -22,12 +22,12 @@ INSERT INTO storage_agents (id, gateway_id, ip_address, hostname, version, state
     ('0192a000-0011-7000-8000-000000110004', '0192a000-0010-7000-8000-000000100004', '127.0.0.1', 'heartland-gw-01','1.0.0-alpha.1', 'DRAINING',  200, '2025-07-01 08:05:00+00', '2026-03-22 11:55:00+00');
 
 -- Endpoints (S3-compatible backends, all pointing to local rustfs for dev)
--- Credentials stored as JSON, using rustfs defaults
-INSERT INTO storage_endpoints (id, gateway_id, name, display_name, engine, endpoint_uri, bucket, region, credentials, credential_state, annotations, created_by, create_time, update_time) VALUES
+-- Configuration stored as JSONB with S3Configuration shape
+INSERT INTO storage_endpoints (id, gateway_id, name, display_name, configuration, annotations, created_by, create_time, update_time) VALUES
     -- Meridian HQ: 2 endpoints (primary + archive)
-    ('0192a000-0012-7000-8000-000000120001', '0192a000-0010-7000-8000-000000100001', 'primary',  'Primary Storage',  'RUSTFS', 'http://localhost:9000', 'pivox-assets',  '', '{"access_key":{"access_key_id":"rustfsadmin","secret_access_key":"rustfsadmin"}}', 'SET', '{}', 'admin@meridian.example', '2025-06-01 09:00:00+00', '2025-06-01 09:00:00+00'),
-    ('0192a000-0012-7000-8000-000000120002', '0192a000-0010-7000-8000-000000100001', 'archive',  'Archive Storage',  'RUSTFS', 'http://localhost:9000', 'pivox-archive', '', '{"access_key":{"access_key_id":"rustfsadmin","secret_access_key":"rustfsadmin"}}', 'SET', '{}', 'admin@meridian.example', '2025-06-01 09:30:00+00', '2025-06-01 09:30:00+00'),
+    ('0192a000-0012-7000-8000-000000120001', '0192a000-0010-7000-8000-000000100001', 'primary',  'Primary Storage',  '{"type":"s3","endpoint_uri":"http://localhost:9000","bucket":"pivox-assets","region":"","access_key":{"access_key_id":"rustfsadmin","secret_access_key":"rustfsadmin"}}', '{}', 'admin@meridian.example', '2025-06-01 09:00:00+00', '2025-06-01 09:00:00+00'),
+    ('0192a000-0012-7000-8000-000000120002', '0192a000-0010-7000-8000-000000100001', 'archive',  'Archive Storage',  '{"type":"s3","endpoint_uri":"http://localhost:9000","bucket":"pivox-archive","region":"","access_key":{"access_key_id":"rustfsadmin","secret_access_key":"rustfsadmin"}}', '{}', 'admin@meridian.example', '2025-06-01 09:30:00+00', '2025-06-01 09:30:00+00'),
     -- Pacific Main: 1 endpoint
-    ('0192a000-0012-7000-8000-000000120003', '0192a000-0010-7000-8000-000000100003', 'primary',  'Primary Storage',  'RUSTFS', 'http://localhost:9000', 'pivox-assets',  '', '{"access_key":{"access_key_id":"rustfsadmin","secret_access_key":"rustfsadmin"}}', 'SET', '{}', 'admin@pacific.example',  '2025-06-20 10:00:00+00', '2025-06-20 10:00:00+00'),
-    -- Heartland DC: 1 endpoint (creds not set, for testing)
-    ('0192a000-0012-7000-8000-000000120004', '0192a000-0010-7000-8000-000000100004', 'primary',  'Primary Storage',  'RUSTFS', 'http://localhost:9000', 'pivox-assets',  '', NULL, 'UNSET', '{}', 'admin@heartland.example', '2025-07-01 09:00:00+00', '2025-07-01 09:00:00+00');
+    ('0192a000-0012-7000-8000-000000120003', '0192a000-0010-7000-8000-000000100003', 'primary',  'Primary Storage',  '{"type":"s3","endpoint_uri":"http://localhost:9000","bucket":"pivox-assets","region":"","access_key":{"access_key_id":"rustfsadmin","secret_access_key":"rustfsadmin"}}', '{}', 'admin@pacific.example',  '2025-06-20 10:00:00+00', '2025-06-20 10:00:00+00'),
+    -- Heartland DC: 1 endpoint
+    ('0192a000-0012-7000-8000-000000120004', '0192a000-0010-7000-8000-000000100004', 'primary',  'Primary Storage',  '{"type":"s3","endpoint_uri":"http://localhost:9000","bucket":"pivox-assets","region":"","access_key":{"access_key_id":"rustfsadmin","secret_access_key":"rustfsadmin"}}', '{}', 'admin@heartland.example', '2025-07-01 09:00:00+00', '2025-07-01 09:00:00+00');
