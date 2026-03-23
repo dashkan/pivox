@@ -43,6 +43,7 @@ const (
 	StorageGateways_GetInstallScript_FullMethodName        = "/pivox.storage.v1.StorageGateways/GetInstallScript"
 	StorageGateways_GetUninstallScript_FullMethodName      = "/pivox.storage.v1.StorageGateways/GetUninstallScript"
 	StorageGateways_UpgradeGateway_FullMethodName          = "/pivox.storage.v1.StorageGateways/UpgradeGateway"
+	StorageGateways_CreateStorageSession_FullMethodName    = "/pivox.storage.v1.StorageGateways/CreateStorageSession"
 )
 
 // StorageGatewaysClient is the client API for StorageGateways service.
@@ -99,6 +100,14 @@ type StorageGatewaysClient interface {
 	// Initiates an upgrade of the storage gateway to the specified target
 	// version. The upgrade is performed as a rolling update across all agents.
 	UpgradeGateway(ctx context.Context, in *UpgradeGatewayRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
+	// Creates a storage session for the authenticated user. Computes
+	// access patterns based on the user's org and project memberships,
+	// pushes session grants to connected gateways, and returns a JWT
+	// cookie for browser-based storage access.
+	//
+	// The response includes a Set-Cookie header (via gRPC metadata) with
+	// the session JWT scoped to .pivox.app domain.
+	CreateStorageSession(ctx context.Context, in *CreateStorageSessionRequest, opts ...grpc.CallOption) (*CreateStorageSessionResponse, error)
 }
 
 type storageGatewaysClient struct {
@@ -199,6 +208,16 @@ func (c *storageGatewaysClient) UpgradeGateway(ctx context.Context, in *UpgradeG
 	return out, nil
 }
 
+func (c *storageGatewaysClient) CreateStorageSession(ctx context.Context, in *CreateStorageSessionRequest, opts ...grpc.CallOption) (*CreateStorageSessionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateStorageSessionResponse)
+	err := c.cc.Invoke(ctx, StorageGateways_CreateStorageSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // StorageGatewaysServer is the server API for StorageGateways service.
 // All implementations must embed UnimplementedStorageGatewaysServer
 // for forward compatibility.
@@ -253,6 +272,14 @@ type StorageGatewaysServer interface {
 	// Initiates an upgrade of the storage gateway to the specified target
 	// version. The upgrade is performed as a rolling update across all agents.
 	UpgradeGateway(context.Context, *UpgradeGatewayRequest) (*longrunningpb.Operation, error)
+	// Creates a storage session for the authenticated user. Computes
+	// access patterns based on the user's org and project memberships,
+	// pushes session grants to connected gateways, and returns a JWT
+	// cookie for browser-based storage access.
+	//
+	// The response includes a Set-Cookie header (via gRPC metadata) with
+	// the session JWT scoped to .pivox.app domain.
+	CreateStorageSession(context.Context, *CreateStorageSessionRequest) (*CreateStorageSessionResponse, error)
 	mustEmbedUnimplementedStorageGatewaysServer()
 }
 
@@ -289,6 +316,9 @@ func (UnimplementedStorageGatewaysServer) GetUninstallScript(context.Context, *G
 }
 func (UnimplementedStorageGatewaysServer) UpgradeGateway(context.Context, *UpgradeGatewayRequest) (*longrunningpb.Operation, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpgradeGateway not implemented")
+}
+func (UnimplementedStorageGatewaysServer) CreateStorageSession(context.Context, *CreateStorageSessionRequest) (*CreateStorageSessionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateStorageSession not implemented")
 }
 func (UnimplementedStorageGatewaysServer) mustEmbedUnimplementedStorageGatewaysServer() {}
 func (UnimplementedStorageGatewaysServer) testEmbeddedByValue()                         {}
@@ -473,6 +503,24 @@ func _StorageGateways_UpgradeGateway_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _StorageGateways_CreateStorageSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateStorageSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StorageGatewaysServer).CreateStorageSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: StorageGateways_CreateStorageSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StorageGatewaysServer).CreateStorageSession(ctx, req.(*CreateStorageSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // StorageGateways_ServiceDesc is the grpc.ServiceDesc for StorageGateways service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -515,6 +563,10 @@ var StorageGateways_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpgradeGateway",
 			Handler:    _StorageGateways_UpgradeGateway_Handler,
+		},
+		{
+			MethodName: "CreateStorageSession",
+			Handler:    _StorageGateways_CreateStorageSession_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -22,6 +22,7 @@ import "google/api/client.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
 import "google/longrunning/operations.proto";
+import "google/protobuf/duration.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 
@@ -134,6 +135,20 @@ service StorageGateways {
     option (google.longrunning.operation_info) = {
       response_type: "StorageGateway"
       metadata_type: "UpgradeGatewayMetadata"
+    };
+  }
+
+  // Creates a storage session for the authenticated user. Computes
+  // access patterns based on the user's org and project memberships,
+  // pushes session grants to connected gateways, and returns a JWT
+  // cookie for browser-based storage access.
+  //
+  // The response includes a Set-Cookie header (via gRPC metadata) with
+  // the session JWT scoped to .pivox.app domain.
+  rpc CreateStorageSession(CreateStorageSessionRequest) returns (CreateStorageSessionResponse) {
+    option (google.api.http) = {
+      post: "/v1/storageSession"
+      body: "*"
     };
   }
 }
@@ -575,4 +590,20 @@ message UpgradeGatewayMetadata {
 
   // The target version being upgraded to.
   string target_version = 6;
+}
+
+// The request sent to the
+// [CreateStorageSession][pivox.storage.v1.StorageGateways.CreateStorageSession]
+// method.
+message CreateStorageSessionRequest {
+  // Optional. Override session duration. Default: 1 hour.
+  google.protobuf.Duration ttl = 1 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// The response returned from the
+// [CreateStorageSession][pivox.storage.v1.StorageGateways.CreateStorageSession]
+// method.
+message CreateStorageSessionResponse {
+  // The session expiry time.
+  google.protobuf.Timestamp expiry = 1;
 }

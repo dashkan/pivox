@@ -174,12 +174,13 @@ func serve(cmd *cobra.Command, args []string) error {
 	apiv1.RegisterApiKeysServer(grpcServer, apikeys.NewApiKeysServer(pool, queries))
 
 	// Storage services
-	storagev1.RegisterStorageGatewaysServer(grpcServer, storage.NewStorageGatewaysServer(pool, queries, enc))
+	connMgr := storage.NewConnectionManager()
+	storagev1.RegisterStorageGatewaysServer(grpcServer, storage.NewStorageGatewaysServer(pool, queries, enc, connMgr))
 	storagev1.RegisterAgentsServer(grpcServer, storage.NewAgentsServer(queries))
 	storagev1.RegisterEndpointsServer(grpcServer, storage.NewEndpointsServer(pool, queries, enc))
 
 	// Agent bidi streaming service (agents authenticate via registration token, not Firebase)
-	agentv1.RegisterAgentServiceServer(grpcServer, storage.NewAgentServiceServer(pool, queries, logger))
+	agentv1.RegisterAgentServiceServer(grpcServer, storage.NewAgentServiceServer(pool, queries, logger, connMgr))
 
 	reflection.Register(grpcServer)
 

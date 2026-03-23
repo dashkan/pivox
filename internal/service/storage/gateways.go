@@ -2,38 +2,50 @@ package storage
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/dashkan/pivox-server/internal/apierr"
 	"github.com/dashkan/pivox-server/internal/convert"
 	"github.com/dashkan/pivox-server/internal/crypto"
 	db "github.com/dashkan/pivox-server/internal/db/generated"
 	"github.com/dashkan/pivox-server/internal/lro"
+	agentv1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/agent/v1"
 	storagev1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/storage/v1"
 	"github.com/dashkan/pivox-server/internal/resource"
 )
 
 type StorageGatewaysServer struct {
 	storagev1.UnimplementedStorageGatewaysServer
-	pool      *pgxpool.Pool
-	queries   *db.Queries
-	encryptor crypto.Encryptor
+	pool              *pgxpool.Pool
+	queries           *db.Queries
+	encryptor         crypto.Encryptor
+	conns             *ConnectionManager
+	sessionSigningKey []byte
 }
 
-func NewStorageGatewaysServer(pool *pgxpool.Pool, queries *db.Queries, enc crypto.Encryptor) *StorageGatewaysServer {
+func NewStorageGatewaysServer(pool *pgxpool.Pool, queries *db.Queries, enc crypto.Encryptor, conns *ConnectionManager) *StorageGatewaysServer {
 	return &StorageGatewaysServer{
-		pool:      pool,
-		queries:   queries,
-		encryptor: enc,
+		pool:              pool,
+		queries:           queries,
+		encryptor:         enc,
+		conns:             conns,
+		sessionSigningKey: []byte("pivox-dev-session-signing-key-do-not-use-in-prod"), // TODO: load from key management system in prod
 	}
 }
 
@@ -318,4 +330,55 @@ func (s *StorageGatewaysServer) GetUninstallScript(ctx context.Context, req *sto
 
 func (s *StorageGatewaysServer) UpgradeGateway(_ context.Context, _ *storagev1.UpgradeGatewayRequest) (*longrunningpb.Operation, error) {
 	return nil, status.Errorf(codes.Unimplemented, "UpgradeGateway not yet implemented")
+}
+
+func (s *StorageGatewaysServer) CreateStorageSession(ctx context.Context, req *storagev1.CreateStorageSessionRequest) (*storagev1.CreateStorageSessionResponse, error) {
+	// Generate opaque token.
+	token := uuid.New().String()
+
+	// Compute expiry (default 1 hour).
+	ttl := time.Hour
+	if req.GetTtl() != nil {
+		ttl = req.GetTtl().AsDuration()
+	}
+	expiry := time.Now().Add(ttl)
+
+	// Build patterns (placeholder: wildcard access for now).
+	patterns := []string{"/*"}
+
+	// Push SessionGrant to all connected gateways.
+	grant := &agentv1.ControlMessage{
+		Id: uuid.New().String(),
+		Message: &agentv1.ControlMessage_SessionGrant{
+			SessionGrant: &agentv1.SessionGrant{
+				Token:    token,
+				Patterns: patterns,
+				Expiry:   timestamppb.New(expiry),
+			},
+		},
+	}
+	s.conns.SendToAll(grant)
+
+	// Mint JWT.
+	jwt := mintSessionJWT(token, expiry, s.sessionSigningKey)
+
+	// Set cookie via gRPC metadata.
+	cookie := fmt.Sprintf("pivox_session=%s; Domain=.pivox.app; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=%d", jwt, int(ttl.Seconds()))
+	_ = grpc.SetHeader(ctx, metadata.Pairs("set-cookie", cookie))
+
+	return &storagev1.CreateStorageSessionResponse{
+		Expiry: timestamppb.New(expiry),
+	}, nil
+}
+
+func mintSessionJWT(token string, expiry time.Time, signingKey []byte) string {
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`))
+	claims := fmt.Sprintf(`{"token":"%s","exp":%d}`, token, expiry.Unix())
+	payload := base64.RawURLEncoding.EncodeToString([]byte(claims))
+
+	mac := hmac.New(sha256.New, signingKey)
+	mac.Write([]byte(header + "." + payload))
+	sig := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+
+	return header + "." + payload + "." + sig
 }

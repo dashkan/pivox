@@ -26,6 +26,7 @@ import (
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	durationpb "google.golang.org/protobuf/types/known/durationpb"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
@@ -1440,11 +1441,107 @@ func (x *UpgradeGatewayMetadata) GetTargetVersion() string {
 	return ""
 }
 
+// The request sent to the
+// [CreateStorageSession][pivox.storage.v1.StorageGateways.CreateStorageSession]
+// method.
+type CreateStorageSessionRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Optional. Override session duration. Default: 1 hour.
+	Ttl           *durationpb.Duration `protobuf:"bytes,1,opt,name=ttl,proto3" json:"ttl,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateStorageSessionRequest) Reset() {
+	*x = CreateStorageSessionRequest{}
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateStorageSessionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateStorageSessionRequest) ProtoMessage() {}
+
+func (x *CreateStorageSessionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateStorageSessionRequest.ProtoReflect.Descriptor instead.
+func (*CreateStorageSessionRequest) Descriptor() ([]byte, []int) {
+	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *CreateStorageSessionRequest) GetTtl() *durationpb.Duration {
+	if x != nil {
+		return x.Ttl
+	}
+	return nil
+}
+
+// The response returned from the
+// [CreateStorageSession][pivox.storage.v1.StorageGateways.CreateStorageSession]
+// method.
+type CreateStorageSessionResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The session expiry time.
+	Expiry        *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=expiry,proto3" json:"expiry,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateStorageSessionResponse) Reset() {
+	*x = CreateStorageSessionResponse{}
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateStorageSessionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateStorageSessionResponse) ProtoMessage() {}
+
+func (x *CreateStorageSessionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_storage_v1_storage_gateway_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateStorageSessionResponse.ProtoReflect.Descriptor instead.
+func (*CreateStorageSessionResponse) Descriptor() ([]byte, []int) {
+	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *CreateStorageSessionResponse) GetExpiry() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Expiry
+	}
+	return nil
+}
+
 var File_pivox_storage_v1_storage_gateway_proto protoreflect.FileDescriptor
 
 const file_pivox_storage_v1_storage_gateway_proto_rawDesc = "" +
 	"\n" +
-	"&pivox/storage/v1/storage_gateway.proto\x12\x10pivox.storage.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xd0\t\n" +
+	"&pivox/storage/v1/storage_gateway.proto\x12\x10pivox.storage.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xd0\t\n" +
 	"\x0eStorageGateway\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12-\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\n" +
@@ -1556,7 +1653,11 @@ const file_pivox_storage_v1_storage_gateway_proto_rawDesc = "" +
 	"\tPREPARING\x10\x01\x12\x0f\n" +
 	"\vDOWNLOADING\x10\x02\x12\v\n" +
 	"\aROLLING\x10\x03\x12\b\n" +
-	"\x04DONE\x10\x042\x82\x0f\n" +
+	"\x04DONE\x10\x04\"O\n" +
+	"\x1bCreateStorageSessionRequest\x120\n" +
+	"\x03ttl\x18\x01 \x01(\v2\x19.google.protobuf.DurationB\x03\xe0A\x01R\x03ttl\"R\n" +
+	"\x1cCreateStorageSessionResponse\x122\n" +
+	"\x06expiry\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\x06expiry2\x99\x10\n" +
 	"\x0fStorageGateways\x12\x89\x02\n" +
 	"\x14CreateStorageGateway\x12-.pivox.storage.v1.CreateStorageGatewayRequest\x1a\x1d.google.longrunning.Operation\"\xa2\x01\xcaA.\n" +
 	"\x0eStorageGateway\x12\x1cCreateStorageGatewayMetadata\xdaA)parent,storage_gateway,storage_gateway_id\x82\xd3\xe4\x93\x02?:\x0fstorage_gateway\",/v1/{parent=organizations/*}/storageGateways\x12\x9e\x01\n" +
@@ -1570,7 +1671,8 @@ const file_pivox_storage_v1_storage_gateway_proto_rawDesc = "" +
 	"\x10GetInstallScript\x12).pivox.storage.v1.GetInstallScriptRequest\x1a*.pivox.storage.v1.GetInstallScriptResponse\"I\xdaA\x04name\x82\xd3\xe4\x93\x02<\x12:/v1/{name=organizations/*/storageGateways/*}:installScript\x12\xbc\x01\n" +
 	"\x12GetUninstallScript\x12+.pivox.storage.v1.GetUninstallScriptRequest\x1a,.pivox.storage.v1.GetUninstallScriptResponse\"K\xdaA\x04name\x82\xd3\xe4\x93\x02>\x12</v1/{name=organizations/*/storageGateways/*}:uninstallScript\x12\xdb\x01\n" +
 	"\x0eUpgradeGateway\x12'.pivox.storage.v1.UpgradeGatewayRequest\x1a\x1d.google.longrunning.Operation\"\x80\x01\xcaA(\n" +
-	"\x0eStorageGateway\x12\x16UpgradeGatewayMetadata\xdaA\x13name,target_version\x82\xd3\xe4\x93\x029:\x01*\"4/v1/{name=organizations/*/storageGateways/*}:upgrade\x1a\x0f\xcaA\fapi.pivox.ioB\xda\x01\n" +
+	"\x0eStorageGateway\x12\x16UpgradeGatewayMetadata\xdaA\x13name,target_version\x82\xd3\xe4\x93\x029:\x01*\"4/v1/{name=organizations/*/storageGateways/*}:upgrade\x12\x94\x01\n" +
+	"\x14CreateStorageSession\x12-.pivox.storage.v1.CreateStorageSessionRequest\x1a..pivox.storage.v1.CreateStorageSessionResponse\"\x1d\x82\xd3\xe4\x93\x02\x17:\x01*\"\x12/v1/storageSession\x1a\x0f\xcaA\fapi.pivox.ioB\xda\x01\n" +
 	"\x14com.pivox.storage.v1B\x13StorageGatewayProtoP\x01ZKgithub.com/dashkan/pivox-server/internal/pkg/gen/pivox/storage/v1;storagev1\xa2\x02\x03PSX\xaa\x02\x10Pivox.Storage.V1\xca\x02\x10Pivox\\Storage\\V1\xe2\x02\x1cPivox\\Storage\\V1\\GPBMetadata\xea\x02\x12Pivox::Storage::V1b\x06proto3"
 
 var (
@@ -1586,7 +1688,7 @@ func file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP() []byte {
 }
 
 var file_pivox_storage_v1_storage_gateway_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_pivox_storage_v1_storage_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_pivox_storage_v1_storage_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_pivox_storage_v1_storage_gateway_proto_goTypes = []any{
 	(StorageGateway_State)(0),                       // 0: pivox.storage.v1.StorageGateway.State
 	(StorageGateway_CertState)(0),                   // 1: pivox.storage.v1.StorageGateway.CertState
@@ -1608,46 +1710,53 @@ var file_pivox_storage_v1_storage_gateway_proto_goTypes = []any{
 	(*GetUninstallScriptResponse)(nil),              // 17: pivox.storage.v1.GetUninstallScriptResponse
 	(*UpgradeGatewayRequest)(nil),                   // 18: pivox.storage.v1.UpgradeGatewayRequest
 	(*UpgradeGatewayMetadata)(nil),                  // 19: pivox.storage.v1.UpgradeGatewayMetadata
-	nil,                                             // 20: pivox.storage.v1.StorageGateway.AnnotationsEntry
-	(*timestamppb.Timestamp)(nil),                   // 21: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),                   // 22: google.protobuf.FieldMask
-	(*longrunningpb.Operation)(nil),                 // 23: google.longrunning.Operation
+	(*CreateStorageSessionRequest)(nil),             // 20: pivox.storage.v1.CreateStorageSessionRequest
+	(*CreateStorageSessionResponse)(nil),            // 21: pivox.storage.v1.CreateStorageSessionResponse
+	nil,                                             // 22: pivox.storage.v1.StorageGateway.AnnotationsEntry
+	(*timestamppb.Timestamp)(nil),                   // 23: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),                   // 24: google.protobuf.FieldMask
+	(*durationpb.Duration)(nil),                     // 25: google.protobuf.Duration
+	(*longrunningpb.Operation)(nil),                 // 26: google.longrunning.Operation
 }
 var file_pivox_storage_v1_storage_gateway_proto_depIdxs = []int32{
 	0,  // 0: pivox.storage.v1.StorageGateway.state:type_name -> pivox.storage.v1.StorageGateway.State
 	1,  // 1: pivox.storage.v1.StorageGateway.cert_state:type_name -> pivox.storage.v1.StorageGateway.CertState
-	21, // 2: pivox.storage.v1.StorageGateway.cert_expiry_time:type_name -> google.protobuf.Timestamp
-	20, // 3: pivox.storage.v1.StorageGateway.annotations:type_name -> pivox.storage.v1.StorageGateway.AnnotationsEntry
-	21, // 4: pivox.storage.v1.StorageGateway.create_time:type_name -> google.protobuf.Timestamp
-	21, // 5: pivox.storage.v1.StorageGateway.update_time:type_name -> google.protobuf.Timestamp
+	23, // 2: pivox.storage.v1.StorageGateway.cert_expiry_time:type_name -> google.protobuf.Timestamp
+	22, // 3: pivox.storage.v1.StorageGateway.annotations:type_name -> pivox.storage.v1.StorageGateway.AnnotationsEntry
+	23, // 4: pivox.storage.v1.StorageGateway.create_time:type_name -> google.protobuf.Timestamp
+	23, // 5: pivox.storage.v1.StorageGateway.update_time:type_name -> google.protobuf.Timestamp
 	3,  // 6: pivox.storage.v1.CreateStorageGatewayRequest.storage_gateway:type_name -> pivox.storage.v1.StorageGateway
 	3,  // 7: pivox.storage.v1.ListStorageGatewaysResponse.storage_gateways:type_name -> pivox.storage.v1.StorageGateway
 	3,  // 8: pivox.storage.v1.UpdateStorageGatewayRequest.storage_gateway:type_name -> pivox.storage.v1.StorageGateway
-	22, // 9: pivox.storage.v1.UpdateStorageGatewayRequest.update_mask:type_name -> google.protobuf.FieldMask
+	24, // 9: pivox.storage.v1.UpdateStorageGatewayRequest.update_mask:type_name -> google.protobuf.FieldMask
 	2,  // 10: pivox.storage.v1.UpgradeGatewayMetadata.phase:type_name -> pivox.storage.v1.UpgradeGatewayMetadata.UpgradeGatewayPhase
-	4,  // 11: pivox.storage.v1.StorageGateways.CreateStorageGateway:input_type -> pivox.storage.v1.CreateStorageGatewayRequest
-	6,  // 12: pivox.storage.v1.StorageGateways.GetStorageGateway:input_type -> pivox.storage.v1.GetStorageGatewayRequest
-	7,  // 13: pivox.storage.v1.StorageGateways.ListStorageGateways:input_type -> pivox.storage.v1.ListStorageGatewaysRequest
-	9,  // 14: pivox.storage.v1.StorageGateways.UpdateStorageGateway:input_type -> pivox.storage.v1.UpdateStorageGatewayRequest
-	11, // 15: pivox.storage.v1.StorageGateways.DeleteStorageGateway:input_type -> pivox.storage.v1.DeleteStorageGatewayRequest
-	13, // 16: pivox.storage.v1.StorageGateways.RotateRegistrationToken:input_type -> pivox.storage.v1.RotateRegistrationTokenRequest
-	14, // 17: pivox.storage.v1.StorageGateways.GetInstallScript:input_type -> pivox.storage.v1.GetInstallScriptRequest
-	16, // 18: pivox.storage.v1.StorageGateways.GetUninstallScript:input_type -> pivox.storage.v1.GetUninstallScriptRequest
-	18, // 19: pivox.storage.v1.StorageGateways.UpgradeGateway:input_type -> pivox.storage.v1.UpgradeGatewayRequest
-	23, // 20: pivox.storage.v1.StorageGateways.CreateStorageGateway:output_type -> google.longrunning.Operation
-	3,  // 21: pivox.storage.v1.StorageGateways.GetStorageGateway:output_type -> pivox.storage.v1.StorageGateway
-	8,  // 22: pivox.storage.v1.StorageGateways.ListStorageGateways:output_type -> pivox.storage.v1.ListStorageGatewaysResponse
-	23, // 23: pivox.storage.v1.StorageGateways.UpdateStorageGateway:output_type -> google.longrunning.Operation
-	23, // 24: pivox.storage.v1.StorageGateways.DeleteStorageGateway:output_type -> google.longrunning.Operation
-	3,  // 25: pivox.storage.v1.StorageGateways.RotateRegistrationToken:output_type -> pivox.storage.v1.StorageGateway
-	15, // 26: pivox.storage.v1.StorageGateways.GetInstallScript:output_type -> pivox.storage.v1.GetInstallScriptResponse
-	17, // 27: pivox.storage.v1.StorageGateways.GetUninstallScript:output_type -> pivox.storage.v1.GetUninstallScriptResponse
-	23, // 28: pivox.storage.v1.StorageGateways.UpgradeGateway:output_type -> google.longrunning.Operation
-	20, // [20:29] is the sub-list for method output_type
-	11, // [11:20] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	25, // 11: pivox.storage.v1.CreateStorageSessionRequest.ttl:type_name -> google.protobuf.Duration
+	23, // 12: pivox.storage.v1.CreateStorageSessionResponse.expiry:type_name -> google.protobuf.Timestamp
+	4,  // 13: pivox.storage.v1.StorageGateways.CreateStorageGateway:input_type -> pivox.storage.v1.CreateStorageGatewayRequest
+	6,  // 14: pivox.storage.v1.StorageGateways.GetStorageGateway:input_type -> pivox.storage.v1.GetStorageGatewayRequest
+	7,  // 15: pivox.storage.v1.StorageGateways.ListStorageGateways:input_type -> pivox.storage.v1.ListStorageGatewaysRequest
+	9,  // 16: pivox.storage.v1.StorageGateways.UpdateStorageGateway:input_type -> pivox.storage.v1.UpdateStorageGatewayRequest
+	11, // 17: pivox.storage.v1.StorageGateways.DeleteStorageGateway:input_type -> pivox.storage.v1.DeleteStorageGatewayRequest
+	13, // 18: pivox.storage.v1.StorageGateways.RotateRegistrationToken:input_type -> pivox.storage.v1.RotateRegistrationTokenRequest
+	14, // 19: pivox.storage.v1.StorageGateways.GetInstallScript:input_type -> pivox.storage.v1.GetInstallScriptRequest
+	16, // 20: pivox.storage.v1.StorageGateways.GetUninstallScript:input_type -> pivox.storage.v1.GetUninstallScriptRequest
+	18, // 21: pivox.storage.v1.StorageGateways.UpgradeGateway:input_type -> pivox.storage.v1.UpgradeGatewayRequest
+	20, // 22: pivox.storage.v1.StorageGateways.CreateStorageSession:input_type -> pivox.storage.v1.CreateStorageSessionRequest
+	26, // 23: pivox.storage.v1.StorageGateways.CreateStorageGateway:output_type -> google.longrunning.Operation
+	3,  // 24: pivox.storage.v1.StorageGateways.GetStorageGateway:output_type -> pivox.storage.v1.StorageGateway
+	8,  // 25: pivox.storage.v1.StorageGateways.ListStorageGateways:output_type -> pivox.storage.v1.ListStorageGatewaysResponse
+	26, // 26: pivox.storage.v1.StorageGateways.UpdateStorageGateway:output_type -> google.longrunning.Operation
+	26, // 27: pivox.storage.v1.StorageGateways.DeleteStorageGateway:output_type -> google.longrunning.Operation
+	3,  // 28: pivox.storage.v1.StorageGateways.RotateRegistrationToken:output_type -> pivox.storage.v1.StorageGateway
+	15, // 29: pivox.storage.v1.StorageGateways.GetInstallScript:output_type -> pivox.storage.v1.GetInstallScriptResponse
+	17, // 30: pivox.storage.v1.StorageGateways.GetUninstallScript:output_type -> pivox.storage.v1.GetUninstallScriptResponse
+	26, // 31: pivox.storage.v1.StorageGateways.UpgradeGateway:output_type -> google.longrunning.Operation
+	21, // 32: pivox.storage.v1.StorageGateways.CreateStorageSession:output_type -> pivox.storage.v1.CreateStorageSessionResponse
+	23, // [23:33] is the sub-list for method output_type
+	13, // [13:23] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_pivox_storage_v1_storage_gateway_proto_init() }
@@ -1661,7 +1770,7 @@ func file_pivox_storage_v1_storage_gateway_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pivox_storage_v1_storage_gateway_proto_rawDesc), len(file_pivox_storage_v1_storage_gateway_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   18,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

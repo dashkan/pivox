@@ -29,14 +29,16 @@ type AgentServiceServer struct {
 	pool    *pgxpool.Pool
 	queries *db.Queries
 	logger  *slog.Logger
+	conns   *ConnectionManager
 }
 
 // NewAgentServiceServer creates a new AgentServiceServer.
-func NewAgentServiceServer(pool *pgxpool.Pool, queries *db.Queries, logger *slog.Logger) *AgentServiceServer {
+func NewAgentServiceServer(pool *pgxpool.Pool, queries *db.Queries, logger *slog.Logger, conns *ConnectionManager) *AgentServiceServer {
 	return &AgentServiceServer{
 		pool:    pool,
 		queries: queries,
 		logger:  logger,
+		conns:   conns,
 	}
 }
 
@@ -168,7 +170,13 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 	}
 
 	// -----------------------------------------------------------------------
-	// 9. Log: "agent connected".
+	// 9. Register connection and defer unregister on disconnect.
+	// -----------------------------------------------------------------------
+	s.conns.Register(&AgentConnection{AgentID: agent.ID, GatewayID: gateway.ID, Stream: stream})
+	defer s.conns.Unregister(agent.ID)
+
+	// -----------------------------------------------------------------------
+	// 10. Log: "agent connected".
 	// -----------------------------------------------------------------------
 	s.logger.InfoContext(ctx, "agent connected",
 		"gateway", gateway.Name,
@@ -177,7 +185,7 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 	)
 
 	// -----------------------------------------------------------------------
-	// 10. Enter receive loop.
+	// 11. Enter receive loop.
 	// -----------------------------------------------------------------------
 	for {
 		msg, err := stream.Recv()
@@ -234,7 +242,7 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 	}
 
 	// -----------------------------------------------------------------------
-	// 11. Stream ended -- handle disconnect.
+	// 12. Stream ended -- handle disconnect.
 	// -----------------------------------------------------------------------
 	if _, err := s.queries.UpdateStorageAgentState(ctx, db.UpdateStorageAgentStateParams{
 		ID:    agent.ID,

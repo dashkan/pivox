@@ -576,6 +576,41 @@
           "StorageGateways"
         ]
       }
+    },
+    "/v1/storageSession": {
+      "post": {
+        "summary": "Creates a storage session for the authenticated user. Computes\naccess patterns based on the user's org and project memberships,\npushes session grants to connected gateways, and returns a JWT\ncookie for browser-based storage access.",
+        "description": "The response includes a Set-Cookie header (via gRPC metadata) with\nthe session JWT scoped to .pivox.app domain.",
+        "operationId": "StorageGateways_CreateStorageSession",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1CreateStorageSessionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "The request sent to the\n[CreateStorageSession][pivox.storage.v1.StorageGateways.CreateStorageSession]\nmethod.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1CreateStorageSessionRequest"
+            }
+          }
+        ],
+        "tags": [
+          "StorageGateways"
+        ]
+      }
     }
   },
   "definitions": {
@@ -667,6 +702,27 @@
         }
       },
       "description": "The `Status` type defines a logical error model that is suitable for\ndifferent programming environments, including REST APIs and RPC APIs. It is\nused by [gRPC](https://github.com/grpc). Each `Status` message contains\nthree pieces of data: error code, error message, and error details.\n\nYou can find out more about this error model and how to work with it in the\n[API Design Guide](https://cloud.google.com/apis/design/errors)."
+    },
+    "v1CreateStorageSessionRequest": {
+      "type": "object",
+      "properties": {
+        "ttl": {
+          "type": "string",
+          "description": "Optional. Override session duration. Default: 1 hour."
+        }
+      },
+      "description": "The request sent to the\n[CreateStorageSession][pivox.storage.v1.StorageGateways.CreateStorageSession]\nmethod."
+    },
+    "v1CreateStorageSessionResponse": {
+      "type": "object",
+      "properties": {
+        "expiry": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The session expiry time."
+        }
+      },
+      "description": "The response returned from the\n[CreateStorageSession][pivox.storage.v1.StorageGateways.CreateStorageSession]\nmethod."
     },
     "v1GetInstallScriptResponse": {
       "type": "object",
