@@ -16,16 +16,26 @@ type Querier interface {
 	// Atomically consumes a code and returns the ID token.
 	// Returns no rows if the code doesn't exist, is expired, or was already consumed.
 	ConsumeAuthTokenCode(ctx context.Context, code uuid.UUID) (AuthTokenCode, error)
+	CountAssetVersions(ctx context.Context, assetID uuid.UUID) (int64, error)
+	CountAssetsByProject(ctx context.Context, projectID uuid.UUID) (int64, error)
 	CountConnectedStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) (int64, error)
+	CountFulfilledLineItems(ctx context.Context, requestID uuid.UUID) (int64, error)
+	CountLineItemsByRequest(ctx context.Context, requestID uuid.UUID) (int64, error)
+	CountRequestsByProject(ctx context.Context, projectID uuid.UUID) (int64, error)
 	CountStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) (int64, error)
 	CountTagBindingsByTagValue(ctx context.Context, tagValueID uuid.UUID) (int64, error)
 	CountTagValuesByTagKey(ctx context.Context, tagKeyID uuid.UUID) (int64, error)
 	CreateApiKey(ctx context.Context, arg CreateApiKeyParams) (ApiKey, error)
+	CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset, error)
+	CreateAssetRendition(ctx context.Context, arg CreateAssetRenditionParams) (AssetRendition, error)
+	CreateAssetVersion(ctx context.Context, arg CreateAssetVersionParams) (AssetVersion, error)
 	// Stores a Firebase ID token behind a short-lived opaque code.
 	CreateAuthTokenCode(ctx context.Context, idToken string) (AuthTokenCode, error)
+	CreateLineItem(ctx context.Context, arg CreateLineItemParams) (LineItem, error)
 	CreateOperation(ctx context.Context, arg CreateOperationParams) (Operation, error)
 	CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error)
 	CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error)
+	CreateRequest(ctx context.Context, arg CreateRequestParams) (Request, error)
 	CreateStorageAgent(ctx context.Context, arg CreateStorageAgentParams) (StorageAgent, error)
 	CreateStorageAgentAudit(ctx context.Context, arg CreateStorageAgentAuditParams) error
 	CreateStorageEndpoint(ctx context.Context, arg CreateStorageEndpointParams) (StorageEndpoint, error)
@@ -33,11 +43,13 @@ type Querier interface {
 	CreateTagBinding(ctx context.Context, arg CreateTagBindingParams) (TagBinding, error)
 	CreateTagKey(ctx context.Context, arg CreateTagKeyParams) (TagKey, error)
 	CreateTagValue(ctx context.Context, arg CreateTagValueParams) (TagValue, error)
+	DeleteAssetRenditionsByVersion(ctx context.Context, versionID uuid.UUID) error
 	// Cleanup: remove codes older than 10 minutes (all should be expired by then).
 	DeleteExpiredAuthTokenCodes(ctx context.Context) error
 	DeleteExpiredOperations(ctx context.Context) error
 	DeleteExpiredStorageAgentAudit(ctx context.Context) (int64, error)
 	DeleteIamPolicy(ctx context.Context, resourceID uuid.UUID) error
+	DeleteLineItem(ctx context.Context, id uuid.UUID) error
 	DeleteOperation(ctx context.Context, id uuid.UUID) error
 	DeleteStorageAgent(ctx context.Context, id uuid.UUID) error
 	DeleteStorageEndpoint(ctx context.Context, id uuid.UUID) error
@@ -51,13 +63,23 @@ type Querier interface {
 	GetApiKeyByOrgAndKeyID(ctx context.Context, arg GetApiKeyByOrgAndKeyIDParams) (ApiKey, error)
 	GetApiKeyIncludingDeleted(ctx context.Context, id uuid.UUID) (ApiKey, error)
 	GetApiKeyString(ctx context.Context, id uuid.UUID) (string, error)
+	GetAsset(ctx context.Context, id uuid.UUID) (Asset, error)
+	GetAssetByChecksum(ctx context.Context, arg GetAssetByChecksumParams) (Asset, error)
+	GetAssetByName(ctx context.Context, arg GetAssetByNameParams) (Asset, error)
+	GetAssetVersion(ctx context.Context, id uuid.UUID) (AssetVersion, error)
+	GetAssetVersionByNumber(ctx context.Context, arg GetAssetVersionByNumberParams) (AssetVersion, error)
 	GetIamPolicy(ctx context.Context, resourceID uuid.UUID) (IamPolicy, error)
+	GetLatestAssetVersion(ctx context.Context, assetID uuid.UUID) (AssetVersion, error)
+	GetLineItem(ctx context.Context, id uuid.UUID) (LineItem, error)
+	GetLineItemByName(ctx context.Context, arg GetLineItemByNameParams) (LineItem, error)
 	GetOperation(ctx context.Context, id uuid.UUID) (Operation, error)
 	GetOrganization(ctx context.Context, id uuid.UUID) (Organization, error)
 	GetOrganizationByName(ctx context.Context, name string) (Organization, error)
 	GetProject(ctx context.Context, id uuid.UUID) (Project, error)
 	GetProjectByName(ctx context.Context, arg GetProjectByNameParams) (Project, error)
 	GetProjectIncludingDeleted(ctx context.Context, id uuid.UUID) (Project, error)
+	GetRequest(ctx context.Context, id uuid.UUID) (Request, error)
+	GetRequestByName(ctx context.Context, arg GetRequestByNameParams) (Request, error)
 	GetStorageAgent(ctx context.Context, id uuid.UUID) (StorageAgent, error)
 	GetStorageAgentByGatewayAndIP(ctx context.Context, arg GetStorageAgentByGatewayAndIPParams) (StorageAgent, error)
 	GetStorageEndpoint(ctx context.Context, id uuid.UUID) (StorageEndpoint, error)
@@ -70,23 +92,47 @@ type Querier interface {
 	GetTagKeyByNamespacedName(ctx context.Context, namespacedName string) (TagKey, error)
 	GetTagValue(ctx context.Context, id uuid.UUID) (TagValue, error)
 	GetTagValueByNamespacedName(ctx context.Context, namespacedName string) (TagValue, error)
+	ListAssetRenditions(ctx context.Context, versionID uuid.UUID) ([]AssetRendition, error)
+	ListAssetVersions(ctx context.Context, arg ListAssetVersionsParams) ([]AssetVersion, error)
+	ListAssetsByProject(ctx context.Context, arg ListAssetsByProjectParams) ([]Asset, error)
+	ListAssetsByProjectWithDeleted(ctx context.Context, arg ListAssetsByProjectWithDeletedParams) ([]Asset, error)
 	ListEffectiveTags(ctx context.Context, parentResource string) ([]ListEffectiveTagsRow, error)
+	ListExpiredAssets(ctx context.Context, limit int32) ([]Asset, error)
+	ListLineItemsByRequest(ctx context.Context, arg ListLineItemsByRequestParams) ([]LineItem, error)
 	ListOperations(ctx context.Context, arg ListOperationsParams) ([]Operation, error)
 	ListPendingOperations(ctx context.Context) ([]Operation, error)
+	ListRequestsByProject(ctx context.Context, arg ListRequestsByProjectParams) ([]Request, error)
+	ListRequestsByProjectWithDeleted(ctx context.Context, arg ListRequestsByProjectWithDeletedParams) ([]Request, error)
 	ListStorageAgentAuditByAgent(ctx context.Context, arg ListStorageAgentAuditByAgentParams) ([]StorageAgentAudit, error)
 	ListStorageAgentAuditByGateway(ctx context.Context, arg ListStorageAgentAuditByGatewayParams) ([]StorageAgentAudit, error)
 	ListStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageAgent, error)
 	ListStorageEndpointsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageEndpoint, error)
 	LookupApiKeyByKeyString(ctx context.Context, keyString string) (ApiKey, error)
+	NextVersionNumber(ctx context.Context, assetID uuid.UUID) (int32, error)
 	RotateRegistrationToken(ctx context.Context, arg RotateRegistrationTokenParams) (StorageGateway, error)
+	SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]Asset, error)
 	SetOrganizationTenantID(ctx context.Context, arg SetOrganizationTenantIDParams) error
 	SoftDeleteApiKey(ctx context.Context, arg SoftDeleteApiKeyParams) (ApiKey, error)
+	SoftDeleteAsset(ctx context.Context, arg SoftDeleteAssetParams) error
 	SoftDeleteProject(ctx context.Context, arg SoftDeleteProjectParams) (Project, error)
+	SoftDeleteRequest(ctx context.Context, arg SoftDeleteRequestParams) error
 	UndeleteApiKey(ctx context.Context, arg UndeleteApiKeyParams) (ApiKey, error)
+	UndeleteAsset(ctx context.Context, id uuid.UUID) error
 	UndeleteProject(ctx context.Context, arg UndeleteProjectParams) (Project, error)
 	UpdateApiKey(ctx context.Context, arg UpdateApiKeyParams) (ApiKey, error)
+	UpdateAsset(ctx context.Context, arg UpdateAssetParams) (Asset, error)
+	UpdateAssetIngestion(ctx context.Context, arg UpdateAssetIngestionParams) error
+	UpdateAssetState(ctx context.Context, arg UpdateAssetStateParams) error
+	UpdateAssetVersionError(ctx context.Context, arg UpdateAssetVersionErrorParams) error
+	UpdateLineItem(ctx context.Context, arg UpdateLineItemParams) (LineItem, error)
+	UpdateLineItemState(ctx context.Context, arg UpdateLineItemStateParams) error
 	UpdateOperationMetadata(ctx context.Context, arg UpdateOperationMetadataParams) error
 	UpdateProject(ctx context.Context, arg UpdateProjectParams) (Project, error)
+	UpdateRequest(ctx context.Context, arg UpdateRequestParams) (Request, error)
+	UpdateRequestApproved(ctx context.Context, arg UpdateRequestApprovedParams) (Request, error)
+	UpdateRequestAssignee(ctx context.Context, arg UpdateRequestAssigneeParams) (Request, error)
+	UpdateRequestDelivered(ctx context.Context, arg UpdateRequestDeliveredParams) (Request, error)
+	UpdateRequestState(ctx context.Context, arg UpdateRequestStateParams) (Request, error)
 	UpdateStorageAgentCacheUsed(ctx context.Context, arg UpdateStorageAgentCacheUsedParams) error
 	UpdateStorageAgentCert(ctx context.Context, arg UpdateStorageAgentCertParams) error
 	UpdateStorageAgentHeartbeat(ctx context.Context, id uuid.UUID) error

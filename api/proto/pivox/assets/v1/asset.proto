@@ -1,0 +1,865 @@
+// Copyright 2025 Pivox
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package pivox.assets.v1;
+
+import "buf/validate/validate.proto";
+import "google/api/annotations.proto";
+import "google/api/client.proto";
+import "google/api/field_behavior.proto";
+import "google/api/resource.proto";
+import "google/longrunning/operations.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "pivox/assets/v1;assetsv1";
+
+// Manages media assets within a project. Assets represent media files
+// (images, video, audio, graphics) with rich metadata, versioning,
+// and AI-generated descriptions. Creation is an LRO that runs the
+// full ingestion pipeline: validation, metadata extraction, thumbnail
+// generation, proxy creation, AI description, transcription, and
+// auto-tagging.
+service Assets {
+  option (google.api.default_host) = "api.pivox.io";
+
+  // Creates a new asset in the specified project. The asset undergoes
+  // a full ingestion pipeline as a long-running operation including
+  // format validation, metadata extraction, thumbnail generation,
+  // and AI processing.
+  //
+  // If no endpoint or filename is provided, a PLACEHOLDER asset is
+  // created for the Request workflow.
+  //
+  // The caller must have `assets.assets.create` permission on the parent
+  // project.
+  rpc CreateAsset(CreateAssetRequest) returns (google.longrunning.Operation) {
+    option (google.api.http) = {
+      post: "/v1/{parent=organizations/*/projects/*}/assets"
+      body: "asset"
+    };
+    option (google.api.method_signature) = "parent,asset";
+    option (google.longrunning.operation_info) = {
+      response_type: "Asset"
+      metadata_type: "CreateAssetMetadata"
+    };
+  }
+
+  // Retrieves an asset by resource name.
+  rpc GetAsset(GetAssetRequest) returns (Asset) {
+    option (google.api.http) = {get: "/v1/{name=organizations/*/projects/*/assets/*}"};
+    option (google.api.method_signature) = "name";
+  }
+
+  // Lists assets in a project.
+  rpc ListAssets(ListAssetsRequest) returns (ListAssetsResponse) {
+    option (google.api.http) = {get: "/v1/{parent=organizations/*/projects/*}/assets"};
+    option (google.api.method_signature) = "parent";
+  }
+
+  // Updates an asset's mutable fields (display_name, path, annotations).
+  // File content is immutable — create a new version instead.
+  rpc UpdateAsset(UpdateAssetRequest) returns (google.longrunning.Operation) {
+    option (google.api.http) = {
+      patch: "/v1/{asset.name=organizations/*/projects/*/assets/*}"
+      body: "asset"
+    };
+    option (google.api.method_signature) = "asset,update_mask";
+    option (google.longrunning.operation_info) = {
+      response_type: "Asset"
+      metadata_type: "UpdateAssetMetadata"
+    };
+  }
+
+  // Soft-deletes an asset. The asset enters DELETE_REQUESTED state and
+  // will be purged after the retention period. Can be restored with
+  // UndeleteAsset before purge.
+  rpc DeleteAsset(DeleteAssetRequest) returns (google.longrunning.Operation) {
+    option (google.api.http) = {delete: "/v1/{name=organizations/*/projects/*/assets/*}"};
+    option (google.api.method_signature) = "name";
+    option (google.longrunning.operation_info) = {
+      response_type: "Asset"
+      metadata_type: "DeleteAssetMetadata"
+    };
+  }
+
+  // Restores a soft-deleted asset.
+  rpc UndeleteAsset(UndeleteAssetRequest) returns (google.longrunning.Operation) {
+    option (google.api.http) = {
+      post: "/v1/{name=organizations/*/projects/*/assets/*}:undelete"
+      body: "*"
+    };
+    option (google.api.method_signature) = "name";
+    option (google.longrunning.operation_info) = {
+      response_type: "Asset"
+      metadata_type: "UndeleteAssetMetadata"
+    };
+  }
+
+  // Creates a new version of an existing asset. Runs the same ingestion
+  // pipeline as CreateAsset. The new version becomes the latest version.
+  // Previous versions remain accessible.
+  rpc CreateAssetVersion(CreateAssetVersionRequest) returns (google.longrunning.Operation) {
+    option (google.api.http) = {
+      post: "/v1/{parent=organizations/*/projects/*/assets/*}/versions"
+      body: "asset_version"
+    };
+    option (google.api.method_signature) = "parent,asset_version";
+    option (google.longrunning.operation_info) = {
+      response_type: "AssetVersion"
+      metadata_type: "CreateAssetVersionMetadata"
+    };
+  }
+
+  // Retrieves a specific version of an asset.
+  rpc GetAssetVersion(GetAssetVersionRequest) returns (AssetVersion) {
+    option (google.api.http) = {get: "/v1/{name=organizations/*/projects/*/assets/*/versions/*}"};
+    option (google.api.method_signature) = "name";
+  }
+
+  // Lists all versions of an asset.
+  rpc ListAssetVersions(ListAssetVersionsRequest) returns (ListAssetVersionsResponse) {
+    option (google.api.http) = {get: "/v1/{parent=organizations/*/projects/*/assets/*}/versions"};
+    option (google.api.method_signature) = "parent";
+  }
+
+  // Imports assets from a storage endpoint path. Recursively scans
+  // the path, creates asset resources, and runs the ingestion pipeline
+  // for each discovered file. Returns an LRO that tracks overall
+  // import progress.
+  //
+  // The caller must have `assets.assets.create` permission on the
+  // parent project and `storage.endpoints.get` on the source endpoint.
+  rpc ImportAssets(ImportAssetsRequest) returns (google.longrunning.Operation) {
+    option (google.api.http) = {
+      post: "/v1/{parent=organizations/*/projects/*}/assets:import"
+      body: "*"
+    };
+    // (-- api-linter: client-libraries::4232::required-fields=disabled
+    //     aip.dev/not-precedent: endpoint is contextually required, not structurally. --)
+    option (google.api.method_signature) = "parent";
+    option (google.longrunning.operation_info) = {
+      response_type: "ImportAssetsResponse"
+      metadata_type: "ImportAssetsMetadata"
+    };
+  }
+}
+
+// A media asset. Assets are immutable — file content cannot be changed
+// after creation. Use versions for new iterations of the same logical
+// asset. Assets are flat (no folder hierarchy); use tags for organization
+// and the optional path field for display grouping.
+message Asset {
+  option (google.api.resource) = {
+    type: "pivox.assets/Asset"
+    pattern: "organizations/{organization}/projects/{project}/assets/{asset}"
+    plural: "assets"
+    singular: "asset"
+  };
+
+  // Asset lifecycle states.
+  enum State {
+    // Unspecified state.
+    STATE_UNSPECIFIED = 0;
+
+    // The asset is a placeholder with no file content. Created by
+    // the Request workflow — the file will be provided when an
+    // artist fulfills the associated line item.
+    PLACEHOLDER = 1;
+
+    // The asset is being ingested (upload, metadata extraction,
+    // thumbnail generation, AI processing).
+    PROCESSING = 2;
+
+    // The asset is fully ingested and available.
+    ACTIVE = 3;
+
+    // An ingestion step failed. Check the latest version's
+    // ingestion_error for details.
+    FAILED = 4;
+
+    // The asset has been marked for deletion. Can be restored
+    // with UndeleteAsset before purge_time.
+    DELETE_REQUESTED = 5;
+  }
+
+  // The broad media category of the asset.
+  enum MediaType {
+    // Unspecified media type.
+    MEDIA_TYPE_UNSPECIFIED = 0;
+
+    // Still image (JPEG, PNG, TIFF, WebP, etc.).
+    IMAGE = 1;
+
+    // Video file (MP4, MOV, MXF, ProRes, etc.).
+    VIDEO = 2;
+
+    // Audio file (WAV, MP3, AAC, FLAC, etc.).
+    AUDIO = 3;
+
+    // Motion graphics or vector (SVG, Lottie, Rive, etc.).
+    GRAPHIC = 4;
+
+    // Document (PDF, PSD, AI, etc.).
+    DOCUMENT = 5;
+  }
+
+  // Output only. The resource name of the asset. Format:
+  // `organizations/{organization}/projects/{project}/assets/{asset}`
+  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Required. A human-readable name for the asset.
+  string display_name = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).string.max_len = 255
+  ];
+
+  // Output only. The current lifecycle state.
+  State state = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The broad media category, determined during ingestion
+  // from the file's MIME type.
+  MediaType media_type = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The MIME type of the original file (e.g. `image/jpeg`,
+  // `video/mp4`). Determined from magic bytes during ingestion, not
+  // from the file extension.
+  string mime_type = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. An organizational path for display grouping (e.g.
+  // `/sports/highlights/2026/`). Not enforced as a hierarchy — purely
+  // for UI presentation and filesystem import preservation. Use tags
+  // for structured categorization.
+  string path = 6 [(google.api.field_behavior) = OPTIONAL];
+
+  // Output only. The storage endpoint where the asset's files are stored.
+  // Format: `organizations/{organization}/storageGateways/{gateway}/endpoints/{endpoint}`
+  string endpoint = 7 [
+    (google.api.field_behavior) = OUTPUT_ONLY,
+    (google.api.resource_reference) = {type: "pivox.storage/Endpoint"}
+  ];
+
+  // Output only. SHA-256 checksum of the original file. Used for
+  // deduplication — if a file with the same checksum already exists
+  // in the project, the existing asset is returned instead of creating
+  // a duplicate.
+  string checksum_sha256 = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Size of the original file in bytes.
+  int64 size_bytes = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The latest version of the asset.
+  // (-- api-linter: core::0122::embedded-resource=disabled
+  //     aip.dev/not-precedent: Embedded for convenience; avoids extra RPC call. --)
+  AssetVersion latest_version = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Total number of versions.
+  int32 version_count = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Technical metadata extracted from the file (EXIF, XMP).
+  // Junk metadata (Adobe comments, software tags) is stripped.
+  // Stored as a structured JSON object — fields vary by media type.
+  google.protobuf.Struct technical_metadata = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. AI-generated description of the asset's visual or
+  // audio content. Used for semantic search.
+  string ai_description = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Transcription of audio/video content. Indexed for
+  // full-text search.
+  string transcription = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Duration of the media, for video and audio assets.
+  google.protobuf.Duration duration = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Width in pixels, for image and video assets.
+  int32 width = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Height in pixels, for image and video assets.
+  int32 height = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. The time at which this asset should expire. When set,
+  // a background reaper will soft-delete the asset after this time.
+  // Can be set directly or via a retention policy (tag-based rules).
+  google.protobuf.Timestamp expire_time = 18 [(google.api.field_behavior) = OPTIONAL];
+
+  // Input only. The time-to-live for the asset, as an alternative to
+  // setting expire_time directly. The server computes expire_time from
+  // create_time + ttl.
+  google.protobuf.Duration ttl = 27 [
+    (google.api.field_behavior) = INPUT_ONLY,
+    (google.api.field_behavior) = OPTIONAL
+  ];
+
+  // Optional. Annotations associated with this asset.
+  map<string, string> annotations = 19 [(google.api.field_behavior) = OPTIONAL];
+
+  // Output only. A checksum computed by the server based on the current
+  // value of the Asset resource.
+  string etag = 20 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The user who created the asset.
+  string creator = 21 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The user who last updated the asset.
+  string updater = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Timestamp when the asset was created.
+  google.protobuf.Timestamp create_time = 23 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Timestamp when the asset was last modified.
+  google.protobuf.Timestamp update_time = 24 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The time at which the asset was soft-deleted.
+  google.protobuf.Timestamp delete_time = 25 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The time at which the asset will be permanently purged.
+  google.protobuf.Timestamp purge_time = 26 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// A specific version of an asset. Each version represents a distinct
+// file upload. Versions are immutable once created. The asset's
+// latest_version field always points to the most recent version.
+message AssetVersion {
+  option (google.api.resource) = {
+    type: "pivox.assets/AssetVersion"
+    pattern: "organizations/{organization}/projects/{project}/assets/{asset}/versions/{version}"
+    plural: "versions"
+    singular: "assetVersion"
+  };
+
+  // Output only. The resource name of the version. Format:
+  // `organizations/{organization}/projects/{project}/assets/{asset}/versions/{version}`
+  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Output only. The sequential version number (1, 2, 3...).
+  int32 version_number = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. SHA-256 checksum of this version's file.
+  string checksum_sha256 = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Size of this version's file in bytes.
+  int64 size_bytes = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. MIME type of this version's file.
+  string mime_type = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The storage object key for the original file.
+  string storage_key = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Generated renditions (thumbnails, proxies, previews).
+  repeated Rendition renditions = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. A note describing what changed in this version.
+  string change_note = 8 [(google.api.field_behavior) = OPTIONAL];
+
+  // Output only. If the ingestion pipeline failed, the error details.
+  string ingestion_error = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The user who created this version.
+  string creator = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Timestamp when this version was created.
+  google.protobuf.Timestamp create_time = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// A generated rendition of an asset version (thumbnail, proxy, preview).
+message Rendition {
+  // The type of rendition.
+  enum Type {
+    // Unspecified rendition type.
+    TYPE_UNSPECIFIED = 0;
+
+    // Small thumbnail (e.g. 150x150).
+    THUMBNAIL_SMALL = 1;
+
+    // Medium thumbnail (e.g. 400x400).
+    THUMBNAIL_MEDIUM = 2;
+
+    // Large thumbnail (e.g. 800x800).
+    THUMBNAIL_LARGE = 3;
+
+    // Animated preview for video (short WebP/GIF loop).
+    ANIMATED_PREVIEW = 4;
+
+    // Video proxy for web playback (H.264 720p).
+    VIDEO_PROXY = 5;
+
+    // Audio preview (MP3, short clip or full).
+    AUDIO_PREVIEW = 6;
+
+    // Poster frame extracted from video.
+    POSTER_FRAME = 7;
+  }
+
+  // Output only. The rendition type.
+  Type type = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The storage object key for this rendition.
+  string storage_key = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. MIME type of the rendition.
+  string mime_type = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Width in pixels (for image/video renditions).
+  int32 width = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Height in pixels (for image/video renditions).
+  int32 height = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Size of the rendition in bytes.
+  int64 size_bytes = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Upload instructions returned to the client. The client uses these
+// to upload the file directly to the storage gateway, then confirms
+// the upload to complete the LRO.
+message UploadInfo {
+  // The method for uploading the file.
+  enum Method {
+    // Unspecified method.
+    METHOD_UNSPECIFIED = 0;
+
+    // Upload via presigned URL (S3 endpoints). Client PUTs the file
+    // directly to the presigned URL.
+    PRESIGNED_URL = 1;
+
+    // Upload via gateway PUT endpoint (filesystem endpoints). Client
+    // PUTs the file to the gateway's HTTPS endpoint with the upload
+    // token in the Authorization header.
+    GATEWAY_PUT = 2;
+  }
+
+  // Output only. The upload method to use.
+  Method method = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The URL to upload the file to. For PRESIGNED_URL this
+  // is the S3 presigned URL. For GATEWAY_PUT this is the gateway's
+  // HTTPS endpoint.
+  string upload_url = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. HTTP headers the client must include in the upload
+  // request (e.g. Content-Type, x-amz-* headers for S3).
+  map<string, string> headers = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. For multipart uploads, the parts to upload.
+  // Empty for single-part uploads.
+  repeated UploadPart parts = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// A part in a multipart upload.
+message UploadPart {
+  // Output only. The part number (1-based).
+  int32 part_number = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The presigned URL for this part.
+  string upload_url = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The byte offset to start reading from the source file.
+  int64 offset = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The number of bytes to upload for this part.
+  int64 size = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// The request sent to the CreateAsset method.
+// (-- api-linter: core::0133::request-unknown-fields=disabled
+//     aip.dev/not-precedent: endpoint, filename, size_bytes needed for upload flow. --)
+message CreateAssetRequest {
+  // Required. The parent project. Format:
+  // `organizations/{organization}/projects/{project}`
+  string parent = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {child_type: "pivox.assets/Asset"},
+    (buf.validate.field).required = true
+  ];
+
+  // Required. The asset to create. Must include display_name. If no
+  // endpoint/filename/size_bytes are provided, a PLACEHOLDER asset is
+  // created (no file upload, used by the Request workflow).
+  Asset asset = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. The storage endpoint to store the asset on. Format:
+  // `organizations/{organization}/storageGateways/{gateway}/endpoints/{endpoint}`
+  //
+  // Required for file uploads. Omit when creating a PLACEHOLDER asset
+  // (the endpoint is set when the asset is fulfilled).
+  string endpoint = 3 [
+    (google.api.field_behavior) = OPTIONAL,
+    (google.api.resource_reference) = {type: "pivox.storage/Endpoint"}
+  ];
+
+  // Optional. The original filename from the client. Used to determine
+  // media type if magic bytes are ambiguous.
+  string filename = 4 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. The file size in bytes. Required for multipart uploads
+  // so the server can compute part boundaries.
+  int64 size_bytes = 5 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. If set to true, the request will only validate the
+  // request without persisting it.
+  bool validate_only = 7 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// LRO metadata for CreateAsset. Reports ingestion pipeline progress.
+message CreateAssetMetadata {
+  // The current step of the ingestion pipeline.
+  enum Step {
+    // Unspecified step.
+    STEP_UNSPECIFIED = 0;
+
+    // Waiting for client to upload the file.
+    AWAITING_UPLOAD = 1;
+
+    // Validating the uploaded file format.
+    VALIDATING = 2;
+
+    // Checking for duplicate files.
+    DEDUPLICATING = 3;
+
+    // Extracting technical metadata (EXIF, XMP).
+    EXTRACTING_METADATA = 4;
+
+    // Generating thumbnails.
+    GENERATING_THUMBNAILS = 5;
+
+    // Generating proxy/preview renditions.
+    GENERATING_PROXY = 6;
+
+    // Running AI description and embedding generation.
+    AI_PROCESSING = 7;
+
+    // Transcribing audio/video content.
+    TRANSCRIBING = 8;
+
+    // Running AI auto-tagging.
+    AUTO_TAGGING = 9;
+
+    // Finalizing the asset.
+    FINALIZING = 10;
+  }
+
+  // The current pipeline step.
+  Step step = 1;
+
+  // Upload instructions for the client. Populated when step is
+  // AWAITING_UPLOAD.
+  UploadInfo upload_info = 2;
+
+  // Progress percentage (0-100) for the current step.
+  int32 progress_percent = 3;
+}
+
+// The request sent to the GetAsset method.
+message GetAssetRequest {
+  // Required. The resource name of the asset to retrieve.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.assets/Asset"},
+    (buf.validate.field).required = true
+  ];
+}
+
+// The request sent to the ListAssets method.
+message ListAssetsRequest {
+  // Required. The parent project whose assets are being listed.
+  // Format: `organizations/{organization}/projects/{project}`
+  string parent = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {child_type: "pivox.assets/Asset"},
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. The maximum number of assets to return.
+  int32 page_size = 2 [
+    (google.api.field_behavior) = OPTIONAL,
+    (buf.validate.field).int32 = {
+      gte: 0
+      lte: 1000
+    }
+  ];
+
+  // Optional. A pagination token returned from a previous call.
+  string page_token = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. An expression for filtering the results.
+  // Filterable fields:
+  //
+  // + `state`
+  // + `mediaType`
+  // + `mimeType`
+  // + `displayName`
+  // + `path`
+  // + `creator`
+  // + `createTime` (supports comparison operators)
+  // + `expireTime` (supports comparison operators)
+  //
+  // Examples:
+  //
+  // + `state = ACTIVE` — only active assets.
+  // + `mediaType = VIDEO` — only video assets.
+  // + `path = "/sports/*"` — assets under the sports path.
+  //
+  // For more information, see [AIP-160](https://aip.dev/160).
+  string filter = 4 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. A comma-separated list of fields to order by.
+  // Supported fields:
+  //
+  // + `displayName`
+  // + `createTime`
+  // + `updateTime`
+  // + `sizeBytes`
+  // + `name`
+  //
+  // Example: `createTime desc, displayName`
+  string order_by = 5 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. If true, include soft-deleted assets in the response.
+  bool show_deleted = 6 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// The response from the ListAssets method.
+message ListAssetsResponse {
+  // The assets belonging to the specified project.
+  repeated Asset assets = 1;
+
+  // A pagination token for the next page.
+  string next_page_token = 2;
+}
+
+// The request sent to the UpdateAsset method.
+message UpdateAssetRequest {
+  // Required. The asset with updated fields.
+  Asset asset = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. An update mask to selectively update fields.
+  google.protobuf.FieldMask update_mask = 2 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. If set to true, validate only without persisting.
+  bool validate_only = 3 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// A status object for the UpdateAsset LRO metadata.
+message UpdateAssetMetadata {}
+
+// The request sent to the DeleteAsset method.
+message DeleteAssetRequest {
+  // Required. The resource name of the asset to delete.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.assets/Asset"},
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. The etag for optimistic concurrency.
+  string etag = 2 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. If true, delete the asset even if it has versions.
+  bool force = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. If set to true, validate only without persisting.
+  bool validate_only = 4 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// A status object for the DeleteAsset LRO metadata.
+message DeleteAssetMetadata {}
+
+// The request sent to the UndeleteAsset method.
+message UndeleteAssetRequest {
+  // Required. The resource name of the asset to restore.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.assets/Asset"},
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. The etag for optimistic concurrency.
+  string etag = 2 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// A status object for the UndeleteAsset LRO metadata.
+message UndeleteAssetMetadata {}
+
+// The request sent to the CreateAssetVersion method.
+// (-- api-linter: core::0133::request-unknown-fields=disabled
+//     aip.dev/not-precedent: filename, size_bytes needed for upload flow. --)
+message CreateAssetVersionRequest {
+  // Required. The parent asset. Format:
+  // `organizations/{organization}/projects/{project}/assets/{asset}`
+  string parent = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {child_type: "pivox.assets/AssetVersion"},
+    (buf.validate.field).required = true
+  ];
+
+  // Required. The version to create.
+  // (-- api-linter: core::0133::request-required-fields=disabled
+  //     aip.dev/not-precedent: asset_version is the resource body. --)
+  AssetVersion asset_version = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. The original filename from the client.
+  string filename = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. The file size in bytes. Required for multipart uploads.
+  int64 size_bytes = 4 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// LRO metadata for CreateAssetVersion. Same pipeline as CreateAsset.
+message CreateAssetVersionMetadata {
+  // The current pipeline step.
+  CreateAssetMetadata.Step step = 1;
+
+  // Upload instructions for the client.
+  UploadInfo upload_info = 2;
+
+  // Progress percentage (0-100) for the current step.
+  int32 progress_percent = 3;
+}
+
+// The request sent to the GetAssetVersion method.
+message GetAssetVersionRequest {
+  // Required. The resource name of the version to retrieve.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.assets/AssetVersion"},
+    (buf.validate.field).required = true
+  ];
+}
+
+// The request sent to the ListAssetVersions method.
+message ListAssetVersionsRequest {
+  // Required. The parent asset whose versions are being listed.
+  string parent = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {child_type: "pivox.assets/AssetVersion"},
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. The maximum number of versions to return.
+  int32 page_size = 2 [
+    (google.api.field_behavior) = OPTIONAL,
+    (buf.validate.field).int32 = {
+      gte: 0
+      lte: 100
+    }
+  ];
+
+  // Optional. A pagination token from a previous call.
+  string page_token = 3 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// The response from the ListAssetVersions method.
+// (-- api-linter: core::0132::response-unknown-fields=disabled
+//     aip.dev/not-precedent: versions is the standard name for this sub-resource. --)
+message ListAssetVersionsResponse {
+  // The versions of the specified asset, ordered by version_number descending.
+  repeated AssetVersion versions = 1;
+
+  // A pagination token for the next page.
+  string next_page_token = 2;
+}
+
+// The request sent to the ImportAssets method.
+message ImportAssetsRequest {
+  // Required. The parent project to import assets into. Format:
+  // `organizations/{organization}/projects/{project}`
+  string parent = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {child_type: "pivox.assets/Asset"},
+    (buf.validate.field).required = true
+  ];
+
+  // Required. The storage endpoint to scan. Format:
+  // `organizations/{organization}/storageGateways/{gateway}/endpoints/{endpoint}`
+  string endpoint = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.storage/Endpoint"},
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. The path prefix to scan within the endpoint. If empty,
+  // scans the entire endpoint.
+  string path_prefix = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. If true, preserve the filesystem directory structure
+  // as the asset path field.
+  bool preserve_paths = 4 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. If true, run AI auto-tagging on imported assets.
+  // Defaults to true.
+  bool auto_tag = 5 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// The response from a completed ImportAssets LRO.
+message ImportAssetsResponse {
+  // The number of assets successfully imported.
+  int32 imported_count = 1;
+
+  // The number of files skipped (unsupported format, duplicates, etc.).
+  int32 skipped_count = 2;
+
+  // The number of files that failed to import.
+  int32 failed_count = 3;
+}
+
+// LRO metadata for ImportAssets. Reports scan and ingestion progress.
+message ImportAssetsMetadata {
+  // The current phase of the import.
+  enum Phase {
+    // Unspecified phase.
+    PHASE_UNSPECIFIED = 0;
+
+    // Scanning the filesystem/bucket for files.
+    SCANNING = 1;
+
+    // Ingesting discovered files.
+    INGESTING = 2;
+
+    // Import complete.
+    DONE = 3;
+  }
+
+  // The current phase.
+  Phase phase = 1;
+
+  // Total files discovered during scan.
+  int32 total_files = 2;
+
+  // Files processed so far.
+  int32 processed_files = 3;
+
+  // Files successfully imported so far.
+  int32 imported_files = 4;
+
+  // Files skipped so far.
+  int32 skipped_files = 5;
+
+  // Files failed so far.
+  int32 failed_files = 6;
+}

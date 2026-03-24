@@ -1276,9 +1276,15 @@ type HandshakeAck struct {
 	SessionSigningKey []byte `protobuf:"bytes,5,opt,name=session_signing_key,json=sessionSigningKey,proto3" json:"session_signing_key,omitempty"`
 	// The allowed CORS origin for the HTTP server (e.g. "https://app.pivox.app").
 	// Dev builds may use "*".
-	CorsOrigin    string `protobuf:"bytes,6,opt,name=cors_origin,json=corsOrigin,proto3" json:"cors_origin,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	CorsOrigin string `protobuf:"bytes,6,opt,name=cors_origin,json=corsOrigin,proto3" json:"cors_origin,omitempty"`
+	// Full set of denied access patterns. Requests matching any pattern
+	// are rejected with 404. Patterns use glob syntax (e.g.
+	// "projects/proj1/*" denies all assets in a deleted project,
+	// "projects/proj1/assets/abc123/*" denies a single deleted asset).
+	// The agent persists these in local SQLite for crash resilience.
+	DeniedPatterns []string `protobuf:"bytes,7,rep,name=denied_patterns,json=deniedPatterns,proto3" json:"denied_patterns,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *HandshakeAck) Reset() {
@@ -1351,6 +1357,13 @@ func (x *HandshakeAck) GetCorsOrigin() string {
 		return x.CorsOrigin
 	}
 	return ""
+}
+
+func (x *HandshakeAck) GetDeniedPatterns() []string {
+	if x != nil {
+		return x.DeniedPatterns
+	}
+	return nil
 }
 
 // SessionGrant pushes a user session to the agent. The agent stores the
@@ -1677,9 +1690,12 @@ type ConfigUpdate struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Full replacement set of endpoint configurations. Endpoints not present in
 	// this list should be removed. Each endpoint includes its own cache config.
-	Endpoints     []*EndpointConfig `protobuf:"bytes,1,rep,name=endpoints,proto3" json:"endpoints,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Endpoints []*EndpointConfig `protobuf:"bytes,1,rep,name=endpoints,proto3" json:"endpoints,omitempty"`
+	// Updated denied access patterns. Full replacement — the agent replaces
+	// its entire denied_patterns set with this list.
+	DeniedPatterns []string `protobuf:"bytes,2,rep,name=denied_patterns,json=deniedPatterns,proto3" json:"denied_patterns,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ConfigUpdate) Reset() {
@@ -1715,6 +1731,13 @@ func (*ConfigUpdate) Descriptor() ([]byte, []int) {
 func (x *ConfigUpdate) GetEndpoints() []*EndpointConfig {
 	if x != nil {
 		return x.Endpoints
+	}
+	return nil
+}
+
+func (x *ConfigUpdate) GetDeniedPatterns() []string {
+	if x != nil {
+		return x.DeniedPatterns
 	}
 	return nil
 }
@@ -2147,7 +2170,7 @@ const file_pivox_agent_v1_agent_proto_rawDesc = "" +
 	"\x10server_heartbeat\x18\x06 \x01(\v2\x1f.pivox.agent.v1.ServerHeartbeatH\x00R\x0fserverHeartbeat\x12C\n" +
 	"\rsession_grant\x18\b \x01(\v2\x1c.pivox.agent.v1.SessionGrantH\x00R\fsessionGrant\x12F\n" +
 	"\x0esession_revoke\x18\t \x01(\v2\x1d.pivox.agent.v1.SessionRevokeH\x00R\rsessionRevokeB\t\n" +
-	"\amessage\"\xf0\x01\n" +
+	"\amessage\"\x99\x02\n" +
 	"\fHandshakeAck\x12\x1d\n" +
 	"\n" +
 	"agent_name\x18\x01 \x01(\tR\tagentName\x12\x19\n" +
@@ -2156,7 +2179,8 @@ const file_pivox_agent_v1_agent_proto_rawDesc = "" +
 	"\tendpoints\x18\x04 \x03(\v2\x1e.pivox.agent.v1.EndpointConfigR\tendpoints\x12.\n" +
 	"\x13session_signing_key\x18\x05 \x01(\fR\x11sessionSigningKey\x12\x1f\n" +
 	"\vcors_origin\x18\x06 \x01(\tR\n" +
-	"corsOrigin\"t\n" +
+	"corsOrigin\x12'\n" +
+	"\x0fdenied_patterns\x18\a \x03(\tR\x0edeniedPatterns\"t\n" +
 	"\fSessionGrant\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\x12\x1a\n" +
 	"\bpatterns\x18\x02 \x03(\tR\bpatterns\x122\n" +
@@ -2174,9 +2198,10 @@ const file_pivox_agent_v1_agent_proto_rawDesc = "" +
 	"\x0etarget_version\x18\x02 \x01(\tR\rtargetVersion\x12!\n" +
 	"\fdownload_url\x18\x03 \x01(\tR\vdownloadUrl\x12'\n" +
 	"\x0fchecksum_sha256\x18\x04 \x01(\tR\x0echecksumSha256\x12+\n" +
-	"\x11signature_ed25519\x18\x05 \x01(\tR\x10signatureEd25519\"L\n" +
+	"\x11signature_ed25519\x18\x05 \x01(\tR\x10signatureEd25519\"u\n" +
 	"\fConfigUpdate\x12<\n" +
-	"\tendpoints\x18\x01 \x03(\v2\x1e.pivox.agent.v1.EndpointConfigR\tendpoints\"\xfd\x01\n" +
+	"\tendpoints\x18\x01 \x03(\v2\x1e.pivox.agent.v1.EndpointConfigR\tendpoints\x12'\n" +
+	"\x0fdenied_patterns\x18\x02 \x03(\tR\x0edeniedPatterns\"\xfd\x01\n" +
 	"\x0eEndpointConfig\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x122\n" +
 	"\x02s3\x18\x02 \x01(\v2 .pivox.agent.v1.S3EndpointConfigH\x00R\x02s3\x12J\n" +

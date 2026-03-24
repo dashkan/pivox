@@ -319,6 +319,13 @@ message HandshakeAck {
   // The allowed CORS origin for the HTTP server (e.g. "https://app.pivox.app").
   // Dev builds may use "*".
   string cors_origin = 6;
+
+  // Full set of denied access patterns. Requests matching any pattern
+  // are rejected with 404. Patterns use glob syntax (e.g.
+  // "projects/proj1/*" denies all assets in a deleted project,
+  // "projects/proj1/assets/abc123/*" denies a single deleted asset).
+  // The agent persists these in local SQLite for crash resilience.
+  repeated string denied_patterns = 7;
 }
 
 // SessionGrant pushes a user session to the agent. The agent stores the
@@ -412,6 +419,10 @@ message ConfigUpdate {
   // Full replacement set of endpoint configurations. Endpoints not present in
   // this list should be removed. Each endpoint includes its own cache config.
   repeated EndpointConfig endpoints = 1;
+
+  // Updated denied access patterns. Full replacement — the agent replaces
+  // its entire denied_patterns set with this list.
+  repeated string denied_patterns = 2;
 }
 
 // ---------------------------------------------------------------------------

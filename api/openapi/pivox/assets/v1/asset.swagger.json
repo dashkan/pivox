@@ -1,0 +1,1180 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "pivox/assets/v1/asset.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "Assets"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/organizations/{organization}/projects/{project}/assets": {
+      "get": {
+        "summary": "Lists assets in a project.",
+        "operationId": "Assets_ListAssets",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListAssetsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Optional. The maximum number of assets to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. A pagination token returned from a previous call.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "filter",
+            "description": "Optional. An expression for filtering the results.\nFilterable fields:\n\n+ `state`\n+ `mediaType`\n+ `mimeType`\n+ `displayName`\n+ `path`\n+ `creator`\n+ `createTime` (supports comparison operators)\n+ `expireTime` (supports comparison operators)\n\nExamples:\n\n+ `state = ACTIVE` — only active assets.\n+ `mediaType = VIDEO` — only video assets.\n+ `path = \"/sports/*\"` — assets under the sports path.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "description": "Optional. A comma-separated list of fields to order by.\nSupported fields:\n\n+ `displayName`\n+ `createTime`\n+ `updateTime`\n+ `sizeBytes`\n+ `name`\n\nExample: `createTime desc, displayName`",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "showDeleted",
+            "description": "Optional. If true, include soft-deleted assets in the response.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "Assets"
+        ]
+      },
+      "post": {
+        "summary": "Creates a new asset in the specified project. The asset undergoes\na full ingestion pipeline as a long-running operation including\nformat validation, metadata extraction, thumbnail generation,\nand AI processing.",
+        "description": "If no endpoint or filename is provided, a PLACEHOLDER asset is\ncreated for the Request workflow.\n\nThe caller must have `assets.assets.create` permission on the parent\nproject.",
+        "operationId": "Assets_CreateAsset",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/longrunningOperation"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "asset",
+            "description": "Required. The asset to create. Must include display_name. If no\nendpoint/filename/size_bytes are provided, a PLACEHOLDER asset is\ncreated (no file upload, used by the Request workflow).",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1Asset"
+            }
+          },
+          {
+            "name": "endpoint",
+            "description": "Optional. The storage endpoint to store the asset on. Format:\n`organizations/{organization}/storageGateways/{gateway}/endpoints/{endpoint}`\n\nRequired for file uploads. Omit when creating a PLACEHOLDER asset\n(the endpoint is set when the asset is fulfilled).",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "filename",
+            "description": "Optional. The original filename from the client. Used to determine\nmedia type if magic bytes are ambiguous.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "sizeBytes",
+            "description": "Optional. The file size in bytes. Required for multipart uploads\nso the server can compute part boundaries.",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "validateOnly",
+            "description": "Optional. If set to true, the request will only validate the\nrequest without persisting it.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "Assets"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/projects/{project}/assets/{asset}": {
+      "get": {
+        "summary": "Retrieves an asset by resource name.",
+        "operationId": "Assets_GetAsset",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Asset"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "asset",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Assets"
+        ]
+      },
+      "delete": {
+        "summary": "Soft-deletes an asset. The asset enters DELETE_REQUESTED state and\nwill be purged after the retention period. Can be restored with\nUndeleteAsset before purge.",
+        "operationId": "Assets_DeleteAsset",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/longrunningOperation"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "asset",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "etag",
+            "description": "Optional. The etag for optimistic concurrency.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "force",
+            "description": "Optional. If true, delete the asset even if it has versions.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "validateOnly",
+            "description": "Optional. If set to true, validate only without persisting.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "Assets"
+        ]
+      },
+      "patch": {
+        "summary": "Updates an asset's mutable fields (display_name, path, annotations).\nFile content is immutable — create a new version instead.",
+        "operationId": "Assets_UpdateAsset",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/longrunningOperation"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "asset",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "asset",
+            "description": "Required. The asset with updated fields.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "displayName": {
+                  "type": "string",
+                  "description": "Required. A human-readable name for the asset."
+                },
+                "state": {
+                  "$ref": "#/definitions/v1AssetState",
+                  "description": "Output only. The current lifecycle state.",
+                  "readOnly": true
+                },
+                "mediaType": {
+                  "$ref": "#/definitions/AssetMediaType",
+                  "description": "Output only. The broad media category, determined during ingestion\nfrom the file's MIME type.",
+                  "readOnly": true
+                },
+                "mimeType": {
+                  "type": "string",
+                  "description": "Output only. The MIME type of the original file (e.g. `image/jpeg`,\n`video/mp4`). Determined from magic bytes during ingestion, not\nfrom the file extension.",
+                  "readOnly": true
+                },
+                "path": {
+                  "type": "string",
+                  "description": "Optional. An organizational path for display grouping (e.g.\n`/sports/highlights/2026/`). Not enforced as a hierarchy — purely\nfor UI presentation and filesystem import preservation. Use tags\nfor structured categorization."
+                },
+                "endpoint": {
+                  "type": "string",
+                  "title": "Output only. The storage endpoint where the asset's files are stored.\nFormat: `organizations/{organization}/storageGateways/{gateway}/endpoints/{endpoint}`",
+                  "readOnly": true
+                },
+                "checksumSha256": {
+                  "type": "string",
+                  "description": "Output only. SHA-256 checksum of the original file. Used for\ndeduplication — if a file with the same checksum already exists\nin the project, the existing asset is returned instead of creating\na duplicate.",
+                  "readOnly": true
+                },
+                "sizeBytes": {
+                  "type": "string",
+                  "format": "int64",
+                  "description": "Output only. Size of the original file in bytes.",
+                  "readOnly": true
+                },
+                "latestVersion": {
+                  "$ref": "#/definitions/v1AssetVersion",
+                  "description": "Output only. The latest version of the asset.",
+                  "readOnly": true
+                },
+                "versionCount": {
+                  "type": "integer",
+                  "format": "int32",
+                  "description": "Output only. Total number of versions.",
+                  "readOnly": true
+                },
+                "technicalMetadata": {
+                  "type": "object",
+                  "description": "Output only. Technical metadata extracted from the file (EXIF, XMP).\nJunk metadata (Adobe comments, software tags) is stripped.\nStored as a structured JSON object — fields vary by media type.",
+                  "readOnly": true
+                },
+                "aiDescription": {
+                  "type": "string",
+                  "description": "Output only. AI-generated description of the asset's visual or\naudio content. Used for semantic search.",
+                  "readOnly": true
+                },
+                "transcription": {
+                  "type": "string",
+                  "description": "Output only. Transcription of audio/video content. Indexed for\nfull-text search.",
+                  "readOnly": true
+                },
+                "duration": {
+                  "type": "string",
+                  "description": "Output only. Duration of the media, for video and audio assets.",
+                  "readOnly": true
+                },
+                "width": {
+                  "type": "integer",
+                  "format": "int32",
+                  "description": "Output only. Width in pixels, for image and video assets.",
+                  "readOnly": true
+                },
+                "height": {
+                  "type": "integer",
+                  "format": "int32",
+                  "description": "Output only. Height in pixels, for image and video assets.",
+                  "readOnly": true
+                },
+                "expireTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Optional. The time at which this asset should expire. When set,\na background reaper will soft-delete the asset after this time.\nCan be set directly or via a retention policy (tag-based rules)."
+                },
+                "ttl": {
+                  "type": "string",
+                  "description": "Input only. The time-to-live for the asset, as an alternative to\nsetting expire_time directly. The server computes expire_time from\ncreate_time + ttl."
+                },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "Optional. Annotations associated with this asset."
+                },
+                "etag": {
+                  "type": "string",
+                  "description": "Output only. A checksum computed by the server based on the current\nvalue of the Asset resource.",
+                  "readOnly": true
+                },
+                "creator": {
+                  "type": "string",
+                  "description": "Output only. The user who created the asset.",
+                  "readOnly": true
+                },
+                "updater": {
+                  "type": "string",
+                  "description": "Output only. The user who last updated the asset.",
+                  "readOnly": true
+                },
+                "createTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when the asset was created.",
+                  "readOnly": true
+                },
+                "updateTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when the asset was last modified.",
+                  "readOnly": true
+                },
+                "deleteTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. The time at which the asset was soft-deleted.",
+                  "readOnly": true
+                },
+                "purgeTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. The time at which the asset will be permanently purged.",
+                  "readOnly": true
+                }
+              },
+              "title": "Required. The asset with updated fields.",
+              "required": [
+                "displayName"
+              ]
+            }
+          },
+          {
+            "name": "validateOnly",
+            "description": "Optional. If set to true, validate only without persisting.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "Assets"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/projects/{project}/assets/{asset}/versions": {
+      "get": {
+        "summary": "Lists all versions of an asset.",
+        "operationId": "Assets_ListAssetVersions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListAssetVersionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "asset",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Optional. The maximum number of versions to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. A pagination token from a previous call.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Assets"
+        ]
+      },
+      "post": {
+        "summary": "Creates a new version of an existing asset. Runs the same ingestion\npipeline as CreateAsset. The new version becomes the latest version.\nPrevious versions remain accessible.",
+        "operationId": "Assets_CreateAssetVersion",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/longrunningOperation"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "asset",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "assetVersion",
+            "description": "Required. The version to create.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1AssetVersion"
+            }
+          },
+          {
+            "name": "filename",
+            "description": "Optional. The original filename from the client.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "sizeBytes",
+            "description": "Optional. The file size in bytes. Required for multipart uploads.",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "int64"
+          }
+        ],
+        "tags": [
+          "Assets"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/projects/{project}/assets/{asset}/versions/{version}": {
+      "get": {
+        "summary": "Retrieves a specific version of an asset.",
+        "operationId": "Assets_GetAssetVersion",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1AssetVersion"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "asset",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Assets"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/projects/{project}/assets/{asset}:undelete": {
+      "post": {
+        "summary": "Restores a soft-deleted asset.",
+        "operationId": "Assets_UndeleteAsset",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/longrunningOperation"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "asset",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AssetsUndeleteAssetBody"
+            }
+          }
+        ],
+        "tags": [
+          "Assets"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/projects/{project}/assets:import": {
+      "post": {
+        "summary": "Imports assets from a storage endpoint path. Recursively scans\nthe path, creates asset resources, and runs the ingestion pipeline\nfor each discovered file. Returns an LRO that tracks overall\nimport progress.",
+        "description": "The caller must have `assets.assets.create` permission on the\nparent project and `storage.endpoints.get` on the source endpoint.",
+        "operationId": "Assets_ImportAssets",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/longrunningOperation"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AssetsImportAssetsBody"
+            }
+          }
+        ],
+        "tags": [
+          "Assets"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "AssetMediaType": {
+      "type": "string",
+      "enum": [
+        "MEDIA_TYPE_UNSPECIFIED",
+        "IMAGE",
+        "VIDEO",
+        "AUDIO",
+        "GRAPHIC",
+        "DOCUMENT"
+      ],
+      "default": "MEDIA_TYPE_UNSPECIFIED",
+      "description": "The broad media category of the asset.\n\n - MEDIA_TYPE_UNSPECIFIED: Unspecified media type.\n - IMAGE: Still image (JPEG, PNG, TIFF, WebP, etc.).\n - VIDEO: Video file (MP4, MOV, MXF, ProRes, etc.).\n - AUDIO: Audio file (WAV, MP3, AAC, FLAC, etc.).\n - GRAPHIC: Motion graphics or vector (SVG, Lottie, Rive, etc.).\n - DOCUMENT: Document (PDF, PSD, AI, etc.)."
+    },
+    "AssetsImportAssetsBody": {
+      "type": "object",
+      "properties": {
+        "endpoint": {
+          "type": "string",
+          "title": "Required. The storage endpoint to scan. Format:\n`organizations/{organization}/storageGateways/{gateway}/endpoints/{endpoint}`"
+        },
+        "pathPrefix": {
+          "type": "string",
+          "description": "Optional. The path prefix to scan within the endpoint. If empty,\nscans the entire endpoint."
+        },
+        "preservePaths": {
+          "type": "boolean",
+          "description": "Optional. If true, preserve the filesystem directory structure\nas the asset path field."
+        },
+        "autoTag": {
+          "type": "boolean",
+          "description": "Optional. If true, run AI auto-tagging on imported assets.\nDefaults to true."
+        }
+      },
+      "description": "The request sent to the ImportAssets method.",
+      "required": [
+        "endpoint"
+      ]
+    },
+    "AssetsUndeleteAssetBody": {
+      "type": "object",
+      "properties": {
+        "etag": {
+          "type": "string",
+          "description": "Optional. The etag for optimistic concurrency."
+        }
+      },
+      "description": "The request sent to the UndeleteAsset method."
+    },
+    "longrunningOperation": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The server-assigned name, which is only unique within the same service that\noriginally returns it. If you use the default HTTP mapping, the\n`name` should be a resource name ending with `operations/{unique_id}`."
+        },
+        "metadata": {
+          "$ref": "#/definitions/protobufAny",
+          "description": "Service-specific metadata associated with the operation.  It typically\ncontains progress information and common metadata such as create time.\nSome services might not provide such metadata.  Any method that returns a\nlong-running operation should document the metadata type, if any."
+        },
+        "done": {
+          "type": "boolean",
+          "description": "If the value is `false`, it means the operation is still in progress.\nIf `true`, the operation is completed, and either `error` or `response` is\navailable."
+        },
+        "error": {
+          "$ref": "#/definitions/rpcStatus",
+          "description": "The error result of the operation in case of failure or cancellation."
+        },
+        "response": {
+          "$ref": "#/definitions/protobufAny",
+          "description": "The normal, successful response of the operation.  If the original\nmethod returns no data on success, such as `Delete`, the response is\n`google.protobuf.Empty`.  If the original method is standard\n`Get`/`Create`/`Update`, the response should be the resource.  For other\nmethods, the response should have the type `XxxResponse`, where `Xxx`\nis the original method name.  For example, if the original method name\nis `TakeSnapshot()`, the inferred response type is\n`TakeSnapshotResponse`."
+        }
+      },
+      "description": "This resource represents a long-running operation that is the result of a\nnetwork API call."
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string",
+          "description": "A URL/resource name that uniquely identifies the type of the serialized\nprotocol buffer message. This string must contain at least\none \"/\" character. The last segment of the URL's path must represent\nthe fully qualified name of the type (as in\n`path/google.protobuf.Duration`). The name should be in a canonical form\n(e.g., leading \".\" is not accepted).\n\nIn practice, teams usually precompile into the binary all types that they\nexpect it to use in the context of Any. However, for URLs which use the\nscheme `http`, `https`, or no scheme, one can optionally set up a type\nserver that maps type URLs to message definitions as follows:\n\n* If no scheme is provided, `https` is assumed.\n* An HTTP GET on the URL must yield a [google.protobuf.Type][]\n  value in binary format, or produce an error.\n* Applications are allowed to cache lookup results based on the\n  URL, or have them precompiled into a binary to avoid any\n  lookup. Therefore, binary compatibility needs to be preserved\n  on changes to types. (Use versioned type names to manage\n  breaking changes.)\n\nNote: this functionality is not currently available in the official\nprotobuf release, and it is not used for type URLs beginning with\ntype.googleapis.com. As of May 2023, there are no widely used type server\nimplementations and no plans to implement one.\n\nSchemes other than `http`, `https` (or the empty scheme) might be\nused with implementation specific semantics."
+        }
+      },
+      "additionalProperties": {},
+      "description": "`Any` contains an arbitrary serialized protocol buffer message along with a\nURL that describes the type of the serialized message.\n\nProtobuf library provides support to pack/unpack Any values in the form\nof utility functions or additional generated methods of the Any type.\n\nExample 1: Pack and unpack a message in C++.\n\n    Foo foo = ...;\n    Any any;\n    any.PackFrom(foo);\n    ...\n    if (any.UnpackTo(\u0026foo)) {\n      ...\n    }\n\nExample 2: Pack and unpack a message in Java.\n\n    Foo foo = ...;\n    Any any = Any.pack(foo);\n    ...\n    if (any.is(Foo.class)) {\n      foo = any.unpack(Foo.class);\n    }\n    // or ...\n    if (any.isSameTypeAs(Foo.getDefaultInstance())) {\n      foo = any.unpack(Foo.getDefaultInstance());\n    }\n\n Example 3: Pack and unpack a message in Python.\n\n    foo = Foo(...)\n    any = Any()\n    any.Pack(foo)\n    ...\n    if any.Is(Foo.DESCRIPTOR):\n      any.Unpack(foo)\n      ...\n\n Example 4: Pack and unpack a message in Go\n\n     foo := \u0026pb.Foo{...}\n     any, err := anypb.New(foo)\n     if err != nil {\n       ...\n     }\n     ...\n     foo := \u0026pb.Foo{}\n     if err := any.UnmarshalTo(foo); err != nil {\n       ...\n     }\n\nThe pack methods provided by protobuf library will by default use\n'type.googleapis.com/full.type.name' as the type URL and the unpack\nmethods only use the fully qualified type name after the last '/'\nin the type URL, for example \"foo.bar.com/x/y.z\" will yield type\nname \"y.z\".\n\nJSON\n====\nThe JSON representation of an `Any` value uses the regular\nrepresentation of the deserialized, embedded message, with an\nadditional field `@type` which contains the type URL. Example:\n\n    package google.profile;\n    message Person {\n      string first_name = 1;\n      string last_name = 2;\n    }\n\n    {\n      \"@type\": \"type.googleapis.com/google.profile.Person\",\n      \"firstName\": \u003cstring\u003e,\n      \"lastName\": \u003cstring\u003e\n    }\n\nIf the embedded message type is well-known and has a custom JSON\nrepresentation, that representation will be embedded adding a field\n`value` which holds the custom JSON in addition to the `@type`\nfield. Example (for message [google.protobuf.Duration][]):\n\n    {\n      \"@type\": \"type.googleapis.com/google.protobuf.Duration\",\n      \"value\": \"1.212s\"\n    }"
+    },
+    "protobufNullValue": {
+      "type": "string",
+      "enum": [
+        "NULL_VALUE"
+      ],
+      "default": "NULL_VALUE",
+      "description": "`NullValue` is a singleton enumeration to represent the null value for the\n`Value` type union.\n\nThe JSON representation for `NullValue` is JSON `null`.\n\n - NULL_VALUE: Null value."
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32",
+          "description": "The status code, which should be an enum value of\n[google.rpc.Code][google.rpc.Code]."
+        },
+        "message": {
+          "type": "string",
+          "description": "A developer-facing error message, which should be in English. Any\nuser-facing error message should be localized and sent in the\n[google.rpc.Status.details][google.rpc.Status.details] field, or localized\nby the client."
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          },
+          "description": "A list of messages that carry the error details.  There is a common set of\nmessage types for APIs to use."
+        }
+      },
+      "description": "The `Status` type defines a logical error model that is suitable for\ndifferent programming environments, including REST APIs and RPC APIs. It is\nused by [gRPC](https://github.com/grpc). Each `Status` message contains\nthree pieces of data: error code, error message, and error details.\n\nYou can find out more about this error model and how to work with it in the\n[API Design Guide](https://cloud.google.com/apis/design/errors)."
+    },
+    "v1Asset": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "Output only. The resource name of the asset. Format:\n`organizations/{organization}/projects/{project}/assets/{asset}`",
+          "readOnly": true
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Required. A human-readable name for the asset."
+        },
+        "state": {
+          "$ref": "#/definitions/v1AssetState",
+          "description": "Output only. The current lifecycle state.",
+          "readOnly": true
+        },
+        "mediaType": {
+          "$ref": "#/definitions/AssetMediaType",
+          "description": "Output only. The broad media category, determined during ingestion\nfrom the file's MIME type.",
+          "readOnly": true
+        },
+        "mimeType": {
+          "type": "string",
+          "description": "Output only. The MIME type of the original file (e.g. `image/jpeg`,\n`video/mp4`). Determined from magic bytes during ingestion, not\nfrom the file extension.",
+          "readOnly": true
+        },
+        "path": {
+          "type": "string",
+          "description": "Optional. An organizational path for display grouping (e.g.\n`/sports/highlights/2026/`). Not enforced as a hierarchy — purely\nfor UI presentation and filesystem import preservation. Use tags\nfor structured categorization."
+        },
+        "endpoint": {
+          "type": "string",
+          "title": "Output only. The storage endpoint where the asset's files are stored.\nFormat: `organizations/{organization}/storageGateways/{gateway}/endpoints/{endpoint}`",
+          "readOnly": true
+        },
+        "checksumSha256": {
+          "type": "string",
+          "description": "Output only. SHA-256 checksum of the original file. Used for\ndeduplication — if a file with the same checksum already exists\nin the project, the existing asset is returned instead of creating\na duplicate.",
+          "readOnly": true
+        },
+        "sizeBytes": {
+          "type": "string",
+          "format": "int64",
+          "description": "Output only. Size of the original file in bytes.",
+          "readOnly": true
+        },
+        "latestVersion": {
+          "$ref": "#/definitions/v1AssetVersion",
+          "description": "Output only. The latest version of the asset.",
+          "readOnly": true
+        },
+        "versionCount": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Output only. Total number of versions.",
+          "readOnly": true
+        },
+        "technicalMetadata": {
+          "type": "object",
+          "description": "Output only. Technical metadata extracted from the file (EXIF, XMP).\nJunk metadata (Adobe comments, software tags) is stripped.\nStored as a structured JSON object — fields vary by media type.",
+          "readOnly": true
+        },
+        "aiDescription": {
+          "type": "string",
+          "description": "Output only. AI-generated description of the asset's visual or\naudio content. Used for semantic search.",
+          "readOnly": true
+        },
+        "transcription": {
+          "type": "string",
+          "description": "Output only. Transcription of audio/video content. Indexed for\nfull-text search.",
+          "readOnly": true
+        },
+        "duration": {
+          "type": "string",
+          "description": "Output only. Duration of the media, for video and audio assets.",
+          "readOnly": true
+        },
+        "width": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Output only. Width in pixels, for image and video assets.",
+          "readOnly": true
+        },
+        "height": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Output only. Height in pixels, for image and video assets.",
+          "readOnly": true
+        },
+        "expireTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Optional. The time at which this asset should expire. When set,\na background reaper will soft-delete the asset after this time.\nCan be set directly or via a retention policy (tag-based rules)."
+        },
+        "ttl": {
+          "type": "string",
+          "description": "Input only. The time-to-live for the asset, as an alternative to\nsetting expire_time directly. The server computes expire_time from\ncreate_time + ttl."
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Optional. Annotations associated with this asset."
+        },
+        "etag": {
+          "type": "string",
+          "description": "Output only. A checksum computed by the server based on the current\nvalue of the Asset resource.",
+          "readOnly": true
+        },
+        "creator": {
+          "type": "string",
+          "description": "Output only. The user who created the asset.",
+          "readOnly": true
+        },
+        "updater": {
+          "type": "string",
+          "description": "Output only. The user who last updated the asset.",
+          "readOnly": true
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the asset was created.",
+          "readOnly": true
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the asset was last modified.",
+          "readOnly": true
+        },
+        "deleteTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. The time at which the asset was soft-deleted.",
+          "readOnly": true
+        },
+        "purgeTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. The time at which the asset will be permanently purged.",
+          "readOnly": true
+        }
+      },
+      "description": "A media asset. Assets are immutable — file content cannot be changed\nafter creation. Use versions for new iterations of the same logical\nasset. Assets are flat (no folder hierarchy); use tags for organization\nand the optional path field for display grouping.",
+      "required": [
+        "displayName"
+      ]
+    },
+    "v1AssetState": {
+      "type": "string",
+      "enum": [
+        "STATE_UNSPECIFIED",
+        "PLACEHOLDER",
+        "PROCESSING",
+        "ACTIVE",
+        "FAILED",
+        "DELETE_REQUESTED"
+      ],
+      "default": "STATE_UNSPECIFIED",
+      "description": "Asset lifecycle states.\n\n - STATE_UNSPECIFIED: Unspecified state.\n - PLACEHOLDER: The asset is a placeholder with no file content. Created by\nthe Request workflow — the file will be provided when an\nartist fulfills the associated line item.\n - PROCESSING: The asset is being ingested (upload, metadata extraction,\nthumbnail generation, AI processing).\n - ACTIVE: The asset is fully ingested and available.\n - FAILED: An ingestion step failed. Check the latest version's\ningestion_error for details.\n - DELETE_REQUESTED: The asset has been marked for deletion. Can be restored\nwith UndeleteAsset before purge_time."
+    },
+    "v1AssetVersion": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "Output only. The resource name of the version. Format:\n`organizations/{organization}/projects/{project}/assets/{asset}/versions/{version}`",
+          "readOnly": true
+        },
+        "versionNumber": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Output only. The sequential version number (1, 2, 3...).",
+          "readOnly": true
+        },
+        "checksumSha256": {
+          "type": "string",
+          "description": "Output only. SHA-256 checksum of this version's file.",
+          "readOnly": true
+        },
+        "sizeBytes": {
+          "type": "string",
+          "format": "int64",
+          "description": "Output only. Size of this version's file in bytes.",
+          "readOnly": true
+        },
+        "mimeType": {
+          "type": "string",
+          "description": "Output only. MIME type of this version's file.",
+          "readOnly": true
+        },
+        "storageKey": {
+          "type": "string",
+          "description": "Output only. The storage object key for the original file.",
+          "readOnly": true
+        },
+        "renditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Rendition"
+          },
+          "description": "Output only. Generated renditions (thumbnails, proxies, previews).",
+          "readOnly": true
+        },
+        "changeNote": {
+          "type": "string",
+          "description": "Optional. A note describing what changed in this version."
+        },
+        "ingestionError": {
+          "type": "string",
+          "description": "Output only. If the ingestion pipeline failed, the error details.",
+          "readOnly": true
+        },
+        "creator": {
+          "type": "string",
+          "description": "Output only. The user who created this version.",
+          "readOnly": true
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when this version was created.",
+          "readOnly": true
+        }
+      },
+      "description": "A specific version of an asset. Each version represents a distinct\nfile upload. Versions are immutable once created. The asset's\nlatest_version field always points to the most recent version."
+    },
+    "v1ListAssetVersionsResponse": {
+      "type": "object",
+      "properties": {
+        "versions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1AssetVersion"
+          },
+          "description": "The versions of the specified asset, ordered by version_number descending."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "A pagination token for the next page."
+        }
+      },
+      "description": "The response from the ListAssetVersions method."
+    },
+    "v1ListAssetsResponse": {
+      "type": "object",
+      "properties": {
+        "assets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Asset"
+          },
+          "description": "The assets belonging to the specified project."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "A pagination token for the next page."
+        }
+      },
+      "description": "The response from the ListAssets method."
+    },
+    "v1Rendition": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "#/definitions/v1RenditionType",
+          "description": "Output only. The rendition type.",
+          "readOnly": true
+        },
+        "storageKey": {
+          "type": "string",
+          "description": "Output only. The storage object key for this rendition.",
+          "readOnly": true
+        },
+        "mimeType": {
+          "type": "string",
+          "description": "Output only. MIME type of the rendition.",
+          "readOnly": true
+        },
+        "width": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Output only. Width in pixels (for image/video renditions).",
+          "readOnly": true
+        },
+        "height": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Output only. Height in pixels (for image/video renditions).",
+          "readOnly": true
+        },
+        "sizeBytes": {
+          "type": "string",
+          "format": "int64",
+          "description": "Output only. Size of the rendition in bytes.",
+          "readOnly": true
+        }
+      },
+      "description": "A generated rendition of an asset version (thumbnail, proxy, preview)."
+    },
+    "v1RenditionType": {
+      "type": "string",
+      "enum": [
+        "TYPE_UNSPECIFIED",
+        "THUMBNAIL_SMALL",
+        "THUMBNAIL_MEDIUM",
+        "THUMBNAIL_LARGE",
+        "ANIMATED_PREVIEW",
+        "VIDEO_PROXY",
+        "AUDIO_PREVIEW",
+        "POSTER_FRAME"
+      ],
+      "default": "TYPE_UNSPECIFIED",
+      "description": "The type of rendition.\n\n - TYPE_UNSPECIFIED: Unspecified rendition type.\n - THUMBNAIL_SMALL: Small thumbnail (e.g. 150x150).\n - THUMBNAIL_MEDIUM: Medium thumbnail (e.g. 400x400).\n - THUMBNAIL_LARGE: Large thumbnail (e.g. 800x800).\n - ANIMATED_PREVIEW: Animated preview for video (short WebP/GIF loop).\n - VIDEO_PROXY: Video proxy for web playback (H.264 720p).\n - AUDIO_PREVIEW: Audio preview (MP3, short clip or full).\n - POSTER_FRAME: Poster frame extracted from video."
+    }
+  }
+}

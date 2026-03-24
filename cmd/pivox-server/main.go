@@ -34,8 +34,12 @@ import (
 	"github.com/dashkan/pivox/internal/service/storage"
 	"github.com/dashkan/pivox/internal/service/tags"
 
+	"github.com/dashkan/pivox/internal/service/assets"
+	"github.com/dashkan/pivox/internal/service/requests"
+
 	agentv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/agent/v1"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
+	assetsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1"
 	storagev1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"
 )
 
@@ -179,6 +183,10 @@ func serve(cmd *cobra.Command, args []string) error {
 	storagev1.RegisterAgentsServer(grpcServer, storage.NewAgentsServer(queries))
 	storagev1.RegisterEndpointsServer(grpcServer, storage.NewEndpointsServer(pool, queries, enc))
 
+	// Asset and request services
+	assetsv1.RegisterAssetsServer(grpcServer, assets.NewAssetsServer(pool, queries))
+	assetsv1.RegisterRequestsServer(grpcServer, requests.NewRequestsServer(pool, queries))
+
 	// Agent bidi streaming service (agents authenticate via registration token, not Firebase)
 	agentv1.RegisterAgentServiceServer(grpcServer, storage.NewAgentServiceServer(pool, queries, logger, connMgr))
 
@@ -212,6 +220,8 @@ func serve(cmd *cobra.Command, args []string) error {
 		storagev1.RegisterStorageGatewaysHandlerFromEndpoint,
 		storagev1.RegisterAgentsHandlerFromEndpoint,
 		storagev1.RegisterEndpointsHandlerFromEndpoint,
+		assetsv1.RegisterAssetsHandlerFromEndpoint,
+		assetsv1.RegisterRequestsHandlerFromEndpoint,
 	} {
 		if err := reg(ctx, gwMux, grpcEndpoint, dialOpts); err != nil {
 			return fmt.Errorf("register REST gateway: %w", err)

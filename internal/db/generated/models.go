@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/pgvector/pgvector-go"
 )
 
 type AgentState string
@@ -57,6 +58,96 @@ func (ns NullAgentState) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.AgentState), nil
+}
+
+type AssetMediaType string
+
+const (
+	AssetMediaTypeIMAGE    AssetMediaType = "IMAGE"
+	AssetMediaTypeVIDEO    AssetMediaType = "VIDEO"
+	AssetMediaTypeAUDIO    AssetMediaType = "AUDIO"
+	AssetMediaTypeGRAPHIC  AssetMediaType = "GRAPHIC"
+	AssetMediaTypeDOCUMENT AssetMediaType = "DOCUMENT"
+)
+
+func (e *AssetMediaType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AssetMediaType(s)
+	case string:
+		*e = AssetMediaType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AssetMediaType: %T", src)
+	}
+	return nil
+}
+
+type NullAssetMediaType struct {
+	AssetMediaType AssetMediaType `json:"asset_media_type"`
+	Valid          bool           `json:"valid"` // Valid is true if AssetMediaType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAssetMediaType) Scan(value interface{}) error {
+	if value == nil {
+		ns.AssetMediaType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AssetMediaType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAssetMediaType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AssetMediaType), nil
+}
+
+type AssetState string
+
+const (
+	AssetStatePLACEHOLDER     AssetState = "PLACEHOLDER"
+	AssetStatePROCESSING      AssetState = "PROCESSING"
+	AssetStateACTIVE          AssetState = "ACTIVE"
+	AssetStateFAILED          AssetState = "FAILED"
+	AssetStateDELETEREQUESTED AssetState = "DELETE_REQUESTED"
+)
+
+func (e *AssetState) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AssetState(s)
+	case string:
+		*e = AssetState(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AssetState: %T", src)
+	}
+	return nil
+}
+
+type NullAssetState struct {
+	AssetState AssetState `json:"asset_state"`
+	Valid      bool       `json:"valid"` // Valid is true if AssetState is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAssetState) Scan(value interface{}) error {
+	if value == nil {
+		ns.AssetState, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AssetState.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAssetState) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AssetState), nil
 }
 
 type CertState string
@@ -278,6 +369,51 @@ func (ns NullInvitationState) Value() (driver.Value, error) {
 	return string(ns.InvitationState), nil
 }
 
+type LineItemState string
+
+const (
+	LineItemStatePENDING           LineItemState = "PENDING"
+	LineItemStateINPROGRESS        LineItemState = "IN_PROGRESS"
+	LineItemStateDELIVERED         LineItemState = "DELIVERED"
+	LineItemStateAPPROVED          LineItemState = "APPROVED"
+	LineItemStateREVISIONREQUESTED LineItemState = "REVISION_REQUESTED"
+)
+
+func (e *LineItemState) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = LineItemState(s)
+	case string:
+		*e = LineItemState(s)
+	default:
+		return fmt.Errorf("unsupported scan type for LineItemState: %T", src)
+	}
+	return nil
+}
+
+type NullLineItemState struct {
+	LineItemState LineItemState `json:"line_item_state"`
+	Valid         bool          `json:"valid"` // Valid is true if LineItemState is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullLineItemState) Scan(value interface{}) error {
+	if value == nil {
+		ns.LineItemState, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.LineItemState.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullLineItemState) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.LineItemState), nil
+}
+
 type ProjectMemberType string
 
 const (
@@ -361,6 +497,145 @@ func (ns NullProjectRole) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.ProjectRole), nil
+}
+
+type RenditionType string
+
+const (
+	RenditionTypeTHUMBNAILSMALL  RenditionType = "THUMBNAIL_SMALL"
+	RenditionTypeTHUMBNAILMEDIUM RenditionType = "THUMBNAIL_MEDIUM"
+	RenditionTypeTHUMBNAILLARGE  RenditionType = "THUMBNAIL_LARGE"
+	RenditionTypeANIMATEDPREVIEW RenditionType = "ANIMATED_PREVIEW"
+	RenditionTypeVIDEOPROXY      RenditionType = "VIDEO_PROXY"
+	RenditionTypeAUDIOPREVIEW    RenditionType = "AUDIO_PREVIEW"
+	RenditionTypePOSTERFRAME     RenditionType = "POSTER_FRAME"
+)
+
+func (e *RenditionType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = RenditionType(s)
+	case string:
+		*e = RenditionType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for RenditionType: %T", src)
+	}
+	return nil
+}
+
+type NullRenditionType struct {
+	RenditionType RenditionType `json:"rendition_type"`
+	Valid         bool          `json:"valid"` // Valid is true if RenditionType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullRenditionType) Scan(value interface{}) error {
+	if value == nil {
+		ns.RenditionType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.RenditionType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullRenditionType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.RenditionType), nil
+}
+
+type RequestPriority string
+
+const (
+	RequestPriorityLOW    RequestPriority = "LOW"
+	RequestPriorityNORMAL RequestPriority = "NORMAL"
+	RequestPriorityHIGH   RequestPriority = "HIGH"
+	RequestPriorityURGENT RequestPriority = "URGENT"
+)
+
+func (e *RequestPriority) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = RequestPriority(s)
+	case string:
+		*e = RequestPriority(s)
+	default:
+		return fmt.Errorf("unsupported scan type for RequestPriority: %T", src)
+	}
+	return nil
+}
+
+type NullRequestPriority struct {
+	RequestPriority RequestPriority `json:"request_priority"`
+	Valid           bool            `json:"valid"` // Valid is true if RequestPriority is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullRequestPriority) Scan(value interface{}) error {
+	if value == nil {
+		ns.RequestPriority, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.RequestPriority.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullRequestPriority) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.RequestPriority), nil
+}
+
+type RequestState string
+
+const (
+	RequestStateDRAFT             RequestState = "DRAFT"
+	RequestStateOPEN              RequestState = "OPEN"
+	RequestStateINPROGRESS        RequestState = "IN_PROGRESS"
+	RequestStateDELIVERED         RequestState = "DELIVERED"
+	RequestStateAPPROVED          RequestState = "APPROVED"
+	RequestStateREVISIONREQUESTED RequestState = "REVISION_REQUESTED"
+	RequestStateREJECTED          RequestState = "REJECTED"
+	RequestStateCANCELLED         RequestState = "CANCELLED"
+)
+
+func (e *RequestState) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = RequestState(s)
+	case string:
+		*e = RequestState(s)
+	default:
+		return fmt.Errorf("unsupported scan type for RequestState: %T", src)
+	}
+	return nil
+}
+
+type NullRequestState struct {
+	RequestState RequestState `json:"request_state"`
+	Valid        bool         `json:"valid"` // Valid is true if RequestState is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullRequestState) Scan(value interface{}) error {
+	if value == nil {
+		ns.RequestState, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.RequestState.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullRequestState) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.RequestState), nil
 }
 
 type ResourceState string
@@ -523,6 +798,64 @@ type ApiKey struct {
 	PurgeTime    pgtype.Timestamptz `json:"purge_time"`
 }
 
+type Asset struct {
+	ID                uuid.UUID          `json:"id"`
+	ProjectID         uuid.UUID          `json:"project_id"`
+	EndpointID        pgtype.UUID        `json:"endpoint_id"`
+	Name              string             `json:"name"`
+	DisplayName       string             `json:"display_name"`
+	Path              string             `json:"path"`
+	MediaType         NullAssetMediaType `json:"media_type"`
+	MimeType          string             `json:"mime_type"`
+	ChecksumSha256    string             `json:"checksum_sha256"`
+	SizeBytes         int64              `json:"size_bytes"`
+	TechnicalMetadata json.RawMessage    `json:"technical_metadata"`
+	AiDescription     string             `json:"ai_description"`
+	Transcription     string             `json:"transcription"`
+	DurationSeconds   pgtype.Float8      `json:"duration_seconds"`
+	Width             pgtype.Int4        `json:"width"`
+	Height            pgtype.Int4        `json:"height"`
+	Annotations       json.RawMessage    `json:"annotations"`
+	SearchVector      interface{}        `json:"search_vector"`
+	Embedding         pgvector.Vector    `json:"embedding"`
+	State             AssetState         `json:"state"`
+	Etag              string             `json:"etag"`
+	Revision          int32              `json:"revision"`
+	CreatedBy         string             `json:"created_by"`
+	UpdatedBy         string             `json:"updated_by"`
+	DeletedBy         string             `json:"deleted_by"`
+	CreateTime        time.Time          `json:"create_time"`
+	UpdateTime        time.Time          `json:"update_time"`
+	DeleteTime        pgtype.Timestamptz `json:"delete_time"`
+	PurgeTime         pgtype.Timestamptz `json:"purge_time"`
+	ExpireTime        pgtype.Timestamptz `json:"expire_time"`
+}
+
+type AssetRendition struct {
+	ID         uuid.UUID     `json:"id"`
+	VersionID  uuid.UUID     `json:"version_id"`
+	Type       RenditionType `json:"type"`
+	StorageKey string        `json:"storage_key"`
+	MimeType   string        `json:"mime_type"`
+	Width      pgtype.Int4   `json:"width"`
+	Height     pgtype.Int4   `json:"height"`
+	SizeBytes  int64         `json:"size_bytes"`
+}
+
+type AssetVersion struct {
+	ID             uuid.UUID `json:"id"`
+	AssetID        uuid.UUID `json:"asset_id"`
+	VersionNumber  int32     `json:"version_number"`
+	ChecksumSha256 string    `json:"checksum_sha256"`
+	SizeBytes      int64     `json:"size_bytes"`
+	MimeType       string    `json:"mime_type"`
+	StorageKey     string    `json:"storage_key"`
+	ChangeNote     string    `json:"change_note"`
+	IngestionError string    `json:"ingestion_error"`
+	CreatedBy      string    `json:"created_by"`
+	CreateTime     time.Time `json:"create_time"`
+}
+
 type AuthTokenCode struct {
 	Code       uuid.UUID `json:"code"`
 	IDToken    string    `json:"id_token"`
@@ -603,6 +936,21 @@ type InvitationPolicy struct {
 	UpdateTime                  time.Time `json:"update_time"`
 }
 
+type LineItem struct {
+	ID          uuid.UUID          `json:"id"`
+	RequestID   uuid.UUID          `json:"request_id"`
+	AssetID     pgtype.UUID        `json:"asset_id"`
+	Name        string             `json:"name"`
+	DisplayName string             `json:"display_name"`
+	Description string             `json:"description"`
+	MediaType   NullAssetMediaType `json:"media_type"`
+	Annotations json.RawMessage    `json:"annotations"`
+	State       LineItemState      `json:"state"`
+	CreatedBy   string             `json:"created_by"`
+	CreateTime  time.Time          `json:"create_time"`
+	UpdateTime  time.Time          `json:"update_time"`
+}
+
 type Operation struct {
 	ID           uuid.UUID   `json:"id"`
 	Prefix       string      `json:"prefix"`
@@ -674,6 +1022,30 @@ type ProjectMember struct {
 type PublicEmailDomain struct {
 	Domain     string    `json:"domain"`
 	CreateTime time.Time `json:"create_time"`
+}
+
+type Request struct {
+	ID            uuid.UUID          `json:"id"`
+	ProjectID     uuid.UUID          `json:"project_id"`
+	Name          string             `json:"name"`
+	DisplayName   string             `json:"display_name"`
+	Description   string             `json:"description"`
+	Priority      RequestPriority    `json:"priority"`
+	Assignee      string             `json:"assignee"`
+	Annotations   json.RawMessage    `json:"annotations"`
+	State         RequestState       `json:"state"`
+	Etag          string             `json:"etag"`
+	Revision      int32              `json:"revision"`
+	CreatedBy     string             `json:"created_by"`
+	UpdatedBy     string             `json:"updated_by"`
+	DeletedBy     string             `json:"deleted_by"`
+	CreateTime    time.Time          `json:"create_time"`
+	UpdateTime    time.Time          `json:"update_time"`
+	DeleteTime    pgtype.Timestamptz `json:"delete_time"`
+	PurgeTime     pgtype.Timestamptz `json:"purge_time"`
+	DueTime       pgtype.Timestamptz `json:"due_time"`
+	DeliveredTime pgtype.Timestamptz `json:"delivered_time"`
+	ApprovedTime  pgtype.Timestamptz `json:"approved_time"`
 }
 
 type Role struct {

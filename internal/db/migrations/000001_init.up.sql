@@ -718,3 +718,224 @@ CREATE TABLE auth_token_codes (
     expire_time TIMESTAMPTZ NOT NULL DEFAULT now() + INTERVAL '60 seconds'
 );
 CREATE INDEX idx_auth_token_codes_expire ON auth_token_codes (expire_time);
+
+-- ============================================================================
+-- pgvector extension (for asset semantic search)
+-- ============================================================================
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- ============================================================================
+-- Asset enum types
+-- ============================================================================
+CREATE TYPE asset_state AS ENUM (
+    'PLACEHOLDER', 'PROCESSING', 'ACTIVE', 'FAILED', 'DELETE_REQUESTED'
+);
+CREATE TYPE asset_media_type AS ENUM (
+    'IMAGE', 'VIDEO', 'AUDIO', 'GRAPHIC', 'DOCUMENT'
+);
+CREATE TYPE rendition_type AS ENUM (
+    'THUMBNAIL_SMALL', 'THUMBNAIL_MEDIUM', 'THUMBNAIL_LARGE',
+    'ANIMATED_PREVIEW', 'VIDEO_PROXY', 'AUDIO_PREVIEW', 'POSTER_FRAME'
+);
+CREATE TYPE request_state AS ENUM (
+    'DRAFT', 'OPEN', 'IN_PROGRESS', 'DELIVERED',
+    'APPROVED', 'REVISION_REQUESTED', 'REJECTED', 'CANCELLED'
+);
+CREATE TYPE request_priority AS ENUM ('LOW', 'NORMAL', 'HIGH', 'URGENT');
+CREATE TYPE line_item_state AS ENUM (
+    'PENDING', 'IN_PROGRESS', 'DELIVERED', 'APPROVED', 'REVISION_REQUESTED'
+);
+
+-- ============================================================================
+-- assets
+-- ============================================================================
+CREATE TABLE assets (
+    id                  UUID PRIMARY KEY DEFAULT uuidv7(),
+    -- relationships
+    project_id          UUID NOT NULL REFERENCES projects(id),
+    endpoint_id         UUID REFERENCES storage_endpoints(id),
+    -- identity
+    name                TEXT NOT NULL,
+    -- domain
+    display_name        TEXT NOT NULL DEFAULT '',
+    path                TEXT NOT NULL DEFAULT '',
+    media_type          asset_media_type,
+    mime_type           TEXT NOT NULL DEFAULT '',
+    checksum_sha256     TEXT NOT NULL DEFAULT '',
+    size_bytes          BIGINT NOT NULL DEFAULT 0,
+    technical_metadata  JSONB NOT NULL DEFAULT '{}',
+    ai_description      TEXT NOT NULL DEFAULT '',
+    transcription       TEXT NOT NULL DEFAULT '',
+    duration_seconds    DOUBLE PRECISION,
+    width               INTEGER,
+    height              INTEGER,
+    annotations         JSONB NOT NULL DEFAULT '{}',
+    -- search
+    search_vector       tsvector GENERATED ALWAYS AS (
+      setweight(to_tsvector('english', coalesce(display_name, '')), 'A') ||
+      setweight(to_tsvector('english', coalesce(ai_description, '')), 'B') ||
+      setweight(to_tsvector('english', coalesce(transcription, '')), 'C')
+    ) STORED,
+    embedding           vector(768),
+    -- state
+    state               asset_state NOT NULL DEFAULT 'PLACEHOLDER',
+    -- versioning
+    etag                TEXT NOT NULL DEFAULT md5(now()::text),
+    revision            INTEGER NOT NULL DEFAULT 1,
+    -- audit
+    created_by          TEXT NOT NULL DEFAULT '',
+    updated_by          TEXT NOT NULL DEFAULT '',
+    deleted_by          TEXT NOT NULL DEFAULT '',
+    -- timestamps
+    create_time         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    update_time         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    delete_time         TIMESTAMPTZ,
+    purge_time          TIMESTAMPTZ,
+    expire_time         TIMESTAMPTZ,
+    -- constraints
+    UNIQUE(project_id, name)
+);
+CREATE INDEX idx_assets_project ON assets (project_id, create_time DESC) WHERE delete_time IS NULL;
+CREATE INDEX idx_assets_state ON assets (project_id, state) WHERE delete_time IS NULL;
+CREATE INDEX idx_assets_checksum ON assets (project_id, checksum_sha256) WHERE checksum_sha256 != '';
+CREATE INDEX idx_assets_search ON assets USING GIN (search_vector);
+CREATE INDEX idx_assets_path ON assets (project_id, path) WHERE delete_time IS NULL;
+CREATE INDEX idx_assets_expire ON assets (expire_time) WHERE expire_time IS NOT NULL AND delete_time IS NULL;
+
+-- ============================================================================
+-- asset_versions
+-- ============================================================================
+CREATE TABLE asset_versions (
+    id                UUID PRIMARY KEY DEFAULT uuidv7(),
+    -- relationships
+    asset_id          UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+    -- domain
+    version_number    INTEGER NOT NULL,
+    checksum_sha256   TEXT NOT NULL DEFAULT '',
+    size_bytes        BIGINT NOT NULL DEFAULT 0,
+    mime_type         TEXT NOT NULL DEFAULT '',
+    storage_key       TEXT NOT NULL DEFAULT '',
+    change_note       TEXT NOT NULL DEFAULT '',
+    ingestion_error   TEXT NOT NULL DEFAULT '',
+    -- audit
+    created_by        TEXT NOT NULL DEFAULT '',
+    -- timestamps
+    create_time       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- constraints
+    UNIQUE(asset_id, version_number)
+);
+CREATE INDEX idx_asset_versions_asset ON asset_versions (asset_id, version_number DESC);
+
+-- ============================================================================
+-- asset_renditions
+-- ============================================================================
+CREATE TABLE asset_renditions (
+    id              UUID PRIMARY KEY DEFAULT uuidv7(),
+    -- relationships
+    version_id      UUID NOT NULL REFERENCES asset_versions(id) ON DELETE CASCADE,
+    -- domain
+    type            rendition_type NOT NULL,
+    storage_key     TEXT NOT NULL,
+    mime_type       TEXT NOT NULL DEFAULT '',
+    width           INTEGER,
+    height          INTEGER,
+    size_bytes      BIGINT NOT NULL DEFAULT 0
+);
+CREATE INDEX idx_renditions_version ON asset_renditions (version_id);
+
+-- ============================================================================
+-- requests
+-- ============================================================================
+CREATE TABLE requests (
+    id                UUID PRIMARY KEY DEFAULT uuidv7(),
+    -- relationships
+    project_id        UUID NOT NULL REFERENCES projects(id),
+    -- identity
+    name              TEXT NOT NULL,
+    -- domain
+    display_name      TEXT NOT NULL DEFAULT '',
+    description       TEXT NOT NULL DEFAULT '',
+    priority          request_priority NOT NULL DEFAULT 'NORMAL',
+    assignee          TEXT NOT NULL DEFAULT '',
+    annotations       JSONB NOT NULL DEFAULT '{}',
+    -- state
+    state             request_state NOT NULL DEFAULT 'DRAFT',
+    -- versioning
+    etag              TEXT NOT NULL DEFAULT md5(now()::text),
+    revision          INTEGER NOT NULL DEFAULT 1,
+    -- audit
+    created_by        TEXT NOT NULL DEFAULT '',
+    updated_by        TEXT NOT NULL DEFAULT '',
+    deleted_by        TEXT NOT NULL DEFAULT '',
+    -- timestamps
+    create_time       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    update_time       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    delete_time       TIMESTAMPTZ,
+    purge_time        TIMESTAMPTZ,
+    due_time          TIMESTAMPTZ,
+    delivered_time    TIMESTAMPTZ,
+    approved_time     TIMESTAMPTZ,
+    -- constraints
+    UNIQUE(project_id, name)
+);
+CREATE INDEX idx_requests_project ON requests (project_id, create_time DESC) WHERE delete_time IS NULL;
+CREATE INDEX idx_requests_state ON requests (project_id, state) WHERE delete_time IS NULL;
+CREATE INDEX idx_requests_assignee ON requests (assignee, state) WHERE assignee != '' AND delete_time IS NULL;
+
+-- ============================================================================
+-- line_items
+-- ============================================================================
+CREATE TABLE line_items (
+    id                UUID PRIMARY KEY DEFAULT uuidv7(),
+    -- relationships
+    request_id        UUID NOT NULL REFERENCES requests(id) ON DELETE CASCADE,
+    asset_id          UUID REFERENCES assets(id),
+    -- identity
+    name              TEXT NOT NULL,
+    -- domain
+    display_name      TEXT NOT NULL DEFAULT '',
+    description       TEXT NOT NULL DEFAULT '',
+    media_type        asset_media_type,
+    annotations       JSONB NOT NULL DEFAULT '{}',
+    -- state
+    state             line_item_state NOT NULL DEFAULT 'PENDING',
+    -- audit
+    created_by        TEXT NOT NULL DEFAULT '',
+    -- timestamps
+    create_time       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    update_time       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- constraints
+    UNIQUE(request_id, name)
+);
+CREATE INDEX idx_line_items_request ON line_items (request_id);
+CREATE INDEX idx_line_items_asset ON line_items (asset_id) WHERE asset_id IS NOT NULL;
+
+-- ============================================================================
+-- Asset permissions
+-- ============================================================================
+INSERT INTO permissions (permission_id, display_name, description) VALUES
+  ('assets.assets.get', 'Get Asset', 'View asset details'),
+  ('assets.assets.list', 'List Assets', 'List assets in a project'),
+  ('assets.assets.create', 'Create Asset', 'Create assets'),
+  ('assets.assets.update', 'Update Asset', 'Modify asset metadata'),
+  ('assets.assets.delete', 'Delete Asset', 'Soft-delete assets'),
+  ('assets.assets.undelete', 'Undelete Asset', 'Restore soft-deleted assets'),
+  ('assets.assets.import', 'Import Assets', 'Import assets from storage endpoint'),
+  ('assets.requests.get', 'Get Request', 'View request details'),
+  ('assets.requests.list', 'List Requests', 'List requests in a project'),
+  ('assets.requests.create', 'Create Request', 'Create asset requests'),
+  ('assets.requests.update', 'Update Request', 'Modify request details'),
+  ('assets.requests.delete', 'Delete Request', 'Soft-delete requests'),
+  ('assets.requests.assign', 'Assign Request', 'Assign artists to requests'),
+  ('assets.requests.claim', 'Claim Request', 'Self-assign to open requests'),
+  ('assets.requests.submit', 'Submit Request', 'Submit draft requests'),
+  ('assets.requests.deliver', 'Deliver Request', 'Mark requests as delivered'),
+  ('assets.requests.approve', 'Approve Request', 'Approve delivered requests'),
+  ('assets.requests.reject', 'Reject Request', 'Reject delivered requests'),
+  ('assets.requests.cancel', 'Cancel Request', 'Cancel requests'),
+  ('assets.lineItems.get', 'Get Line Item', 'View line item details'),
+  ('assets.lineItems.list', 'List Line Items', 'List line items in a request'),
+  ('assets.lineItems.create', 'Create Line Item', 'Add line items to requests'),
+  ('assets.lineItems.update', 'Update Line Item', 'Modify line item details'),
+  ('assets.lineItems.delete', 'Delete Line Item', 'Remove line items from requests'),
+  ('assets.lineItems.fulfill', 'Fulfill Line Item', 'Upload deliverable for line item');
