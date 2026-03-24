@@ -191,7 +191,6 @@ func (s *AssetsServer) CreateAsset(ctx context.Context, req *assetsv1.CreateAsse
 		EndpointID:  endpointID,
 		Name:        assetName,
 		DisplayName: asset.GetDisplayName(),
-		Path:        asset.GetPath(),
 		State:       state,
 		Annotations: annotationsJSON,
 		CreatedBy:   "",
@@ -242,8 +241,6 @@ func (s *AssetsServer) UpdateAsset(ctx context.Context, req *assetsv1.UpdateAsse
 			switch path {
 			case "display_name":
 				updateParams.DisplayName = pgtype.Text{String: asset.GetDisplayName(), Valid: true}
-			case "path":
-				updateParams.Path = pgtype.Text{String: asset.GetPath(), Valid: true}
 			case "annotations":
 				ann, _ := json.Marshal(asset.GetAnnotations())
 				updateParams.Annotations = ann
@@ -255,7 +252,6 @@ func (s *AssetsServer) UpdateAsset(ctx context.Context, req *assetsv1.UpdateAsse
 		}
 	} else {
 		updateParams.DisplayName = pgtype.Text{String: asset.GetDisplayName(), Valid: true}
-		updateParams.Path = pgtype.Text{String: asset.GetPath(), Valid: true}
 	}
 
 	result, err := s.queries.UpdateAsset(ctx, updateParams)

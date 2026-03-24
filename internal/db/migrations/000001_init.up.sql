@@ -762,7 +762,7 @@ CREATE TABLE assets (
     name                TEXT NOT NULL,
     -- domain
     display_name        TEXT NOT NULL DEFAULT '',
-    path                TEXT NOT NULL DEFAULT '',
+    import_path         TEXT NOT NULL DEFAULT '',
     media_type          asset_media_type,
     mime_type           TEXT NOT NULL DEFAULT '',
     checksum_sha256     TEXT NOT NULL DEFAULT '',
@@ -803,7 +803,7 @@ CREATE INDEX idx_assets_project ON assets (project_id, create_time DESC) WHERE d
 CREATE INDEX idx_assets_state ON assets (project_id, state) WHERE delete_time IS NULL;
 CREATE INDEX idx_assets_checksum ON assets (project_id, checksum_sha256) WHERE checksum_sha256 != '';
 CREATE INDEX idx_assets_search ON assets USING GIN (search_vector);
-CREATE INDEX idx_assets_path ON assets (project_id, path) WHERE delete_time IS NULL;
+CREATE INDEX idx_assets_import_path ON assets (project_id, import_path) WHERE delete_time IS NULL AND import_path != '';
 CREATE INDEX idx_assets_expire ON assets (expire_time) WHERE expire_time IS NOT NULL AND delete_time IS NULL;
 
 -- ============================================================================

@@ -22,7 +22,7 @@ func AssetToProto(row db.Asset, projectName string) *assetsv1.Asset {
 		DisplayName:    row.DisplayName,
 		State:          assetState(row.State),
 		ContentType:    row.MimeType,
-		Path:           row.Path,
+		ImportPath:     row.ImportPath,
 		ChecksumSha256: row.ChecksumSha256,
 		SizeBytes:      row.SizeBytes,
 		Etag:           row.Etag,

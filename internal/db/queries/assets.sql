@@ -1,5 +1,5 @@
 -- name: CreateAsset :one
-INSERT INTO assets (id, project_id, endpoint_id, name, display_name, path, state, annotations, created_by, updated_by)
+INSERT INTO assets (id, project_id, endpoint_id, name, display_name, import_path, state, annotations, created_by, updated_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
 RETURNING *;
 
@@ -30,7 +30,6 @@ SELECT count(*) FROM assets WHERE project_id = $1 AND delete_time IS NULL;
 -- name: UpdateAsset :one
 UPDATE assets
 SET display_name = COALESCE(sqlc.narg('display_name'), display_name),
-    path = COALESCE(sqlc.narg('path'), path),
     annotations = COALESCE(sqlc.narg('annotations'), annotations),
     expire_time = COALESCE(sqlc.narg('expire_time'), expire_time),
     revision = revision + 1,

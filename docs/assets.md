@@ -6,7 +6,7 @@ The asset system manages media files (images, video, audio, documents) throughou
 
 **Key design decisions:**
 
-1. **Flat assets, not folders.** Assets have no folder hierarchy. Organization is handled by tags (flexible, multi-dimensional) and an optional `path` field (for display grouping and filesystem import preservation). This avoids recursive permission checks, cascading renames, and move operations.
+1. **Flat assets, not folders.** Assets have no folder hierarchy. Organization is handled entirely by tags (flexible, multi-dimensional). This avoids recursive permission checks, cascading renames, and move operations.
 
 2. **Versions are ops chains, not duplicate blobs.** Upload versions store files. Edit versions store a crop operation + pointer to the source version. The gateway renders edits on demand from the source blob + ops chain. No duplicate storage for edits.
 
@@ -78,7 +78,7 @@ Unknown content types are rejected at upload.
 | `content_type` | string | MIME type from magic bytes, not file extension |
 | `filename` | string | Original uploaded filename |
 | `media_type` | enum | Broad category (IMAGE, VIDEO, AUDIO, DOCUMENT) |
-| `path` | string | Optional display grouping (e.g. `/sports/highlights/`) |
+| `import_path` | string | Original filesystem path from ImportAssets (read-only) |
 | `endpoint` | resource ref | Storage endpoint where files are stored |
 | `checksum_sha256` | string | SHA-256 of original file, used for dedup |
 | `size_bytes` | int64 | File size |
@@ -279,7 +279,7 @@ pgvector with 768-dimensional embeddings (nomic-embed-text for dev, production p
 
 ### Filtering
 
-AIP-160 filter expressions on: `state`, `mediaType`, `contentType`, `displayName`, `path`, `creator`, `createTime`, `expireTime`.
+AIP-160 filter expressions on: `state`, `mediaType`, `contentType`, `displayName`, `creator`, `createTime`, `expireTime`.
 
 ---
 
@@ -302,6 +302,40 @@ projects/proj1/assets/abc/*   — single asset deleted
 ```
 
 Patterns are full-replacement on each push. Agents load from SQLite on reboot, sync full state from control plane on bidi reconnect. See `docs/storage.md` for details.
+
+---
+
+## Rendition Generation
+
+Renditions (thumbnails, proxies, previews) are generated **on agents**, not the server. The server never touches files.
+
+### Flow
+
+1. User uploads file to agent (presigned URL or gateway PUT)
+2. Server sends `GenerateRenditions` command to agent via bidi
+3. Agent generates renditions locally (has direct storage access)
+4. Agent writes renditions to storage: `assets/{id}/v{n}/thumb_sm.jpg`, etc.
+5. Agent reports `RenditionsComplete` with rendition metadata
+6. Server updates `asset_renditions` table
+
+### Agent Roles
+
+Agents support two roles, set during Handshake:
+
+| Role | HTTP serving | Rendition tasks | In DNS | Use case |
+|------|-------------|----------------|--------|----------|
+| BOTH | Yes | Yes | Yes | Default — single agent does everything |
+| SERVE | Yes | No | Yes | Dedicated request serving |
+| WORKER | No | Yes | No | Dedicated rendering (cheaper hardware, burst capacity) |
+
+Default: BOTH. Split into SERVE + WORKER when rendering load impacts serving performance.
+
+### Resource Usage
+
+Rendition generation (ffmpeg transcoding, image processing) is CPU-intensive. WORKER agents can be:
+- Additional servers in the pool dedicated to processing
+- Spun up on demand for bulk imports
+- Lower-spec hardware (no SSD needed, just CPU)
 
 ---
 
@@ -335,7 +369,7 @@ assets/{asset_id}/v{version_number}/preview.webp
 
 Options:
 - `path_prefix` — scan a subdirectory instead of the whole endpoint
-- `preserve_paths` — set the asset `path` field from the filesystem structure
+- `preserve_paths` — generate tags from the filesystem directory structure
 - `auto_tag` — run AI auto-tagging on imported assets (default: true)
 
 LRO metadata tracks: phase (SCANNING → INGESTING → DONE), total/processed/imported/skipped/failed file counts.

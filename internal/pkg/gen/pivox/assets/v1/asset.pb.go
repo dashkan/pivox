@@ -471,11 +471,10 @@ type Asset struct {
 	// Output only. The original filename as provided by the client at
 	// upload time.
 	Filename string `protobuf:"bytes,28,opt,name=filename,proto3" json:"filename,omitempty"`
-	// Optional. An organizational path for display grouping (e.g.
-	// `/sports/highlights/2026/`). Not enforced as a hierarchy — purely
-	// for UI presentation and filesystem import preservation. Use tags
-	// for structured categorization.
-	Path string `protobuf:"bytes,6,opt,name=path,proto3" json:"path,omitempty"`
+	// Output only. The original filesystem path when this asset was created
+	// via ImportAssets. Read-only historical label — not a folder, not
+	// editable. Empty for directly uploaded assets.
+	ImportPath string `protobuf:"bytes,6,opt,name=import_path,json=importPath,proto3" json:"import_path,omitempty"`
 	// Output only. The storage endpoint where the asset's files are stored.
 	// Format: `organizations/{organization}/storageGateways/{gateway}/endpoints/{endpoint}`
 	Endpoint string `protobuf:"bytes,7,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
@@ -600,9 +599,9 @@ func (x *Asset) GetFilename() string {
 	return ""
 }
 
-func (x *Asset) GetPath() string {
+func (x *Asset) GetImportPath() string {
 	if x != nil {
-		return x.Path
+		return x.ImportPath
 	}
 	return ""
 }
@@ -2671,7 +2670,7 @@ var File_pivox_assets_v1_asset_proto protoreflect.FileDescriptor
 
 const file_pivox_assets_v1_asset_proto_rawDesc = "" +
 	"\n" +
-	"\x1bpivox/assets/v1/asset.proto\x12\x0fpivox.assets.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xbb\f\n" +
+	"\x1bpivox/assets/v1/asset.proto\x12\x0fpivox.assets.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xc8\f\n" +
 	"\x05Asset\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12.\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\v\xe0A\x02\xbaH\x05r\x03\x18\xff\x01R\vdisplayName\x127\n" +
@@ -2679,8 +2678,9 @@ const file_pivox_assets_v1_asset_proto_rawDesc = "" +
 	"\n" +
 	"media_type\x18\x04 \x01(\x0e2 .pivox.assets.v1.Asset.MediaTypeB\x03\xe0A\x03R\tmediaType\x12&\n" +
 	"\fcontent_type\x18\x05 \x01(\tB\x03\xe0A\x03R\vcontentType\x12\x1f\n" +
-	"\bfilename\x18\x1c \x01(\tB\x03\xe0A\x03R\bfilename\x12\x17\n" +
-	"\x04path\x18\x06 \x01(\tB\x03\xe0A\x01R\x04path\x12:\n" +
+	"\bfilename\x18\x1c \x01(\tB\x03\xe0A\x03R\bfilename\x12$\n" +
+	"\vimport_path\x18\x06 \x01(\tB\x03\xe0A\x03R\n" +
+	"importPath\x12:\n" +
 	"\bendpoint\x18\a \x01(\tB\x1e\xe0A\x03\xfaA\x18\n" +
 	"\x16pivox.storage/EndpointR\bendpoint\x12,\n" +
 	"\x0fchecksum_sha256\x18\b \x01(\tB\x03\xe0A\x03R\x0echecksumSha256\x12\"\n" +

@@ -335,9 +335,10 @@
                   "description": "Output only. The original filename as provided by the client at\nupload time.",
                   "readOnly": true
                 },
-                "path": {
+                "importPath": {
                   "type": "string",
-                  "description": "Optional. An organizational path for display grouping (e.g.\n`/sports/highlights/2026/`). Not enforced as a hierarchy — purely\nfor UI presentation and filesystem import preservation. Use tags\nfor structured categorization."
+                  "description": "Output only. The original filesystem path when this asset was created\nvia ImportAssets. Read-only historical label — not a folder, not\neditable. Empty for directly uploaded assets.",
+                  "readOnly": true
                 },
                 "endpoint": {
                   "type": "string",
@@ -980,9 +981,10 @@
           "description": "Output only. The original filename as provided by the client at\nupload time.",
           "readOnly": true
         },
-        "path": {
+        "importPath": {
           "type": "string",
-          "description": "Optional. An organizational path for display grouping (e.g.\n`/sports/highlights/2026/`). Not enforced as a hierarchy — purely\nfor UI presentation and filesystem import preservation. Use tags\nfor structured categorization."
+          "description": "Output only. The original filesystem path when this asset was created\nvia ImportAssets. Read-only historical label — not a folder, not\neditable. Empty for directly uploaded assets.",
+          "readOnly": true
         },
         "endpoint": {
           "type": "string",

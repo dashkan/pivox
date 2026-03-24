@@ -847,7 +847,7 @@ type Asset struct {
 	EndpointID        pgtype.UUID        `json:"endpoint_id"`
 	Name              string             `json:"name"`
 	DisplayName       string             `json:"display_name"`
-	Path              string             `json:"path"`
+	ImportPath        string             `json:"import_path"`
 	MediaType         NullAssetMediaType `json:"media_type"`
 	MimeType          string             `json:"mime_type"`
 	ChecksumSha256    string             `json:"checksum_sha256"`

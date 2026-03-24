@@ -253,11 +253,10 @@ message Asset {
   // upload time.
   string filename = 28 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  // Optional. An organizational path for display grouping (e.g.
-  // `/sports/highlights/2026/`). Not enforced as a hierarchy — purely
-  // for UI presentation and filesystem import preservation. Use tags
-  // for structured categorization.
-  string path = 6 [(google.api.field_behavior) = OPTIONAL];
+  // Output only. The original filesystem path when this asset was created
+  // via ImportAssets. Read-only historical label — not a folder, not
+  // editable. Empty for directly uploaded assets.
+  string import_path = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. The storage endpoint where the asset's files are stored.
   // Format: `organizations/{organization}/storageGateways/{gateway}/endpoints/{endpoint}`
