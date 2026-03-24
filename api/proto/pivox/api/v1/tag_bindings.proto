@@ -38,6 +38,7 @@ service TagBindings {
     option (google.api.http) = {
       get: "/v1/{parent=organizations/*}/tagBindings"
       additional_bindings: {get: "/v1/{parent=organizations/*/projects/*}/tagBindings"}
+      additional_bindings: {get: "/v1/{parent=organizations/*/projects/*/assets/*}/tagBindings"}
     };
     option (google.api.method_signature) = "parent";
   }
@@ -47,6 +48,7 @@ service TagBindings {
     option (google.api.http) = {
       get: "/v1/{name=organizations/*/tagBindings/*}"
       additional_bindings: {get: "/v1/{name=organizations/*/projects/*/tagBindings/*}"}
+      additional_bindings: {get: "/v1/{name=organizations/*/projects/*/assets/*/tagBindings/*}"}
     };
     option (google.api.method_signature) = "name";
   }
@@ -58,6 +60,10 @@ service TagBindings {
       body: "tag_binding"
       additional_bindings: {
         post: "/v1/{parent=organizations/*/projects/*}/tagBindings"
+        body: "tag_binding"
+      }
+      additional_bindings: {
+        post: "/v1/{parent=organizations/*/projects/*/assets/*}/tagBindings"
         body: "tag_binding"
       }
     };
@@ -73,6 +79,7 @@ service TagBindings {
     option (google.api.http) = {
       delete: "/v1/{name=organizations/*/tagBindings/*}"
       additional_bindings: {delete: "/v1/{name=organizations/*/projects/*/tagBindings/*}"}
+      additional_bindings: {delete: "/v1/{name=organizations/*/projects/*/assets/*/tagBindings/*}"}
     };
     option (google.api.method_signature) = "name";
     option (google.longrunning.operation_info) = {
@@ -87,6 +94,7 @@ service TagBindings {
     option (google.api.http) = {
       get: "/v1/{parent=organizations/*}/effectiveTags"
       additional_bindings: {get: "/v1/{parent=organizations/*/projects/*}/effectiveTags"}
+      additional_bindings: {get: "/v1/{parent=organizations/*/projects/*/assets/*}/effectiveTags"}
     };
     option (google.api.method_signature) = "parent";
   }
@@ -100,6 +108,7 @@ message TagBinding {
     type: "pivox.api/TagBinding"
     pattern: "organizations/{organization}/tagBindings/{tag_binding}"
     pattern: "organizations/{organization}/projects/{project}/tagBindings/{tag_binding}"
+    pattern: "organizations/{organization}/projects/{project}/assets/{asset}/tagBindings/{tag_binding}"
     plural: "tagBindings"
     singular: "tagBinding"
   };

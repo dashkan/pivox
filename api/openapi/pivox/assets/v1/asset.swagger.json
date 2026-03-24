@@ -322,12 +322,17 @@
                 },
                 "mediaType": {
                   "$ref": "#/definitions/AssetMediaType",
-                  "description": "Output only. The broad media category, determined during ingestion\nfrom the file's MIME type.",
+                  "description": "Output only. The broad media category, derived from the content\ntype during ingestion.",
                   "readOnly": true
                 },
-                "mimeType": {
+                "contentType": {
                   "type": "string",
-                  "description": "Output only. The MIME type of the original file (e.g. `image/jpeg`,\n`video/mp4`). Determined from magic bytes during ingestion, not\nfrom the file extension.",
+                  "description": "Output only. The content type of the original file (e.g.\n`image/jpeg`, `video/mp4`). Determined from magic bytes during\ningestion, not from the file extension.",
+                  "readOnly": true
+                },
+                "filename": {
+                  "type": "string",
+                  "description": "Output only. The original filename as provided by the client at\nupload time.",
                   "readOnly": true
                 },
                 "path": {
@@ -359,21 +364,6 @@
                   "type": "integer",
                   "format": "int32",
                   "description": "Output only. Total number of versions.",
-                  "readOnly": true
-                },
-                "technicalMetadata": {
-                  "type": "object",
-                  "description": "Output only. Technical metadata extracted from the file (EXIF, XMP).\nJunk metadata (Adobe comments, software tags) is stripped.\nStored as a structured JSON object — fields vary by media type.",
-                  "readOnly": true
-                },
-                "aiDescription": {
-                  "type": "string",
-                  "description": "Output only. AI-generated description of the asset's visual or\naudio content. Used for semantic search.",
-                  "readOnly": true
-                },
-                "transcription": {
-                  "type": "string",
-                  "description": "Output only. Transcription of audio/video content. Indexed for\nfull-text search.",
                   "readOnly": true
                 },
                 "duration": {
@@ -461,6 +451,49 @@
             "in": "query",
             "required": false,
             "type": "boolean"
+          }
+        ],
+        "tags": [
+          "Assets"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/projects/{project}/assets/{asset}/metadata": {
+      "get": {
+        "summary": "Retrieves the extracted metadata for an asset (EXIF, XMP, etc.).\nMetadata is a singleton sub-resource — not included in Get/List\nAsset responses to keep them lightweight.",
+        "operationId": "Assets_GetAssetMetadata",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1AssetMetadata"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "asset",
+            "in": "path",
+            "required": true,
+            "type": "string"
           }
         ],
         "tags": [
@@ -807,11 +840,10 @@
         "IMAGE",
         "VIDEO",
         "AUDIO",
-        "GRAPHIC",
         "DOCUMENT"
       ],
       "default": "MEDIA_TYPE_UNSPECIFIED",
-      "description": "The broad media category of the asset.\n\n - MEDIA_TYPE_UNSPECIFIED: Unspecified media type.\n - IMAGE: Still image (JPEG, PNG, TIFF, WebP, etc.).\n - VIDEO: Video file (MP4, MOV, MXF, ProRes, etc.).\n - AUDIO: Audio file (WAV, MP3, AAC, FLAC, etc.).\n - GRAPHIC: Motion graphics or vector (SVG, Lottie, Rive, etc.).\n - DOCUMENT: Document (PDF, PSD, AI, etc.)."
+      "description": "The broad media category of the asset. Derived from content type\nduring ingestion. Used for UI grouping, icons, and pipeline routing.\n\n - MEDIA_TYPE_UNSPECIFIED: Unspecified media type.\n - IMAGE: Still image (JPEG, PNG, TIFF, WebP, SVG, etc.).\n - VIDEO: Video file (MP4, MOV, MXF, ProRes, etc.).\n - AUDIO: Audio file (WAV, MP3, AAC, FLAC, etc.).\n - DOCUMENT: Document (PDF, etc.)."
     },
     "AssetsImportAssetsBody": {
       "type": "object",
@@ -935,12 +967,17 @@
         },
         "mediaType": {
           "$ref": "#/definitions/AssetMediaType",
-          "description": "Output only. The broad media category, determined during ingestion\nfrom the file's MIME type.",
+          "description": "Output only. The broad media category, derived from the content\ntype during ingestion.",
           "readOnly": true
         },
-        "mimeType": {
+        "contentType": {
           "type": "string",
-          "description": "Output only. The MIME type of the original file (e.g. `image/jpeg`,\n`video/mp4`). Determined from magic bytes during ingestion, not\nfrom the file extension.",
+          "description": "Output only. The content type of the original file (e.g.\n`image/jpeg`, `video/mp4`). Determined from magic bytes during\ningestion, not from the file extension.",
+          "readOnly": true
+        },
+        "filename": {
+          "type": "string",
+          "description": "Output only. The original filename as provided by the client at\nupload time.",
           "readOnly": true
         },
         "path": {
@@ -972,21 +1009,6 @@
           "type": "integer",
           "format": "int32",
           "description": "Output only. Total number of versions.",
-          "readOnly": true
-        },
-        "technicalMetadata": {
-          "type": "object",
-          "description": "Output only. Technical metadata extracted from the file (EXIF, XMP).\nJunk metadata (Adobe comments, software tags) is stripped.\nStored as a structured JSON object — fields vary by media type.",
-          "readOnly": true
-        },
-        "aiDescription": {
-          "type": "string",
-          "description": "Output only. AI-generated description of the asset's visual or\naudio content. Used for semantic search.",
-          "readOnly": true
-        },
-        "transcription": {
-          "type": "string",
-          "description": "Output only. Transcription of audio/video content. Indexed for\nfull-text search.",
           "readOnly": true
         },
         "duration": {
@@ -1066,6 +1088,22 @@
       "required": [
         "displayName"
       ]
+    },
+    "v1AssetMetadata": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "Output only. The resource name. Format:\n`organizations/{organization}/projects/{project}/assets/{asset}/metadata`",
+          "readOnly": true
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Output only. The extracted metadata as a structured JSON object.\nFields vary by media type and file format.",
+          "readOnly": true
+        }
+      },
+      "description": "AssetMetadata contains the full extracted metadata for an asset\n(EXIF, XMP, etc.). This is a singleton sub-resource of Asset,\naccessed via GetAssetMetadata. Junk metadata (Adobe comments,\nsoftware tags) is stripped during ingestion."
     },
     "v1AssetState": {
       "type": "string",

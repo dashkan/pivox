@@ -158,6 +158,14 @@ service Assets {
       metadata_type: "ImportAssetsMetadata"
     };
   }
+
+  // Retrieves the extracted metadata for an asset (EXIF, XMP, etc.).
+  // Metadata is a singleton sub-resource — not included in Get/List
+  // Asset responses to keep them lightweight.
+  rpc GetAssetMetadata(GetAssetMetadataRequest) returns (AssetMetadata) {
+    option (google.api.http) = {get: "/v1/{name=organizations/*/projects/*/assets/*/metadata}"};
+    option (google.api.method_signature) = "name";
+  }
 }
 
 // A media asset. Assets are immutable — file content cannot be changed
@@ -198,12 +206,13 @@ message Asset {
     DELETE_REQUESTED = 5;
   }
 
-  // The broad media category of the asset.
+  // The broad media category of the asset. Derived from content type
+  // during ingestion. Used for UI grouping, icons, and pipeline routing.
   enum MediaType {
     // Unspecified media type.
     MEDIA_TYPE_UNSPECIFIED = 0;
 
-    // Still image (JPEG, PNG, TIFF, WebP, etc.).
+    // Still image (JPEG, PNG, TIFF, WebP, SVG, etc.).
     IMAGE = 1;
 
     // Video file (MP4, MOV, MXF, ProRes, etc.).
@@ -212,11 +221,8 @@ message Asset {
     // Audio file (WAV, MP3, AAC, FLAC, etc.).
     AUDIO = 3;
 
-    // Motion graphics or vector (SVG, Lottie, Rive, etc.).
-    GRAPHIC = 4;
-
-    // Document (PDF, PSD, AI, etc.).
-    DOCUMENT = 5;
+    // Document (PDF, etc.).
+    DOCUMENT = 4;
   }
 
   // Output only. The resource name of the asset. Format:
@@ -232,14 +238,20 @@ message Asset {
   // Output only. The current lifecycle state.
   State state = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  // Output only. The broad media category, determined during ingestion
-  // from the file's MIME type.
+  // Output only. The broad media category, derived from the content
+  // type during ingestion.
   MediaType media_type = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  // Output only. The MIME type of the original file (e.g. `image/jpeg`,
-  // `video/mp4`). Determined from magic bytes during ingestion, not
-  // from the file extension.
-  string mime_type = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Output only. The content type of the original file (e.g.
+  // `image/jpeg`, `video/mp4`). Determined from magic bytes during
+  // ingestion, not from the file extension.
+  // (-- api-linter: core::0143::standardized-codes=disabled
+  //     aip.dev/not-precedent: content_type aligns with HTTP convention. --)
+  string content_type = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The original filename as provided by the client at
+  // upload time.
+  string filename = 28 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Optional. An organizational path for display grouping (e.g.
   // `/sports/highlights/2026/`). Not enforced as a hierarchy — purely
@@ -270,19 +282,6 @@ message Asset {
 
   // Output only. Total number of versions.
   int32 version_count = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // Output only. Technical metadata extracted from the file (EXIF, XMP).
-  // Junk metadata (Adobe comments, software tags) is stripped.
-  // Stored as a structured JSON object — fields vary by media type.
-  google.protobuf.Struct technical_metadata = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // Output only. AI-generated description of the asset's visual or
-  // audio content. Used for semantic search.
-  string ai_description = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // Output only. Transcription of audio/video content. Indexed for
-  // full-text search.
-  string transcription = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Duration of the media, for video and audio assets.
   google.protobuf.Duration duration = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
@@ -933,4 +932,36 @@ message ImportAssetsMetadata {
 
   // Files failed so far.
   int32 failed_files = 6;
+}
+
+// The request sent to the GetAssetMetadata method.
+message GetAssetMetadataRequest {
+  // Required. The resource name of the asset metadata. Format:
+  // `organizations/{organization}/projects/{project}/assets/{asset}/metadata`
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.assets/AssetMetadata"},
+    (buf.validate.field).required = true
+  ];
+}
+
+// AssetMetadata contains the full extracted metadata for an asset
+// (EXIF, XMP, etc.). This is a singleton sub-resource of Asset,
+// accessed via GetAssetMetadata. Junk metadata (Adobe comments,
+// software tags) is stripped during ingestion.
+message AssetMetadata {
+  option (google.api.resource) = {
+    type: "pivox.assets/AssetMetadata"
+    pattern: "organizations/{organization}/projects/{project}/assets/{asset}/metadata"
+    plural: "metadata"
+    singular: "metadata"
+  };
+
+  // Output only. The resource name. Format:
+  // `organizations/{organization}/projects/{project}/assets/{asset}/metadata`
+  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Output only. The extracted metadata as a structured JSON object.
+  // Fields vary by media type and file format.
+  google.protobuf.Struct metadata = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
 }

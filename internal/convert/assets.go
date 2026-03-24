@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"google.golang.org/protobuf/types/known/durationpb"
-	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	db "github.com/dashkan/pivox/internal/db/generated"
@@ -22,12 +21,10 @@ func AssetToProto(row db.Asset, projectName string) *assetsv1.Asset {
 		Name:           fmt.Sprintf("%s/assets/%s", projectName, row.Name),
 		DisplayName:    row.DisplayName,
 		State:          assetState(row.State),
-		MimeType:       row.MimeType,
+		ContentType:    row.MimeType,
 		Path:           row.Path,
 		ChecksumSha256: row.ChecksumSha256,
 		SizeBytes:      row.SizeBytes,
-		AiDescription:  row.AiDescription,
-		Transcription:  row.Transcription,
 		Etag:           row.Etag,
 		Creator:        row.CreatedBy,
 		Updater:        row.UpdatedBy,
@@ -48,13 +45,6 @@ func AssetToProto(row db.Asset, projectName string) *assetsv1.Asset {
 
 	if row.DurationSeconds.Valid {
 		pb.Duration = secondsToDuration(row.DurationSeconds.Float64)
-	}
-
-	if len(row.TechnicalMetadata) > 0 {
-		s := &structpb.Struct{}
-		if err := s.UnmarshalJSON(row.TechnicalMetadata); err == nil {
-			pb.TechnicalMetadata = s
-		}
 	}
 
 	if len(row.Annotations) > 0 {
@@ -145,8 +135,6 @@ func assetMediaType(mt db.AssetMediaType) assetsv1.Asset_MediaType {
 		return assetsv1.Asset_VIDEO
 	case db.AssetMediaTypeAUDIO:
 		return assetsv1.Asset_AUDIO
-	case db.AssetMediaTypeGRAPHIC:
-		return assetsv1.Asset_GRAPHIC
 	case db.AssetMediaTypeDOCUMENT:
 		return assetsv1.Asset_DOCUMENT
 	default:

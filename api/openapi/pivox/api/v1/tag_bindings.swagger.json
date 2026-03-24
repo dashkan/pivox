@@ -62,6 +62,310 @@
         ]
       }
     },
+    "/v1/organizations/{organization}/projects/{project}/assets/{asset}/effectiveTags": {
+      "get": {
+        "summary": "Return a list of effective tags for the given Pivox resource, as\nspecified in `parent`.",
+        "operationId": "TagBindings_ListEffectiveTags3",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListEffectiveTagsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "asset",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Optional. The maximum number of effective tags to return in the response.\nThe server allows a maximum of 300 effective tags to return in a single\npage. If unspecified, the server will use 100 as the default.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. A pagination token returned from a previous call to\n`ListEffectiveTags` that indicates from where this listing should continue.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "TagBindings"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/projects/{project}/assets/{asset}/tagBindings": {
+      "get": {
+        "summary": "Lists the TagBindings for the given Pivox resource, as specified\nwith `parent`.",
+        "operationId": "TagBindings_ListTagBindings3",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListTagBindingsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "asset",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Optional. The maximum number of TagBindings to return in the response. The\nserver allows a maximum of 300 TagBindings to return. If unspecified, the\nserver will use 100 as the default.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. A pagination token returned from a previous call to\n`ListTagBindings` that indicates where this listing should continue from.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "filter",
+            "description": "Optional. An expression for filtering the results of the request.\nFilter rules are case insensitive. Filterable fields:\n\n+ `parentResource`\n\nExamples:\n\n+ `parentResource = \"organizations/123/projects/my-project\"` —\n  bindings for a specific resource.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "description": "Optional. A comma-separated list of fields to order by. The default\norder is ascending. Use \"desc\" after a field name for descending.\nSupported fields:\n\n+ `createTime`\n\nExample: `createTime desc`\n\nIf not specified, the results are ordered by `createTime` ascending.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "TagBindings"
+        ]
+      },
+      "post": {
+        "summary": "Creates a TagBinding between a TagValue and a Pivox resource.",
+        "operationId": "TagBindings_CreateTagBinding3",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/longrunningOperation"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "asset",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "tagBinding",
+            "description": "Required. The TagBinding to be created.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1TagBinding"
+            }
+          },
+          {
+            "name": "tagBindingId",
+            "description": "Optional. A unique identifier for the tag binding. If not provided, the server will\ngenerate one.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "validateOnly",
+            "description": "Optional. Set to true to perform the validations necessary for creating the\nresource, but not actually perform the action.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "TagBindings"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/projects/{project}/assets/{asset}/tagBindings/{tagBinding}": {
+      "get": {
+        "summary": "Retrieves a TagBinding.",
+        "operationId": "TagBindings_GetTagBinding3",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1TagBinding"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "asset",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "tagBinding",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "TagBindings"
+        ]
+      },
+      "delete": {
+        "summary": "Deletes a TagBinding.",
+        "operationId": "TagBindings_DeleteTagBinding3",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/longrunningOperation"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "asset",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "tagBinding",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "etag",
+            "description": "Optional. The etag known to the client for the expected state of the tag binding.\nThis is to be used for optimistic concurrency.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "validateOnly",
+            "description": "Optional. If set to true, the request will only validate the request\nwithout persisting it.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "TagBindings"
+        ]
+      }
+    },
     "/v1/organizations/{organization}/projects/{project}/effectiveTags": {
       "get": {
         "summary": "Return a list of effective tags for the given Pivox resource, as\nspecified in `parent`.",

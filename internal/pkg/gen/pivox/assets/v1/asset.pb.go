@@ -112,22 +112,21 @@ func (Asset_State) EnumDescriptor() ([]byte, []int) {
 	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{0, 0}
 }
 
-// The broad media category of the asset.
+// The broad media category of the asset. Derived from content type
+// during ingestion. Used for UI grouping, icons, and pipeline routing.
 type Asset_MediaType int32
 
 const (
 	// Unspecified media type.
 	Asset_MEDIA_TYPE_UNSPECIFIED Asset_MediaType = 0
-	// Still image (JPEG, PNG, TIFF, WebP, etc.).
+	// Still image (JPEG, PNG, TIFF, WebP, SVG, etc.).
 	Asset_IMAGE Asset_MediaType = 1
 	// Video file (MP4, MOV, MXF, ProRes, etc.).
 	Asset_VIDEO Asset_MediaType = 2
 	// Audio file (WAV, MP3, AAC, FLAC, etc.).
 	Asset_AUDIO Asset_MediaType = 3
-	// Motion graphics or vector (SVG, Lottie, Rive, etc.).
-	Asset_GRAPHIC Asset_MediaType = 4
-	// Document (PDF, PSD, AI, etc.).
-	Asset_DOCUMENT Asset_MediaType = 5
+	// Document (PDF, etc.).
+	Asset_DOCUMENT Asset_MediaType = 4
 )
 
 // Enum value maps for Asset_MediaType.
@@ -137,16 +136,14 @@ var (
 		1: "IMAGE",
 		2: "VIDEO",
 		3: "AUDIO",
-		4: "GRAPHIC",
-		5: "DOCUMENT",
+		4: "DOCUMENT",
 	}
 	Asset_MediaType_value = map[string]int32{
 		"MEDIA_TYPE_UNSPECIFIED": 0,
 		"IMAGE":                  1,
 		"VIDEO":                  2,
 		"AUDIO":                  3,
-		"GRAPHIC":                4,
-		"DOCUMENT":               5,
+		"DOCUMENT":               4,
 	}
 )
 
@@ -461,13 +458,19 @@ type Asset struct {
 	DisplayName string `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
 	// Output only. The current lifecycle state.
 	State Asset_State `protobuf:"varint,3,opt,name=state,proto3,enum=pivox.assets.v1.Asset_State" json:"state,omitempty"`
-	// Output only. The broad media category, determined during ingestion
-	// from the file's MIME type.
+	// Output only. The broad media category, derived from the content
+	// type during ingestion.
 	MediaType Asset_MediaType `protobuf:"varint,4,opt,name=media_type,json=mediaType,proto3,enum=pivox.assets.v1.Asset_MediaType" json:"media_type,omitempty"`
-	// Output only. The MIME type of the original file (e.g. `image/jpeg`,
-	// `video/mp4`). Determined from magic bytes during ingestion, not
-	// from the file extension.
-	MimeType string `protobuf:"bytes,5,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
+	// Output only. The content type of the original file (e.g.
+	// `image/jpeg`, `video/mp4`). Determined from magic bytes during
+	// ingestion, not from the file extension.
+	// (-- api-linter: core::0143::standardized-codes=disabled
+	//
+	//	aip.dev/not-precedent: content_type aligns with HTTP convention. --)
+	ContentType string `protobuf:"bytes,5,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
+	// Output only. The original filename as provided by the client at
+	// upload time.
+	Filename string `protobuf:"bytes,28,opt,name=filename,proto3" json:"filename,omitempty"`
 	// Optional. An organizational path for display grouping (e.g.
 	// `/sports/highlights/2026/`). Not enforced as a hierarchy — purely
 	// for UI presentation and filesystem import preservation. Use tags
@@ -490,16 +493,6 @@ type Asset struct {
 	LatestVersion *AssetVersion `protobuf:"bytes,10,opt,name=latest_version,json=latestVersion,proto3" json:"latest_version,omitempty"`
 	// Output only. Total number of versions.
 	VersionCount int32 `protobuf:"varint,11,opt,name=version_count,json=versionCount,proto3" json:"version_count,omitempty"`
-	// Output only. Technical metadata extracted from the file (EXIF, XMP).
-	// Junk metadata (Adobe comments, software tags) is stripped.
-	// Stored as a structured JSON object — fields vary by media type.
-	TechnicalMetadata *structpb.Struct `protobuf:"bytes,12,opt,name=technical_metadata,json=technicalMetadata,proto3" json:"technical_metadata,omitempty"`
-	// Output only. AI-generated description of the asset's visual or
-	// audio content. Used for semantic search.
-	AiDescription string `protobuf:"bytes,13,opt,name=ai_description,json=aiDescription,proto3" json:"ai_description,omitempty"`
-	// Output only. Transcription of audio/video content. Indexed for
-	// full-text search.
-	Transcription string `protobuf:"bytes,14,opt,name=transcription,proto3" json:"transcription,omitempty"`
 	// Output only. Duration of the media, for video and audio assets.
 	Duration *durationpb.Duration `protobuf:"bytes,15,opt,name=duration,proto3" json:"duration,omitempty"`
 	// Output only. Width in pixels, for image and video assets.
@@ -593,9 +586,16 @@ func (x *Asset) GetMediaType() Asset_MediaType {
 	return Asset_MEDIA_TYPE_UNSPECIFIED
 }
 
-func (x *Asset) GetMimeType() string {
+func (x *Asset) GetContentType() string {
 	if x != nil {
-		return x.MimeType
+		return x.ContentType
+	}
+	return ""
+}
+
+func (x *Asset) GetFilename() string {
+	if x != nil {
+		return x.Filename
 	}
 	return ""
 }
@@ -640,27 +640,6 @@ func (x *Asset) GetVersionCount() int32 {
 		return x.VersionCount
 	}
 	return 0
-}
-
-func (x *Asset) GetTechnicalMetadata() *structpb.Struct {
-	if x != nil {
-		return x.TechnicalMetadata
-	}
-	return nil
-}
-
-func (x *Asset) GetAiDescription() string {
-	if x != nil {
-		return x.AiDescription
-	}
-	return ""
-}
-
-func (x *Asset) GetTranscription() string {
-	if x != nil {
-		return x.Transcription
-	}
-	return ""
 }
 
 func (x *Asset) GetDuration() *durationpb.Duration {
@@ -2581,18 +2560,126 @@ func (x *ImportAssetsMetadata) GetFailedFiles() int32 {
 	return 0
 }
 
+// The request sent to the GetAssetMetadata method.
+type GetAssetMetadataRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Required. The resource name of the asset metadata. Format:
+	// `organizations/{organization}/projects/{project}/assets/{asset}/metadata`
+	Name          string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAssetMetadataRequest) Reset() {
+	*x = GetAssetMetadataRequest{}
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAssetMetadataRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAssetMetadataRequest) ProtoMessage() {}
+
+func (x *GetAssetMetadataRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAssetMetadataRequest.ProtoReflect.Descriptor instead.
+func (*GetAssetMetadataRequest) Descriptor() ([]byte, []int) {
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *GetAssetMetadataRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+// AssetMetadata contains the full extracted metadata for an asset
+// (EXIF, XMP, etc.). This is a singleton sub-resource of Asset,
+// accessed via GetAssetMetadata. Junk metadata (Adobe comments,
+// software tags) is stripped during ingestion.
+type AssetMetadata struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Output only. The resource name. Format:
+	// `organizations/{organization}/projects/{project}/assets/{asset}/metadata`
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// Output only. The extracted metadata as a structured JSON object.
+	// Fields vary by media type and file format.
+	Metadata      *structpb.Struct `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AssetMetadata) Reset() {
+	*x = AssetMetadata{}
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssetMetadata) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssetMetadata) ProtoMessage() {}
+
+func (x *AssetMetadata) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssetMetadata.ProtoReflect.Descriptor instead.
+func (*AssetMetadata) Descriptor() ([]byte, []int) {
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *AssetMetadata) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *AssetMetadata) GetMetadata() *structpb.Struct {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
 var File_pivox_assets_v1_asset_proto protoreflect.FileDescriptor
 
 const file_pivox_assets_v1_asset_proto_rawDesc = "" +
 	"\n" +
-	"\x1bpivox/assets/v1/asset.proto\x12\x0fpivox.assets.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xc5\r\n" +
+	"\x1bpivox/assets/v1/asset.proto\x12\x0fpivox.assets.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xbb\f\n" +
 	"\x05Asset\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12.\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\v\xe0A\x02\xbaH\x05r\x03\x18\xff\x01R\vdisplayName\x127\n" +
 	"\x05state\x18\x03 \x01(\x0e2\x1c.pivox.assets.v1.Asset.StateB\x03\xe0A\x03R\x05state\x12D\n" +
 	"\n" +
-	"media_type\x18\x04 \x01(\x0e2 .pivox.assets.v1.Asset.MediaTypeB\x03\xe0A\x03R\tmediaType\x12 \n" +
-	"\tmime_type\x18\x05 \x01(\tB\x03\xe0A\x03R\bmimeType\x12\x17\n" +
+	"media_type\x18\x04 \x01(\x0e2 .pivox.assets.v1.Asset.MediaTypeB\x03\xe0A\x03R\tmediaType\x12&\n" +
+	"\fcontent_type\x18\x05 \x01(\tB\x03\xe0A\x03R\vcontentType\x12\x1f\n" +
+	"\bfilename\x18\x1c \x01(\tB\x03\xe0A\x03R\bfilename\x12\x17\n" +
 	"\x04path\x18\x06 \x01(\tB\x03\xe0A\x01R\x04path\x12:\n" +
 	"\bendpoint\x18\a \x01(\tB\x1e\xe0A\x03\xfaA\x18\n" +
 	"\x16pivox.storage/EndpointR\bendpoint\x12,\n" +
@@ -2601,10 +2688,7 @@ const file_pivox_assets_v1_asset_proto_rawDesc = "" +
 	"size_bytes\x18\t \x01(\x03B\x03\xe0A\x03R\tsizeBytes\x12I\n" +
 	"\x0elatest_version\x18\n" +
 	" \x01(\v2\x1d.pivox.assets.v1.AssetVersionB\x03\xe0A\x03R\rlatestVersion\x12(\n" +
-	"\rversion_count\x18\v \x01(\x05B\x03\xe0A\x03R\fversionCount\x12K\n" +
-	"\x12technical_metadata\x18\f \x01(\v2\x17.google.protobuf.StructB\x03\xe0A\x03R\x11technicalMetadata\x12*\n" +
-	"\x0eai_description\x18\r \x01(\tB\x03\xe0A\x03R\raiDescription\x12)\n" +
-	"\rtranscription\x18\x0e \x01(\tB\x03\xe0A\x03R\rtranscription\x12:\n" +
+	"\rversion_count\x18\v \x01(\x05B\x03\xe0A\x03R\fversionCount\x12:\n" +
 	"\bduration\x18\x0f \x01(\v2\x19.google.protobuf.DurationB\x03\xe0A\x03R\bduration\x12\x19\n" +
 	"\x05width\x18\x10 \x01(\x05B\x03\xe0A\x03R\x05width\x12\x1b\n" +
 	"\x06height\x18\x11 \x01(\x05B\x03\xe0A\x03R\x06height\x12@\n" +
@@ -2635,14 +2719,13 @@ const file_pivox_assets_v1_asset_proto_rawDesc = "" +
 	"\x06ACTIVE\x10\x03\x12\n" +
 	"\n" +
 	"\x06FAILED\x10\x04\x12\x14\n" +
-	"\x10DELETE_REQUESTED\x10\x05\"c\n" +
+	"\x10DELETE_REQUESTED\x10\x05\"V\n" +
 	"\tMediaType\x12\x1a\n" +
 	"\x16MEDIA_TYPE_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05IMAGE\x10\x01\x12\t\n" +
 	"\x05VIDEO\x10\x02\x12\t\n" +
-	"\x05AUDIO\x10\x03\x12\v\n" +
-	"\aGRAPHIC\x10\x04\x12\f\n" +
-	"\bDOCUMENT\x10\x05:f\xeaAc\n" +
+	"\x05AUDIO\x10\x03\x12\f\n" +
+	"\bDOCUMENT\x10\x04:f\xeaAc\n" +
 	"\x12pivox.assets/Asset\x12>organizations/{organization}/projects/{project}/assets/{asset}*\x06assets2\x05asset\"\xea\x05\n" +
 	"\fAssetVersion\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12*\n" +
@@ -2831,7 +2914,14 @@ const file_pivox_assets_v1_asset_proto_rawDesc = "" +
 	"\x11PHASE_UNSPECIFIED\x10\x00\x12\f\n" +
 	"\bSCANNING\x10\x01\x12\r\n" +
 	"\tINGESTING\x10\x02\x12\b\n" +
-	"\x04DONE\x10\x032\xe3\x0e\n" +
+	"\x04DONE\x10\x03\"W\n" +
+	"\x17GetAssetMetadataRequest\x12<\n" +
+	"\x04name\x18\x01 \x01(\tB(\xe0A\x02\xfaA\x1c\n" +
+	"\x1apivox.assets/AssetMetadata\xbaH\x03\xc8\x01\x01R\x04name\"\xe0\x01\n" +
+	"\rAssetMetadata\x12\x17\n" +
+	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x128\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x17.google.protobuf.StructB\x03\xe0A\x03R\bmetadata:|\xeaAy\n" +
+	"\x1apivox.assets/AssetMetadata\x12Gorganizations/{organization}/projects/{project}/assets/{asset}/metadata*\bmetadata2\bmetadata2\x8a\x10\n" +
 	"\x06Assets\x12\xbe\x01\n" +
 	"\vCreateAsset\x12#.pivox.assets.v1.CreateAssetRequest\x1a\x1d.google.longrunning.Operation\"k\xcaA\x1c\n" +
 	"\x05Asset\x12\x13CreateAssetMetadata\xdaA\fparent,asset\x82\xd3\xe4\x93\x027:\x05asset\"./v1/{parent=organizations/*/projects/*}/assets\x12\x83\x01\n" +
@@ -2849,7 +2939,8 @@ const file_pivox_assets_v1_asset_proto_rawDesc = "" +
 	"\x0fGetAssetVersion\x12'.pivox.assets.v1.GetAssetVersionRequest\x1a\x1d.pivox.assets.v1.AssetVersion\"H\xdaA\x04name\x82\xd3\xe4\x93\x02;\x129/v1/{name=organizations/*/projects/*/assets/*/versions/*}\x12\xb6\x01\n" +
 	"\x11ListAssetVersions\x12).pivox.assets.v1.ListAssetVersionsRequest\x1a*.pivox.assets.v1.ListAssetVersionsResponse\"J\xdaA\x06parent\x82\xd3\xe4\x93\x02;\x129/v1/{parent=organizations/*/projects/*/assets/*}/versions\x12\xcd\x01\n" +
 	"\fImportAssets\x12$.pivox.assets.v1.ImportAssetsRequest\x1a\x1d.google.longrunning.Operation\"x\xcaA,\n" +
-	"\x14ImportAssetsResponse\x12\x14ImportAssetsMetadata\xdaA\x06parent\x82\xd3\xe4\x93\x02::\x01*\"5/v1/{parent=organizations/*/projects/*}/assets:import\x1a\x0f\xcaA\fapi.pivox.ioB\xc3\x01\n" +
+	"\x14ImportAssetsResponse\x12\x14ImportAssetsMetadata\xdaA\x06parent\x82\xd3\xe4\x93\x02::\x01*\"5/v1/{parent=organizations/*/projects/*}/assets:import\x12\xa4\x01\n" +
+	"\x10GetAssetMetadata\x12(.pivox.assets.v1.GetAssetMetadataRequest\x1a\x1e.pivox.assets.v1.AssetMetadata\"F\xdaA\x04name\x82\xd3\xe4\x93\x029\x127/v1/{name=organizations/*/projects/*/assets/*/metadata}\x1a\x0f\xcaA\fapi.pivox.ioB\xc3\x01\n" +
 	"\x13com.pivox.assets.v1B\n" +
 	"AssetProtoP\x01ZBgithub.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1;assetsv1\xa2\x02\x03PAX\xaa\x02\x0fPivox.Assets.V1\xca\x02\x0fPivox\\Assets\\V1\xe2\x02\x1bPivox\\Assets\\V1\\GPBMetadata\xea\x02\x11Pivox::Assets::V1b\x06proto3"
 
@@ -2866,7 +2957,7 @@ func file_pivox_assets_v1_asset_proto_rawDescGZIP() []byte {
 }
 
 var file_pivox_assets_v1_asset_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
-var file_pivox_assets_v1_asset_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
+var file_pivox_assets_v1_asset_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
 var file_pivox_assets_v1_asset_proto_goTypes = []any{
 	(Asset_State)(0),                   // 0: pivox.assets.v1.Asset.State
 	(Asset_MediaType)(0),               // 1: pivox.assets.v1.Asset.MediaType
@@ -2900,47 +2991,49 @@ var file_pivox_assets_v1_asset_proto_goTypes = []any{
 	(*ImportAssetsRequest)(nil),        // 29: pivox.assets.v1.ImportAssetsRequest
 	(*ImportAssetsResponse)(nil),       // 30: pivox.assets.v1.ImportAssetsResponse
 	(*ImportAssetsMetadata)(nil),       // 31: pivox.assets.v1.ImportAssetsMetadata
-	nil,                                // 32: pivox.assets.v1.Asset.AnnotationsEntry
-	nil,                                // 33: pivox.assets.v1.UploadInfo.HeadersEntry
-	(*structpb.Struct)(nil),            // 34: google.protobuf.Struct
-	(*durationpb.Duration)(nil),        // 35: google.protobuf.Duration
-	(*timestamppb.Timestamp)(nil),      // 36: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),      // 37: google.protobuf.FieldMask
-	(*longrunningpb.Operation)(nil),    // 38: google.longrunning.Operation
+	(*GetAssetMetadataRequest)(nil),    // 32: pivox.assets.v1.GetAssetMetadataRequest
+	(*AssetMetadata)(nil),              // 33: pivox.assets.v1.AssetMetadata
+	nil,                                // 34: pivox.assets.v1.Asset.AnnotationsEntry
+	nil,                                // 35: pivox.assets.v1.UploadInfo.HeadersEntry
+	(*durationpb.Duration)(nil),        // 36: google.protobuf.Duration
+	(*timestamppb.Timestamp)(nil),      // 37: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),      // 38: google.protobuf.FieldMask
+	(*structpb.Struct)(nil),            // 39: google.protobuf.Struct
+	(*longrunningpb.Operation)(nil),    // 40: google.longrunning.Operation
 }
 var file_pivox_assets_v1_asset_proto_depIdxs = []int32{
 	0,  // 0: pivox.assets.v1.Asset.state:type_name -> pivox.assets.v1.Asset.State
 	1,  // 1: pivox.assets.v1.Asset.media_type:type_name -> pivox.assets.v1.Asset.MediaType
 	7,  // 2: pivox.assets.v1.Asset.latest_version:type_name -> pivox.assets.v1.AssetVersion
-	34, // 3: pivox.assets.v1.Asset.technical_metadata:type_name -> google.protobuf.Struct
-	35, // 4: pivox.assets.v1.Asset.duration:type_name -> google.protobuf.Duration
-	36, // 5: pivox.assets.v1.Asset.expire_time:type_name -> google.protobuf.Timestamp
-	35, // 6: pivox.assets.v1.Asset.ttl:type_name -> google.protobuf.Duration
-	32, // 7: pivox.assets.v1.Asset.annotations:type_name -> pivox.assets.v1.Asset.AnnotationsEntry
-	36, // 8: pivox.assets.v1.Asset.create_time:type_name -> google.protobuf.Timestamp
-	36, // 9: pivox.assets.v1.Asset.update_time:type_name -> google.protobuf.Timestamp
-	36, // 10: pivox.assets.v1.Asset.delete_time:type_name -> google.protobuf.Timestamp
-	36, // 11: pivox.assets.v1.Asset.purge_time:type_name -> google.protobuf.Timestamp
-	10, // 12: pivox.assets.v1.AssetVersion.renditions:type_name -> pivox.assets.v1.Rendition
-	36, // 13: pivox.assets.v1.AssetVersion.create_time:type_name -> google.protobuf.Timestamp
-	8,  // 14: pivox.assets.v1.AssetVersion.crop:type_name -> pivox.assets.v1.Crop
-	9,  // 15: pivox.assets.v1.Crop.area:type_name -> pivox.assets.v1.CropArea
-	2,  // 16: pivox.assets.v1.Rendition.type:type_name -> pivox.assets.v1.Rendition.Type
-	3,  // 17: pivox.assets.v1.UploadInfo.method:type_name -> pivox.assets.v1.UploadInfo.Method
-	33, // 18: pivox.assets.v1.UploadInfo.headers:type_name -> pivox.assets.v1.UploadInfo.HeadersEntry
-	12, // 19: pivox.assets.v1.UploadInfo.parts:type_name -> pivox.assets.v1.UploadPart
-	6,  // 20: pivox.assets.v1.CreateAssetRequest.asset:type_name -> pivox.assets.v1.Asset
-	4,  // 21: pivox.assets.v1.CreateAssetMetadata.step:type_name -> pivox.assets.v1.CreateAssetMetadata.Step
-	11, // 22: pivox.assets.v1.CreateAssetMetadata.upload_info:type_name -> pivox.assets.v1.UploadInfo
-	6,  // 23: pivox.assets.v1.ListAssetsResponse.assets:type_name -> pivox.assets.v1.Asset
-	6,  // 24: pivox.assets.v1.UpdateAssetRequest.asset:type_name -> pivox.assets.v1.Asset
-	37, // 25: pivox.assets.v1.UpdateAssetRequest.update_mask:type_name -> google.protobuf.FieldMask
-	7,  // 26: pivox.assets.v1.CreateAssetVersionRequest.asset_version:type_name -> pivox.assets.v1.AssetVersion
-	8,  // 27: pivox.assets.v1.CreateAssetVersionRequest.crop:type_name -> pivox.assets.v1.Crop
-	4,  // 28: pivox.assets.v1.CreateAssetVersionMetadata.step:type_name -> pivox.assets.v1.CreateAssetMetadata.Step
-	11, // 29: pivox.assets.v1.CreateAssetVersionMetadata.upload_info:type_name -> pivox.assets.v1.UploadInfo
-	7,  // 30: pivox.assets.v1.ListAssetVersionsResponse.versions:type_name -> pivox.assets.v1.AssetVersion
-	5,  // 31: pivox.assets.v1.ImportAssetsMetadata.phase:type_name -> pivox.assets.v1.ImportAssetsMetadata.Phase
+	36, // 3: pivox.assets.v1.Asset.duration:type_name -> google.protobuf.Duration
+	37, // 4: pivox.assets.v1.Asset.expire_time:type_name -> google.protobuf.Timestamp
+	36, // 5: pivox.assets.v1.Asset.ttl:type_name -> google.protobuf.Duration
+	34, // 6: pivox.assets.v1.Asset.annotations:type_name -> pivox.assets.v1.Asset.AnnotationsEntry
+	37, // 7: pivox.assets.v1.Asset.create_time:type_name -> google.protobuf.Timestamp
+	37, // 8: pivox.assets.v1.Asset.update_time:type_name -> google.protobuf.Timestamp
+	37, // 9: pivox.assets.v1.Asset.delete_time:type_name -> google.protobuf.Timestamp
+	37, // 10: pivox.assets.v1.Asset.purge_time:type_name -> google.protobuf.Timestamp
+	10, // 11: pivox.assets.v1.AssetVersion.renditions:type_name -> pivox.assets.v1.Rendition
+	37, // 12: pivox.assets.v1.AssetVersion.create_time:type_name -> google.protobuf.Timestamp
+	8,  // 13: pivox.assets.v1.AssetVersion.crop:type_name -> pivox.assets.v1.Crop
+	9,  // 14: pivox.assets.v1.Crop.area:type_name -> pivox.assets.v1.CropArea
+	2,  // 15: pivox.assets.v1.Rendition.type:type_name -> pivox.assets.v1.Rendition.Type
+	3,  // 16: pivox.assets.v1.UploadInfo.method:type_name -> pivox.assets.v1.UploadInfo.Method
+	35, // 17: pivox.assets.v1.UploadInfo.headers:type_name -> pivox.assets.v1.UploadInfo.HeadersEntry
+	12, // 18: pivox.assets.v1.UploadInfo.parts:type_name -> pivox.assets.v1.UploadPart
+	6,  // 19: pivox.assets.v1.CreateAssetRequest.asset:type_name -> pivox.assets.v1.Asset
+	4,  // 20: pivox.assets.v1.CreateAssetMetadata.step:type_name -> pivox.assets.v1.CreateAssetMetadata.Step
+	11, // 21: pivox.assets.v1.CreateAssetMetadata.upload_info:type_name -> pivox.assets.v1.UploadInfo
+	6,  // 22: pivox.assets.v1.ListAssetsResponse.assets:type_name -> pivox.assets.v1.Asset
+	6,  // 23: pivox.assets.v1.UpdateAssetRequest.asset:type_name -> pivox.assets.v1.Asset
+	38, // 24: pivox.assets.v1.UpdateAssetRequest.update_mask:type_name -> google.protobuf.FieldMask
+	7,  // 25: pivox.assets.v1.CreateAssetVersionRequest.asset_version:type_name -> pivox.assets.v1.AssetVersion
+	8,  // 26: pivox.assets.v1.CreateAssetVersionRequest.crop:type_name -> pivox.assets.v1.Crop
+	4,  // 27: pivox.assets.v1.CreateAssetVersionMetadata.step:type_name -> pivox.assets.v1.CreateAssetMetadata.Step
+	11, // 28: pivox.assets.v1.CreateAssetVersionMetadata.upload_info:type_name -> pivox.assets.v1.UploadInfo
+	7,  // 29: pivox.assets.v1.ListAssetVersionsResponse.versions:type_name -> pivox.assets.v1.AssetVersion
+	5,  // 30: pivox.assets.v1.ImportAssetsMetadata.phase:type_name -> pivox.assets.v1.ImportAssetsMetadata.Phase
+	39, // 31: pivox.assets.v1.AssetMetadata.metadata:type_name -> google.protobuf.Struct
 	13, // 32: pivox.assets.v1.Assets.CreateAsset:input_type -> pivox.assets.v1.CreateAssetRequest
 	15, // 33: pivox.assets.v1.Assets.GetAsset:input_type -> pivox.assets.v1.GetAssetRequest
 	16, // 34: pivox.assets.v1.Assets.ListAssets:input_type -> pivox.assets.v1.ListAssetsRequest
@@ -2951,18 +3044,20 @@ var file_pivox_assets_v1_asset_proto_depIdxs = []int32{
 	26, // 39: pivox.assets.v1.Assets.GetAssetVersion:input_type -> pivox.assets.v1.GetAssetVersionRequest
 	27, // 40: pivox.assets.v1.Assets.ListAssetVersions:input_type -> pivox.assets.v1.ListAssetVersionsRequest
 	29, // 41: pivox.assets.v1.Assets.ImportAssets:input_type -> pivox.assets.v1.ImportAssetsRequest
-	38, // 42: pivox.assets.v1.Assets.CreateAsset:output_type -> google.longrunning.Operation
-	6,  // 43: pivox.assets.v1.Assets.GetAsset:output_type -> pivox.assets.v1.Asset
-	17, // 44: pivox.assets.v1.Assets.ListAssets:output_type -> pivox.assets.v1.ListAssetsResponse
-	38, // 45: pivox.assets.v1.Assets.UpdateAsset:output_type -> google.longrunning.Operation
-	38, // 46: pivox.assets.v1.Assets.DeleteAsset:output_type -> google.longrunning.Operation
-	38, // 47: pivox.assets.v1.Assets.UndeleteAsset:output_type -> google.longrunning.Operation
-	38, // 48: pivox.assets.v1.Assets.CreateAssetVersion:output_type -> google.longrunning.Operation
-	7,  // 49: pivox.assets.v1.Assets.GetAssetVersion:output_type -> pivox.assets.v1.AssetVersion
-	28, // 50: pivox.assets.v1.Assets.ListAssetVersions:output_type -> pivox.assets.v1.ListAssetVersionsResponse
-	38, // 51: pivox.assets.v1.Assets.ImportAssets:output_type -> google.longrunning.Operation
-	42, // [42:52] is the sub-list for method output_type
-	32, // [32:42] is the sub-list for method input_type
+	32, // 42: pivox.assets.v1.Assets.GetAssetMetadata:input_type -> pivox.assets.v1.GetAssetMetadataRequest
+	40, // 43: pivox.assets.v1.Assets.CreateAsset:output_type -> google.longrunning.Operation
+	6,  // 44: pivox.assets.v1.Assets.GetAsset:output_type -> pivox.assets.v1.Asset
+	17, // 45: pivox.assets.v1.Assets.ListAssets:output_type -> pivox.assets.v1.ListAssetsResponse
+	40, // 46: pivox.assets.v1.Assets.UpdateAsset:output_type -> google.longrunning.Operation
+	40, // 47: pivox.assets.v1.Assets.DeleteAsset:output_type -> google.longrunning.Operation
+	40, // 48: pivox.assets.v1.Assets.UndeleteAsset:output_type -> google.longrunning.Operation
+	40, // 49: pivox.assets.v1.Assets.CreateAssetVersion:output_type -> google.longrunning.Operation
+	7,  // 50: pivox.assets.v1.Assets.GetAssetVersion:output_type -> pivox.assets.v1.AssetVersion
+	28, // 51: pivox.assets.v1.Assets.ListAssetVersions:output_type -> pivox.assets.v1.ListAssetVersionsResponse
+	40, // 52: pivox.assets.v1.Assets.ImportAssets:output_type -> google.longrunning.Operation
+	33, // 53: pivox.assets.v1.Assets.GetAssetMetadata:output_type -> pivox.assets.v1.AssetMetadata
+	43, // [43:54] is the sub-list for method output_type
+	32, // [32:43] is the sub-list for method input_type
 	32, // [32:32] is the sub-list for extension type_name
 	32, // [32:32] is the sub-list for extension extendee
 	0,  // [0:32] is the sub-list for field type_name
@@ -2979,7 +3074,7 @@ func file_pivox_assets_v1_asset_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pivox_assets_v1_asset_proto_rawDesc), len(file_pivox_assets_v1_asset_proto_rawDesc)),
 			NumEnums:      6,
-			NumMessages:   28,
+			NumMessages:   30,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

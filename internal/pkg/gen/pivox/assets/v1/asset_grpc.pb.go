@@ -44,6 +44,7 @@ const (
 	Assets_GetAssetVersion_FullMethodName    = "/pivox.assets.v1.Assets/GetAssetVersion"
 	Assets_ListAssetVersions_FullMethodName  = "/pivox.assets.v1.Assets/ListAssetVersions"
 	Assets_ImportAssets_FullMethodName       = "/pivox.assets.v1.Assets/ImportAssets"
+	Assets_GetAssetMetadata_FullMethodName   = "/pivox.assets.v1.Assets/GetAssetMetadata"
 )
 
 // AssetsClient is the client API for Assets service.
@@ -97,6 +98,10 @@ type AssetsClient interface {
 	// The caller must have `assets.assets.create` permission on the
 	// parent project and `storage.endpoints.get` on the source endpoint.
 	ImportAssets(ctx context.Context, in *ImportAssetsRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
+	// Retrieves the extracted metadata for an asset (EXIF, XMP, etc.).
+	// Metadata is a singleton sub-resource — not included in Get/List
+	// Asset responses to keep them lightweight.
+	GetAssetMetadata(ctx context.Context, in *GetAssetMetadataRequest, opts ...grpc.CallOption) (*AssetMetadata, error)
 }
 
 type assetsClient struct {
@@ -207,6 +212,16 @@ func (c *assetsClient) ImportAssets(ctx context.Context, in *ImportAssetsRequest
 	return out, nil
 }
 
+func (c *assetsClient) GetAssetMetadata(ctx context.Context, in *GetAssetMetadataRequest, opts ...grpc.CallOption) (*AssetMetadata, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AssetMetadata)
+	err := c.cc.Invoke(ctx, Assets_GetAssetMetadata_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AssetsServer is the server API for Assets service.
 // All implementations must embed UnimplementedAssetsServer
 // for forward compatibility.
@@ -258,6 +273,10 @@ type AssetsServer interface {
 	// The caller must have `assets.assets.create` permission on the
 	// parent project and `storage.endpoints.get` on the source endpoint.
 	ImportAssets(context.Context, *ImportAssetsRequest) (*longrunningpb.Operation, error)
+	// Retrieves the extracted metadata for an asset (EXIF, XMP, etc.).
+	// Metadata is a singleton sub-resource — not included in Get/List
+	// Asset responses to keep them lightweight.
+	GetAssetMetadata(context.Context, *GetAssetMetadataRequest) (*AssetMetadata, error)
 	mustEmbedUnimplementedAssetsServer()
 }
 
@@ -297,6 +316,9 @@ func (UnimplementedAssetsServer) ListAssetVersions(context.Context, *ListAssetVe
 }
 func (UnimplementedAssetsServer) ImportAssets(context.Context, *ImportAssetsRequest) (*longrunningpb.Operation, error) {
 	return nil, status.Error(codes.Unimplemented, "method ImportAssets not implemented")
+}
+func (UnimplementedAssetsServer) GetAssetMetadata(context.Context, *GetAssetMetadataRequest) (*AssetMetadata, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAssetMetadata not implemented")
 }
 func (UnimplementedAssetsServer) mustEmbedUnimplementedAssetsServer() {}
 func (UnimplementedAssetsServer) testEmbeddedByValue()                {}
@@ -499,6 +521,24 @@ func _Assets_ImportAssets_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Assets_GetAssetMetadata_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAssetMetadataRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AssetsServer).GetAssetMetadata(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Assets_GetAssetMetadata_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AssetsServer).GetAssetMetadata(ctx, req.(*GetAssetMetadataRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Assets_ServiceDesc is the grpc.ServiceDesc for Assets service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -545,6 +585,10 @@ var Assets_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ImportAssets",
 			Handler:    _Assets_ImportAssets_Handler,
+		},
+		{
+			MethodName: "GetAssetMetadata",
+			Handler:    _Assets_GetAssetMetadata_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -1223,11 +1223,10 @@
         "IMAGE",
         "VIDEO",
         "AUDIO",
-        "GRAPHIC",
         "DOCUMENT"
       ],
       "default": "MEDIA_TYPE_UNSPECIFIED",
-      "description": "The broad media category of the asset.\n\n - MEDIA_TYPE_UNSPECIFIED: Unspecified media type.\n - IMAGE: Still image (JPEG, PNG, TIFF, WebP, etc.).\n - VIDEO: Video file (MP4, MOV, MXF, ProRes, etc.).\n - AUDIO: Audio file (WAV, MP3, AAC, FLAC, etc.).\n - GRAPHIC: Motion graphics or vector (SVG, Lottie, Rive, etc.).\n - DOCUMENT: Document (PDF, PSD, AI, etc.)."
+      "description": "The broad media category of the asset. Derived from content type\nduring ingestion. Used for UI grouping, icons, and pipeline routing.\n\n - MEDIA_TYPE_UNSPECIFIED: Unspecified media type.\n - IMAGE: Still image (JPEG, PNG, TIFF, WebP, SVG, etc.).\n - VIDEO: Video file (MP4, MOV, MXF, ProRes, etc.).\n - AUDIO: Audio file (WAV, MP3, AAC, FLAC, etc.).\n - DOCUMENT: Document (PDF, etc.)."
     },
     "RequestPriority": {
       "type": "string",
