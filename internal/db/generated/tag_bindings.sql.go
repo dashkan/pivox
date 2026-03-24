@@ -14,7 +14,7 @@ import (
 const createTagBinding = `-- name: CreateTagBinding :one
 INSERT INTO tag_bindings (id, parent_resource, tag_value_id, created_by)
 VALUES ($1, $2, $3, $4)
-RETURNING id, parent_resource, tag_value_id, annotations, etag, created_by, create_time, update_time
+RETURNING id, parent_resource, tag_value_id, origin, annotations, etag, created_by, create_time, update_time
 `
 
 type CreateTagBindingParams struct {
@@ -36,6 +36,7 @@ func (q *Queries) CreateTagBinding(ctx context.Context, arg CreateTagBindingPara
 		&i.ID,
 		&i.ParentResource,
 		&i.TagValueID,
+		&i.Origin,
 		&i.Annotations,
 		&i.Etag,
 		&i.CreatedBy,
@@ -55,7 +56,7 @@ func (q *Queries) DeleteTagBinding(ctx context.Context, id uuid.UUID) error {
 }
 
 const getTagBinding = `-- name: GetTagBinding :one
-SELECT id, parent_resource, tag_value_id, annotations, etag, created_by, create_time, update_time FROM tag_bindings WHERE id = $1
+SELECT id, parent_resource, tag_value_id, origin, annotations, etag, created_by, create_time, update_time FROM tag_bindings WHERE id = $1
 `
 
 func (q *Queries) GetTagBinding(ctx context.Context, id uuid.UUID) (TagBinding, error) {
@@ -65,6 +66,7 @@ func (q *Queries) GetTagBinding(ctx context.Context, id uuid.UUID) (TagBinding, 
 		&i.ID,
 		&i.ParentResource,
 		&i.TagValueID,
+		&i.Origin,
 		&i.Annotations,
 		&i.Etag,
 		&i.CreatedBy,

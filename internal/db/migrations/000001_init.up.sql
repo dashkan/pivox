@@ -325,12 +325,15 @@ CREATE INDEX idx_tag_values_namespaced ON tag_values (namespaced_name);
 -- ============================================================================
 -- tag_bindings
 -- ============================================================================
+CREATE TYPE tag_binding_origin AS ENUM ('USER', 'SYSTEM', 'AI');
+
 CREATE TABLE tag_bindings (
     id                        UUID PRIMARY KEY DEFAULT uuidv7(),
     -- relationships
     parent_resource           TEXT NOT NULL,
     tag_value_id              UUID NOT NULL REFERENCES tag_values(id) ON DELETE RESTRICT,
     -- domain
+    origin                    tag_binding_origin NOT NULL DEFAULT 'USER',
     annotations               JSONB NOT NULL DEFAULT '{}',
     -- versioning
     etag                      TEXT NOT NULL DEFAULT md5(now()::text),
@@ -344,6 +347,7 @@ CREATE TABLE tag_bindings (
 );
 CREATE INDEX idx_tag_bindings_parent ON tag_bindings (parent_resource);
 CREATE INDEX idx_tag_bindings_tag_value ON tag_bindings (tag_value_id);
+CREATE INDEX idx_tag_bindings_origin ON tag_bindings (parent_resource, origin);
 
 -- ============================================================================
 -- api_keys

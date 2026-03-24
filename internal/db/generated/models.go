@@ -766,6 +766,49 @@ func (ns NullStorageGatewayState) Value() (driver.Value, error) {
 	return string(ns.StorageGatewayState), nil
 }
 
+type TagBindingOrigin string
+
+const (
+	TagBindingOriginUSER   TagBindingOrigin = "USER"
+	TagBindingOriginSYSTEM TagBindingOrigin = "SYSTEM"
+	TagBindingOriginAI     TagBindingOrigin = "AI"
+)
+
+func (e *TagBindingOrigin) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = TagBindingOrigin(s)
+	case string:
+		*e = TagBindingOrigin(s)
+	default:
+		return fmt.Errorf("unsupported scan type for TagBindingOrigin: %T", src)
+	}
+	return nil
+}
+
+type NullTagBindingOrigin struct {
+	TagBindingOrigin TagBindingOrigin `json:"tag_binding_origin"`
+	Valid            bool             `json:"valid"` // Valid is true if TagBindingOrigin is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullTagBindingOrigin) Scan(value interface{}) error {
+	if value == nil {
+		ns.TagBindingOrigin, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.TagBindingOrigin.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullTagBindingOrigin) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.TagBindingOrigin), nil
+}
+
 type Account struct {
 	ID            uuid.UUID          `json:"id"`
 	FirebaseUid   string             `json:"firebase_uid"`
@@ -1148,14 +1191,15 @@ type StorageGateway struct {
 }
 
 type TagBinding struct {
-	ID             uuid.UUID       `json:"id"`
-	ParentResource string          `json:"parent_resource"`
-	TagValueID     uuid.UUID       `json:"tag_value_id"`
-	Annotations    json.RawMessage `json:"annotations"`
-	Etag           string          `json:"etag"`
-	CreatedBy      string          `json:"created_by"`
-	CreateTime     time.Time       `json:"create_time"`
-	UpdateTime     time.Time       `json:"update_time"`
+	ID             uuid.UUID        `json:"id"`
+	ParentResource string           `json:"parent_resource"`
+	TagValueID     uuid.UUID        `json:"tag_value_id"`
+	Origin         TagBindingOrigin `json:"origin"`
+	Annotations    json.RawMessage  `json:"annotations"`
+	Etag           string           `json:"etag"`
+	CreatedBy      string           `json:"created_by"`
+	CreateTime     time.Time        `json:"create_time"`
+	UpdateTime     time.Time        `json:"update_time"`
 }
 
 type TagKey struct {
