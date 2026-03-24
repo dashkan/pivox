@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -98,7 +99,7 @@ func (s *EndpointStore) ServeFile(w http.ResponseWriter, r *http.Request) {
 
 	// Check memory cache first.
 	cacheKey := endpointName + "/" + objectKey
-	if ep.cacheEnabled && s.cache != nil && s.cache.Get(w, cacheKey) {
+	if ep.cacheEnabled && s.cache != nil && s.cache.Get(w, r, cacheKey) {
 		return
 	}
 
@@ -122,7 +123,6 @@ func (s *EndpointStore) serveS3(w http.ResponseWriter, r *http.Request, ep *endp
 	}
 	defer obj.Close()
 
-	// Get object info for headers.
 	info, err := obj.Stat()
 	if err != nil {
 		errResp := minio.ToErrorResponse(err)
@@ -134,35 +134,28 @@ func (s *EndpointStore) serveS3(w http.ResponseWriter, r *http.Request, ep *endp
 		return
 	}
 
-	// Set response headers.
+	// Assets are versioned in their storage key (assets/{id}/v{n}/file.ext)
+	// so they are effectively immutable. Set aggressive cache headers.
 	w.Header().Set("Content-Type", info.ContentType)
-	w.Header().Set("Content-Length", fmt.Sprintf("%d", info.Size))
-	w.Header().Set("ETag", info.ETag)
-	w.Header().Set("Last-Modified", info.LastModified.UTC().Format(http.TimeFormat))
-	w.Header().Set("Accept-Ranges", "bytes")
+	w.Header().Set("ETag", `"`+info.ETag+`"`)
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	w.Header().Set("X-Cache", "MISS")
 
-	// For cacheable objects, read into memory, cache, and serve.
+	// For cacheable objects, read into buffer, cache, and serve via
+	// ServeContent (handles Range, If-None-Match, If-Modified-Since).
 	if ep.cacheEnabled && s.cache != nil && info.Size <= maxCacheableSize {
-		buf := make([]byte, info.Size)
-		n, err := io.ReadFull(obj, buf)
+		buf, err := io.ReadAll(obj)
 		if err == nil {
-			s.cache.Put(cacheKey, buf[:n], info.ContentType, info.ETag, info.LastModified)
-			w.WriteHeader(http.StatusOK)
-			w.Write(buf[:n])
+			s.cache.Put(cacheKey, buf, info.ContentType, info.ETag, info.LastModified)
+			http.ServeContent(w, r, objectKey, info.LastModified, bytes.NewReader(buf))
 			return
 		}
-		// ReadFull failed — fall through to streaming.
+		// ReadAll failed — fall through to direct streaming.
 	}
 
-	// Handle Range requests for video seeking / progressive loading.
-	if rangeHeader := r.Header.Get("Range"); rangeHeader != "" {
-		http.ServeContent(w, r, objectKey, info.LastModified, obj)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	io.Copy(w, obj)
+	// Large or non-cacheable objects: ServeContent with the S3 object
+	// directly. minio's Object implements io.ReadSeeker.
+	http.ServeContent(w, r, objectKey, info.LastModified, obj)
 }
 
 // serveFilesystem serves a file from a local/NFS-mounted filesystem.
@@ -201,6 +194,8 @@ func (s *EndpointStore) serveFilesystem(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
+	// Immutable assets — aggressive caching.
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	// http.ServeContent handles Content-Type detection, Range requests,
 	// and conditional requests (If-Modified-Since, If-None-Match).
 	http.ServeContent(w, r, stat.Name(), stat.ModTime(), f)

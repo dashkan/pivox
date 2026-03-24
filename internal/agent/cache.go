@@ -70,17 +70,19 @@ func NewMemoryCache(maxEntries int, maxBytes int64) *MemoryCache {
 
 // Get retrieves a cached object and writes it to the response.
 // Returns true if the object was found in cache (cache hit).
-func (mc *MemoryCache) Get(w http.ResponseWriter, key string) bool {
+// The real request is passed through so http.ServeContent can handle
+// conditional requests (If-None-Match, If-Modified-Since) and Range.
+func (mc *MemoryCache) Get(w http.ResponseWriter, r *http.Request, key string) bool {
 	obj, ok := mc.cache.Get(key)
 	if !ok {
 		return false
 	}
 
 	w.Header().Set("Content-Type", obj.contentType)
-	w.Header().Set("ETag", obj.etag)
-	w.Header().Set("Last-Modified", obj.lastMod.UTC().Format(http.TimeFormat))
+	w.Header().Set("ETag", `"`+obj.etag+`"`)
 	w.Header().Set("X-Cache", "HIT")
-	http.ServeContent(w, &http.Request{}, "", obj.lastMod, bytes.NewReader(obj.body))
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	http.ServeContent(w, r, "", obj.lastMod, bytes.NewReader(obj.body))
 	return true
 }
 
