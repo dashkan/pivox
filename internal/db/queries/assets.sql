@@ -1,6 +1,6 @@
 -- name: CreateAsset :one
-INSERT INTO assets (id, project_id, endpoint_id, name, display_name, import_path, state, annotations, created_by, updated_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
+INSERT INTO assets (id, project_id, endpoint_id, name, display_name, import_path, filename, state, annotations, created_by, updated_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
 RETURNING *;
 
 -- name: GetAsset :one
@@ -48,7 +48,7 @@ WHERE id = $1;
 UPDATE assets
 SET state = $2,
     media_type = $3,
-    mime_type = $4,
+    content_type = $4,
     checksum_sha256 = $5,
     size_bytes = $6,
     technical_metadata = $7,

@@ -848,8 +848,9 @@ type Asset struct {
 	Name              string             `json:"name"`
 	DisplayName       string             `json:"display_name"`
 	ImportPath        string             `json:"import_path"`
+	Filename          string             `json:"filename"`
 	MediaType         NullAssetMediaType `json:"media_type"`
-	MimeType          string             `json:"mime_type"`
+	ContentType       string             `json:"content_type"`
 	ChecksumSha256    string             `json:"checksum_sha256"`
 	SizeBytes         int64              `json:"size_bytes"`
 	TechnicalMetadata json.RawMessage    `json:"technical_metadata"`

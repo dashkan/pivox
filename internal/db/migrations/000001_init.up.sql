@@ -763,8 +763,9 @@ CREATE TABLE assets (
     -- domain
     display_name        TEXT NOT NULL DEFAULT '',
     import_path         TEXT NOT NULL DEFAULT '',
+    filename            TEXT NOT NULL DEFAULT '',
     media_type          asset_media_type,
-    mime_type           TEXT NOT NULL DEFAULT '',
+    content_type        TEXT NOT NULL DEFAULT '',
     checksum_sha256     TEXT NOT NULL DEFAULT '',
     size_bytes          BIGINT NOT NULL DEFAULT 0,
     technical_metadata  JSONB NOT NULL DEFAULT '{}',

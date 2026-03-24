@@ -191,6 +191,8 @@ func (s *AssetsServer) CreateAsset(ctx context.Context, req *assetsv1.CreateAsse
 		EndpointID:  endpointID,
 		Name:        assetName,
 		DisplayName: asset.GetDisplayName(),
+		ImportPath:  "",
+		Filename:    req.GetFilename(),
 		State:       state,
 		Annotations: annotationsJSON,
 		CreatedBy:   "",

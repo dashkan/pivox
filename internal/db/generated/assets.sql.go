@@ -25,9 +25,9 @@ func (q *Queries) CountAssetsByProject(ctx context.Context, projectID uuid.UUID)
 }
 
 const createAsset = `-- name: CreateAsset :one
-INSERT INTO assets (id, project_id, endpoint_id, name, display_name, import_path, state, annotations, created_by, updated_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
-RETURNING id, project_id, endpoint_id, name, display_name, import_path, media_type, mime_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time
+INSERT INTO assets (id, project_id, endpoint_id, name, display_name, import_path, filename, state, annotations, created_by, updated_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
+RETURNING id, project_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time
 `
 
 type CreateAssetParams struct {
@@ -37,6 +37,7 @@ type CreateAssetParams struct {
 	Name        string          `json:"name"`
 	DisplayName string          `json:"display_name"`
 	ImportPath  string          `json:"import_path"`
+	Filename    string          `json:"filename"`
 	State       AssetState      `json:"state"`
 	Annotations json.RawMessage `json:"annotations"`
 	CreatedBy   string          `json:"created_by"`
@@ -50,6 +51,7 @@ func (q *Queries) CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset
 		arg.Name,
 		arg.DisplayName,
 		arg.ImportPath,
+		arg.Filename,
 		arg.State,
 		arg.Annotations,
 		arg.CreatedBy,
@@ -62,8 +64,9 @@ func (q *Queries) CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset
 		&i.Name,
 		&i.DisplayName,
 		&i.ImportPath,
+		&i.Filename,
 		&i.MediaType,
-		&i.MimeType,
+		&i.ContentType,
 		&i.ChecksumSha256,
 		&i.SizeBytes,
 		&i.TechnicalMetadata,
@@ -91,7 +94,7 @@ func (q *Queries) CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset
 }
 
 const getAsset = `-- name: GetAsset :one
-SELECT id, project_id, endpoint_id, name, display_name, import_path, media_type, mime_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets WHERE id = $1
+SELECT id, project_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets WHERE id = $1
 `
 
 func (q *Queries) GetAsset(ctx context.Context, id uuid.UUID) (Asset, error) {
@@ -104,8 +107,9 @@ func (q *Queries) GetAsset(ctx context.Context, id uuid.UUID) (Asset, error) {
 		&i.Name,
 		&i.DisplayName,
 		&i.ImportPath,
+		&i.Filename,
 		&i.MediaType,
-		&i.MimeType,
+		&i.ContentType,
 		&i.ChecksumSha256,
 		&i.SizeBytes,
 		&i.TechnicalMetadata,
@@ -133,7 +137,7 @@ func (q *Queries) GetAsset(ctx context.Context, id uuid.UUID) (Asset, error) {
 }
 
 const getAssetByChecksum = `-- name: GetAssetByChecksum :one
-SELECT id, project_id, endpoint_id, name, display_name, import_path, media_type, mime_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets WHERE project_id = $1 AND checksum_sha256 = $2 AND delete_time IS NULL
+SELECT id, project_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets WHERE project_id = $1 AND checksum_sha256 = $2 AND delete_time IS NULL
 `
 
 type GetAssetByChecksumParams struct {
@@ -151,8 +155,9 @@ func (q *Queries) GetAssetByChecksum(ctx context.Context, arg GetAssetByChecksum
 		&i.Name,
 		&i.DisplayName,
 		&i.ImportPath,
+		&i.Filename,
 		&i.MediaType,
-		&i.MimeType,
+		&i.ContentType,
 		&i.ChecksumSha256,
 		&i.SizeBytes,
 		&i.TechnicalMetadata,
@@ -180,7 +185,7 @@ func (q *Queries) GetAssetByChecksum(ctx context.Context, arg GetAssetByChecksum
 }
 
 const getAssetByName = `-- name: GetAssetByName :one
-SELECT id, project_id, endpoint_id, name, display_name, import_path, media_type, mime_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets WHERE project_id = $1 AND name = $2
+SELECT id, project_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets WHERE project_id = $1 AND name = $2
 `
 
 type GetAssetByNameParams struct {
@@ -198,8 +203,9 @@ func (q *Queries) GetAssetByName(ctx context.Context, arg GetAssetByNameParams) 
 		&i.Name,
 		&i.DisplayName,
 		&i.ImportPath,
+		&i.Filename,
 		&i.MediaType,
-		&i.MimeType,
+		&i.ContentType,
 		&i.ChecksumSha256,
 		&i.SizeBytes,
 		&i.TechnicalMetadata,
@@ -227,7 +233,7 @@ func (q *Queries) GetAssetByName(ctx context.Context, arg GetAssetByNameParams) 
 }
 
 const listAssetsByProject = `-- name: ListAssetsByProject :many
-SELECT id, project_id, endpoint_id, name, display_name, import_path, media_type, mime_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets
+SELECT id, project_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets
 WHERE project_id = $1 AND delete_time IS NULL
 ORDER BY create_time DESC
 LIMIT $2 OFFSET $3
@@ -255,8 +261,9 @@ func (q *Queries) ListAssetsByProject(ctx context.Context, arg ListAssetsByProje
 			&i.Name,
 			&i.DisplayName,
 			&i.ImportPath,
+			&i.Filename,
 			&i.MediaType,
-			&i.MimeType,
+			&i.ContentType,
 			&i.ChecksumSha256,
 			&i.SizeBytes,
 			&i.TechnicalMetadata,
@@ -291,7 +298,7 @@ func (q *Queries) ListAssetsByProject(ctx context.Context, arg ListAssetsByProje
 }
 
 const listAssetsByProjectWithDeleted = `-- name: ListAssetsByProjectWithDeleted :many
-SELECT id, project_id, endpoint_id, name, display_name, import_path, media_type, mime_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets
+SELECT id, project_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets
 WHERE project_id = $1
 ORDER BY create_time DESC
 LIMIT $2 OFFSET $3
@@ -319,8 +326,9 @@ func (q *Queries) ListAssetsByProjectWithDeleted(ctx context.Context, arg ListAs
 			&i.Name,
 			&i.DisplayName,
 			&i.ImportPath,
+			&i.Filename,
 			&i.MediaType,
-			&i.MimeType,
+			&i.ContentType,
 			&i.ChecksumSha256,
 			&i.SizeBytes,
 			&i.TechnicalMetadata,
@@ -355,7 +363,7 @@ func (q *Queries) ListAssetsByProjectWithDeleted(ctx context.Context, arg ListAs
 }
 
 const listExpiredAssets = `-- name: ListExpiredAssets :many
-SELECT id, project_id, endpoint_id, name, display_name, import_path, media_type, mime_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets
+SELECT id, project_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets
 WHERE expire_time IS NOT NULL AND expire_time < now() AND delete_time IS NULL
 LIMIT $1
 `
@@ -376,8 +384,9 @@ func (q *Queries) ListExpiredAssets(ctx context.Context, limit int32) ([]Asset, 
 			&i.Name,
 			&i.DisplayName,
 			&i.ImportPath,
+			&i.Filename,
 			&i.MediaType,
-			&i.MimeType,
+			&i.ContentType,
 			&i.ChecksumSha256,
 			&i.SizeBytes,
 			&i.TechnicalMetadata,
@@ -412,7 +421,7 @@ func (q *Queries) ListExpiredAssets(ctx context.Context, limit int32) ([]Asset, 
 }
 
 const searchAssets = `-- name: SearchAssets :many
-SELECT id, project_id, endpoint_id, name, display_name, import_path, media_type, mime_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets
+SELECT id, project_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets
 WHERE project_id = $1
   AND delete_time IS NULL
   AND search_vector @@ plainto_tsquery('english', $2)
@@ -448,8 +457,9 @@ func (q *Queries) SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]A
 			&i.Name,
 			&i.DisplayName,
 			&i.ImportPath,
+			&i.Filename,
 			&i.MediaType,
-			&i.MimeType,
+			&i.ContentType,
 			&i.ChecksumSha256,
 			&i.SizeBytes,
 			&i.TechnicalMetadata,
@@ -530,7 +540,7 @@ SET display_name = COALESCE($3, display_name),
     update_time = now(),
     etag = md5(now()::text)
 WHERE id = $1
-RETURNING id, project_id, endpoint_id, name, display_name, import_path, media_type, mime_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time
+RETURNING id, project_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time
 `
 
 type UpdateAssetParams struct {
@@ -557,8 +567,9 @@ func (q *Queries) UpdateAsset(ctx context.Context, arg UpdateAssetParams) (Asset
 		&i.Name,
 		&i.DisplayName,
 		&i.ImportPath,
+		&i.Filename,
 		&i.MediaType,
-		&i.MimeType,
+		&i.ContentType,
 		&i.ChecksumSha256,
 		&i.SizeBytes,
 		&i.TechnicalMetadata,
@@ -589,7 +600,7 @@ const updateAssetIngestion = `-- name: UpdateAssetIngestion :exec
 UPDATE assets
 SET state = $2,
     media_type = $3,
-    mime_type = $4,
+    content_type = $4,
     checksum_sha256 = $5,
     size_bytes = $6,
     technical_metadata = $7,
@@ -608,7 +619,7 @@ type UpdateAssetIngestionParams struct {
 	ID                uuid.UUID          `json:"id"`
 	State             AssetState         `json:"state"`
 	MediaType         NullAssetMediaType `json:"media_type"`
-	MimeType          string             `json:"mime_type"`
+	ContentType       string             `json:"content_type"`
 	ChecksumSha256    string             `json:"checksum_sha256"`
 	SizeBytes         int64              `json:"size_bytes"`
 	TechnicalMetadata json.RawMessage    `json:"technical_metadata"`
@@ -625,7 +636,7 @@ func (q *Queries) UpdateAssetIngestion(ctx context.Context, arg UpdateAssetInges
 		arg.ID,
 		arg.State,
 		arg.MediaType,
-		arg.MimeType,
+		arg.ContentType,
 		arg.ChecksumSha256,
 		arg.SizeBytes,
 		arg.TechnicalMetadata,
