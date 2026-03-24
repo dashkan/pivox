@@ -24,7 +24,15 @@ const (
 // given registration token, and runs the heartbeat loop until the context is
 // cancelled or the stream encounters an error. The caller is responsible for
 // reconnection with backoff.
-func Connect(ctx context.Context, addr string, token string, sessions *SessionStore, logger *slog.Logger) error {
+// ConnectConfig holds the dependencies for the agent connection.
+type ConnectConfig struct {
+	Sessions  *SessionStore
+	Endpoints *EndpointStore
+	Denied    *DeniedPatterns
+	HTTP      *HTTPServer
+}
+
+func Connect(ctx context.Context, addr string, token string, cfg *ConnectConfig, logger *slog.Logger) error {
 	conn, err := grpc.NewClient(addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
@@ -40,7 +48,7 @@ func Connect(ctx context.Context, addr string, token string, sessions *SessionSt
 		return fmt.Errorf("open stream: %w", err)
 	}
 
-	stream := NewStream(bidi, handshakeTimeout, sessions, logger)
+	stream := NewStream(bidi, handshakeTimeout, cfg.Sessions, cfg.Endpoints, cfg.Denied, logger)
 
 	// Start the receive loop in the background. It will return when the
 	// stream is closed or errors out.
@@ -65,6 +73,28 @@ func Connect(ctx context.Context, addr string, token string, sessions *SessionSt
 	}
 
 	logger.Info("connected to server", "agent_name", ack.GetAgentName())
+
+	// Apply initial config from handshake.
+	if endpoints := ack.GetEndpoints(); len(endpoints) > 0 {
+		if err := cfg.Endpoints.Update(endpoints); err != nil {
+			logger.Error("failed to apply initial endpoints", "error", err)
+		} else {
+			logger.Info("loaded endpoints", "count", len(endpoints))
+		}
+	}
+
+	if patterns := ack.GetDeniedPatterns(); len(patterns) > 0 {
+		cfg.Denied.Update(patterns)
+		logger.Info("loaded denied patterns", "count", len(patterns))
+	}
+
+	// Update HTTP server with signing key and CORS from handshake.
+	if key := ack.GetSessionSigningKey(); len(key) > 0 {
+		cfg.HTTP.SetSigningKey(key)
+	}
+	if origin := ack.GetCorsOrigin(); origin != "" {
+		cfg.HTTP.SetCORSOrigin(origin)
+	}
 
 	// Heartbeat loop.
 	startTime := time.Now()

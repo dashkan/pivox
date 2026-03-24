@@ -18,24 +18,28 @@ import (
 // messages (handshake) use a UUID-based correlation id so the caller can
 // block until the server responds.
 type Stream struct {
-	stream   agentv1.AgentService_ConnectClient
-	pending  map[string]chan *agentv1.ControlMessage
-	mu       sync.Mutex
-	timeout  time.Duration
-	sessions *SessionStore
-	logger   *slog.Logger
+	stream    agentv1.AgentService_ConnectClient
+	pending   map[string]chan *agentv1.ControlMessage
+	mu        sync.Mutex
+	timeout   time.Duration
+	sessions  *SessionStore
+	endpoints *EndpointStore
+	denied    *DeniedPatterns
+	logger    *slog.Logger
 }
 
 // NewStream creates a Stream wrapper around the given bidi gRPC stream.
 // The caller must start ReceiveLoop in a separate goroutine before calling
 // any request/response method (e.g. Handshake).
-func NewStream(stream agentv1.AgentService_ConnectClient, timeout time.Duration, sessions *SessionStore, logger *slog.Logger) *Stream {
+func NewStream(stream agentv1.AgentService_ConnectClient, timeout time.Duration, sessions *SessionStore, endpoints *EndpointStore, denied *DeniedPatterns, logger *slog.Logger) *Stream {
 	return &Stream{
-		stream:   stream,
-		pending:  make(map[string]chan *agentv1.ControlMessage),
-		timeout:  timeout,
-		sessions: sessions,
-		logger:   logger,
+		stream:    stream,
+		pending:   make(map[string]chan *agentv1.ControlMessage),
+		timeout:   timeout,
+		sessions:  sessions,
+		endpoints: endpoints,
+		denied:    denied,
+		logger:    logger,
 	}
 }
 
@@ -173,9 +177,16 @@ func (s *Stream) ReceiveLoop(ctx context.Context) error {
 func (s *Stream) handleServerMessage(msg *agentv1.ControlMessage) {
 	switch m := msg.GetMessage().(type) {
 	case *agentv1.ControlMessage_ConfigUpdate:
-		s.logger.Info("received config update",
-			"endpoints", len(m.ConfigUpdate.GetEndpoints()),
-		)
+		update := m.ConfigUpdate
+		if err := s.endpoints.Update(update.GetEndpoints()); err != nil {
+			s.logger.Error("failed to apply config update", "error", err)
+		} else {
+			s.logger.Info("applied config update", "endpoints", len(update.GetEndpoints()))
+		}
+		if patterns := update.GetDeniedPatterns(); patterns != nil {
+			s.denied.Update(patterns)
+			s.logger.Info("updated denied patterns", "count", len(patterns))
+		}
 	case *agentv1.ControlMessage_DrainRequest:
 		s.logger.Info("received drain request",
 			"reason", m.DrainRequest.GetReason(),

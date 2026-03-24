@@ -16,20 +16,33 @@ import (
 // HTTPServer serves files from storage endpoints with session-based auth.
 type HTTPServer struct {
 	sessions   *SessionStore
+	endpoints  *EndpointStore
+	denied     *DeniedPatterns
 	signingKey []byte // HMAC key for JWT validation
 	corsOrigin string // allowed CORS origin
 	logger     *slog.Logger
-	// TODO: endpoint configs will be added when wired to bidi
 }
 
 // NewHTTPServer creates a new HTTPServer.
-func NewHTTPServer(sessions *SessionStore, signingKey []byte, corsOrigin string, logger *slog.Logger) *HTTPServer {
+func NewHTTPServer(sessions *SessionStore, endpoints *EndpointStore, denied *DeniedPatterns, signingKey []byte, corsOrigin string, logger *slog.Logger) *HTTPServer {
 	return &HTTPServer{
 		sessions:   sessions,
+		endpoints:  endpoints,
+		denied:     denied,
 		signingKey: signingKey,
 		corsOrigin: corsOrigin,
 		logger:     logger,
 	}
+}
+
+// SetSigningKey updates the HMAC signing key for JWT validation.
+func (s *HTTPServer) SetSigningKey(key []byte) {
+	s.signingKey = key
+}
+
+// SetCORSOrigin updates the allowed CORS origin.
+func (s *HTTPServer) SetCORSOrigin(origin string) {
+	s.corsOrigin = origin
 }
 
 // ListenAndServe starts the HTTP server on the given address.
@@ -81,10 +94,14 @@ func (s *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Placeholder: actual S3/filesystem proxying will be added next.
-	w.Header().Set("Content-Type", "text/plain")
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintln(w, "OK")
+	// Check denied patterns before serving.
+	if s.denied != nil && s.denied.IsDenied(r.URL.Path) {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	// Proxy to the storage endpoint.
+	s.endpoints.ServeFile(w, r)
 }
 
 func (s *HTTPServer) setCORSHeaders(w http.ResponseWriter) {

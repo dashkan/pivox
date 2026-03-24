@@ -81,12 +81,15 @@ func runStorage(cmd *cobra.Command, args []string) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	// Create the session store and start the cleanup goroutine.
+	// Create stores.
 	sessions := agent.NewSessionStore()
 	go sessions.StartCleanup(ctx, 1*time.Minute)
 
+	endpoints := agent.NewEndpointStore()
+	denied := agent.NewDeniedPatterns()
+
 	// Start the HTTP file server alongside the bidi connection.
-	httpServer := agent.NewHTTPServer(sessions, nil, "*", logger) // nil signingKey for now, * CORS for dev
+	httpServer := agent.NewHTTPServer(sessions, endpoints, denied, nil, "*", logger)
 
 	go func() {
 		addr := fmt.Sprintf("%s:%d", bind, port)
@@ -96,10 +99,17 @@ func runStorage(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
+	connectCfg := &agent.ConnectConfig{
+		Sessions:  sessions,
+		Endpoints: endpoints,
+		Denied:    denied,
+		HTTP:      httpServer,
+	}
+
 	// Connect to control plane with reconnect loop.
 	for {
 		logger.Info("connecting to server", "addr", controlPlaneAddr)
-		err := agent.Connect(ctx, controlPlaneAddr, token, sessions, logger)
+		err := agent.Connect(ctx, controlPlaneAddr, token, connectCfg, logger)
 		if ctx.Err() != nil {
 			logger.Info("storage agent shutting down...")
 			return nil
