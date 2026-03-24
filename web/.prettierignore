@@ -1,0 +1,13 @@
+**/build
+**/coverage
+**/dist
+**/out
+**/.output
+**/.next
+**/node_modules
+**/docs
+**/shadcn
+**/vercel
+packages/primitives
+pnpm-lock.yaml
+*.gen.ts

@@ -1,0 +1,35 @@
+import { createFileRoute, useRouter } from '@tanstack/react-router';
+import { LoginCard } from '@pivox/ui/login-card';
+import { ElectronLoginFeature } from '@renderer/components/electron-login-feature';
+import { authProviders } from '@renderer/lib/auth-providers';
+
+export const Route = createFileRoute('/auth/login')({ component: LoginPage });
+
+function LoginPage() {
+  const router = useRouter();
+
+  return (
+    <ElectronLoginFeature
+      onSuccess={() => router.navigate({ to: '/' })}
+      onLinkRequired={() => router.navigate({ to: '/auth/link-account' })}
+    >
+      <LoginCard.Root>
+        <LoginCard.Header />
+        <LoginCard.EmailField />
+        <LoginCard.PasswordField />
+        <div className="flex items-center justify-between px-4">
+          <LoginCard.RememberMe />
+          <LoginCard.ForgotPassword
+            onClick={() => router.navigate({ to: '/auth/forgot-password' })}
+          />
+        </div>
+        <LoginCard.SubmitButton />
+        <LoginCard.Separator />
+        <LoginCard.SocialButtons providers={authProviders} />
+        <LoginCard.Footer
+          onClick={() => router.navigate({ to: '/auth/register' })}
+        />
+      </LoginCard.Root>
+    </ElectronLoginFeature>
+  );
+}

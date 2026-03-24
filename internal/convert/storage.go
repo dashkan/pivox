@@ -6,8 +6,8 @@ import (
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	db "github.com/dashkan/pivox-server/internal/db/generated"
-	storagev1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/storage/v1"
+	db "github.com/dashkan/pivox/internal/db/generated"
+	storagev1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"
 )
 
 // StorageGatewayToProto converts a DB storage gateway to proto.

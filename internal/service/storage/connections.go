@@ -3,7 +3,7 @@ package storage
 import (
 	"sync"
 
-	agentv1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/agent/v1"
+	agentv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/agent/v1"
 	"github.com/google/uuid"
 )
 

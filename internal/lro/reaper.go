@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	db "github.com/dashkan/pivox-server/internal/db/generated"
+	db "github.com/dashkan/pivox/internal/db/generated"
 )
 
 // Reaper periodically deletes expired operations.

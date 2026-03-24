@@ -3,7 +3,7 @@
 package main
 
 import (
-	"github.com/dashkan/pivox-server/internal/config"
+	"github.com/dashkan/pivox/internal/config"
 	"github.com/spf13/cobra"
 )
 

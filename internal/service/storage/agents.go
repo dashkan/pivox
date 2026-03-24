@@ -7,10 +7,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/dashkan/pivox-server/internal/apierr"
-	"github.com/dashkan/pivox-server/internal/convert"
-	db "github.com/dashkan/pivox-server/internal/db/generated"
-	storagev1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/storage/v1"
+	"github.com/dashkan/pivox/internal/apierr"
+	"github.com/dashkan/pivox/internal/convert"
+	db "github.com/dashkan/pivox/internal/db/generated"
+	storagev1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"
 )
 
 type AgentsServer struct {

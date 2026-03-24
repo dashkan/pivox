@@ -5,21 +5,21 @@ import (
 	"log/slog"
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
-	iampb "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/iam/v1"
+	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/dashkan/pivox-server/internal/apierr"
-	"github.com/dashkan/pivox-server/internal/convert"
-	db "github.com/dashkan/pivox-server/internal/db/generated"
-	"github.com/dashkan/pivox-server/internal/filter"
-	"github.com/dashkan/pivox-server/internal/firebase"
-	"github.com/dashkan/pivox-server/internal/iam"
-	"github.com/dashkan/pivox-server/internal/lro"
-	apiv1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1"
-	"github.com/dashkan/pivox-server/internal/resource"
+	"github.com/dashkan/pivox/internal/apierr"
+	"github.com/dashkan/pivox/internal/convert"
+	db "github.com/dashkan/pivox/internal/db/generated"
+	"github.com/dashkan/pivox/internal/filter"
+	"github.com/dashkan/pivox/internal/firebase"
+	"github.com/dashkan/pivox/internal/iam"
+	"github.com/dashkan/pivox/internal/lro"
+	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
+	"github.com/dashkan/pivox/internal/resource"
 )
 
 type OrganizationsServer struct {

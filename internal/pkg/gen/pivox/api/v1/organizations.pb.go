@@ -23,7 +23,7 @@ package apiv1
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
-	v1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/iam/v1"
+	v1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -2446,8 +2446,8 @@ const file_pivox_api_v1_organizations_proto_rawDesc = "" +
 	"\x12CreateCustomDomain\x12'.pivox.api.v1.CreateCustomDomainRequest\x1a\x1d.google.longrunning.Operation\"\x96\x01\xcaA*\n" +
 	"\fCustomDomain\x12\x1aCreateCustomDomainMetadata\xdaA%parent,custom_domain,custom_domain_id\x82\xd3\xe4\x93\x02;:\rcustom_domain\"*/v1/{parent=organizations/*}/customDomains\x12\xc4\x01\n" +
 	"\x12DeleteCustomDomain\x12'.pivox.api.v1.DeleteCustomDomainRequest\x1a\x1d.google.longrunning.Operation\"f\xcaA*\n" +
-	"\fCustomDomain\x12\x1aDeleteCustomDomainMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02,**/v1/{name=organizations/*/customDomains/*}\x1a\x0f\xcaA\fapi.pivox.ioB\xbd\x01\n" +
-	"\x10com.pivox.api.v1B\x12OrganizationsProtoP\x01ZCgithub.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
+	"\fCustomDomain\x12\x1aDeleteCustomDomainMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02,**/v1/{name=organizations/*/customDomains/*}\x1a\x0f\xcaA\fapi.pivox.ioB\xb6\x01\n" +
+	"\x10com.pivox.api.v1B\x12OrganizationsProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
 
 var (
 	file_pivox_api_v1_organizations_proto_rawDescOnce sync.Once

@@ -1,0 +1,83 @@
+{
+  "name": "@pivox/features",
+  "version": "1.0.0",
+  "description": "Pivox feature modules with logic and state",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "exports": {
+    "./login": {
+      "types": "./dist/esm/login.d.ts",
+      "import": "./dist/esm/login.js"
+    },
+    "./registration": {
+      "types": "./dist/esm/registration.d.ts",
+      "import": "./dist/esm/registration.js"
+    },
+    "./forgot-password": {
+      "types": "./dist/esm/forgot-password.d.ts",
+      "import": "./dist/esm/forgot-password.js"
+    },
+    "./reset-password": {
+      "types": "./dist/esm/reset-password.d.ts",
+      "import": "./dist/esm/reset-password.js"
+    },
+    "./auth": {
+      "types": "./dist/esm/auth.d.ts",
+      "import": "./dist/esm/auth.js"
+    },
+    "./verify-email": {
+      "types": "./dist/esm/verify-email.d.ts",
+      "import": "./dist/esm/verify-email.js"
+    },
+    "./link-account": {
+      "types": "./dist/esm/link-account.d.ts",
+      "import": "./dist/esm/link-account.js"
+    },
+    "./auth-avatar": {
+      "types": "./dist/esm/auth-avatar.d.ts",
+      "import": "./dist/esm/auth-avatar.js"
+    },
+    "./user-profile": {
+      "types": "./dist/esm/user-profile.d.ts",
+      "import": "./dist/esm/user-profile.js"
+    },
+    "./app-layout": {
+      "types": "./dist/esm/app-layout.d.ts",
+      "import": "./dist/esm/app-layout.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "clean": "premove ./build ./dist",
+    "test:build": "publint --strict",
+    "test:eslint": "eslint ./src",
+    "test:lib": "vitest --passWithNoTests",
+    "test:lib:dev": "pnpm test:lib --watch",
+    "test:types": "tsc"
+  },
+  "peerDependencies": {
+    "@types/react": "^19.2.7",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwindcss": "^4.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.2",
+    "@tanstack/vite-config": "^0.5.2",
+    "@types/react": "^19.2.7",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "tailwindcss": "^4.2.2",
+    "vite": "^7.3.1"
+  },
+  "dependencies": {
+    "@pivox/primitives": "workspace:*",
+    "@pivox/ui": "workspace:*",
+    "firebase": "^12.11.0"
+  }
+}

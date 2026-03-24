@@ -1242,9 +1242,9 @@ const file_pivox_iam_v1_roles_proto_rawDesc = "" +
 	"\x0eAddRoleMembers\x12#.pivox.iam.v1.AddRoleMembersRequest\x1a$.pivox.iam.v1.AddRoleMembersResponse\"K\xdaA\frole,members\x82\xd3\xe4\x93\x026:\x01*\"1/v1/{role=organizations/*/roles/*}:addRoleMembers\x12\xb4\x01\n" +
 	"\x11RemoveRoleMembers\x12&.pivox.iam.v1.RemoveRoleMembersRequest\x1a'.pivox.iam.v1.RemoveRoleMembersResponse\"N\xdaA\frole,members\x82\xd3\xe4\x93\x029:\x01*\"4/v1/{role=organizations/*/roles/*}:removeRoleMembers\x12\x99\x01\n" +
 	"\x0fListRoleMembers\x12$.pivox.iam.v1.ListRoleMembersRequest\x1a%.pivox.iam.v1.ListRoleMembersResponse\"9\xdaA\x04role\x82\xd3\xe4\x93\x02,\x12*/v1/{role=organizations/*/roles/*}/members\x12w\n" +
-	"\x0fListPermissions\x12$.pivox.iam.v1.ListPermissionsRequest\x1a%.pivox.iam.v1.ListPermissionsResponse\"\x17\x82\xd3\xe4\x93\x02\x11\x12\x0f/v1/permissions\x1a\x0f\xcaA\fapi.pivox.ioB\xb5\x01\n" +
+	"\x0fListPermissions\x12$.pivox.iam.v1.ListPermissionsRequest\x1a%.pivox.iam.v1.ListPermissionsResponse\"\x17\x82\xd3\xe4\x93\x02\x11\x12\x0f/v1/permissions\x1a\x0f\xcaA\fapi.pivox.ioB\xae\x01\n" +
 	"\x10com.pivox.iam.v1B\n" +
-	"RolesProtoP\x01ZCgithub.com/dashkan/pivox-server/internal/pkg/gen/pivox/iam/v1;iamv1\xa2\x02\x03PIX\xaa\x02\fPivox.Iam.V1\xca\x02\fPivox\\Iam\\V1\xe2\x02\x18Pivox\\Iam\\V1\\GPBMetadata\xea\x02\x0ePivox::Iam::V1b\x06proto3"
+	"RolesProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1;iamv1\xa2\x02\x03PIX\xaa\x02\fPivox.Iam.V1\xca\x02\fPivox\\Iam\\V1\xe2\x02\x18Pivox\\Iam\\V1\\GPBMetadata\xea\x02\x0ePivox::Iam::V1b\x06proto3"
 
 var (
 	file_pivox_iam_v1_roles_proto_rawDescOnce sync.Once

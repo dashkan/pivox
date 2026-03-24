@@ -12,7 +12,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/durationpb"
 
-	agentv1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/agent/v1"
+	agentv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/agent/v1"
 )
 
 const (

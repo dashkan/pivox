@@ -1,7 +1,7 @@
 .PHONY: build run test tidy lint lint-fix fmt \
        lint-proto proto-format proto-breaking proto-generate api-lint \
        db-up db-down db-migrate db-force db-seed db-clear db-drop db-create \
-       docker-up docker-down
+       docker-up docker-down firebase-emu
 
 DATABASE_URL ?= postgresql://localhost:5432/pivox?sslmode=disable
 DATABASE_NAME ?= pivox
@@ -91,3 +91,8 @@ docker-up:
 
 docker-down:
 	docker compose down
+
+# Firebase
+
+firebase-emu:
+	firebase emulators:start --import=.firebase-data --export-on-exit=.firebase-data

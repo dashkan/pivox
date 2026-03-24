@@ -11,8 +11,8 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"golang.org/x/time/rate"
 
-	db "github.com/dashkan/pivox-server/internal/db/generated"
-	"github.com/dashkan/pivox-server/internal/firebase"
+	db "github.com/dashkan/pivox/internal/db/generated"
+	"github.com/dashkan/pivox/internal/firebase"
 )
 
 // InternalHooks handles internal webhook endpoints that are not part of the

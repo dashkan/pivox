@@ -2214,9 +2214,9 @@ const file_pivox_agent_v1_agent_proto_rawDesc = "" +
 	"\x05APPLY\x10\x02\x12\f\n" +
 	"\bROLLBACK\x10\x032l\n" +
 	"\fAgentService\x12K\n" +
-	"\aConnect\x12\x1c.pivox.agent.v1.AgentMessage\x1a\x1e.pivox.agent.v1.ControlMessage(\x010\x01\x1a\x0f\xcaA\fapi.pivox.ioB\xc3\x01\n" +
+	"\aConnect\x12\x1c.pivox.agent.v1.AgentMessage\x1a\x1e.pivox.agent.v1.ControlMessage(\x010\x01\x1a\x0f\xcaA\fapi.pivox.ioB\xbc\x01\n" +
 	"\x12com.pivox.agent.v1B\n" +
-	"AgentProtoP\x01ZGgithub.com/dashkan/pivox-server/internal/pkg/gen/pivox/agent/v1;agentv1\xa2\x02\x03PAX\xaa\x02\x0ePivox.Agent.V1\xca\x02\x0ePivox\\Agent\\V1\xe2\x02\x1aPivox\\Agent\\V1\\GPBMetadata\xea\x02\x10Pivox::Agent::V1b\x06proto3"
+	"AgentProtoP\x01Z@github.com/dashkan/pivox/internal/pkg/gen/pivox/agent/v1;agentv1\xa2\x02\x03PAX\xaa\x02\x0ePivox.Agent.V1\xca\x02\x0ePivox\\Agent\\V1\xe2\x02\x1aPivox\\Agent\\V1\\GPBMetadata\xea\x02\x10Pivox::Agent::V1b\x06proto3"
 
 var (
 	file_pivox_agent_v1_agent_proto_rawDescOnce sync.Once

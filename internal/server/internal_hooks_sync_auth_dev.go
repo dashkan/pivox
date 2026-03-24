@@ -9,9 +9,9 @@ import (
 
 	"golang.org/x/time/rate"
 
-	"github.com/dashkan/pivox-server/internal/config"
-	db "github.com/dashkan/pivox-server/internal/db/generated"
-	"github.com/dashkan/pivox-server/internal/firebase"
+	"github.com/dashkan/pivox/internal/config"
+	db "github.com/dashkan/pivox/internal/db/generated"
+	"github.com/dashkan/pivox/internal/firebase"
 )
 
 // NewInternalHooks creates a new internal hooks handler with shared secret

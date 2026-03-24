@@ -597,9 +597,9 @@ const file_pivox_storage_v1_agent_proto_rawDesc = "" +
 	"ListAgents\x12#.pivox.storage.v1.ListAgentsRequest\x1a$.pivox.storage.v1.ListAgentsResponse\"F\xdaA\x06parent\x82\xd3\xe4\x93\x027\x125/v1/{parent=organizations/*/storageGateways/*}/agents\x12\x99\x01\n" +
 	"\n" +
 	"DrainAgent\x12#.pivox.storage.v1.DrainAgentRequest\x1a\x17.pivox.storage.v1.Agent\"M\xdaA\x04name\x82\xd3\xe4\x93\x02@:\x01*\";/v1/{name=organizations/*/storageGateways/*/agents/*}:drain\x12\x9c\x01\n" +
-	"\vRemoveAgent\x12$.pivox.storage.v1.RemoveAgentRequest\x1a\x17.pivox.storage.v1.Agent\"N\xdaA\x04name\x82\xd3\xe4\x93\x02A:\x01*\"</v1/{name=organizations/*/storageGateways/*/agents/*}:remove\x1a\x0f\xcaA\fapi.pivox.ioB\xd1\x01\n" +
+	"\vRemoveAgent\x12$.pivox.storage.v1.RemoveAgentRequest\x1a\x17.pivox.storage.v1.Agent\"N\xdaA\x04name\x82\xd3\xe4\x93\x02A:\x01*\"</v1/{name=organizations/*/storageGateways/*/agents/*}:remove\x1a\x0f\xcaA\fapi.pivox.ioB\xca\x01\n" +
 	"\x14com.pivox.storage.v1B\n" +
-	"AgentProtoP\x01ZKgithub.com/dashkan/pivox-server/internal/pkg/gen/pivox/storage/v1;storagev1\xa2\x02\x03PSX\xaa\x02\x10Pivox.Storage.V1\xca\x02\x10Pivox\\Storage\\V1\xe2\x02\x1cPivox\\Storage\\V1\\GPBMetadata\xea\x02\x12Pivox::Storage::V1b\x06proto3"
+	"AgentProtoP\x01ZDgithub.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1;storagev1\xa2\x02\x03PSX\xaa\x02\x10Pivox.Storage.V1\xca\x02\x10Pivox\\Storage\\V1\xe2\x02\x1cPivox\\Storage\\V1\\GPBMetadata\xea\x02\x12Pivox::Storage::V1b\x06proto3"
 
 var (
 	file_pivox_storage_v1_agent_proto_rawDescOnce sync.Once

@@ -10,7 +10,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	db "github.com/dashkan/pivox-server/internal/db/generated"
+	db "github.com/dashkan/pivox/internal/db/generated"
 )
 
 func marshalAny(msg proto.Message) (json.RawMessage, error) {

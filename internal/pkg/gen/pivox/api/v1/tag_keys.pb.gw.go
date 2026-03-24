@@ -14,7 +14,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/dashkan/pivox-server/internal/pkg/gen/pivox/iam/v1"
+	"github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/utilities"
 	"google.golang.org/grpc"

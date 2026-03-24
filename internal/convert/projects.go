@@ -6,8 +6,8 @@ import (
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	db "github.com/dashkan/pivox-server/internal/db/generated"
-	apiv1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1"
+	db "github.com/dashkan/pivox/internal/db/generated"
+	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 )
 
 // ProjectToProto converts a DB project to proto.

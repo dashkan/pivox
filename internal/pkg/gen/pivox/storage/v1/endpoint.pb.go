@@ -1261,8 +1261,8 @@ const file_pivox_storage_v1_endpoint_proto_rawDesc = "" +
 	"\x0eUpdateEndpoint\x12'.pivox.storage.v1.UpdateEndpointRequest\x1a\x1d.google.longrunning.Operation\"\x8f\x01\xcaA\"\n" +
 	"\bEndpoint\x12\x16UpdateEndpointMetadata\xdaA\x14endpoint,update_mask\x82\xd3\xe4\x93\x02M:\bendpoint2A/v1/{endpoint.name=organizations/*/storageGateways/*/endpoints/*}\x12\xc6\x01\n" +
 	"\x0eDeleteEndpoint\x12'.pivox.storage.v1.DeleteEndpointRequest\x1a\x1d.google.longrunning.Operation\"l\xcaA\"\n" +
-	"\bEndpoint\x12\x16DeleteEndpointMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02:*8/v1/{name=organizations/*/storageGateways/*/endpoints/*}\x1a\x0f\xcaA\fapi.pivox.ioB\xd4\x01\n" +
-	"\x14com.pivox.storage.v1B\rEndpointProtoP\x01ZKgithub.com/dashkan/pivox-server/internal/pkg/gen/pivox/storage/v1;storagev1\xa2\x02\x03PSX\xaa\x02\x10Pivox.Storage.V1\xca\x02\x10Pivox\\Storage\\V1\xe2\x02\x1cPivox\\Storage\\V1\\GPBMetadata\xea\x02\x12Pivox::Storage::V1b\x06proto3"
+	"\bEndpoint\x12\x16DeleteEndpointMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02:*8/v1/{name=organizations/*/storageGateways/*/endpoints/*}\x1a\x0f\xcaA\fapi.pivox.ioB\xcd\x01\n" +
+	"\x14com.pivox.storage.v1B\rEndpointProtoP\x01ZDgithub.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1;storagev1\xa2\x02\x03PSX\xaa\x02\x10Pivox.Storage.V1\xca\x02\x10Pivox\\Storage\\V1\xe2\x02\x1cPivox\\Storage\\V1\\GPBMetadata\xea\x02\x12Pivox::Storage::V1b\x06proto3"
 
 var (
 	file_pivox_storage_v1_endpoint_proto_rawDescOnce sync.Once

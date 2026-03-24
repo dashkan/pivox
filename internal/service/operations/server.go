@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/dashkan/pivox-server/internal/lro"
+	"github.com/dashkan/pivox/internal/lro"
 )
 
 // OperationsServer implements longrunningpb.OperationsServer by delegating to

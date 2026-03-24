@@ -23,7 +23,7 @@ package apiv1
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
-	v1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/iam/v1"
+	v1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -752,8 +752,8 @@ const file_pivox_api_v1_tag_values_proto_rawDesc = "" +
 	"\bTagValue\x12\x16DeleteTagValueMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02qZ=*;/v1/{name=organizations/*/projects/*/tagKeys/*/tagValues/*}*0/v1/{name=organizations/*/tagKeys/*/tagValues/*}\x12\xe9\x01\n" +
 	"\fGetIamPolicy\x12!.pivox.iam.v1.GetIamPolicyRequest\x1a\x14.pivox.iam.v1.Policy\"\x9f\x01\xdaA\x04name\x82\xd3\xe4\x93\x02\x91\x01:\x01*ZM:\x01*\"H/v1/{name=organizations/*/projects/*/tagKeys/*/tagValues/*}:getIamPolicy\"=/v1/{name=organizations/*/tagKeys/*/tagValues/*}:getIamPolicy\x12\xfc\x01\n" +
 	"\fSetIamPolicy\x12!.pivox.iam.v1.SetIamPolicyRequest\x1a\x14.pivox.iam.v1.Policy\"\xb2\x01\xdaA\x0fresource,policy\x82\xd3\xe4\x93\x02\x99\x01:\x01*ZQ:\x01*\"L/v1/{resource=organizations/*/projects/*/tagKeys/*/tagValues/*}:setIamPolicy\"A/v1/{resource=organizations/*/tagKeys/*/tagValues/*}:setIamPolicy\x12\xad\x02\n" +
-	"\x12TestIamPermissions\x12'.pivox.iam.v1.TestIamPermissionsRequest\x1a(.pivox.iam.v1.TestIamPermissionsResponse\"\xc3\x01\xdaA\x14resource,permissions\x82\xd3\xe4\x93\x02\xa5\x01:\x01*ZW:\x01*\"R/v1/{resource=organizations/*/projects/*/tagKeys/*/tagValues/*}:testIamPermissions\"G/v1/{resource=organizations/*/tagKeys/*/tagValues/*}:testIamPermissions\x1a\x0f\xcaA\fapi.pivox.ioB\xb9\x01\n" +
-	"\x10com.pivox.api.v1B\x0eTagValuesProtoP\x01ZCgithub.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
+	"\x12TestIamPermissions\x12'.pivox.iam.v1.TestIamPermissionsRequest\x1a(.pivox.iam.v1.TestIamPermissionsResponse\"\xc3\x01\xdaA\x14resource,permissions\x82\xd3\xe4\x93\x02\xa5\x01:\x01*ZW:\x01*\"R/v1/{resource=organizations/*/projects/*/tagKeys/*/tagValues/*}:testIamPermissions\"G/v1/{resource=organizations/*/tagKeys/*/tagValues/*}:testIamPermissions\x1a\x0f\xcaA\fapi.pivox.ioB\xb2\x01\n" +
+	"\x10com.pivox.api.v1B\x0eTagValuesProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
 
 var (
 	file_pivox_api_v1_tag_values_proto_rawDescOnce sync.Once

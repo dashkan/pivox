@@ -1672,8 +1672,8 @@ const file_pivox_storage_v1_storage_gateway_proto_rawDesc = "" +
 	"\x12GetUninstallScript\x12+.pivox.storage.v1.GetUninstallScriptRequest\x1a,.pivox.storage.v1.GetUninstallScriptResponse\"K\xdaA\x04name\x82\xd3\xe4\x93\x02>\x12</v1/{name=organizations/*/storageGateways/*}:uninstallScript\x12\xdb\x01\n" +
 	"\x0eUpgradeGateway\x12'.pivox.storage.v1.UpgradeGatewayRequest\x1a\x1d.google.longrunning.Operation\"\x80\x01\xcaA(\n" +
 	"\x0eStorageGateway\x12\x16UpgradeGatewayMetadata\xdaA\x13name,target_version\x82\xd3\xe4\x93\x029:\x01*\"4/v1/{name=organizations/*/storageGateways/*}:upgrade\x12\x94\x01\n" +
-	"\x14CreateStorageSession\x12-.pivox.storage.v1.CreateStorageSessionRequest\x1a..pivox.storage.v1.CreateStorageSessionResponse\"\x1d\x82\xd3\xe4\x93\x02\x17:\x01*\"\x12/v1/storageSession\x1a\x0f\xcaA\fapi.pivox.ioB\xda\x01\n" +
-	"\x14com.pivox.storage.v1B\x13StorageGatewayProtoP\x01ZKgithub.com/dashkan/pivox-server/internal/pkg/gen/pivox/storage/v1;storagev1\xa2\x02\x03PSX\xaa\x02\x10Pivox.Storage.V1\xca\x02\x10Pivox\\Storage\\V1\xe2\x02\x1cPivox\\Storage\\V1\\GPBMetadata\xea\x02\x12Pivox::Storage::V1b\x06proto3"
+	"\x14CreateStorageSession\x12-.pivox.storage.v1.CreateStorageSessionRequest\x1a..pivox.storage.v1.CreateStorageSessionResponse\"\x1d\x82\xd3\xe4\x93\x02\x17:\x01*\"\x12/v1/storageSession\x1a\x0f\xcaA\fapi.pivox.ioB\xd3\x01\n" +
+	"\x14com.pivox.storage.v1B\x13StorageGatewayProtoP\x01ZDgithub.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1;storagev1\xa2\x02\x03PSX\xaa\x02\x10Pivox.Storage.V1\xca\x02\x10Pivox\\Storage\\V1\xe2\x02\x1cPivox\\Storage\\V1\\GPBMetadata\xea\x02\x12Pivox::Storage::V1b\x06proto3"
 
 var (
 	file_pivox_storage_v1_storage_gateway_proto_rawDescOnce sync.Once

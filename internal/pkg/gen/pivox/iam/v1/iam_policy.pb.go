@@ -281,8 +281,8 @@ const file_pivox_iam_v1_iam_policy_proto_rawDesc = "" +
 	"\x01*R\bresource\x12%\n" +
 	"\vpermissions\x18\x02 \x03(\tB\x03\xe0A\x02R\vpermissions\">\n" +
 	"\x1aTestIamPermissionsResponse\x12 \n" +
-	"\vpermissions\x18\x01 \x03(\tR\vpermissionsB\xb9\x01\n" +
-	"\x10com.pivox.iam.v1B\x0eIamPolicyProtoP\x01ZCgithub.com/dashkan/pivox-server/internal/pkg/gen/pivox/iam/v1;iamv1\xa2\x02\x03PIX\xaa\x02\fPivox.Iam.V1\xca\x02\fPivox\\Iam\\V1\xe2\x02\x18Pivox\\Iam\\V1\\GPBMetadata\xea\x02\x0ePivox::Iam::V1b\x06proto3"
+	"\vpermissions\x18\x01 \x03(\tR\vpermissionsB\xb2\x01\n" +
+	"\x10com.pivox.iam.v1B\x0eIamPolicyProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1;iamv1\xa2\x02\x03PIX\xaa\x02\fPivox.Iam.V1\xca\x02\fPivox\\Iam\\V1\xe2\x02\x18Pivox\\Iam\\V1\\GPBMetadata\xea\x02\x0ePivox::Iam::V1b\x06proto3"
 
 var (
 	file_pivox_iam_v1_iam_policy_proto_rawDescOnce sync.Once

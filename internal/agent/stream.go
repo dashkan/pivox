@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	agentv1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/agent/v1"
+	agentv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/agent/v1"
 )
 
 // Stream wraps a bidirectional gRPC stream with typed send methods and

@@ -20,14 +20,14 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/dashkan/pivox-server/internal/apierr"
-	"github.com/dashkan/pivox-server/internal/convert"
-	"github.com/dashkan/pivox-server/internal/crypto"
-	db "github.com/dashkan/pivox-server/internal/db/generated"
-	"github.com/dashkan/pivox-server/internal/lro"
-	agentv1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/agent/v1"
-	storagev1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/storage/v1"
-	"github.com/dashkan/pivox-server/internal/resource"
+	"github.com/dashkan/pivox/internal/apierr"
+	"github.com/dashkan/pivox/internal/convert"
+	"github.com/dashkan/pivox/internal/crypto"
+	db "github.com/dashkan/pivox/internal/db/generated"
+	"github.com/dashkan/pivox/internal/lro"
+	agentv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/agent/v1"
+	storagev1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"
+	"github.com/dashkan/pivox/internal/resource"
 )
 
 type StorageGatewaysServer struct {

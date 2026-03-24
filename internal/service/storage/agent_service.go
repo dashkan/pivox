@@ -18,8 +18,8 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
-	db "github.com/dashkan/pivox-server/internal/db/generated"
-	agentv1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/agent/v1"
+	db "github.com/dashkan/pivox/internal/db/generated"
+	agentv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/agent/v1"
 )
 
 // AgentServiceServer implements the bidirectional streaming AgentService for

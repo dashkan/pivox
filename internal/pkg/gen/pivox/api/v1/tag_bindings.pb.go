@@ -856,8 +856,8 @@ const file_pivox_api_v1_tag_bindings_proto_rawDesc = "" +
 	"\x10DeleteTagBinding\x12%.pivox.api.v1.DeleteTagBindingRequest\x1a\x1d.google.longrunning.Operation\"\x97\x01\xcaA&\n" +
 	"\n" +
 	"TagBinding\x12\x18DeleteTagBindingMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02aZ5*3/v1/{name=organizations/*/projects/*/tagBindings/*}*(/v1/{name=organizations/*/tagBindings/*}\x12\xda\x01\n" +
-	"\x11ListEffectiveTags\x12&.pivox.api.v1.ListEffectiveTagsRequest\x1a'.pivox.api.v1.ListEffectiveTagsResponse\"t\xdaA\x06parent\x82\xd3\xe4\x93\x02eZ7\x125/v1/{parent=organizations/*/projects/*}/effectiveTags\x12*/v1/{parent=organizations/*}/effectiveTags\x1a\x0f\xcaA\fapi.pivox.ioB\xbb\x01\n" +
-	"\x10com.pivox.api.v1B\x10TagBindingsProtoP\x01ZCgithub.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
+	"\x11ListEffectiveTags\x12&.pivox.api.v1.ListEffectiveTagsRequest\x1a'.pivox.api.v1.ListEffectiveTagsResponse\"t\xdaA\x06parent\x82\xd3\xe4\x93\x02eZ7\x125/v1/{parent=organizations/*/projects/*}/effectiveTags\x12*/v1/{parent=organizations/*}/effectiveTags\x1a\x0f\xcaA\fapi.pivox.ioB\xb4\x01\n" +
+	"\x10com.pivox.api.v1B\x10TagBindingsProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
 
 var (
 	file_pivox_api_v1_tag_bindings_proto_rawDescOnce sync.Once

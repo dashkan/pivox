@@ -1419,8 +1419,8 @@ const file_pivox_api_v1_widgets_proto_rawDesc = "" +
 	"\x05field\x18\x01 \x01(\tB\n" +
 	"\xe0A\x02\xbaH\x04r\x02\x10\x01R\x05field\x12&\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\x03\xe0A\x01R\vdisplayName\x12\x1d\n" +
-	"\avisible\x18\x03 \x01(\bB\x03\xe0A\x01R\avisibleB\xb7\x01\n" +
-	"\x10com.pivox.api.v1B\fWidgetsProtoP\x01ZCgithub.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
+	"\avisible\x18\x03 \x01(\bB\x03\xe0A\x01R\avisibleB\xb0\x01\n" +
+	"\x10com.pivox.api.v1B\fWidgetsProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
 
 var (
 	file_pivox_api_v1_widgets_proto_rawDescOnce sync.Once

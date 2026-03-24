@@ -1,0 +1,89 @@
+{
+  "name": "@pivox/ui",
+  "version": "1.0.0",
+  "description": "Pivox presentational components",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "exports": {
+    "./auth": {
+      "types": "./dist/esm/shared/auth-provider.d.ts",
+      "import": "./dist/esm/shared/auth-provider.js"
+    },
+    "./login-card": {
+      "types": "./dist/esm/login-card.d.ts",
+      "import": "./dist/esm/login-card.js"
+    },
+    "./registration-card": {
+      "types": "./dist/esm/registration-card.d.ts",
+      "import": "./dist/esm/registration-card.js"
+    },
+    "./forgot-password-card": {
+      "types": "./dist/esm/forgot-password-card.d.ts",
+      "import": "./dist/esm/forgot-password-card.js"
+    },
+    "./reset-password-card": {
+      "types": "./dist/esm/reset-password-card.d.ts",
+      "import": "./dist/esm/reset-password-card.js"
+    },
+    "./verify-email-card": {
+      "types": "./dist/esm/verify-email-card.d.ts",
+      "import": "./dist/esm/verify-email-card.js"
+    },
+    "./link-account-card": {
+      "types": "./dist/esm/link-account-card.d.ts",
+      "import": "./dist/esm/link-account-card.js"
+    },
+    "./user-avatar": {
+      "types": "./dist/esm/user-avatar.d.ts",
+      "import": "./dist/esm/user-avatar.js"
+    },
+    "./user-profile-card": {
+      "types": "./dist/esm/user-profile-card.d.ts",
+      "import": "./dist/esm/user-profile-card.js"
+    },
+    "./app-layout": {
+      "types": "./dist/esm/app-layout.d.ts",
+      "import": "./dist/esm/app-layout.js"
+    },
+    "./theme-switcher": {
+      "types": "./dist/esm/theme-switcher.d.ts",
+      "import": "./dist/esm/theme-switcher.js"
+    },
+    "./colors.css": "./src/colors.css"
+  },
+  "files": [
+    "dist",
+    "src/colors.css"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "clean": "premove ./build ./dist",
+    "test:build": "publint --strict",
+    "test:eslint": "eslint ./src",
+    "test:lib": "vitest --passWithNoTests",
+    "test:lib:dev": "pnpm test:lib --watch",
+    "test:types": "tsc"
+  },
+  "peerDependencies": {
+    "@types/react": "^19.2.7",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwindcss": "^4.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.2",
+    "@tanstack/vite-config": "^0.5.2",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "tailwindcss": "^4.2.2",
+    "vite": "^7.3.1"
+  },
+  "dependencies": {
+    "@pivox/primitives": "workspace:*",
+    "qrcode.react": "^4.2.0"
+  }
+}

@@ -23,7 +23,7 @@ package apiv1
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
-	v1 "github.com/dashkan/pivox-server/internal/pkg/gen/pivox/iam/v1"
+	v1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -1030,8 +1030,8 @@ const file_pivox_api_v1_projects_proto_rawDesc = "" +
 	"\aProject\x12\x17UndeleteProjectMetadata\xdaA\x04name\x82\xd3\xe4\x93\x023:\x01*\"./v1/{name=organizations/*/projects/*}:undelete\x12\x8d\x01\n" +
 	"\fGetIamPolicy\x12!.pivox.iam.v1.GetIamPolicyRequest\x1a\x14.pivox.iam.v1.Policy\"D\xdaA\x04name\x82\xd3\xe4\x93\x027:\x01*\"2/v1/{name=organizations/*/projects/*}:getIamPolicy\x12\x9c\x01\n" +
 	"\fSetIamPolicy\x12!.pivox.iam.v1.SetIamPolicyRequest\x1a\x14.pivox.iam.v1.Policy\"S\xdaA\x0fresource,policy\x82\xd3\xe4\x93\x02;:\x01*\"6/v1/{resource=organizations/*/projects/*}:setIamPolicy\x12\xc7\x01\n" +
-	"\x12TestIamPermissions\x12'.pivox.iam.v1.TestIamPermissionsRequest\x1a(.pivox.iam.v1.TestIamPermissionsResponse\"^\xdaA\x14resource,permissions\x82\xd3\xe4\x93\x02A:\x01*\"</v1/{resource=organizations/*/projects/*}:testIamPermissions\x1a\x0f\xcaA\fapi.pivox.ioB\xb8\x01\n" +
-	"\x10com.pivox.api.v1B\rProjectsProtoP\x01ZCgithub.com/dashkan/pivox-server/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
+	"\x12TestIamPermissions\x12'.pivox.iam.v1.TestIamPermissionsRequest\x1a(.pivox.iam.v1.TestIamPermissionsResponse\"^\xdaA\x14resource,permissions\x82\xd3\xe4\x93\x02A:\x01*\"</v1/{resource=organizations/*/projects/*}:testIamPermissions\x1a\x0f\xcaA\fapi.pivox.ioB\xb1\x01\n" +
+	"\x10com.pivox.api.v1B\rProjectsProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
 
 var (
 	file_pivox_api_v1_projects_proto_rawDescOnce sync.Once

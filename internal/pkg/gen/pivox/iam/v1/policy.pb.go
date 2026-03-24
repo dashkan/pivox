@@ -208,8 +208,8 @@ const file_pivox_iam_v1_policy_proto_rawDesc = "" +
 	"\aBinding\x12\x12\n" +
 	"\x04role\x18\x01 \x01(\tR\x04role\x12\x18\n" +
 	"\amembers\x18\x02 \x03(\tR\amembers\x12/\n" +
-	"\tcondition\x18\x03 \x01(\v2\x11.google.type.ExprR\tconditionB\xb6\x01\n" +
-	"\x10com.pivox.iam.v1B\vPolicyProtoP\x01ZCgithub.com/dashkan/pivox-server/internal/pkg/gen/pivox/iam/v1;iamv1\xa2\x02\x03PIX\xaa\x02\fPivox.Iam.V1\xca\x02\fPivox\\Iam\\V1\xe2\x02\x18Pivox\\Iam\\V1\\GPBMetadata\xea\x02\x0ePivox::Iam::V1b\x06proto3"
+	"\tcondition\x18\x03 \x01(\v2\x11.google.type.ExprR\tconditionB\xaf\x01\n" +
+	"\x10com.pivox.iam.v1B\vPolicyProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1;iamv1\xa2\x02\x03PIX\xaa\x02\fPivox.Iam.V1\xca\x02\fPivox\\Iam\\V1\xe2\x02\x18Pivox\\Iam\\V1\\GPBMetadata\xea\x02\x0ePivox::Iam::V1b\x06proto3"
 
 var (
 	file_pivox_iam_v1_policy_proto_rawDescOnce sync.Once
