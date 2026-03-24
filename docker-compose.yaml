@@ -23,7 +23,6 @@ services:
     volumes:
       - ./.docker/rustfs:/data
 
-  # Optional: AI embedding model for local dev.
   # Mac users: `brew install ollama` instead (uses Metal GPU).
   # Linux/WSL2 users: requires nvidia-container-toolkit.
   #   Install: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
@@ -38,8 +37,6 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
-    profiles:
-      - ai
 
   ollama-models:
     image: ollama/ollama
@@ -49,5 +46,3 @@ services:
     environment:
       OLLAMA_HOST: http://ollama:11434
     entrypoint: ["sh", "-c", "ollama pull nomic-embed-text"]
-    profiles:
-      - ai
