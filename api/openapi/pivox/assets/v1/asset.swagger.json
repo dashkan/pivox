@@ -563,7 +563,7 @@
           },
           {
             "name": "assetVersion",
-            "description": "Required. The version to create.",
+            "description": "Required. The version to create. Only change_note is user-settable.",
             "in": "body",
             "required": true,
             "schema": {
@@ -572,7 +572,7 @@
           },
           {
             "name": "filename",
-            "description": "Optional. The original filename from the client.",
+            "description": "Optional. The original filename from the client. Set for upload\nversions. If omitted with no crop, this is a revert.",
             "in": "query",
             "required": false,
             "type": "string"
@@ -584,6 +584,67 @@
             "required": false,
             "type": "string",
             "format": "int64"
+          },
+          {
+            "name": "sourceVersion",
+            "description": "Optional. The version to derive from. Defaults to the latest\nversion. Used for edit and revert modes.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "crop.area.x",
+            "description": "Required. Origin X in pixels.",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "crop.area.y",
+            "description": "Required. Origin Y in pixels.",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "crop.area.width",
+            "description": "Required. Width in pixels. Must be positive.",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "crop.area.height",
+            "description": "Required. Height in pixels. Must be positive.",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "crop.straighten",
+            "description": "Optional. Straighten angle in degrees (-45 to 45).",
+            "in": "query",
+            "required": false,
+            "type": "number",
+            "format": "float"
+          },
+          {
+            "name": "crop.flipHorizontal",
+            "description": "Optional. Flip horizontally.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "crop.flipVertical",
+            "description": "Optional. Flip vertically.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
           }
         ],
         "tags": [
@@ -1035,13 +1096,13 @@
         },
         "checksumSha256": {
           "type": "string",
-          "description": "Output only. SHA-256 checksum of this version's file.",
+          "description": "Output only. SHA-256 checksum of this version's file. Only set\nfor upload versions (not edit versions).",
           "readOnly": true
         },
         "sizeBytes": {
           "type": "string",
           "format": "int64",
-          "description": "Output only. Size of this version's file in bytes.",
+          "description": "Output only. Size of this version's file in bytes. Only set\nfor upload versions.",
           "readOnly": true
         },
         "mimeType": {
@@ -1051,7 +1112,7 @@
         },
         "storageKey": {
           "type": "string",
-          "description": "Output only. The storage object key for the original file.",
+          "description": "Output only. The storage object key for the file. Only set for\nupload versions. Edit versions derive their output from the\nsource version's blob + the crop operations.",
           "readOnly": true
         },
         "renditions": {
@@ -1082,9 +1143,74 @@
           "format": "date-time",
           "description": "Output only. Timestamp when this version was created.",
           "readOnly": true
+        },
+        "sourceVersion": {
+          "type": "string",
+          "description": "Output only. The version this was derived from. Empty for upload\nversions. Set for edit versions (crop) and reverts.",
+          "readOnly": true
+        },
+        "crop": {
+          "$ref": "#/definitions/v1Crop",
+          "description": "Output only. The crop/edit applied to the source version.\nEmpty for upload versions.",
+          "readOnly": true
         }
       },
-      "description": "A specific version of an asset. Each version represents a distinct\nfile upload. Versions are immutable once created. The asset's\nlatest_version field always points to the most recent version."
+      "description": "A specific version of an asset. A version is either an upload\n(has a blob) or an edit (has a crop + pointer to the source version).\nVersions are immutable once created. The asset's latest_version\nfield always points to the most recent version."
+    },
+    "v1Crop": {
+      "type": "object",
+      "properties": {
+        "area": {
+          "$ref": "#/definitions/v1CropArea",
+          "description": "Optional. The crop area to apply. If set, width and height must\nbe positive."
+        },
+        "straighten": {
+          "type": "number",
+          "format": "float",
+          "description": "Optional. Straighten angle in degrees (-45 to 45)."
+        },
+        "flipHorizontal": {
+          "type": "boolean",
+          "description": "Optional. Flip horizontally."
+        },
+        "flipVertical": {
+          "type": "boolean",
+          "description": "Optional. Flip vertically."
+        }
+      },
+      "description": "Crop operation combining crop area, straighten, and flip."
+    },
+    "v1CropArea": {
+      "type": "object",
+      "properties": {
+        "x": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Required. Origin X in pixels."
+        },
+        "y": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Required. Origin Y in pixels."
+        },
+        "width": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Required. Width in pixels. Must be positive."
+        },
+        "height": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Required. Height in pixels. Must be positive."
+        }
+      },
+      "description": "The crop area within an image.",
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ]
     },
     "v1ListAssetVersionsResponse": {
       "type": "object",

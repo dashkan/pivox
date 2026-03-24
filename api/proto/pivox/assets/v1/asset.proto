@@ -332,9 +332,10 @@ message Asset {
   google.protobuf.Timestamp purge_time = 26 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
-// A specific version of an asset. Each version represents a distinct
-// file upload. Versions are immutable once created. The asset's
-// latest_version field always points to the most recent version.
+// A specific version of an asset. A version is either an upload
+// (has a blob) or an edit (has a crop + pointer to the source version).
+// Versions are immutable once created. The asset's latest_version
+// field always points to the most recent version.
 message AssetVersion {
   option (google.api.resource) = {
     type: "pivox.assets/AssetVersion"
@@ -350,16 +351,20 @@ message AssetVersion {
   // Output only. The sequential version number (1, 2, 3...).
   int32 version_number = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  // Output only. SHA-256 checksum of this version's file.
+  // Output only. SHA-256 checksum of this version's file. Only set
+  // for upload versions (not edit versions).
   string checksum_sha256 = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  // Output only. Size of this version's file in bytes.
+  // Output only. Size of this version's file in bytes. Only set
+  // for upload versions.
   int64 size_bytes = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. MIME type of this version's file.
   string mime_type = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  // Output only. The storage object key for the original file.
+  // Output only. The storage object key for the file. Only set for
+  // upload versions. Edit versions derive their output from the
+  // source version's blob + the crop operations.
   string storage_key = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Generated renditions (thumbnails, proxies, previews).
@@ -376,6 +381,54 @@ message AssetVersion {
 
   // Output only. Timestamp when this version was created.
   google.protobuf.Timestamp create_time = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The version this was derived from. Empty for upload
+  // versions. Set for edit versions (crop) and reverts.
+  string source_version = 12 [
+    (google.api.field_behavior) = OUTPUT_ONLY,
+    (google.api.resource_reference) = {type: "pivox.assets/AssetVersion"}
+  ];
+
+  // Output only. The crop/edit applied to the source version.
+  // Empty for upload versions.
+  Crop crop = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Crop operation combining crop area, straighten, and flip.
+message Crop {
+  // Optional. The crop area to apply. If set, width and height must
+  // be positive.
+  CropArea area = 1 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Straighten angle in degrees (-45 to 45).
+  float straighten = 2 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Flip horizontally.
+  bool flip_horizontal = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Flip vertically.
+  bool flip_vertical = 4 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// The crop area within an image.
+message CropArea {
+  // Required. Origin X in pixels.
+  int32 x = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // Required. Origin Y in pixels.
+  int32 y = 2 [(google.api.field_behavior) = REQUIRED];
+
+  // Required. Width in pixels. Must be positive.
+  int32 width = 3 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).int32.gt = 0
+  ];
+
+  // Required. Height in pixels. Must be positive.
+  int32 height = 4 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).int32.gt = 0
+  ];
 }
 
 // A generated rendition of an asset version (thumbnail, proxy, preview).
@@ -703,9 +756,14 @@ message UndeleteAssetRequest {
 // A status object for the UndeleteAsset LRO metadata.
 message UndeleteAssetMetadata {}
 
-// The request sent to the CreateAssetVersion method.
+// The request sent to the CreateAssetVersion method. Three modes:
+//
+// 1. Upload: set filename + size_bytes (new file becomes source blob)
+// 2. Edit: set crop + optional source_version (derive from existing version)
+// 3. Revert: set source_version only (copies that version as new latest)
+//
 // (-- api-linter: core::0133::request-unknown-fields=disabled
-//     aip.dev/not-precedent: filename, size_bytes needed for upload flow. --)
+//     aip.dev/not-precedent: filename, size_bytes, source_version, crop needed for version creation flow. --)
 message CreateAssetVersionRequest {
   // Required. The parent asset. Format:
   // `organizations/{organization}/projects/{project}/assets/{asset}`
@@ -715,7 +773,7 @@ message CreateAssetVersionRequest {
     (buf.validate.field).required = true
   ];
 
-  // Required. The version to create.
+  // Required. The version to create. Only change_note is user-settable.
   // (-- api-linter: core::0133::request-required-fields=disabled
   //     aip.dev/not-precedent: asset_version is the resource body. --)
   AssetVersion asset_version = 2 [
@@ -723,11 +781,24 @@ message CreateAssetVersionRequest {
     (buf.validate.field).required = true
   ];
 
-  // Optional. The original filename from the client.
+  // Optional. The original filename from the client. Set for upload
+  // versions. If omitted with no crop, this is a revert.
   string filename = 3 [(google.api.field_behavior) = OPTIONAL];
 
   // Optional. The file size in bytes. Required for multipart uploads.
   int64 size_bytes = 4 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. The version to derive from. Defaults to the latest
+  // version. Used for edit and revert modes.
+  string source_version = 5 [
+    (google.api.field_behavior) = OPTIONAL,
+    (google.api.resource_reference) = {type: "pivox.assets/AssetVersion"}
+  ];
+
+  // Optional. The crop/edit to apply. Set for edit versions.
+  // If set without filename, derives from source_version.
+  // If set with filename, applies to the uploaded file.
+  Crop crop = 6 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // LRO metadata for CreateAssetVersion. Same pipeline as CreateAsset.

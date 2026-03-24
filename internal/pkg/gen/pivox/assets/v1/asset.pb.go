@@ -247,7 +247,7 @@ func (x Rendition_Type) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Rendition_Type.Descriptor instead.
 func (Rendition_Type) EnumDescriptor() ([]byte, []int) {
-	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{2, 0}
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{4, 0}
 }
 
 // The method for uploading the file.
@@ -303,7 +303,7 @@ func (x UploadInfo_Method) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use UploadInfo_Method.Descriptor instead.
 func (UploadInfo_Method) EnumDescriptor() ([]byte, []int) {
-	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{3, 0}
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{5, 0}
 }
 
 // The current step of the ingestion pipeline.
@@ -388,7 +388,7 @@ func (x CreateAssetMetadata_Step) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use CreateAssetMetadata_Step.Descriptor instead.
 func (CreateAssetMetadata_Step) EnumDescriptor() ([]byte, []int) {
-	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{6, 0}
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{8, 0}
 }
 
 // The current phase of the import.
@@ -445,7 +445,7 @@ func (x ImportAssetsMetadata_Phase) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ImportAssetsMetadata_Phase.Descriptor instead.
 func (ImportAssetsMetadata_Phase) EnumDescriptor() ([]byte, []int) {
-	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{23, 0}
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{25, 0}
 }
 
 // A media asset. Assets are immutable — file content cannot be changed
@@ -754,9 +754,10 @@ func (x *Asset) GetPurgeTime() *timestamppb.Timestamp {
 	return nil
 }
 
-// A specific version of an asset. Each version represents a distinct
-// file upload. Versions are immutable once created. The asset's
-// latest_version field always points to the most recent version.
+// A specific version of an asset. A version is either an upload
+// (has a blob) or an edit (has a crop + pointer to the source version).
+// Versions are immutable once created. The asset's latest_version
+// field always points to the most recent version.
 type AssetVersion struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Output only. The resource name of the version. Format:
@@ -764,13 +765,17 @@ type AssetVersion struct {
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Output only. The sequential version number (1, 2, 3...).
 	VersionNumber int32 `protobuf:"varint,2,opt,name=version_number,json=versionNumber,proto3" json:"version_number,omitempty"`
-	// Output only. SHA-256 checksum of this version's file.
+	// Output only. SHA-256 checksum of this version's file. Only set
+	// for upload versions (not edit versions).
 	ChecksumSha256 string `protobuf:"bytes,3,opt,name=checksum_sha256,json=checksumSha256,proto3" json:"checksum_sha256,omitempty"`
-	// Output only. Size of this version's file in bytes.
+	// Output only. Size of this version's file in bytes. Only set
+	// for upload versions.
 	SizeBytes int64 `protobuf:"varint,4,opt,name=size_bytes,json=sizeBytes,proto3" json:"size_bytes,omitempty"`
 	// Output only. MIME type of this version's file.
 	MimeType string `protobuf:"bytes,5,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
-	// Output only. The storage object key for the original file.
+	// Output only. The storage object key for the file. Only set for
+	// upload versions. Edit versions derive their output from the
+	// source version's blob + the crop operations.
 	StorageKey string `protobuf:"bytes,6,opt,name=storage_key,json=storageKey,proto3" json:"storage_key,omitempty"`
 	// Output only. Generated renditions (thumbnails, proxies, previews).
 	Renditions []*Rendition `protobuf:"bytes,7,rep,name=renditions,proto3" json:"renditions,omitempty"`
@@ -781,7 +786,13 @@ type AssetVersion struct {
 	// Output only. The user who created this version.
 	Creator string `protobuf:"bytes,10,opt,name=creator,proto3" json:"creator,omitempty"`
 	// Output only. Timestamp when this version was created.
-	CreateTime    *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	CreateTime *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	// Output only. The version this was derived from. Empty for upload
+	// versions. Set for edit versions (crop) and reverts.
+	SourceVersion string `protobuf:"bytes,12,opt,name=source_version,json=sourceVersion,proto3" json:"source_version,omitempty"`
+	// Output only. The crop/edit applied to the source version.
+	// Empty for upload versions.
+	Crop          *Crop `protobuf:"bytes,13,opt,name=crop,proto3" json:"crop,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -893,6 +904,167 @@ func (x *AssetVersion) GetCreateTime() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *AssetVersion) GetSourceVersion() string {
+	if x != nil {
+		return x.SourceVersion
+	}
+	return ""
+}
+
+func (x *AssetVersion) GetCrop() *Crop {
+	if x != nil {
+		return x.Crop
+	}
+	return nil
+}
+
+// Crop operation combining crop area, straighten, and flip.
+type Crop struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Optional. The crop area to apply. If set, width and height must
+	// be positive.
+	Area *CropArea `protobuf:"bytes,1,opt,name=area,proto3" json:"area,omitempty"`
+	// Optional. Straighten angle in degrees (-45 to 45).
+	Straighten float32 `protobuf:"fixed32,2,opt,name=straighten,proto3" json:"straighten,omitempty"`
+	// Optional. Flip horizontally.
+	FlipHorizontal bool `protobuf:"varint,3,opt,name=flip_horizontal,json=flipHorizontal,proto3" json:"flip_horizontal,omitempty"`
+	// Optional. Flip vertically.
+	FlipVertical  bool `protobuf:"varint,4,opt,name=flip_vertical,json=flipVertical,proto3" json:"flip_vertical,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Crop) Reset() {
+	*x = Crop{}
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Crop) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Crop) ProtoMessage() {}
+
+func (x *Crop) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Crop.ProtoReflect.Descriptor instead.
+func (*Crop) Descriptor() ([]byte, []int) {
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *Crop) GetArea() *CropArea {
+	if x != nil {
+		return x.Area
+	}
+	return nil
+}
+
+func (x *Crop) GetStraighten() float32 {
+	if x != nil {
+		return x.Straighten
+	}
+	return 0
+}
+
+func (x *Crop) GetFlipHorizontal() bool {
+	if x != nil {
+		return x.FlipHorizontal
+	}
+	return false
+}
+
+func (x *Crop) GetFlipVertical() bool {
+	if x != nil {
+		return x.FlipVertical
+	}
+	return false
+}
+
+// The crop area within an image.
+type CropArea struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Required. Origin X in pixels.
+	X int32 `protobuf:"varint,1,opt,name=x,proto3" json:"x,omitempty"`
+	// Required. Origin Y in pixels.
+	Y int32 `protobuf:"varint,2,opt,name=y,proto3" json:"y,omitempty"`
+	// Required. Width in pixels. Must be positive.
+	Width int32 `protobuf:"varint,3,opt,name=width,proto3" json:"width,omitempty"`
+	// Required. Height in pixels. Must be positive.
+	Height        int32 `protobuf:"varint,4,opt,name=height,proto3" json:"height,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CropArea) Reset() {
+	*x = CropArea{}
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CropArea) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CropArea) ProtoMessage() {}
+
+func (x *CropArea) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CropArea.ProtoReflect.Descriptor instead.
+func (*CropArea) Descriptor() ([]byte, []int) {
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *CropArea) GetX() int32 {
+	if x != nil {
+		return x.X
+	}
+	return 0
+}
+
+func (x *CropArea) GetY() int32 {
+	if x != nil {
+		return x.Y
+	}
+	return 0
+}
+
+func (x *CropArea) GetWidth() int32 {
+	if x != nil {
+		return x.Width
+	}
+	return 0
+}
+
+func (x *CropArea) GetHeight() int32 {
+	if x != nil {
+		return x.Height
+	}
+	return 0
+}
+
 // A generated rendition of an asset version (thumbnail, proxy, preview).
 type Rendition struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -914,7 +1086,7 @@ type Rendition struct {
 
 func (x *Rendition) Reset() {
 	*x = Rendition{}
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[2]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -926,7 +1098,7 @@ func (x *Rendition) String() string {
 func (*Rendition) ProtoMessage() {}
 
 func (x *Rendition) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[2]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -939,7 +1111,7 @@ func (x *Rendition) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Rendition.ProtoReflect.Descriptor instead.
 func (*Rendition) Descriptor() ([]byte, []int) {
-	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{2}
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Rendition) GetType() Rendition_Type {
@@ -1007,7 +1179,7 @@ type UploadInfo struct {
 
 func (x *UploadInfo) Reset() {
 	*x = UploadInfo{}
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[3]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1019,7 +1191,7 @@ func (x *UploadInfo) String() string {
 func (*UploadInfo) ProtoMessage() {}
 
 func (x *UploadInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[3]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1032,7 +1204,7 @@ func (x *UploadInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UploadInfo.ProtoReflect.Descriptor instead.
 func (*UploadInfo) Descriptor() ([]byte, []int) {
-	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{3}
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *UploadInfo) GetMethod() UploadInfo_Method {
@@ -1080,7 +1252,7 @@ type UploadPart struct {
 
 func (x *UploadPart) Reset() {
 	*x = UploadPart{}
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[4]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1092,7 +1264,7 @@ func (x *UploadPart) String() string {
 func (*UploadPart) ProtoMessage() {}
 
 func (x *UploadPart) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[4]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1105,7 +1277,7 @@ func (x *UploadPart) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UploadPart.ProtoReflect.Descriptor instead.
 func (*UploadPart) Descriptor() ([]byte, []int) {
-	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{4}
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *UploadPart) GetPartNumber() int32 {
@@ -1170,7 +1342,7 @@ type CreateAssetRequest struct {
 
 func (x *CreateAssetRequest) Reset() {
 	*x = CreateAssetRequest{}
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[5]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1182,7 +1354,7 @@ func (x *CreateAssetRequest) String() string {
 func (*CreateAssetRequest) ProtoMessage() {}
 
 func (x *CreateAssetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[5]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1195,7 +1367,7 @@ func (x *CreateAssetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateAssetRequest.ProtoReflect.Descriptor instead.
 func (*CreateAssetRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{5}
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *CreateAssetRequest) GetParent() string {
@@ -1256,7 +1428,7 @@ type CreateAssetMetadata struct {
 
 func (x *CreateAssetMetadata) Reset() {
 	*x = CreateAssetMetadata{}
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[6]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1268,7 +1440,7 @@ func (x *CreateAssetMetadata) String() string {
 func (*CreateAssetMetadata) ProtoMessage() {}
 
 func (x *CreateAssetMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[6]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1281,7 +1453,7 @@ func (x *CreateAssetMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateAssetMetadata.ProtoReflect.Descriptor instead.
 func (*CreateAssetMetadata) Descriptor() ([]byte, []int) {
-	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{6}
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *CreateAssetMetadata) GetStep() CreateAssetMetadata_Step {
@@ -1316,7 +1488,7 @@ type GetAssetRequest struct {
 
 func (x *GetAssetRequest) Reset() {
 	*x = GetAssetRequest{}
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[7]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1328,7 +1500,7 @@ func (x *GetAssetRequest) String() string {
 func (*GetAssetRequest) ProtoMessage() {}
 
 func (x *GetAssetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[7]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1341,7 +1513,7 @@ func (x *GetAssetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAssetRequest.ProtoReflect.Descriptor instead.
 func (*GetAssetRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{7}
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GetAssetRequest) GetName() string {
@@ -1400,7 +1572,7 @@ type ListAssetsRequest struct {
 
 func (x *ListAssetsRequest) Reset() {
 	*x = ListAssetsRequest{}
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[8]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1412,7 +1584,7 @@ func (x *ListAssetsRequest) String() string {
 func (*ListAssetsRequest) ProtoMessage() {}
 
 func (x *ListAssetsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[8]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1425,7 +1597,7 @@ func (x *ListAssetsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAssetsRequest.ProtoReflect.Descriptor instead.
 func (*ListAssetsRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{8}
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ListAssetsRequest) GetParent() string {
@@ -1483,7 +1655,7 @@ type ListAssetsResponse struct {
 
 func (x *ListAssetsResponse) Reset() {
 	*x = ListAssetsResponse{}
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[9]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1495,7 +1667,7 @@ func (x *ListAssetsResponse) String() string {
 func (*ListAssetsResponse) ProtoMessage() {}
 
 func (x *ListAssetsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[9]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1508,7 +1680,7 @@ func (x *ListAssetsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAssetsResponse.ProtoReflect.Descriptor instead.
 func (*ListAssetsResponse) Descriptor() ([]byte, []int) {
-	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{9}
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ListAssetsResponse) GetAssets() []*Asset {
@@ -1540,7 +1712,7 @@ type UpdateAssetRequest struct {
 
 func (x *UpdateAssetRequest) Reset() {
 	*x = UpdateAssetRequest{}
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[10]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1552,7 +1724,7 @@ func (x *UpdateAssetRequest) String() string {
 func (*UpdateAssetRequest) ProtoMessage() {}
 
 func (x *UpdateAssetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[10]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1565,7 +1737,7 @@ func (x *UpdateAssetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateAssetRequest.ProtoReflect.Descriptor instead.
 func (*UpdateAssetRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{10}
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *UpdateAssetRequest) GetAsset() *Asset {
@@ -1598,7 +1770,7 @@ type UpdateAssetMetadata struct {
 
 func (x *UpdateAssetMetadata) Reset() {
 	*x = UpdateAssetMetadata{}
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[11]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1610,7 +1782,7 @@ func (x *UpdateAssetMetadata) String() string {
 func (*UpdateAssetMetadata) ProtoMessage() {}
 
 func (x *UpdateAssetMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[11]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1623,7 +1795,7 @@ func (x *UpdateAssetMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateAssetMetadata.ProtoReflect.Descriptor instead.
 func (*UpdateAssetMetadata) Descriptor() ([]byte, []int) {
-	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{11}
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{13}
 }
 
 // The request sent to the DeleteAsset method.
@@ -1643,7 +1815,7 @@ type DeleteAssetRequest struct {
 
 func (x *DeleteAssetRequest) Reset() {
 	*x = DeleteAssetRequest{}
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[12]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1655,7 +1827,7 @@ func (x *DeleteAssetRequest) String() string {
 func (*DeleteAssetRequest) ProtoMessage() {}
 
 func (x *DeleteAssetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[12]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1668,7 +1840,7 @@ func (x *DeleteAssetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteAssetRequest.ProtoReflect.Descriptor instead.
 func (*DeleteAssetRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{12}
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *DeleteAssetRequest) GetName() string {
@@ -1708,7 +1880,7 @@ type DeleteAssetMetadata struct {
 
 func (x *DeleteAssetMetadata) Reset() {
 	*x = DeleteAssetMetadata{}
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[13]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1720,7 +1892,7 @@ func (x *DeleteAssetMetadata) String() string {
 func (*DeleteAssetMetadata) ProtoMessage() {}
 
 func (x *DeleteAssetMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[13]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1733,7 +1905,7 @@ func (x *DeleteAssetMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteAssetMetadata.ProtoReflect.Descriptor instead.
 func (*DeleteAssetMetadata) Descriptor() ([]byte, []int) {
-	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{13}
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{15}
 }
 
 // The request sent to the UndeleteAsset method.
@@ -1749,7 +1921,7 @@ type UndeleteAssetRequest struct {
 
 func (x *UndeleteAssetRequest) Reset() {
 	*x = UndeleteAssetRequest{}
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[14]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1761,7 +1933,7 @@ func (x *UndeleteAssetRequest) String() string {
 func (*UndeleteAssetRequest) ProtoMessage() {}
 
 func (x *UndeleteAssetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[14]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1774,7 +1946,7 @@ func (x *UndeleteAssetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UndeleteAssetRequest.ProtoReflect.Descriptor instead.
 func (*UndeleteAssetRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{14}
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *UndeleteAssetRequest) GetName() string {
@@ -1800,7 +1972,7 @@ type UndeleteAssetMetadata struct {
 
 func (x *UndeleteAssetMetadata) Reset() {
 	*x = UndeleteAssetMetadata{}
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[15]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1812,7 +1984,7 @@ func (x *UndeleteAssetMetadata) String() string {
 func (*UndeleteAssetMetadata) ProtoMessage() {}
 
 func (x *UndeleteAssetMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[15]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1825,34 +1997,47 @@ func (x *UndeleteAssetMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UndeleteAssetMetadata.ProtoReflect.Descriptor instead.
 func (*UndeleteAssetMetadata) Descriptor() ([]byte, []int) {
-	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{15}
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{17}
 }
 
-// The request sent to the CreateAssetVersion method.
+// The request sent to the CreateAssetVersion method. Three modes:
+//
+// 1. Upload: set filename + size_bytes (new file becomes source blob)
+// 2. Edit: set crop + optional source_version (derive from existing version)
+// 3. Revert: set source_version only (copies that version as new latest)
+//
 // (-- api-linter: core::0133::request-unknown-fields=disabled
 //
-//	aip.dev/not-precedent: filename, size_bytes needed for upload flow. --)
+//	aip.dev/not-precedent: filename, size_bytes, source_version, crop needed for version creation flow. --)
 type CreateAssetVersionRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The parent asset. Format:
 	// `organizations/{organization}/projects/{project}/assets/{asset}`
 	Parent string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
-	// Required. The version to create.
+	// Required. The version to create. Only change_note is user-settable.
 	// (-- api-linter: core::0133::request-required-fields=disabled
 	//
 	//	aip.dev/not-precedent: asset_version is the resource body. --)
 	AssetVersion *AssetVersion `protobuf:"bytes,2,opt,name=asset_version,json=assetVersion,proto3" json:"asset_version,omitempty"`
-	// Optional. The original filename from the client.
+	// Optional. The original filename from the client. Set for upload
+	// versions. If omitted with no crop, this is a revert.
 	Filename string `protobuf:"bytes,3,opt,name=filename,proto3" json:"filename,omitempty"`
 	// Optional. The file size in bytes. Required for multipart uploads.
-	SizeBytes     int64 `protobuf:"varint,4,opt,name=size_bytes,json=sizeBytes,proto3" json:"size_bytes,omitempty"`
+	SizeBytes int64 `protobuf:"varint,4,opt,name=size_bytes,json=sizeBytes,proto3" json:"size_bytes,omitempty"`
+	// Optional. The version to derive from. Defaults to the latest
+	// version. Used for edit and revert modes.
+	SourceVersion string `protobuf:"bytes,5,opt,name=source_version,json=sourceVersion,proto3" json:"source_version,omitempty"`
+	// Optional. The crop/edit to apply. Set for edit versions.
+	// If set without filename, derives from source_version.
+	// If set with filename, applies to the uploaded file.
+	Crop          *Crop `protobuf:"bytes,6,opt,name=crop,proto3" json:"crop,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CreateAssetVersionRequest) Reset() {
 	*x = CreateAssetVersionRequest{}
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[16]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1864,7 +2049,7 @@ func (x *CreateAssetVersionRequest) String() string {
 func (*CreateAssetVersionRequest) ProtoMessage() {}
 
 func (x *CreateAssetVersionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[16]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1877,7 +2062,7 @@ func (x *CreateAssetVersionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateAssetVersionRequest.ProtoReflect.Descriptor instead.
 func (*CreateAssetVersionRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{16}
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *CreateAssetVersionRequest) GetParent() string {
@@ -1908,6 +2093,20 @@ func (x *CreateAssetVersionRequest) GetSizeBytes() int64 {
 	return 0
 }
 
+func (x *CreateAssetVersionRequest) GetSourceVersion() string {
+	if x != nil {
+		return x.SourceVersion
+	}
+	return ""
+}
+
+func (x *CreateAssetVersionRequest) GetCrop() *Crop {
+	if x != nil {
+		return x.Crop
+	}
+	return nil
+}
+
 // LRO metadata for CreateAssetVersion. Same pipeline as CreateAsset.
 type CreateAssetVersionMetadata struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -1923,7 +2122,7 @@ type CreateAssetVersionMetadata struct {
 
 func (x *CreateAssetVersionMetadata) Reset() {
 	*x = CreateAssetVersionMetadata{}
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[17]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1935,7 +2134,7 @@ func (x *CreateAssetVersionMetadata) String() string {
 func (*CreateAssetVersionMetadata) ProtoMessage() {}
 
 func (x *CreateAssetVersionMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[17]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1948,7 +2147,7 @@ func (x *CreateAssetVersionMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateAssetVersionMetadata.ProtoReflect.Descriptor instead.
 func (*CreateAssetVersionMetadata) Descriptor() ([]byte, []int) {
-	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{17}
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *CreateAssetVersionMetadata) GetStep() CreateAssetMetadata_Step {
@@ -1983,7 +2182,7 @@ type GetAssetVersionRequest struct {
 
 func (x *GetAssetVersionRequest) Reset() {
 	*x = GetAssetVersionRequest{}
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[18]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1995,7 +2194,7 @@ func (x *GetAssetVersionRequest) String() string {
 func (*GetAssetVersionRequest) ProtoMessage() {}
 
 func (x *GetAssetVersionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[18]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2008,7 +2207,7 @@ func (x *GetAssetVersionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAssetVersionRequest.ProtoReflect.Descriptor instead.
 func (*GetAssetVersionRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{18}
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *GetAssetVersionRequest) GetName() string {
@@ -2033,7 +2232,7 @@ type ListAssetVersionsRequest struct {
 
 func (x *ListAssetVersionsRequest) Reset() {
 	*x = ListAssetVersionsRequest{}
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[19]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2045,7 +2244,7 @@ func (x *ListAssetVersionsRequest) String() string {
 func (*ListAssetVersionsRequest) ProtoMessage() {}
 
 func (x *ListAssetVersionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[19]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2058,7 +2257,7 @@ func (x *ListAssetVersionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAssetVersionsRequest.ProtoReflect.Descriptor instead.
 func (*ListAssetVersionsRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{19}
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ListAssetVersionsRequest) GetParent() string {
@@ -2098,7 +2297,7 @@ type ListAssetVersionsResponse struct {
 
 func (x *ListAssetVersionsResponse) Reset() {
 	*x = ListAssetVersionsResponse{}
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[20]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2110,7 +2309,7 @@ func (x *ListAssetVersionsResponse) String() string {
 func (*ListAssetVersionsResponse) ProtoMessage() {}
 
 func (x *ListAssetVersionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[20]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2123,7 +2322,7 @@ func (x *ListAssetVersionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAssetVersionsResponse.ProtoReflect.Descriptor instead.
 func (*ListAssetVersionsResponse) Descriptor() ([]byte, []int) {
-	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{20}
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ListAssetVersionsResponse) GetVersions() []*AssetVersion {
@@ -2164,7 +2363,7 @@ type ImportAssetsRequest struct {
 
 func (x *ImportAssetsRequest) Reset() {
 	*x = ImportAssetsRequest{}
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[21]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2176,7 +2375,7 @@ func (x *ImportAssetsRequest) String() string {
 func (*ImportAssetsRequest) ProtoMessage() {}
 
 func (x *ImportAssetsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[21]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2189,7 +2388,7 @@ func (x *ImportAssetsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ImportAssetsRequest.ProtoReflect.Descriptor instead.
 func (*ImportAssetsRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{21}
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *ImportAssetsRequest) GetParent() string {
@@ -2242,7 +2441,7 @@ type ImportAssetsResponse struct {
 
 func (x *ImportAssetsResponse) Reset() {
 	*x = ImportAssetsResponse{}
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[22]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2254,7 +2453,7 @@ func (x *ImportAssetsResponse) String() string {
 func (*ImportAssetsResponse) ProtoMessage() {}
 
 func (x *ImportAssetsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[22]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2267,7 +2466,7 @@ func (x *ImportAssetsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ImportAssetsResponse.ProtoReflect.Descriptor instead.
 func (*ImportAssetsResponse) Descriptor() ([]byte, []int) {
-	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{22}
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *ImportAssetsResponse) GetImportedCount() int32 {
@@ -2312,7 +2511,7 @@ type ImportAssetsMetadata struct {
 
 func (x *ImportAssetsMetadata) Reset() {
 	*x = ImportAssetsMetadata{}
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[23]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2324,7 +2523,7 @@ func (x *ImportAssetsMetadata) String() string {
 func (*ImportAssetsMetadata) ProtoMessage() {}
 
 func (x *ImportAssetsMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_assets_v1_asset_proto_msgTypes[23]
+	mi := &file_pivox_assets_v1_asset_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2337,7 +2536,7 @@ func (x *ImportAssetsMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ImportAssetsMetadata.ProtoReflect.Descriptor instead.
 func (*ImportAssetsMetadata) Descriptor() ([]byte, []int) {
-	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{23}
+	return file_pivox_assets_v1_asset_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ImportAssetsMetadata) GetPhase() ImportAssetsMetadata_Phase {
@@ -2444,7 +2643,7 @@ const file_pivox_assets_v1_asset_proto_rawDesc = "" +
 	"\x05AUDIO\x10\x03\x12\v\n" +
 	"\aGRAPHIC\x10\x04\x12\f\n" +
 	"\bDOCUMENT\x10\x05:f\xeaAc\n" +
-	"\x12pivox.assets/Asset\x12>organizations/{organization}/projects/{project}/assets/{asset}*\x06assets2\x05asset\"\xf0\x04\n" +
+	"\x12pivox.assets/Asset\x12>organizations/{organization}/projects/{project}/assets/{asset}*\x06assets2\x05asset\"\xea\x05\n" +
 	"\fAssetVersion\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12*\n" +
 	"\x0eversion_number\x18\x02 \x01(\x05B\x03\xe0A\x03R\rversionNumber\x12,\n" +
@@ -2463,8 +2662,25 @@ const file_pivox_assets_v1_asset_proto_rawDesc = "" +
 	"\acreator\x18\n" +
 	" \x01(\tB\x03\xe0A\x03R\acreator\x12@\n" +
 	"\vcreate_time\x18\v \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"createTime:\x8a\x01\xeaA\x86\x01\n" +
-	"\x19pivox.assets/AssetVersion\x12Qorganizations/{organization}/projects/{project}/assets/{asset}/versions/{version}*\bversions2\fassetVersion\"\x94\x03\n" +
+	"createTime\x12H\n" +
+	"\x0esource_version\x18\f \x01(\tB!\xe0A\x03\xfaA\x1b\n" +
+	"\x19pivox.assets/AssetVersionR\rsourceVersion\x12.\n" +
+	"\x04crop\x18\r \x01(\v2\x15.pivox.assets.v1.CropB\x03\xe0A\x03R\x04crop:\x8a\x01\xeaA\x86\x01\n" +
+	"\x19pivox.assets/AssetVersion\x12Qorganizations/{organization}/projects/{project}/assets/{asset}/versions/{version}*\bversions2\fassetVersion\"\xb7\x01\n" +
+	"\x04Crop\x122\n" +
+	"\x04area\x18\x01 \x01(\v2\x19.pivox.assets.v1.CropAreaB\x03\xe0A\x01R\x04area\x12#\n" +
+	"\n" +
+	"straighten\x18\x02 \x01(\x02B\x03\xe0A\x01R\n" +
+	"straighten\x12,\n" +
+	"\x0fflip_horizontal\x18\x03 \x01(\bB\x03\xe0A\x01R\x0eflipHorizontal\x12(\n" +
+	"\rflip_vertical\x18\x04 \x01(\bB\x03\xe0A\x01R\fflipVertical\"v\n" +
+	"\bCropArea\x12\x11\n" +
+	"\x01x\x18\x01 \x01(\x05B\x03\xe0A\x02R\x01x\x12\x11\n" +
+	"\x01y\x18\x02 \x01(\x05B\x03\xe0A\x02R\x01y\x12 \n" +
+	"\x05width\x18\x03 \x01(\x05B\n" +
+	"\xe0A\x02\xbaH\x04\x1a\x02 \x00R\x05width\x12\"\n" +
+	"\x06height\x18\x04 \x01(\x05B\n" +
+	"\xe0A\x02\xbaH\x04\x1a\x02 \x00R\x06height\"\x94\x03\n" +
 	"\tRendition\x128\n" +
 	"\x04type\x18\x01 \x01(\x0e2\x1f.pivox.assets.v1.Rendition.TypeB\x03\xe0A\x03R\x04type\x12$\n" +
 	"\vstorage_key\x18\x02 \x01(\tB\x03\xe0A\x03R\n" +
@@ -2565,13 +2781,16 @@ const file_pivox_assets_v1_asset_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tB \xe0A\x02\xfaA\x14\n" +
 	"\x12pivox.assets/Asset\xbaH\x03\xc8\x01\x01R\x04name\x12\x17\n" +
 	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x01R\x04etag\"\x17\n" +
-	"\x15UndeleteAssetMetadata\"\xf0\x01\n" +
+	"\x15UndeleteAssetMetadata\"\xea\x02\n" +
 	"\x19CreateAssetVersionRequest\x12?\n" +
 	"\x06parent\x18\x01 \x01(\tB'\xe0A\x02\xfaA\x1b\x12\x19pivox.assets/AssetVersion\xbaH\x03\xc8\x01\x01R\x06parent\x12M\n" +
 	"\rasset_version\x18\x02 \x01(\v2\x1d.pivox.assets.v1.AssetVersionB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\fassetVersion\x12\x1f\n" +
 	"\bfilename\x18\x03 \x01(\tB\x03\xe0A\x01R\bfilename\x12\"\n" +
 	"\n" +
-	"size_bytes\x18\x04 \x01(\x03B\x03\xe0A\x01R\tsizeBytes\"\xc4\x01\n" +
+	"size_bytes\x18\x04 \x01(\x03B\x03\xe0A\x01R\tsizeBytes\x12H\n" +
+	"\x0esource_version\x18\x05 \x01(\tB!\xe0A\x01\xfaA\x1b\n" +
+	"\x19pivox.assets/AssetVersionR\rsourceVersion\x12.\n" +
+	"\x04crop\x18\x06 \x01(\v2\x15.pivox.assets.v1.CropB\x03\xe0A\x01R\x04crop\"\xc4\x01\n" +
 	"\x1aCreateAssetVersionMetadata\x12=\n" +
 	"\x04step\x18\x01 \x01(\x0e2).pivox.assets.v1.CreateAssetMetadata.StepR\x04step\x12<\n" +
 	"\vupload_info\x18\x02 \x01(\v2\x1b.pivox.assets.v1.UploadInfoR\n" +
@@ -2647,7 +2866,7 @@ func file_pivox_assets_v1_asset_proto_rawDescGZIP() []byte {
 }
 
 var file_pivox_assets_v1_asset_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
-var file_pivox_assets_v1_asset_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
+var file_pivox_assets_v1_asset_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
 var file_pivox_assets_v1_asset_proto_goTypes = []any{
 	(Asset_State)(0),                   // 0: pivox.assets.v1.Asset.State
 	(Asset_MediaType)(0),               // 1: pivox.assets.v1.Asset.MediaType
@@ -2657,91 +2876,96 @@ var file_pivox_assets_v1_asset_proto_goTypes = []any{
 	(ImportAssetsMetadata_Phase)(0),    // 5: pivox.assets.v1.ImportAssetsMetadata.Phase
 	(*Asset)(nil),                      // 6: pivox.assets.v1.Asset
 	(*AssetVersion)(nil),               // 7: pivox.assets.v1.AssetVersion
-	(*Rendition)(nil),                  // 8: pivox.assets.v1.Rendition
-	(*UploadInfo)(nil),                 // 9: pivox.assets.v1.UploadInfo
-	(*UploadPart)(nil),                 // 10: pivox.assets.v1.UploadPart
-	(*CreateAssetRequest)(nil),         // 11: pivox.assets.v1.CreateAssetRequest
-	(*CreateAssetMetadata)(nil),        // 12: pivox.assets.v1.CreateAssetMetadata
-	(*GetAssetRequest)(nil),            // 13: pivox.assets.v1.GetAssetRequest
-	(*ListAssetsRequest)(nil),          // 14: pivox.assets.v1.ListAssetsRequest
-	(*ListAssetsResponse)(nil),         // 15: pivox.assets.v1.ListAssetsResponse
-	(*UpdateAssetRequest)(nil),         // 16: pivox.assets.v1.UpdateAssetRequest
-	(*UpdateAssetMetadata)(nil),        // 17: pivox.assets.v1.UpdateAssetMetadata
-	(*DeleteAssetRequest)(nil),         // 18: pivox.assets.v1.DeleteAssetRequest
-	(*DeleteAssetMetadata)(nil),        // 19: pivox.assets.v1.DeleteAssetMetadata
-	(*UndeleteAssetRequest)(nil),       // 20: pivox.assets.v1.UndeleteAssetRequest
-	(*UndeleteAssetMetadata)(nil),      // 21: pivox.assets.v1.UndeleteAssetMetadata
-	(*CreateAssetVersionRequest)(nil),  // 22: pivox.assets.v1.CreateAssetVersionRequest
-	(*CreateAssetVersionMetadata)(nil), // 23: pivox.assets.v1.CreateAssetVersionMetadata
-	(*GetAssetVersionRequest)(nil),     // 24: pivox.assets.v1.GetAssetVersionRequest
-	(*ListAssetVersionsRequest)(nil),   // 25: pivox.assets.v1.ListAssetVersionsRequest
-	(*ListAssetVersionsResponse)(nil),  // 26: pivox.assets.v1.ListAssetVersionsResponse
-	(*ImportAssetsRequest)(nil),        // 27: pivox.assets.v1.ImportAssetsRequest
-	(*ImportAssetsResponse)(nil),       // 28: pivox.assets.v1.ImportAssetsResponse
-	(*ImportAssetsMetadata)(nil),       // 29: pivox.assets.v1.ImportAssetsMetadata
-	nil,                                // 30: pivox.assets.v1.Asset.AnnotationsEntry
-	nil,                                // 31: pivox.assets.v1.UploadInfo.HeadersEntry
-	(*structpb.Struct)(nil),            // 32: google.protobuf.Struct
-	(*durationpb.Duration)(nil),        // 33: google.protobuf.Duration
-	(*timestamppb.Timestamp)(nil),      // 34: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),      // 35: google.protobuf.FieldMask
-	(*longrunningpb.Operation)(nil),    // 36: google.longrunning.Operation
+	(*Crop)(nil),                       // 8: pivox.assets.v1.Crop
+	(*CropArea)(nil),                   // 9: pivox.assets.v1.CropArea
+	(*Rendition)(nil),                  // 10: pivox.assets.v1.Rendition
+	(*UploadInfo)(nil),                 // 11: pivox.assets.v1.UploadInfo
+	(*UploadPart)(nil),                 // 12: pivox.assets.v1.UploadPart
+	(*CreateAssetRequest)(nil),         // 13: pivox.assets.v1.CreateAssetRequest
+	(*CreateAssetMetadata)(nil),        // 14: pivox.assets.v1.CreateAssetMetadata
+	(*GetAssetRequest)(nil),            // 15: pivox.assets.v1.GetAssetRequest
+	(*ListAssetsRequest)(nil),          // 16: pivox.assets.v1.ListAssetsRequest
+	(*ListAssetsResponse)(nil),         // 17: pivox.assets.v1.ListAssetsResponse
+	(*UpdateAssetRequest)(nil),         // 18: pivox.assets.v1.UpdateAssetRequest
+	(*UpdateAssetMetadata)(nil),        // 19: pivox.assets.v1.UpdateAssetMetadata
+	(*DeleteAssetRequest)(nil),         // 20: pivox.assets.v1.DeleteAssetRequest
+	(*DeleteAssetMetadata)(nil),        // 21: pivox.assets.v1.DeleteAssetMetadata
+	(*UndeleteAssetRequest)(nil),       // 22: pivox.assets.v1.UndeleteAssetRequest
+	(*UndeleteAssetMetadata)(nil),      // 23: pivox.assets.v1.UndeleteAssetMetadata
+	(*CreateAssetVersionRequest)(nil),  // 24: pivox.assets.v1.CreateAssetVersionRequest
+	(*CreateAssetVersionMetadata)(nil), // 25: pivox.assets.v1.CreateAssetVersionMetadata
+	(*GetAssetVersionRequest)(nil),     // 26: pivox.assets.v1.GetAssetVersionRequest
+	(*ListAssetVersionsRequest)(nil),   // 27: pivox.assets.v1.ListAssetVersionsRequest
+	(*ListAssetVersionsResponse)(nil),  // 28: pivox.assets.v1.ListAssetVersionsResponse
+	(*ImportAssetsRequest)(nil),        // 29: pivox.assets.v1.ImportAssetsRequest
+	(*ImportAssetsResponse)(nil),       // 30: pivox.assets.v1.ImportAssetsResponse
+	(*ImportAssetsMetadata)(nil),       // 31: pivox.assets.v1.ImportAssetsMetadata
+	nil,                                // 32: pivox.assets.v1.Asset.AnnotationsEntry
+	nil,                                // 33: pivox.assets.v1.UploadInfo.HeadersEntry
+	(*structpb.Struct)(nil),            // 34: google.protobuf.Struct
+	(*durationpb.Duration)(nil),        // 35: google.protobuf.Duration
+	(*timestamppb.Timestamp)(nil),      // 36: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),      // 37: google.protobuf.FieldMask
+	(*longrunningpb.Operation)(nil),    // 38: google.longrunning.Operation
 }
 var file_pivox_assets_v1_asset_proto_depIdxs = []int32{
 	0,  // 0: pivox.assets.v1.Asset.state:type_name -> pivox.assets.v1.Asset.State
 	1,  // 1: pivox.assets.v1.Asset.media_type:type_name -> pivox.assets.v1.Asset.MediaType
 	7,  // 2: pivox.assets.v1.Asset.latest_version:type_name -> pivox.assets.v1.AssetVersion
-	32, // 3: pivox.assets.v1.Asset.technical_metadata:type_name -> google.protobuf.Struct
-	33, // 4: pivox.assets.v1.Asset.duration:type_name -> google.protobuf.Duration
-	34, // 5: pivox.assets.v1.Asset.expire_time:type_name -> google.protobuf.Timestamp
-	33, // 6: pivox.assets.v1.Asset.ttl:type_name -> google.protobuf.Duration
-	30, // 7: pivox.assets.v1.Asset.annotations:type_name -> pivox.assets.v1.Asset.AnnotationsEntry
-	34, // 8: pivox.assets.v1.Asset.create_time:type_name -> google.protobuf.Timestamp
-	34, // 9: pivox.assets.v1.Asset.update_time:type_name -> google.protobuf.Timestamp
-	34, // 10: pivox.assets.v1.Asset.delete_time:type_name -> google.protobuf.Timestamp
-	34, // 11: pivox.assets.v1.Asset.purge_time:type_name -> google.protobuf.Timestamp
-	8,  // 12: pivox.assets.v1.AssetVersion.renditions:type_name -> pivox.assets.v1.Rendition
-	34, // 13: pivox.assets.v1.AssetVersion.create_time:type_name -> google.protobuf.Timestamp
-	2,  // 14: pivox.assets.v1.Rendition.type:type_name -> pivox.assets.v1.Rendition.Type
-	3,  // 15: pivox.assets.v1.UploadInfo.method:type_name -> pivox.assets.v1.UploadInfo.Method
-	31, // 16: pivox.assets.v1.UploadInfo.headers:type_name -> pivox.assets.v1.UploadInfo.HeadersEntry
-	10, // 17: pivox.assets.v1.UploadInfo.parts:type_name -> pivox.assets.v1.UploadPart
-	6,  // 18: pivox.assets.v1.CreateAssetRequest.asset:type_name -> pivox.assets.v1.Asset
-	4,  // 19: pivox.assets.v1.CreateAssetMetadata.step:type_name -> pivox.assets.v1.CreateAssetMetadata.Step
-	9,  // 20: pivox.assets.v1.CreateAssetMetadata.upload_info:type_name -> pivox.assets.v1.UploadInfo
-	6,  // 21: pivox.assets.v1.ListAssetsResponse.assets:type_name -> pivox.assets.v1.Asset
-	6,  // 22: pivox.assets.v1.UpdateAssetRequest.asset:type_name -> pivox.assets.v1.Asset
-	35, // 23: pivox.assets.v1.UpdateAssetRequest.update_mask:type_name -> google.protobuf.FieldMask
-	7,  // 24: pivox.assets.v1.CreateAssetVersionRequest.asset_version:type_name -> pivox.assets.v1.AssetVersion
-	4,  // 25: pivox.assets.v1.CreateAssetVersionMetadata.step:type_name -> pivox.assets.v1.CreateAssetMetadata.Step
-	9,  // 26: pivox.assets.v1.CreateAssetVersionMetadata.upload_info:type_name -> pivox.assets.v1.UploadInfo
-	7,  // 27: pivox.assets.v1.ListAssetVersionsResponse.versions:type_name -> pivox.assets.v1.AssetVersion
-	5,  // 28: pivox.assets.v1.ImportAssetsMetadata.phase:type_name -> pivox.assets.v1.ImportAssetsMetadata.Phase
-	11, // 29: pivox.assets.v1.Assets.CreateAsset:input_type -> pivox.assets.v1.CreateAssetRequest
-	13, // 30: pivox.assets.v1.Assets.GetAsset:input_type -> pivox.assets.v1.GetAssetRequest
-	14, // 31: pivox.assets.v1.Assets.ListAssets:input_type -> pivox.assets.v1.ListAssetsRequest
-	16, // 32: pivox.assets.v1.Assets.UpdateAsset:input_type -> pivox.assets.v1.UpdateAssetRequest
-	18, // 33: pivox.assets.v1.Assets.DeleteAsset:input_type -> pivox.assets.v1.DeleteAssetRequest
-	20, // 34: pivox.assets.v1.Assets.UndeleteAsset:input_type -> pivox.assets.v1.UndeleteAssetRequest
-	22, // 35: pivox.assets.v1.Assets.CreateAssetVersion:input_type -> pivox.assets.v1.CreateAssetVersionRequest
-	24, // 36: pivox.assets.v1.Assets.GetAssetVersion:input_type -> pivox.assets.v1.GetAssetVersionRequest
-	25, // 37: pivox.assets.v1.Assets.ListAssetVersions:input_type -> pivox.assets.v1.ListAssetVersionsRequest
-	27, // 38: pivox.assets.v1.Assets.ImportAssets:input_type -> pivox.assets.v1.ImportAssetsRequest
-	36, // 39: pivox.assets.v1.Assets.CreateAsset:output_type -> google.longrunning.Operation
-	6,  // 40: pivox.assets.v1.Assets.GetAsset:output_type -> pivox.assets.v1.Asset
-	15, // 41: pivox.assets.v1.Assets.ListAssets:output_type -> pivox.assets.v1.ListAssetsResponse
-	36, // 42: pivox.assets.v1.Assets.UpdateAsset:output_type -> google.longrunning.Operation
-	36, // 43: pivox.assets.v1.Assets.DeleteAsset:output_type -> google.longrunning.Operation
-	36, // 44: pivox.assets.v1.Assets.UndeleteAsset:output_type -> google.longrunning.Operation
-	36, // 45: pivox.assets.v1.Assets.CreateAssetVersion:output_type -> google.longrunning.Operation
-	7,  // 46: pivox.assets.v1.Assets.GetAssetVersion:output_type -> pivox.assets.v1.AssetVersion
-	26, // 47: pivox.assets.v1.Assets.ListAssetVersions:output_type -> pivox.assets.v1.ListAssetVersionsResponse
-	36, // 48: pivox.assets.v1.Assets.ImportAssets:output_type -> google.longrunning.Operation
-	39, // [39:49] is the sub-list for method output_type
-	29, // [29:39] is the sub-list for method input_type
-	29, // [29:29] is the sub-list for extension type_name
-	29, // [29:29] is the sub-list for extension extendee
-	0,  // [0:29] is the sub-list for field type_name
+	34, // 3: pivox.assets.v1.Asset.technical_metadata:type_name -> google.protobuf.Struct
+	35, // 4: pivox.assets.v1.Asset.duration:type_name -> google.protobuf.Duration
+	36, // 5: pivox.assets.v1.Asset.expire_time:type_name -> google.protobuf.Timestamp
+	35, // 6: pivox.assets.v1.Asset.ttl:type_name -> google.protobuf.Duration
+	32, // 7: pivox.assets.v1.Asset.annotations:type_name -> pivox.assets.v1.Asset.AnnotationsEntry
+	36, // 8: pivox.assets.v1.Asset.create_time:type_name -> google.protobuf.Timestamp
+	36, // 9: pivox.assets.v1.Asset.update_time:type_name -> google.protobuf.Timestamp
+	36, // 10: pivox.assets.v1.Asset.delete_time:type_name -> google.protobuf.Timestamp
+	36, // 11: pivox.assets.v1.Asset.purge_time:type_name -> google.protobuf.Timestamp
+	10, // 12: pivox.assets.v1.AssetVersion.renditions:type_name -> pivox.assets.v1.Rendition
+	36, // 13: pivox.assets.v1.AssetVersion.create_time:type_name -> google.protobuf.Timestamp
+	8,  // 14: pivox.assets.v1.AssetVersion.crop:type_name -> pivox.assets.v1.Crop
+	9,  // 15: pivox.assets.v1.Crop.area:type_name -> pivox.assets.v1.CropArea
+	2,  // 16: pivox.assets.v1.Rendition.type:type_name -> pivox.assets.v1.Rendition.Type
+	3,  // 17: pivox.assets.v1.UploadInfo.method:type_name -> pivox.assets.v1.UploadInfo.Method
+	33, // 18: pivox.assets.v1.UploadInfo.headers:type_name -> pivox.assets.v1.UploadInfo.HeadersEntry
+	12, // 19: pivox.assets.v1.UploadInfo.parts:type_name -> pivox.assets.v1.UploadPart
+	6,  // 20: pivox.assets.v1.CreateAssetRequest.asset:type_name -> pivox.assets.v1.Asset
+	4,  // 21: pivox.assets.v1.CreateAssetMetadata.step:type_name -> pivox.assets.v1.CreateAssetMetadata.Step
+	11, // 22: pivox.assets.v1.CreateAssetMetadata.upload_info:type_name -> pivox.assets.v1.UploadInfo
+	6,  // 23: pivox.assets.v1.ListAssetsResponse.assets:type_name -> pivox.assets.v1.Asset
+	6,  // 24: pivox.assets.v1.UpdateAssetRequest.asset:type_name -> pivox.assets.v1.Asset
+	37, // 25: pivox.assets.v1.UpdateAssetRequest.update_mask:type_name -> google.protobuf.FieldMask
+	7,  // 26: pivox.assets.v1.CreateAssetVersionRequest.asset_version:type_name -> pivox.assets.v1.AssetVersion
+	8,  // 27: pivox.assets.v1.CreateAssetVersionRequest.crop:type_name -> pivox.assets.v1.Crop
+	4,  // 28: pivox.assets.v1.CreateAssetVersionMetadata.step:type_name -> pivox.assets.v1.CreateAssetMetadata.Step
+	11, // 29: pivox.assets.v1.CreateAssetVersionMetadata.upload_info:type_name -> pivox.assets.v1.UploadInfo
+	7,  // 30: pivox.assets.v1.ListAssetVersionsResponse.versions:type_name -> pivox.assets.v1.AssetVersion
+	5,  // 31: pivox.assets.v1.ImportAssetsMetadata.phase:type_name -> pivox.assets.v1.ImportAssetsMetadata.Phase
+	13, // 32: pivox.assets.v1.Assets.CreateAsset:input_type -> pivox.assets.v1.CreateAssetRequest
+	15, // 33: pivox.assets.v1.Assets.GetAsset:input_type -> pivox.assets.v1.GetAssetRequest
+	16, // 34: pivox.assets.v1.Assets.ListAssets:input_type -> pivox.assets.v1.ListAssetsRequest
+	18, // 35: pivox.assets.v1.Assets.UpdateAsset:input_type -> pivox.assets.v1.UpdateAssetRequest
+	20, // 36: pivox.assets.v1.Assets.DeleteAsset:input_type -> pivox.assets.v1.DeleteAssetRequest
+	22, // 37: pivox.assets.v1.Assets.UndeleteAsset:input_type -> pivox.assets.v1.UndeleteAssetRequest
+	24, // 38: pivox.assets.v1.Assets.CreateAssetVersion:input_type -> pivox.assets.v1.CreateAssetVersionRequest
+	26, // 39: pivox.assets.v1.Assets.GetAssetVersion:input_type -> pivox.assets.v1.GetAssetVersionRequest
+	27, // 40: pivox.assets.v1.Assets.ListAssetVersions:input_type -> pivox.assets.v1.ListAssetVersionsRequest
+	29, // 41: pivox.assets.v1.Assets.ImportAssets:input_type -> pivox.assets.v1.ImportAssetsRequest
+	38, // 42: pivox.assets.v1.Assets.CreateAsset:output_type -> google.longrunning.Operation
+	6,  // 43: pivox.assets.v1.Assets.GetAsset:output_type -> pivox.assets.v1.Asset
+	17, // 44: pivox.assets.v1.Assets.ListAssets:output_type -> pivox.assets.v1.ListAssetsResponse
+	38, // 45: pivox.assets.v1.Assets.UpdateAsset:output_type -> google.longrunning.Operation
+	38, // 46: pivox.assets.v1.Assets.DeleteAsset:output_type -> google.longrunning.Operation
+	38, // 47: pivox.assets.v1.Assets.UndeleteAsset:output_type -> google.longrunning.Operation
+	38, // 48: pivox.assets.v1.Assets.CreateAssetVersion:output_type -> google.longrunning.Operation
+	7,  // 49: pivox.assets.v1.Assets.GetAssetVersion:output_type -> pivox.assets.v1.AssetVersion
+	28, // 50: pivox.assets.v1.Assets.ListAssetVersions:output_type -> pivox.assets.v1.ListAssetVersionsResponse
+	38, // 51: pivox.assets.v1.Assets.ImportAssets:output_type -> google.longrunning.Operation
+	42, // [42:52] is the sub-list for method output_type
+	32, // [32:42] is the sub-list for method input_type
+	32, // [32:32] is the sub-list for extension type_name
+	32, // [32:32] is the sub-list for extension extendee
+	0,  // [0:32] is the sub-list for field type_name
 }
 
 func init() { file_pivox_assets_v1_asset_proto_init() }
@@ -2755,7 +2979,7 @@ func file_pivox_assets_v1_asset_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pivox_assets_v1_asset_proto_rawDesc), len(file_pivox_assets_v1_asset_proto_rawDesc)),
 			NumEnums:      6,
-			NumMessages:   26,
+			NumMessages:   28,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
