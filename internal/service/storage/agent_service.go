@@ -339,14 +339,32 @@ type endpointConfigJSON struct {
 	Type string `json:"type"`
 
 	// S3 fields
-	EndpointURI     string `json:"endpoint_uri,omitempty"`
-	Bucket          string `json:"bucket,omitempty"`
-	Region          string `json:"region,omitempty"`
-	AccessKeyID     string `json:"access_key_id,omitempty"`
-	SecretAccessKey string `json:"secret_access_key,omitempty"`
+	EndpointURI string           `json:"endpoint_uri,omitempty"`
+	Bucket      string           `json:"bucket,omitempty"`
+	Region      string           `json:"region,omitempty"`
+	AccessKey   *s3AccessKeyJSON `json:"access_key,omitempty"`
 
 	// Filesystem fields
 	Path string `json:"path,omitempty"`
+}
+
+type s3AccessKeyJSON struct {
+	AccessKeyID     string `json:"access_key_id"`
+	SecretAccessKey string `json:"secret_access_key"`
+}
+
+func (c endpointConfigJSON) accessKeyID() string {
+	if c.AccessKey != nil {
+		return c.AccessKey.AccessKeyID
+	}
+	return ""
+}
+
+func (c endpointConfigJSON) secretAccessKey() string {
+	if c.AccessKey != nil {
+		return c.AccessKey.SecretAccessKey
+	}
+	return ""
 }
 
 func parseEndpointConfig(ep db.StorageEndpoint) (*agentv1.EndpointConfig, error) {
@@ -372,8 +390,8 @@ func parseEndpointConfig(ep db.StorageEndpoint) (*agentv1.EndpointConfig, error)
 				EndpointUri:     raw.EndpointURI,
 				Bucket:          raw.Bucket,
 				Region:          raw.Region,
-				AccessKeyId:     raw.AccessKeyID,
-				SecretAccessKey: raw.SecretAccessKey,
+				AccessKeyId:     raw.accessKeyID(),
+				SecretAccessKey: raw.secretAccessKey(),
 			},
 		}
 	case "filesystem":
