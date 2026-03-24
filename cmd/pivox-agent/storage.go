@@ -85,7 +85,8 @@ func runStorage(cmd *cobra.Command, args []string) error {
 	sessions := agent.NewSessionStore()
 	go sessions.StartCleanup(ctx, 1*time.Minute)
 
-	endpoints := agent.NewEndpointStore()
+	cache := agent.NewMemoryCache(0, 0) // defaults: 1000 entries, 256MB
+	endpoints := agent.NewEndpointStore(cache)
 	denied := agent.NewDeniedPatterns()
 
 	// Start the HTTP file server alongside the bidi connection.

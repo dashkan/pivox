@@ -22,18 +22,21 @@ import (
 type EndpointStore struct {
 	mu        sync.RWMutex
 	endpoints map[string]*endpoint // keyed by endpoint name
+	cache     *MemoryCache
 }
 
 // endpoint is a resolved endpoint with a ready-to-use client.
 type endpoint struct {
-	config *agentv1.EndpointConfig
-	s3     *minio.Client // nil for filesystem endpoints
+	config       *agentv1.EndpointConfig
+	s3           *minio.Client // nil for filesystem endpoints
+	cacheEnabled bool
 }
 
-// NewEndpointStore creates an empty EndpointStore.
-func NewEndpointStore() *EndpointStore {
+// NewEndpointStore creates an empty EndpointStore with a memory cache.
+func NewEndpointStore(cache *MemoryCache) *EndpointStore {
 	return &EndpointStore{
 		endpoints: make(map[string]*endpoint),
+		cache:     cache,
 	}
 }
 
@@ -43,7 +46,10 @@ func (s *EndpointStore) Update(configs []*agentv1.EndpointConfig) error {
 	endpoints := make(map[string]*endpoint, len(configs))
 
 	for _, cfg := range configs {
-		ep := &endpoint{config: cfg}
+		ep := &endpoint{
+			config:       cfg,
+			cacheEnabled: cfg.GetCacheConfig() != nil && cfg.GetCacheConfig().GetEnabled(),
+		}
 
 		if s3Cfg := cfg.GetS3(); s3Cfg != nil {
 			client, err := newS3Client(s3Cfg)
@@ -90,8 +96,14 @@ func (s *EndpointStore) ServeFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check memory cache first.
+	cacheKey := endpointName + "/" + objectKey
+	if ep.cacheEnabled && s.cache != nil && s.cache.Get(w, cacheKey) {
+		return
+	}
+
 	if ep.s3 != nil {
-		s.serveS3(w, r, ep, objectKey)
+		s.serveS3(w, r, ep, objectKey, cacheKey)
 	} else if fsCfg := ep.config.GetFilesystem(); fsCfg != nil {
 		s.serveFilesystem(w, r, fsCfg, objectKey)
 	} else {
@@ -100,7 +112,7 @@ func (s *EndpointStore) ServeFile(w http.ResponseWriter, r *http.Request) {
 }
 
 // serveS3 proxies a GET request to an S3-compatible backend.
-func (s *EndpointStore) serveS3(w http.ResponseWriter, r *http.Request, ep *endpoint, objectKey string) {
+func (s *EndpointStore) serveS3(w http.ResponseWriter, r *http.Request, ep *endpoint, objectKey string, cacheKey string) {
 	bucket := ep.config.GetS3().GetBucket()
 
 	obj, err := ep.s3.GetObject(r.Context(), bucket, objectKey, minio.GetObjectOptions{})
@@ -128,6 +140,20 @@ func (s *EndpointStore) serveS3(w http.ResponseWriter, r *http.Request, ep *endp
 	w.Header().Set("ETag", info.ETag)
 	w.Header().Set("Last-Modified", info.LastModified.UTC().Format(http.TimeFormat))
 	w.Header().Set("Accept-Ranges", "bytes")
+	w.Header().Set("X-Cache", "MISS")
+
+	// For cacheable objects, read into memory, cache, and serve.
+	if ep.cacheEnabled && s.cache != nil && info.Size <= maxCacheableSize {
+		buf := make([]byte, info.Size)
+		n, err := io.ReadFull(obj, buf)
+		if err == nil {
+			s.cache.Put(cacheKey, buf[:n], info.ContentType, info.ETag, info.LastModified)
+			w.WriteHeader(http.StatusOK)
+			w.Write(buf[:n])
+			return
+		}
+		// ReadFull failed — fall through to streaming.
+	}
 
 	// Handle Range requests for video seeking / progressive loading.
 	if rangeHeader := r.Header.Get("Range"); rangeHeader != "" {
