@@ -501,6 +501,11 @@ message GetInstallScriptRequest {
 
   // Optional. Whether to enable telemetry collection.
   bool telemetry = 9 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. The role the agent should perform. Defaults to BOTH
+  // (HTTP serving + rendition processing). Use SERVE for dedicated
+  // request serving or WORKER for dedicated rendering.
+  string role = 10 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // The response returned from the

@@ -38,6 +38,7 @@ the cloud.`,
 	f.String("bind", envOrDefault("PIVOX_BIND", "0.0.0.0"), "Bind address")
 	addControlPlaneFlag(f)
 	f.Bool("telemetry", true, "Enable telemetry reporting to Pivox Cloud")
+	f.String("role", envOrDefault("PIVOX_ROLE", "both"), "Agent role: both, serve, worker")
 	f.String("log-level", envOrDefault("PIVOX_LOG_LEVEL", "info"), "Log level (debug, info, warn, error)")
 
 	_ = cmd.MarkFlagRequired("token")

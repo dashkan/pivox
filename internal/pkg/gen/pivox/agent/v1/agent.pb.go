@@ -38,6 +38,65 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// The role an agent performs in the gateway pool.
+type AgentRole int32
+
+const (
+	// Unspecified role. Treated as BOTH.
+	AgentRole_AGENT_ROLE_UNSPECIFIED AgentRole = 0
+	// Handles both HTTP serving and rendition/processing tasks.
+	AgentRole_BOTH AgentRole = 1
+	// HTTP serving only. Added to DNS round-robin. Does not process
+	// rendition tasks.
+	AgentRole_SERVE AgentRole = 2
+	// Rendition and processing tasks only. Not in DNS. Does not serve
+	// HTTP requests.
+	AgentRole_WORKER AgentRole = 3
+)
+
+// Enum value maps for AgentRole.
+var (
+	AgentRole_name = map[int32]string{
+		0: "AGENT_ROLE_UNSPECIFIED",
+		1: "BOTH",
+		2: "SERVE",
+		3: "WORKER",
+	}
+	AgentRole_value = map[string]int32{
+		"AGENT_ROLE_UNSPECIFIED": 0,
+		"BOTH":                   1,
+		"SERVE":                  2,
+		"WORKER":                 3,
+	}
+)
+
+func (x AgentRole) Enum() *AgentRole {
+	p := new(AgentRole)
+	*p = x
+	return p
+}
+
+func (x AgentRole) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AgentRole) Descriptor() protoreflect.EnumDescriptor {
+	return file_pivox_agent_v1_agent_proto_enumTypes[0].Descriptor()
+}
+
+func (AgentRole) Type() protoreflect.EnumType {
+	return &file_pivox_agent_v1_agent_proto_enumTypes[0]
+}
+
+func (x AgentRole) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AgentRole.Descriptor instead.
+func (AgentRole) EnumDescriptor() ([]byte, []int) {
+	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{0}
+}
+
 // UpgradePhase enumerates the stages of a self-upgrade lifecycle.
 type UpgradePhase int32
 
@@ -91,11 +150,11 @@ func (x UpgradePhase) String() string {
 }
 
 func (UpgradePhase) Descriptor() protoreflect.EnumDescriptor {
-	return file_pivox_agent_v1_agent_proto_enumTypes[0].Descriptor()
+	return file_pivox_agent_v1_agent_proto_enumTypes[1].Descriptor()
 }
 
 func (UpgradePhase) Type() protoreflect.EnumType {
-	return &file_pivox_agent_v1_agent_proto_enumTypes[0]
+	return &file_pivox_agent_v1_agent_proto_enumTypes[1]
 }
 
 func (x UpgradePhase) Number() protoreflect.EnumNumber {
@@ -104,7 +163,7 @@ func (x UpgradePhase) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use UpgradePhase.Descriptor instead.
 func (UpgradePhase) EnumDescriptor() ([]byte, []int) {
-	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{0}
+	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{1}
 }
 
 // UpgradeCommand enumerates the lifecycle commands the control plane can issue
@@ -149,11 +208,11 @@ func (x UpgradeCommand) String() string {
 }
 
 func (UpgradeCommand) Descriptor() protoreflect.EnumDescriptor {
-	return file_pivox_agent_v1_agent_proto_enumTypes[1].Descriptor()
+	return file_pivox_agent_v1_agent_proto_enumTypes[2].Descriptor()
 }
 
 func (UpgradeCommand) Type() protoreflect.EnumType {
-	return &file_pivox_agent_v1_agent_proto_enumTypes[1]
+	return &file_pivox_agent_v1_agent_proto_enumTypes[2]
 }
 
 func (x UpgradeCommand) Number() protoreflect.EnumNumber {
@@ -162,7 +221,7 @@ func (x UpgradeCommand) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use UpgradeCommand.Descriptor instead.
 func (UpgradeCommand) EnumDescriptor() ([]byte, []int) {
-	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{1}
+	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{2}
 }
 
 // AgentMessage wraps every message the agent sends to the control plane over
@@ -349,7 +408,9 @@ type Handshake struct {
 	// Operating system identifier (e.g. "linux", "darwin").
 	Os string `protobuf:"bytes,5,opt,name=os,proto3" json:"os,omitempty"`
 	// CPU architecture (e.g. "amd64", "arm64").
-	Arch          string `protobuf:"bytes,6,opt,name=arch,proto3" json:"arch,omitempty"`
+	Arch string `protobuf:"bytes,6,opt,name=arch,proto3" json:"arch,omitempty"`
+	// The role this agent should perform. Defaults to BOTH.
+	Role          AgentRole `protobuf:"varint,7,opt,name=role,proto3,enum=pivox.agent.v1.AgentRole" json:"role,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -424,6 +485,13 @@ func (x *Handshake) GetArch() string {
 		return x.Arch
 	}
 	return ""
+}
+
+func (x *Handshake) GetRole() AgentRole {
+	if x != nil {
+		return x.Role
+	}
+	return AgentRole_AGENT_ROLE_UNSPECIFIED
 }
 
 // Heartbeat is sent periodically by the agent to signal liveness and report
@@ -2103,7 +2171,7 @@ const file_pivox_agent_v1_agent_proto_rawDesc = "" +
 	"syncStatus\x12F\n" +
 	"\x0eupgrade_status\x18\x05 \x01(\v2\x1d.pivox.agent.v1.UpgradeStatusH\x00R\rupgradeStatus\x129\n" +
 	"\ttelemetry\x18\x06 \x01(\v2\x19.pivox.agent.v1.TelemetryH\x00R\ttelemetryB\t\n" +
-	"\amessage\"\xbe\x01\n" +
+	"\amessage\"\xed\x01\n" +
 	"\tHandshake\x12-\n" +
 	"\x12registration_token\x18\x01 \x01(\tR\x11registrationToken\x12#\n" +
 	"\ragent_version\x18\x02 \x01(\tR\fagentVersion\x12\x1d\n" +
@@ -2111,7 +2179,8 @@ const file_pivox_agent_v1_agent_proto_rawDesc = "" +
 	"ip_address\x18\x03 \x01(\tR\tipAddress\x12\x1a\n" +
 	"\bhostname\x18\x04 \x01(\tR\bhostname\x12\x0e\n" +
 	"\x02os\x18\x05 \x01(\tR\x02os\x12\x12\n" +
-	"\x04arch\x18\x06 \x01(\tR\x04arch\"T\n" +
+	"\x04arch\x18\x06 \x01(\tR\x04arch\x12-\n" +
+	"\x04role\x18\a \x01(\x0e2\x19.pivox.agent.v1.AgentRoleR\x04role\"T\n" +
 	"\tHeartbeat\x12\x14\n" +
 	"\x05state\x18\x01 \x01(\tR\x05state\x121\n" +
 	"\x06uptime\x18\x02 \x01(\v2\x19.google.protobuf.DurationR\x06uptime\"\x88\x01\n" +
@@ -2223,7 +2292,13 @@ const file_pivox_agent_v1_agent_proto_rawDesc = "" +
 	"\vmax_size_gb\x18\x02 \x01(\x05R\tmaxSizeGb\x12'\n" +
 	"\x0feviction_policy\x18\x03 \x01(\tR\x0eevictionPolicy\x12\x1b\n" +
 	"\tttl_hours\x18\x04 \x01(\x05R\bttlHours\"\x11\n" +
-	"\x0fServerHeartbeat*\x7f\n" +
+	"\x0fServerHeartbeat*H\n" +
+	"\tAgentRole\x12\x1a\n" +
+	"\x16AGENT_ROLE_UNSPECIFIED\x10\x00\x12\b\n" +
+	"\x04BOTH\x10\x01\x12\t\n" +
+	"\x05SERVE\x10\x02\x12\n" +
+	"\n" +
+	"\x06WORKER\x10\x03*\x7f\n" +
 	"\fUpgradePhase\x12\x1d\n" +
 	"\x19UPGRADE_PHASE_UNSPECIFIED\x10\x00\x12\x0f\n" +
 	"\vDOWNLOADING\x10\x01\x12\t\n" +
@@ -2255,72 +2330,74 @@ func file_pivox_agent_v1_agent_proto_rawDescGZIP() []byte {
 	return file_pivox_agent_v1_agent_proto_rawDescData
 }
 
-var file_pivox_agent_v1_agent_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_pivox_agent_v1_agent_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
 var file_pivox_agent_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
 var file_pivox_agent_v1_agent_proto_goTypes = []any{
-	(UpgradePhase)(0),                // 0: pivox.agent.v1.UpgradePhase
-	(UpgradeCommand)(0),              // 1: pivox.agent.v1.UpgradeCommand
-	(*AgentMessage)(nil),             // 2: pivox.agent.v1.AgentMessage
-	(*Handshake)(nil),                // 3: pivox.agent.v1.Handshake
-	(*Heartbeat)(nil),                // 4: pivox.agent.v1.Heartbeat
-	(*EndpointHealth)(nil),           // 5: pivox.agent.v1.EndpointHealth
-	(*SyncStatus)(nil),               // 6: pivox.agent.v1.SyncStatus
-	(*UpgradeStatus)(nil),            // 7: pivox.agent.v1.UpgradeStatus
-	(*Telemetry)(nil),                // 8: pivox.agent.v1.Telemetry
-	(*CacheStats)(nil),               // 9: pivox.agent.v1.CacheStats
-	(*RequestMetrics)(nil),           // 10: pivox.agent.v1.RequestMetrics
-	(*SystemMetrics)(nil),            // 11: pivox.agent.v1.SystemMetrics
-	(*ControlMessage)(nil),           // 12: pivox.agent.v1.ControlMessage
-	(*HandshakeAck)(nil),             // 13: pivox.agent.v1.HandshakeAck
-	(*SessionGrant)(nil),             // 14: pivox.agent.v1.SessionGrant
-	(*SessionRevoke)(nil),            // 15: pivox.agent.v1.SessionRevoke
-	(*CertDelivery)(nil),             // 16: pivox.agent.v1.CertDelivery
-	(*DrainRequest)(nil),             // 17: pivox.agent.v1.DrainRequest
-	(*UpgradeRequest)(nil),           // 18: pivox.agent.v1.UpgradeRequest
-	(*ConfigUpdate)(nil),             // 19: pivox.agent.v1.ConfigUpdate
-	(*EndpointConfig)(nil),           // 20: pivox.agent.v1.EndpointConfig
-	(*S3EndpointConfig)(nil),         // 21: pivox.agent.v1.S3EndpointConfig
-	(*FileSystemEndpointConfig)(nil), // 22: pivox.agent.v1.FileSystemEndpointConfig
-	(*EndpointCacheConfig)(nil),      // 23: pivox.agent.v1.EndpointCacheConfig
-	(*ServerHeartbeat)(nil),          // 24: pivox.agent.v1.ServerHeartbeat
-	(*durationpb.Duration)(nil),      // 25: google.protobuf.Duration
-	(*timestamppb.Timestamp)(nil),    // 26: google.protobuf.Timestamp
+	(AgentRole)(0),                   // 0: pivox.agent.v1.AgentRole
+	(UpgradePhase)(0),                // 1: pivox.agent.v1.UpgradePhase
+	(UpgradeCommand)(0),              // 2: pivox.agent.v1.UpgradeCommand
+	(*AgentMessage)(nil),             // 3: pivox.agent.v1.AgentMessage
+	(*Handshake)(nil),                // 4: pivox.agent.v1.Handshake
+	(*Heartbeat)(nil),                // 5: pivox.agent.v1.Heartbeat
+	(*EndpointHealth)(nil),           // 6: pivox.agent.v1.EndpointHealth
+	(*SyncStatus)(nil),               // 7: pivox.agent.v1.SyncStatus
+	(*UpgradeStatus)(nil),            // 8: pivox.agent.v1.UpgradeStatus
+	(*Telemetry)(nil),                // 9: pivox.agent.v1.Telemetry
+	(*CacheStats)(nil),               // 10: pivox.agent.v1.CacheStats
+	(*RequestMetrics)(nil),           // 11: pivox.agent.v1.RequestMetrics
+	(*SystemMetrics)(nil),            // 12: pivox.agent.v1.SystemMetrics
+	(*ControlMessage)(nil),           // 13: pivox.agent.v1.ControlMessage
+	(*HandshakeAck)(nil),             // 14: pivox.agent.v1.HandshakeAck
+	(*SessionGrant)(nil),             // 15: pivox.agent.v1.SessionGrant
+	(*SessionRevoke)(nil),            // 16: pivox.agent.v1.SessionRevoke
+	(*CertDelivery)(nil),             // 17: pivox.agent.v1.CertDelivery
+	(*DrainRequest)(nil),             // 18: pivox.agent.v1.DrainRequest
+	(*UpgradeRequest)(nil),           // 19: pivox.agent.v1.UpgradeRequest
+	(*ConfigUpdate)(nil),             // 20: pivox.agent.v1.ConfigUpdate
+	(*EndpointConfig)(nil),           // 21: pivox.agent.v1.EndpointConfig
+	(*S3EndpointConfig)(nil),         // 22: pivox.agent.v1.S3EndpointConfig
+	(*FileSystemEndpointConfig)(nil), // 23: pivox.agent.v1.FileSystemEndpointConfig
+	(*EndpointCacheConfig)(nil),      // 24: pivox.agent.v1.EndpointCacheConfig
+	(*ServerHeartbeat)(nil),          // 25: pivox.agent.v1.ServerHeartbeat
+	(*durationpb.Duration)(nil),      // 26: google.protobuf.Duration
+	(*timestamppb.Timestamp)(nil),    // 27: google.protobuf.Timestamp
 }
 var file_pivox_agent_v1_agent_proto_depIdxs = []int32{
-	3,  // 0: pivox.agent.v1.AgentMessage.handshake:type_name -> pivox.agent.v1.Handshake
-	4,  // 1: pivox.agent.v1.AgentMessage.heartbeat:type_name -> pivox.agent.v1.Heartbeat
-	5,  // 2: pivox.agent.v1.AgentMessage.endpoint_health:type_name -> pivox.agent.v1.EndpointHealth
-	6,  // 3: pivox.agent.v1.AgentMessage.sync_status:type_name -> pivox.agent.v1.SyncStatus
-	7,  // 4: pivox.agent.v1.AgentMessage.upgrade_status:type_name -> pivox.agent.v1.UpgradeStatus
-	8,  // 5: pivox.agent.v1.AgentMessage.telemetry:type_name -> pivox.agent.v1.Telemetry
-	25, // 6: pivox.agent.v1.Heartbeat.uptime:type_name -> google.protobuf.Duration
-	0,  // 7: pivox.agent.v1.UpgradeStatus.phase:type_name -> pivox.agent.v1.UpgradePhase
-	9,  // 8: pivox.agent.v1.Telemetry.cache_stats:type_name -> pivox.agent.v1.CacheStats
-	10, // 9: pivox.agent.v1.Telemetry.request_metrics:type_name -> pivox.agent.v1.RequestMetrics
-	11, // 10: pivox.agent.v1.Telemetry.system_metrics:type_name -> pivox.agent.v1.SystemMetrics
-	13, // 11: pivox.agent.v1.ControlMessage.handshake_ack:type_name -> pivox.agent.v1.HandshakeAck
-	16, // 12: pivox.agent.v1.ControlMessage.cert_delivery:type_name -> pivox.agent.v1.CertDelivery
-	17, // 13: pivox.agent.v1.ControlMessage.drain_request:type_name -> pivox.agent.v1.DrainRequest
-	18, // 14: pivox.agent.v1.ControlMessage.upgrade_request:type_name -> pivox.agent.v1.UpgradeRequest
-	19, // 15: pivox.agent.v1.ControlMessage.config_update:type_name -> pivox.agent.v1.ConfigUpdate
-	24, // 16: pivox.agent.v1.ControlMessage.server_heartbeat:type_name -> pivox.agent.v1.ServerHeartbeat
-	14, // 17: pivox.agent.v1.ControlMessage.session_grant:type_name -> pivox.agent.v1.SessionGrant
-	15, // 18: pivox.agent.v1.ControlMessage.session_revoke:type_name -> pivox.agent.v1.SessionRevoke
-	20, // 19: pivox.agent.v1.HandshakeAck.endpoints:type_name -> pivox.agent.v1.EndpointConfig
-	26, // 20: pivox.agent.v1.SessionGrant.expiry:type_name -> google.protobuf.Timestamp
-	26, // 21: pivox.agent.v1.CertDelivery.expiry:type_name -> google.protobuf.Timestamp
-	1,  // 22: pivox.agent.v1.UpgradeRequest.command:type_name -> pivox.agent.v1.UpgradeCommand
-	20, // 23: pivox.agent.v1.ConfigUpdate.endpoints:type_name -> pivox.agent.v1.EndpointConfig
-	21, // 24: pivox.agent.v1.EndpointConfig.s3:type_name -> pivox.agent.v1.S3EndpointConfig
-	22, // 25: pivox.agent.v1.EndpointConfig.filesystem:type_name -> pivox.agent.v1.FileSystemEndpointConfig
-	23, // 26: pivox.agent.v1.EndpointConfig.cache_config:type_name -> pivox.agent.v1.EndpointCacheConfig
-	2,  // 27: pivox.agent.v1.AgentService.Connect:input_type -> pivox.agent.v1.AgentMessage
-	12, // 28: pivox.agent.v1.AgentService.Connect:output_type -> pivox.agent.v1.ControlMessage
-	28, // [28:29] is the sub-list for method output_type
-	27, // [27:28] is the sub-list for method input_type
-	27, // [27:27] is the sub-list for extension type_name
-	27, // [27:27] is the sub-list for extension extendee
-	0,  // [0:27] is the sub-list for field type_name
+	4,  // 0: pivox.agent.v1.AgentMessage.handshake:type_name -> pivox.agent.v1.Handshake
+	5,  // 1: pivox.agent.v1.AgentMessage.heartbeat:type_name -> pivox.agent.v1.Heartbeat
+	6,  // 2: pivox.agent.v1.AgentMessage.endpoint_health:type_name -> pivox.agent.v1.EndpointHealth
+	7,  // 3: pivox.agent.v1.AgentMessage.sync_status:type_name -> pivox.agent.v1.SyncStatus
+	8,  // 4: pivox.agent.v1.AgentMessage.upgrade_status:type_name -> pivox.agent.v1.UpgradeStatus
+	9,  // 5: pivox.agent.v1.AgentMessage.telemetry:type_name -> pivox.agent.v1.Telemetry
+	0,  // 6: pivox.agent.v1.Handshake.role:type_name -> pivox.agent.v1.AgentRole
+	26, // 7: pivox.agent.v1.Heartbeat.uptime:type_name -> google.protobuf.Duration
+	1,  // 8: pivox.agent.v1.UpgradeStatus.phase:type_name -> pivox.agent.v1.UpgradePhase
+	10, // 9: pivox.agent.v1.Telemetry.cache_stats:type_name -> pivox.agent.v1.CacheStats
+	11, // 10: pivox.agent.v1.Telemetry.request_metrics:type_name -> pivox.agent.v1.RequestMetrics
+	12, // 11: pivox.agent.v1.Telemetry.system_metrics:type_name -> pivox.agent.v1.SystemMetrics
+	14, // 12: pivox.agent.v1.ControlMessage.handshake_ack:type_name -> pivox.agent.v1.HandshakeAck
+	17, // 13: pivox.agent.v1.ControlMessage.cert_delivery:type_name -> pivox.agent.v1.CertDelivery
+	18, // 14: pivox.agent.v1.ControlMessage.drain_request:type_name -> pivox.agent.v1.DrainRequest
+	19, // 15: pivox.agent.v1.ControlMessage.upgrade_request:type_name -> pivox.agent.v1.UpgradeRequest
+	20, // 16: pivox.agent.v1.ControlMessage.config_update:type_name -> pivox.agent.v1.ConfigUpdate
+	25, // 17: pivox.agent.v1.ControlMessage.server_heartbeat:type_name -> pivox.agent.v1.ServerHeartbeat
+	15, // 18: pivox.agent.v1.ControlMessage.session_grant:type_name -> pivox.agent.v1.SessionGrant
+	16, // 19: pivox.agent.v1.ControlMessage.session_revoke:type_name -> pivox.agent.v1.SessionRevoke
+	21, // 20: pivox.agent.v1.HandshakeAck.endpoints:type_name -> pivox.agent.v1.EndpointConfig
+	27, // 21: pivox.agent.v1.SessionGrant.expiry:type_name -> google.protobuf.Timestamp
+	27, // 22: pivox.agent.v1.CertDelivery.expiry:type_name -> google.protobuf.Timestamp
+	2,  // 23: pivox.agent.v1.UpgradeRequest.command:type_name -> pivox.agent.v1.UpgradeCommand
+	21, // 24: pivox.agent.v1.ConfigUpdate.endpoints:type_name -> pivox.agent.v1.EndpointConfig
+	22, // 25: pivox.agent.v1.EndpointConfig.s3:type_name -> pivox.agent.v1.S3EndpointConfig
+	23, // 26: pivox.agent.v1.EndpointConfig.filesystem:type_name -> pivox.agent.v1.FileSystemEndpointConfig
+	24, // 27: pivox.agent.v1.EndpointConfig.cache_config:type_name -> pivox.agent.v1.EndpointCacheConfig
+	3,  // 28: pivox.agent.v1.AgentService.Connect:input_type -> pivox.agent.v1.AgentMessage
+	13, // 29: pivox.agent.v1.AgentService.Connect:output_type -> pivox.agent.v1.ControlMessage
+	29, // [29:30] is the sub-list for method output_type
+	28, // [28:29] is the sub-list for method input_type
+	28, // [28:28] is the sub-list for extension type_name
+	28, // [28:28] is the sub-list for extension extendee
+	0,  // [0:28] is the sub-list for field type_name
 }
 
 func init() { file_pivox_agent_v1_agent_proto_init() }
@@ -2360,7 +2437,7 @@ func file_pivox_agent_v1_agent_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pivox_agent_v1_agent_proto_rawDesc), len(file_pivox_agent_v1_agent_proto_rawDesc)),
-			NumEnums:      2,
+			NumEnums:      3,
 			NumMessages:   23,
 			NumExtensions: 0,
 			NumServices:   1,

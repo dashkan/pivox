@@ -1047,7 +1047,11 @@ type GetInstallScriptRequest struct {
 	// Optional. Comma-separated list of hosts that should bypass the proxy.
 	NoProxy string `protobuf:"bytes,8,opt,name=no_proxy,json=noProxy,proto3" json:"no_proxy,omitempty"`
 	// Optional. Whether to enable telemetry collection.
-	Telemetry     bool `protobuf:"varint,9,opt,name=telemetry,proto3" json:"telemetry,omitempty"`
+	Telemetry bool `protobuf:"varint,9,opt,name=telemetry,proto3" json:"telemetry,omitempty"`
+	// Optional. The role the agent should perform. Defaults to BOTH
+	// (HTTP serving + rendition processing). Use SERVE for dedicated
+	// request serving or WORKER for dedicated rendering.
+	Role          string `protobuf:"bytes,10,opt,name=role,proto3" json:"role,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1143,6 +1147,13 @@ func (x *GetInstallScriptRequest) GetTelemetry() bool {
 		return x.Telemetry
 	}
 	return false
+}
+
+func (x *GetInstallScriptRequest) GetRole() string {
+	if x != nil {
+		return x.Role
+	}
+	return ""
 }
 
 // The response returned from the
@@ -1614,7 +1625,7 @@ const file_pivox_storage_v1_storage_gateway_proto_rawDesc = "" +
 	"\x1cDeleteStorageGatewayMetadata\"`\n" +
 	"\x1eRotateRegistrationTokenRequest\x12>\n" +
 	"\x04name\x18\x01 \x01(\tB*\xe0A\x02\xfaA\x1e\n" +
-	"\x1cpivox.storage/StorageGateway\xbaH\x03\xc8\x01\x01R\x04name\"\x8b\x03\n" +
+	"\x1cpivox.storage/StorageGateway\xbaH\x03\xc8\x01\x01R\x04name\"\xa4\x03\n" +
 	"\x17GetInstallScriptRequest\x12>\n" +
 	"\x04name\x18\x01 \x01(\tB*\xe0A\x02\xfaA\x1e\n" +
 	"\x1cpivox.storage/StorageGateway\xbaH\x03\xc8\x01\x01R\x04name\x12 \n" +
@@ -1629,7 +1640,9 @@ const file_pivox_storage_v1_storage_gateway_proto_rawDesc = "" +
 	"\vhttps_proxy\x18\a \x01(\tB\x03\xe0A\x01R\n" +
 	"httpsProxy\x12\x1e\n" +
 	"\bno_proxy\x18\b \x01(\tB\x03\xe0A\x01R\anoProxy\x12!\n" +
-	"\ttelemetry\x18\t \x01(\bB\x03\xe0A\x01R\ttelemetry\"2\n" +
+	"\ttelemetry\x18\t \x01(\bB\x03\xe0A\x01R\ttelemetry\x12\x17\n" +
+	"\x04role\x18\n" +
+	" \x01(\tB\x03\xe0A\x01R\x04role\"2\n" +
 	"\x18GetInstallScriptResponse\x12\x16\n" +
 	"\x06script\x18\x01 \x01(\tR\x06script\"[\n" +
 	"\x19GetUninstallScriptRequest\x12>\n" +

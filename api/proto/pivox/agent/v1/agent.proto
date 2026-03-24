@@ -98,6 +98,26 @@ message Handshake {
 
   // CPU architecture (e.g. "amd64", "arm64").
   string arch = 6;
+
+  // The role this agent should perform. Defaults to BOTH.
+  AgentRole role = 7;
+}
+
+// The role an agent performs in the gateway pool.
+enum AgentRole {
+  // Unspecified role. Treated as BOTH.
+  AGENT_ROLE_UNSPECIFIED = 0;
+
+  // Handles both HTTP serving and rendition/processing tasks.
+  BOTH = 1;
+
+  // HTTP serving only. Added to DNS round-robin. Does not process
+  // rendition tasks.
+  SERVE = 2;
+
+  // Rendition and processing tasks only. Not in DNS. Does not serve
+  // HTTP requests.
+  WORKER = 3;
 }
 
 // Heartbeat is sent periodically by the agent to signal liveness and report

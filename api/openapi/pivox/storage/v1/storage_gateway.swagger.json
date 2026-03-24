@@ -443,6 +443,13 @@
             "in": "query",
             "required": false,
             "type": "boolean"
+          },
+          {
+            "name": "role",
+            "description": "Optional. The role the agent should perform. Defaults to BOTH\n(HTTP serving + rendition processing). Use SERVE for dedicated\nrequest serving or WORKER for dedicated rendering.",
+            "in": "query",
+            "required": false,
+            "type": "string"
           }
         ],
         "tags": [
