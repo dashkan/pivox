@@ -1,0 +1,14 @@
+# GPU passthrough for Ollama on Linux/WSL2 with NVIDIA.
+# Requires nvidia-container-toolkit:
+#   https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
+#
+# Usage: docker compose -f docker-compose.yaml -f docker-compose.gpu.yaml --profile ai up -d
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
