@@ -1,6 +1,35 @@
-# Pivox
+# Pivox Broadcast Platform
 
-Monorepo for the Pivox broadcast playout platform. Go control plane, storage gateway agent, React web UI, and Electron desktop app.
+Monorepo for the Pivox Broadcast Platform. Go control plane, storage gateway agent, React web UI, and Electron desktop app.
+
+## Platform Features
+
+| Feature | Status | Description |
+|---|---|---|
+| **Auth** | Built | Firebase Auth, custom storage JWT, Electron OAuth flow |
+| **Organizations** | Services built | Multi-tenant org management. Needs UI + validation |
+| **Projects** | Services built | Project-scoped workspaces. Needs UI + validation |
+| **Tagging** | Services built | Tag keys, values, bindings. Needs UI + validation |
+| **API Keys** | Services built | Integration authentication. Needs UI + validation |
+| **Storage** | Services built | Gateways, agents, endpoints, S3/filesystem. Needs UI + validation |
+| **Dashboards** | Services built | Widget-based dashboards. Needs UI + validation |
+| **Asset Management** | Next | Asset lifecycle, folders, thumbnails, versioning |
+| **Order Management** | Next | Asset request workflow (producer → artist → approval) |
+| **Webhooks** | Planned | Event notifications for external integrations |
+| **Workflow Engine** | Planned | Custom actions on asset ingress, approval workflows |
+| **Notifications** | Planned | In-app + email notifications for workflow events |
+| **Semantic Search** | Planned | Cross-resource search (assets, orders, templates) |
+| **Scheduler / Jobs** | Planned | Scheduled playout actions, timed operations |
+| **Watch / SSE** | Planned | Real-time streaming updates to UI via Server-Sent Events |
+| **Audit Log** | Planned | Platform-wide activity trail for compliance |
+| **AI Chatbot** | Planned | AI-powered assistant for operations |
+| **Slack + Teams** | Planned | Chat integrations for notifications and commands |
+| **IAM** | Services built | Roles, groups, permissions. Needs UI |
+| **Form Builder** | Planned | Custom metadata capture in asset requests |
+| **Image Editor** | Planned | Embedded editor for creating asset versions on the fly |
+| **NRCS** | Planned | Story-centric newsroom system (iNEWS replacement) |
+| **Playout Engine** | Planned | Real-time broadcast rendering (CEF, Rive, FFmpeg) |
+| **WYSIWYG Animation UI** | Planned | HTML motion graphics editor for CEF engine |
 
 ## Repository Structure
 
