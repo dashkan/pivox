@@ -34,7 +34,7 @@ the cloud.`,
 	f.String("token", envOrDefault("PIVOX_TOKEN", ""), "Registration token from the storage gateway")
 	f.String("cache-dir", envOrDefault("PIVOX_CACHE_DIR", "/var/lib/pivox/cache"), "Cache directory path")
 	f.Int("cache-size", 0, "Cache size in GB (0 = auto-detect, 80% of available disk)")
-	f.Int("port", 443, "HTTPS listen port")
+	f.Int("port", defaultPort, "HTTPS listen port")
 	f.String("bind", envOrDefault("PIVOX_BIND", "0.0.0.0"), "Bind address")
 	addControlPlaneFlag(f)
 	f.Bool("telemetry", true, "Enable telemetry reporting to Pivox Cloud")
