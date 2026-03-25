@@ -34,9 +34,10 @@ export function computeMinScale(
  * rotation and scale. Prevents the user from panning the image so
  * far that dead pixels appear.
  *
- * TODO: This uses the bounding-box projection which overestimates
- * available space at non-right angles. See gemini-clamping-fix.md
- * for the corrected corner-constraint formula.
+ * Uses the "inverse projection" method: projects crop rect corners
+ * into the image's unrotated coordinate space and ensures they stay
+ * within the image bounds. This prevents the "corner poke" issue
+ * where crop corners exit the rotated image edge.
  *
  * @returns { maxTx, maxTy } — translation is clamped to [-max, +max]
  */
@@ -51,13 +52,25 @@ export function computeTranslationBounds(
   const absCos = Math.abs(Math.cos(angleRad));
   const absSin = Math.abs(Math.sin(angleRad));
 
-  // The projected size of the scaled+rotated image on each axis
-  const imgVisibleW = imgW * scale * absCos + imgH * scale * absSin;
-  const imgVisibleH = imgW * scale * absSin + imgH * scale * absCos;
+  // Half-dimensions of the scaled image (the boundary)
+  const hIW = (imgW * scale) / 2;
+  const hIH = (imgH * scale) / 2;
 
-  // How much "slack" is available beyond the crop rect
-  const maxTx = Math.max(0, (imgVisibleW - cropW) / 2);
-  const maxTy = Math.max(0, (imgVisibleH - cropH) / 2);
+  // Half-dimensions of the crop rectangle (the window)
+  const hCW = cropW / 2;
+  const hCH = cropH / 2;
+
+  // Solve for maxTx (assuming ty = 0, worst-case corner)
+  // Constraint: |tx*cos| + |hCW*cos + hCH*sin| <= hIW
+  //             |tx*sin| + |hCW*sin + hCH*cos| <= hIH
+  const txLimit1 = absCos > 1e-10 ? (hIW - (hCW * absCos + hCH * absSin)) / absCos : Infinity;
+  const txLimit2 = absSin > 1e-10 ? (hIH - (hCW * absSin + hCH * absCos)) / absSin : Infinity;
+  const maxTx = Math.max(0, Math.min(txLimit1, txLimit2));
+
+  // Solve for maxTy (assuming tx = 0, worst-case corner)
+  const tyLimit1 = absSin > 1e-10 ? (hIW - (hCW * absCos + hCH * absSin)) / absSin : Infinity;
+  const tyLimit2 = absCos > 1e-10 ? (hIH - (hCW * absSin + hCH * absCos)) / absCos : Infinity;
+  const maxTy = Math.max(0, Math.min(tyLimit1, tyLimit2));
 
   return { maxTx, maxTy };
 }
