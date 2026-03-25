@@ -4,7 +4,6 @@ import {
   clampTranslation,
   computeMinScale,
   computeTranslationBounds,
-  isCropSizeValid,
   resizeCropFromHandle,
   stateToImageCropRect,
 } from './crop-math';
@@ -652,21 +651,39 @@ export class ImageEditorEngine {
         const clamped = clampTranslation(newTx, newTy, maxTx, maxTy);
         this._state = { ...this._state, tx: clamped.tx, ty: clamped.ty };
       } else {
-        // Resize crop
-        const { cropW, cropH } = resizeCropFromHandle(
+        // Resize crop — clamp to maximum valid size instead of rejecting
+        let { cropW, cropH } = resizeCropFromHandle(
           this.dragOrigin.handle, dx, dy,
           orig.cropWidth, orig.cropHeight,
           orig.activeTemplate?.ratio ?? null,
         );
-        // Validate: crop can't exceed what the image can fill
-        if (isCropSizeValid(cropW, cropH, this._state.naturalWidth, this._state.naturalHeight, this._state.scale, angle)) {
-          // Recompute scale + clamp
-          const minScale = computeMinScale(cropW, cropH, this._state.naturalWidth, this._state.naturalHeight, angle);
-          const scale = Math.max(this._state.scale, minScale);
-          const { maxTx, maxTy } = computeTranslationBounds(cropW, cropH, this._state.naturalWidth, this._state.naturalHeight, scale, angle);
-          const clamped = clampTranslation(this._state.tx, this._state.ty, maxTx, maxTy);
-          this._state = { ...this._state, cropWidth: cropW, cropHeight: cropH, scale, tx: clamped.tx, ty: clamped.ty };
+
+        // Clamp crop size to what the image can fill at current scale+rotation
+        const absCos = Math.abs(Math.cos(angle));
+        const absSin = Math.abs(Math.sin(angle));
+        const iw = this._state.naturalWidth;
+        const ih = this._state.naturalHeight;
+        const maxW = iw * this._state.scale * absCos + ih * this._state.scale * absSin;
+        const maxH = iw * this._state.scale * absSin + ih * this._state.scale * absCos;
+        cropW = Math.min(cropW, maxW);
+        cropH = Math.min(cropH, maxH);
+
+        // If aspect ratio is locked, re-enforce it after clamping
+        const ratio = orig.activeTemplate?.ratio ?? null;
+        if (ratio !== null) {
+          if (cropW / cropH > ratio) {
+            cropW = cropH * ratio;
+          } else {
+            cropH = cropW / ratio;
+          }
         }
+
+        // Recompute scale + clamp translation
+        const minScale = computeMinScale(cropW, cropH, iw, ih, angle);
+        const scale = Math.max(this._state.scale, minScale);
+        const { maxTx, maxTy } = computeTranslationBounds(cropW, cropH, iw, ih, scale, angle);
+        const clamped = clampTranslation(this._state.tx, this._state.ty, maxTx, maxTy);
+        this._state = { ...this._state, cropWidth: cropW, cropHeight: cropH, scale, tx: clamped.tx, ty: clamped.ty };
       }
 
       this.markDirty();

@@ -88,103 +88,52 @@ export class CropOverlayRenderer {
 
   /**
    * Corner handles: white-filled L-shaped brackets with blue border.
-   * Drawn as a single continuous path — no overlapping seams.
+   * Drawn as a single 6-point polygon path — no overlapping seams.
+   * Straddles the crop border (centered on corner point).
    */
   private drawCornerHandles(
     ctx: CanvasRenderingContext2D,
     rx: number, ry: number, rw: number, rh: number,
     scale: number, _fillColor: string, strokeColor: string,
   ): void {
-    const len = Math.min(26 / scale, rw / 4, rh / 4);
-    const t = 5 / scale; // thickness — just a bit thicker than edge handles
-    const r = 2.5 / scale; // corner radius for rounded outer tips
-    const half = t / 2; // offset so handle straddles the crop border
+    const len = Math.min(18 / scale, rw / 5, rh / 5);
+    const t = 5 / scale;
+    const half = t / 2;
 
-    // Each corner: position offset by half-thickness outward so the
-    // handle sits half inside and half outside the crop rect border
+    // Each corner: the L straddles the corner point by half-thickness
     const corners = [
-      { cx: rx - half, cy: ry - half, dx: 1, dy: 1 },
-      { cx: rx + rw + half, cy: ry - half, dx: -1, dy: 1 },
-      { cx: rx - half, cy: ry + rh + half, dx: 1, dy: -1 },
-      { cx: rx + rw + half, cy: ry + rh + half, dx: -1, dy: -1 },
+      { x: rx, y: ry, dx: 1, dy: 1 },
+      { x: rx + rw, y: ry, dx: -1, dy: 1 },
+      { x: rx, y: ry + rh, dx: 1, dy: -1 },
+      { x: rx + rw, y: ry + rh, dx: -1, dy: -1 },
     ];
 
-    for (const { cx, cy, dx, dy } of corners) {
-      // Build an L-shaped path as a single polygon.
-      // The L has a horizontal arm and a vertical arm meeting at the corner.
-      // Outer edges of the arms are rounded, inner corner is square.
+    for (const { x, y, dx, dy } of corners) {
+      // 6-point L polygon. The L has outer edge at -half from corner,
+      // inner edge at +half, arms extending len from corner.
       //
-      // For top-left (dx=1, dy=1):
-      //   Horizontal arm goes right, vertical arm goes down.
-      //   The L occupies: [cx, cy] to [cx+len, cy+t] horizontally
-      //                   [cx, cy] to [cx+t, cy+len] vertically
-
-      const hEnd = cx + dx * len; // end of horizontal arm
-      const vEnd = cy + dy * len; // end of vertical arm
+      // For dx=1,dy=1 (top-left), the points are:
+      //   P0: outer-left of vertical arm bottom
+      //   P1: outer-top-left corner
+      //   P2: outer-right end of horizontal arm top
+      //   P3: outer-right end of horizontal arm bottom
+      //   P4: inner corner where arms meet
+      //   P5: outer-bottom of vertical arm
+      const outerX = x - dx * half;
+      const outerY = y - dy * half;
+      const innerX = x + dx * half;
+      const innerY = y + dy * half;
+      const hTip = x + dx * len;
+      const vTip = y + dy * len;
 
       ctx.beginPath();
-
-      if (dx === 1 && dy === 1) {
-        // Top-left: horizontal right, vertical down
-        ctx.moveTo(cx, cy + t);           // inner bottom of vertical arm start
-        ctx.lineTo(cx, cy + r);           // up to rounded corner
-        ctx.quadraticCurveTo(cx, cy, cx + r, cy); // round top-left
-        ctx.lineTo(hEnd - r, cy);         // across top of horizontal arm
-        ctx.quadraticCurveTo(hEnd, cy, hEnd, cy + r); // round right end
-        ctx.lineTo(hEnd, cy + t - r);
-        ctx.quadraticCurveTo(hEnd, cy + t, hEnd - r, cy + t); // round right-bottom
-        ctx.lineTo(cx + t, cy + t);       // inner corner (square)
-        ctx.lineTo(cx + t, vEnd - r);
-        ctx.quadraticCurveTo(cx + t, vEnd, cx + t - r, vEnd); // round bottom end
-        ctx.lineTo(cx + r, vEnd);
-        ctx.quadraticCurveTo(cx, vEnd, cx, vEnd - r); // round bottom-left
-        ctx.closePath();
-      } else if (dx === -1 && dy === 1) {
-        // Top-right: horizontal left, vertical down
-        ctx.moveTo(cx, cy + t);
-        ctx.lineTo(cx, cy + r);
-        ctx.quadraticCurveTo(cx, cy, cx - r, cy);
-        ctx.lineTo(hEnd + r, cy);
-        ctx.quadraticCurveTo(hEnd, cy, hEnd, cy + r);
-        ctx.lineTo(hEnd, cy + t - r);
-        ctx.quadraticCurveTo(hEnd, cy + t, hEnd + r, cy + t);
-        ctx.lineTo(cx - t, cy + t);
-        ctx.lineTo(cx - t, vEnd - r);
-        ctx.quadraticCurveTo(cx - t, vEnd, cx - t + r, vEnd);
-        ctx.lineTo(cx - r, vEnd);
-        ctx.quadraticCurveTo(cx, vEnd, cx, vEnd - r);
-        ctx.closePath();
-      } else if (dx === 1 && dy === -1) {
-        // Bottom-left: horizontal right, vertical up
-        ctx.moveTo(cx, cy - t);
-        ctx.lineTo(cx, cy - r);
-        ctx.quadraticCurveTo(cx, cy, cx + r, cy);
-        ctx.lineTo(hEnd - r, cy);
-        ctx.quadraticCurveTo(hEnd, cy, hEnd, cy - r);
-        ctx.lineTo(hEnd, cy - t + r);
-        ctx.quadraticCurveTo(hEnd, cy - t, hEnd - r, cy - t);
-        ctx.lineTo(cx + t, cy - t);
-        ctx.lineTo(cx + t, vEnd + r);
-        ctx.quadraticCurveTo(cx + t, vEnd, cx + t - r, vEnd);
-        ctx.lineTo(cx + r, vEnd);
-        ctx.quadraticCurveTo(cx, vEnd, cx, vEnd + r);
-        ctx.closePath();
-      } else {
-        // Bottom-right (dx=-1, dy=-1): horizontal left, vertical up
-        ctx.moveTo(cx, cy - t);
-        ctx.lineTo(cx, cy - r);
-        ctx.quadraticCurveTo(cx, cy, cx - r, cy);
-        ctx.lineTo(hEnd + r, cy);
-        ctx.quadraticCurveTo(hEnd, cy, hEnd, cy - r);
-        ctx.lineTo(hEnd, cy - t + r);
-        ctx.quadraticCurveTo(hEnd, cy - t, hEnd + r, cy - t);
-        ctx.lineTo(cx - t, cy - t);
-        ctx.lineTo(cx - t, vEnd + r);
-        ctx.quadraticCurveTo(cx - t, vEnd, cx - t + r, vEnd);
-        ctx.lineTo(cx - r, vEnd);
-        ctx.quadraticCurveTo(cx, vEnd, cx, vEnd + r);
-        ctx.closePath();
-      }
+      ctx.moveTo(outerX, vTip);        // P0: vertical arm outer end
+      ctx.lineTo(outerX, outerY);      // P1: outer corner
+      ctx.lineTo(hTip, outerY);        // P2: horizontal arm outer end
+      ctx.lineTo(hTip, innerY);        // P3: horizontal arm inner end
+      ctx.lineTo(innerX, innerY);      // P4: inner corner
+      ctx.lineTo(innerX, vTip);        // P5: vertical arm inner end
+      ctx.closePath();
 
       ctx.fillStyle = 'white';
       ctx.fill();
