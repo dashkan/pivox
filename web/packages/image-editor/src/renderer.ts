@@ -98,13 +98,15 @@ export class CropOverlayRenderer {
     const len = Math.min(26 / scale, rw / 4, rh / 4);
     const t = 5 / scale; // thickness — just a bit thicker than edge handles
     const r = 2.5 / scale; // corner radius for rounded outer tips
+    const half = t / 2; // offset so handle straddles the crop border
 
-    // Each corner: [cx, cy, horizontal direction, vertical direction]
+    // Each corner: position offset by half-thickness outward so the
+    // handle sits half inside and half outside the crop rect border
     const corners = [
-      { cx: rx, cy: ry, dx: 1, dy: 1 },
-      { cx: rx + rw, cy: ry, dx: -1, dy: 1 },
-      { cx: rx, cy: ry + rh, dx: 1, dy: -1 },
-      { cx: rx + rw, cy: ry + rh, dx: -1, dy: -1 },
+      { cx: rx - half, cy: ry - half, dx: 1, dy: 1 },
+      { cx: rx + rw + half, cy: ry - half, dx: -1, dy: 1 },
+      { cx: rx - half, cy: ry + rh + half, dx: 1, dy: -1 },
+      { cx: rx + rw + half, cy: ry + rh + half, dx: -1, dy: -1 },
     ];
 
     for (const { cx, cy, dx, dy } of corners) {
