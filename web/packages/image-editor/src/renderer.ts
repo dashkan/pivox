@@ -108,17 +108,9 @@ export class CropOverlayRenderer {
       { x: rx + rw, y: ry + rh, dx: -1, dy: -1 },
     ];
 
+    const r = Math.min(half, 2.5 / scale); // rounding radius for outer edges
+
     for (const { x, y, dx, dy } of corners) {
-      // 6-point L polygon. The L has outer edge at -half from corner,
-      // inner edge at +half, arms extending len from corner.
-      //
-      // For dx=1,dy=1 (top-left), the points are:
-      //   P0: outer-left of vertical arm bottom
-      //   P1: outer-top-left corner
-      //   P2: outer-right end of horizontal arm top
-      //   P3: outer-right end of horizontal arm bottom
-      //   P4: inner corner where arms meet
-      //   P5: outer-bottom of vertical arm
       const outerX = x - dx * half;
       const outerY = y - dy * half;
       const innerX = x + dx * half;
@@ -126,13 +118,29 @@ export class CropOverlayRenderer {
       const hTip = x + dx * len;
       const vTip = y + dy * len;
 
+      // L-shape with rounded outer edges (3 outer corners + 2 arm tips).
+      // Inner corner (P4) stays square.
+      // Using arcTo for smooth rounding at each turn.
       ctx.beginPath();
-      ctx.moveTo(outerX, vTip);        // P0: vertical arm outer end
-      ctx.lineTo(outerX, outerY);      // P1: outer corner
-      ctx.lineTo(hTip, outerY);        // P2: horizontal arm outer end
-      ctx.lineTo(hTip, innerY);        // P3: horizontal arm inner end
-      ctx.lineTo(innerX, innerY);      // P4: inner corner
-      ctx.lineTo(innerX, vTip);        // P5: vertical arm inner end
+
+      // Start at vertical arm tip (outer side), round the tip
+      ctx.moveTo(innerX, vTip);
+      ctx.arcTo(outerX, vTip, outerX, outerY, r);     // round vertical arm tip
+
+      // Up/down to the main outer corner, round it
+      ctx.arcTo(outerX, outerY, hTip, outerY, r);     // round outer L corner
+
+      // Across to horizontal arm tip, round it
+      ctx.arcTo(hTip, outerY, hTip, innerY, r);       // round horizontal arm tip
+
+      // Back to inner edge of horizontal arm
+      ctx.lineTo(hTip, innerY);
+
+      // Inner corner — square (no rounding)
+      ctx.lineTo(innerX, innerY);
+
+      // Back down to vertical arm tip (inner side)
+      ctx.lineTo(innerX, vTip);
       ctx.closePath();
 
       ctx.fillStyle = 'white';
