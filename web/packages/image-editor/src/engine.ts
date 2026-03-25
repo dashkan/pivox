@@ -651,24 +651,21 @@ export class ImageEditorEngine {
         const clamped = clampTranslation(newTx, newTy, maxTx, maxTy);
         this._state = { ...this._state, tx: clamped.tx, ty: clamped.ty };
       } else {
-        // Resize crop — clamp to maximum valid size instead of rejecting
+        // Resize crop — allow growing, auto-zoom to accommodate
         let { cropW, cropH } = resizeCropFromHandle(
           this.dragOrigin.handle, dx, dy,
           orig.cropWidth, orig.cropHeight,
           orig.activeTemplate?.ratio ?? null,
         );
 
-        // Clamp crop size to what the image can fill at current scale+rotation
-        const absCos = Math.abs(Math.cos(angle));
-        const absSin = Math.abs(Math.sin(angle));
         const iw = this._state.naturalWidth;
         const ih = this._state.naturalHeight;
-        const maxW = iw * this._state.scale * absCos + ih * this._state.scale * absSin;
-        const maxH = iw * this._state.scale * absSin + ih * this._state.scale * absCos;
-        cropW = Math.min(cropW, maxW);
-        cropH = Math.min(cropH, maxH);
 
-        // If aspect ratio is locked, re-enforce it after clamping
+        // Clamp crop to original image dimensions (can't exceed the image)
+        cropW = Math.min(cropW, iw);
+        cropH = Math.min(cropH, ih);
+
+        // If aspect ratio is locked, re-enforce after clamping
         const ratio = orig.activeTemplate?.ratio ?? null;
         if (ratio !== null) {
           if (cropW / cropH > ratio) {
@@ -678,9 +675,13 @@ export class ImageEditorEngine {
           }
         }
 
-        // Recompute scale + clamp translation
-        const minScale = computeMinScale(cropW, cropH, iw, ih, angle);
-        const scale = Math.max(this._state.scale, minScale);
+        // Recalculate minScale for new crop size.
+        // If crop grew: scale adjusts to minScale (zoom out to fit).
+        // If crop shrunk: keep current scale (more room to pan).
+        const newMinScale = computeMinScale(cropW, cropH, iw, ih, angle);
+        const scale = Math.max(newMinScale, this._state.scale > orig.scale ? this._state.scale : newMinScale);
+
+        // Always re-clamp translation after resize
         const { maxTx, maxTy } = computeTranslationBounds(cropW, cropH, iw, ih, scale, angle);
         const clamped = clampTranslation(this._state.tx, this._state.ty, maxTx, maxTy);
         this._state = { ...this._state, cropWidth: cropW, cropHeight: cropH, scale, tx: clamped.tx, ty: clamped.ty };
