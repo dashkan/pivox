@@ -1,4 +1,4 @@
-import type { CropTemplate } from './image-editor.types';
+import type { CropTemplate } from './types';
 
 /** The built-in Free template (always available). */
 export const FREE_TEMPLATE: CropTemplate = { label: 'Free', ratio: null };

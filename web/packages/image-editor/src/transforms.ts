@@ -3,7 +3,7 @@ import type {
   DragHandle,
   ImageEditorEditState,
   ImageEditorState,
-} from './image-editor.types';
+} from './types';
 
 /* ------------------------------------------------------------------ */
 /*  Initial edit state                                                */

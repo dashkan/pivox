@@ -1,0 +1,31 @@
+{
+  "name": "@pivox/image-editor",
+  "version": "1.0.0",
+  "description": "Framework-agnostic image editor engine (crop, rotate, flip, straighten)",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/esm/index.d.ts",
+      "import": "./dist/esm/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "clean": "premove ./build ./dist",
+    "test:build": "publint --strict",
+    "test:eslint": "eslint ./src",
+    "test:lib": "vitest --passWithNoTests",
+    "test:lib:dev": "pnpm test:lib --watch",
+    "test:types": "tsc"
+  },
+  "devDependencies": {
+    "@tanstack/vite-config": "^0.5.2",
+    "vite": "^7.3.1"
+  }
+}

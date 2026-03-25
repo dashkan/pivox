@@ -25,10 +25,9 @@ import {
   Undo2,
   X,
 } from 'lucide-react';
-import { useCallback, useRef } from 'react';
 import { ImageEditorContext, useImageEditorContext } from './image-editor.context';
-import { canvasToImage, handleToCursor, hitTestHandles } from './image-editor.transforms';
-import type { ImageEditorContextValue, ResizeMode } from './image-editor.types';
+import type { ResizeMode } from '@pivox/image-editor';
+import type { ImageEditorContextValue } from './image-editor.types';
 
 /* ------------------------------------------------------------------ */
 /*  ShortcutHint — renders keyboard shortcut text in tooltips          */
@@ -79,138 +78,11 @@ function ImageEditorRoot({
 /* ------------------------------------------------------------------ */
 
 function ImageEditorCanvas({ className }: { className?: string }) {
-  const { state, actions, meta } = useImageEditorContext();
-  const hoverHandleRef = useRef<string | null>(null);
-
-  const isZoomedPastFit =
-    state.zoomMode === 'manual' && state.zoom > 100;
-
-  const handlePointerDown = useCallback(
-    (event: React.PointerEvent<HTMLCanvasElement>) => {
-      if (state.imageStatus !== 'loaded' || state.mode !== 'crop') return;
-      const canvas = meta.canvasRef.current;
-      if (!canvas) return;
-
-      // Middle mouse button or Space+click → pan when zoomed
-      if (event.button === 1 || (event.button === 0 && event.altKey)) {
-        if (isZoomedPastFit) {
-          event.preventDefault();
-          canvas.setPointerCapture(event.pointerId);
-          actions.onPanStart(event.clientX, event.clientY);
-          return;
-        }
-      }
-
-      const canvasRect = canvas.getBoundingClientRect();
-      const imagePoint = canvasToImage(
-        event.clientX,
-        event.clientY,
-        canvasRect,
-        meta.scale,
-        meta.canvasOffset,
-      );
-
-      const hitRadius = 12 / meta.scale;
-      const handle = hitTestHandles(
-        imagePoint.x,
-        imagePoint.y,
-        state.cropRect,
-        hitRadius,
-      );
-
-      if (handle) {
-        event.preventDefault();
-        canvas.setPointerCapture(event.pointerId);
-        actions.onDragStart(handle, event.clientX, event.clientY);
-      }
-    },
-    [state.imageStatus, state.mode, state.cropRect, meta, actions, isZoomedPastFit],
-  );
-
-  const handlePointerMove = useCallback(
-    (event: React.PointerEvent<HTMLCanvasElement>) => {
-      // Pan mode
-      if (state.isPanning) {
-        event.preventDefault();
-        actions.onPanMove(event.clientX, event.clientY);
-        return;
-      }
-
-      // Drag mode
-      if (state.isDragging) {
-        event.preventDefault();
-        actions.onDragMove(event.clientX, event.clientY);
-        return;
-      }
-
-      // Hover cursor
-      if (state.imageStatus !== 'loaded') return;
-      const canvas = meta.canvasRef.current;
-      if (!canvas) return;
-      const canvasRect = canvas.getBoundingClientRect();
-      const imagePoint = canvasToImage(
-        event.clientX,
-        event.clientY,
-        canvasRect,
-        meta.scale,
-        meta.canvasOffset,
-      );
-      const hitRadius = 12 / meta.scale;
-      const handle = hitTestHandles(
-        imagePoint.x,
-        imagePoint.y,
-        state.cropRect,
-        hitRadius,
-      );
-      const cursor = isZoomedPastFit && event.altKey
-        ? 'grab'
-        : handleToCursor(handle);
-      if (hoverHandleRef.current !== cursor) {
-        hoverHandleRef.current = cursor;
-        canvas.style.cursor = cursor;
-      }
-    },
-    [state.isPanning, state.isDragging, state.imageStatus, state.cropRect, meta, actions, isZoomedPastFit],
-  );
-
-  const handlePointerUp = useCallback(
-    (event: React.PointerEvent<HTMLCanvasElement>) => {
-      const canvas = meta.canvasRef.current;
-      if (canvas) canvas.releasePointerCapture(event.pointerId);
-
-      if (state.isPanning) {
-        event.preventDefault();
-        actions.onPanEnd();
-        return;
-      }
-      if (state.isDragging) {
-        event.preventDefault();
-        actions.onDragEnd();
-      }
-    },
-    [state.isPanning, state.isDragging, meta, actions],
-  );
-
-  // Mouse wheel zoom — disabled by default, consumers enable via
-  // onWheel on the canvas or via keyboard shortcuts.
-  const _handleWheel = useCallback(
-    (event: React.WheelEvent<HTMLCanvasElement>) => {
-      if (state.imageStatus !== 'loaded') return;
-      event.preventDefault();
-      if (event.deltaY < 0) {
-        actions.zoomIn();
-      } else {
-        actions.zoomOut();
-      }
-    },
-    [state.imageStatus, actions],
-  );
-  // Suppress unused — available for consumers who want scroll zoom
-  void _handleWheel;
+  const { state, meta } = useImageEditorContext();
 
   return (
     <div
-      ref={meta.rootRef}
+      ref={meta.containerRef}
       data-slot="image-editor-canvas"
       className={cn(
         'relative flex-1 overflow-hidden bg-image-editor-canvas',
@@ -229,14 +101,7 @@ function ImageEditorCanvas({ className }: { className?: string }) {
           </div>
         </div>
       )}
-      <canvas
-        ref={meta.canvasRef}
-        className="absolute inset-0 h-full w-full"
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-      />
+      {/* Canvas element is created and managed by the engine */}
     </div>
   );
 }

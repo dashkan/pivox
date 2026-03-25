@@ -1,5 +1,5 @@
-import { MIN_CROP_SIZE } from './image-editor.constants';
-import type { CropRect, CropTemplate, DragHandle } from './image-editor.types';
+import { MIN_CROP_SIZE } from './constants';
+import type { CropRect, CropTemplate, DragHandle } from './types';
 
 /** Clamp a crop rect within image bounds, enforcing minimum size. */
 export function clampCropRect(

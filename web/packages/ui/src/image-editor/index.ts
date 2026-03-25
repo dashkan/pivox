@@ -3,22 +3,29 @@ export { ImageEditorContext, useImageEditorContext } from './image-editor.contex
 export { useImageEditorState } from './image-editor.hooks';
 export type {
   ImageEditorContextValue,
-  ImageEditorState,
   ImageEditorActions,
   ImageEditorMeta,
-  ImageEditorEditState,
-  CropRect,
-  CropTemplate,
-  ResizeMode,
-  DragHandle,
-  ZoomMode,
-  EditorMode,
   KeyboardShortcutMap,
 } from './image-editor.types';
+
+// Re-export from vanilla engine for convenience
 export {
+  ImageEditorEngine,
   DEFAULT_CROP_TEMPLATES,
   FREE_TEMPLATE,
   ZOOM_MIN,
   ZOOM_MAX,
   ZOOM_STEP,
-} from './image-editor.constants';
+} from '@pivox/image-editor';
+export type {
+  CropColors,
+  CropRect,
+  CropTemplate,
+  DragHandle,
+  EditorMode,
+  ImageEditorEditState,
+  ImageEditorEngineOptions,
+  ImageEditorState,
+  ResizeMode,
+  ZoomMode,
+} from '@pivox/image-editor';
