@@ -49,7 +49,7 @@ const CURSOR_MAP: Record<DragHandle, string> = {
   ne: 'nesw-resize', sw: 'nesw-resize',
   n: 'ns-resize', s: 'ns-resize',
   e: 'ew-resize', w: 'ew-resize',
-  move: 'move',
+  move: 'all-scroll',
 };
 
 /* ------------------------------------------------------------------ */
@@ -336,22 +336,13 @@ export class ImageEditorEngine {
 
   rotateClockwise(): void {
     const rotation = ((this._state.rotation + 90) % 360) as 0 | 90 | 180 | 270;
-    const { naturalWidth, naturalHeight, cropRect } = this._state;
-    const newCrop = clampCropRect(
-      { x: cropRect.y, y: naturalWidth - cropRect.x - cropRect.width, width: cropRect.height, height: cropRect.width },
-      naturalHeight, naturalWidth,
-    );
-    this.pushHistoryAndUpdate({ rotation, cropRect: newCrop });
+    // Keep crop rect unchanged — rotation zoom handles filling the rect
+    this.pushHistoryAndUpdate({ rotation });
   }
 
   rotateCounterClockwise(): void {
     const rotation = ((this._state.rotation + 270) % 360) as 0 | 90 | 180 | 270;
-    const { naturalWidth, naturalHeight, cropRect } = this._state;
-    const newCrop = clampCropRect(
-      { x: naturalHeight - cropRect.y - cropRect.height, y: cropRect.x, width: cropRect.height, height: cropRect.width },
-      naturalHeight, naturalWidth,
-    );
-    this.pushHistoryAndUpdate({ rotation, cropRect: newCrop });
+    this.pushHistoryAndUpdate({ rotation });
   }
 
   setStraighten(degrees: number): void {
@@ -559,11 +550,20 @@ export class ImageEditorEngine {
       const rect = this.canvas?.getBoundingClientRect();
       if (!rect) return;
       const imagePoint = canvasToImage(e.clientX, e.clientY, rect, this.scale, this.offset);
+      let deltaX = imagePoint.x - this.dragOrigin.pointerX;
+      let deltaY = imagePoint.y - this.dragOrigin.pointerY;
+
+      // For 'move' handle: invert direction so user feels like they're
+      // moving the image behind a fixed crop window (img.ly behavior)
+      if (this.dragOrigin.handle === 'move') {
+        deltaX = -deltaX;
+        deltaY = -deltaY;
+      }
+
       const newRect = resizeCropRect(
         this.dragOrigin.originalRect,
         this.dragOrigin.handle,
-        imagePoint.x - this.dragOrigin.pointerX,
-        imagePoint.y - this.dragOrigin.pointerY,
+        deltaX, deltaY,
         this.dragOrigin.imageWidth, this.dragOrigin.imageHeight,
         this.dragOrigin.aspectRatio,
       );
@@ -697,7 +697,7 @@ export class ImageEditorEngine {
 
     let rotZoom = 1;
     if (applyRotationZoom) {
-      rotZoom = computeRotationZoom(naturalWidth, naturalHeight, cropRect, straighten);
+      rotZoom = computeRotationZoom(naturalWidth, naturalHeight, cropRect, rotation + straighten);
     }
 
     const cx = naturalWidth / 2;
