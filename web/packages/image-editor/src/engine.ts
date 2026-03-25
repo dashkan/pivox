@@ -759,7 +759,8 @@ export class ImageEditorEngine {
     const effectiveZoom = state.zoomMode === 'fit' ? 100 : state.zoom;
 
     // Compute viewport scale: how many screen pixels per crop pixel
-    const pad = isCropMode ? CANVAS_PADDING : 0;
+    // Same padding in both modes so the image stays in the same position
+    const pad = CANVAS_PADDING;
     const drawW = containerW - pad * 2;
     const drawH = containerH - pad * 2;
     const vpScale = Math.min(drawW / cw, drawH / ch) * (effectiveZoom / 100);
