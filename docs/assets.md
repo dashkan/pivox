@@ -140,7 +140,7 @@ Combines crop area, rotation, straighten, and flip in a single operation (modele
 
 ```
 Crop {
-  CropArea area      — x, y, width (>0), height (>0)
+  CropArea area      — x, y, width (>0), height (>0) in original image pixels
   float straighten   — degrees (-45 to 45)
   bool flip_horizontal
   bool flip_vertical
@@ -149,6 +149,79 @@ Crop {
 ```
 
 Applied order: crop → rotation → straighten → flip.
+
+### Image Editor State Model
+
+The web image editor (`@pivox/image-editor`) uses a **crop-as-viewport** model internally. The crop rect is a fixed window; the image transforms (scale, rotate, translate) behind it. This ensures zero dead pixels at any rotation angle.
+
+**Editor state (what the UI tracks):**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `cropWidth` | number | Crop viewport width in image pixels |
+| `cropHeight` | number | Crop viewport height in image pixels |
+| `rotation` | 0/90/180/270 | Quarter-turn rotation |
+| `straighten` | number | Fine rotation adjustment (-45° to 45°) |
+| `scale` | number | Image scale factor (≥ minScale for current rotation) |
+| `tx` | number | Image X translation relative to crop center |
+| `ty` | number | Image Y translation relative to crop center |
+| `flipHorizontal` | boolean | Horizontal mirror |
+| `flipVertical` | boolean | Vertical mirror |
+
+**Key algorithm** — prevents dead pixels at any rotation angle:
+
+```
+minScale = max(
+  (cropW × |cos θ| + cropH × |sin θ|) / imgW,
+  (cropW × |sin θ| + cropH × |cos θ|) / imgH
+)
+
+boundaryX = (imgW × scale × |cos θ| + imgH × scale × |sin θ| − cropW) / 2
+boundaryY = (imgW × scale × |sin θ| + imgH × scale × |cos θ| − cropH) / 2
+
+tx = clamp(tx, −boundaryX, boundaryX)
+ty = clamp(ty, −boundaryY, boundaryY)
+```
+
+### Converting Editor State → Proto (CropArea)
+
+The proto expects `CropArea { x, y, width, height }` in original image pixel coordinates. The editor's viewport state (cropW/H, tx, ty, scale, angle) converts to image-space coordinates:
+
+```
+// Inverse-rotate the translation to image space
+offsetX = (−tx / scale) × cos(−θ) − (−ty / scale) × sin(−θ)
+offsetY = (−tx / scale) × sin(−θ) + (−ty / scale) × cos(−θ)
+
+// Crop rect center in image space
+centerX = imgW / 2 + offsetX
+centerY = imgH / 2 + offsetY
+
+// Crop rect dimensions in image space (unscaled)
+w = cropW / scale
+h = cropH / scale
+
+CropArea { x: centerX − w/2, y: centerY − h/2, width: w, height: h }
+```
+
+Use `stateToImageCropRect()` from `@pivox/image-editor` for this conversion.
+
+### Rendering with CSS (no Canvas)
+
+The editor state maps directly to CSS transforms for displaying the crop result via an `<img>` tag:
+
+```html
+<div style="width: {cropWidth}px; height: {cropHeight}px; overflow: hidden;">
+  <img
+    src="..."
+    style="transform-origin: center;
+           transform: translate({tx}px, {ty}px)
+                      rotate({rotation + straighten}deg)
+                      scale({flipH * scale}, {flipV * scale});"
+  />
+</div>
+```
+
+The container clips. The image transforms. Same math as the Canvas renderer.
 
 ### Mutability
 
