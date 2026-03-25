@@ -142,23 +142,13 @@ export function computeEffectiveBounds(
   cropHeight: number,
   angleDeg: number,
 ): { width: number; height: number } {
-  // Normalize to [0, 360)
-  const normalized = ((angleDeg % 360) + 360) % 360;
-
-  // For exact 90° multiples, the image dimensions swap
-  const is90 = Math.abs(normalized - 90) < 0.01 || Math.abs(normalized - 270) < 0.01;
-  const is180 = Math.abs(normalized - 180) < 0.01;
-
-  if (is90) {
-    // 90° or 270°: image W/H swap
-    return { width: imageHeight, height: imageWidth };
-  }
-  if (is180 || Math.abs(normalized) < 0.01) {
+  if (Math.abs(angleDeg % 360) < 0.01) {
     return { width: imageWidth, height: imageHeight };
   }
 
-  // For non-right angles, compute the rotation zoom for a centered crop,
-  // then use that zoom to expand the effective bounds
+  // Compute rotation zoom for a centered crop rect.
+  // The zoom tells us how much the image scales up to fill the crop.
+  // Effective bounds = original dimensions * zoom.
   const centerCrop: CropRect = {
     x: (imageWidth - cropWidth) / 2,
     y: (imageHeight - cropHeight) / 2,
