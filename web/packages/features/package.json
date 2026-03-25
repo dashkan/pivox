@@ -46,6 +46,10 @@
     "./app-layout": {
       "types": "./dist/esm/app-layout.d.ts",
       "import": "./dist/esm/app-layout.js"
+    },
+    "./image-editor": {
+      "types": "./dist/esm/image-editor.d.ts",
+      "import": "./dist/esm/image-editor.js"
     }
   },
   "files": [

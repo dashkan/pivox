@@ -51,6 +51,10 @@
       "types": "./dist/esm/theme-switcher.d.ts",
       "import": "./dist/esm/theme-switcher.js"
     },
+    "./image-editor": {
+      "types": "./dist/esm/image-editor.d.ts",
+      "import": "./dist/esm/image-editor.js"
+    },
     "./colors.css": "./src/colors.css"
   },
   "files": [
@@ -84,6 +88,7 @@
   },
   "dependencies": {
     "@pivox/primitives": "workspace:*",
+    "lucide-react": "^1.0.1",
     "qrcode.react": "^4.2.0"
   }
 }

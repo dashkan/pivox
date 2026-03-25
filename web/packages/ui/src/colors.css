@@ -15,6 +15,13 @@
   --warning-foreground: oklch(0.21 0.006 285.885);
   --error: var(--destructive);
   --error-foreground: oklch(0.985 0 0);
+
+  /* Image editor colors */
+  --image-editor-canvas: oklch(0.95 0.002 197.1);
+  --image-editor-crop-border: oklch(0.62 0.19 255);
+  --image-editor-crop-handle: oklch(0.62 0.19 255);
+  --image-editor-crop-grid: oklch(0.55 0 0 / 40%);
+  --image-editor-crop-overlay: oklch(0 0 0 / 50%);
 }
 
 .dark {
@@ -26,6 +33,13 @@
   --warning-foreground: oklch(0.21 0.006 285.885);
   --error: var(--destructive);
   --error-foreground: oklch(0.985 0 0);
+
+  /* Image editor colors */
+  --image-editor-canvas: oklch(0.2 0.005 220);
+  --image-editor-crop-border: oklch(0.7 0.17 255);
+  --image-editor-crop-handle: oklch(0.7 0.17 255);
+  --image-editor-crop-grid: oklch(0.7 0 0 / 35%);
+  --image-editor-crop-overlay: oklch(0 0 0 / 60%);
 }
 
 @theme inline {
@@ -37,4 +51,9 @@
   --color-warning-foreground: var(--warning-foreground);
   --color-error: var(--error);
   --color-error-foreground: var(--error-foreground);
+  --color-image-editor-canvas: var(--image-editor-canvas);
+  --color-image-editor-crop-border: var(--image-editor-crop-border);
+  --color-image-editor-crop-handle: var(--image-editor-crop-handle);
+  --color-image-editor-crop-grid: var(--image-editor-crop-grid);
+  --color-image-editor-crop-overlay: var(--image-editor-crop-overlay);
 }

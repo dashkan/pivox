@@ -125,7 +125,7 @@ Each version is either an **upload** (has a blob) or an **edit** (has a crop + p
 v1: upload (source blob: sunset-beach.mp4)
 v2: crop(0,0,1920,1080) + straighten(5°) → source: v1
 v3: upload (new file replaces source)
-v4: flip_horizontal → source: v3
+v4: rotation(90) + flip_horizontal → source: v3
 v5: revert → source: v1
 ```
 
@@ -136,18 +136,19 @@ v5: revert → source: v1
 
 ### Crop Operation
 
-Combines crop area, straighten, and flip in a single operation (modeled after img.ly's unified crop tool):
+Combines crop area, rotation, straighten, and flip in a single operation (modeled after img.ly's unified crop tool):
 
 ```
 Crop {
-  CropArea area    — x, y, width (>0), height (>0)
-  float straighten — degrees (-45 to 45)
+  CropArea area      — x, y, width (>0), height (>0)
+  float straighten   — degrees (-45 to 45)
   bool flip_horizontal
   bool flip_vertical
+  int32 rotation     — 90-degree increments (0, 90, 180, 270)
 }
 ```
 
-Applied order: crop → straighten → flip.
+Applied order: crop → rotation → straighten → flip.
 
 ### Mutability
 

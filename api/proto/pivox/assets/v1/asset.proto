@@ -392,7 +392,8 @@ message AssetVersion {
   Crop crop = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
-// Crop operation combining crop area, straighten, and flip.
+// Crop operation combining crop area, rotation, straighten, and flip.
+// Applied order: crop → rotation → straighten → flip.
 message Crop {
   // Optional. The crop area to apply. If set, width and height must
   // be positive.
@@ -406,6 +407,10 @@ message Crop {
 
   // Optional. Flip vertically.
   bool flip_vertical = 4 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Rotation in 90-degree increments (0, 90, 180, 270).
+  // Applied after crop, before straighten.
+  int32 rotation = 5 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // The crop area within an image.

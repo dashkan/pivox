@@ -22,6 +22,7 @@ import { Route as AuthExternalLoginRouteImport } from './routes/auth/external-lo
 import { Route as AuthExternalLinkRouteImport } from './routes/auth/external-link'
 import { Route as AuthDoneRouteImport } from './routes/auth/done'
 import { Route as AuthActionRouteImport } from './routes/auth/action'
+import { Route as AppImageEditorRouteImport } from './routes/_app/image-editor'
 import { Route as AppAboutRouteImport } from './routes/_app/about'
 
 const AppRoute = AppRouteImport.update({
@@ -88,6 +89,11 @@ const AuthActionRoute = AuthActionRouteImport.update({
   path: '/auth/action',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppImageEditorRoute = AppImageEditorRouteImport.update({
+  id: '/image-editor',
+  path: '/image-editor',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAboutRoute = AppAboutRouteImport.update({
   id: '/about',
   path: '/about',
@@ -97,6 +103,7 @@ const AppAboutRoute = AppAboutRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/about': typeof AppAboutRoute
+  '/image-editor': typeof AppImageEditorRoute
   '/auth/action': typeof AuthActionRoute
   '/auth/done': typeof AuthDoneRoute
   '/auth/external-link': typeof AuthExternalLinkRoute
@@ -111,6 +118,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/about': typeof AppAboutRoute
+  '/image-editor': typeof AppImageEditorRoute
   '/auth/action': typeof AuthActionRoute
   '/auth/done': typeof AuthDoneRoute
   '/auth/external-link': typeof AuthExternalLinkRoute
@@ -128,6 +136,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
   '/_app/about': typeof AppAboutRoute
+  '/_app/image-editor': typeof AppImageEditorRoute
   '/auth/action': typeof AuthActionRoute
   '/auth/done': typeof AuthDoneRoute
   '/auth/external-link': typeof AuthExternalLinkRoute
@@ -146,6 +155,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/about'
+    | '/image-editor'
     | '/auth/action'
     | '/auth/done'
     | '/auth/external-link'
@@ -160,6 +170,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/about'
+    | '/image-editor'
     | '/auth/action'
     | '/auth/done'
     | '/auth/external-link'
@@ -176,6 +187,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_app'
     | '/_app/about'
+    | '/_app/image-editor'
     | '/auth/action'
     | '/auth/done'
     | '/auth/external-link'
@@ -298,6 +310,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthActionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/image-editor': {
+      id: '/_app/image-editor'
+      path: '/image-editor'
+      fullPath: '/image-editor'
+      preLoaderRoute: typeof AppImageEditorRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/about': {
       id: '/_app/about'
       path: '/about'
@@ -310,11 +329,13 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppAboutRoute: typeof AppAboutRoute
+  AppImageEditorRoute: typeof AppImageEditorRoute
   AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppAboutRoute: AppAboutRoute,
+  AppImageEditorRoute: AppImageEditorRoute,
   AppIndexRoute: AppIndexRoute,
 }
 

@@ -57,6 +57,7 @@ export default mergeConfig(
       './src/user-profile-card.ts',
       './src/app-layout.ts',
       './src/theme-switcher.ts',
+      './src/image-editor.ts',
     ],
     srcDir: './src',
     cjs: false,
