@@ -34,6 +34,10 @@ export function computeMinScale(
  * rotation and scale. Prevents the user from panning the image so
  * far that dead pixels appear.
  *
+ * TODO: This uses the bounding-box projection which overestimates
+ * available space at non-right angles. See gemini-clamping-fix.md
+ * for the corrected corner-constraint formula.
+ *
  * @returns { maxTx, maxTy } — translation is clamped to [-max, +max]
  */
 export function computeTranslationBounds(
