@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { ImageEditorFeature } from '@pivox/features/image-editor';
-import { ImageEditor, DEFAULT_CROP_TEMPLATES } from '@pivox/ui/image-editor';
+import { DEFAULT_CROP_TEMPLATES, ImageEditor } from '@pivox/ui/image-editor';
 import { TooltipProvider } from '@pivox/primitives/tooltip';
 
 export const Route = createFileRoute('/_app/image-editor')({
@@ -8,7 +8,7 @@ export const Route = createFileRoute('/_app/image-editor')({
 });
 
 const SAMPLE_IMAGE =
-  'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1920&q=80';
+  'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f';
 
 function ImageEditorPage() {
   return (

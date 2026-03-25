@@ -166,7 +166,7 @@ export class ImageEditorEngine {
     this._state = {
       ...this.initialEditState,
       src: options.src ?? '',
-      imageStatus: options.src ? 'loading' : 'idle',
+      imageStatus: 'idle',
       imageError: null,
       naturalWidth: 0,
       naturalHeight: 0,
@@ -183,11 +183,11 @@ export class ImageEditorEngine {
       mode: 'view',
     };
 
-    // Load initial image (can happen before mount)
-    if (options.src) {
-      this.loadImage(options.src);
-    }
+    // Store initial src — loaded after mount when onChange is wired up
+    this.pendingSrc = options.src ?? null;
   }
+
+  private pendingSrc: string | null = null;
 
   /* ---------------------------------------------------------------- */
   /*  Public API — Mount / Unmount                                    */
@@ -232,6 +232,13 @@ export class ImageEditorEngine {
 
     this.mounted = true;
     this.scheduleRender();
+
+    // Load deferred initial image now that mount is complete
+    if (this.pendingSrc) {
+      const src = this.pendingSrc;
+      this.pendingSrc = null;
+      this.loadImage(src);
+    }
   }
 
   /** Unmount from the container. Removes canvas and stops rendering. */

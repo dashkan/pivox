@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { ImageEditorEngine } from '@pivox/image-editor';
 import type { CropRect, CropTemplate, ImageEditorEditState, ImageEditorState } from '@pivox/image-editor';
 import type { ImageEditorActions, ImageEditorContextValue, ImageEditorMeta, KeyboardShortcutMap } from './image-editor.types';
@@ -42,17 +42,26 @@ export function useImageEditorState(
   }
   const engine = engineRef.current;
 
-  // Sync state from engine → React
-  const [state, setState] = useState<ImageEditorState>(() => engine.state);
+  // Wire up onEditChange
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  engine.onEditChange = onChangeRef.current
+    ? (e) => onChangeRef.current?.(e)
+    : null;
 
-  useEffect(() => {
-    engine.onChange = setState;
-    engine.onEditChange = onChange ?? null;
-    return () => {
-      engine.onChange = null;
-      engine.onEditChange = null;
-    };
-  }, [engine, onChange]);
+  // Sync engine state → React via useSyncExternalStore
+  // This correctly handles concurrent mode and avoids tearing
+  const state = useSyncExternalStore(
+    // subscribe: engine calls the listener on every state change
+    useCallback((listener: () => void) => {
+      engine.onChange = () => listener();
+      return () => { engine.onChange = null; };
+    }, [engine]),
+    // getSnapshot: returns current state
+    () => engine.state as ImageEditorState,
+    // getServerSnapshot: SSR fallback
+    () => engine.state as ImageEditorState,
+  );
 
   // Clean up on unmount
   useEffect(() => {
@@ -71,7 +80,7 @@ export function useImageEditorState(
     [engine],
   );
 
-  // Actions — just delegate to engine methods (no stale closures!)
+  // Actions — just delegate to engine methods
   const actions: ImageEditorActions = useMemo(
     () => ({
       loadImage: (src) => engine.loadImage(src),
