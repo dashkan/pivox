@@ -110,23 +110,13 @@ export function computeRotationZoom(
     { x: cropRect.x + cropRect.width, y: cropRect.y + cropRect.height },
   ];
 
-  // For each corner, inverse-rotate around image center to find where it
-  // maps in unrotated image space. The scale factor must ensure this point
-  // lands within [0, imageWidth] x [0, imageHeight] (the unrotated image).
-  //
-  // After scaling by s around the image center, the image bounds become
-  // [icx - icx*s, icx + icx*s] x [icy - icy*s, icy + icy*s]
-  // = [icx*(1-s), icx*(1+s)] x [icy*(1-s), icy*(1+s)]
-  //
-  // The inverse-rotated point (ux, uy) in centered coords must satisfy:
-  //   |ux| <= icx * s  and  |uy| <= icy * s
+  // Inverse-rotate each corner around the image center. The zoom must
+  // ensure all inverse-rotated points fall within [-icx*s, icx*s] x [-icy*s, icy*s].
   let maxScale = 1;
 
   for (const corner of corners) {
     const dx = corner.x - icx;
     const dy = corner.y - icy;
-
-    // Inverse rotate to unrotated centered coords
     const ux = dx * cosA + dy * sinA;
     const uy = -dx * sinA + dy * cosA;
 
@@ -135,6 +125,52 @@ export function computeRotationZoom(
   }
 
   return maxScale;
+}
+
+/**
+ * Compute the effective image dimensions available for crop rect
+ * movement after rotation. The rotated+zoomed image covers a certain
+ * area in the original coordinate system; the crop rect can roam
+ * within that area.
+ *
+ * Returns effective width and height that can be passed to clampCropRect.
+ */
+export function computeEffectiveBounds(
+  imageWidth: number,
+  imageHeight: number,
+  cropWidth: number,
+  cropHeight: number,
+  angleDeg: number,
+): { width: number; height: number } {
+  // Normalize to [0, 360)
+  const normalized = ((angleDeg % 360) + 360) % 360;
+
+  // For exact 90° multiples, the image dimensions swap
+  const is90 = Math.abs(normalized - 90) < 0.01 || Math.abs(normalized - 270) < 0.01;
+  const is180 = Math.abs(normalized - 180) < 0.01;
+
+  if (is90) {
+    // 90° or 270°: image W/H swap
+    return { width: imageHeight, height: imageWidth };
+  }
+  if (is180 || Math.abs(normalized) < 0.01) {
+    return { width: imageWidth, height: imageHeight };
+  }
+
+  // For non-right angles, compute the rotation zoom for a centered crop,
+  // then use that zoom to expand the effective bounds
+  const centerCrop: CropRect = {
+    x: (imageWidth - cropWidth) / 2,
+    y: (imageHeight - cropHeight) / 2,
+    width: cropWidth,
+    height: cropHeight,
+  };
+  const zoom = computeRotationZoom(imageWidth, imageHeight, centerCrop, angleDeg);
+
+  return {
+    width: imageWidth * zoom,
+    height: imageHeight * zoom,
+  };
 }
 
 /* ------------------------------------------------------------------ */

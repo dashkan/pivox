@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ImageEditorEngine } from '@pivox/image-editor';
 import type { CropRect, CropTemplate, ImageEditorEditState, ImageEditorState } from '@pivox/image-editor';
 import type { ImageEditorActions, ImageEditorContextValue, ImageEditorMeta, KeyboardShortcutMap } from './image-editor.types';
@@ -35,38 +35,34 @@ export function useImageEditorState(
 ): ImageEditorContextValue {
   const { shortcuts = {}, onChange, ...engineOptions } = options;
 
-  // Create engine once
+  // Force re-render counter — incremented by engine onChange
+  const [, setVersion] = useState(0);
+
+  // Create engine once, wire up onChange immediately
   const engineRef = useRef<ImageEditorEngine | null>(null);
   if (!engineRef.current) {
-    engineRef.current = new ImageEditorEngine(engineOptions);
+    const engine = new ImageEditorEngine(engineOptions);
+    // Wire up onChange BEFORE any actions can be called.
+    // This increments a version counter to trigger React re-renders.
+    engine.onChange = () => setVersion((v) => v + 1);
+    engineRef.current = engine;
   }
   const engine = engineRef.current;
 
-  // Wire up onEditChange
+  // Keep onEditChange in sync
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   engine.onEditChange = onChangeRef.current
     ? (e) => onChangeRef.current?.(e)
     : null;
 
-  // Sync engine state → React via useSyncExternalStore
-  // This correctly handles concurrent mode and avoids tearing
-  const state = useSyncExternalStore(
-    // subscribe: engine calls the listener on every state change
-    useCallback((listener: () => void) => {
-      engine.onChange = () => listener();
-      return () => { engine.onChange = null; };
-    }, [engine]),
-    // getSnapshot: returns current state
-    () => engine.state as ImageEditorState,
-    // getServerSnapshot: SSR fallback
-    () => engine.state as ImageEditorState,
-  );
-
   // Clean up on unmount
   useEffect(() => {
-    return () => engine.destroy();
-  }, [engine]);
+    return () => {
+      engineRef.current?.destroy();
+      engineRef.current = null;
+    };
+  }, []);
 
   // Ref callback for the canvas container — mounts/unmounts the engine
   const containerRef = useCallback(
@@ -79,6 +75,9 @@ export function useImageEditorState(
     },
     [engine],
   );
+
+  // Read state directly from engine (version counter ensures freshness)
+  const state = engine.state as ImageEditorState;
 
   // Actions — just delegate to engine methods
   const actions: ImageEditorActions = useMemo(

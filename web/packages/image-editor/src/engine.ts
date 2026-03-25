@@ -1,7 +1,8 @@
 import { FREE_TEMPLATE, MAX_HISTORY, ZOOM_MAX, ZOOM_MIN, ZOOM_STEP } from './constants';
-import { applyCropTemplate, clampCropRect, resizeCropRect } from './crop-math';
+import { applyCropTemplate, clampCropRect, clampCropRectWithZoom, resizeCropRect } from './crop-math';
 import {
   canvasToImage,
+  computeEffectiveBounds,
   computeRotationZoom,
   computeViewportTransform,
   createInitialEditState,
@@ -567,13 +568,40 @@ export class ImageEditorEngine {
         deltaY = -deltaY;
       }
 
-      const newRect = resizeCropRect(
+      let newRect = resizeCropRect(
         this.dragOrigin.originalRect,
         this.dragOrigin.handle,
         deltaX, deltaY,
         this.dragOrigin.imageWidth, this.dragOrigin.imageHeight,
         this.dragOrigin.aspectRatio,
       );
+
+      // Clamp within effective bounds (accounts for rotation)
+      const totalAngle = this._state.rotation + this._state.straighten;
+      const iw = this.dragOrigin.imageWidth;
+      const ih = this.dragOrigin.imageHeight;
+
+      if (this.dragOrigin.handle === 'move') {
+        // For movement: use effective bounds (position-independent)
+        const bounds = computeEffectiveBounds(iw, ih, newRect.width, newRect.height, totalAngle);
+        // Center the effective bounds on the image center
+        const cx = iw / 2;
+        const cy = ih / 2;
+        const minX = cx - bounds.width / 2;
+        const minY = cy - bounds.height / 2;
+        const maxX = cx + bounds.width / 2 - newRect.width;
+        const maxY = cy + bounds.height / 2 - newRect.height;
+        newRect = {
+          ...newRect,
+          x: Math.max(minX, Math.min(newRect.x, maxX)),
+          y: Math.max(minY, Math.min(newRect.y, maxY)),
+        };
+      } else {
+        // For resize: use position-dependent zoom
+        const rotZoom = computeRotationZoom(iw, ih, newRect, totalAngle);
+        newRect = clampCropRectWithZoom(newRect, iw, ih, rotZoom);
+      }
+
       this._state = { ...this._state, cropRect: newRect };
       this.markDirty();
       this.onChange?.(this._state);
@@ -664,16 +692,29 @@ export class ImageEditorEngine {
       this.scale = vt.scale;
       this.offset = { x: adjOffsetX, y: adjOffsetY };
 
+      // Draw image with rotation
       ctx.save();
       ctx.translate(adjOffsetX, adjOffsetY);
       ctx.scale(vt.scale, vt.scale);
       this.drawImage(ctx, true);
       ctx.restore();
 
+      // Draw overlay in SCREEN SPACE (does not rotate with the image)
+      const cropScreenX = adjOffsetX + cropRect.x * vt.scale;
+      const cropScreenY = adjOffsetY + cropRect.y * vt.scale;
+      const cropScreenW = cropRect.width * vt.scale;
+      const cropScreenH = cropRect.height * vt.scale;
+      this.renderer.drawScreenOverlay(
+        ctx, containerWidth, containerHeight,
+        cropScreenX, cropScreenY, cropScreenW, cropScreenH,
+        colors.overlay,
+      );
+
+      // Draw handles/grid in image space (not rotated)
       ctx.save();
       ctx.translate(adjOffsetX, adjOffsetY);
       ctx.scale(vt.scale, vt.scale);
-      this.renderer.draw(ctx, state, vt.scale, colors);
+      this.renderer.drawControls(ctx, state, vt.scale, colors);
       ctx.restore();
 
     } else {

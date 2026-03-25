@@ -19,6 +19,41 @@ export function clampCropRect(
   return { x, y, width, height };
 }
 
+/**
+ * Clamp a crop rect within the effective bounds of a rotated+zoomed image.
+ * The rotation zoom expands the effective image area around the center.
+ */
+export function clampCropRectWithZoom(
+  rect: CropRect,
+  imageWidth: number,
+  imageHeight: number,
+  rotationZoom: number,
+): CropRect {
+  let { x, y, width, height } = rect;
+
+  width = Math.max(width, MIN_CROP_SIZE);
+  height = Math.max(height, MIN_CROP_SIZE);
+
+  // Effective bounds: the image is scaled by rotationZoom around its center.
+  // In original image space, this expands the available area.
+  const cx = imageWidth / 2;
+  const cy = imageHeight / 2;
+  const effectiveMinX = cx - cx * rotationZoom;
+  const effectiveMaxX = cx + cx * rotationZoom;
+  const effectiveMinY = cy - cy * rotationZoom;
+  const effectiveMaxY = cy + cy * rotationZoom;
+
+  const effectiveWidth = effectiveMaxX - effectiveMinX;
+  const effectiveHeight = effectiveMaxY - effectiveMinY;
+
+  width = Math.min(width, effectiveWidth);
+  height = Math.min(height, effectiveHeight);
+  x = Math.max(effectiveMinX, Math.min(x, effectiveMaxX - width));
+  y = Math.max(effectiveMinY, Math.min(y, effectiveMaxY - height));
+
+  return { x, y, width, height };
+}
+
 /** Apply an aspect ratio template to a crop rect, maximizing area. */
 export function applyCropTemplate(
   template: CropTemplate,
@@ -137,5 +172,7 @@ export function resizeCropRect(
     }
   }
 
-  return clampCropRect({ x, y, width, height }, imageWidth, imageHeight);
+  // Note: caller is responsible for clamping with appropriate bounds
+  // (rotation-aware bounds may differ from raw image bounds)
+  return { x, y, width, height };
 }

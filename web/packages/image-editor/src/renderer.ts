@@ -2,36 +2,54 @@ import type { CropColors, ImageEditorState } from './types';
 
 /**
  * Draws the crop overlay, grid, and handles onto a canvas context.
- * Expects the context to already be translated/scaled to image-space.
+ *
+ * The `draw` method expects the context translated/scaled to image-space
+ * for the crop rect drawing. The `drawOverlay` method takes raw screen-space
+ * coordinates since the overlay must NOT rotate with the image.
  */
 export class CropOverlayRenderer {
-  draw(
+  /**
+   * Draw the full-canvas dim overlay with a cutout for the crop rect.
+   * Called in SCREEN SPACE (no rotation transform applied).
+   */
+  drawScreenOverlay(
+    ctx: CanvasRenderingContext2D,
+    containerWidth: number,
+    containerHeight: number,
+    cropScreenX: number,
+    cropScreenY: number,
+    cropScreenW: number,
+    cropScreenH: number,
+    overlayColor: string,
+  ): void {
+    ctx.fillStyle = overlayColor;
+    // Top
+    ctx.fillRect(0, 0, containerWidth, cropScreenY);
+    // Bottom
+    ctx.fillRect(0, cropScreenY + cropScreenH, containerWidth, containerHeight - cropScreenY - cropScreenH);
+    // Left
+    ctx.fillRect(0, cropScreenY, cropScreenX, cropScreenH);
+    // Right
+    ctx.fillRect(cropScreenX + cropScreenW, cropScreenY, containerWidth - cropScreenX - cropScreenW, cropScreenH);
+  }
+
+  /**
+   * Draw the crop border, grid, and handles.
+   * Called in IMAGE SPACE (after translate + scale to image coords).
+   */
+  drawControls(
     ctx: CanvasRenderingContext2D,
     state: ImageEditorState,
     scale: number,
     colors: CropColors,
   ): void {
-    const { cropRect, naturalWidth, naturalHeight } = state;
+    const { cropRect } = state;
     const { x: rx, y: ry, width: rw, height: rh } = cropRect;
 
-    this.drawOverlay(ctx, rx, ry, rw, rh, naturalWidth, naturalHeight, colors.overlay);
     this.drawBorder(ctx, rx, ry, rw, rh, scale, colors.border);
     this.drawGrid(ctx, rx, ry, rw, rh, scale, colors.grid);
-    this.drawCornerHandles(ctx, rx, ry, rw, rh, scale, colors.handle);
-    this.drawEdgeHandles(ctx, rx, ry, rw, rh, scale, colors.handle);
-  }
-
-  private drawOverlay(
-    ctx: CanvasRenderingContext2D,
-    rx: number, ry: number, rw: number, rh: number,
-    naturalWidth: number, naturalHeight: number,
-    color: string,
-  ): void {
-    ctx.fillStyle = color;
-    ctx.fillRect(0, 0, naturalWidth, ry);
-    ctx.fillRect(0, ry + rh, naturalWidth, naturalHeight - ry - rh);
-    ctx.fillRect(0, ry, rx, rh);
-    ctx.fillRect(rx + rw, ry, naturalWidth - rx - rw, rh);
+    this.drawCornerHandles(ctx, rx, ry, rw, rh, scale, colors.handle, colors.border);
+    this.drawEdgeHandles(ctx, rx, ry, rw, rh, scale, colors.handle, colors.border);
   }
 
   private drawBorder(
@@ -40,7 +58,7 @@ export class CropOverlayRenderer {
     scale: number, color: string,
   ): void {
     ctx.strokeStyle = color;
-    ctx.lineWidth = 2 / scale;
+    ctx.lineWidth = 1.5 / scale;
     ctx.strokeRect(rx, ry, rw, rh);
   }
 
@@ -65,77 +83,105 @@ export class CropOverlayRenderer {
     }
   }
 
+  /**
+   * Corner handles: thick white-filled rounded rectangles with blue border.
+   * L-shaped brackets with 3 outer edges rounded, inner corner square.
+   */
   private drawCornerHandles(
     ctx: CanvasRenderingContext2D,
     rx: number, ry: number, rw: number, rh: number,
-    scale: number, color: string,
+    scale: number, fillColor: string, strokeColor: string,
   ): void {
-    const bracketLen = Math.min(28 / scale, rw / 4, rh / 4);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 5 / scale;
-    ctx.lineCap = 'round';
+    const len = Math.min(30 / scale, rw / 4, rh / 4);
+    const thickness = 6 / scale;
+    const radius = 3 / scale;
 
-    // Top-left
-    ctx.beginPath();
-    ctx.moveTo(rx, ry + bracketLen);
-    ctx.lineTo(rx, ry);
-    ctx.lineTo(rx + bracketLen, ry);
-    ctx.stroke();
+    const corners = [
+      // [x, y, dirX, dirY] — corner position and which direction arms extend
+      { cx: rx, cy: ry, dx: 1, dy: 1 },          // top-left
+      { cx: rx + rw, cy: ry, dx: -1, dy: 1 },     // top-right
+      { cx: rx, cy: ry + rh, dx: 1, dy: -1 },     // bottom-left
+      { cx: rx + rw, cy: ry + rh, dx: -1, dy: -1 }, // bottom-right
+    ];
 
-    // Top-right
-    ctx.beginPath();
-    ctx.moveTo(rx + rw - bracketLen, ry);
-    ctx.lineTo(rx + rw, ry);
-    ctx.lineTo(rx + rw, ry + bracketLen);
-    ctx.stroke();
+    for (const { cx, cy, dx, dy } of corners) {
+      ctx.save();
 
-    // Bottom-left
-    ctx.beginPath();
-    ctx.moveTo(rx, ry + rh - bracketLen);
-    ctx.lineTo(rx, ry + rh);
-    ctx.lineTo(rx + bracketLen, ry + rh);
-    ctx.stroke();
+      // Horizontal arm: from corner outward
+      const hBarX = dx > 0 ? cx : cx - len;
+      const hBarY = cy - thickness / 2;
 
-    // Bottom-right
-    ctx.beginPath();
-    ctx.moveTo(rx + rw - bracketLen, ry + rh);
-    ctx.lineTo(rx + rw, ry + rh);
-    ctx.lineTo(rx + rw, ry + rh - bracketLen);
-    ctx.stroke();
+      ctx.beginPath();
+      this.drawRoundedRect(ctx, hBarX, hBarY, len, thickness, radius);
+      ctx.fillStyle = 'white';
+      ctx.fill();
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 1.5 / scale;
+      ctx.stroke();
+
+      // Vertical arm: from corner outward
+      const vBarX = cx - thickness / 2;
+      const vBarY = dy > 0 ? cy : cy - len;
+
+      ctx.beginPath();
+      this.drawRoundedRect(ctx, vBarX, vBarY, thickness, len, radius);
+      ctx.fillStyle = 'white';
+      ctx.fill();
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 1.5 / scale;
+      ctx.stroke();
+
+      ctx.restore();
+    }
   }
 
+  /**
+   * Edge handles: shorter white-filled rounded pills with blue border.
+   */
   private drawEdgeHandles(
     ctx: CanvasRenderingContext2D,
     rx: number, ry: number, rw: number, rh: number,
-    scale: number, color: string,
+    scale: number, _fillColor: string, strokeColor: string,
   ): void {
-    const edgeBarLen = Math.min(18 / scale, rw / 5, rh / 5);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 4 / scale;
-    ctx.lineCap = 'round';
+    const barLen = Math.min(22 / scale, rw / 5, rh / 5);
+    const thickness = 4 / scale;
+    const radius = thickness / 2; // fully rounded ends (pill shape)
 
-    // Top
-    ctx.beginPath();
-    ctx.moveTo(rx + rw / 2 - edgeBarLen, ry);
-    ctx.lineTo(rx + rw / 2 + edgeBarLen, ry);
-    ctx.stroke();
+    const edges = [
+      // Horizontal edges (top, bottom)
+      { x: rx + rw / 2 - barLen / 2, y: ry - thickness / 2, w: barLen, h: thickness },
+      { x: rx + rw / 2 - barLen / 2, y: ry + rh - thickness / 2, w: barLen, h: thickness },
+      // Vertical edges (left, right)
+      { x: rx - thickness / 2, y: ry + rh / 2 - barLen / 2, w: thickness, h: barLen },
+      { x: rx + rw - thickness / 2, y: ry + rh / 2 - barLen / 2, w: thickness, h: barLen },
+    ];
 
-    // Bottom
-    ctx.beginPath();
-    ctx.moveTo(rx + rw / 2 - edgeBarLen, ry + rh);
-    ctx.lineTo(rx + rw / 2 + edgeBarLen, ry + rh);
-    ctx.stroke();
+    for (const { x, y, w, h } of edges) {
+      ctx.beginPath();
+      this.drawRoundedRect(ctx, x, y, w, h, radius);
+      ctx.fillStyle = 'white';
+      ctx.fill();
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 1 / scale;
+      ctx.stroke();
+    }
+  }
 
-    // Left
-    ctx.beginPath();
-    ctx.moveTo(rx, ry + rh / 2 - edgeBarLen);
-    ctx.lineTo(rx, ry + rh / 2 + edgeBarLen);
-    ctx.stroke();
-
-    // Right
-    ctx.beginPath();
-    ctx.moveTo(rx + rw, ry + rh / 2 - edgeBarLen);
-    ctx.lineTo(rx + rw, ry + rh / 2 + edgeBarLen);
-    ctx.stroke();
+  private drawRoundedRect(
+    ctx: CanvasRenderingContext2D,
+    x: number, y: number, w: number, h: number,
+    r: number,
+  ): void {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
   }
 }
