@@ -1,5 +1,5 @@
 // Re-export all types from the vanilla engine
-import type { CropRect, CropTemplate, ImageEditorState, ResizeMode } from '@pivox/image-editor';
+import type { CropTemplate, ImageEditorState, ResizeMode } from '@pivox/image-editor';
 
 export type {
   CropColors,
@@ -35,7 +35,6 @@ export interface KeyboardShortcutMap {
 /** Actions exposed to React subcomponents via context. */
 export interface ImageEditorActions {
   loadImage: (src: string) => void;
-  setCropRect: (rect: CropRect) => void;
   setResizeMode: (mode: ResizeMode) => void;
   rotateClockwise: () => void;
   rotateCounterClockwise: () => void;
@@ -57,9 +56,7 @@ export interface ImageEditorActions {
 
 /** Meta values exposed to React subcomponents via context. */
 export interface ImageEditorMeta {
-  /** Ref callback to attach to the canvas container element. */
   containerRef: (el: HTMLDivElement | null) => void;
-  /** Optional keyboard shortcut display strings for tooltips. */
   shortcuts: Partial<KeyboardShortcutMap>;
 }
 

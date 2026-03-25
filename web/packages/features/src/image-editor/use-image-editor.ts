@@ -5,7 +5,6 @@ import {
   useImageEditorState,
 } from '@pivox/ui/image-editor';
 import type {
-  CropRect,
   CropTemplate,
   ImageEditorContextValue,
   ImageEditorEditState,
@@ -141,8 +140,6 @@ function createKeyHandler(
 export interface UseImageEditorFeatureOptions {
   /** Image source — URL or base64 data URI. */
   src?: string;
-  /** Initial crop area. */
-  initialCrop?: Partial<CropRect>;
   /** Override default crop templates. */
   templates?: Array<CropTemplate>;
   /** Max undo history depth (default: 50). */

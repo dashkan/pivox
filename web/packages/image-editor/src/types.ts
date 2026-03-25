@@ -42,15 +42,33 @@ export type EditorMode = 'view' | 'crop';
 /*  State                                                             */
 /* ------------------------------------------------------------------ */
 
-/** The editable parameters tracked in undo history. */
+/**
+ * The editable parameters tracked in undo history.
+ *
+ * Uses the "crop-as-viewport" model: the crop rect is a fixed window,
+ * the image transforms (scale, rotate, translate) behind it.
+ *
+ * - cropWidth/cropHeight define the viewport in image pixels
+ * - tx/ty is the image translation (how far the image is panned)
+ * - scale is the rendering scale (>= minScale for current rotation)
+ * - rotation is 0/90/180/270 quarter turns
+ * - straighten is -45..45 fine adjustment
+ */
 export interface ImageEditorEditState {
-  cropRect: CropRect;
-  resizeMode: ResizeMode;
+  cropWidth: number;
+  cropHeight: number;
   rotation: 0 | 90 | 180 | 270;
   straighten: number;
+  /** Image scale factor. Always >= minScale to prevent dead pixels. */
+  scale: number;
+  /** Image X translation in image-pixel units (relative to crop center). */
+  tx: number;
+  /** Image Y translation in image-pixel units (relative to crop center). */
+  ty: number;
   flipHorizontal: boolean;
   flipVertical: boolean;
   activeTemplate: CropTemplate | null;
+  resizeMode: ResizeMode;
 }
 
 export interface ImageEditorState extends ImageEditorEditState {
@@ -73,13 +91,13 @@ export interface ImageEditorState extends ImageEditorEditState {
   canRedo: boolean;
   /** True if any edit differs from initial state. */
   isDirty: boolean;
-  /** Zoom level as a percentage (100 = 100%). */
+  /** Viewport zoom level as a percentage (100 = fit). */
   zoom: number;
   /** Whether zoom is auto-fit or manually set. */
   zoomMode: ZoomMode;
-  /** Pan offset in CSS pixels when zoomed past fit. */
+  /** Pan offset in CSS pixels when viewport-zoomed past fit. */
   panOffset: { x: number; y: number };
-  /** Whether the user is currently panning. */
+  /** Whether the user is currently panning the viewport. */
   isPanning: boolean;
   /** Current editor mode. */
   mode: EditorMode;
@@ -89,12 +107,12 @@ export interface ImageEditorState extends ImageEditorEditState {
 /*  Engine options                                                    */
 /* ------------------------------------------------------------------ */
 
-/** Options for creating an ImageEditorEngine. */
 export interface ImageEditorEngineOptions {
   /** Initial image source — URL or base64 data URI. */
   src?: string;
-  /** Initial crop (defaults to full image). */
-  initialCrop?: Partial<CropRect>;
+  /** Initial crop dimensions (defaults to full image). */
+  initialCropWidth?: number;
+  initialCropHeight?: number;
   /** Aspect ratio templates (Free is always built-in). */
   templates?: Array<CropTemplate>;
   /** Template to auto-select when image loads. */
@@ -105,24 +123,15 @@ export interface ImageEditorEngineOptions {
   onChange?: (state: ImageEditorState) => void;
   /** Called whenever edit state changes (crop, rotation, etc.). */
   onEditChange?: (editState: ImageEditorEditState) => void;
-  /**
-   * CSS custom property reader for themed colors.
-   * The engine calls this to resolve crop overlay colors.
-   * If not provided, reads from the canvas container's computed style.
-   */
+  /** Themed colors for crop overlay rendering. */
   colors?: CropColors;
 }
 
 /** Colors used for crop overlay rendering. */
 export interface CropColors {
-  /** Canvas background color. */
   canvas: string;
-  /** Crop border color. */
   border: string;
-  /** Crop handle color. */
   handle: string;
-  /** Grid line color. */
   grid: string;
-  /** Overlay (dimmed area) color. */
   overlay: string;
 }

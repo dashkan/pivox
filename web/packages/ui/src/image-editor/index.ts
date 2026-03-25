@@ -8,7 +8,7 @@ export type {
   KeyboardShortcutMap,
 } from './image-editor.types';
 
-// Re-export from vanilla engine for convenience
+// Re-export from vanilla engine
 export {
   ImageEditorEngine,
   DEFAULT_CROP_TEMPLATES,
@@ -16,6 +16,7 @@ export {
   ZOOM_MIN,
   ZOOM_MAX,
   ZOOM_STEP,
+  stateToImageCropRect,
 } from '@pivox/image-editor';
 export type {
   CropColors,

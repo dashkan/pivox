@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ImageEditorEngine } from '@pivox/image-editor';
-import type { CropRect, CropTemplate, ImageEditorEditState, ImageEditorState } from '@pivox/image-editor';
+import type { CropTemplate, ImageEditorEditState, ImageEditorState } from '@pivox/image-editor';
 import type { ImageEditorActions, ImageEditorContextValue, ImageEditorMeta, KeyboardShortcutMap } from './image-editor.types';
 
 /* ------------------------------------------------------------------ */
@@ -12,8 +12,6 @@ import type { ImageEditorActions, ImageEditorContextValue, ImageEditorMeta, Keyb
 export interface UseImageEditorOptions {
   /** Initial image source — URL or base64 data URI. */
   src?: string;
-  /** Initial crop (defaults to full image). */
-  initialCrop?: Partial<CropRect>;
   /** Aspect ratio templates (Free is always built-in). */
   templates?: Array<CropTemplate>;
   /** Template to auto-select when image loads. */
@@ -83,7 +81,6 @@ export function useImageEditorState(
   const actions: ImageEditorActions = useMemo(
     () => ({
       loadImage: (src) => engine.loadImage(src),
-      setCropRect: (rect) => engine.setCropRect(rect),
       setResizeMode: (mode) => engine.setResizeMode(mode),
       rotateClockwise: () => engine.rotateClockwise(),
       rotateCounterClockwise: () => engine.rotateCounterClockwise(),

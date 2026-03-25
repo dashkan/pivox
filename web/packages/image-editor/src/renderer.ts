@@ -43,8 +43,11 @@ export class CropOverlayRenderer {
     scale: number,
     colors: CropColors,
   ): void {
-    const { cropRect } = state;
-    const { x: rx, y: ry, width: rw, height: rh } = cropRect;
+    // In the new model, crop rect is at (0, 0) with cropWidth x cropHeight
+    const rx = 0;
+    const ry = 0;
+    const rw = state.cropWidth;
+    const rh = state.cropHeight;
 
     this.drawBorder(ctx, rx, ry, rw, rh, scale, colors.border);
     this.drawGrid(ctx, rx, ry, rw, rh, scale, colors.grid);
