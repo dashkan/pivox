@@ -4,10 +4,10 @@ package main
 
 import "github.com/spf13/pflag"
 
-const controlPlaneAddr = "api.pivox.app:443"
+var cloudHost = "api.pivox.app"
+
 const defaultPort = 443
 
-func addControlPlaneFlag(_ *pflag.FlagSet) {
-	// In production builds, control plane address is hardcoded.
-	// No flag is exposed.
+func addControlPlaneFlag(f *pflag.FlagSet) {
+	f.StringVar(&cloudHost, "server", envOrDefault("PIVOX_CLOUD_HOST", cloudHost), "Pivox server gRPC address (dev only)")
 }

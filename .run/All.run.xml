@@ -1,7 +1,0 @@
-<component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="All" type="CompoundRunConfigurationType">
-    <toRun name="pivox-agent (Storage)" type="GoApplicationRunConfiguration" />
-    <toRun name="pivox-server" type="GoApplicationRunConfiguration" />
-    <method v="2" />
-  </configuration>
-</component>

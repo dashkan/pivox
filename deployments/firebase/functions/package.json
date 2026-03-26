@@ -1,16 +1,16 @@
 {
   "name": "functions",
   "scripts": {
-    "build": "tsc",
-    "build:watch": "tsc --watch",
+    "build": "DEV=false vite build",
+    "build:dev": "vite build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "serve": "pnpm build && firebase emulators:start --only functions",
-    "shell": "pnpm build && firebase functions:shell",
+    "serve": "pnpm build:dev && firebase emulators:start --only functions",
+    "shell": "pnpm build:dev && firebase functions:shell",
     "start": "pnpm shell",
-    "deploy": "firebase deploy --only functions",
+    "deploy": "pnpm build && firebase deploy --only functions",
     "logs": "firebase functions:log"
   },
   "engines": {
@@ -20,15 +20,17 @@
   "dependencies": {
     "@google-cloud/functions-framework": "^5.0.2",
     "firebase-admin": "^13.7.0",
-    "firebase-functions": "^7.2.0",
+    "firebase-functions": "^7.2.2",
     "google-auth-library": "^10.6.2"
   },
   "devDependencies": {
-    "eslint": "^10.0.3",
+    "@types/node": "^25.5.0",
+    "eslint": "^10.1.0",
     "firebase-functions-test": "^3.4.1",
     "prettier": "^3.8.1",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.57.1"
+    "typescript-eslint": "^8.57.2",
+    "vite": "^8.0.2"
   },
   "private": true,
   "packageManager": "pnpm@10.32.1+sha512.a706938f0e89ac1456b6563eab4edf1d1faf3368d1191fc5c59790e96dc918e4456ab2e67d613de1043d2e8c81f87303e6b40d4ffeca9df15ef1ad567348f2be"

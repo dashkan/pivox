@@ -6,36 +6,44 @@ import {
 } from "firebase-functions/v2/identity";
 import { logger } from "firebase-functions/v2";
 import { defineString } from "firebase-functions/params";
-import { GoogleAuth } from "google-auth-library";
+
+declare const __DEV__: boolean;
 
 setGlobalOptions({ maxInstances: 10 });
 
 const pivoxApiUrl = defineString("PIVOX_API_URL", {
   description: "Base URL of the Pivox API server",
-  default: "http://localhost:8080",
+  default: "https://pivox.ngrok.app",
   label: "API URL",
 });
 
-// Google Auth client for minting OIDC identity tokens. The Cloud Functions
-// runtime provides default credentials via the function's service account.
-const auth = new GoogleAuth();
-
 /**
- * Returns an Authorization header value ("Bearer <token>") containing an
- * OIDC identity token for the given target audience. The token is signed
- * by the Cloud Function's service account and verified by the Go backend
- * against Google's JWKS.
+ * Returns an Authorization header for calling the Pivox API.
+ *
+ * Dev mode: returns "Bearer <SHARED_SECRET>" from the environment, matching
+ * the Go backend's dev-mode `requireSecret` middleware.
+ *
+ * Prod mode: mints an OIDC identity token via the Cloud Function's service
+ * account, verified by the Go backend against Google's JWKS.
  */
-async function getAuthorizationHeader(
-  targetAudience: string,
-): Promise<string> {
-  const client = await auth.getIdTokenClient(targetAudience);
-  const headers = await client.getRequestHeaders();
-  const bearer = headers.get("Authorization");
-  if (!bearer) {
-    throw new Error("Failed to obtain OIDC identity token");
+async function getAuthorizationHeader(targetAudience: string): Promise<string> {
+  if (__DEV__) {
+    const secret = process.env.SHARED_SECRET;
+    if (!secret) {
+      throw new Error("SHARED_SECRET env var is required in dev mode");
+    }
+    return `Bearer ${secret}`;
+  } else {
+    const { GoogleAuth } = await import("google-auth-library");
+    const auth = new GoogleAuth();
+    const client = await auth.getIdTokenClient(targetAudience);
+    const headers = await client.getRequestHeaders();
+    const bearer = headers.get("Authorization");
+    if (!bearer) {
+      throw new Error("Failed to obtain OIDC identity token");
+    }
+    return bearer;
   }
-  return bearer;
 }
 
 /**

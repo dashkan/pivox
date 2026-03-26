@@ -1,7 +1,8 @@
 .PHONY: build run test tidy lint lint-fix fmt \
        lint-proto proto-format proto-breaking proto-generate api-lint \
        db-up db-down db-migrate db-force db-seed db-clear db-drop db-create \
-       docker-up docker-down firebase-emu
+       docker-up docker-down firebase-emu firebase-deploy \
+       proxy-nginx proxy-nginx-stop proxy-ngrok
 
 DATABASE_URL ?= postgresql://localhost:5432/pivox?sslmode=disable
 DATABASE_NAME ?= pivox
@@ -15,11 +16,11 @@ build:
 	go build -o bin/pivox-agent ./cmd/pivox-agent
 
 build-dev:
-	go build -tags dev -o bin/pivox-server ./cmd/pivox-server serve
+	go build -tags dev -o bin/pivox-server ./cmd/pivox-server
 	go build -tags dev -o bin/pivox-agent ./cmd/pivox-agent
 
 run-server:
-	go run -tags dev ./cmd/pivox-server
+	go run -tags dev ./cmd/pivox-server serve
 
 run-agent:
 	go run -tags dev ./cmd/pivox-agent storage --token dev-token-local
@@ -95,4 +96,18 @@ docker-down:
 # Firebase
 
 firebase-emu:
-	firebase emulators:start --import=.firebase-data --export-on-exit=.firebase-data
+	firebase emulators:start --import=.firebase-data --export-on-exit=.firebase-data --inspect-functions
+
+firebase-deploy:
+	pnpm --dir ./deployments/firebase/functions run deploy
+
+# Proxy
+
+proxy-nginx:
+	nginx -c $(PWD)/configs/nginx.conf -e stderr
+
+proxy-nginx-stop:
+	nginx -c $(PWD)/configs/nginx.conf -s stop
+
+proxy-ngrok:
+	ngrok start --config configs/ngrok.yml --all

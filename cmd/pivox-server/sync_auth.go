@@ -11,8 +11,8 @@ import (
 
 func addSyncAuthFlags(cmd *cobra.Command) {
 	f := cmd.Flags()
-	f.String("allowed-service-accounts", envOrDefault("ALLOWED_SERVICE_ACCOUNTS", ""), "Comma-separated list of service account emails allowed to call internal endpoints")
-	f.String("audience", envOrDefault("AUDIENCE", ""), "Expected audience in OIDC tokens (e.g. https://api.pivox.app)")
+	f.String("allowed-service-accounts", envOrDefault("PIVOX_ALLOWED_SERVICE_ACCOUNTS", ""), "Comma-separated list of service account emails allowed to call internal endpoints")
+	f.String("audience", envOrDefault("PIVOX_AUDIENCE", ""), "Expected audience in OIDC tokens (e.g. https://api.pivox.app)")
 }
 
 func loadSyncAuthConfig(cmd *cobra.Command) config.SyncAuthConfig {

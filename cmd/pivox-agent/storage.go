@@ -72,7 +72,7 @@ func runStorage(cmd *cobra.Command, args []string) error {
 	slog.SetDefault(logger)
 
 	logger.Info("starting storage agent",
-		"server", controlPlaneAddr,
+		"server", cloudHost,
 		"bind", fmt.Sprintf("%s:%d", bind, port),
 		"cache_dir", cacheDir,
 		"cache_size_gb", cacheSize,
@@ -110,8 +110,8 @@ func runStorage(cmd *cobra.Command, args []string) error {
 
 	// Connect to control plane with reconnect loop.
 	for {
-		logger.Info("connecting to server", "addr", controlPlaneAddr)
-		err := agent.Connect(ctx, controlPlaneAddr, token, connectCfg, logger)
+		logger.Info("connecting to server", "addr", cloudHost)
+		err := agent.Connect(ctx, cloudHost, token, connectCfg, logger)
 		if ctx.Err() != nil {
 			logger.Info("storage agent shutting down...")
 			return nil

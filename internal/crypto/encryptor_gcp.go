@@ -36,11 +36,11 @@ type GoogleCloudKMSEncryptor struct {
 }
 
 // NewEncryptor creates a GoogleCloudKMSEncryptor for production builds.
-// Requires PIVOX_KMS_KEY_NAME environment variable.
+// Requires PIVOX_GCP_KMS_KEY_NAME environment variable.
 func NewEncryptor() (Encryptor, error) {
-	keyName := os.Getenv("PIVOX_KMS_KEY_NAME")
+	keyName := os.Getenv("PIVOX_GCP_KMS_KEY_NAME")
 	if keyName == "" {
-		return nil, fmt.Errorf("PIVOX_KMS_KEY_NAME environment variable is required")
+		return nil, fmt.Errorf("PIVOX_GCP_KMS_KEY_NAME environment variable is required")
 	}
 
 	ctx := context.Background()

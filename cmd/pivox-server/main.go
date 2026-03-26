@@ -54,14 +54,14 @@ func main() {
 	}
 
 	f := rootCmd.Flags()
-	f.String("database-url", envOrDefault("DATABASE_URL", "postgres://localhost:5432/pivox?sslmode=disable"), "PostgreSQL connection URL")
-	f.String("grpc-port", envOrDefault("GRPC_PORT", ":50051"), "gRPC listen address")
-	f.String("rest-port", envOrDefault("REST_PORT", ":8080"), "REST gateway listen address")
-	f.String("debug-port", envOrDefault("DEBUG_PORT", ":9090"), "Debug/health listen address")
-	f.String("log-level", envOrDefault("LOG_LEVEL", "info"), "Log level (debug, info, warn, error)")
-	f.String("gcp-project-id", envOrDefault("GOOGLE_CLOUD_PROJECT_ID", ""), "Google Cloud project ID")
-	f.String("gcp-service-account-key", envOrDefault("GOOGLE_CLOUD_SERVICE_ACCOUNT_KEY", ""), "Google Cloud service account key (inline JSON)")
-	f.String("gcp-service-account-file", envOrDefault("GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE", ""), "Google Cloud service account key file path")
+	f.String("database-url", envOrDefault("PIVOX_DATABASE_URL", "postgres://localhost:5432/pivox?sslmode=disable"), "PostgreSQL connection URL")
+	f.String("grpc-port", envOrDefault("PIVOX_GRPC_PORT", ":50051"), "gRPC listen address")
+	f.String("rest-port", envOrDefault("PIVOX_REST_PORT", ":8080"), "REST gateway listen address")
+	f.String("debug-port", envOrDefault("PIVOX_DEBUG_PORT", ":9090"), "Debug/health listen address")
+	f.String("log-level", envOrDefault("PIVOX_LOG_LEVEL", "info"), "Log level (debug, info, warn, error)")
+	f.String("gcp-project-id", envOrDefault("PIVOX_GCP_PROJECT_ID", ""), "Google Cloud project ID")
+	f.String("gcp-service-account-key", envOrDefault("PIVOX_GCP_SERVICE_ACCOUNT_KEY", ""), "Google Cloud service account key (inline JSON)")
+	f.String("gcp-service-account-file", envOrDefault("PIVOX_GCP_SERVICE_ACCOUNT_FILE", ""), "Google Cloud service account key file path")
 
 	addSyncAuthFlags(rootCmd)
 

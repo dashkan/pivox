@@ -1,7 +1,8 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="pivox-agent (Storage)" type="GoApplicationRunConfiguration" factoryName="Go Application">
+  <configuration default="false" name="pivox-agent (dev - Storage)" type="GoApplicationRunConfiguration" factoryName="Go Application">
     <module name="pivox" />
     <working_directory value="$PROJECT_DIR$" />
+    <go_parameters value="--tags dev" />
     <parameters value="storage --token dev-token-local" />
     <kind value="PACKAGE" />
     <package value="github.com/dashkan/pivox/cmd/pivox-agent" />

@@ -1,6 +1,5 @@
 import { defineConfig } from 'vite';
 import { devtools } from '@tanstack/devtools-vite';
-import tsconfigPaths from 'vite-tsconfig-paths';
 
 import { tanstackStart } from '@tanstack/react-start/plugin/vite';
 
@@ -12,6 +11,9 @@ const config = defineConfig({
   server: {
     allowedHosts: ['localhost', 'pivox.ngrok.app'],
   },
+  resolve: {
+    tsconfigPaths: true,
+  },
   plugins: [
     devtools(),
     nitro({
@@ -22,7 +24,6 @@ const config = defineConfig({
         },
       },
     }),
-    tsconfigPaths({ projects: ['./tsconfig.json'] }),
     tailwindcss(),
     tanstackStart(),
     viteReact(),

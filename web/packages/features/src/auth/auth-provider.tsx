@@ -15,10 +15,16 @@ import type { User } from 'firebase/auth';
  */
 async function patchProviderData(user: User): Promise<void> {
   const idToken = await user.getIdToken();
-  const apiKey = (user as unknown as { auth: { config: { apiKey: string } } })
-    .auth.config.apiKey;
+  const auth = user as unknown as {
+    auth: { config: { apiKey: string }; emulatorConfig?: { host: string; port: number; protocol: string } };
+  };
+  const apiKey = auth.auth.config.apiKey;
+  const emu = auth.auth.emulatorConfig;
+  const baseUrl = emu
+    ? `${emu.protocol}://${emu.host}:${emu.port}/identitytoolkit.googleapis.com`
+    : 'https://identitytoolkit.googleapis.com';
   const res = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`,
+    `${baseUrl}/v1/accounts:lookup?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

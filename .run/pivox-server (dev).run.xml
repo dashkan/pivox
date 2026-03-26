@@ -1,7 +1,8 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="pivox-server" type="GoApplicationRunConfiguration" factoryName="Go Application">
+  <configuration default="false" name="pivox-server (dev)" type="GoApplicationRunConfiguration" factoryName="Go Application">
     <module name="pivox" />
     <working_directory value="$PROJECT_DIR$" />
+    <go_parameters value="--tags dev" />
     <kind value="PACKAGE" />
     <package value="github.com/dashkan/pivox/cmd/pivox-server" />
     <directory value="$PROJECT_DIR$" />

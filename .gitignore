@@ -5,6 +5,7 @@
 .firebase-data
 .docker/
 bin/
+.envrc.*
 
 # Created by https://www.toptal.com/developers/gitignore/api/go,node,linux,macos,nextjs,windows,firebase,jetbrains+all,visualstudiocode,direnv
 # Edit at https://www.toptal.com/developers/gitignore?templates=go,node,linux,macos,nextjs,windows,firebase,jetbrains+all,visualstudiocode,direnv
