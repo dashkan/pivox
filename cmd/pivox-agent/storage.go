@@ -33,13 +33,14 @@ the cloud.`,
 	f := cmd.Flags()
 	f.String("token", envOrDefault("PIVOX_TOKEN", ""), "Registration token from the storage gateway")
 	f.String("cache-dir", envOrDefault("PIVOX_CACHE_DIR", "/var/lib/pivox/cache"), "Cache directory path")
-	f.Int("cache-size", 0, "Cache size in GB (0 = auto-detect, 80% of available disk)")
-	f.Int("port", defaultPort, "HTTPS listen port")
+	f.Int("cache-size", envOrDefaultInt("PIVOX_CACHE_SIZE", 0), "Cache size in GB (0 = auto-detect, 80% of available disk)")
+	f.Int("port", envOrDefaultInt("PIVOX_PORT", defaultPort), "HTTPS listen port")
 	f.String("bind", envOrDefault("PIVOX_BIND", "0.0.0.0"), "Bind address")
 	addControlPlaneFlag(f)
-	f.Bool("telemetry", true, "Enable telemetry reporting to Pivox Cloud")
+	f.Bool("telemetry", envOrDefault("PIVOX_TELEMETRY", "true") == "true", "Enable telemetry reporting to Pivox Cloud")
 	f.String("role", envOrDefault("PIVOX_ROLE", "both"), "Agent role: both, serve, worker")
 	f.String("log-level", envOrDefault("PIVOX_LOG_LEVEL", "info"), "Log level (debug, info, warn, error)")
+	f.Bool("plaintext", envOrDefault("PIVOX_PLAINTEXT", "false") == "true", "Use plaintext (no TLS) for the control plane gRPC connection")
 
 	_ = cmd.MarkFlagRequired("token")
 
@@ -56,6 +57,7 @@ func runStorage(cmd *cobra.Command, args []string) error {
 	bind, _ := f.GetString("bind")
 	telemetry, _ := f.GetBool("telemetry")
 	logLevel, _ := f.GetString("log-level")
+	plaintext, _ := f.GetBool("plaintext")
 
 	var level slog.Level
 	switch logLevel {
@@ -111,7 +113,7 @@ func runStorage(cmd *cobra.Command, args []string) error {
 	// Connect to control plane with reconnect loop.
 	for {
 		logger.Info("connecting to server", "addr", cloudHost)
-		err := agent.Connect(ctx, cloudHost, token, connectCfg, logger)
+		err := agent.Connect(ctx, cloudHost, !plaintext, token, connectCfg, logger)
 		if ctx.Err() != nil {
 			logger.Info("storage agent shutting down...")
 			return nil

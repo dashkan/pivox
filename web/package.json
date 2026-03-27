@@ -14,15 +14,21 @@
     "prettier:write": "prettier --write .",
     "test:eslint": "pnpm -r --filter \"./packages/**\" --filter \"./apps/**\" run test:eslint",
     "test:types": "pnpm -r --filter \"./packages/**\" --filter \"./apps/**\" run test:types",
-    "dev": "concurrently -n prims,image-editor,ui,feat,web,server -c cyan,cyan,cyan,cyan,blue,red,green \"pnpm web:build:primitives -- --watch\" \"pnpm web:build:image-editor -- --watch\" \"pnpm web:build:ui -- --watch\" \"pnpm web:build:features -- --watch\" \"pnpm web:start\" \"pnpm server:run\"",
+    "server:cloud": "go -C ../ run ./cmd/pivox-server",
+    "server:storage": "go -C ../ run ./cmd/pivox-agent storage --token dev-token-local",
+    "dev": "concurrently -n prims,image-editor,ui,feat,web,cloud,storage -c cyan,cyan,cyan,cyan,blue,red,green,green \"pnpm web:build:primitives -- --watch\" \"pnpm web:build:image-editor -- --watch\" \"pnpm web:build:ui -- --watch\" \"pnpm web:build:features -- --watch\" \"pnpm web:start\" \"pnpm server:cloud\" \"pnpm server:storage\"",
     "dev:electron": "concurrently -n prims,image-editor,ui,feat,web,electron,server -c cyan,cyan,cyan,cyan,blue,red,green \"pnpm web:build:primitives -- --watch\" \"pnpm web:build:image-editor -- --watch\" \"pnpm web:build:ui -- --watch\" \"pnpm web:build:features -- --watch\" \"pnpm web:start\" \"pnpm electron:start\"",
+    "dev:ngrok": "concurrently -n prims,image-editor,ui,feat,web,cloud,storage,nginx,ngrok -c cyan,cyan,cyan,cyan,blue,red,green,green,yellow,magenta \"pnpm web:build:primitives -- --watch\" \"pnpm web:build:image-editor -- --watch\" \"pnpm web:build:ui -- --watch\" \"pnpm web:build:features -- --watch\" \"pnpm web:start\" \"pnpm server:cloud\" \"pnpm server:storage\" \"pnpm proxy:nginx\" \"pnpm proxy:ngrok\"",
     "web:build": "pnpm run build",
     "web:build:primitives": "pnpm --filter @pivox/primitives run build",
     "web:build:image-editor": "pnpm --filter @pivox/image-editor run build",
     "web:build:features": "pnpm --filter @pivox/features build",
     "web:build:ui": "pnpm --filter @pivox/ui build",
     "web:clean": "pnpm clean",
-    "web:start": "pnpm --filter @pivox/start dev"
+    "web:start": "pnpm --filter @pivox/start dev",
+    "proxy:nginx": "nginx -c $PWD/../configs/nginx.conf -e stderr",
+    "proxy:nginx:stop": "nginx -c $PWD/../configs/nginx.conf -s stop",
+    "proxy:ngrok": "ngrok start --config $PWD/../configs/ngrok.yml --all"
   },
   "devDependencies": {
     "@tanstack/eslint-config": "^0.4.0",
@@ -33,7 +39,7 @@
     "prettier": "^3.8.1",
     "publint": "^0.3.18",
     "typescript": "^5.9.3",
-    "vite": "^8.0.2",
+    "vite": "^8.0.3",
     "vitest": "^4.1.1"
   },
   "pnpm": {

@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log/slog"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/durationpb"
 
@@ -32,10 +34,15 @@ type ConnectConfig struct {
 	HTTP      *HTTPServer
 }
 
-func Connect(ctx context.Context, addr string, token string, cfg *ConnectConfig, logger *slog.Logger) error {
-	conn, err := grpc.NewClient(addr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
+func Connect(ctx context.Context, addr string, useTLS bool, token string, cfg *ConnectConfig, logger *slog.Logger) error {
+	var creds grpc.DialOption
+	if useTLS {
+		creds = grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{}))
+	} else {
+		creds = grpc.WithTransportCredentials(insecure.NewCredentials())
+	}
+
+	conn, err := grpc.NewClient(addr, creds)
 	if err != nil {
 		return fmt.Errorf("dial %s: %w", addr, err)
 	}
