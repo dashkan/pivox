@@ -26,13 +26,13 @@ import (
 type AgentServiceServer struct {
 	agentv1.UnimplementedAgentServiceServer
 	pool    *pgxpool.Pool
-	queries *db.Queries
+	queries db.Querier
 	logger  *slog.Logger
 	conns   *agentstream.ConnectionManager
 }
 
 // NewAgentServiceServer creates a new AgentServiceServer.
-func NewAgentServiceServer(pool *pgxpool.Pool, queries *db.Queries, logger *slog.Logger, conns *agentstream.ConnectionManager) *AgentServiceServer {
+func NewAgentServiceServer(pool *pgxpool.Pool, queries db.Querier, logger *slog.Logger, conns *agentstream.ConnectionManager) *AgentServiceServer {
 	return &AgentServiceServer{
 		pool:    pool,
 		queries: queries,

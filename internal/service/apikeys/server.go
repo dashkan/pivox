@@ -24,11 +24,11 @@ import (
 type ApiKeysServer struct {
 	apiv1.UnimplementedApiKeysServer
 	db      db.DBTX
-	queries *db.Queries
+	queries db.Querier
 	filter  *filter.ResourceFilter
 }
 
-func NewApiKeysServer(pool db.DBTX, queries *db.Queries) *ApiKeysServer {
+func NewApiKeysServer(pool db.DBTX, queries db.Querier) *ApiKeysServer {
 	return &ApiKeysServer{
 		db:      pool,
 		queries: queries,

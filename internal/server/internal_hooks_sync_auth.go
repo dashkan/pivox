@@ -19,7 +19,7 @@ import (
 
 // NewInternalHooks creates a new internal hooks handler with Google Cloud OIDC
 // identity token verification for the accounts:sync endpoint.
-func NewInternalHooks(queries *db.Queries, cfg config.SyncAuthConfig, logger *slog.Logger, fb *firebase.AuthService) (*InternalHooks, error) {
+func NewInternalHooks(queries db.Querier, cfg config.SyncAuthConfig, logger *slog.Logger, fb *firebase.AuthService) (*InternalHooks, error) {
 	validator, err := idtoken.NewValidator(context.Background())
 	if err != nil {
 		return nil, err

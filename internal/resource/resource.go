@@ -34,7 +34,7 @@ func CollectionFromName(name string) string {
 }
 
 // ResolveOrgParent resolves an "organizations/{name}" parent to its UUID.
-func ResolveOrgParent(ctx context.Context, queries *db.Queries, parent string) (uuid.UUID, error) {
+func ResolveOrgParent(ctx context.Context, queries db.Querier, parent string) (uuid.UUID, error) {
 	collection := CollectionFromName(parent)
 	if collection != "organizations" {
 		return uuid.Nil, apierr.InvalidArgument(apierr.FieldViolation("parent",

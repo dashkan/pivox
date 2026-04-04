@@ -20,11 +20,11 @@ import (
 type TagBindingsServer struct {
 	apiv1.UnimplementedTagBindingsServer
 	db      db.DBTX
-	queries *db.Queries
+	queries db.Querier
 	filter  *filter.ResourceFilter
 }
 
-func NewTagBindingsServer(pool db.DBTX, queries *db.Queries) *TagBindingsServer {
+func NewTagBindingsServer(pool db.DBTX, queries db.Querier) *TagBindingsServer {
 	return &TagBindingsServer{
 		db:      pool,
 		queries: queries,

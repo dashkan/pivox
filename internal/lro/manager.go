@@ -27,7 +27,7 @@ type WorkFunc func(ctx context.Context) (proto.Message, error)
 // Manager manages long-running operations.
 type Manager struct {
 	pool    *pgxpool.Pool
-	queries *db.Queries
+	queries db.Querier
 	logger  *slog.Logger
 
 	mu        sync.Mutex
@@ -35,7 +35,7 @@ type Manager struct {
 }
 
 // NewManager creates a new LRO manager.
-func NewManager(pool *pgxpool.Pool, queries *db.Queries, logger *slog.Logger) *Manager {
+func NewManager(pool *pgxpool.Pool, queries db.Querier, logger *slog.Logger) *Manager {
 	return &Manager{
 		pool:      pool,
 		queries:   queries,

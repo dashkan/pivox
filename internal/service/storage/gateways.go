@@ -34,13 +34,13 @@ import (
 type StorageGatewaysServer struct {
 	storagev1.UnimplementedStorageGatewaysServer
 	pool              *pgxpool.Pool
-	queries           *db.Queries
+	queries           db.Querier
 	encryptor         crypto.Encryptor
 	conns             *agentstream.ConnectionManager
 	sessionSigningKey []byte
 }
 
-func NewStorageGatewaysServer(pool *pgxpool.Pool, queries *db.Queries, enc crypto.Encryptor, conns *agentstream.ConnectionManager) *StorageGatewaysServer {
+func NewStorageGatewaysServer(pool *pgxpool.Pool, queries db.Querier, enc crypto.Encryptor, conns *agentstream.ConnectionManager) *StorageGatewaysServer {
 	return &StorageGatewaysServer{
 		pool:              pool,
 		queries:           queries,

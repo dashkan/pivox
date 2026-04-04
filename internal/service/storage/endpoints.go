@@ -22,11 +22,11 @@ import (
 type EndpointsServer struct {
 	storagev1.UnimplementedEndpointsServer
 	pool      *pgxpool.Pool
-	queries   *db.Queries
+	queries   db.Querier
 	encryptor crypto.Encryptor
 }
 
-func NewEndpointsServer(pool *pgxpool.Pool, queries *db.Queries, enc crypto.Encryptor) *EndpointsServer {
+func NewEndpointsServer(pool *pgxpool.Pool, queries db.Querier, enc crypto.Encryptor) *EndpointsServer {
 	return &EndpointsServer{
 		pool:      pool,
 		queries:   queries,

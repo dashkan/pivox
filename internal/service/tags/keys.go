@@ -23,12 +23,12 @@ import (
 type TagKeysServer struct {
 	apiv1.UnimplementedTagKeysServer
 	db      db.DBTX
-	queries *db.Queries
+	queries db.Querier
 	iam     *iam.Helper
 	filter  *filter.ResourceFilter
 }
 
-func NewTagKeysServer(pool db.DBTX, queries *db.Queries, iam *iam.Helper) *TagKeysServer {
+func NewTagKeysServer(pool db.DBTX, queries db.Querier, iam *iam.Helper) *TagKeysServer {
 	return &TagKeysServer{
 		db:      pool,
 		queries: queries,

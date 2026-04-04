@@ -10,13 +10,13 @@ import (
 
 // Reaper periodically deletes expired operations.
 type Reaper struct {
-	queries  *db.Queries
+	queries  db.Querier
 	interval time.Duration
 	logger   *slog.Logger
 }
 
 // NewReaper creates a new operation reaper.
-func NewReaper(queries *db.Queries, interval time.Duration, logger *slog.Logger) *Reaper {
+func NewReaper(queries db.Querier, interval time.Duration, logger *slog.Logger) *Reaper {
 	return &Reaper{
 		queries:  queries,
 		interval: interval,

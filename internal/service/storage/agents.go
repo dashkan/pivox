@@ -15,10 +15,10 @@ import (
 
 type AgentsServer struct {
 	storagev1.UnimplementedAgentsServer
-	queries *db.Queries
+	queries db.Querier
 }
 
-func NewAgentsServer(queries *db.Queries) *AgentsServer {
+func NewAgentsServer(queries db.Querier) *AgentsServer {
 	return &AgentsServer{
 		queries: queries,
 	}

@@ -19,7 +19,7 @@ import (
 // public gRPC/REST API. These are called by Firebase Functions and other
 // internal services.
 type InternalHooks struct {
-	queries  *db.Queries
+	queries  db.Querier
 	logger   *slog.Logger
 	firebase *firebase.AuthService
 

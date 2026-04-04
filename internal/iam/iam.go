@@ -17,11 +17,11 @@ import (
 
 // Helper provides reusable IAM operations for any resource type.
 type Helper struct {
-	queries *db.Queries
+	queries db.Querier
 }
 
 // NewHelper creates a new IAM helper.
-func NewHelper(queries *db.Queries) *Helper {
+func NewHelper(queries db.Querier) *Helper {
 	return &Helper{queries: queries}
 }
 

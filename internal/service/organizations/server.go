@@ -26,13 +26,13 @@ type OrganizationsServer struct {
 	apiv1.UnimplementedOrganizationsServer
 	db      db.DBTX
 	pool    *pgxpool.Pool
-	queries *db.Queries
+	queries db.Querier
 	iam     *iam.Helper
 	tenants *firebase.AuthService
 	filter  *filter.ResourceFilter
 }
 
-func NewOrganizationsServer(pool *pgxpool.Pool, queries *db.Queries, iam *iam.Helper, tenants *firebase.AuthService) *OrganizationsServer {
+func NewOrganizationsServer(pool *pgxpool.Pool, queries db.Querier, iam *iam.Helper, tenants *firebase.AuthService) *OrganizationsServer {
 	return &OrganizationsServer{
 		db:      pool,
 		pool:    pool,
@@ -111,7 +111,7 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	qtx := s.queries.WithTx(tx)
+	qtx := db.New(tx)
 
 	org, err := qtx.CreateOrganization(ctx, db.CreateOrganizationParams{
 		ID:          uuid.New(),

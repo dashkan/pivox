@@ -20,10 +20,10 @@ import (
 type AssetsServer struct {
 	assetsv1.UnimplementedAssetsServer
 	db      db.DBTX
-	queries *db.Queries
+	queries db.Querier
 }
 
-func NewAssetsServer(pool db.DBTX, queries *db.Queries) *AssetsServer {
+func NewAssetsServer(pool db.DBTX, queries db.Querier) *AssetsServer {
 	return &AssetsServer{
 		db:      pool,
 		queries: queries,

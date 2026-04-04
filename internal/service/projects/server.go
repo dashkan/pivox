@@ -26,12 +26,12 @@ import (
 type ProjectsServer struct {
 	apiv1.UnimplementedProjectsServer
 	db      db.DBTX
-	queries *db.Queries
+	queries db.Querier
 	iam     *iam.Helper
 	filter  *filter.ResourceFilter
 }
 
-func NewProjectsServer(pool db.DBTX, queries *db.Queries, iam *iam.Helper) *ProjectsServer {
+func NewProjectsServer(pool db.DBTX, queries db.Querier, iam *iam.Helper) *ProjectsServer {
 	return &ProjectsServer{
 		db:      pool,
 		queries: queries,

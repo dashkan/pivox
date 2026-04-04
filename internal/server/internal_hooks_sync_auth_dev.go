@@ -17,7 +17,7 @@ import (
 // NewInternalHooks creates a new internal hooks handler with shared secret
 // authentication for the accounts:sync endpoint. This is the dev-mode
 // fallback for when the Firebase Functions emulator cannot mint OIDC tokens.
-func NewInternalHooks(queries *db.Queries, cfg config.SyncAuthConfig, logger *slog.Logger, fb *firebase.AuthService) (*InternalHooks, error) {
+func NewInternalHooks(queries db.Querier, cfg config.SyncAuthConfig, logger *slog.Logger, fb *firebase.AuthService) (*InternalHooks, error) {
 	h := &InternalHooks{
 		queries:         queries,
 		logger:          logger,
