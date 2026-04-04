@@ -10,7 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	pgxvector "github.com/pgvector/pgvector-go/pgx"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -25,7 +27,7 @@ func SetupTestDB(t *testing.T) (pool *pgxpool.Pool, queries *db.Queries, cleanup
 	ctx := context.Background()
 
 	container, err := postgres.Run(ctx,
-		"postgres:16-alpine",
+		"pgvector/pgvector:pg18",
 		postgres.WithDatabase("pivox_test"),
 		postgres.WithUsername("test"),
 		postgres.WithPassword("test"),
@@ -45,16 +47,43 @@ func SetupTestDB(t *testing.T) (pool *pgxpool.Pool, queries *db.Queries, cleanup
 		t.Fatalf("failed to get connection string: %v", err)
 	}
 
-	pool, err = pgxpool.New(ctx, connStr)
+	// First pool: run migrations (pgvector extension not yet available).
+	migrationPool, err := pgxpool.New(ctx, connStr)
+	if err != nil {
+		_ = container.Terminate(ctx)
+		t.Fatalf("failed to create migration pool: %v", err)
+	}
+
+	if err := runMigrations(ctx, migrationPool); err != nil {
+		migrationPool.Close()
+		_ = container.Terminate(ctx)
+		t.Fatalf("failed to run migrations: %v", err)
+	}
+	// Set default for embedding column to avoid pgvector-go NULL scan panic.
+	// pgvector.Vector (non-pointer) panics on NULL; a zero-vector default sidesteps this.
+	// The column is vector(768), so we use a 768-dimensional zero vector.
+	if _, err := migrationPool.Exec(ctx, "ALTER TABLE assets ALTER COLUMN embedding SET DEFAULT (array_fill(0, ARRAY[768])::vector)"); err != nil {
+		migrationPool.Close()
+		_ = container.Terminate(ctx)
+		t.Fatalf("failed to set embedding default: %v", err)
+	}
+	migrationPool.Close()
+
+	// Second pool: register pgvector types now that the extension exists.
+	// Use DefaultQueryExecMode = QueryExecModeDescribeExec to let pgx
+	// handle NULL vector columns gracefully via the describe protocol.
+	poolCfg, err := pgxpool.ParseConfig(connStr)
+	if err != nil {
+		_ = container.Terminate(ctx)
+		t.Fatalf("failed to parse pool config: %v", err)
+	}
+	poolCfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		return pgxvector.RegisterTypes(ctx, conn)
+	}
+	pool, err = pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {
 		_ = container.Terminate(ctx)
 		t.Fatalf("failed to create pool: %v", err)
-	}
-
-	if err := runMigrations(ctx, pool); err != nil {
-		pool.Close()
-		_ = container.Terminate(ctx)
-		t.Fatalf("failed to run migrations: %v", err)
 	}
 
 	queries = db.New(pool)

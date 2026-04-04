@@ -94,11 +94,13 @@ func (mc *MemoryCache) Put(key string, body []byte, contentType string, etag str
 		return false
 	}
 
-	// Check if adding this would exceed memory limit.
+	// Evict entries until there's room. Release the lock before
+	// RemoveOldest because the eviction callback also acquires mc.mu.
 	mc.mu.Lock()
 	for mc.curBytes+int64(size) > mc.maxBytes && mc.cache.Len() > 0 {
-		// Evict oldest to make room. The evict callback updates curBytes.
+		mc.mu.Unlock()
 		mc.cache.RemoveOldest()
+		mc.mu.Lock()
 	}
 	mc.curBytes += int64(size)
 	mc.mu.Unlock()

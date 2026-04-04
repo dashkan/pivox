@@ -7,6 +7,7 @@ import (
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -15,24 +16,35 @@ import (
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/filter"
-	"github.com/dashkan/pivox/internal/firebase"
 	"github.com/dashkan/pivox/internal/iam"
 	"github.com/dashkan/pivox/internal/lro"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	"github.com/dashkan/pivox/internal/resource"
 )
 
+// TenantService abstracts Firebase Auth tenant operations for testability.
+type TenantService interface {
+	CreateTenant(ctx context.Context, displayName string) (string, error)
+	DeleteTenant(ctx context.Context, tenantID string) error
+}
+
+// TxBeginner abstracts transaction creation for testability.
+// *pgxpool.Pool satisfies this interface.
+type TxBeginner interface {
+	Begin(ctx context.Context) (pgx.Tx, error)
+}
+
 type OrganizationsServer struct {
 	apiv1.UnimplementedOrganizationsServer
 	db      db.DBTX
-	pool    *pgxpool.Pool
+	pool    TxBeginner
 	queries db.Querier
 	iam     *iam.Helper
-	tenants *firebase.AuthService
+	tenants TenantService
 	filter  *filter.ResourceFilter
 }
 
-func NewOrganizationsServer(pool *pgxpool.Pool, queries db.Querier, iam *iam.Helper, tenants *firebase.AuthService) *OrganizationsServer {
+func NewOrganizationsServer(pool *pgxpool.Pool, queries db.Querier, iam *iam.Helper, tenants TenantService) *OrganizationsServer {
 	return &OrganizationsServer{
 		db:      pool,
 		pool:    pool,

@@ -1,0 +1,266 @@
+package apikeys
+
+import (
+	"context"
+	"encoding/json"
+	"testing"
+	"time"
+	"unicode"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
+
+	db "github.com/dashkan/pivox/internal/db/generated"
+	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
+	"github.com/dashkan/pivox/internal/testutil/mocks"
+)
+
+var (
+	testOrgID = uuid.MustParse("0192a000-0001-7000-8000-000000000001")
+	testKeyID = uuid.MustParse("0192a000-0002-7000-8000-000000000001")
+	testOrg   = db.Organization{
+		ID:          testOrgID,
+		Name:        "acme",
+		DisplayName: "Acme Corp",
+		State:       db.ResourceStateACTIVE,
+		CreateTime:  time.Date(2025, 6, 15, 10, 0, 0, 0, time.UTC),
+		UpdateTime:  time.Date(2025, 6, 15, 10, 0, 0, 0, time.UTC),
+	}
+	testDBKey = db.ApiKey{
+		ID:          testKeyID,
+		OrgID:       testOrgID,
+		KeyID:       "my-key",
+		KeyString:   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklm",
+		DisplayName: "My API Key",
+		Annotations: json.RawMessage(`{"env":"prod"}`),
+		Etag:        "etag-1",
+		Revision:    1,
+		CreateTime:  time.Date(2025, 6, 15, 10, 0, 0, 0, time.UTC),
+		UpdateTime:  time.Date(2025, 6, 15, 10, 0, 0, 0, time.UTC),
+	}
+)
+
+func TestUnit_CreateKey_Success(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := NewApiKeysServer(nil, mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
+	mockQ.On("CreateApiKey", mock.Anything, mock.MatchedBy(func(p db.CreateApiKeyParams) bool {
+		return p.OrgID == testOrgID && p.DisplayName == "New Key" && p.KeyID == "custom-id"
+	})).Return(db.ApiKey{
+		ID:          uuid.New(),
+		OrgID:       testOrgID,
+		KeyID:       "custom-id",
+		KeyString:   "generated-key-string-placeholder-12345",
+		DisplayName: "New Key",
+		Annotations: json.RawMessage(`{}`),
+		CreateTime:  time.Now(),
+		UpdateTime:  time.Now(),
+	}, nil)
+
+	resp, err := srv.CreateKey(ctx, &apiv1.CreateKeyRequest{
+		Parent: "organizations/acme",
+		Key:    &apiv1.Key{DisplayName: "New Key"},
+		KeyId:  "custom-id",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "organizations/acme/keys/custom-id", resp.GetName())
+	assert.Equal(t, "New Key", resp.GetDisplayName())
+	// key_string is never returned in the proto conversion
+	assert.Empty(t, resp.GetKeyString())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_CreateKey_InvalidParent(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := NewApiKeysServer(nil, mockQ)
+	ctx := context.Background()
+
+	_, err := srv.CreateKey(ctx, &apiv1.CreateKeyRequest{
+		Parent: "bad-parent",
+		Key:    &apiv1.Key{DisplayName: "Key"},
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	// HandleResourceError wraps the parse error; it will be Internal or InvalidArgument
+	// depending on the error type. For a non-pgx error, it becomes Internal.
+	assert.NotEqual(t, codes.OK, st.Code())
+}
+
+func TestUnit_GetKey_Success(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := NewApiKeysServer(nil, mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
+	mockQ.On("GetApiKeyByOrgAndKeyID", mock.Anything, db.GetApiKeyByOrgAndKeyIDParams{
+		OrgID: testOrgID,
+		KeyID: "my-key",
+	}).Return(testDBKey, nil)
+
+	resp, err := srv.GetKey(ctx, &apiv1.GetKeyRequest{
+		Name: "organizations/acme/keys/my-key",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "organizations/acme/keys/my-key", resp.GetName())
+	assert.Equal(t, "My API Key", resp.GetDisplayName())
+	assert.Equal(t, "etag-1", resp.GetEtag())
+	assert.Equal(t, map[string]string{"env": "prod"}, resp.GetAnnotations())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_GetKey_NotFound(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := NewApiKeysServer(nil, mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
+	mockQ.On("GetApiKeyByOrgAndKeyID", mock.Anything, db.GetApiKeyByOrgAndKeyIDParams{
+		OrgID: testOrgID,
+		KeyID: "nonexistent",
+	}).Return(db.ApiKey{}, pgx.ErrNoRows)
+
+	_, err := srv.GetKey(ctx, &apiv1.GetKeyRequest{
+		Name: "organizations/acme/keys/nonexistent",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+}
+
+func TestUnit_DeleteKey_Success(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := NewApiKeysServer(nil, mockQ)
+	ctx := context.Background()
+
+	deletedKey := testDBKey
+	deletedKey.DeleteTime = pgtype.Timestamptz{Time: time.Now(), Valid: true}
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
+	mockQ.On("GetApiKeyByOrgAndKeyID", mock.Anything, db.GetApiKeyByOrgAndKeyIDParams{
+		OrgID: testOrgID,
+		KeyID: "my-key",
+	}).Return(testDBKey, nil)
+	mockQ.On("SoftDeleteApiKey", mock.Anything, db.SoftDeleteApiKeyParams{
+		ID:        testKeyID,
+		DeletedBy: "",
+	}).Return(deletedKey, nil)
+
+	resp, err := srv.DeleteKey(ctx, &apiv1.DeleteKeyRequest{
+		Name: "organizations/acme/keys/my-key",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "organizations/acme/keys/my-key", resp.GetName())
+	assert.NotNil(t, resp.GetDeleteTime())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_UndeleteKey_Success(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := NewApiKeysServer(nil, mockQ)
+	ctx := context.Background()
+
+	undeletedKey := testDBKey
+	undeletedKey.DeleteTime = pgtype.Timestamptz{} // cleared
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
+	mockQ.On("GetApiKeyByOrgAndKeyID", mock.Anything, db.GetApiKeyByOrgAndKeyIDParams{
+		OrgID: testOrgID,
+		KeyID: "my-key",
+	}).Return(testDBKey, nil)
+	mockQ.On("UndeleteApiKey", mock.Anything, db.UndeleteApiKeyParams{
+		ID:        testKeyID,
+		UpdatedBy: "",
+	}).Return(undeletedKey, nil)
+
+	resp, err := srv.UndeleteKey(ctx, &apiv1.UndeleteKeyRequest{
+		Name: "organizations/acme/keys/my-key",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "organizations/acme/keys/my-key", resp.GetName())
+	assert.Nil(t, resp.GetDeleteTime())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_LookupKey_Success(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := NewApiKeysServer(nil, mockQ)
+	ctx := context.Background()
+
+	mockQ.On("LookupApiKeyByKeyString", mock.Anything, "the-secret-key-string").Return(testDBKey, nil)
+	mockQ.On("GetOrganization", mock.Anything, testOrgID).Return(testOrg, nil)
+
+	resp, err := srv.LookupKey(ctx, &apiv1.LookupKeyRequest{
+		KeyString: "the-secret-key-string",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "organizations/acme", resp.GetParent())
+	assert.Equal(t, "organizations/acme/keys/my-key", resp.GetName())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_UpdateKey_WithFieldMask(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := NewApiKeysServer(nil, mockQ)
+	ctx := context.Background()
+
+	updatedKey := testDBKey
+	updatedKey.DisplayName = "Updated Name"
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
+	mockQ.On("GetApiKeyByOrgAndKeyID", mock.Anything, db.GetApiKeyByOrgAndKeyIDParams{
+		OrgID: testOrgID,
+		KeyID: "my-key",
+	}).Return(testDBKey, nil)
+	mockQ.On("UpdateApiKey", mock.Anything, mock.MatchedBy(func(p db.UpdateApiKeyParams) bool {
+		return p.ID == testKeyID &&
+			p.DisplayName.Valid &&
+			p.DisplayName.String == "Updated Name" &&
+			p.Annotations == nil // not in mask, should not be set
+	})).Return(updatedKey, nil)
+
+	resp, err := srv.UpdateKey(ctx, &apiv1.UpdateKeyRequest{
+		Key: &apiv1.Key{
+			Name:        "organizations/acme/keys/my-key",
+			DisplayName: "Updated Name",
+		},
+		UpdateMask: &fieldmaskpb.FieldMask{
+			Paths: []string{"display_name"},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "Updated Name", resp.GetDisplayName())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_GenerateKeyString(t *testing.T) {
+	key := generateKeyString()
+	assert.Len(t, key, 39, "generated key should be 39 characters")
+
+	for _, c := range key {
+		assert.True(t, unicode.IsLetter(c) || unicode.IsDigit(c),
+			"character %q should be alphanumeric", c)
+	}
+
+	// Verify uniqueness (two keys should differ)
+	key2 := generateKeyString()
+	assert.NotEqual(t, key, key2, "two generated keys should be different")
+}
