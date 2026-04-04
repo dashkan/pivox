@@ -248,29 +248,63 @@ sampling = 1.0         # 100% — low volume in dev, capture everything
 
 ### Production
 
-Export via OTLP to a collector or directly to a backend:
+Each agent exports directly to the cloud backend. No dedicated collector process. The engine exports to its local Playout Agent via localhost; the Playout Agent forwards to the cloud alongside its own telemetry.
+
+```
+Engine Machine:
+  Engine ──OTLP(localhost)──→ Playout Agent ──OTLP──→ Cloud Backend
+                                    │
+                              Local disk buffer
+                              (bounded, survives outages)
+
+Storage Machine:
+  Storage Agent ──OTLP──→ Cloud Backend
+                    │
+              Local disk buffer
+
+Native App ──OTLP──→ Cloud Backend
+```
 
 ```toml
+# Engine config — exports to local Playout Agent
 [telemetry]
 exporter = "otlp"
-otlp_endpoint = "http://collector.internal:4317"  # gRPC OTLP endpoint
-# or direct to backend:
-# otlp_endpoint = "https://tempo.grafana.net:443"
+otlp_endpoint = "http://localhost:4317"
 
 [telemetry.sampling]
 default_rate = 0.01
 ```
 
-### Playout Agent as Local Collector
+```toml
+# Playout Agent config — receives from engine, exports to cloud
+[telemetry]
+exporter = "otlp"
+otlp_endpoint = "https://telemetry.pivox.app:4317"
+local_receiver_port = 4317          # accepts OTLP from local engine
 
-In production, the Playout Agent can optionally run an OTel Collector sidecar. Engines on the same machine or LAN export to the Playout Agent's collector, which buffers, batches, and forwards to the cloud backend. This reduces the number of outbound connections and provides local buffering during cloud connectivity issues.
+[telemetry.buffer]
+max_disk_mb = 1024                  # 1GB disk budget for offline buffering
+retention_hours = 72                # drop entries older than 72h
+```
+
+### Local Buffering and Offline Resilience
+
+Each agent maintains a **bounded disk-backed buffer** for telemetry data. When the cloud backend is unreachable, telemetry accumulates locally. When connectivity restores, the agent flushes the buffer to the cloud.
+
+The buffer has a fixed disk budget (configurable, default 1GB). When the buffer fills, the oldest entries are dropped. No runaway disk consumption. The OTel SDK's `BatchSpanProcessor` and `BatchLogRecordProcessor` handle this natively — bounded queue size, configurable max export batch size, and drop-on-full semantics.
+
+### Offline Diagnosis
+
+When the cloud is unreachable, engineers diagnose locally via the Playout Agent. The native app (Engineering workspace) connects to the Playout Agent on the LAN and reads telemetry directly:
 
 ```
-Engine A ──OTLP──→ ┌──────────────────┐
-Engine B ──OTLP──→ │ Playout Agent    │ ──OTLP──→ Cloud Backend
-Engine C ──OTLP──→ │ (OTel Collector) │
-                    └──────────────────┘
+Native App (Engineering mode) ──gRPC──→ Playout Agent
+                                         ├── Recent traces (in-memory ring buffer)
+                                         ├── Recent logs (disk buffer, queryable)
+                                         └── Current metrics (live)
 ```
+
+No cloud needed for local diagnosis. The engineer is already on the LAN. The Playout Agent exposes a local telemetry query API — recent traces, logs, and live metrics — accessible from the native app's Engineering workspace.
 
 ## gRPC Auto-Instrumentation
 
