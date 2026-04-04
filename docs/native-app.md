@@ -300,6 +300,24 @@ The existing web-based auth components (`@pivox/ui` auth cards, `@pivox/features
 
 Firebase C++ SDK manages its own token persistence. The native app stores the refresh token securely using platform APIs.
 
+### Shared Auth Logic
+
+All auth logic lives in the **shared C++ core**, not in platform-specific code. The Firebase C++ SDK is already cross-platform — wrapping it in Rust would add indirection over a library that already works identically on macOS and Windows.
+
+```
+SwiftUI auth screens ──→ Shared C++ AuthManager ──→ Firebase C++ SDK
+WinUI 3 auth screens ──→ Shared C++ AuthManager ──→ Firebase C++ SDK
+```
+
+The `AuthManager` in the shared C++ core handles:
+
+- Form validation and error mapping
+- Auth state machine (logged out → authenticating → authenticated → token expired)
+- Token management for gRPC metadata
+- All Firebase C++ SDK calls
+
+The native screens are thin views — they render form fields and bind to `AuthManager` callbacks. Written per-platform, but minimal code since all logic is shared.
+
 ### Existing Infrastructure
 
 The external browser auth flow is already built and running in the Electron app (see `docs/authn.md`). The hosted auth pages, Go server callback endpoint, custom token minting, and `pivox://` URL scheme handling all exist. The native app reuses the same server-side infrastructure — only the client-side code changes (Electron's protocol handler → native URL scheme handler, React auth screens → native auth screens).
@@ -392,20 +410,64 @@ The native app architecture enables embedding the Pivox playout engine directly 
 Native App (Designer mode)
   ├── Native shell (SwiftUI / WinUI 3)
   ├── Shared C++ core
-  ├── Embedded Pivox engine (Rust, loaded as library)
+  ├── Embedded Pivox engine-lite (Rust, loaded as library)
   │   ├── Compositor
   │   ├── CEF plugin (template rendering)
   │   ├── Rive plugin
   │   ├── FFmpeg plugin
-  │   └── Software clock + NDI/window output
-  └── CEF viewport (design canvas showing engine output)
+  │   └── Software clock + direct framebuffer output
+  └── Design canvas viewport (showing engine output)
 ```
 
-A template designer gets a complete playout engine running locally inside the app — real compositor, real plugin rendering, real SDK bindings, real transitions. No separate engine process to manage, no network connection to a remote engine. The software clock drives timing, NDI or a direct framebuffer provides preview output to the design canvas viewport.
+A template designer gets a complete playout engine running locally inside the app — real compositor, real plugin rendering, real SDK bindings, real transitions. No separate engine process to manage, no network connection to a remote engine. The software clock drives timing, a direct framebuffer provides preview output to the design canvas viewport.
 
 This is the full development suite in a single application: edit a template, see it rendered by the real engine, test data bindings, preview transitions — all without deploying to a staging server or connecting to external hardware.
 
 For **Operator** mode, the app connects to remote engines via gRPC as normal. The embedded engine is only used in Designer mode for local development preview.
+
+### In-Process gRPC
+
+The embedded engine exposes the **exact same gRPC service interface** as a standalone engine. The only difference is transport — in-process gRPC instead of Unix domain socket or TCP. The app's shared C++ core connects to the embedded engine the same way it connects to a remote engine. No second API surface, no second test matrix.
+
+```
+Operator mode:   App ──gRPC──→ Remote engine (UDS/TCP)
+Designer mode:   App ──gRPC──→ Embedded engine (in-process)
+```
+
+The shared C++ gRPC client code is identical in both modes. A connection target config determines whether to connect to a remote address or the in-process engine.
+
+### Engine-Lite Build Configuration
+
+The embedded engine is an **engine-lite** build that strips hardware-specific components not needed for design preview:
+
+| Component | Standalone Engine | Engine-Lite (Embedded) |
+|---|---|---|
+| Compositor | Yes | Yes |
+| CEF plugin | Yes | Yes |
+| Rive plugin | Yes | Yes |
+| FFmpeg plugin | Yes | Yes |
+| Software clock | Yes | Yes |
+| AJA NTV2 output | Yes | No — no SDI hardware in designer machines |
+| AJA genlock clock | Yes | No — software clock only |
+| GPI handler | Yes | No — no GPI hardware |
+| NVENC recording | Yes | No — no compliance recording for design |
+| ST 2110 output | Yes | No |
+| NDI output | Optional | Optional — direct framebuffer is primary |
+| Caption/VANC | Yes | No |
+
+The engine-lite build is a compile-time configuration (feature flags in Cargo, CMake options), not a runtime switch. It produces a smaller library without hardware SDK dependencies.
+
+### Scope Constraints
+
+The embedded engine is deliberately limited to prevent scope creep:
+
+- **One channel only.** Designers work on one template at a time. Multi-channel preview is an operator concern.
+- **Software clock only.** No genlock, no external timing reference.
+- **No data plane.** Shared memory feeds are not available in embedded mode. Template data comes from the designer's mock data in the UI. Enough to test bindings, not to simulate live production.
+- **No automation integration.** No MOS, VDCP, or external automation triggers.
+- **Direct framebuffer output.** The compositor writes to a buffer the design canvas reads directly. NDI is optional for external monitoring but not the primary path.
+
+The designer app is a design tool, not a production simulator. For full multi-channel testing with live data, the designer deploys to a staging engine (Tier 3 workflow).
 
 ## Advantages Over Electron
 
