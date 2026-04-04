@@ -58,7 +58,6 @@ var (
 func newGatewayServer(q *mocks.MockQuerier) *StorageGatewaysServer {
 	conns := agentstream.NewConnectionManager()
 	return &StorageGatewaysServer{
-		pool:              nil,
 		queries:           q,
 		encryptor:         nil,
 		conns:             conns,

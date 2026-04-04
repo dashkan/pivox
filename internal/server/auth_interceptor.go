@@ -9,13 +9,13 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"github.com/dashkan/pivox/internal/firebase"
+	"github.com/dashkan/pivox/internal/authn"
 )
 
-// authContextKey is the context key for the authenticated Firebase UID.
+// authContextKey is the context key for the authenticated UID.
 type authContextKey struct{}
 
-// AuthenticatedUID extracts the verified Firebase UID from the context.
+// AuthenticatedUID extracts the verified UID from the context.
 // Returns the UID and true if present, or an empty string and false if the
 // request was not authenticated (e.g., a public endpoint).
 func AuthenticatedUID(ctx context.Context) (string, bool) {
@@ -23,7 +23,7 @@ func AuthenticatedUID(ctx context.Context) (string, bool) {
 	return uid, ok
 }
 
-// MustAuthenticatedUID extracts the verified Firebase UID from the context.
+// MustAuthenticatedUID extracts the verified UID from the context.
 // Panics if the context does not contain an authenticated UID — only call
 // this from handlers that are known to be behind the auth interceptor.
 func MustAuthenticatedUID(ctx context.Context) string {
@@ -38,19 +38,19 @@ func MustAuthenticatedUID(ctx context.Context) string {
 // Reflection and health checks are handled separately by gRPC itself.
 var publicMethods = map[string]bool{
 	// AgentService.Connect authenticates via registration_token in the
-	// Handshake message, not via Firebase bearer tokens.
+	// Handshake message, not via bearer tokens.
 	"/pivox.agent.v1.AgentService/Connect": true,
 }
 
 // AuthInterceptor returns a gRPC unary server interceptor that verifies
-// Firebase ID tokens from the "authorization" metadata header.
+// bearer tokens via the provided authn.Service.
 //
 // The interceptor:
 //  1. Skips methods listed in publicMethods.
 //  2. Extracts the Bearer token from the "authorization" metadata.
-//  3. Verifies the token via Firebase Auth.
+//  3. Verifies the token via the auth service.
 //  4. Injects the authenticated UID into the context.
-func AuthInterceptor(auth *firebase.AuthService) grpc.UnaryServerInterceptor {
+func AuthInterceptor(auth authn.Service) grpc.UnaryServerInterceptor {
 	return func(
 		ctx context.Context,
 		req any,
@@ -77,19 +77,19 @@ func AuthInterceptor(auth *firebase.AuthService) grpc.UnaryServerInterceptor {
 		}
 		idToken := strings.TrimPrefix(bearer, "Bearer ")
 
-		token, err := auth.VerifyIDToken(ctx, idToken)
+		identity, err := auth.VerifyToken(ctx, idToken)
 		if err != nil {
 			return nil, status.Error(codes.Unauthenticated, "invalid or expired token")
 		}
 
-		ctx = context.WithValue(ctx, authContextKey{}, token.UID)
+		ctx = context.WithValue(ctx, authContextKey{}, identity.UID)
 		return handler(ctx, req)
 	}
 }
 
 // AuthStreamInterceptor returns a gRPC stream server interceptor that verifies
-// Firebase ID tokens. Same logic as AuthInterceptor but for streaming RPCs.
-func AuthStreamInterceptor(auth *firebase.AuthService) grpc.StreamServerInterceptor {
+// bearer tokens. Same logic as AuthInterceptor but for streaming RPCs.
+func AuthStreamInterceptor(auth authn.Service) grpc.StreamServerInterceptor {
 	return func(
 		srv any,
 		ss grpc.ServerStream,
@@ -116,12 +116,12 @@ func AuthStreamInterceptor(auth *firebase.AuthService) grpc.StreamServerIntercep
 		}
 		idToken := strings.TrimPrefix(bearer, "Bearer ")
 
-		token, err := auth.VerifyIDToken(ss.Context(), idToken)
+		identity, err := auth.VerifyToken(ss.Context(), idToken)
 		if err != nil {
 			return status.Error(codes.Unauthenticated, "invalid or expired token")
 		}
 
-		ctx := context.WithValue(ss.Context(), authContextKey{}, token.UID)
+		ctx := context.WithValue(ss.Context(), authContextKey{}, identity.UID)
 		wrapped := &wrappedStream{ServerStream: ss, ctx: ctx}
 		return handler(srv, wrapped)
 	}

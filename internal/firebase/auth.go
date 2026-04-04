@@ -9,8 +9,12 @@ import (
 	"firebase.google.com/go/v4/auth"
 	"google.golang.org/api/option"
 
+	"github.com/dashkan/pivox/internal/authn"
 	"github.com/dashkan/pivox/internal/config"
 )
+
+// Compile-time check: *AuthService implements authn.Service.
+var _ authn.Service = (*AuthService)(nil)
 
 // AuthService wraps Firebase Auth operations including tenant management,
 // ID token verification, and custom token creation.
@@ -60,9 +64,21 @@ func NewAuthService(ctx context.Context, gc config.GoogleCloudConfig) (*AuthServ
 	}, nil
 }
 
-// VerifyIDToken verifies a Firebase ID token and returns the decoded token.
-func (s *AuthService) VerifyIDToken(ctx context.Context, idToken string) (*auth.Token, error) {
-	return s.authClient.VerifyIDToken(ctx, idToken)
+// VerifyToken verifies a Firebase ID token and returns a provider-independent identity.
+func (s *AuthService) VerifyToken(ctx context.Context, token string) (*authn.Identity, error) {
+	fbToken, err := s.authClient.VerifyIDToken(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	email, _ := fbToken.Claims["email"].(string)
+
+	return &authn.Identity{
+		UID:      fbToken.UID,
+		Email:    email,
+		TenantID: fbToken.Firebase.Tenant,
+		Claims:   fbToken.Claims,
+	}, nil
 }
 
 // CreateCustomToken creates a custom token for the given UID that can be used

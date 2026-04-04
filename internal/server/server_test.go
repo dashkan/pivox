@@ -48,7 +48,7 @@ func setupTestServer(t *testing.T) *grpc.ClientConn {
 
 	queries := db.New(pool)
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
-	lroManager := lro.NewManager(pool, queries, logger)
+	lroManager := lro.NewManager(queries, logger)
 	iamHelper := iam.NewHelper(queries)
 
 	// Suppress unused variable warnings for services that still need LRO.

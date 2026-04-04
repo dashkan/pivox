@@ -61,7 +61,6 @@ var (
 
 func newEndpointsServer(q *mocks.MockQuerier) *EndpointsServer {
 	return &EndpointsServer{
-		pool:      nil,
 		queries:   q,
 		encryptor: nil,
 	}

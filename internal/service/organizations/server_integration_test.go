@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
+	"github.com/dashkan/pivox/internal/authn"
 	"github.com/dashkan/pivox/internal/iam"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
@@ -17,14 +18,22 @@ import (
 	"github.com/dashkan/pivox/internal/testutil"
 )
 
-// noopTenantService stubs out Firebase Auth tenant operations for tests.
-type noopTenantService struct{}
+// noopAuthService stubs out the authn.Service interface for tests.
+type noopAuthService struct{}
 
-func (n noopTenantService) CreateTenant(_ context.Context, displayName string) (string, error) {
+func (n noopAuthService) VerifyToken(_ context.Context, _ string) (*authn.Identity, error) {
+	return &authn.Identity{UID: "test-user"}, nil
+}
+
+func (n noopAuthService) CreateCustomToken(_ context.Context, uid string) (string, error) {
+	return "custom-token-" + uid, nil
+}
+
+func (n noopAuthService) CreateTenant(_ context.Context, displayName string) (string, error) {
 	return "tenant-" + displayName, nil
 }
 
-func (n noopTenantService) DeleteTenant(_ context.Context, _ string) error {
+func (n noopAuthService) DeleteTenant(_ context.Context, _ string) error {
 	return nil
 }
 
@@ -39,7 +48,7 @@ func TestIntegration_Organizations(t *testing.T) {
 	iamHelper := iam.NewHelper(queries)
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, iamHelper, noopTenantService{}))
+		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, iamHelper, noopAuthService{}))
 	})
 
 	client := apiv1.NewOrganizationsClient(conn)

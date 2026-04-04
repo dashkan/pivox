@@ -9,7 +9,6 @@ import (
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/convert"
@@ -21,14 +20,12 @@ import (
 
 type EndpointsServer struct {
 	storagev1.UnimplementedEndpointsServer
-	pool      *pgxpool.Pool
 	queries   db.Querier
 	encryptor crypto.Encryptor
 }
 
-func NewEndpointsServer(pool *pgxpool.Pool, queries db.Querier, enc crypto.Encryptor) *EndpointsServer {
+func NewEndpointsServer(queries db.Querier, enc crypto.Encryptor) *EndpointsServer {
 	return &EndpointsServer{
-		pool:      pool,
 		queries:   queries,
 		encryptor: enc,
 	}

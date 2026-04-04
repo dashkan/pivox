@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/dashkan/pivox/internal/apierr"
+	"github.com/dashkan/pivox/internal/authn"
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/filter"
@@ -21,12 +22,6 @@ import (
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	"github.com/dashkan/pivox/internal/resource"
 )
-
-// TenantService abstracts Firebase Auth tenant operations for testability.
-type TenantService interface {
-	CreateTenant(ctx context.Context, displayName string) (string, error)
-	DeleteTenant(ctx context.Context, tenantID string) error
-}
 
 // TxBeginner abstracts transaction creation for testability.
 // *pgxpool.Pool satisfies this interface.
@@ -40,17 +35,17 @@ type OrganizationsServer struct {
 	pool    TxBeginner
 	queries db.Querier
 	iam     *iam.Helper
-	tenants TenantService
+	auth    authn.Service
 	filter  *filter.ResourceFilter
 }
 
-func NewOrganizationsServer(pool *pgxpool.Pool, queries db.Querier, iam *iam.Helper, tenants TenantService) *OrganizationsServer {
+func NewOrganizationsServer(pool *pgxpool.Pool, queries db.Querier, iam *iam.Helper, auth authn.Service) *OrganizationsServer {
 	return &OrganizationsServer{
 		db:      pool,
 		pool:    pool,
 		queries: queries,
 		iam:     iam,
-		tenants: tenants,
+		auth:    auth,
 		filter:  filter.OrganizationFilter(),
 	}
 }
@@ -135,7 +130,7 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 		return nil, apierr.HandleResourceError(err, "Organization", orgSlug)
 	}
 
-	tenantID, err := s.tenants.CreateTenant(ctx, orgSlug)
+	tenantID, err := s.auth.CreateTenant(ctx, orgSlug)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to create Firebase tenant", "org", orgSlug, "error", err)
 		return nil, status.Errorf(codes.Internal, "create auth tenant: %v", err)
@@ -146,7 +141,7 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 		TenantID: tenantID,
 	}); err != nil {
 		// Clean up the Firebase tenant we just created.
-		if delErr := s.tenants.DeleteTenant(ctx, tenantID); delErr != nil {
+		if delErr := s.auth.DeleteTenant(ctx, tenantID); delErr != nil {
 			slog.ErrorContext(ctx, "failed to clean up Firebase tenant", "tenantID", tenantID, "error", delErr)
 		}
 		return nil, status.Errorf(codes.Internal, "set tenant id: %v", err)
@@ -154,7 +149,7 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 
 	if err := tx.Commit(ctx); err != nil {
 		// Clean up the Firebase tenant since the commit failed.
-		if delErr := s.tenants.DeleteTenant(ctx, tenantID); delErr != nil {
+		if delErr := s.auth.DeleteTenant(ctx, tenantID); delErr != nil {
 			slog.ErrorContext(ctx, "failed to clean up Firebase tenant after commit failure", "tenantID", tenantID, "error", delErr)
 		}
 		return nil, status.Errorf(codes.Internal, "commit transaction: %v", err)

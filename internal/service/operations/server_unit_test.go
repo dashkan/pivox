@@ -24,7 +24,7 @@ import (
 func newTestServer() *OperationsServer {
 	mockQ := new(mocks.MockQuerier)
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	manager := lro.NewManager(nil, mockQ, logger)
+	manager := lro.NewManager(mockQ, logger)
 	return NewOperationsServer(manager)
 }
 
@@ -81,7 +81,7 @@ func TestUnit_ListOperations_DefaultPageSize(t *testing.T) {
 	// on a zero page size.
 	mockQ := new(mocks.MockQuerier)
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	manager := lro.NewManager(nil, mockQ, logger)
+	manager := lro.NewManager(mockQ, logger)
 	srv := NewOperationsServer(manager)
 	ctx := context.Background()
 

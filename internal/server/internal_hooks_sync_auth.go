@@ -12,14 +12,14 @@ import (
 	"golang.org/x/time/rate"
 	"google.golang.org/api/idtoken"
 
+	"github.com/dashkan/pivox/internal/authn"
 	"github.com/dashkan/pivox/internal/config"
 	db "github.com/dashkan/pivox/internal/db/generated"
-	"github.com/dashkan/pivox/internal/firebase"
 )
 
 // NewInternalHooks creates a new internal hooks handler with Google Cloud OIDC
 // identity token verification for the accounts:sync endpoint.
-func NewInternalHooks(queries db.Querier, cfg config.SyncAuthConfig, logger *slog.Logger, fb *firebase.AuthService) (*InternalHooks, error) {
+func NewInternalHooks(queries db.Querier, cfg config.SyncAuthConfig, logger *slog.Logger, auth authn.Service) (*InternalHooks, error) {
 	validator, err := idtoken.NewValidator(context.Background())
 	if err != nil {
 		return nil, err
@@ -33,7 +33,7 @@ func NewInternalHooks(queries db.Querier, cfg config.SyncAuthConfig, logger *slo
 	h := &InternalHooks{
 		queries:         queries,
 		logger:          logger,
-		firebase:        fb,
+		auth:            auth,
 		exchangeLimiter: newIPRateLimiter(rate.Every(6*time.Second), 10),
 	}
 	h.syncAuth = h.requireGoogleIdentity(validator, allowed, cfg.Audience)

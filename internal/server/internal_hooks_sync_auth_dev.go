@@ -9,19 +9,19 @@ import (
 
 	"golang.org/x/time/rate"
 
+	"github.com/dashkan/pivox/internal/authn"
 	"github.com/dashkan/pivox/internal/config"
 	db "github.com/dashkan/pivox/internal/db/generated"
-	"github.com/dashkan/pivox/internal/firebase"
 )
 
 // NewInternalHooks creates a new internal hooks handler with shared secret
 // authentication for the accounts:sync endpoint. This is the dev-mode
 // fallback for when the Firebase Functions emulator cannot mint OIDC tokens.
-func NewInternalHooks(queries db.Querier, cfg config.SyncAuthConfig, logger *slog.Logger, fb *firebase.AuthService) (*InternalHooks, error) {
+func NewInternalHooks(queries db.Querier, cfg config.SyncAuthConfig, logger *slog.Logger, auth authn.Service) (*InternalHooks, error) {
 	h := &InternalHooks{
 		queries:         queries,
 		logger:          logger,
-		firebase:        fb,
+		auth:            auth,
 		exchangeLimiter: newIPRateLimiter(rate.Every(6*time.Second), 10),
 	}
 	h.syncAuth = requireSecret(cfg.SharedSecret)

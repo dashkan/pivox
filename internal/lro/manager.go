@@ -3,6 +3,7 @@ package lro
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -12,7 +13,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -26,7 +26,6 @@ type WorkFunc func(ctx context.Context) (proto.Message, error)
 
 // Manager manages long-running operations.
 type Manager struct {
-	pool    *pgxpool.Pool
 	queries db.Querier
 	logger  *slog.Logger
 
@@ -35,9 +34,8 @@ type Manager struct {
 }
 
 // NewManager creates a new LRO manager.
-func NewManager(pool *pgxpool.Pool, queries db.Querier, logger *slog.Logger) *Manager {
+func NewManager(queries db.Querier, logger *slog.Logger) *Manager {
 	return &Manager{
-		pool:      pool,
 		queries:   queries,
 		logger:    logger,
 		listeners: make(map[uuid.UUID][]chan struct{}),
@@ -96,6 +94,13 @@ func (m *Manager) runWork(opID uuid.UUID, work WorkFunc) {
 			resultJSON, marshalErr = marshalAny(result)
 			if marshalErr != nil {
 				m.logger.Error("failed to marshal operation result", "op", opID, "error", marshalErr)
+				if _, dbErr := m.queries.FailOperation(ctx, db.FailOperationParams{
+					ID:           opID,
+					ErrorCode:    pgtype.Int4{Int32: int32(codes.Internal), Valid: true},
+					ErrorMessage: pgtype.Text{String: "marshal result: " + marshalErr.Error(), Valid: true},
+				}); dbErr != nil {
+					m.logger.Error("failed to mark operation as failed after marshal error", "op", opID, "error", dbErr)
+				}
 				return
 			}
 		}
@@ -132,7 +137,7 @@ func (m *Manager) GetOperation(ctx context.Context, name string) (*longrunningpb
 	}
 	dbOp, err := m.queries.GetOperation(ctx, opID)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apierr.NotFound("Operation", name)
 		}
 		return nil, apierr.Internal("failed to get operation")
@@ -218,7 +223,7 @@ func (m *Manager) DeleteOperation(ctx context.Context, name string) error {
 	}
 	dbOp, err := m.queries.GetOperation(ctx, opID)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return apierr.NotFound("Operation", name)
 		}
 		return apierr.Internal("failed to get operation")
@@ -226,7 +231,10 @@ func (m *Manager) DeleteOperation(ctx context.Context, name string) error {
 	if !dbOp.Done {
 		return apierr.FailedPrecondition("cannot delete a running operation")
 	}
-	return m.queries.DeleteOperation(ctx, opID)
+	if err := m.queries.DeleteOperation(ctx, opID); err != nil {
+		return apierr.Internal("failed to delete operation")
+	}
+	return nil
 }
 
 // CancelOperation cancels a running operation.
@@ -237,7 +245,7 @@ func (m *Manager) CancelOperation(ctx context.Context, name string) error {
 	}
 	_, err = m.queries.CancelOperation(ctx, opID)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			_, getErr := m.queries.GetOperation(ctx, opID)
 			if getErr != nil {
 				return apierr.NotFound("Operation", name)

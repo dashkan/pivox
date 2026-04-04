@@ -132,7 +132,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("initialize encryptor: %w", err)
 	}
-	lroManager := lro.NewManager(pool, queries, logger)
+	lroManager := lro.NewManager(queries, logger)
 	iamHelper := iam.NewHelper(queries)
 
 	// Recover any pending operations from previous run
@@ -180,16 +180,16 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	// Storage services
 	connMgr := agentstream.NewConnectionManager()
-	storagev1.RegisterStorageGatewaysServer(grpcServer, storage.NewStorageGatewaysServer(pool, queries, enc, connMgr))
+	storagev1.RegisterStorageGatewaysServer(grpcServer, storage.NewStorageGatewaysServer(queries, enc, connMgr))
 	storagev1.RegisterAgentsServer(grpcServer, storage.NewAgentsServer(queries))
-	storagev1.RegisterEndpointsServer(grpcServer, storage.NewEndpointsServer(pool, queries, enc))
+	storagev1.RegisterEndpointsServer(grpcServer, storage.NewEndpointsServer(queries, enc))
 
 	// Asset and request services
 	assetsv1.RegisterAssetsServer(grpcServer, assets.NewAssetsServer(pool, queries))
-	assetsv1.RegisterRequestsServer(grpcServer, requests.NewRequestsServer(pool, queries))
+	assetsv1.RegisterRequestsServer(grpcServer, requests.NewRequestsServer(queries))
 
 	// Agent bidi streaming service (agents authenticate via registration token, not Firebase)
-	agentv1.RegisterAgentServiceServer(grpcServer, storage.NewAgentServiceServer(pool, queries, logger, connMgr))
+	agentv1.RegisterAgentServiceServer(grpcServer, storage.NewAgentServiceServer(queries, logger, connMgr))
 
 	reflection.Register(grpcServer)
 
