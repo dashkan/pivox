@@ -402,28 +402,45 @@ pivox-app/
 
 The `pivox-web` repo may still exist for the **browser-only** web UI (pure SPA, no native features) used for remote access, lightweight monitoring, or mobile. The native app is the primary operator tool; the web UI is the fallback.
 
-## Embedded Engine for Development
+## Embedded Engine
 
-The native app architecture enables embedding the Pivox playout engine directly into the application for the **Designer** workspace. Since the engine is Rust + C/C++ and the app already has a C++ shared core, the engine can be loaded in-process:
+The native app architecture enables embedding the Pivox playout engine directly into the application. Since the engine is Rust + C/C++ and the app already has a C++ shared core, the engine can be loaded in-process:
 
 ```
-Native App (Designer mode)
+Native App (with embedded engine)
   ├── Native shell (SwiftUI / WinUI 3)
   ├── Shared C++ core
-  ├── Embedded Pivox engine-lite (Rust, loaded as library)
-  │   ├── Compositor
+  ├── Embedded Pivox engine (Rust, loaded as library)
+  │   ├── Compositor (GPU)
   │   ├── CEF plugin (template rendering)
   │   ├── Rive plugin
   │   ├── FFmpeg plugin
+  │   ├── Hardware encode/decode (NVENC / VideoToolbox)
   │   └── Software clock + direct framebuffer output
   └── Design canvas viewport (showing engine output)
 ```
 
-A template designer gets a complete playout engine running locally inside the app — real compositor, real plugin rendering, real SDK bindings, real transitions. No separate engine process to manage, no network connection to a remote engine. The software clock drives timing, a direct framebuffer provides preview output to the design canvas viewport.
+### For Template Designers
 
-This is the full development suite in a single application: edit a template, see it rendered by the real engine, test data bindings, preview transitions — all without deploying to a staging server or connecting to external hardware.
+A template designer gets the full playout engine running locally inside the app — real GPU compositor, real plugin rendering, real SDK bindings, real transitions, real hardware encode/decode. No separate engine process to manage, no network connection to a remote engine. The software clock drives timing, a direct framebuffer provides preview output to the design canvas viewport.
 
-For **Operator** mode, the app connects to remote engines via gRPC as normal. The embedded engine is only used in Designer mode for local development preview.
+This is the complete development suite in a single application: edit a template, see it rendered by the real engine, test data bindings, preview transitions — all without deploying to a staging server or connecting to external hardware.
+
+### For Engine Developers
+
+The embedded engine is also the **engine development workbench**. Change compositor code, change a plugin, change the frame pipeline — rebuild and see the result immediately in the design canvas. No separate engine process to launch, no gRPC connection to establish, no NDI stream to set up. The engine and its visual output are in the same process.
+
+This collapses the engine development feedback loop to: edit → build → see. The native app becomes the primary tool for developing the engine itself, not just for using it.
+
+### Connection Modes
+
+For **Operator** mode and other production workflows, the app connects to remote engines via gRPC as normal. The embedded engine is used for design and engine development:
+
+```
+Operator mode:     App ──gRPC──→ Remote engine(s) on production hardware
+Designer mode:     App ──gRPC──→ Embedded engine (in-process)
+Engine dev:        App ──gRPC──→ Embedded engine (in-process, rebuild on change)
+```
 
 ### In-Process gRPC
 

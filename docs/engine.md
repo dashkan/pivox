@@ -39,7 +39,7 @@ Performance-critical rendering and hardware output:
 | AJA NTV2 output adapter | C++ wrapper + Rust driver | NTV2 SDK is C++. Thin C++ shim exposes frames to Rust via FFI |
 | NDI output | C++ FFI | NDI SDK is C/C++. Minimal wrapper |
 | Channel supervisor | Rust | Process manager for channel processes. Health monitoring, restart, IPC |
-| MJPEG preview output | Rust | Encode frames for remote browser/Electron preview |
+| MJPEG preview output | Rust | Encode frames for remote browser/native app preview (when engine runs as separate process) |
 | Recording adapter | Rust (NVENC) | Compliance recording — encode output to H.264/HEVC, write to local disk |
 | GPI handler | Rust + C++ (AJA) | Reports GPI pin state changes to control plane via gRPC; actuates output pins on control plane command. No local mapping — all routing via control plane |
 | Caption/VANC handler | Rust + C++ (AJA) | Embed closed captions (CEA-608/708) in SDI VANC and ST 2110-40 metadata |
@@ -1455,17 +1455,24 @@ Tier 1: Browser (fastest iteration)
   - No engine running — pure frontend development
   - Good for: layout, CSS, animations, data binding logic
 
-Tier 2: Local Engine + NDI (daily workflow)
-  - Developer runs Pivox engine locally (macOS or Windows)
-  - Software clock (no AJA hardware needed — same engine binary, different config)
-  - Pivox Electron app for operator UI
-  - NDI output — view in NDI Monitor (free, same machine or any device on network)
+Tier 2: Embedded Engine in Native App (daily workflow)
+  - Developer runs the Pivox native app with the engine embedded in-process
+  - Software clock (no AJA hardware needed — same engine code, different config)
+  - Engine output rendered directly to the design canvas viewport (no NDI needed)
   - Real PivoxSDK — native bindings, view model, timing
   - Template hot-reload: file watcher detects changes, reloads CEF page,
     preserves view model state
-  - Good for: SDK integration, transitions, data binding validation
-  - This is a first-class deployment mode, not a fallback — cloud preview,
-    sales demos, and QA environments also run this way
+  - Also serves as the engine development workbench — change compositor or
+    plugin code, rebuild, see results immediately in the same app
+  - Good for: SDK integration, transitions, data binding validation, engine dev
+  - See docs/native-app.md for embedded engine architecture
+
+Tier 2b: Local Engine Process + NDI (alternative)
+  - Developer runs Pivox engine as a separate local process (macOS or Windows)
+  - Software clock, NDI output — view in NDI Monitor or native app
+  - Useful when testing process isolation, supervisor behavior, or gRPC
+    communication over real transport (UDS/TCP)
+  - This is also the mode used for cloud preview, sales demos, and QA
 
 Tier 3: Staging Engine (pre-air validation)
   - Staging server: same hardware + OS + AJA card as production
@@ -1488,7 +1495,7 @@ Tier 4: Production (on-air)
 - Rust frame pipeline: CPU SIMD for colorspace conversion and compositing
 - NDI output for preview (primary dev output — no hardware needed)
 - AJA output via certified Thunderbolt device (optional — for SDI validation)
-- MJPEG preview for Electron operator UI
+- MJPEG preview for native app (when running engine as separate process)
 
 ### Windows (Dev)
 
@@ -1497,7 +1504,7 @@ Tier 4: Production (on-air)
 - Rust frame pipeline: CPU SIMD for colorspace conversion and compositing
 - NDI output for preview (primary dev output)
 - AJA output via certified Thunderbolt device (optional)
-- MJPEG preview for Electron operator UI
+- MJPEG preview for native app (when running engine as separate process)
 
 ### Linux (Staging/Production — Headless)
 
