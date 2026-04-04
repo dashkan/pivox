@@ -182,16 +182,58 @@ Each mode presents a different panel layout, toolbar set, and menu structure. Th
 
 ## Authentication
 
-### Architecture
+### Two Auth Paths
 
-The native app does **not** use the Firebase C++ SDK for sign-in flows. Authentication happens in the system browser using the Firebase web SDK, identical to the pattern already proven in the Electron app.
+Authentication uses two paths depending on the provider — **native screens** for email/password (the Firebase C++ SDK supports this directly) and **external browser** for everything else (social, OIDC, SAML).
 
-### Flow (All Providers — Google, GitHub, OIDC, SAML)
+### Path 1: Email/Password — Native UI + Firebase C++ SDK
+
+Email/password auth is handled entirely in native screens. No browser involved.
+
+**Sign in, sign up, forgot password, password reset** — all native SwiftUI / WinUI 3 screens calling the Firebase C++ SDK directly:
+
+```cpp
+// Sign in
+auth->SignInWithEmailAndPassword(email, password);
+
+// Register
+auth->CreateUserWithEmailAndPassword(email, password);
+
+// Forgot password
+auth->SendPasswordResetEmail(email);
+```
+
+**User profile management** — native screens for:
+
+- Display name and photo (SwiftUI form / WinUI 3 form)
+- Email change with verification
+- Password change
+- Connected accounts (link/unlink social providers)
+- MFA enrollment (TOTP)
+- Account deletion
+
+These screens replace the current HTML-based `LoginCard`, `RegistrationCard`, `UserProfileCard`, `ForgotPasswordCard`, and `ResetPasswordCard` compound components (documented in `docs/authn.md`) with native equivalents. The Firebase C++ SDK provides all the necessary methods:
+
+```cpp
+// Profile management
+user->UpdateUserProfile(profile);   // display name, photo
+user->UpdatePassword(new_password);
+user->SendEmailVerification();
+user->Delete();                     // account deletion
+
+// Token for gRPC
+user->GetToken(/*force_refresh=*/false, &token_result);
+```
+
+### Path 2: Social / OIDC / SAML — External Browser + Custom Token
+
+Social providers (Google, GitHub, Apple) and enterprise SSO (OIDC, SAML) require browser-based OAuth/SAML flows. The Firebase C++ SDK does not support these directly (no `OAuthProvider` equivalent). The external browser handles it:
 
 ```
 Native app
   │
-  │  1. Opens system browser to hosted auth page
+  │  1. User taps "Sign in with Google" or "Enterprise SSO"
+  │     Opens system browser to hosted auth page
   │     (ASWebAuthenticationSession on macOS,
   │      WebAuthenticationBroker or ShellExecute on Windows)
   │
@@ -225,22 +267,31 @@ Native app captures URL scheme callback
 Authenticated gRPC calls to control plane + engine
 ```
 
-### Why This Works for All Providers
+### Why Two Paths
 
-The Firebase web SDK handles every provider Firebase supports — current and future. Adding a new OIDC or SAML provider in Firebase Console works automatically. No native app update needed.
+| Provider Type | Auth Path | Why |
+|---|---|---|
+| Email/password | Native UI + C++ SDK | C++ SDK supports it directly. Native forms feel right for email/password. No browser needed. |
+| Google, GitHub, Apple | External browser + custom token | OAuth requires browser redirects. C++ SDK has `GoogleAuthProvider` but the browser path is simpler and consistent. |
+| OIDC (enterprise SSO) | External browser + custom token | C++ SDK has no `OAuthProvider`. Must use web SDK. |
+| SAML (enterprise SSO) | External browser + custom token | SAML is browser-based by design (POST bindings, XML redirects). |
 
-The Firebase C++ SDK **does** support `SignInWithCustomToken` — that's the only Firebase C++ API needed on the client. All provider-specific logic (the missing `OAuthProvider` for OIDC/SAML) runs in the browser via the web SDK.
+Social providers *could* use the C++ SDK's native methods (e.g., `GoogleAuthProvider::GetCredential`), but routing them through the browser alongside OIDC/SAML simplifies the auth architecture — one browser flow handles all non-password providers. The native login screen shows email/password fields and social/SSO buttons; the buttons open the browser.
 
-### What the Firebase C++ SDK Handles Locally
+### Native Auth Screens (To Build)
 
-After `SignInWithCustomToken` establishes the session:
+These replace the existing React compound components with native equivalents:
 
-- `User::GetToken()` — JWT for gRPC auth metadata
-- Token auto-refresh — Firebase C++ SDK handles this in long-running desktop processes
-- `User::UpdateUserProfile()` — display name, photo (native profile settings screen)
-- `User::UpdatePassword()` — password change (native security settings screen)
-- `User::SendEmailVerification()` — email verification
-- `Auth::SignOut()` — sign out
+| Screen | Replaces | Firebase C++ SDK Methods |
+|---|---|---|
+| **Login** | `LoginCard` | `SignInWithEmailAndPassword`, social buttons → browser path |
+| **Register** | `RegistrationCard` | `CreateUserWithEmailAndPassword`, social buttons → browser path |
+| **Forgot Password** | `ForgotPasswordCard` | `SendPasswordResetEmail` |
+| **User Profile** | `UserProfileCard.AccountPage` | `UpdateUserProfile`, `UpdatePassword`, `SendEmailVerification` |
+| **Security Settings** | `UserProfileCard.SecurityPage` | `UpdatePassword`, TOTP enrollment |
+| **Link Account** | `LinkAccountCard` | `LinkWithCredential` |
+
+The existing web-based auth components (`@pivox/ui` auth cards, `@pivox/features` auth hooks) remain for the browser-only web UI. The native screens are additive — they don't replace the web implementation, they're a parallel native implementation calling the same Firebase backend.
 
 ### Token Storage
 
@@ -249,9 +300,9 @@ After `SignInWithCustomToken` establishes the session:
 
 Firebase C++ SDK manages its own token persistence. The native app stores the refresh token securely using platform APIs.
 
-### Existing Implementation
+### Existing Infrastructure
 
-This auth flow is already built and running in the Electron app (see `docs/authn.md`). The hosted auth pages, Go server callback endpoint, custom token minting, and `pivox://` URL scheme handling all exist. The native app reuses the same server-side infrastructure — only the client-side auth capture code changes (Electron's protocol handler → native URL scheme handler).
+The external browser auth flow is already built and running in the Electron app (see `docs/authn.md`). The hosted auth pages, Go server callback endpoint, custom token minting, and `pivox://` URL scheme handling all exist. The native app reuses the same server-side infrastructure — only the client-side code changes (Electron's protocol handler → native URL scheme handler, React auth screens → native auth screens).
 
 ## Build System
 
@@ -332,6 +383,29 @@ pivox-app/
 ```
 
 The `pivox-web` repo may still exist for the **browser-only** web UI (pure SPA, no native features) used for remote access, lightweight monitoring, or mobile. The native app is the primary operator tool; the web UI is the fallback.
+
+## Embedded Engine for Development
+
+The native app architecture enables embedding the Pivox playout engine directly into the application for the **Designer** workspace. Since the engine is Rust + C/C++ and the app already has a C++ shared core, the engine can be loaded in-process:
+
+```
+Native App (Designer mode)
+  ├── Native shell (SwiftUI / WinUI 3)
+  ├── Shared C++ core
+  ├── Embedded Pivox engine (Rust, loaded as library)
+  │   ├── Compositor
+  │   ├── CEF plugin (template rendering)
+  │   ├── Rive plugin
+  │   ├── FFmpeg plugin
+  │   └── Software clock + NDI/window output
+  └── CEF viewport (design canvas showing engine output)
+```
+
+A template designer gets a complete playout engine running locally inside the app — real compositor, real plugin rendering, real SDK bindings, real transitions. No separate engine process to manage, no network connection to a remote engine. The software clock drives timing, NDI or a direct framebuffer provides preview output to the design canvas viewport.
+
+This is the full development suite in a single application: edit a template, see it rendered by the real engine, test data bindings, preview transitions — all without deploying to a staging server or connecting to external hardware.
+
+For **Operator** mode, the app connects to remote engines via gRPC as normal. The embedded engine is only used in Designer mode for local development preview.
 
 ## Advantages Over Electron
 
