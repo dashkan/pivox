@@ -8,7 +8,7 @@
 
 ## Communication Architecture
 
-### Go Control Plane <-> Rust Engine
+### Playout Agent <-> Rust Engine
 
 **Protocol:** gRPC over Unix domain sockets (or TCP for remote deployments).
 
@@ -40,10 +40,10 @@ Additional benefits:
 
 ```protobuf
 service PlayoutEngine {
-  // Streaming command channel: control plane -> engine
+  // Streaming command channel: Playout Agent -> engine
   rpc Execute (stream PlayoutCommand) returns (stream CommandAck);
 
-  // Continuous status stream: engine -> control plane
+  // Continuous status stream: engine -> Playout Agent
   rpc WatchStatus (StatusRequest) returns (stream ChannelStatus);
 
   // Input injection for preview/design interaction (mouse, keyboard, touch)
@@ -55,9 +55,9 @@ service PlayoutEngine {
 
 | RPC | Direction | Pattern | Purpose |
 |---|---|---|---|
-| `Execute` | CP -> Engine | Bidi stream | Send playout commands, receive acks |
-| `WatchStatus` | Engine -> CP | Server stream | Continuous channel state updates |
-| `SendInput` | CP -> Engine | Bidi stream | Mouse, keyboard, touch injection |
+| `Execute` | Agent -> Engine | Bidi stream | Send playout commands, receive acks |
+| `WatchStatus` | Engine -> Agent | Server stream | Continuous channel state updates |
+| `SendInput` | Agent -> Engine | Bidi stream | Mouse, keyboard, touch injection |
 
 ## Command Messages
 

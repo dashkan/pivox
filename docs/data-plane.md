@@ -9,16 +9,16 @@ The Pivox Data Plane is the live data infrastructure that connects external data
 **Architecture documents:**
 - `docs/data-plane.md` — this document. Data Plane architecture, shared memory, feeds, schemas.
 - `docs/engine.md` — playout engine. Rendering, compositing, SDK (including `pivox.feeds` and `pivox.model` APIs).
-- `docs/control-plane.md` — control plane. NRCS, operator UI, Data Plane service, hardware automation.
+- `docs/control-plane.md` — Cloud Controller + Playout Agent. NRCS, operator UI, Data Plane service, hardware automation.
 - `docs/architecture.md` — system-level architecture, deployment tiers.
 
 ## Data Plane Components
 
-The Data Plane spans two machines — the CP server handles intelligence (routing, gating, throttling), the engine machine handles the last mile (shared memory writes). The CP does **not** run on the engine machine to avoid consuming rendering resources.
+The Data Plane spans two machines — the Playout Agent server handles intelligence (routing, gating, throttling), the engine machine handles the last mile (shared memory writes). The Playout Agent does **not** run on the engine machine to avoid consuming rendering resources.
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│  CP SERVER (Go)                                           │
+│  PLAYOUT AGENT SERVER                                     │
 │                                                           │
 │  ┌──────────────────────────────────────────────────┐    │
 │  │  Feed Connectors (pluggable, per data provider)   │    │
@@ -62,7 +62,7 @@ The Data Plane spans two machines — the CP server handles intelligence (routin
 │                                                           │
 │  ┌──────────────────────────────────────────────────┐    │
 │  │  Shared Memory Writer (Rust — inside supervisor)  │    │
-│  │  - Receives feed data stream from CP via gRPC     │    │
+│  │  - Receives feed data stream from agent via gRPC  │    │
 │  │  - Writes to /dev/shm/pivox-feeds (lock-free)     │    │
 │  │  - ~50MB RAM, negligible CPU                      │    │
 │  │  - Part of engine supervisor, not a separate proc │    │
@@ -76,7 +76,7 @@ The Data Plane spans two machines — the CP server handles intelligence (routin
 └──────────────────────────────────────────────────────────┘
 ```
 
-**Why the CP doesn't run on the engine machine:** The engine machine is dedicated broadcast hardware running at 60fps with zero margin. Running PostgreSQL, Go services, Redis, and a web server alongside the rendering pipeline risks CPU/memory/disk contention that could cause dropped frames. Only the engine supervisor (Rust, ~20MB) and the shared memory writer (Rust, ~50MB, part of supervisor) run on the engine machine.
+**Why the Playout Agent doesn't run on the engine machine:** The engine machine is dedicated broadcast hardware running at 60fps with zero margin. Running PostgreSQL, Go services, Redis, and a web server alongside the rendering pipeline risks CPU/memory/disk contention that could cause dropped frames. Only the supervisor (Rust, ~20MB) and the shared memory writer (Rust, ~50MB, part of supervisor) run on the engine machine.
 
 **Latency impact:** The gRPC feed stream adds ~0.5-2ms over a facility LAN compared to a co-located write. Still well within the 16.68ms frame budget. For high-frequency feeds, gRPC streaming batches efficiently.
 
@@ -90,7 +90,7 @@ The Data Plane delivers data to the engine via two paths. Templates can use both
 | **Delivery** | gRPC `UpdateCommand` from CP to engine | Engine reads shared memory directly (sub-microsecond) |
 | **Latency** | ~0.3-1ms per update | ~0.001ms per read |
 | **Template code** | Declarative bindings in `onLoad()` | Subscribe once in `onLoad()`, receive callbacks |
-| **Throttling** | Write-side only (control plane) | Two layers: write-side (operator) + read-side (template) |
+| **Throttling** | Write-side only (Playout Agent) | Two layers: write-side (operator) + read-side (template) |
 | **Operator control** | Full — auto/gated/manual per field, pause, override | Feed-level — enable/disable, set write throttle, pause, override |
 | **Best for** | Operator-controlled fields, editorial data, infrequent updates | High-frequency live data, real-time visualizations, tickers, clocks |
 
@@ -138,7 +138,7 @@ SDK fires subscription callbacks at template's requested rate
 
 ### Hierarchical Key-Value with Lock-Free Double Buffer
 
-Each feed is a shared memory region containing **individually keyed and versioned fields**. The writer (shared memory writer in the engine supervisor, receiving data from the CP via gRPC stream) can update a single field without rewriting the entire feed. The reader (engine channel processes) can subscribe to specific fields and detect per-field changes.
+Each feed is a shared memory region containing **individually keyed and versioned fields**. The writer (shared memory writer in the engine supervisor, receiving data from the Playout Agent via gRPC stream) can update a single field without rewriting the entire feed. The reader (engine channel processes) can subscribe to specific fields and detect per-field changes.
 
 **Memory layout — hierarchical: feed → fields, each field double-buffered:**
 
@@ -498,22 +498,22 @@ Multiple connectors for the same domain (e.g., AP and Reuters for elections) out
 
 | Component | Runs On | Language | Purpose |
 |---|---|---|---|
-| Feed connectors | CP server | Go | Connect to external data sources |
-| Routing / gating engine | CP server | Go | Auto/gated/manual per field, operator controls |
-| Schema registry | CP server | Go | Versioned feed schemas, validation |
-| Operator UI controls | CP server (web UI) | Go + React | Per-field monitoring, approval, override |
+| Feed connectors | Playout Agent server | Go | Connect to external data sources |
+| Routing / gating engine | Playout Agent server | Go | Auto/gated/manual per field, operator controls |
+| Schema registry | Playout Agent server | Go | Versioned feed schemas, validation |
+| Operator UI controls | Playout Agent server (web UI) | Go + React | Per-field monitoring, approval, override |
 | Shared memory writer | Engine machine (in supervisor) | Rust | Receive gRPC stream → write to `/dev/shm/` |
 | Shared memory reader | Engine machine (in SDK) | Rust + JS | Read `/dev/shm/` → fire subscription callbacks |
 
 ### Hybrid Deployment
 
-In hybrid deployments, the CP runs on-prem (separate server) or in the cloud. Feed connectors run on the CP server and connect to data sources directly — no cloud round-trip for the data itself.
+In hybrid deployments, the Playout Agent runs on-prem (separate server). Feed connectors run on the agent server and connect to data sources directly — no cloud round-trip for the data itself.
 
 ```
-Cloud CP configures: "connect to AP Elections at ws://feeds.ap.org/..."
+Cloud Controller configures: "connect to AP Elections at ws://feeds.ap.org/..."
   │
   ▼
-On-prem CP server connects to feed DIRECTLY
+On-prem Playout Agent connects to feed DIRECTLY
   │
   │ applies routing/gating/throttling
   │
@@ -527,20 +527,20 @@ Shared memory writer (in engine supervisor) writes to /dev/shm/
 Template receives data via pivox.feeds.subscribe()
 ```
 
-For feeds that need minimum latency (tickers, telemetry), the CP server should be on the facility LAN — not in the cloud. The cloud CP can configure which feeds to connect to, but the actual data flow stays local.
+For feeds that need minimum latency (tickers, telemetry), the Playout Agent server should be on the facility LAN — not in the cloud. The Cloud Controller can configure which feeds to connect to, but the actual data flow stays local.
 
 Templates can also subscribe directly to customer-maintained feed endpoints via `fetch()`/WebSocket in CEF, bypassing the Data Plane entirely — but they lose all operator controls (see Data Plane vs Direct Fetch below).
 
 ## Redundancy — Multi-Engine Feed Delivery
 
-When running redundant engines (Engine A primary, Engine B standby), the CP streams feed data to both engine machines. The shared memory on both machines should have the same data so a changeover doesn't cause visible glitches.
+When running redundant engines (Engine A primary, Engine B standby), the Playout Agent streams feed data to both engine machines. The shared memory on both machines should have the same data so a changeover doesn't cause visible glitches.
 
 ### Approach: Dual-Send, Not Synchronized Writes
 
-The CP sends each feed update to **both engine machines back-to-back** in the same operation (two gRPC sends microseconds apart). No explicit synchronization protocol between engines.
+The Playout Agent sends each feed update to **both engine machines back-to-back** in the same operation (two gRPC sends microseconds apart). No explicit synchronization protocol between engines.
 
 ```
-CP Data Plane receives feed update
+Playout Agent Data Plane receives feed update
   │
   ├──gRPC──► Engine A supervisor ──► shared memory A
   │          (~0.5-1ms LAN latency)
@@ -563,7 +563,7 @@ Frame budget: 16.68ms
 
 If testing during Phase 4 (redundancy) reveals visible issues during changeover, a frame-tagged delivery mechanism can be added:
 
-1. CP tags each feed update with a **target frame number** (the frame this data should first appear on-air)
+1. Playout Agent tags each feed update with a **target frame number** (the frame this data should first appear on-air)
 2. Engine supervisor buffers the update until that frame arrives (synced to genlock)
 3. Both engines write to shared memory on the same genlock edge
 4. Guarantees pixel-identical output on both engines

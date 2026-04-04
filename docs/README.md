@@ -6,7 +6,7 @@ Architecture and design documentation for the Pivox broadcast playout system.
 
 ### System Architecture
 - `architecture.md` — Deployment tiers (cloud, hybrid, on-prem), hybrid model, storage, security, disaster recovery
-- `control-plane.md` — Go control plane: NRCS, operator UI, hardware automation, services
+- `control-plane.md` — Management layer: Cloud Controller, Playout Agent, NRCS, operator UI, hardware automation, services
 - `data-plane.md` — Live data infrastructure: feeds, shared memory, hierarchical KV store, throttling, schemas
 
 ### Playout Engine
@@ -38,5 +38,5 @@ Architecture and design documentation for the Pivox broadcast playout system.
 
 | Repo | Description |
 |---|---|
-| [pivox-server](https://github.com/dashkan/pivox-server) | Go control plane |
+| [pivox-server](https://github.com/dashkan/pivox-server) | Cloud Controller + Playout Agent |
 | [pivox-web](https://github.com/dashkan/pivox-web) | React operator UI + Electron |

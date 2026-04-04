@@ -166,7 +166,7 @@ The SDK's `run()` function manages the gRPC connection and shared memory transpo
 
 ## Plugin Capabilities
 
-Plugins declare capabilities at registration. The control plane uses these to show the right UI controls, route content, and validate rundown items.
+Plugins declare capabilities at registration. The Playout Agent uses these to show the right UI controls, route content, and validate rundown items.
 
 ```protobuf
 message PluginCapabilities {
@@ -219,10 +219,10 @@ message PluginCapabilities {
 Channel processes load plugins on demand:
 
 1. Channel starts with no plugins loaded
-2. Control plane sends `LoadCommand` for a layer with a `.html` template → channel loads CEF plugin
-3. Control plane sends `VideoLoadCommand` for a layer with a `.mxf` clip → channel loads FFmpeg plugin
-4. Control plane sends `LoadCommand` for a layer with a `.riv` file → channel loads Rive plugin
-5. Control plane sends `ClearCommand` for a layer → channel unloads the plugin for that layer (frees resources)
+2. Playout Agent sends `LoadCommand` for a layer with a `.html` template → channel loads CEF plugin
+3. Playout Agent sends `VideoLoadCommand` for a layer with a `.mxf` clip → channel loads FFmpeg plugin
+4. Playout Agent sends `LoadCommand` for a layer with a `.riv` file → channel loads Rive plugin
+5. Playout Agent sends `ClearCommand` for a layer → channel unloads the plugin for that layer (frees resources)
 
 Multiple instances of the same plugin type can be loaded (e.g., CEF for layers 1, 2, and 3). Each instance is independent.
 

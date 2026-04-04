@@ -11,7 +11,7 @@ The template is a **pure view**. It binds to a reactive view model managed by th
 - What the throttle rate is, or how many data sources are connected
 - Anything about the playout hardware, output format, or channel topology
 
-All data routing, gating, throttling, and operator workflow decisions happen in the Go control plane, external to the template. The SDK is the abstraction boundary that keeps templates simple.
+All data routing, gating, throttling, and operator workflow decisions happen in the Playout Agent, external to the template. The SDK is the abstraction boundary that keeps templates simple.
 
 **Related documents:**
 - `docs/engine.md` — playout engine architecture, rendering pipeline, compositing, hardware output
@@ -314,7 +314,7 @@ System data sources can be bound to elements like any other view model field:
 pivox.model.bind('pivox.system.time.display', document.getElementById('clock'));
 ```
 
-**Playout UI context (TBD):** The Go control plane will inject additional context into the view model for templates that need playout-level information — rundown position, show name, segment info, operator-defined metadata. The specific fields are to be defined as the control plane architecture is designed.
+**Playout UI context (TBD):** The Playout Agent will inject additional context into the view model for templates that need playout-level information — rundown position, show name, segment info, operator-defined metadata. The specific fields are to be defined as the management layer architecture is designed.
 
 ## When to Use Which Namespace
 
@@ -349,7 +349,7 @@ pivox.timing.requestFrame(() => {
 
 ## UpdateCommand Flow
 
-When the engine receives an `UpdateCommand` from the Go control plane (whether triggered by an operator, an automated feed, or an approved gate):
+When the engine receives an `UpdateCommand` from the Playout Agent (whether triggered by an operator, an automated feed, or an approved gate):
 
 ```
 1. Engine receives UpdateCommand via gRPC

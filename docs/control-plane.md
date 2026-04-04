@@ -1,16 +1,16 @@
-	# Pivox Control Plane — Architecture & Design
+	# Pivox Management Layer — Architecture & Design
 
 ## Overview
 
-The Pivox control plane is a Go application that manages all broadcast operations above the rendering engine. It is the brain of the system — handling NRCS/rundown management, asset management, operator UI, data binding, hardware automation, redundancy coordination, and all external integrations.
+The Pivox management layer is the software that manages all broadcast operations above the rendering engine. It is the brain of the system — handling NRCS/rundown management, asset management, operator UI, data binding, hardware automation, redundancy coordination, and all external integrations.
 
-**The control plane is a single Go codebase that runs in two modes:**
-- **Cloud mode** — source of truth for configuration, user management, asset storage. Serves the web UI.
-- **Local mode** — runs on-prem alongside the engine. Syncs with cloud, operates independently during outages. Manages local engine(s), local storage, and data feed relays.
+**The management layer runs as two components:**
+- **Cloud Controller** — the SaaS layer at api.pivox.app. Source of truth for configuration, user management, asset storage. Serves the web UI.
+- **Playout Agent** — installed on-prem alongside the engine. Syncs with the Cloud Controller, operates independently during outages. Manages local engine(s), local storage, and data feed relays.
 
-Both modes use the same binary with different configuration. See `docs/architecture.md` for deployment tiers (Cloud, Hybrid, On-Prem).
+Both are built from the same Go codebase with different configuration. See `docs/architecture.md` for deployment tiers (Cloud, Hybrid, On-Prem).
 
-The control plane communicates with the playout engine via gRPC over TCP (facility LAN — the standard deployment, CP and engine on separate machines) or Unix domain sockets (single-machine deployments only). See `docs/engine.md` for the engine architecture.
+The Playout Agent communicates with the playout engine via gRPC over TCP (facility LAN — the standard deployment, agent and engine on separate machines) or Unix domain sockets (single-machine deployments only). See `docs/engine.md` for the engine architecture.
 
 **Day-one scope:**
 - NRCS with rundown management
@@ -31,7 +31,7 @@ The control plane communicates with the playout engine via gRPC over TCP (facili
 
 | Component | Technology | Notes |
 |---|---|---|
-| Language | Go | All control plane services |
+| Language | Go | All management layer services |
 | API | gRPC + REST (dual) | gRPC for engine + internal services, REST for operator UI + external integrations |
 | Database | PostgreSQL | Rundowns, templates, assets, configuration, audit trail |
 | Search | Elasticsearch or Meilisearch | Semantic search for recorded content, asset discovery |
@@ -45,7 +45,7 @@ The control plane communicates with the playout engine via gRPC over TCP (facili
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│  PIVOX CONTROL PLANE (Go)                                            │
+│  PIVOX MANAGEMENT LAYER                                              │
 │                                                                      │
 │  ┌──────────────────────────────────────────────────────────────┐   │
 │  │                      API Gateway                              │   │
@@ -105,7 +105,7 @@ The control plane communicates with the playout engine via gRPC over TCP (facili
 
 ### Playout Controller
 
-The central state machine that coordinates everything. It translates operator actions and automation triggers into engine commands.
+The central state machine that coordinates everything on the Playout Agent. It translates operator actions and automation triggers into engine commands.
 
 **Responsibilities:**
 - Maintains the on-air state for every channel and layer (what's playing, what's cued)
@@ -141,9 +141,9 @@ channels:
         layer: 1
 ```
 
-When the director says "take lower third", the operator presses one button. The playout controller resolves `element=lower-third` → `channel=0, layer=2` and generates the appropriate engine commands. The same element name can map to different channels and layers per show — a sports show might have the lower third on channel 2, layer 1. The engine API stays flat: `(channel, layer, command)`. The control plane holds the show's semantics.
+When the director says "take lower third", the operator presses one button. The playout controller resolves `element=lower-third` → `channel=0, layer=2` and generates the appropriate engine commands. The same element name can map to different channels and layers per show — a sports show might have the lower third on channel 2, layer 1. The engine API stays flat: `(channel, layer, command)`. The Playout Agent holds the show's semantics.
 
-**The bundling pattern:** The playout controller is where high-level operator actions become multiple engine commands. Examples:
+**The bundling pattern:** The playout controller (on the Playout Agent) is where high-level operator actions become multiple engine commands. Examples:
 
 | Operator Action | Engine Commands Generated |
 |---|---|
@@ -252,7 +252,7 @@ Ensures assets are on the engine machine's local SSD before they're needed. Desc
 
 The Data Plane is Pivox's live data infrastructure — connecting external feeds to on-air templates with operator control, gating, throttling, schema versioning, and high-performance shared memory delivery.
 
-See `docs/data-plane.md` for the full Data Plane architecture. Summary of control plane responsibilities:
+See `docs/data-plane.md` for the full Data Plane architecture. Summary of Playout Agent responsibilities:
 
 - Connect to external data sources via pluggable connectors
 - Normalize provider-specific data into versioned Pivox schemas
@@ -261,7 +261,7 @@ See `docs/data-plane.md` for the full Data Plane architecture. Summary of contro
 - Send UpdateCommand via gRPC for view model updates
 - Operator controls: pause, resume, override, approve, throttle per field
 - Maintain last-known-good values for failover
-- In hybrid deployments, runs on the local control plane (data flows locally, no cloud hop)
+- In hybrid deployments, runs on the Playout Agent (data flows locally, no cloud hop)
 
 ### Timer Service
 
@@ -390,13 +390,13 @@ Controls and monitors broadcast facility hardware. Each hardware type has a prot
 | Master control switcher | Automation protocol (varies) | Playout automation, scheduled transitions |
 | Record/ingest servers | VDCP, REST | Trigger recording on external devices |
 
-**Architecture:** Each protocol adapter is a Go service (or goroutine) that:
+**Architecture:** Each protocol adapter is a service (or goroutine) that:
 1. Maintains a persistent connection to the hardware
 2. Exposes a normalized control API to the playout controller
 3. Publishes state changes to the internal message bus
 4. Handles reconnection and error recovery
 
-Hardware configuration (IP addresses, port mappings, protocol versions) is managed via the control plane's configuration system.
+Hardware configuration (IP addresses, port mappings, protocol versions) is managed via the Playout Agent's configuration system.
 
 ### Data Feed Connectors
 
@@ -559,22 +559,22 @@ Configuration changes take effect immediately for most settings (no restart requ
 
 ## Deployment
 
-See `docs/architecture.md` for the full deployment architecture including deployment tiers (Cloud, Hybrid, On-Prem), storage configuration, offline operation, and the local control plane design.
+See `docs/architecture.md` for the full deployment architecture including deployment tiers (Cloud, Hybrid, On-Prem), storage configuration, offline operation, and the Playout Agent design.
 
-### Control Plane Modes
+### Deployment Modes
 
-The control plane is a **single Go codebase** that runs in two modes:
+The management layer is a **single Go codebase** that runs in two modes:
 
-**Cloud mode:**
+**Cloud Controller (api.pivox.app):**
 - Source of truth for configuration, users, orgs
 - Serves the web UI
 - Manages cloud storage (S3/GCS)
 - Database: cloud PostgreSQL (managed)
-- Does NOT connect to engines directly — local control plane instances do
+- Does NOT connect to engines directly — Playout Agent instances do
 
-**Local mode (on-prem):**
-- Runs on-prem alongside the engine
-- Syncs bidirectionally with cloud instance
+**Playout Agent (on-prem):**
+- Installed on-prem alongside the engine (curl | bash, registration token, outbound bidi gRPC to cloud)
+- Syncs bidirectionally with the Cloud Controller
 - Manages local engine(s) via gRPC over UDS
 - Manages local storage (rustfs — S3-compatible)
 - Runs data feed relays (connects to feeds directly, no cloud hop)
@@ -582,18 +582,18 @@ The control plane is a **single Go codebase** that runs in two modes:
 - **Operates independently during internet outages** — cached rundown, local state, local API fallback
 - Database: embedded SQLite or local PostgreSQL
 
-Same binary, different configuration. The local instance is not a dumb proxy — it's a full control plane instance that happens to sync state with the cloud.
+Same binary, different configuration. The Playout Agent is not a dumb proxy — it's a full management instance that happens to sync state with the Cloud Controller.
 
 ### Installation (On-Prem)
 
-Customer downloads and runs an install script — same model as GitHub Actions self-hosted runners:
+Customer downloads and runs an install script — same model as GitHub Actions self-hosted runners and the Storage Gateway agent:
 
 1. Customer runs install script on the on-prem machine
-2. Script installs the Pivox local control plane + engine binaries
-3. Registers with the cloud backend (configures auth, org association, mTLS certificates)
-4. Local control plane establishes outbound connection to cloud (firewall-friendly — no inbound ports needed)
-5. Cloud pushes initial configuration, rundowns, and asset metadata
-6. Local control plane pulls assets from configured storage to local cache
+2. Script installs the Playout Agent + engine binaries
+3. Registers with the Cloud Controller (configures auth, org association, mTLS certificates)
+4. Playout Agent establishes outbound bidi gRPC connection to the Cloud Controller (firewall-friendly — no inbound ports needed)
+5. Cloud Controller pushes initial configuration, rundowns, and asset metadata
+6. Playout Agent pulls assets from configured storage to local cache
 7. System is operational
 
 ### Database
@@ -608,14 +608,14 @@ Customer downloads and runs an install script — same model as GitHub Actions s
 
 | Dimension | Scaling Approach |
 |---|---|
-| More channels | Add engine machines, local control plane manages all of them |
+| More channels | Add engine machines, Playout Agent manages all of them |
 | More operators | Web UI scales horizontally, WebSocket connections via Redis pub/sub |
-| More data feeds | Add feed connector instances on local control plane |
+| More data feeds | Add feed connector instances on Playout Agent |
 | More hardware | Add protocol adapter instances |
 | More storage | Scale object storage (rustfs cluster on-prem, or cloud S3) |
-| More sites | Each site runs its own local control plane, all sync to same cloud instance |
+| More sites | Each site runs its own Playout Agent, all sync to same Cloud Controller |
 
-The control plane is stateless (state lives in PostgreSQL/SQLite + Redis) and can be horizontally scaled behind a load balancer for the REST/WebSocket endpoints. The local control plane can also be run as active/passive or horizontally scaled for high-availability on-prem installations.
+The management layer is stateless (state lives in PostgreSQL/SQLite + Redis) and can be horizontally scaled behind a load balancer for the REST/WebSocket endpoints. The Playout Agent can also be run as active/passive or horizontally scaled for high-availability on-prem installations.
 
 ## Integration Protocol (Pivox Protocol — Future)
 
@@ -665,7 +665,7 @@ To be designed separately.
 ```
 pivox/
 ├── cmd/
-│   ├── pivox-server/              # Main control plane server
+│   ├── pivox-server/              # Main server (Cloud Controller + Playout Agent)
 │   ├── pivox-mos-gateway/         # MOS protocol bridge (separate process)
 │   └── pivox-monitor/             # Monitoring/alerting service
 │
@@ -716,9 +716,9 @@ pivox/
     └── examples/                  # Example configuration files
 ```
 
-## Development Phases (Control Plane)
+## Development Phases (Management Layer)
 
-Control plane development runs in parallel with engine phases from `docs/engine.md`.
+Management layer development runs in parallel with engine phases from `docs/engine.md`.
 
 ### Phase 1 — Core Playout Control
 

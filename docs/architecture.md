@@ -7,28 +7,28 @@ Pivox is a broadcast graphics and media playout platform deployed as a hybrid cl
 **Architecture documents:**
 - `docs/architecture.md` — this document. System-level architecture, deployment tiers, data flow, security.
 - `docs/engine.md` — playout engine (Rust + C++). Rendering, compositing, video playback, SDI/NDI output.
-- `docs/control-plane.md` — control plane (Go). NRCS, asset management, operator UI, hardware automation.
+- `docs/control-plane.md` — Cloud Controller + Playout Agent. NRCS, asset management, operator UI, hardware automation.
 
 ## Deployment Tiers
 
-| Tier | Engine | Control Plane | Storage | Target Customer |
+| Tier | Engine | Management | Storage | Target Customer |
 |---|---|---|---|---|
-| **Pivox Cloud** | Pivox-hosted (GPU cloud instances) | Pivox cloud | Pivox cloud (S3) | Small orgs, no on-prem hardware. Output delivered via NDI/SRT over private networking. |
-| **Pivox Hybrid** | Customer on-prem | Cloud + local on-prem | Cloud and/or on-prem (configurable per org) | Mid-large facilities with internet connectivity |
-| **Pivox On-Prem** | Customer on-prem | Fully on-prem | On-prem only | Enterprises, air-gapped facilities, government |
+| **Pivox Cloud** | Pivox-hosted (GPU cloud instances) | Cloud Controller | Pivox cloud (S3) | Small orgs, no on-prem hardware. Output delivered via NDI/SRT over private networking. |
+| **Pivox Hybrid** | Customer on-prem | Cloud Controller + Playout Agent | Cloud and/or on-prem (configurable per org) | Mid-large facilities with internet connectivity |
+| **Pivox On-Prem** | Customer on-prem | Playout Agent only (standalone) | On-prem only | Enterprises, air-gapped facilities, government |
 
 All three tiers run the **same software**. The difference is configuration and where the data lives.
 
 ## Hybrid Architecture (Primary Deployment Model)
 
-The hybrid model is the primary deployment target. Data lives in the cloud. On-prem, the local control plane and engine run on **separate machines** — the engine machine is dedicated to rendering with minimal overhead.
+The hybrid model is the primary deployment target. Data lives in the cloud. On-prem, the Playout Agent and engine run on **separate machines** — the engine machine is dedicated to rendering with minimal overhead.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │  PIVOX CLOUD                                                  │
 │                                                               │
 │  ┌────────────────────────────────────────────────────────┐  │
-│  │  Cloud Control Plane (Go)                               │  │
+│  │  Cloud Controller (api.pivox.app)                       │  │
 │  │                                                          │  │
 │  │  - Source of truth: config, users, orgs                 │  │
 │  │  - Web UI hosting                                       │  │
@@ -52,9 +52,9 @@ The hybrid model is the primary deployment target. Data lives in the cloud. On-p
 │  CUSTOMER ON-PREM (per site)       │                          │
 │                                    │                          │
 │  ┌─────────────────────────────────┴──────────────────────┐  │
-│  │  LOCAL CP SERVER (Go — separate machine from engine)    │  │
+│  │  PLAYOUT AGENT (separate machine from engine)           │  │
 │  │                                                          │  │
-│  │  Cloud Sync (bidirectional, queues during outages)      │  │
+│  │  Cloud Controller Sync (bidi, queues during outages)    │  │
 │  │  Core Services:                                          │  │
 │  │    - Playout controller                                 │  │
 │  │    - Rundown manager (synced copy)                      │  │
@@ -73,11 +73,11 @@ The hybrid model is the primary deployment target. Data lives in the cloud. On-p
 │  ┌──────────────────────┴───────────────────────────────┐  │
 │  │  ENGINE MACHINE (dedicated broadcast hardware)        │  │
 │  │                                                        │  │
-│  │  Engine Supervisor (Rust, ~20MB):                      │  │
+│  │  Supervisor (Rust, ~20MB):                              │  │
 │  │    - Manages channel/plugin processes                  │  │
-│  │    - Shared memory writer (receives feed stream        │  │
-│  │      from CP, writes to /dev/shm/ for templates)       │  │
-│  │    - gRPC endpoint for CP commands                     │  │
+│  │    - Shared memory writer (receives feed stream          │  │
+│  │      from agent, writes to /dev/shm/ for templates)    │  │
+│  │    - gRPC endpoint for agent commands                  │  │
 │  │                                                        │  │
 │  │  Channel Processes (CEF + FFmpeg + Rive plugins)       │  │
 │  │  AJA card → SDI/ST2110 + NDI + MJPEG output            │  │
@@ -92,12 +92,12 @@ The hybrid model is the primary deployment target. Data lives in the cloud. On-p
 │  ┌────────────────────────────────────────────────────────┐  │
 │  │  Broadcast Hardware                                     │  │
 │  │  Routers, mixers, multiviewers, audio desks             │  │
-│  │  (managed by CP's hardware automation gateway)          │  │
+│  │  (managed by Playout Agent's hardware automation gw)    │  │
 │  └────────────────────────────────────────────────────────┘  │
 └───────────────────────────────────────────────────────────────┘
 ```
 
-**Key design decision:** The CP runs on a separate server from the engine. The engine machine is 100% dedicated to rendering — only the engine supervisor (~20MB Rust process) and shared memory writer run on it. All Go services, PostgreSQL, Redis, web UI, and feed connectors run on the CP server. Communication between CP and engine is gRPC over the facility LAN.
+**Key design decision:** The Playout Agent runs on a separate server from the engine. The engine machine is 100% dedicated to rendering — only the supervisor (~20MB Rust process) and shared memory writer run on it. All Go services, PostgreSQL, Redis, web UI, and feed connectors run on the agent server. Communication between Playout Agent and engine is gRPC over the facility LAN.
 
 ## Cloud-Only Architecture
 
@@ -108,7 +108,7 @@ For small organizations without on-prem infrastructure. The engine runs on Pivox
 │  PIVOX CLOUD                                                  │
 │                                                               │
 │  ┌────────────────────────────────────────────────────────┐  │
-│  │  Cloud Control Plane                                    │  │
+│  │  Cloud Controller                                       │  │
 │  │  (same as hybrid, but manages cloud-hosted engines)     │  │
 │  └─────────────────────────┬──────────────────────────────┘  │
 │                             │ gRPC                            │
@@ -152,7 +152,7 @@ For enterprises and air-gapped facilities with no cloud dependency. Everything r
 │  CUSTOMER ON-PREM (fully self-contained)                       │
 │                                                                │
 │  ┌─────────────────────────────────────────────────────────┐  │
-│  │  Control Plane (Go — same binary, on-prem config)        │  │
+│  │  Playout Agent (standalone mode, same binary)             │  │
 │  │                                                           │  │
 │  │  - All services run locally                              │  │
 │  │  - No cloud sync (standalone mode)                       │  │
@@ -235,10 +235,10 @@ Asset metadata includes which storage location holds each file. The asset cache 
 Designer uploads template
   │
   ▼
-Cloud control plane → cloud storage (S3) or on-prem storage (rustfs)
+Cloud Controller → cloud storage (S3) or on-prem storage (rustfs)
   │
   ▼
-Asset metadata synced to local control plane
+Asset metadata synced to Playout Agent
   │
   ▼
 Asset cache manager (local) pulls asset to local SSD cache
@@ -252,10 +252,10 @@ Engine loads from local SSD cache
 ### Live Data Flow (Hybrid)
 
 ```
-Cloud configures: "connect to AP Elections at ws://feeds.ap.org/..."
+Cloud Controller configures: "connect to AP Elections at ws://feeds.ap.org/..."
   │
   ▼
-Local control plane connects to feed DIRECTLY (no cloud hop)
+Playout Agent connects to feed DIRECTLY (no cloud hop)
   │
   ▼
 Data Plane routes to engine (shared memory + gRPC over TCP (LAN))
@@ -264,7 +264,7 @@ Data Plane routes to engine (shared memory + gRPC over TCP (LAN))
 Engine patches template view model → on-air update
 ```
 
-Live data never traverses the cloud. The cloud configures which feeds to use; the local instance connects and routes locally.
+Live data never traverses the cloud. The Cloud Controller configures which feeds to use; the Playout Agent connects and routes locally.
 
 ### Compliance Recording Flow (Hybrid)
 
@@ -272,7 +272,7 @@ Live data never traverses the cloud. The cloud configures which feeds to use; th
 Engine records to local SSD (real-time)
   │
   ▼
-Local control plane:
+Playout Agent:
   ├── Ingests into asset manager (metadata, thumbnails, indexing)
   ├── Uploads to configured storage:
   │   ├── On-prem rustfs (if configured as primary)
@@ -282,18 +282,18 @@ Local control plane:
 
 ## Sync and Offline Operation
 
-### Cloud ↔ Local Sync
+### Cloud Controller ↔ Playout Agent Sync
 
-The local control plane maintains a persistent outbound connection to the cloud (mTLS). Sync is bidirectional:
+The Playout Agent maintains a persistent outbound bidi gRPC connection to the Cloud Controller (mTLS). Sync is bidirectional:
 
-**Cloud → Local:**
+**Cloud Controller → Playout Agent:**
 - Configuration changes
 - Rundown updates (create, edit, reorder)
 - Template registry changes (new versions, approvals)
 - Asset metadata updates
 - User/permission changes
 
-**Local → Cloud:**
+**Playout Agent → Cloud Controller:**
 - Engine status and health
 - Channel on-air state
 - Recording metadata
@@ -304,7 +304,7 @@ Sync is event-driven (pushed on change), not polled.
 
 ### Offline Operation
 
-When the internet connection drops, the local control plane switches to offline mode:
+When the internet connection drops, the Playout Agent switches to offline mode:
 
 **What continues working:**
 - Engine rendering (unaffected — engine doesn't depend on cloud)
@@ -320,10 +320,10 @@ When the internet connection drops, the local control plane switches to offline 
 **What stops working:**
 - New rundown creation/editing (if not cached locally — TBD: should local allow full editing?)
 - New asset uploads (cloud storage unreachable — unless on-prem storage is configured)
-- Template approval workflow (requires cloud)
+- Template approval workflow (requires Cloud Controller)
 - User authentication for new sessions (cached tokens continue working)
 - Multi-site monitoring aggregation
-- Cloud-to-local config pushes
+- Cloud Controller config pushes
 
 **What the operator sees:**
 - Banner: "OFFLINE MODE — operating from local cache"
@@ -331,7 +331,7 @@ When the internet connection drops, the local control plane switches to offline 
 - Editing functions may be limited (TBD: define exactly which features are disabled)
 
 **On reconnect:**
-- Local control plane reconciles state with cloud
+- Playout Agent reconciles state with Cloud Controller
 - Queued status updates and audit logs are pushed
 - Queued recording uploads resume
 - Any config changes made in cloud during outage are pulled
@@ -342,7 +342,7 @@ When the internet connection drops, the local control plane switches to offline 
 The exact feature set available during offline operation needs deeper analysis:
 
 - Which editing operations should work offline? (edit existing rundown items? create new ones?)
-- Should the local control plane serve the web UI directly during outage?
+- Should the Playout Agent serve the web UI directly during outage?
 - How long can offline mode sustain? (hours? days?)
 - What happens if both engines fail during offline mode? (no cloud to coordinate recovery)
 - Should there be a "emergency offline kit" — pre-cached set of essential templates + rundowns that's always available regardless of cache state?
@@ -353,7 +353,7 @@ The exact feature set available during offline operation needs deeper analysis:
 
 ```
 ┌─ Cloud ─────────────────────────────────────────────┐
-│  Cloud control plane (trusted)                       │
+│  Cloud Controller (trusted)                           │
 │  Cloud storage (trusted)                             │
 │  Cloud database (trusted)                            │
 └──────────────────────┬──────────────────────────────┘
@@ -361,7 +361,7 @@ The exact feature set available during offline operation needs deeper analysis:
                        │ Certificate pinning
                        │ Outbound from on-prem (firewall-friendly)
 ┌──────────────────────┴──────────────────────────────┐
-│  Local control plane (trusted — same binary)         │
+│  Playout Agent (trusted — same binary)                │
 │  └── gRPC over TCP (LAN) to engine (trusted)              │
 │  └── Local storage (trusted)                         │
 └─────────────────────────────────────────────────────┘
@@ -374,13 +374,13 @@ The exact feature set available during offline operation needs deeper analysis:
 | Operator → Cloud UI | OAuth2 / OIDC (see docs/authn.md for auth architecture) |
 | Operator → Local UI (online) | Same — proxied through cloud auth |
 | Operator → Local UI (offline) | Cached auth tokens with local validation |
-| Local CP → Cloud CP | mTLS with org-scoped certificates |
-| Local CP → Engine | gRPC over TCP (LAN) (process-level trust, no auth needed) |
+| Playout Agent → Cloud Controller | mTLS with org-scoped certificates |
+| Playout Agent → Engine | gRPC over TCP (LAN) (process-level trust, no auth needed) |
 | External integrations → API | API keys + TLS |
 
 ### On-Prem Credential Security
 
-The local control plane stores:
+The Playout Agent stores:
 - mTLS certificates for cloud connection
 - Storage credentials (rustfs, S3)
 - Data feed credentials
@@ -394,11 +394,11 @@ These are stored encrypted at rest. The install script provisions a machine-spec
 
 | Connection | Direction | Protocol | Ports |
 |---|---|---|---|
-| Local CP → Cloud CP | Outbound | gRPC over TLS | 443 |
-| Local CP → Cloud storage | Outbound | HTTPS (S3 API) | 443 |
-| Local CP → Data feeds | Outbound | WebSocket/HTTPS | Varies |
+| Playout Agent → Cloud Controller | Outbound | gRPC over TLS | 443 |
+| Playout Agent → Cloud storage | Outbound | HTTPS (S3 API) | 443 |
+| Playout Agent → Data feeds | Outbound | WebSocket/HTTPS | Varies |
 | Operator → Cloud UI | Outbound | HTTPS | 443 |
-| Local CP → Engine | Local | gRPC over TCP (LAN) | N/A (file socket) |
+| Playout Agent → Engine | Local | gRPC over TCP (LAN) | N/A (file socket) |
 | Engine → AJA card | Local | PCIe | N/A |
 | Engine → NDI | Local LAN | mDNS + TCP/UDP | 5353 + dynamic |
 
@@ -420,18 +420,18 @@ Same model as GitHub Actions self-hosted runners:
      --site-name "NYC Studio A"
 
 4. Script installs:
-   - Pivox local control plane (Go binary)
+   - Pivox Playout Agent (Go binary)
    - Pivox engine (Rust + C++ binary + CEF + FFmpeg libs)
    - rustfs (if on-prem storage selected)
    - System service definitions (systemd / Windows Service)
    - AJA NTV2 drivers (if AJA card detected)
 
-5. Local control plane registers with cloud:
+5. Playout Agent registers with Cloud Controller:
    - Exchanges registration token for mTLS certificates
    - Associates with org and site
    - Receives initial configuration
 
-6. Cloud pushes:
+6. Cloud Controller pushes:
    - Channel configuration
    - Rundowns and template metadata
    - Asset metadata (actual files pulled on-demand by cache manager)
@@ -447,18 +447,18 @@ Same model as GitHub Actions self-hosted runners:
 | Local (hybrid) | Pulled from cloud, operator approves and schedules update window |
 | Local (on-prem) | Manual binary update from release artifacts, or internal artifact repository |
 
-Engine updates require channel restart (brief outage). Control plane updates can be rolling (zero downtime) in HA configurations.
+Engine updates require channel restart (brief outage). Playout Agent updates can be rolling (zero downtime) in HA configurations.
 
 ## Multi-Site
 
-Large organizations may have multiple broadcast sites (NYC studio, LA studio, DC bureau, etc.). Each site runs its own local control plane and engines. All sites sync to the same cloud instance.
+Large organizations may have multiple broadcast sites (NYC studio, LA studio, DC bureau, etc.). Each site runs its own Playout Agent and engines. All sites sync to the same Cloud Controller.
 
 ```
-Cloud Control Plane
+Cloud Controller (api.pivox.app)
   │
-  ├── NYC Site (local CP + engines)
-  ├── LA Site (local CP + engines)
-  └── DC Site (local CP + engines)
+  ├── NYC Site (Playout Agent + engines)
+  ├── LA Site (Playout Agent + engines)
+  └── DC Site (Playout Agent + engines)
 ```
 
 **Cross-site capabilities:**
@@ -476,14 +476,14 @@ Cloud Control Plane
 
 Handled by hot-standby redundancy. See `docs/engine.md` — Redundancy section.
 
-### Local Control Plane Failure
+### Playout Agent Failure
 
 - Auto-restart via system service (systemd / Windows Service)
 - Engine continues rendering whatever is currently on-air
-- Operator loses UI control until CP restarts (~5-10 seconds)
-- For HA: active/passive or horizontally scaled local CP
+- Operator loses UI control until agent restarts (~5-10 seconds)
+- For HA: active/passive or horizontally scaled Playout Agent
 
-### Cloud Failure
+### Cloud Controller Failure
 
 - All local sites continue operating independently (offline mode)
 - No new rundown editing, template publishing, or user management

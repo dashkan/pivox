@@ -15,7 +15,7 @@ Pivox is split across multiple repositories, each with a single concern and inde
 | `dashkan/pivox-plugin-ffmpeg` | Rust + C | FFmpeg rendering plugin (video, audio, stills) |
 | `dashkan/pivox-plugin-rive` | C++ + Rust | Rive rendering plugin (2D motion graphics) |
 | `dashkan/pivox-proto` | Protobuf | Engine protocol definitions (playout commands, channel status, input, plugin protocol) |
-| `dashkan/pivox-server` | Go | Control plane: NRCS, asset management, Data Plane, hardware automation, monitoring |
+| `dashkan/pivox-server` | Go | Cloud Controller + Playout Agent: NRCS, asset management, Data Plane, hardware automation, monitoring |
 | `dashkan/pivox-web` | React + TypeScript | Operator UI (browser + Electron) |
 | `dashkan/pivox-sdk-js` | TypeScript | JavaScript PivoxSDK + browser mock (npm package) |
 
@@ -314,7 +314,7 @@ Build order — each step produces a testable artifact:
 - NDI output: send composited frames via NDI
 - MJPEG preview: HTTP server for browser preview
 - Shared memory writer: receive Data Plane feed stream, write to /dev/shm/
-- gRPC endpoint: accept commands from control plane
+- gRPC endpoint: accept commands from Playout Agent
 - Testable: engine starts, accepts gRPC commands, outputs black frames via NDI and MJPEG
 
 **Step 3: pivox-plugin-ffmpeg**
@@ -377,5 +377,5 @@ Build order — each step produces a testable artifact:
 6. `pivox-plugin-cef` — second plugin
 7. `pivox-plugin-rive` — third plugin
 8. `pivox-sdk-js` — JavaScript SDK
-9. `pivox-server` — control plane (can start in parallel with engine work)
+9. `pivox-server` — Cloud Controller + Playout Agent (can start in parallel with engine work)
 10. `pivox-web` — operator UI (can start once server API is defined)

@@ -368,14 +368,14 @@ AIP-160 filter expressions on: `state`, `mediaType`, `contentType`, `displayName
 
 ## Denied Patterns
 
-When an asset or project is soft-deleted, the control plane pushes denied access patterns to Storage Gateway agents via bidi ConfigUpdate. Agents store patterns in local SQLite and check every incoming request.
+When an asset or project is soft-deleted, the Cloud Controller pushes denied access patterns to Storage Gateway agents via bidi ConfigUpdate. Agents store patterns in local SQLite and check every incoming request.
 
 ```
 projects/proj1/*              — entire project deleted
 projects/proj1/assets/abc/*   — single asset deleted
 ```
 
-Patterns are full-replacement on each push. Agents load from SQLite on reboot, sync full state from control plane on bidi reconnect. See `docs/storage.md` for details.
+Patterns are full-replacement on each push. Agents load from SQLite on reboot, sync full state from Cloud Controller on bidi reconnect. See `docs/storage.md` for details.
 
 ---
 

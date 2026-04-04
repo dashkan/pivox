@@ -284,22 +284,22 @@ pivox-engine --dev --channels 1 --ndi-output
 
 ### pivox-server
 
-The Go control plane binary.
+The Go server binary (runs as Cloud Controller or Playout Agent depending on mode).
 
 ```bash
-# Start control plane (cloud mode)
+# Start as Cloud Controller
 pivox-server --mode cloud --config /etc/pivox/server.yaml
 
-# Start control plane (local mode, syncs with cloud)
+# Start as Playout Agent (syncs with Cloud Controller)
 pivox-server --mode local --cloud-endpoint wss://cloud.pivox.io --token <token>
 
-# Start control plane (standalone on-prem, no cloud)
+# Start as standalone Playout Agent (no cloud)
 pivox-server --mode standalone --config /etc/pivox/server.yaml
 ```
 
 ### pivox-ctl
 
-CLI tool for controlling the engine and control plane from the terminal.
+CLI tool for controlling the engine and Playout Agent from the terminal.
 
 ```bash
 # Channel control
@@ -344,13 +344,13 @@ cd pivox
 # Build engine (Rust + C++)
 make build-engine
 
-# Build control plane (Go)
+# Build server (Go)
 make build-server
 
 # Download CEF binary distribution
 make download-cef
 
-# Start dev environment (engine + control plane + Electron)
+# Start dev environment (engine + server + Electron)
 make dev
 ```
 

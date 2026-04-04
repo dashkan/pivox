@@ -271,12 +271,12 @@ AJA's NTV2 SDK supports VANC insertion via `CNTV2Card::SetAncInsertMode()` and r
 
 ### Caption Detection and Alerting
 
-When a video clip is loaded, FFmpeg immediately reports whether a caption track exists. The engine exposes this in the `SlotState` status stream (`has_captions`, `caption_format`). The Go control plane surfaces this in the operator UI:
+When a video clip is loaded, FFmpeg immediately reports whether a caption track exists. The engine exposes this in the `SlotState` status stream (`has_captions`, `caption_format`). The Playout Agent surfaces this in the operator UI:
 
 - **CC detected:** Green indicator with format (e.g., "CEA-708")
 - **No CC detected:** Warning indicator -- operator sees the alert before and during playout
 
-Whether missing CC blocks playout is a **configurable policy** in the Go control plane -- rundown items can be marked as "CC required" and playout blocked if the clip lacks captions. This is an editorial/compliance decision, not an engine decision. The engine just reports `has_captions: true/false`.
+Whether missing CC blocks playout is a **configurable policy** in the Playout Agent -- rundown items can be marked as "CC required" and playout blocked if the clip lacks captions. This is an editorial/compliance decision, not an engine decision. The engine just reports `has_captions: true/false`.
 
 ## GPI
 
@@ -284,9 +284,9 @@ GPI (General Purpose Interface) provides physical button triggers and tally ligh
 
 Pivox targets AJA cards exclusively for GPI — no third-party USB or IP GPI devices. This keeps the hardware stack unified and reduces integration complexity.
 
-### GPI Inputs (Physical Buttons → Control Plane → Engine Commands)
+### GPI Inputs (Physical Buttons → Playout Agent → Engine Commands)
 
-GPI inputs route through the **control plane**, not directly to the engine. The engine with the AJA card reports pin state changes to the control plane, which resolves the mapping and routes the command to the appropriate engine — which may be a different engine on a different machine.
+GPI inputs route through the **Playout Agent**, not directly to the engine. The engine with the AJA card reports pin state changes to the Playout Agent, which resolves the mapping and routes the command to the appropriate engine — which may be a different engine on a different machine.
 
 ```
 Operator panel / GPI button box
@@ -294,25 +294,25 @@ Operator panel / GPI button box
   │  Button press → contact closure → AJA card GPI input pin
   │
   ▼
-Engine reports GPI edge to control plane via gRPC
+Engine reports GPI edge to Playout Agent via gRPC
   │
   ▼
-Control plane resolves mapping:
+Playout Agent resolves mapping:
   GPI 1 rising → TAKE on element "lower-third" (→ Engine A, CH1 Layer 2)
   GPI 2 rising → STOP on element "lower-third" (→ Engine A, CH1 Layer 2)
   GPI 3 rising → TAKE on element "replay"       (→ Engine B, CH1 Layer 0)
   ...
 ```
 
-This design enables **cross-engine triggering** — a GPI button on Engine A (which has the AJA card with GPI pins) can trigger a command on Engine B. The control plane handles the routing. The engine with GPI hardware doesn't need to know what the button does; it just reports "pin N changed state."
+This design enables **cross-engine triggering** — a GPI button on Engine A (which has the AJA card with GPI pins) can trigger a command on Engine B. The Playout Agent handles the routing. The engine with GPI hardware doesn't need to know what the button does; it just reports "pin N changed state."
 
-### GPI Outputs (Control Plane → Engine → Tally Lights)
+### GPI Outputs (Playout Agent → Engine → Tally Lights)
 
 ```
-Control plane determines channel is on-air
+Playout Agent determines channel is on-air
   │
   ▼
-Control plane instructs engine (via gRPC) to set GPI output pin
+Playout Agent instructs engine (via gRPC) to set GPI output pin
   │
   ▼
 Engine sets AJA card GPI output pin high via NTV2 SDK
@@ -321,22 +321,22 @@ Engine sets AJA card GPI output pin high via NTV2 SDK
 Tally light on operator panel illuminates
 ```
 
-GPI output state is driven by the control plane because the control plane holds the authoritative on-air state across all engines. The engine just actuates the physical pin.
+GPI output state is driven by the Playout Agent because it holds the authoritative on-air state across all engines. The engine just actuates the physical pin.
 
 ### Configuration
 
-GPI mapping (which pin triggers which command, which state drives which output) is managed entirely by the Go control plane. The engine exposes two simple interfaces via gRPC:
+GPI mapping (which pin triggers which command, which state drives which output) is managed entirely by the Playout Agent. The engine exposes two simple interfaces via gRPC:
 
-- **GPI input:** reports pin state changes (pin number, rising/falling edge) to the control plane
-- **GPI output:** accepts pin state commands (set pin N high/low) from the control plane
+- **GPI input:** reports pin state changes (pin number, rising/falling edge) to the Playout Agent
+- **GPI output:** accepts pin state commands (set pin N high/low) from the Playout Agent
 
-All mapping logic — which pin means what, which engine to target, which element to address — lives in the control plane's show configuration, alongside all other input mapping (jog/shuttle, keyboard, automation).
+All mapping logic — which pin means what, which engine to target, which element to address — lives in the Playout Agent's show configuration, alongside all other input mapping (jog/shuttle, keyboard, automation).
 
 AJA Corvid and Kona cards provide multiple GPI input/output pins. The exact count varies by card model.
 
 ## Jog/Shuttle Controllers
 
-Physical jog/shuttle hardware provides tactile frame-accurate media control for replay and clip playout workflows. Pivox supports these as input devices via the control plane — the engine receives the same transport commands regardless of whether they originate from a physical wheel, a keyboard shortcut, or an automation system.
+Physical jog/shuttle hardware provides tactile frame-accurate media control for replay and clip playout workflows. Pivox supports these as input devices via the Playout Agent — the engine receives the same transport commands regardless of whether they originate from a physical wheel, a keyboard shortcut, or an automation system.
 
 ### USB HID Controllers
 
@@ -371,13 +371,13 @@ Button: REC              →  start recording (ingest channel)
 
 ### Architecture
 
-Jog/shuttle input adapters live in the **control plane**, not the engine. They follow the same pattern as GPI — translate physical hardware events to engine gRPC commands:
+Jog/shuttle input adapters live in the **Playout Agent**, not the engine. They follow the same pattern as GPI — translate physical hardware events to engine gRPC commands:
 
 ```
 ┌──────────────┐     ┌──────────────┐     ┌─────────┐
 │ AJA GPIO     │────→│              │     │         │
-│ (GPI/tally)  │     │  Control     │────→│ Engine  │
-├──────────────┤     │  Plane       │     │ gRPC    │
+│ (GPI/tally)  │     │  Playout     │────→│ Engine  │
+├──────────────┤     │  Agent       │     │ gRPC    │
 │ USB HID      │────→│              │     │         │
 │ (jog/shuttle)│     │  Maps HW     │     │         │
 ├──────────────┤     │  events to   │     │         │
@@ -390,7 +390,7 @@ The engine doesn't know or care if a jog command came from a physical wheel, a k
 
 ### Configuration
 
-Jog/shuttle controller mapping is managed by the Go control plane. Configuration specifies:
+Jog/shuttle controller mapping is managed by the Playout Agent. Configuration specifies:
 
 - Device type and connection (USB VID/PID, serial port, IP address)
 - Per-button/dial mapping to engine commands
@@ -410,7 +410,7 @@ The number of channels per engine machine depends on output resolution, scene co
 | 2160p59.94 HDR | 1–2 | Corvid 44 12G | HDR processing adds GPU overhead |
 | 4320p (8K) | 1 | Corvid 88 (quad-link per signal) | 8 ports for one fill+key pair |
 
-The AJA card's port count is often the hard ceiling before the GPU becomes the bottleneck. More channels or higher resolution requires additional engine machines. Each machine runs the same engine binary and config format — the control plane orchestrates across machines.
+The AJA card's port count is often the hard ceiling before the GPU becomes the bottleneck. More channels or higher resolution requires additional engine machines. Each machine runs the same engine binary and config format — the Playout Agent orchestrates across machines.
 
 Benchmarks against certified GPU models will populate exact numbers. This matrix is published to customers for hardware procurement.
 
@@ -534,7 +534,7 @@ Low-bandwidth preview for operator UI.
 - Rust encodes every Nth frame as JPEG at reduced resolution (720p)
 - Served as HTTP multipart stream (`Content-Type: multipart/x-mixed-replace`)
 - Consumed by `<img>` tag in browser or Electron
-- Go API server proxies and authenticates the stream
+- API server proxies and authenticates the stream
 - Target: 15fps, 100-200ms latency -- sufficient for operator monitoring
 
 For the MJPEG preview path, every 2nd-4th frame is JPEG-encoded at 720p and served over HTTP. Preview latency of 100-200ms is acceptable.
@@ -573,8 +573,8 @@ Linux is **not** a supported dev platform. Dev is macOS and Windows only.
 - MJPEG preview for remote operator UI
 - GPI via AJA card
 - Compliance recording via NVENC
-- Go control plane services may run in containers
-- Engine processes run on bare metal, managed by Rust supervisor
+- Playout Agent services may run in containers
+- Engine processes run on bare metal, managed by supervisor
 
 ### Windows Server (Staging/Production -- Headless)
 

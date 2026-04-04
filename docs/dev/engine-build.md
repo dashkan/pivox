@@ -280,7 +280,7 @@ cargo build
 # Build release
 cargo build --release
 
-# Build engine only (no Go control plane)
+# Build engine only (no Go server)
 cargo build -p pivox-engine
 
 # Build specific plugin
@@ -309,7 +309,7 @@ build-server:
 build-all: build-engine build-server
 
 dev:
-	# Start engine + control plane + Electron for development
+	# Start engine + server + Electron for development
 	./scripts/dev.sh
 
 test:
@@ -319,7 +319,7 @@ test:
 
 ## CI Build Matrix
 
-| Platform | Engine | Control Plane | Notes |
+| Platform | Engine | Playout Agent / Cloud Controller | Notes |
 |---|---|---|---|
 | macOS arm64 | cargo build | go build | Dev build, no AJA |
 | macOS x64 | cargo build | go build | Dev build, no AJA |

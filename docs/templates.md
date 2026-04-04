@@ -213,11 +213,11 @@ templates/
 
 ### Audio Visualizer Templates
 
-Audio visualizers are standard templates that use `pivox.native.getAudioLevels()` to read audio levels from a specific layer. The Go control plane bundles an audio file (FFmpeg layer) with a visualizer template as a single operator action:
+Audio visualizers are standard templates that use `pivox.native.getAudioLevels()` to read audio levels from a specific layer. The Playout Agent bundles an audio file (FFmpeg layer) with a visualizer template as a single operator action:
 
 ```
 Operator clicks "Play Audio" →
-  Control plane sends:
+  Playout Agent sends:
     1. VideoLoadCommand (audio file on layer 0)
     2. LoadCommand (visualizer on layer 1, audio_layer=0 in view model)
     3. LoadCommand (lower-third on layer 2)

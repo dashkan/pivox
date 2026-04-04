@@ -178,7 +178,7 @@ The Rive designer creates inputs in the state machine editor. The template manif
 }
 ```
 
-The `engine: "rive"` field tells the control plane to route this template to the Rive plugin instead of CEF.
+The `engine: "rive"` field tells the Playout Agent to route this template to the Rive plugin instead of CEF.
 
 ## Designer Workflow
 

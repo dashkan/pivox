@@ -30,7 +30,7 @@ Broadcast operators expect native-feeling tools. Vizrt Trio, Ross XPression, and
 |  - Embedded via SetAsChild (mac) / OSR (win)  |
 +-----------------------------------------------+
 | Shared C++ Core                               |
-|  - gRPC client (engine + control plane)       |
+|  - gRPC client (engine + Cloud Controller)     |
 |  - Document model, undo/redo                  |
 |  - NDI receive for preview                    |
 |  - Auth manager                               |
@@ -145,7 +145,7 @@ The shared C++ layer contains all business logic. Neither the SwiftUI nor WinUI 
 A single gRPC client library, shared between macOS and Windows. Connects to:
 
 - **Engine** — playout commands, channel status, plugin control
-- **Control plane** — rundown management, asset queries, data feeds, template registry
+- **Cloud Controller / Playout Agent** — rundown management, asset queries, data feeds, template registry
 
 Native gRPC in C++ — no IPC translation layer, no Node.js overhead. The same protocol the automation systems and external integrations use.
 
@@ -264,7 +264,7 @@ Native app captures URL scheme callback
   │  8. user->GetToken() for gRPC auth metadata
   │
   ▼
-Authenticated gRPC calls to control plane + engine
+Authenticated gRPC calls to Cloud Controller + engine
 ```
 
 ### Why Two Paths

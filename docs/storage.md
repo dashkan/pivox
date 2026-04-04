@@ -6,7 +6,7 @@ This document defines how Pivox stores, accesses, and distributes media assets (
 
 **Key design decisions:**
 
-1. **Cookie-based auth for reads, presigned URLs for uploads.** Asset reads go through Storage Gateways with session cookie auth — stable URLs enable CDN-style caching. Uploads use S3 presigned URLs for direct-to-storage writes. No component except the control plane holds long-lived storage credentials.
+1. **Cookie-based auth for reads, presigned URLs for uploads.** Asset reads go through Storage Gateways with session cookie auth — stable URLs enable CDN-style caching. Uploads use S3 presigned URLs for direct-to-storage writes. No component except the Cloud Controller holds long-lived storage credentials.
 
 2. **Project-scoped storage.** Every asset belongs to a project (org + workspace). Storage paths are partitioned by project. No cross-project access without explicit sharing.
 
@@ -17,7 +17,7 @@ This document defines how Pivox stores, accesses, and distributes media assets (
 **Related documents:**
 - `docs/architecture.md` — system-level architecture, deployment tiers
 - `docs/engine.md` — engine asset preloading, `LoadCommand` with local paths
-- `docs/control-plane.md` — asset manager, asset cache manager
+- `docs/control-plane.md` — Cloud Controller + Playout Agent, asset manager, asset cache manager
 - `docs/sdk.md` — `pivox.assets.resolve()`, `pivox.assets.preload()`
 
 ---
@@ -52,7 +52,7 @@ Organization
 ```
 ┌─ PIVOX CLOUD ──────────────────────────────────────────────────────┐
 │                                                                      │
-│  Control Plane (api.pivox.app)                                       │
+│  Cloud Controller (api.pivox.app)                                       │
 │    - Asset metadata (PostgreSQL)                                    │
 │    - StorageGateway / Agent / Endpoint resource management          │
 │    - DNS zone management (*.storage.pivox.app)                      │
@@ -112,7 +112,7 @@ Organization
 ```
 1. Admin creates StorageGateway in Pivox Cloud UI
    → Provides: display name, IP addresses of servers
-   → Control plane creates DNS record: west-coast.storage.pivox.app
+   → Cloud Controller creates DNS record: west-coast.storage.pivox.app
      (round-robin A records pointing to the provided IPs)
    → Returns: registration_token (shown once)
    → UI shows install command with configurable parameters
@@ -190,21 +190,21 @@ curl -sSL https://get.pivox.app/agent | bash -s -- --token <same_token>
 curl -sSL https://get.pivox.app/agent | bash -s -- --token <same_token>
 ```
 
-The control plane:
+The Cloud Controller:
 - Creates a new Agent resource for each server
 - Updates the DNS round-robin with all server IPs
 - Pushes the same endpoint config and cache settings to all agents
 
 ### Uninstalling
 
-An uninstall script is available from the control plane. It:
+An uninstall script is available from the Cloud Controller. It:
 1. Stops the `pivox-agent` service
 2. Sends a graceful disconnect over the bidi stream
 3. Disables and removes the systemd unit
 4. Removes the binary, configuration, and (optionally) the cache directory
 5. Removes the `pivox` user and group
 
-The control plane removes the Agent resource and updates DNS.
+The Cloud Controller removes the Agent resource and updates DNS.
 
 ### Adding S3 Endpoints
 
@@ -241,7 +241,7 @@ Assets on filesystem endpoints are stored as immutable versioned files:
 
 No credentials are needed — the agent accesses files using the `pivox` system user's permissions on the mount.
 
-The control plane pushes endpoint configuration to all connected agents via the bidi stream. Agents begin proxying and caching requests immediately.
+The Cloud Controller pushes endpoint configuration to all connected agents via the bidi stream. Agents begin proxying and caching requests immediately.
 
 ---
 
@@ -254,15 +254,15 @@ The agent initiates an outbound gRPC connection to `api.pivox.app`. This persist
 ```
 Agent starts → dials api.pivox.app → sends Handshake (token, version, IP, hostname)
   ↓
-Control plane validates token → creates Agent resource → sends HandshakeAck
+Cloud Controller validates token → creates Agent resource → sends HandshakeAck
   (includes: TLS cert, endpoint configs, cache config)
   ↓
-Steady state: agent sends heartbeats, telemetry; control plane sends config updates, cert renewals
+Steady state: agent sends heartbeats, telemetry; Cloud Controller sends config updates, cert renewals
   ↓
 Disconnect: agent retries with exponential backoff, serves from cached config
 ```
 
-### Agent → Control Plane Messages
+### Agent → Cloud Controller Messages
 
 | Message | When Sent | Gated by Telemetry |
 |---|---|---|
@@ -273,7 +273,7 @@ Disconnect: agent retries with exponential backoff, serves from cached config
 | **UpgradeStatus** | During upgrade phases | No |
 | **Telemetry** | Periodic metrics envelope | Yes |
 
-### Control Plane → Agent Messages
+### Cloud Controller → Agent Messages
 
 | Message | Purpose |
 |---|---|
@@ -305,10 +305,10 @@ The gateway serves HTTPS to browsers and Electron on the local network. Self-sig
 ### Certificate Flow
 
 ```
-1. Gateway created → control plane creates DNS record:
+1. Gateway created → Cloud Controller creates DNS record:
    west-coast.storage.pivox.app → 10.0.1.10, 10.0.1.11
 
-2. Control plane performs Let's Encrypt DNS-01 challenge:
+2. Cloud Controller performs Let's Encrypt DNS-01 challenge:
    - Adds TXT record to _acme-challenge.west-coast.storage.pivox.app
    - Let's Encrypt validates domain ownership
    - Issues a publicly trusted certificate
@@ -317,11 +317,11 @@ The gateway serves HTTPS to browsers and Electron on the local network. Self-sig
 
 4. Agent serves HTTPS with the cert — browsers trust it natively
 
-5. Before expiry (every ~60 days): control plane renews via DNS-01,
+5. Before expiry (every ~60 days): Cloud Controller renews via DNS-01,
    pushes new cert over bidi stream. Agent hot-swaps — zero downtime.
 ```
 
-The agent never needs outbound internet access to ACME servers. The control plane handles all DNS and certificate operations. The agent just receives the cert over the existing bidi connection.
+The agent never needs outbound internet access to ACME servers. The Cloud Controller handles all DNS and certificate operations. The agent just receives the cert over the existing bidi connection.
 
 ---
 
@@ -329,7 +329,7 @@ The agent never needs outbound internet access to ACME servers. The control plan
 
 ### Overview
 
-Agent upgrades follow a k8s-style rolling update pattern. The control plane orchestrates the entire process — download first, then sequential apply with health checks gating progression.
+Agent upgrades follow a k8s-style rolling update pattern. The Cloud Controller orchestrates the entire process — download first, then sequential apply with health checks gating progression.
 
 ### Upgrade Flow
 
@@ -338,26 +338,26 @@ Phase 1: Prepare (all nodes, parallel)
   ─────────────────────────────────────────────
   Admin sets target_version on the gateway (or auto-triggered by new release)
   → UpgradeGateway API call returns a long-running operation (LRO)
-  → Control plane sends UpgradeRequest{phase: DOWNLOAD} to ALL agents
+  → Cloud Controller sends UpgradeRequest{phase: DOWNLOAD} to ALL agents
   → Each agent:
     a. Downloads the new binary from the specified URL
     b. Verifies SHA-256 checksum
     c. Verifies Ed25519 signature (public key baked into agent binary)
     d. Reports UpgradeStatus{phase: READY}
-  → Control plane waits until all agents report READY
+  → Cloud Controller waits until all agents report READY
   → If any agent fails download or verification → abort, LRO fails
 
 Phase 2: Roll (sequential, one at a time)
   ─────────────────────────────────────────────
   For each agent in the pool:
-    → Control plane sends DrainRequest → agent
+    → Cloud Controller sends DrainRequest → agent
     → Agent removes itself from DNS round-robin
     → Agent finishes in-flight requests
     → Agent reports UpgradeStatus{phase: DRAINED}
-    → Control plane sends UpgradeRequest{phase: APPLY}
+    → Cloud Controller sends UpgradeRequest{phase: APPLY}
     → Agent replaces binary, restarts via systemd
     → New binary reconnects, sends Handshake with new version
-    → Control plane health check:
+    → Cloud Controller health check:
       ├── Pass → re-add to DNS, move to next agent
       └── Fail → agent rolls back to old binary (kept as fallback),
                   halt rollout, remaining agents stay on old version,
@@ -439,7 +439,7 @@ pivox-storage-{region}/
 **Isolation guarantees:**
 - Presigned URLs are scoped to a specific object path — a URL for `org_a/project_1/media/image.png` cannot access `org_b/` or even `org_a/project_2/`
 - The backing IAM policy (cloud) or bucket policy (on-prem) enforces org-level isolation as a second layer
-- The control plane validates project membership before signing any URL
+- The Cloud Controller validates project membership before signing any URL
 
 ### Asset Metadata
 
@@ -478,10 +478,10 @@ Asset reads go through Storage Gateways using session cookie auth. URLs are stab
 ```
 1. User authenticates with Pivox Cloud (Firebase ID token)
 
-2. Browser calls CreateStorageSession RPC on the control plane:
+2. Browser calls CreateStorageSession RPC on the Cloud Controller:
    POST /v1/storageSession
 
-3. Control plane:
+3. Cloud Controller:
    a. Verifies Firebase token, identifies user
    b. Computes access patterns from user's org/project memberships:
       ["/local-corp/local/primary/news/*",
@@ -512,7 +512,7 @@ Gateway HTTP server:
   6. Match → serve from cache or proxy to origin
   7. No match → 403 Forbidden
 
-No per-request control plane call. No presigned URL.
+No per-request Cloud Controller call. No presigned URL.
 Cache key is the clean URL — high cache hit rate.
 ```
 
@@ -520,15 +520,15 @@ Cache key is the clean URL — high cache hit rate.
 
 | Event | Behavior |
 |---|---|
-| **Session created** | Control plane pushes SessionGrant to gateways via bidi |
-| **Role changed** | Control plane pushes updated SessionGrant (same token, new patterns) |
-| **Access revoked** | Control plane pushes SessionRevoke — immediate, next request is 403 |
+| **Session created** | Cloud Controller pushes SessionGrant to gateways via bidi |
+| **Role changed** | Cloud Controller pushes updated SessionGrant (same token, new patterns) |
+| **Access revoked** | Cloud Controller pushes SessionRevoke — immediate, next request is 403 |
 | **Session expired** | Gateway flushes token from memory. Browser gets 401, calls CreateStorageSession again. |
 | **Gateway offline** | Sessions in memory persist. New sessions can't be pushed until reconnect. |
 
 ### Uploads — Presigned URLs
 
-Uploads bypass the gateway and go directly to the S3 endpoint via presigned URLs. The control plane generates short-lived, path-scoped URLs — no credentials are distributed to clients.
+Uploads bypass the gateway and go directly to the S3 endpoint via presigned URLs. The Cloud Controller generates short-lived, path-scoped URLs — no credentials are distributed to clients.
 
 | Operation | HTTP Method | TTL | Use Case |
 |---|---|---|---|
@@ -545,7 +545,7 @@ Asset uploads use presigned PUT URLs. The client uploads directly to storage.
 1. Client: InitiateUpload RPC
    { "name": "interview-bg.png", "type": "image", "project_id": "..." }
 
-2. Control plane:
+2. Cloud Controller:
    a. Validates permissions
    b. Creates asset record in DB (state: PENDING_UPLOAD)
    c. Generates storage path: org_abc/proj_123/media/images/{id}.png
@@ -557,7 +557,7 @@ Asset uploads use presigned PUT URLs. The client uploads directly to storage.
 4. Client: ConfirmUpload RPC
    { "asset_id": "...", "checksum_sha256": "e3b0c44..." }
 
-5. Control plane:
+5. Cloud Controller:
    a. Verifies object exists in storage (HEAD request)
    b. Verifies checksum matches
    c. Extracts technical metadata (dimensions, duration, codec)
@@ -567,13 +567,13 @@ Asset uploads use presigned PUT URLs. The client uploads directly to storage.
 
 ### Multipart Upload (Large Files)
 
-For files >100MB, the CP orchestrates an S3 multipart upload:
+For files >100MB, the Cloud Controller orchestrates an S3 multipart upload:
 
 ```
 1. Client: InitiateMultipartUpload
    { "name": "game-replay.mxf", "size_bytes": 2147483648 }
 
-2. CP: Returns upload_id + signed part URLs
+2. Cloud Controller: Returns upload_id + signed part URLs
    {
      "upload_id": "mp_abc123",
      "parts": [
@@ -587,7 +587,7 @@ For files >100MB, the CP orchestrates an S3 multipart upload:
 4. Client: CompleteMultipartUpload
    { "upload_id": "...", "parts": [{ "part_number": 1, "etag": "..." }, ...] }
 
-5. CP: Completes multipart on S3, verifies, extracts metadata
+5. Cloud Controller: Completes multipart on S3, verifies, extracts metadata
 ```
 
 ---
@@ -612,7 +612,7 @@ Each agent in the gateway pool maintains a local disk cache. Cache configuration
 | **Eviction** | LRU/LFU with configurable disk budget |
 | **Integrity** | SHA-256 checksum verified on cache write and periodic read-back |
 | **Warm-up** | Asset cache manager pre-warms by pre-fetching look-ahead assets |
-| **Invalidation** | Control plane pushes cache invalidation via bidi stream |
+| **Invalidation** | Cloud Controller pushes cache invalidation via bidi stream |
 | **Offline** | During cloud outage, cache serves previously-fetched assets indefinitely |
 
 ### Cache vs. Engine SSD Cache
@@ -714,7 +714,7 @@ project:
     alert_threshold_pct: 80
 ```
 
-The control plane enforces quotas before signing upload URLs. Over-quota projects get a clear error.
+The Cloud Controller enforces quotas before signing upload URLs. Over-quota projects get a clear error.
 
 ### Cross-Project Asset Sharing
 
@@ -750,7 +750,7 @@ Org-level shared assets (in `_shared/`) are readable by all projects in the org 
 
 Endpoint credentials (S3 access keys) are:
 - Required at endpoint creation as part of the S3 configuration
-- Stored encrypted in the control plane database (Google Cloud KMS envelope encryption in production)
+- Stored encrypted in the Cloud Controller database (Google Cloud KMS envelope encryption in production)
 - Never returned in API responses (INPUT_ONLY)
 - Delivered to agents over the bidi gRPC stream (encrypted in transit)
 - Stored locally on the agent in encrypted config
@@ -774,7 +774,7 @@ Storage sessions and agent messages are audited:
 | **In transit** | TLS everywhere — gateway (Let's Encrypt), S3 endpoints, bidi gRPC |
 | **At rest (cloud)** | S3 SSE-S3 or SSE-KMS (customer-managed keys) |
 | **At rest (on-prem)** | Storage backend encryption or volume-level (LUKS) |
-| **Credentials at rest** | Encrypted in control plane DB and in agent local config |
+| **Credentials at rest** | Encrypted in Cloud Controller DB and in agent local config |
 | **Agent binary** | Ed25519 signature verification on upgrade |
 
 ---

@@ -21,7 +21,7 @@ This document covers the **playout engine core** — the compositor, frame pipel
 - `docs/plugins/plugin-rive.md` — Rive 2D animation engine
 - `docs/plugins/plugin-unreal.md` — Unreal Engine integration (future)
 
-The upper layer (NRCS, rundowns, template management, asset management, API gateway) is a separate Go application documented in `docs/control-plane.md`.
+The upper layer (NRCS, rundowns, template management, asset management, API gateway) is the Cloud Controller and Playout Agent, documented in `docs/control-plane.md`.
 
 ## Technology Stack
 
@@ -41,7 +41,7 @@ Performance-critical rendering and hardware output:
 | Channel supervisor | Rust | Process manager for channel processes. Health monitoring, restart, IPC |
 | MJPEG preview output | Rust | Encode frames for remote browser/native app preview (when engine runs as separate process) |
 | Recording adapter | Rust (NVENC) | Compliance recording — encode output to H.264/HEVC, write to local disk |
-| GPI handler | Rust + C++ (AJA) | Reports GPI pin state changes to control plane via gRPC; actuates output pins on control plane command. No local mapping — all routing via control plane |
+| GPI handler | Rust + C++ (AJA) | Reports GPI pin state changes to Playout Agent via gRPC; actuates output pins on Playout Agent command. No local mapping — all routing via Playout Agent |
 | Caption/VANC handler | Rust + C++ (AJA) | Embed closed captions (CEA-608/708) in SDI VANC and ST 2110-40 metadata |
 | Colorspace conversion | Rust (CPU SIMD at 1080p, GPU via wgpu at 4K+) | sRGB → Rec.709. CPU SIMD at 1080p; GPU path at 4K+ (runs alongside GPU compositing) |
 
@@ -80,13 +80,13 @@ C++ is used **only** where a third-party SDK requires it (CEF, AJA NTV2, NDI). T
 
 **Do not** try to wrap CEF's full C++ API in Rust FFI bindings — CEF's class hierarchy, ref-counting (CefRefPtr), and callback patterns make this impractical. Instead, keep CEF's C++ surface minimal and forward everything to Rust immediately.
 
-### Upper Layer (Control Plane) — Go
+### Upper Layer (Cloud Controller + Playout Agent) — Go
 
 Everything above playout: NRCS, rundowns, template registry, asset management, REST/gRPC API gateway, operator UI backend, MOS/VDCP gateways, redundancy coordination, monitoring.
 
 ### Boundary — gRPC over Unix Domain Sockets
 
-All communication between Go control plane and Rust engine uses gRPC with protobuf over Unix domain sockets. See [IPC Design](#ipc-design) for details.
+All communication between the Playout Agent and the Rust engine uses gRPC with protobuf over Unix domain sockets. See [IPC Design](#ipc-design) for details.
 
 ## Core Concepts
 
@@ -129,7 +129,7 @@ Each channel runs as a **separate OS process**. Plugin instances (CEF, FFmpeg, R
 
 The **compositor** (Rust) merges all layers into a single RGBA output per frame. The result is split into fill (RGB) + key (alpha) for SDI output.
 
-**Operator addressing:** Directors and operators work with **named elements**, not layer numbers. The control plane maps element names to channel+layer assignments via show configuration:
+**Operator addressing:** Directors and operators work with **named elements**, not layer numbers. The Playout Agent maps element names to channel+layer assignments via show configuration:
 
 ```yaml
 # Show config — maps director's vocabulary to engine addressing
@@ -145,7 +145,7 @@ elements:
     layer: 3
 ```
 
-The director says "take lower third" — the control plane resolves this to `TAKE channel=0 layer=2`. The engine API remains flat `(channel, layer, command)`. Show setup determines which elements live on which layers and which channels. See `docs/control-plane.md` for the Playout Controller's role in this translation.
+The director says "take lower third" — the Playout Agent resolves this to `TAKE channel=0 layer=2`. The engine API remains flat `(channel, layer, command)`. Show setup determines which elements live on which layers and which channels. See `docs/control-plane.md` for the Playout Controller's role in this translation.
 
 ### Foreground / Background Slots
 
@@ -318,7 +318,7 @@ Templates are the content that the engine renders. Two template types are suppor
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  GO CONTROL PLANE                                        │
+│  PLAYOUT AGENT                                           │
 │                                                          │
 │  NRCS / Rundowns ──► Playout Controller ──► gRPC API    │
 │  Template Registry    State Machine          │           │
@@ -749,7 +749,7 @@ Frame Pipeline
   Local SSD (real-time write)
        │
        ▼
-  Go control plane (async, parallel to recording)
+  Playout Agent (async, parallel to recording)
        │
        ├──► Pivox Asset Manager (ingest as new asset)
        │    ├── Segment into clips (per rundown item or intervals)
@@ -764,9 +764,9 @@ Frame Pipeline
        └──► Cloud storage (S3, GCS, Azure Blob)
 ```
 
-**Key design: indexing happens during capture, not after.** As frames are recorded, the Go control plane processes them in parallel — generating thumbnails, extracting metadata from the playout state (which template, which data, which rundown item was on-air at each timecode), and feeding content to the search index. An operator can search for "show me every time we displayed the election board" moments after it aired.
+**Key design: indexing happens during capture, not after.** As frames are recorded, the Playout Agent processes them in parallel — generating thumbnails, extracting metadata from the playout state (which template, which data, which rundown item was on-air at each timecode), and feeding content to the search index. An operator can search for "show me every time we displayed the election board" moments after it aired.
 
-The engine writes to local SSD in real-time — recording cannot depend on network availability. The Go control plane handles ingest, indexing, and transfer to nearline/cloud asynchronously. Retention policy (e.g., 30 days local, 7 years archived) is a Go control plane concern.
+The engine writes to local SSD in real-time — recording cannot depend on network availability. The Playout Agent handles ingest, indexing, and transfer to nearline/cloud asynchronously. Retention policy (e.g., 30 days local, 7 years archived) is a Playout Agent concern.
 
 ## Closed Captioning
 
@@ -815,12 +815,12 @@ AJA's NTV2 SDK supports VANC insertion via `CNTV2Card::SetAncInsertMode()` and r
 
 ### Caption Detection and Alerting
 
-When a video clip is loaded, FFmpeg immediately reports whether a caption track exists. The engine exposes this in the `SlotState` status stream (`has_captions`, `caption_format`). The Go control plane surfaces this in the operator UI:
+When a video clip is loaded, FFmpeg immediately reports whether a caption track exists. The engine exposes this in the `SlotState` status stream (`has_captions`, `caption_format`). The Playout Agent surfaces this in the operator UI:
 
 - **CC detected:** Green indicator with format (e.g., "CEA-708")
 - **No CC detected:** Warning indicator — operator sees the alert before and during playout
 
-Whether missing CC blocks playout is a **configurable policy** in the Go control plane — rundown items can be marked as "CC required" and playout blocked if the clip lacks captions. This is an editorial/compliance decision, not an engine decision. The engine just reports `has_captions: true/false`.
+Whether missing CC blocks playout is a **configurable policy** in the Playout Agent — rundown items can be marked as "CC required" and playout blocked if the clip lacks captions. This is an editorial/compliance decision, not an engine decision. The engine just reports `has_captions: true/false`.
 
 ## GPI (General Purpose Interface)
 
@@ -828,9 +828,9 @@ GPI provides physical button triggers and tally lights via the AJA card's built-
 
 Pivox targets AJA cards exclusively for GPI — no third-party USB or IP GPI devices. This keeps the hardware stack unified and reduces integration complexity.
 
-**All GPI routes through the control plane.** The engine does not interpret GPI events — it reports pin state changes to the control plane via gRPC, and the control plane resolves the mapping and routes commands to the appropriate engine. This enables cross-engine triggering (a GPI button on Engine A can trigger a command on Engine B) and keeps all input mapping in one place.
+**All GPI routes through the Playout Agent.** The engine does not interpret GPI events — it reports pin state changes to the Playout Agent via gRPC, and the Playout Agent resolves the mapping and routes commands to the appropriate engine. This enables cross-engine triggering (a GPI button on Engine A can trigger a command on Engine B) and keeps all input mapping in one place.
 
-### GPI Inputs (Physical Buttons → Control Plane → Engine Commands)
+### GPI Inputs (Physical Buttons → Playout Agent → Engine Commands)
 
 ```
 Operator panel / GPI button box
@@ -838,23 +838,23 @@ Operator panel / GPI button box
   │  Button press → contact closure → AJA card GPI input pin
   │
   ▼
-Engine reports GPI edge to control plane via gRPC
+Engine reports GPI edge to Playout Agent via gRPC
   │
   ▼
-Control plane resolves mapping and routes command:
+Playout Agent resolves mapping and routes command:
   GPI 1 rising → TAKE on element "lower-third" (→ Engine A, CH1 Layer 2)
   GPI 2 rising → STOP on element "lower-third" (→ Engine A, CH1 Layer 2)
   GPI 3 rising → TAKE on element "replay"       (→ Engine B, CH1 Layer 0)
   ...
 ```
 
-### GPI Outputs (Control Plane → Engine → Tally Lights)
+### GPI Outputs (Playout Agent → Engine → Tally Lights)
 
 ```
-Control plane determines channel is on-air
+Playout Agent determines channel is on-air
   │
   ▼
-Control plane instructs engine (via gRPC) to set GPI output pin
+Playout Agent instructs engine (via gRPC) to set GPI output pin
   │
   ▼
 Engine sets AJA card GPI output pin high via NTV2 SDK
@@ -865,12 +865,12 @@ Tally light on operator panel illuminates
 
 ### Configuration
 
-GPI mapping is managed entirely by the Go control plane. The engine exposes two simple gRPC interfaces:
+GPI mapping is managed entirely by the Playout Agent. The engine exposes two simple gRPC interfaces:
 
 - **GPI input:** reports pin state changes (pin number, rising/falling edge)
 - **GPI output:** accepts pin state commands (set pin N high/low)
 
-All mapping logic — which pin means what, which engine to target, which element to address — lives in the control plane's show configuration. See `docs/hardware.md` for full GPI documentation including hardware details and cross-engine routing.
+All mapping logic — which pin means what, which engine to target, which element to address — lives in the Playout Agent's show configuration. See `docs/hardware.md` for full GPI documentation including hardware details and cross-engine routing.
 
 AJA Corvid and Kona cards provide multiple GPI input/output pins. The exact count varies by card model.
 
@@ -991,7 +991,7 @@ The frame pipeline's colorspace conversion is a pluggable stage. For SDR, it doe
 
 See `docs/protocols.md` for the canonical protobuf definitions (all message types, service definitions, enums).
 
-### Go Control Plane ↔ Engine Supervisor
+### Playout Agent ↔ Engine Supervisor
 
 **Protocol:** gRPC over TCP (facility LAN). UDS only for single-machine deployments.
 
@@ -1012,7 +1012,7 @@ See `docs/protocols.md` for the canonical protobuf definitions (all message type
 
 ## Asset Preloading and Caching
 
-Preloading is a **hybrid responsibility** split between the Go control plane (file transfer and caching) and the engine (content warm-up).
+Preloading is a **hybrid responsibility** split between the Playout Agent (file transfer and caching) and the engine (content warm-up).
 
 ### The Problem
 
@@ -1022,7 +1022,7 @@ A rundown item may reference a template, images, fonts, and video clips stored i
 
 ### Responsibility Split
 
-**Go control plane — Asset Cache Manager:**
+**Playout Agent — Asset Cache Manager:**
 - Watches rundown state — knows what items are coming up
 - Resolves asset references to local cache paths
 - Pulls templates, images, fonts, and clips from nearline MAM to local SSD cache
@@ -1041,7 +1041,7 @@ A rundown item may reference a template, images, fonts, and video clips stored i
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  GO CONTROL PLANE                                            │
+│  PLAYOUT AGENT                                               │
 │                                                              │
 │  Rundown:                                                    │
 │    Item 1  ← ON AIR                                         │
@@ -1081,7 +1081,7 @@ A rundown item may reference a template, images, fonts, and video clips stored i
 
 ### Engine Preload Status
 
-The engine reports preload state as part of the existing `SlotState` in the status stream. The `LOADED` status means the background slot is warm and ready for instant play. The Go control plane uses this to enable the operator's play button and inform automation systems.
+The engine reports preload state as part of the existing `SlotState` in the status stream. The `LOADED` status means the background slot is warm and ready for instant play. The Playout Agent uses this to enable the operator's play button and inform automation systems.
 
 ## Remote Input Interaction
 
@@ -1186,7 +1186,7 @@ enum MouseButton {
 
 **Channel modes — input is gated by channel state:**
 
-Each channel operates in one of four modes, set by the Go control plane:
+Each channel operates in one of four modes, set by the Playout Agent:
 
 | Channel Mode | Input Allowed | Output | Use Case |
 |---|---|---|---|
@@ -1195,7 +1195,7 @@ Each channel operates in one of four modes, set by the Go control plane:
 | **Edit** | Yes | MJPEG only | WYSIWYG template design — interactive editing |
 | **Debug** | Yes | MJPEG only | Developer testing — DevTools access enabled |
 
-The Rust supervisor enforces mode rules. If a channel is on-air and input events arrive, they are dropped and an `InputAck` with `accepted=false` is returned on the stream. The Go control plane transitions channels between modes (e.g., Preview → On-Air when the operator takes the channel live).
+The Rust supervisor enforces mode rules. If a channel is on-air and input events arrive, they are dropped and an `InputAck` with `accepted=false` is returned on the stream. The Playout Agent transitions channels between modes (e.g., Preview → On-Air when the operator takes the channel live).
 
 **Latency:** Input round-trip (click → render → MJPEG update in browser) is ~150-250ms. Acceptable for preview and editing. If the WYSIWYG editor needs lower latency, a future optimization is running a local CEF instance in the Electron editor for real-time editing, syncing the template to the engine only for on-air preview.
 
@@ -1247,7 +1247,7 @@ The engine's role in the Data Plane is minimal:
 1. **View model path:** Receive `UpdateCommand` via gRPC → forward to CEF → SDK patches view model → bindings fire
 2. **Shared memory path:** Memory-map the shared memory region at startup → SDK reads per frame → fires subscription callbacks
 
-The engine does not validate, throttle, route, or gate data. It reads what it's given and renders it. All Data Plane logic lives in the Go control plane.
+The engine does not validate, throttle, route, or gate data. It reads what it's given and renders it. All Data Plane logic lives in the Playout Agent.
 
 ### SDK APIs for Data
 
@@ -1359,7 +1359,7 @@ The engine runs as **bare-metal processes**, not in containers.
 
 **Process model:** The Rust channel supervisor manages one OS process per channel. Process isolation provides crash containment (channel 3 crashing doesn't affect channel 1). The supervisor handles health monitoring, automatic restart, and resource limits via cgroups directly.
 
-**Containers for the control plane:** The Go services (API, NRCS, monitoring, gateways) can run in containers/K8s. They communicate with the engine over gRPC via Unix domain sockets (co-located) or TCP (if on separate machines).
+**Containers for the Playout Agent:** The Go services (API, NRCS, monitoring, gateways) can run in containers/K8s. They communicate with the engine over gRPC via Unix domain sockets (co-located) or TCP (if on separate machines).
 
 ## Redundancy
 
@@ -1367,7 +1367,7 @@ The engine runs as **bare-metal processes**, not in containers.
 
 ```
                     ┌──────────────────┐
-                    │  Go Control Plane │
+                    │  Playout Agent    │
                     │  (dual-writes     │
                     │   every command   │
                     │   to both engines)│
@@ -1402,7 +1402,7 @@ The engine runs as **bare-metal processes**, not in containers.
 **How it works:**
 
 1. Both engines render simultaneously. Engine B runs identical CEF instances with identical templates and data.
-2. The Go control plane dual-writes every command to both engines. Both engines execute every play, stop, update, and next command.
+2. The Playout Agent dual-writes every command to both engines. Both engines execute every play, stop, update, and next command.
 3. A hardware changeover switch takes Engine A's output by default. If Engine A fails, the switch cuts to Engine B cleanly — same frame, same graphic.
 4. The Rust supervisor on each engine monitors CEF process health, AJA card status, genlock lock, and frame scheduling. It reports status to the changeover switch via GPI (contact closure) or protocol.
 
@@ -1516,8 +1516,8 @@ Tier 4: Production (on-air)
 - MJPEG preview for remote operator UI
 - GPI via AJA card
 - Compliance recording via NVENC
-- Go control plane services may run in containers
-- Engine processes run on bare metal, managed by Rust supervisor
+- Playout Agent services may run in containers
+- Engine processes run on bare metal, managed by supervisor
 
 ### Windows Server (Staging/Production — Headless)
 
@@ -1530,7 +1530,7 @@ Tier 4: Production (on-air)
 ```
 pivox/
 ├── cmd/
-│   ├── pivox-server/           # Go — main API/NRCS/control plane
+│   ├── pivox-server/           # Go — Cloud Controller / Playout Agent
 │   ├── pivox-mos-gateway/      # Go — MOS protocol bridge
 │   └── pivox-monitor/          # Go — health/alerting
 │
@@ -1587,7 +1587,7 @@ pivox/
 │
 ├── deployments/
 │   ├── docker/                 # Dockerfiles for Go services
-│   └── k8s/                    # Helm charts for control plane
+│   └── k8s/                    # Helm charts for management layer
 │
 ├── scripts/
 │   ├── build-engine.sh         # Build Rust + C++ engine
@@ -1597,7 +1597,7 @@ pivox/
 ├── docs/
 │   ├── architecture.md         # System deployment, hybrid/cloud/on-prem
 │   ├── engine.md               # This document — engine core
-│   ├── control-plane.md        # NRCS, operator UI, services
+│   ├── control-plane.md        # Cloud Controller + Playout Agent
 │   ├── data-plane.md           # Live data feeds, shared memory
 │   ├── sdk.md                  # JavaScript SDK API
 │   ├── protocols.md            # Protobuf definitions
@@ -1666,14 +1666,14 @@ Different channels on the same engine can run at different formats (e.g., CH1 at
 
 ### Tally (TSL UMD Protocol)
 
-Vision mixers send tally signals to indicate which source is currently on-air (program) or in preview. The Go control plane receives tally via TSL UMD (Television Systems Ltd, Universal Monitor Driver) protocol — the industry standard for tally distribution.
+Vision mixers send tally signals to indicate which source is currently on-air (program) or in preview. The Playout Agent receives tally via TSL UMD (Television Systems Ltd, Universal Monitor Driver) protocol — the industry standard for tally distribution.
 
-When a Pivox channel's tally state changes (e.g., mixer cuts to Pivox CH1), the Go control plane:
+When a Pivox channel's tally state changes (e.g., mixer cuts to Pivox CH1), the Playout Agent:
 - Updates the operator UI (red = on-air, green = preview)
 - Can trigger automated actions (e.g., auto-play a graphic when the channel goes on-air)
 - Surfaces the state in `pivox.system.channel.tally` for templates that need tally awareness
 
-This is a Go control plane concern — the engine is unaware of tally.
+This is a Playout Agent concern — the engine is unaware of tally.
 
 ### Still Image Support
 
@@ -1685,13 +1685,13 @@ Implemented via FFmpeg — a still image is a single-frame video. The engine loa
 
 Audio-only files (WAV, MP3, FLAC, AAC) are played via FFmpeg on a video layer — FFmpeg handles them as a media file with no video stream. PCM audio goes to the audio mixer and out to AJA/NDI. No video frames are produced.
 
-For visual presentation (e.g., phone interviews on news shows), the Go control plane **bundles** an audio layer with a visualizer template as a single operator action:
+For visual presentation (e.g., phone interviews on news shows), the Playout Agent **bundles** an audio layer with a visualizer template as a single operator action:
 
 ```
 Operator clicks "Play Audio" on a rundown item
   │
   ▼
-Go control plane sends multiple commands (single operator action):
+Playout Agent sends multiple commands (single operator action):
   1. VideoLoadCommand → Layer 0 (audio file via FFmpeg)
   2. LoadCommand → Layer 1 (visualizer template, with audio_layer=0 in view model)
   3. LoadCommand → Layer 2 (lower-third template, with name/title data)
@@ -1700,9 +1700,9 @@ Go control plane sends multiple commands (single operator action):
 Engine plays audio, visualizer reads levels, lower-third displays — all composited
 ```
 
-The operator sees one rundown item. The control plane handles layer assignment and wiring. The operator never sees layer numbers.
+The operator sees one rundown item. The Playout Agent handles layer assignment and wiring. The operator never sees layer numbers.
 
-**Visualizer templates** read `pivox.native.getAudioLevels({ layer: N })` to render audio visualization. The control plane passes the audio layer ID into the visualizer's view model so it knows which layer to monitor:
+**Visualizer templates** read `pivox.native.getAudioLevels({ layer: N })` to render audio visualization. The Playout Agent passes the audio layer ID into the visualizer's view model so it knows which layer to monitor:
 
 ```javascript
 // Built-in waveform visualizer template
@@ -1739,7 +1739,7 @@ templates/
 
 Custom visualizer themes are just more templates — designers create branded versions that match the show's look, using the same SDK and `getAudioLevels()` binding.
 
-**This pattern — the Go control plane bundling multiple engine commands into a single operator action — applies broadly.** Audio playback is one example. Others include: loading a graphics package (multiple coordinated templates across layers), or setting up a video call (video layer + name strap + show branding). The engine deals with individual layers and commands. The control plane translates operator intent into engine commands.
+**This pattern — the Playout Agent bundling multiple engine commands into a single operator action — applies broadly.** Audio playback is one example. Others include: loading a graphics package (multiple coordinated templates across layers), or setting up a video call (video layer + name strap + show branding). The engine deals with individual layers and commands. The Playout Agent translates operator intent into engine commands.
 
 ### Test Signal Generator
 
@@ -1752,9 +1752,9 @@ Implemented as built-in templates or FFmpeg test sources (`-f lavfi -i testsrc`,
 
 ### Automatic Rundown Advance (Timers)
 
-The Go control plane supports automatic cycling through rundown items at configured intervals. This is a control plane feature — the engine just receives PlayCommand when the timer fires.
+The Playout Agent supports automatic cycling through rundown items at configured intervals. This is a Playout Agent feature — the engine just receives PlayCommand when the timer fires.
 
-**Frame-accurate timing:** The control plane does not use wall-clock timers. It subscribes to the engine's `WatchStatus` stream and counts `frames_rendered` from `ChannelStatus`. This ensures timer accuracy is synced to genlock, not system clock.
+**Frame-accurate timing:** The Playout Agent does not use wall-clock timers. It subscribes to the engine's `WatchStatus` stream and counts `frames_rendered` from `ChannelStatus`. This ensures timer accuracy is synced to genlock, not system clock.
 
 | Timer Mode | Behavior |
 |---|---|
@@ -1767,15 +1767,15 @@ The Go control plane supports automatic cycling through rundown items at configu
 
 | Integration | Protocol | Layer | Purpose |
 |---|---|---|---|
-| Newsroom (ENPS/iNEWS) | MOS (XML/TCP) — to be superseded by Pivox protocol | Go control plane | Rundown-driven graphics |
-| Video server automation | VDCP (RS-422/TCP) | Go control plane | Trigger graphics from playout automation |
-| Vision mixer / switcher | TSL UMD / Ember+ | Go control plane | Tally status, auto-transition triggers |
+| Newsroom (ENPS/iNEWS) | MOS (XML/TCP) — to be superseded by Pivox protocol | Playout Agent | Rundown-driven graphics |
+| Video server automation | VDCP (RS-422/TCP) | Playout Agent | Trigger graphics from playout automation |
+| Vision mixer / switcher | TSL UMD / Ember+ | Playout Agent | Tally status, auto-transition triggers |
 | Timing reference | Blackburst / Tri-level sync / PTP | Engine (AJA card) | Genlock — physical signal or PTP clock |
-| Live data feeds | JSON / XML / WebSocket | Go Data Plane | Live scores, election results, tickers |
-| Asset management | REST API | Go asset cache manager | Templates, clips, logos, images, fonts |
+| Live data feeds | JSON / XML / WebSocket | Playout Agent Data Plane | Live scores, election results, tickers |
+| Asset management | REST API | Playout Agent cache manager | Templates, clips, logos, images, fonts |
 | Changeover switch | GPI / serial protocol | Engine supervisor | Redundancy failover signaling |
 
-**MOS replacement (strategic goal):** MOS is an outdated XML-over-TCP protocol from the early 2000s. A long-term goal is for Pivox to define a modern NRCS integration protocol (gRPC/protobuf-based, real-time, bidirectional streaming) that newsroom system vendors can integrate against. This is a Go control plane / protocol design initiative, not an engine concern. To be designed separately.
+**MOS replacement (strategic goal):** MOS is an outdated XML-over-TCP protocol from the early 2000s. A long-term goal is for Pivox to define a modern NRCS integration protocol (gRPC/protobuf-based, real-time, bidirectional streaming) that newsroom system vendors can integrate against. This is a Cloud Controller / protocol design initiative, not an engine concern. To be designed separately.
 
 ## Development Phases
 
@@ -1828,7 +1828,7 @@ This phase validates: hardware output works, genlock timing is correct, no dropp
 - MJPEG preview per channel
 - Channel mode enforcement (on-air, preview, edit, debug)
 - Caption sideband input (accept from external caption encoders via gRPC/UDP)
-- GPI mapping configuration (Go control plane)
+- GPI mapping configuration (Playout Agent)
 - Recording management (start/stop, retention, transfer to nearline/cloud)
 - Process crash recovery and automatic restart
 
@@ -1843,7 +1843,7 @@ This phase validates: hardware output works, genlock timing is correct, no dropp
 
 ### Phase 4 — Redundancy + Integration
 
-- Hot standby state replication (dual-write from Go control plane)
+- Hot standby state replication (dual-write from Playout Agent)
 - Changeover monitoring (GPI / protocol to hardware switch)
 - MOS gateway for external NRCS systems
 - VDCP gateway for automation integration

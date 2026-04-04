@@ -122,7 +122,7 @@ NVMe SSDs sustain 3-7 GB/s sequential write. A 4-drive NVMe array handles multip
 └─────────────────────────────────┘
 ```
 
-Same engine binary in both configurations. Port direction is config. The control plane orchestrates across machines — ingest engine writes to shared storage, playout engine reads from it. For single-box, it's all local NVMe.
+Same engine binary in both configurations. Port direction is config. The Playout Agent orchestrates across machines — ingest engine writes to shared storage, playout engine reads from it. For single-box, it's all local NVMe.
 
 ## High-Frame-Rate Camera Support
 
@@ -146,7 +146,7 @@ The FFmpeg plugin's existing variable-speed architecture handles this — high-f
 
 Replay operators use physical jog/shuttle controllers for frame-accurate media scrubbing. See `docs/hardware.md` for full details on supported hardware (USB HID controllers, serial/IP broadcast panels) and the input adapter architecture.
 
-The control plane maps hardware events to engine transport commands:
+The Playout Agent maps hardware events to engine transport commands:
 
 | Hardware Event | Engine Command |
 |---|---|
@@ -216,7 +216,7 @@ The engine architecture supports all phases without redesign:
 - **Plugin SDK** — ingest is a new plugin type (or extension of FFmpeg plugin), same interface
 - **Process model** — ingest channels are additional processes managed by the supervisor
 - **Clock source** — ingest captures at the incoming signal's rate, not the output genlock (separate timing domain)
-- **Control plane API** — same gRPC interface, new command types for record/mark/playback
+- **Playout Agent API** — same gRPC interface, new command types for record/mark/playback
 - **Output pipeline** — replay playout uses the same compositor and output adapters
 - **Hardware** — AJA cards already support bidirectional SDI; same certified hardware
 
