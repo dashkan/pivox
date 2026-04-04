@@ -436,26 +436,31 @@ Designer mode:   App ──gRPC──→ Embedded engine (in-process)
 
 The shared C++ gRPC client code is identical in both modes. A connection target config determines whether to connect to a remote address or the in-process engine.
 
-### Engine-Lite Build Configuration
+### Embedded Engine Build Configuration
 
-The embedded engine is an **engine-lite** build that strips hardware-specific components not needed for design preview:
+The embedded engine is the full engine **minus broadcast I/O hardware** (AJA cards, GPI, SDI, ST 2110). Everything that runs on standard desktop hardware with a GPU stays in:
 
-| Component | Standalone Engine | Engine-Lite (Embedded) |
+| Component | Standalone (Production) | Embedded (Designer) |
 |---|---|---|
-| Compositor | Yes | Yes |
+| Compositor (GPU) | Yes | Yes |
 | CEF plugin | Yes | Yes |
 | Rive plugin | Yes | Yes |
 | FFmpeg plugin | Yes | Yes |
-| Software clock | Yes | Yes |
-| AJA NTV2 output | Yes | No — no SDI hardware in designer machines |
-| AJA genlock clock | Yes | No — software clock only |
-| GPI handler | Yes | No — no GPI hardware |
-| NVENC recording | Yes | No — no compliance recording for design |
-| ST 2110 output | Yes | No |
-| NDI output | Optional | Optional — direct framebuffer is primary |
-| Caption/VANC | Yes | No |
+| Hardware encode (NVENC / VideoToolbox) | Yes | Yes |
+| Hardware decode (NVDEC / VideoToolbox) | Yes | Yes |
+| Software clock | Yes | Yes (primary clock source) |
+| NDI output | Yes | Yes |
+| AJA NTV2 (SDI output) | Yes | No — broadcast hardware |
+| AJA genlock clock | Yes | No — broadcast hardware |
+| GPI handler | Yes | No — broadcast hardware |
+| ST 2110 | Yes | No — broadcast hardware |
+| Caption/VANC | Yes | No — broadcast hardware |
 
-The engine-lite build is a compile-time configuration (feature flags in Cargo, CMake options), not a runtime switch. It produces a smaller library without hardware SDK dependencies.
+The distinction is clean: **broadcast I/O requires specialized hardware** and is excluded. Everything else runs on any machine meeting minimum GPU requirements and is included. This isn't "engine-lite" — it's the engine without AJA.
+
+A GPU is a minimum system requirement for the designer app. Features like GPU compositing, hardware encode/decode (NVENC on Windows, VideoToolbox on macOS), and CEF GPU-accelerated rendering require it and will not function without it.
+
+The embedded build configuration emerges naturally from the engine's hardware abstraction. Output adapters that require AJA SDK linkage are behind compile-time feature flags — the embedded build simply disables those flags.
 
 ### Scope Constraints
 
