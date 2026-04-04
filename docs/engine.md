@@ -34,16 +34,16 @@ Performance-critical rendering and hardware output:
 | CEF plugin | C++ (thin) + Rust | Built-in plugin using the Pivox Plugin SDK. C++ is a thin pass-through for CEF callbacks → Rust via FFI |
 | Native SDK functions | Rust (called from C++ V8 handlers) | Frame timing, hardware queries, GPU ops. C++ V8Handler is one-line pass-through per function |
 | FFmpeg plugin | Rust + C (FFmpeg) | Built-in plugin using the Pivox Plugin SDK. Clip playback, replay, variable speed via libav* |
-| Compositor | Rust (CPU SIMD, GPU if needed) | Merge video layers + CEF graphics layers. Alpha blending is CPU-feasible for typical layer counts. GPU path available if profiling demands it |
+| Compositor | Rust (CPU SIMD at 1080p, GPU via wgpu at 4K+) | Merge all plugin layers via alpha blending with per-layer transforms. CPU SIMD handles 1080p; GPU compositing required for 4K+ due to pixel throughput and memory bandwidth |
 | Frame pipeline | Rust | Buffer management, colorspace conversion, fill+key split. Memory safety matters at 60fps |
 | AJA NTV2 output adapter | C++ wrapper + Rust driver | NTV2 SDK is C++. Thin C++ shim exposes frames to Rust via FFI |
 | NDI output | C++ FFI | NDI SDK is C/C++. Minimal wrapper |
 | Channel supervisor | Rust | Process manager for channel processes. Health monitoring, restart, IPC |
 | MJPEG preview output | Rust | Encode frames for remote browser/Electron preview |
 | Recording adapter | Rust (NVENC) | Compliance recording — encode output to H.264/HEVC, write to local disk |
-| GPI handler | Rust + C++ (AJA) | Physical button triggers and tally lights via AJA card GPI or IP-based panels |
+| GPI handler | Rust + C++ (AJA) | Reports GPI pin state changes to control plane via gRPC; actuates output pins on control plane command. No local mapping — all routing via control plane |
 | Caption/VANC handler | Rust + C++ (AJA) | Embed closed captions (CEA-608/708) in SDI VANC and ST 2110-40 metadata |
-| Colorspace conversion | Rust (CPU SIMD, GPU if needed) | sRGB → Rec.709 is near-trivial. CPU SIMD for day one, native GPU only if profiling shows CPU bottleneck |
+| Colorspace conversion | Rust (CPU SIMD at 1080p, GPU via wgpu at 4K+) | sRGB → Rec.709. CPU SIMD at 1080p; GPU path at 4K+ (runs alongside GPU compositing) |
 
 ### C++ / Rust Boundary Principle
 
@@ -104,22 +104,48 @@ This dual-use model (DSK for graphics-only, full-frame for video+graphics) is st
 ### Channel / Layer Model
 
 ```
-Channel = one SDI output pair (fill + key)
+Channel = one compositor = one SDI output pair (fill + key)
   └── Layer Stack (composited bottom-up, higher layer number = on top)
-        Layer 0: Video playback (FFmpeg)    ← clip, replay, live ingest
-        Layer 1: Lower third (CEF)          ← HTML/JS graphic
-        Layer 2: Bug / DOG (CEF)            ← persistent logo
+        Layer 0: Video playback (FFmpeg)    ← clip, replay, stills
+        Layer 1: Lower third (Rive)         ← 2D motion graphic
+        Layer 2: Bug / DOG (still image)    ← persistent logo
         Layer 3: Ticker / crawl (CEF)       ← HTML/JS graphic
         Layer 4: Alert banner (CEF)         ← HTML/JS graphic
         ...
 ```
 
-Each channel runs as a **separate OS process** containing one CEF instance and one FFmpeg instance. A channel contains two source types:
+**Any layer can use any plugin type.** A layer is not tied to CEF, FFmpeg, or Rive — the plugin type is determined by the content assigned to it. A lower third can be CEF today, Rive tomorrow, swapped without changing the layer config. The compositor treats all plugin outputs identically: a source buffer at some resolution, placed on the output canvas.
 
-- **Video layers** — decoded by FFmpeg. Clip playback, replay, variable speed, jog/shuttle. Typically layer 0 (background) but can be any layer.
-- **Graphics layers** — rendered by CEF. HTML/JS templates. Composited on top of video via alpha blending.
+**Layer 0 is not special.** A channel may have no video layer at all — graphics-only output keyed downstream by a vision mixer (DSK model). The compositor starts from a **transparent canvas** (`RGBA 0,0,0,0`) and composites whatever layers are present. The fill+key output pair represents only the graphics content; the video underneath comes from elsewhere in the facility.
 
-The **compositor** (Rust, GPU-accelerated) merges all layers into a single RGBA output per frame. Graphics layers with transparency alpha-blend over video layers. The result is split into fill (RGB) + key (alpha) for SDI output.
+Each layer is **independently addressable** with its own lifecycle:
+
+- Each layer has its own foreground/background slots
+- Each layer accepts cue/take/stop/update commands independently
+- Transitions run per-layer — taking a lower third doesn't interrupt the ticker
+- Each layer is essentially its own mini playout channel within the composite
+
+Each channel runs as a **separate OS process**. Plugin instances (CEF, FFmpeg, Rive) are loaded on demand based on what the layers require.
+
+The **compositor** (Rust) merges all layers into a single RGBA output per frame. The result is split into fill (RGB) + key (alpha) for SDI output.
+
+**Operator addressing:** Directors and operators work with **named elements**, not layer numbers. The control plane maps element names to channel+layer assignments via show configuration:
+
+```yaml
+# Show config — maps director's vocabulary to engine addressing
+channel: 0
+elements:
+  - name: video
+    layer: 0
+  - name: bug
+    layer: 1
+  - name: lower-third
+    layer: 2
+  - name: ticker
+    layer: 3
+```
+
+The director says "take lower third" — the control plane resolves this to `TAKE channel=0 layer=2`. The engine API remains flat `(channel, layer, command)`. Show setup determines which elements live on which layers and which channels. See `docs/control-plane.md` for the Playout Controller's role in this translation.
 
 ### Foreground / Background Slots
 
@@ -166,11 +192,44 @@ CEF manages both foreground and background graphics as DOM elements in a single 
 
 ### Compositor and Transition Engine
 
-The compositor merges all layers per frame. During a transition between foreground and background within a layer, the compositor temporarily blends both:
+The compositor merges all layers per frame onto a **transparent canvas** (`RGBA 0,0,0,0`). Each plugin renders at its **native size** — the CEF viewport dimensions, the Rive artboard size, the video frame resolution, or the image pixel dimensions. The compositor places each layer's output on the canvas using a per-layer transform:
+
+```rust
+pub struct LayerTransform {
+    pub x: f32,          // normalized 0.0–1.0 relative to output canvas
+    pub y: f32,
+    pub width: f32,      // scale relative to native source size (1.0 = native)
+    pub height: f32,
+    pub anchor: Anchor,  // top-left, center, bottom-left, etc.
+    pub crop: Option<Rect>,
+    pub opacity: f32,
+}
+```
+
+```
+Output canvas (1920×1080, starts transparent):
+┌──────────────────────────────────┐
+│                        ┌──────┐  │ ← Layer 2: PNG bug (200×80), placed at (0.85, 0.05)
+│                        │ LOGO │  │
+│                        └──────┘  │
+│                                  │
+│  ┌────────────────────────────┐  │ ← Layer 1: Rive L3 (800×150), placed at (0.05, 0.82)
+│  │  LOWER THIRD (rive)       │  │
+│  └────────────────────────────┘  │
+│                                  │
+│  Layer 0: Video (1920×1080)      │ ← full canvas, transform = identity
+└──────────────────────────────────┘
+```
+
+This model is **uniform across all plugin types**. CEF, Rive, FFmpeg, stills — the compositor treats them identically. A designer builds a reusable banner component once; placement is a property of the layer assignment, not baked into the content. The same banner template can be positioned differently per show via the layer transform in the show config.
+
+For CEF specifically, templates *can* still do their own internal layout with CSS for multi-element compositions (a lower third with name + title + logo). But the template's *placement on canvas* uses the same compositor transform as everything else. A CEF template can render at a smaller viewport (just the banner area) and be positioned by the compositor — same as Rive or a still image.
+
+During a transition between foreground and background within a layer, the compositor temporarily blends both:
 
 **Normal state (no transition):**
 ```
-Layer output = foreground buffer
+Layer output = foreground buffer (placed via layer transform)
 ```
 
 **During transition (e.g., 30-frame dissolve):**
@@ -431,17 +490,76 @@ AJA's NTV2 SDK supports embedding up to 16 channels of audio in each SDI output.
 | Silence generation | When no layers produce audio, output valid silence (zero samples). AJA cards require continuous audio. |
 | Sample rate conversion | All sources resampled to 48kHz (broadcast standard). CEF outputs 48kHz natively. FFmpeg clips may be 44.1kHz or other rates |
 
-### Frame Timing and Genlock
+### Frame Timing and Clock Source
 
-CEF does not know about broadcast timing. The engine controls frame cadence:
+CEF does not know about broadcast timing. The engine controls frame cadence via a **clock source abstraction**. The engine loop doesn't know or care where its frame edges come from — production uses AJA genlock, everything else uses a software clock:
 
-1. Engine receives genlock reference signal via AJA card
-2. On each genlock edge, engine ticks CEF's `DoMessageLoopWork()`
-3. CEF renders and fires `OnPaint()` with the pixel buffer
-4. Engine captures the buffer and routes to compositor → frame pipeline → outputs
-5. AJA card's `AutoCirculate` schedules the frame for the next output field
+```rust
+pub trait ClockSource: Send + Sync {
+    /// Blocks until the next frame edge. Returns the frame timestamp.
+    fn wait_for_frame(&self) -> FrameEdge;
+    /// Current timecode (LTC/VITC in production, free-running in dev)
+    fn timecode(&self) -> Timecode;
+    /// Negotiated frame rate
+    fn frame_rate(&self) -> FrameRate;
+}
+```
+
+**The engine loop is identical regardless of clock source:**
+
+```rust
+loop {
+    let edge = clock.wait_for_frame();   // blocks until edge
+    cef.tick();                           // DoMessageLoopWork()
+    ffmpeg.advance(edge.pts);
+    rive.advance(edge.pts);
+    compositor.render(&layers);
+    for output in &outputs {
+        output.deliver(&compositor.fill, &compositor.key, &edge);
+    }
+}
+```
+
+**Production — AJA genlock clock:**
+
+1. Engine receives genlock reference signal via AJA card (blackburst, tri-level sync, or PTP)
+2. `AjaGenlockClock::wait_for_frame()` blocks on AJA's output vertical interrupt — real hardware timing
+3. On each genlock edge, engine ticks all plugins
+4. AJA card's `AutoCirculate` schedules the frame for the next output field
 
 This ensures every rendered frame aligns with house sync. No dropped frames, no judder.
+
+**Non-production — software clock:**
+
+For development, staging, cloud preview, sales demos, and any deployment without AJA hardware:
+
+1. `SoftwareClock::wait_for_frame()` computes **absolute target times** using rational frame duration arithmetic and sleeps to that wall-clock instant
+2. Platform-specific high-resolution sleep: `mach_wait_until` (macOS), `clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME)` (Linux)
+3. Sub-100μs jitter — sufficient for NDI and preview output
+4. Timecode is free-running from engine start
+
+**Critical: absolute targets, not relative sleeps.** A naive `sleep(16.683ms)` loop drifts over time. The software clock computes `epoch + (frame_number × frame_duration)` using integer arithmetic to prevent accumulation error:
+
+```rust
+// 59.94fps = 60000/1001. Frame duration = 1_000_000_000 * 1001 / 60000 = 16_683_333ns
+// Target for frame N: epoch_ns + N * 1001 * 1_000_000_000 / 60000 (integer math, no drift)
+```
+
+**Clock source is a config choice:**
+
+```toml
+# Development (no AJA hardware)
+[channel.clock]
+source = "software"
+frame_rate = "59.94"
+
+# Production (AJA genlock)
+[channel.clock]
+source = "aja_genlock"
+device = 0
+```
+
+The engine binary is identical across all environments. Only the config changes.
 
 **Frame rate depends on output format:**
 - 1080p59.94: tick at 59.94fps (59.94 full frames per second)
@@ -710,7 +828,9 @@ GPI provides physical button triggers and tally lights via the AJA card's built-
 
 Pivox targets AJA cards exclusively for GPI — no third-party USB or IP GPI devices. This keeps the hardware stack unified and reduces integration complexity.
 
-### GPI Inputs (Physical Buttons → Engine Commands)
+**All GPI routes through the control plane.** The engine does not interpret GPI events — it reports pin state changes to the control plane via gRPC, and the control plane resolves the mapping and routes commands to the appropriate engine. This enables cross-engine triggering (a GPI button on Engine A can trigger a command on Engine B) and keeps all input mapping in one place.
+
+### GPI Inputs (Physical Buttons → Control Plane → Engine Commands)
 
 ```
 Operator panel / GPI button box
@@ -718,24 +838,26 @@ Operator panel / GPI button box
   │  Button press → contact closure → AJA card GPI input pin
   │
   ▼
-Rust supervisor detects GPI edge via NTV2 SDK
+Engine reports GPI edge to control plane via gRPC
   │
   ▼
-Maps to configured command:
-  GPI 1 rising → PlayCommand on CH1 Layer 1
-  GPI 2 rising → StopCommand on CH1 Layer 1
-  GPI 3 rising → NextCommand on CH1 Layer 1
-  GPI 4 rising → PlayCommand on CH2 Layer 1
+Control plane resolves mapping and routes command:
+  GPI 1 rising → TAKE on element "lower-third" (→ Engine A, CH1 Layer 2)
+  GPI 2 rising → STOP on element "lower-third" (→ Engine A, CH1 Layer 2)
+  GPI 3 rising → TAKE on element "replay"       (→ Engine B, CH1 Layer 0)
   ...
 ```
 
-### GPI Outputs (Engine State → Tally Lights)
+### GPI Outputs (Control Plane → Engine → Tally Lights)
 
 ```
-Channel 1 transitions to on-air mode
+Control plane determines channel is on-air
   │
   ▼
-Rust supervisor sets AJA card GPI output pin high
+Control plane instructs engine (via gRPC) to set GPI output pin
+  │
+  ▼
+Engine sets AJA card GPI output pin high via NTV2 SDK
   │
   ▼
 Tally light on operator panel illuminates
@@ -743,7 +865,12 @@ Tally light on operator panel illuminates
 
 ### Configuration
 
-GPI mapping (which pin triggers which command, which state drives which output) is configuration managed by the Go control plane and pushed to the Rust supervisor at startup. The Rust supervisor handles hardware-level GPIO reading/writing via the AJA NTV2 SDK's GPI APIs.
+GPI mapping is managed entirely by the Go control plane. The engine exposes two simple gRPC interfaces:
+
+- **GPI input:** reports pin state changes (pin number, rising/falling edge)
+- **GPI output:** accepts pin state commands (set pin N high/low)
+
+All mapping logic — which pin means what, which engine to target, which element to address — lives in the control plane's show configuration. See `docs/hardware.md` for full GPI documentation including hardware details and cross-engine routing.
 
 AJA Corvid and Kona cards provide multiple GPI input/output pins. The exact count varies by card model.
 
@@ -1172,12 +1299,42 @@ CEF renders (GPU) → OnPaint() delivers pixel buffer → Our pipeline processes
 |---|---|---|
 | All HTML/CSS/WebGL/WebGPU rendering | CEF (automatic, always GPU) | Not our code — Chromium handles it |
 | Colorspace conversion (sRGB → Rec.709) | Our frame pipeline (Rust) | CPU SIMD — this is a near-no-op |
-| Composite CEF layers with video layers | Our compositor (Rust) | CPU SIMD — alpha blending a few layers is CPU-feasible |
+| Composite all plugin layers with transforms | Our compositor (Rust) | CPU SIMD at 1080p; GPU via wgpu at 4K+ |
 | Fill+key split | Our frame pipeline (Rust) | CPU — trivial byte operation |
 | Video decode | FFmpeg | Hardware decode (NVDEC/VAAPI/VideoToolbox) — automatic |
 | Compliance recording | NVENC | Hardware encoder — fixed-function, not shader code |
 
-**Our frame pipeline uses CPU SIMD for day one.** We don't write native GPU shaders for colorspace conversion or compositing unless profiling on production hardware proves CPU is insufficient. If GPU compute is ever needed (e.g., HDR tone mapping at 4K60), use `wgpu` (Rust WebGPU implementation) as a cross-platform abstraction rather than vendor-specific APIs.
+**CPU SIMD is the 1080p path. GPU compositing is required for 4K+.** At 1080p with typical layer counts (4-6 layers), CPU SIMD handles compositing, colorspace conversion, and fill+key split comfortably. At 4K (3840×2160), pixel throughput quadruples — 4 layers at 59.94fps means ~2 billion pixels/sec of blending. Memory bandwidth also becomes a constraint: each 4K RGBA frame is ~33MB, and a 4-layer composite pass touches 8-10 buffers per frame × 33MB × 60fps ≈ 16-20 GB/s, consuming a significant fraction of system memory bandwidth.
+
+For 4K and above, the compositor and frame pipeline must use GPU compute. Use `wgpu` (Rust WebGPU implementation) as a cross-platform abstraction rather than vendor-specific APIs. GPU-resident buffers avoid the system memory bandwidth bottleneck entirely — compositing stays on the GPU, only the final fill+key output crosses PCIe to the AJA card.
+
+### Resolution and Capacity Planning
+
+A high-end GPU is required for production deployments. The number of channels per machine depends on output resolution, scene complexity, and layer count. Customers acquire additional engine machines for more channels at higher resolutions.
+
+**Approximate capacity (reference GPU, worst-case scene: 4 layers, all active, transitions running):**
+
+| Resolution | Channels per Machine | AJA Constraint |
+|---|---|---|
+| 1080p59.94 | 4–6 | Corvid 88: 4 channels fill+key (8 SDI ports) |
+| 2160p59.94 (4K) | 2–3 | Corvid 44 12G: 2 channels fill+key (4 × 12G-SDI ports) |
+| 2160p59.94 HDR | 1–2 | Same as 4K + HDR processing overhead |
+| 4320p (8K) | 1 | Quad-link 12G-SDI per signal (8 ports for one fill+key pair) |
+
+These are approximate — actual capacity depends on GPU model, template complexity, and workload mix. The certified hardware matrix (below) will be validated with production benchmarks. The AJA card's port count is often the hard ceiling before the GPU becomes the bottleneck.
+
+**What scales linearly with resolution (no architecture change):**
+- CEF `OnPaint()` buffer size (set viewport to output resolution)
+- FFmpeg hardware decode (NVDEC handles 4K/8K natively)
+- Rive rendering (vector, resolution-independent)
+- NVENC compliance recording
+- NDI output bandwidth (~150Mbps at 1080p, ~600Mbps at 4K)
+
+**What doesn't scale (requires hardware sizing):**
+- Compositor throughput (GPU fill rate)
+- Memory bandwidth for buffer transfers
+- AJA port count (2 ports per channel for fill+key)
+- NIC capacity for ST 2110 (25GbE or bonded 10GbE for 4K; 8K uncompressed requires JPEG XS / ST 2110-22)
 
 ### GPU Strategy — WebGPU as the 3D Platform
 
@@ -1300,13 +1457,15 @@ Tier 1: Browser (fastest iteration)
 
 Tier 2: Local Engine + NDI (daily workflow)
   - Developer runs Pivox engine locally (macOS or Windows)
+  - Software clock (no AJA hardware needed — same engine binary, different config)
   - Pivox Electron app for operator UI
   - NDI output — view in NDI Monitor (free, same machine or any device on network)
   - Real PivoxSDK — native bindings, view model, timing
   - Template hot-reload: file watcher detects changes, reloads CEF page,
     preserves view model state
   - Good for: SDK integration, transitions, data binding validation
-  - No AJA hardware needed
+  - This is a first-class deployment mode, not a fallback — cloud preview,
+    sales demos, and QA environments also run this way
 
 Tier 3: Staging Engine (pre-air validation)
   - Staging server: same hardware + OS + AJA card as production
@@ -1325,6 +1484,7 @@ Tier 4: Production (on-air)
 ### macOS (Dev)
 
 - CEF OSR builds and runs natively
+- Software clock (default) or AJA genlock via Thunderbolt (optional)
 - Rust frame pipeline: CPU SIMD for colorspace conversion and compositing
 - NDI output for preview (primary dev output — no hardware needed)
 - AJA output via certified Thunderbolt device (optional — for SDI validation)
@@ -1333,6 +1493,7 @@ Tier 4: Production (on-air)
 ### Windows (Dev)
 
 - CEF OSR builds and runs natively
+- Software clock (default) or AJA genlock via Thunderbolt (optional)
 - Rust frame pipeline: CPU SIMD for colorspace conversion and compositing
 - NDI output for preview (primary dev output)
 - AJA output via certified Thunderbolt device (optional)
@@ -1341,7 +1502,8 @@ Tier 4: Production (on-air)
 ### Linux (Staging/Production — Headless)
 
 - CEF OSR headless with `--use-gl=egl`
-- Colorspace conversion and compositing: CPU SIMD (GPU only if profiling shows need)
+- AJA genlock clock (production) or software clock (staging/cloud)
+- Colorspace conversion and compositing: CPU SIMD at 1080p, GPU via wgpu at 4K+
 - AJA output via certified PCIe card
 - NDI output for network monitoring
 - MJPEG preview for remote operator UI

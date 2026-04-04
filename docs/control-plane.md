@@ -110,17 +110,44 @@ The central state machine that coordinates everything. It translates operator ac
 **Responsibilities:**
 - Maintains the on-air state for every channel and layer (what's playing, what's cued)
 - Translates high-level operator actions into low-level engine commands (e.g., "play audio item" → VideoLoadCommand + LoadCommand + PlayCommand across multiple layers)
+- **Resolves named elements to channel+layer addresses** (see element mapping below)
 - Enforces channel modes (on-air, preview, edit, debug)
 - Routes commands to redundant engines (dual-write)
 - Validates commands against plugin capabilities (don't send seek to a CEF plugin)
 - Tracks foreground/background slot state per layer
 - Manages transition defaults and overrides
 
+**Named element mapping:** Directors and operators work with **named elements** ("take lower third", "cue bug"), not channel+layer numbers. The playout controller resolves element names to engine addresses using the show configuration:
+
+```yaml
+# Show config — maps the director's vocabulary to engine addressing
+show: "Evening News"
+channels:
+  - channel: 0
+    elements:
+      - name: video
+        layer: 0
+      - name: bug
+        layer: 1
+      - name: lower-third
+        layer: 2
+      - name: ticker
+        layer: 3
+      - name: alert
+        layer: 4
+  - channel: 1
+    elements:
+      - name: fullscreen-graphic
+        layer: 1
+```
+
+When the director says "take lower third", the operator presses one button. The playout controller resolves `element=lower-third` → `channel=0, layer=2` and generates the appropriate engine commands. The same element name can map to different channels and layers per show — a sports show might have the lower third on channel 2, layer 1. The engine API stays flat: `(channel, layer, command)`. The control plane holds the show's semantics.
+
 **The bundling pattern:** The playout controller is where high-level operator actions become multiple engine commands. Examples:
 
 | Operator Action | Engine Commands Generated |
 |---|---|
-| "Play lower third" | LoadCommand (BG) → PlayCommand (BG→FG with transition) |
+| "Play lower third" | Resolve element → channel+layer, LoadCommand (BG) → PlayCommand (BG→FG with transition) |
 | "Play audio with visualizer" | VideoLoadCommand (audio on layer 0) + LoadCommand (visualizer on layer 1, with audio_layer=0) + LoadCommand (lower-third on layer 2) + PlayCommand on all |
 | "Play graphics package" | Multiple LoadCommands across layers + coordinated PlayCommands |
 | "Update score" | UpdateCommand with data patch to view model |

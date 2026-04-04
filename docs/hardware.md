@@ -282,44 +282,137 @@ Whether missing CC blocks playout is a **configurable policy** in the Go control
 
 GPI (General Purpose Interface) provides physical button triggers and tally lights via the AJA card's built-in GPIO pins. Heavily used in broadcast facilities for critical operations. Supported day one.
 
-Pivox targets AJA cards exclusively for GPI -- no third-party USB or IP GPI devices. This keeps the hardware stack unified and reduces integration complexity.
+Pivox targets AJA cards exclusively for GPI — no third-party USB or IP GPI devices. This keeps the hardware stack unified and reduces integration complexity.
 
-### GPI Inputs (Physical Buttons -> Engine Commands)
+### GPI Inputs (Physical Buttons → Control Plane → Engine Commands)
+
+GPI inputs route through the **control plane**, not directly to the engine. The engine with the AJA card reports pin state changes to the control plane, which resolves the mapping and routes the command to the appropriate engine — which may be a different engine on a different machine.
 
 ```
 Operator panel / GPI button box
-  |
-  |  Button press -> contact closure -> AJA card GPI input pin
-  |
-  v
-Rust supervisor detects GPI edge via NTV2 SDK
-  |
-  v
-Maps to configured command:
-  GPI 1 rising -> PlayCommand on CH1 Layer 1
-  GPI 2 rising -> StopCommand on CH1 Layer 1
-  GPI 3 rising -> NextCommand on CH1 Layer 1
-  GPI 4 rising -> PlayCommand on CH2 Layer 1
+  │
+  │  Button press → contact closure → AJA card GPI input pin
+  │
+  ▼
+Engine reports GPI edge to control plane via gRPC
+  │
+  ▼
+Control plane resolves mapping:
+  GPI 1 rising → TAKE on element "lower-third" (→ Engine A, CH1 Layer 2)
+  GPI 2 rising → STOP on element "lower-third" (→ Engine A, CH1 Layer 2)
+  GPI 3 rising → TAKE on element "replay"       (→ Engine B, CH1 Layer 0)
   ...
 ```
 
-### GPI Outputs (Engine State -> Tally Lights)
+This design enables **cross-engine triggering** — a GPI button on Engine A (which has the AJA card with GPI pins) can trigger a command on Engine B. The control plane handles the routing. The engine with GPI hardware doesn't need to know what the button does; it just reports "pin N changed state."
+
+### GPI Outputs (Control Plane → Engine → Tally Lights)
 
 ```
-Channel 1 transitions to on-air mode
-  |
-  v
-Rust supervisor sets AJA card GPI output pin high
-  |
-  v
+Control plane determines channel is on-air
+  │
+  ▼
+Control plane instructs engine (via gRPC) to set GPI output pin
+  │
+  ▼
+Engine sets AJA card GPI output pin high via NTV2 SDK
+  │
+  ▼
 Tally light on operator panel illuminates
 ```
 
+GPI output state is driven by the control plane because the control plane holds the authoritative on-air state across all engines. The engine just actuates the physical pin.
+
 ### Configuration
 
-GPI mapping (which pin triggers which command, which state drives which output) is configuration managed by the Go control plane and pushed to the Rust supervisor at startup. The Rust supervisor handles hardware-level GPIO reading/writing via the AJA NTV2 SDK's GPI APIs.
+GPI mapping (which pin triggers which command, which state drives which output) is managed entirely by the Go control plane. The engine exposes two simple interfaces via gRPC:
+
+- **GPI input:** reports pin state changes (pin number, rising/falling edge) to the control plane
+- **GPI output:** accepts pin state commands (set pin N high/low) from the control plane
+
+All mapping logic — which pin means what, which engine to target, which element to address — lives in the control plane's show configuration, alongside all other input mapping (jog/shuttle, keyboard, automation).
 
 AJA Corvid and Kona cards provide multiple GPI input/output pins. The exact count varies by card model.
+
+## Jog/Shuttle Controllers
+
+Physical jog/shuttle hardware provides tactile frame-accurate media control for replay and clip playout workflows. Pivox supports these as input devices via the control plane — the engine receives the same transport commands regardless of whether they originate from a physical wheel, a keyboard shortcut, or an automation system.
+
+### USB HID Controllers
+
+Most jog/shuttle devices (Contour ShuttlePRO, ShuttleXpress, Blackmagic Editor Keyboard) register as **generic USB HID devices**, not keyboards. They send HID reports with:
+
+- **Jog wheel:** relative rotation ticks (signed integer per tick) — maps to frame-by-frame advance
+- **Shuttle ring:** absolute position value (e.g., -7 to +7) — maps to variable playback speed
+- **Buttons:** button state bitmask — maps to transport controls (play, stop, mark in/out, record)
+
+Read via platform HID APIs: `hidapi` (cross-platform), `IOHIDManager` (macOS), `hidraw` (Linux).
+
+### Serial/IP Controllers (Broadcast-Grade)
+
+Professional broadcast panels (DNF Controls, Skaarhoj) communicate via serial or TCP/IP protocols with documented command sets. These panels are fully customizable — buttons and dials can be mapped to any command protocol. DNF panels are the standard in EVS-equipped trucks and edit suites.
+
+### Hardware Event Mapping
+
+```
+Hardware event           →  Engine command
+──────────────────────────────────────────────
+Jog tick CW              →  advance +1 frame
+Jog tick CCW             →  advance -1 frame
+Shuttle position 30%     →  play speed 1.0x
+Shuttle position 60%     →  play speed 2.0x
+Shuttle position -40%    →  play speed -1.5x (reverse)
+Shuttle center (0%)      →  pause
+Button: PLAY             →  play at 1x
+Button: MARK IN          →  set in-point at current timecode
+Button: MARK OUT         →  set out-point at current timecode
+Button: REC              →  start recording (ingest channel)
+```
+
+### Architecture
+
+Jog/shuttle input adapters live in the **control plane**, not the engine. They follow the same pattern as GPI — translate physical hardware events to engine gRPC commands:
+
+```
+┌──────────────┐     ┌──────────────┐     ┌─────────┐
+│ AJA GPIO     │────→│              │     │         │
+│ (GPI/tally)  │     │  Control     │────→│ Engine  │
+├──────────────┤     │  Plane       │     │ gRPC    │
+│ USB HID      │────→│              │     │         │
+│ (jog/shuttle)│     │  Maps HW     │     │         │
+├──────────────┤     │  events to   │     │         │
+│ Serial/IP    │────→│  commands    │     │         │
+│ (DNF panels) │     │              │     │         │
+└──────────────┘     └──────────────┘     └─────────┘
+```
+
+The engine doesn't know or care if a jog command came from a physical wheel, a keyboard shortcut, or an automation system. It receives `advance(channel, layer, frames)` or `set_speed(channel, layer, speed)` via gRPC.
+
+### Configuration
+
+Jog/shuttle controller mapping is managed by the Go control plane. Configuration specifies:
+
+- Device type and connection (USB VID/PID, serial port, IP address)
+- Per-button/dial mapping to engine commands
+- Target channel and layer for each control
+- Speed curve for shuttle ring position → playback speed
+
+## Capacity Planning
+
+The number of channels per engine machine depends on output resolution, scene complexity, and hardware configuration. Customers size their deployment by resolution and channel count.
+
+**Approximate capacity per machine (reference: NVIDIA RTX A5000, worst-case scene with 4+ active layers):**
+
+| Resolution | Channels per Machine | AJA Card | Notes |
+|---|---|---|---|
+| 1080p59.94 | 4–6 | Corvid 88 (8 × 3G-SDI) | 4 channels fill+key uses all 8 ports |
+| 2160p59.94 (4K) | 2–3 | Corvid 44 12G (4 × 12G-SDI) | 2 channels fill+key uses all 4 ports |
+| 2160p59.94 HDR | 1–2 | Corvid 44 12G | HDR processing adds GPU overhead |
+| 4320p (8K) | 1 | Corvid 88 (quad-link per signal) | 8 ports for one fill+key pair |
+
+The AJA card's port count is often the hard ceiling before the GPU becomes the bottleneck. More channels or higher resolution requires additional engine machines. Each machine runs the same engine binary and config format — the control plane orchestrates across machines.
+
+Benchmarks against certified GPU models will populate exact numbers. This matrix is published to customers for hardware procurement.
 
 ## HDR (Future Capability)
 
