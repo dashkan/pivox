@@ -1,5 +1,5 @@
 //go:build !dev
 
-package agent
+package storageagent
 
 const devSkipAuth = false

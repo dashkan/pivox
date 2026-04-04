@@ -14,7 +14,7 @@
     "prettier:write": "prettier --write .",
     "test:eslint": "pnpm -r --filter \"./packages/**\" --filter \"./apps/**\" run test:eslint",
     "test:types": "pnpm -r --filter \"./packages/**\" --filter \"./apps/**\" run test:types",
-    "server:cloud": "go -C ../ run ./cmd/pivox-server",
+    "server:cloud": "go -C ../ run ./cmd/pivox-cloud",
     "server:storage": "go -C ../ run ./cmd/pivox-agent storage --token dev-token-local",
     "dev": "concurrently -n prims,image-editor,ui,feat,web,cloud,storage -c gray,gray,gray,gray,blue,red,green \"pnpm web:build:primitives --watch\" \"pnpm web:build:image-editor --watch\" \"pnpm web:build:ui --watch\" \"pnpm web:build:features --watch\" \"pnpm web:start\" \"pnpm server:cloud\" \"pnpm server:storage\"",
     "dev:electron": "concurrently -n prims,image-editor,ui,feat,web,electron -c gray,gray,gray,gray,blue,red \"pnpm web:build:primitives --watch\" \"pnpm web:build:image-editor --watch\" \"pnpm web:build:ui --watch\" \"pnpm web:build:features --watch\" \"pnpm web:start\" \"pnpm electron:start\"",

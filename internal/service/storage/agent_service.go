@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"regexp"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -15,9 +14,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/dashkan/pivox/internal/agentstream"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	agentv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/agent/v1"
 )
@@ -29,11 +28,11 @@ type AgentServiceServer struct {
 	pool    *pgxpool.Pool
 	queries *db.Queries
 	logger  *slog.Logger
-	conns   *ConnectionManager
+	conns   *agentstream.ConnectionManager
 }
 
 // NewAgentServiceServer creates a new AgentServiceServer.
-func NewAgentServiceServer(pool *pgxpool.Pool, queries *db.Queries, logger *slog.Logger, conns *ConnectionManager) *AgentServiceServer {
+func NewAgentServiceServer(pool *pgxpool.Pool, queries *db.Queries, logger *slog.Logger, conns *agentstream.ConnectionManager) *AgentServiceServer {
 	return &AgentServiceServer{
 		pool:    pool,
 		queries: queries,
@@ -172,7 +171,7 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 	// -----------------------------------------------------------------------
 	// 9. Register connection and defer unregister on disconnect.
 	// -----------------------------------------------------------------------
-	s.conns.Register(&AgentConnection{AgentID: agent.ID, GatewayID: gateway.ID, Stream: stream})
+	s.conns.Register(&agentstream.AgentConnection{AgentID: agent.ID, GatewayID: gateway.ID, Stream: stream})
 	defer s.conns.Unregister(agent.ID)
 
 	// -----------------------------------------------------------------------
@@ -272,20 +271,6 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 	return nil
 }
 
-// redactSecretKeyPattern matches "secretAccessKey":"<value>" in protojson output.
-var redactSecretKeyPattern = regexp.MustCompile(`("secretAccessKey"\s*:\s*)"[^"]*"`)
-
-// marshalAndRedact marshals a protobuf message to JSON using protojson and
-// redacts secret_access_key values by replacing them with "***".
-func marshalAndRedact(msg proto.Message) ([]byte, error) {
-	data, err := protojson.Marshal(msg)
-	if err != nil {
-		return nil, fmt.Errorf("protojson marshal: %w", err)
-	}
-	redacted := redactSecretKeyPattern.ReplaceAll(data, []byte(`$1"***"`))
-	return redacted, nil
-}
-
 // auditMessage persists an audit record for a given message. It marshals the
 // proto message to JSON, redacts secrets, and writes to the audit table.
 // Errors are logged but do not interrupt the stream.
@@ -298,7 +283,7 @@ func (s *AgentServiceServer) auditMessage(
 	messageType string,
 	msg proto.Message,
 ) {
-	payload, err := marshalAndRedact(msg)
+	payload, err := agentstream.MarshalAndRedact(msg)
 	if err != nil {
 		s.logger.ErrorContext(ctx, "failed to marshal audit payload",
 			"error", err, "message_type", messageType)

@@ -1,6 +1,6 @@
 //go:build dev
 
-package agent
+package storageagent
 
 // devSkipAuth returns true in dev builds, skipping session auth.
 const devSkipAuth = true

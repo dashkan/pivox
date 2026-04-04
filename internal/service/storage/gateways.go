@@ -20,6 +20,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/dashkan/pivox/internal/agentstream"
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/convert"
 	"github.com/dashkan/pivox/internal/crypto"
@@ -35,11 +36,11 @@ type StorageGatewaysServer struct {
 	pool              *pgxpool.Pool
 	queries           *db.Queries
 	encryptor         crypto.Encryptor
-	conns             *ConnectionManager
+	conns             *agentstream.ConnectionManager
 	sessionSigningKey []byte
 }
 
-func NewStorageGatewaysServer(pool *pgxpool.Pool, queries *db.Queries, enc crypto.Encryptor, conns *ConnectionManager) *StorageGatewaysServer {
+func NewStorageGatewaysServer(pool *pgxpool.Pool, queries *db.Queries, enc crypto.Encryptor, conns *agentstream.ConnectionManager) *StorageGatewaysServer {
 	return &StorageGatewaysServer{
 		pool:              pool,
 		queries:           queries,

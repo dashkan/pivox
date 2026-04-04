@@ -12,15 +12,15 @@ TOOL = go tool -modfile=./tools/go.mod
 # Build
 
 build:
-	go build -o bin/pivox-server ./cmd/pivox-server
+	go build -o bin/pivox-cloud ./cmd/pivox-cloud
 	go build -o bin/pivox-agent ./cmd/pivox-agent
 
 build-dev:
-	go build -tags dev -o bin/pivox-server ./cmd/pivox-server
+	go build -tags dev -o bin/pivox-cloud ./cmd/pivox-cloud
 	go build -tags dev -o bin/pivox-agent ./cmd/pivox-agent
 
 run-server:
-	go run -tags dev ./cmd/pivox-server serve
+	go run -tags dev ./cmd/pivox-cloud serve
 
 run-agent:
 	go run -tags dev ./cmd/pivox-agent storage --token dev-token-local

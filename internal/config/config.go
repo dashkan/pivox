@@ -1,7 +1,7 @@
 package config
 
 // Config holds all server configuration. Populated from cobra flags
-// in cmd/pivox-server/main.go, with env var fallbacks.
+// in cmd/pivox-cloud/main.go, with env var fallbacks.
 type Config struct {
 	DatabaseURL string
 	GRPCPort    string

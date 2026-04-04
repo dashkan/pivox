@@ -1,4 +1,4 @@
-package agent
+package storageagent
 
 import (
 	"context"

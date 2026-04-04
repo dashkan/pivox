@@ -12,7 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dashkan/pivox/internal/agent"
+	agent "github.com/dashkan/pivox/internal/storageagent"
 )
 
 func storageCmd() *cobra.Command {

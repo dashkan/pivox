@@ -20,6 +20,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/dashkan/pivox/internal/agentstream"
 	"github.com/dashkan/pivox/internal/config"
 	"github.com/dashkan/pivox/internal/crypto"
 	db "github.com/dashkan/pivox/internal/db/generated"
@@ -47,7 +48,7 @@ var version = "dev"
 
 func main() {
 	rootCmd := &cobra.Command{
-		Use:     "pivox-server",
+		Use:     "pivox-cloud",
 		Short:   "Pivox control plane server",
 		Version: version,
 		RunE:    serve,
@@ -178,7 +179,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	apiv1.RegisterApiKeysServer(grpcServer, apikeys.NewApiKeysServer(pool, queries))
 
 	// Storage services
-	connMgr := storage.NewConnectionManager()
+	connMgr := agentstream.NewConnectionManager()
 	storagev1.RegisterStorageGatewaysServer(grpcServer, storage.NewStorageGatewaysServer(pool, queries, enc, connMgr))
 	storagev1.RegisterAgentsServer(grpcServer, storage.NewAgentsServer(queries))
 	storagev1.RegisterEndpointsServer(grpcServer, storage.NewEndpointsServer(pool, queries, enc))
