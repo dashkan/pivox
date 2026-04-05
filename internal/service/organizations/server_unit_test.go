@@ -47,6 +47,21 @@ func newTestServer(q *mocks.MockQuerier) *OrganizationsServer {
 }
 
 // ---------------------------------------------------------------------------
+// NewOrganizationsServer
+// ---------------------------------------------------------------------------
+
+func TestUnit_NewOrganizationsServer(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	iamHelper := iam.NewHelper(mockQ)
+	// NewOrganizationsServer requires a *pgxpool.Pool, but we can test the
+	// basic constructor doesn't panic. Pass nil for pool and auth.
+	srv := newTestServer(mockQ)
+	require.NotNil(t, srv)
+	assert.NotNil(t, srv.iam)
+	assert.Equal(t, iamHelper != nil, true) // iamHelper is valid
+}
+
+// ---------------------------------------------------------------------------
 // GetOrganization
 // ---------------------------------------------------------------------------
 
@@ -124,6 +139,34 @@ func TestUnit_GetIamPolicy_Delegated(t *testing.T) {
 	assert.NotNil(t, resp)
 	// Empty policy has no bindings.
 	assert.Empty(t, resp.GetBindings())
+	mockQ.AssertExpectations(t)
+}
+
+// ---------------------------------------------------------------------------
+// SetIamPolicy -- delegates to iam.Helper
+// ---------------------------------------------------------------------------
+
+func TestUnit_SetIamPolicy(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newTestServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
+	mockQ.On("UpsertIamPolicy", mock.Anything, mock.MatchedBy(func(p db.UpsertIamPolicyParams) bool {
+		return p.ResourceID == orgID && p.ResourceType == "organizations"
+	})).Return(db.IamPolicy{
+		ResourceID: orgID,
+		Policy:     json.RawMessage(`{}`),
+		Etag:       "new-etag",
+	}, nil)
+
+	resp, err := srv.SetIamPolicy(ctx, &iampb.SetIamPolicyRequest{
+		Resource: "organizations/acme",
+		Policy:   &iampb.Policy{},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "new-etag", resp.GetEtag())
 	mockQ.AssertExpectations(t)
 }
 

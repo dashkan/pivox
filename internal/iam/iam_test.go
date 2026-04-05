@@ -3,6 +3,7 @@ package iam
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
@@ -229,6 +230,81 @@ func TestTestIamPermissions(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, perms, resp.Permissions)
+}
+
+// ---------- Error paths ----------
+
+func TestGetIamPolicy_DBError(t *testing.T) {
+	ctx := context.Background()
+	orgID := uuid.New()
+
+	mockQ := new(mocks.MockQuerier)
+	mockQ.On("GetOrganizationByName", mock.Anything, "myorg").
+		Return(db.Organization{ID: orgID, Name: "myorg"}, nil)
+	mockQ.On("GetIamPolicy", mock.Anything, orgID).
+		Return(db.IamPolicy{}, fmt.Errorf("connection refused"))
+
+	h := NewHelper(mockQ)
+	_, err := h.GetIamPolicy(ctx, &iampb.GetIamPolicyRequest{Name: "organizations/myorg"})
+
+	require.Error(t, err)
+	st := status.Convert(err)
+	assert.Equal(t, codes.Internal, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestSetIamPolicy_DBError(t *testing.T) {
+	ctx := context.Background()
+	orgID := uuid.New()
+
+	mockQ := new(mocks.MockQuerier)
+	mockQ.On("GetOrganizationByName", mock.Anything, "myorg").
+		Return(db.Organization{ID: orgID, Name: "myorg"}, nil)
+	// The etag check path calls GetIamPolicy, which returns a generic error.
+	mockQ.On("GetIamPolicy", mock.Anything, orgID).
+		Return(db.IamPolicy{}, fmt.Errorf("disk full"))
+
+	h := NewHelper(mockQ)
+	_, err := h.SetIamPolicy(ctx, &iampb.SetIamPolicyRequest{
+		Resource: "organizations/myorg",
+		Policy:   &iampb.Policy{Etag: "some-etag"},
+	})
+
+	require.Error(t, err)
+	st := status.Convert(err)
+	assert.Equal(t, codes.Internal, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestResolveResourceID_ProjectLookupFailure(t *testing.T) {
+	ctx := context.Background()
+	orgID := uuid.New()
+
+	mockQ := new(mocks.MockQuerier)
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").
+		Return(db.Organization{ID: orgID, Name: "acme"}, nil)
+	mockQ.On("GetProjectByName", mock.Anything, db.GetProjectByNameParams{OrgID: orgID, Name: "missing"}).
+		Return(db.Project{}, pgx.ErrNoRows)
+
+	h := NewHelper(mockQ)
+	_, err := h.GetIamPolicy(ctx, &iampb.GetIamPolicyRequest{Name: "organizations/acme/projects/missing"})
+
+	require.Error(t, err)
+	st := status.Convert(err)
+	assert.Equal(t, codes.InvalidArgument, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestResolveResourceID_TagKeyParseError(t *testing.T) {
+	ctx := context.Background()
+	mockQ := new(mocks.MockQuerier)
+
+	h := NewHelper(mockQ)
+	_, err := h.GetIamPolicy(ctx, &iampb.GetIamPolicyRequest{Name: "tagKeys/not-a-uuid"})
+
+	require.Error(t, err)
+	st := status.Convert(err)
+	assert.Equal(t, codes.InvalidArgument, st.Code())
 }
 
 // ---------- resolveResourceID (tested indirectly) ----------

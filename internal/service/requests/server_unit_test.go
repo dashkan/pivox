@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	db "github.com/dashkan/pivox/internal/db/generated"
 	assetsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1"
@@ -585,6 +586,103 @@ func TestCancelRequest_InvalidState_Cancelled(t *testing.T) {
 	require.Error(t, err)
 	st, _ := status.FromError(err)
 	assert.Equal(t, codes.FailedPrecondition, st.Code())
+}
+
+// --- UpdateRequest ---
+
+func TestUpdateRequest_WithFieldMask(t *testing.T) {
+	f := setupRequestFixture(t)
+	f.mockResolveProject()
+
+	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateDRAFT)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+		Return(existing, nil)
+
+	updated := existing
+	updated.DisplayName = "Updated"
+	updated.Description = "New description"
+	f.mockQ.On("UpdateRequest", mock.Anything, mock.MatchedBy(func(p db.UpdateRequestParams) bool {
+		return p.ID == f.requestID &&
+			p.DisplayName.Valid && p.DisplayName.String == "Updated" &&
+			p.Description.Valid && p.Description.String == "New description" &&
+			p.Priority.Valid && p.Priority.RequestPriority == db.RequestPriority("HIGH")
+	})).Return(updated, nil)
+
+	op, err := f.server.UpdateRequest(context.Background(), &assetsv1.UpdateRequestRequest{
+		Request: &assetsv1.Request{
+			Name:        testFull,
+			DisplayName: "Updated",
+			Description: "New description",
+			Priority:    assetsv1.Request_HIGH,
+		},
+		UpdateMask: &fieldmaskpb.FieldMask{
+			Paths: []string{"display_name", "description", "priority"},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.True(t, op.GetDone())
+	f.mockQ.AssertExpectations(t)
+}
+
+func TestUpdateRequest_NoMask(t *testing.T) {
+	f := setupRequestFixture(t)
+	f.mockResolveProject()
+
+	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateDRAFT)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+		Return(existing, nil)
+
+	updated := existing
+	updated.DisplayName = "Full Update"
+	updated.Description = "Full description"
+	f.mockQ.On("UpdateRequest", mock.Anything, mock.MatchedBy(func(p db.UpdateRequestParams) bool {
+		return p.ID == f.requestID &&
+			p.DisplayName.Valid && p.DisplayName.String == "Full Update" &&
+			p.Description.Valid && p.Description.String == "Full description"
+	})).Return(updated, nil)
+
+	op, err := f.server.UpdateRequest(context.Background(), &assetsv1.UpdateRequestRequest{
+		Request: &assetsv1.Request{
+			Name:        testFull,
+			DisplayName: "Full Update",
+			Description: "Full description",
+		},
+		// No UpdateMask
+	})
+
+	require.NoError(t, err)
+	assert.True(t, op.GetDone())
+	f.mockQ.AssertExpectations(t)
+}
+
+// --- DeleteRequest ---
+
+func TestDeleteRequest_Success(t *testing.T) {
+	f := setupRequestFixture(t)
+	f.mockResolveProject()
+
+	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateDRAFT)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+		Return(existing, nil)
+
+	f.mockQ.On("SoftDeleteRequest", mock.Anything, db.SoftDeleteRequestParams{
+		ID:        f.requestID,
+		DeletedBy: "",
+	}).Return(nil)
+
+	op, err := f.server.DeleteRequest(context.Background(), &assetsv1.DeleteRequestRequest{
+		Name: testFull,
+	})
+
+	require.NoError(t, err)
+	assert.True(t, op.GetDone())
+
+	// Verify the returned proto has CANCELLED state.
+	var req assetsv1.Request
+	require.NoError(t, op.GetResponse().UnmarshalTo(&req))
+	assert.Equal(t, assetsv1.Request_CANCELLED, req.GetState())
+	f.mockQ.AssertExpectations(t)
 }
 
 // --- unused import guard ---

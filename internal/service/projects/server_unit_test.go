@@ -17,7 +17,9 @@ import (
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	db "github.com/dashkan/pivox/internal/db/generated"
+	"github.com/dashkan/pivox/internal/iam"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
+	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	"github.com/dashkan/pivox/internal/testutil/mocks"
 )
 
@@ -215,6 +217,107 @@ func TestUnit_DeleteProject_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, resp.GetDone())
 	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_UpdateProject_NoMask(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := NewProjectsServer(nil, mockQ, nil)
+	ctx := context.Background()
+
+	updatedProject := testDBProject
+	updatedProject.DisplayName = "Updated Name"
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
+	mockQ.On("GetProjectByName", mock.Anything, db.GetProjectByNameParams{
+		OrgID: testOrgID,
+		Name:  "my-project",
+	}).Return(testDBProject, nil)
+	mockQ.On("UpdateProject", mock.Anything, mock.MatchedBy(func(p db.UpdateProjectParams) bool {
+		return p.ID == testProjID &&
+			p.DisplayName.Valid &&
+			p.DisplayName.String == "Updated Name" &&
+			p.Labels != nil // labels preserved from existing when nil in request
+	})).Return(updatedProject, nil)
+
+	resp, err := srv.UpdateProject(ctx, &apiv1.UpdateProjectRequest{
+		Project: &apiv1.Project{
+			Name:        "organizations/acme/projects/my-project",
+			DisplayName: "Updated Name",
+		},
+		// No UpdateMask — full update
+	})
+
+	require.NoError(t, err)
+	assert.True(t, resp.GetDone())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_GetIamPolicy(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	iamHelper := iam.NewHelper(mockQ)
+	srv := NewProjectsServer(nil, mockQ, iamHelper)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
+	mockQ.On("GetProjectByName", mock.Anything, db.GetProjectByNameParams{
+		OrgID: testOrgID,
+		Name:  "my-project",
+	}).Return(testDBProject, nil)
+	mockQ.On("GetIamPolicy", mock.Anything, testProjID).Return(db.IamPolicy{}, pgx.ErrNoRows)
+
+	resp, err := srv.GetIamPolicy(ctx, &iampb.GetIamPolicyRequest{
+		Name: "organizations/acme/projects/my-project",
+	})
+
+	require.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.Empty(t, resp.GetBindings())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_SetIamPolicy(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	iamHelper := iam.NewHelper(mockQ)
+	srv := NewProjectsServer(nil, mockQ, iamHelper)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
+	mockQ.On("GetProjectByName", mock.Anything, db.GetProjectByNameParams{
+		OrgID: testOrgID,
+		Name:  "my-project",
+	}).Return(testDBProject, nil)
+	mockQ.On("UpsertIamPolicy", mock.Anything, mock.MatchedBy(func(p db.UpsertIamPolicyParams) bool {
+		return p.ResourceID == testProjID && p.ResourceType == "organizations"
+	})).Return(db.IamPolicy{
+		ResourceID: testProjID,
+		Policy:     json.RawMessage(`{}`),
+		Etag:       "new-etag",
+	}, nil)
+
+	resp, err := srv.SetIamPolicy(ctx, &iampb.SetIamPolicyRequest{
+		Resource: "organizations/acme/projects/my-project",
+		Policy:   &iampb.Policy{},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "new-etag", resp.GetEtag())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_TestIamPermissions(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	iamHelper := iam.NewHelper(mockQ)
+	srv := NewProjectsServer(nil, mockQ, iamHelper)
+	ctx := context.Background()
+
+	perms := []string{"pivox.projects.get", "pivox.projects.delete"}
+	resp, err := srv.TestIamPermissions(ctx, &iampb.TestIamPermissionsRequest{
+		Resource:    "organizations/acme/projects/my-project",
+		Permissions: perms,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, perms, resp.GetPermissions())
 }
 
 func TestUnit_UndeleteProject_Success(t *testing.T) {

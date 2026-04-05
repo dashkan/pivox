@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
@@ -101,6 +102,30 @@ func TestResolveOrgParent_NotFound(t *testing.T) {
 	require.Error(t, err)
 	st := status.Convert(err)
 	assert.Equal(t, codes.NotFound, st.Code())
+	mock.AssertExpectations(t)
+}
+
+func TestResolveOrgParent_InvalidSegment(t *testing.T) {
+	ctx := context.Background()
+	mock := new(mocks.MockQuerier)
+
+	// "organizations/" has empty segment, ParseSegment returns error
+	_, err := ResolveOrgParent(ctx, mock, "organizations/")
+	require.Error(t, err)
+	st := status.Convert(err)
+	assert.Equal(t, codes.InvalidArgument, st.Code())
+}
+
+func TestResolveOrgParent_DBError(t *testing.T) {
+	ctx := context.Background()
+	mock := new(mocks.MockQuerier)
+
+	mock.On("GetOrganizationByName", ctx, "broken-org").Return(db.Organization{}, fmt.Errorf("connection reset"))
+
+	_, err := ResolveOrgParent(ctx, mock, "organizations/broken-org")
+	require.Error(t, err)
+	st := status.Convert(err)
+	assert.Equal(t, codes.Internal, st.Code())
 	mock.AssertExpectations(t)
 }
 

@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	db "github.com/dashkan/pivox/internal/db/generated"
 	assetsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1"
@@ -209,6 +210,89 @@ func TestUpdateAsset_WithFieldMask(t *testing.T) {
 			DisplayName: "Updated Name",
 		},
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"display_name"}},
+	})
+
+	require.NoError(t, err)
+	assert.True(t, op.GetDone())
+	f.mockQ.AssertExpectations(t)
+}
+
+func TestUpdateAsset_NoMask(t *testing.T) {
+	f := setupAssetFixture(t)
+	f.mockResolveProject()
+
+	existing := makeAsset(f.assetID, f.projectID, testAssetName, db.AssetStateACTIVE)
+	f.mockQ.On("GetAssetByName", mock.Anything, db.GetAssetByNameParams{ProjectID: f.projectID, Name: testAssetName}).
+		Return(existing, nil)
+
+	updated := existing
+	updated.DisplayName = "Full Update Name"
+	f.mockQ.On("UpdateAsset", mock.Anything, mock.MatchedBy(func(p db.UpdateAssetParams) bool {
+		return p.ID == f.assetID &&
+			p.DisplayName.Valid && p.DisplayName.String == "Full Update Name" &&
+			p.Annotations == nil && // no annotations in no-mask path (not set unless in mask)
+			!p.ExpireTime.Valid // expire_time not set without mask
+	})).Return(updated, nil)
+
+	op, err := f.server.UpdateAsset(context.Background(), &assetsv1.UpdateAssetRequest{
+		Asset: &assetsv1.Asset{
+			Name:        testAssetFull,
+			DisplayName: "Full Update Name",
+		},
+		// No UpdateMask
+	})
+
+	require.NoError(t, err)
+	assert.True(t, op.GetDone())
+	f.mockQ.AssertExpectations(t)
+}
+
+func TestUpdateAsset_ExpireTime(t *testing.T) {
+	f := setupAssetFixture(t)
+	f.mockResolveProject()
+
+	existing := makeAsset(f.assetID, f.projectID, testAssetName, db.AssetStateACTIVE)
+	f.mockQ.On("GetAssetByName", mock.Anything, db.GetAssetByNameParams{ProjectID: f.projectID, Name: testAssetName}).
+		Return(existing, nil)
+
+	updated := existing
+	f.mockQ.On("UpdateAsset", mock.Anything, mock.MatchedBy(func(p db.UpdateAssetParams) bool {
+		return p.ID == f.assetID && p.ExpireTime.Valid
+	})).Return(updated, nil)
+
+	expireTime := time.Date(2026, 12, 31, 23, 59, 59, 0, time.UTC)
+	op, err := f.server.UpdateAsset(context.Background(), &assetsv1.UpdateAssetRequest{
+		Asset: &assetsv1.Asset{
+			Name:       testAssetFull,
+			ExpireTime: timestamppb.New(expireTime),
+		},
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"expire_time"}},
+	})
+
+	require.NoError(t, err)
+	assert.True(t, op.GetDone())
+	f.mockQ.AssertExpectations(t)
+}
+
+func TestUpdateAsset_Annotations(t *testing.T) {
+	f := setupAssetFixture(t)
+	f.mockResolveProject()
+
+	existing := makeAsset(f.assetID, f.projectID, testAssetName, db.AssetStateACTIVE)
+	f.mockQ.On("GetAssetByName", mock.Anything, db.GetAssetByNameParams{ProjectID: f.projectID, Name: testAssetName}).
+		Return(existing, nil)
+
+	updated := existing
+	f.mockQ.On("UpdateAsset", mock.Anything, mock.MatchedBy(func(p db.UpdateAssetParams) bool {
+		return p.ID == f.assetID && p.Annotations != nil && !p.DisplayName.Valid
+	})).Return(updated, nil)
+
+	op, err := f.server.UpdateAsset(context.Background(), &assetsv1.UpdateAssetRequest{
+		Asset: &assetsv1.Asset{
+			Name:        testAssetFull,
+			Annotations: map[string]string{"team": "eng"},
+		},
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"annotations"}},
 	})
 
 	require.NoError(t, err)
