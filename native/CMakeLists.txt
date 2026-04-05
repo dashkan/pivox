@@ -177,7 +177,7 @@ if(WIN32)
     )
 
     target_include_directories(${WIN_TARGET} PRIVATE ${WIN_PLATFORM_DIR})
-    target_link_libraries(${WIN_TARGET} PRIVATE pivox_core)
+    target_link_libraries(${WIN_TARGET} PRIVATE pivox_win_state crypt32 advapi32)
     target_precompile_headers(${WIN_TARGET} PRIVATE ${WIN_PLATFORM_DIR}/pch.h)
 
     # App.xaml is the ApplicationDefinition (constraint #4).
@@ -229,6 +229,17 @@ if(WIN32)
     # Release PDBs for debugging (constraint #10).
     target_compile_options(${WIN_TARGET} PRIVATE "$<$<CONFIG:Release>:/Zi>")
     target_link_options(${WIN_TARGET} PRIVATE "$<$<CONFIG:Release>:/DEBUG>")
+
+    # WinAppState library — shared between app and tests.
+    add_library(pivox_win_state STATIC
+        ${WIN_PLATFORM_DIR}/WinAppState.cpp
+    )
+    target_include_directories(pivox_win_state PUBLIC
+        ${WIN_PLATFORM_DIR}
+        "${CMAKE_SOURCE_DIR}/core"
+    )
+    target_link_libraries(pivox_win_state PUBLIC pivox_core)
+    target_link_libraries(pivox_win_state PRIVATE crypt32 advapi32)
 endif()
 
 
@@ -249,4 +260,13 @@ if(GTest_FOUND)
 
     include(GoogleTest)
     gtest_discover_tests(pivox_core_tests DISCOVERY_MODE PRE_TEST)
+
+    # Windows-specific integration tests (WinAppState with real Registry/PasswordVault).
+    if(WIN32)
+        add_executable(pivox_win_tests
+            tests/windows/win_app_state_tests.cpp
+        )
+        target_link_libraries(pivox_win_tests PRIVATE pivox_win_state GTest::gtest_main)
+        gtest_discover_tests(pivox_win_tests DISCOVERY_MODE PRE_TEST)
+    endif()
 endif()

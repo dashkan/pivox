@@ -7,6 +7,8 @@
 
 namespace winrt::Pivox::implementation
 {
+    std::shared_ptr<pivox::WinAppState> App::s_appState = std::make_shared<pivox::WinAppState>();
+
     App::App()
     {
 #if defined _DEBUG && !defined DISABLE_XAML_GENERATED_BREAK_ON_UNHANDLED_EXCEPTION
@@ -25,5 +27,10 @@ namespace winrt::Pivox::implementation
     {
         m_window = winrt::make<MainWindow>();
         m_window.Activate();
+    }
+
+    std::shared_ptr<pivox::WinAppState>& App::AppState()
+    {
+        return s_appState;
     }
 }

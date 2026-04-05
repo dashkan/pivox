@@ -45,7 +45,8 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <CheckBox Content="Remember me" Grid.Column="0" />
+                    <CheckBox x:Name="RememberMeCheck" Content="Remember me" Grid.Column="0"
+                        AutomationProperties.AutomationId="login-remember-me" />
                     <HyperlinkButton
                         Content="Forgot password?"
                         Grid.Column="1"

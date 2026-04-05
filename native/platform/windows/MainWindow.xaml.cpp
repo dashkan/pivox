@@ -2,6 +2,7 @@
 #include "MainWindow.xaml.h"
 #include "MainWindow.g.cpp"
 #include "LoginPage.xaml.h"
+#include "App.xaml.h"
 
 namespace winrt::Pivox::implementation
 {
@@ -9,24 +10,72 @@ namespace winrt::Pivox::implementation
     {
         InitializeComponent();
         SetupWindow();
-        ShowAuth();
+
+        // Check rememberMe — skip login if user opted in.
+        auto& appState = App::AppState();
+        auto rememberMe = appState->loadBool("rememberMe");
+        if (rememberMe.has_value() && rememberMe.value())
+        {
+            ShowMainApp();
+        }
+        else
+        {
+            ShowAuth();
+        }
     }
 
     void MainWindow::SetupWindow()
     {
-        if (auto appWindow = this->AppWindow())
+        auto appWindow = this->AppWindow();
+
+        // Restore saved window state, or use defaults.
+        auto& appState = App::AppState();
+        auto saved = appState->loadWindowState();
+        if (saved.has_value())
+        {
+            appWindow.Resize({ saved->width, saved->height });
+            appWindow.Move({ saved->x, saved->y });
+        }
+        else
         {
             appWindow.Resize({ 1280, 800 });
-            appWindow.Title(L"Pivox");
         }
 
-        // Minimum window size — uses Windows App SDK 1.7 OverlappedPresenter API
+        appWindow.Title(L"Pivox");
+
+        // Minimum window size — Windows App SDK 1.7 OverlappedPresenter API
         // (microsoft/microsoft-ui-xaml#2945, #7296).
-        if (auto presenter = this->AppWindow().Presenter().try_as<Microsoft::UI::Windowing::OverlappedPresenter>())
+        if (auto presenter = appWindow.Presenter().try_as<Microsoft::UI::Windowing::OverlappedPresenter>())
         {
             presenter.PreferredMinimumWidth(1024);
             presenter.PreferredMinimumHeight(768);
         }
+
+        // Save window state on move/resize.
+        m_changedToken = appWindow.Changed(
+            [this](Microsoft::UI::Windowing::AppWindow const&,
+                   Microsoft::UI::Windowing::AppWindowChangedEventArgs const& args)
+            {
+                if (args.DidPositionChange() || args.DidSizeChange())
+                {
+                    SaveWindowState();
+                }
+            });
+    }
+
+    void MainWindow::SaveWindowState()
+    {
+        auto appWindow = this->AppWindow();
+        auto pos = appWindow.Position();
+        auto size = appWindow.Size();
+
+        pivox::WindowState ws;
+        ws.x = pos.X;
+        ws.y = pos.Y;
+        ws.width = size.Width;
+        ws.height = size.Height;
+
+        App::AppState()->saveWindowState(ws);
     }
 
     void MainWindow::ShowAuth()
@@ -106,6 +155,8 @@ namespace winrt::Pivox::implementation
 
     void MainWindow::OnSignOut(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
     {
+        // Clear rememberMe on sign out.
+        App::AppState()->saveBool("rememberMe", false);
         ShowAuth();
     }
 }

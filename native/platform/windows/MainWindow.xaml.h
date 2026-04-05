@@ -20,6 +20,9 @@ namespace winrt::Pivox::implementation
         void ShowAuth();
         void ShowMainApp();
         void SetupWindow();
+        void SaveWindowState();
+
+        winrt::event_token m_changedToken;
     };
 }
 
