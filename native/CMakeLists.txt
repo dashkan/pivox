@@ -124,5 +124,6 @@ if(GTest_FOUND)
     )
     target_link_libraries(pivox_core_tests PRIVATE pivox_core GTest::gtest_main)
 
-    add_test(NAME pivox_core_tests COMMAND pivox_core_tests)
+    include(GoogleTest)
+    gtest_discover_tests(pivox_core_tests DISCOVERY_MODE PRE_TEST)
 endif()
