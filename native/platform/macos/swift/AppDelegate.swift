@@ -6,7 +6,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let contentView = ContentView()
-            .frame(minWidth: 520, minHeight: 600)
+            .frame(minWidth: 1024, minHeight: 768)
 
         window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1280, height: 800),
