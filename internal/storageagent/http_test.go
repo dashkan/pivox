@@ -263,3 +263,71 @@ func TestValidateJWT_InvalidPayload(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unmarshal")
 }
+
+// ---------------------------------------------------------------------------
+// ServeHTTP: nil denied patterns (s.denied == nil path)
+// ---------------------------------------------------------------------------
+
+func TestHTTP_NilDeniedPatterns_SkipsDeniedCheck(t *testing.T) {
+	// Build a server with nil denied patterns to exercise the
+	// s.denied != nil guard in ServeHTTP.
+	sessions := NewSessionStore()
+	cache := NewMemoryCache(100, 1024*1024)
+	endpoints := NewEndpointStore(cache)
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+
+	srv := NewHTTPServer(sessions, endpoints, nil, testSigningKey, "https://example.com", logger)
+
+	dir := t.TempDir()
+	err := os.WriteFile(filepath.Join(dir, "file.txt"), []byte("content"), 0o644)
+	require.NoError(t, err)
+
+	err = endpoints.Update([]*agentv1.EndpointConfig{
+		{
+			Name: "organizations/acme/storageGateways/gw1/endpoints/ep",
+			Configuration: &agentv1.EndpointConfig_Filesystem{
+				Filesystem: &agentv1.FileSystemEndpointConfig{Path: dir},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/ep/file.txt", nil)
+	srv.ServeHTTP(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code,
+		"with nil denied patterns, request should proceed to endpoint")
+	assert.Equal(t, "content", w.Body.String())
+}
+
+// ---------------------------------------------------------------------------
+// ServeHTTP: denied pattern does NOT match (falls through to endpoint)
+// ---------------------------------------------------------------------------
+
+func TestHTTP_DeniedPattern_NoMatch_FallsThrough(t *testing.T) {
+	srv, _, endpoints, denied := newTestHTTPServer(t)
+	denied.Update([]string{"/secret/*"})
+
+	dir := t.TempDir()
+	err := os.WriteFile(filepath.Join(dir, "public.txt"), []byte("ok"), 0o644)
+	require.NoError(t, err)
+
+	err = endpoints.Update([]*agentv1.EndpointConfig{
+		{
+			Name: "organizations/acme/storageGateways/gw1/endpoints/media",
+			Configuration: &agentv1.EndpointConfig_Filesystem{
+				Filesystem: &agentv1.FileSystemEndpointConfig{Path: dir},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/media/public.txt", nil)
+	srv.ServeHTTP(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code,
+		"non-denied path should be served from endpoint")
+	assert.Equal(t, "ok", w.Body.String())
+}

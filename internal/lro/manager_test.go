@@ -18,6 +18,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	db "github.com/dashkan/pivox/internal/db/generated"
@@ -690,4 +691,416 @@ func TestWaitOperation_ContextCancelled(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("timed out waiting for WaitOperation to return after cancel")
 	}
+}
+
+// --- Additional coverage tests ---
+
+func TestCreateAndRun_WithMetadata(t *testing.T) {
+	ctx := context.Background()
+	mockQ := new(mocks.MockQuerier)
+	m := NewManager(mockQ, newTestLogger())
+
+	metadata, err := structpb.NewStruct(map[string]interface{}{"progress": "0%"})
+	require.NoError(t, err)
+
+	mockQ.On("CreateOperation", ctx, mock.MatchedBy(func(p db.CreateOperationParams) bool {
+		return p.Prefix == "assets" && len(p.Metadata) > 0
+	})).Return(db.Operation{
+		ID:     uuid.New(),
+		Prefix: "assets",
+		Done:   false,
+	}, nil)
+
+	done := make(chan struct{})
+	mockQ.On("CompleteOperation", mock.Anything, mock.Anything).Return(db.Operation{}, nil).Run(func(_ mock.Arguments) {
+		close(done)
+	})
+
+	op, err := m.CreateAndRun(ctx, "assets", metadata, func(ctx context.Context) (proto.Message, error) {
+		return nil, nil
+	})
+	require.NoError(t, err)
+	require.NotNil(t, op)
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out")
+	}
+}
+
+func TestCreateAndRun_CreateOperationError(t *testing.T) {
+	ctx := context.Background()
+	mockQ := new(mocks.MockQuerier)
+	m := NewManager(mockQ, newTestLogger())
+
+	mockQ.On("CreateOperation", ctx, mock.Anything).Return(db.Operation{}, fmt.Errorf("db down"))
+
+	op, err := m.CreateAndRun(ctx, "assets", nil, func(ctx context.Context) (proto.Message, error) {
+		return nil, nil
+	})
+	require.Error(t, err)
+	assert.Nil(t, op)
+	st := status.Convert(err)
+	assert.Equal(t, codes.Internal, st.Code())
+}
+
+func TestRunWork_MarshalResultError(t *testing.T) {
+	// To trigger marshal error in runWork, we call runWork directly with a work func
+	// that returns a message causing marshalAny to fail. We use a bare proto.Message
+	// interface implementation that isn't registered in the protobuf type registry.
+	mockQ := new(mocks.MockQuerier)
+	m := NewManager(mockQ, newTestLogger())
+
+	opID := uuid.New()
+
+	failCalled := make(chan db.FailOperationParams, 1)
+	mockQ.On("FailOperation", mock.Anything, mock.MatchedBy(func(p db.FailOperationParams) bool {
+		return p.ID == opID
+	})).Return(db.Operation{}, nil).Run(func(args mock.Arguments) {
+		failCalled <- args.Get(1).(db.FailOperationParams)
+	})
+
+	// Use an unregistered proto message: anypb.Any with an unknown type URL.
+	// anypb.New() will fail when the message type is not resolvable.
+	badMsg := &anypb.Any{TypeUrl: "type.googleapis.com/nonexistent.Type", Value: []byte("bad")}
+
+	go m.runWork(opID, func(ctx context.Context) (proto.Message, error) {
+		return badMsg, nil
+	})
+
+	select {
+	case params := <-failCalled:
+		assert.Equal(t, int32(codes.Internal), params.ErrorCode.Int32)
+		assert.Contains(t, params.ErrorMessage.String, "marshal result")
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for FailOperation from marshal error")
+	}
+}
+
+func TestDeleteOperation_InvalidName(t *testing.T) {
+	ctx := context.Background()
+	mockQ := new(mocks.MockQuerier)
+	m := NewManager(mockQ, newTestLogger())
+
+	err := m.DeleteOperation(ctx, "bad-name")
+	require.Error(t, err)
+	st := status.Convert(err)
+	assert.Equal(t, codes.InvalidArgument, st.Code())
+}
+
+func TestDeleteOperation_DBError(t *testing.T) {
+	ctx := context.Background()
+	mockQ := new(mocks.MockQuerier)
+	m := NewManager(mockQ, newTestLogger())
+
+	opID := uuid.New()
+	mockQ.On("GetOperation", ctx, opID).Return(db.Operation{}, fmt.Errorf("connection refused"))
+
+	err := m.DeleteOperation(ctx, fmt.Sprintf("operations/assets/%s", opID))
+	require.Error(t, err)
+	st := status.Convert(err)
+	assert.Equal(t, codes.Internal, st.Code())
+}
+
+func TestDeleteOperation_DeleteDBError(t *testing.T) {
+	ctx := context.Background()
+	mockQ := new(mocks.MockQuerier)
+	m := NewManager(mockQ, newTestLogger())
+
+	opID := uuid.New()
+	mockQ.On("GetOperation", ctx, opID).Return(db.Operation{ID: opID, Done: true}, nil)
+	mockQ.On("DeleteOperation", ctx, opID).Return(fmt.Errorf("disk full"))
+
+	err := m.DeleteOperation(ctx, fmt.Sprintf("operations/assets/%s", opID))
+	require.Error(t, err)
+	st := status.Convert(err)
+	assert.Equal(t, codes.Internal, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestCancelOperation_InvalidName(t *testing.T) {
+	ctx := context.Background()
+	mockQ := new(mocks.MockQuerier)
+	m := NewManager(mockQ, newTestLogger())
+
+	err := m.CancelOperation(ctx, "bad-name")
+	require.Error(t, err)
+	st := status.Convert(err)
+	assert.Equal(t, codes.InvalidArgument, st.Code())
+}
+
+func TestCancelOperation_DBError(t *testing.T) {
+	ctx := context.Background()
+	mockQ := new(mocks.MockQuerier)
+	m := NewManager(mockQ, newTestLogger())
+
+	opID := uuid.New()
+	mockQ.On("CancelOperation", ctx, opID).Return(db.Operation{}, fmt.Errorf("connection refused"))
+
+	err := m.CancelOperation(ctx, fmt.Sprintf("operations/assets/%s", opID))
+	require.Error(t, err)
+	st := status.Convert(err)
+	assert.Equal(t, codes.Internal, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestRecoverPending_ListError(t *testing.T) {
+	ctx := context.Background()
+	mockQ := new(mocks.MockQuerier)
+	m := NewManager(mockQ, newTestLogger())
+
+	mockQ.On("ListPendingOperations", ctx).Return([]db.Operation{}, fmt.Errorf("db down"))
+
+	err := m.RecoverPending(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "list pending operations")
+	mockQ.AssertExpectations(t)
+}
+
+func TestRecoverPending_FailOperationError(t *testing.T) {
+	ctx := context.Background()
+	mockQ := new(mocks.MockQuerier)
+	m := NewManager(mockQ, newTestLogger())
+
+	op := db.Operation{ID: uuid.New(), Prefix: "a"}
+	mockQ.On("ListPendingOperations", ctx).Return([]db.Operation{op}, nil)
+	mockQ.On("FailOperation", ctx, mock.MatchedBy(func(p db.FailOperationParams) bool {
+		return p.ID == op.ID
+	})).Return(db.Operation{}, fmt.Errorf("disk full"))
+
+	// RecoverPending logs the error but does not fail
+	err := m.RecoverPending(ctx)
+	require.NoError(t, err)
+	mockQ.AssertExpectations(t)
+}
+
+func TestGetOperation_DBError(t *testing.T) {
+	ctx := context.Background()
+	mockQ := new(mocks.MockQuerier)
+	m := NewManager(mockQ, newTestLogger())
+
+	opID := uuid.New()
+	mockQ.On("GetOperation", ctx, opID).Return(db.Operation{}, fmt.Errorf("connection refused"))
+
+	_, err := m.GetOperation(ctx, fmt.Sprintf("operations/assets/%s", opID))
+	require.Error(t, err)
+	st := status.Convert(err)
+	assert.Equal(t, codes.Internal, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestListOperations_DBError(t *testing.T) {
+	ctx := context.Background()
+	mockQ := new(mocks.MockQuerier)
+	m := NewManager(mockQ, newTestLogger())
+
+	mockQ.On("ListOperations", ctx, mock.Anything).Return([]db.Operation{}, fmt.Errorf("db down"))
+
+	_, err := m.ListOperations(ctx, "", 10)
+	require.Error(t, err)
+	st := status.Convert(err)
+	assert.Equal(t, codes.Internal, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestListOperations_SkipsBadConversion(t *testing.T) {
+	ctx := context.Background()
+	mockQ := new(mocks.MockQuerier)
+	m := NewManager(mockQ, newTestLogger())
+
+	good := db.Operation{ID: uuid.New(), Prefix: "assets", Done: false}
+	// Bad operation: Done=true with invalid metadata JSON that will cause unmarshalAny to fail
+	bad := db.Operation{
+		ID:       uuid.New(),
+		Prefix:   "assets",
+		Done:     false,
+		Metadata: json.RawMessage(`{invalid json`),
+	}
+
+	mockQ.On("ListOperations", ctx, mock.Anything).Return([]db.Operation{bad, good}, nil)
+
+	ops, err := m.ListOperations(ctx, "assets", 10)
+	require.NoError(t, err)
+	// The bad one should be skipped, only the good one returned
+	assert.Len(t, ops, 1)
+	mockQ.AssertExpectations(t)
+}
+
+func TestDoneOperation_NilMessage(t *testing.T) {
+	// DoneOperation with a nil message should fail because anypb.New(nil) errors
+	_, err := DoneOperation(nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "marshal response to Any")
+}
+
+func TestUnmarshalAny_InvalidJSON(t *testing.T) {
+	_, err := unmarshalAny([]byte(`{not valid json`))
+	require.Error(t, err)
+}
+
+func TestDbToProto_InvalidMetadata(t *testing.T) {
+	op := db.Operation{
+		ID:       uuid.New(),
+		Prefix:   "assets",
+		Done:     false,
+		Metadata: json.RawMessage(`{bad json`),
+	}
+	_, err := dbToProto(op)
+	require.Error(t, err)
+}
+
+func TestDbToProto_InvalidResult(t *testing.T) {
+	op := db.Operation{
+		ID:     uuid.New(),
+		Prefix: "assets",
+		Done:   true,
+		Result: json.RawMessage(`{bad json`),
+	}
+	_, err := dbToProto(op)
+	require.Error(t, err)
+}
+
+func TestDbToProto_DoneNoErrorNoResult(t *testing.T) {
+	// Done with no error and no result -- covers the fall-through path
+	op := db.Operation{
+		ID:     uuid.New(),
+		Prefix: "assets",
+		Done:   true,
+	}
+	pbOp, err := dbToProto(op)
+	require.NoError(t, err)
+	assert.True(t, pbOp.Done)
+	assert.Nil(t, pbOp.GetError())
+	assert.Nil(t, pbOp.GetResponse())
+}
+
+func TestDbToProto_ErrorWithInvalidMessage(t *testing.T) {
+	// Error code set but ErrorMessage not valid -- covers the msg="" branch
+	op := db.Operation{
+		ID:           uuid.New(),
+		Prefix:       "assets",
+		Done:         true,
+		ErrorCode:    pgtype.Int4{Int32: int32(codes.Internal), Valid: true},
+		ErrorMessage: pgtype.Text{Valid: false},
+	}
+	pbOp, err := dbToProto(op)
+	require.NoError(t, err)
+	require.NotNil(t, pbOp.GetError())
+	assert.Equal(t, int32(codes.Internal), pbOp.GetError().Code)
+	assert.Equal(t, "", pbOp.GetError().Message)
+}
+
+func TestRunWork_FailOperationDBError(t *testing.T) {
+	// Test that when work fails AND FailOperation also fails, we just log (no panic)
+	ctx := context.Background()
+	mockQ := new(mocks.MockQuerier)
+	m := NewManager(mockQ, newTestLogger())
+
+	mockQ.On("CreateOperation", ctx, mock.Anything).Return(db.Operation{
+		ID:     uuid.New(),
+		Prefix: "assets",
+		Done:   false,
+	}, nil)
+
+	done := make(chan struct{})
+	mockQ.On("FailOperation", mock.Anything, mock.Anything).Return(db.Operation{}, fmt.Errorf("db down")).Run(func(_ mock.Arguments) {
+		close(done)
+	})
+
+	_, err := m.CreateAndRun(ctx, "assets", nil, func(ctx context.Context) (proto.Message, error) {
+		return nil, fmt.Errorf("work failed")
+	})
+	require.NoError(t, err)
+
+	select {
+	case <-done:
+		// FailOperation was called (and errored), runWork should not panic
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out")
+	}
+}
+
+func TestRunWork_CompleteOperationDBError(t *testing.T) {
+	// Test that when work succeeds but CompleteOperation fails, we just log
+	ctx := context.Background()
+	mockQ := new(mocks.MockQuerier)
+	m := NewManager(mockQ, newTestLogger())
+
+	mockQ.On("CreateOperation", ctx, mock.Anything).Return(db.Operation{
+		ID:     uuid.New(),
+		Prefix: "assets",
+		Done:   false,
+	}, nil)
+
+	done := make(chan struct{})
+	mockQ.On("CompleteOperation", mock.Anything, mock.Anything).Return(db.Operation{}, fmt.Errorf("db down")).Run(func(_ mock.Arguments) {
+		close(done)
+	})
+
+	_, err := m.CreateAndRun(ctx, "assets", nil, func(ctx context.Context) (proto.Message, error) {
+		s, _ := structpb.NewStruct(map[string]interface{}{"k": "v"})
+		return s, nil
+	})
+	require.NoError(t, err)
+
+	select {
+	case <-done:
+		// CompleteOperation was called (and errored), runWork should not panic
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out")
+	}
+}
+
+func TestRunWork_MarshalResultError_FailOperationAlsoFails(t *testing.T) {
+	// When marshal error occurs and FailOperation also fails, we just log both
+	mockQ := new(mocks.MockQuerier)
+	m := NewManager(mockQ, newTestLogger())
+
+	opID := uuid.New()
+
+	done := make(chan struct{})
+	mockQ.On("FailOperation", mock.Anything, mock.MatchedBy(func(p db.FailOperationParams) bool {
+		return p.ID == opID
+	})).Return(db.Operation{}, fmt.Errorf("db down")).Run(func(_ mock.Arguments) {
+		close(done)
+	})
+
+	badMsg := &anypb.Any{TypeUrl: "type.googleapis.com/nonexistent.Type", Value: []byte("bad")}
+
+	go m.runWork(opID, func(ctx context.Context) (proto.Message, error) {
+		return badMsg, nil
+	})
+
+	select {
+	case <-done:
+		// both errors logged, no panic
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out")
+	}
+}
+
+func TestReaper_Run_DeleteError(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	logger := newTestLogger()
+
+	r := NewReaper(mockQ, 10*time.Millisecond, logger)
+
+	called := make(chan struct{}, 10)
+	mockQ.On("DeleteExpiredOperations", mock.Anything).Return(fmt.Errorf("db error")).Run(func(_ mock.Arguments) {
+		select {
+		case called <- struct{}{}:
+		default:
+		}
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+
+	err := r.Run(ctx)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+
+	// Verify it was called at least once despite the error
+	assert.NotEmpty(t, called)
 }
