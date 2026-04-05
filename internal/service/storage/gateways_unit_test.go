@@ -402,6 +402,591 @@ func TestUnit_UpgradeGateway_Unimplemented(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// parseStorageGatewayName — error path
+// ---------------------------------------------------------------------------
+
+func TestUnit_ParseStorageGatewayName_Invalid(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"empty", ""},
+		{"too_few_parts", "organizations/acme"},
+		{"wrong_resource", "organizations/acme/gateways/gw-1"},
+		{"too_many_parts", "organizations/acme/storageGateways/gw-1/extra/more"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, err := parseStorageGatewayName(tc.input)
+			require.Error(t, err)
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// GetStorageGateway — org not found
+// ---------------------------------------------------------------------------
+
+func TestUnit_GetStorageGateway_OrgNotFound(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "missing-org").
+		Return(db.Organization{}, pgx.ErrNoRows)
+
+	_, err := srv.GetStorageGateway(ctx, &storagev1.GetStorageGatewayRequest{
+		Name: "organizations/missing-org/storageGateways/gw-1",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+// ---------------------------------------------------------------------------
+// GetStorageGateway — invalid name
+// ---------------------------------------------------------------------------
+
+func TestUnit_GetStorageGateway_InvalidName(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+	ctx := context.Background()
+
+	_, err := srv.GetStorageGateway(ctx, &storagev1.GetStorageGatewayRequest{
+		Name: "bad-name",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.Internal, st.Code())
+}
+
+// ---------------------------------------------------------------------------
+// UpdateStorageGateway — error paths
+// ---------------------------------------------------------------------------
+
+func TestUnit_UpdateStorageGateway_InvalidName(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+	ctx := context.Background()
+
+	_, err := srv.UpdateStorageGateway(ctx, &storagev1.UpdateStorageGatewayRequest{
+		StorageGateway: &storagev1.StorageGateway{
+			Name: "bad/name",
+		},
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.Internal, st.Code())
+}
+
+func TestUnit_UpdateStorageGateway_OrgNotFound(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "no-org").
+		Return(db.Organization{}, pgx.ErrNoRows)
+
+	_, err := srv.UpdateStorageGateway(ctx, &storagev1.UpdateStorageGatewayRequest{
+		StorageGateway: &storagev1.StorageGateway{
+			Name: "organizations/no-org/storageGateways/gw-1",
+		},
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_UpdateStorageGateway_GatewayNotFound(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "missing",
+	}).Return(db.StorageGateway{}, pgx.ErrNoRows)
+
+	_, err := srv.UpdateStorageGateway(ctx, &storagev1.UpdateStorageGatewayRequest{
+		StorageGateway: &storagev1.StorageGateway{
+			Name: "organizations/acme/storageGateways/missing",
+		},
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_UpdateStorageGateway_UpdateFails(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "gw-1",
+	}).Return(testGateway, nil)
+	mockQ.On("UpdateStorageGateway", mock.Anything, mock.Anything).
+		Return(db.StorageGateway{}, pgx.ErrNoRows)
+
+	_, err := srv.UpdateStorageGateway(ctx, &storagev1.UpdateStorageGatewayRequest{
+		StorageGateway: &storagev1.StorageGateway{
+			Name:        "organizations/acme/storageGateways/gw-1",
+			DisplayName: "Updated",
+		},
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_UpdateStorageGateway_FieldMask_AllPaths(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+	ctx := context.Background()
+
+	updatedGW := testGateway
+	updatedGW.IpAddresses = []string{"10.0.0.5"}
+	updatedGW.TargetVersion = "2.0.0"
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "gw-1",
+	}).Return(testGateway, nil)
+	mockQ.On("UpdateStorageGateway", mock.Anything, mock.MatchedBy(func(p db.UpdateStorageGatewayParams) bool {
+		return p.ID == gwID
+	})).Return(updatedGW, nil)
+
+	resp, err := srv.UpdateStorageGateway(ctx, &storagev1.UpdateStorageGatewayRequest{
+		StorageGateway: &storagev1.StorageGateway{
+			Name:          "organizations/acme/storageGateways/gw-1",
+			IpAddresses:   []string{"10.0.0.5"},
+			TargetVersion: "2.0.0",
+			Annotations:   map[string]string{"k": "v"},
+		},
+		UpdateMask: &fieldmaskpb.FieldMask{
+			Paths: []string{"ip_addresses", "target_version", "annotations"},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.True(t, resp.GetDone())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_UpdateStorageGateway_NoMask_WithAnnotations(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+	ctx := context.Background()
+
+	updatedGW := testGateway
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "gw-1",
+	}).Return(testGateway, nil)
+	mockQ.On("UpdateStorageGateway", mock.Anything, mock.MatchedBy(func(p db.UpdateStorageGatewayParams) bool {
+		return p.ID == gwID
+	})).Return(updatedGW, nil)
+
+	resp, err := srv.UpdateStorageGateway(ctx, &storagev1.UpdateStorageGatewayRequest{
+		StorageGateway: &storagev1.StorageGateway{
+			Name:        "organizations/acme/storageGateways/gw-1",
+			DisplayName: "Updated",
+			Annotations: map[string]string{"env": "staging"},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.True(t, resp.GetDone())
+	mockQ.AssertExpectations(t)
+}
+
+// ---------------------------------------------------------------------------
+// DeleteStorageGateway — error paths
+// ---------------------------------------------------------------------------
+
+func TestUnit_DeleteStorageGateway_InvalidName(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+	ctx := context.Background()
+
+	_, err := srv.DeleteStorageGateway(ctx, &storagev1.DeleteStorageGatewayRequest{
+		Name: "not/a/valid/name/at/all/extra",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.Internal, st.Code())
+}
+
+func TestUnit_DeleteStorageGateway_OrgNotFound(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "no-org").
+		Return(db.Organization{}, pgx.ErrNoRows)
+
+	_, err := srv.DeleteStorageGateway(ctx, &storagev1.DeleteStorageGatewayRequest{
+		Name: "organizations/no-org/storageGateways/gw-1",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_DeleteStorageGateway_GatewayNotFound(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "missing",
+	}).Return(db.StorageGateway{}, pgx.ErrNoRows)
+
+	_, err := srv.DeleteStorageGateway(ctx, &storagev1.DeleteStorageGatewayRequest{
+		Name: "organizations/acme/storageGateways/missing",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_DeleteStorageGateway_DeleteFails(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "gw-1",
+	}).Return(testGateway, nil)
+	mockQ.On("DeleteStorageGateway", mock.Anything, gwID).
+		Return(pgx.ErrNoRows)
+
+	_, err := srv.DeleteStorageGateway(ctx, &storagev1.DeleteStorageGatewayRequest{
+		Name: "organizations/acme/storageGateways/gw-1",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+// ---------------------------------------------------------------------------
+// RotateRegistrationToken — error paths
+// ---------------------------------------------------------------------------
+
+func TestUnit_RotateRegistrationToken_InvalidName(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+	ctx := context.Background()
+
+	_, err := srv.RotateRegistrationToken(ctx, &storagev1.RotateRegistrationTokenRequest{
+		Name: "bad-name",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.Internal, st.Code())
+}
+
+func TestUnit_RotateRegistrationToken_OrgNotFound(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "no-org").
+		Return(db.Organization{}, pgx.ErrNoRows)
+
+	_, err := srv.RotateRegistrationToken(ctx, &storagev1.RotateRegistrationTokenRequest{
+		Name: "organizations/no-org/storageGateways/gw-1",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_RotateRegistrationToken_GatewayNotFound(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "missing",
+	}).Return(db.StorageGateway{}, pgx.ErrNoRows)
+
+	_, err := srv.RotateRegistrationToken(ctx, &storagev1.RotateRegistrationTokenRequest{
+		Name: "organizations/acme/storageGateways/missing",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_RotateRegistrationToken_DBError(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "gw-1",
+	}).Return(testGateway, nil)
+	mockQ.On("RotateRegistrationToken", mock.Anything, mock.Anything).
+		Return(db.StorageGateway{}, pgx.ErrNoRows)
+
+	_, err := srv.RotateRegistrationToken(ctx, &storagev1.RotateRegistrationTokenRequest{
+		Name: "organizations/acme/storageGateways/gw-1",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+// ---------------------------------------------------------------------------
+// GetUninstallScript — error paths
+// ---------------------------------------------------------------------------
+
+func TestUnit_GetUninstallScript_InvalidName(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+	ctx := context.Background()
+
+	_, err := srv.GetUninstallScript(ctx, &storagev1.GetUninstallScriptRequest{
+		Name: "bad-name",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.Internal, st.Code())
+}
+
+func TestUnit_GetUninstallScript_OrgNotFound(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "no-org").
+		Return(db.Organization{}, pgx.ErrNoRows)
+
+	_, err := srv.GetUninstallScript(ctx, &storagev1.GetUninstallScriptRequest{
+		Name: "organizations/no-org/storageGateways/gw-1",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_GetUninstallScript_GatewayNotFound(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "missing",
+	}).Return(db.StorageGateway{}, pgx.ErrNoRows)
+
+	_, err := srv.GetUninstallScript(ctx, &storagev1.GetUninstallScriptRequest{
+		Name: "organizations/acme/storageGateways/missing",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+// ---------------------------------------------------------------------------
+// GetInstallScript — error paths
+// ---------------------------------------------------------------------------
+
+func TestUnit_GetInstallScript_InvalidName(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+	ctx := context.Background()
+
+	_, err := srv.GetInstallScript(ctx, &storagev1.GetInstallScriptRequest{
+		Name: "bad-name",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.Internal, st.Code())
+}
+
+func TestUnit_GetInstallScript_OrgNotFound(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "no-org").
+		Return(db.Organization{}, pgx.ErrNoRows)
+
+	_, err := srv.GetInstallScript(ctx, &storagev1.GetInstallScriptRequest{
+		Name: "organizations/no-org/storageGateways/gw-1",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_GetInstallScript_GatewayNotFound(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "missing",
+	}).Return(db.StorageGateway{}, pgx.ErrNoRows)
+
+	_, err := srv.GetInstallScript(ctx, &storagev1.GetInstallScriptRequest{
+		Name: "organizations/acme/storageGateways/missing",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_GetInstallScript_WithProxyFlags(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "gw-1",
+	}).Return(testGateway, nil)
+
+	resp, err := srv.GetInstallScript(ctx, &storagev1.GetInstallScriptRequest{
+		Name:        "organizations/acme/storageGateways/gw-1",
+		HttpProxy:   "http://proxy:3128",
+		HttpsProxy:  "https://proxy:3128",
+		NoProxy:     "localhost,127.0.0.1",
+	})
+
+	require.NoError(t, err)
+	script := resp.GetScript()
+	assert.Contains(t, script, "--http-proxy http://proxy:3128")
+	assert.Contains(t, script, "--https-proxy https://proxy:3128")
+	assert.Contains(t, script, "--no-proxy localhost,127.0.0.1")
+	mockQ.AssertExpectations(t)
+}
+
+// ---------------------------------------------------------------------------
+// CreateStorageGateway — error paths
+// ---------------------------------------------------------------------------
+
+func TestUnit_CreateStorageGateway_OrgNotFound(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "no-org").
+		Return(db.Organization{}, pgx.ErrNoRows)
+
+	_, err := srv.CreateStorageGateway(ctx, &storagev1.CreateStorageGatewayRequest{
+		Parent: "organizations/no-org",
+		StorageGateway: &storagev1.StorageGateway{
+			DisplayName: "GW",
+		},
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_CreateStorageGateway_WithAnnotations(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("CreateStorageGateway", mock.Anything, mock.MatchedBy(func(p db.CreateStorageGatewayParams) bool {
+		return p.OrgID == gwOrgID && p.Name == "gw-anno"
+	})).Return(testGateway, nil)
+
+	resp, err := srv.CreateStorageGateway(ctx, &storagev1.CreateStorageGatewayRequest{
+		Parent:           "organizations/acme",
+		StorageGatewayId: "gw-anno",
+		StorageGateway: &storagev1.StorageGateway{
+			DisplayName: "Annotated GW",
+			Annotations: map[string]string{"env": "prod"},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.True(t, resp.GetDone())
+	mockQ.AssertExpectations(t)
+}
+
+// ---------------------------------------------------------------------------
 // CreateStorageSession
 // ---------------------------------------------------------------------------
 
