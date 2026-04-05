@@ -318,3 +318,455 @@ func TestUnit_GenerateKeyString(t *testing.T) {
 	key2 := generateKeyString()
 	assert.NotEqual(t, key, key2, "two generated keys should be different")
 }
+
+// --- CreateKey error paths ---
+
+func TestUnit_CreateKey_ErrorPaths(t *testing.T) {
+	tests := []struct {
+		name     string
+		setup    func(mockQ *mocks.MockQuerier)
+		req      *apiv1.CreateKeyRequest
+		wantCode codes.Code
+	}{
+		{
+			name:  "org not found",
+			setup: func(mockQ *mocks.MockQuerier) {
+				mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(db.Organization{}, pgx.ErrNoRows)
+			},
+			req: &apiv1.CreateKeyRequest{
+				Parent: "organizations/acme",
+				Key:    &apiv1.Key{DisplayName: "Key"},
+			},
+			wantCode: codes.NotFound,
+		},
+		{
+			name: "db error on CreateApiKey",
+			setup: func(mockQ *mocks.MockQuerier) {
+				mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
+				mockQ.On("CreateApiKey", mock.Anything, mock.Anything).Return(db.ApiKey{}, pgx.ErrNoRows)
+			},
+			req: &apiv1.CreateKeyRequest{
+				Parent: "organizations/acme",
+				Key:    &apiv1.Key{DisplayName: "Key"},
+			},
+			wantCode: codes.NotFound,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mockQ := new(mocks.MockQuerier)
+			srv := NewApiKeysServer(nil, mockQ)
+			tc.setup(mockQ)
+
+			_, err := srv.CreateKey(context.Background(), tc.req)
+
+			require.Error(t, err)
+			st, ok := status.FromError(err)
+			require.True(t, ok)
+			assert.Equal(t, tc.wantCode, st.Code())
+			mockQ.AssertExpectations(t)
+		})
+	}
+}
+
+// --- GetKeyString error paths ---
+
+func TestUnit_GetKeyString_ErrorPaths(t *testing.T) {
+	tests := []struct {
+		name     string
+		setup    func(mockQ *mocks.MockQuerier)
+		req      *apiv1.GetKeyStringRequest
+		wantCode codes.Code
+	}{
+		{
+			name:  "invalid name",
+			setup: func(mockQ *mocks.MockQuerier) {},
+			req:   &apiv1.GetKeyStringRequest{Name: "bad-name"},
+			wantCode: codes.Internal,
+		},
+		{
+			name: "org not found",
+			setup: func(mockQ *mocks.MockQuerier) {
+				mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(db.Organization{}, pgx.ErrNoRows)
+			},
+			req:      &apiv1.GetKeyStringRequest{Name: "organizations/acme/keys/my-key"},
+			wantCode: codes.NotFound,
+		},
+		{
+			name: "key not found",
+			setup: func(mockQ *mocks.MockQuerier) {
+				mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
+				mockQ.On("GetApiKeyByOrgAndKeyID", mock.Anything, db.GetApiKeyByOrgAndKeyIDParams{
+					OrgID: testOrgID,
+					KeyID: "my-key",
+				}).Return(db.ApiKey{}, pgx.ErrNoRows)
+			},
+			req:      &apiv1.GetKeyStringRequest{Name: "organizations/acme/keys/my-key"},
+			wantCode: codes.NotFound,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mockQ := new(mocks.MockQuerier)
+			srv := NewApiKeysServer(nil, mockQ)
+			tc.setup(mockQ)
+
+			_, err := srv.GetKeyString(context.Background(), tc.req)
+
+			require.Error(t, err)
+			st, ok := status.FromError(err)
+			require.True(t, ok)
+			assert.Equal(t, tc.wantCode, st.Code())
+			mockQ.AssertExpectations(t)
+		})
+	}
+}
+
+// --- UpdateKey error paths ---
+
+func TestUnit_UpdateKey_ErrorPaths(t *testing.T) {
+	tests := []struct {
+		name     string
+		setup    func(mockQ *mocks.MockQuerier)
+		req      *apiv1.UpdateKeyRequest
+		wantCode codes.Code
+	}{
+		{
+			name:  "invalid key name",
+			setup: func(mockQ *mocks.MockQuerier) {},
+			req: &apiv1.UpdateKeyRequest{
+				Key: &apiv1.Key{Name: "bad-name"},
+			},
+			wantCode: codes.Internal,
+		},
+		{
+			name: "org not found",
+			setup: func(mockQ *mocks.MockQuerier) {
+				mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(db.Organization{}, pgx.ErrNoRows)
+			},
+			req: &apiv1.UpdateKeyRequest{
+				Key: &apiv1.Key{Name: "organizations/acme/keys/my-key"},
+			},
+			wantCode: codes.NotFound,
+		},
+		{
+			name: "key not found",
+			setup: func(mockQ *mocks.MockQuerier) {
+				mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
+				mockQ.On("GetApiKeyByOrgAndKeyID", mock.Anything, db.GetApiKeyByOrgAndKeyIDParams{
+					OrgID: testOrgID,
+					KeyID: "my-key",
+				}).Return(db.ApiKey{}, pgx.ErrNoRows)
+			},
+			req: &apiv1.UpdateKeyRequest{
+				Key: &apiv1.Key{Name: "organizations/acme/keys/my-key"},
+			},
+			wantCode: codes.NotFound,
+		},
+		{
+			name: "db error on UpdateApiKey",
+			setup: func(mockQ *mocks.MockQuerier) {
+				mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
+				mockQ.On("GetApiKeyByOrgAndKeyID", mock.Anything, db.GetApiKeyByOrgAndKeyIDParams{
+					OrgID: testOrgID,
+					KeyID: "my-key",
+				}).Return(testDBKey, nil)
+				mockQ.On("UpdateApiKey", mock.Anything, mock.Anything).Return(db.ApiKey{}, pgx.ErrNoRows)
+			},
+			req: &apiv1.UpdateKeyRequest{
+				Key: &apiv1.Key{
+					Name:        "organizations/acme/keys/my-key",
+					DisplayName: "New Name",
+				},
+			},
+			wantCode: codes.NotFound,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mockQ := new(mocks.MockQuerier)
+			srv := NewApiKeysServer(nil, mockQ)
+			tc.setup(mockQ)
+
+			_, err := srv.UpdateKey(context.Background(), tc.req)
+
+			require.Error(t, err)
+			st, ok := status.FromError(err)
+			require.True(t, ok)
+			assert.Equal(t, tc.wantCode, st.Code())
+			mockQ.AssertExpectations(t)
+		})
+	}
+}
+
+// --- DeleteKey error paths ---
+
+func TestUnit_DeleteKey_ErrorPaths(t *testing.T) {
+	tests := []struct {
+		name     string
+		setup    func(mockQ *mocks.MockQuerier)
+		req      *apiv1.DeleteKeyRequest
+		wantCode codes.Code
+	}{
+		{
+			name:     "invalid key name",
+			setup:    func(mockQ *mocks.MockQuerier) {},
+			req:      &apiv1.DeleteKeyRequest{Name: "bad-name"},
+			wantCode: codes.Internal,
+		},
+		{
+			name: "org not found",
+			setup: func(mockQ *mocks.MockQuerier) {
+				mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(db.Organization{}, pgx.ErrNoRows)
+			},
+			req:      &apiv1.DeleteKeyRequest{Name: "organizations/acme/keys/my-key"},
+			wantCode: codes.NotFound,
+		},
+		{
+			name: "key not found",
+			setup: func(mockQ *mocks.MockQuerier) {
+				mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
+				mockQ.On("GetApiKeyByOrgAndKeyID", mock.Anything, db.GetApiKeyByOrgAndKeyIDParams{
+					OrgID: testOrgID,
+					KeyID: "my-key",
+				}).Return(db.ApiKey{}, pgx.ErrNoRows)
+			},
+			req:      &apiv1.DeleteKeyRequest{Name: "organizations/acme/keys/my-key"},
+			wantCode: codes.NotFound,
+		},
+		{
+			name: "db error on SoftDeleteApiKey",
+			setup: func(mockQ *mocks.MockQuerier) {
+				mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
+				mockQ.On("GetApiKeyByOrgAndKeyID", mock.Anything, db.GetApiKeyByOrgAndKeyIDParams{
+					OrgID: testOrgID,
+					KeyID: "my-key",
+				}).Return(testDBKey, nil)
+				mockQ.On("SoftDeleteApiKey", mock.Anything, db.SoftDeleteApiKeyParams{
+					ID:        testKeyID,
+					DeletedBy: "",
+				}).Return(db.ApiKey{}, pgx.ErrNoRows)
+			},
+			req:      &apiv1.DeleteKeyRequest{Name: "organizations/acme/keys/my-key"},
+			wantCode: codes.NotFound,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mockQ := new(mocks.MockQuerier)
+			srv := NewApiKeysServer(nil, mockQ)
+			tc.setup(mockQ)
+
+			_, err := srv.DeleteKey(context.Background(), tc.req)
+
+			require.Error(t, err)
+			st, ok := status.FromError(err)
+			require.True(t, ok)
+			assert.Equal(t, tc.wantCode, st.Code())
+			mockQ.AssertExpectations(t)
+		})
+	}
+}
+
+// --- UndeleteKey error paths ---
+
+func TestUnit_UndeleteKey_ErrorPaths(t *testing.T) {
+	tests := []struct {
+		name     string
+		setup    func(mockQ *mocks.MockQuerier)
+		req      *apiv1.UndeleteKeyRequest
+		wantCode codes.Code
+	}{
+		{
+			name:     "invalid key name",
+			setup:    func(mockQ *mocks.MockQuerier) {},
+			req:      &apiv1.UndeleteKeyRequest{Name: "bad-name"},
+			wantCode: codes.Internal,
+		},
+		{
+			name: "org not found",
+			setup: func(mockQ *mocks.MockQuerier) {
+				mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(db.Organization{}, pgx.ErrNoRows)
+			},
+			req:      &apiv1.UndeleteKeyRequest{Name: "organizations/acme/keys/my-key"},
+			wantCode: codes.NotFound,
+		},
+		{
+			name: "key not found",
+			setup: func(mockQ *mocks.MockQuerier) {
+				mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
+				mockQ.On("GetApiKeyByOrgAndKeyID", mock.Anything, db.GetApiKeyByOrgAndKeyIDParams{
+					OrgID: testOrgID,
+					KeyID: "my-key",
+				}).Return(db.ApiKey{}, pgx.ErrNoRows)
+			},
+			req:      &apiv1.UndeleteKeyRequest{Name: "organizations/acme/keys/my-key"},
+			wantCode: codes.NotFound,
+		},
+		{
+			name: "db error on UndeleteApiKey",
+			setup: func(mockQ *mocks.MockQuerier) {
+				mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
+				mockQ.On("GetApiKeyByOrgAndKeyID", mock.Anything, db.GetApiKeyByOrgAndKeyIDParams{
+					OrgID: testOrgID,
+					KeyID: "my-key",
+				}).Return(testDBKey, nil)
+				mockQ.On("UndeleteApiKey", mock.Anything, db.UndeleteApiKeyParams{
+					ID:        testKeyID,
+					UpdatedBy: "",
+				}).Return(db.ApiKey{}, pgx.ErrNoRows)
+			},
+			req:      &apiv1.UndeleteKeyRequest{Name: "organizations/acme/keys/my-key"},
+			wantCode: codes.NotFound,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mockQ := new(mocks.MockQuerier)
+			srv := NewApiKeysServer(nil, mockQ)
+			tc.setup(mockQ)
+
+			_, err := srv.UndeleteKey(context.Background(), tc.req)
+
+			require.Error(t, err)
+			st, ok := status.FromError(err)
+			require.True(t, ok)
+			assert.Equal(t, tc.wantCode, st.Code())
+			mockQ.AssertExpectations(t)
+		})
+	}
+}
+
+// --- LookupKey error paths ---
+
+func TestUnit_LookupKey_ErrorPaths(t *testing.T) {
+	tests := []struct {
+		name     string
+		setup    func(mockQ *mocks.MockQuerier)
+		req      *apiv1.LookupKeyRequest
+		wantCode codes.Code
+	}{
+		{
+			name: "key string not found",
+			setup: func(mockQ *mocks.MockQuerier) {
+				mockQ.On("LookupApiKeyByKeyString", mock.Anything, "unknown-key").Return(db.ApiKey{}, pgx.ErrNoRows)
+			},
+			req:      &apiv1.LookupKeyRequest{KeyString: "unknown-key"},
+			wantCode: codes.NotFound,
+		},
+		{
+			name: "org not found after key lookup",
+			setup: func(mockQ *mocks.MockQuerier) {
+				mockQ.On("LookupApiKeyByKeyString", mock.Anything, "the-secret-key-string").Return(testDBKey, nil)
+				mockQ.On("GetOrganization", mock.Anything, testOrgID).Return(db.Organization{}, pgx.ErrNoRows)
+			},
+			req:      &apiv1.LookupKeyRequest{KeyString: "the-secret-key-string"},
+			wantCode: codes.NotFound,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mockQ := new(mocks.MockQuerier)
+			srv := NewApiKeysServer(nil, mockQ)
+			tc.setup(mockQ)
+
+			_, err := srv.LookupKey(context.Background(), tc.req)
+
+			require.Error(t, err)
+			st, ok := status.FromError(err)
+			require.True(t, ok)
+			assert.Equal(t, tc.wantCode, st.Code())
+			mockQ.AssertExpectations(t)
+		})
+	}
+}
+
+// --- ListKeys error paths ---
+
+func TestUnit_ListKeys_ErrorPaths(t *testing.T) {
+	tests := []struct {
+		name     string
+		setup    func(mockQ *mocks.MockQuerier)
+		req      *apiv1.ListKeysRequest
+		wantCode codes.Code
+	}{
+		{
+			name:     "invalid parent",
+			setup:    func(mockQ *mocks.MockQuerier) {},
+			req:      &apiv1.ListKeysRequest{Parent: "bad-parent"},
+			wantCode: codes.Internal,
+		},
+		{
+			name: "org not found",
+			setup: func(mockQ *mocks.MockQuerier) {
+				mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(db.Organization{}, pgx.ErrNoRows)
+			},
+			req:      &apiv1.ListKeysRequest{Parent: "organizations/acme"},
+			wantCode: codes.NotFound,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mockQ := new(mocks.MockQuerier)
+			srv := NewApiKeysServer(nil, mockQ)
+			tc.setup(mockQ)
+
+			_, err := srv.ListKeys(context.Background(), tc.req)
+
+			require.Error(t, err)
+			st, ok := status.FromError(err)
+			require.True(t, ok)
+			assert.Equal(t, tc.wantCode, st.Code())
+			mockQ.AssertExpectations(t)
+		})
+	}
+}
+
+// --- GetKey error paths ---
+
+func TestUnit_GetKey_ErrorPaths(t *testing.T) {
+	tests := []struct {
+		name     string
+		setup    func(mockQ *mocks.MockQuerier)
+		req      *apiv1.GetKeyRequest
+		wantCode codes.Code
+	}{
+		{
+			name:     "invalid key name",
+			setup:    func(mockQ *mocks.MockQuerier) {},
+			req:      &apiv1.GetKeyRequest{Name: "bad-name"},
+			wantCode: codes.Internal,
+		},
+		{
+			name: "org not found",
+			setup: func(mockQ *mocks.MockQuerier) {
+				mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(db.Organization{}, pgx.ErrNoRows)
+			},
+			req:      &apiv1.GetKeyRequest{Name: "organizations/acme/keys/my-key"},
+			wantCode: codes.NotFound,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mockQ := new(mocks.MockQuerier)
+			srv := NewApiKeysServer(nil, mockQ)
+			tc.setup(mockQ)
+
+			_, err := srv.GetKey(context.Background(), tc.req)
+
+			require.Error(t, err)
+			st, ok := status.FromError(err)
+			require.True(t, ok)
+			assert.Equal(t, tc.wantCode, st.Code())
+			mockQ.AssertExpectations(t)
+		})
+	}
+}

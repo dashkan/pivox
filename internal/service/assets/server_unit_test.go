@@ -3,10 +3,12 @@ package assets
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -348,6 +350,180 @@ func TestUndeleteAsset_Success(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.True(t, op.GetDone())
+	f.mockQ.AssertExpectations(t)
+}
+
+// --- GetAsset error paths ---
+
+func TestGetAsset_InvalidName(t *testing.T) {
+	f := setupAssetFixture(t)
+
+	_, err := f.server.GetAsset(context.Background(), &assetsv1.GetAssetRequest{
+		Name: "bad/format",
+	})
+	require.Error(t, err)
+	st, _ := status.FromError(err)
+	assert.Equal(t, codes.Internal, st.Code())
+}
+
+func TestGetAsset_NotFound(t *testing.T) {
+	f := setupAssetFixture(t)
+	f.mockResolveProject()
+
+	f.mockQ.On("GetAssetByName", mock.Anything, mock.Anything).
+		Return(db.Asset{}, pgx.ErrNoRows)
+
+	_, err := f.server.GetAsset(context.Background(), &assetsv1.GetAssetRequest{
+		Name: testAssetFull,
+	})
+	require.Error(t, err)
+	st, _ := status.FromError(err)
+	assert.Equal(t, codes.NotFound, st.Code())
+	f.mockQ.AssertExpectations(t)
+}
+
+// --- ListAssets error paths ---
+
+func TestListAssets_InvalidParent(t *testing.T) {
+	f := setupAssetFixture(t)
+
+	_, err := f.server.ListAssets(context.Background(), &assetsv1.ListAssetsRequest{
+		Parent: "bad/format",
+	})
+	require.Error(t, err)
+	st, _ := status.FromError(err)
+	assert.Equal(t, codes.Internal, st.Code())
+}
+
+func TestListAssets_DBError(t *testing.T) {
+	f := setupAssetFixture(t)
+	f.mockResolveProject()
+
+	f.mockQ.On("ListAssetsByProject", mock.Anything, mock.Anything).
+		Return([]db.Asset(nil), fmt.Errorf("db down"))
+
+	_, err := f.server.ListAssets(context.Background(), &assetsv1.ListAssetsRequest{
+		Parent: testParent,
+	})
+	require.Error(t, err)
+	st, _ := status.FromError(err)
+	assert.Equal(t, codes.Internal, st.Code())
+	f.mockQ.AssertExpectations(t)
+}
+
+// --- CreateAsset error paths ---
+
+func TestCreateAsset_DBError(t *testing.T) {
+	f := setupAssetFixture(t)
+	f.mockResolveProject()
+
+	f.mockQ.On("CreateAsset", mock.Anything, mock.Anything).
+		Return(db.Asset{}, fmt.Errorf("db error"))
+
+	_, err := f.server.CreateAsset(context.Background(), &assetsv1.CreateAssetRequest{
+		Parent: testParent,
+		Asset:  &assetsv1.Asset{DisplayName: "Test"},
+	})
+	require.Error(t, err)
+	f.mockQ.AssertExpectations(t)
+}
+
+// --- UpdateAsset error paths ---
+
+func TestUpdateAsset_InvalidName(t *testing.T) {
+	f := setupAssetFixture(t)
+
+	_, err := f.server.UpdateAsset(context.Background(), &assetsv1.UpdateAssetRequest{
+		Asset: &assetsv1.Asset{Name: "bad"},
+	})
+	require.Error(t, err)
+	st, _ := status.FromError(err)
+	assert.Equal(t, codes.Internal, st.Code())
+}
+
+func TestUpdateAsset_NotFound(t *testing.T) {
+	f := setupAssetFixture(t)
+	f.mockResolveProject()
+
+	f.mockQ.On("GetAssetByName", mock.Anything, mock.Anything).
+		Return(db.Asset{}, pgx.ErrNoRows)
+
+	_, err := f.server.UpdateAsset(context.Background(), &assetsv1.UpdateAssetRequest{
+		Asset: &assetsv1.Asset{Name: testAssetFull, DisplayName: "X"},
+	})
+	require.Error(t, err)
+	st, _ := status.FromError(err)
+	assert.Equal(t, codes.NotFound, st.Code())
+	f.mockQ.AssertExpectations(t)
+}
+
+// --- DeleteAsset error paths ---
+
+func TestDeleteAsset_InvalidName(t *testing.T) {
+	f := setupAssetFixture(t)
+
+	_, err := f.server.DeleteAsset(context.Background(), &assetsv1.DeleteAssetRequest{
+		Name: "bad",
+	})
+	require.Error(t, err)
+}
+
+func TestDeleteAsset_NotFound(t *testing.T) {
+	f := setupAssetFixture(t)
+	f.mockResolveProject()
+
+	f.mockQ.On("GetAssetByName", mock.Anything, mock.Anything).
+		Return(db.Asset{}, pgx.ErrNoRows)
+
+	_, err := f.server.DeleteAsset(context.Background(), &assetsv1.DeleteAssetRequest{
+		Name: testAssetFull,
+	})
+	require.Error(t, err)
+	st, _ := status.FromError(err)
+	assert.Equal(t, codes.NotFound, st.Code())
+	f.mockQ.AssertExpectations(t)
+}
+
+func TestDeleteAsset_SoftDeleteError(t *testing.T) {
+	f := setupAssetFixture(t)
+	f.mockResolveProject()
+
+	existing := makeAsset(f.assetID, f.projectID, testAssetName, db.AssetStateACTIVE)
+	f.mockQ.On("GetAssetByName", mock.Anything, mock.Anything).Return(existing, nil)
+	f.mockQ.On("SoftDeleteAsset", mock.Anything, mock.Anything).
+		Return(fmt.Errorf("constraint error"))
+
+	_, err := f.server.DeleteAsset(context.Background(), &assetsv1.DeleteAssetRequest{
+		Name: testAssetFull,
+	})
+	require.Error(t, err)
+	f.mockQ.AssertExpectations(t)
+}
+
+// --- UndeleteAsset error paths ---
+
+func TestUndeleteAsset_InvalidName(t *testing.T) {
+	f := setupAssetFixture(t)
+
+	_, err := f.server.UndeleteAsset(context.Background(), &assetsv1.UndeleteAssetRequest{
+		Name: "bad",
+	})
+	require.Error(t, err)
+}
+
+func TestUndeleteAsset_NotFound(t *testing.T) {
+	f := setupAssetFixture(t)
+	f.mockResolveProject()
+
+	f.mockQ.On("GetAssetByName", mock.Anything, mock.Anything).
+		Return(db.Asset{}, pgx.ErrNoRows)
+
+	_, err := f.server.UndeleteAsset(context.Background(), &assetsv1.UndeleteAssetRequest{
+		Name: testAssetFull,
+	})
+	require.Error(t, err)
+	st, _ := status.FromError(err)
+	assert.Equal(t, codes.NotFound, st.Code())
 	f.mockQ.AssertExpectations(t)
 }
 
