@@ -14,10 +14,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             backing: .buffered,
             defer: false
         )
-        window.center()
+        window.setFrameAutosaveName(NSWindow.FrameAutosaveName("PivoxMainWindow"))
         window.title = "Pivox"
         window.contentView = NSHostingView(rootView: contentView)
         window.makeKeyAndOrderFront(nil)
+
+        // Center only on first launch (no saved frame yet).
+        if !window.setFrameUsingName(NSWindow.FrameAutosaveName("PivoxMainWindow")) {
+            window.center()
+        }
 
         setupMainMenu()
 

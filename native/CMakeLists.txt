@@ -24,7 +24,7 @@ add_subdirectory(core)
 
 if(APPLE)
     # macOS deployment target — set before any targets.
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0" CACHE STRING "Minimum macOS version")
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0" CACHE STRING "Minimum macOS version")
 
     set(APP_TARGET "Pivox")
     set(EXECUTABLE_NAME "${APP_TARGET}")
@@ -73,7 +73,7 @@ if(APPLE)
             COMMAND xcrun actool
                 --compile "${CMAKE_BINARY_DIR}/Pivox.app/Contents/Resources"
                 --platform macosx
-                --minimum-deployment-target "14.0"
+                --minimum-deployment-target "15.0"
                 "${ASSET_CATALOG}"
             COMMENT "Compiling asset catalog..."
             VERBATIM
@@ -96,6 +96,26 @@ if(APPLE)
     )
 
     xctest_add_test(PivoxUnitTests PivoxTests)
+
+    # ----------------------------------------------------------
+    # XCUITest UI tests
+    # ----------------------------------------------------------
+    xctest_add_bundle(PivoxUITests ${APP_TARGET}
+        tests/macos/ui/SidebarUITests.swift
+    )
+
+    target_compile_options(PivoxUITests PRIVATE
+        "SHELL:-import-objc-header ${CMAKE_SOURCE_DIR}/platform/macos/Bridging-Header.h"
+    )
+
+    # Mark as UI test bundle — XCUITest launches the app itself.
+    set_target_properties(PivoxUITests PROPERTIES
+        XCODE_ATTRIBUTE_TEST_TARGET_NAME "${APP_TARGET}"
+        XCODE_ATTRIBUTE_TEST_HOST ""
+        XCODE_PRODUCT_TYPE "com.apple.product-type.bundle.ui-testing"
+    )
+
+    xctest_add_test(PivoxUI PivoxUITests)
 endif()
 
 
