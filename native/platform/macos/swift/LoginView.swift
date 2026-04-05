@@ -70,8 +70,8 @@ struct LoginView: View {
             VStack(spacing: 8) {
                 Button(action: { /* placeholder */ }) {
                     HStack {
-                        Image(systemName: "apple.logo")
-                        Text("Continue with Apple")
+                        GoogleIcon(size: 16)
+                        Text("Continue with Google")
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -80,8 +80,11 @@ struct LoginView: View {
 
                 Button(action: { /* placeholder */ }) {
                     HStack {
-                        GoogleIcon(size: 16)
-                        Text("Continue with Google")
+                        Image("GitHubLogo")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 16, height: 16)
+                        Text("Continue with GitHub")
                     }
                     .frame(maxWidth: .infinity)
                 }

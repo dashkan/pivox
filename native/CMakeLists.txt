@@ -79,6 +79,23 @@ if(APPLE)
             VERBATIM
         )
     endif()
+
+    # ----------------------------------------------------------
+    # XCTest unit tests
+    # ----------------------------------------------------------
+    enable_testing()
+    find_package(XCTest REQUIRED)
+
+    xctest_add_bundle(PivoxTests ${APP_TARGET}
+        tests/macos/CoreTests.swift
+        tests/macos/AuthViewModelTests.swift
+    )
+
+    target_compile_options(PivoxTests PRIVATE
+        "SHELL:-import-objc-header ${CMAKE_SOURCE_DIR}/platform/macos/Bridging-Header.h"
+    )
+
+    xctest_add_test(PivoxUnitTests PivoxTests)
 endif()
 
 

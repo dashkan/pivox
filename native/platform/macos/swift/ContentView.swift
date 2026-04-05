@@ -34,7 +34,7 @@ struct ContentView: View {
         Group {
             switch authState {
             case .loggedOut:
-                AuthRouter()
+                AuthRouter(onAuthenticated: { authState = .loggedIn })
             case .loggedIn:
                 mainAppView
             }
@@ -84,16 +84,17 @@ struct ContentView: View {
 /// Routes between login and registration screens.
 struct AuthRouter: View {
     @State private var showRegister = false
+    var onAuthenticated: () -> Void = {}
 
     var body: some View {
         if showRegister {
             RegisterView(
-                onSignUp: { /* placeholder */ },
+                onSignUp: onAuthenticated,
                 onSwitchToLogin: { showRegister = false }
             )
         } else {
             LoginView(
-                onSignIn: { /* placeholder */ },
+                onSignIn: onAuthenticated,
                 onSwitchToRegister: { showRegister = true }
             )
         }
