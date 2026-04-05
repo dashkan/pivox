@@ -255,6 +255,7 @@ if(GTest_FOUND)
         tests/core/core_tests.cpp
         tests/core/auth_validation_tests.cpp
         tests/core/app_state_tests.cpp
+        tests/core/auth_state_tests.cpp
     )
     target_link_libraries(pivox_core_tests PRIVATE pivox_core GTest::gtest_main)
 
