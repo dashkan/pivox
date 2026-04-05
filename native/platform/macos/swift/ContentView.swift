@@ -20,12 +20,18 @@ enum AppSection: String, CaseIterable, Identifiable {
     }
 }
 
+enum SidebarItem: Hashable {
+    case section(AppSection)
+    case profile
+}
+
 enum AuthState {
     case loggedOut
     case loggedIn
 }
 
 struct ContentView: View {
+    @State private var selectedItem: SidebarItem? = .section(.operator_)
     @State private var authState: AuthState = .loggedOut
 
     var body: some View {
@@ -40,32 +46,56 @@ struct ContentView: View {
     }
 
     private var mainAppView: some View {
-        TabView {
-            ForEach(AppSection.allCases) { section in
-                Tab(section.rawValue, systemImage: section.icon) {
-                    VStack {
-                        Text(section.rawValue)
-                            .font(.largeTitle)
-                            .foregroundStyle(.secondary)
-                        Text("Coming soon")
-                            .foregroundStyle(.tertiary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+        NavigationSplitView {
+            List(selection: $selectedItem) {
+                ForEach(AppSection.allCases) { section in
+                    Label(section.rawValue, systemImage: section.icon)
+                        .tag(SidebarItem.section(section))
                 }
             }
-        }
-        .tabViewStyle(.sidebarAdaptable)
-        .tabViewSidebarBottomBar {
-            HStack {
-                Image(systemName: "person.circle")
-                Text("Profile")
-                Spacer()
+            .listStyle(.sidebar)
+            .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 300)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                VStack(spacing: 0) {
+                    Divider()
+                    Button(action: { selectedItem = .profile }) {
+                        Label("Profile", systemImage: "person.circle")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(
+                                selectedItem == .profile
+                                    ? Color.accentColor
+                                    : Color.clear,
+                                in: RoundedRectangle(cornerRadius: 6)
+                            )
+                            .foregroundStyle(selectedItem == .profile ? .white : .primary)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 8)
+                }
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                // TODO: navigate to profile
+        } detail: {
+            switch selectedItem {
+            case .section(let section):
+                VStack {
+                    Text(section.rawValue)
+                        .font(.largeTitle)
+                        .foregroundStyle(.secondary)
+                    Text("Coming soon")
+                        .foregroundStyle(.tertiary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .profile:
+                ProfileView(onSignOut: {
+                    authState = .loggedOut
+                })
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case nil:
+                Text("Select a section")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
