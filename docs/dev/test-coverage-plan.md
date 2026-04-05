@@ -2,130 +2,212 @@
 
 ## Goal
 
-100% test coverage for Cloud Controller + Storage Agent Go code. Unit tests + integration tests for every package.
+100% test coverage for all hand-written Go code. Generated code (`internal/db/generated/`, `internal/pkg/gen/`) and external SDK wrappers (`internal/firebase/`) are excluded from the target — they're exercised indirectly through integration tests.
+
+## Current State
+
+Last updated: 2026-04-04
+
+| Package | Coverage | Status |
+|---|---|---|
+| `internal/apierr` | **100%** | ✅ Done |
+| `internal/convert` | **100%** | ✅ Done |
+| `internal/crypto` | **100%** | ✅ Done |
+| `internal/agentstream` | **96.3%** | Near-complete |
+| `internal/resource` | **95.0%** | Near-complete |
+| `internal/service/operations` | **88.9%** | Near-complete |
+| `internal/iam` | **87.3%** | Near-complete |
+| `internal/lro` | **83.7%** | Good |
+| `internal/service/requests` | **67.9%** | In progress |
+| `internal/service/assets` | **67.8%** | In progress |
+| `internal/service/apikeys` | **59.9%** | In progress |
+| `internal/service/projects` | **59.8%** | In progress |
+| `internal/service/tags` | **55.7%** | In progress |
+| `internal/service/operations` | **48.1%** | In progress |
+| `internal/filter` | **40.5%** | Needs work |
+| `internal/server` | **40.8%** | Needs work |
+| `internal/service/storage` | **38.0%** | Needs work |
+| `internal/storageagent` | **33.9%** | Needs work |
+| `internal/service/organizations` | **17.9%** | Needs work |
+| `internal/authn` | NO TESTS | Interface-only (no logic) |
+| `internal/config` | NO TESTS | Plain structs (no logic) |
+| `internal/firebase` | NO TESTS | Excluded (SDK wrapper) |
+| `cmd/pivox-cloud` | NO TESTS | Wiring code |
+| `cmd/pivox-agent` | NO TESTS | Wiring code |
 
 ## Prerequisites (Done)
 
 - [x] All services accept `db.Querier` interface (mockable)
-- [x] `internal/testutil/db.go` — testcontainers Postgres setup + migrations
+- [x] `internal/testutil/db.go` — testcontainers Postgres (`pgvector/pgvector:pg18`) + pgvector type registration + migrations
 - [x] `internal/testutil/grpc.go` — bufconn gRPC server helper
-- [x] `internal/testutil/mocks/querier_mock.go` — full MockQuerier (153 methods)
-- [x] `testify` available (assert, require, mock)
+- [x] `internal/testutil/mocks/querier_mock.go` — full MockQuerier
+- [x] `internal/authn/authn.go` — IDP-agnostic auth interface (replaces `*firebase.AuthService`)
+- [x] `LROManager` interface in `operations/server.go` (mockable)
+- [x] `TxBeginner` interface in `organizations/server.go` (mockable)
+- [x] Dead `pool` fields removed from storage servers, LRO manager, requests server
+- [x] `errors.Is(err, pgx.ErrNoRows)` across all sites
+- [x] `lro.runWork` properly fails operations on marshal errors
 
 ## Important Notes
 
-- **Postgres 18** — use `postgres:18` image in testcontainers. PG18 has native `uuidv7()` — no extension needed.
-- **Update `internal/testutil/db.go`** to use `postgres:18` image if it currently specifies a different version.
-- **Do NOT use worktrees** for parallel test writing — they branch from the current commit and agents make conflicting production code changes. Write directly to main, sequentially.
-- **Read production code before writing tests** — every time. Don't assume structure from docs.
-- **Integration tests need a `testing.Short()` guard** — skip when Docker isn't available.
+- **Always use `-tags dev`** for test runs — activates `NoOpEncryptor` and `devSkipAuth`.
+- **Read production code before writing tests** — don't assume structure from this doc.
+- **Integration tests use `testing.Short()` guard** — run `-short` to skip them when Docker isn't available.
+- **testcontainers image**: `pgvector/pgvector:pg18` (not plain `postgres:18`).
+- **Mock pattern**: `MockQuerier` from `internal/testutil/mocks/`, `testify/mock` for custom mocks.
 
-## Execution Order
+## Remaining Work
 
-Sequential. Each step may require production code changes for testability.
+### Phase A: Integration tests for List endpoints
 
-### Step 1: Testability refactoring
+All `List*` methods use `filter.Query()` which builds raw SQL — can only be tested with a real database. These are the biggest uncovered paths in every service.
 
-Before writing any tests, make production code changes needed for mockability:
+Run integration tests with testcontainers + bufconn. Each test creates prerequisite data, then calls the List RPC.
 
-1. **`internal/service/organizations/server.go`** — Extract `TenantService` interface from `*firebase.AuthService` dependency. Extract `TxBeginner` interface from `*pgxpool.Pool` for transaction creation. This enables unit testing the org creation + Firebase tenant + rollback logic without a real Firebase connection.
-
-2. **`internal/resource/resource.go`** — `ResolveOrgParent` currently accepts `db.Querier` (already done). Verify it works with `MockQuerier` — the mock needs to satisfy whatever subset of methods `ResolveOrgParent` calls.
-
-3. **`internal/crypto/`** — Already has `Encryptor` interface + `NoOpEncryptor`. Ready for testing.
-
-4. **`internal/firebase/auth.go`** — Thin wrapper around Firebase SDK. Extract interface if any service tests need to mock it (organizations does).
-
-Run `go build ./...` after refactoring. Commit.
-
-### Step 2: Shared packages (no DB dependency)
-
-These are pure unit tests — no testcontainers, no gRPC, fast.
-
-| Package | Test file | What to test |
+| Package | Function | Test |
 |---|---|---|
-| `internal/agentstream/` | `connection_test.go` | Register, Unregister, SendToGateway, SendToAll, concurrent access |
-| `internal/agentstream/` | `audit_test.go` | MarshalAndRedact, secret redaction, valid JSON output |
-| `internal/crypto/` | `crypto_test.go` | NoOpEncryptor round-trip, interface compliance |
-| `internal/iam/` | `iam_test.go` | GetIamPolicy, SetIamPolicy (etag), TestIamPermissions — mock DB |
-| `internal/storageagent/` | `cache_test.go` | Put, Get, LRU eviction, TTL, memory limits |
-| `internal/storageagent/` | `session_test.go` | Create, validate, expire, revoke |
-| `internal/storageagent/` | `denied_test.go` | Pattern matching, replace, clear |
-| `internal/storageagent/` | `stream_test.go` | Request/response correlation, fire-and-forget |
-| `internal/storageagent/` | `endpoints_test.go` | Endpoint routing, serve file |
-| `internal/storageagent/` | `http_test.go` | Auth middleware, CORS, denied patterns |
+| `service/apikeys` | `ListKeys` | Create 3 keys, list with parent, verify count + pagination |
+| `service/projects` | `ListProjects` | Create 2 projects, list, verify |
+| `service/organizations` | `ListOrganizations` | Already partially covered — verify pagination |
+| `service/requests` | `ListRequests` | Create requests, list with/without `show_deleted` |
+| `service/assets` | `ListAssets` | Create assets, list with/without `show_deleted` |
+| `service/tags` | `ListTagKeys`, `ListTagValues`, `ListTagBindings` | Create chain, list each level |
+| `service/storage` | `ListEndpoints` | Create gateway + endpoints, list |
 
-Run `go test ./internal/agentstream/ ./internal/crypto/ ./internal/iam/ ./internal/storageagent/`. Commit.
+This also covers `filter.Query`, `filter.Scan*`, and `filter.ParseOrderBy` indirectly.
 
-### Step 3: Thin CRUD services — unit tests
+**Bug to fix first**: `filter/scan.go` `ScanTagBindings` is missing the `origin` column.
 
-Mock DB, test handler logic. These are thin so unit tests focus on: resource name parsing, error paths, field mask handling.
+### Phase B: Organizations CreateOrganization (integration)
 
-| Package | Test file | What to test |
-|---|---|---|
-| `internal/service/apikeys/` | `server_unit_test.go` | CRUD, key string generation, name parsing |
-| `internal/service/projects/` | `server_unit_test.go` | CRUD, LRO wrapping, field mask, soft delete |
-| `internal/service/operations/` | `server_unit_test.go` | Get, List, Delete, Cancel, Wait — delegates to lro.Manager |
+The `CreateOrganization` method uses `db.New(tx)` internally which bypasses the mock querier. Must be tested with real Postgres.
 
-Run `go test ./internal/service/apikeys/ ./internal/service/projects/ ./internal/service/operations/`. Commit.
+| Test | What |
+|---|---|
+| `TestIntegration_CreateOrganization_Success` | Create org with noopAuthService, verify tenant ID set |
+| `TestIntegration_CreateOrganization_DuplicateName` | Same name twice → AlreadyExists |
+| `TestIntegration_CreateOrganization_TenantFailure` | Auth service returns error → org not created (tx rolled back) |
 
-### Step 4: State machine services — unit tests
+### Phase C: Server InternalHooks
 
-These have real logic. Test every valid and invalid state transition.
+The `InternalHooks` endpoints are HTTP handlers testable with `httptest`. They use `db.Querier` (mockable) and `authn.Service` (mockable).
 
-| Package | Test file | What to test |
-|---|---|---|
-| `internal/service/requests/` | `server_unit_test.go` | Every state transition (valid + invalid), CRUD, line item creation |
-| `internal/service/assets/` | `server_unit_test.go` | PLACEHOLDER→PROCESSING→ACTIVE, version counting, CRUD |
+| Function | Test |
+|---|---|
+| `NewInternalHooks` (dev) | Constructor with mock auth + mock querier |
+| `Register` | Verify all routes registered on mux |
+| `syncAccount` | Valid request → upsert account; invalid JSON → 400; missing UID → 400 |
+| `exchangeToken` | Valid bearer → verify + create custom token; missing header → 401; invalid token → 401 |
+| `depositToken` | Valid token → create code; invalid token → 401; empty body → 400 |
+| `consumeToken` | Valid code → return ID token; invalid code → 401; bad UUID → 400 |
+| `rateLimit` | Under limit → pass; over limit → 429 |
+| `requireSecret` (dev) | Correct secret → pass; wrong secret → 401 |
+| `ipRateLimiter` | `allow` returns true/false based on rate; `newIPRateLimiter` constructor |
 
-Run tests. Commit.
+### Phase D: Storage service — AgentService bidi stream
 
-### Step 5: Complex services — unit tests
+The `Connect` method is a bidirectional streaming RPC. Test with mock `grpc.ServerStream` and mock querier.
 
-| Package | Test file | What to test |
-|---|---|---|
-| `internal/service/organizations/` | `server_unit_test.go` | Create with Firebase tenant (mock), tx rollback on failure, CRUD, IAM |
-| `internal/service/tags/` | `tags_unit_test.go` | Keys, values, bindings CRUD. Deletion constraints (can't delete key with values, value with bindings) |
-| `internal/service/storage/` | `gateways_unit_test.go` | CRUD, token rotation, JWT session, install script |
-| `internal/service/storage/` | `agents_unit_test.go` | CRUD |
-| `internal/service/storage/` | `endpoints_unit_test.go` | CRUD, S3/filesystem config JSON marshaling |
-| `internal/service/storage/` | `agent_service_unit_test.go` | Bidi stream: handshake, heartbeat, audit, reconnect (mock gRPC stream) |
+| Test | What |
+|---|---|
+| `TestConnect_Handshake` | Mock stream: send Handshake → receive HandshakeAck with endpoints |
+| `TestConnect_InvalidFirstMessage` | Send heartbeat as first message → InvalidArgument |
+| `TestConnect_InvalidToken` | Unknown registration token → Unauthenticated |
+| `TestConnect_Heartbeat` | After handshake, send heartbeat → verify DB heartbeat update |
+| `TestConnect_Disconnect` | Stream closes → agent state set to DISCONNECTED |
+| `TestConnect_GatewayActivation` | First agent connects to PROVISIONING gateway → state becomes ACTIVE |
+| `TestBuildEndpointConfigs` | S3 config, filesystem config, unknown type → error |
+| `TestParseEndpointConfig` | S3, filesystem, unknown type |
+| `TestAuditMessage` | Verify audit record created with redacted payload |
+| `TestMintSessionJWT` | Verify JWT structure, signature, claims |
+| `TestCreateStorageSession` | Session grant sent to all agents, JWT returned |
+| `TestUpdateStorageGateway` | Field mask paths: display_name, ip_addresses, target_version, annotations |
+| `TestGetUninstallScript` | Verify script content |
 
-Run tests. Commit.
+### Phase E: Storage agent stream + endpoints
 
-### Step 6: Integration tests
+| Function | Test |
+|---|---|
+| `NewStream` | Constructor |
+| `Handshake` | Mock bidi client stream — send handshake, receive ack via roundTrip |
+| `SendHeartbeat` / `SendTelemetry` / `SendEndpointHealth` / `SendUpgradeStatus` | Fire-and-forget send |
+| `roundTrip` | Send with correlation ID, receive matching response; timeout |
+| `send` | Basic send |
+| `ReceiveLoop` | Route correlated responses to pending channels; dispatch server messages |
+| `handleServerMessage` | ConfigUpdate → endpoints.Update + denied.Update; SessionGrant → sessions.Grant; SessionRevoke → sessions.Revoke; DrainRequest/CertDelivery/UpgradeRequest/ServerHeartbeat → logged |
+| `StartCleanup` | Context cancellation stops ticker |
+| `EndpointStore.Update` | Filesystem config (no S3 needed for test) |
+| `EndpointStore.ServeFile` | Route to correct endpoint; 404 for missing endpoint; 404 for bad path |
+| `serveFilesystem` | Serve file from temp dir; path traversal blocked; directory returns 404 |
 
-All services, real Postgres (PG18 via testcontainers), real gRPC (bufconn).
+Note: `serveS3` and `newS3Client` require minio — skip unless minio testcontainer is set up. `Connect` (agent-side) requires a real gRPC server — skip or test as E2E.
 
-| Package | Test file | What to test |
-|---|---|---|
-| `internal/service/apikeys/` | `server_integration_test.go` | Full CRUD through gRPC |
-| `internal/service/projects/` | `server_integration_test.go` | Full CRUD through gRPC |
-| `internal/service/operations/` | `server_integration_test.go` | Create/get/list/delete lifecycle |
-| `internal/service/requests/` | `server_integration_test.go` | Full workflow: create→submit→assign→deliver→approve |
-| `internal/service/assets/` | `server_integration_test.go` | State transitions, CRUD |
-| `internal/service/organizations/` | `server_integration_test.go` | CRUD, IAM policies |
-| `internal/service/tags/` | `tags_integration_test.go` | Full lifecycle: key→value→binding→delete chain |
-| `internal/service/storage/` | `integration_test.go` | Gateway+endpoint workflow, bidi streaming |
+### Phase F: Filter package
 
-Run all tests. Commit.
+| Function | Test |
+|---|---|
+| `TagValueFilter`, `TagBindingFilter`, `ApiKeyFilter` | Constructor (verify non-nil) |
+| `ParseOrderBy` | Valid order strings, invalid, empty |
+| `transpileTimestamp` | Timestamp filter expressions |
+| `transpileConst` | String, int, float, bool constants |
+| `transpileSelect` | Select expressions |
+| `transpileBinary` | Remaining binary operators (AND, OR) |
 
-### Step 7: Coverage report
+`Query` + all `Scan*` functions are covered by Phase A integration tests.
+
+### Phase G: Gap sweep
+
+After all phases, run full coverage and write targeted tests for any remaining uncovered lines:
 
 ```bash
-go test ./... -coverprofile=coverage.out -short
-go tool cover -func=coverage.out | tail -1
+go test -tags dev ./internal/... -coverprofile=coverage.out -timeout 300s
+go tool cover -func=coverage.out | grep -v 'pkg/gen/' | grep -v 'db/generated' | grep -v 'testutil' | grep -v '100.0%'
 ```
 
-Identify gaps, write additional tests to reach 100%.
+Target: every hand-written package at 90%+.
 
-## Packages with Existing Tests (Already Have Coverage)
+### Phase H: cmd/ packages (optional)
 
-- `internal/apierr/` — error construction
-- `internal/convert/` — DB to proto conversions
-- `internal/filter/` — query filter transpilation
-- `internal/lro/` — LRO conversions
-- `internal/resource/` — resource name parsing
-- `internal/server/` — validation interceptor
+`cmd/pivox-cloud/main.go` and `cmd/pivox-agent/` are CLI wiring — `cobra` setup, flag parsing, service construction. Testing them means E2E tests (start the server, make requests). This is valuable but separate from unit/integration coverage.
 
-These should be checked for coverage gaps in Step 7 but don't need new test files.
+| Test | What |
+|---|---|
+| `TestServe_MissingDB` | Invalid database URL → error |
+| `TestEnvOrDefault` | Env set → env value; env empty → default |
+| `TestMust` | Returns string, ignores error |
+
+## Excluded from Coverage Target
+
+| Package | Reason |
+|---|---|
+| `internal/db/generated/*.sql.go` | sqlc-generated — exercised indirectly via integration tests |
+| `internal/db/generated/models.go` | sqlc-generated Scan/Value methods — exercised via DB round-trips |
+| `internal/pkg/gen/` | protoc-generated gRPC/proto code |
+| `internal/firebase/` | Thin SDK wrapper — tested via `authn.Service` mock everywhere |
+| `internal/testutil/` | Test infrastructure — not production code |
+
+## Known Production Bugs (fix before/during testing)
+
+- [ ] `filter/scan.go` `ScanTagBindings` — missing `origin` column in row scan (9 columns, scans 8)
+- [ ] `UndeleteKey` / `UndeleteProject` — queries filter `delete_time IS NULL`, can't find soft-deleted rows
+- [ ] `pgvector.Vector` NULL handling — non-pointer type panics (workaround in testutil, needs schema fix)
+
+## Run Commands
+
+```bash
+# Unit tests only (fast, no Docker)
+go test -tags dev ./internal/... -short -count=1 -race
+
+# Full suite including integration tests (needs Docker)
+go test -tags dev ./internal/... -count=1 -race -timeout 300s
+
+# Coverage report
+go test -tags dev ./internal/... -coverprofile=coverage.out -timeout 300s
+go tool cover -func=coverage.out | grep -v 'pkg/gen/' | grep -v 'db/generated' | tail -1
+
+# Per-package coverage
+go tool cover -func=coverage.out | grep -v 'pkg/gen/' | grep -v 'db/generated' | grep -v 'testutil'
+
+# HTML coverage report
+go tool cover -html=coverage.out -o coverage.html
+```
