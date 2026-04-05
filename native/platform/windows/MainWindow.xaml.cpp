@@ -14,13 +14,18 @@ namespace winrt::Pivox::implementation
 
     void MainWindow::SetupWindow()
     {
-        // Set window size via AppWindow.
         if (auto appWindow = this->AppWindow())
         {
             appWindow.Resize({ 1280, 800 });
-
-            // Set minimum size isn't directly available, but we set a reasonable default.
             appWindow.Title(L"Pivox");
+        }
+
+        // Minimum window size — uses Windows App SDK 1.7 OverlappedPresenter API
+        // (microsoft/microsoft-ui-xaml#2945, #7296).
+        if (auto presenter = this->AppWindow().Presenter().try_as<Microsoft::UI::Windowing::OverlappedPresenter>())
+        {
+            presenter.PreferredMinimumWidth(1024);
+            presenter.PreferredMinimumHeight(768);
         }
     }
 
