@@ -105,18 +105,78 @@ func TestIntegration_ApiKeys(t *testing.T) {
 		assert.Equal(t, createdKeyName, resp.GetName())
 	})
 
-	t.Run("DeleteKey", func(t *testing.T) {
-		resp, err := client.DeleteKey(ctx, &apiv1.DeleteKeyRequest{
+	t.Run("ListKeys", func(t *testing.T) {
+		// Create additional keys to test list.
+		for _, id := range []string{"key-two", "key-three"} {
+			_, err := client.CreateKey(ctx, &apiv1.CreateKeyRequest{
+				Parent: "organizations/acme",
+				KeyId:  id,
+				Key: &apiv1.Key{
+					DisplayName: "Key " + id,
+				},
+			})
+			require.NoError(t, err)
+		}
+
+		resp, err := client.ListKeys(ctx, &apiv1.ListKeysRequest{
+			Parent: "organizations/acme",
+		})
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, len(resp.GetKeys()), 3, "should list at least 3 keys")
+
+		// Verify pagination: request page_size=1.
+		paginated, err := client.ListKeys(ctx, &apiv1.ListKeysRequest{
+			Parent:   "organizations/acme",
+			PageSize: 1,
+		})
+		require.NoError(t, err)
+		assert.Len(t, paginated.GetKeys(), 1)
+		assert.NotEmpty(t, paginated.GetNextPageToken(), "should have next page token")
+
+		// Fetch second page.
+		page2, err := client.ListKeys(ctx, &apiv1.ListKeysRequest{
+			Parent:    "organizations/acme",
+			PageSize:  1,
+			PageToken: paginated.GetNextPageToken(),
+		})
+		require.NoError(t, err)
+		assert.Len(t, page2.GetKeys(), 1)
+		assert.NotEqual(t, paginated.GetKeys()[0].GetName(), page2.GetKeys()[0].GetName(), "page 2 should return different key")
+	})
+
+	t.Run("ListKeys_ShowDeleted", func(t *testing.T) {
+		// First list without show_deleted — all active.
+		before, err := client.ListKeys(ctx, &apiv1.ListKeysRequest{
+			Parent: "organizations/acme",
+		})
+		require.NoError(t, err)
+		beforeCount := len(before.GetKeys())
+
+		// Delete the first key.
+		_, err = client.DeleteKey(ctx, &apiv1.DeleteKeyRequest{
 			Name: createdKeyName,
 		})
 		require.NoError(t, err)
-		assert.NotNil(t, resp.GetDeleteTime())
+
+		// Without show_deleted: should have one fewer.
+		after, err := client.ListKeys(ctx, &apiv1.ListKeysRequest{
+			Parent: "organizations/acme",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, beforeCount-1, len(after.GetKeys()))
+
+		// With show_deleted: should include deleted key.
+		withDeleted, err := client.ListKeys(ctx, &apiv1.ListKeysRequest{
+			Parent:      "organizations/acme",
+			ShowDeleted: true,
+		})
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, len(withDeleted.GetKeys()), beforeCount)
 	})
 
 	// NOTE: UndeleteKey currently uses GetApiKeyByOrgAndKeyID which filters
 	// deleted records (delete_time IS NULL), so it cannot find a soft-deleted
-	// key. This is a known limitation in the server code. When the production
-	// code is fixed to use GetApiKeyIncludingDeleted, re-enable this test.
+	// key. This is a known limitation in the server code.
 	t.Run("UndeleteKey", func(t *testing.T) {
 		t.Skip("server uses GetApiKeyByOrgAndKeyID which filters deleted keys")
 	})

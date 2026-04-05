@@ -5,6 +5,7 @@ package assets_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
@@ -131,6 +132,82 @@ func TestIntegration_Assets_PlaceholderLifecycle(t *testing.T) {
 		require.NoError(t, op.GetResponse().UnmarshalTo(&asset))
 		// After undelete, state should revert to non-deleted.
 		assert.NotEqual(t, assetsv1.Asset_DELETE_REQUESTED, asset.GetState())
+	})
+}
+
+func TestIntegration_Assets_ListAssets(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	pool, queries, cleanup := testutil.SetupTestDB(t)
+	defer cleanup()
+
+	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
+		assetsv1.RegisterAssetsServer(s, assets.NewAssetsServer(pool, queries))
+	})
+
+	client := assetsv1.NewAssetsClient(conn)
+	ctx := context.Background()
+
+	org := createIntegrationOrg(t, queries, "acme")
+	createIntegrationProject(t, queries, org.ID, "proj1")
+	parent := "organizations/acme/projects/proj1"
+
+	// Create multiple assets.
+	var assetNames []string
+	for i := range 3 {
+		op, err := client.CreateAsset(ctx, &assetsv1.CreateAssetRequest{
+			Parent: parent,
+			Asset: &assetsv1.Asset{
+				DisplayName: fmt.Sprintf("Asset %d", i),
+			},
+		})
+		require.NoError(t, err)
+		var a assetsv1.Asset
+		require.NoError(t, op.GetResponse().UnmarshalTo(&a))
+		assetNames = append(assetNames, a.GetName())
+	}
+
+	t.Run("list_all", func(t *testing.T) {
+		resp, err := client.ListAssets(ctx, &assetsv1.ListAssetsRequest{
+			Parent: parent,
+		})
+		require.NoError(t, err)
+		assert.Len(t, resp.GetAssets(), 3)
+	})
+
+	t.Run("list_with_show_deleted", func(t *testing.T) {
+		// Delete one asset.
+		_, err := client.DeleteAsset(ctx, &assetsv1.DeleteAssetRequest{
+			Name: assetNames[0],
+		})
+		require.NoError(t, err)
+
+		// Without show_deleted: should have 2.
+		resp, err := client.ListAssets(ctx, &assetsv1.ListAssetsRequest{
+			Parent: parent,
+		})
+		require.NoError(t, err)
+		assert.Len(t, resp.GetAssets(), 2)
+
+		// With show_deleted: should have 3.
+		withDeleted, err := client.ListAssets(ctx, &assetsv1.ListAssetsRequest{
+			Parent:      parent,
+			ShowDeleted: true,
+		})
+		require.NoError(t, err)
+		assert.Len(t, withDeleted.GetAssets(), 3)
+	})
+
+	t.Run("list_pagination", func(t *testing.T) {
+		resp, err := client.ListAssets(ctx, &assetsv1.ListAssetsRequest{
+			Parent:   parent,
+			PageSize: 1,
+		})
+		require.NoError(t, err)
+		assert.Len(t, resp.GetAssets(), 1)
+		assert.NotEmpty(t, resp.GetNextPageToken())
 	})
 }
 

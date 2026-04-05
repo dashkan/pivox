@@ -95,6 +95,25 @@ func TestUnit_GetAgent_NotFound(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// GetAgent — invalid UUID
+// ---------------------------------------------------------------------------
+
+func TestUnit_GetAgent_InvalidUUID(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newAgentsServer(mockQ)
+	ctx := context.Background()
+
+	_, err := srv.GetAgent(ctx, &storagev1.GetAgentRequest{
+		Name: "organizations/acme/storageGateways/gw-1/agents/not-a-uuid",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, st.Code())
+}
+
+// ---------------------------------------------------------------------------
 // ListAgents
 // ---------------------------------------------------------------------------
 
@@ -117,6 +136,66 @@ func TestUnit_ListAgents_Success(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, resp.GetAgents(), 1)
 	assert.Contains(t, resp.GetAgents()[0].GetName(), agentID.String())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_ListAgents_InvalidParent(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newAgentsServer(mockQ)
+	ctx := context.Background()
+
+	_, err := srv.ListAgents(ctx, &storagev1.ListAgentsRequest{
+		Parent: "bad-parent",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, st.Code())
+}
+
+func TestUnit_ListAgents_GatewayNotFound(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newAgentsServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "missing-gw",
+	}).Return(db.StorageGateway{}, pgx.ErrNoRows)
+
+	_, err := srv.ListAgents(ctx, &storagev1.ListAgentsRequest{
+		Parent: "organizations/acme/storageGateways/missing-gw",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_ListAgents_DBError(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newAgentsServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "gw-1",
+	}).Return(testGateway, nil)
+	mockQ.On("ListStorageAgentsByGateway", mock.Anything, gwID).Return([]db.StorageAgent(nil), pgx.ErrNoRows)
+
+	_, err := srv.ListAgents(ctx, &storagev1.ListAgentsRequest{
+		Parent: "organizations/acme/storageGateways/gw-1",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.Internal, st.Code())
 	mockQ.AssertExpectations(t)
 }
 
@@ -146,6 +225,57 @@ func TestUnit_DrainAgent_Success(t *testing.T) {
 	mockQ.AssertExpectations(t)
 }
 
+func TestUnit_DrainAgent_InvalidName(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newAgentsServer(mockQ)
+	ctx := context.Background()
+
+	_, err := srv.DrainAgent(ctx, &storagev1.DrainAgentRequest{
+		Name: "bad-name",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, st.Code())
+}
+
+func TestUnit_DrainAgent_InvalidUUID(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newAgentsServer(mockQ)
+	ctx := context.Background()
+
+	_, err := srv.DrainAgent(ctx, &storagev1.DrainAgentRequest{
+		Name: "organizations/acme/storageGateways/gw-1/agents/not-a-uuid",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, st.Code())
+}
+
+func TestUnit_DrainAgent_DBError(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newAgentsServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("UpdateStorageAgentState", mock.Anything, db.UpdateStorageAgentStateParams{
+		ID:    agentID,
+		State: db.AgentStateDRAINING,
+	}).Return(db.StorageAgent{}, pgx.ErrNoRows)
+
+	_, err := srv.DrainAgent(ctx, &storagev1.DrainAgentRequest{
+		Name: "organizations/acme/storageGateways/gw-1/agents/" + agentID.String(),
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
 // ---------------------------------------------------------------------------
 // RemoveAgent
 // ---------------------------------------------------------------------------
@@ -164,5 +294,70 @@ func TestUnit_RemoveAgent_Success(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, agentName, resp.GetName())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_RemoveAgent_InvalidName(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newAgentsServer(mockQ)
+	ctx := context.Background()
+
+	_, err := srv.RemoveAgent(ctx, &storagev1.RemoveAgentRequest{
+		Name: "bad-name",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, st.Code())
+}
+
+func TestUnit_RemoveAgent_InvalidUUID(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newAgentsServer(mockQ)
+	ctx := context.Background()
+
+	_, err := srv.RemoveAgent(ctx, &storagev1.RemoveAgentRequest{
+		Name: "organizations/acme/storageGateways/gw-1/agents/not-a-uuid",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, st.Code())
+}
+
+func TestUnit_RemoveAgent_DBError(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newAgentsServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("DeleteStorageAgent", mock.Anything, agentID).Return(pgx.ErrNoRows)
+
+	_, err := srv.RemoveAgent(ctx, &storagev1.RemoveAgentRequest{
+		Name: "organizations/acme/storageGateways/gw-1/agents/" + agentID.String(),
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_ResolveGateway_OrgNotFound(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newAgentsServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "no-org").
+		Return(db.Organization{}, pgx.ErrNoRows)
+
+	_, err := srv.resolveGateway(ctx, "no-org", "gw-1")
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
 	mockQ.AssertExpectations(t)
 }

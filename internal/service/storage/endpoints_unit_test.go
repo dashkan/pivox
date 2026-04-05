@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -240,6 +241,273 @@ func TestUnit_DeleteEndpoint_Success(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// CreateEndpoint — error paths
+// ---------------------------------------------------------------------------
+
+func TestUnit_CreateEndpoint_InvalidParent(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newEndpointsServer(mockQ)
+	ctx := context.Background()
+
+	_, err := srv.CreateEndpoint(ctx, &storagev1.CreateEndpointRequest{
+		Parent: "bad-parent",
+		Endpoint: &storagev1.Endpoint{
+			Configuration: &storagev1.Endpoint_S3{
+				S3: &storagev1.S3Configuration{Bucket: "b"},
+			},
+		},
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, st.Code())
+}
+
+func TestUnit_CreateEndpoint_OrgNotFound(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newEndpointsServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "no-org").
+		Return(db.Organization{}, pgx.ErrNoRows)
+
+	_, err := srv.CreateEndpoint(ctx, &storagev1.CreateEndpointRequest{
+		Parent: "organizations/no-org/storageGateways/gw-1",
+		Endpoint: &storagev1.Endpoint{
+			Configuration: &storagev1.Endpoint_S3{
+				S3: &storagev1.S3Configuration{Bucket: "b"},
+			},
+		},
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_CreateEndpoint_InvalidConfig(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newEndpointsServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "gw-1",
+	}).Return(testGateway, nil)
+
+	// No configuration set — should fail.
+	_, err := srv.CreateEndpoint(ctx, &storagev1.CreateEndpointRequest{
+		Parent:   "organizations/acme/storageGateways/gw-1",
+		Endpoint: &storagev1.Endpoint{},
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_CreateEndpoint_DBError(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newEndpointsServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "gw-1",
+	}).Return(testGateway, nil)
+	mockQ.On("CreateStorageEndpoint", mock.Anything, mock.Anything).
+		Return(db.StorageEndpoint{}, pgx.ErrNoRows)
+
+	_, err := srv.CreateEndpoint(ctx, &storagev1.CreateEndpointRequest{
+		Parent: "organizations/acme/storageGateways/gw-1",
+		Endpoint: &storagev1.Endpoint{
+			Configuration: &storagev1.Endpoint_S3{
+				S3: &storagev1.S3Configuration{Bucket: "b"},
+			},
+		},
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_CreateEndpoint_WithLFUCachePolicy(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newEndpointsServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "gw-1",
+	}).Return(testGateway, nil)
+	mockQ.On("CreateStorageEndpoint", mock.Anything, mock.MatchedBy(func(p db.CreateStorageEndpointParams) bool {
+		return p.CacheEviction == db.EvictionPolicyLFU
+	})).Return(testEndpoint, nil)
+
+	resp, err := srv.CreateEndpoint(ctx, &storagev1.CreateEndpointRequest{
+		Parent: "organizations/acme/storageGateways/gw-1",
+		Endpoint: &storagev1.Endpoint{
+			Configuration: &storagev1.Endpoint_S3{
+				S3: &storagev1.S3Configuration{Bucket: "b"},
+			},
+			CacheConfig: &storagev1.CacheConfig{
+				Enabled:        true,
+				MaxSizeGb:      100,
+				EvictionPolicy: storagev1.CacheConfig_LFU,
+			},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.True(t, resp.GetDone())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_CreateEndpoint_WithAnnotations(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newEndpointsServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "gw-1",
+	}).Return(testGateway, nil)
+	mockQ.On("CreateStorageEndpoint", mock.Anything, mock.Anything).Return(testEndpoint, nil)
+
+	resp, err := srv.CreateEndpoint(ctx, &storagev1.CreateEndpointRequest{
+		Parent: "organizations/acme/storageGateways/gw-1",
+		Endpoint: &storagev1.Endpoint{
+			Configuration: &storagev1.Endpoint_Filesystem{
+				Filesystem: &storagev1.FileSystemConfiguration{Path: "/tmp"},
+			},
+			Annotations: map[string]string{"tier": "warm"},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.True(t, resp.GetDone())
+	mockQ.AssertExpectations(t)
+}
+
+// ---------------------------------------------------------------------------
+// GetEndpoint — error paths
+// ---------------------------------------------------------------------------
+
+func TestUnit_GetEndpoint_InvalidName(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newEndpointsServer(mockQ)
+	ctx := context.Background()
+
+	_, err := srv.GetEndpoint(ctx, &storagev1.GetEndpointRequest{
+		Name: "bad-name",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, st.Code())
+}
+
+func TestUnit_GetEndpoint_GatewayNotFound(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newEndpointsServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "missing-gw",
+	}).Return(db.StorageGateway{}, pgx.ErrNoRows)
+
+	_, err := srv.GetEndpoint(ctx, &storagev1.GetEndpointRequest{
+		Name: "organizations/acme/storageGateways/missing-gw/endpoints/ep-s3",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+// ---------------------------------------------------------------------------
+// ListEndpoints — error paths
+// ---------------------------------------------------------------------------
+
+func TestUnit_ListEndpoints_InvalidParent(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newEndpointsServer(mockQ)
+	ctx := context.Background()
+
+	_, err := srv.ListEndpoints(ctx, &storagev1.ListEndpointsRequest{
+		Parent: "bad-parent",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, st.Code())
+}
+
+func TestUnit_ListEndpoints_GatewayNotFound(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newEndpointsServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "missing-gw",
+	}).Return(db.StorageGateway{}, pgx.ErrNoRows)
+
+	_, err := srv.ListEndpoints(ctx, &storagev1.ListEndpointsRequest{
+		Parent: "organizations/acme/storageGateways/missing-gw",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_ListEndpoints_DBError(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newEndpointsServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "gw-1",
+	}).Return(testGateway, nil)
+	mockQ.On("ListStorageEndpointsByGateway", mock.Anything, gwID).
+		Return([]db.StorageEndpoint(nil), fmt.Errorf("db error"))
+
+	_, err := srv.ListEndpoints(ctx, &storagev1.ListEndpointsRequest{
+		Parent: "organizations/acme/storageGateways/gw-1",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.Internal, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+// ---------------------------------------------------------------------------
 // configToJSON
 // ---------------------------------------------------------------------------
 
@@ -300,6 +568,142 @@ func TestUnit_ConfigToJSON_NilConfig(t *testing.T) {
 	_, err := configToJSON(ep)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "configuration is required")
+}
+
+func TestUnit_ConfigToJSON_S3NilInner(t *testing.T) {
+	ep := &storagev1.Endpoint{
+		Configuration: &storagev1.Endpoint_S3{S3: nil},
+	}
+
+	_, err := configToJSON(ep)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "S3 configuration is required")
+}
+
+func TestUnit_ConfigToJSON_FilesystemNilInner(t *testing.T) {
+	ep := &storagev1.Endpoint{
+		Configuration: &storagev1.Endpoint_Filesystem{Filesystem: nil},
+	}
+
+	_, err := configToJSON(ep)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "filesystem configuration is required")
+}
+
+func TestUnit_ConfigToJSON_S3WithoutAccessKey(t *testing.T) {
+	ep := &storagev1.Endpoint{
+		Configuration: &storagev1.Endpoint_S3{
+			S3: &storagev1.S3Configuration{
+				EndpointUri: "https://s3.amazonaws.com",
+				Bucket:      "my-bucket",
+				Region:      "us-west-2",
+			},
+		},
+	}
+
+	raw, err := configToJSON(ep)
+	require.NoError(t, err)
+
+	var m map[string]interface{}
+	require.NoError(t, json.Unmarshal(raw, &m))
+	assert.Equal(t, "s3", m["type"])
+	_, hasKey := m["access_key"]
+	assert.False(t, hasKey)
+}
+
+// ---------------------------------------------------------------------------
+// DeleteEndpoint — error paths
+// ---------------------------------------------------------------------------
+
+func TestUnit_DeleteEndpoint_InvalidName(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newEndpointsServer(mockQ)
+	ctx := context.Background()
+
+	_, err := srv.DeleteEndpoint(ctx, &storagev1.DeleteEndpointRequest{
+		Name: "bad-name",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, st.Code())
+}
+
+func TestUnit_DeleteEndpoint_GatewayNotFound(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newEndpointsServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "missing-gw",
+	}).Return(db.StorageGateway{}, pgx.ErrNoRows)
+
+	_, err := srv.DeleteEndpoint(ctx, &storagev1.DeleteEndpointRequest{
+		Name: "organizations/acme/storageGateways/missing-gw/endpoints/ep-s3",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_DeleteEndpoint_EndpointNotFound(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newEndpointsServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "gw-1",
+	}).Return(testGateway, nil)
+	mockQ.On("GetStorageEndpointByName", mock.Anything, db.GetStorageEndpointByNameParams{
+		GatewayID: gwID,
+		Name:      "missing-ep",
+	}).Return(db.StorageEndpoint{}, pgx.ErrNoRows)
+
+	_, err := srv.DeleteEndpoint(ctx, &storagev1.DeleteEndpointRequest{
+		Name: "organizations/acme/storageGateways/gw-1/endpoints/missing-ep",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_DeleteEndpoint_DeleteFails(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newEndpointsServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "gw-1",
+	}).Return(testGateway, nil)
+	mockQ.On("GetStorageEndpointByName", mock.Anything, db.GetStorageEndpointByNameParams{
+		GatewayID: gwID,
+		Name:      "ep-s3",
+	}).Return(testEndpoint, nil)
+	mockQ.On("DeleteStorageEndpoint", mock.Anything, endpointID).
+		Return(pgx.ErrNoRows)
+
+	_, err := srv.DeleteEndpoint(ctx, &storagev1.DeleteEndpointRequest{
+		Name: "organizations/acme/storageGateways/gw-1/endpoints/ep-s3",
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
 }
 
 // ---------------------------------------------------------------------------
@@ -375,5 +779,357 @@ func TestUnit_ListEndpoints_Success(t *testing.T) {
 	assert.Equal(t, "S3 Endpoint", resp.GetEndpoints()[0].GetDisplayName())
 	assert.Equal(t, "organizations/acme/storageGateways/gw-1/endpoints/ep-fs", resp.GetEndpoints()[1].GetName())
 	assert.Equal(t, "FS Endpoint", resp.GetEndpoints()[1].GetDisplayName())
+	mockQ.AssertExpectations(t)
+}
+
+// ---------------------------------------------------------------------------
+// UpdateEndpoint — error paths and additional field mask paths
+// ---------------------------------------------------------------------------
+
+func TestUnit_UpdateEndpoint_InvalidName(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newEndpointsServer(mockQ)
+	ctx := context.Background()
+
+	_, err := srv.UpdateEndpoint(ctx, &storagev1.UpdateEndpointRequest{
+		Endpoint: &storagev1.Endpoint{
+			Name: "bad-name",
+		},
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, st.Code())
+}
+
+func TestUnit_UpdateEndpoint_GatewayNotFound(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newEndpointsServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "missing-gw",
+	}).Return(db.StorageGateway{}, pgx.ErrNoRows)
+
+	_, err := srv.UpdateEndpoint(ctx, &storagev1.UpdateEndpointRequest{
+		Endpoint: &storagev1.Endpoint{
+			Name: "organizations/acme/storageGateways/missing-gw/endpoints/ep-s3",
+		},
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_UpdateEndpoint_EndpointNotFound(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newEndpointsServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "gw-1",
+	}).Return(testGateway, nil)
+	mockQ.On("GetStorageEndpointByName", mock.Anything, db.GetStorageEndpointByNameParams{
+		GatewayID: gwID,
+		Name:      "missing-ep",
+	}).Return(db.StorageEndpoint{}, pgx.ErrNoRows)
+
+	_, err := srv.UpdateEndpoint(ctx, &storagev1.UpdateEndpointRequest{
+		Endpoint: &storagev1.Endpoint{
+			Name: "organizations/acme/storageGateways/gw-1/endpoints/missing-ep",
+		},
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_UpdateEndpoint_UpdateFails(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newEndpointsServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "gw-1",
+	}).Return(testGateway, nil)
+	mockQ.On("GetStorageEndpointByName", mock.Anything, db.GetStorageEndpointByNameParams{
+		GatewayID: gwID,
+		Name:      "ep-s3",
+	}).Return(testEndpoint, nil)
+	mockQ.On("UpdateStorageEndpoint", mock.Anything, mock.Anything).
+		Return(db.StorageEndpoint{}, pgx.ErrNoRows)
+
+	_, err := srv.UpdateEndpoint(ctx, &storagev1.UpdateEndpointRequest{
+		Endpoint: &storagev1.Endpoint{
+			Name:        "organizations/acme/storageGateways/gw-1/endpoints/ep-s3",
+			DisplayName: "New Name",
+		},
+		UpdateMask: &fieldmaskpb.FieldMask{
+			Paths: []string{"display_name"},
+		},
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_UpdateEndpoint_FieldMask_Configuration(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newEndpointsServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "gw-1",
+	}).Return(testGateway, nil)
+	mockQ.On("GetStorageEndpointByName", mock.Anything, db.GetStorageEndpointByNameParams{
+		GatewayID: gwID,
+		Name:      "ep-s3",
+	}).Return(testEndpoint, nil)
+	mockQ.On("UpdateStorageEndpoint", mock.Anything, mock.MatchedBy(func(p db.UpdateStorageEndpointParams) bool {
+		return p.ID == endpointID && p.Configuration != nil
+	})).Return(testEndpoint, nil)
+
+	resp, err := srv.UpdateEndpoint(ctx, &storagev1.UpdateEndpointRequest{
+		Endpoint: &storagev1.Endpoint{
+			Name: "organizations/acme/storageGateways/gw-1/endpoints/ep-s3",
+			Configuration: &storagev1.Endpoint_S3{
+				S3: &storagev1.S3Configuration{
+					Bucket: "new-bucket",
+					Region: "eu-west-1",
+				},
+			},
+		},
+		UpdateMask: &fieldmaskpb.FieldMask{
+			Paths: []string{"s3"},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.True(t, resp.GetDone())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_UpdateEndpoint_FieldMask_InvalidConfig(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newEndpointsServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "gw-1",
+	}).Return(testGateway, nil)
+	mockQ.On("GetStorageEndpointByName", mock.Anything, db.GetStorageEndpointByNameParams{
+		GatewayID: gwID,
+		Name:      "ep-s3",
+	}).Return(testEndpoint, nil)
+
+	// No configuration set but config path is in mask — should fail.
+	_, err := srv.UpdateEndpoint(ctx, &storagev1.UpdateEndpointRequest{
+		Endpoint: &storagev1.Endpoint{
+			Name: "organizations/acme/storageGateways/gw-1/endpoints/ep-s3",
+		},
+		UpdateMask: &fieldmaskpb.FieldMask{
+			Paths: []string{"configuration"},
+		},
+	})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_UpdateEndpoint_FieldMask_CacheConfig_LFU(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newEndpointsServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "gw-1",
+	}).Return(testGateway, nil)
+	mockQ.On("GetStorageEndpointByName", mock.Anything, db.GetStorageEndpointByNameParams{
+		GatewayID: gwID,
+		Name:      "ep-s3",
+	}).Return(testEndpoint, nil)
+	mockQ.On("UpdateStorageEndpoint", mock.Anything, mock.MatchedBy(func(p db.UpdateStorageEndpointParams) bool {
+		return p.ID == endpointID && p.CacheEnabled.Valid && p.CacheEviction.EvictionPolicy == db.EvictionPolicyLFU
+	})).Return(testEndpoint, nil)
+
+	resp, err := srv.UpdateEndpoint(ctx, &storagev1.UpdateEndpointRequest{
+		Endpoint: &storagev1.Endpoint{
+			Name: "organizations/acme/storageGateways/gw-1/endpoints/ep-s3",
+			CacheConfig: &storagev1.CacheConfig{
+				Enabled:        true,
+				MaxSizeGb:      200,
+				EvictionPolicy: storagev1.CacheConfig_LFU,
+				TtlHours:       48,
+			},
+		},
+		UpdateMask: &fieldmaskpb.FieldMask{
+			Paths: []string{"cache_config"},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.True(t, resp.GetDone())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_UpdateEndpoint_FieldMask_Annotations(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newEndpointsServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "gw-1",
+	}).Return(testGateway, nil)
+	mockQ.On("GetStorageEndpointByName", mock.Anything, db.GetStorageEndpointByNameParams{
+		GatewayID: gwID,
+		Name:      "ep-s3",
+	}).Return(testEndpoint, nil)
+	mockQ.On("UpdateStorageEndpoint", mock.Anything, mock.MatchedBy(func(p db.UpdateStorageEndpointParams) bool {
+		return p.ID == endpointID && p.Annotations != nil
+	})).Return(testEndpoint, nil)
+
+	resp, err := srv.UpdateEndpoint(ctx, &storagev1.UpdateEndpointRequest{
+		Endpoint: &storagev1.Endpoint{
+			Name:        "organizations/acme/storageGateways/gw-1/endpoints/ep-s3",
+			Annotations: map[string]string{"tier": "cold"},
+		},
+		UpdateMask: &fieldmaskpb.FieldMask{
+			Paths: []string{"annotations"},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.True(t, resp.GetDone())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_UpdateEndpoint_NoMask_AllFields(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newEndpointsServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "gw-1",
+	}).Return(testGateway, nil)
+	mockQ.On("GetStorageEndpointByName", mock.Anything, db.GetStorageEndpointByNameParams{
+		GatewayID: gwID,
+		Name:      "ep-s3",
+	}).Return(testEndpoint, nil)
+	mockQ.On("UpdateStorageEndpoint", mock.Anything, mock.MatchedBy(func(p db.UpdateStorageEndpointParams) bool {
+		return p.ID == endpointID && p.DisplayName.Valid && p.Configuration != nil && p.CacheEnabled.Valid
+	})).Return(testEndpoint, nil)
+
+	resp, err := srv.UpdateEndpoint(ctx, &storagev1.UpdateEndpointRequest{
+		Endpoint: &storagev1.Endpoint{
+			Name:        "organizations/acme/storageGateways/gw-1/endpoints/ep-s3",
+			DisplayName: "Full Update",
+			Configuration: &storagev1.Endpoint_S3{
+				S3: &storagev1.S3Configuration{Bucket: "b"},
+			},
+			CacheConfig: &storagev1.CacheConfig{
+				Enabled:   true,
+				MaxSizeGb: 100,
+			},
+			Annotations: map[string]string{"env": "prod"},
+		},
+		// No mask — update all fields.
+	})
+
+	require.NoError(t, err)
+	assert.True(t, resp.GetDone())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_UpdateEndpoint_NoMask_NoConfig(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newEndpointsServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "gw-1",
+	}).Return(testGateway, nil)
+	mockQ.On("GetStorageEndpointByName", mock.Anything, db.GetStorageEndpointByNameParams{
+		GatewayID: gwID,
+		Name:      "ep-s3",
+	}).Return(testEndpoint, nil)
+	mockQ.On("UpdateStorageEndpoint", mock.Anything, mock.MatchedBy(func(p db.UpdateStorageEndpointParams) bool {
+		return p.ID == endpointID && p.Configuration == nil
+	})).Return(testEndpoint, nil)
+
+	// No configuration in request and no mask — config should not be updated.
+	resp, err := srv.UpdateEndpoint(ctx, &storagev1.UpdateEndpointRequest{
+		Endpoint: &storagev1.Endpoint{
+			Name:        "organizations/acme/storageGateways/gw-1/endpoints/ep-s3",
+			DisplayName: "Name Only",
+		},
+	})
+
+	require.NoError(t, err)
+	assert.True(t, resp.GetDone())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_UpdateEndpoint_NoMask_LFUCachePolicy(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newEndpointsServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "gw-1",
+	}).Return(testGateway, nil)
+	mockQ.On("GetStorageEndpointByName", mock.Anything, db.GetStorageEndpointByNameParams{
+		GatewayID: gwID,
+		Name:      "ep-s3",
+	}).Return(testEndpoint, nil)
+	mockQ.On("UpdateStorageEndpoint", mock.Anything, mock.MatchedBy(func(p db.UpdateStorageEndpointParams) bool {
+		return p.ID == endpointID && p.CacheEviction.EvictionPolicy == db.EvictionPolicyLFU
+	})).Return(testEndpoint, nil)
+
+	resp, err := srv.UpdateEndpoint(ctx, &storagev1.UpdateEndpointRequest{
+		Endpoint: &storagev1.Endpoint{
+			Name: "organizations/acme/storageGateways/gw-1/endpoints/ep-s3",
+			CacheConfig: &storagev1.CacheConfig{
+				Enabled:        true,
+				MaxSizeGb:      100,
+				EvictionPolicy: storagev1.CacheConfig_LFU,
+			},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.True(t, resp.GetDone())
 	mockQ.AssertExpectations(t)
 }

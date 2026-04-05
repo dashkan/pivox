@@ -5,6 +5,7 @@ package requests_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
@@ -131,6 +132,79 @@ func TestIntegration_Requests_ApproveWorkflow(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Equal(t, assetsv1.Request_APPROVED, resp.GetState())
+	})
+}
+
+func TestIntegration_Requests_ListRequests(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	_, queries, cleanup := testutil.SetupTestDB(t)
+	defer cleanup()
+
+	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
+		assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(queries))
+	})
+
+	client := assetsv1.NewRequestsClient(conn)
+	ctx := context.Background()
+
+	org := createTestOrg(t, queries, "acme")
+	createTestProject(t, queries, org.ID, "proj1")
+	parent := "organizations/acme/projects/proj1"
+
+	// Create multiple requests.
+	for i := range 3 {
+		op, err := client.CreateRequest(ctx, &assetsv1.CreateRequestRequest{
+			Parent: parent,
+			Request: &assetsv1.Request{
+				DisplayName: fmt.Sprintf("Request %d", i),
+			},
+		})
+		require.NoError(t, err)
+		assert.True(t, op.GetDone())
+	}
+
+	t.Run("list_all", func(t *testing.T) {
+		resp, err := client.ListRequests(ctx, &assetsv1.ListRequestsRequest{
+			Parent: parent,
+		})
+		require.NoError(t, err)
+		assert.Len(t, resp.GetRequests(), 3)
+	})
+
+	t.Run("list_with_show_deleted", func(t *testing.T) {
+		// Delete one request via cancel workflow.
+		listResp, err := client.ListRequests(ctx, &assetsv1.ListRequestsRequest{
+			Parent: parent,
+		})
+		require.NoError(t, err)
+		require.NotEmpty(t, listResp.GetRequests())
+
+		_, err = client.CancelRequest(ctx, &assetsv1.CancelRequestRequest{
+			Name: listResp.GetRequests()[0].GetName(),
+		})
+		require.NoError(t, err)
+
+		// Without show_deleted — cancelled requests are NOT soft-deleted, they still show up.
+		// But the code path with show_deleted uses a different query.
+		withDeleted, err := client.ListRequests(ctx, &assetsv1.ListRequestsRequest{
+			Parent:      parent,
+			ShowDeleted: true,
+		})
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, len(withDeleted.GetRequests()), 3)
+	})
+
+	t.Run("list_pagination", func(t *testing.T) {
+		resp, err := client.ListRequests(ctx, &assetsv1.ListRequestsRequest{
+			Parent:   parent,
+			PageSize: 1,
+		})
+		require.NoError(t, err)
+		assert.Len(t, resp.GetRequests(), 1)
+		assert.NotEmpty(t, resp.GetNextPageToken())
 	})
 }
 

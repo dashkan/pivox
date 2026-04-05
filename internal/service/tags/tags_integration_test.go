@@ -158,10 +158,11 @@ func TestIntegration_Tags_FullLifecycle(t *testing.T) {
 	})
 
 	t.Run("ListTagBindings", func(t *testing.T) {
-		// NOTE: ScanTagBindings is missing the 'origin' column in its scan
-		// list, causing a column count mismatch with SELECT *. This is a
-		// known bug in the filter/scan layer. Skip until fixed.
-		t.Skip("ScanTagBindings missing origin column scan")
+		resp, err := bindingsClient.ListTagBindings(ctx, &apiv1.ListTagBindingsRequest{
+			Parent: "organizations/acme",
+		})
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, len(resp.GetTagBindings()), 1)
 	})
 
 	// --- Deletion constraint tests ---
