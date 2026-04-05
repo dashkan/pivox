@@ -11,17 +11,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"golang.org/x/time/rate"
 
+	"github.com/dashkan/pivox/internal/authn"
 	db "github.com/dashkan/pivox/internal/db/generated"
-	"github.com/dashkan/pivox/internal/firebase"
 )
 
 // InternalHooks handles internal webhook endpoints that are not part of the
 // public gRPC/REST API. These are called by Firebase Functions and other
 // internal services.
 type InternalHooks struct {
-	queries  db.Querier
-	logger   *slog.Logger
-	firebase *firebase.AuthService
+	queries db.Querier
+	logger  *slog.Logger
+	auth    authn.Service
 
 	// syncAuth protects the accounts:sync endpoint. The implementation is
 	// selected at compile time via build tags:
@@ -106,21 +106,21 @@ func (h *InternalHooks) exchangeToken(w http.ResponseWriter, r *http.Request) {
 	}
 	idToken := strings.TrimPrefix(authHeader, "Bearer ")
 
-	token, err := h.firebase.VerifyIDToken(r.Context(), idToken)
+	identity, err := h.auth.VerifyToken(r.Context(), idToken)
 	if err != nil {
 		h.logger.Warn("failed to verify ID token", "error", err)
 		http.Error(w, "invalid ID token", http.StatusUnauthorized)
 		return
 	}
 
-	customToken, err := h.firebase.CreateCustomToken(r.Context(), token.UID)
+	customToken, err := h.auth.CreateCustomToken(r.Context(), identity.UID)
 	if err != nil {
-		h.logger.Error("failed to create custom token", "uid", token.UID, "error", err)
+		h.logger.Error("failed to create custom token", "uid", identity.UID, "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
-	h.logger.Info("token exchanged", "uid", token.UID)
+	h.logger.Info("token exchanged", "uid", identity.UID)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
@@ -152,7 +152,7 @@ func (h *InternalHooks) depositToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify the token is valid before storing it — reject garbage early.
-	if _, err := h.firebase.VerifyIDToken(r.Context(), req.IDToken); err != nil {
+	if _, err := h.auth.VerifyToken(r.Context(), req.IDToken); err != nil {
 		h.logger.Warn("deposit: invalid ID token", "error", err)
 		http.Error(w, "invalid ID token", http.StatusUnauthorized)
 		return

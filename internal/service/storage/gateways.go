@@ -13,7 +13,6 @@ import (
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -33,16 +32,14 @@ import (
 
 type StorageGatewaysServer struct {
 	storagev1.UnimplementedStorageGatewaysServer
-	pool              *pgxpool.Pool
 	queries           db.Querier
 	encryptor         crypto.Encryptor
 	conns             *agentstream.ConnectionManager
 	sessionSigningKey []byte
 }
 
-func NewStorageGatewaysServer(pool *pgxpool.Pool, queries db.Querier, enc crypto.Encryptor, conns *agentstream.ConnectionManager) *StorageGatewaysServer {
+func NewStorageGatewaysServer(queries db.Querier, enc crypto.Encryptor, conns *agentstream.ConnectionManager) *StorageGatewaysServer {
 	return &StorageGatewaysServer{
-		pool:              pool,
 		queries:           queries,
 		encryptor:         enc,
 		conns:             conns,

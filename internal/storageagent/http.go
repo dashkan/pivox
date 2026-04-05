@@ -111,13 +111,6 @@ func (s *HTTPServer) setCORSHeaders(w http.ResponseWriter) {
 	w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, OPTIONS")
 }
 
-// jwtClaims is the expected JWT payload structure.
-type jwtClaims struct {
-	Sub   string  `json:"sub"`
-	Token string  `json:"token"`
-	Exp   float64 `json:"exp"`
-}
-
 // validateJWT parses and validates an HS256 JWT using stdlib only.
 // Returns the claims map on success.
 func (s *HTTPServer) validateJWT(tokenStr string) (map[string]interface{}, error) {

@@ -49,11 +49,11 @@ func TestIntegration_Requests_ApproveWorkflow(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, queries, cleanup := testutil.SetupTestDB(t)
+	_, queries, cleanup := testutil.SetupTestDB(t)
 	defer cleanup()
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(pool, queries))
+		assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(queries))
 	})
 
 	client := assetsv1.NewRequestsClient(conn)
@@ -139,11 +139,11 @@ func TestIntegration_Requests_RejectWorkflow(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, queries, cleanup := testutil.SetupTestDB(t)
+	_, queries, cleanup := testutil.SetupTestDB(t)
 	defer cleanup()
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(pool, queries))
+		assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(queries))
 	})
 
 	client := assetsv1.NewRequestsClient(conn)
@@ -184,11 +184,11 @@ func TestIntegration_Requests_CancelWorkflow(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, queries, cleanup := testutil.SetupTestDB(t)
+	_, queries, cleanup := testutil.SetupTestDB(t)
 	defer cleanup()
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(pool, queries))
+		assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(queries))
 	})
 
 	client := assetsv1.NewRequestsClient(conn)

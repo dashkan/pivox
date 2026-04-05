@@ -21,13 +21,11 @@ import (
 
 type RequestsServer struct {
 	assetsv1.UnimplementedRequestsServer
-	db      db.DBTX
 	queries db.Querier
 }
 
-func NewRequestsServer(pool db.DBTX, queries db.Querier) *RequestsServer {
+func NewRequestsServer(queries db.Querier) *RequestsServer {
 	return &RequestsServer{
-		db:      pool,
 		queries: queries,
 	}
 }

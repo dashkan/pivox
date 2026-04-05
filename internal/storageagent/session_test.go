@@ -1,6 +1,7 @@
 package storageagent
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -146,4 +147,67 @@ func TestSessionConcurrentAccess(t *testing.T) {
 
 	wg.Wait()
 	// If we get here without a race detector panic, concurrency is safe.
+}
+
+func TestStartCleanup_FlushesExpiredSessions(t *testing.T) {
+	store := NewSessionStore()
+
+	// Grant one expired session and one valid session.
+	store.Grant("expired", []string{"/a"}, time.Now().Add(-1*time.Second))
+	store.Grant("valid", []string{"/b"}, time.Now().Add(1*time.Hour))
+
+	// Verify the expired session is still in the map before cleanup runs
+	// (Authorize returns false due to expiry check, but the entry exists).
+	require.False(t, store.Authorize("expired", "/a"))
+	require.True(t, store.Authorize("valid", "/b"))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+
+	go func() {
+		store.StartCleanup(ctx, 10*time.Millisecond)
+		close(done)
+	}()
+
+	// Wait long enough for at least one cleanup tick to fire.
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+
+	// Wait for the goroutine to exit.
+	select {
+	case <-done:
+	case <-time.After(1 * time.Second):
+		t.Fatal("StartCleanup did not return after context cancellation")
+	}
+
+	// The expired session should have been flushed from the map entirely.
+	// Verify by granting the same token again and checking it works --
+	// if FlushExpired ran, the old entry is gone.
+	store.Grant("expired", []string{"/c"}, time.Now().Add(1*time.Hour))
+	assert.True(t, store.Authorize("expired", "/c"),
+		"re-granted token should authorize after cleanup flushed the old entry")
+	assert.True(t, store.Authorize("valid", "/b"),
+		"valid session should survive cleanup")
+}
+
+func TestStartCleanup_StopsOnContextCancel(t *testing.T) {
+	store := NewSessionStore()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+
+	go func() {
+		store.StartCleanup(ctx, 1*time.Hour) // long interval, won't tick
+		close(done)
+	}()
+
+	// Cancel immediately.
+	cancel()
+
+	select {
+	case <-done:
+		// StartCleanup returned promptly after cancellation.
+	case <-time.After(1 * time.Second):
+		t.Fatal("StartCleanup did not return after context cancellation")
+	}
 }

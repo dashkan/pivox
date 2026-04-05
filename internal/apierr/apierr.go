@@ -1,6 +1,7 @@
 package apierr
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -107,7 +108,7 @@ func QuotaExceeded(subject, description string, retryDelay time.Duration) error 
 
 // HandleResourceError translates common database errors into gRPC status errors.
 func HandleResourceError(err error, resourceType, resourceName string) error {
-	if err == pgx.ErrNoRows {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return NotFound(resourceType, resourceName)
 	}
 	if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {

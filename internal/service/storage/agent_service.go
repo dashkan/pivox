@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -25,16 +24,14 @@ import (
 // storage gateway agents connecting to the control plane.
 type AgentServiceServer struct {
 	agentv1.UnimplementedAgentServiceServer
-	pool    *pgxpool.Pool
 	queries db.Querier
 	logger  *slog.Logger
 	conns   *agentstream.ConnectionManager
 }
 
 // NewAgentServiceServer creates a new AgentServiceServer.
-func NewAgentServiceServer(pool *pgxpool.Pool, queries db.Querier, logger *slog.Logger, conns *agentstream.ConnectionManager) *AgentServiceServer {
+func NewAgentServiceServer(queries db.Querier, logger *slog.Logger, conns *agentstream.ConnectionManager) *AgentServiceServer {
 	return &AgentServiceServer{
-		pool:    pool,
 		queries: queries,
 		logger:  logger,
 		conns:   conns,

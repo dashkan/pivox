@@ -7,20 +7,27 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
-
-	"github.com/dashkan/pivox/internal/lro"
 )
+
+// LROManager defines the long-running operation methods the server needs.
+type LROManager interface {
+	GetOperation(ctx context.Context, name string) (*longrunningpb.Operation, error)
+	ListOperations(ctx context.Context, prefix string, pageSize int32) ([]*longrunningpb.Operation, error)
+	WaitOperation(ctx context.Context, name string) (*longrunningpb.Operation, error)
+	DeleteOperation(ctx context.Context, name string) error
+	CancelOperation(ctx context.Context, name string) error
+}
 
 // OperationsServer implements longrunningpb.OperationsServer by delegating to
 // an LRO Manager.
 type OperationsServer struct {
 	longrunningpb.UnimplementedOperationsServer
-	lro *lro.Manager
+	lro LROManager
 }
 
 // NewOperationsServer returns a new OperationsServer backed by the given LRO
 // manager.
-func NewOperationsServer(lro *lro.Manager) *OperationsServer {
+func NewOperationsServer(lro LROManager) *OperationsServer {
 	return &OperationsServer{lro: lro}
 }
 

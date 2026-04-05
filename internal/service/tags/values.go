@@ -2,6 +2,7 @@ package tags
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -131,7 +132,7 @@ func (s *TagValuesServer) CreateTagValue(ctx context.Context, req *apiv1.CreateT
 
 	parentKey, err := s.queries.GetTagKey(ctx, tagKeyID)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apierr.NotFound("TagKey", parent)
 		}
 		return nil, apierr.Internal("failed to get parent tag key")

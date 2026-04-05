@@ -131,6 +131,7 @@ func ScanTagBindings(rows pgx.Rows) ([]db.TagBinding, error) {
 			&tb.ID,
 			&tb.ParentResource,
 			&tb.TagValueID,
+			&tb.Origin,
 			&tb.Annotations,
 			&tb.Etag,
 			&tb.CreatedBy,

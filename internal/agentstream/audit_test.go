@@ -119,6 +119,16 @@ func TestMarshalAndRedact_MultipleEndpoints(t *testing.T) {
 		"expected 2 redacted secrets for 2 endpoints")
 }
 
+func TestMarshalAndRedact_EmptyMessage(t *testing.T) {
+	// An empty ConfigUpdate with no endpoints should marshal to valid JSON
+	// with no redaction needed.
+	msg := &agentv1.ConfigUpdate{}
+	data, err := MarshalAndRedact(msg)
+	require.NoError(t, err)
+	assert.True(t, json.Valid(data), "output should be valid JSON")
+	assert.NotContains(t, string(data), `"***"`)
+}
+
 func TestRedactSecretKeyPattern(t *testing.T) {
 	tests := []struct {
 		name  string

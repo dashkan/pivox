@@ -3,6 +3,7 @@ package iam
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 
 	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
@@ -35,7 +36,7 @@ func (h *Helper) GetIamPolicy(ctx context.Context, req *iampb.GetIamPolicyReques
 
 	dbPolicy, err := h.queries.GetIamPolicy(ctx, resourceID)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return &iampb.Policy{}, nil
 		}
 		return nil, apierr.Internal("failed to get IAM policy")
@@ -68,7 +69,7 @@ func (h *Helper) SetIamPolicy(ctx context.Context, req *iampb.SetIamPolicyReques
 	// Check etag if provided
 	if policy.Etag != "" {
 		existing, err := h.queries.GetIamPolicy(ctx, resourceID)
-		if err != nil && err != pgx.ErrNoRows {
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			return nil, apierr.Internal("failed to get existing IAM policy")
 		}
 		if err == nil && existing.Etag != policy.Etag {

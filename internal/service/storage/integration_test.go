@@ -36,7 +36,7 @@ func TestIntegration_Storage_GatewayLifecycle(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, queries, cleanup := testutil.SetupTestDB(t)
+	_, queries, cleanup := testutil.SetupTestDB(t)
 	defer cleanup()
 
 	enc, err := crypto.NewEncryptor()
@@ -44,8 +44,8 @@ func TestIntegration_Storage_GatewayLifecycle(t *testing.T) {
 	conns := agentstream.NewConnectionManager()
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		storagev1.RegisterStorageGatewaysServer(s, storage.NewStorageGatewaysServer(pool, queries, enc, conns))
-		storagev1.RegisterEndpointsServer(s, storage.NewEndpointsServer(pool, queries, enc))
+		storagev1.RegisterStorageGatewaysServer(s, storage.NewStorageGatewaysServer(queries, enc, conns))
+		storagev1.RegisterEndpointsServer(s, storage.NewEndpointsServer(queries, enc))
 	})
 
 	gwClient := storagev1.NewStorageGatewaysClient(conn)

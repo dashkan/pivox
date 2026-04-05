@@ -1,9 +1,11 @@
 package apierr
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
@@ -178,4 +180,46 @@ func TestAborted(t *testing.T) {
 		}
 	}
 	assert.True(t, foundErrorInfo, "expected ErrorInfo detail with reason")
+}
+
+// ---------------------------------------------------------------------------
+// HandleResourceError
+// ---------------------------------------------------------------------------
+
+func TestHandleResourceError(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		wantCode codes.Code
+	}{
+		{
+			name:     "pgx.ErrNoRows maps to NotFound",
+			err:      pgx.ErrNoRows,
+			wantCode: codes.NotFound,
+		},
+		{
+			name:     "duplicate key maps to AlreadyExists",
+			err:      fmt.Errorf("ERROR: duplicate key value violates unique constraint"),
+			wantCode: codes.AlreadyExists,
+		},
+		{
+			name:     "unique constraint maps to AlreadyExists",
+			err:      fmt.Errorf("pq: unique constraint violation on table foo"),
+			wantCode: codes.AlreadyExists,
+		},
+		{
+			name:     "generic error maps to Internal",
+			err:      fmt.Errorf("something went wrong"),
+			wantCode: codes.Internal,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := HandleResourceError(tt.err, "Asset", "assets/abc")
+			require.Error(t, result)
+			st := status.Convert(result)
+			assert.Equal(t, tt.wantCode, st.Code())
+		})
+	}
 }

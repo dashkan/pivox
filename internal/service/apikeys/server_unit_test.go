@@ -251,6 +251,60 @@ func TestUnit_UpdateKey_WithFieldMask(t *testing.T) {
 	mockQ.AssertExpectations(t)
 }
 
+func TestUnit_GetKeyString_Success(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := NewApiKeysServer(nil, mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
+	mockQ.On("GetApiKeyByOrgAndKeyID", mock.Anything, db.GetApiKeyByOrgAndKeyIDParams{
+		OrgID: testOrgID,
+		KeyID: "my-key",
+	}).Return(testDBKey, nil)
+
+	resp, err := srv.GetKeyString(ctx, &apiv1.GetKeyStringRequest{
+		Name: "organizations/acme/keys/my-key",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, testDBKey.KeyString, resp.GetKeyString())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_UpdateKey_NoMask(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := NewApiKeysServer(nil, mockQ)
+	ctx := context.Background()
+
+	updatedKey := testDBKey
+	updatedKey.DisplayName = "New Name"
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
+	mockQ.On("GetApiKeyByOrgAndKeyID", mock.Anything, db.GetApiKeyByOrgAndKeyIDParams{
+		OrgID: testOrgID,
+		KeyID: "my-key",
+	}).Return(testDBKey, nil)
+	mockQ.On("UpdateApiKey", mock.Anything, mock.MatchedBy(func(p db.UpdateApiKeyParams) bool {
+		return p.ID == testKeyID &&
+			p.DisplayName.Valid &&
+			p.DisplayName.String == "New Name" &&
+			p.Annotations != nil // annotations set because non-nil in request
+	})).Return(updatedKey, nil)
+
+	resp, err := srv.UpdateKey(ctx, &apiv1.UpdateKeyRequest{
+		Key: &apiv1.Key{
+			Name:        "organizations/acme/keys/my-key",
+			DisplayName: "New Name",
+			Annotations: map[string]string{"env": "staging"},
+		},
+		// No UpdateMask — all fields updated
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "New Name", resp.GetDisplayName())
+	mockQ.AssertExpectations(t)
+}
+
 func TestUnit_GenerateKeyString(t *testing.T) {
 	key := generateKeyString()
 	assert.Len(t, key, 39, "generated key should be 39 characters")
