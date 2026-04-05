@@ -56,9 +56,11 @@ struct ContentView: View {
                 }
                 .listStyle(.sidebar)
 
+                Spacer()
+
                 Divider()
 
-                // Profile at sidebar footer — matches Windows NavigationView pattern.
+                // Profile pinned to sidebar footer.
                 List(selection: $selectedItem) {
                     Label("Profile", systemImage: "person.circle")
                         .tag(SidebarItem.profile)
