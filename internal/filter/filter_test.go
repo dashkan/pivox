@@ -2,9 +2,11 @@ package filter
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	expr "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
 // ---------------------------------------------------------------------------
@@ -232,4 +234,141 @@ func TestTranspile_ConstTypes(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, `state = $1`, wc.SQL)
 	assert.Equal(t, []any{"ACTIVE"}, wc.Args)
+}
+
+// ---------------------------------------------------------------------------
+// transpileTimestamp — standalone call (not embedded in a comparison RHS)
+// ---------------------------------------------------------------------------
+
+func TestTranspile_TimestampStandalone(t *testing.T) {
+	tests := []struct {
+		name     string
+		filter   string
+		wantArg  time.Time
+		wantErr  bool
+		errContains string
+	}{
+		{
+			name:    "valid RFC3339 timestamp at root",
+			filter:  `timestamp("2025-01-15T10:30:00Z")`,
+			wantArg: time.Date(2025, 1, 15, 10, 30, 0, 0, time.UTC),
+		},
+		{
+			name:        "invalid timestamp string at root",
+			filter:      `timestamp("not-a-date")`,
+			wantErr:     true,
+			errContains: "invalid timestamp",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rf := ProjectFilter()
+			wc, err := Transpile(rf, tt.filter, 1)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+				return
+			}
+			require.NoError(t, err)
+			// SQL is just the param placeholder since timestamp() is the root expr.
+			assert.Equal(t, "$1", wc.SQL)
+			require.Len(t, wc.Args, 1)
+			ts, ok := wc.Args[0].(time.Time)
+			require.True(t, ok, "expected time.Time arg, got %T", wc.Args[0])
+			assert.Equal(t, tt.wantArg, ts)
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// transpileConst — int, float, string, and bool constant kinds
+// ---------------------------------------------------------------------------
+
+func TestTranspile_ConstIntLiteral(t *testing.T) {
+	// The AIP parser produces an Int64Value ConstExpr for bare integer literals.
+	// When it appears as the root expression, transpileExpr → transpileConst →
+	// Int64Value branch → nextParam(int64).
+	rf := ProjectFilter()
+	wc, err := Transpile(rf, `42`, 1)
+	require.NoError(t, err)
+	assert.Equal(t, "$1", wc.SQL)
+	require.Len(t, wc.Args, 1)
+	assert.Equal(t, int64(42), wc.Args[0])
+}
+
+func TestTranspile_ConstFloatLiteral(t *testing.T) {
+	// The AIP parser produces a DoubleValue ConstExpr for floating-point literals.
+	rf := ProjectFilter()
+	wc, err := Transpile(rf, `3.14`, 1)
+	require.NoError(t, err)
+	assert.Equal(t, "$1", wc.SQL)
+	require.Len(t, wc.Args, 1)
+	assert.Equal(t, 3.14, wc.Args[0])
+}
+
+func TestTranspile_ConstStringLiteral(t *testing.T) {
+	// A quoted string at root → transpileConst StringValue → expandBareLiteral.
+	// ProjectFilter has displayName as the only default field.
+	rf := ProjectFilter()
+	wc, err := Transpile(rf, `"hello"`, 1)
+	require.NoError(t, err)
+	assert.Equal(t, `display_name ILIKE $1`, wc.SQL)
+	assert.Equal(t, []any{"%hello%"}, wc.Args)
+}
+
+func TestTranspileConst_BoolValue(t *testing.T) {
+	// The AIP parser never produces a BoolValue constant from filter strings
+	// (bare `true`/`false` parse as IdentExpr). Test the branch directly by
+	// constructing a Transpiler and calling transpileConst with a BoolValue.
+	rf := ProjectFilter()
+	tr := &Transpiler{filter: rf, startIdx: 1}
+
+	c := &expr.Constant{
+		ConstantKind: &expr.Constant_BoolValue{BoolValue: true},
+	}
+	sql, err := tr.transpileConst(c)
+	require.NoError(t, err)
+	assert.Equal(t, "$1", sql)
+	require.Len(t, tr.args, 1)
+	assert.Equal(t, true, tr.args[0])
+}
+
+// ---------------------------------------------------------------------------
+// transpileSelect — standalone select expression (not inside a comparison)
+// ---------------------------------------------------------------------------
+
+func TestTranspile_SelectStandalone(t *testing.T) {
+	tests := []struct {
+		name        string
+		filter      string
+		wantSQL     string
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:    "labels.env as standalone expression",
+			filter:  `labels.env`,
+			wantSQL: `labels->>'env'`,
+		},
+		{
+			name:        "non-JSONB field traversal error",
+			filter:      `state.sub`,
+			wantErr:     true,
+			errContains: "does not support traversal",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rf := ProjectFilter()
+			wc, err := Transpile(rf, tt.filter, 1)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantSQL, wc.SQL)
+			assert.Empty(t, wc.Args)
+		})
+	}
 }
