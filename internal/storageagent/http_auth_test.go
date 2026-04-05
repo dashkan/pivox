@@ -1,5 +1,3 @@
-//go:build !dev
-
 package storageagent
 
 import (
@@ -20,6 +18,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func skipIfDevAuth(t *testing.T) {
+	t.Helper()
+	if devSkipAuth {
+		t.Skip("auth is disabled in dev mode")
+	}
+}
 
 var testAuthSigningKey = []byte("test-secret-key-for-jwt-signing!")
 
@@ -71,6 +76,7 @@ func setupEndpoint(t *testing.T, endpoints *EndpointStore, name string) string {
 // ---------------------------------------------------------------------------
 
 func TestHTTPAuth_MissingCookie_Unauthorized(t *testing.T) {
+	skipIfDevAuth(t)
 	srv, _, _, _ := newAuthTestHTTPServer(t)
 
 	w := httptest.NewRecorder()
@@ -81,6 +87,7 @@ func TestHTTPAuth_MissingCookie_Unauthorized(t *testing.T) {
 }
 
 func TestHTTPAuth_InvalidJWT_Unauthorized(t *testing.T) {
+	skipIfDevAuth(t)
 	srv, _, _, _ := newAuthTestHTTPServer(t)
 
 	w := httptest.NewRecorder()
@@ -92,6 +99,7 @@ func TestHTTPAuth_InvalidJWT_Unauthorized(t *testing.T) {
 }
 
 func TestHTTPAuth_ExpiredJWT_Unauthorized(t *testing.T) {
+	skipIfDevAuth(t)
 	srv, _, _, _ := newAuthTestHTTPServer(t)
 
 	token := makeAuthJWT(map[string]interface{}{
@@ -108,6 +116,7 @@ func TestHTTPAuth_ExpiredJWT_Unauthorized(t *testing.T) {
 }
 
 func TestHTTPAuth_WrongSigningKey_Unauthorized(t *testing.T) {
+	skipIfDevAuth(t)
 	srv, _, _, _ := newAuthTestHTTPServer(t)
 
 	token := makeAuthJWT(map[string]interface{}{
@@ -124,6 +133,7 @@ func TestHTTPAuth_WrongSigningKey_Unauthorized(t *testing.T) {
 }
 
 func TestHTTPAuth_MissingTokenClaim_Unauthorized(t *testing.T) {
+	skipIfDevAuth(t)
 	srv, _, _, _ := newAuthTestHTTPServer(t)
 
 	// JWT is valid but has no "token" claim.
@@ -141,6 +151,7 @@ func TestHTTPAuth_MissingTokenClaim_Unauthorized(t *testing.T) {
 }
 
 func TestHTTPAuth_EmptyTokenClaim_Unauthorized(t *testing.T) {
+	skipIfDevAuth(t)
 	srv, _, _, _ := newAuthTestHTTPServer(t)
 
 	token := makeAuthJWT(map[string]interface{}{
@@ -157,6 +168,7 @@ func TestHTTPAuth_EmptyTokenClaim_Unauthorized(t *testing.T) {
 }
 
 func TestHTTPAuth_ValidJWT_SessionNotFound_Forbidden(t *testing.T) {
+	skipIfDevAuth(t)
 	srv, _, _, _ := newAuthTestHTTPServer(t)
 
 	// Valid JWT with token claim, but no matching session.
@@ -174,6 +186,7 @@ func TestHTTPAuth_ValidJWT_SessionNotFound_Forbidden(t *testing.T) {
 }
 
 func TestHTTPAuth_ValidJWT_AuthorizedSession_Success(t *testing.T) {
+	skipIfDevAuth(t)
 	srv, sessions, endpoints, _ := newAuthTestHTTPServer(t)
 	setupEndpoint(t, endpoints, "media")
 
@@ -195,6 +208,7 @@ func TestHTTPAuth_ValidJWT_AuthorizedSession_Success(t *testing.T) {
 }
 
 func TestHTTPAuth_ValidJWT_DeniedPattern_NotFound(t *testing.T) {
+	skipIfDevAuth(t)
 	srv, sessions, endpoints, denied := newAuthTestHTTPServer(t)
 	setupEndpoint(t, endpoints, "media")
 	denied.Update([]string{"/media/file.txt"})
