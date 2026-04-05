@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -15,6 +16,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	"github.com/dashkan/pivox/internal/agentstream"
 	db "github.com/dashkan/pivox/internal/db/generated"
@@ -256,4 +258,170 @@ func TestUnit_GetInstallScript_WithFlags(t *testing.T) {
 	assert.Contains(t, script, "--bind-address 0.0.0.0")
 	assert.Contains(t, script, "--telemetry")
 	mockQ.AssertExpectations(t)
+}
+
+// ---------------------------------------------------------------------------
+// UpdateStorageGateway
+// ---------------------------------------------------------------------------
+
+func TestUnit_UpdateStorageGateway_WithFieldMask(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+	ctx := context.Background()
+
+	updatedGW := testGateway
+	updatedGW.DisplayName = "Updated Gateway"
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "gw-1",
+	}).Return(testGateway, nil)
+	mockQ.On("UpdateStorageGateway", mock.Anything, mock.MatchedBy(func(p db.UpdateStorageGatewayParams) bool {
+		return p.ID == gwID &&
+			p.DisplayName == pgtype.Text{String: "Updated Gateway", Valid: true} &&
+			p.IpAddresses == nil && // not in mask, should be zero value
+			p.TargetVersion == pgtype.Text{} // not in mask, should be zero value
+	})).Return(updatedGW, nil)
+
+	resp, err := srv.UpdateStorageGateway(ctx, &storagev1.UpdateStorageGatewayRequest{
+		StorageGateway: &storagev1.StorageGateway{
+			Name:        "organizations/acme/storageGateways/gw-1",
+			DisplayName: "Updated Gateway",
+		},
+		UpdateMask: &fieldmaskpb.FieldMask{
+			Paths: []string{"display_name"},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.True(t, resp.GetDone())
+	inner := new(storagev1.StorageGateway)
+	require.NoError(t, anypb.UnmarshalTo(resp.GetResponse(), inner, proto.UnmarshalOptions{}))
+	assert.Equal(t, "organizations/acme/storageGateways/gw-1", inner.GetName())
+	assert.Equal(t, "Updated Gateway", inner.GetDisplayName())
+	mockQ.AssertExpectations(t)
+}
+
+func TestUnit_UpdateStorageGateway_NoMask(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+	ctx := context.Background()
+
+	updatedGW := testGateway
+	updatedGW.DisplayName = "Full Update"
+	updatedGW.IpAddresses = []string{"10.0.0.2", "10.0.0.3"}
+	updatedGW.TargetVersion = "2.0.0"
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "gw-1",
+	}).Return(testGateway, nil)
+	mockQ.On("UpdateStorageGateway", mock.Anything, mock.MatchedBy(func(p db.UpdateStorageGatewayParams) bool {
+		return p.ID == gwID &&
+			p.DisplayName == pgtype.Text{String: "Full Update", Valid: true} &&
+			len(p.IpAddresses) == 2 &&
+			p.TargetVersion == pgtype.Text{String: "2.0.0", Valid: true}
+	})).Return(updatedGW, nil)
+
+	resp, err := srv.UpdateStorageGateway(ctx, &storagev1.UpdateStorageGatewayRequest{
+		StorageGateway: &storagev1.StorageGateway{
+			Name:          "organizations/acme/storageGateways/gw-1",
+			DisplayName:   "Full Update",
+			IpAddresses:   []string{"10.0.0.2", "10.0.0.3"},
+			TargetVersion: "2.0.0",
+		},
+		// No UpdateMask — all mutable fields updated.
+	})
+
+	require.NoError(t, err)
+	assert.True(t, resp.GetDone())
+	inner := new(storagev1.StorageGateway)
+	require.NoError(t, anypb.UnmarshalTo(resp.GetResponse(), inner, proto.UnmarshalOptions{}))
+	assert.Equal(t, "Full Update", inner.GetDisplayName())
+	mockQ.AssertExpectations(t)
+}
+
+// ---------------------------------------------------------------------------
+// GetUninstallScript
+// ---------------------------------------------------------------------------
+
+func TestUnit_GetUninstallScript_Success(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "gw-1",
+	}).Return(testGateway, nil)
+
+	resp, err := srv.GetUninstallScript(ctx, &storagev1.GetUninstallScriptRequest{
+		Name: "organizations/acme/storageGateways/gw-1",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "curl -sSL https://get.pivox.app/agent/uninstall | bash", resp.GetScript())
+	mockQ.AssertExpectations(t)
+}
+
+// ---------------------------------------------------------------------------
+// ListStorageGateways
+// ---------------------------------------------------------------------------
+
+func TestUnit_ListStorageGateways_Unimplemented(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+
+	_, err := srv.ListStorageGateways(context.Background(), &storagev1.ListStorageGatewaysRequest{})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.Unimplemented, st.Code())
+	assert.Contains(t, st.Message(), "ListStorageGateways not yet implemented")
+}
+
+// ---------------------------------------------------------------------------
+// UpgradeGateway
+// ---------------------------------------------------------------------------
+
+func TestUnit_UpgradeGateway_Unimplemented(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newGatewayServer(mockQ)
+
+	_, err := srv.UpgradeGateway(context.Background(), &storagev1.UpgradeGatewayRequest{})
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.Unimplemented, st.Code())
+	assert.Contains(t, st.Message(), "UpgradeGateway not yet implemented")
+}
+
+// ---------------------------------------------------------------------------
+// CreateStorageSession
+// ---------------------------------------------------------------------------
+
+func TestUnit_CreateStorageSession_Success(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	conns := agentstream.NewConnectionManager()
+	srv := &StorageGatewaysServer{
+		queries:           mockQ,
+		encryptor:         nil,
+		conns:             conns,
+		sessionSigningKey: []byte("test-key"),
+	}
+	ctx := context.Background()
+
+	resp, err := srv.CreateStorageSession(ctx, &storagev1.CreateStorageSessionRequest{})
+
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	// Verify expiry is set and roughly 1 hour from now (default TTL).
+	require.NotNil(t, resp.GetExpiry())
+	expiry := resp.GetExpiry().AsTime()
+	assert.WithinDuration(t, time.Now().Add(time.Hour), expiry, 5*time.Second)
 }

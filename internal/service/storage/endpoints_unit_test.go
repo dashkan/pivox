@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	db "github.com/dashkan/pivox/internal/db/generated"
 	storagev1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"
@@ -299,4 +300,80 @@ func TestUnit_ConfigToJSON_NilConfig(t *testing.T) {
 	_, err := configToJSON(ep)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "configuration is required")
+}
+
+// ---------------------------------------------------------------------------
+// UpdateEndpoint
+// ---------------------------------------------------------------------------
+
+func TestUnit_UpdateEndpoint_Success(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newEndpointsServer(mockQ)
+	ctx := context.Background()
+
+	updatedEndpoint := testEndpoint
+	updatedEndpoint.DisplayName = "Renamed S3 Endpoint"
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "gw-1",
+	}).Return(testGateway, nil)
+	mockQ.On("GetStorageEndpointByName", mock.Anything, db.GetStorageEndpointByNameParams{
+		GatewayID: gwID,
+		Name:      "ep-s3",
+	}).Return(testEndpoint, nil)
+	mockQ.On("UpdateStorageEndpoint", mock.Anything, mock.MatchedBy(func(p db.UpdateStorageEndpointParams) bool {
+		return p.ID == endpointID &&
+			p.DisplayName.Valid && p.DisplayName.String == "Renamed S3 Endpoint" &&
+			p.Configuration == nil // not in mask
+	})).Return(updatedEndpoint, nil)
+
+	resp, err := srv.UpdateEndpoint(ctx, &storagev1.UpdateEndpointRequest{
+		Endpoint: &storagev1.Endpoint{
+			Name:        "organizations/acme/storageGateways/gw-1/endpoints/ep-s3",
+			DisplayName: "Renamed S3 Endpoint",
+		},
+		UpdateMask: &fieldmaskpb.FieldMask{
+			Paths: []string{"display_name"},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.True(t, resp.GetDone())
+	inner := new(storagev1.Endpoint)
+	require.NoError(t, anypb.UnmarshalTo(resp.GetResponse(), inner, proto.UnmarshalOptions{}))
+	assert.Equal(t, "organizations/acme/storageGateways/gw-1/endpoints/ep-s3", inner.GetName())
+	assert.Equal(t, "Renamed S3 Endpoint", inner.GetDisplayName())
+	mockQ.AssertExpectations(t)
+}
+
+// ---------------------------------------------------------------------------
+// ListEndpoints
+// ---------------------------------------------------------------------------
+
+func TestUnit_ListEndpoints_Success(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newEndpointsServer(mockQ)
+	ctx := context.Background()
+
+	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
+	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
+		OrgID: gwOrgID,
+		Name:  "gw-1",
+	}).Return(testGateway, nil)
+	mockQ.On("ListStorageEndpointsByGateway", mock.Anything, gwID).
+		Return([]db.StorageEndpoint{testEndpoint, testFSEndpoint}, nil)
+
+	resp, err := srv.ListEndpoints(ctx, &storagev1.ListEndpointsRequest{
+		Parent: "organizations/acme/storageGateways/gw-1",
+	})
+
+	require.NoError(t, err)
+	require.Len(t, resp.GetEndpoints(), 2)
+	assert.Equal(t, "organizations/acme/storageGateways/gw-1/endpoints/ep-s3", resp.GetEndpoints()[0].GetName())
+	assert.Equal(t, "S3 Endpoint", resp.GetEndpoints()[0].GetDisplayName())
+	assert.Equal(t, "organizations/acme/storageGateways/gw-1/endpoints/ep-fs", resp.GetEndpoints()[1].GetName())
+	assert.Equal(t, "FS Endpoint", resp.GetEndpoints()[1].GetDisplayName())
+	mockQ.AssertExpectations(t)
 }
