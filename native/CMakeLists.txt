@@ -104,9 +104,93 @@ endif()
 # ============================================================
 
 if(WIN32)
-    # TODO: Windows targets will be added here by the Windows Claude agent.
-    # See docs/dev/cross-platform-workflow.md for the SSH workflow.
-    message(STATUS "Windows targets not yet configured — run the Windows build agent.")
+    set(WIN_TARGET "Pivox")
+    set(WIN_PLATFORM_DIR "${CMAKE_SOURCE_DIR}/platform/windows")
+
+    # Copy Directory.Build.props/targets into build dir (constraint #1).
+    configure_file(
+        "${WIN_PLATFORM_DIR}/Directory.Build.props"
+        "${CMAKE_BINARY_DIR}/Directory.Build.props" COPYONLY)
+    configure_file(
+        "${WIN_PLATFORM_DIR}/Directory.Build.targets"
+        "${CMAKE_BINARY_DIR}/Directory.Build.targets" COPYONLY)
+
+    add_executable(${WIN_TARGET} WIN32
+        # App
+        ${WIN_PLATFORM_DIR}/App.idl
+        ${WIN_PLATFORM_DIR}/App.xaml
+        ${WIN_PLATFORM_DIR}/App.xaml.h
+        ${WIN_PLATFORM_DIR}/App.xaml.cpp
+        # MainWindow
+        ${WIN_PLATFORM_DIR}/MainWindow.idl
+        ${WIN_PLATFORM_DIR}/MainWindow.xaml
+        ${WIN_PLATFORM_DIR}/MainWindow.xaml.h
+        ${WIN_PLATFORM_DIR}/MainWindow.xaml.cpp
+        # LoginPage
+        ${WIN_PLATFORM_DIR}/LoginPage.idl
+        ${WIN_PLATFORM_DIR}/LoginPage.xaml
+        ${WIN_PLATFORM_DIR}/LoginPage.xaml.h
+        ${WIN_PLATFORM_DIR}/LoginPage.xaml.cpp
+        # RegisterPage
+        ${WIN_PLATFORM_DIR}/RegisterPage.idl
+        ${WIN_PLATFORM_DIR}/RegisterPage.xaml
+        ${WIN_PLATFORM_DIR}/RegisterPage.xaml.h
+        ${WIN_PLATFORM_DIR}/RegisterPage.xaml.cpp
+    )
+
+    target_include_directories(${WIN_TARGET} PRIVATE ${WIN_PLATFORM_DIR})
+    target_link_libraries(${WIN_TARGET} PRIVATE pivox_core)
+    target_precompile_headers(${WIN_TARGET} PRIVATE ${WIN_PLATFORM_DIR}/pch.h)
+
+    # App.xaml is the ApplicationDefinition (constraint #4).
+    set_property(SOURCE ${WIN_PLATFORM_DIR}/App.xaml
+        PROPERTY VS_XAML_TYPE "ApplicationDefinition")
+
+    # WinUI 3 target properties (constraint #9).
+    set_target_properties(${WIN_TARGET} PROPERTIES
+        VS_GLOBAL_RootNamespace "Pivox"
+        VS_GLOBAL_AppContainerApplication "false"
+        VS_GLOBAL_AppxPackage "false"
+        VS_GLOBAL_CppWinRTOptimized "true"
+        VS_GLOBAL_CppWinRTRootNamespaceAutoMerge "true"
+        VS_GLOBAL_UseWinUI "true"
+        VS_GLOBAL_ApplicationType "Windows Store"
+        VS_GLOBAL_ApplicationTypeRevision "10.0"
+        VS_GLOBAL_WindowsTargetPlatformVersion "10.0"
+        VS_GLOBAL_WindowsTargetPlatformMinVersion "10.0.17763.0"
+        VS_GLOBAL_WindowsPackageType "None"
+        VS_GLOBAL_EnablePreviewMsixTooling "true"
+        VS_GLOBAL_WindowsAppSDKSelfContained "true"
+    )
+
+    # NuGet packages (constraint #8).
+    set_property(TARGET ${WIN_TARGET} PROPERTY VS_PACKAGE_REFERENCES
+        "Microsoft.Windows.CppWinRT_2.0.240405.15"
+        "Microsoft.WindowsAppSDK_1.7.250401001"
+        "Microsoft.Windows.SDK.BuildTools_10.0.26100.1742"
+    )
+
+    # IDL/XAML dependency wiring (constraint #5).
+    get_target_property(_SOURCES ${WIN_TARGET} SOURCES)
+    foreach(_SOURCE ${_SOURCES})
+        cmake_path(GET _SOURCE EXTENSION LAST_ONLY _EXTENSION)
+        if(NOT "${_EXTENSION}" STREQUAL ".idl")
+            continue()
+        endif()
+        set(_IDL_SOURCE "${_SOURCE}")
+        cmake_path(REMOVE_EXTENSION _SOURCE LAST_ONLY OUTPUT_VARIABLE _BASENAME)
+        set(_XAML_SOURCE "${_BASENAME}.xaml")
+        if("${_XAML_SOURCE}" IN_LIST _SOURCES)
+            set_property(SOURCE "${_IDL_SOURCE}" PROPERTY VS_SETTINGS
+                "SubType=Code" "DependentUpon=${_XAML_SOURCE}")
+        else()
+            set_property(SOURCE "${_IDL_SOURCE}" PROPERTY VS_SETTINGS "SubType=Code")
+        endif()
+    endforeach()
+
+    # Release PDBs for debugging (constraint #10).
+    target_compile_options(${WIN_TARGET} PRIVATE "$<$<CONFIG:Release>:/Zi>")
+    target_link_options(${WIN_TARGET} PRIVATE "$<$<CONFIG:Release>:/DEBUG>")
 endif()
 
 

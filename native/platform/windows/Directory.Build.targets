@@ -1,0 +1,8 @@
+<Project>
+  <ItemGroup Condition="'$(ProjectName)' == 'Pivox'">
+    <ClCompile Include="$(GeneratedFilesDir)module.g.cpp" />
+  </ItemGroup>
+  <ItemDefinitionGroup Condition="'$(ProjectName)' == 'Pivox'">
+    <Midl><OutputDirectory /></Midl>
+  </ItemDefinitionGroup>
+</Project>

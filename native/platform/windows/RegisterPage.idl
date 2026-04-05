@@ -1,0 +1,8 @@
+namespace Pivox
+{
+    [default_interface]
+    runtimeclass RegisterPage : Microsoft.UI.Xaml.Controls.Page
+    {
+        RegisterPage();
+    }
+}

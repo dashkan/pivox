@@ -1,0 +1,155 @@
+<Window
+    x:Class="Pivox.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Pivox"
+    Title="Pivox">
+
+    <Grid>
+        <!-- Auth screens shown when logged out -->
+        <Grid x:Name="AuthContainer" Visibility="Visible">
+            <Frame x:Name="AuthFrame" />
+        </Grid>
+
+        <!-- Main app shown when logged in -->
+        <Grid x:Name="MainContainer" Visibility="Collapsed">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Menu bar -->
+            <MenuBar Grid.Row="0">
+                <MenuBarItem Title="File">
+                    <MenuFlyoutItem Text="New Show" />
+                    <MenuFlyoutItem Text="Open Show..." />
+                    <MenuFlyoutSeparator />
+                    <MenuFlyoutItem Text="Exit" Click="OnMenuExit" />
+                </MenuBarItem>
+                <MenuBarItem Title="Edit">
+                    <MenuFlyoutItem Text="Undo" />
+                    <MenuFlyoutItem Text="Redo" />
+                    <MenuFlyoutSeparator />
+                    <MenuFlyoutItem Text="Cut" />
+                    <MenuFlyoutItem Text="Copy" />
+                    <MenuFlyoutItem Text="Paste" />
+                    <MenuFlyoutItem Text="Select All" />
+                </MenuBarItem>
+                <MenuBarItem Title="View">
+                    <MenuFlyoutItem Text="Toggle Sidebar" Click="OnMenuToggleSidebar" />
+                </MenuBarItem>
+                <MenuBarItem Title="Window">
+                    <MenuFlyoutItem Text="Minimize" Click="OnMenuMinimize" />
+                    <MenuFlyoutItem Text="Maximize" Click="OnMenuMaximize" />
+                </MenuBarItem>
+                <MenuBarItem Title="Help">
+                    <MenuFlyoutItem Text="Pivox Help" />
+                    <MenuFlyoutItem Text="About Pivox" />
+                </MenuBarItem>
+            </MenuBar>
+
+            <!-- NavigationView with sidebar -->
+            <NavigationView
+                x:Name="NavView"
+                Grid.Row="1"
+                IsBackButtonVisible="Collapsed"
+                IsSettingsVisible="False"
+                PaneDisplayMode="Left"
+                IsPaneOpen="True"
+                SelectionChanged="OnNavSelectionChanged">
+
+                <NavigationView.MenuItems>
+                    <NavigationViewItem Content="Operator" Tag="Operator"
+                        AutomationProperties.AutomationId="nav-operator">
+                        <NavigationViewItem.Icon>
+                            <SymbolIcon Symbol="Play" />
+                        </NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                    <NavigationViewItem Content="Library" Tag="Library"
+                        AutomationProperties.AutomationId="nav-library">
+                        <NavigationViewItem.Icon>
+                            <SymbolIcon Symbol="Library" />
+                        </NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                    <NavigationViewItem Content="Designer" Tag="Designer"
+                        AutomationProperties.AutomationId="nav-designer">
+                        <NavigationViewItem.Icon>
+                            <FontIcon Glyph="&#xE790;" />
+                        </NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                    <NavigationViewItem Content="Engineering" Tag="Engineering"
+                        AutomationProperties.AutomationId="nav-engineering">
+                        <NavigationViewItem.Icon>
+                            <FontIcon Glyph="&#xE90F;" />
+                        </NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                    <NavigationViewItem Content="Admin" Tag="Admin"
+                        AutomationProperties.AutomationId="nav-admin">
+                        <NavigationViewItem.Icon>
+                            <SymbolIcon Symbol="Setting" />
+                        </NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                </NavigationView.MenuItems>
+
+                <NavigationView.FooterMenuItems>
+                    <NavigationViewItem Content="Profile" Tag="Profile"
+                        AutomationProperties.AutomationId="nav-profile">
+                        <NavigationViewItem.Icon>
+                            <SymbolIcon Symbol="Contact" />
+                        </NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                </NavigationView.FooterMenuItems>
+
+                <!-- Content area -->
+                <Grid Padding="40">
+                    <StackPanel
+                        x:Name="ContentPanel"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="8">
+                        <TextBlock
+                            x:Name="SectionTitle"
+                            Text="Operator"
+                            Style="{StaticResource TitleLargeTextBlockStyle}"
+                            HorizontalAlignment="Center" />
+                        <TextBlock
+                            Text="Coming soon"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            HorizontalAlignment="Center" />
+                    </StackPanel>
+
+                    <!-- Profile flyout panel -->
+                    <StackPanel
+                        x:Name="ProfilePanel"
+                        Visibility="Collapsed"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="20"
+                        Width="300">
+                        <PersonPicture
+                            Width="64" Height="64"
+                            DisplayName="Ashkan Daie" />
+                        <StackPanel Spacing="4" HorizontalAlignment="Center">
+                            <TextBlock
+                                Text="Ashkan Daie"
+                                Style="{StaticResource SubtitleTextBlockStyle}"
+                                HorizontalAlignment="Center" />
+                            <TextBlock
+                                Text="ashkan@pivox.app"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                HorizontalAlignment="Center" />
+                        </StackPanel>
+                        <MenuFlyoutSeparator />
+                        <Button Content="Account Settings" HorizontalAlignment="Stretch" />
+                        <Button
+                            Content="Sign Out"
+                            HorizontalAlignment="Stretch"
+                            Click="OnSignOut"
+                            Foreground="Red"
+                            AutomationProperties.AutomationId="sign-out-button" />
+                    </StackPanel>
+                </Grid>
+            </NavigationView>
+        </Grid>
+    </Grid>
+</Window>

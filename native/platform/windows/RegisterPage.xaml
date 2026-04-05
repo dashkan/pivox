@@ -1,0 +1,106 @@
+<Page
+    x:Class="Pivox.RegisterPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Pivox"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+    <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+        <StackPanel
+            Width="380"
+            Padding="32"
+            Spacing="24"
+            CornerRadius="8"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+
+            <!-- Header -->
+            <StackPanel Spacing="8" HorizontalAlignment="Center">
+                <TextBlock
+                    Text="Pivox"
+                    Style="{StaticResource TitleLargeTextBlockStyle}"
+                    HorizontalAlignment="Center" />
+                <TextBlock
+                    Text="Create your account"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    HorizontalAlignment="Center" />
+            </StackPanel>
+
+            <!-- Form -->
+            <StackPanel Spacing="16">
+                <TextBox
+                    x:Name="EmailBox"
+                    Header="Email"
+                    PlaceholderText="you@example.com"
+                    AutomationProperties.AutomationId="register-email" />
+                <TextBox
+                    x:Name="DisplayNameBox"
+                    Header="Display name"
+                    PlaceholderText="Your name"
+                    AutomationProperties.AutomationId="register-display-name" />
+                <PasswordBox
+                    x:Name="PasswordBox"
+                    Header="Password"
+                    PlaceholderText="At least 8 characters"
+                    AutomationProperties.AutomationId="register-password" />
+                <PasswordBox
+                    x:Name="ConfirmPasswordBox"
+                    Header="Confirm password"
+                    PlaceholderText="Confirm password"
+                    AutomationProperties.AutomationId="register-confirm-password" />
+
+                <Button
+                    Content="Create Account"
+                    Style="{StaticResource AccentButtonStyle}"
+                    HorizontalAlignment="Stretch"
+                    Click="OnSignUp"
+                    AutomationProperties.AutomationId="register-submit" />
+            </StackPanel>
+
+            <!-- Separator -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <MenuFlyoutSeparator Grid.Column="0" VerticalAlignment="Center" />
+                <TextBlock
+                    Grid.Column="1"
+                    Text="or"
+                    Margin="12,0"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <MenuFlyoutSeparator Grid.Column="2" VerticalAlignment="Center" />
+            </Grid>
+
+            <!-- Social signup -->
+            <StackPanel Spacing="8">
+                <Button HorizontalAlignment="Stretch" AutomationProperties.AutomationId="register-google">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ImageIcon Source="/resources/icons/google-g.svg" Width="16" Height="16" />
+                        <TextBlock Text="Continue with Google" />
+                    </StackPanel>
+                </Button>
+                <Button HorizontalAlignment="Stretch" AutomationProperties.AutomationId="register-github">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ImageIcon Source="/resources/icons/github-mark.svg" Width="16" Height="16" />
+                        <TextBlock Text="Continue with GitHub" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+
+            <!-- Footer -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="4">
+                <TextBlock
+                    Text="Already have an account?"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <HyperlinkButton
+                    Content="Sign in"
+                    Padding="0"
+                    Click="OnSwitchToLogin"
+                    AutomationProperties.AutomationId="register-switch-login" />
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</Page>

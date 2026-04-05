@@ -1,0 +1,108 @@
+<Page
+    x:Class="Pivox.LoginPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Pivox"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+    <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+        <StackPanel
+            Width="380"
+            Padding="32"
+            Spacing="24"
+            CornerRadius="8"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+
+            <!-- Header -->
+            <StackPanel Spacing="8" HorizontalAlignment="Center">
+                <TextBlock
+                    Text="Pivox"
+                    Style="{StaticResource TitleLargeTextBlockStyle}"
+                    HorizontalAlignment="Center" />
+                <TextBlock
+                    Text="Sign in to your account"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    HorizontalAlignment="Center" />
+            </StackPanel>
+
+            <!-- Form -->
+            <StackPanel Spacing="16">
+                <TextBox
+                    x:Name="EmailBox"
+                    Header="Email"
+                    PlaceholderText="you@example.com"
+                    AutomationProperties.AutomationId="login-email" />
+                <PasswordBox
+                    x:Name="PasswordBox"
+                    Header="Password"
+                    PlaceholderText="Password"
+                    AutomationProperties.AutomationId="login-password" />
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <CheckBox Content="Remember me" Grid.Column="0" />
+                    <HyperlinkButton
+                        Content="Forgot password?"
+                        Grid.Column="1"
+                        Padding="0" />
+                </Grid>
+
+                <Button
+                    Content="Sign In"
+                    Style="{StaticResource AccentButtonStyle}"
+                    HorizontalAlignment="Stretch"
+                    Click="OnSignIn"
+                    AutomationProperties.AutomationId="login-submit" />
+            </StackPanel>
+
+            <!-- Separator -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <MenuFlyoutSeparator Grid.Column="0" VerticalAlignment="Center" />
+                <TextBlock
+                    Grid.Column="1"
+                    Text="or"
+                    Margin="12,0"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <MenuFlyoutSeparator Grid.Column="2" VerticalAlignment="Center" />
+            </Grid>
+
+            <!-- Social login -->
+            <StackPanel Spacing="8">
+                <Button HorizontalAlignment="Stretch" AutomationProperties.AutomationId="login-google">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ImageIcon Source="/resources/icons/google-g.svg" Width="16" Height="16" />
+                        <TextBlock Text="Continue with Google" />
+                    </StackPanel>
+                </Button>
+                <Button HorizontalAlignment="Stretch" AutomationProperties.AutomationId="login-github">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ImageIcon Source="/resources/icons/github-mark.svg" Width="16" Height="16" />
+                        <TextBlock Text="Continue with GitHub" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+
+            <!-- Footer -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="4">
+                <TextBlock
+                    Text="Don't have an account?"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <HyperlinkButton
+                    Content="Create one"
+                    Padding="0"
+                    Click="OnSwitchToRegister"
+                    AutomationProperties.AutomationId="login-switch-register" />
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</Page>
