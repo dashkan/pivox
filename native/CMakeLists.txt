@@ -108,3 +108,21 @@ if(WIN32)
     # See docs/dev/cross-platform-workflow.md for the SSH workflow.
     message(STATUS "Windows targets not yet configured — run the Windows build agent.")
 endif()
+
+
+# ============================================================
+# Shared C++ Tests (Google Test via vcpkg)
+# ============================================================
+
+find_package(GTest CONFIG)
+if(GTest_FOUND)
+    enable_testing()
+
+    add_executable(pivox_core_tests
+        tests/core/core_tests.cpp
+        tests/core/auth_validation_tests.cpp
+    )
+    target_link_libraries(pivox_core_tests PRIVATE pivox_core GTest::gtest_main)
+
+    add_test(NAME pivox_core_tests COMMAND pivox_core_tests)
+endif()
