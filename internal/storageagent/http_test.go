@@ -19,6 +19,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func skipIfProdAuth(t *testing.T) {
+	t.Helper()
+	if !devSkipAuth {
+		t.Skip("test requires dev mode (devSkipAuth=true) to bypass auth")
+	}
+}
+
 var testSigningKey = []byte("test-secret-key-for-jwt-signing!")
 
 func newTestHTTPServer(t *testing.T) (*HTTPServer, *SessionStore, *EndpointStore, *DeniedPatterns) {
@@ -102,6 +109,7 @@ func TestHTTP_SetCORSOrigin(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestHTTP_DeniedPattern(t *testing.T) {
+	skipIfProdAuth(t)
 	srv, _, _, denied := newTestHTTPServer(t)
 	denied.Update([]string{"/secret/*"})
 
@@ -113,6 +121,7 @@ func TestHTTP_DeniedPattern(t *testing.T) {
 }
 
 func TestHTTP_NoEndpoint(t *testing.T) {
+	skipIfProdAuth(t)
 	srv, _, _, _ := newTestHTTPServer(t)
 
 	w := httptest.NewRecorder()
@@ -123,6 +132,7 @@ func TestHTTP_NoEndpoint(t *testing.T) {
 }
 
 func TestHTTP_ServeFileRouting(t *testing.T) {
+	skipIfProdAuth(t)
 	srv, _, endpoints, _ := newTestHTTPServer(t)
 
 	dir := t.TempDir()
@@ -267,6 +277,7 @@ func TestValidateJWT_InvalidPayload(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestHTTP_NilDeniedPatterns_SkipsDeniedCheck(t *testing.T) {
+	skipIfProdAuth(t)
 	// Build a server with nil denied patterns to exercise the
 	// s.denied != nil guard in ServeHTTP.
 	sessions := NewSessionStore()
@@ -304,6 +315,7 @@ func TestHTTP_NilDeniedPatterns_SkipsDeniedCheck(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestHTTP_DeniedPattern_NoMatch_FallsThrough(t *testing.T) {
+	skipIfProdAuth(t)
 	srv, _, endpoints, denied := newTestHTTPServer(t)
 	denied.Update([]string{"/secret/*"})
 
