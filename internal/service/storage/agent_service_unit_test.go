@@ -490,3 +490,391 @@ func TestAuditMessage_DBError(t *testing.T) {
 
 	mockQ.AssertExpectations(t)
 }
+
+// ---------------------------------------------------------------------------
+// Connect — token DB error (non-ErrNoRows)
+// ---------------------------------------------------------------------------
+
+func TestConnect_TokenDBError(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	conns := agentstream.NewConnectionManager()
+	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
+
+	mockQ.On("GetStorageGatewayByToken", mock.Anything, "any-token").
+		Return(db.StorageGateway{}, errors.New("db connection error"))
+
+	stream := &mockConnectStream{
+		ctx: context.Background(),
+		recvQueue: []*agentv1.AgentMessage{
+			{
+				Id: "msg-1",
+				Message: &agentv1.AgentMessage_Handshake{
+					Handshake: &agentv1.Handshake{
+						RegistrationToken: "any-token",
+						IpAddress:         "10.0.0.1",
+					},
+				},
+			},
+		},
+	}
+
+	err := srv.Connect(stream)
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.Internal, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+// ---------------------------------------------------------------------------
+// Connect — agent lookup DB error (non-ErrNoRows)
+// ---------------------------------------------------------------------------
+
+func TestConnect_AgentLookupDBError(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	conns := agentstream.NewConnectionManager()
+	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
+
+	gatewayID := uuid.New()
+	gateway := db.StorageGateway{
+		ID:    gatewayID,
+		Name:  "gw-test",
+		State: db.StorageGatewayStateACTIVE,
+	}
+
+	mockQ.On("GetStorageGatewayByToken", mock.Anything, "valid-token").Return(gateway, nil)
+	mockQ.On("GetStorageAgentByGatewayAndIP", mock.Anything, mock.Anything).
+		Return(db.StorageAgent{}, errors.New("db connection error"))
+
+	stream := &mockConnectStream{
+		ctx: context.Background(),
+		recvQueue: []*agentv1.AgentMessage{
+			{
+				Id: "msg-1",
+				Message: &agentv1.AgentMessage_Handshake{
+					Handshake: &agentv1.Handshake{
+						RegistrationToken: "valid-token",
+						IpAddress:         "10.0.0.5",
+					},
+				},
+			},
+		},
+	}
+
+	err := srv.Connect(stream)
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.Internal, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+// ---------------------------------------------------------------------------
+// Connect — create agent DB error
+// ---------------------------------------------------------------------------
+
+func TestConnect_CreateAgentDBError(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	conns := agentstream.NewConnectionManager()
+	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
+
+	gatewayID := uuid.New()
+	gateway := db.StorageGateway{
+		ID:    gatewayID,
+		Name:  "gw-test",
+		State: db.StorageGatewayStateACTIVE,
+	}
+
+	mockQ.On("GetStorageGatewayByToken", mock.Anything, "valid-token").Return(gateway, nil)
+	mockQ.On("GetStorageAgentByGatewayAndIP", mock.Anything, mock.Anything).
+		Return(db.StorageAgent{}, pgx.ErrNoRows)
+	mockQ.On("CreateStorageAgent", mock.Anything, mock.Anything).
+		Return(db.StorageAgent{}, errors.New("db error"))
+
+	stream := &mockConnectStream{
+		ctx: context.Background(),
+		recvQueue: []*agentv1.AgentMessage{
+			{
+				Id: "msg-1",
+				Message: &agentv1.AgentMessage_Handshake{
+					Handshake: &agentv1.Handshake{
+						RegistrationToken: "valid-token",
+						IpAddress:         "10.0.0.5",
+					},
+				},
+			},
+		},
+	}
+
+	err := srv.Connect(stream)
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.Internal, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+// ---------------------------------------------------------------------------
+// Connect — reconnecting agent state update error
+// ---------------------------------------------------------------------------
+
+func TestConnect_ReconnectingAgentStateUpdateError(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	conns := agentstream.NewConnectionManager()
+	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
+
+	gatewayID := uuid.New()
+	existingAgentID := uuid.New()
+	gateway := db.StorageGateway{
+		ID:    gatewayID,
+		Name:  "gw-test",
+		State: db.StorageGatewayStateACTIVE,
+	}
+	existingAgent := db.StorageAgent{
+		ID:        existingAgentID,
+		GatewayID: gatewayID,
+		IpAddress: "10.0.0.5",
+		State:     db.AgentStateDISCONNECTED,
+	}
+
+	mockQ.On("GetStorageGatewayByToken", mock.Anything, "valid-token").Return(gateway, nil)
+	mockQ.On("GetStorageAgentByGatewayAndIP", mock.Anything, mock.Anything).Return(existingAgent, nil)
+	mockQ.On("UpdateStorageAgentState", mock.Anything, db.UpdateStorageAgentStateParams{
+		ID:    existingAgentID,
+		State: db.AgentStateCONNECTED,
+	}).Return(db.StorageAgent{}, errors.New("db error"))
+
+	stream := &mockConnectStream{
+		ctx: context.Background(),
+		recvQueue: []*agentv1.AgentMessage{
+			{
+				Id: "msg-1",
+				Message: &agentv1.AgentMessage_Handshake{
+					Handshake: &agentv1.Handshake{
+						RegistrationToken: "valid-token",
+						IpAddress:         "10.0.0.5",
+					},
+				},
+			},
+		},
+	}
+
+	err := srv.Connect(stream)
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.Internal, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+// ---------------------------------------------------------------------------
+// Connect — list endpoints error
+// ---------------------------------------------------------------------------
+
+func TestConnect_ListEndpointsError(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	conns := agentstream.NewConnectionManager()
+	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
+
+	gatewayID := uuid.New()
+	agentIDx := uuid.New()
+	gateway := db.StorageGateway{
+		ID:    gatewayID,
+		Name:  "gw-test",
+		State: db.StorageGatewayStateACTIVE,
+	}
+	agent := db.StorageAgent{
+		ID:        agentIDx,
+		GatewayID: gatewayID,
+		IpAddress: "10.0.0.5",
+		State:     db.AgentStateCONNECTED,
+	}
+
+	mockQ.On("GetStorageGatewayByToken", mock.Anything, "valid-token").Return(gateway, nil)
+	mockQ.On("GetStorageAgentByGatewayAndIP", mock.Anything, mock.Anything).Return(db.StorageAgent{}, pgx.ErrNoRows)
+	mockQ.On("CreateStorageAgent", mock.Anything, mock.Anything).Return(agent, nil)
+	mockQ.On("CreateStorageAgentAudit", mock.Anything, mock.Anything).Return(nil)
+	mockQ.On("ListStorageEndpointsByGateway", mock.Anything, gatewayID).Return([]db.StorageEndpoint{}, errors.New("db error"))
+
+	stream := &mockConnectStream{
+		ctx: context.Background(),
+		recvQueue: []*agentv1.AgentMessage{
+			{
+				Id: "msg-1",
+				Message: &agentv1.AgentMessage_Handshake{
+					Handshake: &agentv1.Handshake{
+						RegistrationToken: "valid-token",
+						IpAddress:         "10.0.0.5",
+					},
+				},
+			},
+		},
+	}
+
+	err := srv.Connect(stream)
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.Internal, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+// ---------------------------------------------------------------------------
+// Connect — reconnecting agent full flow
+// ---------------------------------------------------------------------------
+
+func TestConnect_ReconnectingAgent(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	conns := agentstream.NewConnectionManager()
+	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
+
+	gatewayID := uuid.New()
+	existingAgentID := uuid.New()
+	gateway := db.StorageGateway{
+		ID:    gatewayID,
+		Name:  "gw-reconnect",
+		State: db.StorageGatewayStateACTIVE, // Already active, no state change on connect
+	}
+	existingAgent := db.StorageAgent{
+		ID:        existingAgentID,
+		GatewayID: gatewayID,
+		IpAddress: "10.0.0.7",
+		State:     db.AgentStateCONNECTED,
+	}
+
+	mockQ.On("GetStorageGatewayByToken", mock.Anything, "reconnect-token").Return(gateway, nil)
+	mockQ.On("GetStorageAgentByGatewayAndIP", mock.Anything, mock.Anything).Return(existingAgent, nil)
+	mockQ.On("UpdateStorageAgentState", mock.Anything, db.UpdateStorageAgentStateParams{
+		ID:    existingAgentID,
+		State: db.AgentStateCONNECTED,
+	}).Return(existingAgent, nil)
+	mockQ.On("CreateStorageAgentAudit", mock.Anything, mock.Anything).Return(nil)
+	mockQ.On("ListStorageEndpointsByGateway", mock.Anything, gatewayID).Return([]db.StorageEndpoint{}, nil)
+
+	// Disconnect flow
+	mockQ.On("UpdateStorageAgentState", mock.Anything, db.UpdateStorageAgentStateParams{
+		ID:    existingAgentID,
+		State: db.AgentStateDISCONNECTED,
+	}).Return(existingAgent, nil)
+	mockQ.On("CountConnectedStorageAgentsByGateway", mock.Anything, gatewayID).Return(int64(1), nil)
+
+	stream := &mockConnectStream{
+		ctx: context.Background(),
+		recvQueue: []*agentv1.AgentMessage{
+			{
+				Id: "msg-hs",
+				Message: &agentv1.AgentMessage_Handshake{
+					Handshake: &agentv1.Handshake{
+						RegistrationToken: "reconnect-token",
+						IpAddress:         "10.0.0.7",
+					},
+				},
+			},
+		},
+	}
+
+	err := srv.Connect(stream)
+	require.NoError(t, err)
+	mockQ.AssertExpectations(t)
+}
+
+// ---------------------------------------------------------------------------
+// Connect — receive loop with various message types
+// ---------------------------------------------------------------------------
+
+func TestConnect_ReceiveLoop_MessageTypes(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	conns := agentstream.NewConnectionManager()
+	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
+
+	gatewayID := uuid.New()
+	agentIDy := uuid.New()
+
+	gateway := db.StorageGateway{
+		ID:    gatewayID,
+		Name:  "gw-msg",
+		State: db.StorageGatewayStateACTIVE,
+	}
+	agent := db.StorageAgent{
+		ID:        agentIDy,
+		GatewayID: gatewayID,
+		IpAddress: "10.0.0.8",
+		State:     db.AgentStateCONNECTED,
+	}
+
+	mockQ.On("GetStorageGatewayByToken", mock.Anything, "token-msg").Return(gateway, nil)
+	mockQ.On("GetStorageAgentByGatewayAndIP", mock.Anything, mock.Anything).Return(db.StorageAgent{}, pgx.ErrNoRows)
+	mockQ.On("CreateStorageAgent", mock.Anything, mock.Anything).Return(agent, nil)
+	mockQ.On("CreateStorageAgentAudit", mock.Anything, mock.Anything).Return(nil)
+	mockQ.On("ListStorageEndpointsByGateway", mock.Anything, gatewayID).Return([]db.StorageEndpoint{}, nil)
+
+	// Message handling: heartbeat (updates heartbeat), endpoint_health, telemetry, upgrade_status, sync_status
+	mockQ.On("UpdateStorageAgentHeartbeat", mock.Anything, agentIDy).Return(nil)
+
+	// Disconnect
+	mockQ.On("UpdateStorageAgentState", mock.Anything, db.UpdateStorageAgentStateParams{
+		ID:    agentIDy,
+		State: db.AgentStateDISCONNECTED,
+	}).Return(agent, nil)
+	mockQ.On("CountConnectedStorageAgentsByGateway", mock.Anything, gatewayID).Return(int64(0), nil)
+	mockQ.On("UpdateStorageGatewayState", mock.Anything, db.UpdateStorageGatewayStateParams{
+		ID:    gatewayID,
+		State: db.StorageGatewayStateOFFLINE,
+	}).Return(nil)
+
+	stream := &mockConnectStream{
+		ctx: context.Background(),
+		recvQueue: []*agentv1.AgentMessage{
+			{
+				Id: "msg-hs",
+				Message: &agentv1.AgentMessage_Handshake{
+					Handshake: &agentv1.Handshake{
+						RegistrationToken: "token-msg",
+						IpAddress:         "10.0.0.8",
+					},
+				},
+			},
+			{
+				Id:      "msg-hb",
+				Message: &agentv1.AgentMessage_Heartbeat{Heartbeat: &agentv1.Heartbeat{}},
+			},
+			{
+				Id: "msg-ep",
+				Message: &agentv1.AgentMessage_EndpointHealth{
+					EndpointHealth: &agentv1.EndpointHealth{
+						EndpointName: "ep-1",
+						Reachable:    true,
+						LatencyMs:    10,
+					},
+				},
+			},
+			{
+				Id: "msg-tel",
+				Message: &agentv1.AgentMessage_Telemetry{
+					Telemetry: &agentv1.Telemetry{},
+				},
+			},
+			{
+				Id: "msg-upg",
+				Message: &agentv1.AgentMessage_UpgradeStatus{
+					UpgradeStatus: &agentv1.UpgradeStatus{
+						Version: "2.0.0",
+					},
+				},
+			},
+			{
+				Id: "msg-sync",
+				Message: &agentv1.AgentMessage_SyncStatus{
+					SyncStatus: &agentv1.SyncStatus{
+						PendingWrites: 5,
+						SyncedWrites:  100,
+					},
+				},
+			},
+		},
+	}
+
+	err := srv.Connect(stream)
+	require.NoError(t, err)
+	mockQ.AssertExpectations(t)
+}
