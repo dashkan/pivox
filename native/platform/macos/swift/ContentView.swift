@@ -20,15 +20,19 @@ enum AppSection: String, CaseIterable, Identifiable {
     }
 }
 
+enum SidebarItem: Hashable {
+    case section(AppSection)
+    case profile
+}
+
 enum AuthState {
     case loggedOut
     case loggedIn
 }
 
 struct ContentView: View {
-    @State private var selectedSection: AppSection? = .operator_
+    @State private var selectedItem: SidebarItem? = .section(.operator_)
     @State private var authState: AuthState = .loggedOut
-    @State private var showProfile = false
 
     var body: some View {
         Group {
@@ -43,13 +47,29 @@ struct ContentView: View {
 
     private var mainAppView: some View {
         NavigationSplitView {
-            List(AppSection.allCases, selection: $selectedSection) { section in
-                Label(section.rawValue, systemImage: section.icon)
+            VStack(spacing: 0) {
+                List(selection: $selectedItem) {
+                    ForEach(AppSection.allCases) { section in
+                        Label(section.rawValue, systemImage: section.icon)
+                            .tag(SidebarItem.section(section))
+                    }
+                }
+                .listStyle(.sidebar)
+
+                Divider()
+
+                // Profile at sidebar footer — matches Windows NavigationView pattern.
+                List(selection: $selectedItem) {
+                    Label("Profile", systemImage: "person.circle")
+                        .tag(SidebarItem.profile)
+                }
+                .listStyle(.sidebar)
+                .frame(height: 40)
             }
-            .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 260)
         } detail: {
-            if let section = selectedSection {
+            switch selectedItem {
+            case .section(let section):
                 VStack {
                     Text(section.rawValue)
                         .font(.largeTitle)
@@ -58,24 +78,15 @@ struct ContentView: View {
                         .foregroundStyle(.tertiary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
+            case .profile:
+                ProfileView(onSignOut: {
+                    authState = .loggedOut
+                })
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case nil:
                 Text("Select a section")
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        }
-        .toolbar {
-            ToolbarItem(placement: .automatic) {
-                Button(action: { showProfile.toggle() }) {
-                    Image(systemName: "person.circle")
-                }
-                .popover(isPresented: $showProfile) {
-                    ProfileView(onSignOut: {
-                        showProfile = false
-                        authState = .loggedOut
-                    })
-                    .frame(width: 300, height: 280)
-                }
             }
         }
     }
