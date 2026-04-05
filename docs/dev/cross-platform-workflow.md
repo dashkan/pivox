@@ -2,7 +2,7 @@
 
 ## Overview
 
-Pivox is developed by a single developer on macOS (Apple Silicon). The native app targets both macOS (SwiftUI) and Windows (WinUI 3). Rather than file sync tools (Mutagen, NFS) or remote desktop sessions, cross-platform builds are orchestrated via a **remote MCP server** running on the Windows machine.
+Pivox is developed by a single developer on macOS (Apple Silicon). The native app targets both macOS (SwiftUI) and Windows (WinUI 3). Cross-platform builds are orchestrated over SSH — no file sync tools, no custom servers.
 
 macOS is the brain. Windows is the executor. Git is the only shared state.
 
@@ -29,22 +29,20 @@ Developer + Claude Code (macOS)
   ▼
 Claude Code generates build spec from changes
   │
-  │  MCP tool call over network
+  │  SSH to Windows machine
   │
   ▼
-Windows MCP Server (always running on Windows machine)
+Windows machine (SSH)
   │
-  │  1. git fetch + pull latest
-  │  2. Create worktree on build branch
-  │  3. Launch Claude Code with build spec
+  │  1. git pull latest
+  │  2. Write build spec
+  │  3. Launch Claude Code unattended
   │     (--dangerously-skip-permissions --print)
   │  4. Claude builds, tests, fixes, iterates
-  │  5. Commits results to build branch
-  │  6. Cleans up worktree
-  │  7. Returns summary to macOS
+  │  5. Commits results, pushes
   │
   ▼
-macOS Claude receives results
+macOS receives push notification
 Developer reviews commits, merges
 ```
 
@@ -55,74 +53,51 @@ Developer reviews commits, merges
 No file sync. The git repo is the single source of truth:
 
 - macOS pushes shared code + SwiftUI changes
-- Windows MCP pulls before starting work
-- Windows Claude commits results to a build branch
+- Windows pulls before starting work
+- Windows Claude commits and pushes results
 - Developer reviews and merges from macOS
 
-### Windows MCP Server
+### SSH Commands
 
-A lightweight MCP server running on the Windows machine, exposed over the local network. It provides tools that Claude Code on macOS can call directly.
+Everything runs over SSH. No custom server to build or maintain.
 
-**Core tools:**
+**Build:**
 
-| Tool | Purpose |
-|---|---|
-| `build` | Pull latest, run Claude Code with a build spec, return results |
-| `status` | Check if a build is in progress, return current state |
-| `test` | Run specific tests on Windows, return results |
-| `screenshot` | Capture screenshot of the running app for visual verification |
+```bash
+ssh win 'cd ~/Projects/pivox && git pull && claude --dangerously-skip-permissions --print -p @BUILD_SPEC.md 2>&1 | tee ~/pivox-builds/latest.log'
+```
 
-**Implementation sketch:**
+**Check status:**
 
-```python
-# Pseudocode — the MCP server is simple
-@tool
-def build(spec: str, branch: str = "windows-build") -> BuildResult:
-    # 1. Pull latest
-    run("git fetch origin && git pull")
+```bash
+ssh win 'pgrep -f "claude.*pivox" && echo "build running" || echo "idle"'
+```
 
-    # 2. Create worktree
-    worktree_path = create_worktree(branch)
+**Run tests:**
 
-    # 3. Write spec
-    write_file(f"{worktree_path}/BUILD_SPEC.md", spec)
+```bash
+ssh win 'cd ~/Projects/pivox && cmake --build build --target test'
+```
 
-    # 4. Run Claude Code unattended
-    result = run(
-        f"claude --dangerously-skip-permissions --print "
-        f"-p @BUILD_SPEC.md",
-        cwd=worktree_path,
-        stdout=TEE("~/pivox-builds/latest.log")  # visibility
-    )
+**Screenshot:**
 
-    # 5. Capture results
-    commit_hash = get_head_commit(worktree_path)
-
-    # 6. Clean up
-    cleanup_worktree(worktree_path)
-
-    # 7. Return
-    return BuildResult(
-        success=result.exit_code == 0,
-        commit=commit_hash,
-        log_tail=tail("~/pivox-builds/latest.log", 50)
-    )
+```bash
+ssh win 'powershell -c "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Screen]::PrimaryScreen | ForEach-Object { $bmp = New-Object System.Drawing.Bitmap($_.Bounds.Width, $_.Bounds.Height); [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($_.Bounds.Location, [System.Drawing.Point]::Empty, $_.Bounds.Size); $bmp.Save(\"$HOME/screenshot.png\") }"' && scp win:~/screenshot.png /tmp/screenshot.png
 ```
 
 ### Claude Code on Windows
 
 Runs via `--dangerously-skip-permissions` for unattended execution. Safe because:
 
-- Always runs in a **git worktree** (isolated from main branch)
 - The build spec constrains scope ("only modify files under `platform/windows/` and shared interfaces")
-- Results go to a branch, never main — developer reviews and merges
+- Results are committed and pushed — developer reviews before merging
 - The machine is a build box, not production. No secrets, no deployments.
 
-`--print` streams Claude's output to stdout, which the MCP server tees to a log file for visibility.
+`--print` streams Claude's output to stdout, which `tee` captures to a log file.
 
 ### Visibility
 
-The MCP server tees Claude's output to a log file. On macOS, a terminal on a second monitor provides live visibility:
+On macOS, a terminal on a second monitor provides live visibility:
 
 ```bash
 ssh win 'tail -f ~/pivox-builds/latest.log'
@@ -147,8 +122,11 @@ When invoked:
    - Expected behavior and acceptance criteria
    - Files to modify (scoped to `platform/windows/`, `core/`, `shared-ui/`, `cef/`)
 3. **Push to remote** — ensure all changes are pushed
-4. **Spawn background agent** — calls the Windows MCP server's `build` tool with the spec
-5. **Continue working** — the developer keeps working on macOS. The background agent notifies when the Windows build completes.
+4. **SSH to Windows** — run Claude Code with the build spec:
+   ```bash
+   ssh win 'cd ~/Projects/pivox && git pull && claude --dangerously-skip-permissions --print -p "$(cat)" 2>&1 | tee ~/pivox-builds/latest.log' <<< "$BUILD_SPEC"
+   ```
+5. **Continue working** — the developer keeps working on macOS. The SSH command runs in the background.
 
 ### Build Spec Format
 
@@ -198,35 +176,33 @@ Shared C++ core now has a TransitionPreview class that renders preview frames.
 - Dedicated Windows 11 x64 machine on local network
 - Visual Studio 2026, MSVC, Windows SDK
 - Claude Code installed (for unattended execution)
-- Windows MCP server running as a service
-- SSH enabled (for log tailing and ad-hoc access)
+- SSH enabled (OpenSSH server)
 - RDP/Parsec available for visual debugging when needed
 
 ### Network
 
 - Both machines on the same local network
-- MCP server exposed on a known port (e.g., `http://win:3001/mcp`)
-- SSH for log tailing and ad-hoc commands
+- SSH access configured (`~/.ssh/config` alias `win`)
 - Git remote (GitHub) as the shared repository
 
 ## Scaling Beyond Two Platforms
 
 The same pattern extends to additional build targets:
 
-| Machine | MCP Server | Purpose |
+| Machine | SSH alias | Purpose |
 |---|---|---|
-| Windows x64 | `http://win:3001/mcp` | WinUI 3 native app builds |
-| Linux (headless) | `http://linux:3001/mcp` | Engine builds, CI validation |
-| Windows Server | `http://winserver:3001/mcp` | Engine + AJA driver testing |
+| Windows x64 | `win` | WinUI 3 native app builds |
+| Linux (headless) | `linux` | Engine builds, CI validation |
+| Windows Server | `winserver` | Engine + AJA driver testing |
 
-Each machine runs its own MCP server. Claude on macOS orchestrates all of them. The `/deploy-windows` skill could become `/deploy <target>` with per-target build specs.
+The `/deploy-windows` skill becomes `/deploy <target>` with per-target build specs:
 
 ```
 Developer + Claude (macOS)
   │
-  ├──► Windows MCP → native app build
-  ├──► Linux MCP → engine build + test
-  └──► macOS local → SwiftUI + shared code
+  ├──► ssh win → native app build
+  ├──► ssh linux → engine build + test
+  └──► local → SwiftUI + shared code
        (all in parallel)
 ```
 
@@ -237,7 +213,7 @@ Developer + Claude (macOS)
 1. Write shared C++ and SwiftUI code on macOS
 2. Build and test on macOS (fast local iteration)
 3. When feature is complete and working on macOS:
-   - `/deploy-windows` — triggers Windows build via MCP
+   - `/deploy-windows` — triggers Windows build via SSH
    - Keep working on next task while Windows builds
    - Review Windows results when notified
    - Merge if good, iterate if not
@@ -247,7 +223,7 @@ Developer + Claude (macOS)
 For Windows-specific bugs that need interactive debugging:
 
 1. RDP/Parsec into the Windows machine
-2. Open the worktree branch in Visual Studio
+2. Open the project in Visual Studio
 3. Set breakpoints, run debugger
 4. Fix locally on Windows, commit, push
 5. Pull the fix on macOS, continue
@@ -259,6 +235,6 @@ This should be infrequent — most Windows work is straightforward UI implementa
 GitHub Actions provides a safety net:
 
 - Every push triggers builds on both macOS and Windows runners
-- Catches build breaks before they reach the MCP workflow
+- Catches build breaks before they reach the SSH workflow
 - Runs tests on both platforms
-- The MCP workflow is for development iteration; CI is for validation
+- The SSH workflow is for development iteration; CI is for validation
