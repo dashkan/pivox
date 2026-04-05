@@ -1,2 +1,2 @@
-// Bridging header for Swift ↔ C++ interop.
-// Empty for now — will include CEF bridge and core headers when needed.
+// Bridging header for Swift ↔ C++ interop via Obj-C.
+#import "AppStateBridge.h"

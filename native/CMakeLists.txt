@@ -33,6 +33,19 @@ if(APPLE)
     # Asset catalog — compiled automatically by Xcode generator.
     set(ASSET_CATALOG "${CMAKE_SOURCE_DIR}/platform/macos/Assets.xcassets")
 
+    # Obj-C++ bridge library (wraps C++ core for Swift consumption).
+    add_library(pivox_bridge STATIC
+        platform/macos/objcpp/MacAppState.mm
+        platform/macos/objcpp/AppStateBridge.mm
+    )
+    target_link_libraries(pivox_bridge PUBLIC pivox_core)
+    target_include_directories(pivox_bridge PUBLIC
+        "${CMAKE_SOURCE_DIR}/core"
+        "${CMAKE_SOURCE_DIR}/platform/macos/objcpp"
+    )
+    target_link_libraries(pivox_bridge PRIVATE "-framework Security")
+
+    # Swift executable (SwiftUI app).
     add_executable(${APP_TARGET} MACOSX_BUNDLE
         platform/macos/swift/main.swift
         platform/macos/swift/AppDelegate.swift
@@ -50,10 +63,13 @@ if(APPLE)
         MACOSX_PACKAGE_LOCATION Resources
     )
 
-    target_link_libraries(${APP_TARGET} PRIVATE pivox_core)
+    target_link_libraries(${APP_TARGET} PRIVATE pivox_bridge)
 
     target_compile_options(${APP_TARGET} PRIVATE
         "SHELL:-import-objc-header ${CMAKE_SOURCE_DIR}/platform/macos/Bridging-Header.h"
+    )
+    target_include_directories(${APP_TARGET} PRIVATE
+        "${CMAKE_SOURCE_DIR}/platform/macos/objcpp"
     )
 
     set_target_properties(${APP_TARGET} PROPERTIES
@@ -94,6 +110,7 @@ if(APPLE)
     target_compile_options(PivoxTests PRIVATE
         "SHELL:-import-objc-header ${CMAKE_SOURCE_DIR}/platform/macos/Bridging-Header.h"
     )
+    target_include_directories(PivoxTests PRIVATE "${CMAKE_SOURCE_DIR}/platform/macos/objcpp")
 
     xctest_add_test(PivoxUnitTests PivoxTests)
 
@@ -107,6 +124,7 @@ if(APPLE)
     target_compile_options(PivoxUITests PRIVATE
         "SHELL:-import-objc-header ${CMAKE_SOURCE_DIR}/platform/macos/Bridging-Header.h"
     )
+    target_include_directories(PivoxUITests PRIVATE "${CMAKE_SOURCE_DIR}/platform/macos/objcpp")
 
     # Mark as UI test bundle — XCUITest launches the app itself.
     set_target_properties(PivoxUITests PROPERTIES
@@ -225,6 +243,7 @@ if(GTest_FOUND)
     add_executable(pivox_core_tests
         tests/core/core_tests.cpp
         tests/core/auth_validation_tests.cpp
+        tests/core/app_state_tests.cpp
     )
     target_link_libraries(pivox_core_tests PRIVATE pivox_core GTest::gtest_main)
 

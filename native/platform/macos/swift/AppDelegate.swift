@@ -3,26 +3,42 @@ import SwiftUI
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     var window: NSWindow!
+    private let appState = AppStateBridge.shared()!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let contentView = ContentView()
             .frame(minWidth: 1024, minHeight: 768)
 
+        // Restore saved window state or use defaults.
+        let width = appState.hasWindowState() ? appState.windowWidth() : 1280
+        let height = appState.hasWindowState() ? appState.windowHeight() : 800
+
         window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1280, height: 800),
+            contentRect: NSRect(x: 0, y: 0, width: Int(width), height: Int(height)),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
-        window.setFrameAutosaveName(NSWindow.FrameAutosaveName("PivoxMainWindow"))
         window.title = "Pivox"
         window.contentView = NSHostingView(rootView: contentView)
-        window.makeKeyAndOrderFront(nil)
 
-        // Center only on first launch (no saved frame yet).
-        if !window.setFrameUsingName(NSWindow.FrameAutosaveName("PivoxMainWindow")) {
+        if appState.hasWindowState() {
+            let x = appState.windowX()
+            let y = appState.windowY()
+            window.setFrameOrigin(NSPoint(x: Int(x), y: Int(y)))
+        } else {
             window.center()
         }
+
+        window.makeKeyAndOrderFront(nil)
+
+        // Observe window move/resize to persist state.
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(windowDidResize),
+            name: NSWindow.didResizeNotification, object: window)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(windowDidMove),
+            name: NSWindow.didMoveNotification, object: window)
 
         setupMainMenu()
 
@@ -31,6 +47,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         return true
+    }
+
+    @objc private func windowDidResize(_ notification: Notification) {
+        saveWindowState()
+    }
+
+    @objc private func windowDidMove(_ notification: Notification) {
+        saveWindowState()
+    }
+
+    private func saveWindowState() {
+        let frame = window.frame
+        appState.saveWindowX(Int32(frame.origin.x),
+                            y: Int32(frame.origin.y),
+                            width: Int32(frame.size.width),
+                            height: Int32(frame.size.height))
     }
 
     private func setupMainMenu() {

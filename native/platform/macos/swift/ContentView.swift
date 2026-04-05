@@ -32,7 +32,14 @@ enum AuthState {
 
 struct ContentView: View {
     @State private var selectedItem: SidebarItem? = .section(.operator_)
-    @State private var authState: AuthState = .loggedOut
+    @State private var authState: AuthState
+
+    init() {
+        // If "Remember Me" was checked on last login, skip the login screen.
+        let state = AppStateBridge.shared()!
+        let remembered = state.hasBool(forKey: "rememberMe") && state.loadBool(forKey: "rememberMe")
+        _authState = State(initialValue: remembered ? .loggedIn : .loggedOut)
+    }
 
     var body: some View {
         Group {

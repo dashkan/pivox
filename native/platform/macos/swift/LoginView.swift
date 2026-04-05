@@ -4,9 +4,19 @@ struct LoginView: View {
     var onSignIn: () -> Void
     var onSwitchToRegister: () -> Void
 
+    private let appState = AppStateBridge.shared()!
+
     @State private var email = ""
     @State private var password = ""
-    @State private var rememberMe = false
+    @State private var rememberMe: Bool
+
+    init(onSignIn: @escaping () -> Void, onSwitchToRegister: @escaping () -> Void) {
+        self.onSignIn = onSignIn
+        self.onSwitchToRegister = onSwitchToRegister
+        // Restore "Remember Me" from persisted state.
+        let state = AppStateBridge.shared()!
+        _rememberMe = State(initialValue: state.hasBool(forKey: "rememberMe") ? state.loadBool(forKey: "rememberMe") : false)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -51,7 +61,10 @@ struct LoginView: View {
                         .font(.caption)
                 }
 
-                Button(action: onSignIn) {
+                Button(action: {
+                    appState.save(rememberMe, forKey: "rememberMe")
+                    onSignIn()
+                }) {
                     Text("Sign In")
                         .frame(maxWidth: .infinity)
                 }
