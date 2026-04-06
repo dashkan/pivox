@@ -102,6 +102,7 @@ if(APPLE)
         "${FB_AUTH}/FirebaseCoreExtension.xcframework"
         "${FB_AUTH}/GTMSessionFetcher.xcframework"
         "${FB_AUTH}/RecaptchaInterop.xcframework"
+        # Google Sign-In uses ASWebAuthenticationSession (built-in, no extra SDK).
     )
     target_link_options(${APP_TARGET} PRIVATE "LINKER:-ObjC")
 

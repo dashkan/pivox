@@ -1,11 +1,14 @@
 import Foundation
+import AppKit
+import AuthenticationServices
+import CryptoKit
 import FirebaseCore
 import FirebaseAuth
 
 /// Manages authentication state using Firebase Apple SDK.
 /// Observable by SwiftUI views for reactive auth state updates.
 @Observable
-class AuthService {
+class AuthService: NSObject {
     static let shared = AuthService()
 
     var currentUser: User?
@@ -15,7 +18,9 @@ class AuthService {
     private var authStateHandle: AuthStateDidChangeListenerHandle?
     private let appState = AppStateBridge.shared()!
 
-    private init() {}
+    private override init() {
+        super.init()
+    }
 
     /// Configure Firebase and start listening for auth state changes.
     /// Call once at app launch (AppDelegate).
@@ -66,6 +71,115 @@ class AuthService {
         }
     }
 
+    // MARK: - Google Sign-In (via ASWebAuthenticationSession)
+
+    private let googleClientID = "45920224787-gb662gbotfv763cqjis53748ctgigncl.apps.googleusercontent.com"
+
+    func signInWithGoogle() async {
+        errorMessage = nil
+
+        do {
+            let (idToken, accessToken) = try await performGoogleOAuth()
+            let credential = GoogleAuthProvider.credential(
+                withIDToken: idToken,
+                accessToken: accessToken
+            )
+            let authResult = try await Auth.auth().signIn(with: credential)
+            currentUser = authResult.user
+
+            if let token = try? await authResult.user.getIDToken() {
+                appState.saveSecure(token, forKey: "firebase_id_token")
+            }
+        } catch {
+            errorMessage = firebaseErrorMessage(error)
+        }
+    }
+
+    private func performGoogleOAuth() async throws -> (idToken: String, accessToken: String) {
+        let nonce = UUID().uuidString
+        let codeVerifier = generateCodeVerifier()
+        let codeChallenge = generateCodeChallenge(from: codeVerifier)
+
+        var components = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")!
+        components.queryItems = [
+            URLQueryItem(name: "client_id", value: googleClientID),
+            URLQueryItem(name: "redirect_uri", value: "com.googleusercontent.apps.45920224787-gb662gbotfv763cqjis53748ctgigncl:/oauth2callback"),
+            URLQueryItem(name: "response_type", value: "code"),
+            URLQueryItem(name: "scope", value: "openid email profile"),
+            URLQueryItem(name: "code_challenge", value: codeChallenge),
+            URLQueryItem(name: "code_challenge_method", value: "S256"),
+            URLQueryItem(name: "state", value: nonce),
+        ]
+
+        let authURL = components.url!
+        let callbackScheme = "com.googleusercontent.apps.45920224787-gb662gbotfv763cqjis53748ctgigncl"
+
+        let callbackURL = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
+            let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: callbackScheme) { url, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else if let url = url {
+                    continuation.resume(returning: url)
+                } else {
+                    continuation.resume(throwing: NSError(domain: "AuthService", code: -1, userInfo: [NSLocalizedDescriptionKey: "No callback URL received"]))
+                }
+            }
+            session.presentationContextProvider = self
+            session.prefersEphemeralWebBrowserSession = false
+            session.start()
+        }
+
+        // Extract auth code from callback URL.
+        guard let queryItems = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)?.queryItems,
+              let code = queryItems.first(where: { $0.name == "code" })?.value else {
+            throw NSError(domain: "AuthService", code: -1, userInfo: [NSLocalizedDescriptionKey: "No auth code in callback"])
+        }
+
+        // Exchange code for tokens.
+        let tokenURL = URL(string: "https://oauth2.googleapis.com/token")!
+        var request = URLRequest(url: tokenURL)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+
+        let body = [
+            "code=\(code)",
+            "client_id=\(googleClientID)",
+            "redirect_uri=com.googleusercontent.apps.45920224787-gb662gbotfv763cqjis53748ctgigncl:/oauth2callback",
+            "grant_type=authorization_code",
+            "code_verifier=\(codeVerifier)",
+        ].joined(separator: "&")
+        request.httpBody = body.data(using: .utf8)
+
+        let (data, _) = try await URLSession.shared.data(for: request)
+        let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+
+        guard let idToken = json["id_token"] as? String,
+              let accessToken = json["access_token"] as? String else {
+            throw NSError(domain: "AuthService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to get tokens from Google"])
+        }
+
+        return (idToken, accessToken)
+    }
+
+    // MARK: - PKCE Helpers
+
+    private func generateCodeVerifier() -> String {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        return Data(bytes).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+
+    private func generateCodeChallenge(from verifier: String) -> String {
+        let hash = SHA256.hash(data: Data(verifier.utf8))
+        return Data(hash).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+
     // MARK: - Sign Out
 
     func signOut() {
@@ -79,7 +193,7 @@ class AuthService {
         }
     }
 
-    // MARK: - Error Mapping
+    // MARK: - Sign Out + Error Mapping
 
     private func firebaseErrorMessage(_ error: Error) -> String {
         // Log the full error for debugging.
@@ -108,5 +222,13 @@ class AuthService {
         default:
             return error.localizedDescription
         }
+    }
+}
+
+// MARK: - ASWebAuthenticationPresentationContextProviding
+
+extension AuthService: ASWebAuthenticationPresentationContextProviding {
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        return NSApplication.shared.keyWindow ?? ASPresentationAnchor()
     }
 }

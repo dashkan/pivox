@@ -110,7 +110,9 @@ struct LoginView: View {
 
             // Social login
             VStack(spacing: 8) {
-                Button(action: { /* placeholder */ }) {
+                Button(action: {
+                    Task { await auth.signInWithGoogle() }
+                }) {
                     HStack {
                         GoogleIcon(size: 16)
                         Text("Continue with Google")

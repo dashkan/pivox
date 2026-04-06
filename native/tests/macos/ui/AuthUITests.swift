@@ -93,6 +93,12 @@ class AuthUITests: XCTestCase {
         XCTAssertTrue(operator_.waitForExistence(timeout: 10), "Should navigate to main app after sign-in")
     }
 
+    func testGoogleSignInButtonExists() throws {
+        let googleButton = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'Google'")).firstMatch
+        XCTAssertTrue(googleButton.waitForExistence(timeout: 5), "Continue with Google button should exist")
+        XCTAssertTrue(googleButton.isEnabled, "Google sign-in button should be enabled")
+    }
+
     func testSignInWithInvalidPassword() throws {
         let emailField = app.textFields["login-email"]
         XCTAssertTrue(emailField.waitForExistence(timeout: 5))
