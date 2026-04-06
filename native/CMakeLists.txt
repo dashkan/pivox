@@ -295,7 +295,7 @@ if(WIN32)
         "${CMAKE_SOURCE_DIR}/core"
     )
     target_link_libraries(pivox_win_state PUBLIC pivox_core)
-    target_link_libraries(pivox_win_state PRIVATE crypt32 advapi32)
+    target_link_libraries(pivox_win_state PRIVATE crypt32 advapi32 winhttp)
 
     # Firebase C++ SDK — link auth + app libraries.
     if(EXISTS "${FB_CPP_ROOT}")

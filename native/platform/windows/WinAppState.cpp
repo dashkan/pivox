@@ -192,27 +192,24 @@ void WinAppState::deleteSecure(const std::string& key) {
 // Protocol handler registration
 // ---------------------------------------------------------------------------
 
-void WinAppState::registerProtocolHandler() {
-    // Get path to current executable.
-    wchar_t exePath[MAX_PATH];
-    GetModuleFileNameW(nullptr, exePath, MAX_PATH);
-
-    // Register pivox:// URL scheme at HKCU\Software\Classes\pivox.
+// Helper: register a URL scheme in HKCU\Software\Classes.
+static void registerScheme(const wchar_t* scheme, const wchar_t* description,
+                           const wchar_t* exePath) {
     HKEY hKey;
-    if (RegCreateKeyExW(HKEY_CURRENT_USER, L"Software\\Classes\\pivox", 0, nullptr,
+    std::wstring baseKey = std::wstring(L"Software\\Classes\\") + scheme;
+
+    if (RegCreateKeyExW(HKEY_CURRENT_USER, baseKey.c_str(), 0, nullptr,
             0, KEY_WRITE, nullptr, &hKey, nullptr) == ERROR_SUCCESS) {
-        const wchar_t* desc = L"Pivox OAuth Callback";
         RegSetValueExW(hKey, nullptr, 0, REG_SZ,
-            reinterpret_cast<const BYTE*>(desc),
-            static_cast<DWORD>((wcslen(desc) + 1) * sizeof(wchar_t)));
+            reinterpret_cast<const BYTE*>(description),
+            static_cast<DWORD>((wcslen(description) + 1) * sizeof(wchar_t)));
         const wchar_t* urlProtocol = L"";
         RegSetValueExW(hKey, L"URL Protocol", 0, REG_SZ,
             reinterpret_cast<const BYTE*>(urlProtocol), sizeof(wchar_t));
         RegCloseKey(hKey);
     }
 
-    // Set the default icon.
-    std::wstring iconKey = L"Software\\Classes\\pivox\\DefaultIcon";
+    std::wstring iconKey = baseKey + L"\\DefaultIcon";
     if (RegCreateKeyExW(HKEY_CURRENT_USER, iconKey.c_str(), 0, nullptr,
             0, KEY_WRITE, nullptr, &hKey, nullptr) == ERROR_SUCCESS) {
         std::wstring iconPath = std::wstring(exePath) + L",0";
@@ -222,8 +219,7 @@ void WinAppState::registerProtocolHandler() {
         RegCloseKey(hKey);
     }
 
-    // Set the command to launch the app with the URL.
-    std::wstring cmdKey = L"Software\\Classes\\pivox\\shell\\open\\command";
+    std::wstring cmdKey = baseKey + L"\\shell\\open\\command";
     if (RegCreateKeyExW(HKEY_CURRENT_USER, cmdKey.c_str(), 0, nullptr,
             0, KEY_WRITE, nullptr, &hKey, nullptr) == ERROR_SUCCESS) {
         std::wstring cmd = std::wstring(L"\"") + exePath + L"\" \"%1\"";
@@ -232,6 +228,19 @@ void WinAppState::registerProtocolHandler() {
             static_cast<DWORD>((cmd.size() + 1) * sizeof(wchar_t)));
         RegCloseKey(hKey);
     }
+}
+
+void WinAppState::registerProtocolHandler() {
+    wchar_t exePath[MAX_PATH];
+    GetModuleFileNameW(nullptr, exePath, MAX_PATH);
+
+    // Register pivox:// for non-Google callbacks.
+    registerScheme(L"pivox", L"Pivox OAuth Callback", exePath);
+
+    // Register reversed Google client ID scheme for Google OAuth.
+    registerScheme(
+        L"com.googleusercontent.apps.45920224787-gb662gbotfv763cqjis53748ctgigncl",
+        L"Pivox Google Sign-In", exePath);
 }
 
 } // namespace pivox

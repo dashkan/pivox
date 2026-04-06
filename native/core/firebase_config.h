@@ -15,12 +15,13 @@ constexpr const char* kGcmSenderId = "45920224787";
 constexpr const char* kFirebaseClientId = "45920224787-aolngdbet2ka86f435j5ejm982iuur5k.apps.googleusercontent.com";
 constexpr const char* kBundleId = "app.pivox.native";
 
-// Google Sign-In OAuth client IDs — platform-specific.
-#if __APPLE__
+// Google Sign-In OAuth client ID — iOS-type client, works on all platforms.
+// Uses reversed client ID as redirect scheme (com.googleusercontent.apps.CLIENT_ID_PREFIX).
 constexpr const char* kGoogleSignInClientId = "45920224787-gb662gbotfv763cqjis53748ctgigncl.apps.googleusercontent.com";
-#elif _WIN32
-constexpr const char* kGoogleSignInClientId = "45920224787-332q0atab40vmojtf0admuvtvm8bgfa4.apps.googleusercontent.com";
-#endif
+
+// Reversed client ID used as redirect scheme for Google OAuth.
+constexpr const char* kGoogleRedirectScheme = "com.googleusercontent.apps.45920224787-gb662gbotfv763cqjis53748ctgigncl";
+constexpr const char* kGoogleRedirectUri = "com.googleusercontent.apps.45920224787-gb662gbotfv763cqjis53748ctgigncl:/oauth2callback";
 
 } // namespace firebase_config
 } // namespace pivox

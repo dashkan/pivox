@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <bcrypt.h>
 #include <shellapi.h>
+#include <winhttp.h>
 #include <sstream>
 
 #pragma comment(lib, "bcrypt.lib")
@@ -288,11 +289,25 @@ void WinAuthService::signInWithGoogleAsync(std::function<void(AuthResult)> callb
 
     std::string codeChallenge = generateCodeChallenge(pendingCodeVerifier_);
 
-    // Build Google OAuth URL.
+    // Build Google OAuth URL with reversed client ID as redirect scheme.
+    std::string redirectUri = std::string(firebase_config::kGoogleRedirectUri);
+
+    // URL-encode the redirect_uri.
+    std::string encodedRedirect;
+    for (char c : redirectUri) {
+        if (std::isalnum(static_cast<unsigned char>(c)) || c == '-' || c == '_' || c == '.' || c == '~') {
+            encodedRedirect += c;
+        } else {
+            char hex[4];
+            snprintf(hex, sizeof(hex), "%%%02X", static_cast<unsigned char>(c));
+            encodedRedirect += hex;
+        }
+    }
+
     std::ostringstream url;
     url << "https://accounts.google.com/o/oauth2/v2/auth"
         << "?client_id=" << oauthConfig_.googleClientId
-        << "&redirect_uri=pivox%3A%2F%2Foauth-callback%2F"
+        << "&redirect_uri=" << encodedRedirect
         << "&response_type=code"
         << "&scope=openid%20email%20profile"
         << "&code_challenge=" << codeChallenge
@@ -312,7 +327,7 @@ void WinAuthService::handleOAuthCallback(const std::string& callbackUrl) {
         return;
     }
 
-    // Parse query parameters from pivox://oauth-callback/?code=...&state=...
+    // Parse query parameters from reversed-client-id:/oauth2callback?code=...&state=...
     auto qpos = callbackUrl.find('?');
     if (qpos == std::string::npos) {
         auto cb = std::move(pendingOAuthCallback_);
@@ -352,11 +367,137 @@ void WinAuthService::handleOAuthCallback(const std::string& callbackUrl) {
         return;
     }
 
-    // TODO: Exchange auth code for tokens via POST to https://oauth2.googleapis.com/token
-    // Then create Firebase credential and sign in.
-    // For now, return a clear error that the token exchange is not yet implemented.
-    cb({ AuthError::NotConfigured,
-         "Google OAuth code received. Token exchange not yet implemented." });
+    // Exchange auth code for tokens via POST to https://oauth2.googleapis.com/token.
+    // Build POST body.
+    std::ostringstream postBody;
+    postBody << "code=" << code
+             << "&client_id=" << oauthConfig_.googleClientId
+             << "&redirect_uri=";
+    // URL-encode the redirect_uri in the POST body too.
+    std::string redir = firebase_config::kGoogleRedirectUri;
+    for (char c : redir) {
+        if (std::isalnum(static_cast<unsigned char>(c)) || c == '-' || c == '_' || c == '.' || c == '~') {
+            postBody << c;
+        } else {
+            char hex[4];
+            snprintf(hex, sizeof(hex), "%%%02X", static_cast<unsigned char>(c));
+            postBody << hex;
+        }
+    }
+    postBody << "&grant_type=authorization_code"
+             << "&code_verifier=" << verifier;
+
+    // HTTP POST using WinHTTP (synchronous, no WinRT dependency for tests).
+    HINTERNET hSession = WinHttpOpen(L"Pivox/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+        WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+    if (!hSession) {
+        cb({ AuthError::NetworkError, auth_error::kNetworkError });
+        return;
+    }
+
+    HINTERNET hConnect = WinHttpConnect(hSession, L"oauth2.googleapis.com",
+        INTERNET_DEFAULT_HTTPS_PORT, 0);
+    if (!hConnect) {
+        WinHttpCloseHandle(hSession);
+        cb({ AuthError::NetworkError, auth_error::kNetworkError });
+        return;
+    }
+
+    HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"POST", L"/token",
+        nullptr, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE);
+    if (!hRequest) {
+        WinHttpCloseHandle(hConnect);
+        WinHttpCloseHandle(hSession);
+        cb({ AuthError::NetworkError, auth_error::kNetworkError });
+        return;
+    }
+
+    std::string body = postBody.str();
+    LPCWSTR contentType = L"Content-Type: application/x-www-form-urlencoded";
+    BOOL sent = WinHttpSendRequest(hRequest, contentType, -1,
+        const_cast<char*>(body.data()), static_cast<DWORD>(body.size()),
+        static_cast<DWORD>(body.size()), 0);
+
+    if (!sent || !WinHttpReceiveResponse(hRequest, nullptr)) {
+        WinHttpCloseHandle(hRequest);
+        WinHttpCloseHandle(hConnect);
+        WinHttpCloseHandle(hSession);
+        cb({ AuthError::NetworkError, auth_error::kNetworkError });
+        return;
+    }
+
+    // Read response body.
+    std::string responseBody;
+    DWORD bytesAvailable = 0;
+    while (WinHttpQueryDataAvailable(hRequest, &bytesAvailable) && bytesAvailable > 0) {
+        std::vector<char> buffer(bytesAvailable);
+        DWORD bytesRead = 0;
+        WinHttpReadData(hRequest, buffer.data(), bytesAvailable, &bytesRead);
+        responseBody.append(buffer.data(), bytesRead);
+    }
+
+    WinHttpCloseHandle(hRequest);
+    WinHttpCloseHandle(hConnect);
+    WinHttpCloseHandle(hSession);
+
+    // Parse id_token and access_token from JSON response (simple extraction).
+    auto extractJsonValue = [&](const std::string& json, const std::string& key) -> std::string {
+        auto keyStr = "\"" + key + "\"";
+        auto pos = json.find(keyStr);
+        if (pos == std::string::npos) return "";
+        pos = json.find(':', pos);
+        if (pos == std::string::npos) return "";
+        pos = json.find('"', pos);
+        if (pos == std::string::npos) return "";
+        auto end = json.find('"', pos + 1);
+        if (end == std::string::npos) return "";
+        return json.substr(pos + 1, end - pos - 1);
+    };
+
+    std::string idToken = extractJsonValue(responseBody, "id_token");
+    std::string accessToken = extractJsonValue(responseBody, "access_token");
+
+    if (idToken.empty()) {
+        cb({ AuthError::Unknown, auth_error::kUnknown });
+        return;
+    }
+
+#if PIVOX_HAS_FIREBASE
+    if (firebaseAuth_) {
+        // Create Google credential and sign in to Firebase.
+        auto credential = firebase::auth::GoogleAuthProvider::GetCredential(
+            idToken.c_str(), accessToken.empty() ? nullptr : accessToken.c_str());
+        auto future = firebaseAuth_->SignInWithCredential(credential);
+        while (future.status() == firebase::kFutureStatusPending) {}
+
+        if (future.status() == firebase::kFutureStatusComplete && future.error() == 0) {
+            auto* fbUser = future.result();
+            auto user = mapFirebaseUser(*fbUser);
+
+            auto tokenFuture = const_cast<firebase::auth::User*>(fbUser)->GetToken(false);
+            while (tokenFuture.status() == firebase::kFutureStatusPending) {}
+            std::string fbToken = (tokenFuture.error() == 0) ? *tokenFuture.result() : "";
+
+            saveUserTokens(user, fbToken, "");
+            setAuthState(AuthStatus::SignedIn, user);
+            cb({ AuthError::None, "", user });
+            return;
+        }
+        cb(mapFirebaseError(future.error()));
+        return;
+    }
+#endif
+
+    // Without Firebase SDK, create a user from the id_token claims (JWT).
+    // This is a fallback — in production, Firebase SDK should always be active.
+    AuthUser user;
+    user.email = extractJsonValue(responseBody, "email");
+    user.displayName = extractJsonValue(responseBody, "name");
+    user.uid = "google-" + extractJsonValue(responseBody, "sub");
+
+    saveUserTokens(user, idToken, "");
+    setAuthState(AuthStatus::SignedIn, user);
+    cb({ AuthError::None, "", user });
 }
 
 // ---------------------------------------------------------------------------

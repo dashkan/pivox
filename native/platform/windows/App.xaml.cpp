@@ -57,7 +57,9 @@ namespace winrt::Pivox::implementation
             s_appState->saveString("remembered_email", "");
         }
 
-        // Handle protocol activation (pivox://oauth-callback/...).
+        // Handle protocol activation for both schemes:
+        // - pivox:// (non-Google callbacks)
+        // - com.googleusercontent.apps.CLIENT_ID:// (Google OAuth)
         auto args = Microsoft::Windows::AppLifecycle::AppInstance::GetCurrent().GetActivatedEventArgs();
         if (args && args.Kind() == Microsoft::Windows::AppLifecycle::ExtendedActivationKind::Protocol)
         {
