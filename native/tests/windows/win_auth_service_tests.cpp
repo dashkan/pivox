@@ -147,3 +147,49 @@ TEST_F(WinAuthServiceTest, RestoreSessionWithStoredTokensSucceeds) {
     EXPECT_EQ(auth.currentUser().email, "user@example.com");
     EXPECT_EQ(auth.currentUser().displayName, "Test User");
 }
+
+// ---------------------------------------------------------------------------
+// OAuth configuration
+// ---------------------------------------------------------------------------
+
+TEST_F(WinAuthServiceTest, GoogleNotConfiguredByDefault) {
+    EXPECT_FALSE(auth.isGoogleConfigured());
+    auto result = auth.validateGoogleSignIn();
+    EXPECT_EQ(result.error, pivox::AuthError::NotConfigured);
+}
+
+TEST_F(WinAuthServiceTest, GitHubNotConfiguredByDefault) {
+    EXPECT_FALSE(auth.isGitHubConfigured());
+    auto result = auth.validateGitHubSignIn();
+    EXPECT_EQ(result.error, pivox::AuthError::NotConfigured);
+}
+
+TEST_F(WinAuthServiceTest, GoogleConfiguredAfterSetOAuthConfig) {
+    pivox::OAuthConfig config;
+    config.googleClientId = "123456789.apps.googleusercontent.com";
+    auth.setOAuthConfig(config);
+
+    EXPECT_TRUE(auth.isGoogleConfigured());
+    auto result = auth.validateGoogleSignIn();
+    EXPECT_TRUE(result.ok());
+}
+
+TEST_F(WinAuthServiceTest, GitHubConfiguredAfterSetOAuthConfig) {
+    pivox::OAuthConfig config;
+    config.githubClientId = "gh-client-id-abc";
+    auth.setOAuthConfig(config);
+
+    EXPECT_TRUE(auth.isGitHubConfigured());
+    auto result = auth.validateGitHubSignIn();
+    EXPECT_TRUE(result.ok());
+}
+
+TEST_F(WinAuthServiceTest, OAuthConfigIndependentProviders) {
+    pivox::OAuthConfig config;
+    config.googleClientId = "google-id";
+    // GitHub not set
+    auth.setOAuthConfig(config);
+
+    EXPECT_TRUE(auth.isGoogleConfigured());
+    EXPECT_FALSE(auth.isGitHubConfigured());
+}

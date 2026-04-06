@@ -40,6 +40,31 @@ namespace winrt::Pivox::implementation
         NavigateToMainApp();
     }
 
+    void LoginPage::OnGoogleSignIn(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
+    {
+        auto result = App::AuthService()->validateGoogleSignIn();
+        if (!result.ok())
+        {
+            ErrorBar().Message(winrt::to_hstring(result.errorMessage));
+            ErrorBar().IsOpen(true);
+            return;
+        }
+        // TODO: Launch OAuth2Manager::RequestAuthWithParamsAsync for Google.
+        // This is an async coroutine — will be implemented when OAuth client IDs are configured.
+    }
+
+    void LoginPage::OnGitHubSignIn(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
+    {
+        auto result = App::AuthService()->validateGitHubSignIn();
+        if (!result.ok())
+        {
+            ErrorBar().Message(winrt::to_hstring(result.errorMessage));
+            ErrorBar().IsOpen(true);
+            return;
+        }
+        // TODO: Launch OAuth2Manager::RequestAuthWithParamsAsync for GitHub.
+    }
+
     void LoginPage::OnSwitchToRegister(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
     {
         if (auto frame = this->Frame())

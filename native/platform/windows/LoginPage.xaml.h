@@ -9,6 +9,8 @@ namespace winrt::Pivox::implementation
 
         void OnSignIn(IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& e);
         void OnSwitchToRegister(IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& e);
+        void OnGoogleSignIn(IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& e);
+        void OnGitHubSignIn(IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& e);
 
     private:
         void NavigateToMainApp();

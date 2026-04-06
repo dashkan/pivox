@@ -37,6 +37,26 @@ namespace winrt::Pivox::implementation
         NavigateToMainApp();
     }
 
+    void RegisterPage::OnGoogleSignIn(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
+    {
+        auto result = App::AuthService()->validateGoogleSignIn();
+        if (!result.ok())
+        {
+            ErrorBar().Message(winrt::to_hstring(result.errorMessage));
+            ErrorBar().IsOpen(true);
+        }
+    }
+
+    void RegisterPage::OnGitHubSignIn(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
+    {
+        auto result = App::AuthService()->validateGitHubSignIn();
+        if (!result.ok())
+        {
+            ErrorBar().Message(winrt::to_hstring(result.errorMessage));
+            ErrorBar().IsOpen(true);
+        }
+    }
+
     void RegisterPage::OnSwitchToLogin(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
     {
         if (auto frame = this->Frame())

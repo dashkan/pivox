@@ -44,9 +44,19 @@ struct AuthResult {
     bool ok() const { return error == AuthError::None; }
 };
 
+/// OAuth provider configuration.
+/// Client IDs come from Google Cloud Console / GitHub Developer Settings.
+struct OAuthConfig {
+    std::string googleClientId;
+    std::string githubClientId;
+
+    bool hasGoogle() const { return !googleClientId.empty(); }
+    bool hasGitHub() const { return !githubClientId.empty(); }
+};
+
 /// Manages authentication on Windows.
-/// Wraps Firebase C++ SDK for email/password, manages auth state transitions,
-/// and stores/restores tokens via AppState.
+/// Wraps Firebase C++ SDK for email/password, OAuth2Manager for social sign-in,
+/// manages auth state transitions, and stores/restores tokens via AppState.
 class WinAuthService {
 public:
     explicit WinAuthService(std::shared_ptr<AppState> appState);
@@ -61,12 +71,31 @@ public:
     using AuthStateCallback = std::function<void(AuthStatus, const AuthUser&)>;
     void onAuthStateChanged(AuthStateCallback callback);
 
+    /// Configure OAuth providers. Must be called before social sign-in.
+    void setOAuthConfig(const OAuthConfig& config);
+
     /// Email/password sign-in.
     AuthResult signInWithEmail(const std::string& email, const std::string& password);
 
     /// Email/password registration.
     AuthResult createAccount(const std::string& email, const std::string& password,
                              const std::string& displayName);
+
+    /// Check if Google sign-in is configured.
+    bool isGoogleConfigured() const { return oauthConfig_.hasGoogle(); }
+
+    /// Check if GitHub sign-in is configured.
+    bool isGitHubConfigured() const { return oauthConfig_.hasGitHub(); }
+
+    /// Initiate Google sign-in via OAuth2Manager.
+    /// Returns NotConfigured if googleClientId is not set.
+    /// NOTE: The actual OAuth flow is async (coroutine). This method validates
+    /// the config synchronously and returns the error. The async flow will be
+    /// triggered from the UI layer using OAuth2Manager::RequestAuthWithParamsAsync.
+    AuthResult validateGoogleSignIn() const;
+
+    /// Initiate GitHub sign-in via OAuth2Manager.
+    AuthResult validateGitHubSignIn() const;
 
     /// Sign out — clears session, tokens, and auth state.
     void signOut();
@@ -82,6 +111,7 @@ private:
     AuthStatus status_ = AuthStatus::Unknown;
     AuthUser currentUser_;
     AuthStateCallback callback_;
+    OAuthConfig oauthConfig_;
 };
 
 } // namespace pivox

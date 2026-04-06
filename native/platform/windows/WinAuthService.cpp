@@ -70,6 +70,30 @@ AuthResult WinAuthService::createAccount(const std::string& email, const std::st
 }
 
 // ---------------------------------------------------------------------------
+// OAuth config
+// ---------------------------------------------------------------------------
+
+void WinAuthService::setOAuthConfig(const OAuthConfig& config) {
+    oauthConfig_ = config;
+}
+
+AuthResult WinAuthService::validateGoogleSignIn() const {
+    if (!oauthConfig_.hasGoogle()) {
+        return { AuthError::NotConfigured,
+                 "Google sign-in not configured. Set googleClientId in OAuthConfig." };
+    }
+    return { AuthError::None };
+}
+
+AuthResult WinAuthService::validateGitHubSignIn() const {
+    if (!oauthConfig_.hasGitHub()) {
+        return { AuthError::NotConfigured,
+                 "GitHub sign-in not configured. Set githubClientId in OAuthConfig." };
+    }
+    return { AuthError::None };
+}
+
+// ---------------------------------------------------------------------------
 // Sign out
 // ---------------------------------------------------------------------------
 
