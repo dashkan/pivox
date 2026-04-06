@@ -11,18 +11,8 @@ namespace winrt::Pivox::implementation
         InitializeComponent();
         SetupWindow();
 
-        // Always try to restore a previous session.
-        // Users stay signed in until explicit sign out.
-        auto& authService = App::AuthService();
-#if PIVOX_HAS_FIREBASE
-        if (authService->isFirebaseInitialized())
-        {
-            // Firebase SDK manages its own session persistence.
-            // Check if a user is already signed in.
-            // (Firebase restores session automatically on init.)
-        }
-#endif
-        if (authService->tryRestoreSession())
+        // Firebase manages session persistence. Check if a user is signed in.
+        if (App::AuthService()->hasValidSession())
         {
             ShowMainApp();
         }

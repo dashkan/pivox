@@ -3,18 +3,13 @@
 #include "firebase_config.h"
 #include <winrt/Microsoft.Security.Authentication.OAuth.h>
 #include <winrt/Windows.Data.Json.h>
-#include <thread>
-#include <chrono>
+
+#include "firebase/auth/credential.h"
 
 using namespace winrt::Microsoft::Security::Authentication::OAuth;
 
-#if PIVOX_HAS_FIREBASE
-#include "firebase/auth/credential.h"
-#endif
-
 namespace {
 
-// Fire-and-forget coroutine that runs the OAuth2Manager flow.
 winrt::fire_and_forget LaunchGoogleOAuth(
     pivox::WinAuthService* self,
     uint64_t windowIdValue,
@@ -79,62 +74,40 @@ winrt::fire_and_forget LaunchGoogleOAuth(
 
         // 4. Extract tokens.
         auto accessToken = winrt::to_string(tokenResponse.AccessToken());
-
-        // id_token is in AdditionalParams (IMapView<hstring, IJsonValue>).
         std::string idToken;
         auto additionalParams = tokenResponse.AdditionalParams();
-        if (additionalParams) {
-            if (additionalParams.HasKey(L"id_token")) {
-                auto jsonVal = additionalParams.Lookup(L"id_token");
-                idToken = winrt::to_string(jsonVal.GetString());
-            }
+        if (additionalParams && additionalParams.HasKey(L"id_token")) {
+            idToken = winrt::to_string(additionalParams.Lookup(L"id_token").GetString());
         }
 
         // Bring app to foreground after OAuth redirect.
-        HWND hwnd = GetForegroundWindow();
         auto appHwnd = FindWindowW(nullptr, L"Pivox");
         if (appHwnd) {
             SetForegroundWindow(appHwnd);
         }
 
-        // 5. Sign in to Firebase with the Google credential.
-#if PIVOX_HAS_FIREBASE
+        // 5. Sign in to Firebase with the Google credential via OnCompletion.
         if (self->firebaseAuth_) {
             auto credential = firebase::auth::GoogleAuthProvider::GetCredential(
                 idToken.c_str(), accessToken.empty() ? nullptr : accessToken.c_str());
             auto future = self->firebaseAuth_->SignInWithCredential(credential);
-            while (future.status() == firebase::kFutureStatusPending) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
-            }
-
-            if (future.status() == firebase::kFutureStatusComplete && future.error() == 0) {
-                auto* fbUser = future.result();
-                auto user = self->mapFirebaseUser(*fbUser);
-
-                auto tokenFuture = const_cast<firebase::auth::User*>(fbUser)->GetToken(false);
-                while (tokenFuture.status() == firebase::kFutureStatusPending) {}
-                std::string fbToken = (tokenFuture.error() == 0) ? *tokenFuture.result() : "";
-
-                self->saveUserTokens(user, fbToken, "");
-                self->setAuthState(pivox::AuthStatus::SignedIn, user);
-                self->isOAuthInProgress_ = false;
-                cb({ pivox::AuthError::None, "", user });
-                co_return;
-            }
-
-            self->isOAuthInProgress_ = false;
-            cb(self->mapFirebaseError(future.error()));
+            future.OnCompletion([self, cb](const firebase::Future<firebase::auth::User>& f) {
+                if (f.error() == 0) {
+                    auto user = self->mapFirebaseUser(*f.result());
+                    self->setAuthState(pivox::AuthStatus::SignedIn, user);
+                    self->isOAuthInProgress_ = false;
+                    cb({ pivox::AuthError::None, "", user });
+                } else {
+                    self->isOAuthInProgress_ = false;
+                    cb(self->mapFirebaseError(f.error()));
+                }
+            });
             co_return;
         }
-#endif
 
-        // Fallback without Firebase.
-        pivox::AuthUser user;
-        user.uid = "google-oauth";
-        self->saveUserTokens(user, idToken, "");
-        self->setAuthState(pivox::AuthStatus::SignedIn, user);
+        // Should not reach here — Firebase is always initialized.
         self->isOAuthInProgress_ = false;
-        cb({ pivox::AuthError::None, "", user });
+        cb({ pivox::AuthError::NotConfigured, "Firebase not initialized." });
 
     } catch (...) {
         self->isOAuthInProgress_ = false;
@@ -142,7 +115,6 @@ winrt::fire_and_forget LaunchGoogleOAuth(
     }
 }
 
-// Auto-register the launcher at static init time.
 struct GoogleOAuthRegistrar {
     GoogleOAuthRegistrar() {
         pivox::WinAuthService::setGoogleOAuthLauncher(

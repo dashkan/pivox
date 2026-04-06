@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 #include "WinAuthService.h"
 #include "WinAppState.h"
-#include <thread>
 #include <chrono>
+#include <thread>
 
 class WinAuthServiceTest : public ::testing::Test {
 protected:
@@ -16,12 +16,6 @@ protected:
 
     void TearDown() override {
         auth.signOut();
-        // Clean up any stored tokens.
-        appState->deleteSecure("auth.idToken");
-        appState->deleteSecure("auth.refreshToken");
-        appState->deleteSecure("auth.uid");
-        appState->deleteSecure("auth.email");
-        appState->deleteSecure("auth.displayName");
     }
 };
 
@@ -39,7 +33,7 @@ TEST_F(WinAuthServiceTest, CurrentUserIsEmptyInitially) {
 }
 
 // ---------------------------------------------------------------------------
-// Email/password sign-in
+// Email/password sign-in (async — validation fires synchronously)
 // ---------------------------------------------------------------------------
 
 TEST_F(WinAuthServiceTest, SignInWithEmptyEmailFails) {
@@ -56,16 +50,6 @@ TEST_F(WinAuthServiceTest, SignInWithEmptyPasswordFails) {
     EXPECT_EQ(result.error, pivox::AuthError::WrongPassword);
 }
 
-TEST_F(WinAuthServiceTest, SignInWithValidCredentialsSucceeds) {
-    pivox::AuthResult result;
-    auth.signInWithEmailAsync("user@example.com", "password123",
-        [&](pivox::AuthResult r) { result = r; });
-    // Validation passes but Firebase isn't configured — callback fires from background thread.
-    // Give it a moment.
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    EXPECT_EQ(result.error, pivox::AuthError::NotConfigured);
-}
-
 TEST_F(WinAuthServiceTest, SignInValidationRejectsInvalidEmail) {
     pivox::AuthResult result;
     auth.signInWithEmailAsync("not-an-email", "password123",
@@ -74,7 +58,7 @@ TEST_F(WinAuthServiceTest, SignInValidationRejectsInvalidEmail) {
 }
 
 // ---------------------------------------------------------------------------
-// Account creation
+// Account creation (async — validation fires synchronously)
 // ---------------------------------------------------------------------------
 
 TEST_F(WinAuthServiceTest, CreateAccountWithEmptyEmailFails) {
@@ -93,14 +77,6 @@ TEST_F(WinAuthServiceTest, CreateAccountWithShortPasswordFails) {
     EXPECT_EQ(result.error, pivox::AuthError::WeakPassword);
 }
 
-TEST_F(WinAuthServiceTest, CreateAccountWithValidInputsReturnsNotConfigured) {
-    pivox::AuthResult result;
-    auth.createAccountAsync("user@example.com", "password123", "Test User",
-        [&](pivox::AuthResult r) { result = r; });
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    EXPECT_EQ(result.error, pivox::AuthError::NotConfigured);
-}
-
 // ---------------------------------------------------------------------------
 // Sign out
 // ---------------------------------------------------------------------------
@@ -114,17 +90,6 @@ TEST_F(WinAuthServiceTest, SignOutClearsCurrentUser) {
     auth.signOut();
     EXPECT_TRUE(auth.currentUser().uid.empty());
     EXPECT_TRUE(auth.currentUser().email.empty());
-}
-
-TEST_F(WinAuthServiceTest, SignOutClearsStoredTokens) {
-    // Store some tokens first.
-    appState->saveSecure("auth.idToken", "some-token");
-    appState->saveSecure("auth.refreshToken", "some-refresh");
-
-    auth.signOut();
-
-    EXPECT_FALSE(appState->loadSecure("auth.idToken").has_value());
-    EXPECT_FALSE(appState->loadSecure("auth.refreshToken").has_value());
 }
 
 // ---------------------------------------------------------------------------
@@ -142,29 +107,12 @@ TEST_F(WinAuthServiceTest, CallbackFiresOnSignOut) {
 }
 
 // ---------------------------------------------------------------------------
-// Session restore
+// Session — Firebase manages persistence
 // ---------------------------------------------------------------------------
 
-TEST_F(WinAuthServiceTest, RestoreSessionWithNoTokensReturnsFalse) {
-    bool restored = auth.tryRestoreSession();
-    EXPECT_FALSE(restored);
-    EXPECT_EQ(auth.status(), pivox::AuthStatus::SignedOut);
-}
-
-TEST_F(WinAuthServiceTest, RestoreSessionWithStoredTokensSucceeds) {
-    // Simulate a previous session by storing tokens.
-    appState->saveSecure("auth.idToken", "stored-id-token");
-    appState->saveSecure("auth.refreshToken", "stored-refresh-token");
-    appState->saveSecure("auth.uid", "test-uid-123");
-    appState->saveSecure("auth.email", "user@example.com");
-    appState->saveSecure("auth.displayName", "Test User");
-
-    bool restored = auth.tryRestoreSession();
-    EXPECT_TRUE(restored);
-    EXPECT_EQ(auth.status(), pivox::AuthStatus::SignedIn);
-    EXPECT_EQ(auth.currentUser().uid, "test-uid-123");
-    EXPECT_EQ(auth.currentUser().email, "user@example.com");
-    EXPECT_EQ(auth.currentUser().displayName, "Test User");
+TEST_F(WinAuthServiceTest, HasValidSessionReturnsFalseWithoutInit) {
+    // Firebase not initialized — no valid session.
+    EXPECT_FALSE(auth.hasValidSession());
 }
 
 // ---------------------------------------------------------------------------
@@ -206,7 +154,6 @@ TEST_F(WinAuthServiceTest, GitHubConfiguredAfterSetOAuthConfig) {
 TEST_F(WinAuthServiceTest, OAuthConfigIndependentProviders) {
     pivox::OAuthConfig config;
     config.googleClientId = "google-id";
-    // GitHub not set
     auth.setOAuthConfig(config);
 
     EXPECT_TRUE(auth.isGoogleConfigured());
@@ -231,7 +178,6 @@ TEST_F(WinAuthServiceTest, GoogleSignInInTestModeReturnsNotConfigured) {
 
     pivox::AuthResult received;
     auth.signInWithGoogleAsync(0, [&](pivox::AuthResult r) { received = r; });
-    // In test mode, returns NotConfigured without launching browser.
     EXPECT_EQ(received.error, pivox::AuthError::NotConfigured);
     EXPECT_FALSE(auth.isOAuthInProgress());
 }

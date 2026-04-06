@@ -299,16 +299,13 @@ if(WIN32)
     target_link_libraries(pivox_win_state PUBLIC pivox_core)
     target_link_libraries(pivox_win_state PRIVATE crypt32 advapi32)
 
-    # Firebase C++ SDK — link auth + app libraries.
-    if(EXISTS "${FB_CPP_ROOT}")
-        target_include_directories(pivox_win_state PUBLIC "${FB_CPP_ROOT}/include")
-        target_link_directories(pivox_win_state PUBLIC
-            "${FB_CPP_ROOT}/libs/windows/VS2019/MD/x64/$<CONFIG>")
-        target_link_libraries(pivox_win_state PRIVATE firebase_app firebase_auth
-            ws2_32 userenv)
-        target_compile_definitions(pivox_win_state PUBLIC
-            PIVOX_HAS_FIREBASE=1 _CRT_SECURE_NO_WARNINGS)
-    endif()
+    # Firebase C++ SDK — always linked on Windows.
+    target_include_directories(pivox_win_state PUBLIC "${FB_CPP_ROOT}/include")
+    target_link_directories(pivox_win_state PUBLIC
+        "${FB_CPP_ROOT}/libs/windows/VS2019/MD/x64/$<CONFIG>")
+    target_link_libraries(pivox_win_state PRIVATE firebase_app firebase_auth
+        ws2_32 userenv)
+    target_compile_definitions(pivox_win_state PUBLIC _CRT_SECURE_NO_WARNINGS)
 endif()
 
 
