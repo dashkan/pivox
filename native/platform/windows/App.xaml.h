@@ -19,8 +19,5 @@ namespace winrt::Pivox::implementation
         winrt::Microsoft::UI::Xaml::Window m_window{ nullptr };
         static std::shared_ptr<pivox::WinAppState> s_appState;
         static std::shared_ptr<pivox::WinAuthService> s_authService;
-
-        void HandleProtocolActivation(
-            Microsoft::Windows::AppLifecycle::AppActivationArguments const& args);
     };
 }

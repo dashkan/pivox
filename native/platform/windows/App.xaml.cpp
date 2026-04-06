@@ -2,9 +2,15 @@
 #include "App.xaml.h"
 #include "MainWindow.xaml.h"
 #include "firebase_config.h"
+#include <thread>
 
 // NOTE: App.xaml.cpp does NOT include App.g.cpp.
 // See docs/dev/winui3-cmake-guide.md constraint #3.
+
+static const wchar_t* kMutexName = L"Local\\PivoxAppMutex";
+static const wchar_t* kEventName = L"Local\\PivoxOAuthEvent";
+static const wchar_t* kCallbackRegKey = L"Software\\Pivox";
+static const wchar_t* kCallbackRegValue = L"oauth_callback_url";
 
 namespace winrt::Pivox::implementation
 {
@@ -26,26 +32,48 @@ namespace winrt::Pivox::implementation
         });
 #endif
 
-        // Single-instance: if another Pivox is already running, redirect
-        // this activation to it and exit. This is how OAuth callbacks
-        // (protocol activations) reach the running instance.
-        auto mainInstance = Microsoft::Windows::AppLifecycle::AppInstance::FindOrRegisterForKey(L"pivox-main");
-        if (!mainInstance.IsCurrent())
+        // Single-instance check: if another Pivox is running and we have a
+        // protocol activation URL, write it to registry and signal the event.
+        HANDLE hMutex = CreateMutexW(nullptr, FALSE, kMutexName);
+        if (hMutex && GetLastError() == ERROR_ALREADY_EXISTS)
         {
-            // Another instance owns the key — redirect our activation to it.
-            auto activationArgs = Microsoft::Windows::AppLifecycle::AppInstance::GetCurrent().GetActivatedEventArgs();
-            mainInstance.RedirectActivationToAsync(activationArgs).get();
-            ::ExitProcess(0);
+            // Another instance exists. Check if we were launched with a URL.
+            int argc = 0;
+            LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+            if (argv && argc >= 2)
+            {
+                // argv[1] is the callback URL (e.g., com.googleusercontent.apps.xxx:/oauth2callback?...)
+                std::wstring url = argv[1];
+
+                // Write URL to registry for the running instance to read.
+                HKEY hKey;
+                if (RegCreateKeyExW(HKEY_CURRENT_USER, kCallbackRegKey, 0, nullptr,
+                        0, KEY_WRITE, nullptr, &hKey, nullptr) == ERROR_SUCCESS) {
+                    RegSetValueExW(hKey, kCallbackRegValue, 0, REG_SZ,
+                        reinterpret_cast<const BYTE*>(url.c_str()),
+                        static_cast<DWORD>((url.size() + 1) * sizeof(wchar_t)));
+                    RegCloseKey(hKey);
+                }
+
+                // Signal the running instance.
+                HANDLE hEvent = OpenEventW(EVENT_MODIFY_STATE, FALSE, kEventName);
+                if (hEvent)
+                {
+                    SetEvent(hEvent);
+                    CloseHandle(hEvent);
+                }
+            }
+            if (argv) LocalFree(argv);
+            CloseHandle(hMutex);
+            ExitProcess(0);
             return;
         }
 
-        // We are the main instance. Listen for redirected activations.
-        mainInstance.Activated([this](
-            IInspectable const&,
-            Microsoft::Windows::AppLifecycle::AppActivationArguments const& args)
-        {
-            HandleProtocolActivation(args);
-        });
+        // We are the main instance. Keep the mutex open for lifetime.
+        // (Leaked intentionally — OS cleans up on process exit.)
+
+        // Create the named event for OAuth callbacks.
+        HANDLE hEvent = CreateEventW(nullptr, FALSE, FALSE, kEventName);
 
         // Register pivox:// and Google reversed-client-ID URL schemes.
         pivox::WinAppState::registerProtocolHandler();
@@ -60,26 +88,43 @@ namespace winrt::Pivox::implementation
         pivox::OAuthConfig oauthConfig;
         oauthConfig.googleClientId = pivox::firebase_config::kGoogleSignInClientId;
         s_authService->setOAuthConfig(oauthConfig);
-    }
 
-    void App::HandleProtocolActivation(
-        Microsoft::Windows::AppLifecycle::AppActivationArguments const& args)
-    {
-        if (args.Kind() != Microsoft::Windows::AppLifecycle::ExtendedActivationKind::Protocol)
-        {
-            return;
-        }
+        // Start background thread to listen for OAuth callbacks from second instances.
+        std::thread([hEvent]() {
+            while (true) {
+                WaitForSingleObject(hEvent, INFINITE);
 
-        auto protocolArgs = args.Data().as<
-            winrt::Windows::ApplicationModel::Activation::IProtocolActivatedEventArgs>();
-        if (!protocolArgs) return;
+                // Read the callback URL from registry.
+                HKEY hKey;
+                if (RegOpenKeyExW(HKEY_CURRENT_USER, kCallbackRegKey, 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+                    DWORD size = 0;
+                    DWORD type = 0;
+                    RegQueryValueExW(hKey, kCallbackRegValue, nullptr, &type, nullptr, &size);
+                    if (type == REG_SZ && size > 0) {
+                        std::wstring url(size / sizeof(wchar_t), 0);
+                        RegQueryValueExW(hKey, kCallbackRegValue, nullptr, nullptr,
+                            reinterpret_cast<BYTE*>(url.data()), &size);
+                        RegCloseKey(hKey);
 
-        auto uri = winrt::to_string(protocolArgs.Uri().AbsoluteUri());
+                        // Remove trailing null.
+                        if (!url.empty() && url.back() == L'\0') url.pop_back();
 
-        // Debug: write to registry so we can verify the activation arrived.
-        OutputDebugStringA(("OAuth callback received: " + uri + "\n").c_str());
+                        // Clear the registry value.
+                        HKEY hKeyW;
+                        if (RegOpenKeyExW(HKEY_CURRENT_USER, kCallbackRegKey, 0, KEY_WRITE, &hKeyW) == ERROR_SUCCESS) {
+                            RegDeleteValueW(hKeyW, kCallbackRegValue);
+                            RegCloseKey(hKeyW);
+                        }
 
-        s_authService->handleOAuthCallback(uri);
+                        // Convert to UTF-8 and process.
+                        std::string utf8Url(url.begin(), url.end());
+                        s_authService->handleOAuthCallback(utf8Url);
+                    } else {
+                        RegCloseKey(hKey);
+                    }
+                }
+            }
+        }).detach();
     }
 
     void App::OnLaunched([[maybe_unused]] Microsoft::UI::Xaml::LaunchActivatedEventArgs const& e)
@@ -98,12 +143,16 @@ namespace winrt::Pivox::implementation
             s_appState->saveString("remembered_email", "");
         }
 
-        // Check if this launch itself is a protocol activation (first launch with URL).
-        auto activationArgs = Microsoft::Windows::AppLifecycle::AppInstance::GetCurrent().GetActivatedEventArgs();
-        if (activationArgs)
+        // Check if this launch itself has a URL argument (first launch with protocol activation).
+        int argc = 0;
+        LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+        if (argv && argc >= 2)
         {
-            HandleProtocolActivation(activationArgs);
+            std::wstring url = argv[1];
+            std::string utf8Url(url.begin(), url.end());
+            s_authService->handleOAuthCallback(utf8Url);
         }
+        if (argv) LocalFree(argv);
 
         m_window = winrt::make<MainWindow>();
         m_window.Activate();
