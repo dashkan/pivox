@@ -14,6 +14,7 @@ class AuthService: NSObject {
     var currentUser: User?
     var isSignedIn: Bool { currentUser != nil }
     var errorMessage: String?
+    private var isOAuthInProgress = false
 
     private var authStateHandle: AuthStateDidChangeListenerHandle?
     private let appState = AppStateBridge.shared()!
@@ -76,6 +77,9 @@ class AuthService: NSObject {
     private let googleClientID = "45920224787-gb662gbotfv763cqjis53748ctgigncl.apps.googleusercontent.com"
 
     func signInWithGoogle() async {
+        guard !isOAuthInProgress else { return }
+        isOAuthInProgress = true
+        defer { isOAuthInProgress = false }
         errorMessage = nil
 
         do {
@@ -233,6 +237,8 @@ class AuthService: NSObject {
 
 extension AuthService: ASWebAuthenticationPresentationContextProviding {
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        return NSApplication.shared.keyWindow ?? ASPresentationAnchor()
+        // Must return an existing window — never create a new NSWindow here.
+        // This can be called off the main thread by ASWebAuthenticationSession.
+        return NSApplication.shared.windows.first ?? NSApplication.shared.keyWindow!
     }
 }
