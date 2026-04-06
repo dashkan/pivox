@@ -98,16 +98,7 @@ namespace winrt::Pivox::implementation
         auto password = winrt::to_string(PasswordBox().Password());
         if (email.empty() || password.empty()) return;
 
-        // Remember Me: save or clear the email for next launch.
         bool remember = RememberMeCheck().IsChecked().GetBoolean();
-        if (remember)
-        {
-            App::AppState()->saveString("remembered_email", email);
-        }
-        else
-        {
-            App::AppState()->saveString("remembered_email", "");
-        }
 
         // Show loading state.
         SetLoading(true);
@@ -120,8 +111,19 @@ namespace winrt::Pivox::implementation
 
         if (!result.ok())
         {
+            // Do NOT save email on failed sign-in.
             ShowError(result.errorMessage);
             return;
+        }
+
+        // Remember Me: save or clear email only on SUCCESSFUL sign-in.
+        if (remember)
+        {
+            App::AppState()->saveString("remembered_email", email);
+        }
+        else
+        {
+            App::AppState()->saveString("remembered_email", "");
         }
 
         NavigateToMainApp();

@@ -41,11 +41,12 @@ namespace winrt::Pivox::implementation
 
     void App::OnLaunched([[maybe_unused]] Microsoft::UI::Xaml::LaunchActivatedEventArgs const& e)
     {
-        // RESET_AUTH=1 forces sign-out for test scenarios.
+        // RESET_AUTH=1 forces clean slate for test scenarios.
         wchar_t resetAuth[2] = {};
         if (GetEnvironmentVariableW(L"RESET_AUTH", resetAuth, 2) > 0 && resetAuth[0] == L'1')
         {
             s_authService->signOut();
+            s_appState->saveString("remembered_email", "");
         }
 
         // Handle protocol activation (pivox://oauth-callback/...).
