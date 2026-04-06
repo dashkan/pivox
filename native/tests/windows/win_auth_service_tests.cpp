@@ -1,14 +1,9 @@
 #include <gtest/gtest.h>
 #include "WinAuthService.h"
-#include "WinAppState.h"
-#include <chrono>
-#include <thread>
 
 class WinAuthServiceTest : public ::testing::Test {
 protected:
-    std::shared_ptr<pivox::WinAppState> appState =
-        std::make_shared<pivox::WinAppState>();
-    pivox::WinAuthService auth{appState};
+    pivox::WinAuthService auth{};
 
     void SetUp() override {
         auth.setTestMode(true);

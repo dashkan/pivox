@@ -2,7 +2,8 @@
        lint-proto proto-format proto-breaking proto-generate api-lint \
        db-up db-down db-migrate db-force db-seed db-clear db-drop db-create \
        docker-up docker-down firebase-emu firebase-deploy \
-       proxy-nginx proxy-nginx-stop proxy-ngrok
+       proxy-nginx proxy-nginx-stop proxy-ngrok \
+       test-native-ui
 
 DATABASE_URL ?= postgresql://localhost:5432/pivox?sslmode=disable
 DATABASE_NAME ?= pivox
@@ -100,6 +101,23 @@ firebase-emu:
 
 firebase-deploy:
 	pnpm --dir ./deployments/firebase/functions run deploy
+
+# Native UI Tests (macOS)
+
+test-native-ui:
+	@echo "Starting Firebase Auth emulator..."
+	@firebase emulators:start --only auth --project pivox-cloud &
+	@sleep 3
+	@echo "Running UI tests..."
+	@xcodebuild test \
+		-project native/build-xcode/Pivox.xcodeproj \
+		-scheme PivoxUITests \
+		-configuration Debug \
+		-destination 'platform=macOS' \
+		2>&1 | grep -E "Test Case|passed|failed|skipped|Suite" || true
+	@echo "Stopping emulator..."
+	@-pkill -f "firebase.*emulators" 2>/dev/null
+	@echo "Done."
 
 # Proxy
 

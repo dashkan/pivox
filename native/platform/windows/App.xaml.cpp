@@ -12,7 +12,7 @@ namespace winrt::Pivox::implementation
     std::shared_ptr<pivox::WinAppState> App::s_appState =
         std::make_shared<pivox::WinAppState>();
     std::shared_ptr<pivox::WinAuthService> App::s_authService =
-        std::make_shared<pivox::WinAuthService>(s_appState);
+        std::make_shared<pivox::WinAuthService>();
 
     App::App()
     {

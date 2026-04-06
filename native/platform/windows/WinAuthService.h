@@ -1,14 +1,10 @@
 #pragma once
 
 #include "auth_state.h"
-#include "app_state.h"
 #include "firebase/app.h"
 #include "firebase/auth.h"
 #include <functional>
-#include <memory>
 #include <string>
-#include <optional>
-#include <vector>
 #include <cstdint>
 #include <atomic>
 
@@ -50,7 +46,7 @@ struct OAuthConfig {
 /// Manages authentication on Windows.
 class WinAuthService {
 public:
-    explicit WinAuthService(std::shared_ptr<AppState> appState);
+    WinAuthService();
     ~WinAuthService();
 
     AuthStatus status() const { return status_; }
@@ -102,7 +98,6 @@ public:
     AuthUser mapFirebaseUser(const firebase::auth::User& user) const;
 
 private:
-    std::shared_ptr<AppState> appState_;
     AuthStatus status_ = AuthStatus::Unknown;
     AuthUser currentUser_;
     AuthStateCallback callback_;

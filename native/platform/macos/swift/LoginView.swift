@@ -19,7 +19,9 @@ struct LoginView: View {
     init(onSwitchToRegister: @escaping () -> Void) {
         self.onSwitchToRegister = onSwitchToRegister
         let state = AppStateBridge.shared()!
-        _rememberMe = State(initialValue: state.hasBool(forKey: "rememberMe") ? state.loadBool(forKey: "rememberMe") : false)
+        let savedEmail = state.loadString(forKey: "remembered_email") ?? ""
+        _email = State(initialValue: savedEmail)
+        _rememberMe = State(initialValue: !savedEmail.isEmpty)
     }
 
     var body: some View {
@@ -53,6 +55,7 @@ struct LoginView: View {
                     .textContentType(.emailAddress)
                     .focused($focusedField, equals: .email)
                     .onSubmit { focusedField = .password }
+                    .disabled(isLoading)
                     .accessibilityLabel("Email address")
                     .accessibilityIdentifier("login-email")
 
@@ -61,6 +64,7 @@ struct LoginView: View {
                     .textContentType(.password)
                     .focused($focusedField, equals: .password)
                     .onSubmit { submitSignIn() }
+                    .disabled(isLoading)
                     .accessibilityLabel("Password")
                     .accessibilityIdentifier("login-password")
 
@@ -68,11 +72,13 @@ struct LoginView: View {
                     Toggle("Remember me", isOn: $rememberMe)
                         .toggleStyle(.checkbox)
                         .font(.caption)
+                        .disabled(isLoading)
                         .accessibilityIdentifier("login-remember-me")
                     Spacer()
                     Button("Forgot password?") { /* placeholder */ }
                         .buttonStyle(.link)
                         .font(.caption)
+                        .disabled(isLoading)
                         .accessibilityIdentifier("login-forgot-password")
                 }
 
@@ -91,14 +97,13 @@ struct LoginView: View {
                 .disabled(email.isEmpty || password.isEmpty || isLoading)
                 .accessibilityIdentifier("login-sign-in")
 
-                // Error message
-                if let error = auth.errorMessage {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                        .multilineTextAlignment(.center)
-                        .accessibilityIdentifier("login-error")
-                }
+                // Error message — pre-allocated space to prevent layout shift.
+                Text(auth.errorMessage ?? " ")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
+                    .opacity(auth.errorMessage != nil ? 1 : 0)
+                    .accessibilityIdentifier("login-error")
             }
 
             // Separator
@@ -111,6 +116,8 @@ struct LoginView: View {
             // Social login
             VStack(spacing: 8) {
                 Button(action: {
+                    // Social sign-in clears any remembered email.
+                    appState.save("", forKey: "remembered_email")
                     Task { await auth.signInWithGoogle() }
                 }) {
                     HStack {
@@ -121,6 +128,7 @@ struct LoginView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
+                .disabled(isLoading)
 
                 Button(action: { /* placeholder */ }) {
                     HStack {
@@ -134,6 +142,7 @@ struct LoginView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
+                .disabled(isLoading)
             }
 
             // Footer
@@ -144,6 +153,7 @@ struct LoginView: View {
                 Button("Create one", action: onSwitchToRegister)
                     .buttonStyle(.link)
                     .font(.caption)
+                    .accessibilityIdentifier("login-switch-register")
             }
         }
         .padding(32)
@@ -153,11 +163,14 @@ struct LoginView: View {
 
     private func submitSignIn() {
         guard !email.isEmpty, !password.isEmpty, !isLoading else { return }
-        appState.save(rememberMe, forKey: "rememberMe")
         isLoading = true
         Task {
             await auth.signIn(email: email, password: password)
             isLoading = false
+            // Only save email on successful sign-in.
+            if auth.isSignedIn {
+                appState.save(rememberMe ? email : "", forKey: "remembered_email")
+            }
         }
     }
 }

@@ -15,9 +15,11 @@ struct ProfileView: View {
             VStack(spacing: 4) {
                 Text(auth.currentUser?.displayName ?? "User")
                     .font(.headline)
+                    .accessibilityIdentifier("profile-display-name")
                 Text(auth.currentUser?.email ?? "")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("profile-email")
             }
 
             Divider()
@@ -42,6 +44,7 @@ struct ProfileView: View {
                     .foregroundStyle(.red)
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("profile-sign-out")
             }
         }
         .padding()

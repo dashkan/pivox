@@ -63,6 +63,8 @@ if(APPLE)
     )
     target_link_libraries(pivox_bridge PRIVATE "-framework Security")
 
+    set(FIREBASE_PLIST "${CMAKE_SOURCE_DIR}/configs/firebase/GoogleService-Info.plist")
+
     # Swift executable (SwiftUI app).
     add_executable(${APP_TARGET} MACOSX_BUNDLE
         platform/macos/swift/main.swift
@@ -75,16 +77,12 @@ if(APPLE)
         platform/macos/swift/GoogleIcon.swift
         platform/macos/swift/AuthService.swift
         ${ASSET_CATALOG}
+        ${FIREBASE_PLIST}
     )
 
-    # Asset catalog goes into Resources/.
-    set_source_files_properties(${ASSET_CATALOG} PROPERTIES
+    # Asset catalog and Firebase plist go into Resources/.
+    set_source_files_properties(${ASSET_CATALOG} ${FIREBASE_PLIST} PROPERTIES
         MACOSX_PACKAGE_LOCATION Resources
-    )
-
-    # Copy Firebase config into app bundle Resources/.
-    set_target_properties(${APP_TARGET} PROPERTIES
-        RESOURCE "${CMAKE_SOURCE_DIR}/configs/firebase/GoogleService-Info.plist"
     )
 
     target_link_libraries(${APP_TARGET} PRIVATE pivox_bridge
@@ -101,7 +99,7 @@ if(APPLE)
         "${FB_AUTH}/FirebaseAppCheckInterop.xcframework"
         "${FB_AUTH}/FirebaseCoreExtension.xcframework"
         "${FB_AUTH}/GTMSessionFetcher.xcframework"
-        "${FB_AUTH}/RecaptchaInterop.xcframework"
+        # RecaptchaInterop.xcframework is header-only (iOS slices only) — not linked.
         # Google Sign-In uses ASWebAuthenticationSession (built-in, no extra SDK).
     )
     target_link_options(${APP_TARGET} PRIVATE "LINKER:-ObjC")

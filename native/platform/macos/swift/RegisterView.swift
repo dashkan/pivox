@@ -43,18 +43,26 @@ struct RegisterView: View {
                 TextField("Email", text: $email)
                     .textFieldStyle(.roundedBorder)
                     .textContentType(.emailAddress)
+                    .disabled(isLoading)
+                    .accessibilityIdentifier("register-email")
 
                 TextField("Display name", text: $displayName)
                     .textFieldStyle(.roundedBorder)
                     .textContentType(.name)
+                    .disabled(isLoading)
+                    .accessibilityIdentifier("register-display-name")
 
                 SecureField("Password", text: $password)
                     .textFieldStyle(.roundedBorder)
                     .textContentType(.newPassword)
+                    .disabled(isLoading)
+                    .accessibilityIdentifier("register-password")
 
                 SecureField("Confirm password", text: $confirmPassword)
                     .textFieldStyle(.roundedBorder)
                     .textContentType(.newPassword)
+                    .disabled(isLoading)
+                    .accessibilityIdentifier("register-confirm-password")
 
                 Button(action: {
                     guard password == confirmPassword else {
@@ -79,13 +87,15 @@ struct RegisterView: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .disabled(email.isEmpty || password.isEmpty || confirmPassword.isEmpty || displayName.isEmpty || isLoading)
+                .accessibilityIdentifier("register-create-account")
 
-                if let error = auth.errorMessage {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                        .multilineTextAlignment(.center)
-                }
+                // Error message — pre-allocated space to prevent layout shift.
+                Text(auth.errorMessage ?? " ")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
+                    .opacity(auth.errorMessage != nil ? 1 : 0)
+                    .accessibilityIdentifier("register-error")
             }
 
             // Separator
@@ -108,6 +118,7 @@ struct RegisterView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
+                .disabled(isLoading)
 
                 Button(action: { /* placeholder */ }) {
                     HStack {
@@ -121,6 +132,7 @@ struct RegisterView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
+                .disabled(isLoading)
             }
 
             // Footer
@@ -131,6 +143,7 @@ struct RegisterView: View {
                 Button("Sign in", action: onSwitchToLogin)
                     .buttonStyle(.link)
                     .font(.caption)
+                    .accessibilityIdentifier("register-switch-login")
             }
         }
         .padding(32)

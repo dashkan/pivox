@@ -28,8 +28,25 @@ class AuthService: NSObject {
     func configure() {
         FirebaseApp.configure()
 
+        // Point at local emulator for UI tests (must be before any auth calls).
+        if ProcessInfo.processInfo.environment["USE_AUTH_EMULATOR"] == "1" {
+            Auth.auth().useEmulator(withHost: "127.0.0.1", port: 9099)
+        }
+
         authStateHandle = Auth.auth().addStateDidChangeListener { [weak self] _, user in
             self?.currentUser = user
+        }
+
+        // UI tests pass RESET_AUTH to sign out and clear auth tokens.
+        // Must be after listener registration so the listener sees the sign-out.
+        if ProcessInfo.processInfo.environment["RESET_AUTH"] == "1" {
+            try? Auth.auth().signOut()
+            appState.deleteSecure(forKey: "firebase_id_token")
+            appState.deleteSecure(forKey: "firebase_refresh_token")
+        }
+        // RESET_PREFS clears non-auth user preferences (remembered email, etc).
+        if ProcessInfo.processInfo.environment["RESET_PREFS"] == "1" {
+            appState.save("", forKey: "remembered_email")
         }
     }
 

@@ -13,8 +13,7 @@ static bool isValidEmail(const std::string& email) {
     return dot != std::string::npos && dot > at + 1 && dot < email.size() - 1;
 }
 
-WinAuthService::WinAuthService(std::shared_ptr<AppState> appState)
-    : appState_(std::move(appState)) {}
+WinAuthService::WinAuthService() {}
 
 WinAuthService::~WinAuthService() {
     if (firebaseAuth_) {
