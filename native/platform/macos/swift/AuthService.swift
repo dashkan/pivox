@@ -82,6 +82,9 @@ class AuthService {
     // MARK: - Error Mapping
 
     private func firebaseErrorMessage(_ error: Error) -> String {
+        // Log the full error for debugging.
+        let debugMsg = "[AuthService] Error: \(error)\nNSError: \(error as NSError)"
+        try? debugMsg.write(toFile: "/tmp/pivox-auth-error.txt", atomically: true, encoding: .utf8)
         let nsError = error as NSError
         guard nsError.domain == AuthErrorDomain else {
             return error.localizedDescription

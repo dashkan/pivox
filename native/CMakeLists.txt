@@ -75,7 +75,6 @@ if(APPLE)
         platform/macos/swift/GoogleIcon.swift
         platform/macos/swift/AuthService.swift
         ${ASSET_CATALOG}
-        ${FIREBASE_PLIST}
     )
 
     # Asset catalog goes into Resources/.
@@ -84,9 +83,8 @@ if(APPLE)
     )
 
     # Copy Firebase config into app bundle Resources/.
-    set(FIREBASE_PLIST "${CMAKE_SOURCE_DIR}/configs/firebase/GoogleService-Info.plist")
-    set_source_files_properties(${FIREBASE_PLIST} PROPERTIES
-        MACOSX_PACKAGE_LOCATION Resources
+    set_target_properties(${APP_TARGET} PROPERTIES
+        RESOURCE "${CMAKE_SOURCE_DIR}/configs/firebase/GoogleService-Info.plist"
     )
 
     target_link_libraries(${APP_TARGET} PRIVATE pivox_bridge
@@ -122,6 +120,10 @@ if(APPLE)
         MACOSX_BUNDLE_BUNDLE_NAME "Pivox"
         CMAKE_Swift_LANGUAGE_VERSION 5
         XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
+        XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS "${CMAKE_SOURCE_DIR}/platform/macos/Pivox.entitlements"
+        XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "Apple Development"
+        XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "FAENDBN66M"
+        XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Automatic"
     )
 
     # For Ninja builds: compile asset catalog manually via actool.
@@ -163,6 +165,7 @@ if(APPLE)
     # ----------------------------------------------------------
     xctest_add_bundle(PivoxUITests ${APP_TARGET}
         tests/macos/ui/SidebarUITests.swift
+        tests/macos/ui/AuthUITests.swift
     )
 
     target_compile_options(PivoxUITests PRIVATE

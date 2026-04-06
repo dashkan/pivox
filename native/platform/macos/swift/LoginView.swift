@@ -10,6 +10,11 @@ struct LoginView: View {
     @State private var password = ""
     @State private var rememberMe: Bool
     @State private var isLoading = false
+    @FocusState private var focusedField: Field?
+
+    enum Field: Hashable {
+        case email, password
+    }
 
     init(onSwitchToRegister: @escaping () -> Void) {
         self.onSwitchToRegister = onSwitchToRegister
@@ -27,6 +32,7 @@ struct LoginView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear { focusedField = .email }
     }
 
     private var authCard: some View {
@@ -45,29 +51,32 @@ struct LoginView: View {
                 TextField("Email", text: $email)
                     .textFieldStyle(.roundedBorder)
                     .textContentType(.emailAddress)
+                    .focused($focusedField, equals: .email)
+                    .onSubmit { focusedField = .password }
+                    .accessibilityLabel("Email address")
+                    .accessibilityIdentifier("login-email")
 
                 SecureField("Password", text: $password)
                     .textFieldStyle(.roundedBorder)
                     .textContentType(.password)
+                    .focused($focusedField, equals: .password)
+                    .onSubmit { submitSignIn() }
+                    .accessibilityLabel("Password")
+                    .accessibilityIdentifier("login-password")
 
                 HStack {
                     Toggle("Remember me", isOn: $rememberMe)
                         .toggleStyle(.checkbox)
                         .font(.caption)
+                        .accessibilityIdentifier("login-remember-me")
                     Spacer()
                     Button("Forgot password?") { /* placeholder */ }
                         .buttonStyle(.link)
                         .font(.caption)
+                        .accessibilityIdentifier("login-forgot-password")
                 }
 
-                Button(action: {
-                    appState.save(rememberMe, forKey: "rememberMe")
-                    isLoading = true
-                    Task {
-                        await auth.signIn(email: email, password: password)
-                        isLoading = false
-                    }
-                }) {
+                Button(action: submitSignIn) {
                     if isLoading {
                         ProgressView()
                             .controlSize(.small)
@@ -80,6 +89,7 @@ struct LoginView: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .disabled(email.isEmpty || password.isEmpty || isLoading)
+                .accessibilityIdentifier("login-sign-in")
 
                 // Error message
                 if let error = auth.errorMessage {
@@ -87,6 +97,7 @@ struct LoginView: View {
                         .font(.caption)
                         .foregroundStyle(.red)
                         .multilineTextAlignment(.center)
+                        .accessibilityIdentifier("login-error")
                 }
             }
 
@@ -136,5 +147,15 @@ struct LoginView: View {
         .padding(32)
         .frame(maxWidth: 400)
         .glassCard()
+    }
+
+    private func submitSignIn() {
+        guard !email.isEmpty, !password.isEmpty, !isLoading else { return }
+        appState.save(rememberMe, forKey: "rememberMe")
+        isLoading = true
+        Task {
+            await auth.signIn(email: email, password: password)
+            isLoading = false
+        }
     }
 }
