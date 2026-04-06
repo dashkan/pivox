@@ -24,7 +24,32 @@ namespace winrt::Pivox::implementation
         bool remember = RememberMeCheck().IsChecked().GetBoolean();
         App::AppState()->saveBool("rememberMe", remember);
 
+        // Attempt sign-in via AuthService.
+        auto email = winrt::to_string(EmailBox().Text());
+        auto password = winrt::to_string(PasswordBox().Password());
+        auto result = App::AuthService()->signInWithEmail(email, password);
+
+        if (!result.ok())
+        {
+            ErrorBar().Message(winrt::to_hstring(result.errorMessage));
+            ErrorBar().IsOpen(true);
+            return;
+        }
+
         // Navigate to main app.
+        NavigateToMainApp();
+    }
+
+    void LoginPage::OnSwitchToRegister(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
+    {
+        if (auto frame = this->Frame())
+        {
+            frame.Navigate(winrt::xaml_typename<Pivox::RegisterPage>());
+        }
+    }
+
+    void LoginPage::NavigateToMainApp()
+    {
         if (auto frame = this->Frame())
         {
             if (auto authContainer = frame.Parent().as<Microsoft::UI::Xaml::FrameworkElement>())
@@ -33,7 +58,6 @@ namespace winrt::Pivox::implementation
                 {
                     if (auto panel = rootGrid.as<Microsoft::UI::Xaml::Controls::Panel>())
                     {
-                        // AuthContainer = child 0, MainContainer = child 1
                         if (panel.Children().Size() >= 2)
                         {
                             panel.Children().GetAt(0).as<Microsoft::UI::Xaml::UIElement>()
@@ -44,14 +68,6 @@ namespace winrt::Pivox::implementation
                     }
                 }
             }
-        }
-    }
-
-    void LoginPage::OnSwitchToRegister(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
-    {
-        if (auto frame = this->Frame())
-        {
-            frame.Navigate(winrt::xaml_typename<Pivox::RegisterPage>());
         }
     }
 }

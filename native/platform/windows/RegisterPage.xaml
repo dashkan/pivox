@@ -27,6 +27,13 @@
                     HorizontalAlignment="Center" />
             </StackPanel>
 
+            <!-- Error message -->
+            <InfoBar
+                x:Name="ErrorBar"
+                IsOpen="False"
+                Severity="Error"
+                IsClosable="True" />
+
             <!-- Form -->
             <StackPanel Spacing="16">
                 <TextBox

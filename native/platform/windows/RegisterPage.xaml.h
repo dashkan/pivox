@@ -9,6 +9,9 @@ namespace winrt::Pivox::implementation
 
         void OnSignUp(IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& e);
         void OnSwitchToLogin(IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& e);
+
+    private:
+        void NavigateToMainApp();
     };
 }
 

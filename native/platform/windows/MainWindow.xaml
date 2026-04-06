@@ -127,15 +127,18 @@
                         Spacing="20"
                         Width="300">
                         <PersonPicture
+                            x:Name="ProfileAvatar"
                             Width="64" Height="64"
-                            DisplayName="Ashkan Daie" />
+                            DisplayName="User" />
                         <StackPanel Spacing="4" HorizontalAlignment="Center">
                             <TextBlock
-                                Text="Ashkan Daie"
+                                x:Name="ProfileName"
+                                Text="User"
                                 Style="{StaticResource SubtitleTextBlockStyle}"
                                 HorizontalAlignment="Center" />
                             <TextBlock
-                                Text="ashkan@pivox.app"
+                                x:Name="ProfileEmail"
+                                Text=""
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                 HorizontalAlignment="Center" />
                         </StackPanel>

@@ -11,15 +11,17 @@ namespace winrt::Pivox::implementation
         InitializeComponent();
         SetupWindow();
 
-        // Check rememberMe — skip login if user opted in.
+        // Try to restore a previous session if rememberMe is enabled.
         auto& appState = App::AppState();
+        auto& authService = App::AuthService();
         auto rememberMe = appState->loadBool("rememberMe");
-        if (rememberMe.has_value() && rememberMe.value())
+        if (rememberMe.has_value() && rememberMe.value() && authService->tryRestoreSession())
         {
             ShowMainApp();
         }
         else
         {
+            authService->signOut();
             ShowAuth();
         }
     }
@@ -108,6 +110,14 @@ namespace winrt::Pivox::implementation
 
             if (tag == L"Profile")
             {
+                // Update profile with current auth user data.
+                auto& user = App::AuthService()->currentUser();
+                auto displayName = user.displayName.empty() ? "User" : user.displayName;
+                auto email = user.email.empty() ? "" : user.email;
+                ProfileName().Text(winrt::to_hstring(displayName));
+                ProfileEmail().Text(winrt::to_hstring(email));
+                ProfileAvatar().DisplayName(winrt::to_hstring(displayName));
+
                 ContentPanel().Visibility(Microsoft::UI::Xaml::Visibility::Collapsed);
                 ProfilePanel().Visibility(Microsoft::UI::Xaml::Visibility::Visible);
             }
@@ -155,8 +165,8 @@ namespace winrt::Pivox::implementation
 
     void MainWindow::OnSignOut(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
     {
-        // Clear rememberMe on sign out.
         App::AppState()->saveBool("rememberMe", false);
+        App::AuthService()->signOut();
         ShowAuth();
     }
 }

@@ -233,6 +233,7 @@ if(WIN32)
     # WinAppState library — shared between app and tests.
     add_library(pivox_win_state STATIC
         ${WIN_PLATFORM_DIR}/WinAppState.cpp
+        ${WIN_PLATFORM_DIR}/WinAuthService.cpp
     )
     target_include_directories(pivox_win_state PUBLIC
         ${WIN_PLATFORM_DIR}
@@ -266,6 +267,7 @@ if(GTest_FOUND)
     if(WIN32)
         add_executable(pivox_win_tests
             tests/windows/win_app_state_tests.cpp
+            tests/windows/win_auth_service_tests.cpp
         )
         target_link_libraries(pivox_win_tests PRIVATE pivox_win_state GTest::gtest_main)
         gtest_discover_tests(pivox_win_tests DISCOVERY_MODE PRE_TEST)
