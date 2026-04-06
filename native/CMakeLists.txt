@@ -189,6 +189,13 @@ endif()
 # ============================================================
 
 if(WIN32)
+    # Download Firebase C++ SDK pre-built desktop libraries.
+    set(FIREBASE_CPP_VERSION "13.5.0")
+    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+    include(DownloadFirebaseCpp)
+    DownloadFirebaseCpp("${FIREBASE_CPP_VERSION}" "${CMAKE_SOURCE_DIR}/third_party/firebase-cpp")
+    set(FB_CPP_ROOT "${CMAKE_SOURCE_DIR}/third_party/firebase-cpp/firebase_cpp_sdk")
+
     set(WIN_TARGET "Pivox")
     set(WIN_PLATFORM_DIR "${CMAKE_SOURCE_DIR}/platform/windows")
 
@@ -288,6 +295,17 @@ if(WIN32)
     )
     target_link_libraries(pivox_win_state PUBLIC pivox_core)
     target_link_libraries(pivox_win_state PRIVATE crypt32 advapi32)
+
+    # Firebase C++ SDK — link auth + app libraries.
+    if(EXISTS "${FB_CPP_ROOT}")
+        target_include_directories(pivox_win_state PUBLIC "${FB_CPP_ROOT}/include")
+        target_link_directories(pivox_win_state PUBLIC
+            "${FB_CPP_ROOT}/libs/windows/VS2019/MD/x64/$<CONFIG>")
+        target_link_libraries(pivox_win_state PRIVATE firebase_app firebase_auth
+            ws2_32 userenv)
+        target_compile_definitions(pivox_win_state PUBLIC
+            PIVOX_HAS_FIREBASE=1 _CRT_SECURE_NO_WARNINGS)
+    endif()
 endif()
 
 

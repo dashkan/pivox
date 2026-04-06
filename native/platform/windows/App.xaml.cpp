@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "App.xaml.h"
 #include "MainWindow.xaml.h"
+#include "firebase_config.h"
 
 // NOTE: App.xaml.cpp does NOT include App.g.cpp.
 // See docs/dev/winui3-cmake-guide.md constraint #3.
@@ -24,6 +25,15 @@ namespace winrt::Pivox::implementation
             }
         });
 #endif
+
+        // Initialize Firebase C++ SDK.
+        s_authService->initializeFirebase();
+
+        // Configure OAuth providers with platform-specific client IDs.
+        pivox::OAuthConfig oauthConfig;
+        oauthConfig.googleClientId = pivox::firebase_config::kGoogleSignInClientId;
+        // GitHub client ID: not yet registered — will be added when available.
+        s_authService->setOAuthConfig(oauthConfig);
     }
 
     void App::OnLaunched([[maybe_unused]] Microsoft::UI::Xaml::LaunchActivatedEventArgs const& e)

@@ -7,15 +7,20 @@
 #include <string>
 #include <optional>
 
+#if PIVOX_HAS_FIREBASE
+#include "firebase/app.h"
+#include "firebase/auth.h"
+#endif
+
 namespace pivox {
 
 /// Firebase project configuration.
-/// Values come from google-services.json (or environment/build config).
+/// Values come from firebase_config.h (compile-time constants).
 struct FirebaseConfig {
     std::string apiKey;
     std::string projectId;
     std::string appId;
-    std::string authDomain;    // e.g. "my-project.firebaseapp.com"
+    std::string authDomain;
 
     bool isValid() const {
         return !apiKey.empty() && !projectId.empty() && !appId.empty();
@@ -31,7 +36,7 @@ enum class AuthError {
     EmailAlreadyInUse,
     WeakPassword,
     NetworkError,
-    NotConfigured,    // Firebase SDK not configured
+    NotConfigured,
     Unknown,
 };
 
@@ -45,7 +50,6 @@ struct AuthResult {
 };
 
 /// OAuth provider configuration.
-/// Client IDs come from Google Cloud Console / GitHub Developer Settings.
 struct OAuthConfig {
     std::string googleClientId;
     std::string githubClientId;
@@ -55,63 +59,54 @@ struct OAuthConfig {
 };
 
 /// Manages authentication on Windows.
-/// Wraps Firebase C++ SDK for email/password, OAuth2Manager for social sign-in,
-/// manages auth state transitions, and stores/restores tokens via AppState.
+/// Uses Firebase C++ SDK for email/password and credential-based sign-in,
+/// OAuth2Manager for social sign-in, and AppState for token storage.
 class WinAuthService {
 public:
     explicit WinAuthService(std::shared_ptr<AppState> appState);
+    ~WinAuthService();
 
-    /// Current auth status.
     AuthStatus status() const { return status_; }
-
-    /// Current user (valid only when status == SignedIn).
     const AuthUser& currentUser() const { return currentUser_; }
 
-    /// Register a callback for auth state changes.
     using AuthStateCallback = std::function<void(AuthStatus, const AuthUser&)>;
     void onAuthStateChanged(AuthStateCallback callback);
 
-    /// Configure OAuth providers. Must be called before social sign-in.
     void setOAuthConfig(const OAuthConfig& config);
 
-    /// Email/password sign-in.
     AuthResult signInWithEmail(const std::string& email, const std::string& password);
-
-    /// Email/password registration.
     AuthResult createAccount(const std::string& email, const std::string& password,
                              const std::string& displayName);
 
-    /// Check if Google sign-in is configured.
     bool isGoogleConfigured() const { return oauthConfig_.hasGoogle(); }
-
-    /// Check if GitHub sign-in is configured.
     bool isGitHubConfigured() const { return oauthConfig_.hasGitHub(); }
-
-    /// Initiate Google sign-in via OAuth2Manager.
-    /// Returns NotConfigured if googleClientId is not set.
-    /// NOTE: The actual OAuth flow is async (coroutine). This method validates
-    /// the config synchronously and returns the error. The async flow will be
-    /// triggered from the UI layer using OAuth2Manager::RequestAuthWithParamsAsync.
     AuthResult validateGoogleSignIn() const;
-
-    /// Initiate GitHub sign-in via OAuth2Manager.
     AuthResult validateGitHubSignIn() const;
 
-    /// Sign out — clears session, tokens, and auth state.
     void signOut();
-
-    /// Try to restore a previous session from stored tokens.
-    /// Returns true if a valid session was restored.
     bool tryRestoreSession();
+
+    /// Initialize Firebase SDK. Call once at app startup.
+    bool initializeFirebase();
+    bool isFirebaseInitialized() const;
 
 private:
     void setAuthState(AuthStatus status, const AuthUser& user = {});
+    void saveUserTokens(const AuthUser& user, const std::string& idToken,
+                        const std::string& refreshToken);
 
     std::shared_ptr<AppState> appState_;
     AuthStatus status_ = AuthStatus::Unknown;
     AuthUser currentUser_;
     AuthStateCallback callback_;
     OAuthConfig oauthConfig_;
+
+#if PIVOX_HAS_FIREBASE
+    firebase::App* firebaseApp_ = nullptr;
+    firebase::auth::Auth* firebaseAuth_ = nullptr;
+    AuthResult mapFirebaseError(int errorCode) const;
+    AuthUser mapFirebaseUser(const firebase::auth::User& user) const;
+#endif
 };
 
 } // namespace pivox
