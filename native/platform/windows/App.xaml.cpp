@@ -26,6 +26,15 @@ namespace winrt::Pivox::implementation
         });
 #endif
 
+        // Single-instance: exit if another Pivox is already running.
+        HANDLE hMutex = CreateMutexW(nullptr, FALSE, L"Local\\PivoxAppMutex");
+        if (hMutex && GetLastError() == ERROR_ALREADY_EXISTS)
+        {
+            CloseHandle(hMutex);
+            ExitProcess(0);
+            return;
+        }
+
         // Register pivox:// URL scheme (for non-Google callbacks).
         pivox::WinAppState::registerProtocolHandler();
 
