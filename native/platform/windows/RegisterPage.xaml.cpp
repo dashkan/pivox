@@ -49,7 +49,22 @@ namespace winrt::Pivox::implementation
         if (!result.ok())
         {
             ShowError(result.errorMessage);
+            return;
         }
+
+        App::AppState()->saveString("remembered_email", "");
+        App::AuthService()->signInWithGoogleAsync([this](pivox::AuthResult result) {
+            DispatcherQueue().TryEnqueue([this, result]() {
+                if (result.ok())
+                {
+                    NavigateToMainApp();
+                }
+                else
+                {
+                    ShowError(result.errorMessage);
+                }
+            });
+        });
     }
 
     void RegisterPage::OnGitHubSignIn(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)

@@ -41,6 +41,26 @@ namespace winrt::Pivox::implementation
 
     void App::OnLaunched([[maybe_unused]] Microsoft::UI::Xaml::LaunchActivatedEventArgs const& e)
     {
+        // RESET_AUTH=1 forces sign-out for test scenarios.
+        wchar_t resetAuth[2] = {};
+        if (GetEnvironmentVariableW(L"RESET_AUTH", resetAuth, 2) > 0 && resetAuth[0] == L'1')
+        {
+            s_authService->signOut();
+        }
+
+        // Handle protocol activation (pivox://oauth-callback/...).
+        auto args = Microsoft::Windows::AppLifecycle::AppInstance::GetCurrent().GetActivatedEventArgs();
+        if (args && args.Kind() == Microsoft::Windows::AppLifecycle::ExtendedActivationKind::Protocol)
+        {
+            auto protocolArgs = args.Data().as<
+                winrt::Windows::ApplicationModel::Activation::IProtocolActivatedEventArgs>();
+            if (protocolArgs)
+            {
+                auto uri = winrt::to_string(protocolArgs.Uri().AbsoluteUri());
+                s_authService->handleOAuthCallback(uri);
+            }
+        }
+
         m_window = winrt::make<MainWindow>();
         m_window.Activate();
     }

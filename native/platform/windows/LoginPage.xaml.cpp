@@ -10,18 +10,27 @@ namespace winrt::Pivox::implementation
     {
         InitializeComponent();
 
-        // Restore rememberMe checkbox state.
-        auto rememberMe = App::AppState()->loadBool("rememberMe");
-        if (rememberMe.has_value())
+        // Remember Me: pre-fill email if previously saved.
+        auto savedEmail = App::AppState()->loadString("remembered_email");
+        if (savedEmail.has_value() && !savedEmail->empty())
         {
-            RememberMeCheck().IsChecked(rememberMe.value());
+            EmailBox().Text(winrt::to_hstring(savedEmail.value()));
+            RememberMeCheck().IsChecked(true);
         }
     }
 
     void LoginPage::OnPageLoaded(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
     {
-        // Auto-focus email field on launch.
-        EmailBox().Focus(Microsoft::UI::Xaml::FocusState::Programmatic);
+        // Auto-focus: if email is pre-filled, focus password; otherwise focus email.
+        auto savedEmail = App::AppState()->loadString("remembered_email");
+        if (savedEmail.has_value() && !savedEmail->empty())
+        {
+            PasswordBox().Focus(Microsoft::UI::Xaml::FocusState::Programmatic);
+        }
+        else
+        {
+            EmailBox().Focus(Microsoft::UI::Xaml::FocusState::Programmatic);
+        }
     }
 
     void LoginPage::OnEmailKeyDown(IInspectable const&, Microsoft::UI::Xaml::Input::KeyRoutedEventArgs const& e)
@@ -89,9 +98,16 @@ namespace winrt::Pivox::implementation
         auto password = winrt::to_string(PasswordBox().Password());
         if (email.empty() || password.empty()) return;
 
-        // Save rememberMe preference.
+        // Remember Me: save or clear the email for next launch.
         bool remember = RememberMeCheck().IsChecked().GetBoolean();
-        App::AppState()->saveBool("rememberMe", remember);
+        if (remember)
+        {
+            App::AppState()->saveString("remembered_email", email);
+        }
+        else
+        {
+            App::AppState()->saveString("remembered_email", "");
+        }
 
         // Show loading state.
         SetLoading(true);
@@ -119,7 +135,24 @@ namespace winrt::Pivox::implementation
             ShowError(result.errorMessage);
             return;
         }
-        // TODO: Launch OAuth2Manager::RequestAuthWithParamsAsync for Google.
+
+        // Clear saved email — Google sign-in, not email/password.
+        App::AppState()->saveString("remembered_email", "");
+
+        SetLoading(true);
+        App::AuthService()->signInWithGoogleAsync([this](pivox::AuthResult result) {
+            DispatcherQueue().TryEnqueue([this, result]() {
+                SetLoading(false);
+                if (result.ok())
+                {
+                    NavigateToMainApp();
+                }
+                else
+                {
+                    ShowError(result.errorMessage);
+                }
+            });
+        });
     }
 
     void LoginPage::OnGitHubSignIn(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
@@ -130,7 +163,7 @@ namespace winrt::Pivox::implementation
             ShowError(result.errorMessage);
             return;
         }
-        // TODO: Launch OAuth2Manager::RequestAuthWithParamsAsync for GitHub.
+        // TODO: GitHub OAuth flow — needs client ID registration.
     }
 
     void LoginPage::OnSwitchToRegister(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)

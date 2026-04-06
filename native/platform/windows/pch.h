@@ -27,4 +27,6 @@
 #include <winrt/Microsoft.UI.Xaml.Shapes.h>
 #include <winrt/Microsoft.UI.Xaml.XamlTypeInfo.h>
 
+#include <winrt/Microsoft.Windows.AppLifecycle.h>
+
 #include <microsoft.ui.xaml.window.h>

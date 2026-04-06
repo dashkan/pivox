@@ -11,17 +11,23 @@ namespace winrt::Pivox::implementation
         InitializeComponent();
         SetupWindow();
 
-        // Try to restore a previous session if rememberMe is enabled.
-        auto& appState = App::AppState();
+        // Always try to restore a previous session.
+        // Users stay signed in until explicit sign out.
         auto& authService = App::AuthService();
-        auto rememberMe = appState->loadBool("rememberMe");
-        if (rememberMe.has_value() && rememberMe.value() && authService->tryRestoreSession())
+#if PIVOX_HAS_FIREBASE
+        if (authService->isFirebaseInitialized())
+        {
+            // Firebase SDK manages its own session persistence.
+            // Check if a user is already signed in.
+            // (Firebase restores session automatically on init.)
+        }
+#endif
+        if (authService->tryRestoreSession())
         {
             ShowMainApp();
         }
         else
         {
-            authService->signOut();
             ShowAuth();
         }
     }
@@ -165,7 +171,6 @@ namespace winrt::Pivox::implementation
 
     void MainWindow::OnSignOut(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
     {
-        App::AppState()->saveBool("rememberMe", false);
         App::AuthService()->signOut();
         ShowAuth();
     }

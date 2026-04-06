@@ -6,6 +6,8 @@
 #include <memory>
 #include <string>
 #include <optional>
+#include <vector>
+#include <cstdint>
 
 #if PIVOX_HAS_FIREBASE
 #include "firebase/app.h"
@@ -15,7 +17,6 @@
 namespace pivox {
 
 /// Firebase project configuration.
-/// Values come from firebase_config.h (compile-time constants).
 struct FirebaseConfig {
     std::string apiKey;
     std::string projectId;
@@ -37,6 +38,7 @@ enum class AuthError {
     WeakPassword,
     NetworkError,
     NotConfigured,
+    OAuthInProgress,
     Unknown,
 };
 
@@ -59,8 +61,6 @@ struct OAuthConfig {
 };
 
 /// Manages authentication on Windows.
-/// Uses Firebase C++ SDK for email/password and credential-based sign-in,
-/// OAuth2Manager for social sign-in, and AppState for token storage.
 class WinAuthService {
 public:
     explicit WinAuthService(std::shared_ptr<AppState> appState);
@@ -83,12 +83,27 @@ public:
     AuthResult validateGoogleSignIn() const;
     AuthResult validateGitHubSignIn() const;
 
+    /// Start Google OAuth flow. Opens browser. Callback called when complete.
+    void signInWithGoogleAsync(std::function<void(AuthResult)> callback);
+
+    /// Handle protocol activation callback (pivox://oauth-callback/...)
+    void handleOAuthCallback(const std::string& callbackUrl);
+
+    bool isOAuthInProgress() const { return isOAuthInProgress_; }
+
+    /// Suppress browser launch for unit testing.
+    void setTestMode(bool enabled) { testMode_ = enabled; }
+
     void signOut();
     bool tryRestoreSession();
 
-    /// Initialize Firebase SDK. Call once at app startup.
     bool initializeFirebase();
     bool isFirebaseInitialized() const;
+
+    // PKCE helpers (public for testing)
+    static std::string generateCodeVerifier();
+    static std::string generateCodeChallenge(const std::string& verifier);
+    static std::string base64UrlEncode(const std::vector<uint8_t>& data);
 
 private:
     void setAuthState(AuthStatus status, const AuthUser& user = {});
@@ -100,6 +115,13 @@ private:
     AuthUser currentUser_;
     AuthStateCallback callback_;
     OAuthConfig oauthConfig_;
+
+    // OAuth state
+    std::string pendingCodeVerifier_;
+    std::string pendingStateNonce_;
+    std::function<void(AuthResult)> pendingOAuthCallback_;
+    bool isOAuthInProgress_ = false;
+    bool testMode_ = false;
 
 #if PIVOX_HAS_FIREBASE
     firebase::App* firebaseApp_ = nullptr;

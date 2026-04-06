@@ -1,5 +1,11 @@
 #include "WinAuthService.h"
 #include "firebase_config.h"
+#include <windows.h>
+#include <bcrypt.h>
+#include <shellapi.h>
+#include <sstream>
+
+#pragma comment(lib, "bcrypt.lib")
 
 #if PIVOX_HAS_FIREBASE
 #include "firebase/auth/credential.h"
@@ -202,6 +208,144 @@ AuthResult WinAuthService::validateGitHubSignIn() const {
                  "GitHub sign-in not configured. Set githubClientId in OAuthConfig." };
     }
     return { AuthError::None };
+}
+
+// ---------------------------------------------------------------------------
+// PKCE helpers
+// ---------------------------------------------------------------------------
+
+std::string WinAuthService::base64UrlEncode(const std::vector<uint8_t>& data) {
+    static const char table[] =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    std::string result;
+    result.reserve(4 * ((data.size() + 2) / 3));
+    for (size_t i = 0; i < data.size(); i += 3) {
+        uint32_t n = static_cast<uint32_t>(data[i]) << 16;
+        if (i + 1 < data.size()) n |= static_cast<uint32_t>(data[i + 1]) << 8;
+        if (i + 2 < data.size()) n |= static_cast<uint32_t>(data[i + 2]);
+        result += table[(n >> 18) & 0x3F];
+        result += table[(n >> 12) & 0x3F];
+        if (i + 1 < data.size()) result += table[(n >> 6) & 0x3F];
+        if (i + 2 < data.size()) result += table[n & 0x3F];
+    }
+    return result;
+}
+
+std::string WinAuthService::generateCodeVerifier() {
+    std::vector<uint8_t> randomBytes(32);
+    BCryptGenRandom(nullptr, randomBytes.data(),
+        static_cast<ULONG>(randomBytes.size()), BCRYPT_USE_SYSTEM_PREFERRED_RNG);
+    return base64UrlEncode(randomBytes);
+}
+
+std::string WinAuthService::generateCodeChallenge(const std::string& verifier) {
+    BCRYPT_ALG_HANDLE hAlg = nullptr;
+    BCRYPT_HASH_HANDLE hHash = nullptr;
+    std::vector<uint8_t> hash(32); // SHA256 = 32 bytes
+
+    BCryptOpenAlgorithmProvider(&hAlg, BCRYPT_SHA256_ALGORITHM, nullptr, 0);
+    BCryptCreateHash(hAlg, &hHash, nullptr, 0, nullptr, 0, 0);
+    BCryptHashData(hHash, reinterpret_cast<PUCHAR>(const_cast<char*>(verifier.data())),
+        static_cast<ULONG>(verifier.size()), 0);
+    BCryptFinishHash(hHash, hash.data(), static_cast<ULONG>(hash.size()), 0);
+    BCryptDestroyHash(hHash);
+    BCryptCloseAlgorithmProvider(hAlg, 0);
+
+    return base64UrlEncode(hash);
+}
+
+// ---------------------------------------------------------------------------
+// Google OAuth flow
+// ---------------------------------------------------------------------------
+
+void WinAuthService::signInWithGoogleAsync(std::function<void(AuthResult)> callback) {
+    if (!oauthConfig_.hasGoogle()) {
+        callback({ AuthError::NotConfigured,
+                   "Google sign-in not configured. Set googleClientId." });
+        return;
+    }
+
+    if (isOAuthInProgress_) {
+        callback({ AuthError::OAuthInProgress, "Sign-in already in progress." });
+        return;
+    }
+
+    isOAuthInProgress_ = true;
+    pendingOAuthCallback_ = std::move(callback);
+    pendingCodeVerifier_ = generateCodeVerifier();
+    pendingStateNonce_ = generateCodeVerifier(); // reuse as random nonce
+
+    std::string codeChallenge = generateCodeChallenge(pendingCodeVerifier_);
+
+    // Build Google OAuth URL.
+    std::ostringstream url;
+    url << "https://accounts.google.com/o/oauth2/v2/auth"
+        << "?client_id=" << oauthConfig_.googleClientId
+        << "&redirect_uri=pivox%3A%2F%2Foauth-callback%2F"
+        << "&response_type=code"
+        << "&scope=openid%20email%20profile"
+        << "&code_challenge=" << codeChallenge
+        << "&code_challenge_method=S256"
+        << "&state=" << pendingStateNonce_;
+
+    // Open system browser (skipped in test mode).
+    if (!testMode_) {
+        std::string urlStr = url.str();
+        std::wstring wurl(urlStr.begin(), urlStr.end());
+        ShellExecuteW(nullptr, L"open", wurl.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+    }
+}
+
+void WinAuthService::handleOAuthCallback(const std::string& callbackUrl) {
+    if (!isOAuthInProgress_ || !pendingOAuthCallback_) {
+        return;
+    }
+
+    // Parse query parameters from pivox://oauth-callback/?code=...&state=...
+    auto qpos = callbackUrl.find('?');
+    if (qpos == std::string::npos) {
+        auto cb = std::move(pendingOAuthCallback_);
+        isOAuthInProgress_ = false;
+        cb({ AuthError::Unknown, auth_error::kUnknown });
+        return;
+    }
+
+    std::string query = callbackUrl.substr(qpos + 1);
+    std::string code, state;
+
+    // Simple query string parser.
+    std::istringstream qs(query);
+    std::string param;
+    while (std::getline(qs, param, '&')) {
+        auto eq = param.find('=');
+        if (eq == std::string::npos) continue;
+        auto key = param.substr(0, eq);
+        auto val = param.substr(eq + 1);
+        if (key == "code") code = val;
+        else if (key == "state") state = val;
+    }
+
+    auto cb = std::move(pendingOAuthCallback_);
+    auto verifier = std::move(pendingCodeVerifier_);
+    auto expectedState = std::move(pendingStateNonce_);
+    isOAuthInProgress_ = false;
+
+    // Validate state nonce.
+    if (state != expectedState) {
+        cb({ AuthError::Unknown, auth_error::kUnknown });
+        return;
+    }
+
+    if (code.empty()) {
+        cb({ AuthError::Unknown, auth_error::kUnknown });
+        return;
+    }
+
+    // TODO: Exchange auth code for tokens via POST to https://oauth2.googleapis.com/token
+    // Then create Firebase credential and sign in.
+    // For now, return a clear error that the token exchange is not yet implemented.
+    cb({ AuthError::NotConfigured,
+         "Google OAuth code received. Token exchange not yet implemented." });
 }
 
 // ---------------------------------------------------------------------------
