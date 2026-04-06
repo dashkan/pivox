@@ -7,7 +7,7 @@ static NSString* const kWindowY = @"pivox.window.y";
 static NSString* const kWindowWidth = @"pivox.window.width";
 static NSString* const kWindowHeight = @"pivox.window.height";
 
-static NSString* const kKeychainService = @"app.pivox.desktop";
+static NSString* const kKeychainService = @"app.pivox.native";
 
 namespace pivox {
 

@@ -108,7 +108,7 @@ if(APPLE)
 
     set_target_properties(${APP_TARGET} PROPERTIES
         MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/platform/macos/Info.plist.in
-        MACOSX_BUNDLE_GUI_IDENTIFIER "app.pivox.desktop"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "app.pivox.native"
         MACOSX_BUNDLE_BUNDLE_VERSION "0.1.0"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1.0"
         MACOSX_BUNDLE_BUNDLE_NAME "Pivox"
