@@ -203,22 +203,21 @@ class AuthService: NSObject {
 
     // MARK: - Sign Out + Error Mapping
 
+    /// Maps Firebase errors to user-facing messages.
+    /// These strings MUST match the constants in core/auth_state.h auth_error namespace
+    /// so that all platforms show identical error messages.
     private func firebaseErrorMessage(_ error: Error) -> String {
-        // Log the full error for debugging.
-        let debugMsg = "[AuthService] Error: \(error)\nNSError: \(error as NSError)"
-        try? debugMsg.write(toFile: "/tmp/pivox-auth-error.txt", atomically: true, encoding: .utf8)
         let nsError = error as NSError
         guard nsError.domain == AuthErrorDomain else {
-            return error.localizedDescription
+            return "Something went wrong. Please try again."
         }
 
         switch AuthErrorCode(rawValue: nsError.code) {
         case .invalidEmail:
             return "Invalid email address."
-        case .wrongPassword:
-            return "Incorrect password."
-        case .userNotFound:
-            return "No account found with this email."
+        case .wrongPassword, .userNotFound, .invalidCredential:
+            // Security: don't reveal whether the email exists.
+            return "Incorrect email or password."
         case .emailAlreadyInUse:
             return "An account with this email already exists."
         case .weakPassword:
@@ -228,7 +227,7 @@ class AuthService: NSObject {
         case .tooManyRequests:
             return "Too many attempts. Try again later."
         default:
-            return error.localizedDescription
+            return "Something went wrong. Please try again."
         }
     }
 }

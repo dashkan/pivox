@@ -92,10 +92,10 @@ bool WinAuthService::isFirebaseInitialized() const {
 
 AuthResult WinAuthService::signInWithEmail(const std::string& email, const std::string& password) {
     if (!isValidEmail(email)) {
-        return { AuthError::InvalidEmail, "Invalid email address." };
+        return { AuthError::InvalidEmail, auth_error::kInvalidEmail };
     }
     if (password.empty()) {
-        return { AuthError::WrongPassword, "Password is required." };
+        return { AuthError::WrongPassword, auth_error::kInvalidCredential };
     }
 
 #if PIVOX_HAS_FIREBASE
@@ -139,10 +139,10 @@ AuthResult WinAuthService::signInWithEmail(const std::string& email, const std::
 AuthResult WinAuthService::createAccount(const std::string& email, const std::string& password,
                                          const std::string& displayName) {
     if (!isValidEmail(email)) {
-        return { AuthError::InvalidEmail, "Invalid email address." };
+        return { AuthError::InvalidEmail, auth_error::kInvalidEmail };
     }
     if (password.size() < 8) {
-        return { AuthError::WeakPassword, "Password must be at least 8 characters." };
+        return { AuthError::WeakPassword, auth_error::kWeakPassword };
     }
 
 #if PIVOX_HAS_FIREBASE
@@ -257,19 +257,19 @@ AuthResult WinAuthService::mapFirebaseError(int errorCode) const {
     using namespace firebase::auth;
     switch (errorCode) {
         case kAuthErrorInvalidEmail:
-            return { AuthError::InvalidEmail, "Invalid email address." };
+            return { AuthError::InvalidEmail, auth_error::kInvalidEmail };
         case kAuthErrorWrongPassword:
-            return { AuthError::WrongPassword, "Incorrect password." };
+            return { AuthError::WrongPassword, auth_error::kInvalidCredential };
         case kAuthErrorUserNotFound:
-            return { AuthError::UserNotFound, "No account found with this email." };
+            return { AuthError::UserNotFound, auth_error::kInvalidCredential };
         case kAuthErrorEmailAlreadyInUse:
-            return { AuthError::EmailAlreadyInUse, "An account with this email already exists." };
+            return { AuthError::EmailAlreadyInUse, auth_error::kEmailAlreadyInUse };
         case kAuthErrorWeakPassword:
-            return { AuthError::WeakPassword, "Password is too weak." };
+            return { AuthError::WeakPassword, auth_error::kWeakPassword };
         case kAuthErrorNetworkRequestFailed:
-            return { AuthError::NetworkError, "Network error. Check your connection." };
+            return { AuthError::NetworkError, auth_error::kNetworkError };
         default:
-            return { AuthError::Unknown, "Authentication failed." };
+            return { AuthError::Unknown, auth_error::kUnknown };
     }
 }
 
