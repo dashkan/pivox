@@ -26,7 +26,28 @@ namespace winrt::Pivox::implementation
         });
 #endif
 
-        // Register pivox:// URL scheme for OAuth callbacks.
+        // Single-instance: if another Pivox is already running, redirect
+        // this activation to it and exit. This is how OAuth callbacks
+        // (protocol activations) reach the running instance.
+        auto mainInstance = Microsoft::Windows::AppLifecycle::AppInstance::FindOrRegisterForKey(L"pivox-main");
+        if (!mainInstance.IsCurrent())
+        {
+            // Another instance owns the key — redirect our activation to it.
+            auto activationArgs = Microsoft::Windows::AppLifecycle::AppInstance::GetCurrent().GetActivatedEventArgs();
+            mainInstance.RedirectActivationToAsync(activationArgs).get();
+            ::ExitProcess(0);
+            return;
+        }
+
+        // We are the main instance. Listen for redirected activations.
+        mainInstance.Activated([this](
+            IInspectable const&,
+            Microsoft::Windows::AppLifecycle::AppActivationArguments const& args)
+        {
+            HandleProtocolActivation(args);
+        });
+
+        // Register pivox:// and Google reversed-client-ID URL schemes.
         pivox::WinAppState::registerProtocolHandler();
 
         // Initialize Firebase C++ SDK.
@@ -35,10 +56,26 @@ namespace winrt::Pivox::implementation
         // Connect to Firebase Auth Emulator if requested.
         s_authService->connectToEmulatorIfRequested();
 
-        // Configure OAuth providers with platform-specific client IDs.
+        // Configure OAuth providers.
         pivox::OAuthConfig oauthConfig;
         oauthConfig.googleClientId = pivox::firebase_config::kGoogleSignInClientId;
         s_authService->setOAuthConfig(oauthConfig);
+    }
+
+    void App::HandleProtocolActivation(
+        Microsoft::Windows::AppLifecycle::AppActivationArguments const& args)
+    {
+        if (args.Kind() != Microsoft::Windows::AppLifecycle::ExtendedActivationKind::Protocol)
+        {
+            return;
+        }
+
+        auto protocolArgs = args.Data().as<
+            winrt::Windows::ApplicationModel::Activation::IProtocolActivatedEventArgs>();
+        if (!protocolArgs) return;
+
+        auto uri = winrt::to_string(protocolArgs.Uri().AbsoluteUri());
+        s_authService->handleOAuthCallback(uri);
     }
 
     void App::OnLaunched([[maybe_unused]] Microsoft::UI::Xaml::LaunchActivatedEventArgs const& e)
@@ -57,19 +94,11 @@ namespace winrt::Pivox::implementation
             s_appState->saveString("remembered_email", "");
         }
 
-        // Handle protocol activation for both schemes:
-        // - pivox:// (non-Google callbacks)
-        // - com.googleusercontent.apps.CLIENT_ID:// (Google OAuth)
-        auto args = Microsoft::Windows::AppLifecycle::AppInstance::GetCurrent().GetActivatedEventArgs();
-        if (args && args.Kind() == Microsoft::Windows::AppLifecycle::ExtendedActivationKind::Protocol)
+        // Check if this launch itself is a protocol activation (first launch with URL).
+        auto activationArgs = Microsoft::Windows::AppLifecycle::AppInstance::GetCurrent().GetActivatedEventArgs();
+        if (activationArgs)
         {
-            auto protocolArgs = args.Data().as<
-                winrt::Windows::ApplicationModel::Activation::IProtocolActivatedEventArgs>();
-            if (protocolArgs)
-            {
-                auto uri = winrt::to_string(protocolArgs.Uri().AbsoluteUri());
-                s_authService->handleOAuthCallback(uri);
-            }
+            HandleProtocolActivation(activationArgs);
         }
 
         m_window = winrt::make<MainWindow>();
