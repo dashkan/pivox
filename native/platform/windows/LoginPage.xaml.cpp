@@ -18,25 +18,88 @@ namespace winrt::Pivox::implementation
         }
     }
 
+    void LoginPage::OnPageLoaded(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
+    {
+        // Auto-focus email field on launch.
+        EmailBox().Focus(Microsoft::UI::Xaml::FocusState::Programmatic);
+    }
+
+    void LoginPage::OnEmailKeyDown(IInspectable const&, Microsoft::UI::Xaml::Input::KeyRoutedEventArgs const& e)
+    {
+        if (e.Key() == Windows::System::VirtualKey::Enter)
+        {
+            // Tab to password field.
+            PasswordBox().Focus(Microsoft::UI::Xaml::FocusState::Programmatic);
+            e.Handled(true);
+        }
+    }
+
+    void LoginPage::OnPasswordKeyDown(IInspectable const&, Microsoft::UI::Xaml::Input::KeyRoutedEventArgs const& e)
+    {
+        if (e.Key() == Windows::System::VirtualKey::Enter)
+        {
+            SubmitSignIn();
+            e.Handled(true);
+        }
+    }
+
+    void LoginPage::OnFormChanged(IInspectable const&, IInspectable const&)
+    {
+        UpdateButtonState();
+    }
+
+    void LoginPage::UpdateButtonState()
+    {
+        bool hasEmail = EmailBox().Text().size() > 0;
+        bool hasPassword = PasswordBox().Password().size() > 0;
+        SignInButton().IsEnabled(hasEmail && hasPassword);
+    }
+
+    void LoginPage::SetLoading(bool loading)
+    {
+        SignInButton().IsEnabled(!loading);
+        SignInSpinner().IsActive(loading);
+        SignInSpinner().Visibility(loading
+            ? Microsoft::UI::Xaml::Visibility::Visible
+            : Microsoft::UI::Xaml::Visibility::Collapsed);
+        SignInText().Text(loading ? L"" : L"Sign In");
+    }
+
+    void LoginPage::ShowError(const std::string& message)
+    {
+        ErrorText().Text(winrt::to_hstring(message));
+        ErrorText().Visibility(Microsoft::UI::Xaml::Visibility::Visible);
+    }
+
     void LoginPage::OnSignIn(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
     {
+        SubmitSignIn();
+    }
+
+    void LoginPage::SubmitSignIn()
+    {
+        auto email = winrt::to_string(EmailBox().Text());
+        auto password = winrt::to_string(PasswordBox().Password());
+        if (email.empty() || password.empty()) return;
+
         // Save rememberMe preference.
         bool remember = RememberMeCheck().IsChecked().GetBoolean();
         App::AppState()->saveBool("rememberMe", remember);
 
-        // Attempt sign-in via AuthService.
-        auto email = winrt::to_string(EmailBox().Text());
-        auto password = winrt::to_string(PasswordBox().Password());
+        // Show loading state.
+        SetLoading(true);
+        ErrorText().Visibility(Microsoft::UI::Xaml::Visibility::Collapsed);
+
         auto result = App::AuthService()->signInWithEmail(email, password);
+
+        SetLoading(false);
 
         if (!result.ok())
         {
-            ErrorBar().Message(winrt::to_hstring(result.errorMessage));
-            ErrorBar().IsOpen(true);
+            ShowError(result.errorMessage);
             return;
         }
 
-        // Navigate to main app.
         NavigateToMainApp();
     }
 
@@ -45,12 +108,10 @@ namespace winrt::Pivox::implementation
         auto result = App::AuthService()->validateGoogleSignIn();
         if (!result.ok())
         {
-            ErrorBar().Message(winrt::to_hstring(result.errorMessage));
-            ErrorBar().IsOpen(true);
+            ShowError(result.errorMessage);
             return;
         }
         // TODO: Launch OAuth2Manager::RequestAuthWithParamsAsync for Google.
-        // This is an async coroutine — will be implemented when OAuth client IDs are configured.
     }
 
     void LoginPage::OnGitHubSignIn(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
@@ -58,8 +119,7 @@ namespace winrt::Pivox::implementation
         auto result = App::AuthService()->validateGitHubSignIn();
         if (!result.ok())
         {
-            ErrorBar().Message(winrt::to_hstring(result.errorMessage));
-            ErrorBar().IsOpen(true);
+            ShowError(result.errorMessage);
             return;
         }
         // TODO: Launch OAuth2Manager::RequestAuthWithParamsAsync for GitHub.

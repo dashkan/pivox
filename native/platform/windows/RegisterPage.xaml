@@ -27,35 +27,32 @@
                     HorizontalAlignment="Center" />
             </StackPanel>
 
-            <!-- Error message -->
-            <InfoBar
-                x:Name="ErrorBar"
-                IsOpen="False"
-                Severity="Error"
-                IsClosable="True" />
-
             <!-- Form -->
             <StackPanel Spacing="16">
                 <TextBox
                     x:Name="EmailBox"
                     Header="Email"
                     PlaceholderText="you@example.com"
-                    AutomationProperties.AutomationId="register-email" />
+                    AutomationProperties.AutomationId="register-email"
+                    AutomationProperties.Name="Email address" />
                 <TextBox
                     x:Name="DisplayNameBox"
                     Header="Display name"
                     PlaceholderText="Your name"
-                    AutomationProperties.AutomationId="register-display-name" />
+                    AutomationProperties.AutomationId="register-display-name"
+                    AutomationProperties.Name="Display name" />
                 <PasswordBox
                     x:Name="PasswordBox"
                     Header="Password"
                     PlaceholderText="At least 8 characters"
-                    AutomationProperties.AutomationId="register-password" />
+                    AutomationProperties.AutomationId="register-password"
+                    AutomationProperties.Name="Password" />
                 <PasswordBox
                     x:Name="ConfirmPasswordBox"
                     Header="Confirm password"
                     PlaceholderText="Confirm password"
-                    AutomationProperties.AutomationId="register-confirm-password" />
+                    AutomationProperties.AutomationId="register-confirm-password"
+                    AutomationProperties.Name="Confirm password" />
 
                 <Button
                     Content="Create Account"
@@ -63,6 +60,16 @@
                     HorizontalAlignment="Stretch"
                     Click="OnSignUp"
                     AutomationProperties.AutomationId="register-submit" />
+
+                <!-- Error message below button -->
+                <TextBlock
+                    x:Name="ErrorText"
+                    Foreground="Red"
+                    FontSize="12"
+                    TextWrapping="Wrap"
+                    TextAlignment="Center"
+                    Visibility="Collapsed"
+                    AutomationProperties.AutomationId="register-error" />
             </StackPanel>
 
             <!-- Separator -->

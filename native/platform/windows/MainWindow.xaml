@@ -143,13 +143,14 @@
                                 HorizontalAlignment="Center" />
                         </StackPanel>
                         <MenuFlyoutSeparator />
-                        <Button Content="Account Settings" HorizontalAlignment="Stretch" />
+                        <Button Content="Account Settings" HorizontalAlignment="Stretch"
+                            AutomationProperties.AutomationId="profile-account-settings" />
                         <Button
                             Content="Sign Out"
                             HorizontalAlignment="Stretch"
                             Click="OnSignOut"
                             Foreground="Red"
-                            AutomationProperties.AutomationId="sign-out-button" />
+                            AutomationProperties.AutomationId="profile-sign-out" />
                     </StackPanel>
                 </Grid>
             </NavigationView>

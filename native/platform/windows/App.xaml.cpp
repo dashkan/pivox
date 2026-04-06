@@ -26,6 +26,9 @@ namespace winrt::Pivox::implementation
         });
 #endif
 
+        // Register pivox:// URL scheme for OAuth callbacks.
+        pivox::WinAppState::registerProtocolHandler();
+
         // Initialize Firebase C++ SDK.
         s_authService->initializeFirebase();
 

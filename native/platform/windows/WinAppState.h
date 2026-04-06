@@ -20,6 +20,10 @@ public:
     void saveSecure(const std::string& key, const std::string& value) override;
     std::optional<std::string> loadSecure(const std::string& key) override;
     void deleteSecure(const std::string& key) override;
+
+    /// Register pivox:// URL scheme for OAuth callbacks.
+    /// Writes to HKCU\Software\Classes\pivox — no admin required.
+    static void registerProtocolHandler();
 };
 
 } // namespace pivox

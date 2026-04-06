@@ -3,7 +3,8 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:Pivox"
-    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+    Loaded="OnPageLoaded">
 
     <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
         <StackPanel
@@ -27,25 +28,24 @@
                     HorizontalAlignment="Center" />
             </StackPanel>
 
-            <!-- Error message -->
-            <InfoBar
-                x:Name="ErrorBar"
-                IsOpen="False"
-                Severity="Error"
-                IsClosable="True" />
-
             <!-- Form -->
             <StackPanel Spacing="16">
                 <TextBox
                     x:Name="EmailBox"
                     Header="Email"
                     PlaceholderText="you@example.com"
-                    AutomationProperties.AutomationId="login-email" />
+                    KeyDown="OnEmailKeyDown"
+                    TextChanged="OnFormChanged"
+                    AutomationProperties.AutomationId="login-email"
+                    AutomationProperties.Name="Email address" />
                 <PasswordBox
                     x:Name="PasswordBox"
                     Header="Password"
                     PlaceholderText="Password"
-                    AutomationProperties.AutomationId="login-password" />
+                    KeyDown="OnPasswordKeyDown"
+                    PasswordChanged="OnFormChanged"
+                    AutomationProperties.AutomationId="login-password"
+                    AutomationProperties.Name="Password" />
 
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -57,15 +57,36 @@
                     <HyperlinkButton
                         Content="Forgot password?"
                         Grid.Column="1"
-                        Padding="0" />
+                        Padding="0"
+                        AutomationProperties.AutomationId="login-forgot-password" />
                 </Grid>
 
                 <Button
-                    Content="Sign In"
+                    x:Name="SignInButton"
                     Style="{StaticResource AccentButtonStyle}"
                     HorizontalAlignment="Stretch"
                     Click="OnSignIn"
-                    AutomationProperties.AutomationId="login-submit" />
+                    IsEnabled="False"
+                    AutomationProperties.AutomationId="login-sign-in">
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                        <ProgressRing
+                            x:Name="SignInSpinner"
+                            IsActive="False"
+                            Visibility="Collapsed"
+                            Width="16" Height="16" />
+                        <TextBlock x:Name="SignInText" Text="Sign In" />
+                    </StackPanel>
+                </Button>
+
+                <!-- Error message below button -->
+                <TextBlock
+                    x:Name="ErrorText"
+                    Foreground="Red"
+                    FontSize="12"
+                    TextWrapping="Wrap"
+                    TextAlignment="Center"
+                    Visibility="Collapsed"
+                    AutomationProperties.AutomationId="login-error" />
             </StackPanel>
 
             <!-- Separator -->

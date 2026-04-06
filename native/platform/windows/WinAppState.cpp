@@ -188,4 +188,50 @@ void WinAppState::deleteSecure(const std::string& key) {
     CredDeleteW(targetName.c_str(), CRED_TYPE_GENERIC, 0);
 }
 
+// ---------------------------------------------------------------------------
+// Protocol handler registration
+// ---------------------------------------------------------------------------
+
+void WinAppState::registerProtocolHandler() {
+    // Get path to current executable.
+    wchar_t exePath[MAX_PATH];
+    GetModuleFileNameW(nullptr, exePath, MAX_PATH);
+
+    // Register pivox:// URL scheme at HKCU\Software\Classes\pivox.
+    HKEY hKey;
+    if (RegCreateKeyExW(HKEY_CURRENT_USER, L"Software\\Classes\\pivox", 0, nullptr,
+            0, KEY_WRITE, nullptr, &hKey, nullptr) == ERROR_SUCCESS) {
+        const wchar_t* desc = L"Pivox OAuth Callback";
+        RegSetValueExW(hKey, nullptr, 0, REG_SZ,
+            reinterpret_cast<const BYTE*>(desc),
+            static_cast<DWORD>((wcslen(desc) + 1) * sizeof(wchar_t)));
+        const wchar_t* urlProtocol = L"";
+        RegSetValueExW(hKey, L"URL Protocol", 0, REG_SZ,
+            reinterpret_cast<const BYTE*>(urlProtocol), sizeof(wchar_t));
+        RegCloseKey(hKey);
+    }
+
+    // Set the default icon.
+    std::wstring iconKey = L"Software\\Classes\\pivox\\DefaultIcon";
+    if (RegCreateKeyExW(HKEY_CURRENT_USER, iconKey.c_str(), 0, nullptr,
+            0, KEY_WRITE, nullptr, &hKey, nullptr) == ERROR_SUCCESS) {
+        std::wstring iconPath = std::wstring(exePath) + L",0";
+        RegSetValueExW(hKey, nullptr, 0, REG_SZ,
+            reinterpret_cast<const BYTE*>(iconPath.c_str()),
+            static_cast<DWORD>((iconPath.size() + 1) * sizeof(wchar_t)));
+        RegCloseKey(hKey);
+    }
+
+    // Set the command to launch the app with the URL.
+    std::wstring cmdKey = L"Software\\Classes\\pivox\\shell\\open\\command";
+    if (RegCreateKeyExW(HKEY_CURRENT_USER, cmdKey.c_str(), 0, nullptr,
+            0, KEY_WRITE, nullptr, &hKey, nullptr) == ERROR_SUCCESS) {
+        std::wstring cmd = std::wstring(L"\"") + exePath + L"\" \"%1\"";
+        RegSetValueExW(hKey, nullptr, 0, REG_SZ,
+            reinterpret_cast<const BYTE*>(cmd.c_str()),
+            static_cast<DWORD>((cmd.size() + 1) * sizeof(wchar_t)));
+        RegCloseKey(hKey);
+    }
+}
+
 } // namespace pivox

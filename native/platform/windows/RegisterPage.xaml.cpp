@@ -10,18 +10,24 @@ namespace winrt::Pivox::implementation
         InitializeComponent();
     }
 
+    void RegisterPage::ShowError(const std::string& message)
+    {
+        ErrorText().Text(winrt::to_hstring(message));
+        ErrorText().Visibility(Microsoft::UI::Xaml::Visibility::Visible);
+    }
+
     void RegisterPage::OnSignUp(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
     {
+        ErrorText().Visibility(Microsoft::UI::Xaml::Visibility::Collapsed);
+
         auto email = winrt::to_string(EmailBox().Text());
         auto displayName = winrt::to_string(DisplayNameBox().Text());
         auto password = winrt::to_string(PasswordBox().Password());
         auto confirm = winrt::to_string(ConfirmPasswordBox().Password());
 
-        // Client-side password match check.
         if (password != confirm)
         {
-            ErrorBar().Message(L"Passwords do not match.");
-            ErrorBar().IsOpen(true);
+            ShowError("Passwords do not match.");
             return;
         }
 
@@ -29,8 +35,7 @@ namespace winrt::Pivox::implementation
 
         if (!result.ok())
         {
-            ErrorBar().Message(winrt::to_hstring(result.errorMessage));
-            ErrorBar().IsOpen(true);
+            ShowError(result.errorMessage);
             return;
         }
 
@@ -42,8 +47,7 @@ namespace winrt::Pivox::implementation
         auto result = App::AuthService()->validateGoogleSignIn();
         if (!result.ok())
         {
-            ErrorBar().Message(winrt::to_hstring(result.errorMessage));
-            ErrorBar().IsOpen(true);
+            ShowError(result.errorMessage);
         }
     }
 
@@ -52,8 +56,7 @@ namespace winrt::Pivox::implementation
         auto result = App::AuthService()->validateGitHubSignIn();
         if (!result.ok())
         {
-            ErrorBar().Message(winrt::to_hstring(result.errorMessage));
-            ErrorBar().IsOpen(true);
+            ShowError(result.errorMessage);
         }
     }
 
