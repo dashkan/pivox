@@ -203,9 +203,9 @@ if(WIN32)
 
     # NuGet packages (constraint #8).
     set_property(TARGET ${WIN_TARGET} PROPERTY VS_PACKAGE_REFERENCES
-        "Microsoft.Windows.CppWinRT_2.0.240405.15"
-        "Microsoft.WindowsAppSDK_1.7.250401001"
-        "Microsoft.Windows.SDK.BuildTools_10.0.26100.1742"
+        "Microsoft.Windows.CppWinRT_2.0.250303.1"
+        "Microsoft.WindowsAppSDK_1.8.260317003"
+        "Microsoft.Windows.SDK.BuildTools_10.0.26100.7705"
     )
 
     # IDL/XAML dependency wiring (constraint #5).
