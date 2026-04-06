@@ -90,6 +90,9 @@ class AuthService: NSObject {
             if let token = try? await authResult.user.getIDToken() {
                 appState.saveSecure(token, forKey: "firebase_id_token")
             }
+        } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
+            // User canceled the browser sheet — not an error.
+            return
         } catch {
             errorMessage = firebaseErrorMessage(error)
         }
@@ -183,6 +186,7 @@ class AuthService: NSObject {
     // MARK: - Sign Out
 
     func signOut() {
+        errorMessage = nil
         do {
             try Auth.auth().signOut()
             currentUser = nil
