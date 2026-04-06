@@ -2,6 +2,7 @@
 #include "App.xaml.h"
 #include "MainWindow.xaml.h"
 #include "firebase_config.h"
+#include <winrt/Microsoft.Security.Authentication.OAuth.h>
 
 // NOTE: App.xaml.cpp does NOT include App.g.cpp.
 // See docs/dev/winui3-cmake-guide.md constraint #3.
@@ -26,10 +27,23 @@ namespace winrt::Pivox::implementation
         });
 #endif
 
-        // Single-instance: exit if another Pivox is already running.
+        // Single-instance: if another Pivox is running, handle OAuth callback
+        // forwarding and exit. OAuth2Manager::CompleteAuthRequest sends the
+        // auth code to the first instance's pending RequestAuthWithParamsAsync.
         HANDLE hMutex = CreateMutexW(nullptr, FALSE, L"Local\\PivoxAppMutex");
         if (hMutex && GetLastError() == ERROR_ALREADY_EXISTS)
         {
+            // Check if we were launched with a protocol activation URL.
+            int argc = 0;
+            LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+            if (argv && argc >= 2)
+            {
+                try {
+                    winrt::Windows::Foundation::Uri uri(argv[1]);
+                    winrt::Microsoft::Security::Authentication::OAuth::OAuth2Manager::CompleteAuthRequest(uri);
+                } catch (...) {}
+            }
+            if (argv) LocalFree(argv);
             CloseHandle(hMutex);
             ExitProcess(0);
             return;
