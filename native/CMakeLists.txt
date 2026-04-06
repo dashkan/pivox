@@ -19,6 +19,18 @@ add_subdirectory(core)
 
 
 # ============================================================
+# Firebase Apple SDK (xcframeworks, macOS + iOS)
+# ============================================================
+
+if(APPLE)
+    set(FIREBASE_VERSION "12.11.0")
+    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+    include(DownloadFirebase)
+    DownloadFirebase("${FIREBASE_VERSION}" "${CMAKE_SOURCE_DIR}/third_party/firebase")
+endif()
+
+
+# ============================================================
 # macOS: SwiftUI App
 # ============================================================
 
@@ -32,6 +44,12 @@ if(APPLE)
 
     # Asset catalog — compiled automatically by Xcode generator.
     set(ASSET_CATALOG "${CMAKE_SOURCE_DIR}/platform/macos/Assets.xcassets")
+
+    # Firebase xcframeworks — link to the app and bridge.
+    set(FB_ROOT "${CMAKE_SOURCE_DIR}/third_party/firebase/Firebase")
+    set(FB_ANALYTICS "${FB_ROOT}/FirebaseAnalytics")
+    set(FB_AUTH "${FB_ROOT}/FirebaseAuth")
+    set(FB_GOOGLESIGNIN "${FB_ROOT}/GoogleSignIn")
 
     # Obj-C++ bridge library (wraps C++ core for Swift consumption).
     add_library(pivox_bridge STATIC
@@ -63,7 +81,23 @@ if(APPLE)
         MACOSX_PACKAGE_LOCATION Resources
     )
 
-    target_link_libraries(${APP_TARGET} PRIVATE pivox_bridge)
+    target_link_libraries(${APP_TARGET} PRIVATE pivox_bridge
+        # Firebase Core (from Analytics bundle)
+        "${FB_ANALYTICS}/FirebaseCore.xcframework"
+        "${FB_ANALYTICS}/FirebaseCoreInternal.xcframework"
+        "${FB_ANALYTICS}/FirebaseInstallations.xcframework"
+        "${FB_ANALYTICS}/FBLPromises.xcframework"
+        "${FB_ANALYTICS}/GoogleUtilities.xcframework"
+        "${FB_ANALYTICS}/nanopb.xcframework"
+        # Firebase Auth
+        "${FB_AUTH}/FirebaseAuth.xcframework"
+        "${FB_AUTH}/FirebaseAuthInterop.xcframework"
+        "${FB_AUTH}/FirebaseAppCheckInterop.xcframework"
+        "${FB_AUTH}/FirebaseCoreExtension.xcframework"
+        "${FB_AUTH}/GTMSessionFetcher.xcframework"
+        "${FB_AUTH}/RecaptchaInterop.xcframework"
+    )
+    target_link_options(${APP_TARGET} PRIVATE "LINKER:-ObjC")
 
     target_compile_options(${APP_TARGET} PRIVATE
         "SHELL:-import-objc-header ${CMAKE_SOURCE_DIR}/platform/macos/Bridging-Header.h"
@@ -105,12 +139,14 @@ if(APPLE)
     xctest_add_bundle(PivoxTests ${APP_TARGET}
         tests/macos/CoreTests.swift
         tests/macos/AuthViewModelTests.swift
+        tests/macos/AuthServiceTests.swift
     )
 
     target_compile_options(PivoxTests PRIVATE
         "SHELL:-import-objc-header ${CMAKE_SOURCE_DIR}/platform/macos/Bridging-Header.h"
     )
     target_include_directories(PivoxTests PRIVATE "${CMAKE_SOURCE_DIR}/platform/macos/objcpp")
+    target_link_libraries(PivoxTests PRIVATE pivox_bridge)
 
     xctest_add_test(PivoxUnitTests PivoxTests)
 
