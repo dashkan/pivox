@@ -1,19 +1,18 @@
 import SwiftUI
 
 struct LoginView: View {
-    var onSignIn: () -> Void
     var onSwitchToRegister: () -> Void
 
+    private var auth = AuthService.shared
     private let appState = AppStateBridge.shared()!
 
     @State private var email = ""
     @State private var password = ""
     @State private var rememberMe: Bool
+    @State private var isLoading = false
 
-    init(onSignIn: @escaping () -> Void, onSwitchToRegister: @escaping () -> Void) {
-        self.onSignIn = onSignIn
+    init(onSwitchToRegister: @escaping () -> Void) {
         self.onSwitchToRegister = onSwitchToRegister
-        // Restore "Remember Me" from persisted state.
         let state = AppStateBridge.shared()!
         _rememberMe = State(initialValue: state.hasBool(forKey: "rememberMe") ? state.loadBool(forKey: "rememberMe") : false)
     }
@@ -63,13 +62,32 @@ struct LoginView: View {
 
                 Button(action: {
                     appState.save(rememberMe, forKey: "rememberMe")
-                    onSignIn()
+                    isLoading = true
+                    Task {
+                        await auth.signIn(email: email, password: password)
+                        isLoading = false
+                    }
                 }) {
-                    Text("Sign In")
-                        .frame(maxWidth: .infinity)
+                    if isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        Text("Sign In")
+                            .frame(maxWidth: .infinity)
+                    }
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
+                .disabled(email.isEmpty || password.isEmpty || isLoading)
+
+                // Error message
+                if let error = auth.errorMessage {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .multilineTextAlignment(.center)
+                }
             }
 
             // Separator

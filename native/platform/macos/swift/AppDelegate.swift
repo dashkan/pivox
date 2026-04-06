@@ -6,6 +6,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let appState = AppStateBridge.shared()!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Initialize Firebase before any UI.
+        AuthService.shared.configure()
+
         let contentView = ContentView()
             .frame(minWidth: 1024, minHeight: 768)
 

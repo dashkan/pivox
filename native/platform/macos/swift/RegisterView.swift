@@ -1,13 +1,19 @@
 import SwiftUI
 
 struct RegisterView: View {
-    var onSignUp: () -> Void
     var onSwitchToLogin: () -> Void
+
+    private let auth = AuthService.shared
 
     @State private var email = ""
     @State private var displayName = ""
     @State private var password = ""
     @State private var confirmPassword = ""
+    @State private var isLoading = false
+
+    init(onSwitchToLogin: @escaping () -> Void) {
+        self.onSwitchToLogin = onSwitchToLogin
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -50,12 +56,36 @@ struct RegisterView: View {
                     .textFieldStyle(.roundedBorder)
                     .textContentType(.newPassword)
 
-                Button(action: onSignUp) {
-                    Text("Create Account")
-                        .frame(maxWidth: .infinity)
+                Button(action: {
+                    guard password == confirmPassword else {
+                        auth.errorMessage = "Passwords do not match."
+                        return
+                    }
+                    isLoading = true
+                    Task {
+                        await auth.createAccount(email: email, password: password, displayName: displayName)
+                        isLoading = false
+                    }
+                }) {
+                    if isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        Text("Create Account")
+                            .frame(maxWidth: .infinity)
+                    }
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
+                .disabled(email.isEmpty || password.isEmpty || confirmPassword.isEmpty || displayName.isEmpty || isLoading)
+
+                if let error = auth.errorMessage {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .multilineTextAlignment(.center)
+                }
             }
 
             // Separator

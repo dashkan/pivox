@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ProfileView: View {
-    var onSignOut: () -> Void
+    private var auth = AuthService.shared
 
     var body: some View {
         VStack(spacing: 20) {
@@ -11,11 +11,11 @@ struct ProfileView: View {
                 .frame(width: 64, height: 64)
                 .foregroundStyle(.secondary)
 
-            // User info (placeholder data)
+            // User info
             VStack(spacing: 4) {
-                Text("Ashkan Daie")
+                Text(auth.currentUser?.displayName ?? "User")
                     .font(.headline)
-                Text("ashkan@pivox.app")
+                Text(auth.currentUser?.email ?? "")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -33,7 +33,7 @@ struct ProfileView: View {
                 }
                 .buttonStyle(.plain)
 
-                Button(action: onSignOut) {
+                Button(action: { auth.signOut() }) {
                     HStack {
                         Image(systemName: "rectangle.portrait.and.arrow.forward")
                         Text("Sign Out")

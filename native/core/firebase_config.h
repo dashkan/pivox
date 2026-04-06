@@ -19,7 +19,7 @@ constexpr const char* kBundleId = "app.pivox.native";
 #if __APPLE__
 constexpr const char* kGoogleSignInClientId = "45920224787-gb662gbotfv763cqjis53748ctgigncl.apps.googleusercontent.com";
 #elif _WIN32
-constexpr const char* kGoogleSignInClientId = ""; // TODO: Create Desktop client at console.cloud.google.com
+constexpr const char* kGoogleSignInClientId = "45920224787-332q0atab40vmojtf0admuvtvm8bgfa4.apps.googleusercontent.com";
 #endif
 
 } // namespace firebase_config

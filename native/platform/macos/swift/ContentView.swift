@@ -32,22 +32,14 @@ enum AuthState {
 
 struct ContentView: View {
     @State private var selectedItem: SidebarItem? = .section(.operator_)
-    @State private var authState: AuthState
-
-    init() {
-        // If "Remember Me" was checked on last login, skip the login screen.
-        let state = AppStateBridge.shared()!
-        let remembered = state.hasBool(forKey: "rememberMe") && state.loadBool(forKey: "rememberMe")
-        _authState = State(initialValue: remembered ? .loggedIn : .loggedOut)
-    }
+    private var auth = AuthService.shared
 
     var body: some View {
         Group {
-            switch authState {
-            case .loggedOut:
-                AuthRouter(onAuthenticated: { authState = .loggedIn })
-            case .loggedIn:
+            if auth.isSignedIn {
                 mainAppView
+            } else {
+                AuthRouter()
             }
         }
     }
@@ -95,10 +87,8 @@ struct ContentView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .profile:
-                ProfileView(onSignOut: {
-                    authState = .loggedOut
-                })
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                ProfileView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             case nil:
                 Text("Select a section")
                     .foregroundStyle(.secondary)
@@ -111,17 +101,14 @@ struct ContentView: View {
 /// Routes between login and registration screens.
 struct AuthRouter: View {
     @State private var showRegister = false
-    var onAuthenticated: () -> Void = {}
 
     var body: some View {
         if showRegister {
             RegisterView(
-                onSignUp: onAuthenticated,
                 onSwitchToLogin: { showRegister = false }
             )
         } else {
             LoginView(
-                onSignIn: onAuthenticated,
                 onSwitchToRegister: { showRegister = true }
             )
         }

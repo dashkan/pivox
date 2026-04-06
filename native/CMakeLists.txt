@@ -73,11 +73,19 @@ if(APPLE)
         platform/macos/swift/ProfileView.swift
         platform/macos/swift/GlassCard.swift
         platform/macos/swift/GoogleIcon.swift
+        platform/macos/swift/AuthService.swift
         ${ASSET_CATALOG}
+        ${FIREBASE_PLIST}
     )
 
     # Asset catalog goes into Resources/.
     set_source_files_properties(${ASSET_CATALOG} PROPERTIES
+        MACOSX_PACKAGE_LOCATION Resources
+    )
+
+    # Copy Firebase config into app bundle Resources/.
+    set(FIREBASE_PLIST "${CMAKE_SOURCE_DIR}/configs/firebase/GoogleService-Info.plist")
+    set_source_files_properties(${FIREBASE_PLIST} PROPERTIES
         MACOSX_PACKAGE_LOCATION Resources
     )
 
