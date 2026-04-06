@@ -26,6 +26,7 @@
 #include <winrt/Microsoft.UI.Xaml.Navigation.h>
 #include <winrt/Microsoft.UI.Xaml.Shapes.h>
 #include <winrt/Microsoft.UI.Xaml.XamlTypeInfo.h>
+#include <winrt/Microsoft.UI.h>
 #include <winrt/Microsoft.UI.Content.h>
 
 #include <microsoft.ui.xaml.window.h>

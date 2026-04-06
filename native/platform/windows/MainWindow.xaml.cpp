@@ -41,6 +41,12 @@ namespace winrt::Pivox::implementation
 
         appWindow.Title(L"Pivox");
 
+        // Extend content into title bar — seamless dark background like Calculator.
+        auto titleBar = appWindow.TitleBar();
+        titleBar.ExtendsContentIntoTitleBar(true);
+        titleBar.ButtonBackgroundColor(Microsoft::UI::Colors::Transparent());
+        titleBar.ButtonInactiveBackgroundColor(Microsoft::UI::Colors::Transparent());
+
         // Minimum window size — Windows App SDK 1.7 OverlappedPresenter API
         // (microsoft/microsoft-ui-xaml#2945, #7296).
         if (auto presenter = appWindow.Presenter().try_as<Microsoft::UI::Windowing::OverlappedPresenter>())
