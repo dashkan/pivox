@@ -68,7 +68,8 @@
                     FontSize="12"
                     TextWrapping="Wrap"
                     TextAlignment="Center"
-                    Visibility="Collapsed"
+                    Opacity="0"
+                    Text=" "
                     AutomationProperties.AutomationId="register-error" />
             </StackPanel>
 

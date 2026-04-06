@@ -58,6 +58,13 @@ namespace winrt::Pivox::implementation
     void LoginPage::SetLoading(bool loading)
     {
         SignInButton().IsEnabled(!loading);
+        EmailBox().IsEnabled(!loading);
+        PasswordBox().IsEnabled(!loading);
+        RememberMeCheck().IsEnabled(!loading);
+        ForgotPasswordLink().IsEnabled(!loading);
+        GoogleSignInButton().IsEnabled(!loading);
+        GitHubSignInButton().IsEnabled(!loading);
+        SwitchToRegisterLink().IsEnabled(!loading);
         SignInSpinner().IsActive(loading);
         SignInSpinner().Visibility(loading
             ? Microsoft::UI::Xaml::Visibility::Visible
@@ -68,7 +75,7 @@ namespace winrt::Pivox::implementation
     void LoginPage::ShowError(const std::string& message)
     {
         ErrorText().Text(winrt::to_hstring(message));
-        ErrorText().Visibility(Microsoft::UI::Xaml::Visibility::Visible);
+        ErrorText().Opacity(1);
     }
 
     void LoginPage::OnSignIn(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
@@ -88,7 +95,8 @@ namespace winrt::Pivox::implementation
 
         // Show loading state.
         SetLoading(true);
-        ErrorText().Visibility(Microsoft::UI::Xaml::Visibility::Collapsed);
+        ErrorText().Opacity(0);
+        ErrorText().Text(L" ");
 
         auto result = App::AuthService()->signInWithEmail(email, password);
 

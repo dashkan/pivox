@@ -13,12 +13,13 @@ namespace winrt::Pivox::implementation
     void RegisterPage::ShowError(const std::string& message)
     {
         ErrorText().Text(winrt::to_hstring(message));
-        ErrorText().Visibility(Microsoft::UI::Xaml::Visibility::Visible);
+        ErrorText().Opacity(1);
     }
 
     void RegisterPage::OnSignUp(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
     {
-        ErrorText().Visibility(Microsoft::UI::Xaml::Visibility::Collapsed);
+        ErrorText().Opacity(0);
+        ErrorText().Text(L" ");
 
         auto email = winrt::to_string(EmailBox().Text());
         auto displayName = winrt::to_string(DisplayNameBox().Text());
