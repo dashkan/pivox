@@ -199,76 +199,24 @@ TEST_F(WinAuthServiceTest, OAuthConfigIndependentProviders) {
 }
 
 // ---------------------------------------------------------------------------
-// Google OAuth — async sign-in
+// Google OAuth — async sign-in (OAuth2Manager)
 // ---------------------------------------------------------------------------
 
 TEST_F(WinAuthServiceTest, GoogleSignInAsyncFailsWhenNotConfigured) {
     pivox::AuthResult received;
-    auth.signInWithGoogleAsync([&](pivox::AuthResult r) { received = r; });
+    auth.signInWithGoogleAsync(0, [&](pivox::AuthResult r) { received = r; });
     EXPECT_EQ(received.error, pivox::AuthError::NotConfigured);
     EXPECT_FALSE(auth.isOAuthInProgress());
 }
 
-TEST_F(WinAuthServiceTest, GoogleSignInAsyncPreventsDoubleClick) {
-    pivox::OAuthConfig config;
-    config.googleClientId = "test-client-id";
-    auth.setOAuthConfig(config);
-
-    // First call starts the flow — browser would open.
-    auth.signInWithGoogleAsync([](pivox::AuthResult) {});
-    EXPECT_TRUE(auth.isOAuthInProgress());
-
-    // Second call should fail with OAuthInProgress.
-    pivox::AuthResult received;
-    auth.signInWithGoogleAsync([&](pivox::AuthResult r) { received = r; });
-    EXPECT_EQ(received.error, pivox::AuthError::OAuthInProgress);
-}
-
-TEST_F(WinAuthServiceTest, HandleOAuthCallbackRejectsWrongState) {
+TEST_F(WinAuthServiceTest, GoogleSignInInTestModeReturnsNotConfigured) {
     pivox::OAuthConfig config;
     config.googleClientId = "test-client-id";
     auth.setOAuthConfig(config);
 
     pivox::AuthResult received;
-    auth.signInWithGoogleAsync([&](pivox::AuthResult r) { received = r; });
-
-    // Simulate callback with wrong state nonce.
-    auth.handleOAuthCallback("pivox://oauth-callback/?code=abc&state=wrong-nonce");
-    EXPECT_EQ(received.error, pivox::AuthError::Unknown);
+    auth.signInWithGoogleAsync(0, [&](pivox::AuthResult r) { received = r; });
+    // In test mode, returns NotConfigured without launching browser.
+    EXPECT_EQ(received.error, pivox::AuthError::NotConfigured);
     EXPECT_FALSE(auth.isOAuthInProgress());
-}
-
-TEST_F(WinAuthServiceTest, HandleOAuthCallbackRejectsNoCode) {
-    pivox::OAuthConfig config;
-    config.googleClientId = "test-client-id";
-    auth.setOAuthConfig(config);
-
-    pivox::AuthResult received;
-    auth.signInWithGoogleAsync([&](pivox::AuthResult r) { received = r; });
-
-    // Callback with no code parameter.
-    auth.handleOAuthCallback("pivox://oauth-callback/?state=something");
-    EXPECT_FALSE(received.ok());
-    EXPECT_FALSE(auth.isOAuthInProgress());
-}
-
-// ---------------------------------------------------------------------------
-// PKCE helpers
-// ---------------------------------------------------------------------------
-
-TEST_F(WinAuthServiceTest, PKCECodeVerifierIsCorrectLength) {
-    auto verifier = pivox::WinAuthService::generateCodeVerifier();
-    // 32 random bytes → 43 base64url characters.
-    EXPECT_GE(verifier.size(), 43u);
-}
-
-TEST_F(WinAuthServiceTest, PKCECodeChallengeIsValidSHA256) {
-    auto verifier = pivox::WinAuthService::generateCodeVerifier();
-    auto challenge = pivox::WinAuthService::generateCodeChallenge(verifier);
-    // SHA256 = 32 bytes → 43 base64url characters.
-    EXPECT_EQ(challenge.size(), 43u);
-    // Different verifier → different challenge.
-    auto verifier2 = pivox::WinAuthService::generateCodeVerifier();
-    auto challenge2 = pivox::WinAuthService::generateCodeChallenge(verifier2);
-    EXPECT_NE(challenge, challenge2);
 }

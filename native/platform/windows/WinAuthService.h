@@ -39,6 +39,7 @@ enum class AuthError {
     NetworkError,
     NotConfigured,
     OAuthInProgress,
+    UserCanceled,
     Unknown,
 };
 
@@ -83,48 +84,34 @@ public:
     AuthResult validateGoogleSignIn() const;
     AuthResult validateGitHubSignIn() const;
 
-    /// Start Google OAuth flow. Opens browser. Callback called when complete.
-    void signInWithGoogleAsync(std::function<void(AuthResult)> callback);
-
-    /// Handle protocol activation callback (pivox://oauth-callback/...)
-    void handleOAuthCallback(const std::string& callbackUrl);
+    /// Start Google OAuth flow via OAuth2Manager.
+    /// parentWindowIdValue: the AppWindow ID (uint64_t to avoid WinRT dependency in static lib).
+    /// callback: called on completion (may be from any thread).
+    void signInWithGoogleAsync(
+        uint64_t parentWindowIdValue,
+        std::function<void(AuthResult)> callback);
 
     bool isOAuthInProgress() const { return isOAuthInProgress_; }
 
-    /// Suppress browser launch for unit testing.
     void setTestMode(bool enabled) { testMode_ = enabled; }
+
+    /// Register the OAuth2Manager launcher (called from GoogleOAuth.cpp in the WinUI target).
+    static void setGoogleOAuthLauncher(
+        std::function<void(WinAuthService*, uint64_t, std::string,
+            std::function<void(AuthResult)>)> launcher);
 
     void signOut();
     bool tryRestoreSession();
 
     bool initializeFirebase();
     bool isFirebaseInitialized() const;
-
-    /// Connect to Firebase Auth Emulator if USE_AUTH_EMULATOR=1.
     void connectToEmulatorIfRequested();
 
-    // PKCE helpers (public for testing)
-    static std::string generateCodeVerifier();
-    static std::string generateCodeChallenge(const std::string& verifier);
-    static std::string base64UrlEncode(const std::vector<uint8_t>& data);
-
-private:
+    // Public for OAuth launcher access (GoogleOAuth.cpp).
     void setAuthState(AuthStatus status, const AuthUser& user = {});
     void saveUserTokens(const AuthUser& user, const std::string& idToken,
                         const std::string& refreshToken);
-
-    std::shared_ptr<AppState> appState_;
-    AuthStatus status_ = AuthStatus::Unknown;
-    AuthUser currentUser_;
-    AuthStateCallback callback_;
-    OAuthConfig oauthConfig_;
-
-    // OAuth state
-    std::string pendingCodeVerifier_;
-    std::string pendingStateNonce_;
-    std::function<void(AuthResult)> pendingOAuthCallback_;
     bool isOAuthInProgress_ = false;
-    bool testMode_ = false;
 
 #if PIVOX_HAS_FIREBASE
     firebase::App* firebaseApp_ = nullptr;
@@ -132,6 +119,14 @@ private:
     AuthResult mapFirebaseError(int errorCode) const;
     AuthUser mapFirebaseUser(const firebase::auth::User& user) const;
 #endif
+
+private:
+    std::shared_ptr<AppState> appState_;
+    AuthStatus status_ = AuthStatus::Unknown;
+    AuthUser currentUser_;
+    AuthStateCallback callback_;
+    OAuthConfig oauthConfig_;
+    bool testMode_ = false;
 };
 
 } // namespace pivox

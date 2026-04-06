@@ -227,6 +227,8 @@ if(WIN32)
         # RegisterPage
         ${WIN_PLATFORM_DIR}/RegisterPage.idl
         ${WIN_PLATFORM_DIR}/RegisterPage.xaml
+        # Google OAuth (OAuth2Manager coroutine — needs WinRT)
+        ${WIN_PLATFORM_DIR}/GoogleOAuth.cpp
         ${WIN_PLATFORM_DIR}/RegisterPage.xaml.h
         ${WIN_PLATFORM_DIR}/RegisterPage.xaml.cpp
     )
@@ -295,7 +297,7 @@ if(WIN32)
         "${CMAKE_SOURCE_DIR}/core"
     )
     target_link_libraries(pivox_win_state PUBLIC pivox_core)
-    target_link_libraries(pivox_win_state PRIVATE crypt32 advapi32 winhttp)
+    target_link_libraries(pivox_win_state PRIVATE crypt32 advapi32)
 
     # Firebase C++ SDK — link auth + app libraries.
     if(EXISTS "${FB_CPP_ROOT}")

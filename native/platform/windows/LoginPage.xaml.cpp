@@ -138,32 +138,31 @@ namespace winrt::Pivox::implementation
             return;
         }
 
-        // Clear saved email — Google sign-in, not email/password.
         App::AppState()->saveString("remembered_email", "");
-
         SetLoading(true);
 
-        // Capture DispatcherQueue and weak ref on the UI thread — the callback
-        // fires from a background thread (AppInstance.Activated).
+        auto windowId = this->XamlRoot().ContentIslandEnvironment().AppWindowId();
         auto dispatcher = this->DispatcherQueue();
         auto weakThis = get_weak();
 
-        App::AuthService()->signInWithGoogleAsync([dispatcher, weakThis](pivox::AuthResult result) {
-            dispatcher.TryEnqueue([weakThis, result]() {
-                if (auto strongThis = weakThis.get())
-                {
-                    strongThis->SetLoading(false);
-                    if (result.ok())
+        App::AuthService()->signInWithGoogleAsync(windowId.Value,
+            [dispatcher, weakThis](pivox::AuthResult result) {
+                dispatcher.TryEnqueue([weakThis, result]() {
+                    if (auto strongThis = weakThis.get())
                     {
-                        strongThis->NavigateToMainApp();
+                        strongThis->SetLoading(false);
+                        if (result.ok())
+                        {
+                            strongThis->NavigateToMainApp();
+                        }
+                        else if (!result.errorMessage.empty())
+                        {
+                            strongThis->ShowError(result.errorMessage);
+                        }
+                        // Silent cancel — just re-enable inputs.
                     }
-                    else
-                    {
-                        strongThis->ShowError(result.errorMessage);
-                    }
-                }
+                });
             });
-        });
     }
 
     void LoginPage::OnGitHubSignIn(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
