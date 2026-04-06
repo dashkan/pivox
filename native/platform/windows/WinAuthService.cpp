@@ -84,6 +84,17 @@ bool WinAuthService::initializeFirebase() {
 #endif
 }
 
+void WinAuthService::connectToEmulatorIfRequested() {
+#if PIVOX_HAS_FIREBASE
+    if (!firebaseAuth_) return;
+    wchar_t useEmu[2] = {};
+    if (GetEnvironmentVariableW(L"USE_AUTH_EMULATOR", useEmu, 2) > 0 && useEmu[0] == L'1')
+    {
+        firebaseAuth_->UseEmulator("127.0.0.1", 9099);
+    }
+#endif
+}
+
 bool WinAuthService::isFirebaseInitialized() const {
 #if PIVOX_HAS_FIREBASE
     return firebaseAuth_ != nullptr;

@@ -59,7 +59,7 @@
                     Style="{StaticResource AccentButtonStyle}"
                     HorizontalAlignment="Stretch"
                     Click="OnSignUp"
-                    AutomationProperties.AutomationId="register-submit" />
+                    AutomationProperties.AutomationId="register-create-account" />
 
                 <!-- Error message below button -->
                 <TextBlock

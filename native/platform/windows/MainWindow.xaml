@@ -135,12 +135,14 @@
                                 x:Name="ProfileName"
                                 Text="User"
                                 Style="{StaticResource SubtitleTextBlockStyle}"
-                                HorizontalAlignment="Center" />
+                                HorizontalAlignment="Center"
+                                AutomationProperties.AutomationId="profile-display-name" />
                             <TextBlock
                                 x:Name="ProfileEmail"
                                 Text=""
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                HorizontalAlignment="Center" />
+                                HorizontalAlignment="Center"
+                                AutomationProperties.AutomationId="profile-email" />
                         </StackPanel>
                         <MenuFlyoutSeparator />
                         <Button Content="Account Settings" HorizontalAlignment="Stretch"

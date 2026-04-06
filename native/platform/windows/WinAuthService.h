@@ -100,6 +100,9 @@ public:
     bool initializeFirebase();
     bool isFirebaseInitialized() const;
 
+    /// Connect to Firebase Auth Emulator if USE_AUTH_EMULATOR=1.
+    void connectToEmulatorIfRequested();
+
     // PKCE helpers (public for testing)
     static std::string generateCodeVerifier();
     static std::string generateCodeChallenge(const std::string& verifier);
