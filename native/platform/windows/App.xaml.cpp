@@ -75,6 +75,10 @@ namespace winrt::Pivox::implementation
         if (!protocolArgs) return;
 
         auto uri = winrt::to_string(protocolArgs.Uri().AbsoluteUri());
+
+        // Debug: write to registry so we can verify the activation arrived.
+        OutputDebugStringA(("OAuth callback received: " + uri + "\n").c_str());
+
         s_authService->handleOAuthCallback(uri);
     }
 

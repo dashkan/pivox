@@ -142,16 +142,25 @@ namespace winrt::Pivox::implementation
         App::AppState()->saveString("remembered_email", "");
 
         SetLoading(true);
-        App::AuthService()->signInWithGoogleAsync([this](pivox::AuthResult result) {
-            DispatcherQueue().TryEnqueue([this, result]() {
-                SetLoading(false);
-                if (result.ok())
+
+        // Capture DispatcherQueue and weak ref on the UI thread — the callback
+        // fires from a background thread (AppInstance.Activated).
+        auto dispatcher = this->DispatcherQueue();
+        auto weakThis = get_weak();
+
+        App::AuthService()->signInWithGoogleAsync([dispatcher, weakThis](pivox::AuthResult result) {
+            dispatcher.TryEnqueue([weakThis, result]() {
+                if (auto strongThis = weakThis.get())
                 {
-                    NavigateToMainApp();
-                }
-                else
-                {
-                    ShowError(result.errorMessage);
+                    strongThis->SetLoading(false);
+                    if (result.ok())
+                    {
+                        strongThis->NavigateToMainApp();
+                    }
+                    else
+                    {
+                        strongThis->ShowError(result.errorMessage);
+                    }
                 }
             });
         });
