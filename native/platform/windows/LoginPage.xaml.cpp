@@ -100,33 +100,38 @@ namespace winrt::Pivox::implementation
 
         bool remember = RememberMeCheck().IsChecked().GetBoolean();
 
-        // Show loading state.
         SetLoading(true);
         ErrorText().Opacity(0);
         ErrorText().Text(L" ");
 
-        auto result = App::AuthService()->signInWithEmail(email, password);
+        auto dispatcher = this->DispatcherQueue();
+        auto weakThis = get_weak();
 
-        SetLoading(false);
+        App::AuthService()->signInWithEmailAsync(email, password,
+            [dispatcher, weakThis, remember, email](pivox::AuthResult result) {
+                dispatcher.TryEnqueue([weakThis, result, remember, email]() {
+                    if (auto strongThis = weakThis.get())
+                    {
+                        strongThis->SetLoading(false);
+                        if (!result.ok())
+                        {
+                            strongThis->ShowError(result.errorMessage);
+                            return;
+                        }
 
-        if (!result.ok())
-        {
-            // Do NOT save email on failed sign-in.
-            ShowError(result.errorMessage);
-            return;
-        }
+                        if (remember)
+                        {
+                            App::AppState()->saveString("remembered_email", email);
+                        }
+                        else
+                        {
+                            App::AppState()->saveString("remembered_email", "");
+                        }
 
-        // Remember Me: save or clear email only on SUCCESSFUL sign-in.
-        if (remember)
-        {
-            App::AppState()->saveString("remembered_email", email);
-        }
-        else
-        {
-            App::AppState()->saveString("remembered_email", "");
-        }
-
-        NavigateToMainApp();
+                        strongThis->NavigateToMainApp();
+                    }
+                });
+            });
     }
 
     void LoginPage::OnGoogleSignIn(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)

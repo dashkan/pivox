@@ -16,6 +16,14 @@ namespace winrt::Pivox::implementation
         ErrorText().Opacity(1);
     }
 
+    void RegisterPage::SetLoading(bool loading)
+    {
+        EmailBox().IsEnabled(!loading);
+        DisplayNameBox().IsEnabled(!loading);
+        PasswordBox().IsEnabled(!loading);
+        ConfirmPasswordBox().IsEnabled(!loading);
+    }
+
     void RegisterPage::OnSignUp(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
     {
         ErrorText().Opacity(0);
@@ -32,15 +40,26 @@ namespace winrt::Pivox::implementation
             return;
         }
 
-        auto result = App::AuthService()->createAccount(email, password, displayName);
+        SetLoading(true);
 
-        if (!result.ok())
-        {
-            ShowError(result.errorMessage);
-            return;
-        }
+        auto dispatcher = this->DispatcherQueue();
+        auto weakThis = get_weak();
 
-        NavigateToMainApp();
+        App::AuthService()->createAccountAsync(email, password, displayName,
+            [dispatcher, weakThis](pivox::AuthResult result) {
+                dispatcher.TryEnqueue([weakThis, result]() {
+                    if (auto strongThis = weakThis.get())
+                    {
+                        strongThis->SetLoading(false);
+                        if (!result.ok())
+                        {
+                            strongThis->ShowError(result.errorMessage);
+                            return;
+                        }
+                        strongThis->NavigateToMainApp();
+                    }
+                });
+            });
     }
 
     void RegisterPage::OnGoogleSignIn(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
@@ -53,6 +72,7 @@ namespace winrt::Pivox::implementation
         }
 
         App::AppState()->saveString("remembered_email", "");
+        SetLoading(true);
 
         auto windowId = this->XamlRoot().ContentIslandEnvironment().AppWindowId();
         auto dispatcher = this->DispatcherQueue();
@@ -63,6 +83,7 @@ namespace winrt::Pivox::implementation
                 dispatcher.TryEnqueue([weakThis, result]() {
                     if (auto strongThis = weakThis.get())
                     {
+                        strongThis->SetLoading(false);
                         if (result.ok())
                         {
                             strongThis->NavigateToMainApp();

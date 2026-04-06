@@ -1,6 +1,8 @@
 #include "WinAuthService.h"
 #include "firebase_config.h"
 #include <windows.h>
+#include <thread>
+#include <chrono>
 
 #if PIVOX_HAS_FIREBASE
 #include "firebase/auth/credential.h"
@@ -102,41 +104,54 @@ bool WinAuthService::isFirebaseInitialized() const {
 // Email/password sign-in
 // ---------------------------------------------------------------------------
 
-AuthResult WinAuthService::signInWithEmail(const std::string& email, const std::string& password) {
+void WinAuthService::signInWithEmailAsync(const std::string& email, const std::string& password,
+                                            std::function<void(AuthResult)> callback) {
+    // Synchronous validation — returns immediately.
     if (!isValidEmail(email)) {
-        return { AuthError::InvalidEmail, auth_error::kInvalidEmail };
+        callback({ AuthError::InvalidEmail, auth_error::kInvalidEmail });
+        return;
     }
     if (password.empty()) {
-        return { AuthError::WrongPassword, auth_error::kInvalidCredential };
+        callback({ AuthError::WrongPassword, auth_error::kInvalidCredential });
+        return;
     }
 
 #if PIVOX_HAS_FIREBASE
     if (!firebaseAuth_) {
-        return { AuthError::NotConfigured, "Firebase not initialized. Call initializeFirebase() first." };
+        callback({ AuthError::NotConfigured, "Firebase not initialized." });
+        return;
     }
 
-    auto future = firebaseAuth_->SignInWithEmailAndPassword(email.c_str(), password.c_str());
-    future.OnCompletion([](const firebase::Future<firebase::auth::AuthResult>&) {});
+    // Run Firebase call on background thread to avoid blocking UI.
+    auto auth = firebaseAuth_;
+    auto self = this;
+    std::thread([self, auth, email, password, cb = std::move(callback)]() {
+        auto future = auth->SignInWithEmailAndPassword(email.c_str(), password.c_str());
+        while (future.status() == firebase::kFutureStatusPending) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
 
-    while (future.status() == firebase::kFutureStatusPending) {}
+        if (future.status() == firebase::kFutureStatusComplete && future.error() == 0) {
+            auto* result = future.result();
+            auto user = self->mapFirebaseUser(result->user);
 
-    if (future.status() == firebase::kFutureStatusComplete && future.error() == 0) {
-        auto* result = future.result();
-        auto user = mapFirebaseUser(result->user);
+            auto tokenFuture = const_cast<firebase::auth::User&>(result->user).GetToken(false);
+            while (tokenFuture.status() == firebase::kFutureStatusPending) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+            std::string idToken = (tokenFuture.error() == 0) ? *tokenFuture.result() : "";
 
-        auto tokenFuture = const_cast<firebase::auth::User&>(result->user).GetToken(false);
-        while (tokenFuture.status() == firebase::kFutureStatusPending) {}
-        std::string idToken = (tokenFuture.error() == 0) ? *tokenFuture.result() : "";
+            self->saveUserTokens(user, idToken, "");
+            self->setAuthState(AuthStatus::SignedIn, user);
+            cb({ AuthError::None, "", user });
+            return;
+        }
 
-        saveUserTokens(user, idToken, "");
-        setAuthState(AuthStatus::SignedIn, user);
-        return { AuthError::None, "", user };
-    }
-
-    return mapFirebaseError(future.error());
+        cb(self->mapFirebaseError(future.error()));
+    }).detach();
 #else
-    return { AuthError::NotConfigured, "Firebase C++ SDK not available. "
-             "Build with PIVOX_HAS_FIREBASE=1 after downloading the SDK." };
+    callback({ AuthError::NotConfigured, "Firebase C++ SDK not available. "
+               "Build with PIVOX_HAS_FIREBASE=1 after downloading the SDK." });
 #endif
 }
 
@@ -144,46 +159,59 @@ AuthResult WinAuthService::signInWithEmail(const std::string& email, const std::
 // Account creation
 // ---------------------------------------------------------------------------
 
-AuthResult WinAuthService::createAccount(const std::string& email, const std::string& password,
-                                         const std::string& displayName) {
+void WinAuthService::createAccountAsync(const std::string& email, const std::string& password,
+                                          const std::string& displayName,
+                                          std::function<void(AuthResult)> callback) {
     if (!isValidEmail(email)) {
-        return { AuthError::InvalidEmail, auth_error::kInvalidEmail };
+        callback({ AuthError::InvalidEmail, auth_error::kInvalidEmail });
+        return;
     }
     if (password.size() < 8) {
-        return { AuthError::WeakPassword, auth_error::kWeakPassword };
+        callback({ AuthError::WeakPassword, auth_error::kWeakPassword });
+        return;
     }
 
 #if PIVOX_HAS_FIREBASE
     if (!firebaseAuth_) {
-        return { AuthError::NotConfigured, "Firebase not initialized." };
+        callback({ AuthError::NotConfigured, "Firebase not initialized." });
+        return;
     }
 
-    auto future = firebaseAuth_->CreateUserWithEmailAndPassword(email.c_str(), password.c_str());
-    while (future.status() == firebase::kFutureStatusPending) {}
+    auto auth = firebaseAuth_;
+    auto self = this;
+    std::thread([self, auth, email, password, displayName, cb = std::move(callback)]() {
+        auto future = auth->CreateUserWithEmailAndPassword(email.c_str(), password.c_str());
+        while (future.status() == firebase::kFutureStatusPending) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
 
-    if (future.status() == firebase::kFutureStatusComplete && future.error() == 0) {
-        auto* result = future.result();
+        if (future.status() == firebase::kFutureStatusComplete && future.error() == 0) {
+            auto* result = future.result();
 
-        firebase::auth::User::UserProfile profile;
-        profile.display_name = displayName.c_str();
-        const_cast<firebase::auth::User&>(result->user).UpdateUserProfile(profile);
+            firebase::auth::User::UserProfile profile;
+            profile.display_name = displayName.c_str();
+            const_cast<firebase::auth::User&>(result->user).UpdateUserProfile(profile);
 
-        auto user = mapFirebaseUser(result->user);
-        user.displayName = displayName;
+            auto user = self->mapFirebaseUser(result->user);
+            user.displayName = displayName;
 
-        auto tokenFuture = const_cast<firebase::auth::User&>(result->user).GetToken(false);
-        while (tokenFuture.status() == firebase::kFutureStatusPending) {}
-        std::string idToken = (tokenFuture.error() == 0) ? *tokenFuture.result() : "";
+            auto tokenFuture = const_cast<firebase::auth::User&>(result->user).GetToken(false);
+            while (tokenFuture.status() == firebase::kFutureStatusPending) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+            std::string idToken = (tokenFuture.error() == 0) ? *tokenFuture.result() : "";
 
-        saveUserTokens(user, idToken, "");
-        setAuthState(AuthStatus::SignedIn, user);
-        return { AuthError::None, "", user };
-    }
+            self->saveUserTokens(user, idToken, "");
+            self->setAuthState(AuthStatus::SignedIn, user);
+            cb({ AuthError::None, "", user });
+            return;
+        }
 
-    return mapFirebaseError(future.error());
+        cb(self->mapFirebaseError(future.error()));
+    }).detach();
 #else
-    return { AuthError::NotConfigured, "Firebase C++ SDK not available. "
-             "Build with PIVOX_HAS_FIREBASE=1 after downloading the SDK." };
+    callback({ AuthError::NotConfigured, "Firebase C++ SDK not available. "
+               "Build with PIVOX_HAS_FIREBASE=1 after downloading the SDK." });
 #endif
 }
 

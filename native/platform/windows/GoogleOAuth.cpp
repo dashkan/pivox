@@ -3,6 +3,8 @@
 #include "firebase_config.h"
 #include <winrt/Microsoft.Security.Authentication.OAuth.h>
 #include <winrt/Windows.Data.Json.h>
+#include <thread>
+#include <chrono>
 
 using namespace winrt::Microsoft::Security::Authentication::OAuth;
 
@@ -88,13 +90,22 @@ winrt::fire_and_forget LaunchGoogleOAuth(
             }
         }
 
+        // Bring app to foreground after OAuth redirect.
+        HWND hwnd = GetForegroundWindow();
+        auto appHwnd = FindWindowW(nullptr, L"Pivox");
+        if (appHwnd) {
+            SetForegroundWindow(appHwnd);
+        }
+
         // 5. Sign in to Firebase with the Google credential.
 #if PIVOX_HAS_FIREBASE
         if (self->firebaseAuth_) {
             auto credential = firebase::auth::GoogleAuthProvider::GetCredential(
                 idToken.c_str(), accessToken.empty() ? nullptr : accessToken.c_str());
             auto future = self->firebaseAuth_->SignInWithCredential(credential);
-            while (future.status() == firebase::kFutureStatusPending) {}
+            while (future.status() == firebase::kFutureStatusPending) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
 
             if (future.status() == firebase::kFutureStatusComplete && future.error() == 0) {
                 auto* fbUser = future.result();

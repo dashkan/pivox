@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 #include "WinAuthService.h"
 #include "WinAppState.h"
+#include <thread>
+#include <chrono>
 
 class WinAuthServiceTest : public ::testing::Test {
 protected:
@@ -41,27 +43,33 @@ TEST_F(WinAuthServiceTest, CurrentUserIsEmptyInitially) {
 // ---------------------------------------------------------------------------
 
 TEST_F(WinAuthServiceTest, SignInWithEmptyEmailFails) {
-    auto result = auth.signInWithEmail("", "password123");
+    pivox::AuthResult result;
+    auth.signInWithEmailAsync("", "password123", [&](pivox::AuthResult r) { result = r; });
     EXPECT_FALSE(result.ok());
     EXPECT_EQ(result.error, pivox::AuthError::InvalidEmail);
 }
 
 TEST_F(WinAuthServiceTest, SignInWithEmptyPasswordFails) {
-    auto result = auth.signInWithEmail("user@example.com", "");
+    pivox::AuthResult result;
+    auth.signInWithEmailAsync("user@example.com", "", [&](pivox::AuthResult r) { result = r; });
     EXPECT_FALSE(result.ok());
     EXPECT_EQ(result.error, pivox::AuthError::WrongPassword);
 }
 
 TEST_F(WinAuthServiceTest, SignInWithValidCredentialsSucceeds) {
-    auto result = auth.signInWithEmail("user@example.com", "password123");
-    // Without Firebase SDK configured, this returns NotConfigured.
-    // With Firebase, this would succeed for valid credentials.
-    // The test validates the flow works — real auth is an integration test.
+    pivox::AuthResult result;
+    auth.signInWithEmailAsync("user@example.com", "password123",
+        [&](pivox::AuthResult r) { result = r; });
+    // Validation passes but Firebase isn't configured — callback fires from background thread.
+    // Give it a moment.
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     EXPECT_EQ(result.error, pivox::AuthError::NotConfigured);
 }
 
 TEST_F(WinAuthServiceTest, SignInValidationRejectsInvalidEmail) {
-    auto result = auth.signInWithEmail("not-an-email", "password123");
+    pivox::AuthResult result;
+    auth.signInWithEmailAsync("not-an-email", "password123",
+        [&](pivox::AuthResult r) { result = r; });
     EXPECT_EQ(result.error, pivox::AuthError::InvalidEmail);
 }
 
@@ -70,19 +78,26 @@ TEST_F(WinAuthServiceTest, SignInValidationRejectsInvalidEmail) {
 // ---------------------------------------------------------------------------
 
 TEST_F(WinAuthServiceTest, CreateAccountWithEmptyEmailFails) {
-    auto result = auth.createAccount("", "password123", "User");
+    pivox::AuthResult result;
+    auth.createAccountAsync("", "password123", "User",
+        [&](pivox::AuthResult r) { result = r; });
     EXPECT_FALSE(result.ok());
     EXPECT_EQ(result.error, pivox::AuthError::InvalidEmail);
 }
 
 TEST_F(WinAuthServiceTest, CreateAccountWithShortPasswordFails) {
-    auto result = auth.createAccount("user@example.com", "short", "User");
+    pivox::AuthResult result;
+    auth.createAccountAsync("user@example.com", "short", "User",
+        [&](pivox::AuthResult r) { result = r; });
     EXPECT_FALSE(result.ok());
     EXPECT_EQ(result.error, pivox::AuthError::WeakPassword);
 }
 
 TEST_F(WinAuthServiceTest, CreateAccountWithValidInputsReturnsNotConfigured) {
-    auto result = auth.createAccount("user@example.com", "password123", "Test User");
+    pivox::AuthResult result;
+    auth.createAccountAsync("user@example.com", "password123", "Test User",
+        [&](pivox::AuthResult r) { result = r; });
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     EXPECT_EQ(result.error, pivox::AuthError::NotConfigured);
 }
 

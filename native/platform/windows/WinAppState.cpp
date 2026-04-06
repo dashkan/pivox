@@ -1,6 +1,8 @@
 #include "WinAppState.h"
+#include "firebase_config.h"
 #include <windows.h>
 #include <wincred.h>
+#include <cstring>
 
 static const wchar_t* kRegSubKey = L"Software\\Pivox";
 static const wchar_t* kCredTarget = L"Pivox";
@@ -238,9 +240,9 @@ void WinAppState::registerProtocolHandler() {
     registerScheme(L"pivox", L"Pivox OAuth Callback", exePath);
 
     // Register reversed Google client ID scheme for Google OAuth.
-    registerScheme(
-        L"com.googleusercontent.apps.45920224787-gb662gbotfv763cqjis53748ctgigncl",
-        L"Pivox Google Sign-In", exePath);
+    auto scheme = pivox::firebase_config::kGoogleRedirectScheme;
+    std::wstring googleScheme(scheme, scheme + strlen(scheme));
+    registerScheme(googleScheme.c_str(), L"Pivox Google Sign-In", exePath);
 }
 
 } // namespace pivox

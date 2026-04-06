@@ -8,6 +8,8 @@
 #include <optional>
 #include <vector>
 #include <cstdint>
+#include <atomic>
+#include <thread>
 
 #if PIVOX_HAS_FIREBASE
 #include "firebase/app.h"
@@ -75,9 +77,13 @@ public:
 
     void setOAuthConfig(const OAuthConfig& config);
 
-    AuthResult signInWithEmail(const std::string& email, const std::string& password);
-    AuthResult createAccount(const std::string& email, const std::string& password,
-                             const std::string& displayName);
+    /// Synchronous validation + async Firebase call.
+    /// Callback fires from a background thread — caller must dispatch to UI.
+    void signInWithEmailAsync(const std::string& email, const std::string& password,
+                              std::function<void(AuthResult)> callback);
+    void createAccountAsync(const std::string& email, const std::string& password,
+                            const std::string& displayName,
+                            std::function<void(AuthResult)> callback);
 
     bool isGoogleConfigured() const { return oauthConfig_.hasGoogle(); }
     bool isGitHubConfigured() const { return oauthConfig_.hasGitHub(); }
@@ -111,7 +117,7 @@ public:
     void setAuthState(AuthStatus status, const AuthUser& user = {});
     void saveUserTokens(const AuthUser& user, const std::string& idToken,
                         const std::string& refreshToken);
-    bool isOAuthInProgress_ = false;
+    std::atomic<bool> isOAuthInProgress_ = false;
 
 #if PIVOX_HAS_FIREBASE
     firebase::App* firebaseApp_ = nullptr;

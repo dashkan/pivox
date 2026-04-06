@@ -15,6 +15,7 @@ namespace winrt::Pivox::implementation
     private:
         void NavigateToMainApp();
         void ShowError(const std::string& message);
+        void SetLoading(bool loading);
     };
 }
 
