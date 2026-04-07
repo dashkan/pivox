@@ -190,19 +190,22 @@ To open in Xcode: open `build-xcode/Pivox.xcodeproj`, go to Product → Scheme �
 
 **NuGet dependencies**:
 - `Microsoft.Graphics.Win2D` — 2D rendering (replaces Core Graphics). First-class WinUI 3 citizen.
-- `FluentIcons.WinUI` — [Fluent UI System Icons](https://github.com/microsoft/fluentui-system-icons) (~4000 icons). Covers SF Symbols equivalents that Segoe Fluent Icons lacks (straighten, flip, aspect ratio, etc.). Use `FluentIcons.` prefix in XAML.
+
+**Icons**: Download individual SVGs directly from [microsoft/fluentui-system-icons](https://github.com/microsoft/fluentui-system-icons) into `platform/windows/Assets/Icons/`. No NuGet, no font files — only ship the ~15 icons we actually use. Use `ImageIcon` or extract path data into `PathIcon` for zero external files.
+
+Icon search: `icons_filled.md` / `icons_regular.md` at repo root list all names. SVGs are at `assets/{Name}/SVG/ic_fluent_{name}_{size}_{style}.svg`.
 
 **SF Symbols → Fluent Icons mapping** (image editor):
-| SF Symbol (macOS) | Fluent Icon (Windows) | Usage |
+| SF Symbol (macOS) | Fluent Icon SVG | Usage |
 |---|---|---|
-| `circle.and.line.horizontal.fill` | `CircleLine16Filled` | Straighten tool |
-| `arrow.left.and.right.righttriangle.left.righttriangle.right` | `FlipHorizontal16Regular` | Flip horizontal |
-| `arrow.up.and.down.righttriangle.up.righttriangle.down` | `FlipVertical16Regular` | Flip vertical |
-| `aspectratio` | `RatioOneToOne16Regular` | Aspect ratio |
-| `crop` | `Crop16Regular` | Crop tool tab |
-| `arrow.uturn.backward` | `ArrowUndo16Regular` | Undo |
-| `arrow.uturn.forward` | `ArrowRedo16Regular` | Redo |
-| `minus` / `plus` | `Subtract16Regular` / `Add16Regular` | Zoom controls |
+| `circle.and.line.horizontal.fill` | `ic_fluent_circle_line_16_filled.svg` | Straighten tool |
+| `arrow.left.and.right.righttriangle.left.righttriangle.right` | `ic_fluent_flip_horizontal_16_regular.svg` | Flip horizontal |
+| `arrow.up.and.down.righttriangle.up.righttriangle.down` | `ic_fluent_flip_vertical_16_regular.svg` | Flip vertical |
+| `aspectratio` | `ic_fluent_ratio_one_to_one_16_regular.svg` | Aspect ratio |
+| `crop` | `ic_fluent_crop_16_regular.svg` | Crop tool tab |
+| `arrow.uturn.backward` | `ic_fluent_arrow_undo_16_regular.svg` | Undo |
+| `arrow.uturn.forward` | `ic_fluent_arrow_redo_16_regular.svg` | Redo |
+| `minus` / `plus` | `ic_fluent_subtract_16_regular.svg` / `ic_fluent_add_16_regular.svg` | Zoom controls |
 
 ## What Needs to Happen Next
 
