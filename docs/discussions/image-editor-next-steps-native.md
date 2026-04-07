@@ -63,23 +63,41 @@ Modeled after macOS Photos app:
 - **Grid**: 8x8, shown during drag or straighten (not always)
 - **Dark mode**: `NSWindow.appearance` set to `.darkAqua` during edit, `nil` on exit
 
-### File Changes From This Session
+### macOS Swift File Structure
 
-**Modified:**
-- `native/CMakeLists.txt` — added image editor UI test file, `PRODUCT_BUNDLE_IDENTIFIER`, warnings-as-errors (`-Wall -Wextra -Werror` for C/C++, `/W4 /WX` for MSVC, `SWIFT_TREAT_WARNINGS_AS_ERRORS` for Swift)
-- `native/platform/macos/CMakeLists.txt` — ARC enabled for all bridge .mm files (was only ImageEditorBridge.mm)
-- `native/platform/macos/objcpp/AppStateBridge.h` — added `NS_ASSUME_NONNULL_BEGIN/END`
-- `native/platform/macos/objcpp/ImageEditorBridge.h` — added `NS_ASSUME_NONNULL_BEGIN/END`, nullable annotations on all pointer params
-- `native/platform/macos/swift/ImageEditor/EditView.swift` — tool panel changed from HStack to overlay (prevents window widening), NSView accessibility (`setAccessibilityElement`, `setAccessibilityRole`, `setAccessibilityIdentifier`), removed useless downcast warning
-- `native/platform/macos/swift/ContentView.swift` — dark mode via `NSWindow.appearance` instead of `.preferredColorScheme` + `.id()` (the `.id()` approach destroyed view state), `TEST_IMAGE_PATH` env var hook in LibraryPlaceholderView, accessibility identifiers on Library buttons
-- `native/platform/macos/swift/AuthService.swift` — added `UI_TESTING` env var (single flag resets auth + prefs + sticky tab), clears `selected_section` in RESET_PREFS
-- `native/tests/macos/ui/AuthUITests.swift` — fixed unused variable warning
-- `native/tests/macos/AuthServiceTests.swift` — removed force-unwraps on nonnull AppStateBridge
-- All Swift files using `AppStateBridge.shared()!` — removed force-unwraps (nonnull after NS_ASSUME_NONNULL)
+```
+native/platform/macos/swift/
+├── App/
+│   ├── main.swift
+│   ├── AppDelegate.swift
+│   └── ContentView.swift
+├── Auth/
+│   ├── AuthService.swift
+│   ├── LoginView.swift
+│   ├── RegisterView.swift
+│   └── ProfileView.swift
+├── ImageEditor/
+│   └── EditView.swift
+└── Components/
+    ├── GlassCard.swift
+    └── GoogleIcon.swift
+```
 
-**Added:**
-- `native/tests/macos/ImageEditorBridgeTests.swift` — 27 unit tests for bridge layer
-- `native/tests/macos/ui/ImageEditorUITests.swift` — 12 UI tests (see below)
+### Key Files
+
+| File | Purpose |
+|---|---|
+| `native/core/image-editor/*.h/cpp` | Shared C++ core (types, crop math, engine) |
+| `native/platform/macos/objcpp/ImageEditorBridge.h/mm` | Obj-C++ bridge (C++ → Swift) |
+| `native/platform/macos/swift/ImageEditor/EditView.swift` | SwiftUI renderer + toolbar + tool panel (~770 lines) |
+| `native/platform/macos/swift/App/ContentView.swift` | App shell, Library integration, dark mode, TEST_IMAGE_PATH hook |
+| `native/platform/macos/swift/Auth/AuthService.swift` | Firebase Auth, UI_TESTING flag, emulator support |
+| `native/platform/macos/CMakeLists.txt` | Bridge library (ARC for all .mm files) |
+| `native/CMakeLists.txt` | App target, warnings-as-errors, PRODUCT_BUNDLE_IDENTIFIER |
+| `native/tests/core/crop_math_tests.cpp` | 36 gtest for crop math |
+| `native/tests/core/image_editor_engine_tests.cpp` | 36 gtest for engine |
+| `native/tests/macos/ImageEditorBridgeTests.swift` | 27 XCTest unit for bridge |
+| `native/tests/macos/ui/ImageEditorUITests.swift` | 12 XCUITest UI tests |
 
 ## Known Issues
 
@@ -174,17 +192,16 @@ To open in Xcode: open `build-xcode/Pivox.xcodeproj`, go to Product → Scheme �
 
 ## What Needs to Happen Next
 
-### Immediate (before commit)
+### Immediate
 
-1. **Fix UI test failures** — diagnose why clicking Edit doesn't produce edit-mode toolbar items
+1. **Fix UI test failures** — 10 of 12 image editor UI tests fail. Diagnose by dumping accessibility hierarchy (`print(app.debugDescription)`) after clicking Edit to see what XCUITest sees. All tests that click `edit-enter` and look for edit-mode elements fail.
 2. **Manual test dark mode transition** — verify NSWindow.appearance approach works for: edit → done, edit → back, switching to another app and back
 3. **Run full test suite** — `make test-native-ui` must pass (auth + sidebar + image editor tests)
 
 ### Before Windows Prompt
 
 4. **Polish crop interaction** — test drag handles, straighten slider, flip animation, aspect ratio templates thoroughly
-5. **Commit all changes** — single commit with all image editor + auth + warning fixes
-6. **Generate Windows prompt** — comprehensive, self-contained prompt for `kirby-win`
+5. **Generate Windows prompt** — comprehensive, self-contained prompt for `kirby-win`
 
 ### Future (see also `docs/discussions/image-editor-next-steps.md` for web-side roadmap)
 
@@ -192,3 +209,12 @@ To open in Xcode: open `build-xcode/Pivox.xcodeproj`, go to Product → Scheme �
 - Allow dead pixels + background color option
 - Adjustments (brightness, contrast, saturation, etc.)
 - Rename to ImageTransform when feature set stabilizes
+
+### Lessons Learned
+
+- **`accessibilityIdentifier` on SwiftUI containers can hide children** — setting it on a `Group` wrapping the entire app made all child elements invisible to XCUITest. Don't put identifiers on structural containers.
+- **`accessibilityIdentifier` doesn't propagate through `NSViewRepresentable`** — must call `setAccessibilityElement(true)`, `setAccessibilityRole()`, `setAccessibilityIdentifier()` directly on the NSView in `makeNSView`.
+- **`.preferredColorScheme` doesn't propagate through `NavigationSplitView` sidebar** — when sidebar visibility changes simultaneously, the sidebar retains the stale color scheme. Use `NSWindow.appearance` directly.
+- **`.id()` on `NavigationSplitView` destroys all child state** — forces full rebuild, loses loaded image, selected tab, etc. Never use `.id()` for theme changes on stateful views.
+- **Firebase Auth emulator starts with zero users** — every UI test must register through the UI first. `UI_TESTING=1` env var resets all state (auth + prefs + sticky tab).
+- **Always diagnose before changing code** — dump `app.debugDescription` to see the accessibility hierarchy instead of guessing.
