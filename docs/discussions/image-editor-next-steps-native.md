@@ -195,40 +195,45 @@ To open in Xcode: open `build-xcode/Pivox.xcodeproj`, go to Product → Scheme �
 
 Icon search: `icons_filled.md` / `icons_regular.md` at repo root list all names. SVGs are at `assets/{Name}/SVG/ic_fluent_{name}_{size}_{style}.svg`. Use 24px variants (largest available — sizes are 12, 16, 20, 24). Most detail, scales cleanly since SVG is vector.
 
-**Icon directory convention** — mirrors Microsoft's repo structure, lowercased with dashes:
+**Icon directory convention** — mirrors Microsoft's repo structure, lowercased with dashes. Use 24px (largest available). Pick regular or filled to match the corresponding SF Symbol:
 ```
 native/platform/windows/Assets/Icons/
 ├── crop/
-│   └── ic_fluent_crop_24_regular.svg
+│   └── ic_fluent_crop_24_{regular|filled}.svg
 ├── flip-horizontal/
-│   └── ic_fluent_flip_horizontal_24_regular.svg
+│   └── ic_fluent_flip_horizontal_24_{regular|filled}.svg
 ├── flip-vertical/
-│   └── ic_fluent_flip_vertical_24_regular.svg
+│   └── ic_fluent_flip_vertical_24_{regular|filled}.svg
 ├── arrow-undo/
-│   └── ic_fluent_arrow_undo_24_regular.svg
+│   └── ic_fluent_arrow_undo_24_{regular|filled}.svg
 ├── arrow-redo/
-│   └── ic_fluent_arrow_redo_24_regular.svg
+│   └── ic_fluent_arrow_redo_24_{regular|filled}.svg
 ├── add/
-│   └── ic_fluent_add_24_regular.svg
+│   └── ic_fluent_add_24_{regular|filled}.svg
 ├── subtract/
-│   └── ic_fluent_subtract_24_regular.svg
+│   └── ic_fluent_subtract_24_{regular|filled}.svg
 ├── circle-line/
-│   └── ic_fluent_circle_line_24_filled.svg
+│   └── ic_fluent_circle_line_24_{regular|filled}.svg
 └── ratio-one-to-one/
-    └── ic_fluent_ratio_one_to_one_24_regular.svg
+    └── ic_fluent_ratio_one_to_one_24_{regular|filled}.svg
 ```
 
 **SF Symbols → Fluent Icons mapping** (image editor):
-| SF Symbol (macOS) | Fluent Icon SVG | Usage |
+
+Pick regular or filled per icon — whichever best matches the SF Symbol visual weight.
+
+| SF Symbol (macOS) | Fluent Icon name | Usage |
 |---|---|---|
-| `circle.and.line.horizontal.fill` | `ic_fluent_circle_line_16_filled.svg` | Straighten tool |
-| `arrow.left.and.right.righttriangle.left.righttriangle.right` | `ic_fluent_flip_horizontal_16_regular.svg` | Flip horizontal |
-| `arrow.up.and.down.righttriangle.up.righttriangle.down` | `ic_fluent_flip_vertical_16_regular.svg` | Flip vertical |
-| `aspectratio` | `ic_fluent_ratio_one_to_one_16_regular.svg` | Aspect ratio |
-| `crop` | `ic_fluent_crop_16_regular.svg` | Crop tool tab |
-| `arrow.uturn.backward` | `ic_fluent_arrow_undo_16_regular.svg` | Undo |
-| `arrow.uturn.forward` | `ic_fluent_arrow_redo_16_regular.svg` | Redo |
-| `minus` / `plus` | `ic_fluent_subtract_16_regular.svg` / `ic_fluent_add_16_regular.svg` | Zoom controls |
+| `circle.and.line.horizontal.fill` | `circle_line` (filled) | Straighten tool |
+| `arrow.left.and.right.righttriangle.left.righttriangle.right` | `flip_horizontal` | Flip horizontal |
+| `arrow.up.and.down.righttriangle.up.righttriangle.down` | `flip_vertical` | Flip vertical |
+| `aspectratio` | `ratio_one_to_one` | Aspect ratio |
+| `crop` | `crop` | Crop tool tab |
+| `arrow.uturn.backward` | `arrow_undo` | Undo |
+| `arrow.uturn.forward` | `arrow_redo` | Redo |
+| `minus` / `plus` | `subtract` / `add` | Zoom controls |
+
+SVG path: `assets/{Name}/SVG/ic_fluent_{name}_24_{regular|filled}.svg`
 
 ## What Needs to Happen Next
 
