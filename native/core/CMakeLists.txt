@@ -9,3 +9,8 @@ target_include_directories(pivox_core PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/image-editor"
 )
+
+# MSVC requires _USE_MATH_DEFINES for M_PI in <cmath>.
+if(MSVC)
+    target_compile_definitions(pivox_core PUBLIC _USE_MATH_DEFINES)
+endif()

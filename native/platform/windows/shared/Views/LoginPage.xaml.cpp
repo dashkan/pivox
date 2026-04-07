@@ -1,8 +1,7 @@
 #include "pch.h"
 #include "LoginPage.xaml.h"
 #include "LoginPage.g.cpp"
-#include "MainWindow.xaml.h"
-#include "App.xaml.h"
+#include "PivoxServices.h"
 
 namespace winrt::Pivox::implementation
 {
@@ -11,7 +10,7 @@ namespace winrt::Pivox::implementation
         InitializeComponent();
 
         // Remember Me: pre-fill email if previously saved.
-        auto savedEmail = App::AppState()->loadString("remembered_email");
+        auto savedEmail = pivox::PivoxServices::appState()->loadString("remembered_email");
         if (savedEmail.has_value() && !savedEmail->empty())
         {
             EmailBox().Text(winrt::to_hstring(savedEmail.value()));
@@ -22,7 +21,7 @@ namespace winrt::Pivox::implementation
     void LoginPage::OnPageLoaded(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
     {
         // Auto-focus: if email is pre-filled, focus password; otherwise focus email.
-        auto savedEmail = App::AppState()->loadString("remembered_email");
+        auto savedEmail = pivox::PivoxServices::appState()->loadString("remembered_email");
         if (savedEmail.has_value() && !savedEmail->empty())
         {
             PasswordBox().Focus(Microsoft::UI::Xaml::FocusState::Programmatic);
@@ -107,7 +106,7 @@ namespace winrt::Pivox::implementation
         auto dispatcher = this->DispatcherQueue();
         auto weakThis = get_weak();
 
-        App::AuthService()->signInWithEmailAsync(email, password,
+        pivox::PivoxServices::authService()->signInWithEmailAsync(email, password,
             [dispatcher, weakThis, remember, email](pivox::AuthResult result) {
                 dispatcher.TryEnqueue([weakThis, result, remember, email]() {
                     if (auto strongThis = weakThis.get())
@@ -121,11 +120,11 @@ namespace winrt::Pivox::implementation
 
                         if (remember)
                         {
-                            App::AppState()->saveString("remembered_email", email);
+                            pivox::PivoxServices::appState()->saveString("remembered_email", email);
                         }
                         else
                         {
-                            App::AppState()->saveString("remembered_email", "");
+                            pivox::PivoxServices::appState()->saveString("remembered_email", "");
                         }
 
                         strongThis->NavigateToMainApp();
@@ -136,21 +135,21 @@ namespace winrt::Pivox::implementation
 
     void LoginPage::OnGoogleSignIn(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
     {
-        auto result = App::AuthService()->validateGoogleSignIn();
+        auto result = pivox::PivoxServices::authService()->validateGoogleSignIn();
         if (!result.ok())
         {
             ShowError(result.errorMessage);
             return;
         }
 
-        App::AppState()->saveString("remembered_email", "");
+        pivox::PivoxServices::appState()->saveString("remembered_email", "");
         SetLoading(true);
 
         auto windowId = this->XamlRoot().ContentIslandEnvironment().AppWindowId();
         auto dispatcher = this->DispatcherQueue();
         auto weakThis = get_weak();
 
-        App::AuthService()->signInWithGoogleAsync(windowId.Value,
+        pivox::PivoxServices::authService()->signInWithGoogleAsync(windowId.Value,
             [dispatcher, weakThis](pivox::AuthResult result) {
                 dispatcher.TryEnqueue([weakThis, result]() {
                     if (auto strongThis = weakThis.get())
@@ -172,7 +171,7 @@ namespace winrt::Pivox::implementation
 
     void LoginPage::OnGitHubSignIn(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
     {
-        auto result = App::AuthService()->validateGitHubSignIn();
+        auto result = pivox::PivoxServices::authService()->validateGitHubSignIn();
         if (!result.ok())
         {
             ShowError(result.errorMessage);

@@ -1,0 +1,46 @@
+// PivoxControl.idl : COM IDL for the Pivox ActiveX control.
+// Processed by MIDL to produce the type library and marshalling code.
+
+import "oaidl.idl";
+import "ocidl.idl";
+
+[
+    object,
+    uuid(A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5D),
+    dual,
+    nonextensible,
+    pointer_default(unique)
+]
+interface IPivoxControl : IDispatch
+{
+    [id(1)] HRESULT NavigateTo([in] BSTR pageName);
+    [id(2)] HRESULT Shutdown();
+    [propget, id(3)] HRESULT IsInitialized([out, retval] VARIANT_BOOL* pVal);
+};
+
+[
+    uuid(E5F6A7B8-C9D0-4E1F-8A2B-3C4D5E6F7A8B)
+]
+dispinterface _IPivoxControlEvents
+{
+    properties:
+    methods:
+};
+
+[
+    uuid(D5C4B3A2-F6E5-4B7A-9D8C-1F0E2A3B4C5D),
+    version(1.0),
+]
+library PivoxActiveXLib
+{
+    importlib("stdole2.tlb");
+
+    [
+        uuid(B2A1C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5E),
+    ]
+    coclass PivoxControl
+    {
+        [default] interface IPivoxControl;
+        [default, source] dispinterface _IPivoxControlEvents;
+    };
+};

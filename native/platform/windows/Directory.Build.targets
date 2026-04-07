@@ -1,8 +1,23 @@
 <Project>
-  <ItemGroup Condition="'$(ProjectName)' == 'Pivox'">
+  <!-- Override CMake's per-config CharacterSet=MultiByte. WinUI/WinRT requires Unicode.
+       Must be in .targets (not .props) to run after CMake's generated PropertyGroups. -->
+  <PropertyGroup Condition="'$(ProjectName)' == 'Pivox' OR '$(ProjectName)' == 'PivoxShared' OR '$(ProjectName)' == 'PivoxActiveX'">
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(ProjectName)' == 'Pivox' OR '$(ProjectName)' == 'PivoxShared'">
     <ClCompile Include="$(GeneratedFilesDir)module.g.cpp" />
   </ItemGroup>
-  <ItemDefinitionGroup Condition="'$(ProjectName)' == 'Pivox'">
+  <ItemDefinitionGroup Condition="'$(ProjectName)' == 'Pivox' OR '$(ProjectName)' == 'PivoxShared'">
     <Midl><OutputDirectory /></Midl>
+  </ItemDefinitionGroup>
+  <!-- PivoxActiveX has no WinRT IDL — no module.g.cpp, no MIDL override needed. -->
+
+  <!-- Copy dependent DLLs (PivoxShared.dll) to ActiveX and App output directories.
+       CMake disables MSBuild's auto-copy. Private=true marks dependencies as copy-local. -->
+  <ItemDefinitionGroup Condition="'$(ProjectName)' == 'PivoxActiveX' OR '$(ProjectName)' == 'Pivox'">
+    <ProjectReference>
+      <Private>true</Private>
+    </ProjectReference>
   </ItemDefinitionGroup>
 </Project>

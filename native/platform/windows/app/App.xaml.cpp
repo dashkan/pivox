@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "App.xaml.h"
 #include "MainWindow.xaml.h"
+#include "PivoxServices.h"
 #include "firebase_config.h"
 #include <winrt/Microsoft.Security.Authentication.OAuth.h>
 
@@ -9,11 +10,6 @@
 
 namespace winrt::Pivox::implementation
 {
-    std::shared_ptr<pivox::WinAppState> App::s_appState =
-        std::make_shared<pivox::WinAppState>();
-    std::shared_ptr<pivox::WinAuthService> App::s_authService =
-        std::make_shared<pivox::WinAuthService>();
-
     App::App()
     {
 #if defined _DEBUG && !defined DISABLE_XAML_GENERATED_BREAK_ON_UNHANDLED_EXCEPTION
@@ -52,16 +48,21 @@ namespace winrt::Pivox::implementation
         // Register pivox:// URL scheme (for non-Google callbacks).
         pivox::WinAppState::registerProtocolHandler();
 
+        // Initialize shared services (service locator for shared library pages).
+        auto appState = std::make_shared<pivox::WinAppState>();
+        auto authService = std::make_shared<pivox::WinAuthService>();
+        pivox::PivoxServices::initialize(appState, authService);
+
         // Initialize Firebase C++ SDK.
-        s_authService->initializeFirebase();
+        authService->initializeFirebase();
 
         // Connect to Firebase Auth Emulator if requested.
-        s_authService->connectToEmulatorIfRequested();
+        authService->connectToEmulatorIfRequested();
 
         // Configure OAuth providers.
         pivox::OAuthConfig oauthConfig;
         oauthConfig.googleClientId = pivox::firebase_config::kGoogleSignInClientId;
-        s_authService->setOAuthConfig(oauthConfig);
+        authService->setOAuthConfig(oauthConfig);
     }
 
     void App::OnLaunched([[maybe_unused]] Microsoft::UI::Xaml::LaunchActivatedEventArgs const& e)
@@ -70,27 +71,18 @@ namespace winrt::Pivox::implementation
         wchar_t resetAuth[2] = {};
         if (GetEnvironmentVariableW(L"RESET_AUTH", resetAuth, 2) > 0 && resetAuth[0] == L'1')
         {
-            s_authService->signOut();
+            pivox::PivoxServices::authService()->signOut();
         }
 
         // RESET_PREFS=1: clear non-auth preferences (remembered email).
         wchar_t resetPrefs[2] = {};
         if (GetEnvironmentVariableW(L"RESET_PREFS", resetPrefs, 2) > 0 && resetPrefs[0] == L'1')
         {
-            s_appState->saveString("remembered_email", "");
+            pivox::PivoxServices::appState()->saveString("remembered_email", "");
         }
 
         m_window = winrt::make<MainWindow>();
         m_window.Activate();
     }
 
-    std::shared_ptr<pivox::WinAppState>& App::AppState()
-    {
-        return s_appState;
-    }
-
-    std::shared_ptr<pivox::WinAuthService>& App::AuthService()
-    {
-        return s_authService;
-    }
 }

@@ -1,8 +1,7 @@
 #include "pch.h"
 #include "MainWindow.xaml.h"
 #include "MainWindow.g.cpp"
-#include "LoginPage.xaml.h"
-#include "App.xaml.h"
+#include "PivoxServices.h"
 
 namespace winrt::Pivox::implementation
 {
@@ -12,7 +11,7 @@ namespace winrt::Pivox::implementation
         SetupWindow();
 
         // Firebase manages session persistence. Check if a user is signed in.
-        if (App::AuthService()->hasValidSession())
+        if (pivox::PivoxServices::authService()->hasValidSession())
         {
             ShowMainApp();
         }
@@ -27,7 +26,7 @@ namespace winrt::Pivox::implementation
         auto appWindow = this->AppWindow();
 
         // Restore saved window state, or use defaults.
-        auto& appState = App::AppState();
+        auto& appState = pivox::PivoxServices::appState();
         auto saved = appState->loadWindowState();
         if (saved.has_value())
         {
@@ -79,14 +78,15 @@ namespace winrt::Pivox::implementation
         ws.width = size.Width;
         ws.height = size.Height;
 
-        App::AppState()->saveWindowState(ws);
+        pivox::PivoxServices::appState()->saveWindowState(ws);
     }
 
     void MainWindow::ShowAuth()
     {
         AuthContainer().Visibility(Microsoft::UI::Xaml::Visibility::Visible);
         MainContainer().Visibility(Microsoft::UI::Xaml::Visibility::Collapsed);
-        AuthFrame().Navigate(winrt::xaml_typename<Pivox::LoginPage>());
+        AuthFrame().Navigate({ L"Pivox.LoginPage",
+            winrt::Windows::UI::Xaml::Interop::TypeKind::Metadata });
     }
 
     void MainWindow::ShowMainApp()
@@ -113,7 +113,7 @@ namespace winrt::Pivox::implementation
             if (tag == L"Profile")
             {
                 // Update profile with current auth user data.
-                auto& user = App::AuthService()->currentUser();
+                auto& user = pivox::PivoxServices::authService()->currentUser();
                 auto displayName = user.displayName.empty() ? "User" : user.displayName;
                 auto email = user.email.empty() ? "" : user.email;
                 ProfileName().Text(winrt::to_hstring(displayName));
@@ -167,7 +167,7 @@ namespace winrt::Pivox::implementation
 
     void MainWindow::OnSignOut(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
     {
-        App::AuthService()->signOut();
+        pivox::PivoxServices::authService()->signOut();
         ShowAuth();
     }
 }

@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "RegisterPage.xaml.h"
 #include "RegisterPage.g.cpp"
-#include "App.xaml.h"
+#include "PivoxServices.h"
 
 namespace winrt::Pivox::implementation
 {
@@ -45,7 +45,7 @@ namespace winrt::Pivox::implementation
         auto dispatcher = this->DispatcherQueue();
         auto weakThis = get_weak();
 
-        App::AuthService()->createAccountAsync(email, password, displayName,
+        pivox::PivoxServices::authService()->createAccountAsync(email, password, displayName,
             [dispatcher, weakThis](pivox::AuthResult result) {
                 dispatcher.TryEnqueue([weakThis, result]() {
                     if (auto strongThis = weakThis.get())
@@ -64,21 +64,21 @@ namespace winrt::Pivox::implementation
 
     void RegisterPage::OnGoogleSignIn(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
     {
-        auto result = App::AuthService()->validateGoogleSignIn();
+        auto result = pivox::PivoxServices::authService()->validateGoogleSignIn();
         if (!result.ok())
         {
             ShowError(result.errorMessage);
             return;
         }
 
-        App::AppState()->saveString("remembered_email", "");
+        pivox::PivoxServices::appState()->saveString("remembered_email", "");
         SetLoading(true);
 
         auto windowId = this->XamlRoot().ContentIslandEnvironment().AppWindowId();
         auto dispatcher = this->DispatcherQueue();
         auto weakThis = get_weak();
 
-        App::AuthService()->signInWithGoogleAsync(windowId.Value,
+        pivox::PivoxServices::authService()->signInWithGoogleAsync(windowId.Value,
             [dispatcher, weakThis](pivox::AuthResult result) {
                 dispatcher.TryEnqueue([weakThis, result]() {
                     if (auto strongThis = weakThis.get())
@@ -99,7 +99,7 @@ namespace winrt::Pivox::implementation
 
     void RegisterPage::OnGitHubSignIn(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
     {
-        auto result = App::AuthService()->validateGitHubSignIn();
+        auto result = pivox::PivoxServices::authService()->validateGitHubSignIn();
         if (!result.ok())
         {
             ShowError(result.errorMessage);

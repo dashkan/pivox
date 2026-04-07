@@ -28,10 +28,15 @@ elseif(CMAKE_GENERATOR MATCHES "Visual Studio")
     set(CMAKE_EXE_LINKER_FLAGS_DEBUGUITEST "${CMAKE_EXE_LINKER_FLAGS_DEBUG}")
 endif()
 
-# Warnings as errors.
+# Warnings as errors — compiler and linker.
 if(MSVC)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W4 /WX")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4 /WX")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W4 /WX /wd4100")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4 /WX /wd4100")
+    # /WX for linker. Suppressed linker warnings:
+    #   4099 — missing PDBs in Firebase C++ SDK pre-built libs
+    #   4075 — /INCREMENTAL vs /OPT:ICF conflict (NuGet targets inject /OPT in Debug)
+    # See docs/dev/windows-platform-structure.md "Suppressed warnings".
+    add_link_options(/WX /ignore:4099 /ignore:4075 /ignore:4078)
 else()
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Werror -Wno-unused-parameter")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -Wno-unused-parameter")
@@ -216,7 +221,7 @@ endif()
 
 
 # ============================================================
-# Windows: WinUI 3 App (added by Windows Claude via SSH)
+# Windows: WinUI 3 App + Shared WinRT Component Library
 # ============================================================
 
 if(WIN32)
@@ -227,7 +232,6 @@ if(WIN32)
     DownloadFirebaseCpp("${FIREBASE_CPP_VERSION}" "${CMAKE_SOURCE_DIR}/third_party/firebase-cpp")
     set(FB_CPP_ROOT "${CMAKE_SOURCE_DIR}/third_party/firebase-cpp/firebase_cpp_sdk")
 
-    set(WIN_TARGET "Pivox")
     set(WIN_PLATFORM_DIR "${CMAKE_SOURCE_DIR}/platform/windows")
 
     # Copy Directory.Build.props/targets into build dir (constraint #1).
@@ -238,86 +242,7 @@ if(WIN32)
         "${WIN_PLATFORM_DIR}/Directory.Build.targets"
         "${CMAKE_BINARY_DIR}/Directory.Build.targets" COPYONLY)
 
-    add_executable(${WIN_TARGET} WIN32
-        # App
-        ${WIN_PLATFORM_DIR}/App.idl
-        ${WIN_PLATFORM_DIR}/App.xaml
-        ${WIN_PLATFORM_DIR}/App.xaml.h
-        ${WIN_PLATFORM_DIR}/App.xaml.cpp
-        # MainWindow
-        ${WIN_PLATFORM_DIR}/MainWindow.idl
-        ${WIN_PLATFORM_DIR}/MainWindow.xaml
-        ${WIN_PLATFORM_DIR}/MainWindow.xaml.h
-        ${WIN_PLATFORM_DIR}/MainWindow.xaml.cpp
-        # LoginPage
-        ${WIN_PLATFORM_DIR}/LoginPage.idl
-        ${WIN_PLATFORM_DIR}/LoginPage.xaml
-        ${WIN_PLATFORM_DIR}/LoginPage.xaml.h
-        ${WIN_PLATFORM_DIR}/LoginPage.xaml.cpp
-        # RegisterPage
-        ${WIN_PLATFORM_DIR}/RegisterPage.idl
-        ${WIN_PLATFORM_DIR}/RegisterPage.xaml
-        # Google OAuth (OAuth2Manager coroutine — needs WinRT)
-        ${WIN_PLATFORM_DIR}/GoogleOAuth.cpp
-        ${WIN_PLATFORM_DIR}/RegisterPage.xaml.h
-        ${WIN_PLATFORM_DIR}/RegisterPage.xaml.cpp
-    )
-
-    target_include_directories(${WIN_TARGET} PRIVATE ${WIN_PLATFORM_DIR})
-    target_link_libraries(${WIN_TARGET} PRIVATE pivox_win_state crypt32 advapi32)
-    target_precompile_headers(${WIN_TARGET} PRIVATE ${WIN_PLATFORM_DIR}/pch.h)
-
-    # App.xaml is the ApplicationDefinition (constraint #4).
-    set_property(SOURCE ${WIN_PLATFORM_DIR}/App.xaml
-        PROPERTY VS_XAML_TYPE "ApplicationDefinition")
-
-    # WinUI 3 target properties (constraint #9).
-    set_target_properties(${WIN_TARGET} PROPERTIES
-        VS_GLOBAL_RootNamespace "Pivox"
-        VS_GLOBAL_AppContainerApplication "false"
-        VS_GLOBAL_AppxPackage "false"
-        VS_GLOBAL_CppWinRTOptimized "true"
-        VS_GLOBAL_CppWinRTRootNamespaceAutoMerge "true"
-        VS_GLOBAL_UseWinUI "true"
-        VS_GLOBAL_ApplicationType "Windows Store"
-        VS_GLOBAL_ApplicationTypeRevision "10.0"
-        VS_GLOBAL_WindowsTargetPlatformVersion "10.0"
-        VS_GLOBAL_WindowsTargetPlatformMinVersion "10.0.17763.0"
-        VS_GLOBAL_WindowsPackageType "None"
-        VS_GLOBAL_EnablePreviewMsixTooling "true"
-        VS_GLOBAL_WindowsAppSDKSelfContained "true"
-    )
-
-    # NuGet packages (constraint #8).
-    set_property(TARGET ${WIN_TARGET} PROPERTY VS_PACKAGE_REFERENCES
-        "Microsoft.Windows.CppWinRT_2.0.250303.1"
-        "Microsoft.WindowsAppSDK_1.8.260317003"
-        "Microsoft.Windows.SDK.BuildTools_10.0.26100.7705"
-    )
-
-    # IDL/XAML dependency wiring (constraint #5).
-    get_target_property(_SOURCES ${WIN_TARGET} SOURCES)
-    foreach(_SOURCE ${_SOURCES})
-        cmake_path(GET _SOURCE EXTENSION LAST_ONLY _EXTENSION)
-        if(NOT "${_EXTENSION}" STREQUAL ".idl")
-            continue()
-        endif()
-        set(_IDL_SOURCE "${_SOURCE}")
-        cmake_path(REMOVE_EXTENSION _SOURCE LAST_ONLY OUTPUT_VARIABLE _BASENAME)
-        set(_XAML_SOURCE "${_BASENAME}.xaml")
-        if("${_XAML_SOURCE}" IN_LIST _SOURCES)
-            set_property(SOURCE "${_IDL_SOURCE}" PROPERTY VS_SETTINGS
-                "SubType=Code" "DependentUpon=${_XAML_SOURCE}")
-        else()
-            set_property(SOURCE "${_IDL_SOURCE}" PROPERTY VS_SETTINGS "SubType=Code")
-        endif()
-    endforeach()
-
-    # Release PDBs for debugging (constraint #10).
-    target_compile_options(${WIN_TARGET} PRIVATE "$<$<CONFIG:Release>:/Zi>")
-    target_link_options(${WIN_TARGET} PRIVATE "$<$<CONFIG:Release>:/DEBUG>")
-
-    # WinAppState library — shared between app and tests.
+    # WinAppState library — shared between app, shared library, and tests.
     add_library(pivox_win_state STATIC
         ${WIN_PLATFORM_DIR}/WinAppState.cpp
         ${WIN_PLATFORM_DIR}/WinAuthService.cpp
@@ -330,12 +255,31 @@ if(WIN32)
     target_link_libraries(pivox_win_state PRIVATE crypt32 advapi32)
 
     # Firebase C++ SDK — always linked on Windows.
+    # Architecture-aware: x64 for app, x86 for ActiveX control.
+    if(CMAKE_GENERATOR_PLATFORM STREQUAL "Win32")
+        set(FB_ARCH "x86")
+    else()
+        set(FB_ARCH "x64")
+    endif()
     target_include_directories(pivox_win_state PUBLIC "${FB_CPP_ROOT}/include")
     target_link_directories(pivox_win_state PUBLIC
-        "${FB_CPP_ROOT}/libs/windows/VS2019/MD/x64/$<CONFIG>")
+        "${FB_CPP_ROOT}/libs/windows/VS2019/MD/${FB_ARCH}/$<CONFIG>")
     target_link_libraries(pivox_win_state PRIVATE firebase_app firebase_auth
         ws2_32 userenv)
     target_compile_definitions(pivox_win_state PUBLIC _CRT_SECURE_NO_WARNINGS)
+
+    # Shared WinRT component library (DLL + .winmd).
+    # Must be defined before the app and ActiveX targets — they link against it.
+    add_subdirectory(platform/windows/shared)
+
+    # WinUI 3 app executable.
+    add_subdirectory(platform/windows/app)
+
+    # ActiveX control (ATL-based, XAML Islands).
+    # x86 only — typically built in a separate CMake configure (-A Win32).
+    # Included here so it appears in the solution for x64 builds too;
+    # the ActiveX target simply won't link on non-x86 architectures.
+    add_subdirectory(platform/windows/activex)
 endif()
 
 
