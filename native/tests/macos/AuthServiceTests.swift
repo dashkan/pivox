@@ -8,7 +8,7 @@ class AuthServiceTests: XCTestCase {
 
     func testInitialAuthStatusIsUnknown() {
         // On launch, auth status should be Unknown until we check stored credentials.
-        let appState = AppStateBridge.shared()!
+        let appState = AppStateBridge.shared()
         // Clear any previous state for a clean test.
         appState.deleteSecure(forKey: "firebase_id_token")
         appState.save(false, forKey: "rememberMe")
@@ -22,7 +22,7 @@ class AuthServiceTests: XCTestCase {
     }
 
     func testSaveAndLoadAuthToken() {
-        let appState = AppStateBridge.shared()!
+        let appState = AppStateBridge.shared()
         let testToken = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.test-token"
 
         appState.saveSecure(testToken, forKey: "firebase_id_token")
@@ -35,7 +35,7 @@ class AuthServiceTests: XCTestCase {
     }
 
     func testDeleteAuthToken() {
-        let appState = AppStateBridge.shared()!
+        let appState = AppStateBridge.shared()
         appState.saveSecure("token-to-delete", forKey: "firebase_id_token")
         appState.deleteSecure(forKey: "firebase_id_token")
 
@@ -44,7 +44,7 @@ class AuthServiceTests: XCTestCase {
     }
 
     func testRememberMePersistence() {
-        let appState = AppStateBridge.shared()!
+        let appState = AppStateBridge.shared()
 
         appState.save(true, forKey: "rememberMe")
         XCTAssertTrue(appState.loadBool(forKey: "rememberMe"), "Remember Me should be true")
@@ -54,7 +54,7 @@ class AuthServiceTests: XCTestCase {
     }
 
     func testSignOutClearsCredentials() {
-        let appState = AppStateBridge.shared()!
+        let appState = AppStateBridge.shared()
 
         // Simulate signed-in state
         appState.saveSecure("some-token", forKey: "firebase_id_token")

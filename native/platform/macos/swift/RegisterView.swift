@@ -108,7 +108,11 @@ struct RegisterView: View {
             // Social signup
             VStack(spacing: 8) {
                 Button(action: {
-                    Task { await auth.signInWithGoogle() }
+                    isLoading = true
+                    Task {
+                        await auth.signInWithGoogle()
+                        isLoading = false
+                    }
                 }) {
                     HStack {
                         GoogleIcon(size: 16)

@@ -2,6 +2,8 @@
 
 #import <Foundation/Foundation.h>
 
+NS_ASSUME_NONNULL_BEGIN
+
 /// Obj-C bridge exposing AppState to Swift.
 /// Wraps the C++ MacAppState so Swift doesn't need C++ interop.
 @interface AppStateBridge : NSObject
@@ -17,15 +19,17 @@
 - (int)windowHeight;
 
 // Generic key-value
-- (void)saveString:(NSString*)value forKey:(NSString*)key;
-- (nullable NSString*)loadStringForKey:(NSString*)key;
-- (void)saveBool:(BOOL)value forKey:(NSString*)key;
-- (BOOL)loadBoolForKey:(NSString*)key;
-- (BOOL)hasBoolForKey:(NSString*)key;
+- (void)saveString:(NSString *)value forKey:(NSString *)key;
+- (nullable NSString *)loadStringForKey:(NSString *)key;
+- (void)saveBool:(BOOL)value forKey:(NSString *)key;
+- (BOOL)loadBoolForKey:(NSString *)key;
+- (BOOL)hasBoolForKey:(NSString *)key;
 
 // Secure storage (Keychain)
-- (void)saveSecure:(NSString*)value forKey:(NSString*)key;
-- (nullable NSString*)loadSecureForKey:(NSString*)key;
-- (void)deleteSecureForKey:(NSString*)key;
+- (void)saveSecure:(NSString *)value forKey:(NSString *)key;
+- (nullable NSString *)loadSecureForKey:(NSString *)key;
+- (void)deleteSecureForKey:(NSString *)key;
 
 @end
+
+NS_ASSUME_NONNULL_END

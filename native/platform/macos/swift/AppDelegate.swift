@@ -3,7 +3,7 @@ import SwiftUI
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     var window: NSWindow!
-    private let appState = AppStateBridge.shared()!
+    private let appState = AppStateBridge.shared()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Initialize Firebase before any UI.

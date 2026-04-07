@@ -4,7 +4,7 @@ struct LoginView: View {
     var onSwitchToRegister: () -> Void
 
     private var auth = AuthService.shared
-    private let appState = AppStateBridge.shared()!
+    private let appState = AppStateBridge.shared()
 
     @State private var email = ""
     @State private var password = ""
@@ -18,7 +18,7 @@ struct LoginView: View {
 
     init(onSwitchToRegister: @escaping () -> Void) {
         self.onSwitchToRegister = onSwitchToRegister
-        let state = AppStateBridge.shared()!
+        let state = AppStateBridge.shared()
         let savedEmail = state.loadString(forKey: "remembered_email") ?? ""
         _email = State(initialValue: savedEmail)
         _rememberMe = State(initialValue: !savedEmail.isEmpty)
@@ -116,9 +116,12 @@ struct LoginView: View {
             // Social login
             VStack(spacing: 8) {
                 Button(action: {
-                    // Social sign-in clears any remembered email.
                     appState.save("", forKey: "remembered_email")
-                    Task { await auth.signInWithGoogle() }
+                    isLoading = true
+                    Task {
+                        await auth.signInWithGoogle()
+                        isLoading = false
+                    }
                 }) {
                     HStack {
                         GoogleIcon(size: 16)

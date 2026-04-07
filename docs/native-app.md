@@ -506,10 +506,12 @@ The designer app is a design tool, not a production simulator. For full multi-ch
 
 ## Current Status
 
-**macOS (SwiftUI + CEF):** Working prototype. SwiftUI app with CEF embedded, native toolbar, JS bindings operational, local HTML loading, 60fps external message pump.
+**macOS (SwiftUI):** Functional app shell with sidebar navigation (Operator, Library, Designer, Engineering, Admin), profile. Image editor (crop/rotate/straighten/flip/zoom) in Library section with Photos-style UI. Firebase Auth (email/password + Google Sign-In via ASWebAuthenticationSession). 109 C++ core tests, 27 Swift bridge tests, 28+ XCUITest UI tests (auth + sidebar + image editor).
 
-**Windows (WinUI 3 + CEF OSR):** Working prototype. Software OSR path fully functional (WebGL at full speed). D3D11 GPU path working. Input forwarding, context menus, cursor handling all solved.
+**Windows (WinUI 3):** App shell with sidebar, login, register pages. Firebase C++ SDK for email/password auth. Google Sign-In via OAuth2Manager. Image editor not yet started (Phase 3 — Win2D renderer, see `docs/discussions/image-editor-next-steps-native.md`).
 
-**Shared C++ Core:** Stub. gRPC client, document model, NDI receive not yet implemented.
+**Shared C++ Core:** AppState (preferences, Keychain/CredentialManager), auth validation, image editor engine (crop math, state machine, undo/redo). 109 gtest tests passing on both platforms.
 
-**Authentication:** Server-side infrastructure exists (Go callback, custom token minting, `pivox://` handling). Native client auth capture not yet implemented.
+**Authentication:** Firebase Auth on both platforms. Email/password via native screens. Google Sign-In via ASWebAuthenticationSession (macOS) / OAuth2Manager (Windows). Firebase Auth Emulator integration for UI testing. Shared error constants across platforms (`core/auth_state.h`).
+
+**Build System:** CMake generating Xcode (macOS) and Visual Studio (Windows). Warnings-as-errors enabled (`-Wall -Wextra -Werror` / `/W4 /WX`). `SWIFT_TREAT_WARNINGS_AS_ERRORS` for Swift. `make test-native-ui` orchestrates Firebase emulator + XCUITest lifecycle.

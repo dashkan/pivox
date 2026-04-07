@@ -17,7 +17,7 @@ class AuthService: NSObject {
     private var isOAuthInProgress = false
 
     private var authStateHandle: AuthStateDidChangeListenerHandle?
-    private let appState = AppStateBridge.shared()!
+    private let appState = AppStateBridge.shared()
 
     private override init() {
         super.init()
@@ -33,20 +33,27 @@ class AuthService: NSObject {
             Auth.auth().useEmulator(withHost: "127.0.0.1", port: 9099)
         }
 
+        // Synchronous check — Firebase restores persisted sessions from Keychain
+        // immediately after configure(). This prevents the login screen flash.
+        currentUser = Auth.auth().currentUser
+
         authStateHandle = Auth.auth().addStateDidChangeListener { [weak self] _, user in
             self?.currentUser = user
         }
 
-        // UI tests pass RESET_AUTH to sign out and clear auth tokens.
-        // Must be after listener registration so the listener sees the sign-out.
-        if ProcessInfo.processInfo.environment["RESET_AUTH"] == "1" {
+        // UI_TESTING resets all state: auth tokens, preferences, sticky UI.
+        // Individual flags kept for backward compat but UI_TESTING is the
+        // single flag tests should use going forward.
+        let uiTesting = ProcessInfo.processInfo.environment["UI_TESTING"] == "1"
+
+        if uiTesting || ProcessInfo.processInfo.environment["RESET_AUTH"] == "1" {
             try? Auth.auth().signOut()
             appState.deleteSecure(forKey: "firebase_id_token")
             appState.deleteSecure(forKey: "firebase_refresh_token")
         }
-        // RESET_PREFS clears non-auth user preferences (remembered email, etc).
-        if ProcessInfo.processInfo.environment["RESET_PREFS"] == "1" {
+        if uiTesting || ProcessInfo.processInfo.environment["RESET_PREFS"] == "1" {
             appState.save("", forKey: "remembered_email")
+            appState.save("", forKey: "selected_section")
         }
     }
 

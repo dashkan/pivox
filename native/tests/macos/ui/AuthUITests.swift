@@ -371,7 +371,7 @@ class AuthUITests: XCTestCase {
 
         // Check immediately — fields should be disabled during the network call.
         // Note: the emulator responds fast, so we check within the first moment.
-        let signInButton = app.buttons["login-sign-in"]
+        _ = app.buttons["login-sign-in"]
         // Give a brief moment for the loading state to activate.
         Thread.sleep(forTimeInterval: 0.1)
 

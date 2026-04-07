@@ -10,6 +10,20 @@ endif()
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Warnings as errors.
+if(MSVC)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W4 /WX")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4 /WX")
+else()
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Werror -Wno-unused-parameter")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -Wno-unused-parameter")
+endif()
+
+# Swift: treat warnings as errors via Xcode build setting.
+if(CMAKE_GENERATOR MATCHES "Xcode")
+    set(CMAKE_XCODE_ATTRIBUTE_SWIFT_TREAT_WARNINGS_AS_ERRORS "YES")
+endif()
+
 
 # ============================================================
 # Shared C++ Core
@@ -52,16 +66,7 @@ if(APPLE)
     set(FB_GOOGLESIGNIN "${FB_ROOT}/GoogleSignIn")
 
     # Obj-C++ bridge library (wraps C++ core for Swift consumption).
-    add_library(pivox_bridge STATIC
-        platform/macos/objcpp/MacAppState.mm
-        platform/macos/objcpp/AppStateBridge.mm
-    )
-    target_link_libraries(pivox_bridge PUBLIC pivox_core)
-    target_include_directories(pivox_bridge PUBLIC
-        "${CMAKE_SOURCE_DIR}/core"
-        "${CMAKE_SOURCE_DIR}/platform/macos/objcpp"
-    )
-    target_link_libraries(pivox_bridge PRIVATE "-framework Security")
+    add_subdirectory(platform/macos)
 
     set(FIREBASE_PLIST "${CMAKE_SOURCE_DIR}/configs/firebase/GoogleService-Info.plist")
 
@@ -76,6 +81,7 @@ if(APPLE)
         platform/macos/swift/GlassCard.swift
         platform/macos/swift/GoogleIcon.swift
         platform/macos/swift/AuthService.swift
+        platform/macos/swift/AdjustView.swift
         ${ASSET_CATALOG}
         ${FIREBASE_PLIST}
     )
@@ -123,6 +129,7 @@ if(APPLE)
         XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "Apple Development"
         XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "FAENDBN66M"
         XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Automatic"
+        XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "app.pivox.native"
     )
 
     # For Ninja builds: compile asset catalog manually via actool.
@@ -149,6 +156,7 @@ if(APPLE)
         tests/macos/CoreTests.swift
         tests/macos/AuthViewModelTests.swift
         tests/macos/AuthServiceTests.swift
+        tests/macos/ImageEditorBridgeTests.swift
     )
 
     target_compile_options(PivoxTests PRIVATE
@@ -165,6 +173,7 @@ if(APPLE)
     xctest_add_bundle(PivoxUITests ${APP_TARGET}
         tests/macos/ui/SidebarUITests.swift
         tests/macos/ui/AuthUITests.swift
+        tests/macos/ui/ImageEditorUITests.swift
     )
 
     target_compile_options(PivoxUITests PRIVATE
@@ -320,6 +329,8 @@ if(GTest_FOUND)
         tests/core/auth_validation_tests.cpp
         tests/core/app_state_tests.cpp
         tests/core/auth_state_tests.cpp
+        tests/core/crop_math_tests.cpp
+        tests/core/image_editor_engine_tests.cpp
     )
     target_link_libraries(pivox_core_tests PRIVATE pivox_core GTest::gtest_main)
 

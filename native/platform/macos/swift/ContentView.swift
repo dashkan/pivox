@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 enum AppSection: String, CaseIterable, Identifiable {
     case operator_ = "Operator"
@@ -31,8 +32,20 @@ enum AuthState {
 }
 
 struct ContentView: View {
-    @State private var selectedItem: SidebarItem? = .section(.operator_)
+    @State private var selectedItem: SidebarItem?
+    @State private var sidebarVisibility: NavigationSplitViewVisibility = .automatic
+    @State private var isImageEditing = false
     private var auth = AuthService.shared
+    private let appState = AppStateBridge.shared()
+
+    init() {
+        let saved = AppStateBridge.shared().loadString(forKey: "selected_section")
+        if let saved, let section = AppSection(rawValue: saved) {
+            _selectedItem = State(initialValue: .section(section))
+        } else {
+            _selectedItem = State(initialValue: .section(.operator_))
+        }
+    }
 
     var body: some View {
         Group {
@@ -42,10 +55,15 @@ struct ContentView: View {
                 AuthRouter()
             }
         }
+        .onChange(of: selectedItem) { _, newValue in
+            if case .section(let section) = newValue {
+                appState.save(section.rawValue, forKey: "selected_section")
+            }
+        }
     }
 
     private var mainAppView: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $sidebarVisibility) {
             List(selection: $selectedItem) {
                 ForEach(AppSection.allCases) { section in
                     Label(section.rawValue, systemImage: section.icon)
@@ -78,14 +96,21 @@ struct ContentView: View {
         } detail: {
             switch selectedItem {
             case .section(let section):
-                VStack {
-                    Text(section.rawValue)
-                        .font(.largeTitle)
-                        .foregroundStyle(.secondary)
-                    Text("Coming soon")
-                        .foregroundStyle(.tertiary)
+                if section == .library {
+                    LibraryPlaceholderView(
+                        isEditing: $isImageEditing,
+                        sidebarVisibility: $sidebarVisibility
+                    )
+                } else {
+                    VStack {
+                        Text(section.rawValue)
+                            .font(.largeTitle)
+                            .foregroundStyle(.secondary)
+                        Text("Coming soon")
+                            .foregroundStyle(.tertiary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .profile:
                 ProfileView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -95,6 +120,82 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .onChange(of: isImageEditing) { _, editing in
+            NSApp.keyWindow?.appearance = editing
+                ? NSAppearance(named: .darkAqua)
+                : nil
+        }
+    }
+}
+
+/// Temporary Library placeholder with image edit test.
+struct LibraryPlaceholderView: View {
+    @Binding var isEditing: Bool
+    @Binding var sidebarVisibility: NavigationSplitViewVisibility
+    @State private var selectedImage: NSImage?
+    @State private var showEditor = false
+    @State private var cropResult: String?
+
+    var body: some View {
+        if let image = selectedImage, showEditor {
+            ImageEditView(
+                image: image,
+                isEditing: $isEditing,
+                sidebarVisibility: $sidebarVisibility,
+                onDone: { rect in
+                    cropResult = "Crop: x=\(rect.x) y=\(rect.y) w=\(rect.width) h=\(rect.height)"
+                    closeEditor()
+                },
+                onCancel: {
+                    closeEditor()
+                }
+            )
+        } else {
+            VStack(spacing: 16) {
+                Spacer()
+                Text("Library")
+                    .font(.largeTitle)
+                    .foregroundStyle(.secondary)
+
+                Button("Open Image to Edit") {
+                    let panel = NSOpenPanel()
+                    panel.allowedContentTypes = [.image]
+                    panel.allowsMultipleSelection = false
+                    if panel.runModal() == .OK, let url = panel.url,
+                       let image = NSImage(contentsOf: url) {
+                        selectedImage = image
+                        showEditor = true
+                    }
+                }
+                .controlSize(.large)
+                .accessibilityIdentifier("library-open-image")
+
+                if let result = cropResult {
+                    Text(result)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 8)
+                        .accessibilityIdentifier("library-crop-result")
+                }
+                Spacer()
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .onAppear {
+                // UI test hook: auto-load a test image to bypass NSOpenPanel.
+                if let path = ProcessInfo.processInfo.environment["TEST_IMAGE_PATH"],
+                   let image = NSImage(contentsOfFile: path) {
+                    selectedImage = image
+                    showEditor = true
+                }
+            }
+        }
+    }
+
+    private func closeEditor() {
+        showEditor = false
+        selectedImage = nil
+        isEditing = false
+        sidebarVisibility = .automatic
     }
 }
 
