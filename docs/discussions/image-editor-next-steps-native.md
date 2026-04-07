@@ -239,9 +239,10 @@ SVG path: `assets/{Name}/SVG/ic_fluent_{name}_24_{regular|filled}.svg`
 
 ### Immediate
 
-1. **Fix UI test failures** — 10 of 12 image editor UI tests fail. Diagnose by dumping accessibility hierarchy (`print(app.debugDescription)`) after clicking Edit to see what XCUITest sees. All tests that click `edit-enter` and look for edit-mode elements fail.
-2. **Manual test dark mode transition** — verify NSWindow.appearance approach works for: edit → done, edit → back, switching to another app and back
-3. **Run full test suite** — `make test-native-ui` must pass (auth + sidebar + image editor tests)
+1. **Rewrite straighten ruler as custom NSSlider** — current implementation is a SwiftUI `GeometryReader` + `Canvas` + `DragGesture` hack. Should be a custom `NSSlider` with a custom cell (like Photos' `IPXAdjustmentBrickSliderCell`). Benefits: proper AXSlider accessibility for free, keyboard arrow key support, VoiceOver, XCUITest sees it as a real slider. Current tick pattern is pixel-verified from Photos (see code comments in `RulerSliderRow`): 19 ticks per side, 5pt spacing, 24pt height, muted blue-gray center bar, [4 short, 1 tall] repeating with bright every 10th.
+2. **Fix UI test failures** — 10 of 12 image editor UI tests fail. Diagnose by dumping accessibility hierarchy (`print(app.debugDescription)`) after clicking Edit to see what XCUITest sees. All tests that click `edit-enter` and look for edit-mode elements fail.
+3. **Manual test dark mode transition** — verify NSWindow.appearance approach works for: edit → done, edit → back, switching to another app and back
+4. **Run full test suite** — `make test-native-ui` must pass (auth + sidebar + image editor tests)
 
 ### Before Windows Prompt
 

@@ -336,7 +336,14 @@ struct CropToolButton: View {
 
 /// Photos-style straighten ruler control.
 /// Unified dark bar with label inside. The fill IS the indicator (no separate handle).
-/// Default: gray fill from center, center mark visible. Hover: ticks + blue fill, degrees turn white.
+///
+/// Pixel-verified tick pattern (from Photos.app screenshot analysis):
+///   - 5pt spacing between all ticks, symmetric from center
+///   - Pattern from center outward: [4 short, 1 tall] repeating
+///   - Every 10th tick from center: BRIGHT (rgb 191 = .primary.opacity(0.75))
+///   - All other ticks: DIM (rgb 105 = .primary.opacity(0.4))
+///   - Short ticks: 3pt, Tall ticks: 5pt
+///   - Center bar: 2pt wide, muted blue-gray (NOT accent blue)
 struct RulerSliderRow: View {
     let label: String
     let icon: String
@@ -349,6 +356,17 @@ struct RulerSliderRow: View {
     @State private var isDragging = false
 
     private var isActive: Bool { isHovered || isDragging }
+
+    // Tick layout — measured from Photos.app at 2x retina.
+    private let ticksPerSide = 19   // 19 ticks each side of center
+    private let dimOpacity = 0.4    // rgb ~105/255
+    private let brightOpacity = 0.75 // rgb ~191/255
+    private let shortHeight = 3.0   // pt
+    private let tallHeight = 5.0    // pt
+
+    // Center bar — muted blue-gray, NOT system accent.
+    // Photos uses rgb(68,87,120) on dark bg ≈ .accentColor.opacity(0.35)
+    private let centerBarWidth = 2.0
 
     /// Format degrees like Photos: shows "-0°" at zero.
     private var degreeText: String {
@@ -370,34 +388,47 @@ struct RulerSliderRow: View {
                 let height = geo.size.height
                 let rangeSpan = range.upperBound - range.lowerBound
                 let fraction = (value - range.lowerBound) / rangeSpan
-                let centerFraction = (0 - range.lowerBound) / rangeSpan
+                let centerX = width / 2.0
                 let indicatorX = fraction * width
-                let centerX = centerFraction * width
+                // Tick spacing: distribute ticks evenly from center to edges
+                let tickSpacing = width / Double(ticksPerSide * 2)
 
                 ZStack {
-                    // Tick marks along top — only when active
+                    // Tick marks — only when hovered/dragging
                     if isActive {
                         Canvas { context, size in
-                            let tickCount = 90
-                            let spacing = size.width / Double(tickCount)
-                            for i in 0...tickCount {
-                                let x = Double(i) * spacing
-                                let isMajor = i % 10 == 0
-                                let tickH = isMajor ? 5.0 : 3.0
-                                var path = Path()
-                                path.move(to: CGPoint(x: x, y: 1))
-                                path.addLine(to: CGPoint(x: x, y: 1 + tickH))
-                                context.stroke(path, with: .color(.primary.opacity(isMajor ? 0.3 : 0.12)),
+                            // Draw ticks symmetric from center
+                            for i in 1...ticksPerSide {
+                                // Distance from center: i ticks on each side
+                                let isBright = (i % 10 == 0)
+                                let isTall = (i % 5 == 0)
+                                let tickH = isTall ? tallHeight : shortHeight
+                                let opacity = isBright ? brightOpacity : dimOpacity
+
+                                let offset = Double(i) * tickSpacing
+
+                                // Right side
+                                var pathR = Path()
+                                pathR.move(to: CGPoint(x: centerX + offset, y: 1))
+                                pathR.addLine(to: CGPoint(x: centerX + offset, y: 1 + tickH))
+                                context.stroke(pathR, with: .color(.primary.opacity(opacity)),
+                                              lineWidth: 0.5)
+
+                                // Left side
+                                var pathL = Path()
+                                pathL.move(to: CGPoint(x: centerX - offset, y: 1))
+                                pathL.addLine(to: CGPoint(x: centerX - offset, y: 1 + tickH))
+                                context.stroke(pathL, with: .color(.primary.opacity(opacity)),
                                               lineWidth: 0.5)
                             }
                         }
                         .transition(.opacity)
                     }
 
-                    // Center mark — always visible, subtle
+                    // Center bar — always visible, muted blue-gray
                     Rectangle()
-                        .fill(Color.primary.opacity(0.15))
-                        .frame(width: 0.5, height: height * 0.45)
+                        .fill(Color.accentColor.opacity(isActive ? 0.5 : 0.25))
+                        .frame(width: centerBarWidth, height: height)
                         .position(x: centerX, y: height / 2)
 
                     // Fill from center to value
@@ -424,6 +455,7 @@ struct RulerSliderRow: View {
                     .padding(.horizontal, 10)
                     .allowsHitTesting(false)
                 }
+                .clipShape(RoundedRectangle(cornerRadius: 4))
                 .contentShape(Rectangle())
                 .gesture(
                     DragGesture(minimumDistance: 0)
@@ -444,7 +476,7 @@ struct RulerSliderRow: View {
                     }
                 }
             }
-            .frame(height: 22)
+            .frame(height: 24)
             .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 4))
             .accessibilityIdentifier(id)
         }
