@@ -135,6 +135,7 @@ struct LibraryPlaceholderView: View {
     @State private var selectedImage: NSImage?
     @State private var showEditor = false
     @State private var cropResult: String?
+    @State private var didAutoLoad = false
 
     var body: some View {
         if let image = selectedImage, showEditor {
@@ -182,6 +183,9 @@ struct LibraryPlaceholderView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onAppear {
                 // UI test hook: auto-load a test image to bypass NSOpenPanel.
+                // Only on first appearance — not after Done/Back returns here.
+                guard !didAutoLoad else { return }
+                didAutoLoad = true
                 if let path = ProcessInfo.processInfo.environment["TEST_IMAGE_PATH"],
                    let image = NSImage(contentsOfFile: path) {
                     selectedImage = image

@@ -109,19 +109,19 @@ native/platform/macos/swift/
 
 **Status**: `NSWindow.appearance` approach works but needs manual testing to confirm the sidebar fully reverts in all scenarios. Switching to another app and back seems to fix it (macOS redraws on activation). May need `NSApp.keyWindow?.invalidateShadow()` or similar nudge.
 
-### 2. UI tests — 10 of 12 failing
+### 2. UI tests — FIXED (12/12 passing)
 
-**Passing**: `testEditorOpensInViewMode`, `testCanvasIsDiscoverable`
+**Root causes found and fixed** (via `app.debugDescription` dump):
 
-**Failing**: All tests that click `edit-enter` (Edit button) and then look for edit-mode UI elements (Done button, crop tools, undo/redo, etc.). The Edit button click appears to work (no error on the click itself), but edit-mode toolbar items don't appear.
+1. **`.accessibilityIdentifier("image-edit-view")` on `ImageEditView` body** — propagated to ALL children including `CropToolPanel`, overriding their individual identifiers (edit-straighten, edit-undo, etc.). Toolbar items were unaffected because NSToolbar is separate from the view hierarchy. **Fix**: removed the container identifier; the canvas NSView sets its own identifier directly via `setAccessibilityIdentifier` in `makeNSView`.
 
-**Root cause not yet diagnosed**. Possible causes:
-- The `withAnimation` block in the Edit button handler may delay state changes
-- The `.id(isImageEditing)` was removed — but toolbar content is conditional on `model.isEditing`, not `isImageEditing`. The toolbar swap might not be triggering
-- `NSWindow.appearance` change might interfere with XCUITest's element discovery
-- The toolbar rebuilds completely between view/edit mode — XCUITest may need a wait
+2. **`CropToolButton` used `onTapGesture` instead of `Button`** — the HStack+onTapGesture didn't create a proper AX element. Tests couldn't find flip/aspect buttons. **Fix**: converted to real `Button` with `.buttonStyle(.plain)`. Now appears as AXButton with proper identifier.
 
-**Next step**: Add `print(app.debugDescription)` after clicking Edit to dump the accessibility hierarchy and see what's actually there. Same diagnostic approach that found the NSView accessibility issue.
+3. **`TEST_IMAGE_PATH` auto-load fired on every `onAppear`** — after Done/Back, the placeholder appeared briefly, then `onAppear` re-auto-loaded the image, making the placeholder disappear before the test could find `library-open-image`. **Fix**: added `didAutoLoad` guard so auto-load only fires once.
+
+4. **Zoom controls: toolbar flattens HStack** — `.accessibilityIdentifier("edit-zoom")` on the HStack propagated to children (Slider + Images) instead of the wrapper Group. `app.otherElements["edit-zoom"]` found nothing. **Fix**: test now uses `app.sliders["edit-zoom"]` to find the zoom slider directly.
+
+5. **Straighten ruler rewritten as NSSlider** — now appears as `app.sliders["edit-straighten"]` instead of `app.otherElements`. Test updated accordingly.
 
 ### 3. NSView accessibility
 
@@ -239,10 +239,10 @@ SVG path: `assets/{Name}/SVG/ic_fluent_{name}_24_{regular|filled}.svg`
 
 ### Immediate
 
-1. **Rewrite straighten ruler as custom NSSlider** — current implementation is a SwiftUI `GeometryReader` + `Canvas` + `DragGesture` hack. Should be a custom `NSSlider` with a custom cell (like Photos' `IPXAdjustmentBrickSliderCell`). Benefits: proper AXSlider accessibility for free, keyboard arrow key support, VoiceOver, XCUITest sees it as a real slider. Current tick pattern is pixel-verified from Photos (see code comments in `RulerSliderRow`): 19 ticks per side, 5pt spacing, 24pt height, muted blue-gray center bar, [4 short, 1 tall] repeating with bright every 10th.
-2. **Fix UI test failures** — 10 of 12 image editor UI tests fail. Diagnose by dumping accessibility hierarchy (`print(app.debugDescription)`) after clicking Edit to see what XCUITest sees. All tests that click `edit-enter` and look for edit-mode elements fail.
+1. ~~**Rewrite straighten ruler as custom NSSlider**~~ — **DONE.** Custom `RulerNSSlider` + `RulerSliderNSCell` wrapped in `NSViewRepresentable`. Same pixel-verified tick pattern. Gains: AXSlider role, keyboard arrows, VoiceOver, XCUITest sees `app.sliders["edit-straighten"]`. Snap-to-zero on mouseUp commit.
+2. ~~**Fix UI test failures**~~ — **DONE.** 12/12 passing. See Known Issues §2 for root causes.
 3. **Manual test dark mode transition** — verify NSWindow.appearance approach works for: edit → done, edit → back, switching to another app and back
-4. **Run full test suite** — `make test-native-ui` must pass (auth + sidebar + image editor tests)
+4. ~~**Run full test suite**~~ — **DONE.** 109 C++ core + 16 auth UI + 12 editor UI = 137 passing, 0 failures.
 
 ### Before Windows Prompt
 
@@ -264,3 +264,7 @@ SVG path: `assets/{Name}/SVG/ic_fluent_{name}_24_{regular|filled}.svg`
 - **`.id()` on `NavigationSplitView` destroys all child state** — forces full rebuild, loses loaded image, selected tab, etc. Never use `.id()` for theme changes on stateful views.
 - **Firebase Auth emulator starts with zero users** — every UI test must register through the UI first. `UI_TESTING=1` env var resets all state (auth + prefs + sticky tab).
 - **Always diagnose before changing code** — dump `app.debugDescription` to see the accessibility hierarchy instead of guessing.
+- **`accessibilityIdentifier` on containers propagates to ALL children** — not just hiding, but overriding individual identifiers. The `ImageEditView` body identifier `"image-edit-view"` replaced every child's identifier in `CropToolPanel`. Toolbar items were unaffected (NSToolbar is separate). Only set identifiers on leaf views or NSViews directly.
+- **Use `Button` instead of `onTapGesture` for interactive elements** — `HStack` + `onTapGesture` doesn't create a proper AX element. Real `Button` with `.buttonStyle(.plain)` gives AXButton role, VoiceOver support, keyboard focus, and proper identifier scoping.
+- **SwiftUI toolbar flattens HStack children** — `.accessibilityIdentifier` on an HStack inside `ToolbarItem` propagates to children (Images, Sliders) instead of creating a wrapper Group element. Use specific element queries (`app.sliders["id"]`) not `app.otherElements`.
+- **`onAppear` fires on every view appearance, not just first** — auto-load hooks in UI testing must use a `@State` guard flag to prevent re-execution after Done/Back transitions.

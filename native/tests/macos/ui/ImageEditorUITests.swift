@@ -136,13 +136,13 @@ class ImageEditorUITests: XCTestCase {
         waitForEditor()
         app.buttons["edit-enter"].click()
 
-        let straighten = app.otherElements["edit-straighten"]
+        let straighten = app.sliders["edit-straighten"]
         XCTAssertTrue(straighten.waitForExistence(timeout: 3),
-                      "Straighten tool should be visible")
+                      "Straighten slider should be visible")
 
-        XCTAssertTrue(app.otherElements["edit-flip-h"].exists, "Flip H should be visible")
-        XCTAssertTrue(app.otherElements["edit-flip-v"].exists, "Flip V should be visible")
-        XCTAssertTrue(app.otherElements["edit-aspect"].exists, "Aspect should be visible")
+        XCTAssertTrue(app.buttons["edit-flip-h"].exists, "Flip H should be visible")
+        XCTAssertTrue(app.buttons["edit-flip-v"].exists, "Flip V should be visible")
+        XCTAssertTrue(app.buttons["edit-aspect"].exists, "Aspect should be visible")
     }
 
     func testUndoRedoDisabledInitially() throws {
@@ -225,13 +225,15 @@ class ImageEditorUITests: XCTestCase {
     func testZoomControlsExist() throws {
         waitForEditor()
 
-        let zoom = app.otherElements["edit-zoom"]
+        // Toolbar flattens the HStack — identifier propagates to children.
+        // Check the zoom slider specifically.
+        let zoom = app.sliders["edit-zoom"]
         XCTAssertTrue(zoom.waitForExistence(timeout: 3),
-                      "Zoom controls should be visible in view mode")
+                      "Zoom slider should be visible in view mode")
 
         app.buttons["edit-enter"].click()
         XCTAssertTrue(zoom.waitForExistence(timeout: 3),
-                      "Zoom controls should be visible in edit mode")
+                      "Zoom slider should be visible in edit mode")
     }
 
     // MARK: - Accessibility Tests
