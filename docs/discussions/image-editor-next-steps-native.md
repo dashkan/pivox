@@ -193,29 +193,29 @@ To open in Xcode: open `build-xcode/Pivox.xcodeproj`, go to Product → Scheme �
 
 **Icons**: Download individual SVGs directly from [microsoft/fluentui-system-icons](https://github.com/microsoft/fluentui-system-icons). No NuGet, no font files — only ship the ~15 icons we actually use. Use `ImageIcon` or extract path data into `PathIcon` for zero external files.
 
-Icon search: `icons_filled.md` / `icons_regular.md` at repo root list all names. SVGs are at `assets/{Name}/SVG/ic_fluent_{name}_{size}_{style}.svg`. Use 32px variants — most detail, scales down cleanly since SVG is vector.
+Icon search: `icons_filled.md` / `icons_regular.md` at repo root list all names. SVGs are at `assets/{Name}/SVG/ic_fluent_{name}_{size}_{style}.svg`. Use 24px variants (largest available — sizes are 12, 16, 20, 24). Most detail, scales cleanly since SVG is vector.
 
 **Icon directory convention** — mirrors Microsoft's repo structure, lowercased with dashes:
 ```
 native/platform/windows/Assets/Icons/
 ├── crop/
-│   └── ic_fluent_crop_32_regular.svg
+│   └── ic_fluent_crop_24_regular.svg
 ├── flip-horizontal/
-│   └── ic_fluent_flip_horizontal_32_regular.svg
+│   └── ic_fluent_flip_horizontal_24_regular.svg
 ├── flip-vertical/
-│   └── ic_fluent_flip_vertical_32_regular.svg
+│   └── ic_fluent_flip_vertical_24_regular.svg
 ├── arrow-undo/
-│   └── ic_fluent_arrow_undo_32_regular.svg
+│   └── ic_fluent_arrow_undo_24_regular.svg
 ├── arrow-redo/
-│   └── ic_fluent_arrow_redo_32_regular.svg
+│   └── ic_fluent_arrow_redo_24_regular.svg
 ├── add/
-│   └── ic_fluent_add_32_regular.svg
+│   └── ic_fluent_add_24_regular.svg
 ├── subtract/
-│   └── ic_fluent_subtract_32_regular.svg
+│   └── ic_fluent_subtract_24_regular.svg
 ├── circle-line/
-│   └── ic_fluent_circle_line_32_filled.svg
+│   └── ic_fluent_circle_line_24_filled.svg
 └── ratio-one-to-one/
-    └── ic_fluent_ratio_one_to_one_32_regular.svg
+    └── ic_fluent_ratio_one_to_one_24_regular.svg
 ```
 
 **SF Symbols → Fluent Icons mapping** (image editor):
