@@ -191,9 +191,32 @@ To open in Xcode: open `build-xcode/Pivox.xcodeproj`, go to Product → Scheme �
 **NuGet dependencies**:
 - `Microsoft.Graphics.Win2D` — 2D rendering (replaces Core Graphics). First-class WinUI 3 citizen.
 
-**Icons**: Download individual SVGs directly from [microsoft/fluentui-system-icons](https://github.com/microsoft/fluentui-system-icons) into `platform/windows/Assets/Icons/`. No NuGet, no font files — only ship the ~15 icons we actually use. Use `ImageIcon` or extract path data into `PathIcon` for zero external files.
+**Icons**: Download individual SVGs directly from [microsoft/fluentui-system-icons](https://github.com/microsoft/fluentui-system-icons). No NuGet, no font files — only ship the ~15 icons we actually use. Use `ImageIcon` or extract path data into `PathIcon` for zero external files.
 
-Icon search: `icons_filled.md` / `icons_regular.md` at repo root list all names. SVGs are at `assets/{Name}/SVG/ic_fluent_{name}_{size}_{style}.svg`.
+Icon search: `icons_filled.md` / `icons_regular.md` at repo root list all names. SVGs are at `assets/{Name}/SVG/ic_fluent_{name}_{size}_{style}.svg`. Use 20px variants — good balance of detail for toolbar-sized icons, scale via XAML `Width`/`Height`.
+
+**Icon directory convention** — mirrors Microsoft's repo structure, lowercased with dashes:
+```
+native/platform/windows/Assets/Icons/
+├── crop/
+│   └── ic_fluent_crop_20_regular.svg
+├── flip-horizontal/
+│   └── ic_fluent_flip_horizontal_20_regular.svg
+├── flip-vertical/
+│   └── ic_fluent_flip_vertical_20_regular.svg
+├── arrow-undo/
+│   └── ic_fluent_arrow_undo_20_regular.svg
+├── arrow-redo/
+│   └── ic_fluent_arrow_redo_20_regular.svg
+├── add/
+│   └── ic_fluent_add_20_regular.svg
+├── subtract/
+│   └── ic_fluent_subtract_20_regular.svg
+├── circle-line/
+│   └── ic_fluent_circle_line_20_filled.svg
+└── ratio-one-to-one/
+    └── ic_fluent_ratio_one_to_one_20_regular.svg
+```
 
 **SF Symbols → Fluent Icons mapping** (image editor):
 | SF Symbol (macOS) | Fluent Icon SVG | Usage |
