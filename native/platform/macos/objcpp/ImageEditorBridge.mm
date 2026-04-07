@@ -110,6 +110,9 @@
 
 - (void)setStraighten:(double)degrees { _engine->setStraighten(degrees); }
 - (void)commitStraighten { _engine->commitStraighten(); }
+- (void)setPerspectiveV:(double)degrees { _engine->setPerspectiveV(degrees); }
+- (void)setPerspectiveH:(double)degrees { _engine->setPerspectiveH(degrees); }
+- (void)commitPerspective { _engine->commitPerspective(); }
 - (void)reset { _engine->reset(); }
 - (void)undo { _engine->undo(); }
 - (void)redo { _engine->redo(); }
@@ -161,6 +164,8 @@
     state.cropHeight = s.cropHeight;
     state.rotation = s.rotation;
     state.straighten = s.straighten;
+    state.perspectiveV = s.perspectiveV;
+    state.perspectiveH = s.perspectiveH;
     state.scale = s.scale;
     state.tx = s.tx;
     state.ty = s.ty;

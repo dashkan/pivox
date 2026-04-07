@@ -45,6 +45,9 @@ public:
     void applyTemplate(const CropTemplate& tmpl);
     void setStraighten(double degrees);
     void commitStraighten();
+    void setPerspectiveV(double degrees);
+    void setPerspectiveH(double degrees);
+    void commitPerspective();
     void setResizeMode(ResizeMode mode);
     void reset();
     void undo();
@@ -88,6 +91,7 @@ private:
     void updateState(const ImageEditorState& newState);
     void pushHistoryAndUpdate(const ImageEditorState& newState);
     void applyRotationChange(int rotation, double straighten, bool pushToHistory);
+    void applyPerspectiveChange(double perspV, double perspH, bool pushToHistory);
 
     static EditState extractEditState(const ImageEditorState& s);
     static bool isEditStateDirty(const EditState& a, const EditState& b);
@@ -110,6 +114,7 @@ private:
     std::optional<DragOrigin> dragOrigin_;
     std::optional<EditState> preDragEditState_;
     std::optional<EditState> preStraightenEditState_;
+    std::optional<EditState> prePerspectiveEditState_;
 
     // Viewport pan origin
     struct PanOrigin {

@@ -138,6 +138,39 @@ void ImageEditorEngine::commitStraighten() {
     if (onChangeCallback_) onChangeCallback_(state_);
 }
 
+void ImageEditorEngine::setPerspectiveV(double degrees) {
+    double clamped = std::max(-30.0, std::min(30.0, degrees));
+    if (!prePerspectiveEditState_.has_value()) {
+        prePerspectiveEditState_ = extractEditState(state_);
+    }
+    applyPerspectiveChange(clamped, state_.perspectiveH, false);
+}
+
+void ImageEditorEngine::setPerspectiveH(double degrees) {
+    double clamped = std::max(-30.0, std::min(30.0, degrees));
+    if (!prePerspectiveEditState_.has_value()) {
+        prePerspectiveEditState_ = extractEditState(state_);
+    }
+    applyPerspectiveChange(state_.perspectiveV, clamped, false);
+}
+
+void ImageEditorEngine::commitPerspective() {
+    if (!prePerspectiveEditState_.has_value()) return;
+    auto pre = *prePerspectiveEditState_;
+    prePerspectiveEditState_ = std::nullopt;
+
+    historyPast_.push_back(pre);
+    if (static_cast<int>(historyPast_.size()) > maxHistory_) {
+        historyPast_.erase(historyPast_.begin());
+    }
+    historyFuture_.clear();
+
+    state_.canUndo = true;
+    state_.canRedo = false;
+    state_.isDirty = isEditStateDirty(extractEditState(state_), initialEditState_);
+    if (onChangeCallback_) onChangeCallback_(state_);
+}
+
 void ImageEditorEngine::applyTemplate(const CropTemplate& tmpl) {
     auto newState = state_;
     newState.activeTemplate = tmpl;
@@ -153,12 +186,14 @@ void ImageEditorEngine::applyTemplate(const CropTemplate& tmpl) {
         state_.naturalWidth, state_.naturalHeight);
 
     double angle = totalAngleRad(state_.rotation, state_.straighten);
-    double minScale = computeMinScale(cropW, cropH,
-        state_.naturalWidth, state_.naturalHeight, angle);
+    double pv = state_.perspectiveV * M_PI / 180.0;
+    double ph = state_.perspectiveH * M_PI / 180.0;
+    double minScale = computeMinScaleWithPerspective(cropW, cropH,
+        state_.naturalWidth, state_.naturalHeight, angle, pv, ph);
     double scale = std::max(state_.scale, minScale);
 
     auto [maxTx, maxTy] = computeTranslationBounds(cropW, cropH,
-        state_.naturalWidth, state_.naturalHeight, scale, angle);
+        state_.naturalWidth, state_.naturalHeight, scale, angle, pv, ph);
     auto [tx, ty] = clampTranslation(state_.tx, state_.ty, maxTx, maxTy);
 
     newState.cropWidth = cropW;
@@ -288,6 +323,8 @@ void ImageEditorEngine::onPointerMove(double cropX, double cropY,
         double dy = (cropY - dragOrigin_->screenY);
         auto& orig = dragOrigin_->originalEditState;
         double angle = totalAngleRad(state_.rotation, state_.straighten);
+        double pvr = state_.perspectiveV * M_PI / 180.0;
+        double phr = state_.perspectiveH * M_PI / 180.0;
 
         if (dragOrigin_->handle == DragHandle::Move) {
             double newTx = orig.tx + dx;
@@ -295,7 +332,7 @@ void ImageEditorEngine::onPointerMove(double cropX, double cropY,
             auto [maxTx, maxTy] = computeTranslationBounds(
                 state_.cropWidth, state_.cropHeight,
                 state_.naturalWidth, state_.naturalHeight,
-                state_.scale, angle);
+                state_.scale, angle, pvr, phr);
             auto [clampedTx, clampedTy] = clampTranslation(newTx, newTy, maxTx, maxTy);
             state_.tx = clampedTx;
             state_.ty = clampedTy;
@@ -319,11 +356,11 @@ void ImageEditorEngine::onPointerMove(double cropX, double cropY,
                 }
             }
 
-            double newMinScale = computeMinScale(newCropW, newCropH, iw, ih, angle);
+            double newMinScale = computeMinScaleWithPerspective(newCropW, newCropH, iw, ih, angle, pvr, phr);
             double scale = std::max(newMinScale,
                 state_.scale > orig.scale ? state_.scale : newMinScale);
 
-            auto [maxTx, maxTy] = computeTranslationBounds(newCropW, newCropH, iw, ih, scale, angle);
+            auto [maxTx, maxTy] = computeTranslationBounds(newCropW, newCropH, iw, ih, scale, angle, pvr, phr);
             auto [clampedTx, clampedTy] = clampTranslation(state_.tx, state_.ty, maxTx, maxTy);
 
             state_.cropWidth = newCropW;
@@ -394,15 +431,47 @@ void ImageEditorEngine::applyRotationChange(int rotation, double straighten,
     double cw = state_.cropWidth;
     double ch = state_.cropHeight;
 
-    double minScale = computeMinScale(cw, ch, iw, ih, angle);
+    double pvr = state_.perspectiveV * M_PI / 180.0;
+    double phr = state_.perspectiveH * M_PI / 180.0;
+    double minScale = computeMinScaleWithPerspective(cw, ch, iw, ih, angle, pvr, phr);
     double scale = std::max(state_.scale, minScale);
 
-    auto [maxTx, maxTy] = computeTranslationBounds(cw, ch, iw, ih, scale, angle);
+    auto [maxTx, maxTy] = computeTranslationBounds(cw, ch, iw, ih, scale, angle, pvr, phr);
     auto [tx, ty] = clampTranslation(state_.tx, state_.ty, maxTx, maxTy);
 
     auto newState = state_;
     newState.rotation = rotation;
     newState.straighten = straighten;
+    newState.scale = scale;
+    newState.tx = tx;
+    newState.ty = ty;
+
+    if (pushToHistory) {
+        pushHistoryAndUpdate(newState);
+    } else {
+        updateState(newState);
+    }
+}
+
+void ImageEditorEngine::applyPerspectiveChange(double perspV, double perspH,
+                                                 bool pushToHistory) {
+    double angle = totalAngleRad(state_.rotation, state_.straighten);
+    double iw = state_.naturalWidth;
+    double ih = state_.naturalHeight;
+    double cw = state_.cropWidth;
+    double ch = state_.cropHeight;
+
+    double pvr = perspV * M_PI / 180.0;
+    double phr = perspH * M_PI / 180.0;
+    double minScale = computeMinScaleWithPerspective(cw, ch, iw, ih, angle, pvr, phr);
+    double scale = std::max(state_.scale, minScale);
+
+    auto [maxTx, maxTy] = computeTranslationBounds(cw, ch, iw, ih, scale, angle, pvr, phr);
+    auto [tx, ty] = clampTranslation(state_.tx, state_.ty, maxTx, maxTy);
+
+    auto newState = state_;
+    newState.perspectiveV = perspV;
+    newState.perspectiveH = perspH;
     newState.scale = scale;
     newState.tx = tx;
     newState.ty = ty;

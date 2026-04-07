@@ -17,9 +17,54 @@ double computeMinScale(double cropW, double cropH,
     return std::max(requiredW / imgW, requiredH / imgH);
 }
 
+double computeMinScaleWithPerspective(double cropW, double cropH,
+                                       double imgW, double imgH,
+                                       double angleRad,
+                                       double perspVRad, double perspHRad) {
+    // Per-axis focal length: separate multipliers let us match Photos.app intensity.
+    double base = std::max(cropW, cropH);
+    double dV = base * perspective_constants::kFocalLengthMultiplierV;
+    double dH = base * perspective_constants::kFocalLengthMultiplierH;
+
+    double cosA = std::cos(-angleRad);
+    double sinA = std::sin(-angleRad);
+    double tanV = std::tan(perspVRad);
+    double tanH = std::tan(perspHRad);
+    double cosV = std::cos(perspVRad);
+    double cosH = std::cos(perspHRad);
+
+    double cornersX[] = { -cropW / 2,  cropW / 2,  cropW / 2, -cropW / 2 };
+    double cornersY[] = { -cropH / 2, -cropH / 2,  cropH / 2,  cropH / 2 };
+
+    double maxS = 0.0;
+    for (int i = 0; i < 4; ++i) {
+        // 1. Un-rotate crop corner back to image axes
+        double qx = cornersX[i] * cosA - cornersY[i] * sinA;
+        double qy = cornersX[i] * sinA + cornersY[i] * cosA;
+
+        // 2. Inverse perspective projection (separate focal lengths per axis)
+        double w = 1.0 - (qx * tanH / dH + qy * tanV / dV);
+        if (w < 0.1) w = 0.1;  // prevent singularity near 90°
+
+        double ux = (qx / cosH) / w;
+        double uy = (qy / cosV) / w;
+
+        // 3. Scale needed for this corner to fit inside image bounds
+        double sx = std::abs(ux) / (imgW / 2.0);
+        double sy = std::abs(uy) / (imgH / 2.0);
+        maxS = std::max({maxS, sx, sy});
+    }
+    return maxS;
+}
+
 TranslationBounds computeTranslationBounds(double cropW, double cropH,
                                             double imgW, double imgH,
-                                            double scale, double angleRad) {
+                                            double scale, double angleRad,
+                                            double perspVRad, double perspHRad) {
+    // Perspective is accounted for through the increased scale (from
+    // computeMinScaleWithPerspective). The affine bounds are conservative.
+    (void)perspVRad;
+    (void)perspHRad;
     double absCos = std::abs(std::cos(angleRad));
     double absSin = std::abs(std::sin(angleRad));
 
@@ -125,12 +170,11 @@ CropSize resizeCropFromHandle(DragHandle handle, double deltaX, double deltaY,
 
 bool isCropSizeValid(double newCropW, double newCropH,
                       double imgW, double imgH,
-                      double scale, double angleRad) {
-    double absCos = std::abs(std::cos(angleRad));
-    double absSin = std::abs(std::sin(angleRad));
-    double maxW = imgW * scale * absCos + imgH * scale * absSin;
-    double maxH = imgW * scale * absSin + imgH * scale * absCos;
-    return newCropW <= maxW && newCropH <= maxH;
+                      double scale, double angleRad,
+                      double perspVRad, double perspHRad) {
+    double minS = computeMinScaleWithPerspective(newCropW, newCropH, imgW, imgH,
+                                                  angleRad, perspVRad, perspHRad);
+    return scale >= minS;
 }
 
 std::optional<DragHandle> hitTestHandles(double px, double py,

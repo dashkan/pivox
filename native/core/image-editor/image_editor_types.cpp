@@ -7,6 +7,8 @@ bool EditState::operator==(const EditState& other) const {
            cropHeight == other.cropHeight &&
            rotation == other.rotation &&
            straighten == other.straighten &&
+           perspectiveV == other.perspectiveV &&
+           perspectiveH == other.perspectiveH &&
            scale == other.scale &&
            tx == other.tx &&
            ty == other.ty &&

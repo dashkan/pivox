@@ -197,15 +197,35 @@ struct CropToolPanel: View {
                 .padding(.top, 16)
                 .padding(.bottom, 12)
 
-            // Straighten
-            RulerSliderRow(label: "Straighten", icon: "circle.and.line.horizontal.fill",
-                      value: Binding(
-                        get: { model.state.straighten },
-                        set: { model.bridge.setStraighten($0) }
-                      ),
-                      range: -45...45,
-                      onCommit: { model.bridge.commitStraighten() },
-                      id: "edit-straighten")
+            // Straighten + Perspective — spacing matches Photos.app
+            VStack(spacing: 6) {
+                RulerSliderRow(label: "Straighten", icon: "circle.and.line.horizontal.fill",
+                          value: Binding(
+                            get: { model.state.straighten },
+                            set: { model.bridge.setStraighten($0) }
+                          ),
+                          range: -45...45,
+                          onCommit: { model.bridge.commitStraighten() },
+                          id: "edit-straighten")
+
+                RulerSliderRow(label: "Vertical", icon: "trapezoid.and.line.vertical.fill",
+                          value: Binding(
+                            get: { model.state.perspectiveV },
+                            set: { model.bridge.setPerspectiveV($0) }
+                          ),
+                          range: -30...30,
+                          onCommit: { model.bridge.commitPerspective() },
+                          id: "edit-perspective-v")
+
+                RulerSliderRow(label: "Horizontal", icon: "trapezoid.and.line.horizontal.fill",
+                          value: Binding(
+                            get: { model.state.perspectiveH },
+                            set: { model.bridge.setPerspectiveH($0) }
+                          ),
+                          range: -30...30,
+                          onCommit: { model.bridge.commitPerspective() },
+                          id: "edit-perspective-h")
+            }
 
             Divider().padding(.horizontal, 16).padding(.vertical, 8)
 
@@ -726,9 +746,23 @@ class ImageEditCanvasNSView: NSView {
 
         let angle = Double(s.rotation) + s.straighten
         let angleRad = angle * .pi / 180
+        let perspV = s.perspectiveV * .pi / 180
+        let perspH = s.perspectiveH * .pi / 180
 
-        let imgW = Double(cgImage.width)
-        let imgH = Double(cgImage.height)
+        // Apply perspective warp via Core Image when non-zero.
+        let drawImage: CGImage
+        let imgW: Double
+        let imgH: Double
+        if abs(perspV) > 0.01 || abs(perspH) > 0.01 {
+            drawImage = perspectiveWarp(cgImage, vertRad: perspV, horizRad: perspH) ?? cgImage
+            imgW = Double(drawImage.width)
+            imgH = Double(drawImage.height)
+        } else {
+            drawImage = cgImage
+            imgW = Double(cgImage.width)
+            imgH = Double(cgImage.height)
+        }
+
         let flipX: Double = s.flipHorizontal ? -1 : 1
         let flipY: Double = s.flipVertical ? -1 : 1
         let cgFlipY: Double = -1  // CGContext draws bottom-up in flipped view
@@ -742,7 +776,7 @@ class ImageEditCanvasNSView: NSView {
             ctx.rotate(by: angleRad)
             ctx.scaleBy(x: flipX * s.scale * vpScale,
                        y: flipY * s.scale * vpScale * cgFlipY)
-            ctx.draw(cgImage, in: CGRect(x: -imgW / 2, y: -imgH / 2, width: imgW, height: imgH))
+            ctx.draw(drawImage, in: CGRect(x: -imgW / 2, y: -imgH / 2, width: imgW, height: imgH))
             ctx.restoreGState()
 
             // 2. Subtle dimmed overlay
@@ -772,7 +806,7 @@ class ImageEditCanvasNSView: NSView {
             ctx.rotate(by: angleRad)
             ctx.scaleBy(x: flipX * s.scale * vpScale,
                        y: flipY * s.scale * vpScale * cgFlipY)
-            ctx.draw(cgImage, in: CGRect(x: -imgW / 2, y: -imgH / 2, width: imgW, height: imgH))
+            ctx.draw(drawImage, in: CGRect(x: -imgW / 2, y: -imgH / 2, width: imgW, height: imgH))
             ctx.restoreGState()
         }
     }
@@ -791,6 +825,8 @@ class ImageEditCanvasNSView: NSView {
 
         // Grid — show during drag or when straighten is applied (Photos pattern)
         let showGrid = isDragging || abs(straighten) > 0.1
+            || abs(model?.state.perspectiveV ?? 0) > 0.1
+            || abs(model?.state.perspectiveH ?? 0) > 0.1
         if showGrid {
             ctx.setStrokeColor(gridColor)
             ctx.setLineWidth(0.5 / vpScale)
@@ -931,5 +967,55 @@ class ImageEditCanvasNSView: NSView {
         case "move":     NSCursor.openHand.set()
         default:         NSCursor.arrow.set()
         }
+    }
+
+    // ── Perspective warp via Core Image ────────────────────────────
+
+    private lazy var ciContext = CIContext()
+
+    /// Applies a perspective correction warp using CIPerspectiveTransform.
+    /// Projects image corners through a 3D rotation, then warps the image.
+    func perspectiveWarp(_ image: CGImage, vertRad: Double, horizRad: Double) -> CGImage? {
+        let w = Double(image.width)
+        let h = Double(image.height)
+        // Per-axis focal length — must match C++ perspective_constants.
+        let base = max(w, h)
+        let dV = base * 1.4   // kFocalLengthMultiplierV
+        let dH = base * 0.8   // kFocalLengthMultiplierH
+
+        let cosV = cos(vertRad)
+        let sinV = sin(vertRad)
+        let cosH = cos(horizRad)
+        let sinH = sin(horizRad)
+
+        // Compute where each corner lands after 3D perspective projection.
+        // Image corners in centered coordinates: (±w/2, ±h/2)
+        func project(_ x: Double, _ y: Double) -> CGPoint {
+            let denom = 1.0 + x * sinH / dH + y * sinV / dV
+            let px = (x * cosH) / denom
+            let py = (y * cosV) / denom
+            // Convert back to image coordinates (origin at bottom-left for CI)
+            return CGPoint(x: px + w / 2, y: py + h / 2)
+        }
+
+        // In CI coordinates (y-up), -h/2 is bottom, +h/2 is top.
+        let bl = project(-w / 2, -h / 2)  // bottom-left in CI
+        let br = project( w / 2, -h / 2)  // bottom-right
+        let tr = project( w / 2,  h / 2)  // top-right
+        let tl = project(-w / 2,  h / 2)  // top-left
+
+        let ciImage = CIImage(cgImage: image)
+        guard let filter = CIFilter(name: "CIPerspectiveTransform") else { return nil }
+        filter.setValue(ciImage, forKey: kCIInputImageKey)
+        filter.setValue(CIVector(cgPoint: tl), forKey: "inputTopLeft")
+        filter.setValue(CIVector(cgPoint: tr), forKey: "inputTopRight")
+        filter.setValue(CIVector(cgPoint: br), forKey: "inputBottomRight")
+        filter.setValue(CIVector(cgPoint: bl), forKey: "inputBottomLeft")
+
+        guard let output = filter.outputImage else { return nil }
+        let extent = output.extent
+        guard extent.width > 0, extent.height > 0,
+              !extent.isInfinite else { return nil }
+        return ciContext.createCGImage(output, from: extent)
     }
 }

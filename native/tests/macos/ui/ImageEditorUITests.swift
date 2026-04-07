@@ -1,5 +1,6 @@
 import XCTest
 
+/// Image editor UI tests — 2 focused tests using SKIP_AUTH (no emulator needed).
 class ImageEditorUITests: XCTestCase {
 
     var app: XCUIApplication!
@@ -7,16 +8,11 @@ class ImageEditorUITests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
         app = XCUIApplication()
-        app.launchEnvironment["USE_AUTH_EMULATOR"] = "1"
         app.launchEnvironment["UI_TESTING"] = "1"
+        app.launchEnvironment["SKIP_AUTH"] = "1"
         app.launchEnvironment["TEST_IMAGE_PATH"] = createTestImage()
         app.launch()
 
-        // Register so we land on the main app.
-        // UI_TESTING resets sticky tab → defaults to Operator.
-        registerAndSignIn()
-
-        // Navigate to Library — TEST_IMAGE_PATH auto-loads the image.
         let library = app.staticTexts["Library"]
         XCTAssertTrue(library.waitForExistence(timeout: 3))
         library.click()
@@ -28,7 +24,6 @@ class ImageEditorUITests: XCTestCase {
 
     // MARK: - Helpers
 
-    /// Creates a 400x300 test PNG and returns its path.
     private func createTestImage() -> String {
         let size = NSSize(width: 400, height: 300)
         let image = NSImage(size: size)
@@ -51,199 +46,119 @@ class ImageEditorUITests: XCTestCase {
         return path
     }
 
-    private func uniqueEmail() -> String {
-        "editor-\(UUID().uuidString.prefix(8).lowercased())@pivox.app"
-    }
-
-    /// Register a new account through the UI.
-    private func registerAndSignIn() {
-        let link = app.links["login-switch-register"].exists
-            ? app.links["login-switch-register"]
-            : app.buttons["login-switch-register"]
-        guard link.waitForExistence(timeout: 5) else { return }
-        link.click()
-
-        let email = uniqueEmail()
-        let emailField = app.textFields["register-email"]
-        XCTAssertTrue(emailField.waitForExistence(timeout: 3))
-        emailField.click()
-        emailField.typeText(email)
-
-        app.textFields["register-display-name"].click()
-        app.textFields["register-display-name"].typeText("Test")
-
-        app.secureTextFields["register-password"].click()
-        app.secureTextFields["register-password"].typeText("Testpass123!")
-
-        app.secureTextFields["register-confirm-password"].click()
-        app.secureTextFields["register-confirm-password"].typeText("Testpass123!")
-
-        app.buttons["register-create-account"].click()
-
-        // Wait for main app sidebar.
-        let operator_ = app.staticTexts["Operator"]
-        XCTAssertTrue(operator_.waitForExistence(timeout: 10),
-                      "Should land on main app after registration")
-    }
-
-    /// Wait for image editor to be visible.
-    /// Note: NSView accessibility identifiers don't propagate through SwiftUI
-    /// containers, so we detect the editor by its toolbar Edit button.
     private func waitForEditor() {
         let editButton = app.buttons["edit-enter"]
         XCTAssertTrue(editButton.waitForExistence(timeout: 5),
                       "Image editor should be visible (Edit button in toolbar)")
     }
 
-    // MARK: - View Mode Tests
-
-    func testEditorOpensInViewMode() throws {
-        waitForEditor()
-
-        let editButton = app.buttons["edit-enter"]
-        XCTAssertTrue(editButton.exists, "Edit button should be visible in view mode")
-
-        let doneButton = app.buttons["edit-done"]
-        XCTAssertFalse(doneButton.exists, "Done button should NOT be visible in view mode")
-    }
-
-    func testBackButtonClosesEditor() throws {
-        waitForEditor()
-
-        app.buttons["edit-back"].click()
-
-        let openButton = app.buttons["library-open-image"]
-        XCTAssertTrue(openButton.waitForExistence(timeout: 5),
-                      "Should return to Library view after back")
-    }
-
-    // MARK: - Edit Mode Tests
-
-    func testEditButtonEntersEditMode() throws {
-        waitForEditor()
-
+    private func enterEditMode() {
         app.buttons["edit-enter"].click()
-
         let doneButton = app.buttons["edit-done"]
         XCTAssertTrue(doneButton.waitForExistence(timeout: 3),
-                      "Done button should appear in edit mode")
-
-        let revertButton = app.buttons["edit-revert"]
-        XCTAssertTrue(revertButton.exists, "Revert button should be visible in edit mode")
+                      "Should enter edit mode (Done button visible)")
     }
 
-    func testCropToolPanelVisibleInEditMode() throws {
-        waitForEditor()
-        app.buttons["edit-enter"].click()
+    // MARK: - Test 1: Edit mode — elements, sliders, undo/redo
 
-        let straighten = app.sliders["edit-straighten"]
-        XCTAssertTrue(straighten.waitForExistence(timeout: 3),
-                      "Straighten slider should be visible")
-
-        XCTAssertTrue(app.buttons["edit-flip-h"].exists, "Flip H should be visible")
-        XCTAssertTrue(app.buttons["edit-flip-v"].exists, "Flip V should be visible")
-        XCTAssertTrue(app.buttons["edit-aspect"].exists, "Aspect should be visible")
-    }
-
-    func testUndoRedoDisabledInitially() throws {
-        waitForEditor()
-        app.buttons["edit-enter"].click()
-
-        let undo = app.buttons["edit-undo"]
-        XCTAssertTrue(undo.waitForExistence(timeout: 3))
-        XCTAssertFalse(undo.isEnabled, "Undo should be disabled initially")
-
-        let redo = app.buttons["edit-redo"]
-        XCTAssertTrue(redo.exists)
-        XCTAssertFalse(redo.isEnabled, "Redo should be disabled initially")
-    }
-
-    func testRevertDisabledWhenClean() throws {
-        waitForEditor()
-        app.buttons["edit-enter"].click()
-
-        let revert = app.buttons["edit-revert"]
-        XCTAssertTrue(revert.waitForExistence(timeout: 3))
-        XCTAssertFalse(revert.isEnabled, "Revert should be disabled when clean")
-    }
-
-    func testResetDisabledWhenClean() throws {
-        waitForEditor()
-        app.buttons["edit-enter"].click()
-
-        let reset = app.buttons["edit-reset"]
-        XCTAssertTrue(reset.waitForExistence(timeout: 3))
-        XCTAssertFalse(reset.isEnabled, "Reset should be disabled when clean")
-    }
-
-    // MARK: - Done / Exit Tests
-
-    func testDoneExitsEditMode() throws {
-        waitForEditor()
-        app.buttons["edit-enter"].click()
-
-        let doneButton = app.buttons["edit-done"]
-        XCTAssertTrue(doneButton.waitForExistence(timeout: 3))
-        doneButton.click()
-
-        let openButton = app.buttons["library-open-image"]
-        XCTAssertTrue(openButton.waitForExistence(timeout: 5),
-                      "Should return to Library after Done")
-    }
-
-    func testDoneShowsCropResult() throws {
-        waitForEditor()
-        app.buttons["edit-enter"].click()
-
-        let doneButton = app.buttons["edit-done"]
-        XCTAssertTrue(doneButton.waitForExistence(timeout: 3))
-        doneButton.click()
-
-        let cropResult = app.staticTexts["library-crop-result"]
-        XCTAssertTrue(cropResult.waitForExistence(timeout: 5),
-                      "Crop result should be displayed after Done")
-    }
-
-    func testSidebarRestoredAfterDone() throws {
-        waitForEditor()
-        app.buttons["edit-enter"].click()
-
-        let doneButton = app.buttons["edit-done"]
-        XCTAssertTrue(doneButton.waitForExistence(timeout: 3))
-        doneButton.click()
-
-        let openButton = app.buttons["library-open-image"]
-        XCTAssertTrue(openButton.waitForExistence(timeout: 5))
-
-        let operator_ = app.staticTexts["Operator"]
-        XCTAssertTrue(operator_.waitForExistence(timeout: 3),
-                      "Sidebar should be restored after exiting editor")
-    }
-
-    // MARK: - Zoom Controls
-
-    func testZoomControlsExist() throws {
+    func testEditModeAndSliders() throws {
         waitForEditor()
 
-        // Toolbar flattens the HStack — identifier propagates to children.
-        // Check the zoom slider specifically.
-        let zoom = app.sliders["edit-zoom"]
-        XCTAssertTrue(zoom.waitForExistence(timeout: 3),
-                      "Zoom slider should be visible in view mode")
-
-        app.buttons["edit-enter"].click()
-        XCTAssertTrue(zoom.waitForExistence(timeout: 3),
-                      "Zoom slider should be visible in edit mode")
-    }
-
-    // MARK: - Accessibility Tests
-
-    func testCanvasIsDiscoverable() throws {
-        waitForEditor()
-
+        // ── View mode ──
+        XCTAssertTrue(app.buttons["edit-enter"].exists)
+        XCTAssertFalse(app.buttons["edit-done"].exists)
         let canvas = app.images["image-edit-view"]
-        XCTAssertTrue(canvas.waitForExistence(timeout: 5),
-                      "Image edit canvas should be discoverable by its identifier")
-        XCTAssertEqual(canvas.label, "Image Editor", "Canvas should have correct accessibility label")
+        XCTAssertTrue(canvas.waitForExistence(timeout: 3))
+        XCTAssertEqual(canvas.label, "Image Editor")
+        XCTAssertTrue(app.sliders["edit-zoom"].exists, "Zoom in view mode")
+
+        // ── Enter edit mode ──
+        enterEditMode()
+
+        // All edit-mode elements present
+        XCTAssertTrue(app.buttons["edit-revert"].exists)
+        XCTAssertTrue(app.sliders["edit-zoom"].exists, "Zoom in edit mode")
+        XCTAssertTrue(app.sliders["edit-straighten"].exists, "Straighten")
+        XCTAssertTrue(app.sliders["edit-perspective-v"].exists, "Perspective V")
+        XCTAssertTrue(app.sliders["edit-perspective-h"].exists, "Perspective H")
+        XCTAssertTrue(app.buttons["edit-flip-h"].exists, "Flip H")
+        XCTAssertTrue(app.buttons["edit-flip-v"].exists, "Flip V")
+        XCTAssertTrue(app.buttons["edit-aspect"].exists, "Aspect")
+
+        // Initial state — nothing dirty
+        let undo = app.buttons["edit-undo"]
+        let redo = app.buttons["edit-redo"]
+        XCTAssertFalse(undo.isEnabled, "Undo disabled initially")
+        XCTAssertFalse(redo.isEnabled, "Redo disabled initially")
+        XCTAssertFalse(app.buttons["edit-revert"].isEnabled, "Revert disabled when clean")
+        XCTAssertFalse(app.buttons["edit-reset"].isEnabled, "Reset disabled when clean")
+
+        // ── Exercise each slider: adjust, verify value, undo, verify restored ──
+        let sliders: [(XCUIElement, String)] = [
+            (app.sliders["edit-straighten"], "Straighten"),
+            (app.sliders["edit-perspective-v"], "Perspective V"),
+            (app.sliders["edit-perspective-h"], "Perspective H"),
+        ]
+
+        for (slider, name) in sliders {
+            // Initial value at center (0.5 normalized = 0 degrees)
+            XCTAssertEqual(slider.normalizedSliderPosition, 0.5,
+                           accuracy: 0.01, "\(name) starts at center")
+
+            // Adjust to 75% (XCUITest drag has ~0.03 pixel rounding tolerance)
+            slider.adjust(toNormalizedSliderPosition: 0.75)
+            let adjusted = slider.normalizedSliderPosition
+            XCTAssertEqual(adjusted, 0.75,
+                           accuracy: 0.05, "\(name) near 0.75 after adjust")
+
+            // State dirty
+            XCTAssertTrue(undo.isEnabled, "Undo enabled after \(name)")
+            XCTAssertTrue(app.buttons["edit-reset"].isEnabled, "Reset enabled after \(name)")
+
+            // Undo reverts to 0.5
+            undo.click()
+            XCTAssertEqual(slider.normalizedSliderPosition, 0.5,
+                           accuracy: 0.01, "\(name) at center after undo")
+            XCTAssertTrue(redo.isEnabled, "Redo enabled after undoing \(name)")
+
+            // Redo restores the adjusted value
+            redo.click()
+            XCTAssertEqual(slider.normalizedSliderPosition, adjusted,
+                           accuracy: 0.01, "\(name) restored after redo")
+
+            // Reset to center
+            app.buttons["edit-reset"].click()
+            XCTAssertEqual(slider.normalizedSliderPosition, 0.5,
+                           accuracy: 0.01, "\(name) at center after reset")
+        }
+    }
+
+    // MARK: - Test 2: Navigation — Back exits, Done exits with crop result + sidebar
+
+    func testNavigationFlow() throws {
+        waitForEditor()
+
+        // ── Back → library ──
+        app.buttons["edit-back"].click()
+        let openButton = app.buttons["library-open-image"]
+        XCTAssertTrue(openButton.waitForExistence(timeout: 5), "Back returns to Library")
+
+        // ── Relaunch for Done test (didAutoLoad guard prevents re-load) ──
+        app.terminate()
+        app.launchEnvironment["TEST_IMAGE_PATH"] = createTestImage()
+        app.launch()
+        let library = app.staticTexts["Library"]
+        XCTAssertTrue(library.waitForExistence(timeout: 3))
+        library.click()
+        waitForEditor()
+        enterEditMode()
+
+        // ── Done → library with crop result + sidebar ──
+        app.buttons["edit-done"].click()
+        XCTAssertTrue(openButton.waitForExistence(timeout: 5), "Done returns to Library")
+        XCTAssertTrue(app.staticTexts["library-crop-result"].waitForExistence(timeout: 3),
+                      "Crop result displayed")
+        XCTAssertTrue(app.staticTexts["Operator"].waitForExistence(timeout: 3),
+                      "Sidebar restored after Done")
     }
 }

@@ -133,41 +133,22 @@ native/platform/macos/swift/
 
 ## Test Infrastructure
 
-### Running Tests
+See `docs/dev/ui-testing.md` for full details on build configurations, launch flags, and running tests.
 
+Quick reference:
 ```bash
-# C++ core tests (no emulator needed)
-cmake --build build-xcode --config Debug --target pivox_core_tests
+# C++ core tests
+cd native && cmake --build build-xcode --config Debug --target pivox_core_tests
 ./build-xcode/Debug/pivox_core_tests
 
-# Swift unit tests (bridge tests, no emulator needed)
+# Swift unit tests (bridge)
 xcodebuild test -project build-xcode/Pivox.xcodeproj -scheme PivoxTests -configuration Debug
 
-# UI tests (requires Firebase Auth emulator)
-make test-native-ui   # starts emulator, runs ALL UI tests, stops emulator
+# UI tests (image editor uses DebugUITest, auth uses Debug + emulator)
+make test-native-ui
 
-# Single UI test class
-firebase emulators:start --only auth --project pivox-cloud &
-xcodebuild test -project build-xcode/Pivox.xcodeproj -scheme PivoxUITests -configuration Debug \
-  -only-testing:PivoxUITests/ImageEditorUITests
-pkill -f "firebase.*emulators"
-```
-
-### UI Test Setup
-
-Image editor UI tests use:
-- `UI_TESTING=1` — single flag that resets auth tokens, preferences, and sticky tab selection
-- `USE_AUTH_EMULATOR=1` — points Firebase Auth at local emulator (127.0.0.1:9099)
-- `TEST_IMAGE_PATH=<path>` — auto-loads a test image in LibraryPlaceholderView, bypassing NSOpenPanel
-
-Each test registers a fresh user through the UI (emulator starts with zero users), navigates to Library, and the test image auto-loads.
-
-### Regenerating Xcode Project
-
-After changing CMakeLists.txt:
-```bash
-cd native
-cmake -G Xcode -B build-xcode
+# Regenerate Xcode project after CMakeLists changes
+cd native && cmake -G Xcode -B build-xcode
 ```
 
 To open in Xcode: open `build-xcode/Pivox.xcodeproj`, go to Product → Scheme → Manage Schemes, check "Show" next to Pivox.
@@ -187,6 +168,19 @@ To open in Xcode: open `build-xcode/Pivox.xcodeproj`, go to Product → Scheme �
 5. Windows machine pulls latest (gets shared C++ core), builds with Visual Studio
 
 **Windows build**: `kirby-win` SSH alias, working directory `D:\pivox`. CMake generates Visual Studio solution. Firebase C++ SDK for auth. No Obj-C++ bridge needed — WinUI C++ calls `ImageEditorEngine` directly.
+
+**Windows UI test config**: Same `DebugUITest` pattern as macOS. The CMakeLists.txt already registers the config for Visual Studio. For C++/WinRT, define `UITEST` as a preprocessor macro:
+```cmake
+# In the Windows section of CMakeLists.txt:
+target_compile_definitions(${WIN_TARGET} PRIVATE "$<$<CONFIG:DebugUITest>:UITEST>")
+```
+Then in `WinAuthService.cpp`:
+```cpp
+#ifdef UITEST
+if (getenv("SKIP_AUTH")) { /* bypass */ }
+#endif
+```
+FlaUI tests use `DebugUITest` config. MSTest tests that don't need auth set `SKIP_AUTH=1` in the process start info. See `docs/dev/ui-testing.md` for the full pattern.
 
 **NuGet dependencies**:
 - `Microsoft.Graphics.Win2D` — 2D rendering (replaces Core Graphics). First-class WinUI 3 citizen.

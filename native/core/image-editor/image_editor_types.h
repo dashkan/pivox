@@ -42,6 +42,8 @@ struct EditState {
     double cropHeight = 0;
     int rotation = 0;           // 0, 90, 180, 270
     double straighten = 0;      // -45..45
+    double perspectiveV = 0;    // vertical perspective correction, -30..30 degrees
+    double perspectiveH = 0;    // horizontal perspective correction, -30..30 degrees
     double scale = 1;
     double tx = 0;              // image X translation (image-pixel units)
     double ty = 0;              // image Y translation (image-pixel units)
@@ -97,6 +99,14 @@ namespace zoom_constants {
 namespace crop_constants {
     constexpr double kMinCropSize = 10.0;
     constexpr int kMaxHistory = 50;
+}
+
+/// Perspective correction constants.
+/// Focal length multiplier: smaller = more dramatic effect.
+/// Photos.app uses different intensities for each axis.
+namespace perspective_constants {
+    constexpr double kFocalLengthMultiplierV = 1.4;  // vertical: subtler
+    constexpr double kFocalLengthMultiplierH = 0.8;  // horizontal: more dramatic
 }
 
 } // namespace pivox

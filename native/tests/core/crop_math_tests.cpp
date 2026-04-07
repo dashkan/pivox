@@ -264,3 +264,68 @@ TEST(CropMathTest, TotalAngleRadWithStraighten) {
 TEST(CropMathTest, TotalAngleRadCombined) {
     EXPECT_NEAR(totalAngleRad(90, -10), 80.0 * M_PI / 180.0, 0.0001);
 }
+
+// ─────────────────────────────────────────────────────────────────────
+// computeMinScaleWithPerspective
+// ─────────────────────────────────────────────────────────────────────
+
+TEST(CropMathTest, PerspectiveMinScale_ZeroTilt_MatchesRotationOnly) {
+    // With no perspective, should match the existing rotation-only formula
+    double sRot = computeMinScale(1000, 800, 2000, 1600, M_PI / 6);
+    double sPersp = computeMinScaleWithPerspective(1000, 800, 2000, 1600,
+                                                    M_PI / 6, 0, 0);
+    EXPECT_NEAR(sPersp, sRot, 0.001);
+}
+
+TEST(CropMathTest, PerspectiveMinScale_ZeroTilt_NoRotation_MatchesExact) {
+    double sRot = computeMinScale(1920, 1080, 1920, 1080, 0);
+    double sPersp = computeMinScaleWithPerspective(1920, 1080, 1920, 1080, 0, 0, 0);
+    EXPECT_NEAR(sPersp, sRot, 0.001);
+}
+
+TEST(CropMathTest, PerspectiveMinScale_VerticalTilt_ScalesUp) {
+    double s0 = computeMinScaleWithPerspective(1000, 1000, 2000, 2000, 0, 0, 0);
+    double sV = computeMinScaleWithPerspective(1000, 1000, 2000, 2000,
+                                                0, 20 * M_PI / 180, 0);
+    EXPECT_GT(sV, s0);
+}
+
+TEST(CropMathTest, PerspectiveMinScale_HorizontalTilt_ScalesUp) {
+    double s0 = computeMinScaleWithPerspective(1000, 1000, 2000, 2000, 0, 0, 0);
+    double sH = computeMinScaleWithPerspective(1000, 1000, 2000, 2000,
+                                                0, 0, 20 * M_PI / 180);
+    EXPECT_GT(sH, s0);
+}
+
+TEST(CropMathTest, PerspectiveMinScale_BothAxes_LargerThanEither) {
+    double sV = computeMinScaleWithPerspective(1000, 800, 2000, 1600,
+                                                0, 15 * M_PI / 180, 0);
+    double sH = computeMinScaleWithPerspective(1000, 800, 2000, 1600,
+                                                0, 0, 15 * M_PI / 180);
+    double sBoth = computeMinScaleWithPerspective(1000, 800, 2000, 1600,
+                                                   0, 15 * M_PI / 180,
+                                                   15 * M_PI / 180);
+    EXPECT_GE(sBoth, sV - 0.001);
+    EXPECT_GE(sBoth, sH - 0.001);
+}
+
+TEST(CropMathTest, PerspectiveMinScale_SymmetricPositiveNegative) {
+    double sPos = computeMinScaleWithPerspective(1000, 800, 2000, 1600,
+                                                  0, 25 * M_PI / 180, 0);
+    double sNeg = computeMinScaleWithPerspective(1000, 800, 2000, 1600,
+                                                  0, -25 * M_PI / 180, 0);
+    EXPECT_NEAR(sPos, sNeg, 0.001);
+}
+
+TEST(CropMathTest, PerspectiveMinScale_WithRotation_Combined) {
+    // Perspective + rotation should produce a larger scale than either alone
+    double sRotOnly = computeMinScaleWithPerspective(1000, 800, 2000, 1600,
+                                                      M_PI / 6, 0, 0);
+    double sPerspOnly = computeMinScaleWithPerspective(1000, 800, 2000, 1600,
+                                                        0, 20 * M_PI / 180, 0);
+    double sCombined = computeMinScaleWithPerspective(1000, 800, 2000, 1600,
+                                                       M_PI / 6,
+                                                       20 * M_PI / 180, 0);
+    EXPECT_GE(sCombined, sRotOnly - 0.001);
+    EXPECT_GE(sCombined, sPerspOnly - 0.001);
+}

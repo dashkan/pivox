@@ -27,6 +27,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic) double cropHeight;
 @property (nonatomic) int rotation;
 @property (nonatomic) double straighten;
+@property (nonatomic) double perspectiveV;
+@property (nonatomic) double perspectiveH;
 @property (nonatomic) double scale;
 @property (nonatomic) double tx;
 @property (nonatomic) double ty;
@@ -69,6 +71,9 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)applyFreeformTemplate;
 - (void)setStraighten:(double)degrees;
 - (void)commitStraighten;
+- (void)setPerspectiveV:(double)degrees;
+- (void)setPerspectiveH:(double)degrees;
+- (void)commitPerspective;
 - (void)reset;
 - (void)undo;
 - (void)redo;

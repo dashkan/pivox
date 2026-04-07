@@ -12,7 +12,12 @@ class AuthService: NSObject {
     static let shared = AuthService()
 
     var currentUser: User?
-    var isSignedIn: Bool { currentUser != nil }
+    var isSignedIn: Bool {
+        #if UITEST
+        if ProcessInfo.processInfo.environment["SKIP_AUTH"] == "1" { return true }
+        #endif
+        return currentUser != nil
+    }
     var errorMessage: String?
     private var isOAuthInProgress = false
 
@@ -26,6 +31,19 @@ class AuthService: NSObject {
     /// Configure Firebase and start listening for auth state changes.
     /// Call once at app launch (AppDelegate).
     func configure() {
+        #if UITEST
+        // SKIP_AUTH: bypass Firebase entirely for UI tests that don't need auth.
+        // UITEST compilation condition only exists in DebugUITest build config.
+        // See docs/dev/ui-testing.md for security considerations.
+        if ProcessInfo.processInfo.environment["SKIP_AUTH"] == "1" {
+            let uiTesting = ProcessInfo.processInfo.environment["UI_TESTING"] == "1"
+            if uiTesting {
+                appState.save("", forKey: "selected_section")
+            }
+            return
+        }
+        #endif
+
         FirebaseApp.configure()
 
         // Point at local emulator for UI tests (must be before any auth calls).

@@ -10,6 +10,24 @@ endif()
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# ── Build configurations ──────────────────────────────────────────────
+# DebugUITest: Debug + UITEST flag for auth bypass in UI tests.
+# Keeps bypass code out of normal Debug and Release builds entirely.
+if(CMAKE_GENERATOR MATCHES "Xcode")
+    # Add DebugUITest to Xcode's configuration list (inherits Debug settings).
+    set(CMAKE_CONFIGURATION_TYPES "Debug;Release;DebugUITest" CACHE STRING "" FORCE)
+    # DebugUITest uses the same C/C++/Swift flags as Debug.
+    set(CMAKE_C_FLAGS_DEBUGUITEST "${CMAKE_C_FLAGS_DEBUG}")
+    set(CMAKE_CXX_FLAGS_DEBUGUITEST "${CMAKE_CXX_FLAGS_DEBUG}")
+    set(CMAKE_EXE_LINKER_FLAGS_DEBUGUITEST "${CMAKE_EXE_LINKER_FLAGS_DEBUG}")
+    set(CMAKE_Swift_FLAGS_DEBUGUITEST "${CMAKE_Swift_FLAGS_DEBUG}")
+elseif(CMAKE_GENERATOR MATCHES "Visual Studio")
+    set(CMAKE_CONFIGURATION_TYPES "Debug;Release;DebugUITest" CACHE STRING "" FORCE)
+    set(CMAKE_C_FLAGS_DEBUGUITEST "${CMAKE_C_FLAGS_DEBUG}")
+    set(CMAKE_CXX_FLAGS_DEBUGUITEST "${CMAKE_CXX_FLAGS_DEBUG}")
+    set(CMAKE_EXE_LINKER_FLAGS_DEBUGUITEST "${CMAKE_EXE_LINKER_FLAGS_DEBUG}")
+endif()
+
 # Warnings as errors.
 if(MSVC)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W4 /WX")
@@ -22,6 +40,10 @@ endif()
 # Swift: treat warnings as errors via Xcode build setting.
 if(CMAKE_GENERATOR MATCHES "Xcode")
     set(CMAKE_XCODE_ATTRIBUTE_SWIFT_TREAT_WARNINGS_AS_ERRORS "YES")
+    # DEBUG for Swift in Debug/DebugUITest builds.
+    # UITEST only in DebugUITest — gates SKIP_AUTH and test-only bypass code.
+    set(CMAKE_XCODE_ATTRIBUTE_SWIFT_ACTIVE_COMPILATION_CONDITIONS[variant=Debug] "DEBUG")
+    set(CMAKE_XCODE_ATTRIBUTE_SWIFT_ACTIVE_COMPILATION_CONDITIONS[variant=DebugUITest] "DEBUG UITEST")
 endif()
 
 

@@ -105,17 +105,24 @@ firebase-deploy:
 # Native UI Tests (macOS)
 
 test-native-ui:
-	@echo "Starting Firebase Auth emulator..."
+	@echo "=== Image editor tests (DebugUITest, no emulator) ==="
+	@xcodebuild test \
+		-project native/build-xcode/Pivox.xcodeproj \
+		-scheme PivoxUITests \
+		-configuration DebugUITest \
+		-destination 'platform=macOS' \
+		-only-testing:PivoxUITests/ImageEditorUITests \
+		2>&1 | grep -E "Test Case|passed|failed|skipped|Suite" || true
+	@echo "=== Auth tests (Debug + emulator) ==="
 	@firebase emulators:start --only auth --project pivox-cloud &
 	@sleep 3
-	@echo "Running UI tests..."
 	@xcodebuild test \
 		-project native/build-xcode/Pivox.xcodeproj \
 		-scheme PivoxUITests \
 		-configuration Debug \
 		-destination 'platform=macOS' \
+		-only-testing:PivoxUITests/AuthUITests \
 		2>&1 | grep -E "Test Case|passed|failed|skipped|Suite" || true
-	@echo "Stopping emulator..."
 	@-pkill -f "firebase.*emulators" 2>/dev/null
 	@echo "Done."
 

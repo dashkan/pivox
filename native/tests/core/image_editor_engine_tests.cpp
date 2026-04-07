@@ -350,3 +350,48 @@ TEST(ImageEditorEngineStandaloneTest, CustomTemplatesPreserved) {
     EXPECT_EQ(templates[1].label, "16:9");
     EXPECT_EQ(templates[2].label, "4:3");
 }
+
+// ─────────────────────────────────────────────────────────────────────
+// Perspective correction
+// ─────────────────────────────────────────────────────────────────────
+
+TEST_F(ImageEditorEngineTest, SetPerspectiveV_UpdatesState) {
+    engine.setPerspectiveV(20.0);
+    EXPECT_DOUBLE_EQ(engine.state().perspectiveV, 20.0);
+}
+
+TEST_F(ImageEditorEngineTest, SetPerspectiveH_UpdatesState) {
+    engine.setPerspectiveH(-15.0);
+    EXPECT_DOUBLE_EQ(engine.state().perspectiveH, -15.0);
+}
+
+TEST_F(ImageEditorEngineTest, PerspectiveClamps) {
+    engine.setPerspectiveV(50.0);
+    EXPECT_DOUBLE_EQ(engine.state().perspectiveV, 30.0);
+    engine.setPerspectiveH(-50.0);
+    EXPECT_DOUBLE_EQ(engine.state().perspectiveH, -30.0);
+}
+
+TEST_F(ImageEditorEngineTest, CommitPerspective_PushesToHistory) {
+    engine.setPerspectiveV(10.0);
+    EXPECT_FALSE(engine.state().canUndo);
+    engine.commitPerspective();
+    EXPECT_TRUE(engine.state().canUndo);
+    engine.undo();
+    EXPECT_DOUBLE_EQ(engine.state().perspectiveV, 0.0);
+}
+
+TEST_F(ImageEditorEngineTest, PerspectiveAutoScales) {
+    double scaleBefore = engine.state().scale;
+    engine.setPerspectiveV(25.0);
+    EXPECT_GE(engine.state().scale, scaleBefore);
+}
+
+TEST_F(ImageEditorEngineTest, ResetClearsPerspective) {
+    engine.setPerspectiveV(20.0);
+    engine.setPerspectiveH(15.0);
+    engine.commitPerspective();
+    engine.reset();
+    EXPECT_DOUBLE_EQ(engine.state().perspectiveV, 0.0);
+    EXPECT_DOUBLE_EQ(engine.state().perspectiveH, 0.0);
+}
