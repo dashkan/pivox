@@ -71,17 +71,18 @@ if(APPLE)
     set(FIREBASE_PLIST "${CMAKE_SOURCE_DIR}/configs/firebase/GoogleService-Info.plist")
 
     # Swift executable (SwiftUI app).
+    set(SWIFT_DIR "platform/macos/swift")
     add_executable(${APP_TARGET} MACOSX_BUNDLE
-        platform/macos/swift/main.swift
-        platform/macos/swift/AppDelegate.swift
-        platform/macos/swift/ContentView.swift
-        platform/macos/swift/LoginView.swift
-        platform/macos/swift/RegisterView.swift
-        platform/macos/swift/ProfileView.swift
-        platform/macos/swift/GlassCard.swift
-        platform/macos/swift/GoogleIcon.swift
-        platform/macos/swift/AuthService.swift
-        platform/macos/swift/AdjustView.swift
+        ${SWIFT_DIR}/App/main.swift
+        ${SWIFT_DIR}/App/AppDelegate.swift
+        ${SWIFT_DIR}/App/ContentView.swift
+        ${SWIFT_DIR}/Auth/AuthService.swift
+        ${SWIFT_DIR}/Auth/LoginView.swift
+        ${SWIFT_DIR}/Auth/RegisterView.swift
+        ${SWIFT_DIR}/Auth/ProfileView.swift
+        ${SWIFT_DIR}/ImageEditor/EditView.swift
+        ${SWIFT_DIR}/Components/GlassCard.swift
+        ${SWIFT_DIR}/Components/GoogleIcon.swift
         ${ASSET_CATALOG}
         ${FIREBASE_PLIST}
     )
