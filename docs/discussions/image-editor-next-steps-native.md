@@ -188,7 +188,21 @@ To open in Xcode: open `build-xcode/Pivox.xcodeproj`, go to Product → Scheme �
 
 **Windows build**: `kirby-win` SSH alias, working directory `D:\pivox`. CMake generates Visual Studio solution. Firebase C++ SDK for auth. No Obj-C++ bridge needed — WinUI C++ calls `ImageEditorEngine` directly.
 
-**Win2D dependency**: `Microsoft.Graphics.Win2D` NuGet package. First-class WinUI 3 citizen. Same drawing primitives as Core Graphics (paths, transforms, fills, strokes).
+**NuGet dependencies**:
+- `Microsoft.Graphics.Win2D` — 2D rendering (replaces Core Graphics). First-class WinUI 3 citizen.
+- `FluentIcons.WinUI` — [Fluent UI System Icons](https://github.com/microsoft/fluentui-system-icons) (~4000 icons). Covers SF Symbols equivalents that Segoe Fluent Icons lacks (straighten, flip, aspect ratio, etc.). Use `FluentIcons.` prefix in XAML.
+
+**SF Symbols → Fluent Icons mapping** (image editor):
+| SF Symbol (macOS) | Fluent Icon (Windows) | Usage |
+|---|---|---|
+| `circle.and.line.horizontal.fill` | `CircleLine16Filled` | Straighten tool |
+| `arrow.left.and.right.righttriangle.left.righttriangle.right` | `FlipHorizontal16Regular` | Flip horizontal |
+| `arrow.up.and.down.righttriangle.up.righttriangle.down` | `FlipVertical16Regular` | Flip vertical |
+| `aspectratio` | `RatioOneToOne16Regular` | Aspect ratio |
+| `crop` | `Crop16Regular` | Crop tool tab |
+| `arrow.uturn.backward` | `ArrowUndo16Regular` | Undo |
+| `arrow.uturn.forward` | `ArrowRedo16Regular` | Redo |
+| `minus` / `plus` | `Subtract16Regular` / `Add16Regular` | Zoom controls |
 
 ## What Needs to Happen Next
 
