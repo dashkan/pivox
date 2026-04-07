@@ -19,14 +19,14 @@ The image editor ("Edit" tool) is in the Library section of the Native App. It's
 **Phase 2: macOS Renderer + UI** — Functional, needs polish.
 
 - `native/platform/macos/objcpp/ImageEditorBridge.h/mm` — Obj-C++ bridge wrapping C++ engine
-- `native/platform/macos/swift/AdjustView.swift` — SwiftUI view + Core Graphics renderer (~770 lines)
+- `native/platform/macos/swift/ImageEditor/EditView.swift` — SwiftUI view + Core Graphics renderer (~770 lines)
 - 27 XCTest unit tests for the bridge layer (`ImageEditorBridgeTests.swift`)
 - 12 XCUITest UI tests (`ImageEditorUITests.swift`) — 2 passing, 10 failing (see Known Issues)
 
 ### Architecture
 
 ```
-SwiftUI (AdjustView.swift)
+SwiftUI (EditView.swift)
   │
   │  @Observable ImageEditModel
   │  reads IEBState, calls bridge methods
@@ -70,7 +70,7 @@ Modeled after macOS Photos app:
 - `native/platform/macos/CMakeLists.txt` — ARC enabled for all bridge .mm files (was only ImageEditorBridge.mm)
 - `native/platform/macos/objcpp/AppStateBridge.h` — added `NS_ASSUME_NONNULL_BEGIN/END`
 - `native/platform/macos/objcpp/ImageEditorBridge.h` — added `NS_ASSUME_NONNULL_BEGIN/END`, nullable annotations on all pointer params
-- `native/platform/macos/swift/AdjustView.swift` — tool panel changed from HStack to overlay (prevents window widening), NSView accessibility (`setAccessibilityElement`, `setAccessibilityRole`, `setAccessibilityIdentifier`), removed useless downcast warning
+- `native/platform/macos/swift/ImageEditor/EditView.swift` — tool panel changed from HStack to overlay (prevents window widening), NSView accessibility (`setAccessibilityElement`, `setAccessibilityRole`, `setAccessibilityIdentifier`), removed useless downcast warning
 - `native/platform/macos/swift/ContentView.swift` — dark mode via `NSWindow.appearance` instead of `.preferredColorScheme` + `.id()` (the `.id()` approach destroyed view state), `TEST_IMAGE_PATH` env var hook in LibraryPlaceholderView, accessibility identifiers on Library buttons
 - `native/platform/macos/swift/AuthService.swift` — added `UI_TESTING` env var (single flag resets auth + prefs + sticky tab), clears `selected_section` in RESET_PREFS
 - `native/tests/macos/ui/AuthUITests.swift` — fixed unused variable warning
