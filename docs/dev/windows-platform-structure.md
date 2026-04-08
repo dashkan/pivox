@@ -362,6 +362,138 @@ bridge.MoveAndResize({ pt.x, pt.y, width, height });
 
 Update this mapping in `WM_SIZE` to handle control resize.
 
+#### XAML content approaches — what works and what doesn't
+
+**Three approaches to setting XAML content in the island:**
+
+| Approach | Works? | Notes |
+|----------|--------|-------|
+| **Programmatic C++** (`Button btn; btn.Content(...)`) | **Yes** | No resource loading needed. Framework package provides all types. |
+| **`XamlReader::Load()` from string** | **Yes** | Parses XAML at runtime. Buttons, TextBlocks, SVG Path icons all render. No PRI/XBF needed. |
+| **Compiled XAML UserControl from external DLL** | **No** | Fails with `0x802B000A` (XAML parse). MRT can't find the XBF in the PRI. |
+
+**`XamlReader::Load()` is the recommended approach for XAML Islands content.** It avoids the MRT resource loading problem entirely while still allowing declarative XAML markup. Example:
+
+```cpp
+auto content = winrt::Microsoft::UI::Xaml::Markup::XamlReader::Load(
+    LR"(<StackPanel xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    Background="#1E1E1E" Padding="20" Spacing="16">
+        <TextBlock Text="Hello!" FontSize="24" Foreground="White" />
+        <Button Content="Click Me!" />
+        <Viewbox Width="48" Height="48">
+            <Canvas Width="24" Height="24">
+                <Path Fill="White" Data="M12 2C6.477..." />
+            </Canvas>
+        </Viewbox>
+    </StackPanel>)");
+xamlSource.Content(content.as<UIElement>());
+```
+
+#### WinRT component activation from external DLLs
+
+Plain WinRT runtimeclasses (non-XAML) activate successfully from external DLLs via manifest-based activation context:
+
+1. **Side-by-side manifest** (`ATLProject1.dll.manifest`) next to the ActiveX DLL with `activatableClass` entries
+2. **`CreateActCtxW` + `ActivateActCtx`** in the control's `OnCreate` to activate the manifest
+3. **`DllGetActivationFactory`** exported from the WinRT component DLL (via `.def` file mapping `WINRT_GetActivationFactory`)
+4. **`winrt::get_activation_factory<IActivationFactory>(className)`** to get the factory
+5. **`factory.ActivateInstance<T>()`** to create instances
+
+**Manifest format:**
+```xml
+<asmv3:file name="TestControls.dll">
+  <activatableClass name="TestControls.Greeter"
+      threadingModel="both" xmlns="urn:schemas-microsoft-com:winrt.v1" />
+</asmv3:file>
+```
+
+**Known issue:** The activation context cookie becomes invalid after the control is destroyed and recreated. Second insert in the test container fails with `CLASS_NOT_REGISTERED`. Fix: re-create the activation context on each `OnCreate`, or make it process-lifetime.
+
+#### Compiled XAML from external DLLs (UNSOLVED)
+
+Loading a compiled XAML `UserControl` from a WinRT component DLL fails with `0x802B000A`. The class activates (factory works) but `InitializeComponent()` can't load the XBF from the PRI.
+
+**Root cause:** MRT (Modern Resource Technology) isn't initialized for the component DLL's resources. In a normal WinUI 3 app, the `Application` object handles MRT initialization and metadata provider stitching. In XAML Islands without a full Application lifecycle, MRT doesn't know about external PRI files.
+
+**Possible solutions (not yet validated):**
+- Use `Microsoft.Windows.ApplicationModel.Resources.ResourceManager` to explicitly load the PRI
+- Create a proper `IXamlMetadataProvider` bridge that merges providers from the component DLL
+- Use `XamlReader::Load()` with string-based XAML instead of compiled XAML (proven working)
+
+#### WinRT component DLL project configuration
+
+The WinRT component DLL (TestControls) uses the **Windows Runtime Component (C++/WinRT)** VS template with these modifications:
+
+**NuGet packages:**
+- `Microsoft.Windows.CppWinRT` (latest)
+- `Microsoft.WindowsAppSDK` (1.8.x) — for `Microsoft.UI.Xaml` namespace
+
+**Key properties (in `<PropertyGroup Label="Globals">`):**
+```xml
+<CppWinRTOptimized>true</CppWinRTOptimized>
+<CppWinRTRootNamespaceAutoMerge>true</CppWinRTRootNamespaceAutoMerge>
+<CppWinRTGenerateWindowsMetadata>true</CppWinRTGenerateWindowsMetadata>
+<CppWinRTEnableLegacyCoroutines>false</CppWinRTEnableLegacyCoroutines>
+<AppContainerApplication>true</AppContainerApplication>
+<ApplicationType>Windows Store</ApplicationType>
+<WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
+```
+
+**DLL exports (`.def` file):**
+```
+EXPORTS
+DllCanUnloadNow = WINRT_CanUnloadNow                    PRIVATE
+DllGetActivationFactory = WINRT_GetActivationFactory    PRIVATE
+```
+
+**XAML code-behind pattern (from VS wizard):**
+```cpp
+// TestPanel.h — NO InitializeComponent in constructor
+TestPanel() { }
+
+// TestPanel.cpp — conditional include for generated code
+#include "pch.h"
+#include "TestPanel.h"
+#if __has_include("TestPanel.g.cpp")
+#include "TestPanel.g.cpp"
+#endif
+```
+
+## CMake porting plan
+
+When porting the proven pattern from `D:\activex\ATLProject1` back to the Pivox CMake project:
+
+### ActiveX target (PivoxActiveX)
+
+1. **Remove custom MIDL command** — use MSBuild-native MIDL with `CppWinRTProjectStyle=None` and `CppWinRTModernIDL=false` via `VS_GLOBAL_*` properties
+2. **Add `MddBootstrapInitialize`** in `OnCreate` with `std::once_flag` for process-wide init
+3. **Add `DispatcherQueueController::CreateOnCurrentThread`** guarded by `GetForCurrentThread()` check
+4. **Use `DesktopWindowXamlSource` + `Initialize(windowId)`** — NO `WindowsXamlManager`
+5. **Position via `SiteBridge().MoveAndResize()`** with coordinate mapping — NO `SetParent`
+6. **Use `XamlReader::Load()`** for XAML content from strings
+7. **Link `Microsoft.WindowsAppRuntime.Bootstrap.lib`** for bootstrap API
+8. **Embed manifest** with `activatableClass` entries for PivoxShared types
+9. **Copy `Microsoft.WindowsAppRuntime.Bootstrap.dll`** to output via MSBuild `Private=true`
+10. **Handle `WM_SIZE` and `WM_MOVE`** — call `UpdateBridgePosition()` on both
+
+### Shared library target (PivoxShared)
+
+1. **Keep current CMake configuration** — `CppWinRTComponent=true`, `UseWinUI=true`, `ApplicationType "Windows Store"`
+2. **Export `DllGetActivationFactory`/`DllCanUnloadNow`** via `.def` file mapping `WINRT_*` symbols
+3. **Plain runtimeclasses** (Greeter-style) work via manifest activation
+4. **Compiled XAML UserControls** need MRT solution (TBD) or `XamlReader::Load()` workaround
+
+### Key CMake properties mapping
+
+| MSBuild Property | CMake Equivalent |
+|-----------------|------------------|
+| `CppWinRTProjectStyle=None` | `VS_GLOBAL_CppWinRTProjectStyle "None"` |
+| `CppWinRTModernIDL=false` | `VS_GLOBAL_CppWinRTModernIDL "false"` |
+| `CppWinRTEnableLegacyCoroutines=false` | `VS_GLOBAL_CppWinRTEnableLegacyCoroutines "false"` |
+| `WindowsAppSDKSelfContained=false` | `VS_GLOBAL_WindowsAppSDKSelfContained "false"` |
+| `AppContainerApplication=false` | `VS_GLOBAL_AppContainerApplication "false"` |
+| Manifest embedding | `LINK_FLAGS "/MANIFEST:EMBED /MANIFESTINPUT:..."` |
+
 #### Framework-dependent deployment
 
 The ActiveX control is **not** self-contained — it requires the Windows App SDK runtime installed on the target machine. `MddBootstrapInitialize` loads the runtime from the MSIX framework package. Install via:
