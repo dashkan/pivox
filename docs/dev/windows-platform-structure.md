@@ -409,16 +409,52 @@ Plain WinRT runtimeclasses (non-XAML) activate successfully from external DLLs v
 
 **Known issue:** The activation context cookie becomes invalid after the control is destroyed and recreated. Second insert in the test container fails with `CLASS_NOT_REGISTERED`. Fix: re-create the activation context on each `OnCreate`, or make it process-lifetime.
 
-#### Compiled XAML from external DLLs (UNSOLVED)
+#### Compiled XAML from external DLLs (SOLVED — PRI merging)
 
-Loading a compiled XAML `UserControl` from a WinRT component DLL fails with `0x802B000A`. The class activates (factory works) but `InitializeComponent()` can't load the XBF from the PRI.
+Loading a compiled XAML `UserControl` from a WinRT component DLL initially fails with `0x802B000A` because MRT (Modern Resource Technology) can't find the XBF resources.
 
-**Root cause:** MRT (Modern Resource Technology) isn't initialized for the component DLL's resources. In a normal WinUI 3 app, the `Application` object handles MRT initialization and metadata provider stitching. In XAML Islands without a full Application lifecycle, MRT doesn't know about external PRI files.
+**Root cause:** In XAML Islands without an Application lifecycle, MRT only looks at `resources.pri` in the process/DLL directory. Component DLLs have their own `.pri` files but MRT doesn't discover them automatically.
 
-**Possible solutions (not yet validated):**
-- Use `Microsoft.Windows.ApplicationModel.Resources.ResourceManager` to explicitly load the PRI
-- Create a proper `IXamlMetadataProvider` bridge that merges providers from the component DLL
-- Use `XamlReader::Load()` with string-based XAML instead of compiled XAML (proven working)
+**Solution — merge PRIs at build time using `makepri`:**
+
+```cmd
+cd /d <output_directory>
+makepri createconfig /cf priconfig.xml /dq en-US /o
+makepri new /pr . /cf priconfig.xml /of resources.pri /o
+```
+
+This scans the output directory, finds all XBF resources and existing `.pri` files, and produces a merged `resources.pri`. MRT discovers this automatically.
+
+**Required directory structure (proven working):**
+```
+Debug/
+  ATLProject1.dll              # ActiveX control (host)
+  ATLProject1.dll.manifest     # Activation context manifest
+  TestControls.dll             # WinRT component with XAML UserControl
+  TestControls.pri             # Component's PRI (input to merge)
+  resources.pri                # Merged PRI (output of makepri)
+  TestControls/
+    TestPanel.xbf              # Compiled XAML binary
+  Microsoft.WindowsAppRuntime.Bootstrap.dll
+```
+
+**PRI resource mapping (from `makepri dump`):**
+```xml
+<ResourceMap name="TestControls">
+  <ResourceMapSubtree name="Files">
+    <ResourceMapSubtree name="TestControls">
+      <NamedResource name="TestPanel.xbf"
+          uri="ms-resource://TestControls/Files/TestControls/TestPanel.xbf">
+        <Value>TestControls\TestPanel.xbf</Value>
+      </NamedResource>
+    </ResourceMapSubtree>
+  </ResourceMapSubtree>
+</ResourceMap>
+```
+
+**For CMake:** Add a post-build step that runs `makepri createconfig` + `makepri new` to merge all component PRIs into `resources.pri`.
+
+**Note:** `makepri merge` does not exist in modern SDKs despite documentation suggesting otherwise. Use `makepri new /pr . /cf priconfig.xml /of resources.pri /o` instead.
 
 #### WinRT component DLL project configuration
 
