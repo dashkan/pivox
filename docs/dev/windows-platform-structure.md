@@ -272,263 +272,223 @@ Minimal Win32 application (`PivoxTestHost`) that `CoCreate`s and hosts the Activ
 
 The shared library and ActiveX control must never use `ms-appx:///` URIs. XAML Islands has no app package context. All resources use `{ThemeResource}`, `{StaticResource}`, inline path data, or programmatic loading.
 
-### WinUI 3 XAML Islands initialization (CRITICAL)
+### WinUI 3 XAML Islands in Win32 applications
 
-Hosting WinUI 3 content in an ActiveX control via XAML Islands required significant trial and error. The WinUI 3 API differs substantially from the UWP XAML Islands documentation on learn.microsoft.com. This section documents the **exact working pattern** and every dead end encountered.
+This section documents how to host WinUI 3 (`Microsoft.UI.Xaml`) content inside a Win32 window using XAML Islands with Windows App SDK 1.8+. The WinUI 3 API differs substantially from the UWP XAML Islands documentation on learn.microsoft.com — most UWP patterns do not work.
 
-**Reference implementation:** `D:\activex\ATLProject1` — a clean ATL project with a working WinUI 3 Button hosted via XAML Islands.
+#### Prerequisites
 
-#### The working initialization sequence
+- Windows App SDK 1.8+ runtime installed (`winget install Microsoft.WindowsAppRuntime.1.8`)
+- CppWinRT NuGet package
+- WindowsAppSDK NuGet package
+- `Microsoft.WindowsAppRuntime.Bootstrap.dll` in the output directory
+- The host window must be a real HWND (not windowless)
+
+#### Initialization sequence
+
+All steps happen on the UI thread, typically in a window creation handler:
 
 ```cpp
-// In WM_CREATE handler (control must have m_bWindowOnly = TRUE):
+#include <WindowsAppSDK-VersionInfo.h>
+#include <MddBootstrap.h>
+#include <winrt/Microsoft.UI.Dispatching.h>
+#include <winrt/Microsoft.UI.Xaml.Hosting.h>
+#include <winrt/Microsoft.UI.Xaml.Controls.h>
+#include <winrt/Microsoft.UI.Interop.h>
 
-// 1. Bootstrap Windows App SDK runtime (process-wide, once).
+// 1. Bootstrap Windows App SDK (process-wide, once).
+//    Links against Microsoft.WindowsAppRuntime.Bootstrap.lib.
 PACKAGE_VERSION minVersion{};
 minVersion.Version = WINDOWSAPPSDK_RUNTIME_VERSION_UINT64;
 MddBootstrapInitialize(WINDOWSAPPSDK_RELEASE_MAJORMINOR,
     WINDOWSAPPSDK_RELEASE_VERSION_TAG_W, minVersion);
 
 // 2. DispatcherQueue (thread-level, once).
-if (!DispatcherQueue::GetForCurrentThread())
-    dispatcherController = DispatcherQueueController::CreateOnCurrentThread();
+if (!winrt::Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread())
+    auto controller = winrt::Microsoft::UI::Dispatching::
+        DispatcherQueueController::CreateOnCurrentThread();
 
-// 3. Create XAML Island — NO WindowsXamlManager.
-xamlSource = DesktopWindowXamlSource();
+// 3. Create the XAML Island source.
+auto xamlSource = winrt::Microsoft::UI::Xaml::Hosting::DesktopWindowXamlSource();
 
-// 4. Initialize with top-level window's WindowId.
-HWND topLevel = ::GetAncestor(m_hWnd, GA_ROOT);
-auto windowId = GetWindowIdFromWindow(topLevel);
+// 4. Initialize with the top-level ancestor window's WindowId.
+HWND topLevel = ::GetAncestor(hwnd, GA_ROOT);
+auto windowId = winrt::Microsoft::UI::GetWindowIdFromWindow(topLevel);
 xamlSource.Initialize(windowId);
 
-// 5. Position the SiteBridge — NO SetParent.
+// 5. Position the SiteBridge inside the host window.
+//    The bridge is a child of the top-level window, not the host.
+//    Map host client coordinates to the top-level window's client space.
 auto bridge = xamlSource.SiteBridge();
 POINT pt = { 0, 0 };
-::ClientToScreen(m_hWnd, &pt);
+::ClientToScreen(hwnd, &pt);
 ::ScreenToClient(topLevel, &pt);
 RECT rc;
-::GetClientRect(m_hWnd, &rc);
+::GetClientRect(hwnd, &rc);
 bridge.MoveAndResize({ pt.x, pt.y, rc.right, rc.bottom });
 bridge.Show();
 
-// 6. Set WinUI content.
-Controls::Button btn;
+// 6. Set content.
+winrt::Microsoft::UI::Xaml::Controls::Button btn;
 btn.Content(winrt::box_value(L"Hello XAML Islands!"));
 xamlSource.Content(btn);
 ```
 
-#### Dead ends — what does NOT work
+Reposition the bridge on both `WM_SIZE` and `WM_MOVE` using the same coordinate mapping.
+
+#### What does NOT work with WinUI 3
 
 | Approach | Error | Why |
 |----------|-------|-----|
-| `WindowsXamlManager::InitializeForCurrentThread()` before `Initialize(windowId)` | `RO_E_CLOSED` (0x80000013) on `Initialize()` | WindowsXamlManager takes ownership of the XAML runtime lifecycle. Calling `Initialize(windowId)` after it conflicts — the source is already "closed" from WindowsXamlManager's perspective. |
-| `WindowsXamlManager` without `Initialize(windowId)` | `SiteBridge()` returns null, crash in `ActivateInstance` during rendering | Without `Initialize(windowId)`, the `DesktopWindowXamlSource` has no window association. SiteBridge is null. Even if content is set, the XAML renderer crashes trying to activate internal types. |
-| `IDesktopWindowXamlSourceNative2::AttachToWindow()` | `E_NOINTERFACE` (0x80004002) | This is the **UWP XAML Islands** COM interop interface (`Windows.UI.Xaml`). WinUI 3's `DesktopWindowXamlSource` (`Microsoft.UI.Xaml`) does not implement it. |
-| `SetParent(bridgeHwnd, controlHwnd)` | `RO_E_CLOSED` on next `bridge.MoveAndResize()` | Reparenting the SiteBridge's HWND breaks its internal state. The bridge was created as a child of the top-level window by `Initialize(windowId)`. `SetParent` invalidates that relationship. |
-| `Application` via `IApplicationFactory::CreateInstance()` | Crash in `ActivateInstance` during rendering | Creating a raw Application object doesn't initialize the XAML type system. The internal activation factories remain null. Standard controls (TextBlock, Button) crash during rendering. |
-| `Application::Start()` | Blocks forever | `Start()` runs its own message loop. In an ActiveX control, the host owns the message loop. Never call `Start()`. |
-| Windowless control (default ATL) | `m_hWnd` is null | XAML Islands requires a real HWND. Set `m_bWindowOnly = TRUE` in the control constructor. |
+| `WindowsXamlManager::InitializeForCurrentThread()` then `Initialize(windowId)` | `RO_E_CLOSED` (0x80000013) | They conflict — WindowsXamlManager takes ownership of the XAML lifecycle |
+| `WindowsXamlManager` without `Initialize(windowId)` | `SiteBridge()` returns null | No window association, renderer crashes on internal type activation |
+| `IDesktopWindowXamlSourceNative2::AttachToWindow()` | `E_NOINTERFACE` (0x80004002) | UWP-only interface, not implemented on WinUI 3's DesktopWindowXamlSource |
+| `SetParent(bridgeHwnd, hostHwnd)` | `RO_E_CLOSED` on `MoveAndResize()` | Reparenting breaks the bridge's internal state |
+| `Application::Start()` | Blocks forever | It runs its own message loop; the host process owns the pump |
+| `IApplicationFactory::CreateInstance()` | Crash in `ActivateInstance` | Doesn't initialize the type system; internal factories are null |
 
-#### Build configuration — COM IDL + CppWinRT coexistence
+#### Hosting compiled XAML from external WinRT component DLLs
 
-An ATL ActiveX project has COM IDL (for the control's interfaces/coclass). Adding CppWinRT NuGet causes CppWinRT to hijack MIDL processing, trying to generate `.winmd` from COM IDL and run `mdmerge`. This fails because COM IDL produces `.tlb`, not `.winmd`.
+To load XAML `UserControl`s from a separate WinRT component DLL, three pieces must be in place:
 
-**Solution — three MSBuild properties in the project's `<PropertyGroup Label="Globals">`:**
+**1. Side-by-side manifest for WinRT activation**
+
+The host DLL needs a manifest file (`<host>.dll.manifest`) next to it registering each WinRT type from the component:
 
 ```xml
-<!-- Consume WinRT APIs but don't generate .winmd from COM IDL -->
-<CppWinRTOptimized>true</CppWinRTOptimized>
-<CppWinRTProjectStyle>None</CppWinRTProjectStyle>
-<CppWinRTModernIDL>false</CppWinRTModernIDL>
+<?xml version="1.0" encoding="utf-8"?>
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1"
+          xmlns:asmv3="urn:schemas-microsoft-com:asm.v3">
+  <assemblyIdentity version="1.0.0.0" name="MyHost"/>
+  <asmv3:file name="MyComponent.dll">
+    <activatableClass name="MyComponent.MyControl"
+        threadingModel="both" xmlns="urn:schemas-microsoft-com:winrt.v1" />
+    <activatableClass name="MyComponent.XamlMetaDataProvider"
+        threadingModel="both" xmlns="urn:schemas-microsoft-com:winrt.v1" />
+  </asmv3:file>
+</assembly>
 ```
 
-| Property | Effect |
-|----------|--------|
-| `CppWinRTProjectStyle=None` | Skips `mdmerge` — no .winmd merge step |
-| `CppWinRTModernIDL=false` | Prevents CppWinRT from injecting `/reference` flags and `/nomidl` into MIDL. COM IDL is processed by standard MIDL, producing `.tlb`, `_i.h`, `_i.c`. |
-| No `CppWinRTEnabled` | Let the NuGet package set this automatically. Setting it explicitly changes `CppWinRTPath` and breaks the `cppwinrt.exe` tool path. |
-| No `UseWinUI` | The ActiveX project has no XAML files. `UseWinUI` triggers XAML compilation which conflicts with COM IDL processing. |
+The host must activate this manifest at startup using `CreateActCtxW` + `ActivateActCtx`.
 
-#### SiteBridge positioning
+**2. WinRT component DLL exports**
 
-The `SiteBridge` is a child of the **top-level window** (set by `Initialize(windowId)`), not the control's HWND. To position XAML content inside the ActiveX control, map the control's client coordinates to the top-level window's client coordinates:
+The component DLL must export `DllGetActivationFactory` and `DllCanUnloadNow`. CppWinRT's `module.g.cpp` generates `WINRT_GetActivationFactory` and `WINRT_CanUnloadNow` — map them via a `.def` file:
 
-```cpp
-POINT pt = { 0, 0 };
-::ClientToScreen(m_hWnd, &pt);          // Control → screen
-::ScreenToClient(topLevelHwnd, &pt);     // Screen → top-level client
-bridge.MoveAndResize({ pt.x, pt.y, width, height });
-```
-
-Update this mapping in `WM_SIZE` to handle control resize.
-
-#### XAML content approaches — what works and what doesn't
-
-**Three approaches to setting XAML content in the island:**
-
-| Approach | Works? | Notes |
-|----------|--------|-------|
-| **Programmatic C++** (`Button btn; btn.Content(...)`) | **Yes** | No resource loading needed. Framework package provides all types. |
-| **`XamlReader::Load()` from string** | **Yes** | Parses XAML at runtime. Buttons, TextBlocks, SVG Path icons all render. No PRI/XBF needed. |
-| **Compiled XAML UserControl from external DLL** | **No** | Fails with `0x802B000A` (XAML parse). MRT can't find the XBF in the PRI. |
-
-**`XamlReader::Load()` is the recommended approach for XAML Islands content.** It avoids the MRT resource loading problem entirely while still allowing declarative XAML markup. Example:
-
-```cpp
-auto content = winrt::Microsoft::UI::Xaml::Markup::XamlReader::Load(
-    LR"(<StackPanel xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    Background="#1E1E1E" Padding="20" Spacing="16">
-        <TextBlock Text="Hello!" FontSize="24" Foreground="White" />
-        <Button Content="Click Me!" />
-        <Viewbox Width="48" Height="48">
-            <Canvas Width="24" Height="24">
-                <Path Fill="White" Data="M12 2C6.477..." />
-            </Canvas>
-        </Viewbox>
-    </StackPanel>)");
-xamlSource.Content(content.as<UIElement>());
-```
-
-#### WinRT component activation from external DLLs
-
-Plain WinRT runtimeclasses (non-XAML) activate successfully from external DLLs via manifest-based activation context:
-
-1. **Side-by-side manifest** (`ATLProject1.dll.manifest`) next to the ActiveX DLL with `activatableClass` entries
-2. **`CreateActCtxW` + `ActivateActCtx`** in the control's `OnCreate` to activate the manifest
-3. **`DllGetActivationFactory`** exported from the WinRT component DLL (via `.def` file mapping `WINRT_GetActivationFactory`)
-4. **`winrt::get_activation_factory<IActivationFactory>(className)`** to get the factory
-5. **`factory.ActivateInstance<T>()`** to create instances
-
-**Manifest format:**
-```xml
-<asmv3:file name="TestControls.dll">
-  <activatableClass name="TestControls.Greeter"
-      threadingModel="both" xmlns="urn:schemas-microsoft-com:winrt.v1" />
-</asmv3:file>
-```
-
-**Known issue:** The activation context cookie becomes invalid after the control is destroyed and recreated. Second insert in the test container fails with `CLASS_NOT_REGISTERED`. Fix: re-create the activation context on each `OnCreate`, or make it process-lifetime.
-
-#### Compiled XAML from external DLLs (SOLVED — PRI merging)
-
-Loading a compiled XAML `UserControl` from a WinRT component DLL initially fails with `0x802B000A` because MRT (Modern Resource Technology) can't find the XBF resources.
-
-**Root cause:** In XAML Islands without an Application lifecycle, MRT only looks at `resources.pri` in the process/DLL directory. Component DLLs have their own `.pri` files but MRT doesn't discover them automatically.
-
-**Solution — merge PRIs at build time using `makepri`:**
-
-```cmd
-cd /d <output_directory>
-makepri createconfig /cf priconfig.xml /dq en-US /o
-makepri new /pr . /cf priconfig.xml /of resources.pri /o
-```
-
-This scans the output directory, finds all XBF resources and existing `.pri` files, and produces a merged `resources.pri`. MRT discovers this automatically.
-
-**Required directory structure (proven working):**
-```
-Debug/
-  ATLProject1.dll              # ActiveX control (host)
-  ATLProject1.dll.manifest     # Activation context manifest
-  TestControls.dll             # WinRT component with XAML UserControl
-  TestControls.pri             # Component's PRI (input to merge)
-  resources.pri                # Merged PRI (output of makepri)
-  TestControls/
-    TestPanel.xbf              # Compiled XAML binary
-  Microsoft.WindowsAppRuntime.Bootstrap.dll
-```
-
-**PRI resource mapping (from `makepri dump`):**
-```xml
-<ResourceMap name="TestControls">
-  <ResourceMapSubtree name="Files">
-    <ResourceMapSubtree name="TestControls">
-      <NamedResource name="TestPanel.xbf"
-          uri="ms-resource://TestControls/Files/TestControls/TestPanel.xbf">
-        <Value>TestControls\TestPanel.xbf</Value>
-      </NamedResource>
-    </ResourceMapSubtree>
-  </ResourceMapSubtree>
-</ResourceMap>
-```
-
-**For CMake:** Add a post-build step that runs `makepri createconfig` + `makepri new` to merge all component PRIs into `resources.pri`.
-
-**Note:** `makepri merge` does not exist in modern SDKs despite documentation suggesting otherwise. Use `makepri new /pr . /cf priconfig.xml /of resources.pri /o` instead.
-
-#### WinRT component DLL project configuration
-
-The WinRT component DLL (TestControls) uses the **Windows Runtime Component (C++/WinRT)** VS template with these modifications:
-
-**NuGet packages:**
-- `Microsoft.Windows.CppWinRT` (latest)
-- `Microsoft.WindowsAppSDK` (1.8.x) — for `Microsoft.UI.Xaml` namespace
-
-**Key properties (in `<PropertyGroup Label="Globals">`):**
-```xml
-<CppWinRTOptimized>true</CppWinRTOptimized>
-<CppWinRTRootNamespaceAutoMerge>true</CppWinRTRootNamespaceAutoMerge>
-<CppWinRTGenerateWindowsMetadata>true</CppWinRTGenerateWindowsMetadata>
-<CppWinRTEnableLegacyCoroutines>false</CppWinRTEnableLegacyCoroutines>
-<AppContainerApplication>true</AppContainerApplication>
-<ApplicationType>Windows Store</ApplicationType>
-<WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
-```
-
-**DLL exports (`.def` file):**
 ```
 EXPORTS
 DllCanUnloadNow = WINRT_CanUnloadNow                    PRIVATE
 DllGetActivationFactory = WINRT_GetActivationFactory    PRIVATE
 ```
 
-**XAML code-behind pattern (from VS wizard):**
-```cpp
-// TestPanel.h — NO InitializeComponent in constructor
-TestPanel() { }
+**3. Merged PRI for XAML resource loading (MRT)**
 
-// TestPanel.cpp — conditional include for generated code
-#include "pch.h"
-#include "TestPanel.h"
-#if __has_include("TestPanel.g.cpp")
-#include "TestPanel.g.cpp"
-#endif
+MRT (Modern Resource Technology) resolves compiled XAML binaries (XBF) via `.pri` files. In unpackaged apps, MRT only discovers `resources.pri` in the process/DLL directory. Component DLLs have their own `.pri` files but MRT ignores them.
+
+**Solution:** Merge all PRIs into a single `resources.pri` at build time:
+
+```cmd
+makepri createconfig /cf priconfig.xml /dq en-US /o
+makepri new /pr <output_directory> /cf priconfig.xml /of resources.pri /o
 ```
 
-## CMake porting plan
+This scans the directory tree, finds all XBF files and existing `.pri` files, and produces a merged `resources.pri`.
 
-When porting the proven pattern from `D:\activex\ATLProject1` back to the Pivox CMake project:
+**Note:** `makepri merge` does not exist in modern Windows SDKs despite some documentation suggesting otherwise.
 
-### ActiveX target (PivoxActiveX)
+**Required output directory structure:**
+```
+<output>/
+  MyHost.dll                       # Host DLL
+  MyHost.dll.manifest              # Activation context
+  MyComponent.dll                  # WinRT component
+  MyComponent.pri                  # Component's PRI (input to merge)
+  resources.pri                    # Merged PRI (output of makepri)
+  MyComponent/
+    MyControl.xbf                  # Compiled XAML binary
+  Microsoft.WindowsAppRuntime.Bootstrap.dll
+```
 
-1. **Remove custom MIDL command** — use MSBuild-native MIDL with `CppWinRTProjectStyle=None` and `CppWinRTModernIDL=false` via `VS_GLOBAL_*` properties
-2. **Add `MddBootstrapInitialize`** in `OnCreate` with `std::once_flag` for process-wide init
-3. **Add `DispatcherQueueController::CreateOnCurrentThread`** guarded by `GetForCurrentThread()` check
-4. **Use `DesktopWindowXamlSource` + `Initialize(windowId)`** — NO `WindowsXamlManager`
-5. **Position via `SiteBridge().MoveAndResize()`** with coordinate mapping — NO `SetParent`
-6. **Use `XamlReader::Load()`** for XAML content from strings
-7. **Link `Microsoft.WindowsAppRuntime.Bootstrap.lib`** for bootstrap API
-8. **Embed manifest** with `activatableClass` entries for PivoxShared types
-9. **Copy `Microsoft.WindowsAppRuntime.Bootstrap.dll`** to output via MSBuild `Private=true`
-10. **Handle `WM_SIZE` and `WM_MOVE`** — call `UpdateBridgePosition()` on both
+#### XAML content approaches
 
-### Shared library target (PivoxShared)
+| Approach | Works? | Tradeoffs |
+|----------|--------|-----------|
+| **Programmatic C++** | Yes | No resource loading needed. Verbose. |
+| **`XamlReader::Load()` from string** | Yes | Runtime XAML parsing. No `x:Name` bindings. No compile-time validation. |
+| **Compiled XAML from external DLL** | Yes (with PRI merge) | Best performance. Requires build-time PRI merge and activation manifest. |
 
-1. **Keep current CMake configuration** — `CppWinRTComponent=true`, `UseWinUI=true`, `ApplicationType "Windows Store"`
-2. **Export `DllGetActivationFactory`/`DllCanUnloadNow`** via `.def` file mapping `WINRT_*` symbols
-3. **Plain runtimeclasses** (Greeter-style) work via manifest activation
-4. **Compiled XAML UserControls** need MRT solution (TBD) or `XamlReader::Load()` workaround
+#### Build configuration — COM IDL + CppWinRT in the same project
 
-### Key CMake properties mapping
+When a project has both COM IDL (`.idl` producing `.tlb`) and needs CppWinRT for WinRT API consumption, CppWinRT's build targets hijack MIDL and try to produce `.winmd` from the COM IDL. This fails.
 
-| MSBuild Property | CMake Equivalent |
-|-----------------|------------------|
+**Solution — MSBuild properties in `<PropertyGroup Label="Globals">`:**
+
+```xml
+<CppWinRTOptimized>true</CppWinRTOptimized>
+<CppWinRTProjectStyle>None</CppWinRTProjectStyle>
+<CppWinRTModernIDL>false</CppWinRTModernIDL>
+<CppWinRTEnableLegacyCoroutines>false</CppWinRTEnableLegacyCoroutines>
+```
+
+| Property | Effect |
+|----------|--------|
+| `CppWinRTProjectStyle=None` | Skips `mdmerge` — no `.winmd` generation from COM IDL |
+| `CppWinRTModernIDL=false` | Standard MIDL for COM IDL (produces `.tlb`, `_i.h`, `_i.c`) |
+| `CppWinRTEnableLegacyCoroutines=false` | Suppresses `/await` deprecation warning on VS 2026 |
+| Do NOT set `CppWinRTEnabled` | Let the NuGet package set it; explicit values break tool paths |
+| Do NOT set `UseWinUI` | Triggers XAML compilation which conflicts with COM IDL |
+
+**CMake equivalents:**
+
+| MSBuild Property | CMake |
+|-----------------|-------|
 | `CppWinRTProjectStyle=None` | `VS_GLOBAL_CppWinRTProjectStyle "None"` |
 | `CppWinRTModernIDL=false` | `VS_GLOBAL_CppWinRTModernIDL "false"` |
 | `CppWinRTEnableLegacyCoroutines=false` | `VS_GLOBAL_CppWinRTEnableLegacyCoroutines "false"` |
-| `WindowsAppSDKSelfContained=false` | `VS_GLOBAL_WindowsAppSDKSelfContained "false"` |
-| `AppContainerApplication=false` | `VS_GLOBAL_AppContainerApplication "false"` |
-| Manifest embedding | `LINK_FLAGS "/MANIFEST:EMBED /MANIFESTINPUT:..."` |
+
+#### WinRT component DLL configuration
+
+Use the **Windows Runtime Component (C++/WinRT)** Visual Studio template. Key properties:
+
+```xml
+<CppWinRTOptimized>true</CppWinRTOptimized>
+<CppWinRTRootNamespaceAutoMerge>true</CppWinRTRootNamespaceAutoMerge>
+<CppWinRTGenerateWindowsMetadata>true</CppWinRTGenerateWindowsMetadata>
+<CppWinRTEnableLegacyCoroutines>false</CppWinRTEnableLegacyCoroutines>
+<ApplicationType>Windows Store</ApplicationType>
+<WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
+```
+
+`SelfContained=false` prevents copying 36 WinUI runtime DLLs to the output — the host's bootstrap loads them from the framework package.
+
+XAML code-behind pattern — do NOT call `InitializeComponent` in the constructor:
+
+```cpp
+// MyControl.h
+MyControl() { }  // No InitializeComponent here
+
+// MyControl.cpp
+#include "pch.h"
+#include "MyControl.h"
+#if __has_include("MyControl.g.cpp")
+#include "MyControl.g.cpp"
+#endif
+```
+
+#### Lifecycle
+
+1. Initialize: Bootstrap → DispatcherQueue → DesktopWindowXamlSource → Initialize(windowId) → SiteBridge → Content
+2. Resize/Move: Remap coordinates and call `bridge.MoveAndResize()`
+3. Shutdown: Close `DesktopWindowXamlSource` before releasing COM references. Do NOT call `MddBootstrapShutdown` if other instances may still be active.
+
+#### Framework-dependent deployment
+
+The control requires the Windows App SDK runtime on the target machine:
+```
+winget install Microsoft.WindowsAppRuntime.1.8
+```
+
+`Microsoft.WindowsAppRuntime.Bootstrap.dll` must be in the same directory as the host DLL.
 
 #### Framework-dependent deployment
 
