@@ -27,7 +27,10 @@ static void InitServicesOnce() {
     pivox::PivoxServices::initialize(appState, authService);
 }
 
-CPivoxControl::CPivoxControl() = default;
+CPivoxControl::CPivoxControl() {
+    // XAML Islands requires a real HWND — force windowed mode.
+    m_bWindowOnly = TRUE;
+}
 
 void CPivoxControl::FinalRelease() {
     dragSource_.Detach();
@@ -35,6 +38,8 @@ void CPivoxControl::FinalRelease() {
 }
 
 HRESULT CPivoxControl::OnDraw(ATL_DRAWINFO& di) {
+    if (xamlHost_.IsInitialized()) return S_OK; // XAML Islands handles rendering.
+
     RECT& rc = *const_cast<RECT*>(reinterpret_cast<const RECT*>(di.prcBounds));
     Rectangle(di.hdcDraw, rc.left, rc.top, rc.right, rc.bottom);
     SetTextAlign(di.hdcDraw, TA_CENTER | TA_BASELINE);
@@ -46,31 +51,29 @@ HRESULT CPivoxControl::OnDraw(ATL_DRAWINFO& di) {
     return S_OK;
 }
 
-STDMETHODIMP CPivoxControl::DoVerb(
-    LONG iVerb, LPMSG lpmsg, IOleClientSite* pActiveSite,
-    LONG lindex, HWND hwndParent, LPCRECT lprcPosRect)
-{
-    if (iVerb == OLEIVERB_INPLACEACTIVATE || iVerb == OLEIVERB_UIACTIVATE ||
-        iVerb == OLEIVERB_SHOW)
-    {
-        HRESULT hr = IOleObjectImpl<CPivoxControl>::DoVerb(
-            iVerb, lpmsg, pActiveSite, lindex, hwndParent, lprcPosRect);
-        if (FAILED(hr)) return hr;
+LRESULT CPivoxControl::OnCreate(UINT, WPARAM, LPARAM, BOOL& bHandled) {
+    bHandled = FALSE; // Let ATL process too.
 
-        if (!xamlHost_.IsInitialized() && m_hWnd) {
-            std::call_once(s_servicesInit, InitServicesOnce);
-            if (FAILED(s_servicesInitResult)) return s_servicesInitResult;
-
-            hr = xamlHost_.Initialize(m_hWnd);
-            if (FAILED(hr)) return hr;
-
-            xamlHost_.NavigateTo(L"Pivox.LoginPage");
-        }
-        return S_OK;
+    std::call_once(s_servicesInit, InitServicesOnce);
+    if (FAILED(s_servicesInitResult)) {
+        wchar_t buf[128];
+        swprintf_s(buf, L"[PivoxActiveX] InitServices failed: 0x%08X\n", s_servicesInitResult);
+        OutputDebugStringW(buf);
+        if (IsDebuggerPresent()) __debugbreak();
+        return 0;
     }
 
-    return IOleObjectImpl<CPivoxControl>::DoVerb(
-        iVerb, lpmsg, pActiveSite, lindex, hwndParent, lprcPosRect);
+    HRESULT hr = xamlHost_.Initialize(m_hWnd);
+    if (FAILED(hr)) return 0;  // XamlIslandHost logs the error.
+
+    hr = xamlHost_.NavigateTo(L"Pivox.LoginPage");
+    if (FAILED(hr)) {
+        wchar_t buf[128];
+        swprintf_s(buf, L"[PivoxActiveX] NavigateTo failed: 0x%08X\n", hr);
+        OutputDebugStringW(buf);
+        if (IsDebuggerPresent()) __debugbreak();
+    }
+    return 0;
 }
 
 STDMETHODIMP CPivoxControl::InPlaceDeactivate() {

@@ -62,6 +62,7 @@ END_CONNECTION_POINT_MAP()
 
 BEGIN_MSG_MAP(CPivoxControl)
     CHAIN_MSG_MAP(CComControl<CPivoxControl>)
+    MESSAGE_HANDLER(WM_CREATE, OnCreate)
     MESSAGE_HANDLER(WM_SIZE, OnSize)
     DEFAULT_REFLECTION_HANDLER()
 END_MSG_MAP()
@@ -70,10 +71,6 @@ END_MSG_MAP()
 
     // IViewObjectEx — fallback rendering when XAML Islands isn't active.
     HRESULT OnDraw(ATL_DRAWINFO& di);
-
-    // IOleObject override — initialize XAML Islands on activation.
-    STDMETHOD(DoVerb)(LONG iVerb, LPMSG lpmsg, IOleClientSite* pActiveSite,
-                      LONG lindex, HWND hwndParent, LPCRECT lprcPosRect) override;
 
     // IOleInPlaceObject — clean XAML Islands shutdown.
     STDMETHOD(InPlaceDeactivate)() override;
@@ -89,6 +86,7 @@ END_MSG_MAP()
     void FinalRelease();
 
 private:
+    LRESULT OnCreate(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
     LRESULT OnSize(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
 
     pivox::XamlIslandHost xamlHost_;

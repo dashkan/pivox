@@ -81,12 +81,18 @@ set_source_files_properties(${AX_DIR}/PivoxActiveX.rc PROPERTIES
     VS_SETTINGS "AdditionalIncludeDirectories=${AX_MIDL_OUT}"
 )
 
-target_link_libraries(${AX_TARGET} PRIVATE PivoxShared pivox_win_state crypt32 advapi32)
+# Bootstrap lib for MddBootstrapInitialize (XAML Islands in unpackaged apps).
+set(WASDK_FOUNDATION "Microsoft.WindowsAppSDK.Foundation")
+set(WASDK_FOUNDATION_VER "1.8.260222000")
+set(WASDK_BOOTSTRAP_LIB
+    "$ENV{USERPROFILE}/.nuget/packages/${WASDK_FOUNDATION}/${WASDK_FOUNDATION_VER}/lib/native/${FB_ARCH}/Microsoft.WindowsAppRuntime.Bootstrap.lib")
+target_link_libraries(${AX_TARGET} PRIVATE PivoxShared pivox_win_state crypt32 advapi32
+    "${WASDK_BOOTSTRAP_LIB}")
 target_precompile_headers(${AX_TARGET} PRIVATE ${AX_DIR}/pch.h)
 
-# Use .def file for DLL exports.
+# Use .def file for DLL exports. Embed manifest for XAML Islands support.
 set_target_properties(${AX_TARGET} PROPERTIES
-    LINK_FLAGS "/DEF:\"${AX_DIR}/PivoxControl.def\""
+    LINK_FLAGS "/DEF:\"${AX_DIR}/PivoxControl.def\" /MANIFEST:EMBED /MANIFESTINPUT:\"${AX_DIR}/PivoxActiveX.manifest\""
 )
 
 # CppWinRT provides WinRT projection headers (winrt/Microsoft.UI.Xaml.h etc.)
