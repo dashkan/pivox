@@ -272,22 +272,117 @@ Minimal Win32 application (`PivoxTestHost`) that `CoCreate`s and hosts the Activ
 
 The shared library and ActiveX control must never use `ms-appx:///` URIs. XAML Islands has no app package context. All resources use `{ThemeResource}`, `{StaticResource}`, inline path data, or programmatic loading.
 
-### Message loop integration
+### WinUI 3 XAML Islands initialization (CRITICAL)
 
-The ActiveX host owns the message loop. The XAML Island's dispatcher must integrate with the host's pump via `IDesktopWindowXamlSourceNative2::PreTranslateMessage`. The `XamlIslandHost::ProcessMessage()` method handles this — the host should call it for each `MSG` before `TranslateMessage`/`DispatchMessage`.
+Hosting WinUI 3 content in an ActiveX control via XAML Islands required significant trial and error. The WinUI 3 API differs substantially from the UWP XAML Islands documentation on learn.microsoft.com. This section documents the **exact working pattern** and every dead end encountered.
+
+**Reference implementation:** `D:\activex\ATLProject1` — a clean ATL project with a working WinUI 3 Button hosted via XAML Islands.
+
+#### The working initialization sequence
+
+```cpp
+// In WM_CREATE handler (control must have m_bWindowOnly = TRUE):
+
+// 1. Bootstrap Windows App SDK runtime (process-wide, once).
+PACKAGE_VERSION minVersion{};
+minVersion.Version = WINDOWSAPPSDK_RUNTIME_VERSION_UINT64;
+MddBootstrapInitialize(WINDOWSAPPSDK_RELEASE_MAJORMINOR,
+    WINDOWSAPPSDK_RELEASE_VERSION_TAG_W, minVersion);
+
+// 2. DispatcherQueue (thread-level, once).
+if (!DispatcherQueue::GetForCurrentThread())
+    dispatcherController = DispatcherQueueController::CreateOnCurrentThread();
+
+// 3. Create XAML Island — NO WindowsXamlManager.
+xamlSource = DesktopWindowXamlSource();
+
+// 4. Initialize with top-level window's WindowId.
+HWND topLevel = ::GetAncestor(m_hWnd, GA_ROOT);
+auto windowId = GetWindowIdFromWindow(topLevel);
+xamlSource.Initialize(windowId);
+
+// 5. Position the SiteBridge — NO SetParent.
+auto bridge = xamlSource.SiteBridge();
+POINT pt = { 0, 0 };
+::ClientToScreen(m_hWnd, &pt);
+::ScreenToClient(topLevel, &pt);
+RECT rc;
+::GetClientRect(m_hWnd, &rc);
+bridge.MoveAndResize({ pt.x, pt.y, rc.right, rc.bottom });
+bridge.Show();
+
+// 6. Set WinUI content.
+Controls::Button btn;
+btn.Content(winrt::box_value(L"Hello XAML Islands!"));
+xamlSource.Content(btn);
+```
+
+#### Dead ends — what does NOT work
+
+| Approach | Error | Why |
+|----------|-------|-----|
+| `WindowsXamlManager::InitializeForCurrentThread()` before `Initialize(windowId)` | `RO_E_CLOSED` (0x80000013) on `Initialize()` | WindowsXamlManager takes ownership of the XAML runtime lifecycle. Calling `Initialize(windowId)` after it conflicts — the source is already "closed" from WindowsXamlManager's perspective. |
+| `WindowsXamlManager` without `Initialize(windowId)` | `SiteBridge()` returns null, crash in `ActivateInstance` during rendering | Without `Initialize(windowId)`, the `DesktopWindowXamlSource` has no window association. SiteBridge is null. Even if content is set, the XAML renderer crashes trying to activate internal types. |
+| `IDesktopWindowXamlSourceNative2::AttachToWindow()` | `E_NOINTERFACE` (0x80004002) | This is the **UWP XAML Islands** COM interop interface (`Windows.UI.Xaml`). WinUI 3's `DesktopWindowXamlSource` (`Microsoft.UI.Xaml`) does not implement it. |
+| `SetParent(bridgeHwnd, controlHwnd)` | `RO_E_CLOSED` on next `bridge.MoveAndResize()` | Reparenting the SiteBridge's HWND breaks its internal state. The bridge was created as a child of the top-level window by `Initialize(windowId)`. `SetParent` invalidates that relationship. |
+| `Application` via `IApplicationFactory::CreateInstance()` | Crash in `ActivateInstance` during rendering | Creating a raw Application object doesn't initialize the XAML type system. The internal activation factories remain null. Standard controls (TextBlock, Button) crash during rendering. |
+| `Application::Start()` | Blocks forever | `Start()` runs its own message loop. In an ActiveX control, the host owns the message loop. Never call `Start()`. |
+| Windowless control (default ATL) | `m_hWnd` is null | XAML Islands requires a real HWND. Set `m_bWindowOnly = TRUE` in the control constructor. |
+
+#### Build configuration — COM IDL + CppWinRT coexistence
+
+An ATL ActiveX project has COM IDL (for the control's interfaces/coclass). Adding CppWinRT NuGet causes CppWinRT to hijack MIDL processing, trying to generate `.winmd` from COM IDL and run `mdmerge`. This fails because COM IDL produces `.tlb`, not `.winmd`.
+
+**Solution — three MSBuild properties in the project's `<PropertyGroup Label="Globals">`:**
+
+```xml
+<!-- Consume WinRT APIs but don't generate .winmd from COM IDL -->
+<CppWinRTOptimized>true</CppWinRTOptimized>
+<CppWinRTProjectStyle>None</CppWinRTProjectStyle>
+<CppWinRTModernIDL>false</CppWinRTModernIDL>
+```
+
+| Property | Effect |
+|----------|--------|
+| `CppWinRTProjectStyle=None` | Skips `mdmerge` — no .winmd merge step |
+| `CppWinRTModernIDL=false` | Prevents CppWinRT from injecting `/reference` flags and `/nomidl` into MIDL. COM IDL is processed by standard MIDL, producing `.tlb`, `_i.h`, `_i.c`. |
+| No `CppWinRTEnabled` | Let the NuGet package set this automatically. Setting it explicitly changes `CppWinRTPath` and breaks the `cppwinrt.exe` tool path. |
+| No `UseWinUI` | The ActiveX project has no XAML files. `UseWinUI` triggers XAML compilation which conflicts with COM IDL processing. |
+
+#### SiteBridge positioning
+
+The `SiteBridge` is a child of the **top-level window** (set by `Initialize(windowId)`), not the control's HWND. To position XAML content inside the ActiveX control, map the control's client coordinates to the top-level window's client coordinates:
+
+```cpp
+POINT pt = { 0, 0 };
+::ClientToScreen(m_hWnd, &pt);          // Control → screen
+::ScreenToClient(topLevelHwnd, &pt);     // Screen → top-level client
+bridge.MoveAndResize({ pt.x, pt.y, width, height });
+```
+
+Update this mapping in `WM_SIZE` to handle control resize.
+
+#### Framework-dependent deployment
+
+The ActiveX control is **not** self-contained — it requires the Windows App SDK runtime installed on the target machine. `MddBootstrapInitialize` loads the runtime from the MSIX framework package. Install via:
+```
+winget install Microsoft.WindowsAppRuntime.1.8
+```
+
+The `Microsoft.WindowsAppRuntime.Bootstrap.dll` must be in the same directory as the ActiveX DLL, or the bootstrap call will fail.
 
 ### XAML Islands lifecycle
 
 XAML Islands must be cleanly shut down before COM release:
 1. Close `DesktopWindowXamlSource` first
 2. Then release COM references
-3. Failure to do this causes access violations during DLL unload
+3. Do NOT call `MddBootstrapShutdown` if other control instances may still be active
 
-The `InPlaceDeactivate` → `XamlIslandHost::Shutdown()` path handles this.
+The `InPlaceDeactivate` → close sequence handles this. The bootstrap and DispatcherQueue are process/thread-wide and should only be cleaned up when the DLL unloads.
 
 ### App.xaml / ApplicationDefinition
 
-The `App.xaml` with `VS_XAML_TYPE "ApplicationDefinition"` is specific to the WinUI 3 app. XAML Islands does NOT use an Application subclass — it initializes the XAML runtime directly via `DesktopWindowXamlSource`. The ActiveX control must NOT have an `ApplicationDefinition`.
+The `App.xaml` with `VS_XAML_TYPE "ApplicationDefinition"` is specific to the WinUI 3 app. XAML Islands does NOT use an Application subclass — it initializes the XAML runtime directly via `DesktopWindowXamlSource.Initialize(windowId)`. The ActiveX control must NOT have an `ApplicationDefinition`.
 
 ### App.idl is an empty namespace block
 
