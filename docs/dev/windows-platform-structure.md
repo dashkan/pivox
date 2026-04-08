@@ -308,7 +308,18 @@ if (!winrt::Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread())
     auto controller = winrt::Microsoft::UI::Dispatching::
         DispatcherQueueController::CreateOnCurrentThread();
 
-// 3. Create the XAML Island source.
+// 3. Application singleton — keeps the XAML framework alive across
+//    control destroy/recreate cycles. Must be static, never released.
+static winrt::Microsoft::UI::Xaml::Application s_app{ nullptr };
+if (!winrt::Microsoft::UI::Xaml::Application::Current()) {
+    auto factory = winrt::get_activation_factory<
+        winrt::Microsoft::UI::Xaml::Application,
+        winrt::Microsoft::UI::Xaml::IApplicationFactory>();
+    winrt::Windows::Foundation::IInspectable inner;
+    s_app = factory.CreateInstance(nullptr, inner);
+}
+
+// 4. Create the XAML Island source.
 auto xamlSource = winrt::Microsoft::UI::Xaml::Hosting::DesktopWindowXamlSource();
 
 // 4. Initialize with the top-level ancestor window's WindowId.
@@ -345,7 +356,8 @@ Reposition the bridge on both `WM_SIZE` and `WM_MOVE` using the same coordinate 
 | `IDesktopWindowXamlSourceNative2::AttachToWindow()` | `E_NOINTERFACE` (0x80004002) | UWP-only interface, not implemented on WinUI 3's DesktopWindowXamlSource |
 | `SetParent(bridgeHwnd, hostHwnd)` | `RO_E_CLOSED` on `MoveAndResize()` | Reparenting breaks the bridge's internal state |
 | `Application::Start()` | Blocks forever | It runs its own message loop; the host process owns the pump |
-| `IApplicationFactory::CreateInstance()` | Crash in `ActivateInstance` | Doesn't initialize the type system; internal factories are null |
+| `IApplicationFactory::CreateInstance()` as member variable | Crash on control re-creation | Must be a **process-lifetime static**; as a member it dies with the control and zombifies the XAML framework |
+| `DeactivateActCtx` on control destroy | Crash `c015000f` on re-creation | Activation context cookies are invalid after deactivation; activate once, never deactivate |
 
 #### Hosting compiled XAML from external WinRT component DLLs
 
@@ -475,11 +487,34 @@ MyControl() { }  // No InitializeComponent here
 #endif
 ```
 
-#### Lifecycle
+#### Lifecycle and control re-creation
 
-1. Initialize: Bootstrap → DispatcherQueue → DesktopWindowXamlSource → Initialize(windowId) → SiteBridge → Content
-2. Resize/Move: Remap coordinates and call `bridge.MoveAndResize()`
-3. Shutdown: Close `DesktopWindowXamlSource` before releasing COM references. Do NOT call `MddBootstrapShutdown` if other instances may still be active.
+The XAML framework maintains process-wide global state. All of the following must be **created once and never destroyed** during the process lifetime:
+
+| Resource | Scope | Rule |
+|----------|-------|------|
+| `MddBootstrapInitialize` | Process | Call once. Never call `MddBootstrapShutdown` until process exit. |
+| `DispatcherQueueController` | Thread | Create once per UI thread. Never shut down between island instances. |
+| Activation context (`CreateActCtxW`) | Process | Activate once. **Never call `DeactivateActCtx`** — it crashes (`c015000f`). |
+| `Microsoft.UI.Xaml.Application` | Process | Create a static instance. Never let it go out of scope or call `Exit()`. |
+
+**On control creation** (`WM_CREATE`):
+1. Guard all of the above with `once_flag` or null checks
+2. Create a new `DesktopWindowXamlSource` (this is per-instance, lightweight)
+3. Call `Initialize(windowId)`, position SiteBridge, set content
+
+**On control destruction** (`WM_DESTROY`):
+```cpp
+m_xamlSource.Content(nullptr);   // Clear content first
+m_xamlSource.Close();            // Close the island
+m_xamlSource = nullptr;
+m_xamlInitialized = false;
+// Do NOT touch DispatcherQueue, Application, Bootstrap, or activation context.
+```
+
+The `DesktopWindowXamlSource` is the only thing that gets created and destroyed per control instance. Everything else is process-lifetime infrastructure.
+
+**Why:** The XAML framework binds to the `DispatcherQueue` and `Application` singleton on first use. If these are destroyed, the framework enters a zombie state — subsequent `DesktopWindowXamlSource` creation crashes with access violations in `Microsoft.UI.Xaml.dll`.
 
 #### Framework-dependent deployment
 
@@ -489,24 +524,6 @@ winget install Microsoft.WindowsAppRuntime.1.8
 ```
 
 `Microsoft.WindowsAppRuntime.Bootstrap.dll` must be in the same directory as the host DLL.
-
-#### Framework-dependent deployment
-
-The ActiveX control is **not** self-contained — it requires the Windows App SDK runtime installed on the target machine. `MddBootstrapInitialize` loads the runtime from the MSIX framework package. Install via:
-```
-winget install Microsoft.WindowsAppRuntime.1.8
-```
-
-The `Microsoft.WindowsAppRuntime.Bootstrap.dll` must be in the same directory as the ActiveX DLL, or the bootstrap call will fail.
-
-### XAML Islands lifecycle
-
-XAML Islands must be cleanly shut down before COM release:
-1. Close `DesktopWindowXamlSource` first
-2. Then release COM references
-3. Do NOT call `MddBootstrapShutdown` if other control instances may still be active
-
-The `InPlaceDeactivate` → close sequence handles this. The bootstrap and DispatcherQueue are process/thread-wide and should only be cleaned up when the DLL unloads.
 
 ### App.xaml / ApplicationDefinition
 
