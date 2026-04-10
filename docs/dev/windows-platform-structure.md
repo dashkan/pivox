@@ -294,6 +294,7 @@ All steps happen on the UI thread, typically in a window creation handler:
 #include <winrt/Microsoft.UI.Dispatching.h>
 #include <winrt/Microsoft.UI.Xaml.Hosting.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.h>
+#include <winrt/Microsoft.UI.Xaml.Markup.h>
 #include <winrt/Microsoft.UI.Interop.h>
 
 // 1. Bootstrap Windows App SDK (process-wide, once).
@@ -308,26 +309,64 @@ if (!winrt::Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread())
     auto controller = winrt::Microsoft::UI::Dispatching::
         DispatcherQueueController::CreateOnCurrentThread();
 
-// 3. Application singleton — keeps the XAML framework alive across
-//    control destroy/recreate cycles. Must be static, never released.
+// 3. Application with IXamlMetadataProvider (process-wide, once).
+//    The XAML engine (MetadataAPI.cpp) QIs Application::Current() for
+//    IXamlMetadataProvider to resolve control types like TextBox,
+//    ProgressBar, ColorPicker. Without it, only built-in types
+//    (Button, TextBlock, StackPanel) render — everything else is
+//    silently skipped by the XAML parser.
+//
+//    Use C++/WinRT's ApplicationT<> composable pattern. This handles
+//    inner/outer QI delegation correctly. Do NOT use winrt::implements<>
+//    (doesn't forward QI to inner Application) or pass a raw provider
+//    as outer to CreateInstance (COM aggregation rules prevent it).
+
+struct AppWithMetadata : winrt::Microsoft::UI::Xaml::ApplicationT<AppWithMetadata,
+    winrt::Microsoft::UI::Xaml::Markup::IXamlMetadataProvider>
+{
+    winrt::Microsoft::UI::Xaml::Markup::IXamlMetadataProvider m_provider{ nullptr };
+
+    AppWithMetadata() {
+        // Activate the WinRT component's XamlMetaDataProvider.
+        // The generated provider chains to XamlControlsXamlMetaDataProvider,
+        // which knows all WinUI 3 control types.
+        auto factory = winrt::get_activation_factory<
+            winrt::Windows::Foundation::IActivationFactory>(
+            winrt::hstring(L"MyComponent.XamlMetaDataProvider"));
+        m_provider = factory.ActivateInstance<winrt::Windows::Foundation::IInspectable>()
+            .as<winrt::Microsoft::UI::Xaml::Markup::IXamlMetadataProvider>();
+    }
+
+    // IXamlMetadataProvider — delegate to component provider
+    winrt::Microsoft::UI::Xaml::Markup::IXamlType GetXamlType(
+        winrt::Windows::UI::Xaml::Interop::TypeName const& type) {
+        return m_provider.GetXamlType(type);
+    }
+    winrt::Microsoft::UI::Xaml::Markup::IXamlType GetXamlType(
+        winrt::hstring const& fullName) {
+        return m_provider.GetXamlType(fullName);
+    }
+    winrt::com_array<winrt::Microsoft::UI::Xaml::Markup::XmlnsDefinition>
+    GetXmlnsDefinitions() {
+        return m_provider.GetXmlnsDefinitions();
+    }
+};
+
 static winrt::Microsoft::UI::Xaml::Application s_app{ nullptr };
 if (!winrt::Microsoft::UI::Xaml::Application::Current()) {
-    auto factory = winrt::get_activation_factory<
-        winrt::Microsoft::UI::Xaml::Application,
-        winrt::Microsoft::UI::Xaml::IApplicationFactory>();
-    winrt::Windows::Foundation::IInspectable inner;
-    s_app = factory.CreateInstance(nullptr, inner);
+    auto app = winrt::make<AppWithMetadata>();
+    s_app = app;
 }
 
 // 4. Create the XAML Island source.
 auto xamlSource = winrt::Microsoft::UI::Xaml::Hosting::DesktopWindowXamlSource();
 
-// 4. Initialize with the top-level ancestor window's WindowId.
+// 5. Initialize with the top-level ancestor window's WindowId.
 HWND topLevel = ::GetAncestor(hwnd, GA_ROOT);
 auto windowId = winrt::Microsoft::UI::GetWindowIdFromWindow(topLevel);
 xamlSource.Initialize(windowId);
 
-// 5. Position the SiteBridge inside the host window.
+// 6. Position the SiteBridge inside the host window.
 //    The bridge is a child of the top-level window, not the host.
 //    Map host client coordinates to the top-level window's client space.
 auto bridge = xamlSource.SiteBridge();
@@ -339,10 +378,10 @@ RECT rc;
 bridge.MoveAndResize({ pt.x, pt.y, rc.right, rc.bottom });
 bridge.Show();
 
-// 6. Set content.
-winrt::Microsoft::UI::Xaml::Controls::Button btn;
-btn.Content(winrt::box_value(L"Hello XAML Islands!"));
-xamlSource.Content(btn);
+// 7. Set content — TextBox, ProgressBar, and all WinUI controls now work.
+winrt::Microsoft::UI::Xaml::Controls::TextBox textBox;
+textBox.PlaceholderText(L"Type here...");
+xamlSource.Content(textBox);
 ```
 
 Reposition the bridge on both `WM_SIZE` and `WM_MOVE` using the same coordinate mapping.
@@ -351,13 +390,17 @@ Reposition the bridge on both `WM_SIZE` and `WM_MOVE` using the same coordinate 
 
 | Approach | Error | Why |
 |----------|-------|-----|
+| `IApplicationFactory::CreateInstance(nullptr, inner)` — no `IXamlMetadataProvider` | TextBox, ProgressBar invisible (`0x802B000A`) | XAML engine QIs `Application::Current()` for `IXamlMetadataProvider` (MetadataAPI.cpp line 353). Without it, the parser can't resolve control types from the WinUI controls library. Only built-in types (Button, TextBlock) render. |
+| `winrt::implements<Wrapper, IXamlMetadataProvider>` as outer to `CreateInstance` | `E_NOINTERFACE` (0x80004002) | `winrt::implements<>` doesn't forward unknown QIs to the inner Application. Must use `ApplicationT<>` composable pattern. |
+| Passing raw `IXamlMetadataProvider` object as outer to `CreateInstance` | `E_NOINTERFACE` (0x80004002) | WinRT composition requires the outer to control identity. A standalone WinRT object from a different DLL can't serve as the outer. |
 | `WindowsXamlManager::InitializeForCurrentThread()` then `Initialize(windowId)` | `RO_E_CLOSED` (0x80000013) | They conflict — WindowsXamlManager takes ownership of the XAML lifecycle |
-| `WindowsXamlManager` without `Initialize(windowId)` | `SiteBridge()` returns null | No window association, renderer crashes on internal type activation |
 | `IDesktopWindowXamlSourceNative2::AttachToWindow()` | `E_NOINTERFACE` (0x80004002) | UWP-only interface, not implemented on WinUI 3's DesktopWindowXamlSource |
 | `SetParent(bridgeHwnd, hostHwnd)` | `RO_E_CLOSED` on `MoveAndResize()` | Reparenting breaks the bridge's internal state |
 | `Application::Start()` | Blocks forever | It runs its own message loop; the host process owns the pump |
 | `IApplicationFactory::CreateInstance()` as member variable | Crash on control re-creation | Must be a **process-lifetime static**; as a member it dies with the control and zombifies the XAML framework |
 | `DeactivateActCtx` on control destroy | Crash `c015000f` on re-creation | Activation context cookies are invalid after deactivation; activate once, never deactivate |
+| Loading `generic.xaml` into `Application.Resources` | Crash during render tick | Duplicates the XAML engine's internal template resolution, causing conflicts |
+| `XamlControlsResources` constructor | `AcrylicBackgroundFillColorDefaultBrush not found` or `RPC_E_WRONG_THREAD` | Requires full XAML thread context (WindowsXamlManager) AND framework PRI registration — both conflict with `Initialize(windowId)`. Use `ApplicationT<>` with `IXamlMetadataProvider` instead. |
 
 #### Hosting compiled XAML from external WinRT component DLLs
 
@@ -393,33 +436,47 @@ DllCanUnloadNow = WINRT_CanUnloadNow                    PRIVATE
 DllGetActivationFactory = WINRT_GetActivationFactory    PRIVATE
 ```
 
-**3. Merged PRI for XAML resource loading (MRT)**
+**3. MRT resource loading via `ResourceManagerRequested`**
 
-MRT (Modern Resource Technology) resolves compiled XAML binaries (XBF) via `.pri` files. In unpackaged apps, MRT only discovers `resources.pri` in the process/DLL directory. Component DLLs have their own `.pri` files but MRT ignores them.
+MRT (Modern Resource Technology) resolves compiled XAML binaries (XBF) via `.pri` files. By default, MRT looks for `resources.pri` next to the host EXE — but in ActiveX/COM DLL scenarios, we can't control the host EXE directory.
 
-**Solution:** Merge all PRIs into a single `resources.pri` at build time:
+**Solution:** Hook `Application.ResourceManagerRequested` to redirect MRT to the DLL's own directory:
 
-```cmd
-makepri createconfig /cf priconfig.xml /dq en-US /o
-makepri new /pr <output_directory> /cf priconfig.xml /of resources.pri /o
+```cpp
+s_app.ResourceManagerRequested([](auto&&, auto&& args) {
+    // Get our DLL's directory
+    wchar_t dllPath[MAX_PATH];
+    HMODULE hMod = nullptr;
+    ::GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+        reinterpret_cast<LPCWSTR>(&s_bootstrapped), &hMod);
+    ::GetModuleFileNameW(hMod, dllPath, MAX_PATH);
+
+    std::wstring priPath(dllPath);
+    priPath.resize(priPath.find_last_of(L'\\') + 1);
+    priPath += L"resources.pri";
+
+    auto customMgr = winrt::Microsoft::Windows::ApplicationModel::Resources::
+        ResourceManager(priPath.c_str());
+    args.CustomResourceManager(customMgr);
+});
 ```
 
-This scans the directory tree, finds all XBF files and existing `.pri` files, and produces a merged `resources.pri`.
+This event fires when the XAML engine needs a resource manager. By providing a `CustomResourceManager` pointing to our PRI, all `ms-appx://` resource resolution uses our DLL's directory. No files needed next to the host EXE.
 
-**Note:** `makepri merge` does not exist in modern Windows SDKs despite some documentation suggesting otherwise.
-
-**Required output directory structure:**
+**Required output directory structure (next to registered DLL):**
 ```
-<output>/
-  MyHost.dll                       # Host DLL
+<dll_directory>/
+  MyHost.dll                       # COM-registered DLL
   MyHost.dll.manifest              # Activation context
   MyComponent.dll                  # WinRT component
-  MyComponent.pri                  # Component's PRI (input to merge)
-  resources.pri                    # Merged PRI (output of makepri)
+  MyComponent.pri                  # Component's PRI
+  resources.pri                    # Copy of MyComponent.pri (or merged)
   MyComponent/
     MyControl.xbf                  # Compiled XAML binary
   Microsoft.WindowsAppRuntime.Bootstrap.dll
 ```
+
+**Files needed next to host EXE: NONE.**
 
 #### XAML content approaches
 
@@ -496,7 +553,7 @@ The XAML framework maintains process-wide global state. All of the following mus
 | `MddBootstrapInitialize` | Process | Call once. Never call `MddBootstrapShutdown` until process exit. |
 | `DispatcherQueueController` | Thread | Create once per UI thread. Never shut down between island instances. |
 | Activation context (`CreateActCtxW`) | Process | Activate once. **Never call `DeactivateActCtx`** — it crashes (`c015000f`). |
-| `Microsoft.UI.Xaml.Application` | Process | Create a static instance. Never let it go out of scope or call `Exit()`. |
+| `Microsoft.UI.Xaml.Application` | Process | Create via `ApplicationT<AppWithMetadata>` (composable pattern with `IXamlMetadataProvider`). Store as static. Never let it go out of scope or call `Exit()`. |
 
 **On control creation** (`WM_CREATE`):
 1. Guard all of the above with `once_flag` or null checks
@@ -527,7 +584,7 @@ winget install Microsoft.WindowsAppRuntime.1.8
 
 ### App.xaml / ApplicationDefinition
 
-The `App.xaml` with `VS_XAML_TYPE "ApplicationDefinition"` is specific to the WinUI 3 app. XAML Islands does NOT use an Application subclass — it initializes the XAML runtime directly via `DesktopWindowXamlSource.Initialize(windowId)`. The ActiveX control must NOT have an `ApplicationDefinition`.
+The `App.xaml` with `VS_XAML_TYPE "ApplicationDefinition"` is specific to the WinUI 3 app. XAML Islands uses a code-only Application subclass (via `ApplicationT<>`) that implements `IXamlMetadataProvider` — but it has NO `.xaml` file and NO `ApplicationDefinition`. The ActiveX control must NOT have an `ApplicationDefinition`.
 
 ### App.idl is an empty namespace block
 
