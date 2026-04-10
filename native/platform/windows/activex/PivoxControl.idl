@@ -13,9 +13,8 @@ import "ocidl.idl";
 ]
 interface IPivoxControl : IDispatch
 {
-    [id(1)] HRESULT NavigateTo([in] BSTR pageName);
-    [id(2)] HRESULT Shutdown();
-    [propget, id(3)] HRESULT IsInitialized([out, retval] VARIANT_BOOL* pVal);
+    // MOS Protocol v2.8.5 — host → plugin
+    [id(201)] HRESULT mosMsgFromHost([in] BSTR mosMsg, [out, retval] BSTR* mosResponse);
 };
 
 [
@@ -25,6 +24,10 @@ dispinterface _IPivoxControlEvents
 {
     properties:
     methods:
+        // COM event: button clicked (for testing)
+        [id(1)] void OnButtonClicked([in] BSTR buttonName);
+        // MOS Protocol v2.8.5 — plugin → host
+        [id(201)] void mosMsgFromPlugIn([in] BSTR mosMsg);
 };
 
 [

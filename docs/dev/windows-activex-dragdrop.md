@@ -100,6 +100,14 @@ void DragService::StartDrag(DataPackage const& data) {
 
 Same pattern already used for desktop Win32 API access in the shared component pch.h.
 
+## iNEWS Implemented Categories
+
+The ActiveX control registers the following COM categories in its RGS file:
+
+| Category | GUID | Purpose |
+|----------|------|---------|
+| MOS Item Browser | `{F5D13911-8FD9-11D4-9512-00C04F1E7663}` | Required for iNEWS to discover and load the plugin as a MOS item browser |
+
 ## Upstream fix
 
 If [microsoft/microsoft-ui-xaml#7690](https://github.com/microsoft/microsoft-ui-xaml/issues/7690) is resolved and WinUI native drag works elevated, the `PIVOX_ACTIVEX_HOST` path can switch to native WinUI drag and the manual system can be removed.

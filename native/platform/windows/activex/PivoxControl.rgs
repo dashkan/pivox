@@ -16,6 +16,11 @@ HKCR
             }
             TypeLib = s '{D5C4B3A2-F6E5-4B7A-9D8C-1F0E2A3B4C5D}'
             Version = s '1.0'
+            'Implemented Categories'
+            {
+                // MOS Item Browser
+                '{F5D13911-8FD9-11D4-9512-00C04F1E7663}'
+            }
         }
     }
 }

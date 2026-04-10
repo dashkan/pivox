@@ -40,6 +40,9 @@ target_compile_definitions(${SHARED_TARGET} PRIVATE PIVOX_SHARED_EXPORTS)
 target_link_libraries(${SHARED_TARGET} PRIVATE pivox_win_state crypt32 advapi32)
 target_precompile_headers(${SHARED_TARGET} PRIVATE ${SHARED_DIR}/pch.h)
 
+# DEF file exports DllGetActivationFactory/DllCanUnloadNow for WinRT class activation.
+target_link_options(${SHARED_TARGET} PRIVATE "/DEF:${SHARED_DIR}/PivoxShared.def")
+
 # WinRT component properties — generates .winmd for type activation.
 # ApplicationType "Windows Store" is required for WinUI XAML compilation
 # (the NuGet targets gate on it). AppContainerApplication/AppxPackage "false"

@@ -1,32 +1,68 @@
 #pragma once
-#include "pch.h"
+// XamlIslandHost — manages WinUI 3 XAML Islands lifecycle for ActiveX controls.
+//
+// Process-wide initialization (bootstrap, dispatcher, Application) is done once.
+// Per-instance DWXS slots are pooled via an internal IslandManager — slots are
+// parked (hidden) on release and reused on re-acquisition, avoiding the WinUI
+// re-creation crash (DesktopWindowXamlSource cannot be destroyed safely).
+//
+// Key patterns (hard-won, differs from all MS docs):
+// - ScopedActCtx: push/pop activation context per WinRT call, NEVER permanently
+// - ApplicationT<AppWithMetadata>: IXamlMetadataProvider required for TextBox etc.
+// - ResourceManagerRequested: redirects MRT to DLL directory, no files next to host
+// - Bridge.MoveAndResize({0,0,0,0}) to hide; offscreen coords kill it permanently
+
+#include <map>
 
 namespace pivox {
 
+// RAII activation context push/pop.
+// NEVER leave pushed permanently — crashes MFC hosts (iNEWS).
+struct ScopedActCtx {
+    ULONG_PTR cookie = 0;
+    bool active = false;
+    ScopedActCtx();
+    ~ScopedActCtx();
+};
+
+// Island slot — one DesktopWindowXamlSource + its child HWND.
+struct IslandSlot {
+    HWND childHwnd = nullptr;
+    HWND topLevelHwnd = nullptr;
+    bool parked = false;
+    winrt::Microsoft::UI::Xaml::Hosting::DesktopWindowXamlSource source{ nullptr };
+};
+
 class XamlIslandHost {
 public:
-    XamlIslandHost();
-    ~XamlIslandHost();
+    XamlIslandHost() = default;
+    ~XamlIslandHost() = default;
 
     XamlIslandHost(const XamlIslandHost&) = delete;
     XamlIslandHost& operator=(const XamlIslandHost&) = delete;
 
-    HRESULT Initialize(HWND parentHwnd);
-    HRESULT NavigateTo(const wchar_t* pageName);
-    void Resize(int width, int height);
-    void Shutdown();
+    // Process-wide init: bootstrap, dispatcher, Application, theme.
+    // Safe to call multiple times — guarded by static flags.
+    static HRESULT InitializeProcess();
 
-    bool IsInitialized() const { return initialized_; }
+    // Per-instance: acquire a DWXS slot, position it in siteHwnd.
+    IslandSlot* AcquireSlot(HWND siteHwnd);
+
+    // Release a slot back to the pool (park, collapse bridge).
+    void ReleaseSlot(IslandSlot* slot);
+
+    // Set XAML content on the slot's source.
+    HRESULT SetContent(IslandSlot* slot, const winrt::Microsoft::UI::Xaml::UIElement& content);
+
+    // Reposition the slot to match the site HWND's client rect.
+    void UpdatePosition(IslandSlot* slot, HWND siteHwnd);
 
 private:
-    HRESULT InitializeWindowsAppSDK();
-
-    winrt::Microsoft::UI::Dispatching::DispatcherQueueController dispatcherController_{ nullptr };
-    winrt::Microsoft::UI::Xaml::Hosting::WindowsXamlManager xamlManager_{ nullptr };
-    winrt::Microsoft::UI::Xaml::Application app_{ nullptr };
-    winrt::Microsoft::UI::Xaml::Hosting::DesktopWindowXamlSource xamlSource_{ nullptr };
-    HWND parentHwnd_ = nullptr;
-    bool initialized_ = false;
+    // Island slot pool (process-wide singleton).
+    static void EnsureManagerWindow();
+    static IslandSlot* CreateSlot(HWND topLevelHwnd);
+    static void ParkSlot(IslandSlot* slot);
+    static void PositionBridge(IslandSlot* slot);
 };
 
 } // namespace pivox

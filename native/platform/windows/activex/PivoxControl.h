@@ -4,7 +4,6 @@
 #include "PivoxActiveX_i.h"
 #include "_IPivoxControlEvents_CP.h"
 #include "XamlIslandHost.h"
-#include "DragSource.h"
 
 using namespace ATL;
 
@@ -19,6 +18,7 @@ class ATL_NO_VTABLE CPivoxControl :
     public IConnectionPointContainerImpl<CPivoxControl>,
     public CProxy_IPivoxControlEvents<CPivoxControl>,
     public IPersistStreamInitImpl<CPivoxControl>,
+    public IProvideClassInfo2Impl<&CLSID_PivoxControl, &__uuidof(_IPivoxControlEvents), &LIBID_PivoxActiveXLib>,
     public CComCoClass<CPivoxControl, &CLSID_PivoxControl>,
     public CComControl<CPivoxControl>
 {
@@ -42,13 +42,15 @@ BEGIN_COM_MAP(CPivoxControl)
     COM_INTERFACE_ENTRY(IViewObject)
     COM_INTERFACE_ENTRY(IOleInPlaceObjectWindowless)
     COM_INTERFACE_ENTRY(IOleInPlaceObject)
-    COM_INTERFACE_ENTRY2(IOleWindow, IOleInPlaceObjectWindowless)
+    COM_INTERFACE_ENTRY2(IOleWindow, IOleInPlaceObjectWindowlessImpl)
     COM_INTERFACE_ENTRY(IOleInPlaceActiveObject)
     COM_INTERFACE_ENTRY(IOleControl)
     COM_INTERFACE_ENTRY(IOleObject)
     COM_INTERFACE_ENTRY(IPersistStreamInit)
     COM_INTERFACE_ENTRY2(IPersist, IPersistStreamInit)
     COM_INTERFACE_ENTRY(IConnectionPointContainer)
+    COM_INTERFACE_ENTRY(IProvideClassInfo)
+    COM_INTERFACE_ENTRY(IProvideClassInfo2)
 END_COM_MAP()
 
 BEGIN_PROP_MAP(CPivoxControl)
@@ -63,34 +65,37 @@ END_CONNECTION_POINT_MAP()
 BEGIN_MSG_MAP(CPivoxControl)
     CHAIN_MSG_MAP(CComControl<CPivoxControl>)
     MESSAGE_HANDLER(WM_CREATE, OnCreate)
+    MESSAGE_HANDLER(WM_DESTROY, OnDestroy)
     MESSAGE_HANDLER(WM_SIZE, OnSize)
+    MESSAGE_HANDLER(WM_MOVE, OnMove)
+    MESSAGE_HANDLER(WM_TIMER, OnTimer)
+    MESSAGE_HANDLER(WM_USER + 100, OnStartManualDrag)
     DEFAULT_REFLECTION_HANDLER()
 END_MSG_MAP()
 
     DECLARE_VIEW_STATUS(VIEWSTATUS_SOLIDBKGND | VIEWSTATUS_OPAQUE)
 
-    // IViewObjectEx — fallback rendering when XAML Islands isn't active.
     HRESULT OnDraw(ATL_DRAWINFO& di);
-
-    // IOleInPlaceObject — clean XAML Islands shutdown.
     STDMETHOD(InPlaceDeactivate)() override;
 
     // IPivoxControl
-    STDMETHOD(NavigateTo)(BSTR pageName) override;
-    STDMETHOD(Shutdown)() override;
-    STDMETHOD(get_IsInitialized)(VARIANT_BOOL* pVal) override;
+    STDMETHOD(mosMsgFromHost)(BSTR mosMsg, BSTR* mosResponse) override;
 
     DECLARE_PROTECT_FINAL_CONSTRUCT()
-
     HRESULT FinalConstruct() { return S_OK; }
     void FinalRelease();
 
 private:
-    LRESULT OnCreate(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
-    LRESULT OnSize(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
+    LRESULT OnCreate(UINT, WPARAM, LPARAM, BOOL& bHandled);
+    LRESULT OnDestroy(UINT, WPARAM, LPARAM, BOOL& bHandled);
+    LRESULT OnSize(UINT, WPARAM, LPARAM, BOOL& bHandled);
+    LRESULT OnMove(UINT, WPARAM, LPARAM, BOOL& bHandled);
+    LRESULT OnTimer(UINT, WPARAM, LPARAM, BOOL& bHandled);
+    LRESULT OnStartManualDrag(UINT, WPARAM, LPARAM, BOOL& bHandled);
 
-    pivox::XamlIslandHost xamlHost_;
-    pivox::DragSource dragSource_;
+    pivox::XamlIslandHost host_;
+    pivox::IslandSlot* islandSlot_ = nullptr;
+    bool xamlInitialized_ = false;
 };
 
 OBJECT_ENTRY_AUTO(__uuidof(PivoxControl), CPivoxControl)
