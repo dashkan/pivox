@@ -27,3 +27,4 @@
 #include <winrt/Microsoft.UI.Xaml.XamlTypeInfo.h>
 #include <winrt/Microsoft.UI.h>
 #include <winrt/Microsoft.UI.Content.h>
+#include <winrt/Windows.ApplicationModel.DataTransfer.h>

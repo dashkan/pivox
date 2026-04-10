@@ -14,6 +14,9 @@ add_library(${SHARED_TARGET} SHARED
     # Google OAuth (OAuth2Manager coroutine — needs WinRT)
     ${SHARED_DIR}/GoogleOAuth.cpp
 
+    # Drag service (compile-time abstraction: ActiveX manual drag vs native WinUI)
+    ${SHARED_DIR}/DragService.cpp
+
     # LoginPage
     ${SHARED_DIR}/Views/LoginPage.idl
     ${SHARED_DIR}/Views/LoginPage.xaml
@@ -36,6 +39,14 @@ target_include_directories(${SHARED_TARGET} PUBLIC
 )
 
 target_compile_definitions(${SHARED_TARGET} PRIVATE PIVOX_SHARED_EXPORTS)
+
+# ActiveX build (x86/Win32): enable desktop APIs and manual drag path.
+if(CMAKE_GENERATOR_PLATFORM STREQUAL "Win32")
+    target_compile_definitions(${SHARED_TARGET} PRIVATE
+        PIVOX_ACTIVEX_HOST
+        WINAPI_FAMILY=WINAPI_FAMILY_DESKTOP_APP)
+    target_link_libraries(${SHARED_TARGET} PRIVATE ole32 shell32 user32)
+endif()
 
 target_link_libraries(${SHARED_TARGET} PRIVATE pivox_win_state crypt32 advapi32)
 target_precompile_headers(${SHARED_TARGET} PRIVATE ${SHARED_DIR}/pch.h)

@@ -29,3 +29,4 @@
 #include <winrt/Microsoft.UI.Interop.h>
 #include <winrt/Microsoft.UI.h>
 #include <winrt/Microsoft.Windows.ApplicationModel.Resources.h>
+#include <winrt/Windows.ApplicationModel.DataTransfer.h>

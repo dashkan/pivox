@@ -2,6 +2,7 @@
 #include "PivoxControl.h"
 #include "XamlIslandHost.h"
 #include "DragSource.h"
+#include "DragService.h"
 
 #include <string>
 #include <shlobj.h>
@@ -103,31 +104,14 @@ LRESULT CPivoxControl::OnCreate(UINT, WPARAM, LPARAM, BOOL& bHandled) {
             dragText.IsHitTestVisible(false);
             dragBorder.Child(dragText);
 
-            // Wire DragStarting → manual drag
-            HWND hwnd = m_hWnd;
-            dragBorder.DragStarting([hwnd](auto&&, winrt::Microsoft::UI::Xaml::DragStartingEventArgs const& args) {
-                args.Cancel(true);
-                OutputDebugStringW(L"[PivoxActiveX] DragStarting -> manual drag\n");
-
-                const wchar_t* text = L"Hello from Pivox drag";
-                size_t len = (wcslen(text) + 1) * sizeof(wchar_t);
-                HGLOBAL hGlobal = ::GlobalAlloc(GMEM_MOVEABLE, len);
-                if (!hGlobal) return;
-                memcpy(::GlobalLock(hGlobal), text, len);
-                ::GlobalUnlock(hGlobal);
-
-                IDataObject* pDataObj = nullptr;
-                ::SHCreateDataObject(nullptr, 0, nullptr, nullptr, IID_PPV_ARGS(&pDataObj));
-                if (!pDataObj) { ::GlobalFree(hGlobal); return; }
-
-                FORMATETC fmt = { CF_UNICODETEXT, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
-                STGMEDIUM stg = {};
-                stg.tymed = TYMED_HGLOBAL;
-                stg.hGlobal = hGlobal;
-                pDataObj->SetData(&fmt, &stg, TRUE);
-
-                pivox::GetDragSource().Start(hwnd, pDataObj);
-                pDataObj->Release();
+            // DragStarting — identical pattern to native WinUI:
+            // set data on DataPackage, then let DragService route it.
+            dragBorder.DragStarting([](auto&&, winrt::Microsoft::UI::Xaml::DragStartingEventArgs const& args) {
+                winrt::hstring payload = L"Hello from Pivox drag";
+                args.Data().SetText(payload);
+                args.AllowedOperations(
+                    winrt::Windows::ApplicationModel::DataTransfer::DataPackageOperation::Copy);
+                Pivox::DragService::HandleDragStarting(args, payload);
             });
 
             panel.Children().Append(dragBorder);
@@ -192,33 +176,23 @@ LRESULT CPivoxControl::OnTimer(UINT, WPARAM wParam, LPARAM, BOOL& bHandled) {
     return 0;
 }
 
-LRESULT CPivoxControl::OnStartManualDrag(UINT, WPARAM wParam, LPARAM, BOOL& bHandled) {
+LRESULT CPivoxControl::OnStartManualDrag(UINT, WPARAM, LPARAM, BOOL& bHandled) {
     bHandled = TRUE;
     auto& drag = pivox::GetDragSource();
     if (drag.IsActive()) return 0;
 
-    OutputDebugStringW(L"[PivoxActiveX] OnStartManualDrag (from popup)\n");
+    // Pick up the IDataObject stored by DragService.
+    auto* pDataObj = static_cast<IDataObject*>(::GetPropW(m_hWnd, L"PivoxDragData"));
+    ::RemovePropW(m_hWnd, L"PivoxDragData");
 
-    const wchar_t* text = L"Hello from popup drag";
-    size_t len = (wcslen(text) + 1) * sizeof(wchar_t);
+    if (!pDataObj) {
+        OutputDebugStringW(L"[PivoxActiveX] OnStartManualDrag: no drag data\n");
+        return 0;
+    }
 
-    HGLOBAL hGlobal = ::GlobalAlloc(GMEM_MOVEABLE, len);
-    if (!hGlobal) return 0;
-    memcpy(::GlobalLock(hGlobal), text, len);
-    ::GlobalUnlock(hGlobal);
-
-    IDataObject* pDataObj = nullptr;
-    ::SHCreateDataObject(nullptr, 0, nullptr, nullptr, IID_PPV_ARGS(&pDataObj));
-    if (!pDataObj) { ::GlobalFree(hGlobal); return 0; }
-
-    FORMATETC fmt = { CF_UNICODETEXT, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
-    STGMEDIUM stg = {};
-    stg.tymed = TYMED_HGLOBAL;
-    stg.hGlobal = hGlobal;
-    pDataObj->SetData(&fmt, &stg, TRUE);
-
+    OutputDebugStringW(L"[PivoxActiveX] OnStartManualDrag: starting\n");
     drag.Start(m_hWnd, pDataObj);
-    pDataObj->Release();
+    pDataObj->Release();  // DragSource::Start AddRef'd it
     return 0;
 }
 
