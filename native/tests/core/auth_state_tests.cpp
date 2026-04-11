@@ -1,47 +1,34 @@
 #include <gtest/gtest.h>
+
+#include <cstring>
+
 #include "auth_state.h"
 
-TEST(AuthState, DefaultUserIsEmpty) {
-    pivox::AuthUser user;
-    EXPECT_TRUE(user.uid.empty());
-    EXPECT_TRUE(user.email.empty());
-    EXPECT_TRUE(user.displayName.empty());
-    EXPECT_TRUE(user.photoURL.empty());
-    EXPECT_FALSE(user.emailVerified);
-    EXPECT_TRUE(user.providers.empty());
+// AuthUser and AuthStatus were moved to platform-specific code
+// (WinAuthService.h). auth_state.h now only contains shared error string
+// constants.
+
+TEST(AuthErrorStrings, AllConstantsAreNonEmpty) {
+  EXPECT_GT(std::strlen(pivox::auth_error::kInvalidEmail), 0);
+  EXPECT_GT(std::strlen(pivox::auth_error::kInvalidCredential), 0);
+  EXPECT_GT(std::strlen(pivox::auth_error::kEmailAlreadyInUse), 0);
+  EXPECT_GT(std::strlen(pivox::auth_error::kWeakPassword), 0);
+  EXPECT_GT(std::strlen(pivox::auth_error::kNetworkError), 0);
+  EXPECT_GT(std::strlen(pivox::auth_error::kTooManyRequests), 0);
+  EXPECT_GT(std::strlen(pivox::auth_error::kUnknown), 0);
 }
 
-TEST(AuthState, UserWithProviders) {
-    pivox::AuthUser user;
-    user.uid = "abc123";
-    user.email = "user@example.com";
-    user.displayName = "Test User";
-    user.emailVerified = true;
-    user.providers = {"google.com", "github.com"};
-
-    EXPECT_EQ(user.uid, "abc123");
-    EXPECT_EQ(user.providers.size(), 2);
-    EXPECT_EQ(user.providers[0], "google.com");
-    EXPECT_EQ(user.providers[1], "github.com");
-}
-
-TEST(AuthState, DefaultStatusIsUnknown) {
-    pivox::AuthStatus status = pivox::AuthStatus::Unknown;
-    EXPECT_EQ(status, pivox::AuthStatus::Unknown);
-}
-
-TEST(AuthState, StatusTransitions) {
-    pivox::AuthStatus status = pivox::AuthStatus::Unknown;
-
-    // App checks credentials → signed out
-    status = pivox::AuthStatus::SignedOut;
-    EXPECT_EQ(status, pivox::AuthStatus::SignedOut);
-
-    // User signs in
-    status = pivox::AuthStatus::SignedIn;
-    EXPECT_EQ(status, pivox::AuthStatus::SignedIn);
-
-    // User signs out
-    status = pivox::AuthStatus::SignedOut;
-    EXPECT_EQ(status, pivox::AuthStatus::SignedOut);
+TEST(AuthErrorStrings, EndWithPeriod) {
+  // All user-facing error strings should end with a period for consistency.
+  auto endsWith = [](const char* s, char c) {
+    size_t len = std::strlen(s);
+    return len > 0 && s[len - 1] == c;
+  };
+  EXPECT_TRUE(endsWith(pivox::auth_error::kInvalidEmail, '.'));
+  EXPECT_TRUE(endsWith(pivox::auth_error::kInvalidCredential, '.'));
+  EXPECT_TRUE(endsWith(pivox::auth_error::kEmailAlreadyInUse, '.'));
+  EXPECT_TRUE(endsWith(pivox::auth_error::kWeakPassword, '.'));
+  EXPECT_TRUE(endsWith(pivox::auth_error::kNetworkError, '.'));
+  EXPECT_TRUE(endsWith(pivox::auth_error::kTooManyRequests, '.'));
+  EXPECT_TRUE(endsWith(pivox::auth_error::kUnknown, '.'));
 }

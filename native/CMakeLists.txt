@@ -108,6 +108,8 @@ if(APPLE)
         ${SWIFT_DIR}/Auth/RegisterView.swift
         ${SWIFT_DIR}/Auth/ProfileView.swift
         ${SWIFT_DIR}/ImageEditor/EditView.swift
+        ${SWIFT_DIR}/ImageEditor/RulerSlider.swift
+        ${SWIFT_DIR}/ImageEditor/ImageEditCanvas.swift
         ${SWIFT_DIR}/Components/GlassCard.swift
         ${SWIFT_DIR}/Components/GoogleIcon.swift
         ${ASSET_CATALOG}
