@@ -2,7 +2,7 @@ HKCR
 {
     NoRemove CLSID
     {
-        ForceRemove {B2A1C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5E} = s 'PivoxControl class'
+        ForceRemove {B2A1C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5E} = s 'Pivox NRCS Plugin'
         {
             ForceRemove Programmable
             InprocServer32 = s '%MODULE%'
