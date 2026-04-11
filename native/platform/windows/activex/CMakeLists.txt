@@ -115,8 +115,15 @@ set_property(TARGET ${AX_TARGET} PROPERTY VS_PACKAGE_REFERENCES
 target_compile_options(${AX_TARGET} PRIVATE "$<$<CONFIG:Release>:/Zi>")
 target_link_options(${AX_TARGET} PRIVATE "$<$<CONFIG:Release>:/DEBUG>")
 
-# PivoxShared.dll is auto-copied to the ActiveX output directory by MSBuild
-# via Private=true in Directory.Build.targets.
+# Copy PivoxShared PRI to ActiveX output (needed for XAML resource resolution).
+# The DLL is copied via ProjectReference in Directory.Build.targets, but the
+# PRI requires an explicit copy because MSBuild doesn't auto-copy component PRIs.
+add_custom_command(TARGET ${AX_TARGET} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "$<TARGET_FILE_DIR:PivoxShared>/Pivox.pri"
+        "$<TARGET_FILE_DIR:${AX_TARGET}>/Pivox.pri"
+    COMMENT "Copying Pivox.pri to ActiveX output"
+)
 
 # ActiveX control tests.
 add_subdirectory(tests)

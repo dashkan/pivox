@@ -13,9 +13,17 @@
   </ItemDefinitionGroup>
   <!-- PivoxActiveX has no WinRT IDL — no module.g.cpp, no MIDL override needed. -->
 
-  <!-- Copy dependent DLLs (PivoxShared.dll) to ActiveX and App output directories.
-       CMake disables MSBuild's auto-copy. Private=true marks dependencies as copy-local. -->
-  <ItemDefinitionGroup Condition="'$(ProjectName)' == 'PivoxActiveX' OR '$(ProjectName)' == 'Pivox'">
+  <!-- PivoxActiveX needs a proper ProjectReference to PivoxShared so MSBuild
+       copies the DLL, PRI, winmd, and XBF files. CMake's target_link_libraries
+       only adds AdditionalDependencies (link-time), not a ProjectReference. -->
+  <ItemGroup Condition="'$(ProjectName)' == 'PivoxActiveX'">
+    <ProjectReference Include="$(MSBuildProjectDirectory)\..\shared\PivoxShared.vcxproj">
+      <Private>true</Private>
+    </ProjectReference>
+  </ItemGroup>
+
+  <!-- App also needs copy-local for PivoxShared. -->
+  <ItemDefinitionGroup Condition="'$(ProjectName)' == 'Pivox'">
     <ProjectReference>
       <Private>true</Private>
     </ProjectReference>

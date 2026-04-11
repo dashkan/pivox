@@ -139,7 +139,7 @@ HRESULT XamlIslandHost::InitializeProcess()
             ::GetModuleFileNameW(hMod, dllPath, MAX_PATH);
             std::wstring priPath(dllPath);
             priPath.resize(priPath.find_last_of(L'\\') + 1);
-            priPath += L"PivoxShared.pri";
+            priPath += L"Pivox.pri";
             args.CustomResourceManager(
                 winrt::Microsoft::Windows::ApplicationModel::Resources::
                 ResourceManager(priPath.c_str()));
@@ -262,28 +262,37 @@ void XamlIslandHost::ParkSlot(IslandSlot* slot)
     ::SetParent(slot->childHwnd, s_managerHwnd);
 }
 
-HRESULT XamlIslandHost::SetContent(IslandSlot* slot, const winrt::Microsoft::UI::Xaml::UIElement& content)
+void XamlIslandHost::EnsureResources()
 {
-    if (!slot || !slot->source) return E_INVALIDARG;
+    if (s_themeLoaded) return;
 
-    // Load theme resources once.
-    if (!s_themeLoaded) {
-        ScopedActCtx ctx;
+    ScopedActCtx ctx;
+    try {
+        winrt::Microsoft::UI::Xaml::Controls::XamlControlsResources xcr;
+        s_app.Resources().MergedDictionaries().Append(xcr);
+        s_themeLoaded = true;
+        OutputDebugStringW(L"[PivoxActiveX] XamlControlsResources loaded\n");
+    } catch (const winrt::hresult_error&) {
         try {
             winrt::Microsoft::UI::Xaml::ResourceDictionary themeDict;
             themeDict.Source(winrt::Windows::Foundation::Uri(
                 L"ms-appx:///Microsoft.UI.Xaml/Themes/themeresources.xaml"));
             s_app.Resources().MergedDictionaries().Append(themeDict);
             s_themeLoaded = true;
-            OutputDebugStringW(L"[PivoxActiveX] Theme resources loaded\n");
-        } catch (const winrt::hresult_error& ex) {
+            OutputDebugStringW(L"[PivoxActiveX] Fallback theme resources loaded\n");
+        } catch (const winrt::hresult_error& ex2) {
             wchar_t buf[512];
             swprintf_s(buf, _countof(buf), L"[PivoxActiveX] Theme resources failed: 0x%08X %s\n",
-                static_cast<int32_t>(ex.code()), ex.message().c_str());
+                static_cast<int32_t>(ex2.code()), ex2.message().c_str());
             OutputDebugStringW(buf);
         }
     }
+}
 
+HRESULT XamlIslandHost::SetContent(IslandSlot* slot, const winrt::Microsoft::UI::Xaml::UIElement& content)
+{
+    if (!slot || !slot->source) return E_INVALIDARG;
+    EnsureResources();
     ScopedActCtx ctx;
     slot->source.Content(content);
     return S_OK;

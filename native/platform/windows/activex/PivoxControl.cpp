@@ -6,6 +6,7 @@
 
 #include <string>
 #include <shlobj.h>
+#include <winrt/Pivox.h>
 
 CPivoxControl::CPivoxControl() {
     m_bWindowOnly = TRUE;
@@ -54,69 +55,19 @@ LRESULT CPivoxControl::OnCreate(UINT, WPARAM, LPARAM, BOOL& bHandled) {
             return 0;
         }
 
-        // Activate content — scoped context.
-        // TODO: Replace with proper page navigation (bypass login for ActiveX).
+        // Load XamlControlsResources BEFORE creating any pages.
+        // NavigationView, PersonPicture etc. need these resources during XAML parse.
+        // Must be after DWXS.Initialize() (AcquireSlot above).
+        host_.EnsureResources();
+
+        // Activate MainPage directly via WinRT factory (Frame.Navigate
+        // fails in XAML Islands — XBF resource lookup doesn't work).
         {
             pivox::ScopedActCtx ctx;
             auto factory = winrt::get_activation_factory<winrt::Windows::Foundation::IActivationFactory>(
-                winrt::hstring(L"Pivox.XamlMetaDataProvider"));
-
-            // For now, create a simple test panel.
-            // Replace with Pivox.MainPage or similar when ready.
-            winrt::Microsoft::UI::Xaml::Controls::StackPanel panel;
-            panel.Spacing(16);
-            panel.Padding(winrt::Microsoft::UI::Xaml::ThicknessHelper::FromUniformLength(24));
-            panel.Background(winrt::Microsoft::UI::Xaml::Media::SolidColorBrush(
-                winrt::Microsoft::UI::ColorHelper::FromArgb(255, 30, 30, 30)));
-
-            winrt::Microsoft::UI::Xaml::Controls::TextBlock title;
-            title.Text(L"Pivox");
-            title.FontSize(28);
-            title.Foreground(winrt::Microsoft::UI::Xaml::Media::SolidColorBrush(
-                winrt::Microsoft::UI::Colors::White()));
-            title.HorizontalAlignment(winrt::Microsoft::UI::Xaml::HorizontalAlignment::Center);
-            panel.Children().Append(title);
-
-            winrt::Microsoft::UI::Xaml::Controls::TextBox textBox;
-            textBox.PlaceholderText(L"Type here...");
-            textBox.Width(250);
-            panel.Children().Append(textBox);
-
-            winrt::Microsoft::UI::Xaml::Controls::ProgressBar progressBar;
-            progressBar.Value(65);
-            progressBar.Width(250);
-            panel.Children().Append(progressBar);
-
-            // Drag source
-            winrt::Microsoft::UI::Xaml::Controls::Border dragBorder;
-            dragBorder.Background(winrt::Microsoft::UI::Xaml::Media::SolidColorBrush(
-                winrt::Microsoft::UI::ColorHelper::FromArgb(255, 51, 51, 51)));
-            dragBorder.CornerRadius(winrt::Microsoft::UI::Xaml::CornerRadiusHelper::FromUniformRadius(8));
-            dragBorder.Padding(winrt::Microsoft::UI::Xaml::ThicknessHelper::FromUniformLength(16));
-            dragBorder.CanDrag(true);
-
-            winrt::Microsoft::UI::Xaml::Controls::TextBlock dragText;
-            dragText.Text(L"Drag to story");
-            dragText.FontSize(16);
-            dragText.Foreground(winrt::Microsoft::UI::Xaml::Media::SolidColorBrush(
-                winrt::Microsoft::UI::ColorHelper::FromArgb(255, 0, 191, 255)));
-            dragText.HorizontalAlignment(winrt::Microsoft::UI::Xaml::HorizontalAlignment::Center);
-            dragText.IsHitTestVisible(false);
-            dragBorder.Child(dragText);
-
-            // DragStarting — identical pattern to native WinUI:
-            // set data on DataPackage, then let DragService route it.
-            dragBorder.DragStarting([](auto&&, winrt::Microsoft::UI::Xaml::DragStartingEventArgs const& args) {
-                winrt::hstring payload = L"Hello from Pivox drag";
-                args.Data().SetText(payload);
-                args.AllowedOperations(
-                    winrt::Windows::ApplicationModel::DataTransfer::DataPackageOperation::Copy);
-                Pivox::DragService::HandleDragStarting(args, payload);
-            });
-
-            panel.Children().Append(dragBorder);
-
-            host_.SetContent(islandSlot_, panel);
+                winrt::hstring(L"Pivox.MainPage"));
+            auto page = factory.ActivateInstance<winrt::Microsoft::UI::Xaml::UIElement>();
+            islandSlot_->source.Content(page);
         }
 
         // Expose HWND for popup window drag bridge.

@@ -28,6 +28,12 @@ add_library(${SHARED_TARGET} SHARED
     ${SHARED_DIR}/Views/RegisterPage.xaml
     ${SHARED_DIR}/Views/RegisterPage.xaml.h
     ${SHARED_DIR}/Views/RegisterPage.xaml.cpp
+
+    # MainPage (post-login — NavigationView with sidebar)
+    ${SHARED_DIR}/Views/MainPage.idl
+    ${SHARED_DIR}/Views/MainPage.xaml
+    ${SHARED_DIR}/Views/MainPage.xaml.h
+    ${SHARED_DIR}/Views/MainPage.xaml.cpp
 )
 
 target_include_directories(${SHARED_TARGET} PRIVATE
@@ -60,6 +66,7 @@ target_link_options(${SHARED_TARGET} PRIVATE "/DEF:${SHARED_DIR}/PivoxShared.def
 # keeps this a regular desktop DLL — no sandbox, no package.
 set_target_properties(${SHARED_TARGET} PROPERTIES
     VS_GLOBAL_RootNamespace "Pivox"
+    VS_GLOBAL_AppxPriInitialPath "Pivox"
     VS_GLOBAL_AppContainerApplication "false"
     VS_GLOBAL_AppxPackage "false"
     VS_GLOBAL_CharacterSet "Unicode"

@@ -51,6 +51,10 @@ public:
     // Release a slot back to the pool (park, collapse bridge).
     void ReleaseSlot(IslandSlot* slot);
 
+    // Load XamlControlsResources (once). Must be called after AcquireSlot
+    // and before creating any XAML pages.
+    void EnsureResources();
+
     // Set XAML content on the slot's source.
     HRESULT SetContent(IslandSlot* slot, const winrt::Microsoft::UI::Xaml::UIElement& content);
 
