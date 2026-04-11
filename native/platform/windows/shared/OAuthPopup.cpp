@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "OAuthPopup.h"
 
+#include <shlobj.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.h>
 #include <winrt/Microsoft.Web.WebView2.Core.h>
 
@@ -80,42 +81,30 @@ void LaunchOAuthPopup(
         }
     });
 
-    // DEBUG: test if XAML renders at all without WebView2
-    winrt::Microsoft::UI::Xaml::Controls::TextBlock testLabel;
-    testLabel.Text(L"If you see this, XAML popup works. WebView2 is the problem.");
-    testLabel.FontSize(20);
-    testLabel.Foreground(winrt::Microsoft::UI::Xaml::Media::SolidColorBrush(winrt::Microsoft::UI::Colors::White()));
-    window.Content(testLabel);
+    window.Content(webview);
     window.AppWindow().Resize({ 500, 700 });
     window.Activate();
 
-    // Redirect WebView2 user data folder to a writable location.
-    // Default is next to host EXE which may be read-only (e.g., C:\Program Files).
-    static bool s_udfSet = false;
-    if (!s_udfSet) {
-        PWSTR localAppData = nullptr;
-        if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &localAppData))) {
-            std::wstring udfPath = std::wstring(localAppData) + L"\\Pivox\\WebView2Cache";
-            CoTaskMemFree(localAppData);
-            SetEnvironmentVariableW(L"WEBVIEW2_USER_DATA_FOLDER", udfPath.c_str());
-            OutputDebugStringW((L"[OAuthPopup] UDF set to " + udfPath + L"\n").c_str());
-        }
-        s_udfSet = true;
+    // Create environment with explicit UDF, then init WebView2.
+    PWSTR localAppData = nullptr;
+    std::wstring udfPath = L"C:\\PivoxWebView2";
+    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &localAppData))) {
+        udfPath = std::wstring(localAppData) + L"\\Pivox\\WebView2Cache";
+        CoTaskMemFree(localAppData);
     }
 
-    // DEBUG: Test if a simple TextBlock renders in the popup.
-    winrt::Microsoft::UI::Xaml::Controls::TextBlock testText;
-    testText.Text(L"WebView2 loading...");
-    testText.FontSize(24);
-
-    winrt::Microsoft::UI::Xaml::Controls::Grid grid;
-    grid.Children().Append(testText);
-    grid.Children().Append(webview);
-
-    window.Content(grid);
-
-    OutputDebugStringW(L"[OAuthPopup] Navigating via Source\n");
-    webview.Source(winrt::Windows::Foundation::Uri(authUrl));
+    OutputDebugStringW(L"[OAuthPopup] Creating CoreWebView2Environment\n");
+    auto createOp = winrt::Microsoft::Web::WebView2::Core::CoreWebView2Environment::CreateWithOptionsAsync(
+        L"", udfPath, nullptr);
+    createOp.Completed([webview, authUrlCopy](auto&& op, winrt::Windows::Foundation::AsyncStatus status) {
+        if (status == winrt::Windows::Foundation::AsyncStatus::Completed) {
+            OutputDebugStringW(L"[OAuthPopup] Environment created, calling EnsureCoreWebView2Async\n");
+            auto env = op.GetResults();
+            webview.EnsureCoreWebView2Async(env);
+        } else {
+            OutputDebugStringW(L"[OAuthPopup] Environment creation FAILED\n");
+        }
+    });
 }
 
 } // namespace Pivox
