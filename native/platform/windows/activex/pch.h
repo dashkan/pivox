@@ -30,4 +30,6 @@
 #include <winrt/Microsoft.UI.h>
 #include <winrt/Microsoft.Windows.ApplicationModel.Resources.h>
 #include <winrt/Windows.ApplicationModel.DataTransfer.h>
+#include <winrt/Windows.Web.Http.h>
+#include <winrt/Windows.Data.Json.h>
 #include <winrt/Microsoft.UI.Xaml.Navigation.h>

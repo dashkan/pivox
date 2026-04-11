@@ -30,5 +30,7 @@
 #include <winrt/Microsoft.UI.Content.h>
 
 #include <winrt/Windows.ApplicationModel.DataTransfer.h>
+#include <winrt/Windows.Web.Http.h>
+#include <winrt/Windows.Data.Json.h>
 
 #include <microsoft.ui.xaml.window.h>

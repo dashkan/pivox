@@ -249,6 +249,7 @@ if(WIN32)
         ${WIN_PLATFORM_DIR}/WinAppState.cpp
         ${WIN_PLATFORM_DIR}/WinAuthService.cpp
         ${WIN_SHARED_DIR}/PivoxServices.cpp
+        ${WIN_SHARED_DIR}/OAuthPopup.cpp
         ${WIN_SHARED_DIR}/GoogleOAuth.cpp
         ${WIN_SHARED_DIR}/DragService.cpp
         ${WIN_SHARED_DIR}/Views/LoginPage.idl
