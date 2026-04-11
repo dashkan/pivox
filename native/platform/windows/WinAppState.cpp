@@ -9,7 +9,7 @@ static const wchar_t* kCredTarget = L"Pivox";
 
 // Helper: convert UTF-8 std::string to wide string.
 static std::wstring toWide(const std::string& s) {
-    if (s.empty()) return {};
+    if (s.empty()) { return {}; }
     int len = MultiByteToWideChar(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), nullptr, 0);
     std::wstring ws(len, 0);
     MultiByteToWideChar(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), ws.data(), len);
@@ -18,7 +18,7 @@ static std::wstring toWide(const std::string& s) {
 
 // Helper: convert wide string to UTF-8 std::string.
 static std::string toUtf8(const std::wstring& ws) {
-    if (ws.empty()) return {};
+    if (ws.empty()) { return {}; }
     int len = WideCharToMultiByte(CP_UTF8, 0, ws.data(), static_cast<int>(ws.size()), nullptr, 0, nullptr, nullptr);
     std::string s(len, 0);
     WideCharToMultiByte(CP_UTF8, 0, ws.data(), static_cast<int>(ws.size()), s.data(), len, nullptr, nullptr);
@@ -27,7 +27,7 @@ static std::string toUtf8(const std::wstring& ws) {
 
 // Helper: write a DWORD to registry.
 static void regWriteDword(const wchar_t* name, DWORD value) {
-    HKEY hKey;
+    HKEY hKey = nullptr;
     if (RegCreateKeyExW(HKEY_CURRENT_USER, kRegSubKey, 0, nullptr,
             0, KEY_WRITE, nullptr, &hKey, nullptr) == ERROR_SUCCESS) {
         RegSetValueExW(hKey, name, 0, REG_DWORD,
@@ -38,7 +38,7 @@ static void regWriteDword(const wchar_t* name, DWORD value) {
 
 // Helper: read a DWORD from registry. Returns nullopt if not found.
 static std::optional<DWORD> regReadDword(const wchar_t* name) {
-    HKEY hKey;
+    HKEY hKey = nullptr;
     if (RegOpenKeyExW(HKEY_CURRENT_USER, kRegSubKey, 0, KEY_READ, &hKey) != ERROR_SUCCESS) {
         return std::nullopt;
     }
@@ -56,7 +56,7 @@ static std::optional<DWORD> regReadDword(const wchar_t* name) {
 
 // Helper: write a string to registry.
 static void regWriteString(const wchar_t* name, const std::wstring& value) {
-    HKEY hKey;
+    HKEY hKey = nullptr;
     if (RegCreateKeyExW(HKEY_CURRENT_USER, kRegSubKey, 0, nullptr,
             0, KEY_WRITE, nullptr, &hKey, nullptr) == ERROR_SUCCESS) {
         RegSetValueExW(hKey, name, 0, REG_SZ,
@@ -68,7 +68,7 @@ static void regWriteString(const wchar_t* name, const std::wstring& value) {
 
 // Helper: read a string from registry.
 static std::optional<std::wstring> regReadString(const wchar_t* name) {
-    HKEY hKey;
+    HKEY hKey = nullptr;
     if (RegOpenKeyExW(HKEY_CURRENT_USER, kRegSubKey, 0, KEY_READ, &hKey) != ERROR_SUCCESS) {
         return std::nullopt;
     }
@@ -197,7 +197,7 @@ void WinAppState::deleteSecure(const std::string& key) {
 // Helper: register a URL scheme in HKCU\Software\Classes.
 static void registerScheme(const wchar_t* scheme, const wchar_t* description,
                            const wchar_t* exePath) {
-    HKEY hKey;
+    HKEY hKey = nullptr;
     std::wstring baseKey = std::wstring(L"Software\\Classes\\") + scheme;
 
     if (RegCreateKeyExW(HKEY_CURRENT_USER, baseKey.c_str(), 0, nullptr,
