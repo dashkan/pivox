@@ -14,9 +14,6 @@ add_library(${SHARED_TARGET} SHARED
     # Google OAuth (OAuth2Manager coroutine — needs WinRT)
     ${SHARED_DIR}/GoogleOAuth.cpp
 
-    # Drag service (compile-time abstraction: ActiveX manual drag vs native WinUI)
-    ${SHARED_DIR}/DragService.cpp
-
     # LoginPage
     ${SHARED_DIR}/Views/LoginPage.idl
     ${SHARED_DIR}/Views/LoginPage.xaml
@@ -28,12 +25,6 @@ add_library(${SHARED_TARGET} SHARED
     ${SHARED_DIR}/Views/RegisterPage.xaml
     ${SHARED_DIR}/Views/RegisterPage.xaml.h
     ${SHARED_DIR}/Views/RegisterPage.xaml.cpp
-
-    # MainPage (post-login — NavigationView with sidebar)
-    ${SHARED_DIR}/Views/MainPage.idl
-    ${SHARED_DIR}/Views/MainPage.xaml
-    ${SHARED_DIR}/Views/MainPage.xaml.h
-    ${SHARED_DIR}/Views/MainPage.xaml.cpp
 )
 
 target_include_directories(${SHARED_TARGET} PRIVATE
@@ -46,19 +37,8 @@ target_include_directories(${SHARED_TARGET} PUBLIC
 
 target_compile_definitions(${SHARED_TARGET} PRIVATE PIVOX_SHARED_EXPORTS)
 
-# ActiveX build (x86/Win32): enable desktop APIs and manual drag path.
-if(CMAKE_GENERATOR_PLATFORM STREQUAL "Win32")
-    target_compile_definitions(${SHARED_TARGET} PRIVATE
-        PIVOX_ACTIVEX_HOST
-        WINAPI_FAMILY=WINAPI_FAMILY_DESKTOP_APP)
-    target_link_libraries(${SHARED_TARGET} PRIVATE ole32 shell32 user32)
-endif()
-
 target_link_libraries(${SHARED_TARGET} PRIVATE pivox_win_state crypt32 advapi32)
 target_precompile_headers(${SHARED_TARGET} PRIVATE ${SHARED_DIR}/pch.h)
-
-# DEF file exports DllGetActivationFactory/DllCanUnloadNow for WinRT class activation.
-target_link_options(${SHARED_TARGET} PRIVATE "/DEF:${SHARED_DIR}/PivoxShared.def")
 
 # WinRT component properties — generates .winmd for type activation.
 # ApplicationType "Windows Store" is required for WinUI XAML compilation
@@ -66,7 +46,6 @@ target_link_options(${SHARED_TARGET} PRIVATE "/DEF:${SHARED_DIR}/PivoxShared.def
 # keeps this a regular desktop DLL — no sandbox, no package.
 set_target_properties(${SHARED_TARGET} PROPERTIES
     VS_GLOBAL_RootNamespace "Pivox"
-    VS_GLOBAL_AppxPriInitialPath "Pivox"
     VS_GLOBAL_AppContainerApplication "false"
     VS_GLOBAL_AppxPackage "false"
     VS_GLOBAL_CharacterSet "Unicode"

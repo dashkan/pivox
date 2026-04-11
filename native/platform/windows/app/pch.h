@@ -30,3 +30,6 @@
 #include <winrt/Microsoft.UI.Content.h>
 
 #include <microsoft.ui.xaml.window.h>
+
+// PivoxShared component — projected types for XAML type chaining.
+#include <winrt/Pivox.h>

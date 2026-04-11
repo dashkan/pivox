@@ -3,7 +3,7 @@
 #include "MainWindow.g.cpp"
 #include "PivoxServices.h"
 
-namespace winrt::Pivox::implementation
+namespace winrt::PivoxApp::implementation
 {
     MainWindow::MainWindow()
     {

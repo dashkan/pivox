@@ -36,7 +36,7 @@ if(MSVC)
     #   4099 — missing PDBs in Firebase C++ SDK pre-built libs
     #   4075 — /INCREMENTAL vs /OPT:ICF conflict (NuGet targets inject /OPT in Debug)
     # See docs/dev/windows-platform-structure.md "Suppressed warnings".
-    add_link_options(/WX /ignore:4099 /ignore:4075 /ignore:4078)
+    add_link_options(/WX /ignore:4099 /ignore:4075 /ignore:4078 /ignore:4042)
 else()
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Werror -Wno-unused-parameter")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -Wno-unused-parameter")

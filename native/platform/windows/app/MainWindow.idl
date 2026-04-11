@@ -1,4 +1,4 @@
-namespace Pivox
+namespace PivoxApp
 {
     [default_interface]
     runtimeclass MainWindow : Microsoft.UI.Xaml.Window

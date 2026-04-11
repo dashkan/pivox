@@ -2,7 +2,7 @@
 # Pivox — WinUI 3 application executable
 # ============================================================
 
-set(WIN_TARGET "Pivox")
+set(WIN_TARGET "PivoxApp")
 set(WIN_APP_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 
 add_executable(${WIN_TARGET} WIN32
@@ -28,7 +28,8 @@ set_property(SOURCE ${WIN_APP_DIR}/App.xaml
 
 # WinUI 3 target properties (constraint #9).
 set_target_properties(${WIN_TARGET} PROPERTIES
-    VS_GLOBAL_RootNamespace "Pivox"
+    OUTPUT_NAME "Pivox"
+    VS_GLOBAL_RootNamespace "PivoxApp"
     VS_GLOBAL_AppContainerApplication "false"
     VS_GLOBAL_AppxPackage "false"
     VS_GLOBAL_CppWinRTOptimized "true"

@@ -8,7 +8,7 @@
 // NOTE: App.xaml.cpp does NOT include App.g.cpp.
 // See docs/dev/winui3-cmake-guide.md constraint #3.
 
-namespace winrt::Pivox::implementation
+namespace winrt::PivoxApp::implementation
 {
     App::App()
     {

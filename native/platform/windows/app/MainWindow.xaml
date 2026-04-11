@@ -1,8 +1,8 @@
 <Window
-    x:Class="Pivox.MainWindow"
+    x:Class="PivoxApp.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:local="using:Pivox"
+    xmlns:local="using:PivoxApp"
     Title="Pivox">
 
     <Grid>
