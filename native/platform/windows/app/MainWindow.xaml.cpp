@@ -10,7 +10,6 @@ namespace winrt::PivoxApp::implementation
         InitializeComponent();
         SetupWindow();
 
-        // Firebase manages session persistence. Check if a user is signed in.
         if (pivox::PivoxServices::authService()->hasValidSession())
         {
             ShowMainApp();
@@ -25,7 +24,6 @@ namespace winrt::PivoxApp::implementation
     {
         auto appWindow = this->AppWindow();
 
-        // Restore saved window state, or use defaults.
         auto& appState = pivox::PivoxServices::appState();
         auto saved = appState->loadWindowState();
         if (saved.has_value())
@@ -40,21 +38,17 @@ namespace winrt::PivoxApp::implementation
 
         appWindow.Title(L"Pivox");
 
-        // Extend content into title bar — seamless dark background like Calculator.
         auto titleBar = appWindow.TitleBar();
         titleBar.ExtendsContentIntoTitleBar(true);
         titleBar.ButtonBackgroundColor(Microsoft::UI::Colors::Transparent());
         titleBar.ButtonInactiveBackgroundColor(Microsoft::UI::Colors::Transparent());
 
-        // Minimum window size — Windows App SDK 1.7 OverlappedPresenter API
-        // (microsoft/microsoft-ui-xaml#2945, #7296).
         if (auto presenter = appWindow.Presenter().try_as<Microsoft::UI::Windowing::OverlappedPresenter>())
         {
             presenter.PreferredMinimumWidth(1024);
             presenter.PreferredMinimumHeight(768);
         }
 
-        // Save window state on move/resize.
         m_changedToken = appWindow.Changed(
             [this](Microsoft::UI::Windowing::AppWindow const&,
                    Microsoft::UI::Windowing::AppWindowChangedEventArgs const& args)
@@ -85,51 +79,14 @@ namespace winrt::PivoxApp::implementation
     {
         AuthContainer().Visibility(Microsoft::UI::Xaml::Visibility::Visible);
         MainContainer().Visibility(Microsoft::UI::Xaml::Visibility::Collapsed);
-        AuthFrame().Navigate({ L"Pivox.LoginPage",
-            winrt::Windows::UI::Xaml::Interop::TypeKind::Metadata });
+        AuthFrame().Navigate(winrt::xaml_typename<winrt::Pivox::LoginPage>());
     }
 
     void MainWindow::ShowMainApp()
     {
         AuthContainer().Visibility(Microsoft::UI::Xaml::Visibility::Collapsed);
         MainContainer().Visibility(Microsoft::UI::Xaml::Visibility::Visible);
-
-        // Select the first nav item (Operator).
-        if (NavView().MenuItems().Size() > 0)
-        {
-            NavView().SelectedItem(NavView().MenuItems().GetAt(0));
-        }
-    }
-
-    void MainWindow::OnNavSelectionChanged(
-        Microsoft::UI::Xaml::Controls::NavigationView const&,
-        Microsoft::UI::Xaml::Controls::NavigationViewSelectionChangedEventArgs const& args)
-    {
-        if (auto selectedItem = args.SelectedItem())
-        {
-            auto navItem = selectedItem.as<Microsoft::UI::Xaml::Controls::NavigationViewItem>();
-            auto tag = winrt::unbox_value<winrt::hstring>(navItem.Tag());
-
-            if (tag == L"Profile")
-            {
-                // Update profile with current auth user data.
-                auto& user = pivox::PivoxServices::authService()->currentUser();
-                auto displayName = user.displayName.empty() ? "User" : user.displayName;
-                auto email = user.email.empty() ? "" : user.email;
-                ProfileName().Text(winrt::to_hstring(displayName));
-                ProfileEmail().Text(winrt::to_hstring(email));
-                ProfileAvatar().DisplayName(winrt::to_hstring(displayName));
-
-                ContentPanel().Visibility(Microsoft::UI::Xaml::Visibility::Collapsed);
-                ProfilePanel().Visibility(Microsoft::UI::Xaml::Visibility::Visible);
-            }
-            else
-            {
-                ContentPanel().Visibility(Microsoft::UI::Xaml::Visibility::Visible);
-                ProfilePanel().Visibility(Microsoft::UI::Xaml::Visibility::Collapsed);
-                SectionTitle().Text(tag);
-            }
-        }
+        MainFrame().Navigate(winrt::xaml_typename<winrt::Pivox::MainPage>());
     }
 
     void MainWindow::OnMenuExit(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
@@ -139,7 +96,7 @@ namespace winrt::PivoxApp::implementation
 
     void MainWindow::OnMenuToggleSidebar(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
     {
-        NavView().IsPaneOpen(!NavView().IsPaneOpen());
+        // MainPage owns the NavigationView — toggle via the page if needed.
     }
 
     void MainWindow::OnMenuMinimize(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
@@ -163,11 +120,5 @@ namespace winrt::PivoxApp::implementation
                 presenter.Maximize();
             }
         }
-    }
-
-    void MainWindow::OnSignOut(IInspectable const&, Microsoft::UI::Xaml::RoutedEventArgs const&)
-    {
-        pivox::PivoxServices::authService()->signOut();
-        ShowAuth();
     }
 }

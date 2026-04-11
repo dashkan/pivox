@@ -7,14 +7,10 @@ namespace winrt::PivoxApp::implementation
     {
         MainWindow();
 
-        void OnNavSelectionChanged(
-            Microsoft::UI::Xaml::Controls::NavigationView const& sender,
-            Microsoft::UI::Xaml::Controls::NavigationViewSelectionChangedEventArgs const& args);
         void OnMenuExit(IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& e);
         void OnMenuToggleSidebar(IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& e);
         void OnMenuMinimize(IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& e);
         void OnMenuMaximize(IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& e);
-        void OnSignOut(IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& e);
 
     private:
         void ShowAuth();
