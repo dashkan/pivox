@@ -18,7 +18,6 @@ namespace winrt::Pivox::implementation
 
     private:
         void SubmitSignIn();
-        void NavigateToMainApp();
         void ShowError(const std::string& message);
         void UpdateButtonState();
         void SetLoading(bool loading);

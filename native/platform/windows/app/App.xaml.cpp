@@ -8,7 +8,7 @@
 // NOTE: App.xaml.cpp does NOT include App.g.cpp.
 // See docs/dev/winui3-cmake-guide.md constraint #3.
 
-namespace winrt::PivoxApp::implementation
+namespace winrt::Pivox::implementation
 {
     App::App()
     {
@@ -26,7 +26,7 @@ namespace winrt::PivoxApp::implementation
         // Single-instance: if another Pivox is running, handle OAuth callback
         // forwarding and exit. OAuth2Manager::CompleteAuthRequest sends the
         // auth code to the first instance's pending RequestAuthWithParamsAsync.
-        HANDLE hMutex = CreateMutexW(nullptr, FALSE, L"Local\\PivoxAppMutex");
+        HANDLE hMutex = CreateMutexW(nullptr, FALSE, L"Local\\PivoxMutex");
         if (hMutex && GetLastError() == ERROR_ALREADY_EXISTS)
         {
             // Check if we were launched with a protocol activation URL.

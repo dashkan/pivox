@@ -13,7 +13,6 @@ namespace winrt::Pivox::implementation
         void OnGitHubSignIn(IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& e);
 
     private:
-        void NavigateToMainApp();
         void ShowError(const std::string& message);
         void SetLoading(bool loading);
     };

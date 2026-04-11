@@ -30,7 +30,7 @@ namespace winrt::Pivox::implementation
             {
                 auto& auth = pivox::PivoxServices::authService();
                 if (auth) {
-                    auto& user = auth->currentUser();
+                    auto user = auth->currentUser();
                     auto displayName = user.displayName.empty() ? "User" : user.displayName;
                     auto email = user.email.empty() ? "" : user.email;
                     ProfileName().Text(winrt::to_hstring(displayName));

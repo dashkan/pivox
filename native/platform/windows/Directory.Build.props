@@ -1,14 +1,10 @@
 <Project>
-  <PropertyGroup Condition="'$(ProjectName)' == 'PivoxApp' OR '$(ProjectName)' == 'PivoxShared' OR '$(ProjectName)' == 'PivoxActiveX'">
+  <PropertyGroup Condition="'$(ProjectName)' == 'Pivox' OR '$(ProjectName)' == 'PivoxActiveX'">
     <NuGetTargetMoniker>native,Version=v0.0</NuGetTargetMoniker>
-    <!-- Override CMake's default MultiByte — WinUI/WinRT requires Unicode. -->
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(ProjectName)' == 'PivoxApp'">
+  <PropertyGroup Condition="'$(ProjectName)' == 'Pivox'">
     <RuntimeIdentifiers>win10-x64;win10-arm64</RuntimeIdentifiers>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(ProjectName)' == 'PivoxShared'">
-    <RuntimeIdentifiers>win10-x86;win10-x64;win10-arm64</RuntimeIdentifiers>
   </PropertyGroup>
   <PropertyGroup Condition="'$(ProjectName)' == 'PivoxActiveX'">
     <RuntimeIdentifiers>win10-x86</RuntimeIdentifiers>

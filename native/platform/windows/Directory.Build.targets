@@ -1,32 +1,14 @@
 <Project>
-  <!-- Override CMake's per-config CharacterSet=MultiByte. WinUI/WinRT requires Unicode.
-       Must be in .targets (not .props) to run after CMake's generated PropertyGroups. -->
-  <PropertyGroup Condition="'$(ProjectName)' == 'PivoxApp' OR '$(ProjectName)' == 'PivoxShared' OR '$(ProjectName)' == 'PivoxActiveX'">
+  <!-- Override CMake's per-config CharacterSet=MultiByte. WinUI/WinRT requires Unicode. -->
+  <PropertyGroup Condition="'$(ProjectName)' == 'Pivox' OR '$(ProjectName)' == 'PivoxActiveX'">
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
 
   <!-- module.g.cpp provides WinRT activation factories for XAML types. -->
-  <ItemGroup Condition="'$(ProjectName)' == 'PivoxApp' OR '$(ProjectName)' == 'PivoxShared'">
+  <ItemGroup Condition="'$(ProjectName)' == 'Pivox'">
     <ClCompile Include="$(GeneratedFilesDir)module.g.cpp" />
   </ItemGroup>
-  <ItemDefinitionGroup Condition="'$(ProjectName)' == 'PivoxApp' OR '$(ProjectName)' == 'PivoxShared'">
+  <ItemDefinitionGroup Condition="'$(ProjectName)' == 'Pivox'">
     <Midl><OutputDirectory /></Midl>
-  </ItemDefinitionGroup>
-  <!-- PivoxActiveX has no WinRT IDL — no module.g.cpp, no MIDL override needed. -->
-
-  <!-- PivoxActiveX needs a proper ProjectReference to PivoxShared so MSBuild
-       copies the DLL, PRI, winmd, and XBF files. CMake's target_link_libraries
-       only adds AdditionalDependencies (link-time), not a ProjectReference. -->
-  <ItemGroup Condition="'$(ProjectName)' == 'PivoxActiveX'">
-    <ProjectReference Include="$(MSBuildProjectDirectory)\..\shared\PivoxShared.vcxproj">
-      <Private>true</Private>
-    </ProjectReference>
-  </ItemGroup>
-
-  <!-- App also needs copy-local for PivoxShared. -->
-  <ItemDefinitionGroup Condition="'$(ProjectName)' == 'PivoxApp'">
-    <ProjectReference>
-      <Private>true</Private>
-    </ProjectReference>
   </ItemDefinitionGroup>
 </Project>

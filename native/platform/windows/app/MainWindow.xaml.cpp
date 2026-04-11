@@ -3,19 +3,30 @@
 #include "MainWindow.g.cpp"
 #include "PivoxServices.h"
 
-namespace winrt::PivoxApp::implementation
+namespace winrt::Pivox::implementation
 {
     MainWindow::MainWindow()
     {
         InitializeComponent();
         SetupWindow();
 
-        if (pivox::PivoxServices::authService()->hasValidSession())
-        {
+        // Auth state listener — Firebase drives navigation.
+        auto dispatcher = this->DispatcherQueue();
+        pivox::PivoxServices::authService()->onAuthStateChanged(
+            [this, dispatcher](bool signedIn) {
+                dispatcher.TryEnqueue([this, signedIn]() {
+                    if (signedIn) {
+                        ShowMainApp();
+                    } else {
+                        ShowAuth();
+                    }
+                });
+            });
+
+        // Initial state.
+        if (pivox::PivoxServices::authService()->isSignedIn()) {
             ShowMainApp();
-        }
-        else
-        {
+        } else {
             ShowAuth();
         }
     }

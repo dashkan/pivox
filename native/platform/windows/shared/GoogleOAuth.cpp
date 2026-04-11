@@ -4,6 +4,8 @@
 #include <winrt/Microsoft.Security.Authentication.OAuth.h>
 #include <winrt/Windows.Data.Json.h>
 
+#include "firebase/app.h"
+#include "firebase/auth.h"
 #include "firebase/auth/credential.h"
 
 using namespace winrt::Microsoft::Security::Authentication::OAuth;
@@ -94,7 +96,6 @@ winrt::fire_and_forget LaunchGoogleOAuth(
             future.OnCompletion([self, cb](const firebase::Future<firebase::auth::User>& f) {
                 if (f.error() == 0) {
                     auto user = self->mapFirebaseUser(*f.result());
-                    self->setAuthState(pivox::AuthStatus::SignedIn, user);
                     self->isOAuthInProgress_ = false;
                     cb({ pivox::AuthError::None, "", user });
                 } else {

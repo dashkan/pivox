@@ -1,14 +1,26 @@
 #pragma once
 
 #include "auth_state.h"
-#include "firebase/app.h"
-#include "firebase/auth.h"
 #include <functional>
 #include <string>
+#include <vector>
 #include <cstdint>
 #include <atomic>
 
+// Forward-declare Firebase types — headers in WinAuthService.cpp only.
+namespace firebase { class App; namespace auth { class Auth; class User; } }
+
 namespace pivox {
+
+/// Authenticated user identity.
+struct AuthUser {
+    std::string uid;
+    std::string email;
+    std::string displayName;
+    std::string photoURL;
+    bool emailVerified = false;
+    std::vector<std::string> providers;
+};
 
 /// Error from an auth operation.
 enum class AuthError {
@@ -43,16 +55,24 @@ struct OAuthConfig {
     bool hasGitHub() const { return !githubClientId.empty(); }
 };
 
+/// Auth state change callback — fired when user signs in or out.
+using AuthStateCallback = std::function<void(bool signedIn)>;
+
 /// Manages authentication on Windows.
+/// Firebase SDK handles session persistence — no manual state tracking.
 class WinAuthService {
 public:
     WinAuthService();
     ~WinAuthService();
 
-    AuthStatus status() const { return status_; }
-    const AuthUser& currentUser() const { return currentUser_; }
+    /// Get current user from Firebase (reads SDK state directly).
+    AuthUser currentUser() const;
 
-    using AuthStateCallback = std::function<void(AuthStatus, const AuthUser&)>;
+    /// Check if a user is signed in (reads SDK state directly).
+    bool isSignedIn() const;
+
+    /// Register a callback for auth state changes (sign in / sign out).
+    /// Firebase's AuthStateListener drives this.
     void onAuthStateChanged(AuthStateCallback callback);
 
     void setOAuthConfig(const OAuthConfig& config);
@@ -81,28 +101,25 @@ public:
 
     void signOut();
 
-    /// Check if Firebase has a valid persisted session.
-    bool hasValidSession();
-
     bool initializeFirebase();
     bool isFirebaseInitialized() const;
     void connectToEmulatorIfRequested();
 
     // Public for OAuth launcher access (GoogleOAuth.cpp).
-    void setAuthState(AuthStatus status, const AuthUser& user = {});
     std::atomic<bool> isOAuthInProgress_ = false;
-
     firebase::App* firebaseApp_ = nullptr;
     firebase::auth::Auth* firebaseAuth_ = nullptr;
     AuthResult mapFirebaseError(int errorCode) const;
     AuthUser mapFirebaseUser(const firebase::auth::User& user) const;
 
 private:
-    AuthStatus status_ = AuthStatus::Unknown;
-    AuthUser currentUser_;
-    AuthStateCallback callback_;
     OAuthConfig oauthConfig_;
+    AuthStateCallback authStateCallback_;
     bool testMode_ = false;
+
+    // Firebase AuthStateListener implementation (defined in .cpp).
+    struct AuthListener;
+    AuthListener* authListener_ = nullptr;
 };
 
 } // namespace pivox

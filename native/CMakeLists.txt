@@ -242,35 +242,52 @@ if(WIN32)
         "${WIN_PLATFORM_DIR}/Directory.Build.targets"
         "${CMAKE_BINARY_DIR}/Directory.Build.targets" COPYONLY)
 
-    # WinAppState library — shared between app, shared library, and tests.
-    add_library(pivox_win_state STATIC
+    # Shared Windows source files — compiled directly into each target.
+    # No shared DLL. Each target gets its own copy of all statics.
+    set(WIN_SHARED_DIR "${WIN_PLATFORM_DIR}/shared")
+    set(WIN_SHARED_SOURCES
         ${WIN_PLATFORM_DIR}/WinAppState.cpp
         ${WIN_PLATFORM_DIR}/WinAuthService.cpp
+        ${WIN_SHARED_DIR}/PivoxServices.cpp
+        ${WIN_SHARED_DIR}/GoogleOAuth.cpp
+        ${WIN_SHARED_DIR}/DragService.cpp
+        ${WIN_SHARED_DIR}/Views/LoginPage.idl
+        ${WIN_SHARED_DIR}/Views/LoginPage.xaml
+        ${WIN_SHARED_DIR}/Views/LoginPage.xaml.h
+        ${WIN_SHARED_DIR}/Views/LoginPage.xaml.cpp
+        ${WIN_SHARED_DIR}/Views/RegisterPage.idl
+        ${WIN_SHARED_DIR}/Views/RegisterPage.xaml
+        ${WIN_SHARED_DIR}/Views/RegisterPage.xaml.h
+        ${WIN_SHARED_DIR}/Views/RegisterPage.xaml.cpp
+        ${WIN_SHARED_DIR}/Views/MainPage.idl
+        ${WIN_SHARED_DIR}/Views/MainPage.xaml
+        ${WIN_SHARED_DIR}/Views/MainPage.xaml.h
+        ${WIN_SHARED_DIR}/Views/MainPage.xaml.cpp
+        ${WIN_SHARED_DIR}/Views/TestPage.idl
+        ${WIN_SHARED_DIR}/Views/TestPage.xaml
+        ${WIN_SHARED_DIR}/Views/TestPage.xaml.h
+        ${WIN_SHARED_DIR}/Views/TestPage.xaml.cpp
     )
-    target_include_directories(pivox_win_state PUBLIC
-        ${WIN_PLATFORM_DIR}
-        "${CMAKE_SOURCE_DIR}/core"
-    )
-    target_link_libraries(pivox_win_state PUBLIC pivox_core)
-    target_link_libraries(pivox_win_state PRIVATE crypt32 advapi32)
 
-    # Firebase C++ SDK — always linked on Windows.
-    # Architecture-aware: x64 for app, x86 for ActiveX control.
+    # Common include directories for Windows targets.
+    set(WIN_INCLUDE_DIRS
+        ${WIN_PLATFORM_DIR}
+        ${WIN_SHARED_DIR}
+        ${WIN_SHARED_DIR}/Views
+        "${CMAKE_SOURCE_DIR}/core"
+        "${FB_CPP_ROOT}/include"
+    )
+
+    # Firebase C++ SDK — architecture-aware.
     if(CMAKE_GENERATOR_PLATFORM STREQUAL "Win32")
         set(FB_ARCH "x86")
     else()
         set(FB_ARCH "x64")
     endif()
-    target_include_directories(pivox_win_state PUBLIC "${FB_CPP_ROOT}/include")
-    target_link_directories(pivox_win_state PUBLIC
-        "${FB_CPP_ROOT}/libs/windows/VS2019/MD/${FB_ARCH}/$<CONFIG>")
-    target_link_libraries(pivox_win_state PRIVATE firebase_app firebase_auth
-        ws2_32 userenv)
-    target_compile_definitions(pivox_win_state PUBLIC _CRT_SECURE_NO_WARNINGS)
+    set(FB_LINK_DIR "${FB_CPP_ROOT}/libs/windows/VS2019/MD/${FB_ARCH}/$<CONFIG>")
 
-    # Shared WinRT component library (DLL + .winmd).
-    # Must be defined before the app and ActiveX targets — they link against it.
-    add_subdirectory(platform/windows/shared)
+    # Common link libraries for Windows targets.
+    set(WIN_LINK_LIBS pivox_core crypt32 advapi32 firebase_app firebase_auth ws2_32 userenv)
 
     option(PIVOX_BUILD_ACTIVEX "Build ActiveX plugin (x86 only)" OFF)
 

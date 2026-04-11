@@ -15,11 +15,6 @@
 //       Pivox::DragService::HandleDragStarting(args);
 //   });
 
-#ifdef PIVOX_SHARED_EXPORTS
-#define PIVOX_API __declspec(dllexport)
-#else
-#define PIVOX_API __declspec(dllimport)
-#endif
 
 namespace Pivox {
 
@@ -30,7 +25,7 @@ public:
     // On App: no-op (native WinUI handles everything).
     // Pass the same text you set on args.Data().SetText() — avoids async
     // extraction from DataPackage which fails STA assertion in ActiveX hosts.
-    PIVOX_API static void HandleDragStarting(
+    static void HandleDragStarting(
         const winrt::Microsoft::UI::Xaml::DragStartingEventArgs& args,
         const winrt::hstring& text);
 };

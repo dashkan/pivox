@@ -1,7 +1,7 @@
 #pragma once
 #include "App.xaml.g.h"
 
-namespace winrt::PivoxApp::implementation
+namespace winrt::Pivox::implementation
 {
     struct App : AppT<App>
     {

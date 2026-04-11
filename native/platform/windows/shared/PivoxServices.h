@@ -4,11 +4,6 @@
 #include "WinAuthService.h"
 #include <memory>
 
-#ifdef PIVOX_SHARED_EXPORTS
-#define PIVOX_SHARED_API __declspec(dllexport)
-#else
-#define PIVOX_SHARED_API __declspec(dllimport)
-#endif
 
 namespace pivox {
 
@@ -18,7 +13,7 @@ namespace pivox {
 // through exported methods, never across the DLL boundary directly.
 #pragma warning(push)
 #pragma warning(disable: 4251)
-class PIVOX_SHARED_API PivoxServices {
+class PivoxServices {
 public:
     static void initialize(std::shared_ptr<WinAppState> appState,
                            std::shared_ptr<WinAuthService> authService);

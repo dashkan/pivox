@@ -1,8 +1,9 @@
 # ============================================================
 # Pivox — WinUI 3 application executable
+# All shared source compiled directly — no shared DLL.
 # ============================================================
 
-set(WIN_TARGET "PivoxApp")
+set(WIN_TARGET "Pivox")
 set(WIN_APP_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 
 add_executable(${WIN_TARGET} WIN32
@@ -16,20 +17,27 @@ add_executable(${WIN_TARGET} WIN32
     ${WIN_APP_DIR}/MainWindow.xaml
     ${WIN_APP_DIR}/MainWindow.xaml.h
     ${WIN_APP_DIR}/MainWindow.xaml.cpp
+    # Shared source (Views, services, auth)
+    ${WIN_SHARED_SOURCES}
 )
 
-target_include_directories(${WIN_TARGET} PRIVATE ${WIN_APP_DIR})
-target_link_libraries(${WIN_TARGET} PRIVATE PivoxShared pivox_win_state crypt32 advapi32)
+target_include_directories(${WIN_TARGET} PRIVATE
+    ${WIN_APP_DIR}
+    ${WIN_INCLUDE_DIRS}
+)
+target_link_directories(${WIN_TARGET} PRIVATE "${FB_LINK_DIR}")
+target_link_libraries(${WIN_TARGET} PRIVATE ${WIN_LINK_LIBS})
 target_precompile_headers(${WIN_TARGET} PRIVATE ${WIN_APP_DIR}/pch.h)
+target_compile_definitions(${WIN_TARGET} PRIVATE _CRT_SECURE_NO_WARNINGS)
 
-# App.xaml is the ApplicationDefinition (constraint #4).
+# App.xaml is the ApplicationDefinition.
 set_property(SOURCE ${WIN_APP_DIR}/App.xaml
     PROPERTY VS_XAML_TYPE "ApplicationDefinition")
 
-# WinUI 3 target properties (constraint #9).
+# WinUI 3 target properties.
 set_target_properties(${WIN_TARGET} PROPERTIES
-    OUTPUT_NAME "Pivox"
-    VS_GLOBAL_RootNamespace "PivoxApp"
+    VS_GLOBAL_RootNamespace "Pivox"
+    VS_GLOBAL_AppxPriInitialPath "Pivox"
     VS_GLOBAL_AppContainerApplication "false"
     VS_GLOBAL_AppxPackage "false"
     VS_GLOBAL_CppWinRTOptimized "true"
@@ -44,14 +52,14 @@ set_target_properties(${WIN_TARGET} PROPERTIES
     VS_GLOBAL_WindowsAppSDKSelfContained "true"
 )
 
-# NuGet packages (constraint #8).
+# NuGet packages.
 set_property(TARGET ${WIN_TARGET} PROPERTY VS_PACKAGE_REFERENCES
     "Microsoft.Windows.CppWinRT_2.0.250303.1"
     "Microsoft.WindowsAppSDK_1.8.260317003"
     "Microsoft.Windows.SDK.BuildTools_10.0.26100.7705"
 )
 
-# IDL/XAML dependency wiring (constraint #5).
+# IDL/XAML dependency wiring.
 get_target_property(_SOURCES ${WIN_TARGET} SOURCES)
 foreach(_SOURCE ${_SOURCES})
     cmake_path(GET _SOURCE EXTENSION LAST_ONLY _EXTENSION)
@@ -69,11 +77,6 @@ foreach(_SOURCE ${_SOURCES})
     endif()
 endforeach()
 
-# Embed manifest with WinRT activatable class entries for PivoxShared types.
-target_link_options(${WIN_TARGET} PRIVATE
-    "/MANIFEST:EMBED"
-    "/MANIFESTINPUT:${WIN_APP_DIR}/PivoxApp.manifest")
-
-# Release PDBs for debugging (constraint #10).
+# Release PDBs for debugging.
 target_compile_options(${WIN_TARGET} PRIVATE "$<$<CONFIG:Release>:/Zi>")
 target_link_options(${WIN_TARGET} PRIVATE "$<$<CONFIG:Release>:/DEBUG>")

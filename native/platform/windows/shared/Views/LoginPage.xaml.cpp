@@ -114,6 +114,7 @@ namespace winrt::Pivox::implementation
                         strongThis->SetLoading(false);
                         if (!result.ok())
                         {
+                            OutputDebugStringA(("[PivoxAuth] signIn failed: " + result.errorMessage + "\n").c_str());
                             strongThis->ShowError(result.errorMessage);
                             return;
                         }
@@ -127,7 +128,7 @@ namespace winrt::Pivox::implementation
                             pivox::PivoxServices::appState()->saveString("remembered_email", "");
                         }
 
-                        strongThis->NavigateToMainApp();
+                        
                     }
                 });
             });
@@ -157,7 +158,7 @@ namespace winrt::Pivox::implementation
                         strongThis->SetLoading(false);
                         if (result.ok())
                         {
-                            strongThis->NavigateToMainApp();
+                            
                         }
                         else if (!result.errorMessage.empty())
                         {
@@ -188,26 +189,5 @@ namespace winrt::Pivox::implementation
         }
     }
 
-    void LoginPage::NavigateToMainApp()
-    {
-        if (auto frame = this->Frame())
-        {
-            if (auto authContainer = frame.Parent().as<Microsoft::UI::Xaml::FrameworkElement>())
-            {
-                if (auto rootGrid = authContainer.Parent().as<Microsoft::UI::Xaml::FrameworkElement>())
-                {
-                    if (auto panel = rootGrid.as<Microsoft::UI::Xaml::Controls::Panel>())
-                    {
-                        if (panel.Children().Size() >= 2)
-                        {
-                            panel.Children().GetAt(0).as<Microsoft::UI::Xaml::UIElement>()
-                                .Visibility(Microsoft::UI::Xaml::Visibility::Collapsed);
-                            panel.Children().GetAt(1).as<Microsoft::UI::Xaml::UIElement>()
-                                .Visibility(Microsoft::UI::Xaml::Visibility::Visible);
-                        }
-                    }
-                }
-            }
-        }
-    }
+    // Auth state listener (registered by MainWindow) handles navigation.
 }

@@ -1,7 +1,7 @@
 #pragma once
 #include "MainWindow.g.h"
 
-namespace winrt::PivoxApp::implementation
+namespace winrt::Pivox::implementation
 {
     struct MainWindow : MainWindowT<MainWindow>
     {
@@ -22,7 +22,7 @@ namespace winrt::PivoxApp::implementation
     };
 }
 
-namespace winrt::PivoxApp::factory_implementation
+namespace winrt::Pivox::factory_implementation
 {
     struct MainWindow : MainWindowT<MainWindow, implementation::MainWindow>
     {
