@@ -1,0 +1,15 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "win-activex",
+            "displayName": "ActiveX Plugin (x86)",
+            "generator": "Visual Studio 18 2026",
+            "architecture": { "value": "Win32" },
+            "binaryDir": "${sourceDir}/build-activex-x86",
+            "cacheVariables": {
+                "PIVOX_BUILD_ACTIVEX": "ON"
+            }
+        }
+    ]
+}

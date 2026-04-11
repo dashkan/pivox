@@ -69,6 +69,11 @@ foreach(_SOURCE ${_SOURCES})
     endif()
 endforeach()
 
+# Embed manifest with WinRT activatable class entries for PivoxShared types.
+target_link_options(${WIN_TARGET} PRIVATE
+    "/MANIFEST:EMBED"
+    "/MANIFESTINPUT:${WIN_APP_DIR}/PivoxApp.manifest")
+
 # Release PDBs for debugging (constraint #10).
 target_compile_options(${WIN_TARGET} PRIVATE "$<$<CONFIG:Release>:/Zi>")
 target_link_options(${WIN_TARGET} PRIVATE "$<$<CONFIG:Release>:/DEBUG>")

@@ -32,6 +32,12 @@ add_library(${SHARED_TARGET} SHARED
     ${SHARED_DIR}/Views/MainPage.xaml.h
     ${SHARED_DIR}/Views/MainPage.xaml.cpp
 
+    # TestPage (minimal page for navigation testing)
+    ${SHARED_DIR}/Views/TestPage.idl
+    ${SHARED_DIR}/Views/TestPage.xaml
+    ${SHARED_DIR}/Views/TestPage.xaml.h
+    ${SHARED_DIR}/Views/TestPage.xaml.cpp
+
     # Drag service (compile-time abstraction: ActiveX manual drag vs native WinUI)
     ${SHARED_DIR}/DragService.cpp
 )

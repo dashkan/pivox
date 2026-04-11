@@ -272,14 +272,16 @@ if(WIN32)
     # Must be defined before the app and ActiveX targets — they link against it.
     add_subdirectory(platform/windows/shared)
 
-    # WinUI 3 app executable.
-    add_subdirectory(platform/windows/app)
+    option(PIVOX_BUILD_ACTIVEX "Build ActiveX plugin (x86 only)" OFF)
 
-    # ActiveX control (ATL-based, XAML Islands).
-    # x86 only — typically built in a separate CMake configure (-A Win32).
-    # Included here so it appears in the solution for x64 builds too;
-    # the ActiveX target simply won't link on non-x86 architectures.
-    add_subdirectory(platform/windows/activex)
+    if(PIVOX_BUILD_ACTIVEX)
+        if(NOT CMAKE_GENERATOR_PLATFORM STREQUAL "Win32")
+            message(FATAL_ERROR "PIVOX_BUILD_ACTIVEX requires -A Win32")
+        endif()
+        add_subdirectory(platform/windows/activex)
+    else()
+        add_subdirectory(platform/windows/app)
+    endif()
 endif()
 
 
