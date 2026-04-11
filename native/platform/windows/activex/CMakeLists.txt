@@ -1,7 +1,7 @@
 # ============================================================
-# PivoxActiveX — ATL-based ActiveX user control
-# Hosts WinUI 3 content from PivoxShared via XAML Islands.
-# x86 only. Built in a separate CMake configure (-A Win32).
+# PivoxActiveX — ATL-based ActiveX control with XAML Islands.
+# All shared source compiled directly — no shared DLL.
+# x86 only. Built via cmake --preset win-activex.
 # ============================================================
 
 set(AX_TARGET "PivoxActiveX")
@@ -63,6 +63,9 @@ add_library(${AX_TARGET} SHARED
     # MIDL-generated files
     ${AX_MIDL_OUT}/PivoxActiveX_i.h
     ${AX_MIDL_OUT}/PivoxActiveX_i.c
+
+    # Shared source (Views, services, auth) — compiled directly.
+    ${WIN_SHARED_SOURCES}
 )
 
 # _i.c is plain C — skip the C++ PCH.
@@ -73,7 +76,8 @@ set_source_files_properties(${AX_MIDL_OUT}/PivoxActiveX_i.c PROPERTIES
 
 target_include_directories(${AX_TARGET} PRIVATE
     ${AX_DIR}
-    ${AX_MIDL_OUT}   # PivoxActiveX_i.h
+    ${AX_MIDL_OUT}
+    ${WIN_INCLUDE_DIRS}
 )
 
 # Resource compiler needs the MIDL output directory to find PivoxActiveX.tlb.
@@ -86,8 +90,12 @@ set(WASDK_FOUNDATION "Microsoft.WindowsAppSDK.Foundation")
 set(WASDK_FOUNDATION_VER "1.8.260222000")
 set(WASDK_BOOTSTRAP_LIB
     "$ENV{USERPROFILE}/.nuget/packages/${WASDK_FOUNDATION}/${WASDK_FOUNDATION_VER}/lib/native/${FB_ARCH}/Microsoft.WindowsAppRuntime.Bootstrap.lib")
-target_link_libraries(${AX_TARGET} PRIVATE PivoxShared pivox_win_state crypt32 advapi32
-    "${WASDK_BOOTSTRAP_LIB}")
+target_link_directories(${AX_TARGET} PRIVATE "${FB_LINK_DIR}")
+target_link_libraries(${AX_TARGET} PRIVATE ${WIN_LINK_LIBS} "${WASDK_BOOTSTRAP_LIB}")
+target_compile_definitions(${AX_TARGET} PRIVATE
+    PIVOX_ACTIVEX_HOST
+    WINAPI_FAMILY=WINAPI_FAMILY_DESKTOP_APP
+    _CRT_SECURE_NO_WARNINGS)
 target_precompile_headers(${AX_TARGET} PRIVATE ${AX_DIR}/pch.h)
 
 # Use .def file for DLL exports. Embed manifest for XAML Islands support.
@@ -95,35 +103,58 @@ set_target_properties(${AX_TARGET} PROPERTIES
     LINK_FLAGS "/DEF:\"${AX_DIR}/PivoxControl.def\" /MANIFEST:EMBED /MANIFESTINPUT:\"${AX_DIR}/PivoxActiveX.manifest\""
 )
 
-# CppWinRT provides WinRT projection headers (winrt/Microsoft.UI.Xaml.h etc.)
-# but must not process our COM IDL — that's handled by the custom MIDL above.
+# CppWinRT + WinUI properties for XAML compilation.
 set_target_properties(${AX_TARGET} PROPERTIES
-    VS_GLOBAL_RootNamespace "PivoxActiveX"
+    VS_GLOBAL_RootNamespace "Pivox"
+    VS_GLOBAL_AppxPriInitialPath "Pivox"
+    VS_GLOBAL_AppContainerApplication "false"
+    VS_GLOBAL_AppxPackage "false"
+    VS_GLOBAL_CharacterSet "Unicode"
     VS_GLOBAL_CppWinRTOptimized "true"
+    VS_GLOBAL_CppWinRTRootNamespaceAutoMerge "true"
+    VS_GLOBAL_CppWinRTComponent "true"
+    VS_GLOBAL_UseWinUI "true"
+    VS_GLOBAL_ApplicationType "Windows Store"
+    VS_GLOBAL_ApplicationTypeRevision "10.0"
     VS_GLOBAL_WindowsTargetPlatformVersion "10.0"
     VS_GLOBAL_WindowsTargetPlatformMinVersion "10.0.17763.0"
+    VS_GLOBAL_WindowsPackageType "None"
+    VS_GLOBAL_EnablePreviewMsixTooling "true"
 )
 
-# NuGet packages — CppWinRT for WinRT headers, WindowsAppSDK for XAML Islands.
+# NuGet packages.
 set_property(TARGET ${AX_TARGET} PROPERTY VS_PACKAGE_REFERENCES
     "Microsoft.Windows.CppWinRT_2.0.250303.1"
     "Microsoft.WindowsAppSDK_1.8.260317003"
     "Microsoft.Windows.SDK.BuildTools_10.0.26100.7705"
 )
 
+# IDL/XAML dependency wiring for shared Views.
+get_target_property(_SOURCES ${AX_TARGET} SOURCES)
+foreach(_SOURCE ${_SOURCES})
+    cmake_path(GET _SOURCE EXTENSION LAST_ONLY _EXTENSION)
+    if(NOT "${_EXTENSION}" STREQUAL ".idl")
+        continue()
+    endif()
+    # Skip COM IDL (PivoxControl.idl) — handled by custom MIDL above.
+    cmake_path(GET _SOURCE FILENAME _FILENAME)
+    if("${_FILENAME}" STREQUAL "PivoxControl.idl")
+        continue()
+    endif()
+    set(_IDL_SOURCE "${_SOURCE}")
+    cmake_path(REMOVE_EXTENSION _SOURCE LAST_ONLY OUTPUT_VARIABLE _BASENAME)
+    set(_XAML_SOURCE "${_BASENAME}.xaml")
+    if("${_XAML_SOURCE}" IN_LIST _SOURCES)
+        set_property(SOURCE "${_IDL_SOURCE}" PROPERTY VS_SETTINGS
+            "SubType=Code" "DependentUpon=${_XAML_SOURCE}")
+    else()
+        set_property(SOURCE "${_IDL_SOURCE}" PROPERTY VS_SETTINGS "SubType=Code")
+    endif()
+endforeach()
+
 # Release PDBs for debugging.
 target_compile_options(${AX_TARGET} PRIVATE "$<$<CONFIG:Release>:/Zi>")
 target_link_options(${AX_TARGET} PRIVATE "$<$<CONFIG:Release>:/DEBUG>")
-
-# Copy PivoxShared PRI to ActiveX output (needed for XAML resource resolution).
-# The DLL is copied via ProjectReference in Directory.Build.targets, but the
-# PRI requires an explicit copy because MSBuild doesn't auto-copy component PRIs.
-add_custom_command(TARGET ${AX_TARGET} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "$<TARGET_FILE_DIR:PivoxShared>/Pivox.pri"
-        "$<TARGET_FILE_DIR:${AX_TARGET}>/Pivox.pri"
-    COMMENT "Copying Pivox.pri to ActiveX output"
-)
 
 # ActiveX control tests.
 add_subdirectory(tests)

@@ -5,10 +5,10 @@
   </PropertyGroup>
 
   <!-- module.g.cpp provides WinRT activation factories for XAML types. -->
-  <ItemGroup Condition="'$(ProjectName)' == 'Pivox'">
+  <ItemGroup Condition="'$(ProjectName)' == 'Pivox' OR '$(ProjectName)' == 'PivoxActiveX'">
     <ClCompile Include="$(GeneratedFilesDir)module.g.cpp" />
   </ItemGroup>
-  <ItemDefinitionGroup Condition="'$(ProjectName)' == 'Pivox'">
+  <ItemDefinitionGroup Condition="'$(ProjectName)' == 'Pivox' OR '$(ProjectName)' == 'PivoxActiveX'">
     <Midl><OutputDirectory /></Midl>
   </ItemDefinitionGroup>
 </Project>

@@ -6,3 +6,4 @@ EXPORTS
     DllRegisterServer   PRIVATE
     DllUnregisterServer PRIVATE
     DllInstall          PRIVATE
+    DllGetActivationFactory = WINRT_GetActivationFactory    PRIVATE

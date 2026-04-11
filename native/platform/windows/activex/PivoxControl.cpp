@@ -3,6 +3,10 @@
 #include "XamlIslandHost.h"
 #include "DragSource.h"
 #include "DragService.h"
+#include "PivoxServices.h"
+#include "WinAppState.h"
+#include "WinAuthService.h"
+#include "firebase_config.h"
 
 #include <string>
 #include <shlobj.h>
@@ -34,6 +38,22 @@ LRESULT CPivoxControl::OnCreate(UINT, WPARAM, LPARAM, BOOL& bHandled) {
     bHandled = FALSE;
 
     try {
+        // Initialize shared services (once per process).
+        static bool s_servicesInit = false;
+        if (!s_servicesInit) {
+            auto appState = std::make_shared<pivox::WinAppState>();
+            auto authService = std::make_shared<pivox::WinAuthService>();
+            authService->initializeFirebase();
+            authService->connectToEmulatorIfRequested();
+
+            pivox::OAuthConfig oauthConfig;
+            oauthConfig.googleClientId = pivox::firebase_config::kGoogleSignInClientId;
+            authService->setOAuthConfig(oauthConfig);
+
+            pivox::PivoxServices::initialize(appState, authService);
+            s_servicesInit = true;
+        }
+
         // Process-wide init (bootstrap, dispatcher, Application, theme).
         HRESULT hr = pivox::XamlIslandHost::InitializeProcess();
         if (FAILED(hr)) return 0;
@@ -60,12 +80,30 @@ LRESULT CPivoxControl::OnCreate(UINT, WPARAM, LPARAM, BOOL& bHandled) {
         // Must be after DWXS.Initialize() (AcquireSlot above).
         host_.EnsureResources();
 
-        // Activate MainPage directly via WinRT factory (Frame.Navigate
-        // fails in XAML Islands — XBF resource lookup doesn't work).
+        // Auth state listener — swap content on sign-in/sign-out.
+        // Firebase fires on a background thread, so dispatch to UI thread.
+        auto dispatcher = winrt::Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread();
+        pivox::PivoxServices::authService()->onAuthStateChanged(
+            [this, dispatcher](bool signedIn) {
+                dispatcher.TryEnqueue([this, signedIn]() {
+                    if (!islandSlot_) return;
+                    pivox::ScopedActCtx ctx;
+                    auto factory = winrt::get_activation_factory<winrt::Windows::Foundation::IActivationFactory>(
+                        winrt::hstring(signedIn ? L"Pivox.MainPage" : L"Pivox.LoginPage"));
+                    auto page = factory.ActivateInstance<winrt::Microsoft::UI::Xaml::UIElement>();
+                    islandSlot_->source.Content(page);
+                    OutputDebugStringW(signedIn
+                        ? L"[PivoxActiveX] Switched to MainPage\n"
+                        : L"[PivoxActiveX] Switched to LoginPage\n");
+                });
+            });
+
+        // Initial content based on current auth state.
         {
             pivox::ScopedActCtx ctx;
+            bool signedIn = pivox::PivoxServices::authService()->isSignedIn();
             auto factory = winrt::get_activation_factory<winrt::Windows::Foundation::IActivationFactory>(
-                winrt::hstring(L"Pivox.MainPage"));
+                winrt::hstring(signedIn ? L"Pivox.MainPage" : L"Pivox.LoginPage"));
             auto page = factory.ActivateInstance<winrt::Microsoft::UI::Xaml::UIElement>();
             islandSlot_->source.Content(page);
         }
