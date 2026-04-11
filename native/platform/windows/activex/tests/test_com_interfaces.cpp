@@ -106,15 +106,6 @@ TEST_F(ComInterfaceTest, IPersistStreamInit_GetClassID) {
     EXPECT_EQ(clsid, CLSID_PivoxControl);
 }
 
-TEST_F(ComInterfaceTest, IPivoxControl_IsInitialized_FalseByDefault) {
-    ASSERT_HRESULT_SUCCEEDED(CreateControl());
-    ATL::CComPtr<IPivoxControl> pivox;
-    ASSERT_HRESULT_SUCCEEDED(control_.QueryInterface(&pivox));
-    VARIANT_BOOL isInit = VARIANT_TRUE;
-    ASSERT_HRESULT_SUCCEEDED(pivox->get_IsInitialized(&isInit));
-    EXPECT_EQ(isInit, VARIANT_FALSE);
-}
-
 TEST_F(ComInterfaceTest, ConnectionPoint_Enumeration) {
     ASSERT_HRESULT_SUCCEEDED(CreateControl());
     ATL::CComPtr<IConnectionPointContainer> cpc;

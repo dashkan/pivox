@@ -95,6 +95,7 @@ private:
 
     pivox::XamlIslandHost host_;
     pivox::IslandSlot* islandSlot_ = nullptr;
+    std::shared_ptr<bool> aliveFlag_;
     bool xamlInitialized_ = false;
 };
 

@@ -166,7 +166,7 @@ void WinAppState::saveSecure(const std::string& key, const std::string& value) {
     cred.TargetName = const_cast<LPWSTR>(targetName.c_str());
     cred.CredentialBlobSize = static_cast<DWORD>(value.size());
     cred.CredentialBlob = reinterpret_cast<LPBYTE>(const_cast<char*>(value.data()));
-    cred.Persist = CRED_PERSIST_LOCAL_MACHINE;
+    cred.Persist = CRED_PERSIST_ENTERPRISE;
 
     CredWriteW(&cred, 0);
 }

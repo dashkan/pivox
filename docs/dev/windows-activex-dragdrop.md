@@ -52,27 +52,9 @@ Timer-based polling + direct `IDropTarget` COM calls. Bypasses both the WinUI co
 - **Same-process is sufficient** for iNEWS: the ActiveX plugin and iNEWS story panel share the same process. All iNEWS windows with registered `IDropTarget` are reachable.
 - **Cursor feedback** uses `SetSystemCursor` which globally replaces the system cursor. Restored via `SPI_SETCURSORS` on cleanup. The compositor overrides normal `SetCursor` calls.
 
-## Next: Popup Window Drag
+## Popup Window Drag (Solved)
 
-The manual drag system currently works from the main XAML Islands panel (ATL control's `DragStarting` handler starts the timer on `m_hWnd`). Popup windows (e.g., launched via `OnLaunchWindow`) need the same capability — drag from a popup to an iNEWS story panel.
-
-### Challenge
-
-`ManualDragState` and the timer live on the ATL side (`ATLControl.cpp`). The popup is created in TestControls (`TestPanel.cpp`). The popup's `DragStarting` handler needs to signal the ATL side to start the manual drag.
-
-### Options
-
-1. **COM event** — Add a `OnDragRequested` event to `_IATLControlEvents` dispinterface. TestControls raises it via a method on the ATL control. ATL handles it by starting the manual drag. Clean COM architecture but requires IDL changes.
-
-2. **WinRT event** — Add a custom event to TestPanel (e.g., `DragRequested`). The ATL side subscribes when it wires up the content. Popup raises the event on the TestPanel instance. Simpler than COM events but requires TestPanel IDL changes.
-
-3. **Window property + PostMessage** — ATL sets `SetProp(m_hWnd, "PivoxDragOwner", ...)` on its HWND during `OnCreate`. Popup's `DragStarting` finds the HWND via `GetProp` on the desktop window and posts `WM_USER+100`. Quick and dirty, no IDL changes.
-
-4. **Shared interface** — Define a simple `IDragService` interface in TestControls that ATL implements. Pass it to TestPanel at construction. Popup calls `IDragService::StartDrag(payload)`. Cleanest long-term but most setup.
-
-### Current implementation
-
-Option 3 (PostMessage bridge) for the prototype. Popup's `DragStarting` finds the ATL HWND via `GetPropW("PivoxDragOwner")` + `EnumChildWindows` and posts `WM_USER+100`.
+Popup windows use the same `DragService::HandleDragStarting()` call. The `DragService` implementation on the ActiveX path locates the ATL HWND via `GetPropW("PivoxDragOwner")` + `EnumChildWindows` and posts `WM_USER+100` to start the manual drag timer. This works from any XAML content in the process — main panel or popup.
 
 ### Cursor feedback
 
@@ -84,21 +66,23 @@ Uses `SetSystemCursor` to globally replace the arrow cursor during drag. OLE dra
 - **SEH on IDropTarget calls:** All `DragEnter/DragOver/DragLeave/Drop` calls are wrapped in `__try/__except` to protect against corrupt vtable pointers from `GetProp`.
 - **Cursor restore:** `SystemParametersInfoW(SPI_SETCURSORS)` in `Cleanup()` always runs, including on cancel and SEH catch paths. `OnDestroy` cancels any active drag.
 
-## DragService Abstraction
+## DragService Abstraction (Solved)
 
-The shared WinRT component (`PivoxShared`) should expose a `DragService::StartDrag(DataPackage)` that the XAML UI calls. The implementation is selected at compile time via `PIVOX_ACTIVEX_HOST`:
+`DragService` in `shared/DragService.h/.cpp` provides a compile-time abstraction. The XAML UI calls `DragService::HandleDragStarting(args, text)` identically in both targets. The `PIVOX_ACTIVEX_HOST` preprocessor selects the implementation:
+
+- **ActiveX path** — Cancels the WinUI drag, builds `IDataObject` from the text payload, and posts to the ATL HWND to start the manual in-process drag timer.
+- **App path** — No-op. The caller already set data on `args.Data()`, and native WinUI handles everything.
 
 ```cpp
-void DragService::StartDrag(DataPackage const& data) {
-#ifdef PIVOX_ACTIVEX_HOST
-    // Build IDataObject from DataPackage, post to ATL HWND for manual drag
-#else
-    // Standard WinUI: UIElement.StartDragAsync(data)
-#endif
-}
+// Usage in any XAML page (shared source):
+element.DragStarting([](auto&&, DragStartingEventArgs const& args) {
+    args.Data().SetText(L"my payload");
+    args.AllowedOperations(DataPackageOperation::Copy);
+    Pivox::DragService::HandleDragStarting(args, L"my payload");
+});
 ```
 
-Same pattern already used for desktop Win32 API access in the shared component pch.h.
+The text is passed explicitly to `HandleDragStarting` to avoid async extraction from `DataPackage`, which fails with an STA assertion in ActiveX hosts.
 
 ## iNEWS Implemented Categories
 

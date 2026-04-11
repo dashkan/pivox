@@ -114,11 +114,7 @@ void WinAuthService::createAccountAsync(const std::string& email, const std::str
     auto future = firebaseAuth_->CreateUserWithEmailAndPassword(email.c_str(), password.c_str());
     future.OnCompletion([this, displayName, cb = std::move(callback)](const firebase::Future<firebase::auth::AuthResult>& f) {
         if (f.error() != 0) { cb(mapFirebaseError(f.error())); return; }
-        auto& fbUser = f.result()->user;
-        firebase::auth::User::UserProfile profile;
-        profile.display_name = displayName.c_str();
-        const_cast<firebase::auth::User&>(fbUser).UpdateUserProfile(profile);
-        auto user = mapFirebaseUser(fbUser);
+        auto user = mapFirebaseUser(f.result()->user);
         user.displayName = displayName;
         cb({ AuthError::None, "", user });
     });

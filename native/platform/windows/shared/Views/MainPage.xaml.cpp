@@ -4,6 +4,7 @@
 #include "MainPage.g.cpp"
 #endif
 #include "PivoxServices.h"
+#include "DragService.h"
 
 namespace winrt::Pivox::implementation
 {
@@ -15,6 +16,15 @@ namespace winrt::Pivox::implementation
         {
             NavView().SelectedItem(NavView().MenuItems().GetAt(0));
         }
+
+        // Wire drag source.
+        DragSource().DragStarting([](auto&&, winrt::Microsoft::UI::Xaml::DragStartingEventArgs const& args) {
+            winrt::hstring payload = L"<ncsItem><objID>PIVOX:TEST</objID><mosID>pivox.mos</mosID></ncsItem>";
+            args.Data().SetText(payload);
+            args.AllowedOperations(
+                winrt::Windows::ApplicationModel::DataTransfer::DataPackageOperation::Copy);
+            ::Pivox::DragService::HandleDragStarting(args, payload);
+        });
     }
 
     void MainPage::OnNavSelectionChanged(

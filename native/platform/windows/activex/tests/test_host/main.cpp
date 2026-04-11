@@ -93,7 +93,6 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
         return 0;
     case WM_DESTROY:
         if (g_pivoxControl) {
-            g_pivoxControl->Shutdown();
             g_pivoxControl.Release();
         }
         if (g_oleObject) {

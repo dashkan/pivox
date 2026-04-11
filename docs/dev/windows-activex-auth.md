@@ -118,13 +118,14 @@ auto tokenResult = co_await OAuth2Manager::RequestTokenAsync(tokenEndpoint, toke
 
 ### Shared Auth State
 
-The ActiveX control uses the same `WinAuthService` and `WinAppState` as the full app:
-- Firebase C++ SDK manages session persistence
-- Tokens stored in Windows PasswordVault via `WinAppState::saveSecure`
-- `hasValidSession()` checks Firebase's persisted auth state on startup
-- Both the app and ActiveX control can share the same Firebase auth state since they use the same PasswordVault entries
+The ActiveX control compiles the same `WinAuthService` source as the full app (shared-source model, no DLL boundary). Auth state is shared between both targets via the Firebase SDK's OS credential store persistence:
 
-If the user signs in via the app, the ActiveX control picks it up on next load (and vice versa). No explicit state sharing mechanism needed — Firebase handles it.
+- Firebase C++ SDK persists auth state in the Windows OS credential store
+- `isSignedIn()` and `currentUser()` read from Firebase SDK directly — no manual `AuthStatus` tracking
+- `WinAuthService::onAuthStateChanged()` uses Firebase's `AuthStateListener` to fire callbacks on sign-in/sign-out
+- Pages do not navigate — `MainWindow` (app) and `PivoxControl` (ActiveX) subscribe to auth state changes and swap content
+
+If the user signs in via the app, the ActiveX control picks it up on next load (and vice versa). No explicit state sharing mechanism needed — Firebase handles it through OS credential store persistence.
 
 ### Email/Password Auth
 
@@ -134,11 +135,15 @@ No changes needed — the existing `signInWithEmailAsync` / `createAccountAsync`
 
 WebView2 is already in the output directory (from the WindowsAppSDK NuGet). The `Microsoft.Web.WebView2.Core.dll` is copied by the project reference. No additional installation needed — WebView2 runtime is pre-installed on Windows 10 1903+ and all Windows 11.
 
+## Status
+
+**Solved:** Firebase auth state is shared between app and ActiveX via OS credential store. `WinAuthService` uses Firebase's `AuthStateListener` — no manual `AuthStatus` tracking. Both targets compile the same auth source (shared-source model, no `PivoxShared` DLL).
+
 ## TODOs
 
 - [ ] Verify `AuthRequestParams` exposes PKCE params for manual URL construction
 - [ ] If not, implement PKCE generation (SHA256 + Base64URL) in C++
-- [ ] Create `OAuthPopup` class in PivoxShared or PivoxActiveX
+- [ ] Create `OAuthPopup` class in PivoxActiveX (not PivoxShared — there is no shared DLL)
 - [ ] WebView2 integration in WinUI Window (popup)
 - [ ] NavigationStarting handler to intercept redirect
 - [ ] Token exchange (try OAuth2Manager first, fallback to manual HTTP)
@@ -147,4 +152,4 @@ WebView2 is already in the output directory (from the WindowsAppSDK NuGet). The 
 - [ ] Test inside iNEWS with `uiAccess=true`
 - [ ] Handle auth cancellation (user closes popup)
 - [ ] Handle auth errors (invalid credentials, network failure)
-- [ ] Session persistence — verify Firebase auth state is shared between app and ActiveX
+- [x] Session persistence — Firebase auth state is shared between app and ActiveX via OS credential store (solved)

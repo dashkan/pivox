@@ -29,4 +29,6 @@
 #include <winrt/Microsoft.UI.h>
 #include <winrt/Microsoft.UI.Content.h>
 
+#include <winrt/Windows.ApplicationModel.DataTransfer.h>
+
 #include <microsoft.ui.xaml.window.h>

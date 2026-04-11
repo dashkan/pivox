@@ -70,6 +70,13 @@
                     Text="Coming soon"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                     HorizontalAlignment="Center" />
+
+                <!-- Drag source for MOS item testing -->
+                <Border x:Name="DragSource" Background="#333333" CornerRadius="8"
+                        Padding="16" Margin="0,16,0,0" CanDrag="True">
+                    <TextBlock Text="Drag to story" FontSize="16" Foreground="#00BFFF"
+                               HorizontalAlignment="Center" IsHitTestVisible="False" />
+                </Border>
             </StackPanel>
 
             <StackPanel

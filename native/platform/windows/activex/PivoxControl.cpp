@@ -82,19 +82,19 @@ LRESULT CPivoxControl::OnCreate(UINT, WPARAM, LPARAM, BOOL& bHandled) {
 
         // Auth state listener — swap content on sign-in/sign-out.
         // Firebase fires on a background thread, so dispatch to UI thread.
+        // Use shared alive flag to guard against use-after-free (COM controls lifetime).
+        aliveFlag_ = std::make_shared<bool>(true);
         auto dispatcher = winrt::Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread();
+        auto weak = std::weak_ptr<bool>(aliveFlag_);
         pivox::PivoxServices::authService()->onAuthStateChanged(
-            [this, dispatcher](bool signedIn) {
-                dispatcher.TryEnqueue([this, signedIn]() {
-                    if (!islandSlot_) return;
+            [this, dispatcher, weak](bool signedIn) {
+                dispatcher.TryEnqueue([this, signedIn, weak]() {
+                    if (weak.expired() || !islandSlot_) return;
                     pivox::ScopedActCtx ctx;
                     auto factory = winrt::get_activation_factory<winrt::Windows::Foundation::IActivationFactory>(
                         winrt::hstring(signedIn ? L"Pivox.MainPage" : L"Pivox.LoginPage"));
                     auto page = factory.ActivateInstance<winrt::Microsoft::UI::Xaml::UIElement>();
                     islandSlot_->source.Content(page);
-                    OutputDebugStringW(signedIn
-                        ? L"[PivoxActiveX] Switched to MainPage\n"
-                        : L"[PivoxActiveX] Switched to LoginPage\n");
                 });
             });
 
@@ -127,6 +127,8 @@ LRESULT CPivoxControl::OnCreate(UINT, WPARAM, LPARAM, BOOL& bHandled) {
 
 LRESULT CPivoxControl::OnDestroy(UINT, WPARAM, LPARAM, BOOL& bHandled) {
     bHandled = FALSE;
+    // Invalidate the alive flag so pending auth callbacks are discarded.
+    aliveFlag_.reset();
     auto& drag = pivox::GetDragSource();
     if (drag.IsActive() && drag.OwnerHwnd() == m_hWnd) {
         drag.Cancel();

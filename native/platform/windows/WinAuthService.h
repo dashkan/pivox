@@ -3,7 +3,6 @@
 #include "auth_state.h"
 #include <functional>
 #include <string>
-#include <vector>
 #include <cstdint>
 #include <atomic>
 
@@ -19,7 +18,6 @@ struct AuthUser {
     std::string displayName;
     std::string photoURL;
     bool emailVerified = false;
-    std::vector<std::string> providers;
 };
 
 /// Error from an auth operation.
