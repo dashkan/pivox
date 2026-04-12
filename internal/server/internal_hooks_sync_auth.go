@@ -19,7 +19,7 @@ import (
 
 // NewInternalHooks creates a new internal hooks handler with Google Cloud OIDC
 // identity token verification for the accounts:sync endpoint.
-func NewInternalHooks(queries db.Querier, cfg config.SyncAuthConfig, logger *slog.Logger, auth authn.Service) (*InternalHooks, error) {
+func NewInternalHooks(queries db.Querier, cfg config.SyncAuthConfig, dcfg config.DelegatedAuthConfig, logger *slog.Logger, auth authn.Service) (*InternalHooks, error) {
 	validator, err := idtoken.NewValidator(context.Background())
 	if err != nil {
 		return nil, err
@@ -31,10 +31,12 @@ func NewInternalHooks(queries db.Querier, cfg config.SyncAuthConfig, logger *slo
 	}
 
 	h := &InternalHooks{
-		queries:         queries,
-		logger:          logger,
-		auth:            auth,
-		exchangeLimiter: newIPRateLimiter(rate.Every(6*time.Second), 10),
+		queries:          queries,
+		logger:           logger,
+		auth:             auth,
+		delegatedAuth:    dcfg,
+		exchangeLimiter:  newIPRateLimiter(rate.Every(6*time.Second), 10),
+		delegatedLimiter: newIPRateLimiter(rate.Every(10*time.Second), 3),
 	}
 	h.syncAuth = h.requireGoogleIdentity(validator, allowed, cfg.Audience)
 	return h, nil

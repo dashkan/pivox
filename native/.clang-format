@@ -318,5 +318,15 @@ WhitespaceSensitiveMacros:
   - PP_STRINGIZE
   - STRINGIZE
 WrapNamespaceBodyWithEmptyLines: Leave
+---
+Language:        ObjC
+BasedOnStyle:    Google
+ColumnLimit:     80
+DerivePointerAlignment: true
+ObjCSpaceAfterProperty: false
+ObjCSpaceBeforeProtocolList: true
+ObjCBinPackProtocolList: Never
+ObjCBlockIndentWidth: 2
+ObjCBreakBeforeNestedBlockParam: true
 ...
 

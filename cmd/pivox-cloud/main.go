@@ -63,6 +63,8 @@ func main() {
 	f.String("gcp-project-id", envOrDefault("PIVOX_GCP_PROJECT_ID", ""), "Google Cloud project ID")
 	f.String("gcp-service-account-key", envOrDefault("PIVOX_GCP_SERVICE_ACCOUNT_KEY", ""), "Google Cloud service account key (inline JSON)")
 	f.String("gcp-service-account-file", envOrDefault("PIVOX_GCP_SERVICE_ACCOUNT_FILE", ""), "Google Cloud service account key file path")
+	f.Duration("delegated-auth-session-ttl", envOrDuration("PIVOX_DELEGATED_AUTH_SESSION_TTL", 5*time.Minute), "How long a delegated auth session code remains valid")
+	f.Duration("delegated-auth-poll-interval", envOrDuration("PIVOX_DELEGATED_AUTH_POLL_INTERVAL", 5*time.Second), "Poll interval returned to delegated auth clients")
 
 	addSyncAuthFlags(rootCmd)
 
@@ -78,10 +80,21 @@ func envOrDefault(key, defaultVal string) string {
 	return defaultVal
 }
 
+func envOrDuration(key string, defaultVal time.Duration) time.Duration {
+	if v := os.Getenv(key); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			return d
+		}
+	}
+	return defaultVal
+}
+
 func must(s string, _ error) string { return s }
 
 func serve(cmd *cobra.Command, args []string) error {
 	f := cmd.Flags()
+	sessionTTL, _ := f.GetDuration("delegated-auth-session-ttl")
+	pollInterval, _ := f.GetDuration("delegated-auth-poll-interval")
 	cfg := &config.Config{
 		DatabaseURL: must(f.GetString("database-url")),
 		GRPCPort:    must(f.GetString("grpc-port")),
@@ -94,6 +107,10 @@ func serve(cmd *cobra.Command, args []string) error {
 			ServiceAccountFile: must(f.GetString("gcp-service-account-file")),
 		},
 		SyncAuth: loadSyncAuthConfig(cmd),
+		DelegatedAuth: config.DelegatedAuthConfig{
+			SessionTTL:   sessionTTL,
+			PollInterval: pollInterval,
+		},
 	}
 
 	var level slog.Level
@@ -145,6 +162,27 @@ func serve(cmd *cobra.Command, args []string) error {
 	go func() {
 		if err := reaper.Run(ctx); err != nil && ctx.Err() == nil {
 			logger.Error("reaper stopped", "error", err)
+		}
+	}()
+
+	// Cleanup loop for short-lived auth artifacts (deposit codes + delegated
+	// auth sessions). Runs inline rather than in its own package because the
+	// queries are trivial and the interval is short.
+	go func() {
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := queries.DeleteExpiredAuthTokenCodes(ctx); err != nil {
+					logger.Error("failed to delete expired auth token codes", "error", err)
+				}
+				if err := queries.DeleteExpiredDelegatedAuthSessions(ctx); err != nil {
+					logger.Error("failed to delete expired delegated auth sessions", "error", err)
+				}
+			}
 		}
 	}()
 
@@ -231,7 +269,7 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	// HTTP mux: internal hooks + gRPC gateway (fallback)
 	httpMux := http.NewServeMux()
-	hooks, err := server.NewInternalHooks(queries, cfg.SyncAuth, logger, authSvc)
+	hooks, err := server.NewInternalHooks(queries, cfg.SyncAuth, cfg.DelegatedAuth, logger, authSvc)
 	if err != nil {
 		return fmt.Errorf("initialize internal hooks: %w", err)
 	}

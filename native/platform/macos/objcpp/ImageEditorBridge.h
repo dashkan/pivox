@@ -6,47 +6,47 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// Represents crop template for Swift consumption.
 @interface IEBCropTemplate : NSObject
-@property (nonatomic, copy, nullable) NSString *label;
-@property (nonatomic) double ratio;    // 0 means freeform
-@property (nonatomic) BOOL isFreeform;
+@property(nonatomic, copy, nullable) NSString *label;
+@property(nonatomic) double ratio;  // 0 means freeform
+@property(nonatomic) BOOL isFreeform;
 - (instancetype)initWithLabel:(NSString *)label ratio:(double)ratio;
 + (instancetype)freeform;
 @end
 
 /// Crop rectangle result.
 @interface IEBCropRect : NSObject
-@property (nonatomic) int x;
-@property (nonatomic) int y;
-@property (nonatomic) int width;
-@property (nonatomic) int height;
+@property(nonatomic) int x;
+@property(nonatomic) int y;
+@property(nonatomic) int width;
+@property(nonatomic) int height;
 @end
 
 /// Snapshot of the engine state for SwiftUI rendering.
 @interface IEBState : NSObject
-@property (nonatomic) double cropWidth;
-@property (nonatomic) double cropHeight;
-@property (nonatomic) int rotation;
-@property (nonatomic) double straighten;
-@property (nonatomic) double perspectiveV;
-@property (nonatomic) double perspectiveH;
-@property (nonatomic) double scale;
-@property (nonatomic) double tx;
-@property (nonatomic) double ty;
-@property (nonatomic) BOOL flipHorizontal;
-@property (nonatomic) BOOL flipVertical;
-@property (nonatomic) int naturalWidth;
-@property (nonatomic) int naturalHeight;
-@property (nonatomic) BOOL isDragging;
-@property (nonatomic) BOOL canUndo;
-@property (nonatomic) BOOL canRedo;
-@property (nonatomic) BOOL isDirty;
-@property (nonatomic) double zoom;
-@property (nonatomic) BOOL isZoomFit;
-@property (nonatomic) BOOL isCropMode;
-@property (nonatomic) double panOffsetX;
-@property (nonatomic) double panOffsetY;
-@property (nonatomic, nullable) IEBCropTemplate *activeTemplate;
-@property (nonatomic, copy, nullable) NSArray<IEBCropTemplate *> *templates;
+@property(nonatomic) double cropWidth;
+@property(nonatomic) double cropHeight;
+@property(nonatomic) int rotation;
+@property(nonatomic) double straighten;
+@property(nonatomic) double perspectiveV;
+@property(nonatomic) double perspectiveH;
+@property(nonatomic) double scale;
+@property(nonatomic) double tx;
+@property(nonatomic) double ty;
+@property(nonatomic) BOOL flipHorizontal;
+@property(nonatomic) BOOL flipVertical;
+@property(nonatomic) int naturalWidth;
+@property(nonatomic) int naturalHeight;
+@property(nonatomic) BOOL isDragging;
+@property(nonatomic) BOOL canUndo;
+@property(nonatomic) BOOL canRedo;
+@property(nonatomic) BOOL isDirty;
+@property(nonatomic) double zoom;
+@property(nonatomic) BOOL isZoomFit;
+@property(nonatomic) BOOL isCropMode;
+@property(nonatomic) double panOffsetX;
+@property(nonatomic) double panOffsetY;
+@property(nonatomic, nullable) IEBCropTemplate *activeTemplate;
+@property(nonatomic, copy, nullable) NSArray<IEBCropTemplate *> *templates;
 @end
 
 /// Obj-C++ bridge wrapping the C++ ImageEditorEngine.
@@ -86,7 +86,10 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// Pointer input (crop-centered coordinates).
 - (void)onPointerDownX:(double)x y:(double)y altOrMiddle:(BOOL)alt;
-- (void)onPointerMoveX:(double)x y:(double)y screenDeltaX:(double)sdx screenDeltaY:(double)sdy;
+- (void)onPointerMoveX:(double)x
+                     y:(double)y
+          screenDeltaX:(double)sdx
+          screenDeltaY:(double)sdy;
 - (void)onPointerUp;
 
 /// Hit test (returns handle name string or nil).
@@ -99,7 +102,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (nullable IEBCropRect *)getCropRect;
 
 /// Change callback — called on every state change.
-@property (nonatomic, copy, nullable) void (^onStateChanged)(void);
+@property(nonatomic, copy, nullable) void (^onStateChanged)(void);
 
 @end
 
