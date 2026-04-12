@@ -724,6 +724,23 @@ CREATE TABLE auth_token_codes (
 CREATE INDEX idx_auth_token_codes_expire ON auth_token_codes (expire_time);
 
 -- ============================================================================
+-- delegated_auth_sessions (AUTHN-07: plugins delegate auth to the Pivox app)
+--
+-- Plugins hosted in third-party processes (NRCS ActiveX, Adobe UXP) cannot
+-- safely perform interactive auth. Instead they create a session here, launch
+-- the Pivox app via deep link, and poll until a custom token is available.
+-- The app completes the session after the user signs in through any provider.
+-- ============================================================================
+CREATE TABLE delegated_auth_sessions (
+    code         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    status       TEXT NOT NULL DEFAULT 'pending',
+    custom_token TEXT,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    expires_at   TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX idx_delegated_auth_sessions_expires ON delegated_auth_sessions (expires_at);
+
+-- ============================================================================
 -- pgvector extension (for asset semantic search)
 -- ============================================================================
 CREATE EXTENSION IF NOT EXISTS vector;

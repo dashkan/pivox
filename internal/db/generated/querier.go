@@ -8,14 +8,24 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
 	CancelOperation(ctx context.Context, id uuid.UUID) (Operation, error)
+	// Transitions a pending session to ready and stores the minted custom token.
+	// Only unexpired pending sessions match — a no-row result means the session
+	// was never created, already completed, or has expired.
+	CompleteDelegatedAuthSession(ctx context.Context, arg CompleteDelegatedAuthSessionParams) (DelegatedAuthSession, error)
 	CompleteOperation(ctx context.Context, arg CompleteOperationParams) (Operation, error)
 	// Atomically consumes a code and returns the ID token.
 	// Returns no rows if the code doesn't exist, is expired, or was already consumed.
 	ConsumeAuthTokenCode(ctx context.Context, code uuid.UUID) (AuthTokenCode, error)
+	// Atomically deletes a ready session and returns its custom token. This is
+	// the poll path — a single statement ensures the token is single-use even
+	// under concurrent pollers. No-row result means the session is still pending,
+	// already consumed, or expired; callers distinguish pending via GetDelegatedAuthSessionStatus.
+	ConsumeDelegatedAuthSession(ctx context.Context, code uuid.UUID) (pgtype.Text, error)
 	CountAssetVersions(ctx context.Context, assetID uuid.UUID) (int64, error)
 	CountAssetsByProject(ctx context.Context, projectID uuid.UUID) (int64, error)
 	CountConnectedStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) (int64, error)
@@ -31,6 +41,9 @@ type Querier interface {
 	CreateAssetVersion(ctx context.Context, arg CreateAssetVersionParams) (AssetVersion, error)
 	// Stores a Firebase ID token behind a short-lived opaque code.
 	CreateAuthTokenCode(ctx context.Context, idToken string) (AuthTokenCode, error)
+	// Creates a new delegated auth session. The code and expiry are chosen by the
+	// server so we can control both TTL and the entropy source (crypto/rand).
+	CreateDelegatedAuthSession(ctx context.Context, arg CreateDelegatedAuthSessionParams) (DelegatedAuthSession, error)
 	CreateLineItem(ctx context.Context, arg CreateLineItemParams) (LineItem, error)
 	CreateOperation(ctx context.Context, arg CreateOperationParams) (Operation, error)
 	CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error)
@@ -46,6 +59,8 @@ type Querier interface {
 	DeleteAssetRenditionsByVersion(ctx context.Context, versionID uuid.UUID) error
 	// Cleanup: remove codes older than 10 minutes (all should be expired by then).
 	DeleteExpiredAuthTokenCodes(ctx context.Context) error
+	// Cleanup: remove sessions past their expiry. Run periodically.
+	DeleteExpiredDelegatedAuthSessions(ctx context.Context) error
 	DeleteExpiredOperations(ctx context.Context) error
 	DeleteExpiredStorageAgentAudit(ctx context.Context) (int64, error)
 	DeleteIamPolicy(ctx context.Context, resourceID uuid.UUID) error
@@ -68,6 +83,9 @@ type Querier interface {
 	GetAssetByName(ctx context.Context, arg GetAssetByNameParams) (Asset, error)
 	GetAssetVersion(ctx context.Context, id uuid.UUID) (AssetVersion, error)
 	GetAssetVersionByNumber(ctx context.Context, arg GetAssetVersionByNumberParams) (AssetVersion, error)
+	// Returns the status of a session without mutating it. Used by pollers to
+	// distinguish "still pending" from "expired/unknown" after a failed consume.
+	GetDelegatedAuthSessionStatus(ctx context.Context, code uuid.UUID) (string, error)
 	GetIamPolicy(ctx context.Context, resourceID uuid.UUID) (IamPolicy, error)
 	GetLatestAssetVersion(ctx context.Context, assetID uuid.UUID) (AssetVersion, error)
 	GetLineItem(ctx context.Context, id uuid.UUID) (LineItem, error)

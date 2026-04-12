@@ -1,15 +1,31 @@
 package config
 
+import "time"
+
 // Config holds all server configuration. Populated from cobra flags
 // in cmd/pivox-cloud/main.go, with env var fallbacks.
 type Config struct {
-	DatabaseURL string
-	GRPCPort    string
-	RESTPort    string
-	DebugPort   string
-	LogLevel    string
-	GoogleCloud GoogleCloudConfig
-	SyncAuth    SyncAuthConfig
+	DatabaseURL   string
+	GRPCPort      string
+	RESTPort      string
+	DebugPort     string
+	LogLevel      string
+	GoogleCloud   GoogleCloudConfig
+	SyncAuth      SyncAuthConfig
+	DelegatedAuth DelegatedAuthConfig
+}
+
+// DelegatedAuthConfig controls the delegated auth session flow used by
+// plugins (NRCS ActiveX, Adobe UXP, etc.) that cannot safely authenticate
+// in-process and must hand off to the Pivox app (AUTHN-07).
+type DelegatedAuthConfig struct {
+	// SessionTTL bounds how long a plugin has between creating a session
+	// and the app completing it before the code expires.
+	SessionTTL time.Duration
+
+	// PollInterval is returned to clients in the createDelegatedAuthSession
+	// response so they poll at a rate the server is comfortable with.
+	PollInterval time.Duration
 }
 
 // GoogleCloudConfig holds Google Cloud / Firebase configuration.

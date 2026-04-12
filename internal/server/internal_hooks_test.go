@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -25,6 +26,13 @@ import (
 	"github.com/dashkan/pivox/internal/testutil/mocks"
 )
 
+func testDelegatedAuthConfig() config.DelegatedAuthConfig {
+	return config.DelegatedAuthConfig{
+		SessionTTL:   5 * time.Minute,
+		PollInterval: 5 * time.Second,
+	}
+}
+
 // ---------------------------------------------------------------------------
 // NewInternalHooks (dev mode)
 // ---------------------------------------------------------------------------
@@ -34,7 +42,7 @@ func TestNewInternalHooks_Dev(t *testing.T) {
 	auth := new(mockAuthService)
 	logger := slog.Default()
 
-	h, err := NewInternalHooks(mockQ, config.SyncAuthConfig{SharedSecret: "test-secret"}, logger, auth)
+	h, err := NewInternalHooks(mockQ, config.SyncAuthConfig{SharedSecret: "test-secret"}, testDelegatedAuthConfig(), logger, auth)
 	require.NoError(t, err)
 	require.NotNil(t, h)
 	assert.NotNil(t, h.syncAuth)
@@ -50,7 +58,16 @@ func TestRegister_AllRoutes(t *testing.T) {
 	auth := new(mockAuthService)
 	logger := slog.Default()
 
-	h, err := NewInternalHooks(mockQ, config.SyncAuthConfig{SharedSecret: "s"}, logger, auth)
+	// These may or may not be invoked depending on the handler's early-exit
+	// behavior — .Maybe() lets them pass through without failing the mock.
+	mockQ.On("CreateDelegatedAuthSession", mock.Anything, mock.Anything).
+		Return(db.DelegatedAuthSession{}, nil).Maybe()
+	mockQ.On("ConsumeDelegatedAuthSession", mock.Anything, mock.Anything).
+		Return(pgtype.Text{}, errors.New("no rows")).Maybe()
+	mockQ.On("GetDelegatedAuthSessionStatus", mock.Anything, mock.Anything).
+		Return("", errors.New("no rows")).Maybe()
+
+	h, err := NewInternalHooks(mockQ, config.SyncAuthConfig{SharedSecret: "s"}, testDelegatedAuthConfig(), logger, auth)
 	require.NoError(t, err)
 
 	mux := http.NewServeMux()
@@ -65,6 +82,9 @@ func TestRegister_AllRoutes(t *testing.T) {
 		{"POST", "/internal/v1/auth:exchangeToken"},
 		{"POST", "/internal/v1/auth:depositToken"},
 		{"POST", "/internal/v1/auth:consumeToken"},
+		{"POST", "/internal/v1/auth:createDelegatedAuthSession"},
+		{"POST", "/internal/v1/auth:completeDelegatedAuthSession"},
+		{"POST", "/internal/v1/auth:pollDelegatedAuthSession"},
 	}
 
 	for _, rt := range routes {
@@ -129,7 +149,12 @@ func TestRequireSecret_MissingHeader(t *testing.T) {
 
 func newTestHooks(t *testing.T, mockQ *mocks.MockQuerier, auth *mockAuthService) *InternalHooks {
 	t.Helper()
-	h, err := NewInternalHooks(mockQ, config.SyncAuthConfig{SharedSecret: "s"}, slog.Default(), auth)
+	return newTestHooksWithConfig(t, mockQ, auth, testDelegatedAuthConfig())
+}
+
+func newTestHooksWithConfig(t *testing.T, mockQ *mocks.MockQuerier, auth *mockAuthService, dcfg config.DelegatedAuthConfig) *InternalHooks {
+	t.Helper()
+	h, err := NewInternalHooks(mockQ, config.SyncAuthConfig{SharedSecret: "s"}, dcfg, slog.Default(), auth)
 	require.NoError(t, err)
 	return h
 }
@@ -550,3 +575,367 @@ func TestIPRateLimiter_Allow(t *testing.T) {
 	assert.True(t, l.allow("key-b"))
 }
 
+// ---------------------------------------------------------------------------
+// createDelegatedAuthSession
+// ---------------------------------------------------------------------------
+
+func TestCreateDelegatedAuthSession(t *testing.T) {
+	tests := []struct {
+		name       string
+		body       string
+		setupMock  func(*mocks.MockQuerier)
+		wantStatus int
+		checkBody  func(*testing.T, map[string]any)
+	}{
+		{
+			name: "happy path returns code and poll interval",
+			body: "{}",
+			setupMock: func(mq *mocks.MockQuerier) {
+				mq.On("CreateDelegatedAuthSession", mock.Anything,
+					mock.MatchedBy(func(p db.CreateDelegatedAuthSessionParams) bool {
+						return p.Code != uuid.Nil && p.ExpiresAt.After(time.Now())
+					})).
+					Return(db.DelegatedAuthSession{Status: "pending"}, nil)
+			},
+			wantStatus: http.StatusOK,
+			checkBody: func(t *testing.T, resp map[string]any) {
+				code, _ := resp["code"].(string)
+				_, err := uuid.Parse(code)
+				assert.NoError(t, err, "code should be a valid UUID")
+				assert.Equal(t, float64(5), resp["pollInterval"])
+			},
+		},
+		{
+			name:       "database error",
+			body:       "{}",
+			wantStatus: http.StatusInternalServerError,
+			setupMock: func(mq *mocks.MockQuerier) {
+				mq.On("CreateDelegatedAuthSession", mock.Anything, mock.Anything).
+					Return(db.DelegatedAuthSession{}, errors.New("db down"))
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mockQ := new(mocks.MockQuerier)
+			if tc.setupMock != nil {
+				tc.setupMock(mockQ)
+			}
+			h := newTestHooks(t, mockQ, new(mockAuthService))
+
+			req := httptest.NewRequest("POST", "/internal/v1/auth:createDelegatedAuthSession", strings.NewReader(tc.body))
+			req.RemoteAddr = "10.0.0.1:1111"
+			rr := httptest.NewRecorder()
+
+			h.createDelegatedAuthSession(rr, req)
+
+			assert.Equal(t, tc.wantStatus, rr.Code)
+			if tc.checkBody != nil {
+				var resp map[string]any
+				require.NoError(t, json.NewDecoder(rr.Body).Decode(&resp))
+				tc.checkBody(t, resp)
+			}
+			mockQ.AssertExpectations(t)
+		})
+	}
+}
+
+func TestCreateDelegatedAuthSession_UsesConfiguredTTL(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	cfg := config.DelegatedAuthConfig{SessionTTL: 17 * time.Minute, PollInterval: 9 * time.Second}
+	h := newTestHooksWithConfig(t, mockQ, new(mockAuthService), cfg)
+
+	before := time.Now()
+	mockQ.On("CreateDelegatedAuthSession", mock.Anything,
+		mock.MatchedBy(func(p db.CreateDelegatedAuthSessionParams) bool {
+			// Expiry should be roughly now + 17 minutes.
+			delta := p.ExpiresAt.Sub(before)
+			return delta >= 17*time.Minute-time.Second && delta <= 17*time.Minute+time.Second
+		})).
+		Return(db.DelegatedAuthSession{}, nil)
+
+	req := httptest.NewRequest("POST", "/internal/v1/auth:createDelegatedAuthSession", strings.NewReader("{}"))
+	rr := httptest.NewRecorder()
+	h.createDelegatedAuthSession(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+	var resp map[string]any
+	require.NoError(t, json.NewDecoder(rr.Body).Decode(&resp))
+	assert.Equal(t, float64(9), resp["pollInterval"])
+	mockQ.AssertExpectations(t)
+}
+
+// ---------------------------------------------------------------------------
+// completeDelegatedAuthSession
+// ---------------------------------------------------------------------------
+
+func TestCompleteDelegatedAuthSession(t *testing.T) {
+	validCode := uuid.New()
+
+	tests := []struct {
+		name       string
+		authHeader string
+		body       string
+		setupAuth  func(*mockAuthService)
+		setupDB    func(*mocks.MockQuerier)
+		wantStatus int
+	}{
+		{
+			name:       "happy path mints and stores custom token",
+			authHeader: "Bearer valid-id-token",
+			body:       fmt.Sprintf(`{"code":%q}`, validCode.String()),
+			setupAuth: func(ma *mockAuthService) {
+				ma.On("VerifyToken", mock.Anything, "valid-id-token").
+					Return(&authn.Identity{UID: "uid-7"}, nil)
+				ma.On("CreateCustomToken", mock.Anything, "uid-7").
+					Return("minted-custom-token", nil)
+			},
+			setupDB: func(mq *mocks.MockQuerier) {
+				mq.On("CompleteDelegatedAuthSession", mock.Anything,
+					mock.MatchedBy(func(p db.CompleteDelegatedAuthSessionParams) bool {
+						return p.Code == validCode &&
+							p.CustomToken.Valid &&
+							p.CustomToken.String == "minted-custom-token"
+					})).
+					Return(db.DelegatedAuthSession{Code: validCode, Status: "ready"}, nil)
+			},
+			wantStatus: http.StatusNoContent,
+		},
+		{
+			name:       "missing authorization header",
+			body:       fmt.Sprintf(`{"code":%q}`, validCode.String()),
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			name:       "invalid id token rejected before touching db",
+			authHeader: "Bearer bogus",
+			body:       fmt.Sprintf(`{"code":%q}`, validCode.String()),
+			setupAuth: func(ma *mockAuthService) {
+				ma.On("VerifyToken", mock.Anything, "bogus").
+					Return(nil, errors.New("bad signature"))
+			},
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			name:       "malformed code",
+			authHeader: "Bearer valid-id-token",
+			body:       `{"code":"not-a-uuid"}`,
+			setupAuth: func(ma *mockAuthService) {
+				ma.On("VerifyToken", mock.Anything, "valid-id-token").
+					Return(&authn.Identity{UID: "uid-7"}, nil)
+			},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "session not found, already completed, or expired",
+			authHeader: "Bearer valid-id-token",
+			body:       fmt.Sprintf(`{"code":%q}`, validCode.String()),
+			setupAuth: func(ma *mockAuthService) {
+				ma.On("VerifyToken", mock.Anything, "valid-id-token").
+					Return(&authn.Identity{UID: "uid-7"}, nil)
+				ma.On("CreateCustomToken", mock.Anything, "uid-7").
+					Return("minted-custom-token", nil)
+			},
+			setupDB: func(mq *mocks.MockQuerier) {
+				mq.On("CompleteDelegatedAuthSession", mock.Anything, mock.Anything).
+					Return(db.DelegatedAuthSession{}, errors.New("no rows"))
+			},
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "custom token mint failure",
+			authHeader: "Bearer valid-id-token",
+			body:       fmt.Sprintf(`{"code":%q}`, validCode.String()),
+			setupAuth: func(ma *mockAuthService) {
+				ma.On("VerifyToken", mock.Anything, "valid-id-token").
+					Return(&authn.Identity{UID: "uid-7"}, nil)
+				ma.On("CreateCustomToken", mock.Anything, "uid-7").
+					Return("", errors.New("mint failed"))
+			},
+			wantStatus: http.StatusInternalServerError,
+		},
+		{
+			name:       "invalid json body",
+			authHeader: "Bearer valid-id-token",
+			body:       "not json",
+			setupAuth: func(ma *mockAuthService) {
+				ma.On("VerifyToken", mock.Anything, "valid-id-token").
+					Return(&authn.Identity{UID: "uid-7"}, nil)
+			},
+			wantStatus: http.StatusBadRequest,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mockQ := new(mocks.MockQuerier)
+			auth := new(mockAuthService)
+			if tc.setupAuth != nil {
+				tc.setupAuth(auth)
+			}
+			if tc.setupDB != nil {
+				tc.setupDB(mockQ)
+			}
+			h := newTestHooks(t, mockQ, auth)
+
+			req := httptest.NewRequest("POST", "/internal/v1/auth:completeDelegatedAuthSession", strings.NewReader(tc.body))
+			if tc.authHeader != "" {
+				req.Header.Set("Authorization", tc.authHeader)
+			}
+			rr := httptest.NewRecorder()
+
+			h.completeDelegatedAuthSession(rr, req)
+
+			assert.Equal(t, tc.wantStatus, rr.Code)
+			mockQ.AssertExpectations(t)
+			auth.AssertExpectations(t)
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// pollDelegatedAuthSession
+// ---------------------------------------------------------------------------
+
+func TestPollDelegatedAuthSession(t *testing.T) {
+	validCode := uuid.New()
+
+	tests := []struct {
+		name       string
+		body       string
+		setupDB    func(*mocks.MockQuerier)
+		wantStatus int
+		wantBody   map[string]any
+	}{
+		{
+			name: "ready returns custom token and consumes session",
+			body: fmt.Sprintf(`{"code":%q}`, validCode.String()),
+			setupDB: func(mq *mocks.MockQuerier) {
+				mq.On("ConsumeDelegatedAuthSession", mock.Anything, validCode).
+					Return(pgtype.Text{String: "minted-custom-token", Valid: true}, nil)
+			},
+			wantStatus: http.StatusOK,
+			wantBody:   map[string]any{"customToken": "minted-custom-token"},
+		},
+		{
+			name: "pending returns status pending",
+			body: fmt.Sprintf(`{"code":%q}`, validCode.String()),
+			setupDB: func(mq *mocks.MockQuerier) {
+				mq.On("ConsumeDelegatedAuthSession", mock.Anything, validCode).
+					Return(pgtype.Text{}, errors.New("no rows"))
+				mq.On("GetDelegatedAuthSessionStatus", mock.Anything, validCode).
+					Return("pending", nil)
+			},
+			wantStatus: http.StatusOK,
+			wantBody:   map[string]any{"status": "pending"},
+		},
+		{
+			name: "unknown or expired session returns 404",
+			body: fmt.Sprintf(`{"code":%q}`, validCode.String()),
+			setupDB: func(mq *mocks.MockQuerier) {
+				mq.On("ConsumeDelegatedAuthSession", mock.Anything, validCode).
+					Return(pgtype.Text{}, errors.New("no rows"))
+				mq.On("GetDelegatedAuthSessionStatus", mock.Anything, validCode).
+					Return("", errors.New("no rows"))
+			},
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "malformed code",
+			body:       `{"code":"not-a-uuid"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "invalid json",
+			body:       "not json",
+			wantStatus: http.StatusBadRequest,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mockQ := new(mocks.MockQuerier)
+			if tc.setupDB != nil {
+				tc.setupDB(mockQ)
+			}
+			h := newTestHooks(t, mockQ, new(mockAuthService))
+
+			req := httptest.NewRequest("POST", "/internal/v1/auth:pollDelegatedAuthSession", strings.NewReader(tc.body))
+			req.RemoteAddr = "10.0.0.2:2222"
+			rr := httptest.NewRecorder()
+
+			h.pollDelegatedAuthSession(rr, req)
+
+			assert.Equal(t, tc.wantStatus, rr.Code)
+			if tc.wantBody != nil {
+				var resp map[string]any
+				require.NoError(t, json.NewDecoder(rr.Body).Decode(&resp))
+				assert.Equal(t, tc.wantBody, resp)
+			}
+			mockQ.AssertExpectations(t)
+		})
+	}
+}
+
+// TestDelegatedAuth_DoubleConsume verifies the second poll after a successful
+// consume returns 404 (single-use semantics).
+func TestDelegatedAuth_DoubleConsume(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	code := uuid.New()
+
+	mockQ.On("ConsumeDelegatedAuthSession", mock.Anything, code).
+		Return(pgtype.Text{String: "tok", Valid: true}, nil).Once()
+	mockQ.On("ConsumeDelegatedAuthSession", mock.Anything, code).
+		Return(pgtype.Text{}, errors.New("no rows")).Once()
+	mockQ.On("GetDelegatedAuthSessionStatus", mock.Anything, code).
+		Return("", errors.New("no rows")).Once()
+
+	h := newTestHooks(t, mockQ, new(mockAuthService))
+
+	body := fmt.Sprintf(`{"code":%q}`, code.String())
+
+	// First poll: ready → 200 with token.
+	req1 := httptest.NewRequest("POST", "/internal/v1/auth:pollDelegatedAuthSession", strings.NewReader(body))
+	rr1 := httptest.NewRecorder()
+	h.pollDelegatedAuthSession(rr1, req1)
+	assert.Equal(t, http.StatusOK, rr1.Code)
+
+	// Second poll: gone → 404.
+	req2 := httptest.NewRequest("POST", "/internal/v1/auth:pollDelegatedAuthSession", strings.NewReader(body))
+	rr2 := httptest.NewRecorder()
+	h.pollDelegatedAuthSession(rr2, req2)
+	assert.Equal(t, http.StatusNotFound, rr2.Code)
+
+	mockQ.AssertExpectations(t)
+}
+
+// TestDelegatedAuth_RateLimit verifies all three delegated endpoints go
+// through the rate limiter when registered on the mux.
+func TestDelegatedAuth_RateLimit(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	auth := new(mockAuthService)
+	h := newTestHooks(t, mockQ, auth)
+	// Replace the delegated limiter with a fixture that rejects after one call.
+	h.delegatedLimiter = newIPRateLimiter(rate.Every(time.Hour), 1)
+
+	mockQ.On("CreateDelegatedAuthSession", mock.Anything, mock.Anything).
+		Return(db.DelegatedAuthSession{}, nil).Maybe()
+
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	makeReq := func() *httptest.ResponseRecorder {
+		req := httptest.NewRequest("POST", "/internal/v1/auth:createDelegatedAuthSession", strings.NewReader("{}"))
+		req.RemoteAddr = "198.51.100.1:5555"
+		rr := httptest.NewRecorder()
+		mux.ServeHTTP(rr, req)
+		return rr
+	}
+
+	rr1 := makeReq()
+	assert.NotEqual(t, http.StatusTooManyRequests, rr1.Code)
+
+	rr2 := makeReq()
+	assert.Equal(t, http.StatusTooManyRequests, rr2.Code)
+}

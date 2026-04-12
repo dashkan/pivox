@@ -922,6 +922,14 @@ type CustomDomain struct {
 	VerifyTime pgtype.Timestamptz `json:"verify_time"`
 }
 
+type DelegatedAuthSession struct {
+	Code        uuid.UUID   `json:"code"`
+	Status      string      `json:"status"`
+	CustomToken pgtype.Text `json:"custom_token"`
+	CreatedAt   time.Time   `json:"created_at"`
+	ExpiresAt   time.Time   `json:"expires_at"`
+}
+
 type Group struct {
 	ID          uuid.UUID          `json:"id"`
 	OrgID       uuid.UUID          `json:"org_id"`

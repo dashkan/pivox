@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/mock"
 
 	db "github.com/dashkan/pivox/internal/db/generated"
@@ -79,6 +80,31 @@ func (m *MockQuerier) CreateAuthTokenCode(ctx context.Context, idToken string) (
 }
 
 func (m *MockQuerier) DeleteExpiredAuthTokenCodes(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+func (m *MockQuerier) CreateDelegatedAuthSession(ctx context.Context, arg db.CreateDelegatedAuthSessionParams) (db.DelegatedAuthSession, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.DelegatedAuthSession), args.Error(1)
+}
+
+func (m *MockQuerier) CompleteDelegatedAuthSession(ctx context.Context, arg db.CompleteDelegatedAuthSessionParams) (db.DelegatedAuthSession, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.DelegatedAuthSession), args.Error(1)
+}
+
+func (m *MockQuerier) ConsumeDelegatedAuthSession(ctx context.Context, code uuid.UUID) (pgtype.Text, error) {
+	args := m.Called(ctx, code)
+	return args.Get(0).(pgtype.Text), args.Error(1)
+}
+
+func (m *MockQuerier) GetDelegatedAuthSessionStatus(ctx context.Context, code uuid.UUID) (string, error) {
+	args := m.Called(ctx, code)
+	return args.String(0), args.Error(1)
+}
+
+func (m *MockQuerier) DeleteExpiredDelegatedAuthSessions(ctx context.Context) error {
 	args := m.Called(ctx)
 	return args.Error(0)
 }
