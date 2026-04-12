@@ -76,16 +76,12 @@ class DelegatedAuthUITests: XCTestCase {
 
   // MARK: - Signin deep link
 
-  /// A delegated signin link received while signed out should open a
-  /// dedicated auth window titled "Sign in to Pivox" without disturbing
-  /// the main login screen.
-  func testDelegatedSigninOpensDedicatedWindow() throws {
+  /// A delegated signin link received as a *cold launch* should open a
+  /// dedicated auth window titled "Sign in to Pivox" and skip the main
+  /// Pivox window entirely. The user came from a plugin and has no reason
+  /// to see the full app — the only UI is the sign-in sheet.
+  func testDelegatedSigninColdLaunchOpensOnlyDedicatedWindow() throws {
     launch(deepLink: "pivox://auth/delegate/signin?session=test-code-ui-1")
-
-    // Main login screen still present.
-    XCTAssertTrue(
-      app.textFields["login-email"].waitForExistence(timeout: 5),
-      "Main login screen should still be visible")
 
     // Delegated auth window — queried by title via the windows collection.
     let delegatedWindow = app.windows["Sign in to Pivox"]
@@ -99,6 +95,14 @@ class DelegatedAuthUITests: XCTestCase {
     XCTAssertTrue(
       emailInDelegated.waitForExistence(timeout: 3),
       "Delegated auth window should host a LoginView")
+
+    // The main Pivox window should NOT be created on cold-launch signin —
+    // we quit after the flow completes, and there's no reason to flash a
+    // second window in front of the user.
+    let mainWindow = app.windows["Pivox"]
+    XCTAssertFalse(
+      mainWindow.exists,
+      "Main Pivox window should not be shown on cold-launch signin")
   }
 
   // MARK: - Profile deep link
@@ -129,26 +133,39 @@ class DelegatedAuthUITests: XCTestCase {
 
   // MARK: - Signout deep link
 
-  /// A signout deep link received while signed in should sign the user
-  /// out of the default Firebase app and return the main window to login.
-  func testDelegatedSignoutDeepLinkReturnsToLogin() throws {
+  /// A signout deep link delivered as a *cold launch* should sign out of
+  /// the default Firebase app and then terminate — there's no reason to
+  /// keep an empty Pivox window alive when the user asked for sign-out via
+  /// a plugin deep link. Verified by:
+  ///   1. The signout launch transitions to .notRunning.
+  ///   2. A subsequent plain launch lands on the login screen, proving
+  ///      the signout actually cleared the session.
+  func testDelegatedSignoutColdLaunchTerminatesAndClearsSession() throws {
     launch()
     registerAccount()
-
-    // Re-launch with the signout deep link (no RESET_AUTH so we keep the
-    // signed-in session Firebase just wrote to Keychain).
     app.terminate()
-    let secondApp = XCUIApplication()
-    secondApp.launchEnvironment["USE_AUTH_EMULATOR"] = "1"
-    secondApp.launchEnvironment["PIVOX_TEST_DEEP_LINK"] = "pivox://auth/delegate/signout"
-    secondApp.launch()
 
-    // Default coordinator behaviour: if the app wasn't launched purely for
-    // the signout (it wasn't — launch() created the main window first),
-    // sign out and stay running. Expect the login screen to appear.
+    // Relaunch as a signout cold launch. No RESET_AUTH so the emulator
+    // session from the first launch is still live going in.
+    let signoutApp = XCUIApplication()
+    signoutApp.launchEnvironment["USE_AUTH_EMULATOR"] = "1"
+    signoutApp.launchEnvironment["PIVOX_TEST_DEEP_LINK"] = "pivox://auth/delegate/signout"
+    signoutApp.launch()
+
+    // The app should exit within a couple seconds — there's no UI to
+    // interact with on a signout cold launch.
+    let terminated = signoutApp.wait(for: .notRunning, timeout: 10)
     XCTAssertTrue(
-      secondApp.textFields["login-email"].waitForExistence(timeout: 10),
-      "App should return to login screen after signout deep link")
-    secondApp.terminate()
+      terminated,
+      "App should terminate after cold-launch signout deep link")
+
+    // Session cleared: a fresh plain launch lands on the login screen.
+    let freshApp = XCUIApplication()
+    freshApp.launchEnvironment["USE_AUTH_EMULATOR"] = "1"
+    freshApp.launch()
+    XCTAssertTrue(
+      freshApp.textFields["login-email"].waitForExistence(timeout: 10),
+      "Plain launch after signout should return to login screen")
+    freshApp.terminate()
   }
 }

@@ -154,6 +154,77 @@ class DelegatedAuthTests: XCTestCase {
     wait(for: [expectation], timeout: 1.0)
   }
 
+  // MARK: - Firebase persistence cleanup
+
+  /// The coordinator must sweep on-disk Firebase state keyed by the named
+  /// delegate app after completion. Without this, each delegated flow leaks
+  /// files under ~/Library/ keyed by the session code, matching the bug we
+  /// already fixed on Windows (heartbeat files in %LOCALAPPDATA%).
+  func testCleanupFirebasePersistenceRemovesMatchingFilesOnly() throws {
+    let fm = FileManager.default
+    let tmpDir = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try fm.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+    defer { try? fm.removeItem(at: tmpDir) }
+
+    // Create a mix of stale files at various depths, plus unrelated files
+    // the sweep must leave alone.
+    let appName = "pivox-delegate-\(UUID().uuidString)"
+
+    let stalePaths = [
+      tmpDir.appendingPathComponent("heartbeats-\(appName).json"),
+      tmpDir.appendingPathComponent("firestore")
+        .appendingPathComponent("\(appName).sqlite"),
+      tmpDir.appendingPathComponent("nested").appendingPathComponent("deeper")
+        .appendingPathComponent("\(appName)-keychain.dat"),
+    ]
+    for path in stalePaths {
+      try fm.createDirectory(
+        at: path.deletingLastPathComponent(), withIntermediateDirectories: true)
+      try Data("stale".utf8).write(to: path)
+    }
+
+    let survivors = [
+      tmpDir.appendingPathComponent("other.json"),
+      tmpDir.appendingPathComponent("nested").appendingPathComponent("different-app-state.dat"),
+    ]
+    for path in survivors {
+      try Data("keep".utf8).write(to: path)
+    }
+
+    // Point the sweep at our temp dir and run it.
+    let originalRoots = DelegatedAuthCoordinator.firebasePersistenceRoots
+    DelegatedAuthCoordinator.firebasePersistenceRoots = { [tmpDir] }
+    defer { DelegatedAuthCoordinator.firebasePersistenceRoots = originalRoots }
+
+    DelegatedAuthCoordinator.cleanupFirebasePersistence(appName: appName)
+
+    for stale in stalePaths {
+      XCTAssertFalse(
+        fm.fileExists(atPath: stale.path),
+        "Stale file keyed by \(appName) should be removed: \(stale.lastPathComponent)")
+    }
+    for survivor in survivors {
+      XCTAssertTrue(
+        fm.fileExists(atPath: survivor.path),
+        "Unrelated file should survive sweep: \(survivor.lastPathComponent)")
+    }
+  }
+
+  /// The sweep should be a safe no-op when none of the configured roots
+  /// exist — the default production roots will exist, but tests can point
+  /// it at a missing path and expect silent success.
+  func testCleanupFirebasePersistenceTolerantOfMissingRoots() {
+    let missing = FileManager.default.temporaryDirectory
+      .appendingPathComponent("does-not-exist-\(UUID().uuidString)")
+
+    let originalRoots = DelegatedAuthCoordinator.firebasePersistenceRoots
+    DelegatedAuthCoordinator.firebasePersistenceRoots = { [missing] }
+    defer { DelegatedAuthCoordinator.firebasePersistenceRoots = originalRoots }
+
+    // Should not throw or crash.
+    DelegatedAuthCoordinator.cleanupFirebasePersistence(appName: "pivox-delegate-x")
+  }
+
   // MARK: - Helpers
 
   /// Synthesise a URLSession whose data(for:) is intercepted by a URLProtocol

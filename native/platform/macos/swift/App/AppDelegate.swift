@@ -2,7 +2,7 @@ import Cocoa
 import SwiftUI
 
 class AppDelegate: NSObject, NSApplicationDelegate {
-  var window: NSWindow!
+  var window: NSWindow?
   private let appState = AppStateBridge.shared()
 
   // Delegated auth (AUTHN-07): each `pivox://auth/delegate/signin?session=…`
@@ -10,19 +10,93 @@ class AppDelegate: NSObject, NSApplicationDelegate {
   // Firebase app. Multiple concurrent flows are supported — the coordinator
   // is keyed by session code on this side.
   private var delegatedFlows: [String: DelegatedFlow] = [:]
-  // True when the app was launched *because of* a signin deep link and has
-  // no other reason to stay open. Used to terminate after the flow finishes.
+
+  // True when the cold-launch URL was a delegated auth link. Set before
+  // didFinishLaunching by the NSAppleEventManager handler, so the main
+  // window creation path can skip the main window entirely for signin /
+  // signout actions — the user came from a plugin and has no reason to see
+  // the Pivox app proper. After the delegated flow completes, this flag
+  // also drives the terminate-vs-stay decision in finishDelegatedFlow.
   private var wasLaunchedForDelegatedAuth = false
+
+  // URL captured before Firebase was configured. Drained in
+  // applicationDidFinishLaunching after AuthService.configure() runs.
+  private var pendingColdLaunchURL: URL?
+
+  // Flips true at the end of applicationDidFinishLaunching. URLs arriving
+  // before this point are "cold launch"; after, they are "running app".
+  private var didFinishLaunch = false
 
   private struct DelegatedFlow {
     let coordinator: DelegatedAuthCoordinator
     let window: NSWindow
   }
 
+  // MARK: - Launch lifecycle
+
+  func applicationWillFinishLaunching(_ notification: Notification) {
+    // Register the classic kAEGetURL handler so we can catch cold-launch
+    // URLs *before* applicationDidFinishLaunching runs. NSApplicationDelegate's
+    // `application(_:open:)` fires after the main window is already on
+    // screen, which is too late to decide whether to create that window.
+    NSAppleEventManager.shared().setEventHandler(
+      self,
+      andSelector: #selector(handleGetURLEvent(_:withReplyEvent:)),
+      forEventClass: AEEventClass(kInternetEventClass),
+      andEventID: AEEventID(kAEGetURL)
+    )
+
+    #if UITEST
+      // UI-test-only hook: simulate a cold-launch URL arrival. XCUITest can't
+      // send AppleEvents, so tests set PIVOX_TEST_DEEP_LINK on
+      // launchEnvironment and we pump it through the same capture path the
+      // real handler uses. Gated on #if UITEST so production binaries never
+      // read the variable.
+      if let raw = ProcessInfo.processInfo.environment["PIVOX_TEST_DEEP_LINK"],
+        let url = URL(string: raw)
+      {
+        captureIncomingURL(url)
+      }
+    #endif
+  }
+
   func applicationDidFinishLaunching(_ notification: Notification) {
     // Initialize Firebase before any UI.
     AuthService.shared.configure()
 
+    // If a delegated signin/signout link was captured during will-launch,
+    // skip creating the main window entirely — there is no Pivox UI the user
+    // wants to see. Profile is an explicit "open the app" request so it keeps
+    // the main window.
+    let coldLaunchAction: DelegatedAuthDeepLink.Action? = pendingColdLaunchURL.flatMap {
+      DelegatedAuthDeepLink.parse($0)?.action
+    }
+    let skipMainWindow = coldLaunchAction == .signin || coldLaunchAction == .signout
+
+    if !skipMainWindow {
+      createMainWindow()
+    }
+    setupMainMenu()
+    NSApp.activate(ignoringOtherApps: true)
+
+    didFinishLaunch = true
+
+    // Dispatch any captured cold-launch URL on the next run-loop tick —
+    // NOT synchronously here. SwiftUI hasn't finished wiring up .onReceive
+    // subscribers yet, so a notification posted right now (e.g. the
+    // profile-navigation event) would be dropped. Deferring one tick
+    // also lets NSApp.terminate() unwind cleanly for cold-launch signout,
+    // which otherwise runs inside -applicationDidFinishLaunching: before
+    // the main run loop is fully spinning.
+    if let pending = pendingColdLaunchURL {
+      pendingColdLaunchURL = nil
+      DispatchQueue.main.async { [weak self] in
+        self?.dispatchIncomingURL(pending)
+      }
+    }
+  }
+
+  private func createMainWindow() {
     let contentView = ContentView()
       .frame(minWidth: 1024, minHeight: 768)
 
@@ -30,51 +104,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let width = appState.hasWindowState() ? appState.windowWidth() : 1280
     let height = appState.hasWindowState() ? appState.windowHeight() : 800
 
-    window = NSWindow(
+    let win = NSWindow(
       contentRect: NSRect(x: 0, y: 0, width: Int(width), height: Int(height)),
       styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
       backing: .buffered,
       defer: false
     )
-    window.title = "Pivox"
-    window.contentView = NSHostingView(rootView: contentView)
+    win.title = "Pivox"
+    win.contentView = NSHostingView(rootView: contentView)
 
     if appState.hasWindowState() {
       let x = appState.windowX()
       let y = appState.windowY()
-      window.setFrameOrigin(NSPoint(x: Int(x), y: Int(y)))
+      win.setFrameOrigin(NSPoint(x: Int(x), y: Int(y)))
     } else {
-      window.center()
+      win.center()
     }
 
-    window.makeKeyAndOrderFront(nil)
+    win.makeKeyAndOrderFront(nil)
 
     // Observe window move/resize to persist state.
     NotificationCenter.default.addObserver(
       self, selector: #selector(windowDidResize),
-      name: NSWindow.didResizeNotification, object: window)
+      name: NSWindow.didResizeNotification, object: win)
     NotificationCenter.default.addObserver(
       self, selector: #selector(windowDidMove),
-      name: NSWindow.didMoveNotification, object: window)
+      name: NSWindow.didMoveNotification, object: win)
 
-    setupMainMenu()
-
-    NSApp.activate(ignoringOtherApps: true)
-
-    #if UITEST
-      // UI-test-only hook: synthesise a delegated auth deep link at launch.
-      // XCUITest can't directly drive application(_:open:) from outside the
-      // app process, so tests set PIVOX_TEST_DEEP_LINK on launchEnvironment
-      // and we pump it through the real handler here. Gated on #if UITEST
-      // so production binaries never read the variable.
-      if let raw = ProcessInfo.processInfo.environment["PIVOX_TEST_DEEP_LINK"],
-        let url = URL(string: raw)
-      {
-        DispatchQueue.main.async { [weak self] in
-          self?.application(NSApp, open: [url])
-        }
-      }
-    #endif
+    self.window = win
   }
 
   func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -83,17 +140,40 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
   // MARK: - Deep link handling
 
-  /// Called by AppKit when the system delivers `pivox://` URLs. Routes
-  /// delegated auth links into the coordinator, leaves anything else for
-  /// default handling (e.g. OAuth redirects flow through the Firebase SDK).
-  @MainActor
-  func application(_ application: NSApplication, open urls: [URL]) {
-    for url in urls {
-      if let deepLink = DelegatedAuthDeepLink.parse(url) {
-        handleDelegatedAuth(deepLink)
-      }
-      // Non-delegate URLs (OAuth callbacks, etc.) are handled elsewhere.
+  /// kAEGetURL handler — invoked by AppKit when the system delivers a
+  /// `pivox://` URL to this app, either at cold launch (before
+  /// applicationDidFinishLaunching) or while running.
+  @objc
+  private func handleGetURLEvent(
+    _ event: NSAppleEventDescriptor,
+    withReplyEvent reply: NSAppleEventDescriptor
+  ) {
+    guard
+      let urlString = event.paramDescriptor(forKeyword: AEKeyword(keyDirectObject))?.stringValue,
+      let url = URL(string: urlString)
+    else { return }
+    captureIncomingURL(url)
+  }
+
+  /// Route a `pivox://` URL. If the app is still launching, the URL is
+  /// stashed for didFinishLaunching to drain; otherwise it dispatches
+  /// immediately. Only delegated-auth URLs are tracked here — other schemes
+  /// (OAuth redirects, etc.) flow through the Firebase SDK separately.
+  private func captureIncomingURL(_ url: URL) {
+    guard DelegatedAuthDeepLink.parse(url) != nil else { return }
+
+    if didFinishLaunch {
+      Task { @MainActor in self.dispatchIncomingURL(url) }
+    } else {
+      wasLaunchedForDelegatedAuth = true
+      pendingColdLaunchURL = url
     }
+  }
+
+  @MainActor
+  private func dispatchIncomingURL(_ url: URL) {
+    guard let deepLink = DelegatedAuthDeepLink.parse(url) else { return }
+    handleDelegatedAuth(deepLink)
   }
 
   @MainActor
@@ -111,8 +191,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     case .signout:
       let wasSignedIn = DelegatedAuthCoordinator.handleSignout()
       // Match Windows: if we were launched just for the signout link, exit.
+      // Defer the actual terminate by one run-loop cycle + a small margin
+      // so that (a) any just-posted NSApplicationWillTerminate observers
+      // run cleanly and (b) XCUITest's accessibility bridge — which
+      // attaches asynchronously after applicationDidFinishLaunching —
+      // gets a chance to connect before the process exits. Without the
+      // margin, XCUITest reports "application has not loaded accessibility"
+      // and the UI test that drives this path times out.
       if wasLaunchedForDelegatedAuth || !wasSignedIn {
-        NSApp.terminate(nil)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+          NSApp.terminate(nil)
+        }
       }
     }
   }
@@ -192,7 +281,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
   }
 
   private func saveWindowState() {
-    let frame = window.frame
+    guard let frame = window?.frame else { return }
     appState.saveWindowX(
       Int32(frame.origin.x),
       y: Int32(frame.origin.y),

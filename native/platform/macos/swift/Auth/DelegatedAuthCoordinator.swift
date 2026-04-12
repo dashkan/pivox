@@ -157,8 +157,77 @@ final class DelegatedAuthCoordinator {
   }
 
   private static func deleteFirebaseApp(named name: String) {
-    guard let app = FirebaseApp.app(name: name) else { return }
-    app.delete { _ in }
+    guard let app = FirebaseApp.app(name: name) else {
+      // Nothing registered in memory, but stale on-disk files might still
+      // exist from a previous run — sweep them anyway.
+      cleanupFirebasePersistence(appName: name)
+      return
+    }
+    app.delete { _ in
+      cleanupFirebasePersistence(appName: name)
+    }
+  }
+
+  // MARK: - On-disk persistence cleanup
+  //
+  // These are nonisolated because they only touch the filesystem and hold
+  // no class state — the coordinator is @MainActor-isolated by default but
+  // the cleanup path runs from the Firebase app.delete completion handler,
+  // which is not main-actor scoped.
+
+  /// Override point for tests. Defaults to the user's Library search paths
+  /// where the Firebase Apple SDK stores per-app state. Tests point this at
+  /// a temporary directory so they can verify the sweep without touching
+  /// real system folders.
+  nonisolated(unsafe) static var firebasePersistenceRoots: () -> [URL] = {
+    let fm = FileManager.default
+    guard let library = fm.urls(for: .libraryDirectory, in: .userDomainMask).first
+    else { return [] }
+    return [
+      library.appendingPathComponent("Application Support"),
+      library.appendingPathComponent("Caches"),
+      library.appendingPathComponent("Preferences"),
+      library,
+    ]
+  }
+
+  /// Walk the known Firebase storage locations and remove any file or
+  /// directory whose path component contains `appName`. This mirrors the
+  /// Windows cleanup in App.xaml.cpp and prevents stale
+  /// `pivox-delegate-<session-code>` files from accumulating under
+  /// `~/Library/` across sessions.
+  nonisolated static func cleanupFirebasePersistence(appName: String) {
+    let fm = FileManager.default
+    for root in firebasePersistenceRoots() {
+      walkAndDeleteMatchingAppName(appName, in: root, using: fm, maxDepth: 3)
+    }
+  }
+
+  nonisolated private static func walkAndDeleteMatchingAppName(
+    _ appName: String,
+    in directory: URL,
+    using fm: FileManager,
+    maxDepth: Int
+  ) {
+    guard maxDepth > 0 else { return }
+    guard
+      let contents = try? fm.contentsOfDirectory(
+        at: directory,
+        includingPropertiesForKeys: [.isDirectoryKey],
+        options: [.skipsHiddenFiles]
+      )
+    else { return }
+
+    for item in contents {
+      if item.lastPathComponent.contains(appName) {
+        try? fm.removeItem(at: item)
+        continue
+      }
+      let isDir = (try? item.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
+      if isDir {
+        walkAndDeleteMatchingAppName(appName, in: item, using: fm, maxDepth: maxDepth - 1)
+      }
+    }
   }
 
   /// Default production factory — creates the named Firebase app from the
