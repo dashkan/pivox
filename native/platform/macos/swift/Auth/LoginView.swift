@@ -2,8 +2,10 @@ import SwiftUI
 
 struct LoginView: View {
   var onSwitchToRegister: () -> Void
-
-  private var auth = AuthService.shared
+  // Injectable AuthService so delegated auth flows (AUTHN-07) can reuse the
+  // same UI against a named Firebase backend. Defaults to the shared instance
+  // for normal app launches.
+  var auth: AuthService
   private let appState = AppStateBridge.shared()
 
   @State private var email = ""
@@ -16,7 +18,8 @@ struct LoginView: View {
     case email, password
   }
 
-  init(onSwitchToRegister: @escaping () -> Void) {
+  init(auth: AuthService = .shared, onSwitchToRegister: @escaping () -> Void) {
+    self.auth = auth
     self.onSwitchToRegister = onSwitchToRegister
     let state = AppStateBridge.shared()
     let savedEmail = state.loadString(forKey: "remembered_email") ?? ""

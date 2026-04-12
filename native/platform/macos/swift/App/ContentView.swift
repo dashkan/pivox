@@ -60,6 +60,14 @@ struct ContentView: View {
         appState.save(section.rawValue, forKey: "selected_section")
       }
     }
+    // Delegated auth (AUTHN-07): when the plugin deep-links into
+    // `pivox://auth/delegate/profile`, the coordinator posts this
+    // notification and the main ContentView swings the sidebar to Profile.
+    .onReceive(
+      NotificationCenter.default.publisher(for: DelegatedAuthCoordinator.openProfileNotification)
+    ) { _ in
+      selectedItem = .profile
+    }
   }
 
   private var mainAppView: some View {

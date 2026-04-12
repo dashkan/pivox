@@ -21,11 +21,45 @@ class AuthService: NSObject {
   var errorMessage: String?
   private var isOAuthInProgress = false
 
+  // The Firebase Auth instance this service talks to. The default-init path
+  // binds to the default Firebase app (`Auth.auth()`). Delegated auth flows
+  // (AUTHN-07) construct an AuthService bound to a *named* Firebase app so
+  // plugin sign-in stays isolated from the main app's auth state.
+  private var boundAuth: Auth?
+  private var resolvedAuth: Auth {
+    boundAuth ?? Auth.auth()
+  }
+
+  // When false, sign-in/out paths skip Keychain and remembered-email writes.
+  // Delegated flows set this to false — the plugin session is ephemeral and
+  // persisting a token for it would clobber the main user's session.
+  private let persistCredentials: Bool
+
   private var authStateHandle: AuthStateDidChangeListenerHandle?
   private let appState = AppStateBridge.shared()
 
   private override init() {
+    self.persistCredentials = true
     super.init()
+  }
+
+  /// Construct an AuthService bound to a specific Firebase Auth instance.
+  /// Used by the delegated auth coordinator. Persistence is disabled by
+  /// default because the caller owns the session lifetime.
+  init(auth: Auth, persistCredentials: Bool = false) {
+    self.boundAuth = auth
+    self.persistCredentials = persistCredentials
+    super.init()
+    currentUser = auth.currentUser
+    authStateHandle = auth.addStateDidChangeListener { [weak self] _, user in
+      self?.currentUser = user
+    }
+  }
+
+  deinit {
+    if let handle = authStateHandle {
+      resolvedAuth.removeStateDidChangeListener(handle)
+    }
   }
 
   /// Configure Firebase and start listening for auth state changes.
@@ -48,14 +82,14 @@ class AuthService: NSObject {
 
     // Point at local emulator for UI tests (must be before any auth calls).
     if ProcessInfo.processInfo.environment["USE_AUTH_EMULATOR"] == "1" {
-      Auth.auth().useEmulator(withHost: "127.0.0.1", port: 9099)
+      resolvedAuth.useEmulator(withHost: "127.0.0.1", port: 9099)
     }
 
     // Synchronous check — Firebase restores persisted sessions from Keychain
     // immediately after configure(). This prevents the login screen flash.
-    currentUser = Auth.auth().currentUser
+    currentUser = resolvedAuth.currentUser
 
-    authStateHandle = Auth.auth().addStateDidChangeListener { [weak self] _, user in
+    authStateHandle = resolvedAuth.addStateDidChangeListener { [weak self] _, user in
       self?.currentUser = user
     }
 
@@ -65,7 +99,7 @@ class AuthService: NSObject {
     let uiTesting = ProcessInfo.processInfo.environment["UI_TESTING"] == "1"
 
     if uiTesting || ProcessInfo.processInfo.environment["RESET_AUTH"] == "1" {
-      try? Auth.auth().signOut()
+      try? resolvedAuth.signOut()
       appState.deleteSecure(forKey: "firebase_id_token")
       appState.deleteSecure(forKey: "firebase_refresh_token")
     }
@@ -80,11 +114,11 @@ class AuthService: NSObject {
   func signIn(email: String, password: String) async {
     errorMessage = nil
     do {
-      let result = try await Auth.auth().signIn(withEmail: email, password: password)
+      let result = try await resolvedAuth.signIn(withEmail: email, password: password)
       currentUser = result.user
 
       // Save token for session restore.
-      if let token = try? await result.user.getIDToken() {
+      if persistCredentials, let token = try? await result.user.getIDToken() {
         appState.saveSecure(token, forKey: "firebase_id_token")
       }
     } catch {
@@ -95,7 +129,7 @@ class AuthService: NSObject {
   func createAccount(email: String, password: String, displayName: String) async {
     errorMessage = nil
     do {
-      let result = try await Auth.auth().createUser(withEmail: email, password: password)
+      let result = try await resolvedAuth.createUser(withEmail: email, password: password)
 
       // Set display name.
       let changeRequest = result.user.createProfileChangeRequest()
@@ -104,9 +138,9 @@ class AuthService: NSObject {
 
       // Reload to get updated profile.
       try await result.user.reload()
-      currentUser = Auth.auth().currentUser
+      currentUser = resolvedAuth.currentUser
 
-      if let token = try? await result.user.getIDToken() {
+      if persistCredentials, let token = try? await result.user.getIDToken() {
         appState.saveSecure(token, forKey: "firebase_id_token")
       }
     } catch {
@@ -131,10 +165,10 @@ class AuthService: NSObject {
         withIDToken: idToken,
         accessToken: accessToken
       )
-      let authResult = try await Auth.auth().signIn(with: credential)
+      let authResult = try await resolvedAuth.signIn(with: credential)
       currentUser = authResult.user
 
-      if let token = try? await authResult.user.getIDToken() {
+      if persistCredentials, let token = try? await authResult.user.getIDToken() {
         appState.saveSecure(token, forKey: "firebase_id_token")
       }
     } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
@@ -250,10 +284,12 @@ class AuthService: NSObject {
   func signOut() {
     errorMessage = nil
     do {
-      try Auth.auth().signOut()
+      try resolvedAuth.signOut()
       currentUser = nil
-      appState.deleteSecure(forKey: "firebase_id_token")
-      appState.deleteSecure(forKey: "firebase_refresh_token")
+      if persistCredentials {
+        appState.deleteSecure(forKey: "firebase_id_token")
+        appState.deleteSecure(forKey: "firebase_refresh_token")
+      }
     } catch {
       errorMessage = "Failed to sign out: \(error.localizedDescription)"
     }
