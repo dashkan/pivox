@@ -43,7 +43,7 @@ LRESULT CPivoxControl::OnCreate(UINT, WPARAM, LPARAM, BOOL& bHandled) {
         if (!s_servicesInit) {
             auto appState = std::make_shared<pivox::WinAppState>();
             auto authService = std::make_shared<pivox::WinAuthService>();
-            authService->initializeFirebase();
+            authService->initializeFirebase("pivox-activex");
             authService->connectToEmulatorIfRequested();
 
             pivox::OAuthConfig oauthConfig;
@@ -92,7 +92,7 @@ LRESULT CPivoxControl::OnCreate(UINT, WPARAM, LPARAM, BOOL& bHandled) {
                     if (weak.expired() || !islandSlot_) return;
                     pivox::ScopedActCtx ctx;
                     auto factory = winrt::get_activation_factory<winrt::Windows::Foundation::IActivationFactory>(
-                        winrt::hstring(signedIn ? L"Pivox.MainPage" : L"Pivox.LoginPage"));
+                        winrt::hstring(signedIn ? L"Pivox.MainPage" : L"Pivox.DelegatedLoginPage"));
                     auto page = factory.ActivateInstance<winrt::Microsoft::UI::Xaml::UIElement>();
                     islandSlot_->source.Content(page);
                 });
@@ -103,7 +103,7 @@ LRESULT CPivoxControl::OnCreate(UINT, WPARAM, LPARAM, BOOL& bHandled) {
             pivox::ScopedActCtx ctx;
             bool signedIn = pivox::PivoxServices::authService()->isSignedIn();
             auto factory = winrt::get_activation_factory<winrt::Windows::Foundation::IActivationFactory>(
-                winrt::hstring(signedIn ? L"Pivox.MainPage" : L"Pivox.LoginPage"));
+                winrt::hstring(signedIn ? L"Pivox.MainPage" : L"Pivox.DelegatedLoginPage"));
             auto page = factory.ActivateInstance<winrt::Microsoft::UI::Xaml::UIElement>();
             islandSlot_->source.Content(page);
         }

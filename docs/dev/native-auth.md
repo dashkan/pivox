@@ -183,15 +183,31 @@ All platforms use `AppState` (already built):
 | `deleteSecure(key)` | Keychain | PasswordVault |
 | `saveBool("rememberMe", true)` | NSUserDefaults | LocalSettings |
 
+## Delegated Auth (Plugins)
+
+Plugins running inside third-party host applications (ActiveX in iNEWS, UXP in Adobe, etc.) cannot authenticate directly — no browser control, no protocol handlers, and passwords should never be typed into a host process's memory space.
+
+Instead, plugins use **delegated auth**: the plugin creates a session on the backend, launches the Pivox app via deep link, the user authenticates in the app, and the plugin polls for a custom token.
+
+See [delegated-auth.md](delegated-auth.md) for the full architecture, security properties, and implementation details.
+
+Key points:
+- Plugin only calls `signInWithCustomToken` — no OAuth flows, no password handling
+- Backend is the coordination point — no local state, no file-based signaling
+- Each plugin gets its own Firebase app name (`pivox-activex`) for persistence isolation
+- Add a new auth provider to the app once, every plugin gets it for free
+
 ## What the Native App Does NOT Use
 
-The Go backend has auth endpoints built for the web/Electron app. The native app does NOT use:
+The Go backend has auth endpoints built for the web app. The native app does NOT use:
 - `POST /internal/v1/auth:exchangeToken` — native SDKs handle token exchange
 - `POST /internal/v1/auth:depositToken` — no need to deposit tokens server-side
 - `POST /internal/v1/auth:consumeToken` — no opaque code exchange
-- Custom token minting — native SDKs handle token lifecycle
 
-These endpoints remain for the web app (Start app) and Electron.
+These endpoints remain for the web app (Start app).
+
+The native app DOES use the **delegated auth** endpoints when launched via deep link to authenticate on behalf of a plugin:
+- `POST /internal/v1/auth:completeDelegatedAuthSession` — called by the app after user signs in
 
 ## Dependencies
 

@@ -10,6 +10,9 @@ namespace winrt::Pivox::implementation
         void OnLaunched(Microsoft::UI::Xaml::LaunchActivatedEventArgs const&);
 
     private:
+        void WatchForAuthAndComplete();
         winrt::Microsoft::UI::Xaml::Window m_window{ nullptr };
+        std::string m_delegatedSessionCode;
+        bool m_isDelegatedAuth = false;
     };
 }

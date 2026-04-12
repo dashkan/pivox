@@ -188,6 +188,22 @@ All routes in `web/apps/start/src/routes/auth/`:
 
 ---
 
+## Delegated Auth (Plugins)
+
+Plugins that run inside third-party host applications (ActiveX controls in NRCS apps, Adobe UXP extensions, etc.) cannot authenticate directly. They delegate all authentication to the Pivox app via a backend-mediated session exchange:
+
+1. Plugin creates a session on the backend → gets a code
+2. Plugin launches the Pivox app via `pivox://auth/delegate/signin?session=<code>`
+3. User authenticates in the app (any method — email, Google, GitHub, SSO)
+4. App completes the session on the backend with a Firebase ID token
+5. Plugin polls the backend → gets a custom token → calls `signInWithCustomToken`
+
+This pattern ensures passwords never enter the host process, OAuth popups work reliably (the app owns the browser), and new auth providers only need to be added once.
+
+For full details — architecture, security properties, backend endpoints, client implementation — see [dev/delegated-auth.md](dev/delegated-auth.md).
+
+---
+
 ## Electron Auth
 
 ### Problem

@@ -36,7 +36,6 @@ namespace winrt::Pivox::implementation
     {
         if (e.Key() == Windows::System::VirtualKey::Enter)
         {
-            // Tab to password field.
             PasswordBox().Focus(Microsoft::UI::Xaml::FocusState::Programmatic);
             e.Handled(true);
         }
@@ -127,8 +126,6 @@ namespace winrt::Pivox::implementation
                         {
                             pivox::PivoxServices::appState()->saveString("remembered_email", "");
                         }
-
-                        
                     }
                 });
             });
@@ -156,15 +153,10 @@ namespace winrt::Pivox::implementation
                     if (auto strongThis = weakThis.get())
                     {
                         strongThis->SetLoading(false);
-                        if (result.ok())
-                        {
-                            
-                        }
-                        else if (!result.errorMessage.empty())
+                        if (!result.ok() && !result.errorMessage.empty())
                         {
                             strongThis->ShowError(result.errorMessage);
                         }
-                        // Silent cancel — just re-enable inputs.
                     }
                 });
             });

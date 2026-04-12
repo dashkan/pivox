@@ -1,0 +1,8 @@
+namespace Pivox
+{
+    [default_interface]
+    runtimeclass DelegatedLoginPage : Microsoft.UI.Xaml.Controls.Page
+    {
+        DelegatedLoginPage();
+    }
+}

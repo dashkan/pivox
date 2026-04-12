@@ -58,7 +58,7 @@ bool WinAuthService::isSignedIn() const {
     return firebaseAuth_ && firebaseAuth_->current_user().is_valid();
 }
 
-bool WinAuthService::initializeFirebase() {
+bool WinAuthService::initializeFirebase(const std::string& appName) {
     if (firebaseApp_) return true;
     firebase::AppOptions options;
     options.set_api_key(firebase_config::kApiKey);
@@ -66,7 +66,11 @@ bool WinAuthService::initializeFirebase() {
     options.set_storage_bucket(firebase_config::kStorageBucket);
     options.set_messaging_sender_id(firebase_config::kGcmSenderId);
     options.set_app_id(firebase_config::kFirebaseClientId);
-    firebaseApp_ = firebase::App::Create(options);
+    if (appName.empty()) {
+        firebaseApp_ = firebase::App::Create(options);
+    } else {
+        firebaseApp_ = firebase::App::Create(options, appName.c_str());
+    }
     if (!firebaseApp_) return false;
     firebase::InitResult initResult;
     firebaseAuth_ = firebase::auth::Auth::GetAuth(firebaseApp_, &initResult);
@@ -77,6 +81,7 @@ bool WinAuthService::initializeFirebase() {
     firebaseAuth_->AddAuthStateListener(authListener_);
     return true;
 }
+
 
 void WinAuthService::connectToEmulatorIfRequested() {
     if (!firebaseAuth_) return;
@@ -146,6 +151,35 @@ void WinAuthService::signInWithGoogleAsync(uint64_t parentWindowIdValue, std::fu
     if (!s_googleOAuthLauncher) { callback({ AuthError::NotConfigured, "OAuth launcher not registered." }); return; }
     isOAuthInProgress_ = true;
     s_googleOAuthLauncher(this, parentWindowIdValue, oauthConfig_.googleClientId, std::move(callback));
+}
+
+void WinAuthService::signInWithCustomTokenAsync(const std::string& customToken,
+                                                  std::function<void(AuthResult)> callback) {
+    if (!firebaseAuth_) { callback({ AuthError::NotConfigured, "Firebase not initialized." }); return; }
+    auto future = firebaseAuth_->SignInWithCustomToken(customToken.c_str());
+    future.OnCompletion([this, cb = std::move(callback)](const firebase::Future<firebase::auth::AuthResult>& f) {
+        if (f.error() == 0) {
+            cb({ AuthError::None, "", mapFirebaseUser(f.result()->user) });
+        } else {
+            OutputDebugStringA(("[PivoxAuth] SignInWithCustomToken error " + std::to_string(f.error()) + ": " + f.error_message() + "\n").c_str());
+            cb(mapFirebaseError(f.error()));
+        }
+    });
+}
+
+void WinAuthService::getIdTokenAsync(std::function<void(std::string)> callback) {
+    if (!firebaseAuth_ || !firebaseAuth_->current_user().is_valid()) {
+        callback("");
+        return;
+    }
+    auto future = firebaseAuth_->current_user().GetToken(false);
+    future.OnCompletion([cb = std::move(callback)](const firebase::Future<std::string>& f) {
+        if (f.error() == 0 && f.result()) {
+            cb(*f.result());
+        } else {
+            cb("");
+        }
+    });
 }
 
 void WinAuthService::signOut() {

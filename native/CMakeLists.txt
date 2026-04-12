@@ -251,11 +251,16 @@ if(WIN32)
         ${WIN_SHARED_DIR}/PivoxServices.cpp
         ${WIN_SHARED_DIR}/OAuthPopup.cpp
         ${WIN_SHARED_DIR}/GoogleOAuth.cpp
+        ${WIN_SHARED_DIR}/DelegatedAuthClient.cpp
         ${WIN_SHARED_DIR}/DragService.cpp
         ${WIN_SHARED_DIR}/Views/LoginPage.idl
         ${WIN_SHARED_DIR}/Views/LoginPage.xaml
         ${WIN_SHARED_DIR}/Views/LoginPage.xaml.h
         ${WIN_SHARED_DIR}/Views/LoginPage.xaml.cpp
+        ${WIN_SHARED_DIR}/Views/DelegatedLoginPage.idl
+        ${WIN_SHARED_DIR}/Views/DelegatedLoginPage.xaml
+        ${WIN_SHARED_DIR}/Views/DelegatedLoginPage.xaml.h
+        ${WIN_SHARED_DIR}/Views/DelegatedLoginPage.xaml.cpp
         ${WIN_SHARED_DIR}/Views/RegisterPage.idl
         ${WIN_SHARED_DIR}/Views/RegisterPage.xaml
         ${WIN_SHARED_DIR}/Views/RegisterPage.xaml.h

@@ -19,7 +19,6 @@ void LaunchOAuthPopup(
 
     auto callbackFired = std::make_shared<bool>(false);
     auto cb = std::make_shared<OAuthPopupCallback>(std::move(callback));
-    auto authUrlCopy = std::make_shared<std::wstring>(authUrl);
 
     // Intercept navigation to the redirect URI scheme.
     webview.NavigationStarting([window, callbackScheme, callbackFired, cb](
@@ -60,19 +59,6 @@ void LaunchOAuthPopup(
         }
     });
 
-    // Log WebView2 init status for diagnostics.
-    webview.CoreWebView2Initialized([](
-        auto&&, winrt::Microsoft::UI::Xaml::Controls::CoreWebView2InitializedEventArgs const& args) {
-        if (auto ex = args.Exception()) {
-            wchar_t buf[256];
-            swprintf_s(buf, 256, L"[OAuthPopup] CoreWebView2 init error: 0x%08X\n",
-                static_cast<int32_t>(ex));
-            OutputDebugStringW(buf);
-        } else {
-            OutputDebugStringW(L"[OAuthPopup] CoreWebView2 initialized OK\n");
-        }
-    });
-
     // Handle window closed (user cancelled).
     window.Closed([callbackFired, cb](auto&&, auto&&) {
         if (!*callbackFired) {
@@ -85,26 +71,8 @@ void LaunchOAuthPopup(
     window.AppWindow().Resize({ 500, 700 });
     window.Activate();
 
-    // Create environment with explicit UDF, then init WebView2.
-    PWSTR localAppData = nullptr;
-    std::wstring udfPath = L"C:\\PivoxWebView2";
-    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &localAppData))) {
-        udfPath = std::wstring(localAppData) + L"\\Pivox\\WebView2Cache";
-        CoTaskMemFree(localAppData);
-    }
-
-    OutputDebugStringW(L"[OAuthPopup] Creating CoreWebView2Environment\n");
-    auto createOp = winrt::Microsoft::Web::WebView2::Core::CoreWebView2Environment::CreateWithOptionsAsync(
-        L"", udfPath, nullptr);
-    createOp.Completed([webview, authUrlCopy](auto&& op, winrt::Windows::Foundation::AsyncStatus status) {
-        if (status == winrt::Windows::Foundation::AsyncStatus::Completed) {
-            OutputDebugStringW(L"[OAuthPopup] Environment created, calling EnsureCoreWebView2Async\n");
-            auto env = op.GetResults();
-            webview.EnsureCoreWebView2Async(env);
-        } else {
-            OutputDebugStringW(L"[OAuthPopup] Environment creation FAILED\n");
-        }
-    });
+    // Navigate — WebView2 auto-initializes on first navigation.
+    webview.Source(winrt::Windows::Foundation::Uri(authUrl));
 }
 
 } // namespace Pivox

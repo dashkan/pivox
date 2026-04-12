@@ -89,6 +89,12 @@ public:
     void signInWithGoogleAsync(uint64_t parentWindowIdValue,
                                std::function<void(AuthResult)> callback);
 
+    void signInWithCustomTokenAsync(const std::string& customToken,
+                                    std::function<void(AuthResult)> callback);
+
+    /// Get the current user's Firebase ID token (for backend API calls).
+    void getIdTokenAsync(std::function<void(std::string)> callback);
+
     bool isOAuthInProgress() const { return isOAuthInProgress_; }
 
     void setTestMode(bool enabled) { testMode_ = enabled; }
@@ -99,7 +105,7 @@ public:
 
     void signOut();
 
-    bool initializeFirebase();
+    bool initializeFirebase(const std::string& appName = "");
     bool isFirebaseInitialized() const;
     void connectToEmulatorIfRequested();
 

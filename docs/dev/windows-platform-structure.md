@@ -24,10 +24,12 @@ platform/windows/
 ├── shared/                      # Shared source compiled into each target (NOT a DLL)
 │   ├── PivoxServices.h / .cpp   # Service locator — bridges app state to shared pages
 │   ├── GoogleOAuth.cpp          # OAuth2Manager coroutine (Google Sign-In)
+│   ├── DelegatedAuthClient.h / .cpp  # HTTP client for delegated auth backend endpoints
 │   ├── DragService.h / .cpp     # Compile-time drag abstraction (PIVOX_ACTIVEX_HOST)
 │   ├── pch.h                    # WinUI controls (no Application headers)
 │   ├── Views/
-│   │   ├── LoginPage.idl / .xaml / .h / .cpp
+│   │   ├── LoginPage.idl / .xaml / .h / .cpp           # App login (email/password, Google, GitHub)
+│   │   ├── DelegatedLoginPage.idl / .xaml / .h / .cpp  # Plugin login ("Sign In with Pivox" button)
 │   │   ├── RegisterPage.idl / .xaml / .h / .cpp
 │   │   ├── MainPage.idl / .xaml / .h / .cpp
 │   │   └── TestPage.idl / .xaml / .h / .cpp
@@ -71,12 +73,19 @@ Shared source files in `shared/` are compiled directly into each target. There i
 
 ### What it contains
 
-- **XAML pages** — LoginPage, RegisterPage, MainPage, TestPage (and future views)
+- **XAML pages** — LoginPage (app), DelegatedLoginPage (plugins), RegisterPage, MainPage, TestPage
 - **Custom controls** — In `Controls/` (future)
 - **ResourceDictionaries** — In `Resources/` (future: SVG-wrapped icons)
-- **GoogleOAuth** — OAuth2Manager coroutine for Google Sign-In
+- **GoogleOAuth** — OAuth2Manager coroutine for Google Sign-In (app only)
+- **DelegatedAuthClient** — HTTP client for delegated auth backend endpoints (plugins)
 - **PivoxServices** — Static service locator providing access to `WinAppState` and `WinAuthService`
 - **DragService** — Compile-time drag abstraction (`PIVOX_ACTIVEX_HOST` preprocessor)
+
+### Auth pages
+
+The app and plugins use different login pages:
+- **LoginPage** — Full auth form (email/password, Google, GitHub). Used by the app when running standalone.
+- **DelegatedLoginPage** — Single "Sign In with Pivox" button. Used by plugins (ActiveX, UXP). Launches the Pivox app via deep link and polls the backend for a custom token. See [delegated-auth.md](delegated-auth.md).
 
 ### How it's consumed
 
@@ -425,11 +434,15 @@ Since all XAML is compiled directly into PivoxActiveX.dll (no separate component
 <file name="PivoxActiveX.dll">
   <activatableClass name="Pivox.XamlMetaDataProvider"
       threadingModel="both" xmlns="urn:schemas-microsoft-com:winrt.v1" />
+  <activatableClass name="Pivox.DelegatedLoginPage"
+      threadingModel="both" xmlns="urn:schemas-microsoft-com:winrt.v1" />
   <activatableClass name="Pivox.LoginPage"
       threadingModel="both" xmlns="urn:schemas-microsoft-com:winrt.v1" />
   <!-- ... all pages ... -->
 </file>
 ```
+
+Note: The ActiveX control uses `DelegatedLoginPage` (not `LoginPage`) for its signed-out state. `LoginPage` is still compiled into the DLL for WinRT type registration but is only used by the standalone app.
 
 The manifest is embedded at link time via `/MANIFESTINPUT`. No external `.manifest` file needed at runtime.
 
