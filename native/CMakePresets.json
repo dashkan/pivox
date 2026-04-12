@@ -2,13 +2,24 @@
     "version": 3,
     "configurePresets": [
         {
+            "name": "win-app",
+            "displayName": "Pivox App (x64)",
+            "generator": "Visual Studio 18 2026",
+            "architecture": { "value": "x64" },
+            "binaryDir": "${sourceDir}/build-x64",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+            }
+        },
+        {
             "name": "win-activex",
             "displayName": "ActiveX Plugin (x86)",
             "generator": "Visual Studio 18 2026",
             "architecture": { "value": "Win32" },
             "binaryDir": "${sourceDir}/build-activex-x86",
             "cacheVariables": {
-                "PIVOX_BUILD_ACTIVEX": "ON"
+                "PIVOX_BUILD_ACTIVEX": "ON",
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
             }
         }
     ]

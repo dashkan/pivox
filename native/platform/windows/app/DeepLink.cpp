@@ -1,6 +1,8 @@
-#include "pch.h"
 #include "DeepLink.h"
+
 #include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.Foundation.Collections.h>
+#include <shellapi.h>
 
 DeepLink ParseDeepLinkFromUrl(const std::wstring& url) {
     DeepLink link;

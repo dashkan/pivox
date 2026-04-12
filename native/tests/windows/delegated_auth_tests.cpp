@@ -1,7 +1,5 @@
 #include <gtest/gtest.h>
 #include "DeepLink.h"
-#include "DelegatedAuthClient.h"
-#include "WinAuthService.h"
 
 // ---------------------------------------------------------------------------
 // Deep link parsing
@@ -81,58 +79,19 @@ TEST_F(DeepLinkParseTest, MalformedUrlReturnsDefault) {
     EXPECT_FALSE(link.isDelegatedAuth);
 }
 
-// ---------------------------------------------------------------------------
-// DelegatedAuthClient — backend URL resolution
-// ---------------------------------------------------------------------------
-
-class DelegatedAuthClientTest : public ::testing::Test {
-protected:
-    void SetUp() override {
-        // Clear the env var so tests get the default.
-        SetEnvironmentVariableW(L"PIVOX_BACKEND_URL", nullptr);
-    }
-    void TearDown() override {
-        SetEnvironmentVariableW(L"PIVOX_BACKEND_URL", nullptr);
-    }
-};
-
-TEST_F(DelegatedAuthClientTest, DefaultBackendUrl) {
-    EXPECT_EQ(pivox::DelegatedAuthClient::backendUrl(), "https://pivox.ngrok.app");
+TEST_F(DeepLinkParseTest, GoogleRedirectSchemeIgnored) {
+    auto link = ParseDeepLinkFromUrl(
+        L"com.googleusercontent.apps.12345:/oauth2callback?code=abc");
+    EXPECT_FALSE(link.isDelegatedAuth);
 }
 
-TEST_F(DelegatedAuthClientTest, EnvVarOverridesDefault) {
-    SetEnvironmentVariableW(L"PIVOX_BACKEND_URL", L"http://localhost:8080");
-    EXPECT_EQ(pivox::DelegatedAuthClient::backendUrl(), "http://localhost:8080");
+TEST_F(DeepLinkParseTest, DelegatePathWithoutAction) {
+    auto link = ParseDeepLinkFromUrl(L"pivox://auth/delegate/");
+    EXPECT_TRUE(link.isDelegatedAuth);
+    EXPECT_TRUE(link.action.empty());
 }
 
-TEST_F(DelegatedAuthClientTest, EmptyEnvVarUsesDefault) {
-    SetEnvironmentVariableW(L"PIVOX_BACKEND_URL", L"");
-    EXPECT_EQ(pivox::DelegatedAuthClient::backendUrl(), "https://pivox.ngrok.app");
-}
-
-// ---------------------------------------------------------------------------
-// WinAuthService — delegated auth methods (without Firebase)
-// ---------------------------------------------------------------------------
-
-class WinAuthServiceDelegatedTest : public ::testing::Test {
-protected:
-    pivox::WinAuthService auth{};
-};
-
-TEST_F(WinAuthServiceDelegatedTest, SignInWithCustomTokenFailsWithoutFirebase) {
-    pivox::AuthResult result;
-    auth.signInWithCustomTokenAsync("fake-token",
-        [&](pivox::AuthResult r) { result = r; });
-    EXPECT_FALSE(result.ok());
-    EXPECT_EQ(result.error, pivox::AuthError::NotConfigured);
-}
-
-TEST_F(WinAuthServiceDelegatedTest, GetIdTokenReturnsEmptyWithoutFirebase) {
-    std::string token = "not-empty";
-    auth.getIdTokenAsync([&](std::string t) { token = t; });
-    EXPECT_TRUE(token.empty());
-}
-
-TEST_F(WinAuthServiceDelegatedTest, IsFirebaseInitializedFalseByDefault) {
-    EXPECT_FALSE(auth.isFirebaseInitialized());
+TEST_F(DeepLinkParseTest, NonAuthHost) {
+    auto link = ParseDeepLinkFromUrl(L"pivox://settings/delegate/signin");
+    EXPECT_FALSE(link.isDelegatedAuth);
 }

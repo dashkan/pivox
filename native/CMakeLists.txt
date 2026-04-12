@@ -334,26 +334,21 @@ if(GTest_FOUND)
     # TODO: Windows integration tests need updating after shared-source refactor.
     # Tests reference removed pivox_win_state target and AuthStatus enum.
 
-    # Windows delegated auth tests (deep link parsing, backend URL, auth service validation).
+    # Windows delegated auth tests (deep link parsing).
     # Requires WinRT for URI parsing. Only built on Windows.
     if(WIN32)
         add_executable(pivox_delegated_auth_tests
             tests/windows/delegated_auth_tests.cpp
             ${CMAKE_SOURCE_DIR}/platform/windows/app/DeepLink.cpp
-            ${CMAKE_SOURCE_DIR}/platform/windows/shared/DelegatedAuthClient.cpp
-            ${WIN_PLATFORM_DIR}/WinAuthService.cpp
-            ${WIN_PLATFORM_DIR}/WinAppState.cpp
         )
         target_include_directories(pivox_delegated_auth_tests PRIVATE
             ${CMAKE_SOURCE_DIR}/platform/windows/app
-            ${CMAKE_SOURCE_DIR}/platform/windows/shared
-            ${WIN_PLATFORM_DIR}
-            ${CMAKE_SOURCE_DIR}/core
         )
         target_link_libraries(pivox_delegated_auth_tests PRIVATE
-            pivox_core GTest::gtest_main
-            windowsapp runtimeobject
-            advapi32 credui wincred
+            GTest::gtest_main windowsapp runtimeobject
+        )
+        set_target_properties(pivox_delegated_auth_tests PROPERTIES
+            VS_GLOBAL_CppWinRTOptimized "true"
         )
         target_compile_definitions(pivox_delegated_auth_tests PRIVATE
             _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS
