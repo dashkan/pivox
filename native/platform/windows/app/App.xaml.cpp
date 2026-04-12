@@ -5,57 +5,13 @@
 #include "WinAuthService.h"
 #include "OAuthPopup.h"
 #include "DelegatedAuthClient.h"
+#include "DeepLink.h"
 #include "firebase_config.h"
 #include <winrt/Microsoft.Security.Authentication.OAuth.h>
 #include <thread>
 
 // NOTE: App.xaml.cpp does NOT include App.g.cpp.
 // See docs/dev/winui3-cmake-guide.md constraint #3.
-
-namespace {
-
-// Deep link structure parsed from pivox:// URLs.
-// Supported deep links:
-//   pivox://auth/delegate/signin?session=<code>  — delegated auth from plugin
-//   pivox://auth/delegate/profile                — open profile in app
-//   pivox://auth/delegate/signout                — sign out and exit
-struct DeepLink {
-    bool isDelegatedAuth = false;  // true for any pivox://auth/delegate/* URL
-    std::string action;            // "signin", "profile", "signout"
-    std::string sessionCode;       // session code for "signin" action
-};
-
-// Parse the deep link from the command line (argv[1]).
-DeepLink ParseDeepLink() {
-    DeepLink link;
-    int argc = 0;
-    LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-    if (argv && argc >= 2) {
-        try {
-            winrt::Windows::Foundation::Uri uri(argv[1]);
-            auto scheme = winrt::to_string(uri.SchemeName());
-            auto host = winrt::to_string(uri.Host());
-            auto path = winrt::to_string(uri.Path());
-            if (scheme == "pivox" && host == "auth" && path.rfind("/delegate/", 0) == 0) {
-                link.isDelegatedAuth = true;
-                link.action = path.substr(10); // after "/delegate/"
-                if (link.action == "signin") {
-                    auto query = uri.QueryParsed();
-                    for (uint32_t i = 0; i < query.Size(); i++) {
-                        if (winrt::to_string(query.GetAt(i).Name()) == "session") {
-                            link.sessionCode = winrt::to_string(query.GetAt(i).Value());
-                            break;
-                        }
-                    }
-                }
-            }
-        } catch (...) {}
-    }
-    if (argv) LocalFree(argv);
-    return link;
-}
-
-} // namespace
 
 namespace winrt::Pivox::implementation
 {

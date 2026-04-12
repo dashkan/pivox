@@ -12,6 +12,7 @@ add_executable(${WIN_TARGET} WIN32
     ${WIN_APP_DIR}/App.xaml
     ${WIN_APP_DIR}/App.xaml.h
     ${WIN_APP_DIR}/App.xaml.cpp
+    ${WIN_APP_DIR}/DeepLink.cpp
     # MainWindow
     ${WIN_APP_DIR}/MainWindow.idl
     ${WIN_APP_DIR}/MainWindow.xaml
