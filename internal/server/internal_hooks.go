@@ -28,6 +28,12 @@ type InternalHooks struct {
 	auth          authn.Service
 	delegatedAuth config.DelegatedAuthConfig
 
+	// rateLimitEnabled gates every rateLimitWith middleware. When false the
+	// limiter instances are still kept (so toggling back on does not require
+	// a restart) but allow() is never called. Intended for deployments where
+	// a reverse proxy owns rate limiting.
+	rateLimitEnabled bool
+
 	// syncAuth protects the accounts:sync endpoint. The implementation is
 	// selected at compile time via build tags:
 	//   - Production (default): Google Cloud OIDC identity token verification
@@ -37,10 +43,15 @@ type InternalHooks struct {
 	// Per-IP rate limiter for the token exchange endpoint (AUTHN-06).
 	exchangeLimiter *ipRateLimiter
 
-	// Per-IP rate limiter for the unauthenticated delegated-auth endpoints
-	// (create, poll). More aggressive than exchangeLimiter because these
-	// endpoints require no caller credentials (AUTHN-07).
-	delegatedLimiter *ipRateLimiter
+	// Per-IP rate limiters for the delegated-auth endpoints (AUTHN-07).
+	// Split per endpoint because the access patterns differ sharply:
+	//   - Create: user-initiated, aggressive cap is fine.
+	//   - Complete: called once per flow from the authenticated app.
+	//   - Poll: called every pollInterval seconds by the plugin; its refill
+	//     rate must be faster than the poll cadence or normal use 429s.
+	delegatedCreateLimiter   *ipRateLimiter
+	delegatedCompleteLimiter *ipRateLimiter
+	delegatedPollLimiter     *ipRateLimiter
 }
 
 // Register mounts the internal endpoints on the given mux.
@@ -49,9 +60,12 @@ func (h *InternalHooks) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /internal/v1/auth:exchangeToken", h.rateLimit(h.exchangeToken))
 	mux.HandleFunc("POST /internal/v1/auth:depositToken", h.depositToken)
 	mux.HandleFunc("POST /internal/v1/auth:consumeToken", h.consumeToken)
-	mux.HandleFunc("POST /internal/v1/auth:createDelegatedAuthSession", h.delegatedRateLimit(h.createDelegatedAuthSession))
-	mux.HandleFunc("POST /internal/v1/auth:completeDelegatedAuthSession", h.rateLimit(h.completeDelegatedAuthSession))
-	mux.HandleFunc("POST /internal/v1/auth:pollDelegatedAuthSession", h.delegatedRateLimit(h.pollDelegatedAuthSession))
+	mux.HandleFunc("POST /internal/v1/auth:createDelegatedAuthSession",
+		h.rateLimitWith(h.delegatedCreateLimiter, h.createDelegatedAuthSession))
+	mux.HandleFunc("POST /internal/v1/auth:completeDelegatedAuthSession",
+		h.rateLimitWith(h.delegatedCompleteLimiter, h.completeDelegatedAuthSession))
+	mux.HandleFunc("POST /internal/v1/auth:pollDelegatedAuthSession",
+		h.rateLimitWith(h.delegatedPollLimiter, h.pollDelegatedAuthSession))
 }
 
 // syncAccountRequest is the payload sent by the Firebase onUserCreated function.
@@ -393,14 +407,13 @@ func (h *InternalHooks) rateLimit(next http.HandlerFunc) http.HandlerFunc {
 	return h.rateLimitWith(h.exchangeLimiter, next)
 }
 
-// delegatedRateLimit wraps a handler with the more aggressive per-IP limiter
-// used for unauthenticated delegated-auth endpoints.
-func (h *InternalHooks) delegatedRateLimit(next http.HandlerFunc) http.HandlerFunc {
-	return h.rateLimitWith(h.delegatedLimiter, next)
-}
-
 func (h *InternalHooks) rateLimitWith(limiter *ipRateLimiter, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if !h.rateLimitEnabled {
+			next(w, r)
+			return
+		}
+
 		// Use X-Forwarded-For if behind a reverse proxy, fall back to RemoteAddr.
 		ip := r.Header.Get("X-Forwarded-For")
 		if ip == "" {
@@ -420,29 +433,58 @@ func (h *InternalHooks) rateLimitWith(limiter *ipRateLimiter, next http.HandlerF
 	}
 }
 
-// ipRateLimiter provides per-key token bucket rate limiting.
+// ipStaleAfter is how long an IP's limiter may sit unused before it is
+// evicted from the map. Prevents unbounded map growth from transient IPs.
+const ipStaleAfter = 10 * time.Minute
+
+// ipRateLimiter provides per-key token bucket rate limiting with opportunistic
+// eviction of stale entries. Cleanup runs on each allow() call rather than on
+// a timer to keep the type self-contained; at current request rates the
+// overhead is negligible.
 type ipRateLimiter struct {
 	mu       sync.Mutex
-	limiters map[string]*rate.Limiter
+	limiters map[string]*ipLimiterEntry
 	r        rate.Limit
 	burst    int
+	// now is injected in tests; production uses time.Now.
+	now func() time.Time
+}
+
+type ipLimiterEntry struct {
+	limiter  *rate.Limiter
+	lastSeen time.Time
 }
 
 func newIPRateLimiter(r rate.Limit, burst int) *ipRateLimiter {
 	return &ipRateLimiter{
-		limiters: make(map[string]*rate.Limiter),
+		limiters: make(map[string]*ipLimiterEntry),
 		r:        r,
 		burst:    burst,
+		now:      time.Now,
 	}
 }
 
 func (l *ipRateLimiter) allow(key string) bool {
 	l.mu.Lock()
-	lim, exists := l.limiters[key]
+	now := l.now()
+	l.evictStaleLocked(now)
+	entry, exists := l.limiters[key]
 	if !exists {
-		lim = rate.NewLimiter(l.r, l.burst)
-		l.limiters[key] = lim
+		entry = &ipLimiterEntry{limiter: rate.NewLimiter(l.r, l.burst)}
+		l.limiters[key] = entry
 	}
+	entry.lastSeen = now
+	lim := entry.limiter
 	l.mu.Unlock()
 	return lim.Allow()
+}
+
+// evictStaleLocked removes entries whose last activity was longer than
+// ipStaleAfter ago. Caller must hold l.mu.
+func (l *ipRateLimiter) evictStaleLocked(now time.Time) {
+	for k, entry := range l.limiters {
+		if now.Sub(entry.lastSeen) > ipStaleAfter {
+			delete(l.limiters, k)
+		}
+	}
 }

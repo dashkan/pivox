@@ -107,6 +107,9 @@ if(APPLE)
         ${SWIFT_DIR}/Auth/LoginView.swift
         ${SWIFT_DIR}/Auth/RegisterView.swift
         ${SWIFT_DIR}/Auth/ProfileView.swift
+        ${SWIFT_DIR}/Auth/DelegatedAuthClient.swift
+        ${SWIFT_DIR}/Auth/DelegatedAuthCoordinator.swift
+        ${SWIFT_DIR}/Auth/DelegatedAuthWindowView.swift
         ${SWIFT_DIR}/ImageEditor/EditView.swift
         ${SWIFT_DIR}/ImageEditor/RulerSlider.swift
         ${SWIFT_DIR}/ImageEditor/ImageEditCanvas.swift
@@ -154,6 +157,9 @@ if(APPLE)
         MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1.0"
         MACOSX_BUNDLE_BUNDLE_NAME "Pivox"
         CMAKE_Swift_LANGUAGE_VERSION 5
+        # Required so XCTest bundles can `@testable import Pivox` for
+        # unit tests that reach into the Swift module's internal types.
+        XCODE_ATTRIBUTE_ENABLE_TESTABILITY "YES"
         XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
         XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS "${CMAKE_SOURCE_DIR}/platform/macos/Pivox.entitlements"
         XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "Apple Development"
@@ -186,6 +192,7 @@ if(APPLE)
         tests/macos/CoreTests.swift
         tests/macos/AuthViewModelTests.swift
         tests/macos/AuthServiceTests.swift
+        tests/macos/DelegatedAuthTests.swift
         tests/macos/ImageEditorBridgeTests.swift
     )
 
@@ -203,6 +210,7 @@ if(APPLE)
     xctest_add_bundle(PivoxUITests ${APP_TARGET}
         tests/macos/ui/SidebarUITests.swift
         tests/macos/ui/AuthUITests.swift
+        tests/macos/ui/DelegatedAuthUITests.swift
         tests/macos/ui/ImageEditorUITests.swift
     )
 

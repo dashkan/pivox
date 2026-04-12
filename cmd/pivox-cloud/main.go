@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -65,6 +66,7 @@ func main() {
 	f.String("gcp-service-account-file", envOrDefault("PIVOX_GCP_SERVICE_ACCOUNT_FILE", ""), "Google Cloud service account key file path")
 	f.Duration("delegated-auth-session-ttl", envOrDuration("PIVOX_DELEGATED_AUTH_SESSION_TTL", 5*time.Minute), "How long a delegated auth session code remains valid")
 	f.Duration("delegated-auth-poll-interval", envOrDuration("PIVOX_DELEGATED_AUTH_POLL_INTERVAL", 5*time.Second), "Poll interval returned to delegated auth clients")
+	f.Bool("rate-limit-enabled", envOrBool("PIVOX_RATE_LIMIT_ENABLED", true), "Enable in-process per-IP rate limiting on internal endpoints (disable when a reverse proxy handles it)")
 
 	addSyncAuthFlags(rootCmd)
 
@@ -89,18 +91,29 @@ func envOrDuration(key string, defaultVal time.Duration) time.Duration {
 	return defaultVal
 }
 
+func envOrBool(key string, defaultVal bool) bool {
+	if v := os.Getenv(key); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			return b
+		}
+	}
+	return defaultVal
+}
+
 func must(s string, _ error) string { return s }
 
 func serve(cmd *cobra.Command, args []string) error {
 	f := cmd.Flags()
 	sessionTTL, _ := f.GetDuration("delegated-auth-session-ttl")
 	pollInterval, _ := f.GetDuration("delegated-auth-poll-interval")
+	rateLimitEnabled, _ := f.GetBool("rate-limit-enabled")
 	cfg := &config.Config{
-		DatabaseURL: must(f.GetString("database-url")),
-		GRPCPort:    must(f.GetString("grpc-port")),
-		RESTPort:    must(f.GetString("rest-port")),
-		DebugPort:   must(f.GetString("debug-port")),
-		LogLevel:    must(f.GetString("log-level")),
+		DatabaseURL:      must(f.GetString("database-url")),
+		GRPCPort:         must(f.GetString("grpc-port")),
+		RESTPort:         must(f.GetString("rest-port")),
+		DebugPort:        must(f.GetString("debug-port")),
+		LogLevel:         must(f.GetString("log-level")),
+		RateLimitEnabled: rateLimitEnabled,
 		GoogleCloud: config.GoogleCloudConfig{
 			ProjectID:          must(f.GetString("gcp-project-id")),
 			ServiceAccountKey:  must(f.GetString("gcp-service-account-key")),
@@ -269,7 +282,7 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	// HTTP mux: internal hooks + gRPC gateway (fallback)
 	httpMux := http.NewServeMux()
-	hooks, err := server.NewInternalHooks(queries, cfg.SyncAuth, cfg.DelegatedAuth, logger, authSvc)
+	hooks, err := server.NewInternalHooks(queries, cfg.SyncAuth, cfg.DelegatedAuth, cfg.RateLimitEnabled, logger, authSvc)
 	if err != nil {
 		return fmt.Errorf("initialize internal hooks: %w", err)
 	}
