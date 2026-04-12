@@ -5,14 +5,15 @@ import "time"
 // Config holds all server configuration. Populated from cobra flags
 // in cmd/pivox-cloud/main.go, with env var fallbacks.
 type Config struct {
-	DatabaseURL   string
-	GRPCPort      string
-	RESTPort      string
-	DebugPort     string
-	LogLevel      string
-	GoogleCloud   GoogleCloudConfig
-	SyncAuth      SyncAuthConfig
-	DelegatedAuth DelegatedAuthConfig
+	DatabaseURL      string
+	GRPCPort         string
+	RESTPort         string
+	DebugPort        string
+	LogLevel         string
+	RateLimitEnabled bool
+	GoogleCloud      GoogleCloudConfig
+	SyncAuth         SyncAuthConfig
+	DelegatedAuth    DelegatedAuthConfig
 }
 
 // DelegatedAuthConfig controls the delegated auth session flow used by

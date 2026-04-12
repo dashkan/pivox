@@ -42,7 +42,7 @@ func TestNewInternalHooks_Dev(t *testing.T) {
 	auth := new(mockAuthService)
 	logger := slog.Default()
 
-	h, err := NewInternalHooks(mockQ, config.SyncAuthConfig{SharedSecret: "test-secret"}, testDelegatedAuthConfig(), logger, auth)
+	h, err := NewInternalHooks(mockQ, config.SyncAuthConfig{SharedSecret: "test-secret"}, testDelegatedAuthConfig(), true, logger, auth)
 	require.NoError(t, err)
 	require.NotNil(t, h)
 	assert.NotNil(t, h.syncAuth)
@@ -67,7 +67,7 @@ func TestRegister_AllRoutes(t *testing.T) {
 	mockQ.On("GetDelegatedAuthSessionStatus", mock.Anything, mock.Anything).
 		Return("", errors.New("no rows")).Maybe()
 
-	h, err := NewInternalHooks(mockQ, config.SyncAuthConfig{SharedSecret: "s"}, testDelegatedAuthConfig(), logger, auth)
+	h, err := NewInternalHooks(mockQ, config.SyncAuthConfig{SharedSecret: "s"}, testDelegatedAuthConfig(), true, logger, auth)
 	require.NoError(t, err)
 
 	mux := http.NewServeMux()
@@ -154,7 +154,7 @@ func newTestHooks(t *testing.T, mockQ *mocks.MockQuerier, auth *mockAuthService)
 
 func newTestHooksWithConfig(t *testing.T, mockQ *mocks.MockQuerier, auth *mockAuthService, dcfg config.DelegatedAuthConfig) *InternalHooks {
 	t.Helper()
-	h, err := NewInternalHooks(mockQ, config.SyncAuthConfig{SharedSecret: "s"}, dcfg, slog.Default(), auth)
+	h, err := NewInternalHooks(mockQ, config.SyncAuthConfig{SharedSecret: "s"}, dcfg, true, slog.Default(), auth)
 	require.NoError(t, err)
 	return h
 }
@@ -502,8 +502,9 @@ func TestRateLimit_UnderLimit(t *testing.T) {
 func TestRateLimit_OverLimit(t *testing.T) {
 	// Create hooks with a very restrictive rate limiter.
 	h := &InternalHooks{
-		logger:          slog.Default(),
-		exchangeLimiter: newIPRateLimiter(rate.Every(time.Hour), 1),
+		logger:           slog.Default(),
+		rateLimitEnabled: true,
+		exchangeLimiter:  newIPRateLimiter(rate.Every(time.Hour), 1),
 	}
 
 	inner := func(w http.ResponseWriter, r *http.Request) {
@@ -527,8 +528,9 @@ func TestRateLimit_OverLimit(t *testing.T) {
 
 func TestRateLimit_XForwardedFor(t *testing.T) {
 	h := &InternalHooks{
-		logger:          slog.Default(),
-		exchangeLimiter: newIPRateLimiter(rate.Every(time.Hour), 1),
+		logger:           slog.Default(),
+		rateLimitEnabled: true,
+		exchangeLimiter:  newIPRateLimiter(rate.Every(time.Hour), 1),
 	}
 
 	inner := func(w http.ResponseWriter, r *http.Request) {
@@ -548,6 +550,36 @@ func TestRateLimit_XForwardedFor(t *testing.T) {
 	rr2 := httptest.NewRecorder()
 	limited(rr2, req)
 	assert.Equal(t, http.StatusTooManyRequests, rr2.Code)
+}
+
+// TestRateLimit_DisabledPassthrough verifies that flipping rateLimitEnabled
+// off makes the middleware a no-op even when the underlying limiter would
+// reject the call.
+func TestRateLimit_DisabledPassthrough(t *testing.T) {
+	h := &InternalHooks{
+		logger:           slog.Default(),
+		rateLimitEnabled: false,
+		// Burst 1, glacial refill — if the middleware touched this we'd see 429.
+		exchangeLimiter: newIPRateLimiter(rate.Every(time.Hour), 1),
+	}
+
+	callCount := 0
+	inner := func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		w.WriteHeader(http.StatusOK)
+	}
+
+	limited := h.rateLimit(inner)
+
+	req := httptest.NewRequest("POST", "/test", nil)
+	req.RemoteAddr = "10.0.0.1:9999"
+
+	for range 5 {
+		rr := httptest.NewRecorder()
+		limited(rr, req)
+		assert.Equal(t, http.StatusOK, rr.Code)
+	}
+	assert.Equal(t, 5, callCount)
 }
 
 // ---------------------------------------------------------------------------
@@ -573,6 +605,55 @@ func TestIPRateLimiter_Allow(t *testing.T) {
 
 	// Different key: allowed.
 	assert.True(t, l.allow("key-b"))
+}
+
+// TestIPRateLimiter_StaleEviction verifies that entries whose last activity
+// was longer than ipStaleAfter ago are evicted on the next allow() call.
+func TestIPRateLimiter_StaleEviction(t *testing.T) {
+	l := newIPRateLimiter(rate.Every(time.Hour), 1)
+	// Freeze virtual clock at t0.
+	now := time.Unix(1_700_000_000, 0)
+	l.now = func() time.Time { return now }
+
+	// Seed three IPs at t0.
+	l.allow("a")
+	l.allow("b")
+	l.allow("c")
+	assert.Len(t, l.limiters, 3)
+
+	// Advance past the eviction threshold. Every prior entry should disappear
+	// on the next access.
+	now = now.Add(ipStaleAfter + time.Second)
+	l.allow("d")
+	assert.Len(t, l.limiters, 1, "stale entries should be evicted")
+	_, present := l.limiters["d"]
+	assert.True(t, present)
+
+	// A fresh entry within the window stays put alongside a newer one.
+	now = now.Add(1 * time.Second)
+	l.allow("e")
+	assert.Len(t, l.limiters, 2)
+}
+
+// TestIPRateLimiter_LastSeenRefreshes verifies that repeated activity on a
+// key keeps it alive past the eviction window.
+func TestIPRateLimiter_LastSeenRefreshes(t *testing.T) {
+	l := newIPRateLimiter(rate.Every(time.Hour), 10)
+	now := time.Unix(1_700_000_000, 0)
+	l.now = func() time.Time { return now }
+
+	l.allow("active")
+
+	// Half the window later, touch it again.
+	now = now.Add(ipStaleAfter / 2)
+	l.allow("active")
+
+	// Another half-window — would be stale if lastSeen weren't refreshed.
+	now = now.Add(ipStaleAfter/2 + time.Second)
+	l.allow("trigger-eviction-scan")
+
+	_, present := l.limiters["active"]
+	assert.True(t, present, "active key should not be evicted")
 }
 
 // ---------------------------------------------------------------------------
@@ -910,14 +991,14 @@ func TestDelegatedAuth_DoubleConsume(t *testing.T) {
 	mockQ.AssertExpectations(t)
 }
 
-// TestDelegatedAuth_RateLimit verifies all three delegated endpoints go
-// through the rate limiter when registered on the mux.
+// TestDelegatedAuth_RateLimit verifies the create endpoint is rate-limited
+// through its own limiter.
 func TestDelegatedAuth_RateLimit(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	auth := new(mockAuthService)
 	h := newTestHooks(t, mockQ, auth)
-	// Replace the delegated limiter with a fixture that rejects after one call.
-	h.delegatedLimiter = newIPRateLimiter(rate.Every(time.Hour), 1)
+	// Replace the create limiter with a fixture that rejects after one call.
+	h.delegatedCreateLimiter = newIPRateLimiter(rate.Every(time.Hour), 1)
 
 	mockQ.On("CreateDelegatedAuthSession", mock.Anything, mock.Anything).
 		Return(db.DelegatedAuthSession{}, nil).Maybe()
@@ -938,4 +1019,85 @@ func TestDelegatedAuth_RateLimit(t *testing.T) {
 
 	rr2 := makeReq()
 	assert.Equal(t, http.StatusTooManyRequests, rr2.Code)
+}
+
+// TestDelegatedAuth_LimitersAreIsolated verifies that exhausting the poll
+// limiter does not affect the create limiter (and vice versa). This is the
+// regression the per-endpoint split exists to prevent — a polling plugin
+// should never be able to lock itself out of create/complete.
+func TestDelegatedAuth_LimitersAreIsolated(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	auth := new(mockAuthService)
+	h := newTestHooks(t, mockQ, auth)
+	// Make the poll limiter reject after one call; leave the others permissive.
+	h.delegatedPollLimiter = newIPRateLimiter(rate.Every(time.Hour), 1)
+	h.delegatedCreateLimiter = newIPRateLimiter(rate.Every(time.Hour), 100)
+	h.delegatedCompleteLimiter = newIPRateLimiter(rate.Every(time.Hour), 100)
+
+	code := uuid.New()
+	// First poll: ready. Second poll: limiter rejects before the handler runs,
+	// so the mock should only see exactly one consume call.
+	mockQ.On("ConsumeDelegatedAuthSession", mock.Anything, code).
+		Return(pgtype.Text{String: "tok", Valid: true}, nil).Once()
+	mockQ.On("CreateDelegatedAuthSession", mock.Anything, mock.Anything).
+		Return(db.DelegatedAuthSession{}, nil).Maybe()
+
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	poll := func(ip string) int {
+		req := httptest.NewRequest("POST", "/internal/v1/auth:pollDelegatedAuthSession",
+			strings.NewReader(fmt.Sprintf(`{"code":%q}`, code.String())))
+		req.RemoteAddr = ip + ":5555"
+		rr := httptest.NewRecorder()
+		mux.ServeHTTP(rr, req)
+		return rr.Code
+	}
+	create := func(ip string) int {
+		req := httptest.NewRequest("POST", "/internal/v1/auth:createDelegatedAuthSession",
+			strings.NewReader("{}"))
+		req.RemoteAddr = ip + ":5555"
+		rr := httptest.NewRecorder()
+		mux.ServeHTTP(rr, req)
+		return rr.Code
+	}
+
+	// Exhaust poll.
+	assert.NotEqual(t, http.StatusTooManyRequests, poll("203.0.113.10"))
+	assert.Equal(t, http.StatusTooManyRequests, poll("203.0.113.10"))
+
+	// Create from the same IP should still succeed — different limiter.
+	assert.NotEqual(t, http.StatusTooManyRequests, create("203.0.113.10"))
+	assert.NotEqual(t, http.StatusTooManyRequests, create("203.0.113.10"))
+
+	mockQ.AssertExpectations(t)
+}
+
+// TestDelegatedAuth_PollSustainsCadence verifies the poll limiter can
+// handle the default poll cadence without 429-ing under normal use. This
+// is the regression that motivated the fix — the old single limiter at
+// rate.Every(10s) exhausted its burst before the refill could keep up.
+func TestDelegatedAuth_PollSustainsCadence(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	auth := new(mockAuthService)
+	h := newTestHooks(t, mockQ, auth)
+
+	code := uuid.New()
+	mockQ.On("ConsumeDelegatedAuthSession", mock.Anything, code).
+		Return(pgtype.Text{}, errors.New("no rows")).Maybe()
+	mockQ.On("GetDelegatedAuthSessionStatus", mock.Anything, code).
+		Return("pending", nil).Maybe()
+
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	// Burst 5 at the default config — five rapid polls should all pass.
+	body := fmt.Sprintf(`{"code":%q}`, code.String())
+	for i := 0; i < 5; i++ {
+		req := httptest.NewRequest("POST", "/internal/v1/auth:pollDelegatedAuthSession", strings.NewReader(body))
+		req.RemoteAddr = "198.51.100.50:5555"
+		rr := httptest.NewRecorder()
+		mux.ServeHTTP(rr, req)
+		assert.NotEqual(t, http.StatusTooManyRequests, rr.Code, "poll %d should not be rate limited", i+1)
+	}
 }

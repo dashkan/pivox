@@ -19,7 +19,14 @@ import (
 
 // NewInternalHooks creates a new internal hooks handler with Google Cloud OIDC
 // identity token verification for the accounts:sync endpoint.
-func NewInternalHooks(queries db.Querier, cfg config.SyncAuthConfig, dcfg config.DelegatedAuthConfig, logger *slog.Logger, auth authn.Service) (*InternalHooks, error) {
+func NewInternalHooks(
+	queries db.Querier,
+	cfg config.SyncAuthConfig,
+	dcfg config.DelegatedAuthConfig,
+	rateLimitEnabled bool,
+	logger *slog.Logger,
+	auth authn.Service,
+) (*InternalHooks, error) {
 	validator, err := idtoken.NewValidator(context.Background())
 	if err != nil {
 		return nil, err
@@ -35,8 +42,15 @@ func NewInternalHooks(queries db.Querier, cfg config.SyncAuthConfig, dcfg config
 		logger:           logger,
 		auth:             auth,
 		delegatedAuth:    dcfg,
+		rateLimitEnabled: rateLimitEnabled,
 		exchangeLimiter:  newIPRateLimiter(rate.Every(6*time.Second), 10),
-		delegatedLimiter: newIPRateLimiter(rate.Every(10*time.Second), 3),
+		// Aggressive for create — user-initiated, one per flow, cheap to reject.
+		delegatedCreateLimiter: newIPRateLimiter(rate.Every(10*time.Second), 3),
+		// Parity with exchangeLimiter — complete is authenticated and low volume.
+		delegatedCompleteLimiter: newIPRateLimiter(rate.Every(6*time.Second), 10),
+		// Must sustain the configured poll cadence — refill faster than pollInterval
+		// so a well-behaved client never 429s on normal use.
+		delegatedPollLimiter: newIPRateLimiter(rate.Every(3*time.Second), 5),
 	}
 	h.syncAuth = h.requireGoogleIdentity(validator, allowed, cfg.Audience)
 	return h, nil
