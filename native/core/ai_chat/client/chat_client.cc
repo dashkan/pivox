@@ -1,12 +1,113 @@
 #include "chat_client.h"
 
-#include <grpcpp/grpcpp.h>
 #include <grpcpp/impl/codegen/client_unary_call.h>
 
-#include <thread>
 #include <utility>
 
 namespace pivox::ai_chat {
+
+// ── StreamReactor ───────────────────────────────────────────────────
+
+StreamReactor::StreamReactor(OnEvent on_event, OnError on_error,
+                             OnComplete on_complete)
+    : on_event_(std::move(on_event)),
+      on_error_(std::move(on_error)),
+      on_complete_(std::move(on_complete)) {}
+
+std::shared_ptr<StreamReactor> StreamReactor::Create(
+    OnEvent on_event, OnError on_error, OnComplete on_complete) {
+  auto r = std::shared_ptr<StreamReactor>(
+      new StreamReactor(std::move(on_event), std::move(on_error),
+                        std::move(on_complete)));
+  r->self_ = r;  // Self-ownership until OnDone.
+  return r;
+}
+
+void StreamReactor::Start() {
+  StartCall();
+  StartRead(&read_buf_);
+}
+
+void StreamReactor::QueueWrite(const uint8_t* bytes, size_t size) {
+  grpc::Slice slice(bytes, size);
+  grpc::ByteBuffer buf(&slice, 1);
+
+  std::lock_guard<std::mutex> lock(write_mu_);
+  if (done_) return;
+  write_queue_.push(std::move(buf));
+  MaybeStartWrite();
+}
+
+void StreamReactor::Detach() {
+  std::lock_guard<std::mutex> lock(cb_mu_);
+  on_event_ = nullptr;
+  on_error_ = nullptr;
+  on_complete_ = nullptr;
+}
+
+void StreamReactor::OnReadInitialMetadataDone(bool /*ok*/) {}
+
+void StreamReactor::OnReadDone(bool ok) {
+  if (!ok) return;
+
+  std::vector<grpc::Slice> slices;
+  read_buf_.Dump(&slices);
+
+  std::vector<uint8_t> bytes;
+  for (const auto& s : slices) {
+    bytes.insert(bytes.end(), s.begin(), s.end());
+  }
+
+  {
+    std::lock_guard<std::mutex> lock(cb_mu_);
+    if (on_event_ && !bytes.empty()) {
+      on_event_(bytes.data(), bytes.size());
+    }
+  }
+
+  read_buf_.Clear();
+  StartRead(&read_buf_);
+}
+
+void StreamReactor::OnWriteDone(bool ok) {
+  std::lock_guard<std::mutex> lock(write_mu_);
+  writing_ = false;
+  if (!ok) return;
+  if (!write_queue_.empty()) {
+    MaybeStartWrite();
+  }
+}
+
+void StreamReactor::OnDone(const grpc::Status& status) {
+  {
+    std::lock_guard<std::mutex> lock(write_mu_);
+    done_ = true;
+  }
+
+  {
+    std::lock_guard<std::mutex> lock(cb_mu_);
+    if (status.ok() || status.error_code() == grpc::StatusCode::CANCELLED) {
+      if (on_complete_) on_complete_();
+    } else {
+      if (on_error_) on_error_(status.error_message());
+    }
+    on_event_ = nullptr;
+    on_error_ = nullptr;
+    on_complete_ = nullptr;
+  }
+
+  // Release self-ownership. After this, the reactor may be deleted.
+  self_.reset();
+}
+
+void StreamReactor::MaybeStartWrite() {
+  if (writing_ || write_queue_.empty() || done_) return;
+  writing_ = true;
+  StartWrite(&write_queue_.front());
+  write_queue_.pop();
+}
+
+// ── ChatClient ──────────────────────────────────────────────────────
 
 ChatClient::ChatClient(const std::string& endpoint,
                        const std::string& auth_token)
@@ -14,7 +115,7 @@ ChatClient::ChatClient(const std::string& endpoint,
                                    grpc::InsecureChannelCredentials())),
       auth_token_(auth_token) {}
 
-ChatClient::~ChatClient() { Cancel(); }
+ChatClient::~ChatClient() { Shutdown(); }
 
 void ChatClient::SetAuthToken(const std::string& token) {
   std::lock_guard<std::mutex> lock(mu_);
@@ -23,23 +124,149 @@ void ChatClient::SetAuthToken(const std::string& token) {
 
 void ChatClient::StartStream(OnEvent on_event, OnError on_error,
                              OnComplete on_complete) {
-  Cancel();
-  if (on_error) {
-    on_error("stream not yet connected (no server)");
+  Shutdown();
+
+  {
+    std::lock_guard<std::mutex> lock(mu_);
+    shutdown_ = false;
+    retry_count_ = 0;
+    generation_++;
+    stream_on_event_ = std::move(on_event);
+    stream_on_error_ = std::move(on_error);
+    stream_on_complete_ = std::move(on_complete);
+  }
+
+  OpenStream();
+}
+
+void ChatClient::OpenStream() {
+  OnEvent event_cb;
+  OnComplete complete_cb;
+  {
+    std::lock_guard<std::mutex> lock(mu_);
+    event_cb = stream_on_event_;
+    complete_cb = stream_on_complete_;
+  }
+
+  auto r = StreamReactor::Create(
+      std::move(event_cb),
+      [this](const std::string& msg) { HandleStreamError(msg); },
+      std::move(complete_cb));
+
+  auto* ctx = new grpc::ClientContext();
+  {
+    std::lock_guard<std::mutex> lock(mu_);
+    if (!auth_token_.empty()) {
+      ctx->AddMetadata("authorization", "Bearer " + auth_token_);
+    }
+    active_ctx_ = ctx;
+  }
+
+  grpc::GenericStub stub(channel_);
+  stub.PrepareBidiStreamingCall(
+      ctx,
+      "/pivox.ai.v1.AiChat/Stream",
+      grpc::StubOptions(),
+      r.get());
+
+  r->Start();
+
+  {
+    std::lock_guard<std::mutex> lock(mu_);
+    reactor_ = r;
   }
 }
+
+void ChatClient::HandleStreamError(const std::string& msg) {
+  std::lock_guard<std::mutex> lock(mu_);
+
+  if (shutdown_) return;
+
+  auto state = channel_->GetState(false);
+  bool transient = (state == GRPC_CHANNEL_TRANSIENT_FAILURE ||
+                    state == GRPC_CHANNEL_CONNECTING ||
+                    state == GRPC_CHANNEL_IDLE);
+
+  if (transient && retry_count_ < kMaxRetries) {
+    retry_count_++;
+    int delay_ms = 500 * (1 << (retry_count_ - 1));
+    uint64_t gen = ++generation_;
+
+    if (retry_thread_.joinable()) {
+      mu_.unlock();
+      retry_thread_.join();
+      mu_.lock();
+      if (shutdown_) return;
+    }
+
+    retry_thread_ = std::thread([this, delay_ms, gen]() {
+      std::unique_lock<std::mutex> lk(mu_);
+      cv_.wait_for(lk, std::chrono::milliseconds(delay_ms), [this, gen]() {
+        return shutdown_ || generation_ != gen;
+      });
+
+      if (!shutdown_ && generation_ == gen) {
+        lk.unlock();
+        OpenStream();
+      }
+    });
+  } else {
+    auto cb = stream_on_error_;
+    mu_.unlock();
+    if (cb) cb(msg);
+    mu_.lock();
+  }
+}
+
+void ChatClient::Shutdown() {
+  grpc::ClientContext* ctx_to_cancel = nullptr;
+  std::shared_ptr<StreamReactor> reactor_to_detach;
+
+  {
+    std::lock_guard<std::mutex> lock(mu_);
+    if (shutdown_) return;
+    shutdown_ = true;
+    generation_++;
+    ctx_to_cancel = active_ctx_;
+    active_ctx_ = nullptr;
+    reactor_to_detach = reactor_;
+    reactor_.reset();
+    stream_on_event_ = nullptr;
+    stream_on_error_ = nullptr;
+    stream_on_complete_ = nullptr;
+  }
+
+  // Detach callbacks so the reactor's OnDone won't call into us.
+  if (reactor_to_detach) {
+    reactor_to_detach->Detach();
+  }
+
+  // Cancel the gRPC context to trigger OnDone quickly.
+  if (ctx_to_cancel) {
+    ctx_to_cancel->TryCancel();
+  }
+
+  // Wake and join the retry thread.
+  cv_.notify_all();
+  if (retry_thread_.joinable()) {
+    retry_thread_.join();
+  }
+}
+
+void ChatClient::Cancel() { Shutdown(); }
 
 void ChatClient::Send(const uint8_t* bytes, size_t size) {
-  std::lock_guard<std::mutex> lock(mu_);
-  if (!reactor_) return;
-}
-
-void ChatClient::Cancel() {
-  std::lock_guard<std::mutex> lock(mu_);
-  if (reactor_) {
-    reactor_.reset();
+  std::shared_ptr<StreamReactor> r;
+  {
+    std::lock_guard<std::mutex> lock(mu_);
+    r = reactor_;
+  }
+  if (r) {
+    r->QueueWrite(bytes, size);
   }
 }
+
+// ── UnaryCall ───────────────────────────────────────────────────────
 
 void ChatClient::UnaryCall(const std::string& method,
                            const uint8_t* request_bytes,

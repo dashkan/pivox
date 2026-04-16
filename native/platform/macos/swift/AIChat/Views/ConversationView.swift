@@ -60,36 +60,20 @@ public struct ConversationView: View {
 
     private var promptInput: some View {
         HStack(spacing: 8) {
-            TextField("Message...", text: $inputText, axis: .vertical)
-                .textFieldStyle(.plain)
-                .lineLimit(1...5)
+            TextField("Message...", text: $inputText)
+                .textFieldStyle(.roundedBorder)
                 .focused($inputFocused)
-                .onSubmit {
-                    sendMessage()
-                }
+                .onSubmit { sendMessage() }
 
             if viewModel.state == .streaming {
-                Button {
-                    viewModel.cancel()
-                } label: {
-                    Image(systemName: "stop.circle.fill")
-                        .font(.title2)
-                }
-                .buttonStyle(.plain)
-                .help("Cancel")
+                Button("Stop") { viewModel.cancel() }
             } else {
-                Button {
-                    sendMessage()
-                } label: {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.title2)
-                }
-                .buttonStyle(.plain)
-                .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .help("Send")
+                Button("Send") { sendMessage() }
+                    .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
         .padding(12)
+        .onAppear { inputFocused = true }
     }
 
     private func sendMessage() {

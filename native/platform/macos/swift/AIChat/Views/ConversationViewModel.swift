@@ -36,6 +36,7 @@ public final class ConversationViewModel: ObservableObject {
     }
 
     public func loadHistory() async {
+        guard state == .idle else { return }
         state = .loading
         do {
             let request = Pivox_Ai_V1_ListMessagesRequest.with {
@@ -43,33 +44,21 @@ public final class ConversationViewModel: ObservableObject {
                 $0.pageSize = 100
             }
             let response = try await client.listMessages(request)
+            // Re-check after suspension — send() may have run while we awaited.
+            guard state == .loading else { return }
             messages = response.messages
             state = .idle
         } catch {
+            guard state == .loading else { return }
             state = .error(error.localizedDescription)
         }
     }
 
     public func send(text: String) {
-        let event = Pivox_Ai_V1_ClientEvent.with {
-            $0.message = Pivox_Ai_V1_UserMessage.with {
-                $0.conversation = conversationName
-                $0.parts = [
-                    Pivox_Ai_V1_MessagePart.with {
-                        $0.text = Pivox_Ai_V1_TextPart.with { $0.text = text }
-                    },
-                ]
-            }
-        }
+        // Don't allow sending while already streaming.
+        guard state != .streaming else { return }
 
-        do {
-            try client.send(event)
-        } catch {
-            state = .error(error.localizedDescription)
-            return
-        }
-
-        // Add the user message to the local list immediately.
+        // Add user message to the local list immediately.
         let userMsg = Pivox_Ai_V1_Message.with {
             $0.parts = [
                 Pivox_Ai_V1_MessagePart.with {
@@ -82,27 +71,48 @@ public final class ConversationViewModel: ObservableObject {
 
         state = .streaming
         inFlightText = ""
-        streamTask = Task { await pumpStream() }
+
+        let event = Pivox_Ai_V1_ClientEvent.with {
+            $0.message = Pivox_Ai_V1_UserMessage.with {
+                $0.conversation = conversationName
+                $0.parts = [
+                    Pivox_Ai_V1_MessagePart.with {
+                        $0.text = Pivox_Ai_V1_TextPart.with { $0.text = text }
+                    },
+                ]
+            }
+        }
+
+        streamTask = Task {
+            // Open bidi stream, send message, pump events.
+            let eventStream = client.stream()
+
+            do {
+                try client.send(event)
+            } catch {
+                state = .error(error.localizedDescription)
+                return
+            }
+
+            do {
+                for try await serverEvent in eventStream {
+                    handle(serverEvent)
+                }
+                commitInFlight()
+            } catch is CancellationError {
+                commitInFlight()
+            } catch {
+                state = .error(error.localizedDescription)
+            }
+        }
     }
 
     public func cancel() {
         streamTask?.cancel()
         streamTask = nil
         if state == .streaming {
+            commitInFlight()
             state = .idle
-        }
-    }
-
-    private func pumpStream() async {
-        do {
-            for try await event in client.stream() {
-                handle(event)
-            }
-            commitInFlight()
-        } catch is CancellationError {
-            commitInFlight()
-        } catch {
-            state = .error(error.localizedDescription)
         }
     }
 

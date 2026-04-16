@@ -298,7 +298,7 @@ class AuthService: NSObject {
   // MARK: - Sign Out + Error Mapping
 
   /// Maps Firebase errors to user-facing messages.
-  /// These strings MUST match the constants in core/auth_state.h auth_error namespace
+  /// These strings MUST match the constants in core/auth_constants.h auth_error namespace
   /// so that all platforms show identical error messages.
   private func firebaseErrorMessage(_ error: Error) -> String {
     let nsError = error as NSError

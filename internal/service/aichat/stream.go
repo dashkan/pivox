@@ -21,6 +21,7 @@ const defaultMaxHistoryRows = 500
 func (s *Server) Stream(stream aiv1.AiChat_StreamServer) error {
 	ctx := stream.Context()
 	uid := server.MustAuthenticatedUID(ctx)
+	s.logger.Info("Stream: connection opened", "uid", uid)
 
 	// 1. Wait for first ClientEvent — must be UserMessage.
 	firstMsg, err := stream.Recv()
@@ -77,6 +78,11 @@ func (s *Server) Stream(stream aiv1.AiChat_StreamServer) error {
 		return status.Errorf(codes.Internal, "failed to load history: %v", err)
 	}
 
+	s.logger.Info("Stream: user message received",
+		"conv", conv.Name,
+		"user_text", userText,
+		"seq", nextSeq)
+
 	// 5. Emit TextStart for the assistant response.
 	assistantMsgID := uuid.New().String()[:12]
 	if err := stream.Send(&aiv1.ServerEvent{
@@ -86,6 +92,7 @@ func (s *Server) Stream(stream aiv1.AiChat_StreamServer) error {
 	}
 
 	// 6. Call the model.
+	s.logger.Info("Stream: calling model", "history_len", len(history))
 	modelReq := model.StreamRequest{
 		Messages:     history,
 		Tools:        s.tools.ToDefinitions(),
@@ -93,8 +100,10 @@ func (s *Server) Stream(stream aiv1.AiChat_StreamServer) error {
 	}
 	reader, err := s.model.Stream(ctx, modelReq)
 	if err != nil {
+		s.logger.Error("Stream: model.Stream failed", "error", err)
 		return s.sendStreamError(stream, err)
 	}
+	s.logger.Info("Stream: model stream opened, pumping events")
 	defer reader.Close()
 
 	// 7. Pump model events → ServerEvents.
@@ -111,6 +120,7 @@ func (s *Server) Stream(stream aiv1.AiChat_StreamServer) error {
 		switch evt.Kind {
 		case "text_delta":
 			assistantText.WriteString(evt.Text)
+			s.logger.Debug("Stream: text_delta", "len", len(evt.Text))
 			if err := stream.Send(&aiv1.ServerEvent{
 				Event: &aiv1.ServerEvent_TextDelta{TextDelta: &aiv1.TextDelta{Delta: evt.Text}},
 			}); err != nil {
@@ -126,6 +136,10 @@ func (s *Server) Stream(stream aiv1.AiChat_StreamServer) error {
 			// Handled after the loop.
 		}
 	}
+
+	s.logger.Info("Stream: model done",
+		"assistant_text_len", assistantText.Len(),
+		"conv", conv.Name)
 
 	// 8. Emit TextEnd, persist assistant message, emit Done.
 	if err := stream.Send(&aiv1.ServerEvent{
@@ -151,6 +165,7 @@ func (s *Server) Stream(stream aiv1.AiChat_StreamServer) error {
 	}
 	_ = s.queries.IncrementConversationMessageCount(ctx, conv.ID)
 
+	s.logger.Info("Stream: sending Done", "conv", conv.Name)
 	return stream.Send(&aiv1.ServerEvent{
 		Event: &aiv1.ServerEvent_Done{Done: &aiv1.Done{}},
 	})

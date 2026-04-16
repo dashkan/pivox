@@ -362,7 +362,7 @@ if(GTest_FOUND)
         tests/core/core_tests.cpp
         tests/core/auth_validation_tests.cpp
         tests/core/app_state_tests.cpp
-        tests/core/auth_state_tests.cpp
+        tests/core/auth_constants_tests.cpp
         tests/core/crop_math_tests.cpp
         tests/core/image_editor_engine_tests.cpp
     )

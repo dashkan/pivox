@@ -35,12 +35,14 @@ public final class ChatClient: @unchecked Sendable {
                 ctx.toOpaque(),
                 // on_event
                 { rawCtx, bytes, size in
-                    guard let rawCtx, let bytes else { return }
+                    guard let rawCtx else { return }
                     let streamCtx = Unmanaged<StreamContext>
                         .fromOpaque(rawCtx).takeUnretainedValue()
-                    let data = Data(bytes: bytes, count: size)
-                    if let event = try? Pivox_Ai_V1_ServerEvent(serializedBytes: data) {
-                        streamCtx.continuation.yield(event)
+                    if let bytes, size > 0 {
+                        let data = Data(bytes: bytes, count: size)
+                        if let event = try? Pivox_Ai_V1_ServerEvent(serializedBytes: data) {
+                            streamCtx.continuation.yield(event)
+                        }
                     }
                 },
                 // on_error

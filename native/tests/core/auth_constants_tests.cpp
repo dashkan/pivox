@@ -2,11 +2,10 @@
 
 #include <cstring>
 
-#include "auth_state.h"
+#include "auth_constants.h"
 
 // AuthUser and AuthStatus were moved to platform-specific code
-// (WinAuthService.h). auth_state.h now only contains shared error string
-// constants.
+// (WinAuthService.h). auth_constants.h contains shared error string constants.
 
 TEST(AuthErrorStrings, AllConstantsAreNonEmpty) {
   EXPECT_GT(std::strlen(pivox::auth_error::kInvalidEmail), 0);

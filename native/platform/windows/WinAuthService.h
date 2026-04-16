@@ -1,6 +1,6 @@
 #pragma once
 
-#include "auth_state.h"
+#include "auth_constants.h"
 #include <functional>
 #include <string>
 #include <cstdint>

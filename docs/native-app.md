@@ -512,6 +512,6 @@ The designer app is a design tool, not a production simulator. For full multi-ch
 
 **Shared C++ Core:** AppState (preferences, Keychain/CredentialManager), auth validation, image editor engine (crop math, state machine, undo/redo). 109 gtest tests passing on both platforms.
 
-**Authentication:** Firebase Auth on both platforms. Email/password via native screens. Google Sign-In via ASWebAuthenticationSession (macOS) / OAuth2Manager (Windows). Firebase Auth Emulator integration for UI testing. Shared error constants across platforms (`core/auth_state.h`).
+**Authentication:** Firebase Auth on both platforms. Email/password via native screens. Google Sign-In via ASWebAuthenticationSession (macOS) / OAuth2Manager (Windows). Firebase Auth Emulator integration for UI testing. Shared error constants across platforms (`core/auth_constants.h`).
 
 **Build System:** CMake generating Xcode (macOS) and Visual Studio (Windows). Warnings-as-errors enabled (`-Wall -Wextra -Werror` / `/W4 /WX`). `SWIFT_TREAT_WARNINGS_AS_ERRORS` for Swift. `make test-native-ui` orchestrates Firebase emulator + XCUITest lifecycle.

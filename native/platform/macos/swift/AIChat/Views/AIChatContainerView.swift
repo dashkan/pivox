@@ -1,3 +1,4 @@
+import FirebaseAuth
 import SwiftUI
 
 /// Right-side chat panel. Opens straight to a new conversation.
@@ -25,7 +26,7 @@ struct AIChatContainerView: View {
         }
         .task {
             do {
-                let token = AppStateBridge.shared().loadSecure(forKey: "firebase_id_token") ?? ""
+                let token = try await Auth.auth().currentUser?.getIDToken() ?? ""
                 client = try ChatClient(endpoint: endpoint, authToken: token)
             } catch {
                 initError = error.localizedDescription
@@ -40,6 +41,7 @@ struct AIChatPanel: View {
     let orgName: String
 
     @State private var conversationName: String?
+    @State private var pendingMessage: String?
     @State private var showHistory = false
 
     var body: some View {
@@ -63,6 +65,7 @@ struct AIChatPanel: View {
 
                 Button {
                     conversationName = nil
+                    pendingMessage = nil
                 } label: {
                     Image(systemName: "plus")
                 }
@@ -78,14 +81,19 @@ struct AIChatPanel: View {
                 let listVM = ConversationListViewModel(client: client, orgName: orgName)
                 ConversationListView(viewModel: listVM) { conv in
                     conversationName = conv.name
+                    pendingMessage = nil
                     showHistory = false
                 }
             } else if let name = conversationName {
-                // Wrap in a keyed container so @StateObject resets on name change.
-                ActiveConversationView(client: client, conversationName: name)
-                    .id(name)
+                ActiveConversationView(
+                    client: client,
+                    conversationName: name,
+                    initialMessage: pendingMessage
+                )
+                .id(name)
             } else {
-                NewChatView(client: client, orgName: orgName) { name in
+                NewChatView(client: client, orgName: orgName) { name, message in
+                    pendingMessage = message
                     conversationName = name
                 }
             }
@@ -98,14 +106,24 @@ struct AIChatPanel: View {
 /// Keyed by conversation name via .id() in the parent — new name = new view + new VM.
 struct ActiveConversationView: View {
     @StateObject private var viewModel: ConversationViewModel
+    private let initialMessage: String?
 
-    init(client: ChatClient, conversationName: String) {
+    init(client: ChatClient, conversationName: String, initialMessage: String? = nil) {
         _viewModel = StateObject(wrappedValue: ConversationViewModel(
             client: client, conversationName: conversationName))
+        self.initialMessage = initialMessage
     }
 
     var body: some View {
         ConversationView(viewModel: viewModel)
+            .onAppear {
+                // Send before ConversationView's .task fires loadHistory().
+                // send() is synchronous — sets state to .streaming immediately.
+                // loadHistory() will see state != .idle and skip.
+                if let msg = initialMessage, !msg.isEmpty {
+                    viewModel.send(text: msg)
+                }
+            }
     }
 }
 
@@ -113,10 +131,11 @@ struct ActiveConversationView: View {
 struct NewChatView: View {
     let client: ChatClient
     let orgName: String
-    let onCreated: (String) -> Void
+    let onCreated: (String, String) -> Void
 
     @State private var inputText = ""
     @State private var isCreating = false
+    @FocusState private var inputFocused: Bool
 
     var body: some View {
         VStack {
@@ -135,21 +154,18 @@ struct NewChatView: View {
 
             // Prompt input at the bottom
             HStack(spacing: 8) {
-                TextField("Message...", text: $inputText, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .lineLimit(1...5)
+                TextField("Message...", text: $inputText)
+                    .textFieldStyle(.roundedBorder)
+                    .focused($inputFocused)
                     .onSubmit { sendFirst() }
 
-                Button {
+                Button("Send") {
                     sendFirst()
-                } label: {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.title2)
                 }
-                .buttonStyle(.plain)
                 .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isCreating)
             }
             .padding(12)
+            .onAppear { inputFocused = true }
         }
     }
 
@@ -160,7 +176,6 @@ struct NewChatView: View {
 
         Task {
             do {
-                // Create the conversation on the server.
                 let request = Pivox_Ai_V1_CreateConversationRequest.with {
                     $0.parent = "organizations/\(orgName)"
                     $0.conversation = Pivox_Ai_V1_Conversation.with {
@@ -169,11 +184,7 @@ struct NewChatView: View {
                 }
                 let conv = try await client.createConversation(request)
                 inputText = ""
-                onCreated(conv.name)
-
-                // TODO: Send the first message to the conversation via the bidi stream.
-                // For now, the conversation is created and the user can type in the
-                // ConversationView which handles sending.
+                onCreated(conv.name, text)
             } catch {
                 isCreating = false
             }

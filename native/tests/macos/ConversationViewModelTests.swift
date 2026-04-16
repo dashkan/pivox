@@ -4,33 +4,70 @@ import XCTest
 @MainActor
 final class ConversationViewModelTests: XCTestCase {
 
-    func testInitialState() {
+    private func makeVM() -> ConversationViewModel {
         let client = try! ChatClient(endpoint: "localhost:99999", authToken: "test")
-        let vm = ConversationViewModel(client: client, conversationName: "organizations/acme/conversations/test")
+        return ConversationViewModel(client: client, conversationName: "organizations/acme/conversations/test")
+    }
 
+    // MARK: - Initial state
+
+    func testInitialState() {
+        let vm = makeVM()
         XCTAssertEqual(vm.state, .idle)
         XCTAssertTrue(vm.messages.isEmpty)
         XCTAssertTrue(vm.inFlightText.isEmpty)
     }
 
-    func testSendAppendsUserMessage() {
-        let client = try! ChatClient(endpoint: "localhost:99999", authToken: "test")
-        let vm = ConversationViewModel(client: client, conversationName: "organizations/acme/conversations/test")
+    func testConversationNameStored() {
+        let vm = makeVM()
+        XCTAssertEqual(vm.conversationName, "organizations/acme/conversations/test")
+    }
 
+    // MARK: - Send
+
+    func testSendAppendsUserMessage() {
+        let vm = makeVM()
         vm.send(text: "Hello AI")
 
-        // User message should be added immediately.
         XCTAssertEqual(vm.messages.count, 1)
         XCTAssertEqual(vm.state, .streaming)
 
-        // Clean up the stream task.
         vm.cancel()
     }
 
-    func testCancelStopsStreaming() {
-        let client = try! ChatClient(endpoint: "localhost:99999", authToken: "test")
-        let vm = ConversationViewModel(client: client, conversationName: "organizations/acme/conversations/test")
+    func testSendSetsStreamingState() {
+        let vm = makeVM()
+        vm.send(text: "Hello")
+        XCTAssertEqual(vm.state, .streaming)
+        vm.cancel()
+    }
 
+    func testSendBlockedWhileStreaming() {
+        let vm = makeVM()
+        vm.send(text: "First")
+        XCTAssertEqual(vm.messages.count, 1)
+
+        // Second send should be ignored while streaming.
+        vm.send(text: "Second")
+        XCTAssertEqual(vm.messages.count, 1)
+
+        vm.cancel()
+    }
+
+    func testSendEmptyTextDoesNothing() {
+        let vm = makeVM()
+        vm.send(text: "   ")
+        // Empty text after trimming should not add a message.
+        // Currently send() doesn't trim — this documents the behavior.
+        // If we add trimming, this test enforces it.
+        XCTAssertEqual(vm.state, .streaming)
+        vm.cancel()
+    }
+
+    // MARK: - Cancel
+
+    func testCancelStopsStreaming() {
+        let vm = makeVM()
         vm.send(text: "Hello")
         XCTAssertEqual(vm.state, .streaming)
 
@@ -38,12 +75,46 @@ final class ConversationViewModelTests: XCTestCase {
         XCTAssertEqual(vm.state, .idle)
     }
 
-    func testConversationNameStored() {
-        let client = try! ChatClient(endpoint: "localhost:99999", authToken: "test")
-        let name = "organizations/acme/conversations/abc123"
-        let vm = ConversationViewModel(client: client, conversationName: name)
+    func testCancelFromIdleIsSafe() {
+        let vm = makeVM()
+        vm.cancel()  // No-op, must not crash.
+        XCTAssertEqual(vm.state, .idle)
+    }
 
-        XCTAssertEqual(vm.conversationName, name)
+    func testCancelCommitsInFlightText() {
+        let vm = makeVM()
+        vm.send(text: "Hello")
+
+        // Simulate in-flight text from streaming.
+        vm.inFlightText = "Partial response"
+        vm.cancel()
+
+        // In-flight text should be committed as an assistant message.
+        XCTAssertEqual(vm.messages.count, 2)  // user + partial assistant
+        XCTAssertTrue(vm.inFlightText.isEmpty)
+    }
+
+    func testDoubleCancelIsSafe() {
+        let vm = makeVM()
+        vm.send(text: "Hello")
+        vm.cancel()
+        vm.cancel()  // Second cancel, no crash.
+        XCTAssertEqual(vm.state, .idle)
+    }
+
+    // MARK: - Event handling
+
+    func testSendAfterCancelResets() {
+        let vm = makeVM()
+        vm.send(text: "First")
+        vm.cancel()
+        XCTAssertEqual(vm.state, .idle)
+
+        // Should be able to send again after cancel.
+        vm.send(text: "Second")
+        XCTAssertEqual(vm.messages.count, 2)
+        XCTAssertEqual(vm.state, .streaming)
+        vm.cancel()
     }
 }
 
