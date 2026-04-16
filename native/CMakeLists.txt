@@ -127,6 +127,7 @@ if(APPLE)
         ${SWIFT_DIR}/AIChat/Views/ConversationListView.swift
         ${SWIFT_DIR}/AIChat/Views/ConversationViewModel.swift
         ${SWIFT_DIR}/AIChat/Views/ConversationView.swift
+        ${SWIFT_DIR}/AIChat/Views/AIChatContainerView.swift
         ${ASSET_CATALOG}
         ${FIREBASE_PLIST}
     )

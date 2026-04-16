@@ -6,6 +6,7 @@ enum AppSection: String, CaseIterable, Identifiable {
   case library = "Library"
   case designer = "Designer"
   case engineering = "Engineering"
+  case aiChat = "AI Chat"
   case admin = "Admin"
 
   var id: String { rawValue }
@@ -16,6 +17,7 @@ enum AppSection: String, CaseIterable, Identifiable {
     case .library: return "photo.on.rectangle"
     case .designer: return "paintbrush"
     case .engineering: return "wrench.and.screwdriver"
+    case .aiChat: return "bubble.left.and.text.bubble.right"
     case .admin: return "gearshape"
     }
   }
@@ -109,6 +111,8 @@ struct ContentView: View {
             isEditing: $isImageEditing,
             sidebarVisibility: $sidebarVisibility
           )
+        } else if section == .aiChat {
+          AIChatContainerView()
         } else {
           VStack {
             Text(section.rawValue)
