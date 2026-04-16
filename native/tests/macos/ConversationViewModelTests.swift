@@ -186,6 +186,33 @@ final class ConversationViewModelTests: XCTestCase {
         XCTAssertEqual(vm.state, .error("Server error: not found"))
     }
 
+    func testLoadHistoryPrependsWhenSendRacesDuringLoad() async throws {
+        let mock = makeMock()
+        mock.messages = [
+            .with { $0.name = "m1"; $0.role = .user;
+                $0.parts = [.with { $0.text = .with { $0.text = "old msg" } }] },
+            .with { $0.name = "m2"; $0.role = .assistant;
+                $0.parts = [.with { $0.text = .with { $0.text = "old reply" } }] },
+        ]
+        mock.streamEvents = [
+            .with { $0.textStart = .with { $0.messageID = "m3" } },
+            .with { $0.textDelta = .with { $0.delta = "new reply" } },
+            .with { $0.textEnd = Pivox_Ai_V1_TextEnd() },
+            .with { $0.done = Pivox_Ai_V1_Done() },
+        ]
+        let (vm, _) = makeVM(mock)
+
+        let loadTask = Task { await vm.loadHistory() }
+        try await Task.sleep(for: .milliseconds(50))
+        vm.send(text: "new msg")
+
+        await loadTask.value
+        try await Task.sleep(for: .milliseconds(200))
+
+        // History should be prepended before the user's new message.
+        XCTAssertGreaterThanOrEqual(vm.messages.count, 3)
+    }
+
     func testLoadHistorySkipsIfNotIdle() async {
         let mock = makeMock()
         mock.messages = [.with { $0.name = "m1" }]

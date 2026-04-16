@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -318,4 +319,55 @@ func TestDbMessageToModel(t *testing.T) {
 	assert.Equal(t, "hello", m.Parts[0].Text)
 	assert.Equal(t, "tool_call", m.Parts[1].Type)
 	assert.Equal(t, "search", m.Parts[1].ToolCall.Name)
+}
+
+func TestStream_InvalidConversationReturnsNotFound(t *testing.T) {
+	q := new(mocks.MockQuerier)
+	llm := &mockLanguageModel{}
+	srv := NewServer(nil, q, llm, nil, slog.Default())
+
+	org := testOrg()
+	ctx := authenticatedCtx("user1")
+
+	q.On("GetOrganizationByName", mock.Anything, "acme").Return(org, nil)
+	q.On("GetConversationByName", mock.Anything, mock.Anything).Return(
+		db.Conversation{}, pgx.ErrNoRows)
+
+	stream := &mockStream{
+		ctx: ctx,
+		recvMsgs: []*aiv1.ClientEvent{
+			{Event: &aiv1.ClientEvent_Message{Message: &aiv1.UserMessage{
+				Conversation: "organizations/acme/conversations/nonexistent",
+				Parts:        []*aiv1.MessagePart{{Part: &aiv1.MessagePart_Text{Text: &aiv1.TextPart{Text: "Hi"}}}},
+			}}},
+		},
+	}
+
+	err := srv.Stream(stream)
+	require.Error(t, err)
+	st, _ := status.FromError(err)
+	assert.Equal(t, codes.NotFound, st.Code())
+}
+
+func TestStream_InvalidConversationNameReturnsInvalidArgument(t *testing.T) {
+	q := new(mocks.MockQuerier)
+	llm := &mockLanguageModel{}
+	srv := NewServer(nil, q, llm, nil, slog.Default())
+
+	ctx := authenticatedCtx("user1")
+
+	stream := &mockStream{
+		ctx: ctx,
+		recvMsgs: []*aiv1.ClientEvent{
+			{Event: &aiv1.ClientEvent_Message{Message: &aiv1.UserMessage{
+				Conversation: "garbage/name",
+				Parts:        []*aiv1.MessagePart{{Part: &aiv1.MessagePart_Text{Text: &aiv1.TextPart{Text: "Hi"}}}},
+			}}},
+		},
+	}
+
+	err := srv.Stream(stream)
+	require.Error(t, err)
+	st, _ := status.FromError(err)
+	assert.Equal(t, codes.InvalidArgument, st.Code())
 }

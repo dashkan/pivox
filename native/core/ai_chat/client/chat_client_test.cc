@@ -229,6 +229,48 @@ TEST(ChatClientC, UnaryCallWithNullMethod) {
   pivox_ai_chat_client_destroy(client);
 }
 
+// ── Retry exhaustion ────────────────────────────────────────────────
+
+TEST(ChatClientC, RetryExhaustedFiresError) {
+  auto* client = pivox_ai_chat_client_create("localhost:99999", "test");
+  ASSERT_NE(client, nullptr);
+
+  std::atomic<int> error_count{0};
+
+  pivox_ai_chat_client_start_stream(
+      client, &error_count,
+      [](void*, const uint8_t*, size_t) {},
+      [](void* ctx, const char*) {
+        static_cast<std::atomic<int>*>(ctx)->fetch_add(1);
+      },
+      [](void*) {});
+
+  for (int i = 0; i < 100 && error_count.load() == 0; i++) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  }
+
+  EXPECT_EQ(error_count.load(), 1)
+      << "on_error must fire exactly once after retries exhausted";
+  pivox_ai_chat_client_destroy(client);
+}
+
+// ── Unary call orphan on destroy ────────────────────────────────────
+
+TEST(ChatClientC, DestroyDuringUnaryCall) {
+  auto* client = pivox_ai_chat_client_create("localhost:99999", "test");
+  ASSERT_NE(client, nullptr);
+
+  uint8_t req[] = {0x0a, 0x05, 0x74, 0x65, 0x73, 0x74};
+  pivox_ai_chat_unary_call(
+      client, "/pivox.ai.v1.AiChat/ListConversations",
+      req, sizeof(req), nullptr,
+      [](void*, const uint8_t*, size_t) {},
+      [](void*, const char*) {});
+
+  std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  pivox_ai_chat_client_destroy(client);
+}
+
 // ── Destroy with active stream ──────────────────────────────────────
 
 TEST(ChatClientC, DestroyWithActiveStream) {
