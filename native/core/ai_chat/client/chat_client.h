@@ -31,14 +31,16 @@ class StreamReactor
  public:
   // Use Create() instead of constructing directly — sets up self-ownership.
   static std::shared_ptr<StreamReactor> Create(
+      std::unique_ptr<grpc::ClientContext> ctx,
       OnEvent on_event, OnError on_error, OnComplete on_complete);
 
   void Start();
   void QueueWrite(const uint8_t* bytes, size_t size);
 
-  // Clears all callbacks under lock. Safe to call from any thread.
+  // Clears all callbacks under lock and cancels the gRPC context.
   // After Detach(), OnDone will not call into the ChatClient.
-  void Detach();
+  // on_cancel is invoked exactly once so Swift can release retained refs.
+  void Detach(std::function<void()> on_cancel = nullptr);
 
   void OnReadInitialMetadataDone(bool ok) override;
   void OnReadDone(bool ok) override;
@@ -46,13 +48,17 @@ class StreamReactor
   void OnDone(const grpc::Status& status) override;
 
  private:
-  StreamReactor(OnEvent on_event, OnError on_error, OnComplete on_complete);
+  StreamReactor(std::unique_ptr<grpc::ClientContext> ctx,
+                OnEvent on_event, OnError on_error, OnComplete on_complete);
   void MaybeStartWrite();
 
   std::mutex cb_mu_;
   OnEvent on_event_;
   OnError on_error_;
   OnComplete on_complete_;
+
+  // Owns the gRPC context — deleted when reactor self-destructs in OnDone.
+  std::unique_ptr<grpc::ClientContext> ctx_;
 
   // Self-ownership: released in OnDone after all callbacks are done.
   std::shared_ptr<StreamReactor> self_;
@@ -95,7 +101,6 @@ class ChatClient {
   std::condition_variable cv_;
   std::string auth_token_;
   std::shared_ptr<StreamReactor> reactor_;
-  grpc::ClientContext* active_ctx_ = nullptr;
 
   // Stored callbacks for retry.
   OnEvent stream_on_event_;

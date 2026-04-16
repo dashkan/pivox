@@ -45,9 +45,14 @@ public final class ConversationViewModel: ObservableObject {
             }
             let response = try await client.listMessages(request)
             // Re-check after suspension — send() may have run while we awaited.
-            guard state == .loading else { return }
-            messages = response.messages
-            state = .idle
+            if state == .loading {
+                messages = response.messages
+                state = .idle
+            } else {
+                // User sent a message while we were loading. Prepend history
+                // before the user's message instead of discarding it.
+                messages.insert(contentsOf: response.messages, at: 0)
+            }
         } catch {
             guard state == .loading else { return }
             state = .error(error.localizedDescription)

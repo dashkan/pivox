@@ -8,18 +8,21 @@ namespace pivox::ai_chat {
 
 // ── StreamReactor ───────────────────────────────────────────────────
 
-StreamReactor::StreamReactor(OnEvent on_event, OnError on_error,
+StreamReactor::StreamReactor(std::unique_ptr<grpc::ClientContext> ctx,
+                             OnEvent on_event, OnError on_error,
                              OnComplete on_complete)
     : on_event_(std::move(on_event)),
       on_error_(std::move(on_error)),
-      on_complete_(std::move(on_complete)) {}
+      on_complete_(std::move(on_complete)),
+      ctx_(std::move(ctx)) {}
 
 std::shared_ptr<StreamReactor> StreamReactor::Create(
+    std::unique_ptr<grpc::ClientContext> ctx,
     OnEvent on_event, OnError on_error, OnComplete on_complete) {
   auto r = std::shared_ptr<StreamReactor>(
-      new StreamReactor(std::move(on_event), std::move(on_error),
-                        std::move(on_complete)));
-  r->self_ = r;  // Self-ownership until OnDone.
+      new StreamReactor(std::move(ctx), std::move(on_event),
+                        std::move(on_error), std::move(on_complete)));
+  r->self_ = r;
   return r;
 }
 
@@ -38,11 +41,20 @@ void StreamReactor::QueueWrite(const uint8_t* bytes, size_t size) {
   MaybeStartWrite();
 }
 
-void StreamReactor::Detach() {
+void StreamReactor::Detach(std::function<void()> on_cancel) {
   std::lock_guard<std::mutex> lock(cb_mu_);
   on_event_ = nullptr;
   on_error_ = nullptr;
+  // Fire on_complete (or on_cancel) so the caller can release retained refs.
+  // This is the Swift StreamContext cleanup path on cancellation.
+  if (on_cancel) {
+    on_cancel();
+  } else if (on_complete_) {
+    on_complete_();
+  }
   on_complete_ = nullptr;
+  // Cancel the gRPC context to trigger OnDone quickly.
+  if (ctx_) ctx_->TryCancel();
 }
 
 void StreamReactor::OnReadInitialMetadataDone(bool /*ok*/) {}
@@ -148,23 +160,24 @@ void ChatClient::OpenStream() {
     complete_cb = stream_on_complete_;
   }
 
-  auto r = StreamReactor::Create(
-      std::move(event_cb),
-      [this](const std::string& msg) { HandleStreamError(msg); },
-      std::move(complete_cb));
-
-  auto* ctx = new grpc::ClientContext();
+  auto ctx = std::make_unique<grpc::ClientContext>();
   {
     std::lock_guard<std::mutex> lock(mu_);
     if (!auth_token_.empty()) {
       ctx->AddMetadata("authorization", "Bearer " + auth_token_);
     }
-    active_ctx_ = ctx;
   }
+
+  auto* raw_ctx = ctx.get();
+  auto r = StreamReactor::Create(
+      std::move(ctx),
+      std::move(event_cb),
+      [this](const std::string& msg) { HandleStreamError(msg); },
+      std::move(complete_cb));
 
   grpc::GenericStub stub(channel_);
   stub.PrepareBidiStreamingCall(
-      ctx,
+      raw_ctx,
       "/pivox.ai.v1.AiChat/Stream",
       grpc::StubOptions(),
       r.get());
@@ -219,7 +232,6 @@ void ChatClient::HandleStreamError(const std::string& msg) {
 }
 
 void ChatClient::Shutdown() {
-  grpc::ClientContext* ctx_to_cancel = nullptr;
   std::shared_ptr<StreamReactor> reactor_to_detach;
 
   {
@@ -227,8 +239,6 @@ void ChatClient::Shutdown() {
     if (shutdown_) return;
     shutdown_ = true;
     generation_++;
-    ctx_to_cancel = active_ctx_;
-    active_ctx_ = nullptr;
     reactor_to_detach = reactor_;
     reactor_.reset();
     stream_on_event_ = nullptr;
@@ -236,14 +246,10 @@ void ChatClient::Shutdown() {
     stream_on_complete_ = nullptr;
   }
 
-  // Detach callbacks so the reactor's OnDone won't call into us.
+  // Detach callbacks + cancel context + fire on_cancel for Swift cleanup.
+  // The reactor owns the ClientContext — it's deleted in OnDone via self_.
   if (reactor_to_detach) {
     reactor_to_detach->Detach();
-  }
-
-  // Cancel the gRPC context to trigger OnDone quickly.
-  if (ctx_to_cancel) {
-    ctx_to_cancel->TryCancel();
   }
 
   // Wake and join the retry thread.

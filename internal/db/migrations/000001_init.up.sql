@@ -1018,7 +1018,7 @@ CREATE TABLE messages (
     UNIQUE(conversation_id, name),
     UNIQUE(conversation_id, sequence)
 );
-CREATE INDEX idx_messages_conversation ON messages (conversation_id, sequence);
+-- idx_messages_conversation not needed: UNIQUE(conversation_id, sequence) already creates a B-tree index.
 
 -- ============================================================================
 -- AI chat — artifact_versions (created before artifacts so artifacts can FK to latest_version_id)

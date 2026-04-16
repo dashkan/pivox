@@ -140,7 +140,17 @@ if(APPLE)
     # SwiftProtobuf — compiled from vendored SPM checkout.
     # PivoxModels' `swift build` fetches swift-protobuf into .build/checkouts/.
     # We compile it as a CMake Swift static library so the Xcode project links it.
-    set(SWIFT_PROTOBUF_DIR "platform/macos/swift-packages/PivoxModels/.build/checkouts/swift-protobuf/Sources/SwiftProtobuf")
+    # Resolve SPM dependencies first so the checkout exists on fresh clones.
+    set(PIVOX_MODELS_PKG "${CMAKE_SOURCE_DIR}/platform/macos/swift-packages/PivoxModels")
+    execute_process(
+        COMMAND swift package resolve
+        WORKING_DIRECTORY "${PIVOX_MODELS_PKG}"
+        RESULT_VARIABLE SPM_RESOLVE_RESULT
+    )
+    if(NOT SPM_RESOLVE_RESULT EQUAL 0)
+        message(FATAL_ERROR "swift package resolve failed in PivoxModels")
+    endif()
+    set(SWIFT_PROTOBUF_DIR "${PIVOX_MODELS_PKG}/.build/checkouts/swift-protobuf/Sources/SwiftProtobuf")
     file(GLOB SWIFT_PROTOBUF_SOURCES "${SWIFT_PROTOBUF_DIR}/*.swift")
     add_library(SwiftProtobuf STATIC ${SWIFT_PROTOBUF_SOURCES})
     target_compile_options(SwiftProtobuf PRIVATE
