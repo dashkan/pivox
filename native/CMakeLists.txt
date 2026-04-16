@@ -120,6 +120,9 @@ if(APPLE)
         ${SWIFT_DIR}/ImageEditor/ImageEditCanvas.swift
         ${SWIFT_DIR}/Components/GlassCard.swift
         ${SWIFT_DIR}/Components/GoogleIcon.swift
+        ${SWIFT_DIR}/AIChat/Client/ChatError.swift
+        ${SWIFT_DIR}/AIChat/Client/ChatClient.swift
+        ${SWIFT_DIR}/AIChat/Client/ChatClient+Resources.swift
         ${ASSET_CATALOG}
         ${FIREBASE_PLIST}
     )
@@ -142,7 +145,7 @@ if(APPLE)
         XCODE_ATTRIBUTE_ENABLE_TESTABILITY "NO"
     )
 
-    target_link_libraries(${APP_TARGET} PRIVATE pivox_bridge SwiftProtobuf
+    target_link_libraries(${APP_TARGET} PRIVATE pivox_bridge pivox_ai_chat_client SwiftProtobuf
         # Firebase Core (from Analytics bundle)
         "${FB_ANALYTICS}/FirebaseCore.xcframework"
         "${FB_ANALYTICS}/FirebaseCoreInternal.xcframework"
@@ -166,6 +169,7 @@ if(APPLE)
     )
     target_include_directories(${APP_TARGET} PRIVATE
         "${CMAKE_SOURCE_DIR}/platform/macos/objcpp"
+        "${CMAKE_SOURCE_DIR}/core/ai_chat/client"
     )
 
     set_target_properties(${APP_TARGET} PROPERTIES
@@ -212,13 +216,17 @@ if(APPLE)
         tests/macos/AuthServiceTests.swift
         tests/macos/DelegatedAuthTests.swift
         tests/macos/ImageEditorBridgeTests.swift
+        tests/macos/ChatClientTests.swift
     )
 
     target_compile_options(PivoxTests PRIVATE
         "SHELL:-import-objc-header ${CMAKE_SOURCE_DIR}/platform/macos/Bridging-Header.h"
     )
-    target_include_directories(PivoxTests PRIVATE "${CMAKE_SOURCE_DIR}/platform/macos/objcpp")
-    target_link_libraries(PivoxTests PRIVATE pivox_bridge)
+    target_include_directories(PivoxTests PRIVATE
+        "${CMAKE_SOURCE_DIR}/platform/macos/objcpp"
+        "${CMAKE_SOURCE_DIR}/core/ai_chat/client"
+    )
+    target_link_libraries(PivoxTests PRIVATE pivox_bridge pivox_ai_chat_client SwiftProtobuf)
 
     xctest_add_test(PivoxUnitTests PivoxTests)
 
