@@ -28,13 +28,17 @@ void pivox_ai_chat_client_set_auth_token(PivoxAiChatClient* client,
   client->impl->SetAuthToken(auth_token ? auth_token : "");
 }
 
-void pivox_ai_chat_client_start_stream(PivoxAiChatClient* client, void* ctx,
+void pivox_ai_chat_client_start_stream(PivoxAiChatClient* client,
+                                        const uint8_t* request_bytes,
+                                        size_t request_size,
+                                        void* ctx,
                                         pivox_ai_chat_on_event on_event,
                                         pivox_ai_chat_on_error on_error,
                                         pivox_ai_chat_on_complete on_complete) {
   if (!client) return;
 
   client->impl->StartStream(
+      request_bytes, request_size,
       [ctx, on_event](const uint8_t* bytes, size_t size) {
         if (on_event) on_event(ctx, bytes, size);
       },
@@ -44,12 +48,6 @@ void pivox_ai_chat_client_start_stream(PivoxAiChatClient* client, void* ctx,
       [ctx, on_complete]() {
         if (on_complete) on_complete(ctx);
       });
-}
-
-void pivox_ai_chat_client_send(PivoxAiChatClient* client,
-                                const uint8_t* bytes, size_t size) {
-  if (!client) return;
-  client->impl->Send(bytes, size);
 }
 
 void pivox_ai_chat_client_cancel(PivoxAiChatClient* client) {

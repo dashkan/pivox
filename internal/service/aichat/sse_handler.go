@@ -68,26 +68,17 @@ func (h *SSEHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Open gRPC bidi stream, forwarding the auth token.
+	// Open server-streaming call, forwarding the auth token.
 	authHeader := r.Header.Get("Authorization")
 	ctx := metadata.AppendToOutgoingContext(r.Context(), "authorization", authHeader)
-	stream, err := h.grpcClient.Stream(ctx, grpc.WaitForReady(true))
-	if err != nil {
-		sseError(w, flusher, err)
-		return
-	}
-
-	// Send user message as the first ClientEvent.
-	if err := stream.Send(&aiv1.ClientEvent{
+	clientEvent := &aiv1.ClientEvent{
 		Event: &aiv1.ClientEvent_Message{Message: &aiv1.UserMessage{
 			Conversation: req.ConversationName,
 			Parts:        parts,
 		}},
-	}); err != nil {
-		sseError(w, flusher, err)
-		return
 	}
-	if err := stream.CloseSend(); err != nil {
+	stream, err := h.grpcClient.Stream(ctx, clientEvent, grpc.WaitForReady(true))
+	if err != nil {
 		sseError(w, flusher, err)
 		return
 	}

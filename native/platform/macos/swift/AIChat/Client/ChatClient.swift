@@ -2,8 +2,6 @@ import Foundation
 import SwiftProtobuf
 
 /// Swift facade wrapping the shared C++ AiChatClient via the C FFI.
-/// All methods produce typed `Pivox_Ai_V1_*` values — bytes are an
-/// implementation detail of the bridge layer.
 public final class ChatClient: @unchecked Sendable {
     private let handle: OpaquePointer
 
@@ -18,50 +16,56 @@ public final class ChatClient: @unchecked Sendable {
         pivox_ai_chat_client_destroy(handle)
     }
 
-    /// Updates the bearer token (e.g. after Firebase refresh).
     public func setAuthToken(_ token: String) {
         pivox_ai_chat_client_set_auth_token(handle, token)
     }
 
-    /// Opens a bidi stream and returns an async sequence of server events.
-    public func stream() -> AsyncThrowingStream<Pivox_Ai_V1_ServerEvent, Error> {
-        AsyncThrowingStream { continuation in
+    /// Opens a server-streaming call with the given client event.
+    /// Returns an async sequence of server events.
+    public func stream(_ event: Pivox_Ai_V1_ClientEvent) throws -> AsyncThrowingStream<Pivox_Ai_V1_ServerEvent, Error> {
+        let requestData = try event.serializedData()
+
+        return AsyncThrowingStream { continuation in
             let ctx = Unmanaged.passRetained(
                 StreamContext(continuation: continuation)
             )
 
-            pivox_ai_chat_client_start_stream(
-                handle,
-                ctx.toOpaque(),
-                // on_event
-                { rawCtx, bytes, size in
-                    guard let rawCtx else { return }
-                    let streamCtx = Unmanaged<StreamContext>
-                        .fromOpaque(rawCtx).takeUnretainedValue()
-                    if let bytes, size > 0 {
-                        let data = Data(bytes: bytes, count: size)
-                        if let event = try? Pivox_Ai_V1_ServerEvent(serializedBytes: data) {
-                            streamCtx.continuation.yield(event)
+            requestData.withUnsafeBytes { buf in
+                pivox_ai_chat_client_start_stream(
+                    handle,
+                    buf.bindMemory(to: UInt8.self).baseAddress,
+                    buf.count,
+                    ctx.toOpaque(),
+                    // on_event
+                    { rawCtx, bytes, size in
+                        guard let rawCtx else { return }
+                        let streamCtx = Unmanaged<StreamContext>
+                            .fromOpaque(rawCtx).takeUnretainedValue()
+                        if let bytes, size > 0 {
+                            let data = Data(bytes: bytes, count: size)
+                            if let event = try? Pivox_Ai_V1_ServerEvent(serializedBytes: data) {
+                                streamCtx.continuation.yield(event)
+                            }
                         }
+                    },
+                    // on_error
+                    { rawCtx, msg in
+                        guard let rawCtx else { return }
+                        let streamCtx = Unmanaged<StreamContext>
+                            .fromOpaque(rawCtx).takeRetainedValue()
+                        let message = msg.map { String(cString: $0) } ?? "unknown error"
+                        streamCtx.continuation.finish(
+                            throwing: ChatError.streamFailed(message))
+                    },
+                    // on_complete
+                    { rawCtx in
+                        guard let rawCtx else { return }
+                        let streamCtx = Unmanaged<StreamContext>
+                            .fromOpaque(rawCtx).takeRetainedValue()
+                        streamCtx.continuation.finish()
                     }
-                },
-                // on_error
-                { rawCtx, msg in
-                    guard let rawCtx else { return }
-                    let streamCtx = Unmanaged<StreamContext>
-                        .fromOpaque(rawCtx).takeRetainedValue()
-                    let message = msg.map { String(cString: $0) } ?? "unknown error"
-                    streamCtx.continuation.finish(
-                        throwing: ChatError.streamFailed(message))
-                },
-                // on_complete
-                { rawCtx in
-                    guard let rawCtx else { return }
-                    let streamCtx = Unmanaged<StreamContext>
-                        .fromOpaque(rawCtx).takeRetainedValue()
-                    streamCtx.continuation.finish()
-                }
-            )
+                )
+            }
 
             let handleBits = Int(bitPattern: handle)
             continuation.onTermination = { _ in
@@ -71,20 +75,7 @@ public final class ChatClient: @unchecked Sendable {
         }
     }
 
-    /// Sends a client event to the server.
-    public func send(_ event: Pivox_Ai_V1_ClientEvent) throws {
-        let data = try event.serializedData()
-        data.withUnsafeBytes { buf in
-            pivox_ai_chat_client_send(
-                handle,
-                buf.bindMemory(to: UInt8.self).baseAddress,
-                buf.count
-            )
-        }
-    }
-
     /// Executes a unary RPC and returns the raw response bytes.
-    /// Used by typed wrapper methods for each resource RPC.
     func unaryCall(method: String, request: any SwiftProtobuf.Message) async throws -> Data {
         let requestData = try request.serializedData()
         return try await withCheckedThrowingContinuation { cont in
@@ -99,7 +90,6 @@ public final class ChatClient: @unchecked Sendable {
                     buf.bindMemory(to: UInt8.self).baseAddress,
                     buf.count,
                     contBox.toOpaque(),
-                    // on_response
                     { rawCtx, bytes, size in
                         guard let rawCtx else { return }
                         let box = Unmanaged<ContinuationBox>
@@ -111,7 +101,6 @@ public final class ChatClient: @unchecked Sendable {
                             box.continuation.resume(returning: Data())
                         }
                     },
-                    // on_error
                     { rawCtx, msg in
                         guard let rawCtx else { return }
                         let box = Unmanaged<ContinuationBox>
@@ -125,8 +114,6 @@ public final class ChatClient: @unchecked Sendable {
         }
     }
 }
-
-// MARK: - Internal helpers
 
 private final class StreamContext {
     let continuation: AsyncThrowingStream<Pivox_Ai_V1_ServerEvent, Error>.Continuation

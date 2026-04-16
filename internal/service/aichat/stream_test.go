@@ -53,34 +53,23 @@ func (r *sliceReader) Next(_ context.Context) (model.ModelEvent, error) {
 
 func (r *sliceReader) Close() error { return nil }
 
-// mockStream implements aiv1.AiChat_StreamServer for tests.
-type mockStream struct {
-	ctx      context.Context
-	recvMsgs []*aiv1.ClientEvent
-	recvPos  int
-	sent     []*aiv1.ServerEvent
+// mockServerStream implements grpc.ServerStreamingServer[aiv1.ServerEvent] for tests.
+type mockServerStream struct {
+	ctx  context.Context
+	sent []*aiv1.ServerEvent
 }
 
-func (s *mockStream) Send(ev *aiv1.ServerEvent) error {
+func (s *mockServerStream) Send(ev *aiv1.ServerEvent) error {
 	s.sent = append(s.sent, ev)
 	return nil
 }
 
-func (s *mockStream) Recv() (*aiv1.ClientEvent, error) {
-	if s.recvPos >= len(s.recvMsgs) {
-		return nil, io.EOF
-	}
-	msg := s.recvMsgs[s.recvPos]
-	s.recvPos++
-	return msg, nil
-}
-
-func (s *mockStream) Context() context.Context     { return s.ctx }
-func (s *mockStream) SetHeader(metadata.MD) error  { return nil }
-func (s *mockStream) SendHeader(metadata.MD) error { return nil }
-func (s *mockStream) SetTrailer(metadata.MD)       {}
-func (s *mockStream) SendMsg(any) error            { return nil }
-func (s *mockStream) RecvMsg(any) error            { return nil }
+func (s *mockServerStream) Context() context.Context     { return s.ctx }
+func (s *mockServerStream) SetHeader(metadata.MD) error  { return nil }
+func (s *mockServerStream) SendHeader(metadata.MD) error { return nil }
+func (s *mockServerStream) SetTrailer(metadata.MD)       {}
+func (s *mockServerStream) SendMsg(any) error            { return nil }
+func (s *mockServerStream) RecvMsg(any) error            { return nil }
 
 func authenticatedCtx(uid string) context.Context {
 	return server.WithAuthenticatedUID(context.Background(), uid)
@@ -130,19 +119,17 @@ func TestStream_HappyPath(t *testing.T) {
 	q.On("IncrementConversationMessageCount", mock.Anything, conv.ID).Return(nil)
 	q.On("ListMessagesNewestFirst", mock.Anything, mock.Anything).Return([]db.Message{}, nil)
 
-	stream := &mockStream{
-		ctx: ctx,
-		recvMsgs: []*aiv1.ClientEvent{
-			{Event: &aiv1.ClientEvent_Message{Message: &aiv1.UserMessage{
-				Conversation: "organizations/acme/conversations/conv1",
-				Parts: []*aiv1.MessagePart{
-					{Part: &aiv1.MessagePart_Text{Text: &aiv1.TextPart{Text: "Hi"}}},
-				},
-			}}},
-		},
+	clientEvent := &aiv1.ClientEvent{
+		Event: &aiv1.ClientEvent_Message{Message: &aiv1.UserMessage{
+			Conversation: "organizations/acme/conversations/conv1",
+			Parts: []*aiv1.MessagePart{
+				{Part: &aiv1.MessagePart_Text{Text: &aiv1.TextPart{Text: "Hi"}}},
+			},
+		}},
 	}
+	stream := &mockServerStream{ctx: ctx}
 
-	err := srv.Stream(stream)
+	err := srv.Stream(clientEvent, stream)
 	require.NoError(t, err)
 
 	// Verify event sequence: TextStart, TextDelta("Hello "), TextDelta("world!"), TextEnd, Done
@@ -163,24 +150,104 @@ func TestStream_HappyPath(t *testing.T) {
 	assert.Equal(t, 2, calls)
 }
 
-func TestStream_FirstEventNotUserMessage(t *testing.T) {
+func TestStream_EmptyEventReturnsInvalidArgument(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
 	srv := NewServer(nil, q, llm, nil, slog.Default())
 
 	ctx := authenticatedCtx("user1")
-	stream := &mockStream{
-		ctx: ctx,
-		recvMsgs: []*aiv1.ClientEvent{
-			{Event: &aiv1.ClientEvent_ToolOutput{ToolOutput: &aiv1.ToolOutput{}}},
-		},
-	}
+	stream := &mockServerStream{ctx: ctx}
 
-	err := srv.Stream(stream)
+	err := srv.Stream(&aiv1.ClientEvent{}, stream)
 	require.Error(t, err)
 	st, ok := status.FromError(err)
 	require.True(t, ok)
 	assert.Equal(t, codes.InvalidArgument, st.Code())
+}
+
+func TestStream_ToolOutputMissingCallIDReturnsInvalidArgument(t *testing.T) {
+	q := new(mocks.MockQuerier)
+	llm := &mockLanguageModel{}
+	srv := NewServer(nil, q, llm, nil, slog.Default())
+
+	ctx := authenticatedCtx("user1")
+	stream := &mockServerStream{ctx: ctx}
+
+	err := srv.Stream(&aiv1.ClientEvent{
+		Event: &aiv1.ClientEvent_ToolOutput{ToolOutput: &aiv1.ToolOutput{
+			Conversation: "organizations/acme/conversations/conv1",
+		}},
+	}, stream)
+	require.Error(t, err)
+	st, _ := status.FromError(err)
+	assert.Equal(t, codes.InvalidArgument, st.Code())
+}
+
+func TestStream_ToolOutputResumesGeneration(t *testing.T) {
+	q := new(mocks.MockQuerier)
+	llm := &mockLanguageModel{
+		events: []model.ModelEvent{
+			{Kind: "text_delta", Text: "done"},
+			{Kind: "finish"},
+		},
+	}
+	srv := NewServer(nil, q, llm, tools.NewRegistry(), slog.Default())
+
+	org := testOrg()
+	uid := "user1"
+	conv := testConversation(org.ID, uid)
+	ctx := authenticatedCtx(uid)
+
+	q.On("GetOrganizationByName", mock.Anything, "acme").Return(org, nil)
+	q.On("GetConversationByName", mock.Anything, db.GetConversationByNameParams{
+		OrgID: org.ID, Name: "conv1",
+	}).Return(conv, nil)
+	q.On("GetNextSequenceForConversation", mock.Anything, conv.ID).Return(int32(3), nil)
+	q.On("CreateMessage", mock.Anything, mock.Anything).Return(db.Message{}, nil)
+	q.On("IncrementConversationMessageCount", mock.Anything, conv.ID).Return(nil)
+	q.On("ListMessagesNewestFirst", mock.Anything, mock.Anything).Return([]db.Message{}, nil)
+
+	clientEvent := &aiv1.ClientEvent{
+		Event: &aiv1.ClientEvent_ToolOutput{ToolOutput: &aiv1.ToolOutput{
+			Conversation: "organizations/acme/conversations/conv1",
+			ToolCallId:   "call-123",
+			ResultJson:   `{"ok":true}`,
+		}},
+	}
+	stream := &mockServerStream{ctx: ctx}
+
+	err := srv.Stream(clientEvent, stream)
+	require.NoError(t, err)
+
+	// Verify the inbound message was persisted with role="tool" and
+	// a ToolResultPart carrying the tool_call_id.
+	var createCall *mock.Call
+	for i := range q.Calls {
+		if q.Calls[i].Method == "CreateMessage" {
+			createCall = &q.Calls[i]
+			break
+		}
+	}
+	require.NotNil(t, createCall, "CreateMessage must be called for the tool output")
+	params := createCall.Arguments.Get(1).(db.CreateMessageParams)
+	assert.Equal(t, "tool", params.Role)
+
+	parts, perr := unmarshalParts(params.Parts)
+	require.NoError(t, perr)
+	require.Len(t, parts, 1)
+	tr := parts[0].GetToolResult()
+	require.NotNil(t, tr)
+	assert.Equal(t, "call-123", tr.GetToolCallId())
+	assert.Equal(t, `{"ok":true}`, tr.GetResultJson())
+
+	// Verify the model was invoked and a Done event was emitted.
+	var gotDone bool
+	for _, ev := range stream.sent {
+		if ev.GetDone() != nil {
+			gotDone = true
+		}
+	}
+	assert.True(t, gotDone, "stream must emit Done after model finish")
 }
 
 func TestStream_WrongOwner(t *testing.T) {
@@ -195,17 +262,15 @@ func TestStream_WrongOwner(t *testing.T) {
 	q.On("GetOrganizationByName", mock.Anything, "acme").Return(org, nil)
 	q.On("GetConversationByName", mock.Anything, mock.Anything).Return(conv, nil)
 
-	stream := &mockStream{
-		ctx: ctx,
-		recvMsgs: []*aiv1.ClientEvent{
-			{Event: &aiv1.ClientEvent_Message{Message: &aiv1.UserMessage{
-				Conversation: "organizations/acme/conversations/conv1",
-				Parts:        []*aiv1.MessagePart{{Part: &aiv1.MessagePart_Text{Text: &aiv1.TextPart{Text: "Hi"}}}},
-			}}},
-		},
+	clientEvent := &aiv1.ClientEvent{
+		Event: &aiv1.ClientEvent_Message{Message: &aiv1.UserMessage{
+			Conversation: "organizations/acme/conversations/conv1",
+			Parts:        []*aiv1.MessagePart{{Part: &aiv1.MessagePart_Text{Text: &aiv1.TextPart{Text: "Hi"}}}},
+		}},
 	}
+	stream := &mockServerStream{ctx: ctx}
 
-	err := srv.Stream(stream)
+	err := srv.Stream(clientEvent, stream)
 	require.Error(t, err)
 	st, _ := status.FromError(err)
 	assert.Equal(t, codes.PermissionDenied, st.Code())
@@ -228,17 +293,15 @@ func TestStream_ModelError(t *testing.T) {
 	q.On("IncrementConversationMessageCount", mock.Anything, conv.ID).Return(nil)
 	q.On("ListMessagesNewestFirst", mock.Anything, mock.Anything).Return([]db.Message{}, nil)
 
-	stream := &mockStream{
-		ctx: ctx,
-		recvMsgs: []*aiv1.ClientEvent{
-			{Event: &aiv1.ClientEvent_Message{Message: &aiv1.UserMessage{
-				Conversation: "organizations/acme/conversations/conv1",
-				Parts:        []*aiv1.MessagePart{{Part: &aiv1.MessagePart_Text{Text: &aiv1.TextPart{Text: "Hi"}}}},
-			}}},
-		},
+	clientEvent := &aiv1.ClientEvent{
+		Event: &aiv1.ClientEvent_Message{Message: &aiv1.UserMessage{
+			Conversation: "organizations/acme/conversations/conv1",
+			Parts:        []*aiv1.MessagePart{{Part: &aiv1.MessagePart_Text{Text: &aiv1.TextPart{Text: "Hi"}}}},
+		}},
 	}
+	stream := &mockServerStream{ctx: ctx}
 
-	err := srv.Stream(stream)
+	err := srv.Stream(clientEvent, stream)
 	require.Error(t, err)
 	// Verify a StreamError event was sent before the error return.
 	var gotStreamError bool
@@ -333,17 +396,15 @@ func TestStream_InvalidConversationReturnsNotFound(t *testing.T) {
 	q.On("GetConversationByName", mock.Anything, mock.Anything).Return(
 		db.Conversation{}, pgx.ErrNoRows)
 
-	stream := &mockStream{
-		ctx: ctx,
-		recvMsgs: []*aiv1.ClientEvent{
-			{Event: &aiv1.ClientEvent_Message{Message: &aiv1.UserMessage{
-				Conversation: "organizations/acme/conversations/nonexistent",
-				Parts:        []*aiv1.MessagePart{{Part: &aiv1.MessagePart_Text{Text: &aiv1.TextPart{Text: "Hi"}}}},
-			}}},
-		},
+	clientEvent := &aiv1.ClientEvent{
+		Event: &aiv1.ClientEvent_Message{Message: &aiv1.UserMessage{
+			Conversation: "organizations/acme/conversations/nonexistent",
+			Parts:        []*aiv1.MessagePart{{Part: &aiv1.MessagePart_Text{Text: &aiv1.TextPart{Text: "Hi"}}}},
+		}},
 	}
+	stream := &mockServerStream{ctx: ctx}
 
-	err := srv.Stream(stream)
+	err := srv.Stream(clientEvent, stream)
 	require.Error(t, err)
 	st, _ := status.FromError(err)
 	assert.Equal(t, codes.NotFound, st.Code())
@@ -356,17 +417,15 @@ func TestStream_InvalidConversationNameReturnsInvalidArgument(t *testing.T) {
 
 	ctx := authenticatedCtx("user1")
 
-	stream := &mockStream{
-		ctx: ctx,
-		recvMsgs: []*aiv1.ClientEvent{
-			{Event: &aiv1.ClientEvent_Message{Message: &aiv1.UserMessage{
-				Conversation: "garbage/name",
-				Parts:        []*aiv1.MessagePart{{Part: &aiv1.MessagePart_Text{Text: &aiv1.TextPart{Text: "Hi"}}}},
-			}}},
-		},
+	clientEvent := &aiv1.ClientEvent{
+		Event: &aiv1.ClientEvent_Message{Message: &aiv1.UserMessage{
+			Conversation: "garbage/name",
+			Parts:        []*aiv1.MessagePart{{Part: &aiv1.MessagePart_Text{Text: &aiv1.TextPart{Text: "Hi"}}}},
+		}},
 	}
+	stream := &mockServerStream{ctx: ctx}
 
-	err := srv.Stream(stream)
+	err := srv.Stream(clientEvent, stream)
 	require.Error(t, err)
 	st, _ := status.FromError(err)
 	assert.Equal(t, codes.InvalidArgument, st.Code())

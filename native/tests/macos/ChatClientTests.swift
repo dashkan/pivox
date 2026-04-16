@@ -24,7 +24,9 @@ final class ChatClientTests: XCTestCase {
 
     // MARK: - Send
 
-    func testSendWithoutStream() throws {
+    // MARK: - Stream
+
+    func testStreamReturnsAsyncSequence() throws {
         let client = try ChatClient(endpoint: "localhost:99999", authToken: "test")
         let event = Pivox_Ai_V1_ClientEvent.with {
             $0.message = Pivox_Ai_V1_UserMessage.with {
@@ -36,14 +38,7 @@ final class ChatClientTests: XCTestCase {
                 ]
             }
         }
-        XCTAssertNoThrow(try client.send(event))
-    }
-
-    // MARK: - Stream
-
-    func testStreamReturnsAsyncSequence() throws {
-        let client = try ChatClient(endpoint: "localhost:99999", authToken: "test")
-        let stream = client.stream()
+        let stream = try client.stream(event)
         XCTAssertNotNil(stream)
     }
 

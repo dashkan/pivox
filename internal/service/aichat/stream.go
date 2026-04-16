@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -18,23 +19,50 @@ import (
 const defaultModelContextBudget = 22500
 const defaultMaxHistoryRows = 500
 
-func (s *Server) Stream(stream aiv1.AiChat_StreamServer) error {
+func (s *Server) Stream(req *aiv1.ClientEvent, stream grpc.ServerStreamingServer[aiv1.ServerEvent]) error {
 	ctx := stream.Context()
 	uid := server.MustAuthenticatedUID(ctx)
 	s.logger.Info("Stream: connection opened", "uid", uid)
 
-	// 1. Wait for first ClientEvent — must be UserMessage.
-	firstMsg, err := stream.Recv()
-	if err != nil {
-		return err
-	}
-	userMsg := firstMsg.GetMessage()
-	if userMsg == nil {
-		return status.Error(codes.InvalidArgument, "first event must be a user message")
+	// 1. Read the client event — either a user message starting a new turn,
+	// or a tool output resuming generation after a client-side tool call.
+	var convRef, role, logText string
+	var parts []*aiv1.MessagePart
+	switch ev := req.GetEvent().(type) {
+	case *aiv1.ClientEvent_Message:
+		um := ev.Message
+		if um == nil {
+			return status.Error(codes.InvalidArgument, "user message is empty")
+		}
+		convRef = um.GetConversation()
+		role = "user"
+		parts = um.GetParts()
+		logText = extractText(parts)
+	case *aiv1.ClientEvent_ToolOutput:
+		to := ev.ToolOutput
+		if to == nil {
+			return status.Error(codes.InvalidArgument, "tool output is empty")
+		}
+		if to.GetToolCallId() == "" {
+			return status.Error(codes.InvalidArgument, "tool output missing tool_call_id")
+		}
+		convRef = to.GetConversation()
+		role = "tool"
+		parts = []*aiv1.MessagePart{{Part: &aiv1.MessagePart_ToolResult{
+			ToolResult: &aiv1.ToolResultPart{
+				ToolCallId: to.GetToolCallId(),
+				ResultJson: to.GetResultJson(),
+				IsError:    to.GetIsError(),
+			},
+		}}}
+		logText = to.GetResultJson()
+	default:
+		return status.Error(codes.InvalidArgument,
+			"request must contain a user message or tool output")
 	}
 
 	// 2. Load conversation, verify ownership.
-	orgName, convName, err := parseConversationName(userMsg.GetConversation())
+	orgName, convName, err := parseConversationName(convRef)
 	if err != nil {
 		return status.Errorf(codes.InvalidArgument, "invalid conversation: %v", err)
 	}
@@ -47,14 +75,13 @@ func (s *Server) Stream(stream aiv1.AiChat_StreamServer) error {
 		return status.Error(codes.PermissionDenied, "conversation belongs to another user")
 	}
 
-	// 3. Get next sequence number and persist the user message.
+	// 3. Get next sequence number and persist the inbound message.
 	nextSeq, err := s.queries.GetNextSequenceForConversation(ctx, conv.ID)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed to get sequence: %v", err)
 	}
 
-	userText := extractText(userMsg.GetParts())
-	userPartsJSON, err := marshalParts(userMsg.GetParts())
+	inboundPartsJSON, err := marshalParts(parts)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed to marshal parts: %v", err)
 	}
@@ -62,13 +89,13 @@ func (s *Server) Stream(stream aiv1.AiChat_StreamServer) error {
 	_, err = s.queries.CreateMessage(ctx, db.CreateMessageParams{
 		ConversationID: conv.ID,
 		Name:           uuid.New().String()[:12],
-		Role:           "user",
-		Parts:          userPartsJSON,
+		Role:           role,
+		Parts:          inboundPartsJSON,
 		Sequence:       int64(nextSeq),
-		TokenCount:     int32(estimateTokens(userText)),
+		TokenCount:     int32(estimateTokens(logText)),
 	})
 	if err != nil {
-		return status.Errorf(codes.Internal, "failed to persist user message: %v", err)
+		return status.Errorf(codes.Internal, "failed to persist inbound message: %v", err)
 	}
 	_ = s.queries.IncrementConversationMessageCount(ctx, conv.ID)
 
@@ -78,9 +105,10 @@ func (s *Server) Stream(stream aiv1.AiChat_StreamServer) error {
 		return status.Errorf(codes.Internal, "failed to load history: %v", err)
 	}
 
-	s.logger.Info("Stream: user message received",
+	s.logger.Info("Stream: inbound event received",
 		"conv", conv.Name,
-		"user_text", userText,
+		"role", role,
+		"text", logText,
 		"seq", nextSeq)
 
 	// 5. Emit TextStart for the assistant response.
@@ -172,7 +200,7 @@ func (s *Server) Stream(stream aiv1.AiChat_StreamServer) error {
 }
 
 // handleToolCall dispatches a tool call to the server registry or forwards to the client.
-func (s *Server) handleToolCall(stream aiv1.AiChat_StreamServer, tc *model.ToolCall) error {
+func (s *Server) handleToolCall(stream grpc.ServerStreamingServer[aiv1.ServerEvent], tc *model.ToolCall) error {
 	if tc == nil {
 		return nil
 	}
@@ -299,7 +327,7 @@ func (s *Server) defaultSystemPrompt() string {
 	return "You are a helpful AI assistant in Pivox."
 }
 
-func (s *Server) sendStreamError(stream aiv1.AiChat_StreamServer, err error) error {
+func (s *Server) sendStreamError(stream grpc.ServerStreamingServer[aiv1.ServerEvent], err error) error {
 	st, ok := status.FromError(err)
 	if !ok {
 		st = status.New(codes.Internal, err.Error())

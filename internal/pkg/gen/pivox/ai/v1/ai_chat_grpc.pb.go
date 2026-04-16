@@ -85,29 +85,30 @@ type AiChatClient interface {
 	// Deletes an artifact version. If the last version is deleted, the parent
 	// artifact is also deleted.
 	DeleteArtifactVersion(ctx context.Context, in *DeleteArtifactVersionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	// Bidirectional streaming RPC for live AI chat. Native clients (macOS,
-	// Windows) use this directly. Web clients use the SSE adapter at
-	// POST /v1/ai:stream instead.
+	// Server-streaming RPC for AI chat. Each call sends one client event
+	// (user message or tool output) and receives the model's response as
+	// a stream of server events. Native clients use this directly. Web
+	// clients use the SSE adapter at POST /v1/ai:stream instead.
 	// (-- api-linter: core::0136::verb-noun=disabled
 	//
-	//	aip.dev/not-precedent: bidi streaming custom method for live chat transport. --)
+	//	aip.dev/not-precedent: server-streaming custom method for live chat transport. --)
 	//
 	// (-- api-linter: core::0136::request-message-name=disabled
 	//
-	//	aip.dev/not-precedent: bidi streaming uses ClientEvent/ServerEvent, not StreamRequest/StreamResponse. --)
+	//	aip.dev/not-precedent: uses ClientEvent/ServerEvent, not StreamRequest/StreamResponse. --)
 	//
 	// (-- api-linter: core::0136::response-message-name=disabled
 	//
-	//	aip.dev/not-precedent: bidi streaming uses ClientEvent/ServerEvent, not StreamRequest/StreamResponse. --)
+	//	aip.dev/not-precedent: uses ClientEvent/ServerEvent, not StreamRequest/StreamResponse. --)
 	//
 	// (-- api-linter: core::0136::http-method=disabled
 	//
-	//	aip.dev/not-precedent: bidi streaming custom method for live chat transport. --)
+	//	aip.dev/not-precedent: server-streaming custom method for live chat transport. --)
 	//
 	// (-- api-linter: core::0136::http-uri-suffix=disabled
 	//
-	//	aip.dev/not-precedent: bidi streaming custom method for live chat transport. --)
-	Stream(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ClientEvent, ServerEvent], error)
+	//	aip.dev/not-precedent: server-streaming custom method for live chat transport. --)
+	Stream(ctx context.Context, in *ClientEvent, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ServerEvent], error)
 }
 
 type aiChatClient struct {
@@ -248,18 +249,24 @@ func (c *aiChatClient) DeleteArtifactVersion(ctx context.Context, in *DeleteArti
 	return out, nil
 }
 
-func (c *aiChatClient) Stream(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ClientEvent, ServerEvent], error) {
+func (c *aiChatClient) Stream(ctx context.Context, in *ClientEvent, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ServerEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &AiChat_ServiceDesc.Streams[0], AiChat_Stream_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	x := &grpc.GenericClientStream[ClientEvent, ServerEvent]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
 	return x, nil
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type AiChat_StreamClient = grpc.BidiStreamingClient[ClientEvent, ServerEvent]
+type AiChat_StreamClient = grpc.ServerStreamingClient[ServerEvent]
 
 // AiChatServer is the server API for AiChat service.
 // All implementations must embed UnimplementedAiChatServer
@@ -296,29 +303,30 @@ type AiChatServer interface {
 	// Deletes an artifact version. If the last version is deleted, the parent
 	// artifact is also deleted.
 	DeleteArtifactVersion(context.Context, *DeleteArtifactVersionRequest) (*emptypb.Empty, error)
-	// Bidirectional streaming RPC for live AI chat. Native clients (macOS,
-	// Windows) use this directly. Web clients use the SSE adapter at
-	// POST /v1/ai:stream instead.
+	// Server-streaming RPC for AI chat. Each call sends one client event
+	// (user message or tool output) and receives the model's response as
+	// a stream of server events. Native clients use this directly. Web
+	// clients use the SSE adapter at POST /v1/ai:stream instead.
 	// (-- api-linter: core::0136::verb-noun=disabled
 	//
-	//	aip.dev/not-precedent: bidi streaming custom method for live chat transport. --)
+	//	aip.dev/not-precedent: server-streaming custom method for live chat transport. --)
 	//
 	// (-- api-linter: core::0136::request-message-name=disabled
 	//
-	//	aip.dev/not-precedent: bidi streaming uses ClientEvent/ServerEvent, not StreamRequest/StreamResponse. --)
+	//	aip.dev/not-precedent: uses ClientEvent/ServerEvent, not StreamRequest/StreamResponse. --)
 	//
 	// (-- api-linter: core::0136::response-message-name=disabled
 	//
-	//	aip.dev/not-precedent: bidi streaming uses ClientEvent/ServerEvent, not StreamRequest/StreamResponse. --)
+	//	aip.dev/not-precedent: uses ClientEvent/ServerEvent, not StreamRequest/StreamResponse. --)
 	//
 	// (-- api-linter: core::0136::http-method=disabled
 	//
-	//	aip.dev/not-precedent: bidi streaming custom method for live chat transport. --)
+	//	aip.dev/not-precedent: server-streaming custom method for live chat transport. --)
 	//
 	// (-- api-linter: core::0136::http-uri-suffix=disabled
 	//
-	//	aip.dev/not-precedent: bidi streaming custom method for live chat transport. --)
-	Stream(grpc.BidiStreamingServer[ClientEvent, ServerEvent]) error
+	//	aip.dev/not-precedent: server-streaming custom method for live chat transport. --)
+	Stream(*ClientEvent, grpc.ServerStreamingServer[ServerEvent]) error
 	mustEmbedUnimplementedAiChatServer()
 }
 
@@ -368,7 +376,7 @@ func (UnimplementedAiChatServer) ListArtifactVersions(context.Context, *ListArti
 func (UnimplementedAiChatServer) DeleteArtifactVersion(context.Context, *DeleteArtifactVersionRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteArtifactVersion not implemented")
 }
-func (UnimplementedAiChatServer) Stream(grpc.BidiStreamingServer[ClientEvent, ServerEvent]) error {
+func (UnimplementedAiChatServer) Stream(*ClientEvent, grpc.ServerStreamingServer[ServerEvent]) error {
 	return status.Error(codes.Unimplemented, "method Stream not implemented")
 }
 func (UnimplementedAiChatServer) mustEmbedUnimplementedAiChatServer() {}
@@ -627,11 +635,15 @@ func _AiChat_DeleteArtifactVersion_Handler(srv interface{}, ctx context.Context,
 }
 
 func _AiChat_Stream_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(AiChatServer).Stream(&grpc.GenericServerStream[ClientEvent, ServerEvent]{ServerStream: stream})
+	m := new(ClientEvent)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(AiChatServer).Stream(m, &grpc.GenericServerStream[ClientEvent, ServerEvent]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type AiChat_StreamServer = grpc.BidiStreamingServer[ClientEvent, ServerEvent]
+type AiChat_StreamServer = grpc.ServerStreamingServer[ServerEvent]
 
 // AiChat_ServiceDesc is the grpc.ServiceDesc for AiChat service.
 // It's only intended for direct use with grpc.RegisterService,
@@ -698,7 +710,6 @@ var AiChat_ServiceDesc = grpc.ServiceDesc{
 			StreamName:    "Stream",
 			Handler:       _AiChat_Stream_Handler,
 			ServerStreams: true,
-			ClientStreams: true,
 		},
 	},
 	Metadata: "pivox/ai/v1/ai_chat.proto",

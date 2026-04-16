@@ -13,8 +13,11 @@ final class MockChatClient: ChatClientProtocol, @unchecked Sendable {
     /// Tracks whether stream() was called.
     var streamCallCount = 0
 
-    func stream() -> AsyncThrowingStream<Pivox_Ai_V1_ServerEvent, Error> {
+    var sentEvents: [Pivox_Ai_V1_ClientEvent] = []
+
+    func stream(_ event: Pivox_Ai_V1_ClientEvent) throws -> AsyncThrowingStream<Pivox_Ai_V1_ServerEvent, Error> {
         streamCallCount += 1
+        sentEvents.append(event)
         let events = streamEvents
         let error = streamError
         return AsyncThrowingStream { continuation in
@@ -27,16 +30,6 @@ final class MockChatClient: ChatClientProtocol, @unchecked Sendable {
                 continuation.finish()
             }
         }
-    }
-
-    // MARK: - Send
-
-    var sentEvents: [Pivox_Ai_V1_ClientEvent] = []
-    var sendError: Error?
-
-    func send(_ event: Pivox_Ai_V1_ClientEvent) throws {
-        if let sendError { throw sendError }
-        sentEvents.append(event)
     }
 
     // MARK: - Conversations

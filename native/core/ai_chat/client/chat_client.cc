@@ -9,18 +9,21 @@ namespace pivox::ai_chat {
 // ── StreamReactor ───────────────────────────────────────────────────
 
 StreamReactor::StreamReactor(std::unique_ptr<grpc::ClientContext> ctx,
+                             const grpc::ByteBuffer& request,
                              OnEvent on_event, OnError on_error,
                              OnComplete on_complete)
     : on_event_(std::move(on_event)),
       on_error_(std::move(on_error)),
       on_complete_(std::move(on_complete)),
-      ctx_(std::move(ctx)) {}
+      ctx_(std::move(ctx)),
+      request_(request) {}
 
 std::shared_ptr<StreamReactor> StreamReactor::Create(
     std::unique_ptr<grpc::ClientContext> ctx,
+    const grpc::ByteBuffer& request,
     OnEvent on_event, OnError on_error, OnComplete on_complete) {
   auto r = std::shared_ptr<StreamReactor>(
-      new StreamReactor(std::move(ctx), std::move(on_event),
+      new StreamReactor(std::move(ctx), request, std::move(on_event),
                         std::move(on_error), std::move(on_complete)));
   r->self_ = r;
   return r;
@@ -28,36 +31,29 @@ std::shared_ptr<StreamReactor> StreamReactor::Create(
 
 void StreamReactor::Start() {
   StartCall();
-  StartRead(&read_buf_);
+  StartWrite(&request_);
 }
 
-void StreamReactor::QueueWrite(const uint8_t* bytes, size_t size) {
-  grpc::Slice slice(bytes, size);
-  grpc::ByteBuffer buf(&slice, 1);
-
-  std::lock_guard<std::mutex> lock(write_mu_);
-  if (done_) return;
-  write_queue_.push(std::move(buf));
-  MaybeStartWrite();
+void StreamReactor::OnWriteDone(bool ok) {
+  if (ok) {
+    // Request sent — half-close the write side and start reading.
+    StartWritesDone();
+    StartRead(&read_buf_);
+  }
 }
 
 void StreamReactor::Detach(std::function<void()> on_cancel) {
   std::lock_guard<std::mutex> lock(cb_mu_);
   on_event_ = nullptr;
   on_error_ = nullptr;
-  // Fire on_complete (or on_cancel) so the caller can release retained refs.
-  // This is the Swift StreamContext cleanup path on cancellation.
   if (on_cancel) {
     on_cancel();
   } else if (on_complete_) {
     on_complete_();
   }
   on_complete_ = nullptr;
-  // Cancel the gRPC context to trigger OnDone quickly.
   if (ctx_) ctx_->TryCancel();
 }
-
-void StreamReactor::OnReadInitialMetadataDone(bool /*ok*/) {}
 
 void StreamReactor::OnReadDone(bool ok) {
   if (!ok) return;
@@ -81,21 +77,7 @@ void StreamReactor::OnReadDone(bool ok) {
   StartRead(&read_buf_);
 }
 
-void StreamReactor::OnWriteDone(bool ok) {
-  std::lock_guard<std::mutex> lock(write_mu_);
-  writing_ = false;
-  if (!ok) return;
-  if (!write_queue_.empty()) {
-    MaybeStartWrite();
-  }
-}
-
 void StreamReactor::OnDone(const grpc::Status& status) {
-  {
-    std::lock_guard<std::mutex> lock(write_mu_);
-    done_ = true;
-  }
-
   {
     std::lock_guard<std::mutex> lock(cb_mu_);
     if (status.ok() || status.error_code() == grpc::StatusCode::CANCELLED) {
@@ -108,15 +90,7 @@ void StreamReactor::OnDone(const grpc::Status& status) {
     on_complete_ = nullptr;
   }
 
-  // Release self-ownership. After this, the reactor may be deleted.
   self_.reset();
-}
-
-void StreamReactor::MaybeStartWrite() {
-  if (writing_ || write_queue_.empty() || done_) return;
-  writing_ = true;
-  StartWrite(&write_queue_.front());
-  write_queue_.pop();
 }
 
 // ── ChatClient ──────────────────────────────────────────────────────
@@ -134,7 +108,8 @@ void ChatClient::SetAuthToken(const std::string& token) {
   auth_token_ = token;
 }
 
-void ChatClient::StartStream(OnEvent on_event, OnError on_error,
+void ChatClient::StartStream(const uint8_t* request_bytes, size_t request_size,
+                             OnEvent on_event, OnError on_error,
                              OnComplete on_complete) {
   Shutdown();
 
@@ -146,6 +121,7 @@ void ChatClient::StartStream(OnEvent on_event, OnError on_error,
     stream_on_event_ = std::move(on_event);
     stream_on_error_ = std::move(on_error);
     stream_on_complete_ = std::move(on_complete);
+    stream_request_.assign(request_bytes, request_bytes + request_size);
   }
 
   OpenStream();
@@ -154,10 +130,12 @@ void ChatClient::StartStream(OnEvent on_event, OnError on_error,
 void ChatClient::OpenStream() {
   OnEvent event_cb;
   OnComplete complete_cb;
+  std::vector<uint8_t> req;
   {
     std::lock_guard<std::mutex> lock(mu_);
     event_cb = stream_on_event_;
     complete_cb = stream_on_complete_;
+    req = stream_request_;
   }
 
   auto ctx = std::make_unique<grpc::ClientContext>();
@@ -168,9 +146,12 @@ void ChatClient::OpenStream() {
     }
   }
 
+  grpc::Slice req_slice(req.data(), req.size());
+  grpc::ByteBuffer request_buf(&req_slice, 1);
+
   auto* raw_ctx = ctx.get();
   auto r = StreamReactor::Create(
-      std::move(ctx),
+      std::move(ctx), request_buf,
       std::move(event_cb),
       [this](const std::string& msg) { HandleStreamError(msg); },
       std::move(complete_cb));
@@ -246,13 +227,10 @@ void ChatClient::Shutdown() {
     stream_on_complete_ = nullptr;
   }
 
-  // Detach callbacks + cancel context + fire on_cancel for Swift cleanup.
-  // The reactor owns the ClientContext — it's deleted in OnDone via self_.
   if (reactor_to_detach) {
     reactor_to_detach->Detach();
   }
 
-  // Wake and join the retry thread.
   cv_.notify_all();
   if (retry_thread_.joinable()) {
     retry_thread_.join();
@@ -260,17 +238,6 @@ void ChatClient::Shutdown() {
 }
 
 void ChatClient::Cancel() { Shutdown(); }
-
-void ChatClient::Send(const uint8_t* bytes, size_t size) {
-  std::shared_ptr<StreamReactor> r;
-  {
-    std::lock_guard<std::mutex> lock(mu_);
-    r = reactor_;
-  }
-  if (r) {
-    r->QueueWrite(bytes, size);
-  }
-}
 
 // ── UnaryCall ───────────────────────────────────────────────────────
 

@@ -89,17 +89,9 @@ public final class ConversationViewModel: ObservableObject {
         }
 
         streamTask = Task {
-            // Open bidi stream, send message, pump events.
-            let eventStream = client.stream()
-
             do {
-                try client.send(event)
-            } catch {
-                state = .error(error.localizedDescription)
-                return
-            }
+                let eventStream = try client.stream(event)
 
-            do {
                 for try await serverEvent in eventStream {
                     handle(serverEvent)
                 }

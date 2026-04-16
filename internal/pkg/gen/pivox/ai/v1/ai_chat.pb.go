@@ -1921,7 +1921,7 @@ const file_pivox_ai_v1_ai_chat_proto_rawDesc = "" +
 	"\x06status\x18\x01 \x01(\v2\x12.google.rpc.StatusR\x06status\";\n" +
 	"\bDataPart\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x1b\n" +
-	"\tdata_json\x18\x02 \x01(\tR\bdataJson2\xa6\x11\n" +
+	"\tdata_json\x18\x02 \x01(\tR\bdataJson2\xa4\x11\n" +
 	"\x06AiChat\x12\x8c\x01\n" +
 	"\x0fGetConversation\x12#.pivox.ai.v1.GetConversationRequest\x1a\x19.pivox.ai.v1.Conversation\"9\xdaA\x04name\x82\xd3\xe4\x93\x02,\x12*/v1/{name=organizations/*/conversations/*}\x12\x9f\x01\n" +
 	"\x11ListConversations\x12%.pivox.ai.v1.ListConversationsRequest\x1a&.pivox.ai.v1.ListConversationsResponse\";\xdaA\x06parent\x82\xd3\xe4\x93\x02,\x12*/v1/{parent=organizations/*}/conversations\x12\xaf\x01\n" +
@@ -1936,8 +1936,8 @@ const file_pivox_ai_v1_ai_chat_proto_rawDesc = "" +
 	"\x0eDeleteArtifact\x12\".pivox.ai.v1.DeleteArtifactRequest\x1a\x16.google.protobuf.Empty\"E\xdaA\x04name\x82\xd3\xe4\x93\x028*6/v1/{name=organizations/*/conversations/*/artifacts/*}\x12\xac\x01\n" +
 	"\x12GetArtifactVersion\x12&.pivox.ai.v1.GetArtifactVersionRequest\x1a\x1c.pivox.ai.v1.ArtifactVersion\"P\xdaA\x04name\x82\xd3\xe4\x93\x02C\x12A/v1/{name=organizations/*/conversations/*/artifacts/*/versions/*}\x12\xbf\x01\n" +
 	"\x14ListArtifactVersions\x12(.pivox.ai.v1.ListArtifactVersionsRequest\x1a).pivox.ai.v1.ListArtifactVersionsResponse\"R\xdaA\x06parent\x82\xd3\xe4\x93\x02C\x12A/v1/{parent=organizations/*/conversations/*/artifacts/*}/versions\x12\xac\x01\n" +
-	"\x15DeleteArtifactVersion\x12).pivox.ai.v1.DeleteArtifactVersionRequest\x1a\x16.google.protobuf.Empty\"P\xdaA\x04name\x82\xd3\xe4\x93\x02C*A/v1/{name=organizations/*/conversations/*/artifacts/*/versions/*}\x12B\n" +
-	"\x06Stream\x12\x18.pivox.ai.v1.ClientEvent\x1a\x18.pivox.ai.v1.ServerEvent\"\x00(\x010\x01\x1a\x0f\xcaA\fapi.pivox.ioB\xa8\x01\n" +
+	"\x15DeleteArtifactVersion\x12).pivox.ai.v1.DeleteArtifactVersionRequest\x1a\x16.google.protobuf.Empty\"P\xdaA\x04name\x82\xd3\xe4\x93\x02C*A/v1/{name=organizations/*/conversations/*/artifacts/*/versions/*}\x12@\n" +
+	"\x06Stream\x12\x18.pivox.ai.v1.ClientEvent\x1a\x18.pivox.ai.v1.ServerEvent\"\x000\x01\x1a\x0f\xcaA\fapi.pivox.ioB\xa8\x01\n" +
 	"\x0fcom.pivox.ai.v1B\vAiChatProtoP\x01Z:github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1;aiv1\xa2\x02\x03PAX\xaa\x02\vPivox.Ai.V1\xca\x02\vPivox\\Ai\\V1\xe2\x02\x17Pivox\\Ai\\V1\\GPBMetadata\xea\x02\rPivox::Ai::V1b\x06proto3"
 
 var (

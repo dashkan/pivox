@@ -119,20 +119,21 @@ service AiChat {
     option (google.api.method_signature) = "name";
   }
 
-  // Bidirectional streaming RPC for live AI chat. Native clients (macOS,
-  // Windows) use this directly. Web clients use the SSE adapter at
-  // POST /v1/ai:stream instead.
+  // Server-streaming RPC for AI chat. Each call sends one client event
+  // (user message or tool output) and receives the model's response as
+  // a stream of server events. Native clients use this directly. Web
+  // clients use the SSE adapter at POST /v1/ai:stream instead.
   // (-- api-linter: core::0136::verb-noun=disabled
-  //     aip.dev/not-precedent: bidi streaming custom method for live chat transport. --)
+  //     aip.dev/not-precedent: server-streaming custom method for live chat transport. --)
   // (-- api-linter: core::0136::request-message-name=disabled
-  //     aip.dev/not-precedent: bidi streaming uses ClientEvent/ServerEvent, not StreamRequest/StreamResponse. --)
+  //     aip.dev/not-precedent: uses ClientEvent/ServerEvent, not StreamRequest/StreamResponse. --)
   // (-- api-linter: core::0136::response-message-name=disabled
-  //     aip.dev/not-precedent: bidi streaming uses ClientEvent/ServerEvent, not StreamRequest/StreamResponse. --)
+  //     aip.dev/not-precedent: uses ClientEvent/ServerEvent, not StreamRequest/StreamResponse. --)
   // (-- api-linter: core::0136::http-method=disabled
-  //     aip.dev/not-precedent: bidi streaming custom method for live chat transport. --)
+  //     aip.dev/not-precedent: server-streaming custom method for live chat transport. --)
   // (-- api-linter: core::0136::http-uri-suffix=disabled
-  //     aip.dev/not-precedent: bidi streaming custom method for live chat transport. --)
-  rpc Stream(stream ClientEvent) returns (stream ServerEvent) {}
+  //     aip.dev/not-precedent: server-streaming custom method for live chat transport. --)
+  rpc Stream(ClientEvent) returns (stream ServerEvent) {}
 }
 
 // An event sent by the client during a streaming chat session.
