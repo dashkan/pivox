@@ -6,7 +6,7 @@ public final class ConversationListViewModel: ObservableObject {
     @Published public var conversations: [Pivox_Ai_V1_Conversation] = []
     @Published public var state: ListState = .idle
 
-    private let client: ChatClient
+    private let client: any ChatClientProtocol
     private let orgName: String
 
     public enum ListState: Equatable {
@@ -27,7 +27,7 @@ public final class ConversationListViewModel: ObservableObject {
         }
     }
 
-    public init(client: ChatClient, orgName: String) {
+    public init(client: any ChatClientProtocol, orgName: String) {
         self.client = client
         self.orgName = orgName
     }

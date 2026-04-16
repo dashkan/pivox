@@ -7,7 +7,7 @@ public final class ConversationViewModel: ObservableObject {
     @Published public var inFlightText: String = ""
     @Published public var state: ConversationState = .idle
 
-    private let client: ChatClient
+    private let client: any ChatClientProtocol
     public let conversationName: String
 
     private var streamTask: Task<Void, Never>?
@@ -30,7 +30,7 @@ public final class ConversationViewModel: ObservableObject {
         }
     }
 
-    public init(client: ChatClient, conversationName: String) {
+    public init(client: any ChatClientProtocol, conversationName: String) {
         self.client = client
         self.conversationName = conversationName
     }
