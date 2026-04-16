@@ -3,7 +3,6 @@ import SwiftUI
 /// Top-level container for the AI Chat feature. Shows a conversation list
 /// on the left and the active conversation on the right.
 struct AIChatContainerView: View {
-    @State private var selectedConversation: Pivox_Ai_V1_Conversation?
     @State private var client: ChatClient?
     @State private var initError: String?
 
@@ -14,7 +13,7 @@ struct AIChatContainerView: View {
     var body: some View {
         Group {
             if let client {
-                chatNavigation(client: client)
+                AIChatNavigationView(client: client, orgName: orgName)
             } else if let initError {
                 Text("Chat unavailable: \(initError)")
                     .foregroundStyle(.secondary)
@@ -33,23 +32,37 @@ struct AIChatContainerView: View {
             }
         }
     }
+}
 
-    private func chatNavigation(client: ChatClient) -> some View {
+/// Inner view that owns the view models via @StateObject.
+struct AIChatNavigationView: View {
+    let client: ChatClient
+    let orgName: String
+    @StateObject private var listViewModel: ConversationListViewModel
+    @State private var selectedConversation: Pivox_Ai_V1_Conversation?
+
+    init(client: ChatClient, orgName: String) {
+        self.client = client
+        self.orgName = orgName
+        _listViewModel = StateObject(wrappedValue: ConversationListViewModel(client: client, orgName: orgName))
+    }
+
+    var body: some View {
         NavigationSplitView {
-            let vm = ConversationListViewModel(client: client, orgName: orgName)
-            ConversationListView(viewModel: vm) { conv in
+            ConversationListView(viewModel: listViewModel) { conv in
                 selectedConversation = conv
             }
             .navigationTitle("Conversations")
         } detail: {
             if let conv = selectedConversation {
-                let vm = ConversationViewModel(
-                    client: client,
-                    conversationName: conv.name
+                ConversationView(
+                    viewModel: ConversationViewModel(
+                        client: client,
+                        conversationName: conv.name
+                    )
                 )
-                ConversationView(viewModel: vm)
-                    .navigationTitle(conv.title.isEmpty ? "Chat" : conv.title)
-                    .id(conv.name) // Reset view when switching conversations.
+                .navigationTitle(conv.title.isEmpty ? "Chat" : conv.title)
+                .id(conv.name)
             } else {
                 Text("Select a conversation")
                     .foregroundStyle(.secondary)

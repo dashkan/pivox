@@ -85,7 +85,6 @@ public final class ChatClient: @unchecked Sendable {
     /// Used by typed wrapper methods for each resource RPC.
     func unaryCall(method: String, request: any SwiftProtobuf.Message) async throws -> Data {
         let requestData = try request.serializedData()
-
         return try await withCheckedThrowingContinuation { cont in
             let contBox = Unmanaged.passRetained(
                 ContinuationBox(continuation: cont)
@@ -100,11 +99,15 @@ public final class ChatClient: @unchecked Sendable {
                     contBox.toOpaque(),
                     // on_response
                     { rawCtx, bytes, size in
-                        guard let rawCtx, let bytes else { return }
+                        guard let rawCtx else { return }
                         let box = Unmanaged<ContinuationBox>
                             .fromOpaque(rawCtx).takeRetainedValue()
-                        box.continuation.resume(
-                            returning: Data(bytes: bytes, count: size))
+                        if let bytes, size > 0 {
+                            box.continuation.resume(
+                                returning: Data(bytes: bytes, count: size))
+                        } else {
+                            box.continuation.resume(returning: Data())
+                        }
                     },
                     // on_error
                     { rawCtx, msg in
