@@ -7,8 +7,8 @@ struct AIChatContainerView: View {
     @State private var client: ChatClient?
     @State private var initError: String?
 
-    // TODO: Get org name from the authenticated user's context.
-    private let orgName = "default"
+    // TODO: Resolve from authenticated user's org membership.
+    private let orgName = "local-corp"
     private let endpoint = "localhost:50051"
 
     var body: some View {
