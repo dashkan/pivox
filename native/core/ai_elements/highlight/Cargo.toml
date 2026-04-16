@@ -1,0 +1,28 @@
+[package]
+name = "pivox-highlight"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+tree-sitter = "0.25"
+tree-sitter-highlight = "0.25"
+
+# Language grammars
+tree-sitter-python = "0.23"
+tree-sitter-javascript = "0.23"
+tree-sitter-typescript = "0.23"
+tree-sitter-rust = "0.24"
+tree-sitter-go = "0.23"
+tree-sitter-c = "0.23"
+tree-sitter-cpp = "0.23"
+tree-sitter-json = "0.24"
+tree-sitter-bash = "0.23"
+tree-sitter-html = "0.23"
+tree-sitter-css = "0.23"
+# tree-sitter-toml pinned to old tree-sitter core — incompatible. Re-add when updated.
+tree-sitter-yaml = "0.7"
+tree-sitter-swift = "0.7"
+tree-sitter-md = "0.5"
