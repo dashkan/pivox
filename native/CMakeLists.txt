@@ -123,6 +123,10 @@ if(APPLE)
         ${SWIFT_DIR}/AIChat/Client/ChatError.swift
         ${SWIFT_DIR}/AIChat/Client/ChatClient.swift
         ${SWIFT_DIR}/AIChat/Client/ChatClient+Resources.swift
+        ${SWIFT_DIR}/AIChat/Views/ConversationListViewModel.swift
+        ${SWIFT_DIR}/AIChat/Views/ConversationListView.swift
+        ${SWIFT_DIR}/AIChat/Views/ConversationViewModel.swift
+        ${SWIFT_DIR}/AIChat/Views/ConversationView.swift
         ${ASSET_CATALOG}
         ${FIREBASE_PLIST}
     )
@@ -217,6 +221,7 @@ if(APPLE)
         tests/macos/DelegatedAuthTests.swift
         tests/macos/ImageEditorBridgeTests.swift
         tests/macos/ChatClientTests.swift
+        tests/macos/ConversationViewModelTests.swift
     )
 
     target_compile_options(PivoxTests PRIVATE
