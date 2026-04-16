@@ -6,7 +6,6 @@ enum AppSection: String, CaseIterable, Identifiable {
   case library = "Library"
   case designer = "Designer"
   case engineering = "Engineering"
-  case aiChat = "AI Chat"
   case admin = "Admin"
 
   var id: String { rawValue }
@@ -17,7 +16,6 @@ enum AppSection: String, CaseIterable, Identifiable {
     case .library: return "photo.on.rectangle"
     case .designer: return "paintbrush"
     case .engineering: return "wrench.and.screwdriver"
-    case .aiChat: return "bubble.left.and.text.bubble.right"
     case .admin: return "gearshape"
     }
   }
@@ -37,6 +35,7 @@ struct ContentView: View {
   @State private var selectedItem: SidebarItem?
   @State private var sidebarVisibility: NavigationSplitViewVisibility = .automatic
   @State private var isImageEditing = false
+  @State private var showAIChat = false
   private var auth = AuthService.shared
   private let appState = AppStateBridge.shared()
 
@@ -62,9 +61,6 @@ struct ContentView: View {
         appState.save(section.rawValue, forKey: "selected_section")
       }
     }
-    // Delegated auth (AUTHN-07): when the plugin deep-links into
-    // `pivox://auth/delegate/profile`, the coordinator posts this
-    // notification and the main ContentView swings the sidebar to Profile.
     .onReceive(
       NotificationCenter.default.publisher(for: DelegatedAuthCoordinator.openProfileNotification)
     ) { _ in
@@ -104,32 +100,21 @@ struct ContentView: View {
         }
       }
     } detail: {
-      switch selectedItem {
-      case .section(let section):
-        if section == .library {
-          LibraryPlaceholderView(
-            isEditing: $isImageEditing,
-            sidebarVisibility: $sidebarVisibility
-          )
-        } else if section == .aiChat {
-          AIChatContainerView()
-        } else {
-          VStack {
-            Text(section.rawValue)
-              .font(.largeTitle)
-              .foregroundStyle(.secondary)
-            Text("Coming soon")
-              .foregroundStyle(.tertiary)
+      detailContent
+    }
+    .toolbar {
+      ToolbarItem(placement: .primaryAction) {
+        Button {
+          withAnimation(.easeInOut(duration: 0.2)) {
+            showAIChat.toggle()
           }
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } label: {
+          Image(systemName: showAIChat
+            ? "bubble.left.and.text.bubble.right.fill"
+            : "bubble.left.and.text.bubble.right")
         }
-      case .profile:
-        ProfileView()
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
-      case nil:
-        Text("Select a section")
-          .foregroundStyle(.secondary)
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .help("Toggle AI Chat (⌘⇧A)")
+        .keyboardShortcut("a", modifiers: [.command, .shift])
       }
     }
     .onChange(of: isImageEditing) { _, editing in
@@ -137,6 +122,51 @@ struct ContentView: View {
         editing
         ? NSAppearance(named: .darkAqua)
         : nil
+    }
+  }
+
+  @ViewBuilder
+  private var detailContent: some View {
+    HSplitView {
+      // Main content area
+      mainDetail
+        .frame(minWidth: 400)
+
+      // AI Chat panel — slides in from right
+      if showAIChat {
+        AIChatContainerView()
+          .frame(minWidth: 320, idealWidth: 400, maxWidth: 500)
+          .transition(.move(edge: .trailing))
+      }
+    }
+  }
+
+  @ViewBuilder
+  private var mainDetail: some View {
+    switch selectedItem {
+    case .section(let section):
+      if section == .library {
+        LibraryPlaceholderView(
+          isEditing: $isImageEditing,
+          sidebarVisibility: $sidebarVisibility
+        )
+      } else {
+        VStack {
+          Text(section.rawValue)
+            .font(.largeTitle)
+            .foregroundStyle(.secondary)
+          Text("Coming soon")
+            .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+      }
+    case .profile:
+      ProfileView()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    case nil:
+      Text("Select a section")
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
   }
 }
@@ -196,8 +226,6 @@ struct LibraryPlaceholderView: View {
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       .onAppear {
-        // UI test hook: auto-load a test image to bypass NSOpenPanel.
-        // Only on first appearance — not after Done/Back returns here.
         guard !didAutoLoad else { return }
         didAutoLoad = true
         if let path = ProcessInfo.processInfo.environment["TEST_IMAGE_PATH"],
