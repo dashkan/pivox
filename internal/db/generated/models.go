@@ -841,6 +841,30 @@ type ApiKey struct {
 	PurgeTime    pgtype.Timestamptz `json:"purge_time"`
 }
 
+type Artifact struct {
+	ID              uuid.UUID   `json:"id"`
+	ConversationID  uuid.UUID   `json:"conversation_id"`
+	Name            string      `json:"name"`
+	Type            string      `json:"type"`
+	Title           string      `json:"title"`
+	Description     string      `json:"description"`
+	LatestVersionID pgtype.UUID `json:"latest_version_id"`
+	CreateTime      time.Time   `json:"create_time"`
+	UpdateTime      time.Time   `json:"update_time"`
+}
+
+type ArtifactVersion struct {
+	ID                uuid.UUID   `json:"id"`
+	ArtifactID        uuid.UUID   `json:"artifact_id"`
+	Name              string      `json:"name"`
+	InlineData        []byte      `json:"inline_data"`
+	InlineContentType pgtype.Text `json:"inline_content_type"`
+	InlineSizeBytes   pgtype.Int8 `json:"inline_size_bytes"`
+	AssetVersionName  pgtype.Text `json:"asset_version_name"`
+	Sequence          int32       `json:"sequence"`
+	CreateTime        time.Time   `json:"create_time"`
+}
+
 type Asset struct {
 	ID                uuid.UUID          `json:"id"`
 	ProjectID         uuid.UUID          `json:"project_id"`
@@ -906,6 +930,26 @@ type AuthTokenCode struct {
 	Consumed   bool      `json:"consumed"`
 	CreateTime time.Time `json:"create_time"`
 	ExpireTime time.Time `json:"expire_time"`
+}
+
+type Conversation struct {
+	ID              uuid.UUID          `json:"id"`
+	OrgID           uuid.UUID          `json:"org_id"`
+	CreatorUid      string             `json:"creator_uid"`
+	Name            string             `json:"name"`
+	Title           string             `json:"title"`
+	Description     string             `json:"description"`
+	Archived        bool               `json:"archived"`
+	Pinned          bool               `json:"pinned"`
+	MessageCount    int32              `json:"message_count"`
+	LastMessageTime pgtype.Timestamptz `json:"last_message_time"`
+	Etag            string             `json:"etag"`
+	Revision        int32              `json:"revision"`
+	CreatedBy       string             `json:"created_by"`
+	UpdatedBy       string             `json:"updated_by"`
+	CreateTime      time.Time          `json:"create_time"`
+	UpdateTime      time.Time          `json:"update_time"`
+	DeleteTime      pgtype.Timestamptz `json:"delete_time"`
 }
 
 type CustomDomain struct {
@@ -1001,6 +1045,17 @@ type LineItem struct {
 	CreatedBy   string             `json:"created_by"`
 	CreateTime  time.Time          `json:"create_time"`
 	UpdateTime  time.Time          `json:"update_time"`
+}
+
+type Message struct {
+	ID             uuid.UUID       `json:"id"`
+	ConversationID uuid.UUID       `json:"conversation_id"`
+	Name           string          `json:"name"`
+	Role           string          `json:"role"`
+	Parts          json.RawMessage `json:"parts"`
+	Sequence       int64           `json:"sequence"`
+	TokenCount     int32           `json:"token_count"`
+	CreateTime     time.Time       `json:"create_time"`
 }
 
 type Operation struct {

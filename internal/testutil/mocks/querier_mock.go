@@ -741,3 +741,168 @@ func (m *MockQuerier) UpdateOperationMetadata(ctx context.Context, arg db.Update
 	args := m.Called(ctx, arg)
 	return args.Error(0)
 }
+
+// --- AI Chat ---
+
+// Conversations
+
+func (m *MockQuerier) CountConversationsByCreator(ctx context.Context, arg db.CountConversationsByCreatorParams) (int64, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+func (m *MockQuerier) CreateConversation(ctx context.Context, arg db.CreateConversationParams) (db.Conversation, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.Conversation), args.Error(1)
+}
+
+func (m *MockQuerier) DeleteConversation(ctx context.Context, id uuid.UUID) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
+func (m *MockQuerier) GetConversationByID(ctx context.Context, id uuid.UUID) (db.Conversation, error) {
+	args := m.Called(ctx, id)
+	return args.Get(0).(db.Conversation), args.Error(1)
+}
+
+func (m *MockQuerier) GetConversationByName(ctx context.Context, arg db.GetConversationByNameParams) (db.Conversation, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.Conversation), args.Error(1)
+}
+
+func (m *MockQuerier) IncrementConversationMessageCount(ctx context.Context, id uuid.UUID) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
+func (m *MockQuerier) ListConversationsByCreator(ctx context.Context, arg db.ListConversationsByCreatorParams) ([]db.Conversation, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).([]db.Conversation), args.Error(1)
+}
+
+func (m *MockQuerier) ListConversationsByCreatorActive(ctx context.Context, arg db.ListConversationsByCreatorActiveParams) ([]db.Conversation, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).([]db.Conversation), args.Error(1)
+}
+
+func (m *MockQuerier) UpdateConversation(ctx context.Context, arg db.UpdateConversationParams) (db.Conversation, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.Conversation), args.Error(1)
+}
+
+// Messages
+
+func (m *MockQuerier) CountMessagesByConversation(ctx context.Context, conversationID uuid.UUID) (int64, error) {
+	args := m.Called(ctx, conversationID)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+func (m *MockQuerier) CreateMessage(ctx context.Context, arg db.CreateMessageParams) (db.Message, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.Message), args.Error(1)
+}
+
+func (m *MockQuerier) GetMessageByName(ctx context.Context, arg db.GetMessageByNameParams) (db.Message, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.Message), args.Error(1)
+}
+
+func (m *MockQuerier) GetNextSequenceForConversation(ctx context.Context, conversationID uuid.UUID) (int32, error) {
+	args := m.Called(ctx, conversationID)
+	return args.Get(0).(int32), args.Error(1)
+}
+
+func (m *MockQuerier) ListMessagesByConversation(ctx context.Context, arg db.ListMessagesByConversationParams) ([]db.Message, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).([]db.Message), args.Error(1)
+}
+
+func (m *MockQuerier) ListMessagesNewestFirst(ctx context.Context, arg db.ListMessagesNewestFirstParams) ([]db.Message, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).([]db.Message), args.Error(1)
+}
+
+func (m *MockQuerier) SumTokensByConversation(ctx context.Context, conversationID uuid.UUID) (int64, error) {
+	args := m.Called(ctx, conversationID)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+// Artifacts
+
+func (m *MockQuerier) CountArtifactsByConversation(ctx context.Context, conversationID uuid.UUID) (int64, error) {
+	args := m.Called(ctx, conversationID)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+func (m *MockQuerier) CreateArtifact(ctx context.Context, arg db.CreateArtifactParams) (db.Artifact, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.Artifact), args.Error(1)
+}
+
+func (m *MockQuerier) DeleteArtifact(ctx context.Context, id uuid.UUID) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
+func (m *MockQuerier) GetArtifactByID(ctx context.Context, id uuid.UUID) (db.Artifact, error) {
+	args := m.Called(ctx, id)
+	return args.Get(0).(db.Artifact), args.Error(1)
+}
+
+func (m *MockQuerier) GetArtifactByName(ctx context.Context, arg db.GetArtifactByNameParams) (db.Artifact, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.Artifact), args.Error(1)
+}
+
+func (m *MockQuerier) ListArtifactsByConversation(ctx context.Context, arg db.ListArtifactsByConversationParams) ([]db.Artifact, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).([]db.Artifact), args.Error(1)
+}
+
+func (m *MockQuerier) UpdateArtifactLatestVersion(ctx context.Context, arg db.UpdateArtifactLatestVersionParams) error {
+	args := m.Called(ctx, arg)
+	return args.Error(0)
+}
+
+// Artifact Versions
+
+func (m *MockQuerier) CountArtifactVersionsByArtifact(ctx context.Context, artifactID uuid.UUID) (int64, error) {
+	args := m.Called(ctx, artifactID)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+func (m *MockQuerier) CreateAssetArtifactVersion(ctx context.Context, arg db.CreateAssetArtifactVersionParams) (db.ArtifactVersion, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.ArtifactVersion), args.Error(1)
+}
+
+func (m *MockQuerier) CreateInlineArtifactVersion(ctx context.Context, arg db.CreateInlineArtifactVersionParams) (db.ArtifactVersion, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.ArtifactVersion), args.Error(1)
+}
+
+func (m *MockQuerier) DeleteArtifactVersion(ctx context.Context, id uuid.UUID) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
+func (m *MockQuerier) GetArtifactVersionByName(ctx context.Context, arg db.GetArtifactVersionByNameParams) (db.ArtifactVersion, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.ArtifactVersion), args.Error(1)
+}
+
+func (m *MockQuerier) GetArtifactVersionForContent(ctx context.Context, arg db.GetArtifactVersionForContentParams) (db.GetArtifactVersionForContentRow, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.GetArtifactVersionForContentRow), args.Error(1)
+}
+
+func (m *MockQuerier) IsOnlyArtifactVersion(ctx context.Context, artifactID uuid.UUID) (bool, error) {
+	args := m.Called(ctx, artifactID)
+	return args.Bool(0), args.Error(1)
+}
+
+func (m *MockQuerier) ListArtifactVersionsByArtifact(ctx context.Context, arg db.ListArtifactVersionsByArtifactParams) ([]db.ListArtifactVersionsByArtifactRow, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).([]db.ListArtifactVersionsByArtifactRow), args.Error(1)
+}

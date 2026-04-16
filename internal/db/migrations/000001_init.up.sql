@@ -961,3 +961,136 @@ INSERT INTO permissions (permission_id, display_name, description) VALUES
   ('assets.lineItems.update', 'Update Line Item', 'Modify line item details'),
   ('assets.lineItems.delete', 'Delete Line Item', 'Remove line items from requests'),
   ('assets.lineItems.fulfill', 'Fulfill Line Item', 'Upload deliverable for line item');
+
+-- ============================================================================
+-- AI chat — conversations
+-- ============================================================================
+CREATE TABLE conversations (
+    id              UUID PRIMARY KEY DEFAULT uuidv7(),
+    -- relationships
+    org_id          UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    creator_uid     TEXT NOT NULL,  -- firebase UID of conversation owner
+    -- identity
+    name            TEXT NOT NULL,  -- stable ID used in resource name
+    -- domain
+    title           TEXT NOT NULL DEFAULT '',
+    description     TEXT NOT NULL DEFAULT '',
+    archived        BOOLEAN NOT NULL DEFAULT FALSE,
+    pinned          BOOLEAN NOT NULL DEFAULT FALSE,
+    message_count   INTEGER NOT NULL DEFAULT 0,
+    last_message_time TIMESTAMPTZ,
+    -- etag/revision
+    etag            TEXT NOT NULL DEFAULT md5(now()::text),
+    revision        INTEGER NOT NULL DEFAULT 1,
+    -- audit
+    created_by      TEXT NOT NULL DEFAULT '',
+    updated_by      TEXT NOT NULL DEFAULT '',
+    -- timestamps
+    create_time     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    update_time     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    delete_time     TIMESTAMPTZ,
+    -- constraints
+    UNIQUE(org_id, name)
+);
+CREATE INDEX idx_conversations_org ON conversations (org_id, create_time DESC) WHERE delete_time IS NULL;
+CREATE INDEX idx_conversations_creator ON conversations (org_id, creator_uid, create_time DESC) WHERE delete_time IS NULL;
+CREATE INDEX idx_conversations_archived ON conversations (org_id, creator_uid) WHERE archived = FALSE AND delete_time IS NULL;
+
+-- ============================================================================
+-- AI chat — messages
+-- ============================================================================
+CREATE TABLE messages (
+    id              UUID PRIMARY KEY DEFAULT uuidv7(),
+    -- relationships
+    conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    -- identity
+    name            TEXT NOT NULL,
+    -- domain
+    role            TEXT NOT NULL,  -- "user" | "assistant" | "system" | "tool"
+    parts           JSONB NOT NULL DEFAULT '[]',  -- serialized repeated MessagePart
+    -- ordering
+    sequence        BIGINT NOT NULL,  -- monotonic within conversation
+    -- token budget tracking — heuristic (len(text)/4), not exact per-model tokenization
+    token_count     INTEGER NOT NULL DEFAULT 0,
+    -- timestamps
+    create_time     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- constraints
+    UNIQUE(conversation_id, name),
+    UNIQUE(conversation_id, sequence)
+);
+CREATE INDEX idx_messages_conversation ON messages (conversation_id, sequence);
+
+-- ============================================================================
+-- AI chat — artifact_versions (created before artifacts so artifacts can FK to latest_version_id)
+-- ============================================================================
+CREATE TABLE artifact_versions (
+    id                   UUID PRIMARY KEY DEFAULT uuidv7(),
+    -- relationships (artifact_id FK added after artifacts table is created)
+    artifact_id          UUID NOT NULL,
+    -- identity
+    name                 TEXT NOT NULL,  -- e.g. "v1", "v2"
+    -- domain — inline mode (small text artifacts: code, markdown, svg)
+    inline_data          BYTEA,
+    inline_content_type  TEXT,
+    inline_size_bytes    BIGINT CHECK (inline_size_bytes IS NULL OR inline_size_bytes <= 1048576),  -- 1 MB cap
+    -- domain — asset mode (binary artifacts: image, pdf, video)
+    asset_version_name   TEXT,  -- "organizations/.../assets/.../versions/..." pointer
+    -- ordering
+    sequence             INTEGER NOT NULL,  -- v1 = 1, v2 = 2, ...
+    -- timestamps
+    create_time          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- constraints
+    UNIQUE(artifact_id, name),
+    UNIQUE(artifact_id, sequence),
+    CHECK (
+        (inline_data IS NOT NULL AND inline_content_type IS NOT NULL AND inline_size_bytes IS NOT NULL AND asset_version_name IS NULL)
+        OR
+        (inline_data IS NULL AND inline_content_type IS NULL AND inline_size_bytes IS NULL AND asset_version_name IS NOT NULL)
+    )
+);
+
+-- ============================================================================
+-- AI chat — artifacts
+-- ============================================================================
+CREATE TABLE artifacts (
+    id              UUID PRIMARY KEY DEFAULT uuidv7(),
+    -- relationships
+    conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    -- identity
+    name            TEXT NOT NULL,
+    -- domain
+    type            TEXT NOT NULL,   -- "code" | "markdown" | "svg" | "image" | ...
+    title           TEXT NOT NULL DEFAULT '',
+    description     TEXT NOT NULL DEFAULT '',
+    latest_version_id UUID REFERENCES artifact_versions(id) DEFERRABLE INITIALLY DEFERRED,
+    -- timestamps
+    create_time     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    update_time     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- constraints
+    UNIQUE(conversation_id, name)
+);
+CREATE INDEX idx_artifacts_conversation ON artifacts (conversation_id, create_time DESC);
+
+-- Now add the FK from artifact_versions back to artifacts
+ALTER TABLE artifact_versions ADD CONSTRAINT fk_artifact_versions_artifact
+    FOREIGN KEY (artifact_id) REFERENCES artifacts(id) ON DELETE CASCADE;
+
+CREATE INDEX idx_artifact_versions_artifact ON artifact_versions (artifact_id, sequence DESC);
+CREATE INDEX idx_artifact_versions_asset ON artifact_versions (asset_version_name) WHERE asset_version_name IS NOT NULL;
+
+-- AI chat permissions
+INSERT INTO permissions (permission_id, display_name, description) VALUES
+  ('ai.conversations.get', 'Get Conversation', 'View conversation details'),
+  ('ai.conversations.list', 'List Conversations', 'List conversations in an organization'),
+  ('ai.conversations.create', 'Create Conversation', 'Create conversations'),
+  ('ai.conversations.update', 'Update Conversation', 'Modify conversation details'),
+  ('ai.conversations.delete', 'Delete Conversation', 'Soft-delete conversations'),
+  ('ai.messages.get', 'Get Message', 'View message details'),
+  ('ai.messages.list', 'List Messages', 'List messages in a conversation'),
+  ('ai.artifacts.get', 'Get Artifact', 'View artifact details'),
+  ('ai.artifacts.list', 'List Artifacts', 'List artifacts in a conversation'),
+  ('ai.artifacts.delete', 'Delete Artifact', 'Delete artifacts'),
+  ('ai.artifactVersions.get', 'Get Artifact Version', 'View artifact version details'),
+  ('ai.artifactVersions.list', 'List Artifact Versions', 'List artifact versions'),
+  ('ai.artifactVersions.delete', 'Delete Artifact Version', 'Delete artifact versions'),
+  ('ai.chat.stream', 'Stream Chat', 'Use AI chat streaming');

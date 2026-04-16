@@ -679,6 +679,14 @@
             "in": "query",
             "required": false,
             "type": "boolean"
+          },
+          {
+            "name": "crop.rotation",
+            "description": "Optional. Rotation in 90-degree increments (0, 90, 180, 270).\nApplied after crop, before straighten.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
           }
         ],
         "tags": [
@@ -1216,9 +1224,14 @@
         "flipVertical": {
           "type": "boolean",
           "description": "Optional. Flip vertically."
+        },
+        "rotation": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Optional. Rotation in 90-degree increments (0, 90, 180, 270).\nApplied after crop, before straighten."
         }
       },
-      "description": "Crop operation combining crop area, straighten, and flip."
+      "description": "Crop operation combining crop area, rotation, straighten, and flip.\nApplied order: crop → rotation → straighten → flip."
     },
     "v1CropArea": {
       "type": "object",

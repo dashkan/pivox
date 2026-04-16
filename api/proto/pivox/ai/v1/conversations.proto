@@ -1,0 +1,170 @@
+// Copyright 2025 Pivox
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package pivox.ai.v1;
+
+import "buf/validate/validate.proto";
+import "google/api/field_behavior.proto";
+import "google/api/resource.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "pivox/ai/v1;aiv1";
+
+// A conversation represents a single chat thread between a user and the AI.
+message Conversation {
+  option (google.api.resource) = {
+    type: "pivox.ai/Conversation"
+    pattern: "organizations/{organization}/conversations/{conversation}"
+    plural: "conversations"
+    singular: "conversation"
+  };
+
+  // The resource name of the conversation.
+  // Format: `organizations/{organization}/conversations/{conversation}`
+  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Output only. The user who created this conversation.
+  // Format: `organizations/{organization}/users/{user}`
+  string creator = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // The conversation title. May be set by the user or auto-generated.
+  string title = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // An optional description of the conversation.
+  string description = 4 [(google.api.field_behavior) = OPTIONAL];
+
+  // Whether the conversation is archived.
+  bool archived = 5 [(google.api.field_behavior) = OPTIONAL];
+
+  // Whether the conversation is pinned.
+  bool pinned = 6 [(google.api.field_behavior) = OPTIONAL];
+
+  // Output only. The number of messages in the conversation.
+  int32 message_count = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The time of the last message in the conversation.
+  google.protobuf.Timestamp last_message_time = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. When the conversation was created.
+  google.protobuf.Timestamp create_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. When the conversation was last updated.
+  google.protobuf.Timestamp update_time = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. A checksum computed by the server based on the current value
+  // of the Conversation resource.
+  string etag = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Request message for `GetConversation`.
+message GetConversationRequest {
+  // Required. The resource name of the conversation to retrieve.
+  // Format: `organizations/{organization}/conversations/{conversation}`
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.ai/Conversation"},
+    (buf.validate.field).required = true
+  ];
+}
+
+// Request message for `ListConversations`.
+message ListConversationsRequest {
+  // Required. The parent organization.
+  // Format: `organizations/{organization}`
+  string parent = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {child_type: "pivox.ai/Conversation"},
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. Maximum number of conversations to return.
+  int32 page_size = 2 [
+    (google.api.field_behavior) = OPTIONAL,
+    (buf.validate.field).int32 = {
+      gte: 0
+      lte: 1000
+    }
+  ];
+
+  // Optional. Page token from a previous ListConversations call.
+  string page_token = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. An expression for filtering the results.
+  // Filterable fields:
+  //
+  // + `archived` - filter by archived status
+  //
+  // Examples:
+  //
+  // + `archived = false` - only active conversations.
+  //
+  // For more information, see [AIP-160](https://aip.dev/160).
+  string filter = 4 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. A comma-separated list of fields to order by. The default
+  // order is ascending. Use "desc" after a field name for descending.
+  // Supported fields:
+  //
+  // + `createTime`
+  // + `lastMessageTime`
+  //
+  // If not specified, results are ordered by `lastMessageTime` descending.
+  string order_by = 5 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// Response message for `ListConversations`.
+message ListConversationsResponse {
+  // The conversations in the organization.
+  repeated Conversation conversations = 1;
+
+  // Token for the next page of results.
+  string next_page_token = 2;
+}
+
+// Request message for `CreateConversation`.
+message CreateConversationRequest {
+  // Required. The parent organization.
+  // Format: `organizations/{organization}`
+  string parent = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {child_type: "pivox.ai/Conversation"},
+    (buf.validate.field).required = true
+  ];
+
+  // Required. The conversation to create.
+  Conversation conversation = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+// Request message for `UpdateConversation`.
+message UpdateConversationRequest {
+  // Required. The conversation to update.
+  Conversation conversation = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // Optional. The list of fields to update.
+  google.protobuf.FieldMask update_mask = 2 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// Request message for `DeleteConversation`.
+message DeleteConversationRequest {
+  // Required. The resource name of the conversation to delete.
+  // Format: `organizations/{organization}/conversations/{conversation}`
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.ai/Conversation"},
+    (buf.validate.field).required = true
+  ];
+}

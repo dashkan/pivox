@@ -1,0 +1,429 @@
+// Copyright 2025 Pivox
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package pivox.ai.v1;
+
+import "google/api/annotations.proto";
+import "google/api/client.proto";
+import "google/api/field_behavior.proto";
+import "google/api/resource.proto";
+import "google/protobuf/empty.proto";
+import "google/rpc/status.proto";
+import "pivox/ai/v1/artifacts.proto";
+import "pivox/ai/v1/conversations.proto";
+import "pivox/ai/v1/messages.proto";
+
+option go_package = "pivox/ai/v1;aiv1";
+
+// AI chat service providing conversation management and real-time streaming.
+// Resource methods follow AIP conventions. The Stream method is a non-AIP
+// bidi RPC for live chat transport.
+service AiChat {
+  option (google.api.default_host) = "api.pivox.io";
+
+  // Gets a conversation by resource name.
+  rpc GetConversation(GetConversationRequest) returns (Conversation) {
+    option (google.api.http) = {get: "/v1/{name=organizations/*/conversations/*}"};
+    option (google.api.method_signature) = "name";
+  }
+
+  // Lists conversations in an organization.
+  rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse) {
+    option (google.api.http) = {get: "/v1/{parent=organizations/*}/conversations"};
+    option (google.api.method_signature) = "parent";
+  }
+
+  // Creates a new conversation.
+  rpc CreateConversation(CreateConversationRequest) returns (Conversation) {
+    option (google.api.http) = {
+      post: "/v1/{parent=organizations/*}/conversations"
+      body: "conversation"
+    };
+    option (google.api.method_signature) = "parent,conversation";
+  }
+
+  // Updates a conversation's mutable fields.
+  rpc UpdateConversation(UpdateConversationRequest) returns (Conversation) {
+    option (google.api.http) = {
+      patch: "/v1/{conversation.name=organizations/*/conversations/*}"
+      body: "conversation"
+    };
+    option (google.api.method_signature) = "conversation,update_mask";
+  }
+
+  // Soft-deletes a conversation.
+  rpc DeleteConversation(DeleteConversationRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/v1/{name=organizations/*/conversations/*}"};
+    option (google.api.method_signature) = "name";
+  }
+
+  // Gets a message by resource name.
+  rpc GetMessage(GetMessageRequest) returns (Message) {
+    option (google.api.http) = {get: "/v1/{name=organizations/*/conversations/*/messages/*}"};
+    option (google.api.method_signature) = "name";
+  }
+
+  // Lists messages in a conversation.
+  rpc ListMessages(ListMessagesRequest) returns (ListMessagesResponse) {
+    option (google.api.http) = {get: "/v1/{parent=organizations/*/conversations/*}/messages"};
+    option (google.api.method_signature) = "parent";
+  }
+
+  // Gets an artifact by resource name.
+  rpc GetArtifact(GetArtifactRequest) returns (Artifact) {
+    option (google.api.http) = {get: "/v1/{name=organizations/*/conversations/*/artifacts/*}"};
+    option (google.api.method_signature) = "name";
+  }
+
+  // Lists artifacts in a conversation.
+  rpc ListArtifacts(ListArtifactsRequest) returns (ListArtifactsResponse) {
+    option (google.api.http) = {get: "/v1/{parent=organizations/*/conversations/*}/artifacts"};
+    option (google.api.method_signature) = "parent";
+  }
+
+  // Deletes an artifact and all its versions.
+  rpc DeleteArtifact(DeleteArtifactRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/v1/{name=organizations/*/conversations/*/artifacts/*}"};
+    option (google.api.method_signature) = "name";
+  }
+
+  // Gets an artifact version by resource name.
+  rpc GetArtifactVersion(GetArtifactVersionRequest) returns (ArtifactVersion) {
+    option (google.api.http) = {get: "/v1/{name=organizations/*/conversations/*/artifacts/*/versions/*}"};
+    option (google.api.method_signature) = "name";
+  }
+
+  // Lists versions of an artifact.
+  rpc ListArtifactVersions(ListArtifactVersionsRequest) returns (ListArtifactVersionsResponse) {
+    option (google.api.http) = {get: "/v1/{parent=organizations/*/conversations/*/artifacts/*}/versions"};
+    option (google.api.method_signature) = "parent";
+  }
+
+  // Deletes an artifact version. If the last version is deleted, the parent
+  // artifact is also deleted.
+  rpc DeleteArtifactVersion(DeleteArtifactVersionRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/v1/{name=organizations/*/conversations/*/artifacts/*/versions/*}"};
+    option (google.api.method_signature) = "name";
+  }
+
+  // Bidirectional streaming RPC for live AI chat. Native clients (macOS,
+  // Windows) use this directly. Web clients use the SSE adapter at
+  // POST /v1/ai:stream instead.
+  // (-- api-linter: core::0136::verb-noun=disabled
+  //     aip.dev/not-precedent: bidi streaming custom method for live chat transport. --)
+  // (-- api-linter: core::0136::request-message-name=disabled
+  //     aip.dev/not-precedent: bidi streaming uses ClientEvent/ServerEvent, not StreamRequest/StreamResponse. --)
+  // (-- api-linter: core::0136::response-message-name=disabled
+  //     aip.dev/not-precedent: bidi streaming uses ClientEvent/ServerEvent, not StreamRequest/StreamResponse. --)
+  // (-- api-linter: core::0136::http-method=disabled
+  //     aip.dev/not-precedent: bidi streaming custom method for live chat transport. --)
+  // (-- api-linter: core::0136::http-uri-suffix=disabled
+  //     aip.dev/not-precedent: bidi streaming custom method for live chat transport. --)
+  rpc Stream(stream ClientEvent) returns (stream ServerEvent) {}
+}
+
+// An event sent by the client during a streaming chat session.
+message ClientEvent {
+  oneof event {
+    // A user message to send to the model.
+    UserMessage message = 1;
+
+    // A tool output provided by the client in response to a tool call.
+    ToolOutput tool_output = 2;
+
+    // A tool approval response from the user.
+    ToolApprovalResponse tool_approval_response = 3;
+  }
+}
+
+// A user message submitted to the AI.
+message UserMessage {
+  // Required. The conversation to send the message to.
+  // Format: `organizations/{organization}/conversations/{conversation}`
+  string conversation = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.ai/Conversation"}
+  ];
+
+  // Required. The message parts.
+  repeated MessagePart parts = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+// A tool output provided by the client after executing a client-side tool.
+message ToolOutput {
+  // Required. The ID of the tool call this output is for.
+  string tool_call_id = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // Required. The conversation this tool output belongs to.
+  // Format: `organizations/{organization}/conversations/{conversation}`
+  string conversation = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.ai/Conversation"}
+  ];
+
+  // Optional. The JSON-encoded tool result.
+  string result_json = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Whether the tool execution resulted in an error.
+  bool is_error = 4 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// A response to a tool approval request.
+message ToolApprovalResponse {
+  // Required. The ID of the tool call being approved or denied.
+  string tool_call_id = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // Required. Whether the tool execution is approved.
+  bool approved = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+// An event sent by the server during a streaming chat session.
+message ServerEvent {
+  oneof event {
+    // Signals the start of an assistant text response.
+    TextStart text_start = 1;
+
+    // A chunk of assistant text.
+    TextDelta text_delta = 2;
+
+    // Signals the end of the assistant text response.
+    TextEnd text_end = 3;
+
+    // Signals the start of reasoning/thinking output.
+    ReasoningStart reasoning_start = 4;
+
+    // A chunk of reasoning text.
+    ReasoningDelta reasoning_delta = 5;
+
+    // Signals the end of reasoning output.
+    ReasoningEnd reasoning_end = 6;
+
+    // Signals the start of a tool call with partial input.
+    ToolCallStart tool_call_start = 7;
+
+    // A chunk of tool call input JSON.
+    ToolCallDelta tool_call_delta = 8;
+
+    // The tool call input is complete and ready for execution.
+    ToolInputAvailable tool_input_available = 9;
+
+    // A tool execution result (from a server-side tool).
+    ToolOutputAvailable tool_output_available = 10;
+
+    // A tool execution error.
+    ToolError tool_error = 11;
+
+    // A tool requires user approval before execution.
+    ToolApprovalRequested tool_approval_requested = 12;
+
+    // Signals the start of an artifact being produced.
+    ArtifactStart artifact_start = 13;
+
+    // A chunk of artifact content.
+    ArtifactDelta artifact_delta = 14;
+
+    // Signals the end of an artifact, including its persisted version.
+    ArtifactEnd artifact_end = 15;
+
+    // An error during artifact production.
+    ArtifactError artifact_error = 16;
+
+    // Metadata about the assistant message (token counts, model info).
+    MessageMetadata message_metadata = 17;
+
+    // The stream is complete.
+    Done done = 18;
+
+    // A stream-level error.
+    StreamError stream_error = 19;
+
+    // An opaque data part for future extensions (engine status, etc.).
+    DataPart data_part = 20;
+  }
+}
+
+// Signals the start of an assistant text response.
+message TextStart {
+  // The message ID being generated.
+  string message_id = 1;
+}
+
+// A chunk of assistant text.
+message TextDelta {
+  // The text content of this chunk.
+  string delta = 1;
+}
+
+// Signals the end of the assistant text response.
+message TextEnd {}
+
+// Signals the start of reasoning/thinking output.
+message ReasoningStart {
+  // The message ID for the reasoning block.
+  string message_id = 1;
+}
+
+// A chunk of reasoning text.
+message ReasoningDelta {
+  // The reasoning text content of this chunk.
+  string delta = 1;
+}
+
+// Signals the end of reasoning output.
+message ReasoningEnd {}
+
+// Signals the start of a tool call.
+message ToolCallStart {
+  // The unique ID of this tool call.
+  string tool_call_id = 1;
+
+  // The tool being called.
+  string tool = 2;
+}
+
+// A chunk of tool call input JSON being streamed.
+message ToolCallDelta {
+  // The tool call ID this delta belongs to.
+  string tool_call_id = 1;
+
+  // A chunk of the JSON input.
+  string delta = 2;
+}
+
+// The tool call input is fully available and ready for execution.
+message ToolInputAvailable {
+  // The unique ID of this tool call.
+  string tool_call_id = 1;
+
+  // The tool to execute.
+  string tool = 2;
+
+  // The complete JSON-encoded input arguments.
+  string input_json = 3;
+
+  // Whether this tool is executed server-side (true) or client-side (false).
+  bool server_side = 4;
+}
+
+// A tool execution result from a server-side tool.
+message ToolOutputAvailable {
+  // The tool call ID this output is for.
+  string tool_call_id = 1;
+
+  // The JSON-encoded tool result.
+  string result_json = 2;
+}
+
+// A tool execution error.
+message ToolError {
+  // The tool call ID that errored.
+  string tool_call_id = 1;
+
+  // The error message.
+  string error_message = 2;
+}
+
+// A tool that requires user approval before execution.
+message ToolApprovalRequested {
+  // The unique ID of this tool call.
+  string tool_call_id = 1;
+
+  // The tool requesting approval.
+  string tool = 2;
+
+  // The complete JSON-encoded input arguments for review.
+  string input_json = 3;
+}
+
+// Signals the start of an artifact being produced.
+message ArtifactStart {
+  // The artifact ID being produced.
+  string artifact_id = 1;
+
+  // The type of artifact (e.g. "code", "markdown", "svg").
+  string type = 2;
+
+  // A human-readable title.
+  string title = 3;
+}
+
+// A chunk of artifact content.
+message ArtifactDelta {
+  // The artifact ID this delta belongs to.
+  string artifact_id = 1;
+
+  // A chunk of the content.
+  string delta = 2;
+}
+
+// Signals the end of an artifact, including its persisted version info.
+message ArtifactEnd {
+  // The artifact ID.
+  string artifact_id = 1;
+
+  // The persisted artifact version.
+  // Format: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
+  string artifact_version = 2 [(google.api.resource_reference) = {type: "pivox.ai/ArtifactVersion"}];
+
+  // The MIME type of the artifact.
+  string mime_type = 3;
+
+  // The size in bytes of the artifact content.
+  int64 size_bytes = 4;
+}
+
+// An error during artifact production.
+message ArtifactError {
+  // The artifact ID that errored.
+  string artifact_id = 1;
+
+  // The error details.
+  google.rpc.Status status = 2;
+}
+
+// Metadata about the assistant message.
+message MessageMetadata {
+  // The message ID this metadata is for.
+  string message_id = 1;
+
+  // The model that generated the response.
+  string model = 2;
+
+  // Input token count (approximate).
+  int32 input_tokens = 3;
+
+  // Output token count (approximate).
+  int32 output_tokens = 4;
+}
+
+// The stream is complete. No more events will be sent.
+message Done {}
+
+// A stream-level error.
+message StreamError {
+  // The error details.
+  google.rpc.Status status = 1;
+}
+
+// An opaque data part for future extensions (engine status, rundown
+// updates, etc.). Follows Vercel AI SDK's DataPart convention.
+message DataPart {
+  // The data type identifier.
+  string type = 1;
+
+  // The JSON-encoded payload.
+  string data_json = 2;
+}

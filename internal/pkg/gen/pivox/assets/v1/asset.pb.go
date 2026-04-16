@@ -896,7 +896,8 @@ func (x *AssetVersion) GetCrop() *Crop {
 	return nil
 }
 
-// Crop operation combining crop area, straighten, and flip.
+// Crop operation combining crop area, rotation, straighten, and flip.
+// Applied order: crop → rotation → straighten → flip.
 type Crop struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Optional. The crop area to apply. If set, width and height must
@@ -907,7 +908,10 @@ type Crop struct {
 	// Optional. Flip horizontally.
 	FlipHorizontal bool `protobuf:"varint,3,opt,name=flip_horizontal,json=flipHorizontal,proto3" json:"flip_horizontal,omitempty"`
 	// Optional. Flip vertically.
-	FlipVertical  bool `protobuf:"varint,4,opt,name=flip_vertical,json=flipVertical,proto3" json:"flip_vertical,omitempty"`
+	FlipVertical bool `protobuf:"varint,4,opt,name=flip_vertical,json=flipVertical,proto3" json:"flip_vertical,omitempty"`
+	// Optional. Rotation in 90-degree increments (0, 90, 180, 270).
+	// Applied after crop, before straighten.
+	Rotation      int32 `protobuf:"varint,5,opt,name=rotation,proto3" json:"rotation,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -968,6 +972,13 @@ func (x *Crop) GetFlipVertical() bool {
 		return x.FlipVertical
 	}
 	return false
+}
+
+func (x *Crop) GetRotation() int32 {
+	if x != nil {
+		return x.Rotation
+	}
+	return 0
 }
 
 // The crop area within an image.
@@ -2749,14 +2760,15 @@ const file_pivox_assets_v1_asset_proto_rawDesc = "" +
 	"\x0esource_version\x18\f \x01(\tB!\xe0A\x03\xfaA\x1b\n" +
 	"\x19pivox.assets/AssetVersionR\rsourceVersion\x12.\n" +
 	"\x04crop\x18\r \x01(\v2\x15.pivox.assets.v1.CropB\x03\xe0A\x03R\x04crop:\x8a\x01\xeaA\x86\x01\n" +
-	"\x19pivox.assets/AssetVersion\x12Qorganizations/{organization}/projects/{project}/assets/{asset}/versions/{version}*\bversions2\fassetVersion\"\xb7\x01\n" +
+	"\x19pivox.assets/AssetVersion\x12Qorganizations/{organization}/projects/{project}/assets/{asset}/versions/{version}*\bversions2\fassetVersion\"\xd8\x01\n" +
 	"\x04Crop\x122\n" +
 	"\x04area\x18\x01 \x01(\v2\x19.pivox.assets.v1.CropAreaB\x03\xe0A\x01R\x04area\x12#\n" +
 	"\n" +
 	"straighten\x18\x02 \x01(\x02B\x03\xe0A\x01R\n" +
 	"straighten\x12,\n" +
 	"\x0fflip_horizontal\x18\x03 \x01(\bB\x03\xe0A\x01R\x0eflipHorizontal\x12(\n" +
-	"\rflip_vertical\x18\x04 \x01(\bB\x03\xe0A\x01R\fflipVertical\"v\n" +
+	"\rflip_vertical\x18\x04 \x01(\bB\x03\xe0A\x01R\fflipVertical\x12\x1f\n" +
+	"\brotation\x18\x05 \x01(\x05B\x03\xe0A\x01R\brotation\"v\n" +
 	"\bCropArea\x12\x11\n" +
 	"\x01x\x18\x01 \x01(\x05B\x03\xe0A\x02R\x01x\x12\x11\n" +
 	"\x01y\x18\x02 \x01(\x05B\x03\xe0A\x02R\x01y\x12 \n" +

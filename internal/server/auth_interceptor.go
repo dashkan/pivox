@@ -23,6 +23,12 @@ func AuthenticatedUID(ctx context.Context) (string, bool) {
 	return uid, ok
 }
 
+// WithAuthenticatedUID returns a new context with the given UID set,
+// as if the auth interceptor had verified it. Intended for tests.
+func WithAuthenticatedUID(ctx context.Context, uid string) context.Context {
+	return context.WithValue(ctx, authContextKey{}, uid)
+}
+
 // MustAuthenticatedUID extracts the verified UID from the context.
 // Panics if the context does not contain an authenticated UID — only call
 // this from handlers that are known to be behind the auth interceptor.

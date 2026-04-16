@@ -36,10 +36,14 @@ import (
 	"github.com/dashkan/pivox/internal/service/storage"
 	"github.com/dashkan/pivox/internal/service/tags"
 
+	"github.com/dashkan/pivox/internal/service/aichat"
+	"github.com/dashkan/pivox/internal/service/aichat/model"
+	"github.com/dashkan/pivox/internal/service/aichat/tools"
 	"github.com/dashkan/pivox/internal/service/assets"
 	"github.com/dashkan/pivox/internal/service/requests"
 
 	agentv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/agent/v1"
+	aiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	assetsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1"
 	storagev1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"
@@ -67,6 +71,8 @@ func main() {
 	f.Duration("delegated-auth-session-ttl", envOrDuration("PIVOX_DELEGATED_AUTH_SESSION_TTL", 5*time.Minute), "How long a delegated auth session code remains valid")
 	f.Duration("delegated-auth-poll-interval", envOrDuration("PIVOX_DELEGATED_AUTH_POLL_INTERVAL", 5*time.Second), "Poll interval returned to delegated auth clients")
 	f.Bool("rate-limit-enabled", envOrBool("PIVOX_RATE_LIMIT_ENABLED", true), "Enable in-process per-IP rate limiting on internal endpoints (disable when a reverse proxy handles it)")
+	f.String("ollama-url", envOrDefault("PIVOX_OLLAMA_URL", "http://localhost:11434"), "Ollama API base URL")
+	f.String("ollama-model", envOrDefault("PIVOX_OLLAMA_MODEL", "qwen3-vl"), "Ollama model to use for AI chat")
 
 	addSyncAuthFlags(rootCmd)
 
@@ -239,6 +245,17 @@ func serve(cmd *cobra.Command, args []string) error {
 	assetsv1.RegisterAssetsServer(grpcServer, assets.NewAssetsServer(pool, queries))
 	assetsv1.RegisterRequestsServer(grpcServer, requests.NewRequestsServer(queries))
 
+	// AI Chat service
+	ollamaURL := must(f.GetString("ollama-url"))
+	ollamaModel := must(f.GetString("ollama-model"))
+	llm, err := model.NewOllamaAdapter(ollamaURL, ollamaModel)
+	if err != nil {
+		return fmt.Errorf("initialize Ollama adapter: %w", err)
+	}
+	toolRegistry := tools.NewRegistry()
+	aiChatServer := aichat.NewServer(pool, queries, llm, toolRegistry, logger)
+	aiv1.RegisterAiChatServer(grpcServer, aiChatServer)
+
 	// Agent bidi streaming service (agents authenticate via registration token, not Firebase)
 	agentv1.RegisterAgentServiceServer(grpcServer, storage.NewAgentServiceServer(queries, logger, connMgr))
 
@@ -274,10 +291,38 @@ func serve(cmd *cobra.Command, args []string) error {
 		storagev1.RegisterEndpointsHandlerFromEndpoint,
 		assetsv1.RegisterAssetsHandlerFromEndpoint,
 		assetsv1.RegisterRequestsHandlerFromEndpoint,
+		aiv1.RegisterAiChatHandlerFromEndpoint,
 	} {
 		if err := reg(ctx, gwMux, grpcEndpoint, dialOpts); err != nil {
 			return fmt.Errorf("register REST gateway: %w", err)
 		}
+	}
+
+	// AI Chat HTTP handlers (inline artifact content + SSE stream)
+	contentHandler := aichat.NewContentHandler(queries, logger)
+	if err := gwMux.HandlePath(
+		"GET",
+		"/v1/organizations/{org}/conversations/{conv}/artifacts/{art}/versions/{ver}:content",
+		func(w http.ResponseWriter, r *http.Request, _ map[string]string) {
+			contentHandler.ServeHTTP(w, r)
+		},
+	); err != nil {
+		return fmt.Errorf("register artifact content handler: %w", err)
+	}
+
+	grpcConn, err := grpc.NewClient(grpcEndpoint, dialOpts...)
+	if err != nil {
+		return fmt.Errorf("dial local gRPC for SSE handler: %w", err)
+	}
+	sseHandler := aichat.NewSSEHandler(aiv1.NewAiChatClient(grpcConn), logger)
+	if err := gwMux.HandlePath(
+		"POST",
+		"/v1/ai:stream",
+		func(w http.ResponseWriter, r *http.Request, _ map[string]string) {
+			sseHandler.ServeHTTP(w, r)
+		},
+	); err != nil {
+		return fmt.Errorf("register SSE stream handler: %w", err)
 	}
 
 	// HTTP mux: internal hooks + gRPC gateway (fallback)

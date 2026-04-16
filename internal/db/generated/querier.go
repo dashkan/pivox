@@ -26,25 +26,34 @@ type Querier interface {
 	// under concurrent pollers. No-row result means the session is still pending,
 	// already consumed, or expired; callers distinguish pending via GetDelegatedAuthSessionStatus.
 	ConsumeDelegatedAuthSession(ctx context.Context, code uuid.UUID) (pgtype.Text, error)
+	CountArtifactVersionsByArtifact(ctx context.Context, artifactID uuid.UUID) (int64, error)
+	CountArtifactsByConversation(ctx context.Context, conversationID uuid.UUID) (int64, error)
 	CountAssetVersions(ctx context.Context, assetID uuid.UUID) (int64, error)
 	CountAssetsByProject(ctx context.Context, projectID uuid.UUID) (int64, error)
 	CountConnectedStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) (int64, error)
+	CountConversationsByCreator(ctx context.Context, arg CountConversationsByCreatorParams) (int64, error)
 	CountFulfilledLineItems(ctx context.Context, requestID uuid.UUID) (int64, error)
 	CountLineItemsByRequest(ctx context.Context, requestID uuid.UUID) (int64, error)
+	CountMessagesByConversation(ctx context.Context, conversationID uuid.UUID) (int64, error)
 	CountRequestsByProject(ctx context.Context, projectID uuid.UUID) (int64, error)
 	CountStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) (int64, error)
 	CountTagBindingsByTagValue(ctx context.Context, tagValueID uuid.UUID) (int64, error)
 	CountTagValuesByTagKey(ctx context.Context, tagKeyID uuid.UUID) (int64, error)
 	CreateApiKey(ctx context.Context, arg CreateApiKeyParams) (ApiKey, error)
+	CreateArtifact(ctx context.Context, arg CreateArtifactParams) (Artifact, error)
 	CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset, error)
+	CreateAssetArtifactVersion(ctx context.Context, arg CreateAssetArtifactVersionParams) (ArtifactVersion, error)
 	CreateAssetRendition(ctx context.Context, arg CreateAssetRenditionParams) (AssetRendition, error)
 	CreateAssetVersion(ctx context.Context, arg CreateAssetVersionParams) (AssetVersion, error)
 	// Stores a Firebase ID token behind a short-lived opaque code.
 	CreateAuthTokenCode(ctx context.Context, idToken string) (AuthTokenCode, error)
+	CreateConversation(ctx context.Context, arg CreateConversationParams) (Conversation, error)
 	// Creates a new delegated auth session. The code and expiry are chosen by the
 	// server so we can control both TTL and the entropy source (crypto/rand).
 	CreateDelegatedAuthSession(ctx context.Context, arg CreateDelegatedAuthSessionParams) (DelegatedAuthSession, error)
+	CreateInlineArtifactVersion(ctx context.Context, arg CreateInlineArtifactVersionParams) (ArtifactVersion, error)
 	CreateLineItem(ctx context.Context, arg CreateLineItemParams) (LineItem, error)
+	CreateMessage(ctx context.Context, arg CreateMessageParams) (Message, error)
 	CreateOperation(ctx context.Context, arg CreateOperationParams) (Operation, error)
 	CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error)
 	CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error)
@@ -56,7 +65,10 @@ type Querier interface {
 	CreateTagBinding(ctx context.Context, arg CreateTagBindingParams) (TagBinding, error)
 	CreateTagKey(ctx context.Context, arg CreateTagKeyParams) (TagKey, error)
 	CreateTagValue(ctx context.Context, arg CreateTagValueParams) (TagValue, error)
+	DeleteArtifact(ctx context.Context, id uuid.UUID) error
+	DeleteArtifactVersion(ctx context.Context, id uuid.UUID) error
 	DeleteAssetRenditionsByVersion(ctx context.Context, versionID uuid.UUID) error
+	DeleteConversation(ctx context.Context, id uuid.UUID) error
 	// Cleanup: remove codes older than 10 minutes (all should be expired by then).
 	DeleteExpiredAuthTokenCodes(ctx context.Context) error
 	// Cleanup: remove sessions past their expiry. Run periodically.
@@ -78,11 +90,17 @@ type Querier interface {
 	GetApiKeyByOrgAndKeyID(ctx context.Context, arg GetApiKeyByOrgAndKeyIDParams) (ApiKey, error)
 	GetApiKeyIncludingDeleted(ctx context.Context, id uuid.UUID) (ApiKey, error)
 	GetApiKeyString(ctx context.Context, id uuid.UUID) (string, error)
+	GetArtifactByID(ctx context.Context, id uuid.UUID) (Artifact, error)
+	GetArtifactByName(ctx context.Context, arg GetArtifactByNameParams) (Artifact, error)
+	GetArtifactVersionByName(ctx context.Context, arg GetArtifactVersionByNameParams) (ArtifactVersion, error)
+	GetArtifactVersionForContent(ctx context.Context, arg GetArtifactVersionForContentParams) (GetArtifactVersionForContentRow, error)
 	GetAsset(ctx context.Context, id uuid.UUID) (Asset, error)
 	GetAssetByChecksum(ctx context.Context, arg GetAssetByChecksumParams) (Asset, error)
 	GetAssetByName(ctx context.Context, arg GetAssetByNameParams) (Asset, error)
 	GetAssetVersion(ctx context.Context, id uuid.UUID) (AssetVersion, error)
 	GetAssetVersionByNumber(ctx context.Context, arg GetAssetVersionByNumberParams) (AssetVersion, error)
+	GetConversationByID(ctx context.Context, id uuid.UUID) (Conversation, error)
+	GetConversationByName(ctx context.Context, arg GetConversationByNameParams) (Conversation, error)
 	// Returns the status of a session without mutating it. Used by pollers to
 	// distinguish "still pending" from "expired/unknown" after a failed consume.
 	GetDelegatedAuthSessionStatus(ctx context.Context, code uuid.UUID) (string, error)
@@ -90,6 +108,8 @@ type Querier interface {
 	GetLatestAssetVersion(ctx context.Context, assetID uuid.UUID) (AssetVersion, error)
 	GetLineItem(ctx context.Context, id uuid.UUID) (LineItem, error)
 	GetLineItemByName(ctx context.Context, arg GetLineItemByNameParams) (LineItem, error)
+	GetMessageByName(ctx context.Context, arg GetMessageByNameParams) (Message, error)
+	GetNextSequenceForConversation(ctx context.Context, conversationID uuid.UUID) (int32, error)
 	GetOperation(ctx context.Context, id uuid.UUID) (Operation, error)
 	GetOrganization(ctx context.Context, id uuid.UUID) (Organization, error)
 	GetOrganizationByName(ctx context.Context, name string) (Organization, error)
@@ -110,13 +130,23 @@ type Querier interface {
 	GetTagKeyByNamespacedName(ctx context.Context, namespacedName string) (TagKey, error)
 	GetTagValue(ctx context.Context, id uuid.UUID) (TagValue, error)
 	GetTagValueByNamespacedName(ctx context.Context, namespacedName string) (TagValue, error)
+	IncrementConversationMessageCount(ctx context.Context, id uuid.UUID) error
+	IsOnlyArtifactVersion(ctx context.Context, artifactID uuid.UUID) (bool, error)
+	ListArtifactVersionsByArtifact(ctx context.Context, arg ListArtifactVersionsByArtifactParams) ([]ListArtifactVersionsByArtifactRow, error)
+	ListArtifactsByConversation(ctx context.Context, arg ListArtifactsByConversationParams) ([]Artifact, error)
 	ListAssetRenditions(ctx context.Context, versionID uuid.UUID) ([]AssetRendition, error)
 	ListAssetVersions(ctx context.Context, arg ListAssetVersionsParams) ([]AssetVersion, error)
 	ListAssetsByProject(ctx context.Context, arg ListAssetsByProjectParams) ([]Asset, error)
 	ListAssetsByProjectWithDeleted(ctx context.Context, arg ListAssetsByProjectWithDeletedParams) ([]Asset, error)
+	ListConversationsByCreator(ctx context.Context, arg ListConversationsByCreatorParams) ([]Conversation, error)
+	ListConversationsByCreatorActive(ctx context.Context, arg ListConversationsByCreatorActiveParams) ([]Conversation, error)
 	ListEffectiveTags(ctx context.Context, parentResource string) ([]ListEffectiveTagsRow, error)
 	ListExpiredAssets(ctx context.Context, limit int32) ([]Asset, error)
 	ListLineItemsByRequest(ctx context.Context, arg ListLineItemsByRequestParams) ([]LineItem, error)
+	ListMessagesByConversation(ctx context.Context, arg ListMessagesByConversationParams) ([]Message, error)
+	// Fetches messages newest-first for budget truncation in Go.
+	// Caller walks rows accumulating token_count and stops when budget is exceeded.
+	ListMessagesNewestFirst(ctx context.Context, arg ListMessagesNewestFirstParams) ([]Message, error)
 	ListOperations(ctx context.Context, arg ListOperationsParams) ([]Operation, error)
 	ListPendingOperations(ctx context.Context) ([]Operation, error)
 	ListRequestsByProject(ctx context.Context, arg ListRequestsByProjectParams) ([]Request, error)
@@ -134,14 +164,17 @@ type Querier interface {
 	SoftDeleteAsset(ctx context.Context, arg SoftDeleteAssetParams) error
 	SoftDeleteProject(ctx context.Context, arg SoftDeleteProjectParams) (Project, error)
 	SoftDeleteRequest(ctx context.Context, arg SoftDeleteRequestParams) error
+	SumTokensByConversation(ctx context.Context, conversationID uuid.UUID) (int64, error)
 	UndeleteApiKey(ctx context.Context, arg UndeleteApiKeyParams) (ApiKey, error)
 	UndeleteAsset(ctx context.Context, id uuid.UUID) error
 	UndeleteProject(ctx context.Context, arg UndeleteProjectParams) (Project, error)
 	UpdateApiKey(ctx context.Context, arg UpdateApiKeyParams) (ApiKey, error)
+	UpdateArtifactLatestVersion(ctx context.Context, arg UpdateArtifactLatestVersionParams) error
 	UpdateAsset(ctx context.Context, arg UpdateAssetParams) (Asset, error)
 	UpdateAssetIngestion(ctx context.Context, arg UpdateAssetIngestionParams) error
 	UpdateAssetState(ctx context.Context, arg UpdateAssetStateParams) error
 	UpdateAssetVersionError(ctx context.Context, arg UpdateAssetVersionErrorParams) error
+	UpdateConversation(ctx context.Context, arg UpdateConversationParams) (Conversation, error)
 	UpdateLineItem(ctx context.Context, arg UpdateLineItemParams) (LineItem, error)
 	UpdateLineItemState(ctx context.Context, arg UpdateLineItemStateParams) error
 	UpdateOperationMetadata(ctx context.Context, arg UpdateOperationMetadataParams) error
