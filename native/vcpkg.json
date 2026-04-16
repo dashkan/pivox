@@ -5,6 +5,7 @@
   "dependencies": [
     "gtest",
     "grpc",
-    "protobuf"
+    "protobuf",
+    "cmark-gfm"
   ]
 }

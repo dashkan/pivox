@@ -1,4 +1,5 @@
 add_subdirectory(ai_chat/client)
+add_subdirectory(ai_elements/markdown)
 
 add_library(pivox_core STATIC
     core.cpp
