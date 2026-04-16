@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.23)
+cmake_minimum_required(VERSION 4.0)
 
 # Swift is only used on macOS.
 if(APPLE)
@@ -97,9 +97,14 @@ if(APPLE)
 
     set(FIREBASE_PLIST "${CMAKE_SOURCE_DIR}/configs/firebase/GoogleService-Info.plist")
 
+    # PivoxModels — generated Swift proto types.
+    set(PIVOX_MODELS_DIR "platform/macos/swift-packages/PivoxModels/Sources/PivoxModels/Generated")
+    file(GLOB PIVOX_MODELS_SOURCES "${PIVOX_MODELS_DIR}/*.swift")
+
     # Swift executable (SwiftUI app).
     set(SWIFT_DIR "platform/macos/swift")
     add_executable(${APP_TARGET} MACOSX_BUNDLE
+        ${PIVOX_MODELS_SOURCES}
         ${SWIFT_DIR}/App/main.swift
         ${SWIFT_DIR}/App/AppDelegate.swift
         ${SWIFT_DIR}/App/ContentView.swift
@@ -124,7 +129,20 @@ if(APPLE)
         MACOSX_PACKAGE_LOCATION Resources
     )
 
-    target_link_libraries(${APP_TARGET} PRIVATE pivox_bridge
+    # SwiftProtobuf — compiled from vendored SPM checkout.
+    # PivoxModels' `swift build` fetches swift-protobuf into .build/checkouts/.
+    # We compile it as a CMake Swift static library so the Xcode project links it.
+    set(SWIFT_PROTOBUF_DIR "platform/macos/swift-packages/PivoxModels/.build/checkouts/swift-protobuf/Sources/SwiftProtobuf")
+    file(GLOB SWIFT_PROTOBUF_SOURCES "${SWIFT_PROTOBUF_DIR}/*.swift")
+    add_library(SwiftProtobuf STATIC ${SWIFT_PROTOBUF_SOURCES})
+    target_compile_options(SwiftProtobuf PRIVATE
+        "$<$<COMPILE_LANGUAGE:Swift>:-package-name;SwiftProtobuf>")
+    set_target_properties(SwiftProtobuf PROPERTIES
+        CMAKE_Swift_LANGUAGE_VERSION 6
+        XCODE_ATTRIBUTE_ENABLE_TESTABILITY "NO"
+    )
+
+    target_link_libraries(${APP_TARGET} PRIVATE pivox_bridge SwiftProtobuf
         # Firebase Core (from Analytics bundle)
         "${FB_ANALYTICS}/FirebaseCore.xcframework"
         "${FB_ANALYTICS}/FirebaseCoreInternal.xcframework"
@@ -156,7 +174,7 @@ if(APPLE)
         MACOSX_BUNDLE_BUNDLE_VERSION "0.1.0"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1.0"
         MACOSX_BUNDLE_BUNDLE_NAME "Pivox"
-        CMAKE_Swift_LANGUAGE_VERSION 5
+        CMAKE_Swift_LANGUAGE_VERSION 6
         # Required so XCTest bundles can `@testable import Pivox` for
         # unit tests that reach into the Swift module's internal types.
         XCODE_ATTRIBUTE_ENABLE_TESTABILITY "YES"

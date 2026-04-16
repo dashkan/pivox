@@ -1,3 +1,5 @@
+add_subdirectory(ai_chat/client)
+
 add_library(pivox_core STATIC
     core.cpp
     image-editor/image_editor_types.cpp

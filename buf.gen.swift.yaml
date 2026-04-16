@@ -1,0 +1,16 @@
+version: v2
+clean: true
+managed:
+  enabled: true
+inputs:
+  - directory: api/proto
+    paths:
+      - api/proto/pivox
+      - api/proto/google/rpc
+      - api/proto/google/type
+plugins:
+  - remote: buf.build/apple/swift:v1.36.1
+    out: native/platform/macos/swift-packages/PivoxModels/Sources/PivoxModels/Generated
+    opt:
+      - Visibility=Public
+      - FileNaming=PathToUnderscores
