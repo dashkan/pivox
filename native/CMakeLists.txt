@@ -1,5 +1,30 @@
 cmake_minimum_required(VERSION 4.0)
 
+# ── vcpkg overlay ports ─────────────────────────────────────────────
+# We ship a local vcpkg port overlay at `native/vcpkg-ports/` for packages
+# that need patches we don't want to monkey-patch at the CMake layer.
+#
+# Currently overlaid:
+#   abseil — absl/time emits `-Wl,-framework,CoreFoundation` in its
+#            INTERFACE_LINK_LIBRARIES. The clang driver parses `-Wl,X,Y,Z`;
+#            swiftc does not, so any Swift target that transitively
+#            consumes absl::time (e.g. via gRPC) fails to link under the
+#            Ninja generator. Our patch applies absl's OWN planned fix
+#            early — switching to the CMake 3.24+ neutral form
+#            `$<LINK_LIBRARY:FRAMEWORK,CoreFoundation>`, which both driver
+#            parsers accept.
+#
+#            Upstream TODO (will let us delete our overlay once merged):
+#            https://github.com/abseil/abseil-cpp/blob/master/absl/time/CMakeLists.txt
+#            grep for TODO(#1495)
+#
+# When upstream lands the fix AND vcpkg picks it up, delete
+# `native/vcpkg-ports/abseil/` and remove this comment block.
+#
+# Consumers: pass `-DVCPKG_OVERLAY_PORTS=${sourceDir}/vcpkg-ports` to cmake
+# (already wired in CMakePresets.json).
+# ────────────────────────────────────────────────────────────────────
+
 # Swift is only used on macOS.
 if(APPLE)
     project(Pivox LANGUAGES C CXX Swift)
@@ -261,7 +286,10 @@ if(APPLE)
     target_compile_options(PivoxUITests PRIVATE
         "SHELL:-import-objc-header ${CMAKE_SOURCE_DIR}/platform/macos/Bridging-Header.h"
     )
-    target_include_directories(PivoxUITests PRIVATE "${CMAKE_SOURCE_DIR}/platform/macos/objcpp")
+    target_include_directories(PivoxUITests PRIVATE
+        "${CMAKE_SOURCE_DIR}/platform/macos/objcpp"
+        "${CMAKE_SOURCE_DIR}/core/ai_chat/client"
+    )
 
     # Mark as UI test bundle — XCUITest launches the app itself.
     set_target_properties(PivoxUITests PROPERTIES

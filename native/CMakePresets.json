@@ -2,6 +2,23 @@
     "version": 3,
     "configurePresets": [
         {
+            "name": "mac-app",
+            "displayName": "Pivox App (macOS)",
+            "generator": "Xcode",
+            "binaryDir": "${sourceDir}/build-xcode",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                "VCPKG_INSTALLED_DIR": "$env{VCPKG_ROOT}/installed",
+                "VCPKG_OVERLAY_PORTS": "${sourceDir}/vcpkg-ports",
+                "CMAKE_OSX_SYSROOT": "macosx"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            }
+        },
+        {
             "name": "win-app",
             "displayName": "Pivox App (x64)",
             "generator": "Visual Studio 18 2026",
@@ -21,6 +38,12 @@
                 "PIVOX_BUILD_ACTIVEX": "ON",
                 "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
             }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "mac-app",
+            "configurePreset": "mac-app"
         }
     ]
 }
