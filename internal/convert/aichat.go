@@ -13,10 +13,10 @@ import (
 
 // ConversationToProto converts a DB conversation to proto.
 // orgName is the organization segment (e.g. "acme").
-func ConversationToProto(row db.Conversation, orgName string) *aiv1.Conversation {
+func ConversationToProto(row db.AiConversation, orgName string) *aiv1.Conversation {
 	pb := &aiv1.Conversation{
 		Name:         fmt.Sprintf("organizations/%s/conversations/%s", orgName, row.Name),
-		Creator:      fmt.Sprintf("organizations/%s/users/%s", orgName, row.CreatorUid),
+		Creator:      fmt.Sprintf("organizations/%s/users/%s", orgName, row.CreatedBy),
 		Title:        row.Title,
 		Description:  row.Description,
 		Archived:     row.Archived,
@@ -34,7 +34,7 @@ func ConversationToProto(row db.Conversation, orgName string) *aiv1.Conversation
 
 // MessageToProto converts a DB message to proto.
 // convName is the full conversation resource name.
-func MessageToProto(row db.Message, convName string) (*aiv1.Message, error) {
+func MessageToProto(row db.AiMessage, convName string) (*aiv1.Message, error) {
 	pb := &aiv1.Message{
 		Name:       fmt.Sprintf("%s/messages/%s", convName, row.Name),
 		Role:       roleToProto(row.Role),
@@ -59,7 +59,7 @@ func MessageToProto(row db.Message, convName string) (*aiv1.Message, error) {
 
 // ArtifactToProto converts a DB artifact to proto.
 // convName is the full conversation resource name.
-func ArtifactToProto(row db.Artifact, convName string) *aiv1.Artifact {
+func ArtifactToProto(row db.AiArtifact, convName string) *aiv1.Artifact {
 	artName := fmt.Sprintf("%s/artifacts/%s", convName, row.Name)
 	pb := &aiv1.Artifact{
 		Name:        artName,
@@ -78,7 +78,7 @@ func ArtifactToProto(row db.Artifact, convName string) *aiv1.Artifact {
 
 // ArtifactVersionToProtoAi converts a DB artifact version to proto.
 // artName is the full artifact resource name.
-func ArtifactVersionToProtoAi(row db.ArtifactVersion, artName string) *aiv1.ArtifactVersion {
+func ArtifactVersionToProtoAi(row db.AiArtifactVersion, artName string) *aiv1.ArtifactVersion {
 	pb := &aiv1.ArtifactVersion{
 		Name:       fmt.Sprintf("%s/versions/%s", artName, row.Name),
 		CreateTime: timestamppb.New(row.CreateTime),

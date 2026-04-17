@@ -138,10 +138,10 @@ func (s *Server) DeleteArtifactVersion(ctx context.Context, req *aiv1.DeleteArti
 }
 
 // resolveArtifact resolves org + conversation + artifact names to the DB row.
-func (s *Server) resolveArtifact(ctx context.Context, orgName, convName, artName string) (db.Artifact, error) {
+func (s *Server) resolveArtifact(ctx context.Context, orgName, convName, artName string) (db.AiArtifact, error) {
 	conv, err := s.resolveConversation(ctx, orgName, convName)
 	if err != nil {
-		return db.Artifact{}, err
+		return db.AiArtifact{}, err
 	}
 
 	art, err := s.queries.GetArtifactByName(ctx, db.GetArtifactByNameParams{
@@ -149,7 +149,7 @@ func (s *Server) resolveArtifact(ctx context.Context, orgName, convName, artName
 		Name:           artName,
 	})
 	if err != nil {
-		return db.Artifact{}, apierr.HandleResourceError(err, "Artifact", buildArtifactName(orgName, convName, artName))
+		return db.AiArtifact{}, apierr.HandleResourceError(err, "Artifact", buildArtifactName(orgName, convName, artName))
 	}
 	return art, nil
 }

@@ -59,10 +59,10 @@ func (s *Server) ListConversations(ctx context.Context, req *aiv1.ListConversati
 	}
 
 	rows, err := s.queries.ListConversationsByCreator(ctx, db.ListConversationsByCreatorParams{
-		OrgID:      orgID,
-		CreatorUid: uid,
-		Limit:      pageSize + 1,
-		Offset:     0,
+		OrgID:     orgID,
+		CreatedBy: uid,
+		Limit:     pageSize + 1,
+		Offset:    0,
 	})
 	if err != nil {
 		return nil, apierr.Internal("database error")
@@ -101,7 +101,6 @@ func (s *Server) CreateConversation(ctx context.Context, req *aiv1.CreateConvers
 
 	row, err := s.queries.CreateConversation(ctx, db.CreateConversationParams{
 		OrgID:       orgID,
-		CreatorUid:  uid,
 		Name:        uuid.New().String()[:12],
 		Title:       conv.GetTitle(),
 		Description: conv.GetDescription(),

@@ -1,6 +1,20 @@
 -- 000001_init.down.sql
 -- Drop all tables in reverse dependency order.
 
+-- AI chat
+DROP TABLE IF EXISTS ai_artifact_versions;
+DROP TABLE IF EXISTS ai_artifacts;
+DROP TABLE IF EXISTS ai_messages;
+DROP TABLE IF EXISTS ai_conversations;
+
+-- Assets
+DROP TABLE IF EXISTS asset_request_line_items;
+DROP TABLE IF EXISTS asset_requests;
+DROP TABLE IF EXISTS asset_renditions;
+DROP TABLE IF EXISTS asset_versions;
+DROP TABLE IF EXISTS assets;
+
+-- Auth / IAM / org
 DROP TABLE IF EXISTS delegated_auth_sessions;
 DROP TABLE IF EXISTS auth_token_codes;
 DROP TABLE IF EXISTS public_email_domains;
@@ -31,6 +45,15 @@ DROP TABLE IF EXISTS custom_domains;
 DROP TABLE IF EXISTS organizations;
 DROP TABLE IF EXISTS operations;
 
+-- Enum types
+DROP TYPE IF EXISTS line_item_state;
+DROP TYPE IF EXISTS request_priority;
+DROP TYPE IF EXISTS request_state;
+DROP TYPE IF EXISTS rendition_type;
+DROP TYPE IF EXISTS asset_media_type;
+DROP TYPE IF EXISTS asset_state;
+DROP TYPE IF EXISTS tag_binding_origin;
+DROP TYPE IF EXISTS delegated_auth_session_state;
 DROP TYPE IF EXISTS endpoint_state;
 DROP TYPE IF EXISTS agent_state;
 DROP TYPE IF EXISTS eviction_policy;

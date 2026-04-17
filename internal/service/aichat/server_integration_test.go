@@ -98,11 +98,11 @@ func createTestOrg(t *testing.T, queries *db.Queries) db.Organization {
 	return org
 }
 
-func createTestConversation(t *testing.T, queries *db.Queries, orgID uuid.UUID) db.Conversation {
+func createTestConversation(t *testing.T, queries *db.Queries, orgID uuid.UUID) db.AiConversation {
 	t.Helper()
 	conv, err := queries.CreateConversation(context.Background(), db.CreateConversationParams{
 		OrgID:      orgID,
-		CreatorUid: testUID,
+		CreatedBy: testUID,
 		Name:       "conv-" + uuid.New().String()[:8],
 		Title:      "Test Conversation",
 		CreatedBy:  testUID,
@@ -304,7 +304,7 @@ func TestIntegration_StreamWrongOwner(t *testing.T) {
 	// Create conversation owned by a different user.
 	conv, err := queries.CreateConversation(context.Background(), db.CreateConversationParams{
 		OrgID:      org.ID,
-		CreatorUid: "other-user",
+		CreatedBy: "other-user",
 		Name:       "conv-" + uuid.New().String()[:8],
 		Title:      "Other's Chat",
 		CreatedBy:  "other-user",

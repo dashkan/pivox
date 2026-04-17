@@ -14,7 +14,6 @@ func TagBindingToProto(tb db.TagBinding, tagValue db.TagValue) *apiv1.TagBinding
 		TagValue:   "tagKeys/" + tagValue.TagKeyID.String() + "/tagValues/" + tagValue.ID.String(),
 		Etag:       tb.Etag,
 		CreateTime: timestamppb.New(tb.CreateTime),
-		UpdateTime: timestamppb.New(tb.UpdateTime),
 	}
 }
 

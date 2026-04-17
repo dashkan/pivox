@@ -13,7 +13,7 @@ import (
 // RequestToProto converts a DB request to proto.
 // projectName is the full resource name of the parent project
 // (e.g. "organizations/acme/projects/my-project").
-func RequestToProto(row db.Request, projectName string) *assetsv1.Request {
+func RequestToProto(row db.AssetRequest, projectName string) *assetsv1.Request {
 	pb := &assetsv1.Request{
 		Name:        fmt.Sprintf("%s/requests/%s", projectName, row.Name),
 		DisplayName: row.DisplayName,
@@ -26,12 +26,6 @@ func RequestToProto(row db.Request, projectName string) *assetsv1.Request {
 		Updater:     row.UpdatedBy,
 		CreateTime:  timestamppb.New(row.CreateTime),
 		UpdateTime:  timestamppb.New(row.UpdateTime),
-	}
-	if row.DeleteTime.Valid {
-		pb.DeleteTime = timestamppb.New(row.DeleteTime.Time)
-	}
-	if row.PurgeTime.Valid {
-		pb.PurgeTime = timestamppb.New(row.PurgeTime.Time)
 	}
 	if row.DueTime.Valid {
 		pb.DueTime = timestamppb.New(row.DueTime.Time)
@@ -55,7 +49,7 @@ func RequestToProto(row db.Request, projectName string) *assetsv1.Request {
 // (e.g. "organizations/acme/projects/my-project/requests/req-1").
 // projectName is the full resource name of the parent project
 // (e.g. "organizations/acme/projects/my-project").
-func LineItemToProto(row db.LineItem, requestName string, projectName string) *assetsv1.LineItem {
+func LineItemToProto(row db.AssetRequestLineItem, requestName string, projectName string) *assetsv1.LineItem {
 	pb := &assetsv1.LineItem{
 		Name:        fmt.Sprintf("%s/lineItems/%s", requestName, row.Name),
 		DisplayName: row.DisplayName,

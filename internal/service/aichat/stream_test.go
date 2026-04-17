@@ -82,11 +82,11 @@ func testOrg() db.Organization {
 	}
 }
 
-func testConversation(orgID uuid.UUID, uid string) db.Conversation {
-	return db.Conversation{
+func testConversation(orgID uuid.UUID, uid string) db.AiConversation {
+	return db.AiConversation{
 		ID:         uuid.New(),
 		OrgID:      orgID,
-		CreatorUid: uid,
+		CreatedBy: uid,
 		Name:       "conv1",
 		CreateTime: time.Now(),
 		UpdateTime: time.Now(),
@@ -115,9 +115,9 @@ func TestStream_HappyPath(t *testing.T) {
 		OrgID: org.ID, Name: "conv1",
 	}).Return(conv, nil)
 	q.On("GetNextSequenceForConversation", mock.Anything, conv.ID).Return(int32(1), nil)
-	q.On("CreateMessage", mock.Anything, mock.Anything).Return(db.Message{}, nil)
+	q.On("CreateMessage", mock.Anything, mock.Anything).Return(db.AiMessage{}, nil)
 	q.On("IncrementConversationMessageCount", mock.Anything, conv.ID).Return(nil)
-	q.On("ListMessagesNewestFirst", mock.Anything, mock.Anything).Return([]db.Message{}, nil)
+	q.On("ListMessagesNewestFirst", mock.Anything, mock.Anything).Return([]db.AiMessage{}, nil)
 
 	clientEvent := &aiv1.ClientEvent{
 		Event: &aiv1.ClientEvent_Message{Message: &aiv1.UserMessage{
@@ -203,9 +203,9 @@ func TestStream_ToolOutputResumesGeneration(t *testing.T) {
 		OrgID: org.ID, Name: "conv1",
 	}).Return(conv, nil)
 	q.On("GetNextSequenceForConversation", mock.Anything, conv.ID).Return(int32(3), nil)
-	q.On("CreateMessage", mock.Anything, mock.Anything).Return(db.Message{}, nil)
+	q.On("CreateMessage", mock.Anything, mock.Anything).Return(db.AiMessage{}, nil)
 	q.On("IncrementConversationMessageCount", mock.Anything, conv.ID).Return(nil)
-	q.On("ListMessagesNewestFirst", mock.Anything, mock.Anything).Return([]db.Message{}, nil)
+	q.On("ListMessagesNewestFirst", mock.Anything, mock.Anything).Return([]db.AiMessage{}, nil)
 
 	clientEvent := &aiv1.ClientEvent{
 		Event: &aiv1.ClientEvent_ToolOutput{ToolOutput: &aiv1.ToolOutput{
@@ -289,9 +289,9 @@ func TestStream_ModelError(t *testing.T) {
 	q.On("GetOrganizationByName", mock.Anything, "acme").Return(org, nil)
 	q.On("GetConversationByName", mock.Anything, mock.Anything).Return(conv, nil)
 	q.On("GetNextSequenceForConversation", mock.Anything, conv.ID).Return(int32(1), nil)
-	q.On("CreateMessage", mock.Anything, mock.Anything).Return(db.Message{}, nil)
+	q.On("CreateMessage", mock.Anything, mock.Anything).Return(db.AiMessage{}, nil)
 	q.On("IncrementConversationMessageCount", mock.Anything, conv.ID).Return(nil)
-	q.On("ListMessagesNewestFirst", mock.Anything, mock.Anything).Return([]db.Message{}, nil)
+	q.On("ListMessagesNewestFirst", mock.Anything, mock.Anything).Return([]db.AiMessage{}, nil)
 
 	clientEvent := &aiv1.ClientEvent{
 		Event: &aiv1.ClientEvent_Message{Message: &aiv1.UserMessage{
@@ -332,9 +332,9 @@ func TestLoadModelHistory_BudgetTruncation(t *testing.T) {
 	})
 
 	// Create messages totaling well over budget.
-	var rows []db.Message
+	var rows []db.AiMessage
 	for i := 0; i < 10; i++ {
-		rows = append(rows, db.Message{
+		rows = append(rows, db.AiMessage{
 			ID:             uuid.New(),
 			ConversationID: convID,
 			Name:           uuid.New().String()[:12],
@@ -369,7 +369,7 @@ func TestDbMessageToModel(t *testing.T) {
 		}}},
 	})
 
-	row := db.Message{
+	row := db.AiMessage{
 		Role:       "assistant",
 		Parts:      parts,
 		CreateTime: time.Now(),
@@ -394,7 +394,7 @@ func TestStream_InvalidConversationReturnsNotFound(t *testing.T) {
 
 	q.On("GetOrganizationByName", mock.Anything, "acme").Return(org, nil)
 	q.On("GetConversationByName", mock.Anything, mock.Anything).Return(
-		db.Conversation{}, pgx.ErrNoRows)
+		db.AiConversation{}, pgx.ErrNoRows)
 
 	clientEvent := &aiv1.ClientEvent{
 		Event: &aiv1.ClientEvent_Message{Message: &aiv1.UserMessage{

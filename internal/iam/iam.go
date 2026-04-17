@@ -88,7 +88,7 @@ func (h *Helper) SetIamPolicy(ctx context.Context, req *iampb.SetIamPolicyReques
 		ResourceID:   resourceID,
 		ResourceType: resourceType,
 		Policy:       json.RawMessage(policyJSON),
-		UpdatedBy:    "",
+		CreatedBy:    "",
 	})
 	if err != nil {
 		return nil, apierr.Internal("failed to set IAM policy")

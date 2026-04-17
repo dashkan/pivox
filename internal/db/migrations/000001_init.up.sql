@@ -112,14 +112,12 @@ CREATE TABLE custom_domains (
     created_by  TEXT NOT NULL DEFAULT '',
     -- timestamps
     create_time TIMESTAMPTZ NOT NULL DEFAULT now(),
-    update_time TIMESTAMPTZ NOT NULL DEFAULT now(),
-    delete_time TIMESTAMPTZ,
     verify_time TIMESTAMPTZ,
     -- constraints
     UNIQUE(org_id, domain)
 );
-CREATE INDEX idx_custom_domains_org ON custom_domains (org_id) WHERE delete_time IS NULL;
-CREATE UNIQUE INDEX idx_custom_domains_domain ON custom_domains (domain) WHERE delete_time IS NULL;
+CREATE INDEX idx_custom_domains_org ON custom_domains (org_id);
+CREATE UNIQUE INDEX idx_custom_domains_domain ON custom_domains (domain);
 
 -- ============================================================================
 -- projects
@@ -341,7 +339,6 @@ CREATE TABLE tag_bindings (
     created_by                TEXT NOT NULL DEFAULT '',
     -- timestamps
     create_time               TIMESTAMPTZ NOT NULL DEFAULT now(),
-    update_time               TIMESTAMPTZ NOT NULL DEFAULT now(),
     -- constraints
     UNIQUE(parent_resource, tag_value_id)
 );
@@ -389,7 +386,11 @@ CREATE TABLE iam_policies (
     resource_type TEXT NOT NULL,
     policy        JSONB NOT NULL DEFAULT '{}',
     etag          TEXT NOT NULL DEFAULT md5(now()::text),
+    -- audit
+    created_by    TEXT NOT NULL DEFAULT '',
     updated_by    TEXT NOT NULL DEFAULT '',
+    -- timestamps
+    create_time   TIMESTAMPTZ NOT NULL DEFAULT now(),
     update_time   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_iam_policies_type ON iam_policies (resource_type);
@@ -479,14 +480,11 @@ CREATE TABLE groups (
     -- audit
     created_by   TEXT NOT NULL DEFAULT '',
     updated_by   TEXT NOT NULL DEFAULT '',
-    deleted_by   TEXT NOT NULL DEFAULT '',
     -- timestamps
     create_time  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    update_time  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    delete_time  TIMESTAMPTZ,
-    purge_time   TIMESTAMPTZ
+    update_time  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_groups_org ON groups (org_id) WHERE delete_time IS NULL;
+CREATE INDEX idx_groups_org ON groups (org_id);
 
 -- ============================================================================
 -- group_members (user <-> group)
@@ -540,14 +538,11 @@ CREATE TABLE roles (
     -- audit
     created_by   TEXT NOT NULL DEFAULT '',
     updated_by   TEXT NOT NULL DEFAULT '',
-    deleted_by   TEXT NOT NULL DEFAULT '',
     -- timestamps
     create_time  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    update_time  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    delete_time  TIMESTAMPTZ,
-    purge_time   TIMESTAMPTZ
+    update_time  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_roles_org ON roles (org_id) WHERE delete_time IS NULL;
+CREATE INDEX idx_roles_org ON roles (org_id);
 
 -- ============================================================================
 -- role_permissions (role <-> permission)
@@ -589,11 +584,12 @@ CREATE TABLE invitations (
     -- domain
     email       TEXT NOT NULL,
     token       TEXT NOT NULL UNIQUE,
-    inviter     TEXT NOT NULL DEFAULT '',
     -- state
     state       invitation_state NOT NULL DEFAULT 'PENDING',
     -- versioning
     etag        TEXT NOT NULL DEFAULT md5(now()::text),
+    -- audit
+    created_by  TEXT NOT NULL DEFAULT '',
     -- timestamps
     create_time TIMESTAMPTZ NOT NULL DEFAULT now(),
     expire_time TIMESTAMPTZ NOT NULL DEFAULT now() + INTERVAL '7 days',
@@ -731,14 +727,22 @@ CREATE INDEX idx_auth_token_codes_expire ON auth_token_codes (expire_time);
 -- the Pivox app via deep link, and poll until a custom token is available.
 -- The app completes the session after the user signs in through any provider.
 -- ============================================================================
-CREATE TABLE delegated_auth_sessions (
-    code         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    status       TEXT NOT NULL DEFAULT 'pending',
-    custom_token TEXT,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-    expires_at   TIMESTAMPTZ NOT NULL
+CREATE TYPE delegated_auth_session_state AS ENUM (
+    'PENDING', 'APPROVED', 'DENIED', 'EXPIRED'
 );
-CREATE INDEX idx_delegated_auth_sessions_expires ON delegated_auth_sessions (expires_at);
+
+CREATE TABLE delegated_auth_sessions (
+    -- `gen_random_uuid()` (not `uuidv7()`) is deliberate — this code appears
+    -- in URLs used for inter-process auth handoff and must not be sequential
+    -- or time-guessable.
+    code         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    state        delegated_auth_session_state NOT NULL DEFAULT 'PENDING',
+    custom_token TEXT,
+    -- timestamps
+    create_time  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    expire_time  TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX idx_delegated_auth_sessions_expire ON delegated_auth_sessions (expire_time);
 
 -- ============================================================================
 -- pgvector extension (for asset semantic search)
@@ -866,9 +870,9 @@ CREATE TABLE asset_renditions (
 CREATE INDEX idx_renditions_version ON asset_renditions (version_id);
 
 -- ============================================================================
--- requests
+-- asset_requests
 -- ============================================================================
-CREATE TABLE requests (
+CREATE TABLE asset_requests (
     id                UUID PRIMARY KEY DEFAULT uuidv7(),
     -- relationships
     project_id        UUID NOT NULL REFERENCES projects(id),
@@ -888,29 +892,26 @@ CREATE TABLE requests (
     -- audit
     created_by        TEXT NOT NULL DEFAULT '',
     updated_by        TEXT NOT NULL DEFAULT '',
-    deleted_by        TEXT NOT NULL DEFAULT '',
     -- timestamps
     create_time       TIMESTAMPTZ NOT NULL DEFAULT now(),
     update_time       TIMESTAMPTZ NOT NULL DEFAULT now(),
-    delete_time       TIMESTAMPTZ,
-    purge_time        TIMESTAMPTZ,
     due_time          TIMESTAMPTZ,
     delivered_time    TIMESTAMPTZ,
     approved_time     TIMESTAMPTZ,
     -- constraints
     UNIQUE(project_id, name)
 );
-CREATE INDEX idx_requests_project ON requests (project_id, create_time DESC) WHERE delete_time IS NULL;
-CREATE INDEX idx_requests_state ON requests (project_id, state) WHERE delete_time IS NULL;
-CREATE INDEX idx_requests_assignee ON requests (assignee, state) WHERE assignee != '' AND delete_time IS NULL;
+CREATE INDEX idx_asset_requests_project ON asset_requests (project_id, create_time DESC);
+CREATE INDEX idx_asset_requests_state ON asset_requests (project_id, state);
+CREATE INDEX idx_asset_requests_assignee ON asset_requests (assignee, state) WHERE assignee != '';
 
 -- ============================================================================
--- line_items
+-- asset_request_line_items
 -- ============================================================================
-CREATE TABLE line_items (
+CREATE TABLE asset_request_line_items (
     id                UUID PRIMARY KEY DEFAULT uuidv7(),
     -- relationships
-    request_id        UUID NOT NULL REFERENCES requests(id) ON DELETE CASCADE,
+    request_id        UUID NOT NULL REFERENCES asset_requests(id) ON DELETE CASCADE,
     asset_id          UUID REFERENCES assets(id),
     -- identity
     name              TEXT NOT NULL,
@@ -923,14 +924,15 @@ CREATE TABLE line_items (
     state             line_item_state NOT NULL DEFAULT 'PENDING',
     -- audit
     created_by        TEXT NOT NULL DEFAULT '',
+    updated_by        TEXT NOT NULL DEFAULT '',
     -- timestamps
     create_time       TIMESTAMPTZ NOT NULL DEFAULT now(),
     update_time       TIMESTAMPTZ NOT NULL DEFAULT now(),
     -- constraints
     UNIQUE(request_id, name)
 );
-CREATE INDEX idx_line_items_request ON line_items (request_id);
-CREATE INDEX idx_line_items_asset ON line_items (asset_id) WHERE asset_id IS NOT NULL;
+CREATE INDEX idx_asset_request_line_items_request ON asset_request_line_items (request_id);
+CREATE INDEX idx_asset_request_line_items_asset ON asset_request_line_items (asset_id) WHERE asset_id IS NOT NULL;
 
 -- ============================================================================
 -- Asset permissions
@@ -963,13 +965,12 @@ INSERT INTO permissions (permission_id, display_name, description) VALUES
   ('assets.lineItems.fulfill', 'Fulfill Line Item', 'Upload deliverable for line item');
 
 -- ============================================================================
--- AI chat — conversations
+-- AI chat — ai_conversations
 -- ============================================================================
-CREATE TABLE conversations (
+CREATE TABLE ai_conversations (
     id              UUID PRIMARY KEY DEFAULT uuidv7(),
     -- relationships
     org_id          UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-    creator_uid     TEXT NOT NULL,  -- firebase UID of conversation owner
     -- identity
     name            TEXT NOT NULL,  -- stable ID used in resource name
     -- domain
@@ -988,21 +989,20 @@ CREATE TABLE conversations (
     -- timestamps
     create_time     TIMESTAMPTZ NOT NULL DEFAULT now(),
     update_time     TIMESTAMPTZ NOT NULL DEFAULT now(),
-    delete_time     TIMESTAMPTZ,
     -- constraints
     UNIQUE(org_id, name)
 );
-CREATE INDEX idx_conversations_org ON conversations (org_id, create_time DESC) WHERE delete_time IS NULL;
-CREATE INDEX idx_conversations_creator ON conversations (org_id, creator_uid, create_time DESC) WHERE delete_time IS NULL;
-CREATE INDEX idx_conversations_archived ON conversations (org_id, creator_uid) WHERE archived = FALSE AND delete_time IS NULL;
+CREATE INDEX idx_ai_conversations_org ON ai_conversations (org_id, create_time DESC);
+CREATE INDEX idx_ai_conversations_creator ON ai_conversations (org_id, created_by, create_time DESC);
+CREATE INDEX idx_ai_conversations_archived ON ai_conversations (org_id, created_by) WHERE archived = FALSE;
 
 -- ============================================================================
--- AI chat — messages
+-- AI chat — ai_messages
 -- ============================================================================
-CREATE TABLE messages (
+CREATE TABLE ai_messages (
     id              UUID PRIMARY KEY DEFAULT uuidv7(),
     -- relationships
-    conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    conversation_id UUID NOT NULL REFERENCES ai_conversations(id) ON DELETE CASCADE,
     -- identity
     name            TEXT NOT NULL,
     -- domain
@@ -1018,14 +1018,14 @@ CREATE TABLE messages (
     UNIQUE(conversation_id, name),
     UNIQUE(conversation_id, sequence)
 );
--- idx_messages_conversation not needed: UNIQUE(conversation_id, sequence) already creates a B-tree index.
+-- idx_ai_messages_conversation not needed: UNIQUE(conversation_id, sequence) already creates a B-tree index.
 
 -- ============================================================================
--- AI chat — artifact_versions (created before artifacts so artifacts can FK to latest_version_id)
+-- AI chat — ai_artifact_versions (created before ai_artifacts so ai_artifacts can FK to latest_version_id)
 -- ============================================================================
-CREATE TABLE artifact_versions (
+CREATE TABLE ai_artifact_versions (
     id                   UUID PRIMARY KEY DEFAULT uuidv7(),
-    -- relationships (artifact_id FK added after artifacts table is created)
+    -- relationships (artifact_id FK added after ai_artifacts table is created)
     artifact_id          UUID NOT NULL,
     -- identity
     name                 TEXT NOT NULL,  -- e.g. "v1", "v2"
@@ -1037,6 +1037,8 @@ CREATE TABLE artifact_versions (
     asset_version_name   TEXT,  -- "organizations/.../assets/.../versions/..." pointer
     -- ordering
     sequence             INTEGER NOT NULL,  -- v1 = 1, v2 = 2, ...
+    -- audit
+    created_by           TEXT NOT NULL DEFAULT '',
     -- timestamps
     create_time          TIMESTAMPTZ NOT NULL DEFAULT now(),
     -- constraints
@@ -1050,33 +1052,36 @@ CREATE TABLE artifact_versions (
 );
 
 -- ============================================================================
--- AI chat — artifacts
+-- AI chat — ai_artifacts
 -- ============================================================================
-CREATE TABLE artifacts (
+CREATE TABLE ai_artifacts (
     id              UUID PRIMARY KEY DEFAULT uuidv7(),
     -- relationships
-    conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    conversation_id UUID NOT NULL REFERENCES ai_conversations(id) ON DELETE CASCADE,
     -- identity
     name            TEXT NOT NULL,
     -- domain
     type            TEXT NOT NULL,   -- "code" | "markdown" | "svg" | "image" | ...
     title           TEXT NOT NULL DEFAULT '',
     description     TEXT NOT NULL DEFAULT '',
-    latest_version_id UUID REFERENCES artifact_versions(id) DEFERRABLE INITIALLY DEFERRED,
+    latest_version_id UUID REFERENCES ai_artifact_versions(id) DEFERRABLE INITIALLY DEFERRED,
+    -- audit
+    created_by      TEXT NOT NULL DEFAULT '',
+    updated_by      TEXT NOT NULL DEFAULT '',
     -- timestamps
     create_time     TIMESTAMPTZ NOT NULL DEFAULT now(),
     update_time     TIMESTAMPTZ NOT NULL DEFAULT now(),
     -- constraints
     UNIQUE(conversation_id, name)
 );
-CREATE INDEX idx_artifacts_conversation ON artifacts (conversation_id, create_time DESC);
+CREATE INDEX idx_ai_artifacts_conversation ON ai_artifacts (conversation_id, create_time DESC);
 
--- Now add the FK from artifact_versions back to artifacts
-ALTER TABLE artifact_versions ADD CONSTRAINT fk_artifact_versions_artifact
-    FOREIGN KEY (artifact_id) REFERENCES artifacts(id) ON DELETE CASCADE;
+-- Now add the FK from ai_artifact_versions back to ai_artifacts
+ALTER TABLE ai_artifact_versions ADD CONSTRAINT fk_ai_artifact_versions_artifact
+    FOREIGN KEY (artifact_id) REFERENCES ai_artifacts(id) ON DELETE CASCADE;
 
-CREATE INDEX idx_artifact_versions_artifact ON artifact_versions (artifact_id, sequence DESC);
-CREATE INDEX idx_artifact_versions_asset ON artifact_versions (asset_version_name) WHERE asset_version_name IS NOT NULL;
+CREATE INDEX idx_ai_artifact_versions_artifact ON ai_artifact_versions (artifact_id, sequence DESC);
+CREATE INDEX idx_ai_artifact_versions_asset ON ai_artifact_versions (asset_version_name) WHERE asset_version_name IS NOT NULL;
 
 -- AI chat permissions
 INSERT INTO permissions (permission_id, display_name, description) VALUES
@@ -1084,7 +1089,7 @@ INSERT INTO permissions (permission_id, display_name, description) VALUES
   ('ai.conversations.list', 'List Conversations', 'List conversations in an organization'),
   ('ai.conversations.create', 'Create Conversation', 'Create conversations'),
   ('ai.conversations.update', 'Update Conversation', 'Modify conversation details'),
-  ('ai.conversations.delete', 'Delete Conversation', 'Soft-delete conversations'),
+  ('ai.conversations.delete', 'Delete Conversation', 'Delete conversations'),
   ('ai.messages.get', 'Get Message', 'View message details'),
   ('ai.messages.list', 'List Messages', 'List messages in a conversation'),
   ('ai.artifacts.get', 'Get Artifact', 'View artifact details'),

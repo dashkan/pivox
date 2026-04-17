@@ -239,6 +239,50 @@ func (ns NullCustomDomainState) Value() (driver.Value, error) {
 	return string(ns.CustomDomainState), nil
 }
 
+type DelegatedAuthSessionState string
+
+const (
+	DelegatedAuthSessionStatePENDING  DelegatedAuthSessionState = "PENDING"
+	DelegatedAuthSessionStateAPPROVED DelegatedAuthSessionState = "APPROVED"
+	DelegatedAuthSessionStateDENIED   DelegatedAuthSessionState = "DENIED"
+	DelegatedAuthSessionStateEXPIRED  DelegatedAuthSessionState = "EXPIRED"
+)
+
+func (e *DelegatedAuthSessionState) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = DelegatedAuthSessionState(s)
+	case string:
+		*e = DelegatedAuthSessionState(s)
+	default:
+		return fmt.Errorf("unsupported scan type for DelegatedAuthSessionState: %T", src)
+	}
+	return nil
+}
+
+type NullDelegatedAuthSessionState struct {
+	DelegatedAuthSessionState DelegatedAuthSessionState `json:"delegated_auth_session_state"`
+	Valid                     bool                      `json:"valid"` // Valid is true if DelegatedAuthSessionState is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullDelegatedAuthSessionState) Scan(value interface{}) error {
+	if value == nil {
+		ns.DelegatedAuthSessionState, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.DelegatedAuthSessionState.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullDelegatedAuthSessionState) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.DelegatedAuthSessionState), nil
+}
+
 type EndpointState string
 
 const (
@@ -822,6 +866,62 @@ type Account struct {
 	LastLoginTime pgtype.Timestamptz `json:"last_login_time"`
 }
 
+type AiArtifact struct {
+	ID              uuid.UUID   `json:"id"`
+	ConversationID  uuid.UUID   `json:"conversation_id"`
+	Name            string      `json:"name"`
+	Type            string      `json:"type"`
+	Title           string      `json:"title"`
+	Description     string      `json:"description"`
+	LatestVersionID pgtype.UUID `json:"latest_version_id"`
+	CreatedBy       string      `json:"created_by"`
+	UpdatedBy       string      `json:"updated_by"`
+	CreateTime      time.Time   `json:"create_time"`
+	UpdateTime      time.Time   `json:"update_time"`
+}
+
+type AiArtifactVersion struct {
+	ID                uuid.UUID   `json:"id"`
+	ArtifactID        uuid.UUID   `json:"artifact_id"`
+	Name              string      `json:"name"`
+	InlineData        []byte      `json:"inline_data"`
+	InlineContentType pgtype.Text `json:"inline_content_type"`
+	InlineSizeBytes   pgtype.Int8 `json:"inline_size_bytes"`
+	AssetVersionName  pgtype.Text `json:"asset_version_name"`
+	Sequence          int32       `json:"sequence"`
+	CreatedBy         string      `json:"created_by"`
+	CreateTime        time.Time   `json:"create_time"`
+}
+
+type AiConversation struct {
+	ID              uuid.UUID          `json:"id"`
+	OrgID           uuid.UUID          `json:"org_id"`
+	Name            string             `json:"name"`
+	Title           string             `json:"title"`
+	Description     string             `json:"description"`
+	Archived        bool               `json:"archived"`
+	Pinned          bool               `json:"pinned"`
+	MessageCount    int32              `json:"message_count"`
+	LastMessageTime pgtype.Timestamptz `json:"last_message_time"`
+	Etag            string             `json:"etag"`
+	Revision        int32              `json:"revision"`
+	CreatedBy       string             `json:"created_by"`
+	UpdatedBy       string             `json:"updated_by"`
+	CreateTime      time.Time          `json:"create_time"`
+	UpdateTime      time.Time          `json:"update_time"`
+}
+
+type AiMessage struct {
+	ID             uuid.UUID       `json:"id"`
+	ConversationID uuid.UUID       `json:"conversation_id"`
+	Name           string          `json:"name"`
+	Role           string          `json:"role"`
+	Parts          json.RawMessage `json:"parts"`
+	Sequence       int64           `json:"sequence"`
+	TokenCount     int32           `json:"token_count"`
+	CreateTime     time.Time       `json:"create_time"`
+}
+
 type ApiKey struct {
 	ID           uuid.UUID          `json:"id"`
 	OrgID        uuid.UUID          `json:"org_id"`
@@ -839,30 +939,6 @@ type ApiKey struct {
 	UpdateTime   time.Time          `json:"update_time"`
 	DeleteTime   pgtype.Timestamptz `json:"delete_time"`
 	PurgeTime    pgtype.Timestamptz `json:"purge_time"`
-}
-
-type Artifact struct {
-	ID              uuid.UUID   `json:"id"`
-	ConversationID  uuid.UUID   `json:"conversation_id"`
-	Name            string      `json:"name"`
-	Type            string      `json:"type"`
-	Title           string      `json:"title"`
-	Description     string      `json:"description"`
-	LatestVersionID pgtype.UUID `json:"latest_version_id"`
-	CreateTime      time.Time   `json:"create_time"`
-	UpdateTime      time.Time   `json:"update_time"`
-}
-
-type ArtifactVersion struct {
-	ID                uuid.UUID   `json:"id"`
-	ArtifactID        uuid.UUID   `json:"artifact_id"`
-	Name              string      `json:"name"`
-	InlineData        []byte      `json:"inline_data"`
-	InlineContentType pgtype.Text `json:"inline_content_type"`
-	InlineSizeBytes   pgtype.Int8 `json:"inline_size_bytes"`
-	AssetVersionName  pgtype.Text `json:"asset_version_name"`
-	Sequence          int32       `json:"sequence"`
-	CreateTime        time.Time   `json:"create_time"`
 }
 
 type Asset struct {
@@ -910,6 +986,43 @@ type AssetRendition struct {
 	SizeBytes  int64         `json:"size_bytes"`
 }
 
+type AssetRequest struct {
+	ID            uuid.UUID          `json:"id"`
+	ProjectID     uuid.UUID          `json:"project_id"`
+	Name          string             `json:"name"`
+	DisplayName   string             `json:"display_name"`
+	Description   string             `json:"description"`
+	Priority      RequestPriority    `json:"priority"`
+	Assignee      string             `json:"assignee"`
+	Annotations   json.RawMessage    `json:"annotations"`
+	State         RequestState       `json:"state"`
+	Etag          string             `json:"etag"`
+	Revision      int32              `json:"revision"`
+	CreatedBy     string             `json:"created_by"`
+	UpdatedBy     string             `json:"updated_by"`
+	CreateTime    time.Time          `json:"create_time"`
+	UpdateTime    time.Time          `json:"update_time"`
+	DueTime       pgtype.Timestamptz `json:"due_time"`
+	DeliveredTime pgtype.Timestamptz `json:"delivered_time"`
+	ApprovedTime  pgtype.Timestamptz `json:"approved_time"`
+}
+
+type AssetRequestLineItem struct {
+	ID          uuid.UUID          `json:"id"`
+	RequestID   uuid.UUID          `json:"request_id"`
+	AssetID     pgtype.UUID        `json:"asset_id"`
+	Name        string             `json:"name"`
+	DisplayName string             `json:"display_name"`
+	Description string             `json:"description"`
+	MediaType   NullAssetMediaType `json:"media_type"`
+	Annotations json.RawMessage    `json:"annotations"`
+	State       LineItemState      `json:"state"`
+	CreatedBy   string             `json:"created_by"`
+	UpdatedBy   string             `json:"updated_by"`
+	CreateTime  time.Time          `json:"create_time"`
+	UpdateTime  time.Time          `json:"update_time"`
+}
+
 type AssetVersion struct {
 	ID             uuid.UUID `json:"id"`
 	AssetID        uuid.UUID `json:"asset_id"`
@@ -932,26 +1045,6 @@ type AuthTokenCode struct {
 	ExpireTime time.Time `json:"expire_time"`
 }
 
-type Conversation struct {
-	ID              uuid.UUID          `json:"id"`
-	OrgID           uuid.UUID          `json:"org_id"`
-	CreatorUid      string             `json:"creator_uid"`
-	Name            string             `json:"name"`
-	Title           string             `json:"title"`
-	Description     string             `json:"description"`
-	Archived        bool               `json:"archived"`
-	Pinned          bool               `json:"pinned"`
-	MessageCount    int32              `json:"message_count"`
-	LastMessageTime pgtype.Timestamptz `json:"last_message_time"`
-	Etag            string             `json:"etag"`
-	Revision        int32              `json:"revision"`
-	CreatedBy       string             `json:"created_by"`
-	UpdatedBy       string             `json:"updated_by"`
-	CreateTime      time.Time          `json:"create_time"`
-	UpdateTime      time.Time          `json:"update_time"`
-	DeleteTime      pgtype.Timestamptz `json:"delete_time"`
-}
-
 type CustomDomain struct {
 	ID         uuid.UUID          `json:"id"`
 	OrgID      uuid.UUID          `json:"org_id"`
@@ -961,35 +1054,30 @@ type CustomDomain struct {
 	Etag       string             `json:"etag"`
 	CreatedBy  string             `json:"created_by"`
 	CreateTime time.Time          `json:"create_time"`
-	UpdateTime time.Time          `json:"update_time"`
-	DeleteTime pgtype.Timestamptz `json:"delete_time"`
 	VerifyTime pgtype.Timestamptz `json:"verify_time"`
 }
 
 type DelegatedAuthSession struct {
-	Code        uuid.UUID   `json:"code"`
-	Status      string      `json:"status"`
-	CustomToken pgtype.Text `json:"custom_token"`
-	CreatedAt   time.Time   `json:"created_at"`
-	ExpiresAt   time.Time   `json:"expires_at"`
+	Code        uuid.UUID                 `json:"code"`
+	State       DelegatedAuthSessionState `json:"state"`
+	CustomToken pgtype.Text               `json:"custom_token"`
+	CreateTime  time.Time                 `json:"create_time"`
+	ExpireTime  time.Time                 `json:"expire_time"`
 }
 
 type Group struct {
-	ID          uuid.UUID          `json:"id"`
-	OrgID       uuid.UUID          `json:"org_id"`
-	DisplayName string             `json:"display_name"`
-	Description string             `json:"description"`
-	Annotations json.RawMessage    `json:"annotations"`
-	State       ResourceState      `json:"state"`
-	Etag        string             `json:"etag"`
-	Revision    int32              `json:"revision"`
-	CreatedBy   string             `json:"created_by"`
-	UpdatedBy   string             `json:"updated_by"`
-	DeletedBy   string             `json:"deleted_by"`
-	CreateTime  time.Time          `json:"create_time"`
-	UpdateTime  time.Time          `json:"update_time"`
-	DeleteTime  pgtype.Timestamptz `json:"delete_time"`
-	PurgeTime   pgtype.Timestamptz `json:"purge_time"`
+	ID          uuid.UUID       `json:"id"`
+	OrgID       uuid.UUID       `json:"org_id"`
+	DisplayName string          `json:"display_name"`
+	Description string          `json:"description"`
+	Annotations json.RawMessage `json:"annotations"`
+	State       ResourceState   `json:"state"`
+	Etag        string          `json:"etag"`
+	Revision    int32           `json:"revision"`
+	CreatedBy   string          `json:"created_by"`
+	UpdatedBy   string          `json:"updated_by"`
+	CreateTime  time.Time       `json:"create_time"`
+	UpdateTime  time.Time       `json:"update_time"`
 }
 
 type GroupMember struct {
@@ -1005,7 +1093,9 @@ type IamPolicy struct {
 	ResourceType string          `json:"resource_type"`
 	Policy       json.RawMessage `json:"policy"`
 	Etag         string          `json:"etag"`
+	CreatedBy    string          `json:"created_by"`
 	UpdatedBy    string          `json:"updated_by"`
+	CreateTime   time.Time       `json:"create_time"`
 	UpdateTime   time.Time       `json:"update_time"`
 }
 
@@ -1015,9 +1105,9 @@ type Invitation struct {
 	RoleID     pgtype.UUID        `json:"role_id"`
 	Email      string             `json:"email"`
 	Token      string             `json:"token"`
-	Inviter    string             `json:"inviter"`
 	State      InvitationState    `json:"state"`
 	Etag       string             `json:"etag"`
+	CreatedBy  string             `json:"created_by"`
 	CreateTime time.Time          `json:"create_time"`
 	ExpireTime time.Time          `json:"expire_time"`
 	AcceptTime pgtype.Timestamptz `json:"accept_time"`
@@ -1030,32 +1120,6 @@ type InvitationPolicy struct {
 	DisallowedDomains           []string  `json:"disallowed_domains"`
 	Etag                        string    `json:"etag"`
 	UpdateTime                  time.Time `json:"update_time"`
-}
-
-type LineItem struct {
-	ID          uuid.UUID          `json:"id"`
-	RequestID   uuid.UUID          `json:"request_id"`
-	AssetID     pgtype.UUID        `json:"asset_id"`
-	Name        string             `json:"name"`
-	DisplayName string             `json:"display_name"`
-	Description string             `json:"description"`
-	MediaType   NullAssetMediaType `json:"media_type"`
-	Annotations json.RawMessage    `json:"annotations"`
-	State       LineItemState      `json:"state"`
-	CreatedBy   string             `json:"created_by"`
-	CreateTime  time.Time          `json:"create_time"`
-	UpdateTime  time.Time          `json:"update_time"`
-}
-
-type Message struct {
-	ID             uuid.UUID       `json:"id"`
-	ConversationID uuid.UUID       `json:"conversation_id"`
-	Name           string          `json:"name"`
-	Role           string          `json:"role"`
-	Parts          json.RawMessage `json:"parts"`
-	Sequence       int64           `json:"sequence"`
-	TokenCount     int32           `json:"token_count"`
-	CreateTime     time.Time       `json:"create_time"`
 }
 
 type Operation struct {
@@ -1131,47 +1195,20 @@ type PublicEmailDomain struct {
 	CreateTime time.Time `json:"create_time"`
 }
 
-type Request struct {
-	ID            uuid.UUID          `json:"id"`
-	ProjectID     uuid.UUID          `json:"project_id"`
-	Name          string             `json:"name"`
-	DisplayName   string             `json:"display_name"`
-	Description   string             `json:"description"`
-	Priority      RequestPriority    `json:"priority"`
-	Assignee      string             `json:"assignee"`
-	Annotations   json.RawMessage    `json:"annotations"`
-	State         RequestState       `json:"state"`
-	Etag          string             `json:"etag"`
-	Revision      int32              `json:"revision"`
-	CreatedBy     string             `json:"created_by"`
-	UpdatedBy     string             `json:"updated_by"`
-	DeletedBy     string             `json:"deleted_by"`
-	CreateTime    time.Time          `json:"create_time"`
-	UpdateTime    time.Time          `json:"update_time"`
-	DeleteTime    pgtype.Timestamptz `json:"delete_time"`
-	PurgeTime     pgtype.Timestamptz `json:"purge_time"`
-	DueTime       pgtype.Timestamptz `json:"due_time"`
-	DeliveredTime pgtype.Timestamptz `json:"delivered_time"`
-	ApprovedTime  pgtype.Timestamptz `json:"approved_time"`
-}
-
 type Role struct {
-	ID          uuid.UUID          `json:"id"`
-	OrgID       uuid.UUID          `json:"org_id"`
-	DisplayName string             `json:"display_name"`
-	Description string             `json:"description"`
-	IsSystem    bool               `json:"is_system"`
-	Annotations json.RawMessage    `json:"annotations"`
-	State       ResourceState      `json:"state"`
-	Etag        string             `json:"etag"`
-	Revision    int32              `json:"revision"`
-	CreatedBy   string             `json:"created_by"`
-	UpdatedBy   string             `json:"updated_by"`
-	DeletedBy   string             `json:"deleted_by"`
-	CreateTime  time.Time          `json:"create_time"`
-	UpdateTime  time.Time          `json:"update_time"`
-	DeleteTime  pgtype.Timestamptz `json:"delete_time"`
-	PurgeTime   pgtype.Timestamptz `json:"purge_time"`
+	ID          uuid.UUID       `json:"id"`
+	OrgID       uuid.UUID       `json:"org_id"`
+	DisplayName string          `json:"display_name"`
+	Description string          `json:"description"`
+	IsSystem    bool            `json:"is_system"`
+	Annotations json.RawMessage `json:"annotations"`
+	State       ResourceState   `json:"state"`
+	Etag        string          `json:"etag"`
+	Revision    int32           `json:"revision"`
+	CreatedBy   string          `json:"created_by"`
+	UpdatedBy   string          `json:"updated_by"`
+	CreateTime  time.Time       `json:"create_time"`
+	UpdateTime  time.Time       `json:"update_time"`
 }
 
 type RoleMember struct {
@@ -1263,7 +1300,6 @@ type TagBinding struct {
 	Etag           string           `json:"etag"`
 	CreatedBy      string           `json:"created_by"`
 	CreateTime     time.Time        `json:"create_time"`
-	UpdateTime     time.Time        `json:"update_time"`
 }
 
 type TagKey struct {

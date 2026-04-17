@@ -108,7 +108,6 @@ var (
 		Annotations:    json.RawMessage(`{}`),
 		Etag:           "etag-tb-1",
 		CreateTime:     time.Date(2025, 6, 15, 10, 0, 0, 0, time.UTC),
-		UpdateTime:     time.Date(2025, 6, 15, 10, 0, 0, 0, time.UTC),
 	}
 )
 

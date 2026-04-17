@@ -1,32 +1,32 @@
 -- name: CreateConversation :one
-INSERT INTO conversations (org_id, creator_uid, name, title, description, created_by, updated_by)
-VALUES ($1, $2, $3, $4, $5, $6, $6)
+INSERT INTO ai_conversations (org_id, name, title, description, created_by, updated_by)
+VALUES ($1, $2, $3, $4, $5, $5)
 RETURNING *;
 
 -- name: GetConversationByName :one
-SELECT * FROM conversations WHERE org_id = $1 AND name = $2 AND delete_time IS NULL;
+SELECT * FROM ai_conversations WHERE org_id = $1 AND name = $2;
 
 -- name: GetConversationByID :one
-SELECT * FROM conversations WHERE id = $1 AND delete_time IS NULL;
+SELECT * FROM ai_conversations WHERE id = $1;
 
 -- name: ListConversationsByCreator :many
-SELECT * FROM conversations
-WHERE org_id = $1 AND creator_uid = $2 AND delete_time IS NULL
+SELECT * FROM ai_conversations
+WHERE org_id = $1 AND created_by = $2
 ORDER BY create_time DESC
 LIMIT $3 OFFSET $4;
 
 -- name: ListConversationsByCreatorActive :many
-SELECT * FROM conversations
-WHERE org_id = $1 AND creator_uid = $2 AND archived = FALSE AND delete_time IS NULL
+SELECT * FROM ai_conversations
+WHERE org_id = $1 AND created_by = $2 AND archived = FALSE
 ORDER BY create_time DESC
 LIMIT $3 OFFSET $4;
 
 -- name: CountConversationsByCreator :one
-SELECT count(*) FROM conversations
-WHERE org_id = $1 AND creator_uid = $2 AND delete_time IS NULL;
+SELECT count(*) FROM ai_conversations
+WHERE org_id = $1 AND created_by = $2;
 
 -- name: UpdateConversation :one
-UPDATE conversations
+UPDATE ai_conversations
 SET title = COALESCE(sqlc.narg('title'), title),
     description = COALESCE(sqlc.narg('description'), description),
     archived = COALESCE(sqlc.narg('archived'), archived),
@@ -35,14 +35,14 @@ SET title = COALESCE(sqlc.narg('title'), title),
     updated_by = $2,
     update_time = now(),
     etag = md5(now()::text)
-WHERE id = $1 AND delete_time IS NULL
+WHERE id = $1
 RETURNING *;
 
 -- name: DeleteConversation :exec
-UPDATE conversations SET delete_time = now() WHERE id = $1 AND delete_time IS NULL;
+DELETE FROM ai_conversations WHERE id = $1;
 
 -- name: IncrementConversationMessageCount :exec
-UPDATE conversations
+UPDATE ai_conversations
 SET message_count = message_count + 1,
     last_message_time = now(),
     update_time = now()

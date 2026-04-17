@@ -61,9 +61,9 @@ func (f *requestFixture) mockResolveProject() {
 		Return(db.Project{ID: f.projectID, Name: testProject, OrgID: f.orgID}, nil)
 }
 
-func makeRequest(id, projectID uuid.UUID, name string, state db.RequestState) db.Request {
+func makeRequest(id, projectID uuid.UUID, name string, state db.RequestState) db.AssetRequest {
 	now := time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC)
-	return db.Request{
+	return db.AssetRequest{
 		ID:          id,
 		ProjectID:   projectID,
 		Name:        name,
@@ -98,7 +98,7 @@ func TestCreateRequest_Success(t *testing.T) {
 
 	f.mockQ.On("CreateLineItem", mock.Anything, mock.MatchedBy(func(p db.CreateLineItemParams) bool {
 		return p.RequestID == f.requestID && p.AssetID.Valid
-	})).Return(db.LineItem{ID: uuid.New(), Name: "li-1"}, nil)
+	})).Return(db.AssetRequestLineItem{ID: uuid.New(), Name: "li-1"}, nil)
 
 	op, err := f.server.CreateRequest(context.Background(), &assetsv1.CreateRequestRequest{
 		Parent: testParent,
@@ -141,7 +141,7 @@ func TestGetRequest_Success(t *testing.T) {
 	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
 		Return(existing, nil)
 
-	li := db.LineItem{
+	li := db.AssetRequestLineItem{
 		ID:          uuid.New(),
 		RequestID:   f.requestID,
 		Name:        "li-1",
@@ -155,7 +155,7 @@ func TestGetRequest_Success(t *testing.T) {
 		RequestID: f.requestID,
 		Limit:     100,
 		Offset:    0,
-	}).Return([]db.LineItem{li}, nil)
+	}).Return([]db.AssetRequestLineItem{li}, nil)
 
 	f.mockQ.On("CountFulfilledLineItems", mock.Anything, f.requestID).Return(int64(0), nil)
 
@@ -669,10 +669,7 @@ func TestDeleteRequest_Success(t *testing.T) {
 	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
 		Return(existing, nil)
 
-	f.mockQ.On("SoftDeleteRequest", mock.Anything, db.SoftDeleteRequestParams{
-		ID:        f.requestID,
-		DeletedBy: "",
-	}).Return(nil)
+	f.mockQ.On("DeleteRequest", mock.Anything, f.requestID).Return(nil)
 
 	op, err := f.server.DeleteRequest(context.Background(), &assetsv1.DeleteRequestRequest{
 		Name: testFull,
@@ -711,7 +708,7 @@ func TestCreateRequest_DBError(t *testing.T) {
 	f.mockResolveProject()
 
 	f.mockQ.On("CreateRequest", mock.Anything, mock.Anything).
-		Return(db.Request{}, errors.New("connection reset"))
+		Return(db.AssetRequest{}, errors.New("connection reset"))
 
 	_, err := f.server.CreateRequest(context.Background(), &assetsv1.CreateRequestRequest{
 		Parent:  testParent,
@@ -760,7 +757,7 @@ func TestCreateRequest_CreateLineItemError(t *testing.T) {
 		Return(db.Asset{ID: assetID, Name: "asset-1", State: db.AssetStatePLACEHOLDER, Annotations: json.RawMessage("{}")}, nil)
 
 	f.mockQ.On("CreateLineItem", mock.Anything, mock.Anything).
-		Return(db.LineItem{}, errors.New("line item insert failed"))
+		Return(db.AssetRequestLineItem{}, errors.New("line item insert failed"))
 
 	_, err := f.server.CreateRequest(context.Background(), &assetsv1.CreateRequestRequest{
 		Parent: testParent,
@@ -827,7 +824,7 @@ func TestGetRequest_NotFound(t *testing.T) {
 	f.mockResolveProject()
 
 	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
-		Return(db.Request{}, pgx.ErrNoRows)
+		Return(db.AssetRequest{}, pgx.ErrNoRows)
 
 	_, err := f.server.GetRequest(context.Background(), &assetsv1.GetRequestRequest{
 		Name: testFull,
@@ -858,7 +855,7 @@ func TestUpdateRequest_NotFound(t *testing.T) {
 	f.mockResolveProject()
 
 	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
-		Return(db.Request{}, pgx.ErrNoRows)
+		Return(db.AssetRequest{}, pgx.ErrNoRows)
 
 	_, err := f.server.UpdateRequest(context.Background(), &assetsv1.UpdateRequestRequest{
 		Request: &assetsv1.Request{Name: testFull, DisplayName: "Updated"},
@@ -879,7 +876,7 @@ func TestUpdateRequest_DBError(t *testing.T) {
 		Return(existing, nil)
 
 	f.mockQ.On("UpdateRequest", mock.Anything, mock.Anything).
-		Return(db.Request{}, errors.New("db failure"))
+		Return(db.AssetRequest{}, errors.New("db failure"))
 
 	_, err := f.server.UpdateRequest(context.Background(), &assetsv1.UpdateRequestRequest{
 		Request: &assetsv1.Request{Name: testFull, DisplayName: "Updated"},
@@ -962,7 +959,7 @@ func TestDeleteRequest_NotFound(t *testing.T) {
 	f.mockResolveProject()
 
 	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
-		Return(db.Request{}, pgx.ErrNoRows)
+		Return(db.AssetRequest{}, pgx.ErrNoRows)
 
 	_, err := f.server.DeleteRequest(context.Background(), &assetsv1.DeleteRequestRequest{
 		Name: testFull,
@@ -982,10 +979,7 @@ func TestDeleteRequest_SoftDeleteError(t *testing.T) {
 	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
 		Return(existing, nil)
 
-	f.mockQ.On("SoftDeleteRequest", mock.Anything, db.SoftDeleteRequestParams{
-		ID:        f.requestID,
-		DeletedBy: "",
-	}).Return(errors.New("db failure"))
+	f.mockQ.On("DeleteRequest", mock.Anything, f.requestID).Return(errors.New("db failure"))
 
 	_, err := f.server.DeleteRequest(context.Background(), &assetsv1.DeleteRequestRequest{
 		Name: testFull,
@@ -1017,7 +1011,7 @@ func TestAssignRequest_NotFound(t *testing.T) {
 	f.mockResolveProject()
 
 	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
-		Return(db.Request{}, pgx.ErrNoRows)
+		Return(db.AssetRequest{}, pgx.ErrNoRows)
 
 	_, err := f.server.AssignRequest(context.Background(), &assetsv1.AssignRequestRequest{
 		Name:     testFull,
@@ -1039,7 +1033,7 @@ func TestAssignRequest_UpdateAssigneeDBError(t *testing.T) {
 		Return(existing, nil)
 
 	f.mockQ.On("UpdateRequestAssignee", mock.Anything, mock.Anything).
-		Return(db.Request{}, errors.New("db failure"))
+		Return(db.AssetRequest{}, errors.New("db failure"))
 
 	_, err := f.server.AssignRequest(context.Background(), &assetsv1.AssignRequestRequest{
 		Name:     testFull,
@@ -1071,7 +1065,7 @@ func TestClaimRequest_NotFound(t *testing.T) {
 	f.mockResolveProject()
 
 	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
-		Return(db.Request{}, pgx.ErrNoRows)
+		Return(db.AssetRequest{}, pgx.ErrNoRows)
 
 	_, err := f.server.ClaimRequest(context.Background(), &assetsv1.ClaimRequestRequest{
 		Name: testFull,
@@ -1092,7 +1086,7 @@ func TestClaimRequest_UpdateAssigneeDBError(t *testing.T) {
 		Return(existing, nil)
 
 	f.mockQ.On("UpdateRequestAssignee", mock.Anything, mock.Anything).
-		Return(db.Request{}, errors.New("db failure"))
+		Return(db.AssetRequest{}, errors.New("db failure"))
 
 	_, err := f.server.ClaimRequest(context.Background(), &assetsv1.ClaimRequestRequest{
 		Name: testFull,
@@ -1123,7 +1117,7 @@ func TestCancelRequest_NotFound(t *testing.T) {
 	f.mockResolveProject()
 
 	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
-		Return(db.Request{}, pgx.ErrNoRows)
+		Return(db.AssetRequest{}, pgx.ErrNoRows)
 
 	_, err := f.server.CancelRequest(context.Background(), &assetsv1.CancelRequestRequest{
 		Name: testFull,
@@ -1144,7 +1138,7 @@ func TestCancelRequest_UpdateStateDBError(t *testing.T) {
 		Return(existing, nil)
 
 	f.mockQ.On("UpdateRequestState", mock.Anything, mock.Anything).
-		Return(db.Request{}, errors.New("db failure"))
+		Return(db.AssetRequest{}, errors.New("db failure"))
 
 	_, err := f.server.CancelRequest(context.Background(), &assetsv1.CancelRequestRequest{
 		Name: testFull,
@@ -1175,7 +1169,7 @@ func TestSubmitRequest_NotFound(t *testing.T) {
 	f.mockResolveProject()
 
 	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
-		Return(db.Request{}, pgx.ErrNoRows)
+		Return(db.AssetRequest{}, pgx.ErrNoRows)
 
 	_, err := f.server.SubmitRequest(context.Background(), &assetsv1.SubmitRequestRequest{
 		Name: testFull,
@@ -1196,7 +1190,7 @@ func TestSubmitRequest_UpdateStateDBError(t *testing.T) {
 		Return(existing, nil)
 
 	f.mockQ.On("UpdateRequestState", mock.Anything, mock.Anything).
-		Return(db.Request{}, errors.New("db failure"))
+		Return(db.AssetRequest{}, errors.New("db failure"))
 
 	_, err := f.server.SubmitRequest(context.Background(), &assetsv1.SubmitRequestRequest{
 		Name: testFull,
@@ -1242,7 +1236,7 @@ func TestListRequests_DBError(t *testing.T) {
 	f.mockResolveProject()
 
 	f.mockQ.On("ListRequestsByProject", mock.Anything, mock.Anything).
-		Return([]db.Request{}, errors.New("db failure"))
+		Return([]db.AssetRequest{}, errors.New("db failure"))
 
 	_, err := f.server.ListRequests(context.Background(), &assetsv1.ListRequestsRequest{
 		Parent: testParent,
@@ -1258,10 +1252,10 @@ func TestListRequests_ShowDeleted(t *testing.T) {
 	f := setupRequestFixture(t)
 	f.mockResolveProject()
 
-	rows := []db.Request{
+	rows := []db.AssetRequest{
 		makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateCANCELLED),
 	}
-	f.mockQ.On("ListRequestsByProjectWithDeleted", mock.Anything, mock.Anything).
+	f.mockQ.On("ListRequestsByProject", mock.Anything, mock.Anything).
 		Return(rows, nil)
 
 	resp, err := f.server.ListRequests(context.Background(), &assetsv1.ListRequestsRequest{
@@ -1278,8 +1272,8 @@ func TestListRequests_ShowDeleted_DBError(t *testing.T) {
 	f := setupRequestFixture(t)
 	f.mockResolveProject()
 
-	f.mockQ.On("ListRequestsByProjectWithDeleted", mock.Anything, mock.Anything).
-		Return([]db.Request{}, errors.New("db failure"))
+	f.mockQ.On("ListRequestsByProject", mock.Anything, mock.Anything).
+		Return([]db.AssetRequest{}, errors.New("db failure"))
 
 	_, err := f.server.ListRequests(context.Background(), &assetsv1.ListRequestsRequest{
 		Parent:      testParent,
@@ -1297,7 +1291,7 @@ func TestListRequests_Pagination(t *testing.T) {
 	f.mockResolveProject()
 
 	// Return pageSize+1 rows to trigger next page token.
-	rows := make([]db.Request, 3)
+	rows := make([]db.AssetRequest, 3)
 	for i := range rows {
 		rows[i] = makeRequest(uuid.New(), f.projectID, "req-"+uuid.New().String()[:8], db.RequestStateOPEN)
 	}
@@ -1322,7 +1316,7 @@ func TestListRequests_PageSizeClamped(t *testing.T) {
 
 	f.mockQ.On("ListRequestsByProject", mock.Anything, mock.MatchedBy(func(p db.ListRequestsByProjectParams) bool {
 		return p.Limit == 1001 // 1000 + 1 for next-page detection
-	})).Return([]db.Request{}, nil)
+	})).Return([]db.AssetRequest{}, nil)
 
 	_, err := f.server.ListRequests(context.Background(), &assetsv1.ListRequestsRequest{
 		Parent:   testParent,
@@ -1339,7 +1333,7 @@ func TestListRequests_DefaultPageSize(t *testing.T) {
 
 	f.mockQ.On("ListRequestsByProject", mock.Anything, mock.MatchedBy(func(p db.ListRequestsByProjectParams) bool {
 		return p.Limit == 101 // default 100 + 1
-	})).Return([]db.Request{}, nil)
+	})).Return([]db.AssetRequest{}, nil)
 
 	_, err := f.server.ListRequests(context.Background(), &assetsv1.ListRequestsRequest{
 		Parent: testParent,

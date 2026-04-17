@@ -55,7 +55,7 @@ func (h *ContentHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify the caller owns the conversation.
-	if conv.CreatorUid != uid {
+	if conv.CreatedBy != uid {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}

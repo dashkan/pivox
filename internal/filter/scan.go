@@ -136,7 +136,6 @@ func ScanTagBindings(rows pgx.Rows) ([]db.TagBinding, error) {
 			&tb.Etag,
 			&tb.CreatedBy,
 			&tb.CreateTime,
-			&tb.UpdateTime,
 		); err != nil {
 			return nil, err
 		}

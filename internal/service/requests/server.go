@@ -119,20 +119,13 @@ func (s *RequestsServer) ListRequests(ctx context.Context, req *assetsv1.ListReq
 		pageSize = 1000
 	}
 
-	var rows []db.Request
-	if req.GetShowDeleted() {
-		rows, err = s.queries.ListRequestsByProjectWithDeleted(ctx, db.ListRequestsByProjectWithDeletedParams{
-			ProjectID: projectID,
-			Limit:     pageSize + 1,
-			Offset:    0,
-		})
-	} else {
-		rows, err = s.queries.ListRequestsByProject(ctx, db.ListRequestsByProjectParams{
-			ProjectID: projectID,
-			Limit:     pageSize + 1,
-			Offset:    0,
-		})
-	}
+	var rows []db.AssetRequest
+	rows, err = s.queries.ListRequestsByProject(ctx, db.ListRequestsByProjectParams{
+		ProjectID: projectID,
+		Limit:     pageSize + 1,
+		Offset:    0,
+	})
+	_ = req.GetShowDeleted() // soft-delete removed; flag is a no-op
 	if err != nil {
 		return nil, apierr.Internal("database error")
 	}
@@ -321,10 +314,7 @@ func (s *RequestsServer) DeleteRequest(ctx context.Context, req *assetsv1.Delete
 		return nil, apierr.HandleResourceError(err, "Request", req.GetName())
 	}
 
-	err = s.queries.SoftDeleteRequest(ctx, db.SoftDeleteRequestParams{
-		ID:        existing.ID,
-		DeletedBy: "",
-	})
+	err = s.queries.DeleteRequest(ctx, existing.ID)
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Request", req.GetName())
 	}

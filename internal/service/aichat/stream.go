@@ -71,7 +71,7 @@ func (s *Server) Stream(req *aiv1.ClientEvent, stream grpc.ServerStreamingServer
 	if err != nil {
 		return err
 	}
-	if conv.CreatorUid != uid {
+	if conv.CreatedBy != uid {
 		return status.Error(codes.PermissionDenied, "conversation belongs to another user")
 	}
 
@@ -253,7 +253,7 @@ func (s *Server) loadModelHistory(ctx context.Context, convID uuid.UUID) ([]mode
 
 	// Walk newest→oldest accumulating tokens, stop when budget exceeded.
 	budget := defaultModelContextBudget
-	var kept []db.Message
+	var kept []db.AiMessage
 	running := 0
 	for _, row := range rows {
 		running += int(row.TokenCount)
@@ -276,7 +276,7 @@ func (s *Server) loadModelHistory(ctx context.Context, convID uuid.UUID) ([]mode
 	return msgs, nil
 }
 
-func dbMessageToModel(row db.Message) model.Message {
+func dbMessageToModel(row db.AiMessage) model.Message {
 	m := model.Message{Role: row.Role}
 
 	parts, _ := unmarshalParts(row.Parts)

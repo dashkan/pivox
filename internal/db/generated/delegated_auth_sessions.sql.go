@@ -15,12 +15,12 @@ import (
 
 const completeDelegatedAuthSession = `-- name: CompleteDelegatedAuthSession :one
 UPDATE delegated_auth_sessions
-SET status = 'ready',
+SET state = 'APPROVED',
     custom_token = $2
 WHERE code = $1
-  AND status = 'pending'
-  AND expires_at > now()
-RETURNING code, status, custom_token, created_at, expires_at
+  AND state = 'PENDING'
+  AND expire_time > now()
+RETURNING code, state, custom_token, create_time, expire_time
 `
 
 type CompleteDelegatedAuthSessionParams struct {
@@ -28,7 +28,7 @@ type CompleteDelegatedAuthSessionParams struct {
 	CustomToken pgtype.Text `json:"custom_token"`
 }
 
-// Transitions a pending session to ready and stores the minted custom token.
+// Transitions a pending session to approved and stores the minted custom token.
 // Only unexpired pending sessions match — a no-row result means the session
 // was never created, already completed, or has expired.
 func (q *Queries) CompleteDelegatedAuthSession(ctx context.Context, arg CompleteDelegatedAuthSessionParams) (DelegatedAuthSession, error) {
@@ -36,10 +36,10 @@ func (q *Queries) CompleteDelegatedAuthSession(ctx context.Context, arg Complete
 	var i DelegatedAuthSession
 	err := row.Scan(
 		&i.Code,
-		&i.Status,
+		&i.State,
 		&i.CustomToken,
-		&i.CreatedAt,
-		&i.ExpiresAt,
+		&i.CreateTime,
+		&i.ExpireTime,
 	)
 	return i, err
 }
@@ -47,15 +47,15 @@ func (q *Queries) CompleteDelegatedAuthSession(ctx context.Context, arg Complete
 const consumeDelegatedAuthSession = `-- name: ConsumeDelegatedAuthSession :one
 DELETE FROM delegated_auth_sessions
 WHERE code = $1
-  AND status = 'ready'
-  AND expires_at > now()
+  AND state = 'APPROVED'
+  AND expire_time > now()
 RETURNING custom_token
 `
 
-// Atomically deletes a ready session and returns its custom token. This is
+// Atomically deletes an approved session and returns its custom token. This is
 // the poll path — a single statement ensures the token is single-use even
 // under concurrent pollers. No-row result means the session is still pending,
-// already consumed, or expired; callers distinguish pending via GetDelegatedAuthSessionStatus.
+// already consumed, or expired; callers distinguish pending via GetDelegatedAuthSessionState.
 func (q *Queries) ConsumeDelegatedAuthSession(ctx context.Context, code uuid.UUID) (pgtype.Text, error) {
 	row := q.db.QueryRow(ctx, consumeDelegatedAuthSession, code)
 	var custom_token pgtype.Text
@@ -64,34 +64,34 @@ func (q *Queries) ConsumeDelegatedAuthSession(ctx context.Context, code uuid.UUI
 }
 
 const createDelegatedAuthSession = `-- name: CreateDelegatedAuthSession :one
-INSERT INTO delegated_auth_sessions (code, expires_at)
+INSERT INTO delegated_auth_sessions (code, expire_time)
 VALUES ($1, $2)
-RETURNING code, status, custom_token, created_at, expires_at
+RETURNING code, state, custom_token, create_time, expire_time
 `
 
 type CreateDelegatedAuthSessionParams struct {
-	Code      uuid.UUID `json:"code"`
-	ExpiresAt time.Time `json:"expires_at"`
+	Code       uuid.UUID `json:"code"`
+	ExpireTime time.Time `json:"expire_time"`
 }
 
 // Creates a new delegated auth session. The code and expiry are chosen by the
 // server so we can control both TTL and the entropy source (crypto/rand).
 func (q *Queries) CreateDelegatedAuthSession(ctx context.Context, arg CreateDelegatedAuthSessionParams) (DelegatedAuthSession, error) {
-	row := q.db.QueryRow(ctx, createDelegatedAuthSession, arg.Code, arg.ExpiresAt)
+	row := q.db.QueryRow(ctx, createDelegatedAuthSession, arg.Code, arg.ExpireTime)
 	var i DelegatedAuthSession
 	err := row.Scan(
 		&i.Code,
-		&i.Status,
+		&i.State,
 		&i.CustomToken,
-		&i.CreatedAt,
-		&i.ExpiresAt,
+		&i.CreateTime,
+		&i.ExpireTime,
 	)
 	return i, err
 }
 
 const deleteExpiredDelegatedAuthSessions = `-- name: DeleteExpiredDelegatedAuthSessions :exec
 DELETE FROM delegated_auth_sessions
-WHERE expires_at < now()
+WHERE expire_time < now()
 `
 
 // Cleanup: remove sessions past their expiry. Run periodically.
@@ -100,18 +100,18 @@ func (q *Queries) DeleteExpiredDelegatedAuthSessions(ctx context.Context) error 
 	return err
 }
 
-const getDelegatedAuthSessionStatus = `-- name: GetDelegatedAuthSessionStatus :one
-SELECT status
+const getDelegatedAuthSessionState = `-- name: GetDelegatedAuthSessionState :one
+SELECT state
 FROM delegated_auth_sessions
 WHERE code = $1
-  AND expires_at > now()
+  AND expire_time > now()
 `
 
-// Returns the status of a session without mutating it. Used by pollers to
+// Returns the state of a session without mutating it. Used by pollers to
 // distinguish "still pending" from "expired/unknown" after a failed consume.
-func (q *Queries) GetDelegatedAuthSessionStatus(ctx context.Context, code uuid.UUID) (string, error) {
-	row := q.db.QueryRow(ctx, getDelegatedAuthSessionStatus, code)
-	var status string
-	err := row.Scan(&status)
-	return status, err
+func (q *Queries) GetDelegatedAuthSessionState(ctx context.Context, code uuid.UUID) (DelegatedAuthSessionState, error) {
+	row := q.db.QueryRow(ctx, getDelegatedAuthSessionState, code)
+	var state DelegatedAuthSessionState
+	err := row.Scan(&state)
+	return state, err
 }

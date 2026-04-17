@@ -264,8 +264,8 @@ func (h *InternalHooks) createDelegatedAuthSession(w http.ResponseWriter, r *htt
 	expiresAt := time.Now().Add(h.delegatedAuth.SessionTTL)
 
 	if _, err := h.queries.CreateDelegatedAuthSession(r.Context(), db.CreateDelegatedAuthSessionParams{
-		Code:      code,
-		ExpiresAt: expiresAt,
+		Code:       code,
+		ExpireTime: expiresAt,
 	}); err != nil {
 		h.logger.Error("failed to create delegated auth session", "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -383,22 +383,22 @@ func (h *InternalHooks) pollDelegatedAuthSession(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Consume missed — fall back to a status lookup so we can distinguish
+	// Consume missed — fall back to a state lookup so we can distinguish
 	// "still pending" from "unknown/expired".
-	status, err := h.queries.GetDelegatedAuthSessionStatus(r.Context(), code)
+	state, err := h.queries.GetDelegatedAuthSessionState(r.Context(), code)
 	if err != nil {
 		http.Error(w, "session not found", http.StatusNotFound)
 		return
 	}
-	if status == "pending" {
+	if state == db.DelegatedAuthSessionStatePENDING {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]string{
 			"status": "pending",
 		})
 		return
 	}
-	// Any other status is treated as gone (should not normally happen — a
-	// 'ready' row would have been consumed above).
+	// Any other state is treated as gone (should not normally happen — an
+	// APPROVED row would have been consumed above).
 	http.Error(w, "session not found", http.StatusNotFound)
 }
 

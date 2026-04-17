@@ -22,7 +22,7 @@ func (q *Queries) DeleteIamPolicy(ctx context.Context, resourceID uuid.UUID) err
 }
 
 const getIamPolicy = `-- name: GetIamPolicy :one
-SELECT resource_id, resource_type, policy, etag, updated_by, update_time FROM iam_policies WHERE resource_id = $1
+SELECT resource_id, resource_type, policy, etag, created_by, updated_by, create_time, update_time FROM iam_policies WHERE resource_id = $1
 `
 
 func (q *Queries) GetIamPolicy(ctx context.Context, resourceID uuid.UUID) (IamPolicy, error) {
@@ -33,28 +33,30 @@ func (q *Queries) GetIamPolicy(ctx context.Context, resourceID uuid.UUID) (IamPo
 		&i.ResourceType,
 		&i.Policy,
 		&i.Etag,
+		&i.CreatedBy,
 		&i.UpdatedBy,
+		&i.CreateTime,
 		&i.UpdateTime,
 	)
 	return i, err
 }
 
 const upsertIamPolicy = `-- name: UpsertIamPolicy :one
-INSERT INTO iam_policies (resource_id, resource_type, policy, updated_by)
-VALUES ($1, $2, $3, $4)
+INSERT INTO iam_policies (resource_id, resource_type, policy, created_by, updated_by)
+VALUES ($1, $2, $3, $4, $4)
 ON CONFLICT (resource_id) DO UPDATE
 SET policy = EXCLUDED.policy,
     etag = md5(now()::text),
     updated_by = EXCLUDED.updated_by,
     update_time = now()
-RETURNING resource_id, resource_type, policy, etag, updated_by, update_time
+RETURNING resource_id, resource_type, policy, etag, created_by, updated_by, create_time, update_time
 `
 
 type UpsertIamPolicyParams struct {
 	ResourceID   uuid.UUID       `json:"resource_id"`
 	ResourceType string          `json:"resource_type"`
 	Policy       json.RawMessage `json:"policy"`
-	UpdatedBy    string          `json:"updated_by"`
+	CreatedBy    string          `json:"created_by"`
 }
 
 func (q *Queries) UpsertIamPolicy(ctx context.Context, arg UpsertIamPolicyParams) (IamPolicy, error) {
@@ -62,7 +64,7 @@ func (q *Queries) UpsertIamPolicy(ctx context.Context, arg UpsertIamPolicyParams
 		arg.ResourceID,
 		arg.ResourceType,
 		arg.Policy,
-		arg.UpdatedBy,
+		arg.CreatedBy,
 	)
 	var i IamPolicy
 	err := row.Scan(
@@ -70,7 +72,9 @@ func (q *Queries) UpsertIamPolicy(ctx context.Context, arg UpsertIamPolicyParams
 		&i.ResourceType,
 		&i.Policy,
 		&i.Etag,
+		&i.CreatedBy,
 		&i.UpdatedBy,
+		&i.CreateTime,
 		&i.UpdateTime,
 	)
 	return i, err

@@ -121,10 +121,10 @@ func (s *Server) DeleteArtifact(ctx context.Context, req *aiv1.DeleteArtifactReq
 }
 
 // resolveConversation resolves org name + conversation name to the DB row.
-func (s *Server) resolveConversation(ctx context.Context, orgName, convName string) (db.Conversation, error) {
+func (s *Server) resolveConversation(ctx context.Context, orgName, convName string) (db.AiConversation, error) {
 	orgID, err := s.resolveOrg(ctx, orgName)
 	if err != nil {
-		return db.Conversation{}, err
+		return db.AiConversation{}, err
 	}
 
 	conv, err := s.queries.GetConversationByName(ctx, db.GetConversationByNameParams{
@@ -132,7 +132,7 @@ func (s *Server) resolveConversation(ctx context.Context, orgName, convName stri
 		Name:  convName,
 	})
 	if err != nil {
-		return db.Conversation{}, apierr.HandleResourceError(err, "Conversation", buildConversationName(orgName, convName))
+		return db.AiConversation{}, apierr.HandleResourceError(err, "Conversation", buildConversationName(orgName, convName))
 	}
 	return conv, nil
 }

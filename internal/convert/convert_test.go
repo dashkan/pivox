@@ -479,14 +479,14 @@ func TestRequestToProto(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		row         db.Request
+		row         db.AssetRequest
 		projectName string
 		wantState   assetsv1.Request_State
 		checkFunc   func(t *testing.T, pb *assetsv1.Request)
 	}{
 		{
 			name: "full request with all timestamps",
-			row: db.Request{
+			row: db.AssetRequest{
 				ID:            uuid.New(),
 				Name:          "req-1",
 				DisplayName:   "My Request",
@@ -499,8 +499,6 @@ func TestRequestToProto(t *testing.T) {
 				UpdatedBy:     "manager@test.com",
 				CreateTime:    now,
 				UpdateTime:    updated,
-				DeleteTime:    pgtype.Timestamptz{Time: now.Add(48 * time.Hour), Valid: true},
-				PurgeTime:     pgtype.Timestamptz{Time: now.Add(96 * time.Hour), Valid: true},
 				DueTime:       pgtype.Timestamptz{Time: dueTime, Valid: true},
 				DeliveredTime: pgtype.Timestamptz{Time: deliveredTime, Valid: true},
 				ApprovedTime:  pgtype.Timestamptz{Time: approvedTime, Valid: true},
@@ -509,8 +507,6 @@ func TestRequestToProto(t *testing.T) {
 			projectName: "organizations/acme/projects/p1",
 			wantState:   assetsv1.Request_OPEN,
 			checkFunc: func(t *testing.T, pb *assetsv1.Request) {
-				assert.NotNil(t, pb.DeleteTime)
-				assert.NotNil(t, pb.PurgeTime)
 				assert.NotNil(t, pb.DueTime)
 				assert.NotNil(t, pb.DeliveredTime)
 				assert.NotNil(t, pb.ApprovedTime)
@@ -520,7 +516,7 @@ func TestRequestToProto(t *testing.T) {
 		},
 		{
 			name: "minimal request without optional timestamps",
-			row: db.Request{
+			row: db.AssetRequest{
 				ID:          uuid.New(),
 				Name:        "req-2",
 				DisplayName: "Simple Request",
@@ -571,14 +567,14 @@ func TestLineItemToProto(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		row         db.LineItem
+		row         db.AssetRequestLineItem
 		requestName string
 		projectName string
 		checkFunc   func(t *testing.T, pb *assetsv1.LineItem)
 	}{
 		{
 			name: "line item with asset and media type",
-			row: db.LineItem{
+			row: db.AssetRequestLineItem{
 				ID:          uuid.New(),
 				Name:        "li-1",
 				DisplayName: "Photo Request",
@@ -601,7 +597,7 @@ func TestLineItemToProto(t *testing.T) {
 		},
 		{
 			name: "line item without optional fields",
-			row: db.LineItem{
+			row: db.AssetRequestLineItem{
 				ID:          uuid.New(),
 				Name:        "li-2",
 				DisplayName: "Basic",
@@ -1342,7 +1338,6 @@ func TestTagBindingToProto(t *testing.T) {
 		TagValueID:     tvID,
 		Etag:           "etag-tb",
 		CreateTime:     now,
-		UpdateTime:     now,
 	}
 	tv := db.TagValue{
 		ID:       tvID,

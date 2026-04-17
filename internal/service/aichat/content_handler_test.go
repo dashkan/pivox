@@ -32,7 +32,7 @@ func TestContentHandler_InlineHappyPath(t *testing.T) {
 	}).Return(conv, nil)
 	q.On("GetArtifactByName", mock.Anything, db.GetArtifactByNameParams{
 		ConversationID: conv.ID, Name: "art1",
-	}).Return(db.Artifact{ID: artID, ConversationID: conv.ID, Name: "art1", CreateTime: time.Now(), UpdateTime: time.Now()}, nil)
+	}).Return(db.AiArtifact{ID: artID, ConversationID: conv.ID, Name: "art1", CreateTime: time.Now(), UpdateTime: time.Now()}, nil)
 	q.On("GetArtifactVersionForContent", mock.Anything, db.GetArtifactVersionForContentParams{
 		ArtifactID: artID, Name: "v1",
 	}).Return(db.GetArtifactVersionForContentRow{
@@ -68,7 +68,7 @@ func TestContentHandler_AssetBacked(t *testing.T) {
 	q.On("GetOrganizationByName", mock.Anything, "acme").Return(org, nil)
 	q.On("GetConversationByName", mock.Anything, mock.Anything).Return(conv, nil)
 	q.On("GetArtifactByName", mock.Anything, mock.Anything).Return(
-		db.Artifact{ID: artID, CreateTime: time.Now(), UpdateTime: time.Now()}, nil)
+		db.AiArtifact{ID: artID, CreateTime: time.Now(), UpdateTime: time.Now()}, nil)
 	q.On("GetArtifactVersionForContent", mock.Anything, mock.Anything).Return(db.GetArtifactVersionForContentRow{
 		ID:               uuid.New(),
 		ArtifactID:       artID,
@@ -127,7 +127,7 @@ func TestContentHandler_IfNoneMatch(t *testing.T) {
 	q.On("GetOrganizationByName", mock.Anything, "acme").Return(org, nil)
 	q.On("GetConversationByName", mock.Anything, mock.Anything).Return(conv, nil)
 	q.On("GetArtifactByName", mock.Anything, mock.Anything).Return(
-		db.Artifact{ID: artID, CreateTime: time.Now(), UpdateTime: time.Now()}, nil)
+		db.AiArtifact{ID: artID, CreateTime: time.Now(), UpdateTime: time.Now()}, nil)
 	q.On("GetArtifactVersionForContent", mock.Anything, mock.Anything).Return(db.GetArtifactVersionForContentRow{
 		ID:                uuid.New(),
 		ArtifactID:        artID,
