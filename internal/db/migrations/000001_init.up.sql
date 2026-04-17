@@ -992,9 +992,17 @@ CREATE TABLE ai_conversations (
     -- constraints
     UNIQUE(org_id, name)
 );
-CREATE INDEX idx_ai_conversations_org ON ai_conversations (org_id, create_time DESC);
-CREATE INDEX idx_ai_conversations_creator ON ai_conversations (org_id, created_by, create_time DESC);
-CREATE INDEX idx_ai_conversations_archived ON ai_conversations (org_id, created_by) WHERE archived = FALSE;
+-- Primary list index: (org_id, created_by) prefix always filtered on for
+-- access control; `id DESC` at the end serves both the default newest-first
+-- sort and cursor-based pagination (`WHERE id < $cursor`) as a pure index
+-- scan. `uuidv7()` gives time-ordered + unique, so `id DESC` == chronological.
+CREATE INDEX idx_ai_conversations_creator ON ai_conversations (org_id, created_by, id DESC);
+
+-- Partial index for the "non-archived" filtered list, which is the common case.
+CREATE INDEX idx_ai_conversations_active ON ai_conversations (org_id, created_by, id DESC) WHERE archived = FALSE;
+
+-- Partial index for "pinned first" views.
+CREATE INDEX idx_ai_conversations_pinned ON ai_conversations (org_id, created_by, id DESC) WHERE pinned = TRUE;
 
 -- ============================================================================
 -- AI chat — ai_messages

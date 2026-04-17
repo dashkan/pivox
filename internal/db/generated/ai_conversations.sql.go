@@ -12,23 +12,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const countConversationsByCreator = `-- name: CountConversationsByCreator :one
-SELECT count(*) FROM ai_conversations
-WHERE org_id = $1 AND created_by = $2
-`
-
-type CountConversationsByCreatorParams struct {
-	OrgID     uuid.UUID `json:"org_id"`
-	CreatedBy string    `json:"created_by"`
-}
-
-func (q *Queries) CountConversationsByCreator(ctx context.Context, arg CountConversationsByCreatorParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countConversationsByCreator, arg.OrgID, arg.CreatedBy)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const createConversation = `-- name: CreateConversation :one
 INSERT INTO ai_conversations (org_id, name, title, description, created_by, updated_by)
 VALUES ($1, $2, $3, $4, $5, $5)
@@ -153,117 +136,8 @@ func (q *Queries) IncrementConversationMessageCount(ctx context.Context, id uuid
 	return err
 }
 
-const listConversationsByCreator = `-- name: ListConversationsByCreator :many
-SELECT id, org_id, name, title, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time FROM ai_conversations
-WHERE org_id = $1 AND created_by = $2
-ORDER BY create_time DESC
-LIMIT $3 OFFSET $4
-`
-
-type ListConversationsByCreatorParams struct {
-	OrgID     uuid.UUID `json:"org_id"`
-	CreatedBy string    `json:"created_by"`
-	Limit     int32     `json:"limit"`
-	Offset    int32     `json:"offset"`
-}
-
-func (q *Queries) ListConversationsByCreator(ctx context.Context, arg ListConversationsByCreatorParams) ([]AiConversation, error) {
-	rows, err := q.db.Query(ctx, listConversationsByCreator,
-		arg.OrgID,
-		arg.CreatedBy,
-		arg.Limit,
-		arg.Offset,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []AiConversation{}
-	for rows.Next() {
-		var i AiConversation
-		if err := rows.Scan(
-			&i.ID,
-			&i.OrgID,
-			&i.Name,
-			&i.Title,
-			&i.Description,
-			&i.Archived,
-			&i.Pinned,
-			&i.MessageCount,
-			&i.LastMessageTime,
-			&i.Etag,
-			&i.Revision,
-			&i.CreatedBy,
-			&i.UpdatedBy,
-			&i.CreateTime,
-			&i.UpdateTime,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listConversationsByCreatorActive = `-- name: ListConversationsByCreatorActive :many
-SELECT id, org_id, name, title, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time FROM ai_conversations
-WHERE org_id = $1 AND created_by = $2 AND archived = FALSE
-ORDER BY create_time DESC
-LIMIT $3 OFFSET $4
-`
-
-type ListConversationsByCreatorActiveParams struct {
-	OrgID     uuid.UUID `json:"org_id"`
-	CreatedBy string    `json:"created_by"`
-	Limit     int32     `json:"limit"`
-	Offset    int32     `json:"offset"`
-}
-
-func (q *Queries) ListConversationsByCreatorActive(ctx context.Context, arg ListConversationsByCreatorActiveParams) ([]AiConversation, error) {
-	rows, err := q.db.Query(ctx, listConversationsByCreatorActive,
-		arg.OrgID,
-		arg.CreatedBy,
-		arg.Limit,
-		arg.Offset,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []AiConversation{}
-	for rows.Next() {
-		var i AiConversation
-		if err := rows.Scan(
-			&i.ID,
-			&i.OrgID,
-			&i.Name,
-			&i.Title,
-			&i.Description,
-			&i.Archived,
-			&i.Pinned,
-			&i.MessageCount,
-			&i.LastMessageTime,
-			&i.Etag,
-			&i.Revision,
-			&i.CreatedBy,
-			&i.UpdatedBy,
-			&i.CreateTime,
-			&i.UpdateTime,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const updateConversation = `-- name: UpdateConversation :one
+
 UPDATE ai_conversations
 SET title = COALESCE($3, title),
     description = COALESCE($4, description),
@@ -286,6 +160,8 @@ type UpdateConversationParams struct {
 	Pinned      pgtype.Bool `json:"pinned"`
 }
 
+// ListConversations/CountConversations replaced by filter.Query in the
+// service layer — see internal/filter/declarations.go ConversationFilter.
 func (q *Queries) UpdateConversation(ctx context.Context, arg UpdateConversationParams) (AiConversation, error) {
 	row := q.db.QueryRow(ctx, updateConversation,
 		arg.ID,

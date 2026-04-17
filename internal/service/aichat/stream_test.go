@@ -103,7 +103,7 @@ func TestStream_HappyPath(t *testing.T) {
 			{Kind: "finish"},
 		},
 	}
-	srv := NewServer(nil, q, llm, tools.NewRegistry(), slog.Default())
+	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, slog.Default())
 
 	org := testOrg()
 	uid := "user1"
@@ -153,7 +153,7 @@ func TestStream_HappyPath(t *testing.T) {
 func TestStream_EmptyEventReturnsInvalidArgument(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, nil, slog.Default())
+	srv := NewServer(nil, q, llm, nil, nil, slog.Default())
 
 	ctx := authenticatedCtx("user1")
 	stream := &mockServerStream{ctx: ctx}
@@ -168,7 +168,7 @@ func TestStream_EmptyEventReturnsInvalidArgument(t *testing.T) {
 func TestStream_ToolOutputMissingCallIDReturnsInvalidArgument(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, nil, slog.Default())
+	srv := NewServer(nil, q, llm, nil, nil, slog.Default())
 
 	ctx := authenticatedCtx("user1")
 	stream := &mockServerStream{ctx: ctx}
@@ -191,7 +191,7 @@ func TestStream_ToolOutputResumesGeneration(t *testing.T) {
 			{Kind: "finish"},
 		},
 	}
-	srv := NewServer(nil, q, llm, tools.NewRegistry(), slog.Default())
+	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, slog.Default())
 
 	org := testOrg()
 	uid := "user1"
@@ -253,7 +253,7 @@ func TestStream_ToolOutputResumesGeneration(t *testing.T) {
 func TestStream_WrongOwner(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, nil, slog.Default())
+	srv := NewServer(nil, q, llm, nil, nil, slog.Default())
 
 	org := testOrg()
 	conv := testConversation(org.ID, "other-user")
@@ -279,7 +279,7 @@ func TestStream_WrongOwner(t *testing.T) {
 func TestStream_ModelError(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{err: io.ErrUnexpectedEOF}
-	srv := NewServer(nil, q, llm, nil, slog.Default())
+	srv := NewServer(nil, q, llm, nil, nil, slog.Default())
 
 	org := testOrg()
 	uid := "user1"
@@ -324,7 +324,7 @@ func TestExtractText(t *testing.T) {
 
 func TestLoadModelHistory_BudgetTruncation(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	srv := NewServer(nil, q, nil, nil, slog.Default())
+	srv := NewServer(nil, q, nil, nil, nil, slog.Default())
 
 	convID := uuid.New()
 	partsJSON, _ := marshalParts([]*aiv1.MessagePart{
@@ -387,7 +387,7 @@ func TestDbMessageToModel(t *testing.T) {
 func TestStream_InvalidConversationReturnsNotFound(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, nil, slog.Default())
+	srv := NewServer(nil, q, llm, nil, nil, slog.Default())
 
 	org := testOrg()
 	ctx := authenticatedCtx("user1")
@@ -413,7 +413,7 @@ func TestStream_InvalidConversationReturnsNotFound(t *testing.T) {
 func TestStream_InvalidConversationNameReturnsInvalidArgument(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, nil, slog.Default())
+	srv := NewServer(nil, q, llm, nil, nil, slog.Default())
 
 	ctx := authenticatedCtx("user1")
 

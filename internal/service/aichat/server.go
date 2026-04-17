@@ -3,7 +3,9 @@ package aichat
 import (
 	"log/slog"
 
+	"github.com/dashkan/pivox/internal/appkey"
 	db "github.com/dashkan/pivox/internal/db/generated"
+	"github.com/dashkan/pivox/internal/filter"
 	aiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1"
 	"github.com/dashkan/pivox/internal/service/aichat/model"
 	"github.com/dashkan/pivox/internal/service/aichat/tools"
@@ -17,10 +19,12 @@ type Server struct {
 	model   model.LanguageModel
 	tools   *tools.Registry
 	logger  *slog.Logger
+	codec   *appkey.Codec
+	filter  *filter.ResourceFilter
 }
 
 // NewServer creates a new AiChat service server.
-func NewServer(pool db.DBTX, queries db.Querier, llm model.LanguageModel, toolRegistry *tools.Registry, logger *slog.Logger) *Server {
+func NewServer(pool db.DBTX, queries db.Querier, llm model.LanguageModel, toolRegistry *tools.Registry, codec *appkey.Codec, logger *slog.Logger) *Server {
 	if toolRegistry == nil {
 		toolRegistry = tools.NewRegistry()
 	}
@@ -30,5 +34,7 @@ func NewServer(pool db.DBTX, queries db.Querier, llm model.LanguageModel, toolRe
 		model:   llm,
 		tools:   toolRegistry,
 		logger:  logger,
+		codec:   codec,
+		filter:  filter.ConversationFilter(),
 	}
 }

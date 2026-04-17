@@ -64,8 +64,8 @@ func TestRegister_AllRoutes(t *testing.T) {
 		Return(db.DelegatedAuthSession{}, nil).Maybe()
 	mockQ.On("ConsumeDelegatedAuthSession", mock.Anything, mock.Anything).
 		Return(pgtype.Text{}, errors.New("no rows")).Maybe()
-	mockQ.On("GetDelegatedAuthSessionStatus", mock.Anything, mock.Anything).
-		Return("", errors.New("no rows")).Maybe()
+	mockQ.On("GetDelegatedAuthSessionState", mock.Anything, mock.Anything).
+		Return(db.DelegatedAuthSessionState(""), errors.New("no rows")).Maybe()
 
 	h, err := NewInternalHooks(mockQ, config.SyncAuthConfig{SharedSecret: "s"}, testDelegatedAuthConfig(), true, logger, auth)
 	require.NoError(t, err)
@@ -674,9 +674,9 @@ func TestCreateDelegatedAuthSession(t *testing.T) {
 			setupMock: func(mq *mocks.MockQuerier) {
 				mq.On("CreateDelegatedAuthSession", mock.Anything,
 					mock.MatchedBy(func(p db.CreateDelegatedAuthSessionParams) bool {
-						return p.Code != uuid.Nil && p.ExpiresAt.After(time.Now())
+						return p.Code != uuid.Nil && p.ExpireTime.After(time.Now())
 					})).
-					Return(db.DelegatedAuthSession{Status: "pending"}, nil)
+					Return(db.DelegatedAuthSession{State: db.DelegatedAuthSessionStatePENDING}, nil)
 			},
 			wantStatus: http.StatusOK,
 			checkBody: func(t *testing.T, resp map[string]any) {
@@ -731,7 +731,7 @@ func TestCreateDelegatedAuthSession_UsesConfiguredTTL(t *testing.T) {
 	mockQ.On("CreateDelegatedAuthSession", mock.Anything,
 		mock.MatchedBy(func(p db.CreateDelegatedAuthSessionParams) bool {
 			// Expiry should be roughly now + 17 minutes.
-			delta := p.ExpiresAt.Sub(before)
+			delta := p.ExpireTime.Sub(before)
 			return delta >= 17*time.Minute-time.Second && delta <= 17*time.Minute+time.Second
 		})).
 		Return(db.DelegatedAuthSession{}, nil)
@@ -779,7 +779,7 @@ func TestCompleteDelegatedAuthSession(t *testing.T) {
 							p.CustomToken.Valid &&
 							p.CustomToken.String == "minted-custom-token"
 					})).
-					Return(db.DelegatedAuthSession{Code: validCode, Status: "ready"}, nil)
+					Return(db.DelegatedAuthSession{Code: validCode, State: db.DelegatedAuthSessionStateAPPROVED}, nil)
 			},
 			wantStatus: http.StatusNoContent,
 		},
@@ -905,8 +905,8 @@ func TestPollDelegatedAuthSession(t *testing.T) {
 			setupDB: func(mq *mocks.MockQuerier) {
 				mq.On("ConsumeDelegatedAuthSession", mock.Anything, validCode).
 					Return(pgtype.Text{}, errors.New("no rows"))
-				mq.On("GetDelegatedAuthSessionStatus", mock.Anything, validCode).
-					Return("pending", nil)
+				mq.On("GetDelegatedAuthSessionState", mock.Anything, validCode).
+					Return(db.DelegatedAuthSessionStatePENDING, nil)
 			},
 			wantStatus: http.StatusOK,
 			wantBody:   map[string]any{"status": "pending"},
@@ -917,8 +917,8 @@ func TestPollDelegatedAuthSession(t *testing.T) {
 			setupDB: func(mq *mocks.MockQuerier) {
 				mq.On("ConsumeDelegatedAuthSession", mock.Anything, validCode).
 					Return(pgtype.Text{}, errors.New("no rows"))
-				mq.On("GetDelegatedAuthSessionStatus", mock.Anything, validCode).
-					Return("", errors.New("no rows"))
+				mq.On("GetDelegatedAuthSessionState", mock.Anything, validCode).
+		Return(db.DelegatedAuthSessionState(""), errors.New("no rows"))
 			},
 			wantStatus: http.StatusNotFound,
 		},
@@ -969,8 +969,8 @@ func TestDelegatedAuth_DoubleConsume(t *testing.T) {
 		Return(pgtype.Text{String: "tok", Valid: true}, nil).Once()
 	mockQ.On("ConsumeDelegatedAuthSession", mock.Anything, code).
 		Return(pgtype.Text{}, errors.New("no rows")).Once()
-	mockQ.On("GetDelegatedAuthSessionStatus", mock.Anything, code).
-		Return("", errors.New("no rows")).Once()
+	mockQ.On("GetDelegatedAuthSessionState", mock.Anything, code).
+		Return(db.DelegatedAuthSessionState(""), errors.New("no rows")).Once()
 
 	h := newTestHooks(t, mockQ, new(mockAuthService))
 
@@ -1085,8 +1085,8 @@ func TestDelegatedAuth_PollSustainsCadence(t *testing.T) {
 	code := uuid.New()
 	mockQ.On("ConsumeDelegatedAuthSession", mock.Anything, code).
 		Return(pgtype.Text{}, errors.New("no rows")).Maybe()
-	mockQ.On("GetDelegatedAuthSessionStatus", mock.Anything, code).
-		Return("pending", nil).Maybe()
+	mockQ.On("GetDelegatedAuthSessionState", mock.Anything, code).
+		Return(db.DelegatedAuthSessionStatePENDING, nil).Maybe()
 
 	mux := http.NewServeMux()
 	h.Register(mux)

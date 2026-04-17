@@ -4,6 +4,7 @@ package apikeys_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
+	"github.com/dashkan/pivox/internal/appkey"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	"github.com/dashkan/pivox/internal/service/apikeys"
@@ -37,8 +39,10 @@ func TestIntegration_ApiKeys(t *testing.T) {
 	pool, queries, cleanup := testutil.SetupTestDB(t)
 	defer cleanup()
 
+	codec, err := appkey.NewFromHex(strings.Repeat("ab", 32))
+	require.NoError(t, err)
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		apiv1.RegisterApiKeysServer(s, apikeys.NewApiKeysServer(pool, queries, nil))
+		apiv1.RegisterApiKeysServer(s, apikeys.NewApiKeysServer(pool, queries, codec))
 	})
 
 	client := apiv1.NewApiKeysClient(conn)

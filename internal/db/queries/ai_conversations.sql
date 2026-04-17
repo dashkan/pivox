@@ -9,21 +9,8 @@ SELECT * FROM ai_conversations WHERE org_id = $1 AND name = $2;
 -- name: GetConversationByID :one
 SELECT * FROM ai_conversations WHERE id = $1;
 
--- name: ListConversationsByCreator :many
-SELECT * FROM ai_conversations
-WHERE org_id = $1 AND created_by = $2
-ORDER BY create_time DESC
-LIMIT $3 OFFSET $4;
-
--- name: ListConversationsByCreatorActive :many
-SELECT * FROM ai_conversations
-WHERE org_id = $1 AND created_by = $2 AND archived = FALSE
-ORDER BY create_time DESC
-LIMIT $3 OFFSET $4;
-
--- name: CountConversationsByCreator :one
-SELECT count(*) FROM ai_conversations
-WHERE org_id = $1 AND created_by = $2;
+-- ListConversations/CountConversations replaced by filter.Query in the
+-- service layer — see internal/filter/declarations.go ConversationFilter.
 
 -- name: UpdateConversation :one
 UPDATE ai_conversations

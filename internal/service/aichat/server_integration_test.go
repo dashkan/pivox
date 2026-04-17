@@ -38,7 +38,7 @@ func setupIntegration(t *testing.T) (aiv1.AiChatClient, *db.Queries, func()) {
 
 	// Mock model that returns a fixed response.
 	llm := &fixedModel{text: "Hello from integration test!"}
-	srv := aichat.NewServer(pool, queries, llm, tools.NewRegistry(), slog.Default())
+	srv := aichat.NewServer(pool, queries, llm, tools.NewRegistry(), nil, slog.Default())
 
 	// gRPC server with a fake auth interceptor that injects testUID.
 	lis := bufconn.Listen(1024 * 1024)
@@ -101,11 +101,10 @@ func createTestOrg(t *testing.T, queries *db.Queries) db.Organization {
 func createTestConversation(t *testing.T, queries *db.Queries, orgID uuid.UUID) db.AiConversation {
 	t.Helper()
 	conv, err := queries.CreateConversation(context.Background(), db.CreateConversationParams{
-		OrgID:      orgID,
+		OrgID:     orgID,
+		Name:      "conv-" + uuid.New().String()[:8],
+		Title:     "Test Conversation",
 		CreatedBy: testUID,
-		Name:       "conv-" + uuid.New().String()[:8],
-		Title:      "Test Conversation",
-		CreatedBy:  testUID,
 	})
 	require.NoError(t, err)
 	return conv
@@ -303,16 +302,15 @@ func TestIntegration_StreamWrongOwner(t *testing.T) {
 
 	// Create conversation owned by a different user.
 	conv, err := queries.CreateConversation(context.Background(), db.CreateConversationParams{
-		OrgID:      org.ID,
+		OrgID:     org.ID,
+		Name:      "conv-" + uuid.New().String()[:8],
+		Title:     "Other's Chat",
 		CreatedBy: "other-user",
-		Name:       "conv-" + uuid.New().String()[:8],
-		Title:      "Other's Chat",
-		CreatedBy:  "other-user",
 	})
 	require.NoError(t, err)
 
 	llm := &fixedModel{text: "should not reach here"}
-	srv := aichat.NewServer(nil, queries, llm, tools.NewRegistry(), slog.Default())
+	srv := aichat.NewServer(nil, queries, llm, tools.NewRegistry(), nil, slog.Default())
 
 	lis := bufconn.Listen(1024 * 1024)
 	grpcServer := grpc.NewServer(

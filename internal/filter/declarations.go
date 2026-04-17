@@ -25,14 +25,16 @@ type SortableField struct {
 // independently: a field may be filterable only, sortable only, both, or
 // neither. No implicit coupling.
 type ResourceFilter struct {
-	Filterable    map[string]FilterableField
-	Sortable      map[string]SortableField
-	Table         string   // SQL table name
-	SoftDelete    bool     // if true, adds "delete_time IS NULL"
-	OrderBy       string   // default ORDER BY (e.g. "id ASC")
-	CursorColumn  string   // column used for cursor pagination (e.g. "id")
-	DefaultFields []string // filter fields searched when bare literals have no field qualifier
-	ParentColumn  string   // column name for parent filtering (default: "parent_id")
+	Filterable      map[string]FilterableField
+	Sortable        map[string]SortableField
+	Table           string   // SQL table name
+	SoftDelete      bool     // if true, adds "delete_time IS NULL"
+	OrderBy         string   // default ORDER BY (e.g. "id ASC")
+	CursorColumn    string   // column used for cursor pagination (e.g. "id")
+	CursorDirection string   // "ASC" (default) or "DESC" — must match the direction of CursorColumn in OrderBy
+	DefaultFields   []string // filter fields searched when bare literals have no field qualifier
+	ParentColumn    string   // column name for parent filtering (default: "parent_id")
+	UserColumn      string   // column name for implicit user-scoped access control (e.g. "created_by"); QueryParams.UserID is required when set
 }
 
 // ProjectFilter returns the filter config for projects.
@@ -140,6 +142,34 @@ func TagBindingFilter() *ResourceFilter {
 		CursorColumn:  "id",
 		DefaultFields: []string{"parentResource"},
 		ParentColumn:  "parent_resource",
+	}
+}
+
+// ConversationFilter returns the filter config for AI chat conversations.
+// Access-controlled by (org_id, created_by) — conversations are private to
+// their creator.
+func ConversationFilter() *ResourceFilter {
+	return &ResourceFilter{
+		Filterable: map[string]FilterableField{
+			"title":           {Column: "title", Type: filtering.TypeString, AllowPartial: true},
+			"archived":        {Column: "archived", Type: filtering.TypeBool},
+			"pinned":          {Column: "pinned", Type: filtering.TypeBool},
+			"createTime":      {Column: "create_time", Type: filtering.TypeTimestamp},
+			"lastMessageTime": {Column: "last_message_time", Type: filtering.TypeTimestamp},
+		},
+		Sortable: map[string]SortableField{
+			"title":           {Column: "title"},
+			"createTime":      {Column: "create_time"},
+			"lastMessageTime": {Column: "last_message_time"},
+		},
+		Table:           "ai_conversations",
+		SoftDelete:      false, // AI resources don't soft-delete
+		OrderBy:         "id DESC",
+		CursorColumn:    "id",
+		CursorDirection: "DESC",
+		DefaultFields:   []string{"title"},
+		ParentColumn:    "org_id",
+		UserColumn:      "created_by",
 	}
 }
 

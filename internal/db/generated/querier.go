@@ -31,7 +31,6 @@ type Querier interface {
 	CountAssetVersions(ctx context.Context, assetID uuid.UUID) (int64, error)
 	CountAssetsByProject(ctx context.Context, projectID uuid.UUID) (int64, error)
 	CountConnectedStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) (int64, error)
-	CountConversationsByCreator(ctx context.Context, arg CountConversationsByCreatorParams) (int64, error)
 	CountFulfilledLineItems(ctx context.Context, requestID uuid.UUID) (int64, error)
 	CountLineItemsByRequest(ctx context.Context, requestID uuid.UUID) (int64, error)
 	CountMessagesByConversation(ctx context.Context, conversationID uuid.UUID) (int64, error)
@@ -139,8 +138,6 @@ type Querier interface {
 	ListAssetVersions(ctx context.Context, arg ListAssetVersionsParams) ([]AssetVersion, error)
 	ListAssetsByProject(ctx context.Context, arg ListAssetsByProjectParams) ([]Asset, error)
 	ListAssetsByProjectWithDeleted(ctx context.Context, arg ListAssetsByProjectWithDeletedParams) ([]Asset, error)
-	ListConversationsByCreator(ctx context.Context, arg ListConversationsByCreatorParams) ([]AiConversation, error)
-	ListConversationsByCreatorActive(ctx context.Context, arg ListConversationsByCreatorActiveParams) ([]AiConversation, error)
 	ListEffectiveTags(ctx context.Context, parentResource string) ([]ListEffectiveTagsRow, error)
 	ListExpiredAssets(ctx context.Context, limit int32) ([]Asset, error)
 	ListLineItemsByRequest(ctx context.Context, arg ListLineItemsByRequestParams) ([]AssetRequestLineItem, error)
@@ -173,6 +170,8 @@ type Querier interface {
 	UpdateAssetIngestion(ctx context.Context, arg UpdateAssetIngestionParams) error
 	UpdateAssetState(ctx context.Context, arg UpdateAssetStateParams) error
 	UpdateAssetVersionError(ctx context.Context, arg UpdateAssetVersionErrorParams) error
+	// ListConversations/CountConversations replaced by filter.Query in the
+	// service layer — see internal/filter/declarations.go ConversationFilter.
 	UpdateConversation(ctx context.Context, arg UpdateConversationParams) (AiConversation, error)
 	UpdateLineItem(ctx context.Context, arg UpdateLineItemParams) (AssetRequestLineItem, error)
 	UpdateLineItemState(ctx context.Context, arg UpdateLineItemStateParams) error

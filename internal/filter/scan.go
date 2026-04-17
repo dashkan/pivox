@@ -6,6 +6,36 @@ import (
 	db "github.com/dashkan/pivox/internal/db/generated"
 )
 
+// ScanConversations scans rows into db.AiConversation structs.
+func ScanConversations(rows pgx.Rows) ([]db.AiConversation, error) {
+	defer rows.Close()
+	var results []db.AiConversation
+	for rows.Next() {
+		var c db.AiConversation
+		if err := rows.Scan(
+			&c.ID,
+			&c.OrgID,
+			&c.Name,
+			&c.Title,
+			&c.Description,
+			&c.Archived,
+			&c.Pinned,
+			&c.MessageCount,
+			&c.LastMessageTime,
+			&c.Etag,
+			&c.Revision,
+			&c.CreatedBy,
+			&c.UpdatedBy,
+			&c.CreateTime,
+			&c.UpdateTime,
+		); err != nil {
+			return nil, err
+		}
+		results = append(results, c)
+	}
+	return results, rows.Err()
+}
+
 // ScanProjects scans rows into db.Project structs.
 func ScanProjects(rows pgx.Rows) ([]db.Project, error) {
 	defer rows.Close()

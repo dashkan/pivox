@@ -741,11 +741,6 @@ func (m *MockQuerier) UpdateOperationMetadata(ctx context.Context, arg db.Update
 
 // Conversations
 
-func (m *MockQuerier) CountConversationsByCreator(ctx context.Context, arg db.CountConversationsByCreatorParams) (int64, error) {
-	args := m.Called(ctx, arg)
-	return args.Get(0).(int64), args.Error(1)
-}
-
 func (m *MockQuerier) CreateConversation(ctx context.Context, arg db.CreateConversationParams) (db.AiConversation, error) {
 	args := m.Called(ctx, arg)
 	return args.Get(0).(db.AiConversation), args.Error(1)
@@ -769,16 +764,6 @@ func (m *MockQuerier) GetConversationByName(ctx context.Context, arg db.GetConve
 func (m *MockQuerier) IncrementConversationMessageCount(ctx context.Context, id uuid.UUID) error {
 	args := m.Called(ctx, id)
 	return args.Error(0)
-}
-
-func (m *MockQuerier) ListConversationsByCreator(ctx context.Context, arg db.ListConversationsByCreatorParams) ([]db.AiConversation, error) {
-	args := m.Called(ctx, arg)
-	return args.Get(0).([]db.AiConversation), args.Error(1)
-}
-
-func (m *MockQuerier) ListConversationsByCreatorActive(ctx context.Context, arg db.ListConversationsByCreatorActiveParams) ([]db.AiConversation, error) {
-	args := m.Called(ctx, arg)
-	return args.Get(0).([]db.AiConversation), args.Error(1)
 }
 
 func (m *MockQuerier) UpdateConversation(ctx context.Context, arg db.UpdateConversationParams) (db.AiConversation, error) {

@@ -258,7 +258,7 @@ func serve(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("initialize Ollama adapter: %w", err)
 	}
 	toolRegistry := tools.NewRegistry()
-	aiChatServer := aichat.NewServer(pool, queries, llm, toolRegistry, logger)
+	aiChatServer := aichat.NewServer(pool, queries, llm, toolRegistry, nil, logger)
 	aiv1.RegisterAiChatServer(grpcServer, aiChatServer)
 
 	// Agent bidi streaming service (agents authenticate via registration token, not Firebase)

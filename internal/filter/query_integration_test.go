@@ -5,12 +5,14 @@ package filter
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dashkan/pivox/internal/appkey"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/testutil"
 )
@@ -504,10 +506,15 @@ func TestQueryIntegration_CursorPagination(t *testing.T) {
 	require.Len(t, allProjects, 3)
 
 	// Use the first project's ID as cursor — should get items after it.
+	codec, err := appkey.NewFromHex(strings.Repeat("ab", 32))
+	require.NoError(t, err)
 	cursorID := allProjects[0].ID
+	cursorTok, err := EncodeNextPageToken(codec, cursorID)
+	require.NoError(t, err)
 	rows, err = Query(ctx, pool, rf, QueryParams{
 		ParentID: org.ID.String(),
-		Cursor:   cursorID.String(),
+		Cursor:   cursorTok,
+		Codec:    codec,
 	})
 	require.NoError(t, err)
 
