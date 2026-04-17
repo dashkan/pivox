@@ -66,10 +66,24 @@ public struct ConversationView: View {
                 .onSubmit { sendMessage() }
 
             if viewModel.state == .streaming {
-                Button("Stop") { viewModel.cancel() }
+                Button {
+                    viewModel.cancel()
+                } label: {
+                    Image(systemName: "stop.circle.fill")
+                }
+                .buttonStyle(.plain)
+                .help("Stop")
+                .accessibilityLabel("Stop")
             } else {
-                Button("Send") { sendMessage() }
-                    .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                Button {
+                    sendMessage()
+                } label: {
+                    Image(systemName: "paperplane.fill")
+                }
+                .buttonStyle(.plain)
+                .help("Send")
+                .accessibilityLabel("Send")
+                .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
         .padding(12)

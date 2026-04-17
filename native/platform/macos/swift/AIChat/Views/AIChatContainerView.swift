@@ -67,10 +67,11 @@ struct AIChatPanel: View {
                     conversationName = nil
                     pendingMessage = nil
                 } label: {
-                    Image(systemName: "plus")
+                    Image(systemName: "plus.bubble")
                 }
                 .buttonStyle(.plain)
                 .help("New conversation")
+                .accessibilityLabel("New conversation")
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
@@ -88,7 +89,8 @@ struct AIChatPanel: View {
                 ActiveConversationView(
                     client: client,
                     conversationName: name,
-                    initialMessage: pendingMessage
+                    initialMessage: pendingMessage,
+                    isNew: pendingMessage != nil
                 )
                 .id(name)
             } else {
@@ -108,9 +110,9 @@ struct ActiveConversationView: View {
     @StateObject private var viewModel: ConversationViewModel
     private let initialMessage: String?
 
-    init(client: ChatClient, conversationName: String, initialMessage: String? = nil) {
+    init(client: ChatClient, conversationName: String, initialMessage: String? = nil, isNew: Bool = false) {
         _viewModel = StateObject(wrappedValue: ConversationViewModel(
-            client: client, conversationName: conversationName))
+            client: client, conversationName: conversationName, isNew: isNew))
         self.initialMessage = initialMessage
     }
 
@@ -159,9 +161,14 @@ struct NewChatView: View {
                     .focused($inputFocused)
                     .onSubmit { sendFirst() }
 
-                Button("Send") {
+                Button {
                     sendFirst()
+                } label: {
+                    Image(systemName: "paperplane.fill")
                 }
+                .buttonStyle(.plain)
+                .help("Send")
+                .accessibilityLabel("Send")
                 .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isCreating)
             }
             .padding(12)

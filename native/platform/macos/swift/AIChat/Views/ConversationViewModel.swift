@@ -9,6 +9,10 @@ public final class ConversationViewModel: ObservableObject {
 
     private let client: any ChatClientProtocol
     public let conversationName: String
+    /// True when the conversation was just created in this session (via the
+    /// new-chat flow) and has no server-side history to load. Prevents a
+    /// pointless `listMessages` RPC that could race with the first `send()`.
+    private let isNew: Bool
 
     private var streamTask: Task<Void, Never>?
 
@@ -30,12 +34,17 @@ public final class ConversationViewModel: ObservableObject {
         }
     }
 
-    public init(client: any ChatClientProtocol, conversationName: String) {
+    public init(client: any ChatClientProtocol, conversationName: String, isNew: Bool = false) {
         self.client = client
         self.conversationName = conversationName
+        self.isNew = isNew
     }
 
     public func loadHistory() async {
+        // Brand-new conversations have no server history yet. Skipping avoids
+        // a racy listMessages call that could return the just-sent user
+        // message and cause a UI duplicate.
+        guard !isNew else { return }
         guard state == .idle else { return }
         state = .loading
         do {
