@@ -148,11 +148,18 @@ message ListMessagesRequest {
 
   // Optional. Page token from a previous ListMessages call.
   string page_token = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. AIP-160 filter. Filterable fields: `role`, `createTime`.
+  string filter = 4 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. AIP-132 order_by. Sortable fields: `createTime`.
+  // Default: newest first (by id — uuidv7 is time-ordered).
+  string order_by = 5 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // Response message for `ListMessages`.
 message ListMessagesResponse {
-  // The messages in the conversation, ordered by sequence.
+  // The messages in the conversation. Default order: newest first.
   repeated Message messages = 1;
 
   // Token for the next page of results.

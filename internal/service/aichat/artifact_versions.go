@@ -3,13 +3,17 @@ package aichat
 import (
 	"context"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
+	"github.com/dashkan/pivox/internal/filter"
 	aiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1"
+	"github.com/dashkan/pivox/internal/server"
 )
 
 func (s *Server) GetArtifactVersion(ctx context.Context, req *aiv1.GetArtifactVersionRequest) (*aiv1.ArtifactVersion, error) {
@@ -18,7 +22,9 @@ func (s *Server) GetArtifactVersion(ctx context.Context, req *aiv1.GetArtifactVe
 		return nil, apierr.HandleResourceError(err, "ArtifactVersion", req.GetName())
 	}
 
-	art, err := s.resolveArtifact(ctx, orgName, convName, artName)
+	uid := server.MustAuthenticatedUID(ctx)
+
+	art, err := s.resolveArtifact(ctx, orgName, convName, artName, uid)
 	if err != nil {
 		return nil, err
 	}
@@ -41,9 +47,28 @@ func (s *Server) ListArtifactVersions(ctx context.Context, req *aiv1.ListArtifac
 		return nil, apierr.HandleResourceError(err, "Artifact", req.GetParent())
 	}
 
-	art, err := s.resolveArtifact(ctx, orgName, convName, artName)
+	uid := server.MustAuthenticatedUID(ctx)
+
+	art, err := s.resolveArtifact(ctx, orgName, convName, artName, uid)
 	if err != nil {
 		return nil, err
+	}
+
+	rows, err := filter.Query(ctx, s.db, s.artifactVersionFilter, filter.QueryParams{
+		Filter:   req.GetFilter(),
+		ParentID: art.ID.String(),
+		OrderBy:  req.GetOrderBy(),
+		PageSize: req.GetPageSize(),
+		Cursor:   req.GetPageToken(),
+		Codec:    s.codec,
+	})
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid list params: %v", err)
+	}
+
+	results, err := filter.ScanArtifactVersions(rows)
+	if err != nil {
+		return nil, apierr.Internal("database error")
 	}
 
 	pageSize := req.GetPageSize()
@@ -54,23 +79,17 @@ func (s *Server) ListArtifactVersions(ctx context.Context, req *aiv1.ListArtifac
 		pageSize = 100
 	}
 
-	rows, err := s.queries.ListArtifactVersionsByArtifact(ctx, db.ListArtifactVersionsByArtifactParams{
-		ArtifactID: art.ID,
-		Limit:      pageSize + 1,
-		Offset:     0,
-	})
-	if err != nil {
-		return nil, apierr.Internal("database error")
-	}
-
 	var nextPageToken string
-	if int32(len(rows)) > pageSize {
-		nextPageToken = rows[pageSize].ID.String()
-		rows = rows[:pageSize]
+	if int32(len(results)) > pageSize {
+		nextPageToken, err = filter.EncodeNextPageToken(s.codec, results[pageSize].ID)
+		if err != nil {
+			return nil, apierr.Internal("encode page token")
+		}
+		results = results[:pageSize]
 	}
 
-	versions := make([]*aiv1.ArtifactVersion, 0, len(rows))
-	for _, r := range rows {
+	versions := make([]*aiv1.ArtifactVersion, 0, len(results))
+	for _, r := range results {
 		pb := &aiv1.ArtifactVersion{
 			Name:       buildArtifactVersionName(orgName, convName, artName, r.Name),
 			CreateTime: timestamppb.New(r.CreateTime),
@@ -103,7 +122,9 @@ func (s *Server) DeleteArtifactVersion(ctx context.Context, req *aiv1.DeleteArti
 		return nil, apierr.HandleResourceError(err, "ArtifactVersion", req.GetName())
 	}
 
-	art, err := s.resolveArtifact(ctx, orgName, convName, artName)
+	uid := server.MustAuthenticatedUID(ctx)
+
+	art, err := s.resolveArtifact(ctx, orgName, convName, artName, uid)
 	if err != nil {
 		return nil, err
 	}
@@ -137,9 +158,10 @@ func (s *Server) DeleteArtifactVersion(ctx context.Context, req *aiv1.DeleteArti
 	return &emptypb.Empty{}, nil
 }
 
-// resolveArtifact resolves org + conversation + artifact names to the DB row.
-func (s *Server) resolveArtifact(ctx context.Context, orgName, convName, artName string) (db.AiArtifact, error) {
-	conv, err := s.resolveConversation(ctx, orgName, convName)
+// resolveArtifact resolves org + conversation + artifact names to the DB row,
+// verifying the authenticated user owns the parent conversation.
+func (s *Server) resolveArtifact(ctx context.Context, orgName, convName, artName, uid string) (db.AiArtifact, error) {
+	conv, err := s.resolveConversation(ctx, orgName, convName, uid)
 	if err != nil {
 		return db.AiArtifact{}, err
 	}

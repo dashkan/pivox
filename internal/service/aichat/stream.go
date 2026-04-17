@@ -67,12 +67,9 @@ func (s *Server) Stream(req *aiv1.ClientEvent, stream grpc.ServerStreamingServer
 		return status.Errorf(codes.InvalidArgument, "invalid conversation: %v", err)
 	}
 
-	conv, err := s.resolveConversation(ctx, orgName, convName)
+	conv, err := s.resolveConversation(ctx, orgName, convName, uid)
 	if err != nil {
 		return err
-	}
-	if conv.CreatedBy != uid {
-		return status.Error(codes.PermissionDenied, "conversation belongs to another user")
 	}
 
 	// 3. Get next sequence number and persist the inbound message.

@@ -372,7 +372,11 @@ type ListArtifactsRequest struct {
 	// Optional. Maximum number of artifacts to return.
 	PageSize int32 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	// Optional. Page token from a previous ListArtifacts call.
-	PageToken     string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	PageToken string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	// Optional. AIP-160 filter. Filterable fields: `title`, `type`, `createTime`.
+	Filter string `protobuf:"bytes,4,opt,name=filter,proto3" json:"filter,omitempty"`
+	// Optional. AIP-132 order_by. Sortable fields: `title`, `createTime`.
+	OrderBy       string `protobuf:"bytes,5,opt,name=order_by,json=orderBy,proto3" json:"order_by,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -424,6 +428,20 @@ func (x *ListArtifactsRequest) GetPageSize() int32 {
 func (x *ListArtifactsRequest) GetPageToken() string {
 	if x != nil {
 		return x.PageToken
+	}
+	return ""
+}
+
+func (x *ListArtifactsRequest) GetFilter() string {
+	if x != nil {
+		return x.Filter
+	}
+	return ""
+}
+
+func (x *ListArtifactsRequest) GetOrderBy() string {
+	if x != nil {
+		return x.OrderBy
 	}
 	return ""
 }
@@ -596,7 +614,11 @@ type ListArtifactVersionsRequest struct {
 	// Optional. Maximum number of versions to return.
 	PageSize int32 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	// Optional. Page token from a previous ListArtifactVersions call.
-	PageToken     string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	PageToken string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	// Optional. AIP-160 filter. Filterable fields: `createTime`.
+	Filter string `protobuf:"bytes,4,opt,name=filter,proto3" json:"filter,omitempty"`
+	// Optional. AIP-132 order_by. Sortable fields: `createTime`.
+	OrderBy       string `protobuf:"bytes,5,opt,name=order_by,json=orderBy,proto3" json:"order_by,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -648,6 +670,20 @@ func (x *ListArtifactVersionsRequest) GetPageSize() int32 {
 func (x *ListArtifactVersionsRequest) GetPageToken() string {
 	if x != nil {
 		return x.PageToken
+	}
+	return ""
+}
+
+func (x *ListArtifactVersionsRequest) GetFilter() string {
+	if x != nil {
+		return x.Filter
+	}
+	return ""
+}
+
+func (x *ListArtifactVersionsRequest) GetOrderBy() string {
+	if x != nil {
+		return x.OrderBy
 	}
 	return ""
 }
@@ -789,12 +825,14 @@ const file_pivox_ai_v1_artifacts_proto_rawDesc = "" +
 	"size_bytes\x18\x03 \x01(\x03R\tsizeBytes\"I\n" +
 	"\x12GetArtifactRequest\x123\n" +
 	"\x04name\x18\x01 \x01(\tB\x1f\xe0A\x02\xfaA\x13\n" +
-	"\x11pivox.ai/Artifact\xbaH\x03\xc8\x01\x01R\x04name\"\x9f\x01\n" +
+	"\x11pivox.ai/Artifact\xbaH\x03\xc8\x01\x01R\x04name\"\xdc\x01\n" +
 	"\x14ListArtifactsRequest\x127\n" +
 	"\x06parent\x18\x01 \x01(\tB\x1f\xe0A\x02\xfaA\x13\x12\x11pivox.ai/Artifact\xbaH\x03\xc8\x01\x01R\x06parent\x12*\n" +
 	"\tpage_size\x18\x02 \x01(\x05B\r\xe0A\x01\xbaH\a\x1a\x05\x18\xe8\a(\x00R\bpageSize\x12\"\n" +
 	"\n" +
-	"page_token\x18\x03 \x01(\tB\x03\xe0A\x01R\tpageToken\"t\n" +
+	"page_token\x18\x03 \x01(\tB\x03\xe0A\x01R\tpageToken\x12\x1b\n" +
+	"\x06filter\x18\x04 \x01(\tB\x03\xe0A\x01R\x06filter\x12\x1e\n" +
+	"\border_by\x18\x05 \x01(\tB\x03\xe0A\x01R\aorderBy\"t\n" +
 	"\x15ListArtifactsResponse\x123\n" +
 	"\tartifacts\x18\x01 \x03(\v2\x15.pivox.ai.v1.ArtifactR\tartifacts\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"g\n" +
@@ -804,12 +842,14 @@ const file_pivox_ai_v1_artifacts_proto_rawDesc = "" +
 	"\x05force\x18\x02 \x01(\bB\x03\xe0A\x01R\x05force\"W\n" +
 	"\x19GetArtifactVersionRequest\x12:\n" +
 	"\x04name\x18\x01 \x01(\tB&\xe0A\x02\xfaA\x1a\n" +
-	"\x18pivox.ai/ArtifactVersion\xbaH\x03\xc8\x01\x01R\x04name\"\xac\x01\n" +
+	"\x18pivox.ai/ArtifactVersion\xbaH\x03\xc8\x01\x01R\x04name\"\xe9\x01\n" +
 	"\x1bListArtifactVersionsRequest\x12>\n" +
 	"\x06parent\x18\x01 \x01(\tB&\xe0A\x02\xfaA\x1a\x12\x18pivox.ai/ArtifactVersion\xbaH\x03\xc8\x01\x01R\x06parent\x12)\n" +
 	"\tpage_size\x18\x02 \x01(\x05B\f\xe0A\x01\xbaH\x06\x1a\x04\x18d(\x00R\bpageSize\x12\"\n" +
 	"\n" +
-	"page_token\x18\x03 \x01(\tB\x03\xe0A\x01R\tpageToken\"\x80\x01\n" +
+	"page_token\x18\x03 \x01(\tB\x03\xe0A\x01R\tpageToken\x12\x1b\n" +
+	"\x06filter\x18\x04 \x01(\tB\x03\xe0A\x01R\x06filter\x12\x1e\n" +
+	"\border_by\x18\x05 \x01(\tB\x03\xe0A\x01R\aorderBy\"\x80\x01\n" +
 	"\x1cListArtifactVersionsResponse\x128\n" +
 	"\bversions\x18\x01 \x03(\v2\x1c.pivox.ai.v1.ArtifactVersionR\bversions\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"Z\n" +

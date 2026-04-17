@@ -42,19 +42,35 @@ struct AIChatPanel: View {
 
     @State private var conversationName: String?
     @State private var pendingMessage: String?
-    @State private var showHistory = false
+    @State private var showHistoryPopover = false
+    // Owned at the panel level so the popover reuses the same loaded list
+    // across open/close cycles — no refetch on every open.
+    @StateObject private var historyVM: ConversationListViewModel
+
+    init(client: ChatClient, orgName: String) {
+        self.client = client
+        self.orgName = orgName
+        _historyVM = StateObject(wrappedValue: ConversationListViewModel(client: client, orgName: orgName))
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             // Header bar
             HStack {
-                Button {
-                    showHistory.toggle()
-                } label: {
-                    Image(systemName: "clock.arrow.circlepath")
+                IconButton(systemName: "clock.arrow.circlepath", label: "Show conversation history", help: "Conversation history") {
+                    showHistoryPopover.toggle()
                 }
-                .buttonStyle(.plain)
-                .help("Conversation history")
+                .popover(isPresented: $showHistoryPopover, arrowEdge: .top) {
+                    ConversationHistoryPopover(viewModel: historyVM) { conv in
+                        conversationName = conv.name
+                        pendingMessage = nil
+                        showHistoryPopover = false
+                    }
+                    // Match popover width to the AI panel by sizing against
+                    // the enclosing window reference dimension. 360pt
+                    // approximates the panel's right-side width in practice.
+                    .frame(minWidth: 340, idealWidth: 360, maxWidth: 420, minHeight: 280, idealHeight: 400, maxHeight: 600)
+                }
 
                 Spacer()
 
@@ -63,29 +79,17 @@ struct AIChatPanel: View {
 
                 Spacer()
 
-                Button {
+                IconButton(systemName: "plus.bubble", label: "New conversation", help: "New conversation") {
                     conversationName = nil
                     pendingMessage = nil
-                } label: {
-                    Image(systemName: "plus.bubble")
                 }
-                .buttonStyle(.plain)
-                .help("New conversation")
-                .accessibilityLabel("New conversation")
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
 
             Divider()
 
-            if showHistory {
-                let listVM = ConversationListViewModel(client: client, orgName: orgName)
-                ConversationListView(viewModel: listVM) { conv in
-                    conversationName = conv.name
-                    pendingMessage = nil
-                    showHistory = false
-                }
-            } else if let name = conversationName {
+            if let name = conversationName {
                 ActiveConversationView(
                     client: client,
                     conversationName: name,
@@ -161,14 +165,9 @@ struct NewChatView: View {
                     .focused($inputFocused)
                     .onSubmit { sendFirst() }
 
-                Button {
+                IconButton(systemName: "paperplane.fill", label: "Send", help: "Send") {
                     sendFirst()
-                } label: {
-                    Image(systemName: "paperplane.fill")
                 }
-                .buttonStyle(.plain)
-                .help("Send")
-                .accessibilityLabel("Send")
                 .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isCreating)
             }
             .padding(12)

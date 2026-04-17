@@ -16,13 +16,6 @@ SELECT id, artifact_id, inline_data, inline_content_type, inline_size_bytes, ass
 FROM ai_artifact_versions
 WHERE artifact_id = $1 AND name = $2;
 
--- name: ListArtifactVersionsByArtifact :many
-SELECT id, artifact_id, name, inline_content_type, inline_size_bytes, asset_version_name, sequence, create_time
-FROM ai_artifact_versions
-WHERE artifact_id = $1
-ORDER BY sequence DESC
-LIMIT $2 OFFSET $3;
-
 -- name: CountArtifactVersionsByArtifact :one
 SELECT count(*) FROM ai_artifact_versions WHERE artifact_id = $1;
 

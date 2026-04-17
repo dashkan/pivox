@@ -1026,7 +1026,9 @@ CREATE TABLE ai_messages (
     UNIQUE(conversation_id, name),
     UNIQUE(conversation_id, sequence)
 );
--- idx_ai_messages_conversation not needed: UNIQUE(conversation_id, sequence) already creates a B-tree index.
+-- Cursor pagination: ORDER BY id DESC with conversation_id predicate.
+-- UNIQUE(conversation_id, sequence) indexes sequence, not id — add explicit index for id-based pagination.
+CREATE INDEX idx_ai_messages_conversation_id ON ai_messages (conversation_id, id DESC);
 
 -- ============================================================================
 -- AI chat — ai_artifact_versions (created before ai_artifacts so ai_artifacts can FK to latest_version_id)
@@ -1082,13 +1084,13 @@ CREATE TABLE ai_artifacts (
     -- constraints
     UNIQUE(conversation_id, name)
 );
-CREATE INDEX idx_ai_artifacts_conversation ON ai_artifacts (conversation_id, create_time DESC);
+CREATE INDEX idx_ai_artifacts_conversation ON ai_artifacts (conversation_id, id DESC);
 
 -- Now add the FK from ai_artifact_versions back to ai_artifacts
 ALTER TABLE ai_artifact_versions ADD CONSTRAINT fk_ai_artifact_versions_artifact
     FOREIGN KEY (artifact_id) REFERENCES ai_artifacts(id) ON DELETE CASCADE;
 
-CREATE INDEX idx_ai_artifact_versions_artifact ON ai_artifact_versions (artifact_id, sequence DESC);
+CREATE INDEX idx_ai_artifact_versions_artifact ON ai_artifact_versions (artifact_id, id DESC);
 CREATE INDEX idx_ai_artifact_versions_asset ON ai_artifact_versions (asset_version_name) WHERE asset_version_name IS NOT NULL;
 
 -- AI chat permissions

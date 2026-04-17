@@ -3,10 +3,15 @@ package aichat
 import (
 	"context"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
+	"github.com/dashkan/pivox/internal/filter"
 	aiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1"
+	"github.com/dashkan/pivox/internal/server"
 )
 
 func (s *Server) GetMessage(ctx context.Context, req *aiv1.GetMessageRequest) (*aiv1.Message, error) {
@@ -15,17 +20,11 @@ func (s *Server) GetMessage(ctx context.Context, req *aiv1.GetMessageRequest) (*
 		return nil, apierr.HandleResourceError(err, "Message", req.GetName())
 	}
 
-	orgID, err := s.resolveOrg(ctx, orgName)
+	uid := server.MustAuthenticatedUID(ctx)
+
+	conv, err := s.resolveConversation(ctx, orgName, convName, uid)
 	if err != nil {
 		return nil, err
-	}
-
-	conv, err := s.queries.GetConversationByName(ctx, db.GetConversationByNameParams{
-		OrgID: orgID,
-		Name:  convName,
-	})
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Conversation", buildConversationName(orgName, convName))
 	}
 
 	row, err := s.queries.GetMessageByName(ctx, db.GetMessageByNameParams{
@@ -50,17 +49,28 @@ func (s *Server) ListMessages(ctx context.Context, req *aiv1.ListMessagesRequest
 		return nil, apierr.HandleResourceError(err, "Conversation", req.GetParent())
 	}
 
-	orgID, err := s.resolveOrg(ctx, orgName)
+	uid := server.MustAuthenticatedUID(ctx)
+
+	conv, err := s.resolveConversation(ctx, orgName, convName, uid)
 	if err != nil {
 		return nil, err
 	}
 
-	conv, err := s.queries.GetConversationByName(ctx, db.GetConversationByNameParams{
-		OrgID: orgID,
-		Name:  convName,
+	rows, err := filter.Query(ctx, s.db, s.messageFilter, filter.QueryParams{
+		Filter:   req.GetFilter(),
+		ParentID: conv.ID.String(),
+		OrderBy:  req.GetOrderBy(),
+		PageSize: req.GetPageSize(),
+		Cursor:   req.GetPageToken(),
+		Codec:    s.codec,
 	})
 	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Conversation", req.GetParent())
+		return nil, status.Errorf(codes.InvalidArgument, "invalid list params: %v", err)
+	}
+
+	results, err := filter.ScanMessages(rows)
+	if err != nil {
+		return nil, apierr.Internal("database error")
 	}
 
 	pageSize := req.GetPageSize()
@@ -71,24 +81,18 @@ func (s *Server) ListMessages(ctx context.Context, req *aiv1.ListMessagesRequest
 		pageSize = 1000
 	}
 
-	rows, err := s.queries.ListMessagesByConversation(ctx, db.ListMessagesByConversationParams{
-		ConversationID: conv.ID,
-		Limit:          pageSize + 1,
-		Offset:         0,
-	})
-	if err != nil {
-		return nil, apierr.Internal("database error")
-	}
-
 	var nextPageToken string
-	if int32(len(rows)) > pageSize {
-		nextPageToken = rows[pageSize].ID.String()
-		rows = rows[:pageSize]
+	if int32(len(results)) > pageSize {
+		nextPageToken, err = filter.EncodeNextPageToken(s.codec, results[pageSize].ID)
+		if err != nil {
+			return nil, apierr.Internal("encode page token")
+		}
+		results = results[:pageSize]
 	}
 
 	convFullName := buildConversationName(orgName, convName)
-	msgs := make([]*aiv1.Message, 0, len(rows))
-	for _, r := range rows {
+	msgs := make([]*aiv1.Message, 0, len(results))
+	for _, r := range results {
 		pb, err := convert.MessageToProto(r, convFullName)
 		if err != nil {
 			s.logger.Warn("failed to convert message", "message", r.Name, "error", err)

@@ -97,48 +97,6 @@ func (q *Queries) GetNextSequenceForConversation(ctx context.Context, conversati
 	return column_1, err
 }
 
-const listMessagesByConversation = `-- name: ListMessagesByConversation :many
-SELECT id, conversation_id, name, role, parts, sequence, token_count, create_time FROM ai_messages
-WHERE conversation_id = $1
-ORDER BY sequence ASC
-LIMIT $2 OFFSET $3
-`
-
-type ListMessagesByConversationParams struct {
-	ConversationID uuid.UUID `json:"conversation_id"`
-	Limit          int32     `json:"limit"`
-	Offset         int32     `json:"offset"`
-}
-
-func (q *Queries) ListMessagesByConversation(ctx context.Context, arg ListMessagesByConversationParams) ([]AiMessage, error) {
-	rows, err := q.db.Query(ctx, listMessagesByConversation, arg.ConversationID, arg.Limit, arg.Offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []AiMessage{}
-	for rows.Next() {
-		var i AiMessage
-		if err := rows.Scan(
-			&i.ID,
-			&i.ConversationID,
-			&i.Name,
-			&i.Role,
-			&i.Parts,
-			&i.Sequence,
-			&i.TokenCount,
-			&i.CreateTime,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listMessagesNewestFirst = `-- name: ListMessagesNewestFirst :many
 SELECT id, conversation_id, name, role, parts, sequence, token_count, create_time FROM ai_messages
 WHERE conversation_id = $1

@@ -86,7 +86,7 @@ func testConversation(orgID uuid.UUID, uid string) db.AiConversation {
 	return db.AiConversation{
 		ID:         uuid.New(),
 		OrgID:      orgID,
-		CreatedBy: uid,
+		CreatedBy:  uid,
 		Name:       "conv1",
 		CreateTime: time.Now(),
 		UpdateTime: time.Now(),
@@ -273,7 +273,9 @@ func TestStream_WrongOwner(t *testing.T) {
 	err := srv.Stream(clientEvent, stream)
 	require.Error(t, err)
 	st, _ := status.FromError(err)
-	assert.Equal(t, codes.PermissionDenied, st.Code())
+	// resolveConversation returns NotFound rather than PermissionDenied on
+	// wrong-owner access so we don't leak existence of other users' chats.
+	assert.Equal(t, codes.NotFound, st.Code())
 }
 
 func TestStream_ModelError(t *testing.T) {

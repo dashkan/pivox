@@ -53,7 +53,7 @@ func (s *Server) ListConversations(ctx context.Context, req *aiv1.ListConversati
 
 	uid := server.MustAuthenticatedUID(ctx)
 
-	rows, err := filter.Query(ctx, s.db, s.filter, filter.QueryParams{
+	rows, err := filter.Query(ctx, s.db, s.conversationFilter, filter.QueryParams{
 		Filter:   req.GetFilter(),
 		ParentID: orgID.String(),
 		UserID:   uid,

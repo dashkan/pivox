@@ -173,6 +173,67 @@ func ConversationFilter() *ResourceFilter {
 	}
 }
 
+// MessageFilter returns the filter config for AI chat messages. Scoped to a
+// parent conversation; the handler must verify the authenticated user owns
+// that conversation before calling filter.Query (access control happens at
+// the parent layer, not via UserColumn here).
+func MessageFilter() *ResourceFilter {
+	return &ResourceFilter{
+		Filterable: map[string]FilterableField{
+			"role":       {Column: "role", Type: filtering.TypeString},
+			"createTime": {Column: "create_time", Type: filtering.TypeTimestamp},
+		},
+		Sortable: map[string]SortableField{
+			"createTime": {Column: "create_time"},
+		},
+		Table:           "ai_messages",
+		OrderBy:         "id DESC",
+		CursorColumn:    "id",
+		CursorDirection: "DESC",
+		ParentColumn:    "conversation_id",
+	}
+}
+
+// ArtifactFilter returns the filter config for AI chat artifacts.
+func ArtifactFilter() *ResourceFilter {
+	return &ResourceFilter{
+		Filterable: map[string]FilterableField{
+			"title":      {Column: "title", Type: filtering.TypeString, AllowPartial: true},
+			"type":       {Column: "type", Type: filtering.TypeString},
+			"createTime": {Column: "create_time", Type: filtering.TypeTimestamp},
+		},
+		Sortable: map[string]SortableField{
+			"title":      {Column: "title"},
+			"createTime": {Column: "create_time"},
+		},
+		Table:           "ai_artifacts",
+		OrderBy:         "id DESC",
+		CursorColumn:    "id",
+		CursorDirection: "DESC",
+		DefaultFields:   []string{"title"},
+		ParentColumn:    "conversation_id",
+	}
+}
+
+// ArtifactVersionFilter returns the filter config for AI chat artifact versions.
+// Sorted newest version first (id DESC, which matches sequence DESC under
+// uuidv7).
+func ArtifactVersionFilter() *ResourceFilter {
+	return &ResourceFilter{
+		Filterable: map[string]FilterableField{
+			"createTime": {Column: "create_time", Type: filtering.TypeTimestamp},
+		},
+		Sortable: map[string]SortableField{
+			"createTime": {Column: "create_time"},
+		},
+		Table:           "ai_artifact_versions",
+		OrderBy:         "id DESC",
+		CursorColumn:    "id",
+		CursorDirection: "DESC",
+		ParentColumn:    "artifact_id",
+	}
+}
+
 // ApiKeyFilter returns the filter config for API keys.
 func ApiKeyFilter() *ResourceFilter {
 	return &ResourceFilter{

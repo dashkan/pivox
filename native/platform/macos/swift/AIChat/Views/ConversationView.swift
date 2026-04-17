@@ -7,7 +7,11 @@ public struct ConversationView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            messageList
+            ZStack {
+                messageList
+                loadingOverlay
+                errorOverlay
+            }
             Divider()
             promptInput
         }
@@ -18,39 +22,89 @@ public struct ConversationView: View {
         }
     }
 
-    private var messageList: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 12) {
-                    ForEach(Array(viewModel.messages.enumerated()), id: \.offset) { index, msg in
-                        MessageBubble(message: msg)
-                            .id(index)
-                    }
+    @ViewBuilder
+    private var loadingOverlay: some View {
+        if viewModel.state == .loading && viewModel.messages.isEmpty {
+            ProgressView()
+                .controlSize(.regular)
+        }
+    }
 
-                    // In-flight assistant text while streaming.
-                    if !viewModel.inFlightText.isEmpty {
-                        inFlightBubble
-                            .id("inflight")
-                    }
+    @ViewBuilder
+    private var errorOverlay: some View {
+        if case .error(let msg) = viewModel.state, viewModel.messages.isEmpty {
+            VStack(spacing: 6) {
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.title2)
+                    .foregroundStyle(.orange)
+                Text("Couldn't load messages")
+                    .font(.subheadline)
+                Text(msg)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                Button("Retry") {
+                    Task { await viewModel.loadHistory() }
                 }
-                .padding()
+                .buttonStyle(.borderless)
             }
-            .onChange(of: viewModel.messages.count) {
-                withAnimation {
-                    proxy.scrollTo(viewModel.messages.count - 1, anchor: .bottom)
+            .padding()
+        }
+    }
+
+    private var messageList: some View {
+        ScrollView {
+            // Eager VStack — LazyVStack + .defaultScrollAnchor(.bottom) is
+            // unreliable because the anchor resolves before lazy rows are
+            // materialized and the scroll lands in a height-unknown gap.
+            // Text bubbles are cheap; eager layout is fine up to a few
+            // hundred messages.
+            VStack(alignment: .leading, spacing: 12) {
+                if viewModel.canLoadOlder {
+                    loadOlderSentinel
+                }
+
+                ForEach(viewModel.messages, id: \.name) { msg in
+                    MessageBubble(message: msg)
+                        .id(msg.name)
+                }
+
+                // In-flight assistant text while streaming.
+                if !viewModel.inFlightText.isEmpty {
+                    inFlightBubble
+                        .id("inflight")
                 }
             }
-            .onChange(of: viewModel.inFlightText) {
-                withAnimation {
-                    proxy.scrollTo("inflight", anchor: .bottom)
-                }
-            }
+            .padding()
+        }
+        // Chat semantics — content-size changes keep the bottom edge anchored
+        // to the viewport bottom. Initial load lands at bottom; append follows
+        // the new tail; prepend keeps the user reading the same message in the
+        // same viewport position.
+        .defaultScrollAnchor(.bottom)
+    }
+
+    /// Top-of-list sentinel that triggers older-page fetches via onAppear.
+    /// No manual scroll preservation — .defaultScrollAnchor(.bottom) on the
+    /// parent ScrollView keeps the user's current read position stable as
+    /// older messages are prepended above.
+    private var loadOlderSentinel: some View {
+        HStack {
+            Spacer()
+            ProgressView()
+                .controlSize(.small)
+            Spacer()
+        }
+        .padding(.vertical, 6)
+        .onAppear {
+            Task { await viewModel.loadOlder() }
         }
     }
 
     private var inFlightBubble: some View {
         HStack {
             Text(viewModel.inFlightText)
+                .textSelection(.enabled)
                 .padding(10)
                 .background(Color.secondary.opacity(0.1))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -66,23 +120,13 @@ public struct ConversationView: View {
                 .onSubmit { sendMessage() }
 
             if viewModel.state == .streaming {
-                Button {
+                IconButton(systemName: "stop.circle.fill", label: "Stop", help: "Stop") {
                     viewModel.cancel()
-                } label: {
-                    Image(systemName: "stop.circle.fill")
                 }
-                .buttonStyle(.plain)
-                .help("Stop")
-                .accessibilityLabel("Stop")
             } else {
-                Button {
+                IconButton(systemName: "paperplane.fill", label: "Send", help: "Send") {
                     sendMessage()
-                } label: {
-                    Image(systemName: "paperplane.fill")
                 }
-                .buttonStyle(.plain)
-                .help("Send")
-                .accessibilityLabel("Send")
                 .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
@@ -107,6 +151,7 @@ struct MessageBubble: View {
             if isUser { Spacer() }
             VStack(alignment: isUser ? .trailing : .leading, spacing: 4) {
                 Text(textContent)
+                    .textSelection(.enabled)
                     .padding(10)
                     .background(isUser
                         ? Color.accentColor.opacity(0.15)

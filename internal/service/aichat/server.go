@@ -14,13 +14,16 @@ import (
 // Server implements the AiChat gRPC service.
 type Server struct {
 	aiv1.UnimplementedAiChatServer
-	db      db.DBTX
-	queries db.Querier
-	model   model.LanguageModel
-	tools   *tools.Registry
-	logger  *slog.Logger
-	codec   *appkey.Codec
-	filter  *filter.ResourceFilter
+	db                    db.DBTX
+	queries               db.Querier
+	model                 model.LanguageModel
+	tools                 *tools.Registry
+	logger                *slog.Logger
+	codec                 *appkey.Codec
+	conversationFilter    *filter.ResourceFilter
+	messageFilter         *filter.ResourceFilter
+	artifactFilter        *filter.ResourceFilter
+	artifactVersionFilter *filter.ResourceFilter
 }
 
 // NewServer creates a new AiChat service server.
@@ -29,12 +32,15 @@ func NewServer(pool db.DBTX, queries db.Querier, llm model.LanguageModel, toolRe
 		toolRegistry = tools.NewRegistry()
 	}
 	return &Server{
-		db:      pool,
-		queries: queries,
-		model:   llm,
-		tools:   toolRegistry,
-		logger:  logger,
-		codec:   codec,
-		filter:  filter.ConversationFilter(),
+		db:                    pool,
+		queries:               queries,
+		model:                 llm,
+		tools:                 toolRegistry,
+		logger:                logger,
+		codec:                 codec,
+		conversationFilter:    filter.ConversationFilter(),
+		messageFilter:         filter.MessageFilter(),
+		artifactFilter:        filter.ArtifactFilter(),
+		artifactVersionFilter: filter.ArtifactVersionFilter(),
 	}
 }

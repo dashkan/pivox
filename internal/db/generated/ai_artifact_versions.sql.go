@@ -7,7 +7,6 @@ package db
 
 import (
 	"context"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -171,58 +170,4 @@ func (q *Queries) IsOnlyArtifactVersion(ctx context.Context, artifactID uuid.UUI
 	var is_only bool
 	err := row.Scan(&is_only)
 	return is_only, err
-}
-
-const listArtifactVersionsByArtifact = `-- name: ListArtifactVersionsByArtifact :many
-SELECT id, artifact_id, name, inline_content_type, inline_size_bytes, asset_version_name, sequence, create_time
-FROM ai_artifact_versions
-WHERE artifact_id = $1
-ORDER BY sequence DESC
-LIMIT $2 OFFSET $3
-`
-
-type ListArtifactVersionsByArtifactParams struct {
-	ArtifactID uuid.UUID `json:"artifact_id"`
-	Limit      int32     `json:"limit"`
-	Offset     int32     `json:"offset"`
-}
-
-type ListArtifactVersionsByArtifactRow struct {
-	ID                uuid.UUID   `json:"id"`
-	ArtifactID        uuid.UUID   `json:"artifact_id"`
-	Name              string      `json:"name"`
-	InlineContentType pgtype.Text `json:"inline_content_type"`
-	InlineSizeBytes   pgtype.Int8 `json:"inline_size_bytes"`
-	AssetVersionName  pgtype.Text `json:"asset_version_name"`
-	Sequence          int32       `json:"sequence"`
-	CreateTime        time.Time   `json:"create_time"`
-}
-
-func (q *Queries) ListArtifactVersionsByArtifact(ctx context.Context, arg ListArtifactVersionsByArtifactParams) ([]ListArtifactVersionsByArtifactRow, error) {
-	rows, err := q.db.Query(ctx, listArtifactVersionsByArtifact, arg.ArtifactID, arg.Limit, arg.Offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListArtifactVersionsByArtifactRow{}
-	for rows.Next() {
-		var i ListArtifactVersionsByArtifactRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.ArtifactID,
-			&i.Name,
-			&i.InlineContentType,
-			&i.InlineSizeBytes,
-			&i.AssetVersionName,
-			&i.Sequence,
-			&i.CreateTime,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }

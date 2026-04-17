@@ -651,7 +651,12 @@ type ListMessagesRequest struct {
 	// Optional. Maximum number of messages to return.
 	PageSize int32 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	// Optional. Page token from a previous ListMessages call.
-	PageToken     string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	PageToken string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	// Optional. AIP-160 filter. Filterable fields: `role`, `createTime`.
+	Filter string `protobuf:"bytes,4,opt,name=filter,proto3" json:"filter,omitempty"`
+	// Optional. AIP-132 order_by. Sortable fields: `createTime`.
+	// Default: newest first (by id — uuidv7 is time-ordered).
+	OrderBy       string `protobuf:"bytes,5,opt,name=order_by,json=orderBy,proto3" json:"order_by,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -707,10 +712,24 @@ func (x *ListMessagesRequest) GetPageToken() string {
 	return ""
 }
 
+func (x *ListMessagesRequest) GetFilter() string {
+	if x != nil {
+		return x.Filter
+	}
+	return ""
+}
+
+func (x *ListMessagesRequest) GetOrderBy() string {
+	if x != nil {
+		return x.OrderBy
+	}
+	return ""
+}
+
 // Response message for `ListMessages`.
 type ListMessagesResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// The messages in the conversation, ordered by sequence.
+	// The messages in the conversation. Default order: newest first.
 	Messages []*Message `protobuf:"bytes,1,rep,name=messages,proto3" json:"messages,omitempty"`
 	// Token for the next page of results.
 	NextPageToken string `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
@@ -804,12 +823,14 @@ const file_pivox_ai_v1_messages_proto_rawDesc = "" +
 	"\x03url\x18\x02 \x01(\tB\x03\xe0A\x03R\x03url\"G\n" +
 	"\x11GetMessageRequest\x122\n" +
 	"\x04name\x18\x01 \x01(\tB\x1e\xe0A\x02\xfaA\x12\n" +
-	"\x10pivox.ai/Message\xbaH\x03\xc8\x01\x01R\x04name\"\x9d\x01\n" +
+	"\x10pivox.ai/Message\xbaH\x03\xc8\x01\x01R\x04name\"\xda\x01\n" +
 	"\x13ListMessagesRequest\x126\n" +
 	"\x06parent\x18\x01 \x01(\tB\x1e\xe0A\x02\xfaA\x12\x12\x10pivox.ai/Message\xbaH\x03\xc8\x01\x01R\x06parent\x12*\n" +
 	"\tpage_size\x18\x02 \x01(\x05B\r\xe0A\x01\xbaH\a\x1a\x05\x18\xe8\a(\x00R\bpageSize\x12\"\n" +
 	"\n" +
-	"page_token\x18\x03 \x01(\tB\x03\xe0A\x01R\tpageToken\"p\n" +
+	"page_token\x18\x03 \x01(\tB\x03\xe0A\x01R\tpageToken\x12\x1b\n" +
+	"\x06filter\x18\x04 \x01(\tB\x03\xe0A\x01R\x06filter\x12\x1e\n" +
+	"\border_by\x18\x05 \x01(\tB\x03\xe0A\x01R\aorderBy\"p\n" +
 	"\x14ListMessagesResponse\x120\n" +
 	"\bmessages\x18\x01 \x03(\v2\x14.pivox.ai.v1.MessageR\bmessages\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken*K\n" +

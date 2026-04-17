@@ -6,12 +6,6 @@ RETURNING *;
 -- name: GetMessageByName :one
 SELECT * FROM ai_messages WHERE conversation_id = $1 AND name = $2;
 
--- name: ListMessagesByConversation :many
-SELECT * FROM ai_messages
-WHERE conversation_id = $1
-ORDER BY sequence ASC
-LIMIT $2 OFFSET $3;
-
 -- name: ListMessagesNewestFirst :many
 -- Fetches messages newest-first for budget truncation in Go.
 -- Caller walks rows accumulating token_count and stops when budget is exceeded.

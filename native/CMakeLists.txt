@@ -145,12 +145,14 @@ if(APPLE)
         ${SWIFT_DIR}/ImageEditor/ImageEditCanvas.swift
         ${SWIFT_DIR}/Components/GlassCard.swift
         ${SWIFT_DIR}/Components/GoogleIcon.swift
+        ${SWIFT_DIR}/Components/IconButton.swift
         ${SWIFT_DIR}/AIChat/Client/ChatError.swift
         ${SWIFT_DIR}/AIChat/Client/ChatClient.swift
         ${SWIFT_DIR}/AIChat/Client/ChatClientProtocol.swift
         ${SWIFT_DIR}/AIChat/Client/ChatClient+Resources.swift
         ${SWIFT_DIR}/AIChat/Views/ConversationListViewModel.swift
         ${SWIFT_DIR}/AIChat/Views/ConversationListView.swift
+        ${SWIFT_DIR}/AIChat/Views/ConversationHistoryPopover.swift
         ${SWIFT_DIR}/AIChat/Views/ConversationViewModel.swift
         ${SWIFT_DIR}/AIChat/Views/ConversationView.swift
         ${SWIFT_DIR}/AIChat/Views/AIChatContainerView.swift

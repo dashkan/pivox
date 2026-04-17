@@ -793,11 +793,6 @@ func (m *MockQuerier) GetNextSequenceForConversation(ctx context.Context, conver
 	return args.Get(0).(int32), args.Error(1)
 }
 
-func (m *MockQuerier) ListMessagesByConversation(ctx context.Context, arg db.ListMessagesByConversationParams) ([]db.AiMessage, error) {
-	args := m.Called(ctx, arg)
-	return args.Get(0).([]db.AiMessage), args.Error(1)
-}
-
 func (m *MockQuerier) ListMessagesNewestFirst(ctx context.Context, arg db.ListMessagesNewestFirstParams) ([]db.AiMessage, error) {
 	args := m.Called(ctx, arg)
 	return args.Get(0).([]db.AiMessage), args.Error(1)
@@ -833,11 +828,6 @@ func (m *MockQuerier) GetArtifactByID(ctx context.Context, id uuid.UUID) (db.AiA
 func (m *MockQuerier) GetArtifactByName(ctx context.Context, arg db.GetArtifactByNameParams) (db.AiArtifact, error) {
 	args := m.Called(ctx, arg)
 	return args.Get(0).(db.AiArtifact), args.Error(1)
-}
-
-func (m *MockQuerier) ListArtifactsByConversation(ctx context.Context, arg db.ListArtifactsByConversationParams) ([]db.AiArtifact, error) {
-	args := m.Called(ctx, arg)
-	return args.Get(0).([]db.AiArtifact), args.Error(1)
 }
 
 func (m *MockQuerier) UpdateArtifactLatestVersion(ctx context.Context, arg db.UpdateArtifactLatestVersionParams) error {
@@ -880,9 +870,4 @@ func (m *MockQuerier) GetArtifactVersionForContent(ctx context.Context, arg db.G
 func (m *MockQuerier) IsOnlyArtifactVersion(ctx context.Context, artifactID uuid.UUID) (bool, error) {
 	args := m.Called(ctx, artifactID)
 	return args.Bool(0), args.Error(1)
-}
-
-func (m *MockQuerier) ListArtifactVersionsByArtifact(ctx context.Context, arg db.ListArtifactVersionsByArtifactParams) ([]db.ListArtifactVersionsByArtifactRow, error) {
-	args := m.Called(ctx, arg)
-	return args.Get(0).([]db.ListArtifactVersionsByArtifactRow), args.Error(1)
 }

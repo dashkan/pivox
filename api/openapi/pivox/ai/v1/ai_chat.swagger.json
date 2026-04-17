@@ -58,14 +58,14 @@
           },
           {
             "name": "filter",
-            "description": "Optional. An expression for filtering the results.\nFilterable fields:\n\n+ `archived` - filter by archived status\n\nExamples:\n\n+ `archived = false` - only active conversations.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
+            "description": "Optional. An expression for filtering the results.\nFilterable fields:\n\n+ `title` - substring match with wildcards (e.g. `title = \"budget*\"`)\n+ `archived` - filter by archived status\n+ `pinned` - filter by pinned status\n+ `createTime`, `lastMessageTime` - timestamp comparisons\n\nExamples:\n\n+ `archived = false` - only active conversations\n+ `pinned = true` - pinned conversations\n+ `title = \"Q4*\"` - conversations whose title starts with \"Q4\"\n\nFor more information, see [AIP-160](https://aip.dev/160).",
             "in": "query",
             "required": false,
             "type": "string"
           },
           {
             "name": "orderBy",
-            "description": "Optional. A comma-separated list of fields to order by. The default\norder is ascending. Use \"desc\" after a field name for descending.\nSupported fields:\n\n+ `createTime`\n+ `lastMessageTime`\n\nIf not specified, results are ordered by `lastMessageTime` descending.",
+            "description": "Optional. A comma-separated list of fields to order by. The default\norder is ascending. Use \"desc\" after a field name for descending.\nSupported fields:\n\n+ `title`\n+ `createTime`\n+ `lastMessageTime`\n\nIf not specified, results are ordered by creation time descending\n(newest first).",
             "in": "query",
             "required": false,
             "type": "string"
@@ -329,6 +329,20 @@
             "in": "query",
             "required": false,
             "type": "string"
+          },
+          {
+            "name": "filter",
+            "description": "Optional. AIP-160 filter. Filterable fields: `title`, `type`, `createTime`.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "description": "Optional. AIP-132 order_by. Sortable fields: `title`, `createTime`.",
+            "in": "query",
+            "required": false,
+            "type": "string"
           }
         ],
         "tags": [
@@ -479,6 +493,20 @@
             "in": "query",
             "required": false,
             "type": "string"
+          },
+          {
+            "name": "filter",
+            "description": "Optional. AIP-160 filter. Filterable fields: `createTime`.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "description": "Optional. AIP-132 order_by. Sortable fields: `createTime`.",
+            "in": "query",
+            "required": false,
+            "type": "string"
           }
         ],
         "tags": [
@@ -625,6 +653,20 @@
           {
             "name": "pageToken",
             "description": "Optional. Page token from a previous ListMessages call.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "filter",
+            "description": "Optional. AIP-160 filter. Filterable fields: `role`, `createTime`.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "description": "Optional. AIP-132 order_by. Sortable fields: `createTime`.\nDefault: newest first (by id — uuidv7 is time-ordered).",
             "in": "query",
             "required": false,
             "type": "string"
@@ -939,7 +981,7 @@
             "type": "object",
             "$ref": "#/definitions/v1Message"
           },
-          "description": "The messages in the conversation, ordered by sequence."
+          "description": "The messages in the conversation. Default order: newest first."
         },
         "nextPageToken": {
           "type": "string",

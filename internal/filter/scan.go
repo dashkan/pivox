@@ -6,6 +6,80 @@ import (
 	db "github.com/dashkan/pivox/internal/db/generated"
 )
 
+// ScanMessages scans rows into db.AiMessage structs.
+func ScanMessages(rows pgx.Rows) ([]db.AiMessage, error) {
+	defer rows.Close()
+	var results []db.AiMessage
+	for rows.Next() {
+		var m db.AiMessage
+		if err := rows.Scan(
+			&m.ID,
+			&m.ConversationID,
+			&m.Name,
+			&m.Role,
+			&m.Parts,
+			&m.Sequence,
+			&m.TokenCount,
+			&m.CreateTime,
+		); err != nil {
+			return nil, err
+		}
+		results = append(results, m)
+	}
+	return results, rows.Err()
+}
+
+// ScanArtifacts scans rows into db.AiArtifact structs.
+func ScanArtifacts(rows pgx.Rows) ([]db.AiArtifact, error) {
+	defer rows.Close()
+	var results []db.AiArtifact
+	for rows.Next() {
+		var a db.AiArtifact
+		if err := rows.Scan(
+			&a.ID,
+			&a.ConversationID,
+			&a.Name,
+			&a.Type,
+			&a.Title,
+			&a.Description,
+			&a.LatestVersionID,
+			&a.CreatedBy,
+			&a.UpdatedBy,
+			&a.CreateTime,
+			&a.UpdateTime,
+		); err != nil {
+			return nil, err
+		}
+		results = append(results, a)
+	}
+	return results, rows.Err()
+}
+
+// ScanArtifactVersions scans rows into db.AiArtifactVersion structs.
+func ScanArtifactVersions(rows pgx.Rows) ([]db.AiArtifactVersion, error) {
+	defer rows.Close()
+	var results []db.AiArtifactVersion
+	for rows.Next() {
+		var v db.AiArtifactVersion
+		if err := rows.Scan(
+			&v.ID,
+			&v.ArtifactID,
+			&v.Name,
+			&v.InlineData,
+			&v.InlineContentType,
+			&v.InlineSizeBytes,
+			&v.AssetVersionName,
+			&v.Sequence,
+			&v.CreatedBy,
+			&v.CreateTime,
+		); err != nil {
+			return nil, err
+		}
+		results = append(results, v)
+	}
+	return results, rows.Err()
+}
+
 // ScanConversations scans rows into db.AiConversation structs.
 func ScanConversations(rows pgx.Rows) ([]db.AiConversation, error) {
 	defer rows.Close()

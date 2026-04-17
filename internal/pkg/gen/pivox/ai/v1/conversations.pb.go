@@ -238,11 +238,16 @@ type ListConversationsRequest struct {
 	// Optional. An expression for filtering the results.
 	// Filterable fields:
 	//
+	// + `title` - substring match with wildcards (e.g. `title = "budget*"`)
 	// + `archived` - filter by archived status
+	// + `pinned` - filter by pinned status
+	// + `createTime`, `lastMessageTime` - timestamp comparisons
 	//
 	// Examples:
 	//
-	// + `archived = false` - only active conversations.
+	// + `archived = false` - only active conversations
+	// + `pinned = true` - pinned conversations
+	// + `title = "Q4*"` - conversations whose title starts with "Q4"
 	//
 	// For more information, see [AIP-160](https://aip.dev/160).
 	Filter string `protobuf:"bytes,4,opt,name=filter,proto3" json:"filter,omitempty"`
@@ -250,10 +255,12 @@ type ListConversationsRequest struct {
 	// order is ascending. Use "desc" after a field name for descending.
 	// Supported fields:
 	//
+	// + `title`
 	// + `createTime`
 	// + `lastMessageTime`
 	//
-	// If not specified, results are ordered by `lastMessageTime` descending.
+	// If not specified, results are ordered by creation time descending
+	// (newest first).
 	OrderBy       string `protobuf:"bytes,5,opt,name=order_by,json=orderBy,proto3" json:"order_by,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

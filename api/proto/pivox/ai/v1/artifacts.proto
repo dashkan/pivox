@@ -135,6 +135,12 @@ message ListArtifactsRequest {
 
   // Optional. Page token from a previous ListArtifacts call.
   string page_token = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. AIP-160 filter. Filterable fields: `title`, `type`, `createTime`.
+  string filter = 4 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. AIP-132 order_by. Sortable fields: `title`, `createTime`.
+  string order_by = 5 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // Response message for `ListArtifacts`.
@@ -193,6 +199,12 @@ message ListArtifactVersionsRequest {
 
   // Optional. Page token from a previous ListArtifactVersions call.
   string page_token = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. AIP-160 filter. Filterable fields: `createTime`.
+  string filter = 4 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. AIP-132 order_by. Sortable fields: `createTime`.
+  string order_by = 5 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // Response message for `ListArtifactVersions`.

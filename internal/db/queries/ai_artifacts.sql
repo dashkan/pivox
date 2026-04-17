@@ -9,12 +9,6 @@ SELECT * FROM ai_artifacts WHERE conversation_id = $1 AND name = $2;
 -- name: GetArtifactByID :one
 SELECT * FROM ai_artifacts WHERE id = $1;
 
--- name: ListArtifactsByConversation :many
-SELECT * FROM ai_artifacts
-WHERE conversation_id = $1
-ORDER BY create_time DESC
-LIMIT $2 OFFSET $3;
-
 -- name: CountArtifactsByConversation :one
 SELECT count(*) FROM ai_artifacts WHERE conversation_id = $1;
 

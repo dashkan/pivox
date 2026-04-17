@@ -132,8 +132,6 @@ type Querier interface {
 	GetTagValueByNamespacedName(ctx context.Context, namespacedName string) (TagValue, error)
 	IncrementConversationMessageCount(ctx context.Context, id uuid.UUID) error
 	IsOnlyArtifactVersion(ctx context.Context, artifactID uuid.UUID) (bool, error)
-	ListArtifactVersionsByArtifact(ctx context.Context, arg ListArtifactVersionsByArtifactParams) ([]ListArtifactVersionsByArtifactRow, error)
-	ListArtifactsByConversation(ctx context.Context, arg ListArtifactsByConversationParams) ([]AiArtifact, error)
 	ListAssetRenditions(ctx context.Context, versionID uuid.UUID) ([]AssetRendition, error)
 	ListAssetVersions(ctx context.Context, arg ListAssetVersionsParams) ([]AssetVersion, error)
 	ListAssetsByProject(ctx context.Context, arg ListAssetsByProjectParams) ([]Asset, error)
@@ -141,7 +139,6 @@ type Querier interface {
 	ListEffectiveTags(ctx context.Context, parentResource string) ([]ListEffectiveTagsRow, error)
 	ListExpiredAssets(ctx context.Context, limit int32) ([]Asset, error)
 	ListLineItemsByRequest(ctx context.Context, arg ListLineItemsByRequestParams) ([]AssetRequestLineItem, error)
-	ListMessagesByConversation(ctx context.Context, arg ListMessagesByConversationParams) ([]AiMessage, error)
 	// Fetches messages newest-first for budget truncation in Go.
 	// Caller walks rows accumulating token_count and stops when budget is exceeded.
 	ListMessagesNewestFirst(ctx context.Context, arg ListMessagesNewestFirstParams) ([]AiMessage, error)

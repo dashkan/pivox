@@ -122,51 +122,6 @@ func (q *Queries) GetArtifactByName(ctx context.Context, arg GetArtifactByNamePa
 	return i, err
 }
 
-const listArtifactsByConversation = `-- name: ListArtifactsByConversation :many
-SELECT id, conversation_id, name, type, title, description, latest_version_id, created_by, updated_by, create_time, update_time FROM ai_artifacts
-WHERE conversation_id = $1
-ORDER BY create_time DESC
-LIMIT $2 OFFSET $3
-`
-
-type ListArtifactsByConversationParams struct {
-	ConversationID uuid.UUID `json:"conversation_id"`
-	Limit          int32     `json:"limit"`
-	Offset         int32     `json:"offset"`
-}
-
-func (q *Queries) ListArtifactsByConversation(ctx context.Context, arg ListArtifactsByConversationParams) ([]AiArtifact, error) {
-	rows, err := q.db.Query(ctx, listArtifactsByConversation, arg.ConversationID, arg.Limit, arg.Offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []AiArtifact{}
-	for rows.Next() {
-		var i AiArtifact
-		if err := rows.Scan(
-			&i.ID,
-			&i.ConversationID,
-			&i.Name,
-			&i.Type,
-			&i.Title,
-			&i.Description,
-			&i.LatestVersionID,
-			&i.CreatedBy,
-			&i.UpdatedBy,
-			&i.CreateTime,
-			&i.UpdateTime,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const updateArtifactLatestVersion = `-- name: UpdateArtifactLatestVersion :exec
 UPDATE ai_artifacts
 SET latest_version_id = $2, update_time = now()
