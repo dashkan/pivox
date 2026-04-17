@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/dashkan/pivox/internal/appkey"
 	db "github.com/dashkan/pivox/internal/db/generated"
 )
 
@@ -16,8 +17,9 @@ type QueryParams struct {
 	ParentID    string // parent UUID (resolved by caller) or full resource name for tag_bindings
 	OrderBy     string // AIP-132 order_by expression
 	PageSize    int32
-	Cursor      string // page token (number-based pagination)
-	ShowDeleted bool   // if true, include soft-deleted rows
+	Cursor      string        // encrypted page_token from the client (opaque)
+	ShowDeleted bool          // if true, include soft-deleted rows
+	Codec       *appkey.Codec // required when Cursor is non-empty; used to decrypt it
 }
 
 // Query builds and executes a filtered SELECT query against the given resource table.
@@ -54,9 +56,14 @@ func Query(ctx context.Context, dbtx db.DBTX, rf *ResourceFilter, params QueryPa
 	}
 
 	// Cursor pagination (UUID-based, UUIDv7 is time-ordered).
+	// params.Cursor is the opaque client-visible page_token; decrypt first.
 	if params.Cursor != "" {
+		rawCursor, err := decodeCursor(params.Codec, params.Cursor)
+		if err != nil {
+			return nil, err
+		}
 		conditions = append(conditions, fmt.Sprintf("%s > $%d", rf.CursorColumn, paramIdx))
-		args = append(args, params.Cursor)
+		args = append(args, rawCursor)
 		paramIdx++
 	}
 

@@ -15,6 +15,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/dashkan/pivox/internal/apierr"
+	"github.com/dashkan/pivox/internal/appkey"
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/filter"
@@ -26,13 +27,15 @@ type ApiKeysServer struct {
 	db      db.DBTX
 	queries db.Querier
 	filter  *filter.ResourceFilter
+	codec   *appkey.Codec
 }
 
-func NewApiKeysServer(pool db.DBTX, queries db.Querier) *ApiKeysServer {
+func NewApiKeysServer(pool db.DBTX, queries db.Querier, codec *appkey.Codec) *ApiKeysServer {
 	return &ApiKeysServer{
 		db:      pool,
 		queries: queries,
 		filter:  filter.ApiKeyFilter(),
+		codec:   codec,
 	}
 }
 
@@ -100,6 +103,7 @@ func (s *ApiKeysServer) ListKeys(ctx context.Context, req *apiv1.ListKeysRequest
 		PageSize:    req.GetPageSize(),
 		Cursor:      req.GetPageToken(),
 		ShowDeleted: req.GetShowDeleted(),
+		Codec:       s.codec,
 	})
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid filter: %v", err)
@@ -120,7 +124,10 @@ func (s *ApiKeysServer) ListKeys(ctx context.Context, req *apiv1.ListKeysRequest
 
 	var nextPageToken string
 	if int32(len(results)) > pageSize {
-		nextPageToken = results[pageSize].ID.String()
+		nextPageToken, err = filter.EncodeNextPageToken(s.codec, results[pageSize].ID)
+		if err != nil {
+			return nil, apierr.Internal("encode page token")
+		}
 		results = results[:pageSize]
 	}
 

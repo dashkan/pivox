@@ -118,7 +118,7 @@ var (
 func TestUnit_CreateTagKey_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	iamHelper := iam.NewHelper(mockQ)
-	srv := NewTagKeysServer(nil, mockQ, iamHelper)
+	srv := NewTagKeysServer(nil, mockQ, iamHelper, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
@@ -145,7 +145,7 @@ func TestUnit_CreateTagKey_Success(t *testing.T) {
 func TestUnit_GetTagKey_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	iamHelper := iam.NewHelper(mockQ)
-	srv := NewTagKeysServer(nil, mockQ, iamHelper)
+	srv := NewTagKeysServer(nil, mockQ, iamHelper, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetTagKey", mock.Anything, testTagKeyID).Return(testTagKey, nil)
@@ -163,7 +163,7 @@ func TestUnit_GetTagKey_Success(t *testing.T) {
 func TestUnit_UpdateTagKey_WithMask(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	iamHelper := iam.NewHelper(mockQ)
-	srv := NewTagKeysServer(nil, mockQ, iamHelper)
+	srv := NewTagKeysServer(nil, mockQ, iamHelper, nil)
 	ctx := context.Background()
 
 	updatedKey := testTagKey
@@ -189,7 +189,7 @@ func TestUnit_UpdateTagKey_WithMask(t *testing.T) {
 func TestUnit_UpdateTagKey_NoMask(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	iamHelper := iam.NewHelper(mockQ)
-	srv := NewTagKeysServer(nil, mockQ, iamHelper)
+	srv := NewTagKeysServer(nil, mockQ, iamHelper, nil)
 	ctx := context.Background()
 
 	updatedKey := testTagKey
@@ -215,7 +215,7 @@ func TestUnit_UpdateTagKey_NoMask(t *testing.T) {
 func TestUnit_DeleteTagKey_WithValues(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	iamHelper := iam.NewHelper(mockQ)
-	srv := NewTagKeysServer(nil, mockQ, iamHelper)
+	srv := NewTagKeysServer(nil, mockQ, iamHelper, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetTagKey", mock.Anything, testTagKeyID).Return(testTagKey, nil)
@@ -236,7 +236,7 @@ func TestUnit_DeleteTagKey_WithValues(t *testing.T) {
 func TestUnit_DeleteTagKey_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	iamHelper := iam.NewHelper(mockQ)
-	srv := NewTagKeysServer(nil, mockQ, iamHelper)
+	srv := NewTagKeysServer(nil, mockQ, iamHelper, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetTagKey", mock.Anything, testTagKeyID).Return(testTagKey, nil)
@@ -259,7 +259,7 @@ func TestUnit_DeleteTagKey_Success(t *testing.T) {
 func TestUnit_GetTagKey_NotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	iamHelper := iam.NewHelper(mockQ)
-	srv := NewTagKeysServer(nil, mockQ, iamHelper)
+	srv := NewTagKeysServer(nil, mockQ, iamHelper, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetTagKey", mock.Anything, testTagKeyID).Return(db.TagKey{}, pgx.ErrNoRows)
@@ -279,7 +279,7 @@ func TestUnit_GetTagKey_NotFound(t *testing.T) {
 func TestGetIamPolicy_TagKeys(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	iamHelper := iam.NewHelper(mockQ)
-	srv := NewTagKeysServer(nil, mockQ, iamHelper)
+	srv := NewTagKeysServer(nil, mockQ, iamHelper, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetIamPolicy", mock.Anything, testTagKeyID).Return(db.IamPolicy{}, pgx.ErrNoRows)
@@ -297,7 +297,7 @@ func TestGetIamPolicy_TagKeys(t *testing.T) {
 func TestSetIamPolicy_TagKeys(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	iamHelper := iam.NewHelper(mockQ)
-	srv := NewTagKeysServer(nil, mockQ, iamHelper)
+	srv := NewTagKeysServer(nil, mockQ, iamHelper, nil)
 	ctx := context.Background()
 
 	mockQ.On("UpsertIamPolicy", mock.Anything, mock.MatchedBy(func(p db.UpsertIamPolicyParams) bool {
@@ -321,7 +321,7 @@ func TestSetIamPolicy_TagKeys(t *testing.T) {
 func TestTestIamPermissions_TagKeys(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	iamHelper := iam.NewHelper(mockQ)
-	srv := NewTagKeysServer(nil, mockQ, iamHelper)
+	srv := NewTagKeysServer(nil, mockQ, iamHelper, nil)
 	ctx := context.Background()
 
 	perms := []string{"pivox.tagKeys.get", "pivox.tagKeys.delete"}
@@ -337,7 +337,7 @@ func TestTestIamPermissions_TagKeys(t *testing.T) {
 func TestUnit_CreateTagValue_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	iamHelper := iam.NewHelper(mockQ)
-	srv := NewTagValuesServer(nil, mockQ, iamHelper)
+	srv := NewTagValuesServer(nil, mockQ, iamHelper, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetTagKey", mock.Anything, testTagKeyID).Return(testTagKey, nil)
@@ -362,7 +362,7 @@ func TestUnit_CreateTagValue_Success(t *testing.T) {
 func TestUnit_CreateTagValue_ParentNotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	iamHelper := iam.NewHelper(mockQ)
-	srv := NewTagValuesServer(nil, mockQ, iamHelper)
+	srv := NewTagValuesServer(nil, mockQ, iamHelper, nil)
 	ctx := context.Background()
 
 	bogusKeyID := uuid.MustParse("0192a000-9999-7000-8000-000000000001")
@@ -384,7 +384,7 @@ func TestUnit_CreateTagValue_ParentNotFound(t *testing.T) {
 func TestUnit_GetTagValue_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	iamHelper := iam.NewHelper(mockQ)
-	srv := NewTagValuesServer(nil, mockQ, iamHelper)
+	srv := NewTagValuesServer(nil, mockQ, iamHelper, nil)
 	ctx := context.Background()
 
 	tvName := "tagKeys/" + testTagKeyID.String() + "/tagValues/" + testTagValID.String()
@@ -403,7 +403,7 @@ func TestUnit_GetTagValue_Success(t *testing.T) {
 func TestUnit_UpdateTagValue_WithMask(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	iamHelper := iam.NewHelper(mockQ)
-	srv := NewTagValuesServer(nil, mockQ, iamHelper)
+	srv := NewTagValuesServer(nil, mockQ, iamHelper, nil)
 	ctx := context.Background()
 
 	tvName := "tagKeys/" + testTagKeyID.String() + "/tagValues/" + testTagValID.String()
@@ -431,7 +431,7 @@ func TestUnit_UpdateTagValue_WithMask(t *testing.T) {
 func TestUnit_UpdateTagValue_NoMask(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	iamHelper := iam.NewHelper(mockQ)
-	srv := NewTagValuesServer(nil, mockQ, iamHelper)
+	srv := NewTagValuesServer(nil, mockQ, iamHelper, nil)
 	ctx := context.Background()
 
 	tvName := "tagKeys/" + testTagKeyID.String() + "/tagValues/" + testTagValID.String()
@@ -460,7 +460,7 @@ func TestUnit_UpdateTagValue_NoMask(t *testing.T) {
 func TestGetIamPolicy_TagValues(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	iamHelper := iam.NewHelper(mockQ)
-	srv := NewTagValuesServer(nil, mockQ, iamHelper)
+	srv := NewTagValuesServer(nil, mockQ, iamHelper, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetIamPolicy", mock.Anything, testTagValID).Return(db.IamPolicy{}, pgx.ErrNoRows)
@@ -478,7 +478,7 @@ func TestGetIamPolicy_TagValues(t *testing.T) {
 func TestSetIamPolicy_TagValues(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	iamHelper := iam.NewHelper(mockQ)
-	srv := NewTagValuesServer(nil, mockQ, iamHelper)
+	srv := NewTagValuesServer(nil, mockQ, iamHelper, nil)
 	ctx := context.Background()
 
 	mockQ.On("UpsertIamPolicy", mock.Anything, mock.MatchedBy(func(p db.UpsertIamPolicyParams) bool {
@@ -502,7 +502,7 @@ func TestSetIamPolicy_TagValues(t *testing.T) {
 func TestTestIamPermissions_TagValues(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	iamHelper := iam.NewHelper(mockQ)
-	srv := NewTagValuesServer(nil, mockQ, iamHelper)
+	srv := NewTagValuesServer(nil, mockQ, iamHelper, nil)
 	ctx := context.Background()
 
 	perms := []string{"pivox.tagValues.get"}
@@ -518,7 +518,7 @@ func TestTestIamPermissions_TagValues(t *testing.T) {
 func TestUnit_DeleteTagValue_WithBindings(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	iamHelper := iam.NewHelper(mockQ)
-	srv := NewTagValuesServer(nil, mockQ, iamHelper)
+	srv := NewTagValuesServer(nil, mockQ, iamHelper, nil)
 	ctx := context.Background()
 
 	tvName := "tagKeys/" + testTagKeyID.String() + "/tagValues/" + testTagValID.String()
@@ -540,7 +540,7 @@ func TestUnit_DeleteTagValue_WithBindings(t *testing.T) {
 func TestUnit_DeleteTagValue_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	iamHelper := iam.NewHelper(mockQ)
-	srv := NewTagValuesServer(nil, mockQ, iamHelper)
+	srv := NewTagValuesServer(nil, mockQ, iamHelper, nil)
 	ctx := context.Background()
 
 	tvName := "tagKeys/" + testTagKeyID.String() + "/tagValues/" + testTagValID.String()
@@ -563,7 +563,7 @@ func TestUnit_DeleteTagValue_Success(t *testing.T) {
 
 func TestUnit_GetTagBinding_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewTagBindingsServer(nil, mockQ)
+	srv := NewTagBindingsServer(nil, mockQ, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetTagBinding", mock.Anything, testBindID).Return(testTagBinding, nil)
@@ -581,7 +581,7 @@ func TestUnit_GetTagBinding_Success(t *testing.T) {
 
 func TestUnit_CreateTagBinding_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewTagBindingsServer(nil, mockQ)
+	srv := NewTagBindingsServer(nil, mockQ, nil)
 	ctx := context.Background()
 
 	tvName := "tagKeys/" + testTagKeyID.String() + "/tagValues/" + testTagValID.String()
@@ -608,7 +608,7 @@ func TestUnit_CreateTagBinding_Success(t *testing.T) {
 
 func TestUnit_DeleteTagBinding_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewTagBindingsServer(nil, mockQ)
+	srv := NewTagBindingsServer(nil, mockQ, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetTagBinding", mock.Anything, testBindID).Return(testTagBinding, nil)
@@ -625,7 +625,7 @@ func TestUnit_DeleteTagBinding_Success(t *testing.T) {
 
 func TestUnit_ListEffectiveTags_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewTagBindingsServer(nil, mockQ)
+	srv := NewTagBindingsServer(nil, mockQ, nil)
 	ctx := context.Background()
 
 	rows := []db.ListEffectiveTagsRow{
@@ -675,7 +675,7 @@ func TestUnit_GetTagKey_InvalidName(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
 			iamHelper := iam.NewHelper(mockQ)
-			srv := NewTagKeysServer(nil, mockQ, iamHelper)
+			srv := NewTagKeysServer(nil, mockQ, iamHelper, nil)
 			ctx := context.Background()
 
 			_, err := srv.GetTagKey(ctx, &apiv1.GetTagKeyRequest{Name: tc.reqName})
@@ -715,7 +715,7 @@ func TestUnit_CreateTagKey_InvalidParent(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
 			iamHelper := iam.NewHelper(mockQ)
-			srv := NewTagKeysServer(nil, mockQ, iamHelper)
+			srv := NewTagKeysServer(nil, mockQ, iamHelper, nil)
 			ctx := context.Background()
 
 			switch tc.name {
@@ -761,7 +761,7 @@ func TestUnit_CreateTagKey_DBError(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
 			iamHelper := iam.NewHelper(mockQ)
-			srv := NewTagKeysServer(nil, mockQ, iamHelper)
+			srv := NewTagKeysServer(nil, mockQ, iamHelper, nil)
 			ctx := context.Background()
 
 			mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
@@ -823,7 +823,7 @@ func TestUnit_UpdateTagKey_ErrorPaths(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
 			iamHelper := iam.NewHelper(mockQ)
-			srv := NewTagKeysServer(nil, mockQ, iamHelper)
+			srv := NewTagKeysServer(nil, mockQ, iamHelper, nil)
 			ctx := context.Background()
 
 			tc.setup(mockQ)
@@ -892,7 +892,7 @@ func TestUnit_DeleteTagKey_ErrorPaths(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
 			iamHelper := iam.NewHelper(mockQ)
-			srv := NewTagKeysServer(nil, mockQ, iamHelper)
+			srv := NewTagKeysServer(nil, mockQ, iamHelper, nil)
 			ctx := context.Background()
 
 			tc.setup(mockQ)
@@ -912,7 +912,7 @@ func TestUnit_ListTagKeys_QueryError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	iamHelper := iam.NewHelper(mockQ)
 	mockDB := &mockDBTX{queryErr: fmt.Errorf("filter parse error: unknown field")}
-	srv := NewTagKeysServer(mockDB, mockQ, iamHelper)
+	srv := NewTagKeysServer(mockDB, mockQ, iamHelper, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
@@ -934,7 +934,7 @@ func TestUnit_ListTagKeys_ScanError(t *testing.T) {
 	iamHelper := iam.NewHelper(mockQ)
 	scanErr := fmt.Errorf("scan error")
 	mockDB := &mockDBTX{queryRows: &errRows{err: scanErr}}
-	srv := NewTagKeysServer(mockDB, mockQ, iamHelper)
+	srv := NewTagKeysServer(mockDB, mockQ, iamHelper, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
@@ -953,7 +953,7 @@ func TestUnit_ListTagKeys_ScanError(t *testing.T) {
 func TestUnit_ListTagKeys_InvalidParent(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	iamHelper := iam.NewHelper(mockQ)
-	srv := NewTagKeysServer(nil, mockQ, iamHelper)
+	srv := NewTagKeysServer(nil, mockQ, iamHelper, nil)
 	ctx := context.Background()
 
 	_, err := srv.ListTagKeys(ctx, &apiv1.ListTagKeysRequest{
@@ -1003,7 +1003,7 @@ func TestUnit_GetTagValue_ErrorPaths(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
 			iamHelper := iam.NewHelper(mockQ)
-			srv := NewTagValuesServer(nil, mockQ, iamHelper)
+			srv := NewTagValuesServer(nil, mockQ, iamHelper, nil)
 			ctx := context.Background()
 
 			tc.setup(mockQ)
@@ -1063,7 +1063,7 @@ func TestUnit_CreateTagValue_ErrorPaths(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
 			iamHelper := iam.NewHelper(mockQ)
-			srv := NewTagValuesServer(nil, mockQ, iamHelper)
+			srv := NewTagValuesServer(nil, mockQ, iamHelper, nil)
 			ctx := context.Background()
 
 			tc.setup(mockQ)
@@ -1125,7 +1125,7 @@ func TestUnit_UpdateTagValue_ErrorPaths(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
 			iamHelper := iam.NewHelper(mockQ)
-			srv := NewTagValuesServer(nil, mockQ, iamHelper)
+			srv := NewTagValuesServer(nil, mockQ, iamHelper, nil)
 			ctx := context.Background()
 
 			tc.setup(mockQ)
@@ -1195,7 +1195,7 @@ func TestUnit_DeleteTagValue_ErrorPaths(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
 			iamHelper := iam.NewHelper(mockQ)
-			srv := NewTagValuesServer(nil, mockQ, iamHelper)
+			srv := NewTagValuesServer(nil, mockQ, iamHelper, nil)
 			ctx := context.Background()
 
 			tc.setup(mockQ)
@@ -1215,7 +1215,7 @@ func TestUnit_ListTagValues_ErrorPaths(t *testing.T) {
 	t.Run("invalid parent format", func(t *testing.T) {
 		mockQ := new(mocks.MockQuerier)
 		iamHelper := iam.NewHelper(mockQ)
-		srv := NewTagValuesServer(nil, mockQ, iamHelper)
+		srv := NewTagValuesServer(nil, mockQ, iamHelper, nil)
 		ctx := context.Background()
 
 		_, err := srv.ListTagValues(ctx, &apiv1.ListTagValuesRequest{
@@ -1232,7 +1232,7 @@ func TestUnit_ListTagValues_ErrorPaths(t *testing.T) {
 	t.Run("parent tag key not found", func(t *testing.T) {
 		mockQ := new(mocks.MockQuerier)
 		iamHelper := iam.NewHelper(mockQ)
-		srv := NewTagValuesServer(nil, mockQ, iamHelper)
+		srv := NewTagValuesServer(nil, mockQ, iamHelper, nil)
 		ctx := context.Background()
 
 		mockQ.On("GetTagKey", mock.Anything, testTagKeyID).Return(db.TagKey{}, pgx.ErrNoRows)
@@ -1252,7 +1252,7 @@ func TestUnit_ListTagValues_ErrorPaths(t *testing.T) {
 		mockQ := new(mocks.MockQuerier)
 		iamHelper := iam.NewHelper(mockQ)
 		mockDB := &mockDBTX{queryErr: fmt.Errorf("filter parse error: unknown field")}
-		srv := NewTagValuesServer(mockDB, mockQ, iamHelper)
+		srv := NewTagValuesServer(mockDB, mockQ, iamHelper, nil)
 		ctx := context.Background()
 
 		mockQ.On("GetTagKey", mock.Anything, testTagKeyID).Return(testTagKey, nil)
@@ -1274,7 +1274,7 @@ func TestUnit_ListTagValues_ErrorPaths(t *testing.T) {
 		iamHelper := iam.NewHelper(mockQ)
 		scanErr := fmt.Errorf("scan error")
 		mockDB := &mockDBTX{queryRows: &errRows{err: scanErr}}
-		srv := NewTagValuesServer(mockDB, mockQ, iamHelper)
+		srv := NewTagValuesServer(mockDB, mockQ, iamHelper, nil)
 		ctx := context.Background()
 
 		mockQ.On("GetTagKey", mock.Anything, testTagKeyID).Return(testTagKey, nil)
@@ -1335,7 +1335,7 @@ func TestUnit_GetTagBinding_ErrorPaths(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
-			srv := NewTagBindingsServer(nil, mockQ)
+			srv := NewTagBindingsServer(nil, mockQ, nil)
 			ctx := context.Background()
 
 			tc.setup(mockQ)
@@ -1395,7 +1395,7 @@ func TestUnit_CreateTagBinding_ErrorPaths(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
-			srv := NewTagBindingsServer(nil, mockQ)
+			srv := NewTagBindingsServer(nil, mockQ, nil)
 			ctx := context.Background()
 
 			tc.setup(mockQ)
@@ -1456,7 +1456,7 @@ func TestUnit_DeleteTagBinding_ErrorPaths(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
-			srv := NewTagBindingsServer(nil, mockQ)
+			srv := NewTagBindingsServer(nil, mockQ, nil)
 			ctx := context.Background()
 
 			tc.setup(mockQ)
@@ -1476,7 +1476,7 @@ func TestUnit_ListTagBindings_ErrorPaths(t *testing.T) {
 	t.Run("filter query error", func(t *testing.T) {
 		mockQ := new(mocks.MockQuerier)
 		mockDB := &mockDBTX{queryErr: fmt.Errorf("filter parse error: unknown field")}
-		srv := NewTagBindingsServer(mockDB, mockQ)
+		srv := NewTagBindingsServer(mockDB, mockQ, nil)
 		ctx := context.Background()
 
 		_, err := srv.ListTagBindings(ctx, &apiv1.ListTagBindingsRequest{
@@ -1495,7 +1495,7 @@ func TestUnit_ListTagBindings_ErrorPaths(t *testing.T) {
 		mockQ := new(mocks.MockQuerier)
 		scanErr := fmt.Errorf("scan error")
 		mockDB := &mockDBTX{queryRows: &errRows{err: scanErr}}
-		srv := NewTagBindingsServer(mockDB, mockQ)
+		srv := NewTagBindingsServer(mockDB, mockQ, nil)
 		ctx := context.Background()
 
 		_, err := srv.ListTagBindings(ctx, &apiv1.ListTagBindingsRequest{
@@ -1512,7 +1512,7 @@ func TestUnit_ListTagBindings_ErrorPaths(t *testing.T) {
 
 func TestUnit_ListEffectiveTags_DBError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewTagBindingsServer(nil, mockQ)
+	srv := NewTagBindingsServer(nil, mockQ, nil)
 	ctx := context.Background()
 
 	mockQ.On("ListEffectiveTags", mock.Anything, "organizations/acme/storageGateways/gw-1").

@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/dashkan/pivox/internal/apierr"
+	"github.com/dashkan/pivox/internal/appkey"
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/filter"
@@ -22,13 +23,15 @@ type TagBindingsServer struct {
 	db      db.DBTX
 	queries db.Querier
 	filter  *filter.ResourceFilter
+	codec   *appkey.Codec
 }
 
-func NewTagBindingsServer(pool db.DBTX, queries db.Querier) *TagBindingsServer {
+func NewTagBindingsServer(pool db.DBTX, queries db.Querier, codec *appkey.Codec) *TagBindingsServer {
 	return &TagBindingsServer{
 		db:      pool,
 		queries: queries,
 		filter:  filter.TagBindingFilter(),
+		codec:   codec,
 	}
 }
 
@@ -39,6 +42,7 @@ func (s *TagBindingsServer) ListTagBindings(ctx context.Context, req *apiv1.List
 		OrderBy:  req.GetOrderBy(),
 		PageSize: req.GetPageSize(),
 		Cursor:   req.GetPageToken(),
+		Codec:       s.codec,
 	})
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid filter: %v", err)
@@ -59,7 +63,10 @@ func (s *TagBindingsServer) ListTagBindings(ctx context.Context, req *apiv1.List
 
 	var nextPageToken string
 	if int32(len(results)) > pageSize {
-		nextPageToken = results[pageSize].ID.String()
+		nextPageToken, err = filter.EncodeNextPageToken(s.codec, results[pageSize].ID)
+		if err != nil {
+			return nil, apierr.Internal("encode page token")
+		}
 		results = results[:pageSize]
 	}
 

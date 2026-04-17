@@ -46,16 +46,12 @@ func ParseOrderBy(rf *ResourceFilter, orderBy string) (string, error) {
 			continue
 		}
 
-		fm, ok := rf.Fields[fieldName]
+		sf, ok := rf.Sortable[fieldName]
 		if !ok {
 			return "", fmt.Errorf("invalid order_by field %q", fieldName)
 		}
-		// JSONB map fields cannot be ordered.
-		if fm.JSONB {
-			return "", fmt.Errorf("field %q does not support ordering", fieldName)
-		}
 
-		clauses = append(clauses, fmt.Sprintf("%s %s", fm.Column, direction))
+		clauses = append(clauses, fmt.Sprintf("%s %s", sf.Column, direction))
 	}
 
 	if len(clauses) == 0 {

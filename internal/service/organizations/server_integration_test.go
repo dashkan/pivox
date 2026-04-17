@@ -70,7 +70,7 @@ func TestIntegration_CreateOrganization_DuplicateName(t *testing.T) {
 	iamHelper := iam.NewHelper(queries)
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, iamHelper, noopAuthService{}))
+		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, iamHelper, noopAuthService{}, nil))
 	})
 
 	client := apiv1.NewOrganizationsClient(conn)
@@ -105,7 +105,7 @@ func TestIntegration_CreateOrganization_TenantFailure(t *testing.T) {
 	iamHelper := iam.NewHelper(queries)
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, iamHelper, failingAuthService{}))
+		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, iamHelper, failingAuthService{}, nil))
 	})
 
 	client := apiv1.NewOrganizationsClient(conn)
@@ -142,7 +142,7 @@ func TestIntegration_Organizations(t *testing.T) {
 	iamHelper := iam.NewHelper(queries)
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, iamHelper, noopAuthService{}))
+		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, iamHelper, noopAuthService{}, nil))
 	})
 
 	client := apiv1.NewOrganizationsClient(conn)

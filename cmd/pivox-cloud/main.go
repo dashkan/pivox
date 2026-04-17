@@ -22,6 +22,7 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	"github.com/dashkan/pivox/internal/agentstream"
+	"github.com/dashkan/pivox/internal/appkey"
 	"github.com/dashkan/pivox/internal/config"
 	"github.com/dashkan/pivox/internal/crypto"
 	db "github.com/dashkan/pivox/internal/db/generated"
@@ -168,6 +169,10 @@ func serve(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("initialize encryptor: %w", err)
 	}
+	appCodec, err := appkey.NewFromEnv()
+	if err != nil {
+		return fmt.Errorf("initialize app key: %w", err)
+	}
 	lroManager := lro.NewManager(queries, logger)
 	iamHelper := iam.NewHelper(queries)
 
@@ -228,12 +233,12 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	// Register all services
 	longrunningpb.RegisterOperationsServer(grpcServer, operations.NewOperationsServer(lroManager))
-	apiv1.RegisterProjectsServer(grpcServer, projects.NewProjectsServer(pool, queries, iamHelper))
-	apiv1.RegisterOrganizationsServer(grpcServer, organizations.NewOrganizationsServer(pool, queries, iamHelper, authSvc))
-	apiv1.RegisterTagKeysServer(grpcServer, tags.NewTagKeysServer(pool, queries, iamHelper))
-	apiv1.RegisterTagValuesServer(grpcServer, tags.NewTagValuesServer(pool, queries, iamHelper))
-	apiv1.RegisterTagBindingsServer(grpcServer, tags.NewTagBindingsServer(pool, queries))
-	apiv1.RegisterApiKeysServer(grpcServer, apikeys.NewApiKeysServer(pool, queries))
+	apiv1.RegisterProjectsServer(grpcServer, projects.NewProjectsServer(pool, queries, iamHelper, appCodec))
+	apiv1.RegisterOrganizationsServer(grpcServer, organizations.NewOrganizationsServer(pool, queries, iamHelper, authSvc, appCodec))
+	apiv1.RegisterTagKeysServer(grpcServer, tags.NewTagKeysServer(pool, queries, iamHelper, appCodec))
+	apiv1.RegisterTagValuesServer(grpcServer, tags.NewTagValuesServer(pool, queries, iamHelper, appCodec))
+	apiv1.RegisterTagBindingsServer(grpcServer, tags.NewTagBindingsServer(pool, queries, appCodec))
+	apiv1.RegisterApiKeysServer(grpcServer, apikeys.NewApiKeysServer(pool, queries, appCodec))
 
 	// Storage services
 	connMgr := agentstream.NewConnectionManager()

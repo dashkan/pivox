@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.einride.tech/aip/filtering"
 	expr "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
@@ -19,7 +20,7 @@ func TestTagValueFilter(t *testing.T) {
 	assert.Equal(t, "tag_values", rf.Table)
 	assert.Equal(t, "tag_key_id", rf.ParentColumn)
 	assert.False(t, rf.SoftDelete)
-	assert.NotEmpty(t, rf.Fields)
+	assert.NotEmpty(t, rf.Filterable)
 }
 
 func TestTagBindingFilter(t *testing.T) {
@@ -28,7 +29,7 @@ func TestTagBindingFilter(t *testing.T) {
 	assert.Equal(t, "tag_bindings", rf.Table)
 	assert.Equal(t, "parent_resource", rf.ParentColumn)
 	assert.False(t, rf.SoftDelete)
-	assert.NotEmpty(t, rf.Fields)
+	assert.NotEmpty(t, rf.Filterable)
 }
 
 func TestApiKeyFilter(t *testing.T) {
@@ -37,7 +38,7 @@ func TestApiKeyFilter(t *testing.T) {
 	assert.Equal(t, "api_keys", rf.Table)
 	assert.Equal(t, "org_id", rf.ParentColumn)
 	assert.True(t, rf.SoftDelete)
-	assert.NotEmpty(t, rf.Fields)
+	assert.NotEmpty(t, rf.Filterable)
 }
 
 func TestProjectFilter(t *testing.T) {
@@ -45,8 +46,8 @@ func TestProjectFilter(t *testing.T) {
 	require.NotNil(t, rf)
 	assert.Equal(t, "projects", rf.Table)
 	assert.True(t, rf.SoftDelete)
-	assert.Contains(t, rf.Fields, "labels")
-	assert.True(t, rf.Fields["labels"].JSONB)
+	assert.Contains(t, rf.Filterable, "labels")
+	assert.True(t, rf.Filterable["labels"].JSONB)
 }
 
 func TestOrganizationFilter(t *testing.T) {
@@ -200,7 +201,7 @@ func TestTranspile_SelectOnNonJSONB_Error(t *testing.T) {
 
 func TestTranspile_BareLiteral_NoDefaultFields_Error(t *testing.T) {
 	rf := &ResourceFilter{
-		Fields:        map[string]FieldMapping{"x": {Column: "x"}},
+		Filterable:    map[string]FilterableField{"x": {Column: "x"}},
 		Table:         "test",
 		DefaultFields: nil, // no default fields
 	}
@@ -242,10 +243,10 @@ func TestTranspile_ConstTypes(t *testing.T) {
 
 func TestTranspile_TimestampStandalone(t *testing.T) {
 	tests := []struct {
-		name     string
-		filter   string
-		wantArg  time.Time
-		wantErr  bool
+		name        string
+		filter      string
+		wantArg     time.Time
+		wantErr     bool
 		errContains string
 	}{
 		{
@@ -371,4 +372,75 @@ func TestTranspile_SelectStandalone(t *testing.T) {
 			assert.Empty(t, wc.Args)
 		})
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Filterable / Sortable separation contract
+//
+// Filter-capability and sort-capability are declared independently. A field
+// may appear in Filterable only, Sortable only, both, or neither. No implicit
+// coupling — the presence of a field in Filterable does NOT make it sortable
+// and vice versa.
+// ---------------------------------------------------------------------------
+
+func filterOnlyRF() *ResourceFilter {
+	return &ResourceFilter{
+		Filterable: map[string]FilterableField{
+			"searchOnly": {Column: "search_only", Type: filtering.TypeString},
+		},
+		Sortable: map[string]SortableField{
+			// deliberately empty — search_only is filter-only
+		},
+		Table: "test",
+	}
+}
+
+func sortOnlyRF() *ResourceFilter {
+	return &ResourceFilter{
+		Filterable: map[string]FilterableField{
+			// deliberately empty — sort_only is sort-only
+		},
+		Sortable: map[string]SortableField{
+			"sortOnly": {Column: "sort_only"},
+		},
+		Table: "test",
+	}
+}
+
+func TestFilterSortSplit_FilterOnlyField_FilterWorks(t *testing.T) {
+	rf := filterOnlyRF()
+	wc, err := Transpile(rf, `searchOnly = "foo"`, 1)
+	require.NoError(t, err)
+	assert.Contains(t, wc.SQL, "search_only")
+}
+
+func TestFilterSortSplit_FilterOnlyField_OrderByRejected(t *testing.T) {
+	rf := filterOnlyRF()
+	_, err := ParseOrderBy(rf, "searchOnly")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid order_by field")
+}
+
+func TestFilterSortSplit_SortOnlyField_OrderByWorks(t *testing.T) {
+	rf := sortOnlyRF()
+	got, err := ParseOrderBy(rf, "sortOnly desc")
+	require.NoError(t, err)
+	assert.Equal(t, "sort_only DESC", got)
+}
+
+func TestFilterSortSplit_SortOnlyField_FilterRejected(t *testing.T) {
+	rf := sortOnlyRF()
+	_, err := Transpile(rf, `sortOnly = "foo"`, 1)
+	require.Error(t, err)
+}
+
+// ProjectFilter's `labels` is JSONB (filterable) but must NOT be sortable —
+// the previous impl special-cased this via rf.Fields[x].JSONB; the new
+// design enforces it by simply not listing it in Sortable.
+func TestProjectFilter_JSONBLabelsNotSortable(t *testing.T) {
+	rf := ProjectFilter()
+	assert.Contains(t, rf.Filterable, "labels")
+	assert.NotContains(t, rf.Sortable, "labels")
+	_, err := ParseOrderBy(rf, "labels")
+	require.Error(t, err)
 }

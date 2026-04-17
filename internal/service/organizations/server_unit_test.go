@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/dashkan/pivox/internal/appkey"
 	"github.com/dashkan/pivox/internal/authn"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/filter"
@@ -43,10 +45,12 @@ var (
 
 func newTestServer(q *mocks.MockQuerier) *OrganizationsServer {
 	iamHelper := iam.NewHelper(q)
+	codec, _ := appkey.NewFromHex(strings.Repeat("ab", 32))
 	return &OrganizationsServer{
 		queries: q,
 		iam:     iamHelper,
 		filter:  filter.OrganizationFilter(),
+		codec:   codec,
 	}
 }
 
@@ -744,8 +748,8 @@ func (r *emptyRows) Conn() *pgx.Conn                              { return nil }
 // Each call to Next() advances to the next organization; Scan() populates
 // the destination variables using the same column order as ScanOrganizations.
 type dataRows struct {
-	orgs  []db.Organization
-	idx   int
+	orgs   []db.Organization
+	idx    int
 	closed bool
 }
 
@@ -785,9 +789,9 @@ func (r *dataRows) Scan(dest ...any) error {
 	// dest[14], dest[15] are pgtype.Timestamptz — leave as zero
 	return nil
 }
-func (r *dataRows) Values() ([]any, error)  { return nil, nil }
-func (r *dataRows) RawValues() [][]byte     { return nil }
-func (r *dataRows) Conn() *pgx.Conn         { return nil }
+func (r *dataRows) Values() ([]any, error) { return nil, nil }
+func (r *dataRows) RawValues() [][]byte    { return nil }
+func (r *dataRows) Conn() *pgx.Conn        { return nil }
 
 // ---------------------------------------------------------------------------
 // ListOrganizations
@@ -940,9 +944,11 @@ func TestUnit_ListOrganizations_Pagination(t *testing.T) {
 	}
 
 	dbtx := &mockListDBTX{queryRows: newDataRows(orgs)}
+	codec, _ := appkey.NewFromHex(strings.Repeat("ab", 32))
 	srv := &OrganizationsServer{
 		db:     dbtx,
 		filter: filter.OrganizationFilter(),
+		codec:  codec,
 	}
 
 	resp, err := srv.ListOrganizations(ctx, &apiv1.ListOrganizationsRequest{
@@ -952,8 +958,13 @@ func TestUnit_ListOrganizations_Pagination(t *testing.T) {
 	require.NoError(t, err)
 	// Should only return pageSize results.
 	assert.Len(t, resp.GetOrganizations(), pageSize)
-	// NextPageToken should be set to the ID of the (pageSize+1)-th result.
-	assert.Equal(t, orgs[pageSize].ID.String(), resp.GetNextPageToken())
+	// NextPageToken is opaque — decrypt it to verify it encodes the expected ID.
+	require.NotEmpty(t, resp.GetNextPageToken())
+	raw, err := codec.Decrypt(resp.GetNextPageToken())
+	require.NoError(t, err)
+	var decodedID uuid.UUID
+	copy(decodedID[:], raw)
+	assert.Equal(t, orgs[pageSize].ID, decodedID)
 }
 
 func TestUnit_ListOrganizations_PageSizeClamped(t *testing.T) {
@@ -1132,7 +1143,7 @@ func TestUnit_NewOrganizationsServer_Constructor(t *testing.T) {
 	auth := new(mockAuthService)
 
 	// NewOrganizationsServer with nil pool exercises the constructor code path.
-	srv := NewOrganizationsServer(nil, mockQ, iamHelper, auth)
+	srv := NewOrganizationsServer(nil, mockQ, iamHelper, auth, nil)
 
 	require.NotNil(t, srv)
 	assert.NotNil(t, srv.filter)

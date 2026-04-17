@@ -255,7 +255,7 @@ func (t *Transpiler) transpileTimestamp(call *expr.Expr_Call) (string, error) {
 
 func (t *Transpiler) transpileIdent(name string) (string, error) {
 	// Known field: resolve to column name.
-	if fm, ok := t.filter.Fields[name]; ok {
+	if fm, ok := t.filter.Filterable[name]; ok {
 		return fm.Column, nil
 	}
 	// Unknown identifier: treat as a bare literal and expand against default fields.
@@ -289,29 +289,29 @@ func (t *Transpiler) transpileSelect(sel *expr.Expr_Select) (string, error) {
 	return fmt.Sprintf("%s->>'%s'", fm.Column, sel.GetField()), nil
 }
 
-// resolveField extracts the column name and FieldMapping from an expression.
-func (t *Transpiler) resolveField(e *expr.Expr) (string, FieldMapping, error) {
+// resolveField extracts the column name and FilterableField from an expression.
+func (t *Transpiler) resolveField(e *expr.Expr) (string, FilterableField, error) {
 	switch v := e.GetExprKind().(type) {
 	case *expr.Expr_IdentExpr:
 		name := v.IdentExpr.GetName()
-		fm, ok := t.filter.Fields[name]
+		fm, ok := t.filter.Filterable[name]
 		if !ok {
-			return "", FieldMapping{}, fmt.Errorf("unknown field: %s", name)
+			return "", FilterableField{}, fmt.Errorf("unknown field: %s", name)
 		}
 		return fm.Column, fm, nil
 	case *expr.Expr_SelectExpr:
 		// Dot-traversal, e.g. labels.key → labels->>'key'
 		_, fm, err := t.resolveField(v.SelectExpr.GetOperand())
 		if err != nil {
-			return "", FieldMapping{}, err
+			return "", FilterableField{}, err
 		}
 		if !fm.JSONB {
-			return "", FieldMapping{}, fmt.Errorf("%s does not support traversal", v.SelectExpr.GetOperand().GetIdentExpr().GetName())
+			return "", FilterableField{}, fmt.Errorf("%s does not support traversal", v.SelectExpr.GetOperand().GetIdentExpr().GetName())
 		}
 		col := fmt.Sprintf("%s->>'%s'", fm.Column, v.SelectExpr.GetField())
-		return col, FieldMapping{Column: col, Type: filtering.TypeString}, nil
+		return col, FilterableField{Column: col, Type: filtering.TypeString}, nil
 	default:
-		return "", FieldMapping{}, fmt.Errorf("expected field identifier, got %T", v)
+		return "", FilterableField{}, fmt.Errorf("expected field identifier, got %T", v)
 	}
 }
 
@@ -372,7 +372,7 @@ func (t *Transpiler) expandBareLiteral(value string) (string, error) {
 	}
 	clauses := make([]string, 0, len(t.filter.DefaultFields))
 	for _, fieldName := range t.filter.DefaultFields {
-		fm, ok := t.filter.Fields[fieldName]
+		fm, ok := t.filter.Filterable[fieldName]
 		if !ok {
 			continue
 		}

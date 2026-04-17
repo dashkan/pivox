@@ -50,7 +50,7 @@ var (
 
 func TestUnit_GetProject_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil)
+	srv := NewProjectsServer(nil, mockQ, nil, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
@@ -74,7 +74,7 @@ func TestUnit_GetProject_Success(t *testing.T) {
 
 func TestUnit_GetProject_InvalidName(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil)
+	srv := NewProjectsServer(nil, mockQ, nil, nil)
 	ctx := context.Background()
 
 	_, err := srv.GetProject(ctx, &apiv1.GetProjectRequest{
@@ -89,7 +89,7 @@ func TestUnit_GetProject_InvalidName(t *testing.T) {
 
 func TestUnit_GetProject_NotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil)
+	srv := NewProjectsServer(nil, mockQ, nil, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
@@ -110,7 +110,7 @@ func TestUnit_GetProject_NotFound(t *testing.T) {
 
 func TestUnit_CreateProject_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil)
+	srv := NewProjectsServer(nil, mockQ, nil, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
@@ -142,7 +142,7 @@ func TestUnit_CreateProject_Success(t *testing.T) {
 
 func TestUnit_CreateProject_InvalidParent(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil)
+	srv := NewProjectsServer(nil, mockQ, nil, nil)
 	ctx := context.Background()
 
 	_, err := srv.CreateProject(ctx, &apiv1.CreateProjectRequest{
@@ -158,7 +158,7 @@ func TestUnit_CreateProject_InvalidParent(t *testing.T) {
 
 func TestUnit_UpdateProject_WithFieldMask(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil)
+	srv := NewProjectsServer(nil, mockQ, nil, nil)
 	ctx := context.Background()
 
 	updatedProject := testDBProject
@@ -193,7 +193,7 @@ func TestUnit_UpdateProject_WithFieldMask(t *testing.T) {
 
 func TestUnit_DeleteProject_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil)
+	srv := NewProjectsServer(nil, mockQ, nil, nil)
 	ctx := context.Background()
 
 	deletedProject := testDBProject
@@ -221,7 +221,7 @@ func TestUnit_DeleteProject_Success(t *testing.T) {
 
 func TestUnit_UpdateProject_NoMask(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil)
+	srv := NewProjectsServer(nil, mockQ, nil, nil)
 	ctx := context.Background()
 
 	updatedProject := testDBProject
@@ -255,7 +255,7 @@ func TestUnit_UpdateProject_NoMask(t *testing.T) {
 func TestUnit_GetIamPolicy(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	iamHelper := iam.NewHelper(mockQ)
-	srv := NewProjectsServer(nil, mockQ, iamHelper)
+	srv := NewProjectsServer(nil, mockQ, iamHelper, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
@@ -278,7 +278,7 @@ func TestUnit_GetIamPolicy(t *testing.T) {
 func TestUnit_SetIamPolicy(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	iamHelper := iam.NewHelper(mockQ)
-	srv := NewProjectsServer(nil, mockQ, iamHelper)
+	srv := NewProjectsServer(nil, mockQ, iamHelper, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
@@ -307,7 +307,7 @@ func TestUnit_SetIamPolicy(t *testing.T) {
 func TestUnit_TestIamPermissions(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	iamHelper := iam.NewHelper(mockQ)
-	srv := NewProjectsServer(nil, mockQ, iamHelper)
+	srv := NewProjectsServer(nil, mockQ, iamHelper, nil)
 	ctx := context.Background()
 
 	perms := []string{"pivox.projects.get", "pivox.projects.delete"}
@@ -322,7 +322,7 @@ func TestUnit_TestIamPermissions(t *testing.T) {
 
 func TestUnit_UndeleteProject_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil)
+	srv := NewProjectsServer(nil, mockQ, nil, nil)
 	ctx := context.Background()
 
 	undeletedProject := testDBProject
@@ -418,7 +418,7 @@ func TestUnit_UpdateProject_ErrorPaths(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
 			tc.setupMocks(mockQ)
-			srv := NewProjectsServer(nil, mockQ, nil)
+			srv := NewProjectsServer(nil, mockQ, nil, nil)
 
 			_, err := srv.UpdateProject(ctx, tc.req)
 
@@ -491,7 +491,7 @@ func TestUnit_DeleteProject_ErrorPaths(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
 			tc.setupMocks(mockQ)
-			srv := NewProjectsServer(nil, mockQ, nil)
+			srv := NewProjectsServer(nil, mockQ, nil, nil)
 
 			_, err := srv.DeleteProject(ctx, tc.req)
 
@@ -564,7 +564,7 @@ func TestUnit_UndeleteProject_ErrorPaths(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
 			tc.setupMocks(mockQ)
-			srv := NewProjectsServer(nil, mockQ, nil)
+			srv := NewProjectsServer(nil, mockQ, nil, nil)
 
 			_, err := srv.UndeleteProject(ctx, tc.req)
 
@@ -607,7 +607,7 @@ func TestUnit_ListProjects_InvalidParent(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
 			tc.setupMocks(mockQ)
-			srv := NewProjectsServer(nil, mockQ, nil)
+			srv := NewProjectsServer(nil, mockQ, nil, nil)
 
 			_, err := srv.ListProjects(ctx, tc.req)
 
@@ -622,7 +622,7 @@ func TestUnit_ListProjects_InvalidParent(t *testing.T) {
 
 func TestUnit_UpdateProject_LabelsMask(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil)
+	srv := NewProjectsServer(nil, mockQ, nil, nil)
 	ctx := context.Background()
 
 	updatedProject := testDBProject
@@ -654,7 +654,7 @@ func TestUnit_UpdateProject_LabelsMask(t *testing.T) {
 
 func TestUnit_UpdateProject_NoMaskWithLabels(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil)
+	srv := NewProjectsServer(nil, mockQ, nil, nil)
 	ctx := context.Background()
 
 	updatedProject := testDBProject
@@ -684,7 +684,7 @@ func TestUnit_UpdateProject_NoMaskWithLabels(t *testing.T) {
 
 func TestUnit_GetProject_OrgNotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil)
+	srv := NewProjectsServer(nil, mockQ, nil, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "unknown-org").
@@ -703,7 +703,7 @@ func TestUnit_GetProject_OrgNotFound(t *testing.T) {
 
 func TestUnit_CreateProject_AutoGeneratedID(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil)
+	srv := NewProjectsServer(nil, mockQ, nil, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
@@ -733,7 +733,7 @@ func TestUnit_CreateProject_AutoGeneratedID(t *testing.T) {
 
 func TestUnit_CreateProject_DBError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil)
+	srv := NewProjectsServer(nil, mockQ, nil, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)

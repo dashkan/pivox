@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/dashkan/pivox/internal/apierr"
+	"github.com/dashkan/pivox/internal/appkey"
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/filter"
@@ -29,14 +30,16 @@ type ProjectsServer struct {
 	queries db.Querier
 	iam     *iam.Helper
 	filter  *filter.ResourceFilter
+	codec   *appkey.Codec
 }
 
-func NewProjectsServer(pool db.DBTX, queries db.Querier, iam *iam.Helper) *ProjectsServer {
+func NewProjectsServer(pool db.DBTX, queries db.Querier, iam *iam.Helper, codec *appkey.Codec) *ProjectsServer {
 	return &ProjectsServer{
 		db:      pool,
 		queries: queries,
 		iam:     iam,
 		filter:  filter.ProjectFilter(),
+		codec:   codec,
 	}
 }
 
@@ -81,6 +84,7 @@ func (s *ProjectsServer) ListProjects(ctx context.Context, req *apiv1.ListProjec
 		PageSize:    req.GetPageSize(),
 		Cursor:      req.GetPageToken(),
 		ShowDeleted: req.GetShowDeleted(),
+		Codec:       s.codec,
 	})
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid filter: %v", err)
@@ -101,7 +105,10 @@ func (s *ProjectsServer) ListProjects(ctx context.Context, req *apiv1.ListProjec
 
 	var nextPageToken string
 	if int32(len(results)) > pageSize {
-		nextPageToken = results[pageSize].ID.String()
+		nextPageToken, err = filter.EncodeNextPageToken(s.codec, results[pageSize].ID)
+		if err != nil {
+			return nil, apierr.Internal("encode page token")
+		}
 		results = results[:pageSize]
 	}
 

@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/dashkan/pivox/internal/apierr"
+	"github.com/dashkan/pivox/internal/appkey"
 	"github.com/dashkan/pivox/internal/authn"
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
@@ -37,9 +38,10 @@ type OrganizationsServer struct {
 	iam     *iam.Helper
 	auth    authn.Service
 	filter  *filter.ResourceFilter
+	codec   *appkey.Codec
 }
 
-func NewOrganizationsServer(pool *pgxpool.Pool, queries db.Querier, iam *iam.Helper, auth authn.Service) *OrganizationsServer {
+func NewOrganizationsServer(pool *pgxpool.Pool, queries db.Querier, iam *iam.Helper, auth authn.Service, codec *appkey.Codec) *OrganizationsServer {
 	return &OrganizationsServer{
 		db:      pool,
 		pool:    pool,
@@ -47,6 +49,7 @@ func NewOrganizationsServer(pool *pgxpool.Pool, queries db.Querier, iam *iam.Hel
 		iam:     iam,
 		auth:    auth,
 		filter:  filter.OrganizationFilter(),
+		codec:   codec,
 	}
 }
 
@@ -71,6 +74,7 @@ func (s *OrganizationsServer) ListOrganizations(ctx context.Context, req *apiv1.
 		PageSize:    req.GetPageSize(),
 		Cursor:      req.GetPageToken(),
 		ShowDeleted: req.GetShowDeleted(),
+		Codec:       s.codec,
 	})
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid filter: %v", err)
@@ -91,7 +95,10 @@ func (s *OrganizationsServer) ListOrganizations(ctx context.Context, req *apiv1.
 
 	var nextPageToken string
 	if int32(len(results)) > pageSize {
-		nextPageToken = results[pageSize].ID.String()
+		nextPageToken, err = filter.EncodeNextPageToken(s.codec, results[pageSize].ID)
+		if err != nil {
+			return nil, apierr.Internal("encode page token")
+		}
 		results = results[:pageSize]
 	}
 

@@ -38,7 +38,7 @@ func TestIntegration_ApiKeys(t *testing.T) {
 	defer cleanup()
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		apiv1.RegisterApiKeysServer(s, apikeys.NewApiKeysServer(pool, queries))
+		apiv1.RegisterApiKeysServer(s, apikeys.NewApiKeysServer(pool, queries, nil))
 	})
 
 	client := apiv1.NewApiKeysClient(conn)
