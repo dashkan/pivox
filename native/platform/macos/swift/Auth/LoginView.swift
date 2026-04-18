@@ -159,6 +159,7 @@ struct LoginView: View {
         Button("Create one", action: onSwitchToRegister)
           .buttonStyle(.link)
           .font(.caption)
+          .disabled(isLoading)
           .accessibilityIdentifier("login-switch-register")
       }
     }

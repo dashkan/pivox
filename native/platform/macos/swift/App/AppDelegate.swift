@@ -64,6 +64,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Initialize Firebase before any UI.
     AuthService.shared.configure()
 
+    // Install the shared gRPC auth token provider. Every RPC client
+    // (ChatClient and future services) reads tokens through this —
+    // ChatClient no longer takes an authToken parameter.
+    PivoxAuthBridge.registerTokenProvider()
+
     // If a delegated signin/signout link was captured during will-launch,
     // skip creating the main window entirely — there is no Pivox UI the user
     // wants to see. Profile is an explicit "open the app" request so it keeps

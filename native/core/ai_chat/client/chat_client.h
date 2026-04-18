@@ -94,13 +94,15 @@ struct UnaryStatus {
 
 class SWIFT_SHARED_REFERENCE(ChatClientRetain, ChatClientRelease) ChatClient {
  public:
-  static SWIFT_RETURNS_RETAINED ChatClient* Create(
-      const char* endpoint, const char* auth_token);
+  // Authentication is handled channel-wide by the shared auth interceptor
+  // (see native/core/auth/auth_interceptor.h). The platform registers a
+  // token provider at startup; the interceptor fetches per-RPC. No token
+  // is passed through this constructor.
+  static SWIFT_RETURNS_RETAINED ChatClient* Create(const char* endpoint);
 
   ChatClient(const ChatClient&) = delete;
   ChatClient& operator=(const ChatClient&) = delete;
 
-  void SetAuthToken(const char* token);
   void Cancel();
 
 #if PIVOX_AI_CHAT_HAS_SWIFT_PROTOS
@@ -126,7 +128,7 @@ class SWIFT_SHARED_REFERENCE(ChatClientRetain, ChatClientRelease) ChatClient {
 #endif
 
  private:
-  ChatClient(const std::string& endpoint, const std::string& auth_token);
+  explicit ChatClient(const std::string& endpoint);
   ~ChatClient();
 
   // Internal bytes-based transport. Used by both typed wrappers above
@@ -152,7 +154,6 @@ class SWIFT_SHARED_REFERENCE(ChatClientRetain, ChatClientRelease) ChatClient {
 
   std::mutex mu_;
   std::condition_variable cv_;
-  std::string auth_token_;
   std::shared_ptr<StreamReactor> reactor_;
 
   // Stream callback triple — lambdas bound in StartStream, kept as

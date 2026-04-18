@@ -390,7 +390,7 @@ if(WIN32)
     set(FB_LINK_DIR "${FB_CPP_ROOT}/libs/windows/VS2019/MD/${FB_ARCH}/$<CONFIG>")
 
     # Common link libraries for Windows targets.
-    set(WIN_LINK_LIBS pivox_core crypt32 advapi32 firebase_app firebase_auth ws2_32 userenv)
+    set(WIN_LINK_LIBS pivox_core pivox_auth crypt32 advapi32 firebase_app firebase_auth ws2_32 userenv)
 
     option(PIVOX_BUILD_ACTIVEX "Build ActiveX plugin (x86 only)" OFF)
 
@@ -421,7 +421,7 @@ if(GTest_FOUND)
         tests/core/crop_math_tests.cpp
         tests/core/image_editor_engine_tests.cpp
     )
-    target_link_libraries(pivox_core_tests PRIVATE pivox_core GTest::gtest_main)
+    target_link_libraries(pivox_core_tests PRIVATE pivox_core pivox_auth GTest::gtest_main)
 
     include(GoogleTest)
     gtest_discover_tests(pivox_core_tests DISCOVERY_MODE PRE_TEST)

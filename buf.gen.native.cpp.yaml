@@ -14,9 +14,11 @@ inputs:
       - api/proto/google/longrunning
       - api/proto/buf/validate
 plugins:
-  # C++ proto types — consumed by shared C++ code. Plugin version pinned
-  # to match vcpkg protobuf runtime (29.5); mismatched runtime fails to
-  # compile generated code.
+  # C++ proto types — consumed by shared C++ code. Pinned to the version
+  # matching vcpkg's libprotobuf. Latest plugin emits code referencing
+  # newer runtime APIs (PROTOBUF_NONNULL, ParseNamedEnum overloads) that
+  # older runtimes don't provide — verified empirically. Bump this only
+  # when bumping vcpkg protobuf; keep them in lockstep.
   - remote: buf.build/protocolbuffers/cpp:v29.5
     out: native/core/generated/cpp
 

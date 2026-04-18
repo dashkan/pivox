@@ -1,4 +1,3 @@
-import FirebaseAuth
 import PivoxModels
 import SwiftUI
 
@@ -26,9 +25,11 @@ struct AIChatContainerView: View {
             }
         }
         .task {
+            // Auth header is attached per-RPC by the shared auth interceptor
+            // (see PivoxAuthBridge). ChatClient construction is synchronous
+            // now — no token fetch ceremony here.
             do {
-                let token = try await Auth.auth().currentUser?.getIDToken() ?? ""
-                client = try ChatClient(endpoint: endpoint, authToken: token)
+                client = try ChatClient(endpoint: endpoint)
             } catch {
                 initError = error.localizedDescription
             }

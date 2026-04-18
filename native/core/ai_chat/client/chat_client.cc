@@ -4,6 +4,8 @@
 
 #include <utility>
 
+#include "auth_interceptor.h"
+
 namespace pivox::ai_chat {
 
 // ── StreamReactor ───────────────────────────────────────────────────
@@ -92,25 +94,15 @@ void StreamReactor::OnDone(const grpc::Status& status) {
 
 // ── ChatClient ──────────────────────────────────────────────────────
 
-SWIFT_RETURNS_RETAINED ChatClient* ChatClient::Create(
-    const char* endpoint, const char* auth_token) {
+SWIFT_RETURNS_RETAINED ChatClient* ChatClient::Create(const char* endpoint) {
   if (!endpoint) return nullptr;
-  return new (std::nothrow) ChatClient(
-      endpoint, auth_token ? auth_token : "");
+  return new (std::nothrow) ChatClient(endpoint);
 }
 
-ChatClient::ChatClient(const std::string& endpoint,
-                       const std::string& auth_token)
-    : channel_(grpc::CreateChannel(endpoint,
-                                   grpc::InsecureChannelCredentials())),
-      auth_token_(auth_token) {}
+ChatClient::ChatClient(const std::string& endpoint)
+    : channel_(pivox::auth::CreateAuthenticatedChannel(endpoint)) {}
 
 ChatClient::~ChatClient() { Shutdown(); }
-
-void ChatClient::SetAuthToken(const char* token) {
-  std::lock_guard<std::mutex> lock(mu_);
-  auth_token_ = token ? token : "";
-}
 
 void ChatClient::Cancel() { Shutdown(); }
 
@@ -140,16 +132,8 @@ grpc::Status ChatClient::DoUnaryCall(const char* method,
                                        const uint8_t* request_bytes,
                                        size_t request_size,
                                        std::vector<uint8_t>* response_out) {
-  std::string token;
-  {
-    std::lock_guard<std::mutex> lock(mu_);
-    token = auth_token_;
-  }
-
+  // Authorization header is attached by the channel's auth interceptor.
   grpc::ClientContext rpc_ctx;
-  if (!token.empty()) {
-    rpc_ctx.AddMetadata("authorization", "Bearer " + token);
-  }
   rpc_ctx.set_deadline(std::chrono::system_clock::now() +
                        std::chrono::seconds(30));
 
@@ -186,13 +170,8 @@ void ChatClient::OpenStream() {
     req = stream_request_;
   }
 
+  // Authorization header is attached by the channel's auth interceptor.
   auto rpc_ctx = std::make_unique<grpc::ClientContext>();
-  {
-    std::lock_guard<std::mutex> lock(mu_);
-    if (!auth_token_.empty()) {
-      rpc_ctx->AddMetadata("authorization", "Bearer " + auth_token_);
-    }
-  }
 
   grpc::Slice req_slice(req.data(), req.size());
   grpc::ByteBuffer request_buf(&req_slice, 1);

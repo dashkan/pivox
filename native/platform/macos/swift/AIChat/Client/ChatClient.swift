@@ -26,15 +26,14 @@ public final class ChatClient: @unchecked Sendable {
     /// extensions in the same module can reach the C++ methods.
     internal let cpp: pivox.ai_chat.ChatClient
 
-    public init(endpoint: String, authToken: String) throws {
-        guard let instance = pivox.ai_chat.ChatClient.Create(endpoint, authToken) else {
+    public init(endpoint: String) throws {
+        // Authentication is handled by the shared gRPC auth interceptor —
+        // the channel fetches a Firebase token per RPC via the provider
+        // registered in PivoxAuthBridge at app startup. No token passed here.
+        guard let instance = pivox.ai_chat.ChatClient.Create(endpoint) else {
             throw ChatError.initFailed
         }
         self.cpp = instance
-    }
-
-    public func setAuthToken(_ token: String) {
-        cpp.SetAuthToken(token)
     }
 
     // MARK: - Generic unary (compat shim for non-migrated resource RPCs).

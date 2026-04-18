@@ -13,6 +13,7 @@ target_link_libraries(pivox_ai_chat_client PUBLIC
     gRPC::grpc++
     protobuf::libprotobuf
     pivox_protos_cpp
+    pivox_auth
 )
 
 # On Apple, the bridge (chat_client_apple.cc) consumes PivoxModels-Swift.h —
@@ -36,17 +37,7 @@ target_include_directories(pivox_ai_chat_client PUBLIC
     "${CMAKE_SOURCE_DIR}/core/generated/bridge"
 )
 
-# Tests
-find_package(GTest CONFIG REQUIRED)
-
-add_executable(pivox_ai_chat_client_tests
-    chat_client_test.cc
-)
-
-target_link_libraries(pivox_ai_chat_client_tests PRIVATE
-    pivox_ai_chat_client
-    GTest::gtest
-    GTest::gtest_main
-)
-
-add_test(NAME AiChatClientTests COMMAND pivox_ai_chat_client_tests)
+# Tests for this client are deferred: the previous C-API tests were
+# retired when chat_client_c.{h,cc} was removed. New tests need to be
+# written against the typed C++ API. Auth / interceptor is covered in
+# native/core/auth tests.
