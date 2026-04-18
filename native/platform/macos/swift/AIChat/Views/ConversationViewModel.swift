@@ -1,4 +1,5 @@
 import Foundation
+import PivoxModels
 import SwiftUI
 
 @MainActor
@@ -152,7 +153,7 @@ public final class ConversationViewModel: ObservableObject {
 
         streamTask = Task {
             do {
-                let eventStream = try client.stream(event)
+                let eventStream = client.stream(event)
 
                 for try await serverEvent in eventStream {
                     handle(serverEvent)

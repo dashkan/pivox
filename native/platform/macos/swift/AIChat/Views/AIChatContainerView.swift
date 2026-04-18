@@ -1,4 +1,5 @@
 import FirebaseAuth
+import PivoxModels
 import SwiftUI
 
 /// Right-side chat panel. Opens straight to a new conversation.

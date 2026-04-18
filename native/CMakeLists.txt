@@ -122,40 +122,18 @@ if(APPLE)
 
     set(FIREBASE_PLIST "${CMAKE_SOURCE_DIR}/configs/firebase/GoogleService-Info.plist")
 
-    # PivoxModels — generated Swift proto types.
-    set(PIVOX_MODELS_DIR "platform/macos/swift-packages/PivoxModels/Sources/PivoxModels/Generated")
-    file(GLOB PIVOX_MODELS_SOURCES "${PIVOX_MODELS_DIR}/*.swift")
-
-    # Swift executable (SwiftUI app).
+    # Swift executable (SwiftUI app). All .swift under platform/macos/swift
+    # is picked up recursively — including files generated into per-feature
+    # `Generated/` subdirs by the protoc-gen-pivox-swift-facade plugin.
+    # CONFIGURE_DEPENDS re-triggers CMake when files appear/disappear.
     set(SWIFT_DIR "platform/macos/swift")
+    file(GLOB_RECURSE APP_SWIFT_SOURCES
+        CONFIGURE_DEPENDS
+        "${CMAKE_SOURCE_DIR}/${SWIFT_DIR}/*.swift"
+    )
+
     add_executable(${APP_TARGET} MACOSX_BUNDLE
-        ${PIVOX_MODELS_SOURCES}
-        ${SWIFT_DIR}/App/main.swift
-        ${SWIFT_DIR}/App/AppDelegate.swift
-        ${SWIFT_DIR}/App/ContentView.swift
-        ${SWIFT_DIR}/Auth/AuthService.swift
-        ${SWIFT_DIR}/Auth/LoginView.swift
-        ${SWIFT_DIR}/Auth/RegisterView.swift
-        ${SWIFT_DIR}/Auth/ProfileView.swift
-        ${SWIFT_DIR}/Auth/DelegatedAuthClient.swift
-        ${SWIFT_DIR}/Auth/DelegatedAuthCoordinator.swift
-        ${SWIFT_DIR}/Auth/DelegatedAuthWindowView.swift
-        ${SWIFT_DIR}/ImageEditor/EditView.swift
-        ${SWIFT_DIR}/ImageEditor/RulerSlider.swift
-        ${SWIFT_DIR}/ImageEditor/ImageEditCanvas.swift
-        ${SWIFT_DIR}/Components/GlassCard.swift
-        ${SWIFT_DIR}/Components/GoogleIcon.swift
-        ${SWIFT_DIR}/Components/IconButton.swift
-        ${SWIFT_DIR}/AIChat/Client/ChatError.swift
-        ${SWIFT_DIR}/AIChat/Client/ChatClient.swift
-        ${SWIFT_DIR}/AIChat/Client/ChatClientProtocol.swift
-        ${SWIFT_DIR}/AIChat/Client/ChatClient+Resources.swift
-        ${SWIFT_DIR}/AIChat/Views/ConversationListViewModel.swift
-        ${SWIFT_DIR}/AIChat/Views/ConversationListView.swift
-        ${SWIFT_DIR}/AIChat/Views/ConversationHistoryPopover.swift
-        ${SWIFT_DIR}/AIChat/Views/ConversationViewModel.swift
-        ${SWIFT_DIR}/AIChat/Views/ConversationView.swift
-        ${SWIFT_DIR}/AIChat/Views/AIChatContainerView.swift
+        ${APP_SWIFT_SOURCES}
         ${ASSET_CATALOG}
         ${FIREBASE_PLIST}
     )
@@ -163,6 +141,12 @@ if(APPLE)
     # Asset catalog and Firebase plist go into Resources/.
     set_source_files_properties(${ASSET_CATALOG} ${FIREBASE_PLIST} PROPERTIES
         MACOSX_PACKAGE_LOCATION Resources
+    )
+
+    # App imports PivoxModels which is built with C++ interop. Consumers of
+    # an interop-enabled module must enable the same mode.
+    target_compile_options(${APP_TARGET} PRIVATE
+        "$<$<COMPILE_LANGUAGE:Swift>:-cxx-interoperability-mode=default>"
     )
 
     # SwiftProtobuf — compiled from vendored SPM checkout.
@@ -188,7 +172,36 @@ if(APPLE)
         XCODE_ATTRIBUTE_ENABLE_TESTABILITY "NO"
     )
 
-    target_link_libraries(${APP_TARGET} PRIVATE pivox_bridge pivox_ai_chat_client SwiftProtobuf
+    # PivoxModels — Swift proto types as a proper module, with C++ interop
+    # enabled so the emitted PivoxModels-Swift.h is consumable from C++.
+    # The shared C++ chat client uses it to accept typed Swift proto values
+    # at the Swift↔C++ bridge.
+    set(PIVOX_MODELS_SRC "${PIVOX_MODELS_PKG}/Sources/PivoxModels")
+    # Recursive — swift-protobuf emits flat, but our bridge plugin's output
+    # lands under Generated/<package>/<file>.bridge.swift. Both picked up.
+    file(GLOB_RECURSE PIVOX_MODELS_GEN_SOURCES
+        CONFIGURE_DEPENDS
+        "${PIVOX_MODELS_SRC}/Generated/*.swift"
+    )
+
+    add_library(PivoxModels STATIC
+        ${PIVOX_MODELS_GEN_SOURCES}
+    )
+    target_link_libraries(PivoxModels PUBLIC SwiftProtobuf)
+    target_compile_options(PivoxModels PRIVATE
+        "$<$<COMPILE_LANGUAGE:Swift>:-cxx-interoperability-mode=default>"
+    )
+    set_target_properties(PivoxModels PROPERTIES
+        CMAKE_Swift_LANGUAGE_VERSION 6
+        XCODE_ATTRIBUTE_SWIFT_INSTALL_OBJC_HEADER "YES"
+        XCODE_ATTRIBUTE_SWIFT_OBJC_INTERFACE_HEADER_NAME "PivoxModels-Swift.h"
+    )
+
+    # The shared C++ chat client's Apple bridge consumes PivoxModels-Swift.h,
+    # so chat client compilation must wait for PivoxModels to have emitted it.
+    add_dependencies(pivox_ai_chat_client PivoxModels)
+
+    target_link_libraries(${APP_TARGET} PRIVATE pivox_bridge pivox_ai_chat_client SwiftProtobuf PivoxModels
         # Firebase Core (from Analytics bundle)
         "${FB_ANALYTICS}/FirebaseCore.xcframework"
         "${FB_ANALYTICS}/FirebaseCoreInternal.xcframework"

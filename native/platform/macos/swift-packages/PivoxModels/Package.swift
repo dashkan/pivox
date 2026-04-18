@@ -16,7 +16,13 @@ let package = Package(
             dependencies: [
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
             ],
-            path: "Sources/PivoxModels"
+            path: "Sources/PivoxModels",
+            swiftSettings: [
+                // Emit a C++ header exposing Swift types for Swift↔C++ interop.
+                // Consumed by the shared C++ chat client so it can accept
+                // Pivox_Ai_V1_* Swift proto values directly at the FFI boundary.
+                .interoperabilityMode(.Cxx),
+            ]
         ),
     ]
 )

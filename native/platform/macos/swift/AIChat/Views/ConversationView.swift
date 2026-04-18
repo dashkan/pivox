@@ -1,3 +1,4 @@
+import PivoxModels
 import SwiftUI
 
 public struct ConversationView: View {

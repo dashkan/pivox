@@ -140,11 +140,16 @@ public struct Pivox_Ai_V1_ListConversationsRequest: Sendable {
   /// Optional. An expression for filtering the results.
   /// Filterable fields:
   ///
+  /// + `title` - substring match with wildcards (e.g. `title = "budget*"`)
   /// + `archived` - filter by archived status
+  /// + `pinned` - filter by pinned status
+  /// + `createTime`, `lastMessageTime` - timestamp comparisons
   ///
   /// Examples:
   ///
-  /// + `archived = false` - only active conversations.
+  /// + `archived = false` - only active conversations
+  /// + `pinned = true` - pinned conversations
+  /// + `title = "Q4*"` - conversations whose title starts with "Q4"
   ///
   /// For more information, see [AIP-160](https://aip.dev/160).
   public var filter: String = String()
@@ -153,10 +158,12 @@ public struct Pivox_Ai_V1_ListConversationsRequest: Sendable {
   /// order is ascending. Use "desc" after a field name for descending.
   /// Supported fields:
   ///
+  /// + `title`
   /// + `createTime`
   /// + `lastMessageTime`
   ///
-  /// If not specified, results are ordered by `lastMessageTime` descending.
+  /// If not specified, results are ordered by creation time descending
+  /// (newest first).
   public var orderBy: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()

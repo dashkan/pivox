@@ -1,5 +1,7 @@
 .PHONY: build run test tidy lint lint-fix fmt \
-       lint-proto proto-format proto-breaking proto-generate api-lint \
+       lint-proto proto-format proto-breaking proto-generate proto-generate-native \
+       proto-generate-native-swift proto-generate-native-cpp proto-generate-native-facade \
+       build-proto-plugins test-proto-plugins update-proto-plugin-goldens proto-test-fixtures api-lint \
        db-up db-down db-migrate db-force db-seed db-clear db-drop db-create \
        docker-up docker-down firebase-emu firebase-deploy \
        proxy-nginx proxy-nginx-stop proxy-ngrok \
@@ -52,8 +54,57 @@ proto-format:
 proto-breaking:
 	$(TOOL) buf breaking --against '.git\#branch=main'
 
-proto-generate:
+proto-generate: proto-generate-go proto-generate-native
+
+# Go codegen (BE + internal gRPC types).
+proto-generate-go:
 	$(TOOL) buf generate
+
+# Native codegen (Swift + C++ types for macOS app and shared C++ chat client).
+# Split into separate templates so each side can have its own input scope:
+# - Swift needs the full app surface (ai, api, iam, assets, storage, ...)
+# - C++ only needs the shared-logic surface (ai/v1 + its transitive imports)
+#   to avoid dragging in deps (google/longrunning, etc.) that the native
+#   chat client doesn't need.
+proto-generate-native: proto-generate-native-swift proto-generate-native-cpp proto-generate-native-facade
+
+proto-generate-native-swift: build-proto-plugins
+	$(TOOL) buf generate --template buf.gen.native.swift.yaml
+
+proto-generate-native-cpp: build-proto-plugins
+	$(TOOL) buf generate --template buf.gen.native.cpp.yaml
+
+# Swift facade — narrow-scoped to services that have a matching C++
+# bridge (kept in sync with buf.gen.native.cpp.yaml's path list).
+proto-generate-native-facade: build-proto-plugins
+	$(TOOL) buf generate --template buf.gen.native.facade.yaml
+
+# Build our three local buf plugins. Each emits a distinct slice of the
+# Swift↔C++ interop bridge and can be retired independently as the
+# underlying interop constraints relax upstream. Sources under
+# tools/cmd/; shared helpers in tools/internal/pivoxgen.
+build-proto-plugins:
+	@mkdir -p bin
+	cd tools && go build -o $(PWD)/bin/protoc-gen-pivox-swift-protobridge ./cmd/protoc-gen-pivox-swift-protobridge
+	cd tools && go build -o $(PWD)/bin/protoc-gen-pivox-cpp-bridge ./cmd/protoc-gen-pivox-cpp-bridge
+	cd tools && go build -o $(PWD)/bin/protoc-gen-pivox-swift-facade ./cmd/protoc-gen-pivox-swift-facade
+
+# Run the plugin test suites. Each plugin has a golden-file test driven
+# by tools/testdata/ai_chat.descriptors.binpb.
+test-proto-plugins:
+	cd tools && go test ./cmd/...
+
+# Regenerate golden files in-place (do this after an intentional
+# template change). Inspect the diff before committing.
+update-proto-plugin-goldens:
+	cd tools && go test ./cmd/... -update
+
+# Rebuild the descriptor fixture tests load (rare — only when we change
+# the test fixture .proto or buf's managed settings).
+proto-test-fixtures:
+	$(TOOL) buf build --as-file-descriptor-set \
+		-o tools/testdata/ai_chat.descriptors.binpb \
+		--path api/proto/pivox/ai/v1/ai_chat.proto
 
 api-lint:
 	$(TOOL) api-linter --proto-path=api/proto --config=api/proto/api-linter.yaml --set-exit-status api/proto/pivox/**/**/*.proto

@@ -4,6 +4,9 @@ go 1.25.6
 
 tool (
 	github.com/bufbuild/buf/cmd/buf
+	github.com/dashkan/pivox/tools/cmd/protoc-gen-pivox-cpp-bridge
+	github.com/dashkan/pivox/tools/cmd/protoc-gen-pivox-swift-facade
+	github.com/dashkan/pivox/tools/cmd/protoc-gen-pivox-swift-protobridge
 	github.com/golang-migrate/migrate/v4/cmd/migrate
 	github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 	github.com/googleapis/api-linter/v2/cmd/api-linter
@@ -12,6 +15,8 @@ tool (
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc
 	google.golang.org/protobuf/cmd/protoc-gen-go
 )
+
+require google.golang.org/protobuf v1.36.11
 
 require (
 	4d63.com/gocheckcompilerdirectives v1.3.0 // indirect
@@ -426,7 +431,6 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260217215200-42d3e9bedb6d // indirect
 	google.golang.org/grpc v1.79.1 // indirect
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.6.1 // indirect
-	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

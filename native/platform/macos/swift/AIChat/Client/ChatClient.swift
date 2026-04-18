@@ -1,125 +1,86 @@
 import Foundation
+import PivoxModels
 import SwiftProtobuf
 
-/// Swift facade wrapping the shared C++ AiChatClient via the C FFI.
+/// Swift error surfaced for any non-OK gRPC result.
+public struct GRPCError: Error, CustomStringConvertible {
+    public let code: Int32   // grpc::StatusCode raw value
+    public let message: String
+
+    public var description: String { "GRPCError(\(code)): \(message)" }
+}
+
+/// Swift facade over the shared C++ `pivox::ai_chat::ChatClient`.
+///
+/// `ChatClient` is a Swift-C++ interop shared-reference type, so this
+/// facade holds it directly as a typed C++ value. All calls into C++
+/// use typed Swift proto pointers (Swift passes them as `OpaquePointer`;
+/// C++ sees the real typed pointer). Response values flow back as
+/// typed Swift proto values in Result structs or via callbacks.
 public final class ChatClient: @unchecked Sendable {
-    private let handle: OpaquePointer
+    /// The underlying C++ shared-reference instance. `SWIFT_SHARED_REFERENCE`
+    /// makes Swift manage retain/release automatically via the global
+    /// `ChatClientRetain`/`ChatClientRelease` hooks.
+    ///
+    /// Visibility is `internal` (module-scoped) so the generated facade
+    /// extensions in the same module can reach the C++ methods.
+    internal let cpp: pivox.ai_chat.ChatClient
 
     public init(endpoint: String, authToken: String) throws {
-        guard let h = pivox_ai_chat_client_create(endpoint, authToken) else {
+        guard let instance = pivox.ai_chat.ChatClient.Create(endpoint, authToken) else {
             throw ChatError.initFailed
         }
-        self.handle = h
-    }
-
-    deinit {
-        pivox_ai_chat_client_destroy(handle)
+        self.cpp = instance
     }
 
     public func setAuthToken(_ token: String) {
-        pivox_ai_chat_client_set_auth_token(handle, token)
+        cpp.SetAuthToken(token)
     }
 
-    /// Opens a server-streaming call with the given client event.
-    /// Returns an async sequence of server events.
-    public func stream(_ event: Pivox_Ai_V1_ClientEvent) throws -> AsyncThrowingStream<Pivox_Ai_V1_ServerEvent, Error> {
-        let requestData = try event.serializedData()
+    // MARK: - Generic unary (compat shim for non-migrated resource RPCs).
+    // TODO: replace all call sites in ChatClient+Resources.swift with
+    // typed C++ methods (like listMessages) once codegen lands.
 
-        return AsyncThrowingStream { continuation in
-            let ctx = Unmanaged.passRetained(
-                StreamContext(continuation: continuation)
-            )
-
-            requestData.withUnsafeBytes { buf in
-                pivox_ai_chat_client_start_stream(
-                    handle,
-                    buf.bindMemory(to: UInt8.self).baseAddress,
-                    buf.count,
-                    ctx.toOpaque(),
-                    // on_event
-                    { rawCtx, bytes, size in
-                        guard let rawCtx else { return }
-                        let streamCtx = Unmanaged<StreamContext>
-                            .fromOpaque(rawCtx).takeUnretainedValue()
-                        if let bytes, size > 0 {
-                            let data = Data(bytes: bytes, count: size)
-                            if let event = try? Pivox_Ai_V1_ServerEvent(serializedBytes: data) {
-                                streamCtx.continuation.yield(event)
-                            }
-                        }
-                    },
-                    // on_error
-                    { rawCtx, msg in
-                        guard let rawCtx else { return }
-                        let streamCtx = Unmanaged<StreamContext>
-                            .fromOpaque(rawCtx).takeRetainedValue()
-                        let message = msg.map { String(cString: $0) } ?? "unknown error"
-                        streamCtx.continuation.finish(
-                            throwing: ChatError.streamFailed(message))
-                    },
-                    // on_complete
-                    { rawCtx in
-                        guard let rawCtx else { return }
-                        let streamCtx = Unmanaged<StreamContext>
-                            .fromOpaque(rawCtx).takeRetainedValue()
-                        streamCtx.continuation.finish()
-                    }
-                )
-            }
-
-            let handleBits = Int(bitPattern: handle)
-            continuation.onTermination = { _ in
-                let h = OpaquePointer(bitPattern: handleBits)
-                pivox_ai_chat_client_cancel(h)
-            }
-        }
-    }
-
-    /// Executes a unary RPC and returns the raw response bytes.
-    func unaryCall(method: String, request: any SwiftProtobuf.Message) async throws -> Data {
+    func unaryCall(
+        method: String,
+        request: any SwiftProtobuf.Message
+    ) async throws -> Data {
         let requestData = try request.serializedData()
         return try await withCheckedThrowingContinuation { cont in
-            let contBox = Unmanaged.passRetained(
-                ContinuationBox(continuation: cont)
-            )
+            let box = Unmanaged.passRetained(ContinuationBox(continuation: cont))
 
             requestData.withUnsafeBytes { buf in
-                pivox_ai_chat_unary_call(
-                    handle,
+                cpp.UnaryCallBytes(
                     method,
                     buf.bindMemory(to: UInt8.self).baseAddress,
                     buf.count,
-                    contBox.toOpaque(),
+                    box.toOpaque(),
                     { rawCtx, bytes, size in
                         guard let rawCtx else { return }
-                        let box = Unmanaged<ContinuationBox>
+                        let b = Unmanaged<ContinuationBox>
                             .fromOpaque(rawCtx).takeRetainedValue()
                         if let bytes, size > 0 {
-                            box.continuation.resume(
+                            b.continuation.resume(
                                 returning: Data(bytes: bytes, count: size))
                         } else {
-                            box.continuation.resume(returning: Data())
+                            b.continuation.resume(returning: Data())
                         }
                     },
-                    { rawCtx, msg in
+                    { rawCtx, code, msg in
                         guard let rawCtx else { return }
-                        let box = Unmanaged<ContinuationBox>
+                        let b = Unmanaged<ContinuationBox>
                             .fromOpaque(rawCtx).takeRetainedValue()
-                        let message = msg.map { String(cString: $0) } ?? "RPC failed"
-                        box.continuation.resume(
-                            throwing: ChatError.serverError(message))
+                        let text = msg.map { String(cString: $0) } ?? "RPC failed"
+                        b.continuation.resume(
+                            throwing: GRPCError(code: code, message: text))
                     }
                 )
             }
         }
     }
-}
 
-private final class StreamContext {
-    let continuation: AsyncThrowingStream<Pivox_Ai_V1_ServerEvent, Error>.Continuation
-    init(continuation: AsyncThrowingStream<Pivox_Ai_V1_ServerEvent, Error>.Continuation) {
-        self.continuation = continuation
-    }
+    // Typed per-RPC methods (stream, listMessages, etc.) are generated
+    // in AiChat+Facade.swift by protoc-gen-pivox-swift-facade.
 }
 
 private final class ContinuationBox {

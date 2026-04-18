@@ -205,6 +205,12 @@ public struct Pivox_Ai_V1_ListArtifactsRequest: Sendable {
   /// Optional. Page token from a previous ListArtifacts call.
   public var pageToken: String = String()
 
+  /// Optional. AIP-160 filter. Filterable fields: `title`, `type`, `createTime`.
+  public var filter: String = String()
+
+  /// Optional. AIP-132 order_by. Sortable fields: `title`, `createTime`.
+  public var orderBy: String = String()
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -276,6 +282,12 @@ public struct Pivox_Ai_V1_ListArtifactVersionsRequest: Sendable {
 
   /// Optional. Page token from a previous ListArtifactVersions call.
   public var pageToken: String = String()
+
+  /// Optional. AIP-160 filter. Filterable fields: `createTime`.
+  public var filter: String = String()
+
+  /// Optional. AIP-132 order_by. Sortable fields: `createTime`.
+  public var orderBy: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -528,7 +540,7 @@ extension Pivox_Ai_V1_GetArtifactRequest: SwiftProtobuf.Message, SwiftProtobuf._
 
 extension Pivox_Ai_V1_ListArtifactsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ListArtifactsRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}parent\0\u{3}page_size\0\u{3}page_token\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}parent\0\u{3}page_size\0\u{3}page_token\0\u{1}filter\0\u{3}order_by\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -539,6 +551,8 @@ extension Pivox_Ai_V1_ListArtifactsRequest: SwiftProtobuf.Message, SwiftProtobuf
       case 1: try { try decoder.decodeSingularStringField(value: &self.parent) }()
       case 2: try { try decoder.decodeSingularInt32Field(value: &self.pageSize) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.pageToken) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.filter) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.orderBy) }()
       default: break
       }
     }
@@ -554,6 +568,12 @@ extension Pivox_Ai_V1_ListArtifactsRequest: SwiftProtobuf.Message, SwiftProtobuf
     if !self.pageToken.isEmpty {
       try visitor.visitSingularStringField(value: self.pageToken, fieldNumber: 3)
     }
+    if !self.filter.isEmpty {
+      try visitor.visitSingularStringField(value: self.filter, fieldNumber: 4)
+    }
+    if !self.orderBy.isEmpty {
+      try visitor.visitSingularStringField(value: self.orderBy, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -561,6 +581,8 @@ extension Pivox_Ai_V1_ListArtifactsRequest: SwiftProtobuf.Message, SwiftProtobuf
     if lhs.parent != rhs.parent {return false}
     if lhs.pageSize != rhs.pageSize {return false}
     if lhs.pageToken != rhs.pageToken {return false}
+    if lhs.filter != rhs.filter {return false}
+    if lhs.orderBy != rhs.orderBy {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -668,7 +690,7 @@ extension Pivox_Ai_V1_GetArtifactVersionRequest: SwiftProtobuf.Message, SwiftPro
 
 extension Pivox_Ai_V1_ListArtifactVersionsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ListArtifactVersionsRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}parent\0\u{3}page_size\0\u{3}page_token\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}parent\0\u{3}page_size\0\u{3}page_token\0\u{1}filter\0\u{3}order_by\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -679,6 +701,8 @@ extension Pivox_Ai_V1_ListArtifactVersionsRequest: SwiftProtobuf.Message, SwiftP
       case 1: try { try decoder.decodeSingularStringField(value: &self.parent) }()
       case 2: try { try decoder.decodeSingularInt32Field(value: &self.pageSize) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.pageToken) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.filter) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.orderBy) }()
       default: break
       }
     }
@@ -694,6 +718,12 @@ extension Pivox_Ai_V1_ListArtifactVersionsRequest: SwiftProtobuf.Message, SwiftP
     if !self.pageToken.isEmpty {
       try visitor.visitSingularStringField(value: self.pageToken, fieldNumber: 3)
     }
+    if !self.filter.isEmpty {
+      try visitor.visitSingularStringField(value: self.filter, fieldNumber: 4)
+    }
+    if !self.orderBy.isEmpty {
+      try visitor.visitSingularStringField(value: self.orderBy, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -701,6 +731,8 @@ extension Pivox_Ai_V1_ListArtifactVersionsRequest: SwiftProtobuf.Message, SwiftP
     if lhs.parent != rhs.parent {return false}
     if lhs.pageSize != rhs.pageSize {return false}
     if lhs.pageToken != rhs.pageToken {return false}
+    if lhs.filter != rhs.filter {return false}
+    if lhs.orderBy != rhs.orderBy {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
