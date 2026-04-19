@@ -1,6 +1,7 @@
-use std::ffi::{CStr, c_char, c_int, c_uint};
+use std::ffi::{CStr, CString, c_char, c_int, c_uint};
 use std::ptr;
 use std::slice;
+use std::sync::OnceLock;
 
 use tree_sitter_highlight::{Highlight, HighlightConfiguration, HighlightEvent, Highlighter};
 
@@ -124,8 +125,26 @@ pub extern "C" fn pivox_highlighter_create() -> *mut PivoxHighlighter {
     register_lang!(configs, "c", tree_sitter_c,
         highlights = tree_sitter_c::HIGHLIGHT_QUERY);
 
-    register_lang!(configs, "cpp", tree_sitter_cpp,
-        highlights = tree_sitter_cpp::HIGHLIGHT_QUERY);
+    // Try our own richer highlights for cpp; fall back to the crate's
+    // stock query if the custom one fails to compile (e.g., references
+    // a node type the shipped grammar doesn't export).
+    match HighlightConfiguration::new(
+        tree_sitter_cpp::LANGUAGE.into(),
+        "highlight",
+        include_str!("../queries/cpp_highlights.scm"),
+        "",
+        "",
+    ) {
+        Ok(mut config) => {
+            config.configure(HIGHLIGHT_NAMES);
+            configs.push(("cpp", config));
+        }
+        Err(e) => {
+            eprintln!("[pivox-highlight] cpp: custom query failed ({e}); using stock");
+            register_lang!(configs, "cpp", tree_sitter_cpp,
+                highlights = tree_sitter_cpp::HIGHLIGHT_QUERY);
+        }
+    }
 
     register_lang!(configs, "json", tree_sitter_json,
         highlights = tree_sitter_json::HIGHLIGHTS_QUERY);
@@ -251,12 +270,28 @@ pub extern "C" fn pivox_highlight_result_free(result: PivoxHighlightResult) {
     }
 }
 
+/// HIGHLIGHT_NAMES entries are Rust `&str` literals — NOT null-terminated
+/// in memory. Returning `.as_ptr()` as `*const c_char` would make the C
+/// consumer read past the end into adjacent bytes until it happens to
+/// hit a null. Build real null-terminated CStrings once, cached
+/// process-global, and hand back their pointers instead.
+fn highlight_cstrings() -> &'static [CString] {
+    static CSTRS: OnceLock<Vec<CString>> = OnceLock::new();
+    CSTRS.get_or_init(|| {
+        HIGHLIGHT_NAMES
+            .iter()
+            .map(|s| CString::new(*s).expect("HIGHLIGHT_NAMES contains no NUL bytes"))
+            .collect()
+    })
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn pivox_highlight_name(id: c_int) -> *const c_char {
-    if id < 0 || id as usize >= HIGHLIGHT_NAMES.len() {
+    let names = highlight_cstrings();
+    if id < 0 || id as usize >= names.len() {
         return ptr::null();
     }
-    HIGHLIGHT_NAMES[id as usize].as_ptr() as *const c_char
+    names[id as usize].as_ptr()
 }
 
 #[unsafe(no_mangle)]

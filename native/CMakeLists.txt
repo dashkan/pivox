@@ -201,7 +201,7 @@ if(APPLE)
     # so chat client compilation must wait for PivoxModels to have emitted it.
     add_dependencies(pivox_ai_chat_client PivoxModels)
 
-    target_link_libraries(${APP_TARGET} PRIVATE pivox_bridge pivox_ai_chat_client SwiftProtobuf PivoxModels
+    target_link_libraries(${APP_TARGET} PRIVATE pivox_bridge pivox_ai_chat_client pivox_markdown pivox_highlight_wrapper SwiftProtobuf PivoxModels
         # Firebase Core (from Analytics bundle)
         "${FB_ANALYTICS}/FirebaseCore.xcframework"
         "${FB_ANALYTICS}/FirebaseCoreInternal.xcframework"
@@ -226,6 +226,7 @@ if(APPLE)
     target_include_directories(${APP_TARGET} PRIVATE
         "${CMAKE_SOURCE_DIR}/platform/macos/objcpp"
         "${CMAKE_SOURCE_DIR}/core/ai_chat/client"
+        "${CMAKE_SOURCE_DIR}/core/ai_elements/highlight/include"
     )
 
     set_target_properties(${APP_TARGET} PROPERTIES
@@ -244,7 +245,35 @@ if(APPLE)
         XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "FAENDBN66M"
         XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Automatic"
         XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "app.pivox.native"
+        # Runtime search path for embedded dylibs. The Rust highlight
+        # crate ships as a cdylib (see core/ai_elements/highlight/);
+        # its LC_ID_DYLIB is @rpath-tagged at compile time, and dyld
+        # resolves @rpath via this search path at launch. Required to
+        # dodge the 3-personality compact-unwind ceiling by moving
+        # Rust's _rust_eh_personality out of the main executable image.
+        XCODE_ATTRIBUTE_LD_RUNPATH_SEARCH_PATHS "@executable_path/../Frameworks"
     )
+
+    # Embed the Rust highlight dylib into Contents/Frameworks and
+    # re-sign. Corrosion's aggregated output lives at a stable path
+    # relative to CMAKE_BINARY_DIR; IMPORTED_LOCATION is empty for the
+    # multi-config Xcode generator at build-time expansion, so we
+    # reference the known path directly.
+    set(PIVOX_HIGHLIGHT_DYLIB_SRC
+        "${CMAKE_BINARY_DIR}/core/ai_elements/highlight/libpivox_highlight.dylib")
+    set(PIVOX_APP_FRAMEWORKS_DIR "$<TARGET_BUNDLE_CONTENT_DIR:${APP_TARGET}>/Frameworks")
+    add_custom_command(TARGET ${APP_TARGET} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${PIVOX_APP_FRAMEWORKS_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${PIVOX_HIGHLIGHT_DYLIB_SRC}"
+            "${PIVOX_APP_FRAMEWORKS_DIR}/"
+        COMMAND codesign --force --sign -
+            "${PIVOX_APP_FRAMEWORKS_DIR}/libpivox_highlight.dylib"
+        COMMENT "Embedding + signing Rust highlight dylib"
+        VERBATIM
+    )
+    add_dependencies(${APP_TARGET} cargo-build_pivox_highlight)
+
 
     # For Ninja builds: compile asset catalog manually via actool.
     if(NOT CMAKE_GENERATOR MATCHES "Xcode")

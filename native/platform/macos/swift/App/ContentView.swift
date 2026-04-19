@@ -35,17 +35,35 @@ struct ContentView: View {
   @State private var selectedItem: SidebarItem?
   @State private var sidebarVisibility: NavigationSplitViewVisibility = .automatic
   @State private var isImageEditing = false
-  @State private var showAIChat = false
+  @State private var showAIChat: Bool
+  @State private var chatPanelWidth: CGFloat
   private var auth = AuthService.shared
   private let appState = AppStateBridge.shared()
 
+  /// Clamp range for the persisted chat-panel width so malformed /
+  /// stale values don't produce unusable UIs. Matches the frame bounds
+  /// we pass to the panel.
+  private static let chatMinWidth: CGFloat = 320
+  private static let chatMaxWidth: CGFloat = 500
+  private static let chatDefaultWidth: CGFloat = 400
+
   init() {
-    let saved = AppStateBridge.shared().loadString(forKey: "selected_section")
+    let state = AppStateBridge.shared()
+
+    let saved = state.loadString(forKey: "selected_section")
     if let saved, let section = AppSection(rawValue: saved) {
       _selectedItem = State(initialValue: .section(section))
     } else {
       _selectedItem = State(initialValue: .section(.playoutOperator))
     }
+
+    // Chat panel: toggle state + width restored across launches.
+    _showAIChat = State(initialValue: state.hasBool(forKey: "ai_chat_open")
+        ? state.loadBool(forKey: "ai_chat_open") : false)
+
+    let savedWidth = state.loadString(forKey: "ai_chat_panel_width")
+      .flatMap { Double($0) }.map { CGFloat($0) } ?? Self.chatDefaultWidth
+    _chatPanelWidth = State(initialValue: min(max(savedWidth, Self.chatMinWidth), Self.chatMaxWidth))
   }
 
   var body: some View {
@@ -60,6 +78,9 @@ struct ContentView: View {
       if case .section(let section) = newValue {
         appState.save(section.rawValue, forKey: "selected_section")
       }
+    }
+    .onChange(of: showAIChat) { _, isOpen in
+      appState.save(isOpen, forKey: "ai_chat_open")
     }
     .onReceive(
       NotificationCenter.default.publisher(for: DelegatedAuthCoordinator.openProfileNotification)
@@ -132,10 +153,30 @@ struct ContentView: View {
       mainDetail
         .frame(minWidth: 400)
 
-      // AI Chat panel — slides in from right
+      // AI Chat panel — slides in from right. Width persists across
+      // launches: initial size from AppState, subsequent user drags
+      // captured via a GeometryReader overlay that records the actual
+      // rendered width into AppState (debounced by change-on-value).
       if showAIChat {
         AIChatContainerView()
-          .frame(minWidth: 320, idealWidth: 400, maxWidth: 500)
+          .frame(minWidth: Self.chatMinWidth,
+                 idealWidth: chatPanelWidth,
+                 maxWidth: Self.chatMaxWidth)
+          .background(
+            GeometryReader { proxy in
+              Color.clear.onChange(of: proxy.size.width) { _, newWidth in
+                guard newWidth >= Self.chatMinWidth,
+                      newWidth <= Self.chatMaxWidth else { return }
+                // Only persist substantive changes — avoids flooding
+                // storage on every layout pass during a drag.
+                if abs(newWidth - chatPanelWidth) >= 4 {
+                  chatPanelWidth = newWidth
+                  appState.save(String(Double(newWidth)),
+                                forKey: "ai_chat_panel_width")
+                }
+              }
+            }
+          )
           .transition(.move(edge: .trailing))
       }
     }

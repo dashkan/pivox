@@ -4,7 +4,22 @@ version = "0.1.0"
 edition = "2024"
 
 [lib]
-crate-type = ["staticlib"]
+crate-type = ["cdylib"]
+
+# cdylib + embedded-as-Framework is the canonical fix for Apple's
+# 3-personality compact-unwind ceiling when mixing Swift / C++ / Obj-C /
+# Rust in one Mach-O image. Putting Rust in its own dylib gives the
+# main executable __gxx + __objc + Swift slots, while Rust's
+# _rust_eh_personality lives alongside its own C++ personality in the
+# separate image. See docs/ai/ignored_risks.md and rust-lang#102754.
+#
+# panic=abort kept on top: we don't rely on catch_unwind across the
+# FFI, so any Rust panic is a bug we want to surface as a crash.
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
 
 [dependencies]
 tree-sitter = "0.25"

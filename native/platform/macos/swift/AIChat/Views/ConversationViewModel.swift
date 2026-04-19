@@ -73,9 +73,7 @@ public final class ConversationViewModel: ObservableObject {
                 $0.parent = conversationName
                 $0.pageSize = Self.pageSize
             }
-            print("[chat] listMessages → \(conversationName) pageSize=\(Self.pageSize)")
             let response = try await client.listMessages(request)
-            print("[chat] listMessages ← \(response.messages.count) messages, nextToken=\(response.nextPageToken.isEmpty ? "<none>" : "<present>")")
             // Server returns newest-first; reverse to oldest→newest for display.
             let ordered = Array(response.messages.reversed())
             // Re-check after suspension — send() may have run while we awaited.
@@ -90,7 +88,6 @@ public final class ConversationViewModel: ObservableObject {
             }
             olderCursor = response.nextPageToken.isEmpty ? nil : response.nextPageToken
         } catch {
-            print("[chat] listMessages error: \(error)")
             guard state == .loading else { return }
             state = .error(error.localizedDescription)
         }
@@ -177,6 +174,12 @@ public final class ConversationViewModel: ObservableObject {
     }
 
     private func handle(_ event: Pivox_Ai_V1_ServerEvent) {
+        // Drop any events that arrive after a user-initiated cancel.
+        // AsyncThrowingStream can buffer deltas between our cancel()
+        // call and the iterator actually throwing CancellationError,
+        // so without this guard a stray text_delta re-populates
+        // inFlightText and commits as a phantom second message.
+        guard state == .streaming else { return }
         switch event.event {
         case .textStart:
             inFlightText = ""

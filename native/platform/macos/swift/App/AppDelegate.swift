@@ -35,6 +35,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
   // MARK: - Launch lifecycle
 
   func applicationWillFinishLaunching(_ notification: Notification) {
+    // Shorter tooltip delay than the macOS default (1000ms). AppKit's
+    // NSToolTipManager reads this default at app startup; register
+    // before any UI is built. 400ms matches the Gemini-era feel —
+    // quick enough to feel responsive, long enough to not pop on
+    // casual cursor sweeps.
+    UserDefaults.standard.register(defaults: ["NSInitialToolTipDelay": 400])
+
     // Register the classic kAEGetURL handler so we can catch cold-launch
     // URLs *before* applicationDidFinishLaunching runs. NSApplicationDelegate's
     // `application(_:open:)` fires after the main window is already on

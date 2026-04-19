@@ -49,10 +49,18 @@ struct AIChatPanel: View {
     // across open/close cycles — no refetch on every open.
     @StateObject private var historyVM: ConversationListViewModel
 
+    private static let lastConversationKey = "ai_chat_last_conversation"
+
     init(client: ChatClient, orgName: String) {
         self.client = client
         self.orgName = orgName
         _historyVM = StateObject(wrappedValue: ConversationListViewModel(client: client, orgName: orgName))
+        // Restore last-opened conversation across launches. If the
+        // server has since deleted it, ConversationView's loadHistory
+        // will surface the error and the user picks another from
+        // history or starts new.
+        let saved = AppStateBridge.shared().loadString(forKey: Self.lastConversationKey)
+        _conversationName = State(initialValue: (saved?.isEmpty == false) ? saved : nil)
     }
 
     var body: some View {
@@ -107,6 +115,13 @@ struct AIChatPanel: View {
             }
         }
         .background(.background)
+        .onChange(of: conversationName) { _, newName in
+            // Empty string clears the persisted value (saved as blank)
+            // so a fresh launch lands on New Chat instead of the last
+            // conversation the user explicitly dismissed.
+            AppStateBridge.shared().save(newName ?? "",
+                                         forKey: Self.lastConversationKey)
+        }
     }
 }
 
@@ -173,7 +188,11 @@ struct NewChatView: View {
                 .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isCreating)
             }
             .padding(12)
-            .onAppear { inputFocused = true }
+            .onAppear {
+                // Same pattern as ConversationView — defer a tick past
+                // the sidebar's default-focus heuristic.
+                DispatchQueue.main.async { inputFocused = true }
+            }
         }
     }
 
