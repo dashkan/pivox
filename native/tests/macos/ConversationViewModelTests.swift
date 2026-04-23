@@ -1,3 +1,4 @@
+import PivoxModels
 import XCTest
 @testable import Pivox
 

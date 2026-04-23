@@ -12,16 +12,20 @@ import SwiftUI
 /// Use `reliableHelp` instead of `.help()` on plain icon buttons. The
 /// cost is one extra NSView per button, which is negligible at chat-row
 /// scale.
-struct NativeTooltip: NSViewRepresentable {
-    let tooltip: String
+public struct NativeTooltip: NSViewRepresentable {
+    public let tooltip: String
 
-    func makeNSView(context: Context) -> PassThroughTooltipView {
+    public init(tooltip: String) {
+        self.tooltip = tooltip
+    }
+
+    public func makeNSView(context: Context) -> PassThroughTooltipView {
         let view = PassThroughTooltipView()
         view.toolTip = tooltip
         return view
     }
 
-    func updateNSView(_ nsView: PassThroughTooltipView, context: Context) {
+    public func updateNSView(_ nsView: PassThroughTooltipView, context: Context) {
         nsView.toolTip = tooltip
     }
 }
@@ -29,14 +33,14 @@ struct NativeTooltip: NSViewRepresentable {
 /// NSView that registers a tooltip via AppKit's NSToolTip manager while
 /// forwarding all mouse events to the SwiftUI content layered behind it.
 /// Returning nil from `hitTest` is what makes clicks pass through.
-final class PassThroughTooltipView: NSView {
-    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+public final class PassThroughTooltipView: NSView {
+    public override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
 extension View {
     /// Native AppKit tooltip for views that `.help()` fails on (plain-
     /// style buttons, transparent hit areas). Mirrors `.help()`'s API.
-    func reliableHelp(_ text: String) -> some View {
+    public func reliableHelp(_ text: String) -> some View {
         overlay(NativeTooltip(tooltip: text))
     }
 }

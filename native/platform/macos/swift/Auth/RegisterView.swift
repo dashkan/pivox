@@ -127,7 +127,13 @@ struct RegisterView: View {
         .controlSize(.large)
         .disabled(isLoading)
 
-        Button(action: {}) {
+        Button(action: {
+          isLoading = true
+          Task {
+            await auth.signInWithGitHub()
+            isLoading = false
+          }
+        }) {
           HStack {
             Image("GitHubLogo")
               .resizable()

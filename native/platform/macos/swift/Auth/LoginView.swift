@@ -136,7 +136,14 @@ struct LoginView: View {
         .controlSize(.large)
         .disabled(isLoading)
 
-        Button(action: {}) {
+        Button(action: {
+          appState.save("", forKey: "remembered_email")
+          isLoading = true
+          Task {
+            await auth.signInWithGitHub()
+            isLoading = false
+          }
+        }) {
           HStack {
             Image("GitHubLogo")
               .resizable()

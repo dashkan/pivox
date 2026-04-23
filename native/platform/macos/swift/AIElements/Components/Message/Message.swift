@@ -65,9 +65,9 @@ struct Message: View {
             Spacer(minLength: 0)
             if !editing {
                 HStack(spacing: 2) {
-                    ActionIcon(systemName: "doc.on.doc",
+                    IconButton(systemName: "doc.on.doc",
                                label: "Copy prompt") { copy() }
-                    ActionIcon(systemName: "pencil",
+                    IconButton(systemName: "pencil",
                                label: "Edit prompt",
                                action: beginEdit)
                 }
@@ -171,18 +171,18 @@ struct Message: View {
     @ViewBuilder
     private var assistantActions: some View {
         MessageActions {
-            ActionIcon(systemName: thumbsUp ? "hand.thumbsup.fill" : "hand.thumbsup",
+            IconButton(systemName: thumbsUp ? "hand.thumbsup.fill" : "hand.thumbsup",
                           label: "Good response",
                           isOn: thumbsUp) { toggleThumbs(up: true) }
-            ActionIcon(systemName: thumbsDown ? "hand.thumbsdown.fill" : "hand.thumbsdown",
+            IconButton(systemName: thumbsDown ? "hand.thumbsdown.fill" : "hand.thumbsdown",
                           label: "Bad response",
                           isOn: thumbsDown) { toggleThumbs(up: false) }
             if onRegenerate != nil {
-                ActionIcon(systemName: "arrow.clockwise",
+                IconButton(systemName: "arrow.clockwise",
                               label: "Redo",
                               action: { onRegenerate?() })
             }
-            ActionIcon(systemName: "doc.on.doc",
+            IconButton(systemName: "doc.on.doc",
                           label: "Copy response") { copy() }
         }
     }

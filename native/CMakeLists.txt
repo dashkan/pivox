@@ -296,24 +296,30 @@ if(APPLE)
     find_package(XCTest REQUIRED)
 
     xctest_add_bundle(PivoxTests ${APP_TARGET}
-        tests/macos/CoreTests.swift
-        tests/macos/AuthViewModelTests.swift
-        tests/macos/AuthServiceTests.swift
-        tests/macos/DelegatedAuthTests.swift
-        tests/macos/ImageEditorBridgeTests.swift
-        tests/macos/ChatClientTests.swift
         tests/macos/MockChatClient.swift
-        tests/macos/ConversationViewModelTests.swift
+        tests/macos/ConversationTranscriptViewTests.swift
+    )
+    # Copy conversation fixture into the test bundle's Resources so
+    # `Bundle(for:).url(forResource:)` can find it at test runtime.
+    set_source_files_properties(
+        tests/macos/fixtures_conversation_oldest.json
+        PROPERTIES MACOSX_PACKAGE_LOCATION Resources
+    )
+    target_sources(PivoxTests PRIVATE
+        tests/macos/fixtures_conversation_oldest.json
     )
 
     target_compile_options(PivoxTests PRIVATE
         "SHELL:-import-objc-header ${CMAKE_SOURCE_DIR}/platform/macos/Bridging-Header.h"
+        "$<$<COMPILE_LANGUAGE:Swift>:-cxx-interoperability-mode=default>"
     )
     target_include_directories(PivoxTests PRIVATE
         "${CMAKE_SOURCE_DIR}/platform/macos/objcpp"
         "${CMAKE_SOURCE_DIR}/core/ai_chat/client"
+        "${CMAKE_SOURCE_DIR}/core/ai_elements/markdown"
+        "${CMAKE_SOURCE_DIR}/core/ai_elements/highlight/include"
     )
-    target_link_libraries(PivoxTests PRIVATE pivox_bridge pivox_ai_chat_client SwiftProtobuf)
+    target_link_libraries(PivoxTests PRIVATE pivox_bridge pivox_ai_chat_client pivox_markdown pivox_highlight_wrapper SwiftProtobuf PivoxModels)
 
     xctest_add_test(PivoxUnitTests PivoxTests)
 

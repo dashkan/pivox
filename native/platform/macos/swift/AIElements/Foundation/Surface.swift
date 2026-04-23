@@ -12,7 +12,7 @@ public enum SurfaceLevel {
 /// Elevated and floating use Liquid Glass on macOS 26+, material fallback otherwise.
 struct SurfaceModifier: ViewModifier {
     let level: SurfaceLevel
-    @Environment(\.aiElementsTheme) private var theme
+    @Environment(\.pivoxTheme) private var theme
 
     func body(content: Content) -> some View {
         content

@@ -4,7 +4,7 @@ import SwiftUI
 /// row with chevron rotation, no indentation, subtle separator.
 /// Used by Reasoning, Tool, Task, Sandbox, Agent, Sources, StackTrace, FileTree.
 public struct FlatDisclosureStyle: DisclosureGroupStyle {
-    @Environment(\.aiElementsTheme) private var theme
+    @Environment(\.pivoxTheme) private var theme
 
     public func makeBody(configuration: Configuration) -> some View {
         VStack(alignment: .leading, spacing: 0) {

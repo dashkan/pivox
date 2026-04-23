@@ -1,6 +1,9 @@
 import Foundation
+import OSLog
 import PivoxModels
 import SwiftUI
+
+private let paginationLog = OSLog(subsystem: "pivox.transcript", category: "pagination")
 
 @MainActor
 public final class ConversationViewModel: ObservableObject {
@@ -27,7 +30,13 @@ public final class ConversationViewModel: ObservableObject {
 
     public var canLoadOlder: Bool {
         guard let c = olderCursor else { return false }
-        return !c.isEmpty && !isLoadingOlder
+        return !c.isEmpty
+        // Don't gate on `isLoadingOlder`: that flag toggles during
+        // the RPC and, paired with the sentinel's `if canLoadOlder`
+        // guard in the view, was unmounting + remounting the
+        // sentinel — re-firing its `.onAppear` and pulling every
+        // page up-front with no user scrolling. loadOlder() itself
+        // still guards against concurrent entry.
     }
 
     public enum ConversationState: Equatable {
@@ -76,6 +85,7 @@ public final class ConversationViewModel: ObservableObject {
             let response = try await client.listMessages(request)
             // Server returns newest-first; reverse to oldest→newest for display.
             let ordered = Array(response.messages.reversed())
+            Self.prewarmMarkdownCache(for: ordered)
             // Re-check after suspension — send() may have run while we awaited.
             if state == .loading {
                 messages = ordered
@@ -87,6 +97,10 @@ public final class ConversationViewModel: ObservableObject {
                 messages.insert(contentsOf: ordered, at: 0)
             }
             olderCursor = response.nextPageToken.isEmpty ? nil : response.nextPageToken
+            os_log(.debug, log: paginationLog,
+                "loadHistory: +%d msgs, total=%d, nextToken=%{public}@",
+                ordered.count, messages.count,
+                response.nextPageToken.isEmpty ? "nil" : "set")
         } catch {
             guard state == .loading else { return }
             state = .error(error.localizedDescription)
@@ -97,8 +111,15 @@ public final class ConversationViewModel: ObservableObject {
     /// for capturing the anchor message id before calling and restoring scroll
     /// after the await returns.
     public func loadOlder() async {
-        guard let token = olderCursor, !token.isEmpty else { return }
-        guard !isLoadingOlder else { return }
+        guard let token = olderCursor, !token.isEmpty else {
+            os_log(.debug, log: paginationLog, "loadOlder: skipped (no cursor)")
+            return
+        }
+        guard !isLoadingOlder else {
+            os_log(.debug, log: paginationLog, "loadOlder: skipped (already loading)")
+            return
+        }
+        os_log(.debug, log: paginationLog, "loadOlder: starting, token present")
         isLoadingOlder = true
         defer { isLoadingOlder = false }
         do {
@@ -109,11 +130,34 @@ public final class ConversationViewModel: ObservableObject {
             }
             let response = try await client.listMessages(request)
             let ordered = Array(response.messages.reversed())
+            Self.prewarmMarkdownCache(for: ordered)
             messages.insert(contentsOf: ordered, at: 0)
             olderCursor = response.nextPageToken.isEmpty ? nil : response.nextPageToken
+            os_log(.debug, log: paginationLog,
+                "loadOlder: +%d msgs, total=%d, nextToken=%{public}@",
+                ordered.count, messages.count,
+                response.nextPageToken.isEmpty ? "nil (no more pages)" : "set")
         } catch {
-            // Swallow — older-page fetch failure shouldn't poison the session.
-            // The sentinel will re-trigger on next scroll attempt.
+            os_log(.error, log: paginationLog,
+                "loadOlder: failed %{public}@",
+                "\(error)")
+        }
+    }
+
+    /// Pre-parses each message's markdown off the main thread so that
+    /// the SwiftUI body hits `MarkdownParser`'s cache instead of
+    /// running cmark-gfm synchronously during cell render. This is
+    /// what makes `LazyVStack` stutter-free for rich markdown rows.
+    private static func prewarmMarkdownCache(for messages: [Pivox_Ai_V1_Message]) {
+        for msg in messages {
+            // Only assistant messages render markdown; user messages are
+            // plain `Text`. Still, warming user messages is a no-op cost.
+            let text = msg.parts.compactMap { part -> String? in
+                if case .text(let tp) = part.part { return tp.text }
+                return nil
+            }.joined()
+            guard !text.isEmpty else { continue }
+            MarkdownParser.parseAsync(text)
         }
     }
 
@@ -198,11 +242,12 @@ public final class ConversationViewModel: ObservableObject {
 
     private func commitInFlight() {
         guard !inFlightText.isEmpty else { return }
+        let committedText = inFlightText
         let assistantMsg = Pivox_Ai_V1_Message.with {
             $0.name = Self.localName()
             $0.parts = [
                 Pivox_Ai_V1_MessagePart.with {
-                    $0.text = Pivox_Ai_V1_TextPart.with { $0.text = inFlightText }
+                    $0.text = Pivox_Ai_V1_TextPart.with { $0.text = committedText }
                 },
             ]
             $0.role = .assistant
@@ -211,6 +256,10 @@ public final class ConversationViewModel: ObservableObject {
         appendTick &+= 1
         inFlightText = ""
         state = .idle
+        // Warm the cache for the just-committed message so its next
+        // render (including re-renders from `LazyVStack` recycling)
+        // hits cached parse results.
+        MarkdownParser.parseAsync(committedText)
     }
 
     private static func localName() -> String { "local/\(UUID().uuidString)" }

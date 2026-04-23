@@ -31,7 +31,6 @@
         <dict>
             <key>CFBundleURLSchemes</key>
             <array>
-                <string>com.googleusercontent.apps.45920224787-aolngdbet2ka86f435j5ejm982iuur5k</string>
                 <string>pivox</string>
             </array>
             <key>CFBundleURLName</key>

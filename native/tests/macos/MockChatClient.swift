@@ -1,4 +1,5 @@
 import Foundation
+import PivoxModels
 @testable import Pivox
 
 /// Mock ChatClient for unit testing view models without a network connection.
@@ -15,7 +16,7 @@ final class MockChatClient: ChatClientProtocol, @unchecked Sendable {
 
     var sentEvents: [Pivox_Ai_V1_ClientEvent] = []
 
-    func stream(_ event: Pivox_Ai_V1_ClientEvent) throws -> AsyncThrowingStream<Pivox_Ai_V1_ServerEvent, Error> {
+    func stream(_ event: Pivox_Ai_V1_ClientEvent) -> AsyncThrowingStream<Pivox_Ai_V1_ServerEvent, Error> {
         streamCallCount += 1
         sentEvents.append(event)
         let events = streamEvents

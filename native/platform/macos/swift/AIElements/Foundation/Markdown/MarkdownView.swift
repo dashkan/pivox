@@ -170,7 +170,7 @@ private struct CodeBlockView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             Spacer()
-            ActionIcon(systemName: copied ? "checkmark" : "doc.on.doc",
+            IconButton(systemName: copied ? "checkmark" : "doc.on.doc",
                        label: copied ? "Copied" : "Copy code",
                        action: copyCode)
         }

@@ -1,6 +1,15 @@
 import PivoxModels
 import SwiftUI
 
+extension Notification.Name {
+    /// Posted by the ⌘⇧A hotkey to ask the chat panel to grab focus
+    /// on its message input. Toggling the panel via the toolbar button
+    /// does *not* post this — focus stays on the button there, so a
+    /// keyboard user activating the toggle with Space isn't thrown
+    /// across the window.
+    static let aiChatFocusRequested = Notification.Name("pivox.aiChat.focusRequested")
+}
+
 /// Right-side chat panel. Opens straight to a new conversation.
 /// Toggle via the toolbar button or ⌘⇧A.
 struct AIChatContainerView: View {
@@ -45,6 +54,12 @@ struct AIChatPanel: View {
     @State private var conversationName: String?
     @State private var pendingMessage: String?
     @State private var showHistoryPopover = false
+    // Absorbs the default first-responder selection when the panel
+    // first mounts so no visible focus ring lands on the history
+    // IconButton (first focusable child). Kept non-visible via
+    // `.focusEffectDisabled()`. User Tab / arrow nav takes over
+    // once they actually press a key.
+    @FocusState private var panelFocused: Bool
     // Owned at the panel level so the popover reuses the same loaded list
     // across open/close cycles — no refetch on every open.
     @StateObject private var historyVM: ConversationListViewModel
@@ -115,6 +130,10 @@ struct AIChatPanel: View {
             }
         }
         .background(.background)
+        .focusable()
+        .focused($panelFocused)
+        .focusEffectDisabled()
+        .onAppear { panelFocused = true }
         .onChange(of: conversationName) { _, newName in
             // Empty string clears the persisted value (saved as blank)
             // so a fresh launch lands on New Chat instead of the last
@@ -188,9 +207,10 @@ struct NewChatView: View {
                 .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isCreating)
             }
             .padding(12)
-            .onAppear {
-                // Same pattern as ConversationView — defer a tick past
-                // the sidebar's default-focus heuristic.
+            .onReceive(NotificationCenter.default.publisher(for: .aiChatFocusRequested)) { _ in
+                // Only the hotkey path posts this; clicking or Space-
+                // activating the toolbar button opens the chat without
+                // stealing focus.
                 DispatchQueue.main.async { inputFocused = true }
             }
         }

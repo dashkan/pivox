@@ -23,7 +23,6 @@ enum AppSection: String, CaseIterable, Identifiable {
 
 enum SidebarItem: Hashable {
   case section(AppSection)
-  case profile
 }
 
 enum AuthState {
@@ -37,6 +36,7 @@ struct ContentView: View {
   @State private var isImageEditing = false
   @State private var showAIChat: Bool
   @State private var chatPanelWidth: CGFloat
+  @State private var showingProfile = false
   private var auth = AuthService.shared
   private let appState = AppStateBridge.shared()
 
@@ -85,43 +85,68 @@ struct ContentView: View {
     .onReceive(
       NotificationCenter.default.publisher(for: DelegatedAuthCoordinator.openProfileNotification)
     ) { _ in
-      selectedItem = .profile
+      showingProfile = true
     }
+  }
+
+  /// Prefer the user's custom photo, fall back to any linked provider's
+  /// photo (Google/GitHub/etc). When a user signs in via Google and
+  /// hasn't set a custom photo, Firebase doesn't always mirror Google's
+  /// avatar into `user.photoURL` — we dig it out of `providerData`
+  /// ourselves so the bar has a picture instead of a silhouette.
+  private var effectivePhotoURL: URL? {
+    if let url = auth.currentUser?.photoURL { return url }
+    return auth.currentUser?.providerData
+      .compactMap(\.photoURL)
+      .first
   }
 
   private var mainAppView: some View {
     NavigationSplitView(columnVisibility: $sidebarVisibility) {
-      List(selection: $selectedItem) {
-        ForEach(AppSection.allCases) { section in
-          Label(section.rawValue, systemImage: section.icon)
-            .tag(SidebarItem.section(section))
-        }
-      }
-      .listStyle(.sidebar)
+      SidebarNavList(selectedItem: $selectedItem)
       .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 300)
       .safeAreaInset(edge: .bottom, spacing: 0) {
-        VStack(spacing: 0) {
-          Divider()
-          Button(action: { selectedItem = .profile }) {
-            Label("Profile", systemImage: "person.circle")
-              .frame(maxWidth: .infinity, alignment: .leading)
-              .padding(.horizontal, 16)
-              .padding(.vertical, 10)
-              .background(
-                selectedItem == .profile
-                  ? Color.accentColor
-                  : Color.clear,
-                in: RoundedRectangle(cornerRadius: 6)
-              )
-              .foregroundStyle(selectedItem == .profile ? .white : .primary)
-          }
-          .buttonStyle(.plain)
-          .padding(.horizontal, 8)
-          .padding(.vertical, 8)
-        }
+        ProfileBar(
+          photoURL: effectivePhotoURL,
+          displayName: auth.currentUser?.displayName,
+          email: auth.currentUser?.email,
+          action: { showingProfile = true }
+        )
       }
     } detail: {
       detailContent
+    }
+    .sheet(isPresented: $showingProfile) {
+      // Fixed frame so switching between Account / Security tabs
+      // doesn't resize the dialog to fit each page's content.
+      ProfileView()
+        .frame(width: 720, height: 620)
+    }
+    .background {
+      // Hotkey target. Lives outside the toolbar button so that
+      // Space-to-activate on the toolbar button and Cmd+Shift+A
+      // go through separate code paths — the hotkey opens AND asks
+      // the chat view to grab focus; Space on the button only
+      // toggles visibility, leaving focus on the button itself.
+      Button {
+        let willOpen = !showAIChat
+        withAnimation(.easeInOut(duration: 0.2)) {
+          showAIChat = willOpen ? true : false
+        }
+        if willOpen {
+          NotificationCenter.default.post(name: .aiChatFocusRequested, object: nil)
+        }
+      } label: {
+        EmptyView()
+      }
+      .keyboardShortcut("a", modifiers: [.command, .shift])
+      .buttonStyle(.plain)
+      .frame(width: 0, height: 0)
+      .opacity(0)
+      .accessibilityHidden(true)
+      // Keep the button out of the Tab loop — otherwise focus hops
+      // onto this invisible element and user sees "Tab did nothing".
+      .focusable(false)
     }
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
@@ -135,7 +160,6 @@ struct ContentView: View {
             : "bubble.left.and.text.bubble.right")
         }
         .help("Toggle AI Chat (⌘⇧A)")
-        .keyboardShortcut("a", modifiers: [.command, .shift])
       }
     }
     .onChange(of: isImageEditing) { _, editing in
@@ -149,14 +173,24 @@ struct ContentView: View {
   @ViewBuilder
   private var detailContent: some View {
     HSplitView {
-      // Main content area
+      // Main content area. `maxWidth: .infinity` locks in a stable
+      // ideal width across sections — without it, HSplitView sees
+      // different intrinsic widths per section (e.g. Library's button
+      // is wider than the placeholder texts) and re-splits the chat
+      // panel accordingly when you switch sidebar items.
       mainDetail
-        .frame(minWidth: 400)
+        .frame(minWidth: 400, maxWidth: .infinity)
 
       // AI Chat panel — slides in from right. Width persists across
-      // launches: initial size from AppState, subsequent user drags
-      // captured via a GeometryReader overlay that records the actual
-      // rendered width into AppState (debounced by change-on-value).
+      // launches: initial size from AppState at mount. Subsequent
+      // user drags are observed via a GeometryReader and persisted to
+      // AppState, but we deliberately do NOT write back into
+      // `chatPanelWidth` at runtime. Doing so creates a feedback loop
+      // with `idealWidth`: GeometryReader observes width → updates
+      // state → idealWidth changes → HSplitView rebalances → observed
+      // width changes again. That loop was visible as the panel
+      // drifting every time the sidebar selection changed, because a
+      // content swap triggers HSplitView to re-propose sizes.
       if showAIChat {
         AIChatContainerView()
           .frame(minWidth: Self.chatMinWidth,
@@ -167,13 +201,9 @@ struct ContentView: View {
               Color.clear.onChange(of: proxy.size.width) { _, newWidth in
                 guard newWidth >= Self.chatMinWidth,
                       newWidth <= Self.chatMaxWidth else { return }
-                // Only persist substantive changes — avoids flooding
-                // storage on every layout pass during a drag.
-                if abs(newWidth - chatPanelWidth) >= 4 {
-                  chatPanelWidth = newWidth
-                  appState.save(String(Double(newWidth)),
-                                forKey: "ai_chat_panel_width")
-                }
+                // Persist only — no runtime state update (see above).
+                appState.save(String(Double(newWidth)),
+                              forKey: "ai_chat_panel_width")
               }
             }
           )
@@ -182,33 +212,37 @@ struct ContentView: View {
     }
   }
 
-  @ViewBuilder
   private var mainDetail: some View {
-    switch selectedItem {
-    case .section(let section):
-      if section == .library {
-        LibraryPlaceholderView(
-          isEditing: $isImageEditing,
-          sidebarVisibility: $sidebarVisibility
-        )
-      } else {
-        VStack {
-          Text(section.rawValue)
-            .font(.largeTitle)
-            .foregroundStyle(.secondary)
-          Text("Coming soon")
-            .foregroundStyle(.tertiary)
+    // All section branches render inside the same outer container so
+    // HSplitView sees a stable child type across sidebar changes.
+    // Previously, Library returned `LibraryPlaceholderView` while
+    // other sections returned a `VStack`, and switching to Library
+    // caused HSplitView to re-evaluate proposed widths — visible as
+    // the AI chat panel resizing. Wrapping everything in the same
+    // outer view keeps the proposal stable.
+    ZStack {
+      switch selectedItem {
+      case .section(let section):
+        if section == .library {
+          LibraryPlaceholderView(
+            isEditing: $isImageEditing,
+            sidebarVisibility: $sidebarVisibility
+          )
+        } else {
+          VStack {
+            Text(section.rawValue)
+              .font(.largeTitle)
+              .foregroundStyle(.secondary)
+            Text("Coming soon")
+              .foregroundStyle(.tertiary)
+          }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+      case nil:
+        Text("Select a section")
+          .foregroundStyle(.secondary)
       }
-    case .profile:
-      ProfileView()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    case nil:
-      Text("Select a section")
-        .foregroundStyle(.secondary)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 }
 

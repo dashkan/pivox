@@ -17,6 +17,7 @@ import { Route as AuthRegisterRouteImport } from './routes/auth/register'
 import { Route as AuthRedirectRouteImport } from './routes/auth/redirect'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as AuthLinkAccountRouteImport } from './routes/auth/link-account'
+import { Route as AuthGithubCompleteRouteImport } from './routes/auth/github-complete'
 import { Route as AuthForgotPasswordRouteImport } from './routes/auth/forgot-password'
 import { Route as AuthExternalLoginRouteImport } from './routes/auth/external-login'
 import { Route as AuthExternalLinkRouteImport } from './routes/auth/external-link'
@@ -64,6 +65,11 @@ const AuthLinkAccountRoute = AuthLinkAccountRouteImport.update({
   path: '/auth/link-account',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthGithubCompleteRoute = AuthGithubCompleteRouteImport.update({
+  id: '/auth/github-complete',
+  path: '/auth/github-complete',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthForgotPasswordRoute = AuthForgotPasswordRouteImport.update({
   id: '/auth/forgot-password',
   path: '/auth/forgot-password',
@@ -109,6 +115,7 @@ export interface FileRoutesByFullPath {
   '/auth/external-link': typeof AuthExternalLinkRoute
   '/auth/external-login': typeof AuthExternalLoginRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
+  '/auth/github-complete': typeof AuthGithubCompleteRoute
   '/auth/link-account': typeof AuthLinkAccountRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/redirect': typeof AuthRedirectRoute
@@ -124,6 +131,7 @@ export interface FileRoutesByTo {
   '/auth/external-link': typeof AuthExternalLinkRoute
   '/auth/external-login': typeof AuthExternalLoginRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
+  '/auth/github-complete': typeof AuthGithubCompleteRoute
   '/auth/link-account': typeof AuthLinkAccountRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/redirect': typeof AuthRedirectRoute
@@ -142,6 +150,7 @@ export interface FileRoutesById {
   '/auth/external-link': typeof AuthExternalLinkRoute
   '/auth/external-login': typeof AuthExternalLoginRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
+  '/auth/github-complete': typeof AuthGithubCompleteRoute
   '/auth/link-account': typeof AuthLinkAccountRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/redirect': typeof AuthRedirectRoute
@@ -161,6 +170,7 @@ export interface FileRouteTypes {
     | '/auth/external-link'
     | '/auth/external-login'
     | '/auth/forgot-password'
+    | '/auth/github-complete'
     | '/auth/link-account'
     | '/auth/login'
     | '/auth/redirect'
@@ -176,6 +186,7 @@ export interface FileRouteTypes {
     | '/auth/external-link'
     | '/auth/external-login'
     | '/auth/forgot-password'
+    | '/auth/github-complete'
     | '/auth/link-account'
     | '/auth/login'
     | '/auth/redirect'
@@ -193,6 +204,7 @@ export interface FileRouteTypes {
     | '/auth/external-link'
     | '/auth/external-login'
     | '/auth/forgot-password'
+    | '/auth/github-complete'
     | '/auth/link-account'
     | '/auth/login'
     | '/auth/redirect'
@@ -209,6 +221,7 @@ export interface RootRouteChildren {
   AuthExternalLinkRoute: typeof AuthExternalLinkRoute
   AuthExternalLoginRoute: typeof AuthExternalLoginRoute
   AuthForgotPasswordRoute: typeof AuthForgotPasswordRoute
+  AuthGithubCompleteRoute: typeof AuthGithubCompleteRoute
   AuthLinkAccountRoute: typeof AuthLinkAccountRoute
   AuthLoginRoute: typeof AuthLoginRoute
   AuthRedirectRoute: typeof AuthRedirectRoute
@@ -273,6 +286,13 @@ declare module '@tanstack/react-router' {
       path: '/auth/link-account'
       fullPath: '/auth/link-account'
       preLoaderRoute: typeof AuthLinkAccountRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/github-complete': {
+      id: '/auth/github-complete'
+      path: '/auth/github-complete'
+      fullPath: '/auth/github-complete'
+      preLoaderRoute: typeof AuthGithubCompleteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth/forgot-password': {
@@ -348,6 +368,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthExternalLinkRoute: AuthExternalLinkRoute,
   AuthExternalLoginRoute: AuthExternalLoginRoute,
   AuthForgotPasswordRoute: AuthForgotPasswordRoute,
+  AuthGithubCompleteRoute: AuthGithubCompleteRoute,
   AuthLinkAccountRoute: AuthLinkAccountRoute,
   AuthLoginRoute: AuthLoginRoute,
   AuthRedirectRoute: AuthRedirectRoute,

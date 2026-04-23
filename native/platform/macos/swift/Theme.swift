@@ -1,10 +1,11 @@
 import SwiftUI
 
-// MARK: - Design Tokens
-
-/// Core design tokens for AIElements. Adaptive for light/dark mode.
-/// Injected via `.environment(\.aiElementsTheme, theme)`.
-public struct AIElementsTheme: Sendable {
+/// App-wide design tokens. Adaptive for light/dark mode via NSColor
+/// semantic colors. Injected via `.environment(\.pivoxTheme, theme)`.
+/// Every view — auth, profile, chat, image editor — reads from the
+/// same `@Environment(\.pivoxTheme)` so visual language stays
+/// consistent across the app.
+public struct PivoxTheme: Sendable {
 
     // MARK: Typography
 
@@ -40,7 +41,9 @@ public struct AIElementsTheme: Sendable {
     public let borderSubtle: Color
     public let accent: Color
     public let accentSubtle: Color
+    /// Destructive / danger actions (delete account, remove, etc).
     public let destructive: Color
+    public let destructiveSubtle: Color
     public let success: Color
     public let warning: Color
 
@@ -54,7 +57,7 @@ public struct AIElementsTheme: Sendable {
 
     // MARK: Default
 
-    public static let `default` = AIElementsTheme(
+    public static let `default` = PivoxTheme(
         bodyFont: .body,
         bodySmallFont: .callout,
         captionFont: .caption,
@@ -81,9 +84,10 @@ public struct AIElementsTheme: Sendable {
         borderSubtle: Color(nsColor: .quaternaryLabelColor),
         accent: Color.accentColor,
         accentSubtle: Color.accentColor.opacity(0.15),
-        destructive: Color.red,
-        success: Color.green,
-        warning: Color.orange,
+        destructive: Color(nsColor: .systemRed),
+        destructiveSubtle: Color(nsColor: .systemRed).opacity(0.15),
+        success: Color(nsColor: .systemGreen),
+        warning: Color(nsColor: .systemOrange),
 
         userBubble: Color.accentColor.opacity(0.12),
         assistantBubble: Color(nsColor: .controlBackgroundColor),
@@ -95,13 +99,13 @@ public struct AIElementsTheme: Sendable {
 
 // MARK: - Environment Key
 
-private struct AIElementsThemeKey: EnvironmentKey {
-    static let defaultValue = AIElementsTheme.default
+private struct PivoxThemeKey: EnvironmentKey {
+    static let defaultValue = PivoxTheme.default
 }
 
 extension EnvironmentValues {
-    public var aiElementsTheme: AIElementsTheme {
-        get { self[AIElementsThemeKey.self] }
-        set { self[AIElementsThemeKey.self] = newValue }
+    public var pivoxTheme: PivoxTheme {
+        get { self[PivoxThemeKey.self] }
+        set { self[PivoxThemeKey.self] = newValue }
     }
 }

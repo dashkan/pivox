@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Container for a row of `ActionIcon` buttons beneath (or beside) a
+/// Container for a row of `IconButton` buttons beneath (or beside) a
 /// message. Kept as a thin decomposition so the row can stay role-
 /// specific on the Message component while the icon itself is a
 /// shared primitive.

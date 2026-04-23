@@ -23,12 +23,60 @@ enum MarkdownBlock: Equatable {
 
 /// Parser calling into the shared C++ cmark-gfm wrapper (via `pivox_md_parse_json`).
 /// Thread-safe — the underlying C++ parser is stateless per call.
+///
+/// Results are cached keyed by input string. Committed chat messages
+/// are immutable, so after the first parse of a given message's text,
+/// every subsequent `parse(...)` for that text is a dictionary
+/// lookup. This is what makes `LazyVStack` viable for a transcript of
+/// `Message` views: the per-cell rebuild cost drops from "re-run
+/// cmark-gfm" to "read an array reference."
 enum MarkdownParser {
+    private static let cacheLock = NSLock()
+    nonisolated(unsafe) private static var cache: [String: [MarkdownBlock]] = [:]
+
+    /// Serial queue for background parsing. The underlying cmark-gfm
+    /// core extensions use `cmark_gfm_core_extensions_ensure_registered`
+    /// which performs one-time global registration that is NOT
+    /// thread-safe — parallel calls racing the registration produced
+    /// crashes on startup when we prewarmed 50 messages in parallel.
+    /// Serialising solves it without sacrificing off-main-thread work.
+    private static let parseQueue = DispatchQueue(
+        label: "pivox.markdown.parse", qos: .userInitiated)
+
     /// Parse a markdown string into a typed block list. Returns an empty
     /// list if parsing fails (e.g. the C bridge returns null). Does NOT
     /// throw — markdown parsing failures are visual, not semantic, and the
     /// caller handles an empty list as "nothing to render."
     static func parse(_ markdown: String) -> [MarkdownBlock] {
+        cacheLock.lock()
+        if let cached = cache[markdown] {
+            cacheLock.unlock()
+            return cached
+        }
+        cacheLock.unlock()
+
+        let blocks = parseUncached(markdown)
+
+        cacheLock.lock()
+        cache[markdown] = blocks
+        cacheLock.unlock()
+        return blocks
+    }
+
+    /// Warm the cache for a markdown string off the main thread. Call
+    /// when a message is first received (before the user can scroll
+    /// to it) so the eventual SwiftUI body evaluation hits a cached
+    /// parse result instead of blocking the main thread on cmark-gfm.
+    /// Parses run on a single serial queue (not the global concurrent
+    /// pool) because cmark-gfm's extension registration is not
+    /// thread-safe.
+    static func parseAsync(_ markdown: String) {
+        parseQueue.async {
+            _ = parse(markdown)
+        }
+    }
+
+    private static func parseUncached(_ markdown: String) -> [MarkdownBlock] {
         guard let cStr = pivox_md_parse_json(markdown) else { return [] }
         defer { pivox_md_free_string(cStr) }
         let data = Data(bytes: cStr, count: strlen(cStr))

@@ -2,7 +2,6 @@
 
 import { useActionState, useRef, useState } from 'react';
 import {
-  GithubAuthProvider,
   GoogleAuthProvider,
   OAuthProvider,
   createUserWithEmailAndPassword,
@@ -17,14 +16,15 @@ import type {
   RegistrationMeta,
   RegistrationState,
 } from '@pivox/ui/registration-card';
-import type { User } from 'firebase/auth';
+import type { User, UserCredential } from 'firebase/auth';
 import type { FirebaseError } from 'firebase/app';
 import { firebaseErrorMessage } from '@/shared/firebase-error';
+import { signInWithGitHubPopup } from '@/shared/github-oauth';
 import { setPendingLink } from '@/shared/pending-link';
 
+// GitHub uses a manual OAuth flow (see `signInWithGitHubPopup`).
 const socialProviders = {
   'google.com': () => new GoogleAuthProvider(),
-  'github.com': () => new GithubAuthProvider(),
   'apple.com': () => new OAuthProvider('apple.com'),
 } as const;
 
@@ -88,8 +88,16 @@ export function useRegistration(
     socialLogin: async (provider) => {
       setError(null);
       try {
-        const auth = getAuth();
-        const result = await signInWithPopup(auth, socialProviders[provider]());
+        let result: UserCredential;
+        if (provider === 'github.com') {
+          result = await signInWithGitHubPopup();
+        } else if (provider in socialProviders) {
+          const auth = getAuth();
+          const factory = socialProviders[provider as keyof typeof socialProviders];
+          result = await signInWithPopup(auth, factory());
+        } else {
+          throw new Error(`Unsupported provider: ${provider}`);
+        }
         onSuccess?.(result.user);
       } catch (e) {
         const err = e as FirebaseError;
