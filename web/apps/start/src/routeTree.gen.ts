@@ -25,6 +25,8 @@ import { Route as AuthDoneRouteImport } from './routes/auth/done'
 import { Route as AuthActionRouteImport } from './routes/auth/action'
 import { Route as AppImageEditorRouteImport } from './routes/_app/image-editor'
 import { Route as AppAboutRouteImport } from './routes/_app/about'
+import { Route as ApiOauthProviderStartRouteImport } from './routes/api/oauth/$provider/start'
+import { Route as ApiOauthProviderCallbackRouteImport } from './routes/api/oauth/$provider/callback'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -105,6 +107,17 @@ const AppAboutRoute = AppAboutRouteImport.update({
   path: '/about',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiOauthProviderStartRoute = ApiOauthProviderStartRouteImport.update({
+  id: '/api/oauth/$provider/start',
+  path: '/api/oauth/$provider/start',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOauthProviderCallbackRoute =
+  ApiOauthProviderCallbackRouteImport.update({
+    id: '/api/oauth/$provider/callback',
+    path: '/api/oauth/$provider/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -122,6 +135,8 @@ export interface FileRoutesByFullPath {
   '/auth/register': typeof AuthRegisterRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
   '/auth/verify-email': typeof AuthVerifyEmailRoute
+  '/api/oauth/$provider/callback': typeof ApiOauthProviderCallbackRoute
+  '/api/oauth/$provider/start': typeof ApiOauthProviderStartRoute
 }
 export interface FileRoutesByTo {
   '/about': typeof AppAboutRoute
@@ -139,6 +154,8 @@ export interface FileRoutesByTo {
   '/auth/reset-password': typeof AuthResetPasswordRoute
   '/auth/verify-email': typeof AuthVerifyEmailRoute
   '/': typeof AppIndexRoute
+  '/api/oauth/$provider/callback': typeof ApiOauthProviderCallbackRoute
+  '/api/oauth/$provider/start': typeof ApiOauthProviderStartRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -158,6 +175,8 @@ export interface FileRoutesById {
   '/auth/reset-password': typeof AuthResetPasswordRoute
   '/auth/verify-email': typeof AuthVerifyEmailRoute
   '/_app/': typeof AppIndexRoute
+  '/api/oauth/$provider/callback': typeof ApiOauthProviderCallbackRoute
+  '/api/oauth/$provider/start': typeof ApiOauthProviderStartRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -177,6 +196,8 @@ export interface FileRouteTypes {
     | '/auth/register'
     | '/auth/reset-password'
     | '/auth/verify-email'
+    | '/api/oauth/$provider/callback'
+    | '/api/oauth/$provider/start'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/about'
@@ -194,6 +215,8 @@ export interface FileRouteTypes {
     | '/auth/reset-password'
     | '/auth/verify-email'
     | '/'
+    | '/api/oauth/$provider/callback'
+    | '/api/oauth/$provider/start'
   id:
     | '__root__'
     | '/_app'
@@ -212,6 +235,8 @@ export interface FileRouteTypes {
     | '/auth/reset-password'
     | '/auth/verify-email'
     | '/_app/'
+    | '/api/oauth/$provider/callback'
+    | '/api/oauth/$provider/start'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -228,6 +253,8 @@ export interface RootRouteChildren {
   AuthRegisterRoute: typeof AuthRegisterRoute
   AuthResetPasswordRoute: typeof AuthResetPasswordRoute
   AuthVerifyEmailRoute: typeof AuthVerifyEmailRoute
+  ApiOauthProviderCallbackRoute: typeof ApiOauthProviderCallbackRoute
+  ApiOauthProviderStartRoute: typeof ApiOauthProviderStartRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -344,6 +371,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAboutRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/oauth/$provider/start': {
+      id: '/api/oauth/$provider/start'
+      path: '/api/oauth/$provider/start'
+      fullPath: '/api/oauth/$provider/start'
+      preLoaderRoute: typeof ApiOauthProviderStartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/oauth/$provider/callback': {
+      id: '/api/oauth/$provider/callback'
+      path: '/api/oauth/$provider/callback'
+      fullPath: '/api/oauth/$provider/callback'
+      preLoaderRoute: typeof ApiOauthProviderCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -375,6 +416,8 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRegisterRoute: AuthRegisterRoute,
   AuthResetPasswordRoute: AuthResetPasswordRoute,
   AuthVerifyEmailRoute: AuthVerifyEmailRoute,
+  ApiOauthProviderCallbackRoute: ApiOauthProviderCallbackRoute,
+  ApiOauthProviderStartRoute: ApiOauthProviderStartRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

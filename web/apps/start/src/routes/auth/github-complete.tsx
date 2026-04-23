@@ -5,25 +5,34 @@ export const Route = createFileRoute('/auth/github-complete')({
   component: GitHubCompletePage,
 });
 
-// Landing page for the web half of the GitHub OAuth flow. The Cloud
-// Function redirects here with ?access_token=…&state=… after
-// exchanging the auth code. We forward the payload to the opener via
-// postMessage and close ourselves. If the opener is gone (user
-// navigated away), we show a friendly hint.
+// Landing page for the web half of the GitHub OAuth flow. The broker
+// at `/api/oauth/github/callback` redirects here with the provider
+// token in the URL fragment — `#token=…&kind=github_access_token&
+// provider=github` on success, or `#error=…&error_description=…` on
+// failure. We forward the payload to the opener via postMessage and
+// close ourselves.
+//
+// Fragment (not query) is deliberate — the broker uses `#` so the
+// token can't leak through referrer headers or server access logs on
+// the way back. JS on this page reads `window.location.hash` to pick
+// it up.
 function GitHubCompletePage() {
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    const frag = window.location.hash.startsWith('#')
+      ? window.location.hash.slice(1)
+      : window.location.hash;
+    const params = new URLSearchParams(frag);
+
     const payload = {
       type: 'pivox:github-auth',
-      state: params.get('state') ?? '',
-      access_token: params.get('access_token') ?? undefined,
+      access_token: params.get('token') ?? undefined,
       error: params.get('error') ?? undefined,
       error_description: params.get('error_description') ?? undefined,
     };
 
     const opener = window.opener as Window | null;
     if (opener && !opener.closed) {
-      // targetOrigin restricts delivery to same-origin openers only —
+      // targetOrigin restricts delivery to same-origin openers —
       // a malicious cross-origin opener wouldn't receive the token.
       opener.postMessage(payload, window.location.origin);
     }

@@ -272,23 +272,31 @@ class AuthService: NSObject {
 
   // MARK: - GitHub Sign-In
   //
-  // Flow: ASWebAuthenticationSession opens github.com/login/oauth/authorize
-  // with redirect_uri pointing at our Cloud Function. GitHub redirects
-  // to the function with a code; the function exchanges the code using
-  // its server-side client_secret and then bounces the user back via
-  // `pivox://oauth/github/callback?access_token=…&state=…`, which
-  // ASWebAuthenticationSession intercepts in-process.
+  // Flow:
+  //   1. ASWebAuthenticationSession opens `<broker>/api/oauth/github/start`
+  //      on our start-app backend.
+  //   2. The broker 302's to github.com/login/oauth/authorize with its
+  //      own client_id and redirect_uri (the broker's own callback).
+  //      Client_id + client_secret live server-side only — no secrets
+  //      in this binary.
+  //   3. GitHub redirects to the broker's callback with a code.
+  //      Broker exchanges code→token server-side, then 302's to
+  //      `pivox://auth-complete#provider=github&kind=github_access_token&token=…`.
+  //   4. ASWebAuthenticationSession intercepts the `pivox://` URL
+  //      because it matches our registered callback scheme and hands
+  //      the full URL back to us here.
+  //   5. We parse the access_token from the URL fragment and finish
+  //      the Firebase sign-in with `signInWithCredential`.
   //
-  // Why via our function rather than a direct pivox:// callback: the
-  // code-for-token exchange needs client_secret, and we won't ship
-  // secrets in the binary. Using one Cloud Function as the OAuth App
-  // callback also lets web share the same OAuth App and the same
-  // server-side exchange path.
+  // The broker handles state (CSRF) signing and verification itself;
+  // native doesn't need to generate or validate its own nonce.
 
-  private let githubClientID = "Ov23lizatEPgvs7FVA8X"
-  private let githubCallbackURL =
-    "https://us-central1-pivox-cloud.cloudfunctions.net/githubOAuthCallback"
-  private let githubFinalScheme = "pivox"
+  /// Base URL for the Pivox backend. Hardcoded for now — swap when
+  /// the host changes, rebuild, ship.
+  private static let brokerBaseURL = "https://pivox.ngrok.app"
+
+  private let githubReturnURL = "pivox://auth-complete"
+  private let githubCallbackScheme = "pivox"
 
   func signInWithGitHub() async {
     guard !isOAuthInProgress else { return }
@@ -296,30 +304,27 @@ class AuthService: NSObject {
     defer { isOAuthInProgress = false }
     errorMessage = nil
 
-    guard !githubClientID.isEmpty else {
-      errorMessage =
-        "GitHub sign-in is not configured. Set `githubClientID` in AuthService."
-      return
-    }
-
     do {
-      let nonce = UUID().uuidString
-      let state = "native:\(nonce)"
-
-      var components = URLComponents(string: "https://github.com/login/oauth/authorize")!
-      components.queryItems = [
-        URLQueryItem(name: "client_id", value: githubClientID),
-        URLQueryItem(name: "redirect_uri", value: githubCallbackURL),
-        URLQueryItem(name: "scope", value: "read:user user:email"),
-        URLQueryItem(name: "state", value: state),
-        URLQueryItem(name: "allow_signup", value: "true"),
-      ]
+      // Entry into the broker. Everything provider-specific
+      // (authorize URL, client_id, scopes, state) is handled
+      // server-side; we just point at the broker and tell it where
+      // we want the user returned to.
+      guard
+        let encodedReturn = githubReturnURL.addingPercentEncoding(
+          withAllowedCharacters: .urlQueryAllowed),
+        let startURL = URL(
+          string: "\(Self.brokerBaseURL)/api/oauth/github/start?return=\(encodedReturn)")
+      else {
+        throw NSError(
+          domain: "AuthService", code: -1,
+          userInfo: [NSLocalizedDescriptionKey: "Failed to build GitHub broker URL"])
+      }
 
       let finalURL = try await withCheckedThrowingContinuation {
         (continuation: CheckedContinuation<URL, Error>) in
         let session = ASWebAuthenticationSession(
-          url: components.url!,
-          callbackURLScheme: githubFinalScheme
+          url: startURL,
+          callbackURLScheme: githubCallbackScheme
         ) { url, error in
           if let error = error {
             continuation.resume(throwing: error)
@@ -337,14 +342,12 @@ class AuthService: NSObject {
         session.start()
       }
 
-      let items = URLComponents(url: finalURL, resolvingAgainstBaseURL: false)?.queryItems ?? []
-
-      // Validate state before trusting anything else in the URL.
-      guard items.first(where: { $0.name == "state" })?.value == state else {
-        throw NSError(
-          domain: "AuthService", code: -1,
-          userInfo: [NSLocalizedDescriptionKey: "GitHub OAuth state mismatch"])
-      }
+      // Broker returns payload in the URL fragment (not query) so it
+      // never ends up in server logs or Referer headers on the way
+      // back. Fragment format is query-string-like:
+      //   provider=github&kind=github_access_token&token=…
+      let fragment = finalURL.fragment ?? ""
+      let items = URLComponents(string: "?\(fragment)")?.queryItems ?? []
 
       if let errorCode = items.first(where: { $0.name == "error" })?.value {
         let description =
@@ -354,7 +357,22 @@ class AuthService: NSObject {
           userInfo: [NSLocalizedDescriptionKey: "GitHub sign-in failed: \(description)"])
       }
 
-      guard let accessToken = items.first(where: { $0.name == "access_token" })?.value else {
+      // Sanity check provider + credential kind before trusting the
+      // token. An attacker who somehow crafted a `pivox://` URL
+      // couldn't fake a signed Firebase credential, but rejecting
+      // unexpected shapes here gives clearer errors if the broker
+      // contract ever drifts.
+      guard items.first(where: { $0.name == "provider" })?.value == "github" else {
+        throw NSError(
+          domain: "AuthService", code: -1,
+          userInfo: [NSLocalizedDescriptionKey: "Broker returned wrong provider"])
+      }
+      guard items.first(where: { $0.name == "kind" })?.value == "github_access_token" else {
+        throw NSError(
+          domain: "AuthService", code: -1,
+          userInfo: [NSLocalizedDescriptionKey: "Broker returned unexpected credential kind"])
+      }
+      guard let accessToken = items.first(where: { $0.name == "token" })?.value else {
         throw NSError(
           domain: "AuthService", code: -1,
           userInfo: [NSLocalizedDescriptionKey: "Callback missing access_token"])
