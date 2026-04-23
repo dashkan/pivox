@@ -15,4 +15,12 @@ extension View {
       )
     }
   }
+
+  /// Conditional glass card — passes `self` through unchanged when
+  /// `enabled` is false. Used for the auth screens so we can A/B
+  /// compare with/without the floating-card treatment at runtime.
+  @ViewBuilder
+  func glassCardIfEnabled(_ enabled: Bool) -> some View {
+    if enabled { self.glassCard() } else { self }
+  }
 }

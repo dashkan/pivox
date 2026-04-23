@@ -18,6 +18,11 @@ public struct PivoxTheme: Sendable {
     // Text roles. Use these instead of literals like
     // `.title3.weight(.semibold)` so a single theme change
     // propagates everywhere.
+    /// Brand/splash title (sign-in, register, launch screens).
+    /// Prominent standalone type — not the same as a dialog's
+    /// pageTitleFont (which is smaller and meant to sit next to an
+    /// action button).
+    public let brandTitleFont: Font
     /// Page-level title (dialog/page headers). 17pt semibold.
     public let pageTitleFont: Font
     /// Subsection heading (Profile, Email, Danger zone). 15pt semibold.
@@ -93,6 +98,7 @@ public struct PivoxTheme: Sendable {
         headingFont: .headline,
         codeFont: .system(.body, design: .monospaced),
 
+        brandTitleFont: .largeTitle.weight(.bold),
         pageTitleFont: .title2.weight(.semibold),
         sectionHeadingFont: .title3.weight(.semibold),
         rowTitleFont: .body.weight(.semibold),

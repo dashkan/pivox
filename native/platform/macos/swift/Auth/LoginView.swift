@@ -8,11 +8,16 @@ struct LoginView: View {
   var auth: AuthService
   private let appState = AppStateBridge.shared()
 
+  @Environment(\.pivoxTheme) private var theme
   @State private var email = ""
   @State private var password = ""
   @State private var rememberMe: Bool
   @State private var isLoading = false
   @FocusState private var focusedField: Field?
+  /// DEBUG-only toggle (⌘⇧G) so we can A/B the glass card
+  /// treatment live without rebuilding. Persists across launches so
+  /// the preference survives reopening the app.
+  @AppStorage("debug.auth.glass_card") private var useGlassCard: Bool = true
 
   enum Field: Hashable {
     case email, password
@@ -37,17 +42,69 @@ struct LoginView: View {
       Spacer()
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
+    // Liquid Glass refracts and distorts content behind it. An
+    // opaque uniform background gives the glass nothing to react to,
+    // which is why `.glassCard()` looks identical to the fallback
+    // material on a plain window. Providing a subtle colored
+    // gradient behind the auth area gives the glass visible
+    // refraction — accent-tinted light that the card distorts and
+    // bends as it floats over. This is the macOS 26 pattern Apple
+    // uses for login/onboarding moments.
+    .background(authBackdrop.ignoresSafeArea())
     .onAppear { focusedField = .email }
+    .background(glassToggleShortcut)
+  }
+
+  /// Soft accent-tinted backdrop behind the auth card. Uses theme
+  /// colors so it adapts to dark mode. Two overlapping radial
+  /// gradients create gentle color variation that Liquid Glass
+  /// refracts visibly without being a loud, branded hero image.
+  private var authBackdrop: some View {
+    ZStack {
+      theme.background
+      RadialGradient(
+        colors: [theme.accent.opacity(0.28), .clear],
+        center: .topLeading,
+        startRadius: 0,
+        endRadius: 520)
+      RadialGradient(
+        colors: [theme.accent.opacity(0.18), .clear],
+        center: .bottomTrailing,
+        startRadius: 0,
+        endRadius: 620)
+    }
+  }
+
+  /// Hidden button wired as a ⌘⇧G shortcut so we can A/B the glass
+  /// card treatment live. Zero-sized, invisible, outside tab order.
+  private var glassToggleShortcut: some View {
+    Button {
+      useGlassCard.toggle()
+    } label: { EmptyView() }
+      .keyboardShortcut("g", modifiers: [.command, .shift])
+      .buttonStyle(.plain)
+      .frame(width: 0, height: 0)
+      .opacity(0)
+      .accessibilityHidden(true)
+      .focusable(false)
   }
 
   private var authCard: some View {
     VStack(spacing: 24) {
+      // Upper section (header + form) is locked to a fixed height.
+      // This is what keeps the separator and everything below it at
+      // identical Y-coordinates between Login (shorter form) and
+      // Register (taller form) — earlier the total card height was
+      // fixed but a Spacer inside distributed residual height, and
+      // sub-pixel rounding drifted the separator by 1pt. Pinning the
+      // upper section eliminates that.
+      VStack(spacing: 24) {
       // Header
       VStack(spacing: 8) {
         Text("Pivox")
-          .font(.largeTitle.weight(.bold))
+          .font(theme.brandTitleFont)
         Text("Sign in to your account")
-          .font(.subheadline)
+          .font(theme.bodyFont)
           .foregroundStyle(.secondary)
       }
 
@@ -74,13 +131,13 @@ struct LoginView: View {
         HStack {
           Toggle("Remember me", isOn: $rememberMe)
             .toggleStyle(.checkbox)
-            .font(.caption)
+            .font(theme.bodyFont)
             .disabled(isLoading)
             .accessibilityIdentifier("login-remember-me")
           Spacer()
           Button("Forgot password?") {}
             .buttonStyle(.link)
-            .font(.caption)
+            .font(theme.bodyFont)
             .disabled(isLoading)
             .accessibilityIdentifier("login-forgot-password")
         }
@@ -102,18 +159,27 @@ struct LoginView: View {
 
         // Error message — pre-allocated space to prevent layout shift.
         Text(auth.errorMessage ?? " ")
-          .font(.caption)
-          .foregroundStyle(.red)
+          .font(theme.bodyFont)
+          .foregroundStyle(theme.destructive)
           .multilineTextAlignment(.center)
           .opacity(auth.errorMessage != nil ? 1 : 0)
           .accessibilityIdentifier("login-error")
       }
 
+      // Flexible gap inside the upper (fixed-height) section. Grows
+      // on Login (shorter form), collapses on Register (taller).
+      Spacer(minLength: 12)
+      }
+      // Exact height of the upper section. Sized just above
+      // Register's natural upper content so Register's Spacer
+      // collapses to near minLength while Login's grows to match.
+      .frame(height: 320)
+
       // Separator
       HStack {
-        Rectangle().frame(height: 1).foregroundStyle(.separator)
-        Text("or").font(.caption).foregroundStyle(.secondary)
-        Rectangle().frame(height: 1).foregroundStyle(.separator)
+        Rectangle().frame(height: 1).foregroundStyle(theme.border)
+        Text("or").font(theme.bodySmallFont).foregroundStyle(.secondary)
+        Rectangle().frame(height: 1).foregroundStyle(theme.border)
       }
 
       // Social login
@@ -161,18 +227,18 @@ struct LoginView: View {
       // Footer
       HStack(spacing: 4) {
         Text("Don't have an account?")
-          .font(.caption)
+          .font(theme.bodyFont)
           .foregroundStyle(.secondary)
         Button("Create one", action: onSwitchToRegister)
           .buttonStyle(.link)
-          .font(.caption)
+          .font(theme.bodyFont)
           .disabled(isLoading)
           .accessibilityIdentifier("login-switch-register")
       }
     }
     .padding(32)
     .frame(maxWidth: 400)
-    .glassCard()
+    .glassCardIfEnabled(useGlassCard)
   }
 
   private func submitSignIn() {
