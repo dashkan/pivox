@@ -142,20 +142,9 @@ struct LoginView: View {
             .accessibilityIdentifier("login-forgot-password")
         }
 
-        Button(action: submitSignIn) {
-          if isLoading {
-            ProgressView()
-              .controlSize(.small)
-              .frame(maxWidth: .infinity)
-          } else {
-            Text("Sign In")
-              .frame(maxWidth: .infinity)
-          }
-        }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
-        .disabled(email.isEmpty || password.isEmpty || isLoading)
-        .accessibilityIdentifier("login-sign-in")
+        AuthPrimaryButton("Sign In", isLoading: isLoading, action: submitSignIn)
+          .disabled(email.isEmpty || password.isEmpty || isLoading)
+          .accessibilityIdentifier("login-sign-in")
 
         // Error message — pre-allocated space to prevent layout shift.
         Text(auth.errorMessage ?? " ")

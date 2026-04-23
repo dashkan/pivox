@@ -89,6 +89,18 @@ public struct PivoxTheme: Sendable {
     public let codeText: Color
     public let inlineCodeBackground: Color
 
+    // MARK: Button
+    //
+    // Foreground color for `.borderedProminent` / tinted-glass buttons.
+    // macOS 26 renders prominent buttons as a translucent tint
+    // resolved from the accent color and picks its own "harmonizing"
+    // foreground, which collapses to low-contrast (violet text on
+    // violet fill) with brand accents. Forcing white across the app
+    // guarantees contrast regardless of which system accent a user
+    // has set. Changes here propagate to every prominent button via
+    // `PivoxPrimaryButton` and any Label that reads the token.
+    public let prominentButtonText: Color
+
     // MARK: Default
 
     public static let `default` = PivoxTheme(
@@ -138,7 +150,9 @@ public struct PivoxTheme: Sendable {
         assistantBubble: Color(nsColor: .controlBackgroundColor),
         codeSurface: Color(nsColor: .textBackgroundColor),
         codeText: Color(nsColor: .textColor),
-        inlineCodeBackground: Color(nsColor: .quaternaryLabelColor).opacity(0.5)
+        inlineCodeBackground: Color(nsColor: .quaternaryLabelColor).opacity(0.5),
+
+        prominentButtonText: .white
     )
 }
 

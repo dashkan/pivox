@@ -108,7 +108,7 @@ struct RegisterView: View {
           .disabled(isLoading)
           .accessibilityIdentifier("register-confirm-password")
 
-        Button(action: {
+        AuthPrimaryButton("Create Account", isLoading: isLoading) {
           guard password == confirmPassword else {
             auth.errorMessage = "Passwords do not match."
             return
@@ -118,18 +118,7 @@ struct RegisterView: View {
             await auth.createAccount(email: email, password: password, displayName: displayName)
             isLoading = false
           }
-        }) {
-          if isLoading {
-            ProgressView()
-              .controlSize(.small)
-              .frame(maxWidth: .infinity)
-          } else {
-            Text("Create Account")
-              .frame(maxWidth: .infinity)
-          }
         }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
         .disabled(
           email.isEmpty || password.isEmpty || confirmPassword.isEmpty || displayName.isEmpty
             || isLoading

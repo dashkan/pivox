@@ -240,6 +240,10 @@ if(APPLE)
         # unit tests that reach into the Swift module's internal types.
         XCODE_ATTRIBUTE_ENABLE_TESTABILITY "YES"
         XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
+        # Pivox brand accent (violet). Applies only when the user's
+        # macOS Accent color is set to "Multicolor"; any specific user
+        # accent choice (Blue, Pink, etc.) always wins per HIG.
+        XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME "AccentColor"
         XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS "${CMAKE_SOURCE_DIR}/platform/macos/Pivox.entitlements"
         XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "Apple Development"
         XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "FAENDBN66M"
