@@ -123,6 +123,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
       defer: false
     )
     win.title = "Pivox"
+    // Minimum content size = sum of each column's minimum. Prevents
+    // the user from resizing the window small enough to squish the
+    // sidebar below its own min when chat is open:
+    //   sidebar (220) + main detail (400) + chat panel (320) = 940
+    //   vertical needs ~1 full chat message visible: 500
+    // Without this, SwiftUI's column-width negotiation crushes
+    // whichever column is weakest (historically the sidebar).
+    win.contentMinSize = NSSize(width: 940, height: 500)
     win.contentView = NSHostingView(rootView: contentView)
 
     if appState.hasWindowState() {

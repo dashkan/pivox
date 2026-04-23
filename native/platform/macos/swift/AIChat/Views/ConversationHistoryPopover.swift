@@ -3,19 +3,47 @@ import SwiftProtobuf
 import SwiftUI
 
 /// Dropdown popover listing recent conversations. Opened from the history
-/// button in the AI chat header. Supports:
+/// button in the AI chat header.
 ///
-///   * Client-side filter by title (case-insensitive substring)
-///   * Infinite scroll via page token
-///   * Inline rename (click pencil → in-place TextField, return/esc commits/cancels)
-///   * Inline delete confirm (click trash → row morphs to "Delete? [Yes] [Cancel]")
-///   * Keyboard navigation + VoiceOver labels
+/// ## Keyboard
+/// Matches macOS HIG for popover-with-search patterns (Spotlight, Safari
+/// address bar, Finder Go To Folder):
+///
+///  * Popover opens → search field focused.
+///  * `↓` from search → focus first list row; `↑/↓` arrow-nav rows.
+///  * `↑` from first row → bounce back to search (keeps filter editable).
+///  * `Return` on a focused row → open that conversation.
+///  * `Esc`: clears the filter if non-empty, otherwise dismisses the
+///    popover.
+///
+/// ## Other features
+///  * Client-side filter by title (case-insensitive substring).
+///  * Infinite scroll via page token (last-row-visible triggers loadMore).
+///  * Inline rename (pencil → in-place TextField, Return/Esc commits/cancels).
+///  * Inline delete confirm (trash → row morphs to "Delete? [Yes] [Cancel]").
+///
+/// ## Why `List(selection:)`
+/// The row layout is a pure SwiftUI `ScrollView + LazyVStack` no more —
+/// `List(selection:)` bridges to AppKit's responder chain and gives us
+/// arrow-key nav, selection highlight, and VoiceOver row semantics for
+/// free. Reinventing those with `.onKeyPress` on a VStack was considered
+/// and rejected — too much HIG surface to re-create by hand.
 public struct ConversationHistoryPopover: View {
     @ObservedObject var viewModel: ConversationListViewModel
     let onSelect: (Pivox_Ai_V1_Conversation) -> Void
 
+    @Environment(\.dismiss) private var dismiss
     @State private var searchText: String = ""
-    @FocusState private var searchFocused: Bool
+    @State private var selection: String?
+    @FocusState private var focus: Focus?
+
+    /// Where keyboard focus currently lives inside the popover.
+    /// `nil` = unfocused (transient); the task/onAppear restores it
+    /// to `.search` whenever the popover opens.
+    private enum Focus: Hashable {
+        case search
+        case list
+    }
 
     public var body: some View {
         VStack(spacing: 0) {
@@ -27,7 +55,7 @@ public struct ConversationHistoryPopover: View {
             if viewModel.conversations.isEmpty && viewModel.state == .idle {
                 await viewModel.load()
             }
-            searchFocused = true
+            focus = .search
         }
     }
 
@@ -40,8 +68,26 @@ public struct ConversationHistoryPopover: View {
                 .accessibilityHidden(true)
             TextField("Filter by title", text: $searchText)
                 .textFieldStyle(.plain)
-                .focused($searchFocused)
+                .focused($focus, equals: .search)
                 .accessibilityLabel("Filter conversations by title")
+                // ↓ moves focus into the list on the first row. If
+                // filtered is empty, let the event pass through so
+                // the system beep signals nothing to navigate to.
+                .onKeyPress(.downArrow) {
+                    guard let first = filtered.first else { return .ignored }
+                    selection = first.name
+                    focus = .list
+                    return .handled
+                }
+                // Esc: clear filter first, then dismiss on a second
+                // Esc when the filter is already empty.
+                .onExitCommand {
+                    if !searchText.isEmpty {
+                        searchText = ""
+                    } else {
+                        dismiss()
+                    }
+                }
             if !searchText.isEmpty {
                 IconButton(systemName: "xmark.circle.fill", label: "Clear filter") {
                     searchText = ""
@@ -89,42 +135,77 @@ public struct ConversationHistoryPopover: View {
     }
 
     private var rows: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                ForEach(filtered, id: \.name) { conv in
-                    HistoryRow(
-                        conversation: conv,
-                        onOpen: { onSelect(conv) },
-                        onRename: { newTitle in
-                            Task { try? await viewModel.rename(name: conv.name, newTitle: newTitle) }
-                        },
-                        onDelete: {
-                            Task { try? await viewModel.delete(name: conv.name) }
-                        }
-                    )
-                    Divider()
-                }
-
-                if viewModel.isLoadingMore {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                            .controlSize(.small)
-                            .padding(8)
-                        Spacer()
+        List(selection: $selection) {
+            ForEach(filtered, id: \.name) { conv in
+                HistoryRow(
+                    conversation: conv,
+                    onOpen: { onSelect(conv) },
+                    onRename: { newTitle in
+                        Task { try? await viewModel.rename(name: conv.name, newTitle: newTitle) }
+                    },
+                    onDelete: {
+                        Task { try? await viewModel.delete(name: conv.name) }
                     }
-                }
-            }
-            .background(
-                // Infinite-scroll sentinel — the invisible footer triggers a
-                // next-page fetch when it enters the viewport.
-                GeometryReader { _ in
-                    Color.clear.onAppear {
+                )
+                .tag(conv.name)
+                // Infinite scroll: kick off the next page when the
+                // last row enters the viewport. Replaces the old
+                // GeometryReader-in-background trick which doesn't
+                // work cleanly inside a List.
+                .onAppear {
+                    if conv.name == filtered.last?.name {
                         Task { await viewModel.loadMore() }
                     }
                 }
-            )
+            }
+
+            if viewModel.isLoadingMore {
+                HStack {
+                    Spacer()
+                    ProgressView().controlSize(.small).padding(8)
+                    Spacer()
+                }
+                .listRowSeparator(.hidden)
+            }
         }
+        .listStyle(.plain)
+        .focused($focus, equals: .list)
+        // Return on a focused/selected row opens that conversation.
+        // Enter on macOS is treated identically.
+        .onKeyPress(.return) {
+            openSelection()
+            return .handled
+        }
+        // ↑ from the first row hops focus back to the search field
+        // so the user can keep editing the filter without reaching
+        // for the mouse. For any non-first row, `.ignored` lets List
+        // handle normal row-wise upward movement.
+        .onKeyPress(.upArrow) {
+            guard let name = selection,
+                  let idx = filtered.firstIndex(where: { $0.name == name }),
+                  idx == 0
+            else { return .ignored }
+            selection = nil
+            focus = .search
+            return .handled
+        }
+        // Esc from the list clears the filter if any, otherwise
+        // dismisses the popover — same semantics as the search field.
+        .onExitCommand {
+            if !searchText.isEmpty {
+                searchText = ""
+                focus = .search
+            } else {
+                dismiss()
+            }
+        }
+    }
+
+    private func openSelection() {
+        guard let name = selection,
+              let conv = filtered.first(where: { $0.name == name })
+        else { return }
+        onSelect(conv)
     }
 }
 
@@ -165,6 +246,9 @@ private struct HistoryRow: View {
         .padding(.vertical, 4)
         .frame(height: rowHeight)
         .contentShape(Rectangle())
+        // Click-to-open still works alongside List's own row
+        // selection — the tap gesture and List's selection handler
+        // run in parallel, so a single click both selects AND opens.
         .onTapGesture {
             if case .display = mode { onOpen() }
         }

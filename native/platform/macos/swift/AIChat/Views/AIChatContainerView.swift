@@ -90,6 +90,16 @@ struct AIChatPanel: View {
                         conversationName = conv.name
                         pendingMessage = nil
                         showHistoryPopover = false
+                        // Conversation selection is a commit — user
+                        // chose THIS conversation, next action is
+                        // compose. Focus input regardless of whether
+                        // they clicked or pressed Return; differs
+                        // from the toolbar toggle (where kb Space
+                        // might be a transient "peek").
+                        DispatchQueue.main.async {
+                            NotificationCenter.default.post(
+                                name: .aiChatFocusRequested, object: nil)
+                        }
                     }
                     // Match popover width to the AI panel by sizing against
                     // the enclosing window reference dimension. 360pt
@@ -107,6 +117,14 @@ struct AIChatPanel: View {
                 IconButton(systemName: "plus.bubble", label: "New conversation", help: "New conversation") {
                     conversationName = nil
                     pendingMessage = nil
+                    // "New conversation" is a commit: user intends
+                    // to start composing right now. Focus the input
+                    // regardless of mouse vs keyboard activation
+                    // (same reasoning as history-popover selection).
+                    DispatchQueue.main.async {
+                        NotificationCenter.default.post(
+                            name: .aiChatFocusRequested, object: nil)
+                    }
                 }
             }
             .padding(.horizontal, 12)
@@ -196,10 +214,12 @@ struct NewChatView: View {
 
             // Prompt input at the bottom
             HStack(spacing: 8) {
-                TextField("Message...", text: $inputText)
-                    .textFieldStyle(.roundedBorder)
-                    .focused($inputFocused)
-                    .onSubmit { sendFirst() }
+                ShimmerPromptField(
+                    text: $inputText,
+                    placeholder: "Message...",
+                    isEnabled: !isCreating,
+                    onSubmit: sendFirst,
+                    focused: $inputFocused)
 
                 IconButton(systemName: "paperplane.fill", label: "Send", help: "Send") {
                     sendFirst()

@@ -37,6 +37,7 @@ struct ContentView: View {
   @State private var showAIChat: Bool
   @State private var chatPanelWidth: CGFloat
   @State private var showingProfile = false
+  @State private var aiToggleHovered = false
   private var auth = AuthService.shared
   private let appState = AppStateBridge.shared()
 
@@ -108,19 +109,106 @@ struct ContentView: View {
   }
 
   private var mainAppView: some View {
-    NavigationSplitView(columnVisibility: $sidebarVisibility) {
-      SidebarNavList(selectedItem: $selectedItem)
-      .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 300)
-      .safeAreaInset(edge: .bottom, spacing: 0) {
-        ProfileBar(
-          photoURL: effectivePhotoURL,
-          displayName: auth.currentUser?.displayName,
-          email: auth.currentUser?.email,
-          action: { showingProfile = true }
-        )
+    // Chat panel lives as a PEER of NavigationSplitView, not inside
+    // its detail column. This lets NavigationSplitView negotiate
+    // sidebar-vs-detail cleanly (where it's well-behaved) while the
+    // outer HSplitView handles main-vs-chat (where HSplitView is
+    // well-behaved). The previous structure nested HSplitView inside
+    // NavigationSplitView's detail, and HSplitView's width demands
+    // couldn't propagate up — so opening chat silently crushed the
+    // sidebar below its own declared min.
+    HSplitView {
+      NavigationSplitView(columnVisibility: $sidebarVisibility) {
+        SidebarNavList(selectedItem: $selectedItem)
+          .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 300)
+          .safeAreaInset(edge: .bottom, spacing: 0) {
+            ProfileBar(
+              photoURL: effectivePhotoURL,
+              displayName: auth.currentUser?.displayName,
+              email: auth.currentUser?.email,
+              action: { showingProfile = true }
+            )
+          }
+      } detail: {
+        mainDetail
       }
-    } detail: {
-      detailContent
+      // `maxWidth: .infinity` is the expanding side so the chat
+      // panel's `idealWidth` drives the split position. Without it,
+      // the HSplitView re-negotiates when a sidebar section change
+      // shifts `mainDetail`'s intrinsic width (Library's button is
+      // wider than the other sections' text), which used to drift
+      // the chat panel width.
+      //
+      // `minWidth: 580` = sidebar min (180) + mainDetail min (400),
+      // ensuring the NavigationSplitView side of the outer split is
+      // never crushed below a width that fits both its columns.
+      .frame(minWidth: 580, maxWidth: .infinity)
+
+      if showAIChat {
+        AIChatContainerView()
+          .frame(minWidth: Self.chatMinWidth,
+                 idealWidth: chatPanelWidth,
+                 maxWidth: Self.chatMaxWidth)
+          .background(
+            GeometryReader { proxy in
+              Color.clear.onChange(of: proxy.size.width) { _, newWidth in
+                guard newWidth >= Self.chatMinWidth,
+                      newWidth <= Self.chatMaxWidth else { return }
+                appState.save(String(Double(newWidth)),
+                              forKey: "ai_chat_panel_width")
+              }
+            }
+          )
+          .transition(.move(edge: .trailing))
+      }
+    }
+    .toolbar {
+      // Applied on the outer HSplitView (the thing that spans the
+      // whole window) rather than on NavigationSplitView, so
+      // `.primaryAction` actually lands at the window's right edge.
+      // When the toolbar was on NavigationSplitView it anchored to
+      // the sidebar-plus-detail half only, putting the chat toggle
+      // in the middle of the window.
+      ToolbarItem(placement: .primaryAction) {
+        Button {
+          withAnimation(.easeInOut(duration: 0.2)) {
+            showAIChat.toggle()
+          }
+        } label: {
+          Image(systemName: "sparkles")
+            .pivoxIconToolbar()
+            .symbolVariant(showAIChat ? .fill : .none)
+            .aiShimmerSymbol(isActive: aiToggleHovered)
+            .padding(6)
+            .contentShape(Rectangle())
+            .onHover { aiToggleHovered = $0 }
+        }
+        // `.plain` drops the default toolbar-button chrome, which
+        // includes the subtle gray hover highlight AppKit overlays
+        // on top of the icon. We replace its job with our own icon
+        // shimmer on hover — "cursor is here" without the gray ring
+        // competing with the sparkles glow.
+        .buttonStyle(.plain)
+        // Mouse-click-only side-effect: when opening via pointer,
+        // also steal focus to the message input. `TapGesture` fires
+        // for mouse/touch but NOT for keyboard Space-activation on
+        // a focused button, so a keyboard user Tab'ing around the
+        // UI can toggle the panel without losing their focus
+        // position. The deferred check reads `showAIChat` after all
+        // synchronous gesture handlers have run, so whichever order
+        // SwiftUI dispatches them, we only post when the panel is
+        // actually now open.
+        .simultaneousGesture(
+          TapGesture().onEnded {
+            DispatchQueue.main.async {
+              if showAIChat {
+                NotificationCenter.default.post(name: .aiChatFocusRequested, object: nil)
+              }
+            }
+          }
+        )
+        .help("Toggle AI Chat (⌘⇧A)")
+      }
     }
     .sheet(isPresented: $showingProfile) {
       // Fixed frame so switching between Account / Security tabs
@@ -154,68 +242,11 @@ struct ContentView: View {
       // onto this invisible element and user sees "Tab did nothing".
       .focusable(false)
     }
-    .toolbar {
-      ToolbarItem(placement: .primaryAction) {
-        Button {
-          withAnimation(.easeInOut(duration: 0.2)) {
-            showAIChat.toggle()
-          }
-        } label: {
-          Image(systemName: showAIChat
-            ? "bubble.left.and.text.bubble.right.fill"
-            : "bubble.left.and.text.bubble.right")
-            .pivoxIconToolbar()
-        }
-        .help("Toggle AI Chat (⌘⇧A)")
-      }
-    }
     .onChange(of: isImageEditing) { _, editing in
       NSApp.keyWindow?.appearance =
         editing
         ? NSAppearance(named: .darkAqua)
         : nil
-    }
-  }
-
-  @ViewBuilder
-  private var detailContent: some View {
-    HSplitView {
-      // Main content area. `maxWidth: .infinity` locks in a stable
-      // ideal width across sections — without it, HSplitView sees
-      // different intrinsic widths per section (e.g. Library's button
-      // is wider than the placeholder texts) and re-splits the chat
-      // panel accordingly when you switch sidebar items.
-      mainDetail
-        .frame(minWidth: 400, maxWidth: .infinity)
-
-      // AI Chat panel — slides in from right. Width persists across
-      // launches: initial size from AppState at mount. Subsequent
-      // user drags are observed via a GeometryReader and persisted to
-      // AppState, but we deliberately do NOT write back into
-      // `chatPanelWidth` at runtime. Doing so creates a feedback loop
-      // with `idealWidth`: GeometryReader observes width → updates
-      // state → idealWidth changes → HSplitView rebalances → observed
-      // width changes again. That loop was visible as the panel
-      // drifting every time the sidebar selection changed, because a
-      // content swap triggers HSplitView to re-propose sizes.
-      if showAIChat {
-        AIChatContainerView()
-          .frame(minWidth: Self.chatMinWidth,
-                 idealWidth: chatPanelWidth,
-                 maxWidth: Self.chatMaxWidth)
-          .background(
-            GeometryReader { proxy in
-              Color.clear.onChange(of: proxy.size.width) { _, newWidth in
-                guard newWidth >= Self.chatMinWidth,
-                      newWidth <= Self.chatMaxWidth else { return }
-                // Persist only — no runtime state update (see above).
-                appState.save(String(Double(newWidth)),
-                              forKey: "ai_chat_panel_width")
-              }
-            }
-          )
-          .transition(.move(edge: .trailing))
-      }
     }
   }
 

@@ -55,10 +55,12 @@ public struct ConversationView: View {
 
     private var promptInput: some View {
         HStack(spacing: 8) {
-            TextField("Message...", text: $inputText)
-                .textFieldStyle(.roundedBorder)
-                .focused($inputFocused)
-                .onSubmit { sendMessage() }
+            ShimmerPromptField(
+                text: $inputText,
+                placeholder: "Message...",
+                isEnabled: true,
+                onSubmit: sendMessage,
+                focused: $inputFocused)
 
             if viewModel.state == .streaming {
                 IconButton(systemName: "stop.circle.fill", label: "Stop", help: "Stop") {
