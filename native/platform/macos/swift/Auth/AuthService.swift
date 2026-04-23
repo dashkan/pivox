@@ -12,6 +12,16 @@ class AuthService: NSObject {
   static let shared = AuthService()
 
   var currentUser: User?
+  /// Monotonically-bumped counter that triggers `@Observable`
+  /// re-evaluation for consumers outside this file. Firebase mutates
+  /// its `User` reference in place on profile edits (photoURL,
+  /// displayName, etc.), so `@Observable`'s identity-based change
+  /// detection doesn't reliably fire for downstream views that read
+  /// `currentUser.photoURL` etc. Any mutation path that edits the
+  /// user profile in place should bump this; views that need to react
+  /// to such changes should read it inside their body (often just
+  /// `_ = auth.profileRevision` is enough) to establish the dep.
+  var profileRevision: Int = 0
   var isSignedIn: Bool {
     #if UITEST
       if ProcessInfo.processInfo.environment["SKIP_AUTH"] == "1" { return true }
@@ -406,6 +416,7 @@ class AuthService: NSObject {
       try await req.commitChanges()
       try await user.reload()
       currentUser = resolvedAuth.currentUser
+      profileRevision &+= 1
     } catch {
       throw ProfileError.message(firebaseErrorMessage(error))
     }
@@ -437,6 +448,7 @@ class AuthService: NSObject {
       }
       try await user.reload()
       currentUser = resolvedAuth.currentUser
+      profileRevision &+= 1
     } catch {
       throw ProfileError.message(firebaseErrorMessage(error))
     }

@@ -487,9 +487,12 @@ private struct ProfileFieldRow: View {
     @State private var draft: String = ""
     @Environment(\.pivoxTheme) private var theme
 
-    /// Height of both the read-mode row and the edit-mode TextField,
-    /// so switching modes doesn't shift surrounding layout.
-    private let rowHeight: CGFloat = 30
+    /// Outer row height. Sized to match the tallest child across
+    /// both modes (read-mode is dominated by the 32pt IconButton hit
+    /// target) so switching edit mode on/off doesn't shift the
+    /// surrounding layout. Inner controls (TextField, buttons) stay
+    /// at their natural macOS sizes and center inside this frame.
+    private let rowHeight: CGFloat = 32
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -497,38 +500,39 @@ private struct ProfileFieldRow: View {
                 .font(theme.fieldLabelFont)
                 .foregroundStyle(.secondary)
 
-            if editing {
-                HStack(spacing: 6) {
-                    TextField("", text: $draft)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(height: rowHeight)
-                        .onSubmit { onSave(draft) }
-                    Button("Save") { onSave(draft) }
-                        .controlSize(.small)
-                        .keyboardShortcut(.defaultAction)
-                        .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    Button("Cancel") { editing = false }
-                        .controlSize(.small)
-                        .keyboardShortcut(.cancelAction)
-                }
-            } else {
-                HStack(spacing: 8) {
-                    Text(value.isEmpty ? "—" : value)
-                        .font(theme.bodyFont)
-                        .foregroundStyle(value.isEmpty ? .tertiary : .primary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .frame(height: rowHeight, alignment: .leading)
-                    IconButton(
-                        systemName: "pencil",
-                        label: "Edit \(label.lowercased())"
-                    ) {
-                        draft = fetchCurrent()
-                        editing = true
+            Group {
+                if editing {
+                    HStack(spacing: 6) {
+                        TextField("", text: $draft)
+                            .textFieldStyle(.roundedBorder)
+                            .onSubmit { onSave(draft) }
+                        Button("Save") { onSave(draft) }
+                            .buttonStyle(.borderedProminent)
+                            .keyboardShortcut(.defaultAction)
+                            .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        Button("Cancel") { editing = false }
+                            .buttonStyle(.bordered)
+                            .keyboardShortcut(.cancelAction)
                     }
-                    Spacer(minLength: 0)
+                } else {
+                    HStack(spacing: 8) {
+                        Text(value.isEmpty ? "—" : value)
+                            .font(theme.bodyFont)
+                            .foregroundStyle(value.isEmpty ? .tertiary : .primary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        IconButton(
+                            systemName: "pencil",
+                            label: "Edit \(label.lowercased())"
+                        ) {
+                            draft = fetchCurrent()
+                            editing = true
+                        }
+                        Spacer(minLength: 0)
+                    }
                 }
             }
+            .frame(height: rowHeight)
         }
     }
 }

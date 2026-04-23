@@ -94,7 +94,13 @@ struct ContentView: View {
   /// hasn't set a custom photo, Firebase doesn't always mirror Google's
   /// avatar into `user.photoURL` — we dig it out of `providerData`
   /// ourselves so the bar has a picture instead of a silhouette.
+  ///
+  /// Reads `auth.profileRevision` to establish an `@Observable`
+  /// dependency on profile mutations. Firebase's `User` is mutated
+  /// in place on photo/name edits, so without this touchpoint the
+  /// view never re-evaluates and the sidebar keeps the stale photo.
   private var effectivePhotoURL: URL? {
+    _ = auth.profileRevision
     if let url = auth.currentUser?.photoURL { return url }
     return auth.currentUser?.providerData
       .compactMap(\.photoURL)
