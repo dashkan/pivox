@@ -22,7 +22,7 @@ struct RulerSliderRow: View {
   var body: some View {
     HStack(spacing: 8) {
       Image(systemName: icon)
-        .font(.system(size: 13))
+        .font(.callout)
         .foregroundStyle(.secondary)
         .frame(width: 18)
 
@@ -260,12 +260,15 @@ final class RulerSliderNSCell: NSSliderCell {
     }
 
     // Label text (left) + degrees text (right)
+    // Match the SwiftUI `.callout` size used elsewhere in this view
+    // so the ruler labels line up with other UI metrics.
+    let labelFontSize = NSFont.preferredFont(forTextStyle: .callout).pointSize
     let labelAttrs: [NSAttributedString.Key: Any] = [
-      .font: NSFont.systemFont(ofSize: 13),
+      .font: NSFont.systemFont(ofSize: labelFontSize),
       .foregroundColor: NSColor.secondaryLabelColor,
     ]
     let degreeAttrs: [NSAttributedString.Key: Any] = [
-      .font: NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular),
+      .font: NSFont.monospacedDigitSystemFont(ofSize: labelFontSize, weight: .regular),
       .foregroundColor: isActive ? NSColor.labelColor : NSColor.secondaryLabelColor,
     ]
     let labelStr = NSAttributedString(string: label, attributes: labelAttrs)

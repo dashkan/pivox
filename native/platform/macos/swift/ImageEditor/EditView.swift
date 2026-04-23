@@ -81,6 +81,7 @@ struct ImageEditView: View {
     ToolbarItem(placement: .navigation) {
       Button(action: { onCancel?() }) {
         Image(systemName: "chevron.left")
+          .pivoxIconToolbar()
       }
       .help("Back")
       .accessibilityIdentifier("edit-back")
@@ -339,11 +340,11 @@ struct CropToolButton: View {
     Button(action: action) {
       HStack(spacing: 8) {
         Image(systemName: icon)
-          .font(.system(size: 13))
+          .font(.callout)
           .foregroundStyle(.secondary)
           .frame(width: 18)
         Text(label)
-          .font(.system(size: 13))
+          .font(.callout)
           .foregroundStyle(.secondary)
       }
       .frame(maxWidth: .infinity, alignment: .leading)

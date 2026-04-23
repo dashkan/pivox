@@ -56,6 +56,7 @@ public struct ConversationListView: View {
                     }
                 } label: {
                     Image(systemName: "plus")
+                        .pivoxIconToolbar()
                 }
                 .help("New conversation")
             }
@@ -65,8 +66,8 @@ public struct ConversationListView: View {
     private var emptyState: some View {
         VStack(spacing: 12) {
             Image(systemName: "bubble.left.and.bubble.right")
-                .font(.system(size: 40))
-                .foregroundStyle(.secondary)
+                .font(.largeTitle)
+                .foregroundStyle(.tertiary)
             Text("No conversations yet")
                 .font(.headline)
             Button("Start your first conversation") {
@@ -84,8 +85,8 @@ public struct ConversationListView: View {
     private func errorState(_ message: String) -> some View {
         VStack(spacing: 12) {
             Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 40))
-                .foregroundStyle(.secondary)
+                .font(.largeTitle)
+                .foregroundStyle(.tertiary)
             Text(message)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)

@@ -184,7 +184,7 @@ struct NewChatView: View {
             Spacer()
 
             Image(systemName: "bubble.left.and.text.bubble.right")
-                .font(.system(size: 36))
+                .font(.largeTitle)
                 .foregroundStyle(.tertiary)
                 .padding(.bottom, 8)
 

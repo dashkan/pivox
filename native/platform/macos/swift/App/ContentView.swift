@@ -158,6 +158,7 @@ struct ContentView: View {
           Image(systemName: showAIChat
             ? "bubble.left.and.text.bubble.right.fill"
             : "bubble.left.and.text.bubble.right")
+            .pivoxIconToolbar()
         }
         .help("Toggle AI Chat (⌘⇧A)")
       }

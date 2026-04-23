@@ -236,6 +236,11 @@ class ImageEditCanvasNSView: NSView {
     let cw = dc.cw
     let ch = dc.ch
     let vpScale = dc.vpScale
+    // Literal white for crop UI is intentional — these draw on top
+    // of the user's image, not the app background. Using semantic
+    // `labelColor` would render black-on-bright-regions in light
+    // mode (invisible). Every image editor (Photos, Lightroom,
+    // Pixelmator) uses white crop handles regardless of appearance.
     let white = NSColor.white.cgColor
     let gridColor = NSColor.white.withAlphaComponent(0.25).cgColor
 

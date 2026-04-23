@@ -45,7 +45,7 @@ struct LoginView: View {
       // Header
       VStack(spacing: 8) {
         Text("Pivox")
-          .font(.system(size: 32, weight: .bold))
+          .font(.largeTitle.weight(.bold))
         Text("Sign in to your account")
           .font(.subheadline)
           .foregroundStyle(.secondary)

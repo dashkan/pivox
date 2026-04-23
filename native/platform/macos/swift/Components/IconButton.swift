@@ -13,24 +13,26 @@ import SwiftUI
 ///    NativeTooltip)
 ///  - Accessibility label wired through
 ///
-/// Sizing: 13pt glyph by default with ~28pt hit target; override via
-/// the `size` param for places that need more presence.
+/// Sizing is driven by `PivoxTheme.iconToolbar` — the standard icon
+/// font used across the app (17pt .medium by default, matching
+/// Apple's toolbar-icon convention). `iconInline` is available in
+/// the theme as a smaller variant if a specific spot needs it later;
+/// for now every `IconButton` uses the toolbar size for consistency.
 public struct IconButton: View {
     let systemName: String
     let label: String
     let help: String?
     let role: ButtonRole?
-    let size: CGFloat
     /// When true, icon is tinted with the accent color to indicate a
     /// latched / toggled-on state (e.g., thumbs-up after voting).
     let isOn: Bool
-    /// Whether to show a subtle hover background. Off by default for
-    /// actions that live inside tight rows (message action bars); on
-    /// for standalone buttons (chat panel header, toolbars) where the
-    /// affordance cue helps.
+    /// Whether to show a subtle hover background. Off for actions
+    /// inside tight rows that already have their own background;
+    /// on for standalone buttons where the affordance cue helps.
     let showsHoverBackground: Bool
     let action: () -> Void
 
+    @Environment(\.pivoxTheme) private var theme
     @State private var isHovered = false
 
     public init(
@@ -38,7 +40,6 @@ public struct IconButton: View {
         label: String,
         help: String? = nil,
         role: ButtonRole? = nil,
-        size: CGFloat = 13,
         isOn: Bool = false,
         showsHoverBackground: Bool = true,
         action: @escaping () -> Void
@@ -47,17 +48,21 @@ public struct IconButton: View {
         self.label = label
         self.help = help
         self.role = role
-        self.size = size
         self.isOn = isOn
         self.showsHoverBackground = showsHoverBackground
         self.action = action
     }
 
+    /// Hit-target metrics derived from `theme.iconSize`. 17pt glyph
+    /// + 15pt padding = 32pt square hit target, matching Apple's
+    /// default toolbar-button metrics.
+    private static let hitTarget: CGFloat = 32
+
     public var body: some View {
         Button(role: role, action: action) {
             Image(systemName: systemName)
-                .font(.system(size: size))
-                .frame(width: size + 15, height: size + 15)
+                .font(theme.iconToolbar)
+                .frame(width: Self.hitTarget, height: Self.hitTarget)
                 .contentShape(Rectangle())
                 .background(
                     RoundedRectangle(cornerRadius: 6)
@@ -65,7 +70,7 @@ public struct IconButton: View {
                 )
         }
         .buttonStyle(.plain)
-        .foregroundStyle(isOn ? Color.accentColor : Color.secondary)
+        .foregroundStyle(isOn ? theme.accent : theme.textSecondary)
         // reliableHelp routes through an AppKit tooltip shim because
         // SwiftUI's native .help() fails to register on plain-style
         // buttons with no background fill.

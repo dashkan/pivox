@@ -15,6 +15,35 @@ public struct PivoxTheme: Sendable {
     public let headingFont: Font
     public let codeFont: Font
 
+    // Text roles. Use these instead of literals like
+    // `.title3.weight(.semibold)` so a single theme change
+    // propagates everywhere.
+    /// Page-level title (dialog/page headers). 17pt semibold.
+    public let pageTitleFont: Font
+    /// Subsection heading (Profile, Email, Danger zone). 15pt semibold.
+    public let sectionHeadingFont: Font
+    /// Primary row title (e.g. "Delete account" row label). Body
+    /// weight with semibold for emphasis.
+    public let rowTitleFont: Font
+    /// Small label above a field value (Display name, Email, etc.).
+    public let fieldLabelFont: Font
+    /// Status chip text (Verified / Unverified / etc.) — body-small
+    /// at medium weight.
+    public let statusBadgeFont: Font
+
+    // MARK: Icon sizing
+    //
+    // Semantic icon fonts. Starting point is `iconToolbar` used
+    // uniformly everywhere (even tight inline rows) — matches Apple's
+    // toolbar-icon convention (Music/Finder/Mail: 17pt .medium) and
+    // keeps visual language consistent. `iconInline` is kept as a
+    // smaller variant we can opt into later for specific spots if a
+    // real need surfaces. `iconEmptyState` sizes the large placeholder
+    // glyphs in empty/error states.
+    public let iconToolbar: Font
+    public let iconInline: Font
+    public let iconEmptyState: Font
+
     // MARK: Spacing
 
     public let spacingXS: CGFloat
@@ -64,6 +93,16 @@ public struct PivoxTheme: Sendable {
         headingFont: .headline,
         codeFont: .system(.body, design: .monospaced),
 
+        pageTitleFont: .title2.weight(.semibold),
+        sectionHeadingFont: .title3.weight(.semibold),
+        rowTitleFont: .body.weight(.semibold),
+        fieldLabelFont: .subheadline,
+        statusBadgeFont: .callout.weight(.medium),
+
+        iconToolbar: .system(size: 17, weight: .medium),
+        iconInline: .system(size: 14, weight: .medium),
+        iconEmptyState: .largeTitle,
+
         spacingXS: 4,
         spacingSM: 8,
         spacingMD: 12,
@@ -108,4 +147,78 @@ extension EnvironmentValues {
         get { self[PivoxThemeKey.self] }
         set { self[PivoxThemeKey.self] = newValue }
     }
+}
+
+// MARK: - Convenience modifiers
+//
+// These read the theme from the environment so call sites don't need
+// `@Environment(\.pivoxTheme)` plumbing for one-off icon sizing.
+// Prefer these over hand-written `.font(.system(size: 17, weight: .medium))`.
+
+extension View {
+    /// Standard toolbar/action icon sizing. 17pt .medium by default;
+    /// adapts if the theme is overridden via environment.
+    public func pivoxIconToolbar() -> some View {
+        modifier(PivoxIconToolbarModifier())
+    }
+
+    /// Compact inline icon sizing. 14pt .medium by default.
+    public func pivoxIconInline() -> some View {
+        modifier(PivoxIconInlineModifier())
+    }
+
+    /// Large empty/error state glyph sizing.
+    public func pivoxIconEmptyState() -> some View {
+        modifier(PivoxIconEmptyStateModifier())
+    }
+}
+
+private struct PivoxIconToolbarModifier: ViewModifier {
+    @Environment(\.pivoxTheme) private var theme
+    func body(content: Content) -> some View {
+        content.font(theme.iconToolbar)
+    }
+}
+
+private struct PivoxIconInlineModifier: ViewModifier {
+    @Environment(\.pivoxTheme) private var theme
+    func body(content: Content) -> some View {
+        content.font(theme.iconInline)
+    }
+}
+
+private struct PivoxIconEmptyStateModifier: ViewModifier {
+    @Environment(\.pivoxTheme) private var theme
+    func body(content: Content) -> some View {
+        content.font(theme.iconEmptyState)
+    }
+}
+
+// MARK: - Label style
+//
+// `Label(text, systemImage:)` sizes both the title and the icon from
+// the ambient font — which at default button sizing gives a small
+// icon (~13pt). For buttons we want the "chat icon" feel (17pt medium)
+// without upsizing the text, so this label style pins the icon to the
+// toolbar-icon token and leaves the title at the ambient font.
+
+public struct PivoxIconLabelStyle: LabelStyle {
+    @Environment(\.pivoxTheme) private var theme
+
+    public init() {}
+
+    public func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 6) {
+            configuration.icon.font(theme.iconToolbar)
+            configuration.title
+        }
+    }
+}
+
+extension LabelStyle where Self == PivoxIconLabelStyle {
+    /// Button-friendly label style that upsizes the icon to
+    /// `theme.iconToolbar` while leaving the title at the button's
+    /// ambient font. Matches the visual weight of our chat panel
+    /// IconButtons on text+icon buttons elsewhere in the app.
+    public static var pivoxIcon: PivoxIconLabelStyle { PivoxIconLabelStyle() }
 }

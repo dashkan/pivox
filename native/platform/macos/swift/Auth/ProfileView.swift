@@ -88,6 +88,7 @@ struct ProfileView: View {
 private struct AccountPage: View {
     let onError: (Error) -> Void
     private var auth = AuthService.shared
+    @Environment(\.pivoxTheme) private var theme
 
     init(onError: @escaping (Error) -> Void) {
         self.onError = onError
@@ -97,17 +98,18 @@ private struct AccountPage: View {
         VStack(alignment: .leading, spacing: 0) {
             // Header: title + Sign out (top-right). Sign out is NOT a
             // destructive action — it's just exiting the session.
-            HStack(alignment: .firstTextBaseline) {
+            HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Account")
-                        .font(.title2.weight(.semibold))
+                        .font(theme.pageTitleFont)
                     Text("Manage your account information.")
-                        .font(.callout)
+                        .font(theme.bodyFont)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button(action: { auth.signOut() }) {
                     Label("Sign out", systemImage: "rectangle.portrait.and.arrow.forward")
+                        .labelStyle(.pivoxIcon)
                 }
                 .controlSize(.regular)
                 .accessibilityIdentifier("profile-sign-out")
@@ -136,6 +138,7 @@ private struct AccountPage: View {
 private struct ProfileSubsection: View {
     let onError: (Error) -> Void
     private var auth = AuthService.shared
+    @Environment(\.pivoxTheme) private var theme
 
     @State private var editingName = false
 
@@ -156,7 +159,7 @@ private struct ProfileSubsection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Profile")
-                .font(.headline)
+                .font(theme.sectionHeadingFont)
 
             HStack(alignment: .top, spacing: 16) {
                 VStack(spacing: 8) {
@@ -247,8 +250,12 @@ private struct PhotoMenuButton: View {
         } label: {
             Text("Change")
         }
+        // Default `menuStyle(.button)` with system-default control
+        // size — matches the scale of other neutral bordered buttons
+        // in this dialog (Sign Out). `.fixedSize()` so the button
+        // hugs its label width instead of stretching with the
+        // enclosing VStack.
         .menuStyle(.button)
-        .controlSize(.small)
         .fixedSize()
     }
 
@@ -300,6 +307,7 @@ private enum ProfileProviderLabel {
 private struct EmailSubsection: View {
     let onError: (Error) -> Void
     private var auth = AuthService.shared
+    @Environment(\.pivoxTheme) private var theme
 
     @State private var sending = false
 
@@ -310,21 +318,21 @@ private struct EmailSubsection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Email")
-                .font(.headline)
+                .font(theme.sectionHeadingFont)
 
             HStack(spacing: 8) {
                 Text(auth.currentUser?.email ?? "—")
-                    .font(.body)
+                    .font(theme.bodyFont)
                 if auth.currentUser?.isEmailVerified == true {
                     Label("Verified", systemImage: "checkmark.seal.fill")
-                        .labelStyle(.titleAndIcon)
-                        .font(.caption)
-                        .foregroundStyle(.green)
+                        .labelStyle(.pivoxIcon)
+                        .font(theme.statusBadgeFont)
+                        .foregroundStyle(theme.success)
                 } else if auth.currentUser != nil {
                     Label("Unverified", systemImage: "exclamationmark.triangle.fill")
-                        .labelStyle(.titleAndIcon)
-                        .font(.caption)
-                        .foregroundStyle(.orange)
+                        .labelStyle(.pivoxIcon)
+                        .font(theme.statusBadgeFont)
+                        .foregroundStyle(theme.warning)
                 }
                 Spacer()
             }
@@ -376,23 +384,25 @@ private struct DangerSubsection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Danger zone")
-                .font(.headline)
+                .font(theme.sectionHeadingFont)
                 .foregroundStyle(theme.destructive)
 
-            HStack(alignment: .firstTextBaseline) {
+            HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Delete account")
-                        .font(.callout.weight(.medium))
+                        .font(theme.rowTitleFont)
                     Text("Permanently remove your Pivox account. This can't be undone.")
-                        .font(.caption)
+                        .font(theme.bodyFont)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button(role: .destructive, action: { confirmDelete = true }) {
                     Label("Delete account", systemImage: "trash")
+                        .labelStyle(.pivoxIcon)
                         .foregroundStyle(.white)
                 }
                 .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
                 .tint(theme.destructive)
             }
         }
@@ -475,6 +485,7 @@ private struct ProfileFieldRow: View {
     let onSave: (String) -> Void
 
     @State private var draft: String = ""
+    @Environment(\.pivoxTheme) private var theme
 
     /// Height of both the read-mode row and the edit-mode TextField,
     /// so switching modes doesn't shift surrounding layout.
@@ -483,7 +494,7 @@ private struct ProfileFieldRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label)
-                .font(.caption)
+                .font(theme.fieldLabelFont)
                 .foregroundStyle(.secondary)
 
             if editing {
@@ -503,15 +514,14 @@ private struct ProfileFieldRow: View {
             } else {
                 HStack(spacing: 8) {
                     Text(value.isEmpty ? "—" : value)
-                        .font(.body)
+                        .font(theme.bodyFont)
                         .foregroundStyle(value.isEmpty ? .tertiary : .primary)
                         .lineLimit(1)
                         .truncationMode(.middle)
                         .frame(height: rowHeight, alignment: .leading)
                     IconButton(
                         systemName: "pencil",
-                        label: "Edit \(label.lowercased())",
-                        size: 14
+                        label: "Edit \(label.lowercased())"
                     ) {
                         draft = fetchCurrent()
                         editing = true

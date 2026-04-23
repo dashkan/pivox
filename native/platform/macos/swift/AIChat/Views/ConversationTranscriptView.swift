@@ -3,6 +3,14 @@ import Combine
 import PivoxModels
 import SwiftUI
 
+// NSEvent isn't declared `Sendable` by AppKit, but Swift 6 requires
+// the handler passed to `addLocalMonitorForEvents` to be `@Sendable`,
+// which in turn requires its parameter type to conform. The monitor
+// only fires on the main thread for UI events, so the value is
+// effectively main-actor-isolated — declaring unchecked Sendable is
+// the same assumption the rest of AppKit already makes internally.
+extension NSEvent: @retroactive @unchecked Sendable {}
+
 /// AppKit-backed transcript view. `NSScrollView` + `NSTableView` with
 /// per-cell `NSHostingView` rendering the SwiftUI `Message` component.
 ///
@@ -57,8 +65,15 @@ struct ConversationTranscriptView: NSViewRepresentable {
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
-        scrollView.drawsBackground = false
         scrollView.borderType = .noBorder
+        // Transparent background at BOTH layers: the scroll view
+        // itself (which is what `drawsBackground = false` controls)
+        // AND the content view (NSClipView, which independently draws
+        // `NSColor.controlBackgroundColor` by default → near-black in
+        // dark mode, visible as a dark edge against the parent panel).
+        scrollView.drawsBackground = false
+        scrollView.backgroundColor = .clear
+        scrollView.contentView.drawsBackground = false
 
         let tableView = NSTableView()
         tableView.headerView = nil
@@ -113,7 +128,17 @@ struct ConversationTranscriptView: NSViewRepresentable {
             name: NSView.boundsDidChangeNotification,
             object: scrollView.contentView)
 
+        // Install the scroll-event forwarder so vertical scrolls over
+        // nested horizontal scroll views (code blocks) reach our
+        // transcript scroll view instead of being swallowed by the
+        // inner scroller. See `installScrollMonitor` for details.
+        context.coordinator.installScrollMonitor()
+
         return scrollView
+    }
+
+    static func dismantleNSView(_ nsView: NSScrollView, coordinator: Coordinator) {
+        coordinator.teardown()
     }
 
     /// `updateNSView` fires whenever an observed property on
@@ -196,6 +221,16 @@ struct ConversationTranscriptView: NSViewRepresentable {
         /// reusing one and swapping `rootView` is ~100x cheaper.
         private let sizingHost = NSHostingController(rootView: AnyView(EmptyView()))
 
+        /// Window-level scroll-wheel monitor used to forward
+        /// predominantly vertical scroll events to our scroll view
+        /// even when the cursor is over a nested horizontal-scroll
+        /// view (e.g. a code block). Without this, hit-testing
+        /// dispatches the event to the inner `NSScrollView`, which
+        /// swallows it even though it can only scroll horizontally —
+        /// producing the "mouse over code block freezes transcript
+        /// scroll" bug.
+        private var scrollMonitor: Any?
+
         /// Width at which each row's height in `heightCache` is
         /// valid. Rows whose entry here doesn't match the current
         /// effective width are stale and get re-measured the next
@@ -213,6 +248,56 @@ struct ConversationTranscriptView: NSViewRepresentable {
         init(viewModel: ConversationViewModel) {
             self.viewModel = viewModel
             super.init()
+        }
+
+        // MARK: - Scroll forwarding
+
+        func installScrollMonitor() {
+            scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+                guard let self else { return event }
+                return MainActor.assumeIsolated { self.routeScrollEvent(event) }
+            }
+        }
+
+        func teardown() {
+            if let monitor = scrollMonitor {
+                NSEvent.removeMonitor(monitor)
+                scrollMonitor = nil
+            }
+        }
+
+        /// Scrolls the clip view origin to the bottom of the
+        /// document. Requires a valid layout pass — call after the
+        /// table has had a chance to measure its rows (next runloop
+        /// tick after `reloadData`).
+        private func scrollToBottom() {
+            guard let scrollView, let tableView, !rows.isEmpty else { return }
+            tableView.layoutSubtreeIfNeeded()
+            let docHeight = tableView.frame.height
+            let clipHeight = scrollView.contentView.bounds.height
+            guard docHeight > clipHeight else { return }
+            let origin = NSPoint(x: 0, y: docHeight - clipHeight)
+            scrollView.contentView.scroll(to: origin)
+            scrollView.reflectScrolledClipView(scrollView.contentView)
+        }
+
+        /// Routes a scroll wheel event: if it's inside our scroll
+        /// view and predominantly vertical, we deliver it directly
+        /// to our scroll view and consume it (return nil). If it's
+        /// predominantly horizontal, we let it continue down the
+        /// normal dispatch path so code blocks' inner horizontal
+        /// scrolling still works. Events outside our scroll view or
+        /// from other windows pass through unchanged.
+        private func routeScrollEvent(_ event: NSEvent) -> NSEvent? {
+            guard let scrollView, let window = scrollView.window,
+                  event.window === window else { return event }
+            let pointInScroll = scrollView.convert(event.locationInWindow, from: nil)
+            guard scrollView.bounds.contains(pointInScroll) else { return event }
+            if abs(event.scrollingDeltaY) >= abs(event.scrollingDeltaX) {
+                scrollView.scrollWheel(with: event)
+                return nil
+            }
+            return event
         }
 
         // MARK: - Sync
@@ -252,13 +337,22 @@ struct ConversationTranscriptView: NSViewRepresentable {
                     hasScrolledToBottomOnce = true
                     // Defer the scroll to next runloop tick: after
                     // reloadData, NSTableView needs a layout pass
-                    // before row rects are valid. Calling
-                    // scrollRowToVisible synchronously scrolls to
-                    // stale (pre-layout) coordinates — you end up
-                    // somewhere mid-content instead of the bottom.
+                    // before row rects are valid. Calling scroll
+                    // synchronously lands on stale (pre-layout)
+                    // coordinates — you end up somewhere mid-content
+                    // instead of the bottom.
+                    //
+                    // We do NOT use `scrollRowToVisible(last)` here:
+                    // that API only scrolls the minimum amount to
+                    // make the row visible, which leaves the last
+                    // row flush against the top of the viewport if
+                    // content is tall. We want the transcript bottom
+                    // flush with the viewport bottom — newest
+                    // message sitting just above the prompt input —
+                    // so we scroll the clip view origin explicitly
+                    // to `contentHeight - clipHeight`.
                     DispatchQueue.main.async { [weak self] in
-                        guard let self, !self.rows.isEmpty else { return }
-                        self.tableView?.scrollRowToVisible(self.rows.count - 1)
+                        self?.scrollToBottom()
                     }
                 }
             } else if prependCount > 0 {

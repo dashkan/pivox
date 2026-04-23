@@ -26,7 +26,7 @@ struct ProfileBar: View {
             HStack(spacing: 10) {
                 ProfileBarAvatar(photoURL: photoURL, size: Self.avatarSize)
                 Text(displayLabel)
-                    .font(.system(size: 14))
+                    .font(.body)
                     .foregroundStyle(.primary)
                     .lineLimit(1)
                     .truncationMode(.tail)
