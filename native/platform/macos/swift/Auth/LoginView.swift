@@ -36,8 +36,14 @@ struct LoginView: View {
     VStack(spacing: 0) {
       Spacer()
 
-      authCard
-        .padding(.horizontal, 40)
+      Group {
+        if auth.pendingMFAResolver != nil {
+          MFAChallengeView(auth: auth)
+        } else {
+          authCard
+        }
+      }
+      .padding(.horizontal, 40)
 
       Spacer()
     }
@@ -241,5 +247,80 @@ struct LoginView: View {
         appState.save(rememberMe ? email : "", forKey: "remembered_email")
       }
     }
+  }
+}
+
+/// Second-factor challenge shown on the login card when the first
+/// factor (email/password or OAuth) succeeded but the account has
+/// TOTP enrolled. Styled to match `LoginView.authCard` so the
+/// window chrome doesn't shift when we swap between the sign-in
+/// form and this challenge.
+private struct MFAChallengeView: View {
+  let auth: AuthService
+
+  @Environment(\.pivoxTheme) private var theme
+  @AppStorage("debug.auth.glass_card") private var useGlassCard: Bool = true
+
+  @State private var code: String = ""
+  @State private var isVerifying = false
+  @State private var errorMessage: String?
+
+  var body: some View {
+    VStack(spacing: 24) {
+      VStack(spacing: 8) {
+        Image(systemName: "lock.shield")
+          .font(.system(size: 32, weight: .regular))
+          .foregroundStyle(.secondary)
+        Text("Two-factor authentication")
+          .font(theme.brandTitleFont)
+        Text("Enter the 6-digit code from your authenticator app.")
+          .font(theme.bodyFont)
+          .foregroundStyle(.secondary)
+          .multilineTextAlignment(.center)
+      }
+
+      OTPSegmentedField(value: $code, length: 6)
+
+      AuthPrimaryButton("Verify", isLoading: isVerifying, action: verify)
+        .disabled(code.count < 6 || isVerifying)
+        .accessibilityIdentifier("mfa-verify")
+
+      Text(errorMessage ?? " ")
+        .font(theme.bodyFont)
+        .foregroundStyle(theme.destructive)
+        .multilineTextAlignment(.center)
+        .opacity(errorMessage != nil ? 1 : 0)
+
+      Button("Use a different account", action: cancel)
+        .buttonStyle(.link)
+        .font(theme.bodyFont)
+        .disabled(isVerifying)
+        .accessibilityIdentifier("mfa-cancel")
+    }
+    .padding(32)
+    .frame(maxWidth: 400)
+    .glassCardIfEnabled(useGlassCard)
+  }
+
+  private func verify() {
+    guard code.count == 6 else { return }
+    isVerifying = true
+    errorMessage = nil
+    Task {
+      defer { isVerifying = false }
+      do {
+        try await auth.completeMFASignIn(code: code)
+      } catch let error as ProfileError {
+        errorMessage = error.userMessage
+        code = ""
+      } catch {
+        errorMessage = error.localizedDescription
+        code = ""
+      }
+    }
+  }
+
+  private func cancel() {
+    auth.cancelMFASignIn()
   }
 }

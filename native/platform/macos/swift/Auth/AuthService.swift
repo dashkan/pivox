@@ -40,6 +40,17 @@ class AuthService: NSObject {
   var errorMessage: String?
   private var isOAuthInProgress = false
 
+  /// Non-nil while a sign-in attempt has succeeded past the first
+  /// factor but still needs a TOTP code. The UI observes this and
+  /// swaps to a 6-digit input screen; `completeMFASignIn(code:)`
+  /// finishes the flow, `cancelMFASignIn()` discards it.
+  ///
+  /// Lives at the service layer rather than being thrown out of
+  /// `signIn(...)` because the sign-in methods here set
+  /// `errorMessage` instead of throwing, and the MFA-required case
+  /// is *not* an error — it's a continuation point.
+  var pendingMFAResolver: MultiFactorResolver?
+
   // The Firebase Auth instance this service talks to. The default-init path
   // binds to the default Firebase app (`Auth.auth()`). Delegated auth flows
   // (AUTHN-07) construct an AuthService bound to a *named* Firebase app so
@@ -141,6 +152,10 @@ class AuthService: NSObject {
         appState.saveSecure(token, forKey: "firebase_id_token")
       }
     } catch {
+      if let resolver = multiFactorResolver(from: error) {
+        pendingMFAResolver = resolver
+        return
+      }
       errorMessage = firebaseErrorMessage(error)
     }
   }
@@ -194,6 +209,10 @@ class AuthService: NSObject {
       // User canceled the browser sheet — not an error.
       return
     } catch {
+      if let resolver = multiFactorResolver(from: error) {
+        pendingMFAResolver = resolver
+        return
+      }
       errorMessage = firebaseErrorMessage(error)
     }
   }
@@ -325,6 +344,10 @@ class AuthService: NSObject {
     } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
       return
     } catch {
+      if let resolver = multiFactorResolver(from: error) {
+        pendingMFAResolver = resolver
+        return
+      }
       errorMessage = firebaseErrorMessage(error)
     }
   }
@@ -593,6 +616,58 @@ class AuthService: NSObject {
   /// inherited from the Obj-C bridge; the raw string is a stable
   /// Firebase contract ("totp") so we use it directly.
   private static let totpFactorID = "totp"
+
+  /// Completes a sign-in that paused on the second-factor step.
+  /// Uses the first TOTP hint in the resolver — we only enroll one
+  /// factor, so the array has exactly one element in practice. The
+  /// resolver is cleared on success so the LoginView falls back to
+  /// the normal form.
+  func completeMFASignIn(code: String) async throws {
+    guard let resolver = pendingMFAResolver else {
+      throw ProfileError.message("No sign-in in progress.")
+    }
+    guard let hint = resolver.hints.first(where: {
+      $0.factorID == Self.totpFactorID
+    }) else {
+      throw ProfileError.message("No authenticator is enrolled on this account.")
+    }
+    let assertion = TOTPMultiFactorGenerator.assertionForSignIn(
+      withEnrollmentID: hint.uid, oneTimePassword: code)
+    do {
+      let result = try await resolver.resolveSignIn(with: assertion)
+      currentUser = result.user
+      pendingMFAResolver = nil
+      if persistCredentials, let token = try? await result.user.getIDToken() {
+        appState.saveSecure(token, forKey: "firebase_id_token")
+      }
+    } catch {
+      // Leave the resolver in place so the user can retry with a
+      // fresh code — TOTP codes tick every 30s and a wrong entry
+      // shouldn't unwind them back to the email/password form.
+      throw mapToProfileError(error)
+    }
+  }
+
+  /// Drop the pending MFA sign-in. No-op if there's none in flight.
+  func cancelMFASignIn() {
+    pendingMFAResolver = nil
+  }
+
+  /// Pulls a `MultiFactorResolver` out of a sign-in error when
+  /// Firebase returned `secondFactorRequired`. Returns nil for any
+  /// other error — caller should treat those as real failures.
+  private func multiFactorResolver(from error: Error) -> MultiFactorResolver? {
+    let ns = error as NSError
+    guard
+      ns.domain == AuthErrorDomain,
+      AuthErrorCode(rawValue: ns.code) == .secondFactorRequired,
+      let resolver = ns.userInfo[AuthErrorUserInfoMultiFactorResolverKey]
+        as? MultiFactorResolver
+    else {
+      return nil
+    }
+    return resolver
+  }
 
   /// Async wrapper around `multiFactor.getSessionWithCompletion`.
   /// Unlike the other MFA methods, the iOS SDK's
