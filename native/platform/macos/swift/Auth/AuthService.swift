@@ -779,16 +779,25 @@ class AuthService: NSObject {
     guard let user = resolvedAuth.currentUser else {
       throw ProfileError.notSignedIn
     }
-    guard let factor = user.multiFactor.enrolledFactors.first(where: {
-      $0.factorID == Self.totpFactorID
-    }) else {
-      throw ProfileError.message("No authenticator is enrolled.")
-    }
     do {
+      // Refresh before reading enrolledFactors. Firebase's local
+      // user object can lag after a reauthenticate-via-OAuth round
+      // trip — `enrolledFactors` returns an empty array until the
+      // next reload, which would make the "No authenticator is
+      // enrolled" guard fire even though the server-side factor
+      // is still there.
+      try await user.reload()
+      guard let factor = user.multiFactor.enrolledFactors.first(where: {
+        $0.factorID == Self.totpFactorID
+      }) else {
+        throw ProfileError.message("No authenticator is enrolled.")
+      }
       try await user.multiFactor.unenroll(with: factor)
       try await user.reload()
       currentUser = resolvedAuth.currentUser
       profileRevision &+= 1
+    } catch let profileError as ProfileError {
+      throw profileError
     } catch {
       throw mapToProfileError(error)
     }
@@ -802,6 +811,21 @@ class AuthService: NSObject {
   /// last auth), throwing `auth/requires-recent-login` otherwise.
   /// Each linked provider needs its own reauth path — callers pick
   /// the one matching the method the user wants to use now.
+  ///
+  /// ## MFA-enrolled accounts
+  /// When the account has TOTP enrolled, Firebase requires the
+  /// reauth flow itself to include the second factor. The first-
+  /// factor reauth (password or OAuth) throws
+  /// `secondFactorRequired`; we capture the resolver into
+  /// `pendingReauthResolver` and throw `.requiresSecondFactor` so
+  /// the UI can prompt for the TOTP code. The caller then calls
+  /// `completeReauthSecondFactor(code:)` to finish the flow.
+
+  /// Resolver in flight while a reauth is paused on its second
+  /// factor. The UI watches `requiresSecondFactor` errors and
+  /// drives the OTP step; we hold the resolver here so the second
+  /// step has it available.
+  private var pendingReauthResolver: MultiFactorResolver?
 
   func reauthenticateWithPassword(_ password: String) async throws {
     guard let user = resolvedAuth.currentUser, let email = user.email else {
@@ -811,7 +835,7 @@ class AuthService: NSObject {
     do {
       _ = try await user.reauthenticate(with: credential)
     } catch {
-      throw mapToProfileError(error)
+      try captureReauthSecondFactorOrRethrow(error)
     }
   }
 
@@ -827,7 +851,7 @@ class AuthService: NSObject {
     } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
       throw ProfileError.message("Re-authentication cancelled.")
     } catch {
-      throw mapToProfileError(error)
+      try captureReauthSecondFactorOrRethrow(error)
     }
   }
 
@@ -842,8 +866,51 @@ class AuthService: NSObject {
     } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
       throw ProfileError.message("Re-authentication cancelled.")
     } catch {
+      try captureReauthSecondFactorOrRethrow(error)
+    }
+  }
+
+  /// Inspect a reauth error: if Firebase asked for the second
+  /// factor, stash the resolver and throw
+  /// `.requiresSecondFactor` so the UI can drive the OTP step.
+  /// Otherwise re-throw via the normal mapper.
+  private func captureReauthSecondFactorOrRethrow(_ error: Error) throws {
+    if let resolver = multiFactorResolver(from: error) {
+      pendingReauthResolver = resolver
+      throw ProfileError.requiresSecondFactor
+    }
+    throw mapToProfileError(error)
+  }
+
+  /// Finish a paused reauth using a TOTP code. Mirrors
+  /// `completeMFASignIn(code:)` but for the reauth flow:
+  /// `resolver.resolveSignIn(with:)` is the same call Firebase
+  /// uses for both — internally it completes whichever flow the
+  /// resolver was created for. On success the user has a fresh
+  /// session and the caller can retry the original sensitive op.
+  func completeReauthSecondFactor(code: String) async throws {
+    guard let resolver = pendingReauthResolver else {
+      throw ProfileError.message("No re-authentication in progress.")
+    }
+    guard let hint = resolver.hints.first(where: {
+      $0.factorID == Self.totpFactorID
+    }) else {
+      throw ProfileError.message("No authenticator is enrolled on this account.")
+    }
+    let assertion = TOTPMultiFactorGenerator.assertionForSignIn(
+      withEnrollmentID: hint.uid, oneTimePassword: code)
+    do {
+      _ = try await resolver.resolveSignIn(with: assertion)
+      pendingReauthResolver = nil
+    } catch {
       throw mapToProfileError(error)
     }
+  }
+
+  /// Drop any in-flight reauth resolver. Called when the user
+  /// cancels the OTP step or backs out of the reauth view.
+  func cancelReauthSecondFactor() {
+    pendingReauthResolver = nil
   }
 
   // MARK: - Sign Out
@@ -906,7 +973,12 @@ class AuthService: NSObject {
     case .operationNotAllowed:
       return "This sign-in provider is not enabled."
     default:
-      return "Something went wrong. Please try again."
+      // Fall through to Firebase's localized description for codes
+      // we haven't mapped yet (especially MFA-specific ones).
+      // "Something went wrong" is useless for diagnosis — the
+      // underlying message ("MFA enrollment failed", "Invalid
+      // verification code", etc.) is at least actionable.
+      return nsError.localizedDescription
     }
   }
 }
@@ -918,6 +990,11 @@ class AuthService: NSObject {
 enum ProfileError: Error {
   case notSignedIn
   case requiresRecentLogin
+  /// Reauth started successfully but the account is MFA-enrolled,
+  /// so Firebase wants the second-factor verification before the
+  /// reauth is considered complete. Caller should drive an OTP
+  /// step and finish via `AuthService.completeReauthSecondFactor`.
+  case requiresSecondFactor
   case message(String)
 
   var userMessage: String {
@@ -925,6 +1002,8 @@ enum ProfileError: Error {
     case .notSignedIn: return "Not signed in"
     case .requiresRecentLogin:
       return "For your security, please sign out and sign in again before making this change."
+    case .requiresSecondFactor:
+      return "Enter the code from your authenticator app to continue."
     case .message(let m): return m
     }
   }

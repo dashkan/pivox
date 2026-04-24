@@ -167,6 +167,7 @@ struct ContentView: View {
               displayName: auth.currentUser?.displayName,
               email: auth.currentUser?.email,
               onSettings: { AppDelegate.shared?.showSettings(tab: .account) },
+              onSecurity: { AppDelegate.shared?.showSettings(tab: .security) },
               onSignOut: { auth.signOut() }
             )
           }

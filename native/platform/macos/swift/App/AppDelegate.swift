@@ -1,7 +1,7 @@
 import Cocoa
 import SwiftUI
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
   /// Convenience accessor for the live AppDelegate instance. Set up
   /// in `main.swift` as `NSApp.delegate`; this casts back for code
   /// in SwiftUI views that needs to reach into AppKit-hosted
@@ -353,6 +353,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     settingsItem.target = self
     appMenu.addItem(settingsItem)
     appMenu.addItem(NSMenuItem.separator())
+    let signOutItem = NSMenuItem(
+      title: "Sign Out",
+      action: #selector(signOutAction(_:)),
+      keyEquivalent: "")
+    signOutItem.target = self
+    appMenu.addItem(signOutItem)
+    appMenu.addItem(NSMenuItem.separator())
     appMenu.addItem(
       withTitle: "Quit Pivox", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
     let appMenuItem = NSMenuItem()
@@ -442,5 +449,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let raw = UserDefaults.standard.string(forKey: Self.lastSettingsTabKey) ?? ""
     let tab = SettingsView.Tab(rawValue: raw) ?? .general
     Task { @MainActor in self.showSettings(tab: tab) }
+  }
+
+  /// App menu Sign Out target. Mirrors the sidebar profile menu's
+  /// "Sign Out" item — same effect, different entry point. No
+  /// confirmation dialog: signing out is non-destructive (no data
+  /// loss, can sign back in immediately).
+  @objc private func signOutAction(_ sender: Any?) {
+    AuthService.shared.signOut()
+  }
+
+  /// Disable the Sign Out menu item when there's nothing to sign
+  /// out from. Other menu items go through their own validation
+  /// or are always enabled.
+  ///
+  /// `override` is required because NSObject still carries the
+  /// deprecated `validateMenuItem(_:)` from before
+  /// `NSMenuItemValidation` existed; Swift sees our impl as
+  /// overriding it. The deprecation warning is harmless — AppKit
+  /// still routes menu validation through this method.
+  @available(macOS, deprecated: 11.0)
+  override func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+    if menuItem.action == #selector(signOutAction(_:)) {
+      return AuthService.shared.isSignedIn
+    }
+    return true
   }
 }

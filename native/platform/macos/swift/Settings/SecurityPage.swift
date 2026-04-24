@@ -423,7 +423,16 @@ private struct ReauthenticateView: View {
     private var auth = AuthService.shared
     @Environment(\.pivoxTheme) private var theme
 
+    /// Two-stage reauth state. The first-factor stage shows
+    /// password / OAuth options; if Firebase responds with
+    /// `requiresSecondFactor`, we transition to the OTP stage so
+    /// the user can complete the MFA leg of reauth. Both stages
+    /// have to succeed before we call `onReauthenticated()`.
+    private enum Stage { case firstFactor, secondFactor }
+
+    @State private var stage: Stage = .firstFactor
     @State private var password = ""
+    @State private var otpCode = ""
     @State private var submitting = false
     @State private var errorMessage: String?
 
@@ -447,7 +456,7 @@ private struct ReauthenticateView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
-                Button(action: onCancel) {
+                Button(action: backOrCancel) {
                     Label("Back", systemImage: "chevron.left")
                         .labelStyle(.titleAndIcon)
                 }
@@ -460,9 +469,11 @@ private struct ReauthenticateView: View {
             .padding(.bottom, 8)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Confirm it's you")
+                Text(stage == .firstFactor ? "Confirm it's you" : "Two-factor authentication")
                     .font(theme.pageTitleFont)
-                Text(reason)
+                Text(stage == .firstFactor
+                    ? reason
+                    : "Enter the 6-digit code from your authenticator app to continue.")
                     .font(theme.bodyFont)
                     .foregroundStyle(.secondary)
             }
@@ -472,52 +483,10 @@ private struct ReauthenticateView: View {
 
             HStack {
                 Spacer()
-                VStack(alignment: .leading, spacing: 16) {
-                    if hasPassword {
-                        passwordRow
-                    }
-                    if hasPassword && (hasGoogle || hasGitHub) {
-                        HStack(spacing: 10) {
-                            Rectangle().frame(height: 1).foregroundStyle(theme.border)
-                            Text("or").font(theme.bodySmallFont).foregroundStyle(.secondary)
-                            Rectangle().frame(height: 1).foregroundStyle(theme.border)
-                        }
-                    }
-                    if hasGoogle || hasGitHub {
-                        VStack(spacing: 8) {
-                            if hasGoogle {
-                                Button(action: { runReauth(.google) }) {
-                                    HStack {
-                                        GoogleIcon(size: 16)
-                                        Text("Continue with Google")
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                }
-                                .buttonStyle(.bordered)
-                                .controlSize(.large)
-                                .disabled(submitting)
-                            }
-                            if hasGitHub {
-                                Button(action: { runReauth(.github) }) {
-                                    HStack {
-                                        Image("GitHubLogo")
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fit)
-                                            .frame(width: 16, height: 16)
-                                        Text("Continue with GitHub")
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                }
-                                .buttonStyle(.bordered)
-                                .controlSize(.large)
-                                .disabled(submitting)
-                            }
-                        }
-                    }
-                    if let errorMessage {
-                        Text(errorMessage)
-                            .font(.caption)
-                            .foregroundStyle(.red)
+                Group {
+                    switch stage {
+                    case .firstFactor: firstFactorContent
+                    case .secondFactor: secondFactorContent
                     }
                 }
                 .frame(width: 360)
@@ -526,6 +495,59 @@ private struct ReauthenticateView: View {
             .padding(.vertical, 32)
 
             Spacer()
+        }
+    }
+
+    // MARK: - Stage 1: first factor
+
+    private var firstFactorContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if hasPassword {
+                passwordRow
+            }
+            if hasPassword && (hasGoogle || hasGitHub) {
+                HStack(spacing: 10) {
+                    Rectangle().frame(height: 1).foregroundStyle(theme.border)
+                    Text("or").font(theme.bodySmallFont).foregroundStyle(.secondary)
+                    Rectangle().frame(height: 1).foregroundStyle(theme.border)
+                }
+            }
+            if hasGoogle || hasGitHub {
+                VStack(spacing: 8) {
+                    if hasGoogle {
+                        Button(action: { runReauth(.google) }) {
+                            HStack {
+                                GoogleIcon(size: 16)
+                                Text("Continue with Google")
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                        .disabled(submitting)
+                    }
+                    if hasGitHub {
+                        Button(action: { runReauth(.github) }) {
+                            HStack {
+                                Image("GitHubLogo")
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(width: 16, height: 16)
+                                Text("Continue with GitHub")
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                        .disabled(submitting)
+                    }
+                }
+            }
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
         }
     }
 
@@ -547,6 +569,26 @@ private struct ReauthenticateView: View {
         }
     }
 
+    // MARK: - Stage 2: second factor (TOTP)
+
+    private var secondFactorContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            OTPSegmentedField(
+                value: $otpCode, length: 6, onComplete: completeSecondFactor)
+            HStack {
+                if submitting { ProgressView().controlSize(.small) }
+                Spacer()
+            }
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+
+    // MARK: - Actions
+
     private enum Method { case password, google, github }
 
     private func runReauth(_ method: Method) {
@@ -561,11 +603,51 @@ private struct ReauthenticateView: View {
                 case .github: try await auth.reauthenticateWithGitHub()
                 }
                 onReauthenticated()
+            } catch ProfileError.requiresSecondFactor {
+                // First-factor accepted, but the account is MFA-
+                // enrolled. AuthService has stashed the resolver;
+                // hand off to the OTP stage.
+                stage = .secondFactor
+                errorMessage = nil
+                otpCode = ""
             } catch let error as ProfileError {
                 errorMessage = error.userMessage
             } catch {
                 errorMessage = error.localizedDescription
             }
+        }
+    }
+
+    private func completeSecondFactor() {
+        guard otpCode.count == 6 else { return }
+        submitting = true
+        errorMessage = nil
+        Task {
+            defer { submitting = false }
+            do {
+                try await auth.completeReauthSecondFactor(code: otpCode)
+                onReauthenticated()
+            } catch let error as ProfileError {
+                errorMessage = error.userMessage
+                otpCode = ""
+            } catch {
+                errorMessage = error.localizedDescription
+                otpCode = ""
+            }
+        }
+    }
+
+    /// Back button: in the OTP stage, returns to first-factor and
+    /// drops the pending resolver. In first-factor stage, fully
+    /// cancels the reauth.
+    private func backOrCancel() {
+        if stage == .secondFactor {
+            auth.cancelReauthSecondFactor()
+            otpCode = ""
+            errorMessage = nil
+            stage = .firstFactor
+        } else {
+            onCancel()
         }
     }
 }

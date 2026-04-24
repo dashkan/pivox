@@ -31,6 +31,7 @@ struct ProfileBar: View {
     let displayName: String?
     let email: String?
     let onSettings: () -> Void
+    let onSecurity: () -> Void
     let onSignOut: () -> Void
 
     private static let avatarSize: CGFloat = 32
@@ -86,6 +87,7 @@ struct ProfileBar: View {
         guard let anchor = anchorView else { return }
         let target = MenuActionTarget(
             onSettings: onSettings,
+            onSecurity: onSecurity,
             onSignOut: onSignOut,
             onSwitchOrg: { id in OrgDirectory.shared.switchTo(id) })
         menuActionTarget = target
@@ -112,16 +114,22 @@ struct ProfileBar: View {
 
         menu.addItem(.separator())
 
-        // No ⌘, key equivalent on this item: this entry always
-        // opens Account, but the global ⌘, shortcut opens whichever
-        // tab was used last. Showing ⌘, here would imply they
-        // behave the same, which they don't.
+        // No ⌘, key equivalent on this item: it always opens
+        // Account, but the global ⌘, opens whichever tab was used
+        // last. Showing ⌘, would imply they behave the same.
         let settings = NSMenuItem(
             title: "Settings…",
             action: #selector(MenuActionTarget.openSettings),
             keyEquivalent: "")
         settings.target = target
         menu.addItem(settings)
+
+        let security = NSMenuItem(
+            title: "Security…",
+            action: #selector(MenuActionTarget.openSecurity),
+            keyEquivalent: "")
+        security.target = target
+        menu.addItem(security)
 
         menu.addItem(.separator())
 
@@ -166,20 +174,24 @@ struct ProfileBar: View {
 /// `@objc` methods that wrap the SwiftUI-level closures.
 private final class MenuActionTarget: NSObject {
     let onSettings: () -> Void
+    let onSecurity: () -> Void
     let onSignOut: () -> Void
     let onSwitchOrg: (String) -> Void
 
     init(
         onSettings: @escaping () -> Void,
+        onSecurity: @escaping () -> Void,
         onSignOut: @escaping () -> Void,
         onSwitchOrg: @escaping (String) -> Void
     ) {
         self.onSettings = onSettings
+        self.onSecurity = onSecurity
         self.onSignOut = onSignOut
         self.onSwitchOrg = onSwitchOrg
     }
 
     @objc func openSettings() { onSettings() }
+    @objc func openSecurity() { onSecurity() }
     @objc func openSignOut() { onSignOut() }
 
     @objc func switchOrganization(_ sender: NSMenuItem) {
