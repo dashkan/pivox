@@ -11,7 +11,16 @@ import Foundation
 class AuthService: NSObject {
   static let shared = AuthService()
 
-  var currentUser: User?
+  var currentUser: User? {
+    didSet {
+      // Flush cached avatar images whenever the user changes (sign
+      // in, sign out, account switch). Prevents the next account
+      // from briefly rendering the previous user's photo.
+      if oldValue?.uid != currentUser?.uid {
+        AvatarImageCache.shared.clear()
+      }
+    }
+  }
   /// Monotonically-bumped counter that triggers `@Observable`
   /// re-evaluation for consumers outside this file. Firebase mutates
   /// its `User` reference in place on profile edits (photoURL,
@@ -530,12 +539,188 @@ class AuthService: NSObject {
         appState.deleteSecure(forKey: "firebase_refresh_token")
       }
     } catch {
-      let ns = error as NSError
-      if ns.domain == AuthErrorDomain,
-         AuthErrorCode(rawValue: ns.code) == .requiresRecentLogin {
-        throw ProfileError.requiresRecentLogin
+      throw mapToProfileError(error)
+    }
+  }
+
+  // MARK: - Password
+
+  /// Whether the user has an email/password credential linked. Used
+  /// by the Security page to pick between "Set password" (OAuth-only
+  /// users) and "Change password" (users who already have one).
+  var hasPasswordProvider: Bool {
+    (currentUser?.providerData ?? []).contains { $0.providerID == "password" }
+  }
+
+  /// Add an email/password credential to the current user. This is
+  /// the path for accounts created via OAuth (Google/GitHub) — they
+  /// don't have a password yet, and this links one as an additional
+  /// sign-in method. Sends a verification email after linking so the
+  /// new credential is confirmed.
+  func setPassword(_ newPassword: String) async throws {
+    guard let user = resolvedAuth.currentUser, let email = user.email else {
+      throw ProfileError.notSignedIn
+    }
+    let credential = EmailAuthProvider.credential(withEmail: email, password: newPassword)
+    do {
+      _ = try await user.link(with: credential)
+      try await user.sendEmailVerification()
+      try await user.reload()
+      currentUser = resolvedAuth.currentUser
+      profileRevision &+= 1
+    } catch {
+      throw mapToProfileError(error)
+    }
+  }
+
+  /// Change the password for a user that already has an
+  /// email/password credential. Re-authenticates with the current
+  /// password first because Firebase requires recent auth for
+  /// password changes; if that fails surface the underlying error
+  /// (typically "wrong password" or `requiresRecentLogin`).
+  func changePassword(currentPassword: String, newPassword: String) async throws {
+    guard let user = resolvedAuth.currentUser, let email = user.email else {
+      throw ProfileError.notSignedIn
+    }
+    let credential = EmailAuthProvider.credential(withEmail: email, password: currentPassword)
+    do {
+      _ = try await user.reauthenticate(with: credential)
+      try await user.updatePassword(to: newPassword)
+    } catch {
+      throw mapToProfileError(error)
+    }
+  }
+
+  // MARK: - TOTP (Two-factor authentication)
+
+  /// Firebase's factor ID for TOTP. The iOS SDK exposes this as
+  /// `PhoneMultiFactorInfo.FIRTOTPMultiFactorID`, an awkward name
+  /// inherited from the Obj-C bridge; the raw string is a stable
+  /// Firebase contract ("totp") so we use it directly.
+  private static let totpFactorID = "totp"
+
+  /// Async wrapper around `multiFactor.getSessionWithCompletion`.
+  /// Unlike the other MFA methods, the iOS SDK's
+  /// `getSessionWithCompletion:` takes a nullable completion block,
+  /// so the Swift async bridge doesn't generate an async variant.
+  /// Wrapping manually here keeps the call sites async/await-clean.
+  private static func getMultiFactorSession(for user: User) async throws -> MultiFactorSession {
+    try await withCheckedThrowingContinuation { continuation in
+      user.multiFactor.getSessionWithCompletion { session, error in
+        if let session {
+          continuation.resume(returning: session)
+        } else {
+          continuation.resume(throwing: error ?? ProfileError.message("Failed to start enrollment."))
+        }
       }
-      throw ProfileError.message(firebaseErrorMessage(error))
+    }
+  }
+
+  /// Whether a TOTP second factor is enrolled. Firebase's
+  /// `multiFactor` is a non-optional member on `User` but the
+  /// `enrolledFactors` array may still throw on a stale user object
+  /// during a reload window; we defensively treat any access failure
+  /// as "not enrolled".
+  var isMfaEnrolled: Bool {
+    guard let user = currentUser else { return false }
+    return user.multiFactor.enrolledFactors.contains {
+      $0.factorID == Self.totpFactorID
+    }
+  }
+
+  /// In-flight TOTP enrollment secret. Held between
+  /// `startTotpEnrollment` and `verifyTotpEnrollment` so the verify
+  /// assertion can reference the same secret the QR code was built
+  /// from. Cleared on cancel / success.
+  private var totpSecret: TOTPSecret?
+
+  /// Public DTO returned from `startTotpEnrollment`. Carries just
+  /// the info the UI needs to render the QR screen.
+  struct TOTPEnrollmentContext {
+    /// `otpauth://` URL suitable for rendering as a QR code.
+    let qrCodeURL: String
+    /// Base32-encoded shared secret — shown alongside the QR for
+    /// users whose authenticator app takes manual entry.
+    let sharedSecret: String
+  }
+
+  /// Begin TOTP enrollment. Firebase requires email verification
+  /// before a second factor can be added (otherwise an attacker who
+  /// gains the account could enroll their own 2FA and lock the
+  /// owner out). Returns the context the UI needs to show a QR
+  /// code; the caller must follow up with `verifyTotpEnrollment` or
+  /// `cancelTotpEnrollment`.
+  func startTotpEnrollment() async throws -> TOTPEnrollmentContext {
+    guard let user = resolvedAuth.currentUser else {
+      throw ProfileError.notSignedIn
+    }
+    guard user.isEmailVerified else {
+      throw ProfileError.message(
+        "Verify your email before enabling two-factor authentication.")
+    }
+    do {
+      let session = try await Self.getMultiFactorSession(for: user)
+      let secret = try await TOTPMultiFactorGenerator.generateSecret(with: session)
+      self.totpSecret = secret
+      return TOTPEnrollmentContext(
+        qrCodeURL: secret.generateQRCodeURL(
+          withAccountName: user.email ?? "",
+          issuer: "Pivox"),
+        sharedSecret: secret.sharedSecretKey())
+    } catch {
+      throw mapToProfileError(error)
+    }
+  }
+
+  /// Complete TOTP enrollment with the 6-digit code from the user's
+  /// authenticator app. `startTotpEnrollment` must have been called
+  /// first; throws if there's no secret in flight.
+  func verifyTotpEnrollment(code: String) async throws {
+    guard let user = resolvedAuth.currentUser else {
+      throw ProfileError.notSignedIn
+    }
+    guard let secret = totpSecret else {
+      throw ProfileError.message("No enrollment in progress.")
+    }
+    let assertion = TOTPMultiFactorGenerator.assertionForEnrollment(
+      with: secret, oneTimePassword: code)
+    do {
+      try await user.multiFactor.enroll(with: assertion, displayName: "Authenticator app")
+      totpSecret = nil
+      try await user.reload()
+      currentUser = resolvedAuth.currentUser
+      profileRevision &+= 1
+    } catch {
+      throw mapToProfileError(error)
+    }
+  }
+
+  /// Discard any in-flight enrollment secret. Safe to call from any
+  /// state — no-op if the user never started enrollment.
+  func cancelTotpEnrollment() {
+    totpSecret = nil
+  }
+
+  /// Remove the currently-enrolled TOTP factor. Firebase requires a
+  /// recent login for this operation; stale sessions throw
+  /// `ProfileError.requiresRecentLogin` which the caller should
+  /// handle by prompting for re-auth.
+  func unenrollTotp() async throws {
+    guard let user = resolvedAuth.currentUser else {
+      throw ProfileError.notSignedIn
+    }
+    guard let factor = user.multiFactor.enrolledFactors.first(where: {
+      $0.factorID == Self.totpFactorID
+    }) else {
+      throw ProfileError.message("No authenticator is enrolled.")
+    }
+    do {
+      try await user.multiFactor.unenroll(with: factor)
+      try await user.reload()
+      currentUser = resolvedAuth.currentUser
+      profileRevision &+= 1
+    } catch {
+      throw mapToProfileError(error)
     }
   }
 
@@ -555,7 +740,21 @@ class AuthService: NSObject {
     }
   }
 
-  // MARK: - Sign Out + Error Mapping
+  // MARK: - Error Mapping
+
+  /// Converts a raw Firebase error into a `ProfileError`, preserving
+  /// the distinct `requiresRecentLogin` case so the caller can route
+  /// into a re-auth flow instead of treating it as a generic failure.
+  /// Any other auth-domain error is collapsed into a user-facing
+  /// message via `firebaseErrorMessage`.
+  private func mapToProfileError(_ error: Error) -> ProfileError {
+    let ns = error as NSError
+    if ns.domain == AuthErrorDomain,
+       AuthErrorCode(rawValue: ns.code) == .requiresRecentLogin {
+      return .requiresRecentLogin
+    }
+    return .message(firebaseErrorMessage(error))
+  }
 
   /// Maps Firebase errors to user-facing messages.
   /// These strings MUST match the constants in core/auth/auth_constants.h auth_error namespace
