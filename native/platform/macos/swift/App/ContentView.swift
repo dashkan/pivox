@@ -37,7 +37,6 @@ struct ContentView: View {
   @State private var showAIChat: Bool
   @State private var chatPanelWidth: CGFloat
   @State private var sidebarWidth: CGFloat
-  @State private var showingProfile = false
   @State private var aiToggleHovered = false
   private var auth = AuthService.shared
   private let appState = AppStateBridge.shared()
@@ -101,7 +100,7 @@ struct ContentView: View {
     .onReceive(
       NotificationCenter.default.publisher(for: DelegatedAuthCoordinator.openProfileNotification)
     ) { _ in
-      showingProfile = true
+      AppDelegate.shared?.showSettings(tab: .account)
     }
   }
 
@@ -167,7 +166,8 @@ struct ContentView: View {
               photoURL: effectivePhotoURL,
               displayName: auth.currentUser?.displayName,
               email: auth.currentUser?.email,
-              action: { showingProfile = true }
+              onSettings: { AppDelegate.shared?.showSettings(tab: .account) },
+              onSignOut: { auth.signOut() }
             )
           }
       } detail: {
@@ -250,12 +250,6 @@ struct ContentView: View {
         )
         .help("Toggle AI Chat (⌘⇧A)")
       }
-    }
-    .sheet(isPresented: $showingProfile) {
-      // Fixed frame so switching between Account / Security tabs
-      // doesn't resize the dialog to fit each page's content.
-      ProfileView()
-        .frame(width: 720, height: 620)
     }
     .background {
       // Hotkey target. Lives outside the toolbar button so that

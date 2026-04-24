@@ -2,8 +2,24 @@ import Cocoa
 import SwiftUI
 
 class AppDelegate: NSObject, NSApplicationDelegate {
+  /// Convenience accessor for the live AppDelegate instance. Set up
+  /// in `main.swift` as `NSApp.delegate`; this casts back for code
+  /// in SwiftUI views that needs to reach into AppKit-hosted
+  /// windows (like the Settings window).
+  static var shared: AppDelegate? { NSApp.delegate as? AppDelegate }
+
   var window: NSWindow?
   private let appState = AppStateBridge.shared()
+
+  /// Lazily-initialized settings window controller. The first call
+  /// to `showSettings(tab:)` creates it; every subsequent call
+  /// reuses it and just brings the window forward — same pattern
+  /// Apple uses for System Settings, Xcode Preferences, etc.
+  private var settingsWindowController: SettingsWindowController?
+
+  /// Key under which we persist the last-used Settings tab so ⌘,
+  /// returns the user to where they were.
+  private static let lastSettingsTabKey = "settings.last_tab"
 
   // Delegated auth (AUTHN-07): each `pivox://auth/delegate/signin?session=…`
   // deep link gets its own coordinator, its own NSWindow, and its own named
@@ -330,6 +346,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
       withTitle: "About Pivox", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
       keyEquivalent: "")
     appMenu.addItem(NSMenuItem.separator())
+    let settingsItem = NSMenuItem(
+      title: "Settings…",
+      action: #selector(openSettingsAction(_:)),
+      keyEquivalent: ",")
+    settingsItem.target = self
+    appMenu.addItem(settingsItem)
+    appMenu.addItem(NSMenuItem.separator())
     appMenu.addItem(
       withTitle: "Quit Pivox", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
     let appMenuItem = NSMenuItem()
@@ -388,5 +411,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     mainMenu.addItem(helpMenuItem)
 
     NSApp.mainMenu = mainMenu
+  }
+
+  // MARK: - Settings window
+
+  /// Open the Settings window on a specific tab. Creates the
+  /// window controller on first call and reuses it afterwards so
+  /// the window remembers its on-screen position across opens.
+  /// The requested tab is always applied, so callers with a
+  /// specific deep-link intent (profile button → Account) land on
+  /// the right page even if another tab was shown last.
+  @MainActor
+  func showSettings(tab: SettingsView.Tab) {
+    let controller = settingsWindowController ?? {
+      let c = SettingsWindowController()
+      settingsWindowController = c
+      return c
+    }()
+    controller.show(tab: tab)
+    appState.save(tab.rawValue, forKey: Self.lastSettingsTabKey)
+  }
+
+  /// ⌘, target. Opens Settings on whatever tab the user was on
+  /// last (General if there's no persisted choice yet).
+  @objc private func openSettingsAction(_ sender: Any?) {
+    let raw = appState.loadString(forKey: Self.lastSettingsTabKey) ?? ""
+    let tab = SettingsView.Tab(rawValue: raw) ?? .general
+    Task { @MainActor in self.showSettings(tab: tab) }
   }
 }

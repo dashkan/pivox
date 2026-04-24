@@ -1,15 +1,22 @@
+import AppKit
 import SwiftUI
 
 /// Bottom-of-sidebar account bar. Translucent footer with the
-/// user's avatar and display name; tapping it opens the profile
-/// dialog.
+/// user's avatar, display name, and current organization.
+/// Clicking it opens a menu with Organization switcher, Settings…,
+/// and Sign Out.
+///
+/// The menu opens *upward* (anchored to the top of the bar) so it
+/// doesn't cover the sidebar content below when the bar sits at
+/// the bottom of the sidebar. SwiftUI's `Menu` places its dropdown
+/// in the default downward direction and has no API knob to flip
+/// it; we bridge to `NSMenu.popUp(positioning:at:in:)` with the
+/// last menu item as the positioning anchor, which places that
+/// item at the chosen point and extends the menu upward from
+/// there.
 ///
 /// Uses `.glassEffect(.regular)` on macOS 26+ (native Liquid Glass)
-/// with a `.thinMaterial` fallback on older macOS. We explored a
-/// progressive-blur variant via private `CABackdropLayer` to match
-/// Apple Music's exact look — the code worked but the shipped
-/// surface wasn't worth the App Store exposure. If we ever want
-/// that look back, see git history for `VariableBlurBackdrop`.
+/// with a `.thinMaterial` fallback on older macOS.
 ///
 /// Accepts the fields it renders as plain value types (URL, String)
 /// rather than a Firebase `User` reference — SwiftUI's view-diff
@@ -23,27 +30,48 @@ struct ProfileBar: View {
     let photoURL: URL?
     let displayName: String?
     let email: String?
-    let action: () -> Void
+    let onSettings: () -> Void
+    let onSignOut: () -> Void
 
     private static let avatarSize: CGFloat = 32
 
+    /// Anchor for positioning the AppKit `NSMenu`. Captured from
+    /// the invisible `MenuAnchorCapture` background view.
+    @State private var anchorView: NSView?
+
+    /// Holds the menu's action target so it isn't deallocated
+    /// before the click lands. NSMenuItem only weakly references
+    /// its target; a `let` inside the action would die before the
+    /// user selects an item.
+    @State private var menuActionTarget: MenuActionTarget?
+
+    @Environment(\.pivoxTheme) private var theme
+
     var body: some View {
-        Button(action: action) {
+        Button(action: showUpwardMenu) {
             HStack(spacing: 10) {
                 ProfileBarAvatar(photoURL: photoURL, size: Self.avatarSize)
-                Text(displayLabel)
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(displayLabel)
+                        .font(.body)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Text(OrgDirectory.shared.current.name)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+            .padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(ProfileBarButtonStyle())
+        .background(MenuAnchorCapture { self.anchorView = $0 })
         .modifier(ProfileBarGlassBackground())
         .accessibilityIdentifier("sidebar-profile-bar")
     }
@@ -53,6 +81,125 @@ struct ProfileBar: View {
         if let email = email, !email.isEmpty { return email }
         return "Signed in"
     }
+
+    private func showUpwardMenu() {
+        guard let anchor = anchorView else { return }
+        let target = MenuActionTarget(
+            onSettings: onSettings,
+            onSignOut: onSignOut,
+            onSwitchOrg: { id in OrgDirectory.shared.switchTo(id) })
+        menuActionTarget = target
+
+        let menu = NSMenu()
+
+        // Organization submenu. Parent item has no direct action;
+        // children switch the current org.
+        let orgs = OrgDirectory.shared
+        let orgSubmenu = NSMenu()
+        for org in orgs.all {
+            let item = NSMenuItem(
+                title: org.name,
+                action: #selector(MenuActionTarget.switchOrganization(_:)),
+                keyEquivalent: "")
+            item.target = target
+            item.representedObject = org.id
+            if org.id == orgs.current.id { item.state = .on }
+            orgSubmenu.addItem(item)
+        }
+        let orgItem = NSMenuItem(title: "Organization", action: nil, keyEquivalent: "")
+        orgItem.submenu = orgSubmenu
+        menu.addItem(orgItem)
+
+        menu.addItem(.separator())
+
+        let settings = NSMenuItem(
+            title: "Settings…",
+            action: #selector(MenuActionTarget.openSettings),
+            keyEquivalent: ",")
+        settings.keyEquivalentModifierMask = [.command]
+        settings.target = target
+        menu.addItem(settings)
+
+        menu.addItem(.separator())
+
+        let signOut = NSMenuItem(
+            title: "Sign Out",
+            action: #selector(MenuActionTarget.openSignOut),
+            keyEquivalent: "")
+        signOut.target = target
+        menu.addItem(signOut)
+
+        // Compute the button's top-left in *screen* coordinates so
+        // we can hand an unambiguous point to NSMenu — view-coord
+        // variants have to reason about NSView.isFlipped, which
+        // was the source of the previous "opens at cursor"
+        // behavior. With `in: nil`, `at:` is interpreted as
+        // screen coordinates (origin bottom-left, y grows up).
+        guard let window = anchor.window else { return }
+        let buttonInWindow = anchor.convert(anchor.bounds, to: nil)
+        let buttonInScreen = window.convertToScreen(buttonInWindow)
+        // `positioning: menu.items.last` places the last item's
+        // *top* at the given point. We want the last item's
+        // *bottom* at the button's top so the full menu sits
+        // above the bar — shift the point up by one item height
+        // in screen coords (y grows up, so add). 22pt is the
+        // standard NSMenu row height; small mismatches with the
+        // actual height result in a ~1pt gap or overlap that's
+        // below visual threshold.
+        let itemHeight: CGFloat = 22
+        let anchorPoint = NSPoint(
+            x: buttonInScreen.minX,
+            y: buttonInScreen.maxY + itemHeight)
+        menu.popUp(
+            positioning: menu.items.last,
+            at: anchorPoint,
+            in: nil)
+    }
+}
+
+/// Obj-C bridge target for the NSMenu items. SwiftUI closures
+/// can't be used as NSMenuItem actions directly — NSMenuItem
+/// expects a `Selector` and a target. This tiny class exposes
+/// `@objc` methods that wrap the SwiftUI-level closures.
+private final class MenuActionTarget: NSObject {
+    let onSettings: () -> Void
+    let onSignOut: () -> Void
+    let onSwitchOrg: (String) -> Void
+
+    init(
+        onSettings: @escaping () -> Void,
+        onSignOut: @escaping () -> Void,
+        onSwitchOrg: @escaping (String) -> Void
+    ) {
+        self.onSettings = onSettings
+        self.onSignOut = onSignOut
+        self.onSwitchOrg = onSwitchOrg
+    }
+
+    @objc func openSettings() { onSettings() }
+    @objc func openSignOut() { onSignOut() }
+
+    @objc func switchOrganization(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        onSwitchOrg(id)
+    }
+}
+
+/// Invisible 0-sized NSView that runs a callback with itself on
+/// creation. Used as a `.background` behind the ProfileBar so we
+/// have an NSView anchor in the AppKit world for positioning the
+/// NSMenu. The captured view's geometry tracks the button because
+/// SwiftUI places backgrounds in the same frame as the foreground.
+private struct MenuAnchorCapture: NSViewRepresentable {
+    let onCreated: (NSView) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async { onCreated(view) }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
 }
 
 /// Glass background for the bar — native Liquid Glass on macOS 26+,

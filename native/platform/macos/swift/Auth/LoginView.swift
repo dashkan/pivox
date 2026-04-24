@@ -118,7 +118,11 @@ struct LoginView: View {
       VStack(spacing: 16) {
         TextField("Email", text: $email)
           .textFieldStyle(.roundedBorder)
-          .textContentType(.emailAddress)
+          // `.username`, not `.emailAddress`. Password managers
+          // (1Password, iCloud Keychain, etc.) key on
+          // `.username` to offer login fill; `.emailAddress` is a
+          // Contacts-suggestion hint and doesn't trigger autofill.
+          .textContentType(.username)
           .focused($focusedField, equals: .email)
           .onSubmit { focusedField = .password }
           .disabled(isLoading)
@@ -279,11 +283,15 @@ private struct MFAChallengeView: View {
           .multilineTextAlignment(.center)
       }
 
-      OTPSegmentedField(value: $code, length: 6)
+      OTPSegmentedField(value: $code, length: 6, onComplete: verify)
 
-      AuthPrimaryButton("Verify", isLoading: isVerifying, action: verify)
-        .disabled(code.count < 6 || isVerifying)
-        .accessibilityIdentifier("mfa-verify")
+      // No Verify button: the OTP field auto-submits on 6 digits
+      // via `onComplete`. A button would be disabled until after
+      // auto-submit already fired. Inline spinner below gives the
+      // user the loading signal instead.
+      if isVerifying {
+        ProgressView().controlSize(.small)
+      }
 
       Text(errorMessage ?? " ")
         .font(theme.bodyFont)

@@ -86,7 +86,7 @@ struct RegisterView: View {
       VStack(spacing: 16) {
         TextField("Email", text: $email)
           .textFieldStyle(.roundedBorder)
-          .textContentType(.emailAddress)
+          .textContentType(.username)
           .disabled(isLoading)
           .accessibilityIdentifier("register-email")
 
