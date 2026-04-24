@@ -453,6 +453,21 @@ private struct SecurityPage: View {
 
     @State private var errorMessage: String?
     @State private var enrollment: AuthService.TOTPEnrollmentContext?
+    @State private var pendingReauth: PendingReauth?
+
+    /// Operations that may hit Firebase's "requires-recent-login"
+    /// gate. When that happens we push the reauth view and, after
+    /// a successful reauth, retry the original operation.
+    enum PendingReauth: Identifiable {
+        case enableTotp
+        case disableTotp
+        var id: String {
+            switch self {
+            case .enableTotp: return "enableTotp"
+            case .disableTotp: return "disableTotp"
+            }
+        }
+    }
 
     var body: some View {
         Group {
@@ -461,6 +476,11 @@ private struct SecurityPage: View {
                     context: enrollment,
                     onCancel: cancelEnrollment,
                     onVerified: { self.enrollment = nil })
+            } else if let pendingReauth {
+                ReauthenticateView(
+                    reason: reauthReason(for: pendingReauth),
+                    onCancel: { self.pendingReauth = nil },
+                    onReauthenticated: { runPending(pendingReauth) })
             } else {
                 mainView
             }
@@ -498,10 +518,46 @@ private struct SecurityPage: View {
                     Divider().padding(.vertical, 4)
                     MFASubsection(
                         onError: handleError,
-                        onEnrollmentStarted: { enrollment = $0 })
+                        onEnrollmentStarted: { enrollment = $0 },
+                        onReauthRequired: { pendingReauth = $0 })
                 }
                 .padding(.horizontal, 24)
                 .padding(.vertical, 16)
+            }
+        }
+    }
+
+    private func reauthReason(for op: PendingReauth) -> String {
+        switch op {
+        case .enableTotp:
+            return "To enable two-factor authentication, please confirm it's you."
+        case .disableTotp:
+            return "To disable two-factor authentication, please confirm it's you."
+        }
+    }
+
+    /// Clear the reauth marker and re-run the operation. The
+    /// Firebase session is fresh now so the same method that threw
+    /// `requiresRecentLogin` will succeed this time.
+    private func runPending(_ op: PendingReauth) {
+        pendingReauth = nil
+        switch op {
+        case .enableTotp:
+            Task {
+                do {
+                    let ctx = try await auth.startTotpEnrollment()
+                    enrollment = ctx
+                } catch {
+                    handleError(error)
+                }
+            }
+        case .disableTotp:
+            Task {
+                do {
+                    try await auth.unenrollTotp()
+                } catch {
+                    handleError(error)
+                }
             }
         }
     }
@@ -671,6 +727,7 @@ private func labeledSecureField(_ label: String, text: Binding<String>) -> some 
 private struct MFASubsection: View {
     let onError: (Error) -> Void
     let onEnrollmentStarted: (AuthService.TOTPEnrollmentContext) -> Void
+    let onReauthRequired: (SecurityPage.PendingReauth) -> Void
     private var auth = AuthService.shared
     @Environment(\.pivoxTheme) private var theme
 
@@ -678,10 +735,12 @@ private struct MFASubsection: View {
 
     init(
         onError: @escaping (Error) -> Void,
-        onEnrollmentStarted: @escaping (AuthService.TOTPEnrollmentContext) -> Void
+        onEnrollmentStarted: @escaping (AuthService.TOTPEnrollmentContext) -> Void,
+        onReauthRequired: @escaping (SecurityPage.PendingReauth) -> Void
     ) {
         self.onError = onError
         self.onEnrollmentStarted = onEnrollmentStarted
+        self.onReauthRequired = onReauthRequired
     }
 
     var body: some View {
@@ -739,6 +798,8 @@ private struct MFASubsection: View {
             do {
                 let ctx = try await auth.startTotpEnrollment()
                 onEnrollmentStarted(ctx)
+            } catch ProfileError.requiresRecentLogin {
+                onReauthRequired(.enableTotp)
             } catch {
                 onError(error)
             }
@@ -751,8 +812,155 @@ private struct MFASubsection: View {
             defer { submitting = false }
             do {
                 try await auth.unenrollTotp()
+            } catch ProfileError.requiresRecentLogin {
+                onReauthRequired(.disableTotp)
             } catch {
                 onError(error)
+            }
+        }
+    }
+}
+
+// MARK: - Reauthentication push page
+
+/// "Confirm it's you" surface shown before privileged ops (MFA
+/// enroll/unenroll, account delete if we wire it later). Shows
+/// exactly the reauth methods the user actually has linked — a
+/// password field if they have email/password, and buttons for any
+/// OAuth providers in `providerData`. Picks the first completed
+/// reauth path as success; does not require the user to re-auth
+/// with every linked method.
+private struct ReauthenticateView: View {
+    let reason: String
+    let onCancel: () -> Void
+    let onReauthenticated: () -> Void
+
+    private var auth = AuthService.shared
+    @Environment(\.pivoxTheme) private var theme
+
+    @State private var password = ""
+    @State private var submitting = false
+    @State private var errorMessage: String?
+
+    init(
+        reason: String,
+        onCancel: @escaping () -> Void,
+        onReauthenticated: @escaping () -> Void
+    ) {
+        self.reason = reason
+        self.onCancel = onCancel
+        self.onReauthenticated = onReauthenticated
+    }
+
+    private var providerIDs: [String] {
+        (auth.currentUser?.providerData ?? []).map(\.providerID)
+    }
+    private var hasPassword: Bool { providerIDs.contains("password") }
+    private var hasGoogle: Bool { providerIDs.contains("google.com") }
+    private var hasGitHub: Bool { providerIDs.contains("github.com") }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 10) {
+                Button(action: onCancel) {
+                    Label("Back", systemImage: "chevron.left")
+                        .labelStyle(.titleAndIcon)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 14)
+            .padding(.bottom, 8)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Confirm it's you")
+                    .font(theme.pageTitleFont)
+                Text(reason)
+                    .font(theme.bodyFont)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 16)
+            Divider()
+
+            VStack(alignment: .leading, spacing: 16) {
+                if hasPassword {
+                    passwordRow
+                }
+                if hasPassword && (hasGoogle || hasGitHub) {
+                    HStack(spacing: 10) {
+                        Divider()
+                        Text("or")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Divider()
+                    }
+                    .frame(maxWidth: 360)
+                }
+                if hasGoogle {
+                    Button(action: { runReauth(.google) }) {
+                        Label("Continue with Google", systemImage: "g.circle")
+                    }
+                    .controlSize(.large)
+                    .disabled(submitting)
+                }
+                if hasGitHub {
+                    Button(action: { runReauth(.github) }) {
+                        Label("Continue with GitHub", systemImage: "chevron.left.forwardslash.chevron.right")
+                    }
+                    .controlSize(.large)
+                    .disabled(submitting)
+                }
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 20)
+
+            Spacer()
+        }
+    }
+
+    private var passwordRow: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Enter your password")
+                .font(theme.sectionHeadingFont)
+            HStack(spacing: 8) {
+                SecureField("", text: $password)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 280)
+                    .onSubmit { runReauth(.password) }
+                Button("Continue") { runReauth(.password) }
+                    .keyboardShortcut(.defaultAction)
+                    .controlSize(.regular)
+                    .disabled(password.isEmpty || submitting)
+            }
+        }
+    }
+
+    private enum Method { case password, google, github }
+
+    private func runReauth(_ method: Method) {
+        submitting = true
+        errorMessage = nil
+        Task {
+            defer { submitting = false }
+            do {
+                switch method {
+                case .password: try await auth.reauthenticateWithPassword(password)
+                case .google: try await auth.reauthenticateWithGoogle()
+                case .github: try await auth.reauthenticateWithGitHub()
+                }
+                onReauthenticated()
+            } catch let error as ProfileError {
+                errorMessage = error.userMessage
+            } catch {
+                errorMessage = error.localizedDescription
             }
         }
     }

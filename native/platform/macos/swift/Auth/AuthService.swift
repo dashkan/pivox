@@ -314,79 +314,7 @@ class AuthService: NSObject {
     errorMessage = nil
 
     do {
-      // Entry into the broker. Everything provider-specific
-      // (authorize URL, client_id, scopes, state) is handled
-      // server-side; we just point at the broker and tell it where
-      // we want the user returned to.
-      guard
-        let encodedReturn = githubReturnURL.addingPercentEncoding(
-          withAllowedCharacters: .urlQueryAllowed),
-        let startURL = URL(
-          string: "\(Self.brokerBaseURL)/api/oauth/github/start?return=\(encodedReturn)")
-      else {
-        throw NSError(
-          domain: "AuthService", code: -1,
-          userInfo: [NSLocalizedDescriptionKey: "Failed to build GitHub broker URL"])
-      }
-
-      let finalURL = try await withCheckedThrowingContinuation {
-        (continuation: CheckedContinuation<URL, Error>) in
-        let session = ASWebAuthenticationSession(
-          url: startURL,
-          callbackURLScheme: githubCallbackScheme
-        ) { url, error in
-          if let error = error {
-            continuation.resume(throwing: error)
-          } else if let url = url {
-            continuation.resume(returning: url)
-          } else {
-            continuation.resume(
-              throwing: NSError(
-                domain: "AuthService", code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "No callback URL received"]))
-          }
-        }
-        session.presentationContextProvider = self
-        session.prefersEphemeralWebBrowserSession = false
-        session.start()
-      }
-
-      // Broker returns payload in the URL fragment (not query) so it
-      // never ends up in server logs or Referer headers on the way
-      // back. Fragment format is query-string-like:
-      //   provider=github&kind=github_access_token&token=…
-      let fragment = finalURL.fragment ?? ""
-      let items = URLComponents(string: "?\(fragment)")?.queryItems ?? []
-
-      if let errorCode = items.first(where: { $0.name == "error" })?.value {
-        let description =
-          items.first(where: { $0.name == "error_description" })?.value ?? errorCode
-        throw NSError(
-          domain: "AuthService", code: -1,
-          userInfo: [NSLocalizedDescriptionKey: "GitHub sign-in failed: \(description)"])
-      }
-
-      // Sanity check provider + credential kind before trusting the
-      // token. An attacker who somehow crafted a `pivox://` URL
-      // couldn't fake a signed Firebase credential, but rejecting
-      // unexpected shapes here gives clearer errors if the broker
-      // contract ever drifts.
-      guard items.first(where: { $0.name == "provider" })?.value == "github" else {
-        throw NSError(
-          domain: "AuthService", code: -1,
-          userInfo: [NSLocalizedDescriptionKey: "Broker returned wrong provider"])
-      }
-      guard items.first(where: { $0.name == "kind" })?.value == "github_access_token" else {
-        throw NSError(
-          domain: "AuthService", code: -1,
-          userInfo: [NSLocalizedDescriptionKey: "Broker returned unexpected credential kind"])
-      }
-      guard let accessToken = items.first(where: { $0.name == "token" })?.value else {
-        throw NSError(
-          domain: "AuthService", code: -1,
-          userInfo: [NSLocalizedDescriptionKey: "Callback missing access_token"])
-      }
-
+      let accessToken = try await performGitHubOAuth()
       let credential = GitHubAuthProvider.credential(withToken: accessToken)
       let result = try await resolvedAuth.signIn(with: credential)
       currentUser = result.user
@@ -399,6 +327,73 @@ class AuthService: NSObject {
     } catch {
       errorMessage = firebaseErrorMessage(error)
     }
+  }
+
+  /// Factored GitHub broker flow. Opens the broker in an
+  /// ASWebAuthenticationSession, validates the returned fragment,
+  /// and yields the GitHub access token. Shared between initial
+  /// sign-in and the reauth path used by sensitive profile ops.
+  private func performGitHubOAuth() async throws -> String {
+    guard
+      let encodedReturn = githubReturnURL.addingPercentEncoding(
+        withAllowedCharacters: .urlQueryAllowed),
+      let startURL = URL(
+        string: "\(Self.brokerBaseURL)/api/oauth/github/start?return=\(encodedReturn)")
+    else {
+      throw NSError(
+        domain: "AuthService", code: -1,
+        userInfo: [NSLocalizedDescriptionKey: "Failed to build GitHub broker URL"])
+    }
+
+    let finalURL = try await withCheckedThrowingContinuation {
+      (continuation: CheckedContinuation<URL, Error>) in
+      let session = ASWebAuthenticationSession(
+        url: startURL,
+        callbackURLScheme: githubCallbackScheme
+      ) { url, error in
+        if let error = error {
+          continuation.resume(throwing: error)
+        } else if let url = url {
+          continuation.resume(returning: url)
+        } else {
+          continuation.resume(
+            throwing: NSError(
+              domain: "AuthService", code: -1,
+              userInfo: [NSLocalizedDescriptionKey: "No callback URL received"]))
+        }
+      }
+      session.presentationContextProvider = self
+      session.prefersEphemeralWebBrowserSession = false
+      session.start()
+    }
+
+    let fragment = finalURL.fragment ?? ""
+    let items = URLComponents(string: "?\(fragment)")?.queryItems ?? []
+
+    if let errorCode = items.first(where: { $0.name == "error" })?.value {
+      let description =
+        items.first(where: { $0.name == "error_description" })?.value ?? errorCode
+      throw NSError(
+        domain: "AuthService", code: -1,
+        userInfo: [NSLocalizedDescriptionKey: "GitHub sign-in failed: \(description)"])
+    }
+
+    guard items.first(where: { $0.name == "provider" })?.value == "github" else {
+      throw NSError(
+        domain: "AuthService", code: -1,
+        userInfo: [NSLocalizedDescriptionKey: "Broker returned wrong provider"])
+    }
+    guard items.first(where: { $0.name == "kind" })?.value == "github_access_token" else {
+      throw NSError(
+        domain: "AuthService", code: -1,
+        userInfo: [NSLocalizedDescriptionKey: "Broker returned unexpected credential kind"])
+    }
+    guard let accessToken = items.first(where: { $0.name == "token" })?.value else {
+      throw NSError(
+        domain: "AuthService", code: -1,
+        userInfo: [NSLocalizedDescriptionKey: "Callback missing access_token"])
+    }
+    return accessToken
   }
 
   // MARK: - PKCE Helpers
@@ -719,6 +714,58 @@ class AuthService: NSObject {
       try await user.reload()
       currentUser = resolvedAuth.currentUser
       profileRevision &+= 1
+    } catch {
+      throw mapToProfileError(error)
+    }
+  }
+
+  // MARK: - Reauthentication
+
+  /// Re-establish a "recent" auth state for sensitive ops. Firebase
+  /// gates password change, email change, delete, and second-factor
+  /// enroll/unenroll on a fresh session (typically <5 minutes since
+  /// last auth), throwing `auth/requires-recent-login` otherwise.
+  /// Each linked provider needs its own reauth path — callers pick
+  /// the one matching the method the user wants to use now.
+
+  func reauthenticateWithPassword(_ password: String) async throws {
+    guard let user = resolvedAuth.currentUser, let email = user.email else {
+      throw ProfileError.notSignedIn
+    }
+    let credential = EmailAuthProvider.credential(withEmail: email, password: password)
+    do {
+      _ = try await user.reauthenticate(with: credential)
+    } catch {
+      throw mapToProfileError(error)
+    }
+  }
+
+  func reauthenticateWithGoogle() async throws {
+    guard let user = resolvedAuth.currentUser else {
+      throw ProfileError.notSignedIn
+    }
+    do {
+      let (idToken, accessToken) = try await performGoogleOAuth()
+      let credential = GoogleAuthProvider.credential(
+        withIDToken: idToken, accessToken: accessToken)
+      _ = try await user.reauthenticate(with: credential)
+    } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
+      throw ProfileError.message("Re-authentication cancelled.")
+    } catch {
+      throw mapToProfileError(error)
+    }
+  }
+
+  func reauthenticateWithGitHub() async throws {
+    guard let user = resolvedAuth.currentUser else {
+      throw ProfileError.notSignedIn
+    }
+    do {
+      let accessToken = try await performGitHubOAuth()
+      let credential = GitHubAuthProvider.credential(withToken: accessToken)
+      _ = try await user.reauthenticate(with: credential)
+    } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
+      throw ProfileError.message("Re-authentication cancelled.")
     } catch {
       throw mapToProfileError(error)
     }
