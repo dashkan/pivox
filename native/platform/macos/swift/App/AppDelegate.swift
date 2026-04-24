@@ -18,7 +18,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
   private var settingsWindowController: SettingsWindowController?
 
   /// Key under which we persist the last-used Settings tab so ⌘,
-  /// returns the user to where they were.
+  /// returns the user to where they were last.
   private static let lastSettingsTabKey = "settings.last_tab"
 
   // Delegated auth (AUTHN-07): each `pivox://auth/delegate/signin?session=…`
@@ -416,26 +416,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
   // MARK: - Settings window
 
   /// Open the Settings window on a specific tab. Creates the
-  /// window controller on first call and reuses it afterwards so
-  /// the window remembers its on-screen position across opens.
-  /// The requested tab is always applied, so callers with a
-  /// specific deep-link intent (profile button → Account) land on
-  /// the right page even if another tab was shown last.
+  /// window controller on first call and reuses it afterwards;
+  /// the controller's `onTabChanged` callback (wired here)
+  /// persists the tab on every change — including in-window
+  /// toolbar clicks — so the next ⌘, returns to the same place.
   @MainActor
   func showSettings(tab: SettingsView.Tab) {
     let controller = settingsWindowController ?? {
       let c = SettingsWindowController()
+      c.onTabChanged = { tab in
+        UserDefaults.standard.set(tab.rawValue, forKey: Self.lastSettingsTabKey)
+      }
       settingsWindowController = c
       return c
     }()
     controller.show(tab: tab)
-    appState.save(tab.rawValue, forKey: Self.lastSettingsTabKey)
   }
 
   /// ⌘, target. Opens Settings on whatever tab the user was on
-  /// last (General if there's no persisted choice yet).
+  /// last (General if no choice has been persisted yet). The
+  /// sidebar profile menu's "Settings…" item intentionally
+  /// omits the ⌘, key equivalent because it always lands on
+  /// Account, which doesn't match what ⌘, does.
   @objc private func openSettingsAction(_ sender: Any?) {
-    let raw = appState.loadString(forKey: Self.lastSettingsTabKey) ?? ""
+    let raw = UserDefaults.standard.string(forKey: Self.lastSettingsTabKey) ?? ""
     let tab = SettingsView.Tab(rawValue: raw) ?? .general
     Task { @MainActor in self.showSettings(tab: tab) }
   }

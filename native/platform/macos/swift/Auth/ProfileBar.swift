@@ -112,11 +112,14 @@ struct ProfileBar: View {
 
         menu.addItem(.separator())
 
+        // No ⌘, key equivalent on this item: this entry always
+        // opens Account, but the global ⌘, shortcut opens whichever
+        // tab was used last. Showing ⌘, here would imply they
+        // behave the same, which they don't.
         let settings = NSMenuItem(
             title: "Settings…",
             action: #selector(MenuActionTarget.openSettings),
-            keyEquivalent: ",")
-        settings.keyEquivalentModifierMask = [.command]
+            keyEquivalent: "")
         settings.target = target
         menu.addItem(settings)
 

@@ -26,6 +26,14 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
     /// straight through the binding we pass to `SettingsView`.
     private let selection = SettingsSelection()
 
+    /// Fires after every effective tab change (entry-point or
+    /// toolbar click). The owner uses this to persist the last
+    /// tab — keeping persistence inside this controller would
+    /// leak knowledge of where state is stored. Without this
+    /// callback wired up, in-window tab navigation wouldn't
+    /// influence what ⌘, opens next.
+    var onTabChanged: ((SettingsView.Tab) -> Void)?
+
     private let hostingController: ResizingHostingController<SettingsView>
 
     init() {
@@ -75,13 +83,15 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
     }
 
     /// Single path that writes the selection — updates the
-    /// observable model, the toolbar selection, and the window
-    /// title. Keeps the three in sync regardless of whether the
-    /// change came from `show(tab:)` or a toolbar click.
+    /// observable model, the toolbar selection, the window
+    /// title, and notifies the owner. Keeps the four in sync
+    /// regardless of whether the change came from `show(tab:)`
+    /// or a toolbar click.
     private func applyTab(_ tab: SettingsView.Tab) {
         selection.tab = tab
         window?.toolbar?.selectedItemIdentifier = tab.toolbarIdentifier
         window?.title = tab.label
+        onTabChanged?(tab)
     }
 
     // MARK: - Toolbar
