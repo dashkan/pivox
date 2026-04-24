@@ -89,6 +89,15 @@ public struct PivoxTheme: Sendable {
     public let codeText: Color
     public let inlineCodeBackground: Color
 
+    // MARK: Sidebar
+    //
+    // Selection-pill fill for sidebar rows. Music / Mail / Finder
+    // use a neutral-gray pill (no accent tint — text/icon carry the
+    // accent color instead). Stays the same color whether the window
+    // is active or inactive; only the text+icon toggles between
+    // accent and secondary via emphasis.
+    public let sidebarSelectionFill: Color
+
     // MARK: Button
     //
     // Foreground color for `.borderedProminent` / tinted-glass buttons.
@@ -151,6 +160,8 @@ public struct PivoxTheme: Sendable {
         codeSurface: Color(nsColor: .textBackgroundColor),
         codeText: Color(nsColor: .textColor),
         inlineCodeBackground: Color(nsColor: .quaternaryLabelColor).opacity(0.5),
+
+        sidebarSelectionFill: Color(nsColor: .secondarySystemFill),
 
         prominentButtonText: .white
     )

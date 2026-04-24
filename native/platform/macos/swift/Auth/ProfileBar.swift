@@ -1,9 +1,15 @@
 import SwiftUI
 
-/// Bottom-of-sidebar account bar. Mirrors the pattern used by Apple
-/// Music and Mail: a translucent strip pinned below the navigation
-/// list, showing the user's avatar and display name. Tapping it
-/// presents the Profile dialog.
+/// Bottom-of-sidebar account bar. Translucent footer with the
+/// user's avatar and display name; tapping it opens the profile
+/// dialog.
+///
+/// Uses `.glassEffect(.regular)` on macOS 26+ (native Liquid Glass)
+/// with a `.thinMaterial` fallback on older macOS. We explored a
+/// progressive-blur variant via private `CABackdropLayer` to match
+/// Apple Music's exact look — the code worked but the shipped
+/// surface wasn't worth the App Store exposure. If we ever want
+/// that look back, see git history for `VariableBlurBackdrop`.
 ///
 /// Accepts the fields it renders as plain value types (URL, String)
 /// rather than a Firebase `User` reference — SwiftUI's view-diff
@@ -38,10 +44,7 @@ struct ProfileBar: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(ProfileBarButtonStyle())
-        .background(.ultraThinMaterial)
-        .overlay(alignment: .top) {
-            Divider()
-        }
+        .modifier(ProfileBarGlassBackground())
         .accessibilityIdentifier("sidebar-profile-bar")
     }
 
@@ -49,6 +52,19 @@ struct ProfileBar: View {
         if let name = displayName, !name.isEmpty { return name }
         if let email = email, !email.isEmpty { return email }
         return "Signed in"
+    }
+}
+
+/// Glass background for the bar — native Liquid Glass on macOS 26+,
+/// `.thinMaterial` fallback elsewhere.
+private struct ProfileBarGlassBackground: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content.glassEffect(.regular, in: Rectangle())
+        } else {
+            content.background(.thinMaterial)
+        }
     }
 }
 
@@ -90,4 +106,3 @@ private struct ProfileBarButtonStyle: ButtonStyle {
                 : Color.clear)
     }
 }
-

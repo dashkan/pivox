@@ -131,6 +131,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Without this, SwiftUI's column-width negotiation crushes
     // whichever column is weakest (historically the sidebar).
     win.contentMinSize = NSSize(width: 940, height: 500)
+    // Let the window itself be translucent so NavigationSplitView's
+    // built-in sidebar material can blur the desktop wallpaper
+    // behind it (Music/Finder bleed effect). On macOS 26 this uses
+    // Liquid Glass rendering and respects the user's Clear/Tinted
+    // preference automatically; on older macOS it falls back to the
+    // classic NSVisualEffectView translucent sidebar. Detail /
+    // chat-panel views supply their own opaque-ish backgrounds, so
+    // making the window itself clear only affects the sidebar column
+    // (which is the one we want glass on).
+    win.isOpaque = false
+    win.backgroundColor = .clear
     win.contentView = NSHostingView(rootView: contentView)
 
     if appState.hasWindowState() {
