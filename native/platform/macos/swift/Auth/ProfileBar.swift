@@ -75,17 +75,11 @@ private struct ProfileBarAvatar: View {
     let size: CGFloat
 
     var body: some View {
-        AsyncImage(url: photoURL) { phase in
-            if let image = phase.image {
-                image.resizable().scaledToFill()
-            } else if phase.error != nil || photoURL == nil {
-                Image(systemName: "person.crop.circle.fill")
-                    .resizable()
-                    .scaledToFit()
-                    .foregroundStyle(.secondary)
-            } else {
-                ProgressView().controlSize(.small)
-            }
+        CachedAvatarImage(url: photoURL) {
+            Image(systemName: "person.crop.circle.fill")
+                .resizable()
+                .scaledToFit()
+                .foregroundStyle(.secondary)
         }
         .frame(width: size, height: size)
         .clipShape(Circle())
