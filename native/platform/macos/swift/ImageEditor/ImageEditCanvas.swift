@@ -375,6 +375,19 @@ class ImageEditCanvasNSView: NSView {
   }
 
   override func mouseMoved(with event: NSEvent) {
+    // Bail out unless the pointer is actually over us. Tracking
+    // areas fire mouseMoved across our full bounds even when an
+    // overlay covers part of them (e.g. the floating AI chat panel
+    // overlaid in a ZStack), and calling `NSCursor.set` here would
+    // stomp the overlay's own cursor. Treat both "hit-tested to a
+    // sibling on top" and "hit-test returned nil" (cursor briefly
+    // outside the window content area while a tracking event was
+    // already in flight) as bail-outs — the only case we want to
+    // proceed is when the canvas itself owns the cursor position.
+    if let window {
+      guard let hit = window.contentView?.hitTest(event.locationInWindow),
+            hit === self || hit.isDescendant(of: self) else { return }
+    }
     guard model?.state.isCropMode == true else {
       NSCursor.arrow.set()
       return

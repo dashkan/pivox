@@ -55,6 +55,18 @@ final class AIChatWindowController: NSWindowController, NSWindowDelegate {
         panel.title = "Pivox AI"
         panel.isReleasedWhenClosed = false
         panel.contentView = hosting.view
+        // Explicit opaque backdrop. We removed the SwiftUI-side
+        // `.background(.background)` from `AIChatContainerView` so
+        // the inline float-mode wrapper can paint `.thinMaterial`
+        // instead — but that left the detached panel relying on
+        // whatever default the `.utilityWindow` style mask
+        // provides. On macOS versions where utility panels enable
+        // vibrancy on the content area, message bubbles + composer
+        // would sit on a tinted/vibrant background. Pinning the
+        // panel's `backgroundColor` and `isOpaque = true` defeats
+        // that and gives the detached chat a stable solid backing.
+        panel.backgroundColor = .windowBackgroundColor
+        panel.isOpaque = true
         // Floating-by-default behavior for inspector-style panels.
         // Replaces the previous user-toggled "keep on top" knob; HIG
         // expects panels to float without per-window user controls.

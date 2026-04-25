@@ -201,7 +201,13 @@ struct AIChatPanel: View {
                 }
             }
         }
-        .background(.background)
+        // No `.background(...)` here — the parent
+        // (`InlineAIChatPanel`'s wrapper, or the detached
+        // `AIChatWindowController`) owns the backdrop. The float
+        // layout uses `.thinMaterial` for Liquid Glass; setting an
+        // opaque background here would paint on top and defeat
+        // the bleed-through. Push layout sets a solid backdrop in
+        // its wrapper.
         .focusable()
         .focused($panelFocused)
         .focusEffectDisabled()

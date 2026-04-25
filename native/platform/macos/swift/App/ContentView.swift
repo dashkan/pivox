@@ -36,6 +36,12 @@ struct ContentView: View {
   @State private var isImageEditing = false
   @State private var sidebarWidth: CGFloat
   @State private var aiToggleHovered = false
+  /// Persisted chat panel width. Shared across float and push
+  /// layouts so resizing in one mode is reflected when the user
+  /// flips to the other. Loaded from AppStateBridge in init,
+  /// updated by `ChatResizeHandle` (float) and the push HSplitView
+  /// observer, persisted on drag-end (float) / continuously (push).
+  @State private var chatPanelWidth: CGFloat = Self.loadChatPanelWidth()
   private var auth = AuthService.shared
   private var aiChatState = AIChatState.shared
   private let appState = AppStateBridge.shared()
@@ -48,9 +54,25 @@ struct ContentView: View {
 
   /// Inline chat panel width bounds. Same as before the dock /
   /// detach split — inline mode reuses these.
-  private static let chatMinWidth: CGFloat = 320
-  private static let chatMaxWidth: CGFloat = 500
-  private static let chatDefaultWidth: CGFloat = 400
+  /// Width bounds for the inline chat panel. Same range in both
+  /// push and float layouts — one drag affordance, one persisted
+  /// value, consistent across mode switches. Range matches the
+  /// pre-refactor HSplitView bounds plus a bit of headroom for
+  /// users on bigger displays.
+  private static let chatMinWidth: CGFloat = 360
+  private static let chatMaxWidth: CGFloat = 560
+  private static let chatDefaultWidth: CGFloat = 420
+  /// Inset of the floating panel from the window edges. 12pt
+  /// matches Apple's typical card-floating-over-content depth.
+  private static let chatFloatInset: CGFloat = 12
+  /// Storage key for the persisted chat panel width.
+  private static let chatPanelWidthKey = "chat_panel_width"
+
+  private static func loadChatPanelWidth() -> CGFloat {
+    let raw = AppStateBridge.shared().loadString(forKey: chatPanelWidthKey) ?? ""
+    let parsed = Double(raw) ?? Double(chatDefaultWidth)
+    return CGFloat(parsed).clamped(to: chatMinWidth...chatMaxWidth)
+  }
 
   init() {
     let state = AppStateBridge.shared()
@@ -122,16 +144,164 @@ struct ContentView: View {
   }
 
   private var mainAppView: some View {
-    // Chat panel lives as a PEER of NavigationSplitView, not inside
-    // its detail column. This lets NavigationSplitView negotiate
-    // sidebar-vs-detail cleanly (where it's well-behaved) while the
-    // outer HSplitView handles main-vs-chat (where HSplitView is
-    // well-behaved). The previous structure nested HSplitView inside
-    // NavigationSplitView's detail, and HSplitView's width demands
-    // couldn't propagate up — so opening chat silently crushed the
-    // sidebar below its own declared min.
+    // Chat layout branches on `aiChatState.layoutMode`:
+    //
+    //   - `.push`: HStack peer of NavigationSplitView with the chat
+    //     panel as a fixed-width column. Canvas resizes to make
+    //     room. Mac-conservative pattern (Mail/Slack/Cursor/Xcode).
+    //   - `.float`: ZStack with the canvas full-width and the chat
+    //     panel as a translucent card overlaid on the right. Canvas
+    //     keeps its full geometric width; content peeks through the
+    //     panel's `.regularMaterial` (Liquid Glass on macOS 26+).
+    //
+    // The chat panel itself is the same view in both layouts — only
+    // the framing wrapper changes.
+    Group {
+      switch aiChatState.layoutMode {
+      case .push:
+        pushLayout
+      case .float:
+        floatLayout
+      }
+    }
+    .toolbar {
+      // Toolbar lives at the outer level so `.primaryAction`
+      // anchors at the window's right edge regardless of the inner
+      // layout choice.
+      ToolbarItem(placement: .primaryAction) {
+        Button {
+          AppDelegate.shared?.toggleAIChat(focusInputOnOpen: false)
+        } label: {
+          Image(systemName: "sparkles")
+            .pivoxIconToolbar()
+            .symbolVariant(aiChatState.isVisible ? .fill : .none)
+            .aiShimmerSymbol(isActive: aiToggleHovered)
+            .padding(6)
+            .contentShape(Rectangle())
+            .onHover { aiToggleHovered = $0 }
+        }
+        .buttonStyle(.plain)
+        .simultaneousGesture(
+          TapGesture().onEnded {
+            DispatchQueue.main.async {
+              if aiChatState.isVisible {
+                NotificationCenter.default.post(name: .aiChatFocusRequested, object: nil)
+              }
+            }
+          }
+        )
+        .help("Toggle AI Chat (⌘⇧A)")
+      }
+    }
+    .background {
+      Button {
+        AppDelegate.shared?.toggleAIChat(focusInputOnOpen: true)
+      } label: {
+        EmptyView()
+      }
+      .keyboardShortcut("a", modifiers: [.command, .shift])
+      .buttonStyle(.plain)
+      .frame(width: 0, height: 0)
+      .opacity(0)
+      .accessibilityHidden(true)
+      .focusable(false)
+    }
+  }
+
+  /// Push layout: chat panel takes a column on the right of an
+  /// `HSplitView`, canvas resizes to fit. The HSplitView's drag
+  /// handle is the native Mac affordance for column resizing;
+  /// the persisted width (`chatPanelWidth`) is fed in as `ideal`
+  /// and observed via GeometryReader so user drags persist
+  /// without us writing back to `idealWidth` mid-render (which
+  /// would feedback-loop with HSplitView's internal sizing).
+  ///
+  /// The opaque `.windowBackgroundColor` backdrop is set here (not
+  /// in `InlineAIChatPanel`) so float layout can paint material
+  /// instead. The main window has `isOpaque = false` to enable
+  /// wallpaper bleed in the sidebar; without an opaque backdrop on
+  /// the chat column, that bleed would leak into the chat too.
+  private var pushLayout: some View {
     HSplitView {
-      NavigationSplitView(columnVisibility: $sidebarVisibility) {
+      navigationSplitView
+        .frame(minWidth: 580, maxWidth: .infinity)
+      if aiChatState.isVisible && aiChatState.mode == .docked {
+        InlineAIChatPanel()
+          .frame(minWidth: Self.chatMinWidth,
+                 idealWidth: chatPanelWidth,
+                 maxWidth: Self.chatMaxWidth)
+          .background(Color(nsColor: .windowBackgroundColor))
+          .background(
+            GeometryReader { proxy in
+              Color.clear.onChange(of: proxy.size.width) { _, newWidth in
+                guard newWidth >= Self.chatMinWidth,
+                      newWidth <= Self.chatMaxWidth else { return }
+                chatPanelWidth = newWidth
+                appState.save(String(Double(newWidth)),
+                              forKey: Self.chatPanelWidthKey)
+              }
+            }
+          )
+          .transition(.move(edge: .trailing).combined(with: .opacity))
+      }
+    }
+    .animation(.easeOut(duration: 0.22), value: aiChatState.isVisible)
+  }
+
+  /// Float layout: chat panel renders as a translucent card
+  /// overlaid on top of the canvas. Canvas geometry is unchanged
+  /// when the panel toggles in/out — no reflow.
+  private var floatLayout: some View {
+    ZStack(alignment: .topTrailing) {
+      navigationSplitView
+        .frame(minWidth: 580, maxWidth: .infinity)
+      if aiChatState.isVisible && aiChatState.mode == .docked {
+        InlineAIChatPanel()
+          .frame(width: chatPanelWidth)
+          // Liquid Glass background. `.thinMaterial` lets more
+          // canvas content bleed through than `.regularMaterial`
+          // — visible glass effect on macOS 26+, real
+          // translucency on older versions. Bubble content keeps
+          // its solid `theme.userBubble` / `theme.assistantBubble`
+          // colors (set inside the chat views) so messages remain
+          // legible against the bleed-through.
+          .background(.thinMaterial)
+          .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+          .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+          // AppKit-native resize handle — see ChatResizeHandle for
+          // the rationale (SwiftUI drag gestures + `.thinMaterial`
+          // panel = visible flicker). Overlay sits AFTER `.clipShape`
+          // so the 6pt strip isn't clipped at the rounded corners.
+          .overlay(alignment: .leading) {
+            ChatResizeHandle(
+              width: $chatPanelWidth,
+              range: Self.chatMinWidth...Self.chatMaxWidth,
+              onEnded: { final in
+                appState.save(String(Double(final)),
+                              forKey: Self.chatPanelWidthKey)
+              }
+            )
+            .frame(width: 6)
+          }
+          // Shadow gives the card a "floating above" depth. Cast
+          // primarily to the LEFT (negative x) since the panel sits
+          // against the window's right edge — shadow on the right
+          // would clip outside the window.
+          .shadow(color: .black.opacity(0.18), radius: 16, x: -4, y: 4)
+          .padding(.top, Self.chatFloatInset)
+          .padding(.trailing, Self.chatFloatInset)
+          .padding(.bottom, Self.chatFloatInset)
+          .transition(.move(edge: .trailing).combined(with: .opacity))
+      }
+    }
+    .animation(.easeOut(duration: 0.22), value: aiChatState.isVisible)
+  }
+
+  /// Shared sidebar + detail navigation, used by both layout modes.
+  /// Extracted to avoid duplicating the NavigationSplitView body
+  /// across `pushLayout` / `floatLayout`.
+  private var navigationSplitView: some View {
+    NavigationSplitView(columnVisibility: $sidebarVisibility) {
         SidebarNavList(selectedItem: $selectedItem)
           .navigationSplitViewColumnWidth(
             min: Self.sidebarMinWidth,
@@ -173,88 +343,6 @@ struct ContentView: View {
       } detail: {
         mainDetail
       }
-      // `maxWidth: .infinity` is the expanding side so the chat
-      // panel's `idealWidth` drives the split position. Without it,
-      // the HSplitView re-negotiates when a sidebar section change
-      // shifts `mainDetail`'s intrinsic width (Library's button is
-      // wider than the other sections' text), which used to drift
-      // the chat panel width.
-      //
-      // `minWidth: 580` = sidebar min (180) + mainDetail min (400),
-      // ensuring the NavigationSplitView side of the outer split is
-      // never crushed below a width that fits both its columns.
-      .frame(minWidth: 580, maxWidth: .infinity)
-
-      if aiChatState.isVisible && aiChatState.mode == .docked {
-        InlineAIChatPanel()
-          .frame(minWidth: Self.chatMinWidth,
-                 idealWidth: Self.chatDefaultWidth,
-                 maxWidth: Self.chatMaxWidth)
-          .transition(.move(edge: .trailing))
-      }
-    }
-    .toolbar {
-      // Toolbar lives on the outer HSplitView so `.primaryAction`
-      // anchors at the window's right edge.
-      ToolbarItem(placement: .primaryAction) {
-        Button {
-          AppDelegate.shared?.toggleAIChat(focusInputOnOpen: false)
-        } label: {
-          Image(systemName: "sparkles")
-            .pivoxIconToolbar()
-            .symbolVariant(aiChatState.isVisible ? .fill : .none)
-            .aiShimmerSymbol(isActive: aiToggleHovered)
-            .padding(6)
-            .contentShape(Rectangle())
-            .onHover { aiToggleHovered = $0 }
-        }
-        // `.plain` drops the default toolbar-button chrome (the
-        // subtle gray hover highlight AppKit overlays on the icon).
-        // We replace its job with our own shimmer on hover.
-        .buttonStyle(.plain)
-        // Mouse-click-only side-effect: when opening via pointer,
-        // also steal focus to the chat's message input. `TapGesture`
-        // fires for mouse/touch but NOT for keyboard Space-
-        // activation on a focused button, so keyboard users Tab'ing
-        // around the UI can toggle the chat without losing focus.
-        .simultaneousGesture(
-          TapGesture().onEnded {
-            DispatchQueue.main.async {
-              if aiChatState.isVisible {
-                NotificationCenter.default.post(name: .aiChatFocusRequested, object: nil)
-              }
-            }
-          }
-        )
-        .help("Toggle AI Chat (⌘⇧A)")
-      }
-    }
-    .background {
-      // Hotkey target. Lives outside the toolbar button so that
-      // Space-to-activate on the toolbar button and Cmd+Shift+A
-      // go through separate code paths — the hotkey opens AND asks
-      // the chat view to grab focus; Space on the button only
-      // toggles visibility, leaving focus on the button itself.
-      Button {
-        AppDelegate.shared?.toggleAIChat(focusInputOnOpen: true)
-      } label: {
-        EmptyView()
-      }
-      .keyboardShortcut("a", modifiers: [.command, .shift])
-      .buttonStyle(.plain)
-      .frame(width: 0, height: 0)
-      .opacity(0)
-      .accessibilityHidden(true)
-      // Keep the button out of the Tab loop — otherwise focus hops
-      // onto this invisible element and user sees "Tab did nothing".
-      .focusable(false)
-    }
-    .onChange(of: isImageEditing) { _, editing in
-      NSApp.keyWindow?.appearance =
-        editing
-        ? NSAppearance(named: .darkAqua)
-        : nil
-    }
   }
 
   private var mainDetail: some View {
@@ -309,6 +397,15 @@ struct LibraryPlaceholderView: View {
 
   var body: some View {
     if let image = selectedImage, showEditor {
+      // `.preferredColorScheme(.dark)` is scoped to ImageEditView
+      // so the editor renders dark without forcing
+      // `NSApp.keyWindow.appearance = .darkAqua` on the entire
+      // window. Window-level flips re-resolve every appearance-
+      // dependent surface (including the chat panel's
+      // `.thinMaterial`), causing the chat to re-render mid-drag
+      // and the resize handle's gesture state to reset. Scoping
+      // dark mode here keeps the rest of the window's appearance
+      // unchanged.
       ImageEditView(
         image: image,
         isEditing: $isEditing,
@@ -321,6 +418,7 @@ struct LibraryPlaceholderView: View {
           closeEditor()
         }
       )
+      .preferredColorScheme(.dark)
     } else {
       VStack(spacing: 16) {
         Spacer()
@@ -387,5 +485,14 @@ struct AuthRouter: View {
         onSwitchToRegister: { showRegister = true }
       )
     }
+  }
+}
+
+private extension Comparable {
+  /// Clamp `self` into a closed range. Used by the chat panel
+  /// width logic so drag deltas can't push the persisted width
+  /// outside `[chatMinWidth, chatMaxWidth]`.
+  func clamped(to range: ClosedRange<Self>) -> Self {
+    min(max(self, range.lowerBound), range.upperBound)
   }
 }

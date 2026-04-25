@@ -33,7 +33,7 @@ final class ConversationTranscriptViewTests: XCTestCase {
             client: mock,
             conversationName: "organizations/test/conversations/harness",
             isNew: false)
-        let transcript = ConversationTranscriptView(viewModel: vm, onSend: { _ in })
+        let transcript = ConversationTranscriptView(viewModel: vm)
         let host = NSHostingView(rootView: transcript)
         host.frame = NSRect(origin: .zero, size: Self.windowSize)
 

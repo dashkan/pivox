@@ -7,18 +7,20 @@ final class MockChatClient: ChatClientProtocol, @unchecked Sendable {
 
     // MARK: - Stream
 
-    /// Events to yield from stream(), consumed in order.
+    /// Events to yield from streamGenerateContent(), consumed in order.
     var streamEvents: [Pivox_Ai_V1_ServerEvent] = []
     /// Error to throw from stream after yielding all events.
     var streamError: Error?
-    /// Tracks whether stream() was called.
+    /// Tracks how many stream calls have been initiated.
     var streamCallCount = 0
+    /// Captured `GenerateContentRequest`s sent to streamGenerateContent.
+    var sentRequests: [Pivox_Ai_V1_GenerateContentRequest] = []
 
-    var sentEvents: [Pivox_Ai_V1_ClientEvent] = []
-
-    func stream(_ event: Pivox_Ai_V1_ClientEvent) -> AsyncThrowingStream<Pivox_Ai_V1_ServerEvent, Error> {
+    func streamGenerateContent(
+        _ request: Pivox_Ai_V1_GenerateContentRequest
+    ) -> AsyncThrowingStream<Pivox_Ai_V1_ServerEvent, Error> {
         streamCallCount += 1
-        sentEvents.append(event)
+        sentRequests.append(request)
         let events = streamEvents
         let error = streamError
         return AsyncThrowingStream { continuation in
@@ -30,6 +32,44 @@ final class MockChatClient: ChatClientProtocol, @unchecked Sendable {
             } else {
                 continuation.finish()
             }
+        }
+    }
+
+    // MARK: - Generate (unary)
+
+    var generateResponse: Pivox_Ai_V1_GenerateContentResponse?
+    var generateError: Error?
+
+    func generateContent(
+        _ request: Pivox_Ai_V1_GenerateContentRequest
+    ) async throws -> Pivox_Ai_V1_GenerateContentResponse {
+        if let err = generateError { throw err }
+        return generateResponse ?? Pivox_Ai_V1_GenerateContentResponse()
+    }
+
+    // MARK: - Summarize
+
+    var summarizeResponse: Pivox_Ai_V1_Conversation?
+    var summarizeError: Error?
+
+    func summarizeConversation(
+        _ request: Pivox_Ai_V1_SummarizeConversationRequest
+    ) async throws -> Pivox_Ai_V1_Conversation {
+        if let err = summarizeError { throw err }
+        return summarizeResponse ?? Pivox_Ai_V1_Conversation()
+    }
+
+    // MARK: - Get conversation
+
+    var getConversationResponse: Pivox_Ai_V1_Conversation?
+    var getConversationError: Error?
+
+    func getConversation(
+        _ request: Pivox_Ai_V1_GetConversationRequest
+    ) async throws -> Pivox_Ai_V1_Conversation {
+        if let err = getConversationError { throw err }
+        return getConversationResponse ?? Pivox_Ai_V1_Conversation.with {
+            $0.name = request.name
         }
     }
 

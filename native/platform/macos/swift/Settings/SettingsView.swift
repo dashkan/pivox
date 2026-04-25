@@ -17,6 +17,7 @@ struct SettingsView: View {
 
     enum Tab: String, Hashable, CaseIterable, Identifiable {
         case general
+        case ai
         case account
         case security
 
@@ -25,6 +26,7 @@ struct SettingsView: View {
         var label: String {
             switch self {
             case .general: return "General"
+            case .ai: return "AI"
             case .account: return "Account"
             case .security: return "Security"
             }
@@ -33,6 +35,7 @@ struct SettingsView: View {
         var iconSymbol: String {
             switch self {
             case .general: return "gearshape"
+            case .ai: return "sparkles"
             case .account: return "person.crop.circle"
             case .security: return "lock.shield"
             }
@@ -43,6 +46,7 @@ struct SettingsView: View {
         Group {
             switch selection.tab {
             case .general: GeneralPage()
+            case .ai: AIPage()
             case .account: AccountPage()
             case .security: SecurityPage()
             }
