@@ -228,11 +228,18 @@ func serve(cmd *cobra.Command, args []string) error {
 		grpc.ChainUnaryInterceptor(
 			server.LoggingUnaryInterceptor(logger),
 			server.AuthInterceptor(authSvc),
+			// Membership check runs after Auth so the caller's UID is
+			// in context, and before Validate so we don't leak field
+			// shape errors to memberless callers. Allowlisted methods
+			// (CreateOrganization, ListOrganizations, AcceptInvitation,
+			// GetInvitation) bypass — see server/membership_interceptor.go.
+			server.MembershipRequiredInterceptor(queries),
 			server.FieldMaskAwareValidationInterceptor(validator),
 		),
 		grpc.ChainStreamInterceptor(
 			server.LoggingStreamInterceptor(logger),
 			server.AuthStreamInterceptor(authSvc),
+			server.MembershipRequiredStreamInterceptor(queries),
 		),
 	)
 
