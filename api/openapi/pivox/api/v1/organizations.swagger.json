@@ -227,11 +227,6 @@
                   "description": "Output only. A checksum computed by the server based on the current value\nof the Organization resource. This may be sent on update and delete\nrequests to ensure the client has an up-to-date value before proceeding.",
                   "readOnly": true
                 },
-                "owner": {
-                  "type": "string",
-                  "title": "Output only. The resource name of the organization owner.\nFormat: `organizations/{organization}/users/{user}`",
-                  "readOnly": true
-                },
                 "annotations": {
                   "type": "object",
                   "additionalProperties": {
@@ -1371,11 +1366,6 @@
         "etag": {
           "type": "string",
           "description": "Output only. A checksum computed by the server based on the current value\nof the Organization resource. This may be sent on update and delete\nrequests to ensure the client has an up-to-date value before proceeding.",
-          "readOnly": true
-        },
-        "owner": {
-          "type": "string",
-          "title": "Output only. The resource name of the organization owner.\nFormat: `organizations/{organization}/users/{user}`",
           "readOnly": true
         },
         "annotations": {

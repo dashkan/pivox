@@ -101,10 +101,6 @@ public struct Pivox_Api_V1_Organization: Sendable {
   /// requests to ensure the client has an up-to-date value before proceeding.
   public var etag: String = String()
 
-  /// Output only. The resource name of the organization owner.
-  /// Format: `organizations/{organization}/users/{user}`
-  public var owner: String = String()
-
   /// Optional. Labels associated with this organization.
   /// Labels are key-value pairs that can be used to organize and track resources.
   public var annotations: Dictionary<String,String> = [:]
@@ -1119,7 +1115,7 @@ fileprivate let _protobuf_package = "pivox.api.v1"
 
 extension Pivox_Api_V1_Organization: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".Organization"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}display_name\0\u{2}\u{2}state\0\u{3}create_time\0\u{3}update_time\0\u{3}delete_time\0\u{1}etag\0\u{4}\u{2}purge_time\0\u{2}\u{2}annotations\0\u{1}owner\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}display_name\0\u{2}\u{2}state\0\u{3}create_time\0\u{3}update_time\0\u{3}delete_time\0\u{1}etag\0\u{4}\u{2}purge_time\0\u{2}\u{2}annotations\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1136,7 +1132,6 @@ extension Pivox_Api_V1_Organization: SwiftProtobuf.Message, SwiftProtobuf._Messa
       case 8: try { try decoder.decodeSingularStringField(value: &self.etag) }()
       case 10: try { try decoder.decodeSingularMessageField(value: &self._purgeTime) }()
       case 12: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.annotations) }()
-      case 13: try { try decoder.decodeSingularStringField(value: &self.owner) }()
       default: break
       }
     }
@@ -1174,9 +1169,6 @@ extension Pivox_Api_V1_Organization: SwiftProtobuf.Message, SwiftProtobuf._Messa
     if !self.annotations.isEmpty {
       try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.annotations, fieldNumber: 12)
     }
-    if !self.owner.isEmpty {
-      try visitor.visitSingularStringField(value: self.owner, fieldNumber: 13)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1189,7 +1181,6 @@ extension Pivox_Api_V1_Organization: SwiftProtobuf.Message, SwiftProtobuf._Messa
     if lhs._deleteTime != rhs._deleteTime {return false}
     if lhs._purgeTime != rhs._purgeTime {return false}
     if lhs.etag != rhs.etag {return false}
-    if lhs.owner != rhs.owner {return false}
     if lhs.annotations != rhs.annotations {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

@@ -295,13 +295,6 @@ message Organization {
   // requests to ensure the client has an up-to-date value before proceeding.
   string etag = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  // Output only. The resource name of the organization owner.
-  // Format: `organizations/{organization}/users/{user}`
-  string owner = 13 [
-    (google.api.field_behavior) = OUTPUT_ONLY,
-    (google.api.resource_reference) = {type: "pivox.iam/User"}
-  ];
-
   // Optional. Labels associated with this organization.
   // Labels are key-value pairs that can be used to organize and track resources.
   map<string, string> annotations = 12 [(google.api.field_behavior) = OPTIONAL];

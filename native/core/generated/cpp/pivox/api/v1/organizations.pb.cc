@@ -490,9 +490,6 @@ inline constexpr Organization::Impl_::Impl_(
         etag_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        owner_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
         create_time_{nullptr},
         update_time_{nullptr},
         delete_time_{nullptr},
@@ -950,7 +947,6 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::pivox::api::v1::Organization, _impl_.delete_time_),
         PROTOBUF_FIELD_OFFSET(::pivox::api::v1::Organization, _impl_.purge_time_),
         PROTOBUF_FIELD_OFFSET(::pivox::api::v1::Organization, _impl_.etag_),
-        PROTOBUF_FIELD_OFFSET(::pivox::api::v1::Organization, _impl_.owner_),
         PROTOBUF_FIELD_OFFSET(::pivox::api::v1::Organization, _impl_.annotations_),
         ~0u,
         ~0u,
@@ -959,7 +955,6 @@ const ::uint32_t
         1,
         2,
         3,
-        ~0u,
         ~0u,
         ~0u,
         ~0u,  // no _has_bits_
@@ -1314,36 +1309,36 @@ const ::uint32_t
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, 10, -1, sizeof(::pivox::api::v1::Organization_AnnotationsEntry_DoNotUse)},
-        {12, 30, -1, sizeof(::pivox::api::v1::Organization)},
-        {40, -1, -1, sizeof(::pivox::api::v1::GetOrganizationRequest)},
-        {49, -1, -1, sizeof(::pivox::api::v1::ListOrganizationsRequest)},
-        {62, 73, -1, sizeof(::pivox::api::v1::CreateOrganizationRequest)},
-        {76, 87, -1, sizeof(::pivox::api::v1::UpdateOrganizationRequest)},
-        {90, -1, -1, sizeof(::pivox::api::v1::ListOrganizationsResponse)},
-        {100, 117, -1, sizeof(::pivox::api::v1::CustomDomain)},
-        {126, -1, -1, sizeof(::pivox::api::v1::DnsRecord)},
-        {137, -1, -1, sizeof(::pivox::api::v1::GetCustomDomainRequest)},
-        {146, -1, -1, sizeof(::pivox::api::v1::ListCustomDomainsRequest)},
-        {157, -1, -1, sizeof(::pivox::api::v1::ListCustomDomainsResponse)},
-        {167, 179, -1, sizeof(::pivox::api::v1::CreateCustomDomainRequest)},
-        {183, -1, -1, sizeof(::pivox::api::v1::CreateCustomDomainMetadata)},
-        {191, -1, -1, sizeof(::pivox::api::v1::DeleteCustomDomainRequest)},
-        {202, -1, -1, sizeof(::pivox::api::v1::CreateOrganizationMetadata)},
-        {210, -1, -1, sizeof(::pivox::api::v1::UpdateOrganizationMetadata)},
-        {218, -1, -1, sizeof(::pivox::api::v1::DeleteCustomDomainMetadata)},
-        {226, 243, -1, sizeof(::pivox::api::v1::Invitation)},
-        {252, 266, -1, sizeof(::pivox::api::v1::InvitationPolicy)},
-        {272, 283, -1, sizeof(::pivox::api::v1::CreateInvitationRequest)},
-        {286, -1, -1, sizeof(::pivox::api::v1::ListInvitationsRequest)},
-        {299, -1, -1, sizeof(::pivox::api::v1::ListInvitationsResponse)},
-        {309, -1, -1, sizeof(::pivox::api::v1::GetInvitationRequest)},
-        {318, -1, -1, sizeof(::pivox::api::v1::AcceptInvitationRequest)},
-        {327, 336, -1, sizeof(::pivox::api::v1::AcceptInvitationResponse)},
-        {337, -1, -1, sizeof(::pivox::api::v1::DeclineInvitationRequest)},
-        {346, 355, -1, sizeof(::pivox::api::v1::DeclineInvitationResponse)},
-        {356, -1, -1, sizeof(::pivox::api::v1::DeleteInvitationRequest)},
-        {366, -1, -1, sizeof(::pivox::api::v1::GetInvitationPolicyRequest)},
-        {375, 385, -1, sizeof(::pivox::api::v1::UpdateInvitationPolicyRequest)},
+        {12, 29, -1, sizeof(::pivox::api::v1::Organization)},
+        {38, -1, -1, sizeof(::pivox::api::v1::GetOrganizationRequest)},
+        {47, -1, -1, sizeof(::pivox::api::v1::ListOrganizationsRequest)},
+        {60, 71, -1, sizeof(::pivox::api::v1::CreateOrganizationRequest)},
+        {74, 85, -1, sizeof(::pivox::api::v1::UpdateOrganizationRequest)},
+        {88, -1, -1, sizeof(::pivox::api::v1::ListOrganizationsResponse)},
+        {98, 115, -1, sizeof(::pivox::api::v1::CustomDomain)},
+        {124, -1, -1, sizeof(::pivox::api::v1::DnsRecord)},
+        {135, -1, -1, sizeof(::pivox::api::v1::GetCustomDomainRequest)},
+        {144, -1, -1, sizeof(::pivox::api::v1::ListCustomDomainsRequest)},
+        {155, -1, -1, sizeof(::pivox::api::v1::ListCustomDomainsResponse)},
+        {165, 177, -1, sizeof(::pivox::api::v1::CreateCustomDomainRequest)},
+        {181, -1, -1, sizeof(::pivox::api::v1::CreateCustomDomainMetadata)},
+        {189, -1, -1, sizeof(::pivox::api::v1::DeleteCustomDomainRequest)},
+        {200, -1, -1, sizeof(::pivox::api::v1::CreateOrganizationMetadata)},
+        {208, -1, -1, sizeof(::pivox::api::v1::UpdateOrganizationMetadata)},
+        {216, -1, -1, sizeof(::pivox::api::v1::DeleteCustomDomainMetadata)},
+        {224, 241, -1, sizeof(::pivox::api::v1::Invitation)},
+        {250, 264, -1, sizeof(::pivox::api::v1::InvitationPolicy)},
+        {270, 281, -1, sizeof(::pivox::api::v1::CreateInvitationRequest)},
+        {284, -1, -1, sizeof(::pivox::api::v1::ListInvitationsRequest)},
+        {297, -1, -1, sizeof(::pivox::api::v1::ListInvitationsResponse)},
+        {307, -1, -1, sizeof(::pivox::api::v1::GetInvitationRequest)},
+        {316, -1, -1, sizeof(::pivox::api::v1::AcceptInvitationRequest)},
+        {325, 334, -1, sizeof(::pivox::api::v1::AcceptInvitationResponse)},
+        {335, -1, -1, sizeof(::pivox::api::v1::DeclineInvitationRequest)},
+        {344, 353, -1, sizeof(::pivox::api::v1::DeclineInvitationResponse)},
+        {354, -1, -1, sizeof(::pivox::api::v1::DeleteInvitationRequest)},
+        {364, -1, -1, sizeof(::pivox::api::v1::GetInvitationPolicyRequest)},
+        {373, 383, -1, sizeof(::pivox::api::v1::UpdateInvitationPolicyRequest)},
 };
 static const ::_pb::Message* const file_default_instances[] = {
     &::pivox::api::v1::_Organization_AnnotationsEntry_DoNotUse_default_instance_._instance,
@@ -1388,7 +1383,7 @@ const char descriptor_table_protodef_pivox_2fapi_2fv1_2forganizations_2eproto[] 
     "/longrunning/operations.proto\032 google/pr"
     "otobuf/field_mask.proto\032\037google/protobuf"
     "/timestamp.proto\032\035pivox/iam/v1/iam_polic"
-    "y.proto\032\031pivox/iam/v1/policy.proto\"\207\006\n\014O"
+    "y.proto\032\031pivox/iam/v1/policy.proto\"\331\005\n\014O"
     "rganization\022\027\n\004name\030\001 \001(\tB\003\340A\010R\004name\022&\n\014"
     "display_name\030\002 \001(\tB\003\340A\003R\013displayName\022;\n\005"
     "state\030\004 \001(\0162 .pivox.api.v1.Organization."
@@ -1399,233 +1394,232 @@ const char descriptor_table_protodef_pivox_2fapi_2fv1_2forganizations_2eproto[] 
     "time\030\007 \001(\0132\032.google.protobuf.TimestampB\003"
     "\340A\003R\ndeleteTime\022>\n\npurge_time\030\n \001(\0132\032.go"
     "ogle.protobuf.TimestampB\003\340A\003R\tpurgeTime\022"
-    "\027\n\004etag\030\010 \001(\tB\003\340A\003R\004etag\022,\n\005owner\030\r \001(\tB"
-    "\026\340A\003\372A\020\n\016pivox.iam/UserR\005owner\022R\n\013annota"
-    "tions\030\014 \003(\0132+.pivox.api.v1.Organization."
-    "AnnotationsEntryB\003\340A\001R\013annotations\032>\n\020An"
-    "notationsEntry\022\020\n\003key\030\001 \001(\tR\003key\022\024\n\005valu"
-    "e\030\002 \001(\tR\005value:\0028\001\"@\n\005State\022\025\n\021STATE_UNS"
-    "PECIFIED\020\000\022\n\n\006ACTIVE\020\001\022\024\n\020DELETE_REQUEST"
-    "ED\020\002:V\352AS\n\026pivox.api/Organization\022\034organ"
-    "izations/{organization}*\rorganizations2\014"
-    "organization\"R\n\026GetOrganizationRequest\0228"
-    "\n\004name\030\001 \001(\tB$\340A\002\372A\030\n\026pivox.api/Organiza"
-    "tion\272H\003\310\001\001R\004name\"\317\001\n\030ListOrganizationsRe"
-    "quest\022*\n\tpage_size\030\001 \001(\005B\r\340A\001\272H\007\032\005\030\350\007(\000R"
-    "\010pageSize\022\"\n\npage_token\030\002 \001(\tB\003\340A\001R\tpage"
-    "Token\022&\n\014show_deleted\030\003 \001(\010B\003\340A\001R\013showDe"
-    "leted\022\033\n\006filter\030\004 \001(\tB\003\340A\001R\006filter\022\036\n\010or"
-    "der_by\030\005 \001(\tB\003\340A\001R\007orderBy\"\333\001\n\031CreateOrg"
-    "anizationRequest\022I\n\014organization\030\001 \001(\0132\032"
-    ".pivox.api.v1.OrganizationB\t\340A\002\272H\003\310\001\001R\014o"
-    "rganization\022I\n\017organization_id\030\002 \001(\tB \340A"
-    "\001\272H\032r\0302\026^[a-z][a-z0-9-]{3,19}$R\016organiza"
-    "tionId\022(\n\rvalidate_only\030\003 \001(\010B\003\340A\001R\014vali"
-    "dateOnly\"\322\001\n\031UpdateOrganizationRequest\022I"
-    "\n\014organization\030\001 \001(\0132\032.pivox.api.v1.Orga"
-    "nizationB\t\340A\002\272H\003\310\001\001R\014organization\022@\n\013upd"
-    "ate_mask\030\002 \001(\0132\032.google.protobuf.FieldMa"
-    "skB\003\340A\001R\nupdateMask\022(\n\rvalidate_only\030\004 \001"
-    "(\010B\003\340A\001R\014validateOnly\"\205\001\n\031ListOrganizati"
-    "onsResponse\022@\n\rorganizations\030\001 \003(\0132\032.piv"
-    "ox.api.v1.OrganizationR\rorganizations\022&\n"
-    "\017next_page_token\030\002 \001(\tR\rnextPageToken\"\324\006"
-    "\n\014CustomDomain\022\027\n\004name\030\001 \001(\tB\003\340A\010R\004name\022"
-    "\236\001\n\006domain\030\003 \001(\tB\205\001\340A\005\272H\177\272\001|\n\014valid_doma"
-    "in\022\033must be a valid domain name\032Othis.ma"
-    "tches(\'^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}["
-    "a-zA-Z0-9])\?\\\\.)+[a-zA-Z]{2,}$\')R\006domain"
-    "\022;\n\005state\030\004 \001(\0162 .pivox.api.v1.CustomDom"
-    "ain.StateB\003\340A\003R\005state\022N\n\024required_dns_re"
-    "cords\030\005 \003(\0132\027.pivox.api.v1.DnsRecordB\003\340A"
-    "\003R\022requiredDnsRecords\022@\n\013create_time\030\006 \001"
-    "(\0132\032.google.protobuf.TimestampB\003\340A\003R\ncre"
-    "ateTime\022@\n\013update_time\030\007 \001(\0132\032.google.pr"
-    "otobuf.TimestampB\003\340A\003R\nupdateTime\022@\n\013del"
-    "ete_time\030\010 \001(\0132\032.google.protobuf.Timesta"
-    "mpB\003\340A\003R\ndeleteTime\022@\n\013verify_time\030\t \001(\013"
-    "2\032.google.protobuf.TimestampB\003\340A\003R\nverif"
-    "yTime\022\027\n\004etag\030\n \001(\tB\003\340A\003R\004etag\"f\n\005State\022"
-    "\025\n\021STATE_UNSPECIFIED\020\000\022\013\n\007PENDING\020\001\022\020\n\014P"
-    "ROVISIONING\020\002\022\n\n\006ACTIVE\020\003\022\n\n\006FAILED\020\004\022\017\n"
-    "\013DEACTIVATED\020\005:t\352Aq\n\026pivox.api/CustomDom"
-    "ain\022:organizations/{organization}/custom"
-    "Domains/{custom_domain}*\rcustomDomains2\014"
-    "customDomain\"X\n\tDnsRecord\022\027\n\004type\030\001 \001(\tB"
-    "\003\340A\003R\004type\022\027\n\004host\030\002 \001(\tB\003\340A\003R\004host\022\031\n\005v"
-    "alue\030\003 \001(\tB\003\340A\003R\005value\"R\n\026GetCustomDomai"
-    "nRequest\0228\n\004name\030\001 \001(\tB$\340A\002\372A\030\n\026pivox.ap"
-    "i/CustomDomain\272H\003\310\001\001R\004name\"\250\001\n\030ListCusto"
-    "mDomainsRequest\022<\n\006parent\030\001 \001(\tB$\340A\002\372A\030\022"
-    "\026pivox.api/CustomDomain\272H\003\310\001\001R\006parent\022*\n"
-    "\tpage_size\030\002 \001(\005B\r\340A\001\272H\007\032\005\030\350\007(\000R\010pageSiz"
-    "e\022\"\n\npage_token\030\003 \001(\tB\003\340A\001R\tpageToken\"\206\001"
-    "\n\031ListCustomDomainsResponse\022A\n\016custom_do"
-    "mains\030\001 \003(\0132\032.pivox.api.v1.CustomDomainR"
-    "\rcustomDomains\022&\n\017next_page_token\030\002 \001(\tR"
-    "\rnextPageToken\"\376\001\n\031CreateCustomDomainReq"
-    "uest\022<\n\006parent\030\001 \001(\tB$\340A\002\372A\030\022\026pivox.api/"
-    "CustomDomain\272H\003\310\001\001R\006parent\022J\n\rcustom_dom"
-    "ain\030\002 \001(\0132\032.pivox.api.v1.CustomDomainB\t\340"
-    "A\002\272H\003\310\001\001R\014customDomain\022-\n\020custom_domain_"
-    "id\030\003 \001(\tB\003\340A\001R\016customDomainId\022(\n\rvalidat"
-    "e_only\030\004 \001(\010B\003\340A\001R\014validateOnly\"\034\n\032Creat"
-    "eCustomDomainMetadata\"\230\001\n\031DeleteCustomDo"
-    "mainRequest\0228\n\004name\030\001 \001(\tB$\340A\002\372A\030\n\026pivox"
-    ".api/CustomDomain\272H\003\310\001\001R\004name\022\027\n\004etag\030\002 "
-    "\001(\tB\003\340A\001R\004etag\022(\n\rvalidate_only\030\003 \001(\010B\003\340"
-    "A\001R\014validateOnly\"\034\n\032CreateOrganizationMe"
-    "tadata\"\034\n\032UpdateOrganizationMetadata\"\034\n\032"
-    "DeleteCustomDomainMetadata\"\277\005\n\nInvitatio"
-    "n\022\027\n\004name\030\001 \001(\tB\003\340A\010R\004name\022u\n\005email\030\002 \001("
-    "\tB_\340A\002\340A\005\272HV\272\001S\n\013valid_email\022\035must be a "
-    "valid email address\032%this.matches(\'^[^@]"
-    "+@[^@]+\\\\.[^@]+$\')R\005email\022\032\n\004role\030\003 \001(\tB"
-    "\006\340A\001\340A\005R\004role\0229\n\005state\030\004 \001(\0162\036.pivox.api"
-    ".v1.Invitation.StateB\003\340A\003R\005state\022\035\n\007invi"
-    "ter\030\005 \001(\tB\003\340A\003R\007inviter\022@\n\013create_time\030\006"
-    " \001(\0132\032.google.protobuf.TimestampB\003\340A\003R\nc"
-    "reateTime\022@\n\013expire_time\030\007 \001(\0132\032.google."
-    "protobuf.TimestampB\003\340A\003R\nexpireTime\022@\n\013a"
-    "ccept_time\030\010 \001(\0132\032.google.protobuf.Times"
-    "tampB\003\340A\003R\nacceptTime\022\027\n\004etag\030\t \001(\tB\003\340A\003"
-    "R\004etag\"a\n\005State\022\025\n\021STATE_UNSPECIFIED\020\000\022\013"
-    "\n\007PENDING\020\001\022\014\n\010ACCEPTED\020\002\022\014\n\010DECLINED\020\003\022"
-    "\013\n\007REVOKED\020\004\022\013\n\007EXPIRED\020\005:i\352Af\n\024pivox.ap"
-    "i/Invitation\0225organizations/{organizatio"
-    "n}/invitations/{invitation}*\013invitations"
-    "2\ninvitation\"\250\003\n\020InvitationPolicy\022\027\n\004nam"
-    "e\030\001 \001(\tB\003\340A\010R\004name\022H\n\036disable_public_ema"
-    "il_addresses\030\002 \001(\010B\003\340A\001R\033disablePublicEm"
-    "ailAddresses\022,\n\017allowed_domains\030\003 \003(\tB\003\340"
-    "A\001R\016allowedDomains\0222\n\022disallowed_domains"
-    "\030\004 \003(\tB\003\340A\001R\021disallowedDomains\022@\n\013update"
-    "_time\030\005 \001(\0132\032.google.protobuf.TimestampB"
-    "\003\340A\003R\nupdateTime\022\027\n\004etag\030\006 \001(\tB\003\340A\003R\004eta"
-    "g:t\352Aq\n\032pivox.api/InvitationPolicy\022-orga"
-    "nizations/{organization}/invitationPolic"
-    "y*\022invitationPolicies2\020invitationPolicy\""
-    "\304\001\n\027CreateInvitationRequest\022:\n\006parent\030\001 "
-    "\001(\tB\"\340A\002\372A\026\022\024pivox.api/Invitation\272H\003\310\001\001R"
-    "\006parent\022C\n\ninvitation\030\002 \001(\0132\030.pivox.api."
-    "v1.InvitationB\t\340A\002\272H\003\310\001\001R\ninvitation\022(\n\r"
-    "invitation_id\030\003 \001(\tB\003\340A\001R\014invitationId\"\341"
-    "\001\n\026ListInvitationsRequest\022:\n\006parent\030\001 \001("
-    "\tB\"\340A\002\372A\026\022\024pivox.api/Invitation\272H\003\310\001\001R\006p"
-    "arent\022*\n\tpage_size\030\002 \001(\005B\r\340A\001\272H\007\032\005\030\350\007(\000R"
-    "\010pageSize\022\"\n\npage_token\030\003 \001(\tB\003\340A\001R\tpage"
-    "Token\022\033\n\006filter\030\004 \001(\tB\003\340A\001R\006filter\022\036\n\010or"
-    "der_by\030\005 \001(\tB\003\340A\001R\007orderBy\"}\n\027ListInvita"
-    "tionsResponse\022:\n\013invitations\030\001 \003(\0132\030.piv"
-    "ox.api.v1.InvitationR\013invitations\022&\n\017nex"
-    "t_page_token\030\002 \001(\tR\rnextPageToken\"N\n\024Get"
-    "InvitationRequest\0226\n\004name\030\001 \001(\tB\"\340A\002\372A\026\n"
-    "\024pivox.api/Invitation\272H\003\310\001\001R\004name\"Q\n\027Acc"
-    "eptInvitationRequest\0226\n\004name\030\001 \001(\tB\"\340A\002\372"
-    "A\026\n\024pivox.api/Invitation\272H\003\310\001\001R\004name\"T\n\030"
-    "AcceptInvitationResponse\0228\n\ninvitation\030\001"
-    " \001(\0132\030.pivox.api.v1.InvitationR\ninvitati"
-    "on\"R\n\030DeclineInvitationRequest\0226\n\004name\030\001"
-    " \001(\tB\"\340A\002\372A\026\n\024pivox.api/Invitation\272H\003\310\001\001"
-    "R\004name\"U\n\031DeclineInvitationResponse\0228\n\ni"
-    "nvitation\030\001 \001(\0132\030.pivox.api.v1.Invitatio"
-    "nR\ninvitation\"j\n\027DeleteInvitationRequest"
-    "\0226\n\004name\030\001 \001(\tB\"\340A\002\372A\026\n\024pivox.api/Invita"
-    "tion\272H\003\310\001\001R\004name\022\027\n\004etag\030\002 \001(\tB\003\340A\001R\004eta"
-    "g\"Z\n\032GetInvitationPolicyRequest\022<\n\004name\030"
-    "\001 \001(\tB(\340A\002\372A\034\n\032pivox.api/InvitationPolic"
-    "y\272H\003\310\001\001R\004name\"\271\001\n\035UpdateInvitationPolicy"
-    "Request\022V\n\021invitation_policy\030\001 \001(\0132\036.piv"
-    "ox.api.v1.InvitationPolicyB\t\340A\002\272H\003\310\001\001R\020i"
-    "nvitationPolicy\022@\n\013update_mask\030\002 \001(\0132\032.g"
-    "oogle.protobuf.FieldMaskB\003\340A\001R\nupdateMas"
-    "k2\363\031\n\rOrganizations\022~\n\017GetOrganization\022$"
-    ".pivox.api.v1.GetOrganizationRequest\032\032.p"
-    "ivox.api.v1.Organization\")\332A\004name\202\323\344\223\002\034\022"
-    "\032/v1/{name=organizations/*}\022\177\n\021ListOrgan"
-    "izations\022&.pivox.api.v1.ListOrganization"
-    "sRequest\032\'.pivox.api.v1.ListOrganization"
-    "sResponse\"\031\202\323\344\223\002\023\022\021/v1/organizations\022\321\001\n"
-    "\022CreateOrganization\022\'.pivox.api.v1.Creat"
-    "eOrganizationRequest\032\035.google.longrunnin"
-    "g.Operation\"s\312A*\n\014Organization\022\032CreateOr"
-    "ganizationMetadata\332A\034organization,organi"
-    "zation_id\202\323\344\223\002!\"\021/v1/organizations:\014orga"
-    "nization\022\363\001\n\022UpdateOrganization\022\'.pivox."
-    "api.v1.UpdateOrganizationRequest\032\035.googl"
-    "e.longrunning.Operation\"\224\001\312A*\n\014Organizat"
-    "ion\022\032UpdateOrganizationMetadata\332A\030organi"
-    "zation,update_mask\332A\014organization\202\323\344\223\00272"
-    "\'/v1/{organization.name=organizations/*}"
-    ":\014organization\022\202\001\n\014GetIamPolicy\022!.pivox."
-    "iam.v1.GetIamPolicyRequest\032\024.pivox.iam.v"
-    "1.Policy\"9\332A\004name\202\323\344\223\002,\"\'/v1/{name=organ"
-    "izations/*}:getIamPolicy:\001*\022\221\001\n\014SetIamPo"
-    "licy\022!.pivox.iam.v1.SetIamPolicyRequest\032"
-    "\024.pivox.iam.v1.Policy\"H\332A\017resource,polic"
-    "y\202\323\344\223\0020\"+/v1/{resource=organizations/*}:"
-    "setIamPolicy:\001*\022\274\001\n\022TestIamPermissions\022\'"
-    ".pivox.iam.v1.TestIamPermissionsRequest\032"
-    "(.pivox.iam.v1.TestIamPermissionsRespons"
-    "e\"S\332A\024resource,permissions\202\323\344\223\0026\"1/v1/{r"
-    "esource=organizations/*}:testIamPermissi"
-    "ons:\001*\022\263\001\n\020CreateInvitation\022%.pivox.api."
-    "v1.CreateInvitationRequest\032\030.pivox.api.v"
-    "1.Invitation\"^\332A\037parent,invitation,invit"
-    "ation_id\202\323\344\223\0026\"(/v1/{parent=organization"
-    "s/*}/invitations:\ninvitation\022\231\001\n\017ListInv"
-    "itations\022$.pivox.api.v1.ListInvitationsR"
-    "equest\032%.pivox.api.v1.ListInvitationsRes"
-    "ponse\"9\332A\006parent\202\323\344\223\002*\022(/v1/{parent=orga"
-    "nizations/*}/invitations\022\206\001\n\rGetInvitati"
-    "on\022\".pivox.api.v1.GetInvitationRequest\032\030"
-    ".pivox.api.v1.Invitation\"7\332A\004name\202\323\344\223\002*\022"
-    "(/v1/{name=organizations/*/invitations/*"
-    "}\022\244\001\n\020AcceptInvitation\022%.pivox.api.v1.Ac"
-    "ceptInvitationRequest\032&.pivox.api.v1.Acc"
-    "eptInvitationResponse\"A\332A\004name\202\323\344\223\0024\"//v"
-    "1/{name=organizations/*/invitations/*}:a"
-    "ccept:\001*\022\250\001\n\021DeclineInvitation\022&.pivox.a"
-    "pi.v1.DeclineInvitationRequest\032\'.pivox.a"
-    "pi.v1.DeclineInvitationResponse\"B\332A\004name"
-    "\202\323\344\223\0025\"0/v1/{name=organizations/*/invita"
-    "tions/*}:decline:\001*\022\214\001\n\020DeleteInvitation"
-    "\022%.pivox.api.v1.DeleteInvitationRequest\032"
-    "\030.pivox.api.v1.Invitation\"7\332A\004name\202\323\344\223\002*"
-    "*(/v1/{name=organizations/*/invitations/"
-    "*}\022\233\001\n\023GetInvitationPolicy\022(.pivox.api.v"
-    "1.GetInvitationPolicyRequest\032\036.pivox.api"
-    ".v1.InvitationPolicy\":\332A\004name\202\323\344\223\002-\022+/v1"
-    "/{name=organizations/*/invitationPolicy}"
-    "\022\337\001\n\026UpdateInvitationPolicy\022+.pivox.api."
-    "v1.UpdateInvitationPolicyRequest\032\036.pivox"
-    ".api.v1.InvitationPolicy\"x\332A\035invitation_"
-    "policy,update_mask\202\323\344\223\002R2=/v1/{invitatio"
-    "n_policy.name=organizations/*/invitation"
-    "Policy}:\021invitation_policy\022\216\001\n\017GetCustom"
-    "Domain\022$.pivox.api.v1.GetCustomDomainReq"
-    "uest\032\032.pivox.api.v1.CustomDomain\"9\332A\004nam"
-    "e\202\323\344\223\002,\022*/v1/{name=organizations/*/custo"
-    "mDomains/*}\022\241\001\n\021ListCustomDomains\022&.pivo"
-    "x.api.v1.ListCustomDomainsRequest\032\'.pivo"
-    "x.api.v1.ListCustomDomainsResponse\";\332A\006p"
-    "arent\202\323\344\223\002,\022*/v1/{parent=organizations/*"
-    "}/customDomains\022\365\001\n\022CreateCustomDomain\022\'"
-    ".pivox.api.v1.CreateCustomDomainRequest\032"
-    "\035.google.longrunning.Operation\"\226\001\312A*\n\014Cu"
-    "stomDomain\022\032CreateCustomDomainMetadata\332A"
-    "%parent,custom_domain,custom_domain_id\202\323"
-    "\344\223\002;\"*/v1/{parent=organizations/*}/custo"
-    "mDomains:\rcustom_domain\022\304\001\n\022DeleteCustom"
-    "Domain\022\'.pivox.api.v1.DeleteCustomDomain"
-    "Request\032\035.google.longrunning.Operation\"f"
-    "\312A*\n\014CustomDomain\022\032DeleteCustomDomainMet"
-    "adata\332A\004name\202\323\344\223\002,**/v1/{name=organizati"
-    "ons/*/customDomains/*}\032\017\312A\014api.pivox.ioB"
-    "\214\001\n\020com.pivox.api.v1B\022OrganizationsProto"
-    "P\001Z\022pivox/api/v1;apiv1\242\002\003PAX\252\002\014Pivox.Api"
-    ".V1\312\002\014Pivox\\Api\\V1\342\002\030Pivox\\Api\\V1\\GPBMet"
-    "adata\352\002\016Pivox::Api::V1b\006proto3"
+    "\027\n\004etag\030\010 \001(\tB\003\340A\003R\004etag\022R\n\013annotations\030"
+    "\014 \003(\0132+.pivox.api.v1.Organization.Annota"
+    "tionsEntryB\003\340A\001R\013annotations\032>\n\020Annotati"
+    "onsEntry\022\020\n\003key\030\001 \001(\tR\003key\022\024\n\005value\030\002 \001("
+    "\tR\005value:\0028\001\"@\n\005State\022\025\n\021STATE_UNSPECIFI"
+    "ED\020\000\022\n\n\006ACTIVE\020\001\022\024\n\020DELETE_REQUESTED\020\002:V"
+    "\352AS\n\026pivox.api/Organization\022\034organizatio"
+    "ns/{organization}*\rorganizations2\014organi"
+    "zation\"R\n\026GetOrganizationRequest\0228\n\004name"
+    "\030\001 \001(\tB$\340A\002\372A\030\n\026pivox.api/Organization\272H"
+    "\003\310\001\001R\004name\"\317\001\n\030ListOrganizationsRequest\022"
+    "*\n\tpage_size\030\001 \001(\005B\r\340A\001\272H\007\032\005\030\350\007(\000R\010pageS"
+    "ize\022\"\n\npage_token\030\002 \001(\tB\003\340A\001R\tpageToken\022"
+    "&\n\014show_deleted\030\003 \001(\010B\003\340A\001R\013showDeleted\022"
+    "\033\n\006filter\030\004 \001(\tB\003\340A\001R\006filter\022\036\n\010order_by"
+    "\030\005 \001(\tB\003\340A\001R\007orderBy\"\333\001\n\031CreateOrganizat"
+    "ionRequest\022I\n\014organization\030\001 \001(\0132\032.pivox"
+    ".api.v1.OrganizationB\t\340A\002\272H\003\310\001\001R\014organiz"
+    "ation\022I\n\017organization_id\030\002 \001(\tB \340A\001\272H\032r\030"
+    "2\026^[a-z][a-z0-9-]{3,19}$R\016organizationId"
+    "\022(\n\rvalidate_only\030\003 \001(\010B\003\340A\001R\014validateOn"
+    "ly\"\322\001\n\031UpdateOrganizationRequest\022I\n\014orga"
+    "nization\030\001 \001(\0132\032.pivox.api.v1.Organizati"
+    "onB\t\340A\002\272H\003\310\001\001R\014organization\022@\n\013update_ma"
+    "sk\030\002 \001(\0132\032.google.protobuf.FieldMaskB\003\340A"
+    "\001R\nupdateMask\022(\n\rvalidate_only\030\004 \001(\010B\003\340A"
+    "\001R\014validateOnly\"\205\001\n\031ListOrganizationsRes"
+    "ponse\022@\n\rorganizations\030\001 \003(\0132\032.pivox.api"
+    ".v1.OrganizationR\rorganizations\022&\n\017next_"
+    "page_token\030\002 \001(\tR\rnextPageToken\"\324\006\n\014Cust"
+    "omDomain\022\027\n\004name\030\001 \001(\tB\003\340A\010R\004name\022\236\001\n\006do"
+    "main\030\003 \001(\tB\205\001\340A\005\272H\177\272\001|\n\014valid_domain\022\033mu"
+    "st be a valid domain name\032Othis.matches("
+    "\'^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z"
+    "0-9])\?\\\\.)+[a-zA-Z]{2,}$\')R\006domain\022;\n\005st"
+    "ate\030\004 \001(\0162 .pivox.api.v1.CustomDomain.St"
+    "ateB\003\340A\003R\005state\022N\n\024required_dns_records\030"
+    "\005 \003(\0132\027.pivox.api.v1.DnsRecordB\003\340A\003R\022req"
+    "uiredDnsRecords\022@\n\013create_time\030\006 \001(\0132\032.g"
+    "oogle.protobuf.TimestampB\003\340A\003R\ncreateTim"
+    "e\022@\n\013update_time\030\007 \001(\0132\032.google.protobuf"
+    ".TimestampB\003\340A\003R\nupdateTime\022@\n\013delete_ti"
+    "me\030\010 \001(\0132\032.google.protobuf.TimestampB\003\340A"
+    "\003R\ndeleteTime\022@\n\013verify_time\030\t \001(\0132\032.goo"
+    "gle.protobuf.TimestampB\003\340A\003R\nverifyTime\022"
+    "\027\n\004etag\030\n \001(\tB\003\340A\003R\004etag\"f\n\005State\022\025\n\021STA"
+    "TE_UNSPECIFIED\020\000\022\013\n\007PENDING\020\001\022\020\n\014PROVISI"
+    "ONING\020\002\022\n\n\006ACTIVE\020\003\022\n\n\006FAILED\020\004\022\017\n\013DEACT"
+    "IVATED\020\005:t\352Aq\n\026pivox.api/CustomDomain\022:o"
+    "rganizations/{organization}/customDomain"
+    "s/{custom_domain}*\rcustomDomains2\014custom"
+    "Domain\"X\n\tDnsRecord\022\027\n\004type\030\001 \001(\tB\003\340A\003R\004"
+    "type\022\027\n\004host\030\002 \001(\tB\003\340A\003R\004host\022\031\n\005value\030\003"
+    " \001(\tB\003\340A\003R\005value\"R\n\026GetCustomDomainReque"
+    "st\0228\n\004name\030\001 \001(\tB$\340A\002\372A\030\n\026pivox.api/Cust"
+    "omDomain\272H\003\310\001\001R\004name\"\250\001\n\030ListCustomDomai"
+    "nsRequest\022<\n\006parent\030\001 \001(\tB$\340A\002\372A\030\022\026pivox"
+    ".api/CustomDomain\272H\003\310\001\001R\006parent\022*\n\tpage_"
+    "size\030\002 \001(\005B\r\340A\001\272H\007\032\005\030\350\007(\000R\010pageSize\022\"\n\np"
+    "age_token\030\003 \001(\tB\003\340A\001R\tpageToken\"\206\001\n\031List"
+    "CustomDomainsResponse\022A\n\016custom_domains\030"
+    "\001 \003(\0132\032.pivox.api.v1.CustomDomainR\rcusto"
+    "mDomains\022&\n\017next_page_token\030\002 \001(\tR\rnextP"
+    "ageToken\"\376\001\n\031CreateCustomDomainRequest\022<"
+    "\n\006parent\030\001 \001(\tB$\340A\002\372A\030\022\026pivox.api/Custom"
+    "Domain\272H\003\310\001\001R\006parent\022J\n\rcustom_domain\030\002 "
+    "\001(\0132\032.pivox.api.v1.CustomDomainB\t\340A\002\272H\003\310"
+    "\001\001R\014customDomain\022-\n\020custom_domain_id\030\003 \001"
+    "(\tB\003\340A\001R\016customDomainId\022(\n\rvalidate_only"
+    "\030\004 \001(\010B\003\340A\001R\014validateOnly\"\034\n\032CreateCusto"
+    "mDomainMetadata\"\230\001\n\031DeleteCustomDomainRe"
+    "quest\0228\n\004name\030\001 \001(\tB$\340A\002\372A\030\n\026pivox.api/C"
+    "ustomDomain\272H\003\310\001\001R\004name\022\027\n\004etag\030\002 \001(\tB\003\340"
+    "A\001R\004etag\022(\n\rvalidate_only\030\003 \001(\010B\003\340A\001R\014va"
+    "lidateOnly\"\034\n\032CreateOrganizationMetadata"
+    "\"\034\n\032UpdateOrganizationMetadata\"\034\n\032Delete"
+    "CustomDomainMetadata\"\277\005\n\nInvitation\022\027\n\004n"
+    "ame\030\001 \001(\tB\003\340A\010R\004name\022u\n\005email\030\002 \001(\tB_\340A\002"
+    "\340A\005\272HV\272\001S\n\013valid_email\022\035must be a valid "
+    "email address\032%this.matches(\'^[^@]+@[^@]"
+    "+\\\\.[^@]+$\')R\005email\022\032\n\004role\030\003 \001(\tB\006\340A\001\340A"
+    "\005R\004role\0229\n\005state\030\004 \001(\0162\036.pivox.api.v1.In"
+    "vitation.StateB\003\340A\003R\005state\022\035\n\007inviter\030\005 "
+    "\001(\tB\003\340A\003R\007inviter\022@\n\013create_time\030\006 \001(\0132\032"
+    ".google.protobuf.TimestampB\003\340A\003R\ncreateT"
+    "ime\022@\n\013expire_time\030\007 \001(\0132\032.google.protob"
+    "uf.TimestampB\003\340A\003R\nexpireTime\022@\n\013accept_"
+    "time\030\010 \001(\0132\032.google.protobuf.TimestampB\003"
+    "\340A\003R\nacceptTime\022\027\n\004etag\030\t \001(\tB\003\340A\003R\004etag"
+    "\"a\n\005State\022\025\n\021STATE_UNSPECIFIED\020\000\022\013\n\007PEND"
+    "ING\020\001\022\014\n\010ACCEPTED\020\002\022\014\n\010DECLINED\020\003\022\013\n\007REV"
+    "OKED\020\004\022\013\n\007EXPIRED\020\005:i\352Af\n\024pivox.api/Invi"
+    "tation\0225organizations/{organization}/inv"
+    "itations/{invitation}*\013invitations2\ninvi"
+    "tation\"\250\003\n\020InvitationPolicy\022\027\n\004name\030\001 \001("
+    "\tB\003\340A\010R\004name\022H\n\036disable_public_email_add"
+    "resses\030\002 \001(\010B\003\340A\001R\033disablePublicEmailAdd"
+    "resses\022,\n\017allowed_domains\030\003 \003(\tB\003\340A\001R\016al"
+    "lowedDomains\0222\n\022disallowed_domains\030\004 \003(\t"
+    "B\003\340A\001R\021disallowedDomains\022@\n\013update_time\030"
+    "\005 \001(\0132\032.google.protobuf.TimestampB\003\340A\003R\n"
+    "updateTime\022\027\n\004etag\030\006 \001(\tB\003\340A\003R\004etag:t\352Aq"
+    "\n\032pivox.api/InvitationPolicy\022-organizati"
+    "ons/{organization}/invitationPolicy*\022inv"
+    "itationPolicies2\020invitationPolicy\"\304\001\n\027Cr"
+    "eateInvitationRequest\022:\n\006parent\030\001 \001(\tB\"\340"
+    "A\002\372A\026\022\024pivox.api/Invitation\272H\003\310\001\001R\006paren"
+    "t\022C\n\ninvitation\030\002 \001(\0132\030.pivox.api.v1.Inv"
+    "itationB\t\340A\002\272H\003\310\001\001R\ninvitation\022(\n\rinvita"
+    "tion_id\030\003 \001(\tB\003\340A\001R\014invitationId\"\341\001\n\026Lis"
+    "tInvitationsRequest\022:\n\006parent\030\001 \001(\tB\"\340A\002"
+    "\372A\026\022\024pivox.api/Invitation\272H\003\310\001\001R\006parent\022"
+    "*\n\tpage_size\030\002 \001(\005B\r\340A\001\272H\007\032\005\030\350\007(\000R\010pageS"
+    "ize\022\"\n\npage_token\030\003 \001(\tB\003\340A\001R\tpageToken\022"
+    "\033\n\006filter\030\004 \001(\tB\003\340A\001R\006filter\022\036\n\010order_by"
+    "\030\005 \001(\tB\003\340A\001R\007orderBy\"}\n\027ListInvitationsR"
+    "esponse\022:\n\013invitations\030\001 \003(\0132\030.pivox.api"
+    ".v1.InvitationR\013invitations\022&\n\017next_page"
+    "_token\030\002 \001(\tR\rnextPageToken\"N\n\024GetInvita"
+    "tionRequest\0226\n\004name\030\001 \001(\tB\"\340A\002\372A\026\n\024pivox"
+    ".api/Invitation\272H\003\310\001\001R\004name\"Q\n\027AcceptInv"
+    "itationRequest\0226\n\004name\030\001 \001(\tB\"\340A\002\372A\026\n\024pi"
+    "vox.api/Invitation\272H\003\310\001\001R\004name\"T\n\030Accept"
+    "InvitationResponse\0228\n\ninvitation\030\001 \001(\0132\030"
+    ".pivox.api.v1.InvitationR\ninvitation\"R\n\030"
+    "DeclineInvitationRequest\0226\n\004name\030\001 \001(\tB\""
+    "\340A\002\372A\026\n\024pivox.api/Invitation\272H\003\310\001\001R\004name"
+    "\"U\n\031DeclineInvitationResponse\0228\n\ninvitat"
+    "ion\030\001 \001(\0132\030.pivox.api.v1.InvitationR\ninv"
+    "itation\"j\n\027DeleteInvitationRequest\0226\n\004na"
+    "me\030\001 \001(\tB\"\340A\002\372A\026\n\024pivox.api/Invitation\272H"
+    "\003\310\001\001R\004name\022\027\n\004etag\030\002 \001(\tB\003\340A\001R\004etag\"Z\n\032G"
+    "etInvitationPolicyRequest\022<\n\004name\030\001 \001(\tB"
+    "(\340A\002\372A\034\n\032pivox.api/InvitationPolicy\272H\003\310\001"
+    "\001R\004name\"\271\001\n\035UpdateInvitationPolicyReques"
+    "t\022V\n\021invitation_policy\030\001 \001(\0132\036.pivox.api"
+    ".v1.InvitationPolicyB\t\340A\002\272H\003\310\001\001R\020invitat"
+    "ionPolicy\022@\n\013update_mask\030\002 \001(\0132\032.google."
+    "protobuf.FieldMaskB\003\340A\001R\nupdateMask2\363\031\n\r"
+    "Organizations\022~\n\017GetOrganization\022$.pivox"
+    ".api.v1.GetOrganizationRequest\032\032.pivox.a"
+    "pi.v1.Organization\")\332A\004name\202\323\344\223\002\034\022\032/v1/{"
+    "name=organizations/*}\022\177\n\021ListOrganizatio"
+    "ns\022&.pivox.api.v1.ListOrganizationsReque"
+    "st\032\'.pivox.api.v1.ListOrganizationsRespo"
+    "nse\"\031\202\323\344\223\002\023\022\021/v1/organizations\022\321\001\n\022Creat"
+    "eOrganization\022\'.pivox.api.v1.CreateOrgan"
+    "izationRequest\032\035.google.longrunning.Oper"
+    "ation\"s\312A*\n\014Organization\022\032CreateOrganiza"
+    "tionMetadata\332A\034organization,organization"
+    "_id\202\323\344\223\002!\"\021/v1/organizations:\014organizati"
+    "on\022\363\001\n\022UpdateOrganization\022\'.pivox.api.v1"
+    ".UpdateOrganizationRequest\032\035.google.long"
+    "running.Operation\"\224\001\312A*\n\014Organization\022\032U"
+    "pdateOrganizationMetadata\332A\030organization"
+    ",update_mask\332A\014organization\202\323\344\223\00272\'/v1/{"
+    "organization.name=organizations/*}:\014orga"
+    "nization\022\202\001\n\014GetIamPolicy\022!.pivox.iam.v1"
+    ".GetIamPolicyRequest\032\024.pivox.iam.v1.Poli"
+    "cy\"9\332A\004name\202\323\344\223\002,\"\'/v1/{name=organizatio"
+    "ns/*}:getIamPolicy:\001*\022\221\001\n\014SetIamPolicy\022!"
+    ".pivox.iam.v1.SetIamPolicyRequest\032\024.pivo"
+    "x.iam.v1.Policy\"H\332A\017resource,policy\202\323\344\223\002"
+    "0\"+/v1/{resource=organizations/*}:setIam"
+    "Policy:\001*\022\274\001\n\022TestIamPermissions\022\'.pivox"
+    ".iam.v1.TestIamPermissionsRequest\032(.pivo"
+    "x.iam.v1.TestIamPermissionsResponse\"S\332A\024"
+    "resource,permissions\202\323\344\223\0026\"1/v1/{resourc"
+    "e=organizations/*}:testIamPermissions:\001*"
+    "\022\263\001\n\020CreateInvitation\022%.pivox.api.v1.Cre"
+    "ateInvitationRequest\032\030.pivox.api.v1.Invi"
+    "tation\"^\332A\037parent,invitation,invitation_"
+    "id\202\323\344\223\0026\"(/v1/{parent=organizations/*}/i"
+    "nvitations:\ninvitation\022\231\001\n\017ListInvitatio"
+    "ns\022$.pivox.api.v1.ListInvitationsRequest"
+    "\032%.pivox.api.v1.ListInvitationsResponse\""
+    "9\332A\006parent\202\323\344\223\002*\022(/v1/{parent=organizati"
+    "ons/*}/invitations\022\206\001\n\rGetInvitation\022\".p"
+    "ivox.api.v1.GetInvitationRequest\032\030.pivox"
+    ".api.v1.Invitation\"7\332A\004name\202\323\344\223\002*\022(/v1/{"
+    "name=organizations/*/invitations/*}\022\244\001\n\020"
+    "AcceptInvitation\022%.pivox.api.v1.AcceptIn"
+    "vitationRequest\032&.pivox.api.v1.AcceptInv"
+    "itationResponse\"A\332A\004name\202\323\344\223\0024\"//v1/{nam"
+    "e=organizations/*/invitations/*}:accept:"
+    "\001*\022\250\001\n\021DeclineInvitation\022&.pivox.api.v1."
+    "DeclineInvitationRequest\032\'.pivox.api.v1."
+    "DeclineInvitationResponse\"B\332A\004name\202\323\344\223\0025"
+    "\"0/v1/{name=organizations/*/invitations/"
+    "*}:decline:\001*\022\214\001\n\020DeleteInvitation\022%.piv"
+    "ox.api.v1.DeleteInvitationRequest\032\030.pivo"
+    "x.api.v1.Invitation\"7\332A\004name\202\323\344\223\002**(/v1/"
+    "{name=organizations/*/invitations/*}\022\233\001\n"
+    "\023GetInvitationPolicy\022(.pivox.api.v1.GetI"
+    "nvitationPolicyRequest\032\036.pivox.api.v1.In"
+    "vitationPolicy\":\332A\004name\202\323\344\223\002-\022+/v1/{name"
+    "=organizations/*/invitationPolicy}\022\337\001\n\026U"
+    "pdateInvitationPolicy\022+.pivox.api.v1.Upd"
+    "ateInvitationPolicyRequest\032\036.pivox.api.v"
+    "1.InvitationPolicy\"x\332A\035invitation_policy"
+    ",update_mask\202\323\344\223\002R2=/v1/{invitation_poli"
+    "cy.name=organizations/*/invitationPolicy"
+    "}:\021invitation_policy\022\216\001\n\017GetCustomDomain"
+    "\022$.pivox.api.v1.GetCustomDomainRequest\032\032"
+    ".pivox.api.v1.CustomDomain\"9\332A\004name\202\323\344\223\002"
+    ",\022*/v1/{name=organizations/*/customDomai"
+    "ns/*}\022\241\001\n\021ListCustomDomains\022&.pivox.api."
+    "v1.ListCustomDomainsRequest\032\'.pivox.api."
+    "v1.ListCustomDomainsResponse\";\332A\006parent\202"
+    "\323\344\223\002,\022*/v1/{parent=organizations/*}/cust"
+    "omDomains\022\365\001\n\022CreateCustomDomain\022\'.pivox"
+    ".api.v1.CreateCustomDomainRequest\032\035.goog"
+    "le.longrunning.Operation\"\226\001\312A*\n\014CustomDo"
+    "main\022\032CreateCustomDomainMetadata\332A%paren"
+    "t,custom_domain,custom_domain_id\202\323\344\223\002;\"*"
+    "/v1/{parent=organizations/*}/customDomai"
+    "ns:\rcustom_domain\022\304\001\n\022DeleteCustomDomain"
+    "\022\'.pivox.api.v1.DeleteCustomDomainReques"
+    "t\032\035.google.longrunning.Operation\"f\312A*\n\014C"
+    "ustomDomain\022\032DeleteCustomDomainMetadata\332"
+    "A\004name\202\323\344\223\002,**/v1/{name=organizations/*/"
+    "customDomains/*}\032\017\312A\014api.pivox.ioB\214\001\n\020co"
+    "m.pivox.api.v1B\022OrganizationsProtoP\001Z\022pi"
+    "vox/api/v1;apiv1\242\002\003PAX\252\002\014Pivox.Api.V1\312\002\014"
+    "Pivox\\Api\\V1\342\002\030Pivox\\Api\\V1\\GPBMetadata\352"
+    "\002\016Pivox::Api::V1b\006proto3"
 };
 static const ::_pbi::DescriptorTable* const descriptor_table_pivox_2fapi_2fv1_2forganizations_2eproto_deps[10] =
     {
@@ -1644,7 +1638,7 @@ static ::absl::once_flag descriptor_table_pivox_2fapi_2fv1_2forganizations_2epro
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_pivox_2fapi_2fv1_2forganizations_2eproto = {
     false,
     false,
-    9830,
+    9784,
     descriptor_table_protodef_pivox_2fapi_2fv1_2forganizations_2eproto,
     "pivox/api/v1/organizations.proto",
     &descriptor_table_pivox_2fapi_2fv1_2forganizations_2eproto_once,
@@ -1867,8 +1861,7 @@ inline PROTOBUF_NDEBUG_INLINE Organization::Impl_::Impl_(
         annotations_{visibility, arena, from.annotations_},
         name_(arena, from.name_),
         display_name_(arena, from.display_name_),
-        etag_(arena, from.etag_),
-        owner_(arena, from.owner_) {}
+        etag_(arena, from.etag_) {}
 
 Organization::Organization(
     ::google::protobuf::Arena* arena,
@@ -1907,8 +1900,7 @@ inline PROTOBUF_NDEBUG_INLINE Organization::Impl_::Impl_(
         annotations_{visibility, arena},
         name_(arena),
         display_name_(arena),
-        etag_(arena),
-        owner_(arena) {}
+        etag_(arena) {}
 
 inline void Organization::SharedCtor(::_pb::Arena* arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
@@ -1930,7 +1922,6 @@ inline void Organization::SharedDtor(MessageLite& self) {
   this_._impl_.name_.Destroy();
   this_._impl_.display_name_.Destroy();
   this_._impl_.etag_.Destroy();
-  this_._impl_.owner_.Destroy();
   delete this_._impl_.create_time_;
   delete this_._impl_.update_time_;
   delete this_._impl_.delete_time_;
@@ -1990,15 +1981,15 @@ const ::google::protobuf::internal::ClassData* Organization::GetClassData() cons
   return _class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<4, 10, 5, 78, 2> Organization::_table_ = {
+const ::_pbi::TcParseTable<4, 9, 5, 73, 2> Organization::_table_ = {
   {
     PROTOBUF_FIELD_OFFSET(Organization, _impl_._has_bits_),
     0, // no _extensions_
-    13, 120,  // max_field_number, fast_idx_mask
+    12, 120,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294960388,  // skipmap
+    4294964484,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    10,  // num_field_entries
+    9,  // num_field_entries
     5,  // num_aux_entries
     offsetof(decltype(_table_), aux_entries),
     _class_data_.base(),
@@ -2037,9 +2028,7 @@ const ::_pbi::TcParseTable<4, 10, 5, 78, 2> Organization::_table_ = {
      {82, 3, 3, PROTOBUF_FIELD_OFFSET(Organization, _impl_.purge_time_)}},
     {::_pbi::TcParser::MiniParse, {}},
     {::_pbi::TcParser::MiniParse, {}},
-    // string owner = 13 [json_name = "owner", (.google.api.field_behavior) = OUTPUT_ONLY, (.google.api.resource_reference) = {
-    {::_pbi::TcParser::FastUS1,
-     {106, 63, 0, PROTOBUF_FIELD_OFFSET(Organization, _impl_.owner_)}},
+    {::_pbi::TcParser::MiniParse, {}},
     {::_pbi::TcParser::MiniParse, {}},
     {::_pbi::TcParser::MiniParse, {}},
   }}, {{
@@ -2072,9 +2061,6 @@ const ::_pbi::TcParseTable<4, 10, 5, 78, 2> Organization::_table_ = {
     // map<string, string> annotations = 12 [json_name = "annotations", (.google.api.field_behavior) = OPTIONAL];
     {PROTOBUF_FIELD_OFFSET(Organization, _impl_.annotations_), -1, 4,
     (0 | ::_fl::kFcRepeated | ::_fl::kMap)},
-    // string owner = 13 [json_name = "owner", (.google.api.field_behavior) = OUTPUT_ONLY, (.google.api.resource_reference) = {
-    {PROTOBUF_FIELD_OFFSET(Organization, _impl_.owner_), -1, 0,
-    (0 | ::_fl::kFcSingular | ::_fl::kUtf8String | ::_fl::kRepAString)},
   }}, {{
     {::_pbi::TcParser::GetTable<::google::protobuf::Timestamp>()},
     {::_pbi::TcParser::GetTable<::google::protobuf::Timestamp>()},
@@ -2085,13 +2071,12 @@ const ::_pbi::TcParseTable<4, 10, 5, 78, 2> Organization::_table_ = {
         1, 0, 0, 9,
         9)},
   }}, {{
-    "\31\4\14\0\0\0\0\4\0\13\5\0\0\0\0\0"
+    "\31\4\14\0\0\0\0\4\0\13\0\0\0\0\0\0"
     "pivox.api.v1.Organization"
     "name"
     "display_name"
     "etag"
     "annotations"
-    "owner"
   }},
 };
 
@@ -2106,7 +2091,6 @@ PROTOBUF_NOINLINE void Organization::Clear() {
   _impl_.name_.ClearToEmpty();
   _impl_.display_name_.ClearToEmpty();
   _impl_.etag_.ClearToEmpty();
-  _impl_.owner_.ClearToEmpty();
   cached_has_bits = _impl_._has_bits_[0];
   if (cached_has_bits & 0x0000000fu) {
     if (cached_has_bits & 0x00000001u) {
@@ -2239,14 +2223,6 @@ PROTOBUF_NOINLINE void Organization::Clear() {
             }
           }
 
-          // string owner = 13 [json_name = "owner", (.google.api.field_behavior) = OUTPUT_ONLY, (.google.api.resource_reference) = {
-          if (!this_._internal_owner().empty()) {
-            const std::string& _s = this_._internal_owner();
-            ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-                _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "pivox.api.v1.Organization.owner");
-            target = stream->WriteStringMaybeAliased(13, _s, target);
-          }
-
           if (PROTOBUF_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
             target =
                 ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
@@ -2298,11 +2274,6 @@ PROTOBUF_NOINLINE void Organization::Clear() {
             if (!this_._internal_etag().empty()) {
               total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                               this_._internal_etag());
-            }
-            // string owner = 13 [json_name = "owner", (.google.api.field_behavior) = OUTPUT_ONLY, (.google.api.resource_reference) = {
-            if (!this_._internal_owner().empty()) {
-              total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                              this_._internal_owner());
             }
           }
           cached_has_bits = this_._impl_._has_bits_[0];
@@ -2357,9 +2328,6 @@ void Organization::MergeImpl(::google::protobuf::MessageLite& to_msg, const ::go
   }
   if (!from._internal_etag().empty()) {
     _this->_internal_set_etag(from._internal_etag());
-  }
-  if (!from._internal_owner().empty()) {
-    _this->_internal_set_owner(from._internal_owner());
   }
   cached_has_bits = from._impl_._has_bits_[0];
   if (cached_has_bits & 0x0000000fu) {
@@ -2425,7 +2393,6 @@ void Organization::InternalSwap(Organization* PROTOBUF_RESTRICT other) {
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.name_, &other->_impl_.name_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.display_name_, &other->_impl_.display_name_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.etag_, &other->_impl_.etag_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.owner_, &other->_impl_.owner_, arena);
   ::google::protobuf::internal::memswap<
       PROTOBUF_FIELD_OFFSET(Organization, _impl_.state_)
       + sizeof(Organization::_impl_.state_)

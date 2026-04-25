@@ -257,9 +257,6 @@ type Organization struct {
 	// of the Organization resource. This may be sent on update and delete
 	// requests to ensure the client has an up-to-date value before proceeding.
 	Etag string `protobuf:"bytes,8,opt,name=etag,proto3" json:"etag,omitempty"`
-	// Output only. The resource name of the organization owner.
-	// Format: `organizations/{organization}/users/{user}`
-	Owner string `protobuf:"bytes,13,opt,name=owner,proto3" json:"owner,omitempty"`
 	// Optional. Labels associated with this organization.
 	// Labels are key-value pairs that can be used to organize and track resources.
 	Annotations   map[string]string `protobuf:"bytes,12,rep,name=annotations,proto3" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
@@ -349,13 +346,6 @@ func (x *Organization) GetPurgeTime() *timestamppb.Timestamp {
 func (x *Organization) GetEtag() string {
 	if x != nil {
 		return x.Etag
-	}
-	return ""
-}
-
-func (x *Organization) GetOwner() string {
-	if x != nil {
-		return x.Owner
 	}
 	return ""
 }
@@ -2241,7 +2231,7 @@ var File_pivox_api_v1_organizations_proto protoreflect.FileDescriptor
 
 const file_pivox_api_v1_organizations_proto_rawDesc = "" +
 	"\n" +
-	" pivox/api/v1/organizations.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1dpivox/iam/v1/iam_policy.proto\x1a\x19pivox/iam/v1/policy.proto\"\x87\x06\n" +
+	" pivox/api/v1/organizations.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1dpivox/iam/v1/iam_policy.proto\x1a\x19pivox/iam/v1/policy.proto\"\xd9\x05\n" +
 	"\fOrganization\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12&\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\x03\xe0A\x03R\vdisplayName\x12;\n" +
@@ -2255,9 +2245,7 @@ const file_pivox_api_v1_organizations_proto_rawDesc = "" +
 	"\n" +
 	"purge_time\x18\n" +
 	" \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\tpurgeTime\x12\x17\n" +
-	"\x04etag\x18\b \x01(\tB\x03\xe0A\x03R\x04etag\x12,\n" +
-	"\x05owner\x18\r \x01(\tB\x16\xe0A\x03\xfaA\x10\n" +
-	"\x0epivox.iam/UserR\x05owner\x12R\n" +
+	"\x04etag\x18\b \x01(\tB\x03\xe0A\x03R\x04etag\x12R\n" +
 	"\vannotations\x18\f \x03(\v2+.pivox.api.v1.Organization.AnnotationsEntryB\x03\xe0A\x01R\vannotations\x1a>\n" +
 	"\x10AnnotationsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
