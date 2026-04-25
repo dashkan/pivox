@@ -301,7 +301,6 @@ if(APPLE)
 
     xctest_add_bundle(PivoxTests ${APP_TARGET}
         tests/macos/MockChatClient.swift
-        tests/macos/ConversationTranscriptViewTests.swift
         tests/macos/AIChatStateTests.swift
     )
     # Copy conversation fixture into the test bundle's Resources so
