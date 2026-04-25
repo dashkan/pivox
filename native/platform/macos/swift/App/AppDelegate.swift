@@ -21,6 +21,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
   /// returns the user to where they were last.
   private static let lastSettingsTabKey = "settings.last_tab"
 
+  /// Detached AI Chat window. Created lazily when the user
+  /// detaches and kept across close cycles — the SwiftUI state
+  /// inside survives miniaturize → reopen, but a full re-detach
+  /// after a dock will produce a fresh window.
+  private var aiChatWindowController: AIChatWindowController?
+
   // Delegated auth (AUTHN-07): each `pivox://auth/delegate/signin?session=…`
   // deep link gets its own coordinator, its own NSWindow, and its own named
   // Firebase app. Multiple concurrent flows are supported — the coordinator
@@ -170,6 +176,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     win.makeKeyAndOrderFront(nil)
 
+    // Observe window close to cascade-close the detached AI Chat
+    // window — chat is conceptually a child of the main session,
+    // so it shouldn't outlive the main window.
+    NotificationCenter.default.addObserver(
+      self, selector: #selector(mainWindowWillCloseNotification),
+      name: NSWindow.willCloseNotification, object: win)
     // Observe window move/resize to persist state.
     NotificationCenter.default.addObserver(
       self, selector: #selector(windowDidResize),
@@ -457,6 +469,116 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
   /// loss, can sign back in immediately).
   @objc private func signOutAction(_ sender: Any?) {
     AuthService.shared.signOut()
+  }
+
+  // MARK: - AI Chat (docked + detached)
+
+  /// Toggle the chat surface in its current mode. Closes if open,
+  /// opens (in the persisted mode — docked unless the user
+  /// previously detached) if not. `focusInputOnOpen` is requested
+  /// for explicit user intent (mouse click / ⌘⇧A).
+  @MainActor
+  func toggleAIChat(focusInputOnOpen: Bool) {
+    let state = AIChatState.shared
+    if state.isVisible {
+      hideAIChat()
+    } else {
+      showAIChat(focusInputOnOpen: focusInputOnOpen)
+    }
+  }
+
+  /// Make the chat visible in whatever mode is persisted.
+  @MainActor
+  func showAIChat(focusInputOnOpen: Bool) {
+    let state = AIChatState.shared
+    state.isVisible = true
+    switch state.mode {
+    case .docked:
+      // Docked: nothing to spawn — ContentView's HSplitView
+      // renders the inline panel based on `state.isVisible`.
+      // Just request focus if asked.
+      if focusInputOnOpen {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+          NotificationCenter.default.post(name: .aiChatFocusRequested, object: nil)
+        }
+      }
+    case .detached:
+      openOrFocusChatWindow(focusInput: focusInputOnOpen)
+    }
+  }
+
+  /// Hide the chat surface — closes the inline panel (via the
+  /// observable state) or the detached window depending on mode.
+  @MainActor
+  func hideAIChat() {
+    let state = AIChatState.shared
+    state.isVisible = false
+    if state.mode == .detached {
+      aiChatWindowController?.window?.performClose(nil)
+    }
+  }
+
+  /// User asked to pop the inline panel out into its own window.
+  /// Hides the inline panel, flips mode to `.detached`, opens the
+  /// detached window. ChatClient survives the swap because it
+  /// lives on `AIChatService`.
+  @MainActor
+  func detachAIChat() {
+    AIChatState.shared.mode = .detached
+    AIChatState.shared.isVisible = true
+    openOrFocusChatWindow(focusInput: false)
+  }
+
+  /// User asked to dock the detached window back into the main
+  /// window. Closes the detached window, flips mode to `.docked`,
+  /// inline panel becomes visible via `state.isVisible`.
+  @MainActor
+  func dockAIChat() {
+    aiChatWindowController?.window?.performClose(nil)
+    AIChatState.shared.mode = .docked
+    AIChatState.shared.isVisible = true
+  }
+
+  @MainActor
+  private func openOrFocusChatWindow(focusInput: Bool) {
+    let controller = aiChatWindowController ?? {
+      let new = AIChatWindowController()
+      new.onWindowClosed = { [weak self] in
+        // Window was closed externally (red traffic light, ⌘W,
+        // or main window cascade). Reflect that in the shared
+        // state so the toolbar fill flips back to outline.
+        AIChatState.shared.isVisible = false
+        self?.aiChatWindowController = nil
+      }
+      aiChatWindowController = new
+      return new
+    }()
+    controller.show()
+    if focusInput {
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+        controller.focusMessageInput()
+      }
+    }
+  }
+
+  /// Restore the chat surface if it was visible at last quit.
+  /// Account-scoped, so only fires after sign-in.
+  @MainActor
+  func restoreAIChatIfNeeded() {
+    let state = AIChatState.shared
+    guard state.isVisible else { return }
+    if state.mode == .detached {
+      openOrFocusChatWindow(focusInput: false)
+    }
+    // Docked mode needs no spawn — ContentView's HSplitView
+    // already reads `state.isVisible` and renders the panel.
+  }
+
+  /// Close the detached chat window when the main window is
+  /// closing. Wired to `NSWindow.willCloseNotification` on the
+  /// main window in `createMainWindow`.
+  @objc private func mainWindowWillCloseNotification(_ notification: Notification) {
+    aiChatWindowController?.window?.performClose(nil)
   }
 
   /// Disable the Sign Out menu item when there's nothing to sign

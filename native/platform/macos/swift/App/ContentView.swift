@@ -34,25 +34,23 @@ struct ContentView: View {
   @State private var selectedItem: SidebarItem?
   @State private var sidebarVisibility: NavigationSplitViewVisibility = .automatic
   @State private var isImageEditing = false
-  @State private var showAIChat: Bool
-  @State private var chatPanelWidth: CGFloat
   @State private var sidebarWidth: CGFloat
   @State private var aiToggleHovered = false
   private var auth = AuthService.shared
+  private var aiChatState = AIChatState.shared
   private let appState = AppStateBridge.shared()
-
-  /// Clamp range for the persisted chat-panel width so malformed /
-  /// stale values don't produce unusable UIs. Matches the frame bounds
-  /// we pass to the panel.
-  private static let chatMinWidth: CGFloat = 320
-  private static let chatMaxWidth: CGFloat = 500
-  private static let chatDefaultWidth: CGFloat = 400
 
   /// Clamp range for the persisted sidebar width. Matches the
   /// `navigationSplitViewColumnWidth(min:ideal:max:)` bounds.
   private static let sidebarMinWidth: CGFloat = 180
   private static let sidebarMaxWidth: CGFloat = 300
   private static let sidebarDefaultWidth: CGFloat = 220
+
+  /// Inline chat panel width bounds. Same as before the dock /
+  /// detach split — inline mode reuses these.
+  private static let chatMinWidth: CGFloat = 320
+  private static let chatMaxWidth: CGFloat = 500
+  private static let chatDefaultWidth: CGFloat = 400
 
   init() {
     let state = AppStateBridge.shared()
@@ -64,17 +62,8 @@ struct ContentView: View {
       _selectedItem = State(initialValue: .section(.playoutOperator))
     }
 
-    // Chat panel: toggle state + width restored across launches.
-    _showAIChat = State(initialValue: state.hasBool(forKey: "ai_chat_open")
-        ? state.loadBool(forKey: "ai_chat_open") : false)
-
-    let savedWidth = state.loadString(forKey: "ai_chat_panel_width")
-      .flatMap { Double($0) }.map { CGFloat($0) } ?? Self.chatDefaultWidth
-    _chatPanelWidth = State(initialValue: min(max(savedWidth, Self.chatMinWidth), Self.chatMaxWidth))
-
     // Sidebar width: persist across launches so a wider / narrower
-    // sidebar chosen by the user sticks. Same load-clamp-init shape
-    // as the chat panel above.
+    // sidebar chosen by the user sticks.
     let savedSidebarWidth = state.loadString(forKey: "sidebar_width")
       .flatMap { Double($0) }.map { CGFloat($0) } ?? Self.sidebarDefaultWidth
     _sidebarWidth = State(initialValue:
@@ -94,8 +83,18 @@ struct ContentView: View {
         appState.save(section.rawValue, forKey: "selected_section")
       }
     }
-    .onChange(of: showAIChat) { _, isOpen in
-      appState.save(isOpen, forKey: "ai_chat_open")
+    .onChange(of: auth.isSignedIn) { _, isSignedIn in
+      // Restore the AI Chat window only after the user is signed
+      // in, since the chat is account-scoped. Persists open/closed
+      // across launches via UserDefaults inside AppDelegate.
+      if isSignedIn {
+        AppDelegate.shared?.restoreAIChatIfNeeded()
+      }
+    }
+    .task {
+      if auth.isSignedIn {
+        AppDelegate.shared?.restoreAIChatIfNeeded()
+      }
     }
     .onReceive(
       NotificationCenter.default.publisher(for: DelegatedAuthCoordinator.openProfileNotification)
@@ -186,64 +185,42 @@ struct ContentView: View {
       // never crushed below a width that fits both its columns.
       .frame(minWidth: 580, maxWidth: .infinity)
 
-      if showAIChat {
-        AIChatContainerView()
+      if aiChatState.isVisible && aiChatState.mode == .docked {
+        InlineAIChatPanel()
           .frame(minWidth: Self.chatMinWidth,
-                 idealWidth: chatPanelWidth,
+                 idealWidth: Self.chatDefaultWidth,
                  maxWidth: Self.chatMaxWidth)
-          .background(
-            GeometryReader { proxy in
-              Color.clear.onChange(of: proxy.size.width) { _, newWidth in
-                guard newWidth >= Self.chatMinWidth,
-                      newWidth <= Self.chatMaxWidth else { return }
-                appState.save(String(Double(newWidth)),
-                              forKey: "ai_chat_panel_width")
-              }
-            }
-          )
           .transition(.move(edge: .trailing))
       }
     }
     .toolbar {
-      // Applied on the outer HSplitView (the thing that spans the
-      // whole window) rather than on NavigationSplitView, so
-      // `.primaryAction` actually lands at the window's right edge.
-      // When the toolbar was on NavigationSplitView it anchored to
-      // the sidebar-plus-detail half only, putting the chat toggle
-      // in the middle of the window.
+      // Toolbar lives on the outer HSplitView so `.primaryAction`
+      // anchors at the window's right edge.
       ToolbarItem(placement: .primaryAction) {
         Button {
-          withAnimation(.easeInOut(duration: 0.2)) {
-            showAIChat.toggle()
-          }
+          AppDelegate.shared?.toggleAIChat(focusInputOnOpen: false)
         } label: {
           Image(systemName: "sparkles")
             .pivoxIconToolbar()
-            .symbolVariant(showAIChat ? .fill : .none)
+            .symbolVariant(aiChatState.isVisible ? .fill : .none)
             .aiShimmerSymbol(isActive: aiToggleHovered)
             .padding(6)
             .contentShape(Rectangle())
             .onHover { aiToggleHovered = $0 }
         }
-        // `.plain` drops the default toolbar-button chrome, which
-        // includes the subtle gray hover highlight AppKit overlays
-        // on top of the icon. We replace its job with our own icon
-        // shimmer on hover — "cursor is here" without the gray ring
-        // competing with the sparkles glow.
+        // `.plain` drops the default toolbar-button chrome (the
+        // subtle gray hover highlight AppKit overlays on the icon).
+        // We replace its job with our own shimmer on hover.
         .buttonStyle(.plain)
         // Mouse-click-only side-effect: when opening via pointer,
-        // also steal focus to the message input. `TapGesture` fires
-        // for mouse/touch but NOT for keyboard Space-activation on
-        // a focused button, so a keyboard user Tab'ing around the
-        // UI can toggle the panel without losing their focus
-        // position. The deferred check reads `showAIChat` after all
-        // synchronous gesture handlers have run, so whichever order
-        // SwiftUI dispatches them, we only post when the panel is
-        // actually now open.
+        // also steal focus to the chat's message input. `TapGesture`
+        // fires for mouse/touch but NOT for keyboard Space-
+        // activation on a focused button, so keyboard users Tab'ing
+        // around the UI can toggle the chat without losing focus.
         .simultaneousGesture(
           TapGesture().onEnded {
             DispatchQueue.main.async {
-              if showAIChat {
+              if aiChatState.isVisible {
                 NotificationCenter.default.post(name: .aiChatFocusRequested, object: nil)
               }
             }
@@ -259,13 +236,7 @@ struct ContentView: View {
       // the chat view to grab focus; Space on the button only
       // toggles visibility, leaving focus on the button itself.
       Button {
-        let willOpen = !showAIChat
-        withAnimation(.easeInOut(duration: 0.2)) {
-          showAIChat = willOpen ? true : false
-        }
-        if willOpen {
-          NotificationCenter.default.post(name: .aiChatFocusRequested, object: nil)
-        }
+        AppDelegate.shared?.toggleAIChat(focusInputOnOpen: true)
       } label: {
         EmptyView()
       }

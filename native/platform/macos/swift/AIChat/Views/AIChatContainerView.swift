@@ -8,23 +8,28 @@ extension Notification.Name {
     /// keyboard user activating the toggle with Space isn't thrown
     /// across the window.
     static let aiChatFocusRequested = Notification.Name("pivox.aiChat.focusRequested")
+
+    /// Posted by the jump-to-latest pill in the transcript when the
+    /// user clicks it. The transcript coordinator listens, scrolls
+    /// to bottom, and re-engages stick-to-bottom.
+    static let aiChatJumpToLatest = Notification.Name("pivox.aiChat.jumpToLatest")
 }
 
-/// Right-side chat panel. Opens straight to a new conversation.
-/// Toggle via the toolbar button or ⌘⇧A.
+/// AI chat surface. Renders whichever stage the shared
+/// `AIChatService` is in: progress while connecting, error if
+/// init failed, the chat panel once a `ChatClient` is available.
+///
+/// The view itself owns no `ChatClient` — that's lifted into
+/// `AIChatService.shared` so a dock ↔ detach mode swap can
+/// re-mount the container without tearing down the gRPC channel.
 struct AIChatContainerView: View {
-    @State private var client: ChatClient?
-    @State private var initError: String?
-
-    // TODO: Resolve from authenticated user's org membership.
-    private let orgName = "local-corp"
-    private let endpoint = "localhost:50051"
+    private var service = AIChatService.shared
 
     var body: some View {
         Group {
-            if let client {
-                AIChatPanel(client: client, orgName: orgName)
-            } else if let initError {
+            if let client = service.client {
+                AIChatPanel(client: client, orgName: service.orgName)
+            } else if let initError = service.initError {
                 Text("Chat unavailable: \(initError)")
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -34,14 +39,7 @@ struct AIChatContainerView: View {
             }
         }
         .task {
-            // Auth header is attached per-RPC by the shared auth interceptor
-            // (see PivoxAuthBridge). ChatClient construction is synchronous
-            // now — no token fetch ceremony here.
-            do {
-                client = try ChatClient(endpoint: endpoint)
-            } catch {
-                initError = error.localizedDescription
-            }
+            await service.connect()
         }
     }
 }
@@ -126,6 +124,20 @@ struct AIChatPanel: View {
                             name: .aiChatFocusRequested, object: nil)
                     }
                 }
+
+                // Detach button: only visible while docked. Detached
+                // mode has its own dock button in the window's
+                // titlebar toolbar, so showing one here would be
+                // confusing (clicking it would do nothing useful).
+                if AIChatState.shared.mode == .docked {
+                    IconButton(
+                        systemName: "arrow.up.right.square",
+                        label: "Detach AI Chat into its own window",
+                        help: "Pop out into a new window"
+                    ) {
+                        AppDelegate.shared?.detachAIChat()
+                    }
+                }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
@@ -162,15 +174,21 @@ struct AIChatPanel: View {
     }
 }
 
-/// Owns the ConversationViewModel via @StateObject so SwiftUI observes @Published changes.
-/// Keyed by conversation name via .id() in the parent — new name = new view + new VM.
+/// Reads the long-lived `ConversationViewModel` for a given
+/// conversation from `AIChatService` instead of owning a
+/// `@StateObject`. This is what makes dock/detach safe for an
+/// in-flight stream: when the view tree re-mounts after a mode
+/// swap, the same view model — including its active streaming
+/// Task — is still alive in the service and the new view simply
+/// re-attaches to it.
 struct ActiveConversationView: View {
-    @StateObject private var viewModel: ConversationViewModel
+    @ObservedObject var viewModel: ConversationViewModel
     private let initialMessage: String?
 
-    init(client: ChatClient, conversationName: String, initialMessage: String? = nil, isNew: Bool = false) {
-        _viewModel = StateObject(wrappedValue: ConversationViewModel(
-            client: client, conversationName: conversationName, isNew: isNew))
+    init?(client: ChatClient, conversationName: String, initialMessage: String? = nil, isNew: Bool = false) {
+        guard let vm = AIChatService.shared.viewModel(
+            for: conversationName, isNew: isNew) else { return nil }
+        self.viewModel = vm
         self.initialMessage = initialMessage
     }
 

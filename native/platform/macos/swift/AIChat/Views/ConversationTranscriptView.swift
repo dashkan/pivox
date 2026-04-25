@@ -128,6 +128,20 @@ struct ConversationTranscriptView: NSViewRepresentable {
             name: NSView.boundsDidChangeNotification,
             object: scrollView.contentView)
 
+        // Jump-to-latest pill click handler. Pill visibility itself
+        // is driven off `contentViewBoundsDidChange` below — purely
+        // a function of how far from the document bottom the user
+        // currently is, with no gesture-tracking state. That avoids
+        // the flicker where a downward-scroll-at-bottom would
+        // momentarily flip a "user is interacting" flag and reveal
+        // the pill for one frame, even though the user never
+        // actually left the bottom.
+        NotificationCenter.default.addObserver(
+            context.coordinator,
+            selector: #selector(Coordinator.handleJumpToLatest(_:)),
+            name: .aiChatJumpToLatest,
+            object: nil)
+
         // Install the scroll-event forwarder so vertical scrolls over
         // nested horizontal scroll views (code blocks) reach our
         // transcript scroll view instead of being swallowed by the
@@ -304,7 +318,67 @@ struct ConversationTranscriptView: NSViewRepresentable {
 
         func sync(viewModel: ConversationViewModel) {
             self.viewModel = viewModel
-            applyMessages(viewModel.messages)
+            let new = viewModel.messages
+
+            // Streaming text update: same count, same names, but
+            // the last message's text grew. The placeholder
+            // assistant message is being filled in delta by delta.
+            // The height cache keys by message name, so a naive
+            // reload here would render at the cached (small) height
+            // from the first delta. Invalidate the cache entry for
+            // the streaming row, then `noteHeightOfRows` so
+            // NSTableView re-asks `heightOfRow` with the new text.
+            if let lastNew = new.last, let lastOld = messages.last,
+               new.count == messages.count,
+               lastNew.name == lastOld.name,
+               Self.textOf(lastNew) != Self.textOf(lastOld) {
+                // Capture BEFORE the row grows. After
+                // `noteHeightOfRows` the document is taller while
+                // the clip view's origin hasn't moved, so a
+                // post-mutation `isAtBottom()` would always read
+                // false — exactly the wrong answer when the user
+                // was sitting at the bottom watching the stream.
+                let wasAtBottom = isAtBottom()
+                messages = new
+                rebuildRowsKeepingPages()
+                if let lastRowIdx = rows.indices.last {
+                    let key = cacheKey(for: rows[lastRowIdx])
+                    heightCache.removeValue(forKey: key)
+                    lastNotedWidth.removeValue(forKey: key)
+                    let last = IndexSet(integer: lastRowIdx)
+                    tableView?.noteHeightOfRows(withIndexesChanged: last)
+                    tableView?.reloadData(forRowIndexes: last,
+                                          columnIndexes: IndexSet(integer: 0))
+                }
+                if wasAtBottom {
+                    DispatchQueue.main.async { [weak self] in
+                        self?.scrollToBottom()
+                    }
+                } else {
+                    // No auto-scroll: the doc grew but the user is
+                    // off the bottom. Distance-from-bottom just
+                    // increased, which can cross the pill threshold.
+                    // Bounds-change won't fire (clip view didn't
+                    // move), so we have to recheck explicitly.
+                    DispatchQueue.main.async { [weak self] in
+                        self?.updatePillVisibility()
+                    }
+                }
+                return
+            }
+
+            applyMessages(new)
+        }
+
+        /// Concatenated plain text of all `text` parts in a message.
+        /// Used to detect streaming-text mutations that
+        /// `messagesUnchanged` (which compares by name) would
+        /// otherwise miss.
+        private static func textOf(_ msg: Pivox_Ai_V1_Message) -> String {
+            msg.parts.compactMap { p -> String? in
+                if case .text(let tp) = p.part { return tp.text }
+                return nil
+            }.joined()
         }
 
         /// Dispatcher for mutations coming off `viewModel.messages`.
@@ -358,11 +432,34 @@ struct ConversationTranscriptView: NSViewRepresentable {
             } else if prependCount > 0 {
                 // Older page prepended. Preserve scroll.
                 applyPrepend(newMessages: new, prependCount: prependCount)
+            } else if newCount > oldCount {
+                // Tail append: user just sent a message, or a
+                // streamed assistant response just committed. The
+                // user's mental model is "the new message I asked
+                // for is at the bottom" — keep the viewport pinned
+                // there. We gate on `viewModel.stickToBottom` (the
+                // pill-visibility flag) rather than `isAtBottom()`
+                // because `ConversationViewModel.send()` forces
+                // `stickToBottom = true` to express intent: "the
+                // user just hit Send, take them to the new message
+                // even if they were scrolled up reading earlier
+                // history." A pure position check would ignore that
+                // intent.
+                messages = new
+                rebuildRowsKeepingPages()
+                tableView?.reloadData()
+                if viewModel.stickToBottom {
+                    DispatchQueue.main.async { [weak self] in
+                        self?.scrollToBottom()
+                    }
+                } else {
+                    DispatchQueue.main.async { [weak self] in
+                        self?.updatePillVisibility()
+                    }
+                }
             } else if newCount != oldCount {
-                // Any other size change (future: streaming append,
-                // message edit, regenerate). Structural reload for
-                // now — specialized handling layers in later with
-                // its own phase gate.
+                // Other size changes (message edit, regenerate
+                // later) — structural reload, no scroll change.
                 messages = new
                 rebuildRowsKeepingPages()
                 tableView?.reloadData()
@@ -570,6 +667,53 @@ struct ConversationTranscriptView: NSViewRepresentable {
             refreshVisibleRowHeights()
         }
 
+        /// Jump-to-latest pill clicked. Force re-engage stickiness
+        /// and snap to bottom; subsequent streaming deltas / tail
+        /// appends will follow as they arrive.
+        @objc func handleJumpToLatest(_ notification: Notification) {
+            viewModel.stickToBottom = true
+            scrollToBottom()
+        }
+
+        /// Whether the visible rect's bottom is essentially at the
+        /// document's bottom edge. Tight tolerance — used to decide
+        /// whether to auto-scroll on streaming deltas / tail
+        /// appends. Anything further than 30pt from the bottom
+        /// counts as "user has moved away" and we leave them alone.
+        private func isAtBottom() -> Bool {
+            guard let scrollView else { return true }
+            let visible = scrollView.contentView.documentVisibleRect
+            let docHeight = scrollView.documentView?.frame.height ?? 0
+            let tolerance: CGFloat = 30
+            return visible.maxY >= docHeight - tolerance
+        }
+
+        /// Recomputes `viewModel.stickToBottom` from current scroll
+        /// position. The flag drives the jump-to-latest pill, NOT
+        /// auto-scroll behavior — see `isAtBottom()` for the tight
+        /// auto-scroll gate.
+        ///
+        /// Threshold is one viewport height: the pill only appears
+        /// once the user has scrolled up far enough that the
+        /// previously-visible "page" of content (everything that was
+        /// on screen) is fully off-screen. Smaller scrolls — incidental
+        /// upward nudges, downward scrolls at the bottom, momentum
+        /// tails — never cross the threshold, so the pill doesn't
+        /// flicker during gestures. By the time the pill shows up,
+        /// the user has unambiguously navigated away and the affordance
+        /// is genuinely useful.
+        private func updatePillVisibility() {
+            guard let scrollView else { return }
+            let visible = scrollView.contentView.documentVisibleRect
+            let docHeight = scrollView.documentView?.frame.height ?? 0
+            let viewportHeight = scrollView.contentView.bounds.height
+            let threshold = max(120, viewportHeight)
+            let nearBottom = visible.maxY >= docHeight - threshold
+            if viewModel.stickToBottom != nearBottom {
+                viewModel.stickToBottom = nearBottom
+            }
+        }
+
         @objc func contentViewBoundsDidChange(_ notification: Notification) {
             // Every scroll tick: catch any rows newly scrolled into
             // view whose heights were measured at an older width.
@@ -577,6 +721,14 @@ struct ConversationTranscriptView: NSViewRepresentable {
             // refresh visible" — rows not visible during a resize
             // get refreshed here as they scroll into view.
             refreshVisibleRowHeights()
+
+            // Pill visibility tracks the user's actual scroll
+            // position continuously: it only appears once they've
+            // scrolled away by more than one viewport. This is how
+            // we get "no flicker on downward scrolls at the bottom"
+            // and "pill appears as soon as it's actually useful"
+            // without any gesture-tracking state.
+            updatePillVisibility()
 
             // Pagination trigger: user scrolled near the top.
             guard hasScrolledToBottomOnce else { return }

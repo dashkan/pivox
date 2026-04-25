@@ -12,6 +12,29 @@ public struct ConversationView: View {
                 ConversationTranscriptView(viewModel: viewModel)
                 loadingOverlay
                 errorOverlay
+                // Jump-to-latest pill, anchored to the bottom of
+                // the transcript region. Visible whenever the user
+                // has scrolled away from the bottom — same pattern
+                // Slack / Discord / Claude use.
+                if !viewModel.stickToBottom {
+                    VStack {
+                        Spacer()
+                        JumpToLatestPill()
+                            .padding(.bottom, 12)
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
+                }
+            }
+            // Shimmer placeholder shown only during the gap between
+            // "user sent" and "first streaming delta arrives". Once
+            // tokens start, the streaming response is rendered as
+            // a normal message row in the transcript above (the
+            // view model appends a placeholder on the first delta
+            // and updates its text in place), so no separate
+            // streaming container is needed here.
+            if viewModel.state == .streaming && viewModel.inFlightText.isEmpty {
+                ChatThinkingIndicator()
+                    .transition(.opacity)
             }
             Divider()
             promptInput

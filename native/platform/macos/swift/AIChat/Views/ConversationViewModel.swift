@@ -16,6 +16,15 @@ public final class ConversationViewModel: ObservableObject {
     @Published public private(set) var appendTick: Int = 0
     @Published public private(set) var isLoadingOlder: Bool = false
 
+    /// Whether the transcript should follow new content to the
+    /// bottom. Starts true. Set to false when the user manually
+    /// scrolls up; set back to true when they scroll back to
+    /// bottom or send a new message (sending implies "show me the
+    /// answer"). The transcript view writes this on user-driven
+    /// scroll-position changes; auto-scroll on streaming deltas
+    /// and message appends gates on it.
+    @Published public var stickToBottom: Bool = true
+
     private let client: any ChatClientProtocol
     public let conversationName: String
     /// True when the conversation was just created in this session (via the
@@ -25,6 +34,15 @@ public final class ConversationViewModel: ObservableObject {
 
     private var streamTask: Task<Void, Never>?
     private var olderCursor: String?
+
+    /// `messages` index of the streaming placeholder while a
+    /// response is in flight. We append a real `Pivox_Ai_V1_Message`
+    /// to `messages` on the first delta and update its text in
+    /// place on subsequent deltas — so the transcript renders the
+    /// streaming response as a normal message that grows, not in
+    /// a separate scrollable container outside the transcript.
+    /// Cleared back to nil when the stream commits / errors.
+    private var streamingPlaceholderName: String?
 
     private static let pageSize: Int32 = 50
 
@@ -165,6 +183,11 @@ public final class ConversationViewModel: ObservableObject {
         // Don't allow sending while already streaming.
         guard state != .streaming else { return }
 
+        // Sending a new prompt is a clear "show me the response"
+        // signal — re-engage stick-to-bottom regardless of where
+        // the user had scrolled to before.
+        stickToBottom = true
+
         // Add user message to the local list immediately.
         let userMsg = Pivox_Ai_V1_Message.with {
             $0.name = Self.localName()
@@ -227,38 +250,69 @@ public final class ConversationViewModel: ObservableObject {
         switch event.event {
         case .textStart:
             inFlightText = ""
+            streamingPlaceholderName = nil
         case .textDelta(let delta):
             inFlightText += delta.delta
+            applyDeltaToPlaceholder()
         case .textEnd:
             commitInFlight()
         case .done:
             state = .idle
+            streamingPlaceholderName = nil
         case .streamError(let err):
             state = .error(err.status.message)
+            streamingPlaceholderName = nil
         default:
             break
         }
     }
 
-    private func commitInFlight() {
-        guard !inFlightText.isEmpty else { return }
-        let committedText = inFlightText
-        let assistantMsg = Pivox_Ai_V1_Message.with {
-            $0.name = Self.localName()
+    /// First delta of a stream: append a placeholder message to
+    /// the transcript with the partial text. Subsequent deltas:
+    /// update the placeholder's text in place. The transcript
+    /// view sees a row that grows, so streaming reads as a normal
+    /// message animating in — no separate streaming container.
+    private func applyDeltaToPlaceholder() {
+        if let name = streamingPlaceholderName,
+           let idx = messages.lastIndex(where: { $0.name == name }) {
+            messages[idx].parts = [
+                Pivox_Ai_V1_MessagePart.with {
+                    $0.text = Pivox_Ai_V1_TextPart.with { $0.text = inFlightText }
+                }
+            ]
+            return
+        }
+        let name = Self.localName()
+        streamingPlaceholderName = name
+        let placeholder = Pivox_Ai_V1_Message.with {
+            $0.name = name
             $0.parts = [
                 Pivox_Ai_V1_MessagePart.with {
-                    $0.text = Pivox_Ai_V1_TextPart.with { $0.text = committedText }
-                },
+                    $0.text = Pivox_Ai_V1_TextPart.with { $0.text = inFlightText }
+                }
             ]
             $0.role = .assistant
         }
-        messages.append(assistantMsg)
+        messages.append(placeholder)
         appendTick &+= 1
+    }
+
+    /// Stream finished. Placeholder (if any) is already in the
+    /// messages array and IS the final message — we just clear
+    /// streaming state. Markdown cache is warmed for the final
+    /// text so the next render hits the cache.
+    private func commitInFlight() {
+        guard !inFlightText.isEmpty else {
+            // textEnd without any deltas: state was streaming with
+            // no placeholder appended. Just transition back to idle.
+            state = .idle
+            streamingPlaceholderName = nil
+            return
+        }
+        let committedText = inFlightText
         inFlightText = ""
         state = .idle
-        // Warm the cache for the just-committed message so its next
-        // render (including re-renders from `LazyVStack` recycling)
-        // hits cached parse results.
+        streamingPlaceholderName = nil
         MarkdownParser.parseAsync(committedText)
     }
 
