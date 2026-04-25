@@ -34,67 +34,115 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
   typealias Version = _2
 }
 
-/// An event sent by the client during a streaming chat session.
-public struct Pivox_Ai_V1_ClientEvent: Sendable {
+/// Input to `GenerateContent` and `StreamGenerateContent`. Mirrors the
+/// shape of the Vercel AI SDK's `streamText` / `generateText` params
+/// and Google's `GenerateContentRequest`: a list of role-tagged
+/// messages (the conversation turns), an optional system instruction,
+/// optional tool definitions, and standard generation parameters.
+///
+/// Pivox-specific: `parent` carries the org for routing, and
+/// `conversation` (optional) opts the call into stateful behavior —
+/// when set, the server prepends the conversation's stored history
+/// (and stored system instruction, if any) before the inline
+/// `messages`, and persists the resulting turn(s) on success. When
+/// unset, the call is fully stateless: the caller provides whatever
+/// history is needed inline.
+public struct Pivox_Ai_V1_GenerateContentRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var event: Pivox_Ai_V1_ClientEvent.OneOf_Event? = nil
+  /// Required. The parent organization that scopes this call.
+  /// Format: `organizations/{organization}`
+  public var parent: String = String()
 
-  /// A user message to send to the model.
-  public var message: Pivox_Ai_V1_UserMessage {
-    get {
-      if case .message(let v)? = event {return v}
-      return Pivox_Ai_V1_UserMessage()
-    }
-    set {event = .message(newValue)}
-  }
+  /// Optional. The conversation to attach this turn to. When set, the
+  /// server hydrates history from the conversation and persists the
+  /// new turn(s) on success. When unset, the call is stateless.
+  /// Format: `organizations/{organization}/conversations/{conversation}`
+  public var conversation: String = String()
 
-  /// A tool output provided by the client in response to a tool call.
-  public var toolOutput: Pivox_Ai_V1_ToolOutput {
-    get {
-      if case .toolOutput(let v)? = event {return v}
-      return Pivox_Ai_V1_ToolOutput()
-    }
-    set {event = .toolOutput(newValue)}
-  }
+  /// Required. The new turn(s) the caller wants the model to act on.
+  /// For stateful calls (`conversation` set), this is typically a
+  /// single user message. For stateless calls, this is the full
+  /// conversation history with the final user turn at the end.
+  public var messages: [Pivox_Ai_V1_InputMessage] = []
 
-  /// A tool approval response from the user.
-  public var toolApprovalResponse: Pivox_Ai_V1_ToolApprovalResponse {
-    get {
-      if case .toolApprovalResponse(let v)? = event {return v}
-      return Pivox_Ai_V1_ToolApprovalResponse()
-    }
-    set {event = .toolApprovalResponse(newValue)}
-  }
+  /// Optional. System instruction applied to this generation. For
+  /// stateful calls, overrides the conversation's stored system
+  /// instruction for THIS call only. For stateless calls, this is the
+  /// only system prompt the model sees.
+  public var systemInstruction: String = String()
+
+  /// Optional. Tools the model may call during this generation.
+  public var tools: [Pivox_Ai_V1_ToolDefinition] = []
+
+  /// Optional. Sampling temperature. Server picks a sensible default
+  /// when unset.
+  public var temperature: Float = 0
+
+  /// Optional. Maximum output tokens. Server caps this if unset or
+  /// above its policy limit.
+  public var maxOutputTokens: Int32 = 0
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public enum OneOf_Event: Equatable, Sendable {
-    /// A user message to send to the model.
-    case message(Pivox_Ai_V1_UserMessage)
-    /// A tool output provided by the client in response to a tool call.
-    case toolOutput(Pivox_Ai_V1_ToolOutput)
-    /// A tool approval response from the user.
-    case toolApprovalResponse(Pivox_Ai_V1_ToolApprovalResponse)
-
-  }
 
   public init() {}
 }
 
-/// A user message submitted to the AI.
-public struct Pivox_Ai_V1_UserMessage: Sendable {
+/// Response from the unary `GenerateContent`. The streaming variant
+/// (`StreamGenerateContent`) emits the same content as a sequence of
+/// `ServerEvent`s instead.
+public struct Pivox_Ai_V1_GenerateContentResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Required. The conversation to send the message to.
-  /// Format: `organizations/{organization}/conversations/{conversation}`
-  public var conversation: String = String()
+  /// The assistant message produced by this generation.
+  public var message: Pivox_Ai_V1_Message {
+    get {_message ?? Pivox_Ai_V1_Message()}
+    set {_message = newValue}
+  }
+  /// Returns true if `message` has been explicitly set.
+  public var hasMessage: Bool {self._message != nil}
+  /// Clears the value of `message`. Subsequent reads from it will return its default value.
+  public mutating func clearMessage() {self._message = nil}
 
-  /// Required. The message parts.
+  /// Token accounting for billing/observability.
+  public var usage: Pivox_Ai_V1_TokenUsage {
+    get {_usage ?? Pivox_Ai_V1_TokenUsage()}
+    set {_usage = newValue}
+  }
+  /// Returns true if `usage` has been explicitly set.
+  public var hasUsage: Bool {self._usage != nil}
+  /// Clears the value of `usage`. Subsequent reads from it will return its default value.
+  public mutating func clearUsage() {self._usage = nil}
+
+  /// The model that produced the response.
+  public var model: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _message: Pivox_Ai_V1_Message? = nil
+  fileprivate var _usage: Pivox_Ai_V1_TokenUsage? = nil
+}
+
+/// A single conversation turn supplied as input to a generation. The
+/// role-and-parts shape mirrors the Vercel AI SDK's `UIMessage` and
+/// Google's `Content`: tool calls, tool results, files, reasoning,
+/// and text are all represented as `MessagePart` variants — no
+/// separate request envelopes for tool flows.
+public struct Pivox_Ai_V1_InputMessage: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Required. The role of this message's author.
+  public var role: Pivox_Ai_V1_Role = .unspecified
+
+  /// Required. The structured parts of this message.
   public var parts: [Pivox_Ai_V1_MessagePart] = []
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -102,41 +150,60 @@ public struct Pivox_Ai_V1_UserMessage: Sendable {
   public init() {}
 }
 
-/// A tool output provided by the client after executing a client-side tool.
-public struct Pivox_Ai_V1_ToolOutput: Sendable {
+/// A tool the model may invoke during generation. Schemas are
+/// expressed as JSON Schema (encoded as a JSON string) so this proto
+/// doesn't need to model the schema language directly.
+///
+/// The identifier field is named `tool` (not `name`) to match the
+/// existing convention in `ToolCallPart` / `ToolResultPart` and to
+/// avoid AIP-122's resource-annotation expectation triggered by
+/// messages containing a `name` field.
+public struct Pivox_Ai_V1_ToolDefinition: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Required. The ID of the tool call this output is for.
-  public var toolCallID: String = String()
+  /// Required. The tool's identifier, as the model will reference it.
+  public var tool: String = String()
 
-  /// Required. The conversation this tool output belongs to.
-  /// Format: `organizations/{organization}/conversations/{conversation}`
-  public var conversation: String = String()
+  /// Optional. A natural-language description shown to the model.
+  public var description_p: String = String()
 
-  /// Optional. The JSON-encoded tool result.
-  public var resultJson: String = String()
-
-  /// Optional. Whether the tool execution resulted in an error.
-  public var isError: Bool = false
+  /// Required. JSON Schema describing the tool's input arguments,
+  /// encoded as a JSON string.
+  public var inputSchemaJson: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 }
 
-/// A response to a tool approval request.
-public struct Pivox_Ai_V1_ToolApprovalResponse: Sendable {
+/// Token usage accounting for a generation.
+public struct Pivox_Ai_V1_TokenUsage: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Required. The ID of the tool call being approved or denied.
-  public var toolCallID: String = String()
+  /// Approximate input token count (prompt + history + system).
+  public var inputTokens: Int32 = 0
 
-  /// Required. Whether the tool execution is approved.
-  public var approved: Bool = false
+  /// Approximate output token count (the generated response).
+  public var outputTokens: Int32 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+/// Request message for `SummarizeConversation`.
+public struct Pivox_Ai_V1_SummarizeConversationRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Required. The conversation to summarize.
+  /// Format: `organizations/{organization}/conversations/{conversation}`
+  public var name: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -735,9 +802,9 @@ public struct Pivox_Ai_V1_DataPart: Sendable {
 
 fileprivate let _protobuf_package = "pivox.ai.v1"
 
-extension Pivox_Ai_V1_ClientEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ClientEvent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}message\0\u{3}tool_output\0\u{3}tool_approval_response\0")
+extension Pivox_Ai_V1_GenerateContentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".GenerateContentRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}parent\0\u{1}conversation\0\u{1}messages\0\u{3}system_instruction\0\u{1}tools\0\u{1}temperature\0\u{3}max_output_tokens\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -745,45 +812,69 @@ extension Pivox_Ai_V1_ClientEvent: SwiftProtobuf.Message, SwiftProtobuf._Message
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try {
-        var v: Pivox_Ai_V1_UserMessage?
-        var hadOneofValue = false
-        if let current = self.event {
-          hadOneofValue = true
-          if case .message(let m) = current {v = m}
-        }
-        try decoder.decodeSingularMessageField(value: &v)
-        if let v = v {
-          if hadOneofValue {try decoder.handleConflictingOneOf()}
-          self.event = .message(v)
-        }
-      }()
-      case 2: try {
-        var v: Pivox_Ai_V1_ToolOutput?
-        var hadOneofValue = false
-        if let current = self.event {
-          hadOneofValue = true
-          if case .toolOutput(let m) = current {v = m}
-        }
-        try decoder.decodeSingularMessageField(value: &v)
-        if let v = v {
-          if hadOneofValue {try decoder.handleConflictingOneOf()}
-          self.event = .toolOutput(v)
-        }
-      }()
-      case 3: try {
-        var v: Pivox_Ai_V1_ToolApprovalResponse?
-        var hadOneofValue = false
-        if let current = self.event {
-          hadOneofValue = true
-          if case .toolApprovalResponse(let m) = current {v = m}
-        }
-        try decoder.decodeSingularMessageField(value: &v)
-        if let v = v {
-          if hadOneofValue {try decoder.handleConflictingOneOf()}
-          self.event = .toolApprovalResponse(v)
-        }
-      }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.parent) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.conversation) }()
+      case 3: try { try decoder.decodeRepeatedMessageField(value: &self.messages) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.systemInstruction) }()
+      case 5: try { try decoder.decodeRepeatedMessageField(value: &self.tools) }()
+      case 6: try { try decoder.decodeSingularFloatField(value: &self.temperature) }()
+      case 7: try { try decoder.decodeSingularInt32Field(value: &self.maxOutputTokens) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.parent.isEmpty {
+      try visitor.visitSingularStringField(value: self.parent, fieldNumber: 1)
+    }
+    if !self.conversation.isEmpty {
+      try visitor.visitSingularStringField(value: self.conversation, fieldNumber: 2)
+    }
+    if !self.messages.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.messages, fieldNumber: 3)
+    }
+    if !self.systemInstruction.isEmpty {
+      try visitor.visitSingularStringField(value: self.systemInstruction, fieldNumber: 4)
+    }
+    if !self.tools.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.tools, fieldNumber: 5)
+    }
+    if self.temperature.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.temperature, fieldNumber: 6)
+    }
+    if self.maxOutputTokens != 0 {
+      try visitor.visitSingularInt32Field(value: self.maxOutputTokens, fieldNumber: 7)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Pivox_Ai_V1_GenerateContentRequest, rhs: Pivox_Ai_V1_GenerateContentRequest) -> Bool {
+    if lhs.parent != rhs.parent {return false}
+    if lhs.conversation != rhs.conversation {return false}
+    if lhs.messages != rhs.messages {return false}
+    if lhs.systemInstruction != rhs.systemInstruction {return false}
+    if lhs.tools != rhs.tools {return false}
+    if lhs.temperature != rhs.temperature {return false}
+    if lhs.maxOutputTokens != rhs.maxOutputTokens {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Pivox_Ai_V1_GenerateContentResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".GenerateContentResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}message\0\u{1}usage\0\u{1}model\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._message) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._usage) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.model) }()
       default: break
       }
     }
@@ -794,34 +885,30 @@ extension Pivox_Ai_V1_ClientEvent: SwiftProtobuf.Message, SwiftProtobuf._Message
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    switch self.event {
-    case .message?: try {
-      guard case .message(let v)? = self.event else { preconditionFailure() }
+    try { if let v = self._message {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    }()
-    case .toolOutput?: try {
-      guard case .toolOutput(let v)? = self.event else { preconditionFailure() }
+    } }()
+    try { if let v = self._usage {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    }()
-    case .toolApprovalResponse?: try {
-      guard case .toolApprovalResponse(let v)? = self.event else { preconditionFailure() }
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-    }()
-    case nil: break
+    } }()
+    if !self.model.isEmpty {
+      try visitor.visitSingularStringField(value: self.model, fieldNumber: 3)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Pivox_Ai_V1_ClientEvent, rhs: Pivox_Ai_V1_ClientEvent) -> Bool {
-    if lhs.event != rhs.event {return false}
+  public static func ==(lhs: Pivox_Ai_V1_GenerateContentResponse, rhs: Pivox_Ai_V1_GenerateContentResponse) -> Bool {
+    if lhs._message != rhs._message {return false}
+    if lhs._usage != rhs._usage {return false}
+    if lhs.model != rhs.model {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-extension Pivox_Ai_V1_UserMessage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".UserMessage"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}conversation\0\u{1}parts\0")
+extension Pivox_Ai_V1_InputMessage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".InputMessage"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}role\0\u{1}parts\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -829,7 +916,7 @@ extension Pivox_Ai_V1_UserMessage: SwiftProtobuf.Message, SwiftProtobuf._Message
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.conversation) }()
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.role) }()
       case 2: try { try decoder.decodeRepeatedMessageField(value: &self.parts) }()
       default: break
       }
@@ -837,8 +924,8 @@ extension Pivox_Ai_V1_UserMessage: SwiftProtobuf.Message, SwiftProtobuf._Message
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.conversation.isEmpty {
-      try visitor.visitSingularStringField(value: self.conversation, fieldNumber: 1)
+    if self.role != .unspecified {
+      try visitor.visitSingularEnumField(value: self.role, fieldNumber: 1)
     }
     if !self.parts.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.parts, fieldNumber: 2)
@@ -846,17 +933,17 @@ extension Pivox_Ai_V1_UserMessage: SwiftProtobuf.Message, SwiftProtobuf._Message
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Pivox_Ai_V1_UserMessage, rhs: Pivox_Ai_V1_UserMessage) -> Bool {
-    if lhs.conversation != rhs.conversation {return false}
+  public static func ==(lhs: Pivox_Ai_V1_InputMessage, rhs: Pivox_Ai_V1_InputMessage) -> Bool {
+    if lhs.role != rhs.role {return false}
     if lhs.parts != rhs.parts {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-extension Pivox_Ai_V1_ToolOutput: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ToolOutput"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}tool_call_id\0\u{1}conversation\0\u{3}result_json\0\u{3}is_error\0")
+extension Pivox_Ai_V1_ToolDefinition: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ToolDefinition"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}tool\0\u{1}description\0\u{3}input_schema_json\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -864,44 +951,39 @@ extension Pivox_Ai_V1_ToolOutput: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.toolCallID) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.conversation) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.resultJson) }()
-      case 4: try { try decoder.decodeSingularBoolField(value: &self.isError) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.tool) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.description_p) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.inputSchemaJson) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.toolCallID.isEmpty {
-      try visitor.visitSingularStringField(value: self.toolCallID, fieldNumber: 1)
+    if !self.tool.isEmpty {
+      try visitor.visitSingularStringField(value: self.tool, fieldNumber: 1)
     }
-    if !self.conversation.isEmpty {
-      try visitor.visitSingularStringField(value: self.conversation, fieldNumber: 2)
+    if !self.description_p.isEmpty {
+      try visitor.visitSingularStringField(value: self.description_p, fieldNumber: 2)
     }
-    if !self.resultJson.isEmpty {
-      try visitor.visitSingularStringField(value: self.resultJson, fieldNumber: 3)
-    }
-    if self.isError != false {
-      try visitor.visitSingularBoolField(value: self.isError, fieldNumber: 4)
+    if !self.inputSchemaJson.isEmpty {
+      try visitor.visitSingularStringField(value: self.inputSchemaJson, fieldNumber: 3)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Pivox_Ai_V1_ToolOutput, rhs: Pivox_Ai_V1_ToolOutput) -> Bool {
-    if lhs.toolCallID != rhs.toolCallID {return false}
-    if lhs.conversation != rhs.conversation {return false}
-    if lhs.resultJson != rhs.resultJson {return false}
-    if lhs.isError != rhs.isError {return false}
+  public static func ==(lhs: Pivox_Ai_V1_ToolDefinition, rhs: Pivox_Ai_V1_ToolDefinition) -> Bool {
+    if lhs.tool != rhs.tool {return false}
+    if lhs.description_p != rhs.description_p {return false}
+    if lhs.inputSchemaJson != rhs.inputSchemaJson {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-extension Pivox_Ai_V1_ToolApprovalResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ToolApprovalResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}tool_call_id\0\u{1}approved\0")
+extension Pivox_Ai_V1_TokenUsage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".TokenUsage"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}input_tokens\0\u{3}output_tokens\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -909,26 +991,56 @@ extension Pivox_Ai_V1_ToolApprovalResponse: SwiftProtobuf.Message, SwiftProtobuf
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.toolCallID) }()
-      case 2: try { try decoder.decodeSingularBoolField(value: &self.approved) }()
+      case 1: try { try decoder.decodeSingularInt32Field(value: &self.inputTokens) }()
+      case 2: try { try decoder.decodeSingularInt32Field(value: &self.outputTokens) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.toolCallID.isEmpty {
-      try visitor.visitSingularStringField(value: self.toolCallID, fieldNumber: 1)
+    if self.inputTokens != 0 {
+      try visitor.visitSingularInt32Field(value: self.inputTokens, fieldNumber: 1)
     }
-    if self.approved != false {
-      try visitor.visitSingularBoolField(value: self.approved, fieldNumber: 2)
+    if self.outputTokens != 0 {
+      try visitor.visitSingularInt32Field(value: self.outputTokens, fieldNumber: 2)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Pivox_Ai_V1_ToolApprovalResponse, rhs: Pivox_Ai_V1_ToolApprovalResponse) -> Bool {
-    if lhs.toolCallID != rhs.toolCallID {return false}
-    if lhs.approved != rhs.approved {return false}
+  public static func ==(lhs: Pivox_Ai_V1_TokenUsage, rhs: Pivox_Ai_V1_TokenUsage) -> Bool {
+    if lhs.inputTokens != rhs.inputTokens {return false}
+    if lhs.outputTokens != rhs.outputTokens {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Pivox_Ai_V1_SummarizeConversationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SummarizeConversationRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Pivox_Ai_V1_SummarizeConversationRequest, rhs: Pivox_Ai_V1_SummarizeConversationRequest) -> Bool {
+    if lhs.name != rhs.name {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

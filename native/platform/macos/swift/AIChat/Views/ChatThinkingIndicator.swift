@@ -11,6 +11,7 @@ import SwiftUI
 /// rough sense of elapsed time without showing a precise clock
 /// (which can read as a deadline).
 struct ChatThinkingIndicator: View {
+    @Environment(\.pivoxTheme) private var theme
     @State private var phaseIndex: Int = 0
     @State private var shimmerPhase: CGFloat = 0
 
@@ -27,33 +28,35 @@ struct ChatThinkingIndicator: View {
     private static let phaseInterval: TimeInterval = 8
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: theme.spacingSM) {
+            // No explicit `.foregroundStyle` here — `aiShimmerSymbol`
+            // owns the color, applying an animated AngularGradient.
+            // Setting a concrete Color first would win the priority
+            // contest in SwiftUI and mask the rainbow effect (the
+            // earlier version used `.secondary` which is a
+            // HierarchicalShapeStyle and could be overridden; a
+            // concrete Color from the theme can't).
             Image(systemName: "sparkles")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.secondary)
+                .font(theme.iconInline)
                 .symbolEffect(.pulse, options: .repeating)
-                // Always-on AI shimmer — same effect the toolbar
-                // sparkles uses on hover, but here it runs the
-                // whole time the thinking indicator is visible to
-                // signal "AI is doing work right now."
                 .aiShimmerSymbol(isActive: true)
 
             Text(phases[min(phaseIndex, phases.count - 1)])
-                .font(.system(size: 13))
+                .font(theme.bodySmallFont)
                 .foregroundStyle(
                     LinearGradient(
                         stops: [
-                            .init(color: .secondary, location: max(0, shimmerPhase - 0.2)),
-                            .init(color: .primary, location: shimmerPhase),
-                            .init(color: .secondary, location: min(1, shimmerPhase + 0.2)),
+                            .init(color: theme.textSecondary, location: max(0, shimmerPhase - 0.2)),
+                            .init(color: theme.textPrimary, location: shimmerPhase),
+                            .init(color: theme.textSecondary, location: min(1, shimmerPhase + 0.2)),
                         ],
                         startPoint: .leading,
                         endPoint: .trailing))
 
             Spacer()
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.horizontal, theme.spacingLG)
+        .padding(.vertical, theme.spacingSM)
         .onAppear { startAnimating() }
     }
 

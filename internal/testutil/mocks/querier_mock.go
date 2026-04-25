@@ -771,6 +771,11 @@ func (m *MockQuerier) UpdateConversation(ctx context.Context, arg db.UpdateConve
 	return args.Get(0).(db.AiConversation), args.Error(1)
 }
 
+func (m *MockQuerier) SetAutoTitle(ctx context.Context, arg db.SetAutoTitleParams) (db.AiConversation, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.AiConversation), args.Error(1)
+}
+
 // Messages
 
 func (m *MockQuerier) CountMessagesByConversation(ctx context.Context, conversationID uuid.UUID) (int64, error) {

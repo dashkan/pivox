@@ -15,7 +15,7 @@ import (
 const createConversation = `-- name: CreateConversation :one
 INSERT INTO ai_conversations (org_id, name, title, description, created_by, updated_by)
 VALUES ($1, $2, $3, $4, $5, $5)
-RETURNING id, org_id, name, title, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time
+RETURNING id, org_id, name, title, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time, title_user_set
 `
 
 type CreateConversationParams struct {
@@ -51,6 +51,7 @@ func (q *Queries) CreateConversation(ctx context.Context, arg CreateConversation
 		&i.UpdatedBy,
 		&i.CreateTime,
 		&i.UpdateTime,
+		&i.TitleUserSet,
 	)
 	return i, err
 }
@@ -65,7 +66,7 @@ func (q *Queries) DeleteConversation(ctx context.Context, id uuid.UUID) error {
 }
 
 const getConversationByID = `-- name: GetConversationByID :one
-SELECT id, org_id, name, title, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time FROM ai_conversations WHERE id = $1
+SELECT id, org_id, name, title, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time, title_user_set FROM ai_conversations WHERE id = $1
 `
 
 func (q *Queries) GetConversationByID(ctx context.Context, id uuid.UUID) (AiConversation, error) {
@@ -87,12 +88,13 @@ func (q *Queries) GetConversationByID(ctx context.Context, id uuid.UUID) (AiConv
 		&i.UpdatedBy,
 		&i.CreateTime,
 		&i.UpdateTime,
+		&i.TitleUserSet,
 	)
 	return i, err
 }
 
 const getConversationByName = `-- name: GetConversationByName :one
-SELECT id, org_id, name, title, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time FROM ai_conversations WHERE org_id = $1 AND name = $2
+SELECT id, org_id, name, title, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time, title_user_set FROM ai_conversations WHERE org_id = $1 AND name = $2
 `
 
 type GetConversationByNameParams struct {
@@ -119,6 +121,7 @@ func (q *Queries) GetConversationByName(ctx context.Context, arg GetConversation
 		&i.UpdatedBy,
 		&i.CreateTime,
 		&i.UpdateTime,
+		&i.TitleUserSet,
 	)
 	return i, err
 }
@@ -136,10 +139,55 @@ func (q *Queries) IncrementConversationMessageCount(ctx context.Context, id uuid
 	return err
 }
 
+const setAutoTitle = `-- name: SetAutoTitle :one
+UPDATE ai_conversations
+SET title = $2,
+    revision = revision + 1,
+    update_time = now(),
+    etag = md5(now()::text)
+WHERE id = $1
+RETURNING id, org_id, name, title, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time, title_user_set
+`
+
+type SetAutoTitleParams struct {
+	ID    uuid.UUID `json:"id"`
+	Title string    `json:"title"`
+}
+
+// Server-driven title write (the `:summarize` path). Does NOT flip
+// `title_user_set` — that's the whole point of the flag.
+func (q *Queries) SetAutoTitle(ctx context.Context, arg SetAutoTitleParams) (AiConversation, error) {
+	row := q.db.QueryRow(ctx, setAutoTitle, arg.ID, arg.Title)
+	var i AiConversation
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.Name,
+		&i.Title,
+		&i.Description,
+		&i.Archived,
+		&i.Pinned,
+		&i.MessageCount,
+		&i.LastMessageTime,
+		&i.Etag,
+		&i.Revision,
+		&i.CreatedBy,
+		&i.UpdatedBy,
+		&i.CreateTime,
+		&i.UpdateTime,
+		&i.TitleUserSet,
+	)
+	return i, err
+}
+
 const updateConversation = `-- name: UpdateConversation :one
 
 UPDATE ai_conversations
 SET title = COALESCE($3, title),
+    title_user_set = CASE
+        WHEN $3::text IS NOT NULL THEN TRUE
+        ELSE title_user_set
+    END,
     description = COALESCE($4, description),
     archived = COALESCE($5, archived),
     pinned = COALESCE($6, pinned),
@@ -148,7 +196,7 @@ SET title = COALESCE($3, title),
     update_time = now(),
     etag = md5(now()::text)
 WHERE id = $1
-RETURNING id, org_id, name, title, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time
+RETURNING id, org_id, name, title, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time, title_user_set
 `
 
 type UpdateConversationParams struct {
@@ -162,6 +210,11 @@ type UpdateConversationParams struct {
 
 // ListConversations/CountConversations replaced by filter.Query in the
 // service layer — see internal/filter/declarations.go ConversationFilter.
+// A user-driven title write (UpdateConversation with `title` in the
+// update mask) flips `title_user_set` to true so subsequent
+// `:summarize` calls won't overwrite it. The boolean is only ever
+// raised here, never lowered — once a user has curated a title, that
+// intent is sticky.
 func (q *Queries) UpdateConversation(ctx context.Context, arg UpdateConversationParams) (AiConversation, error) {
 	row := q.db.QueryRow(ctx, updateConversation,
 		arg.ID,
@@ -188,6 +241,7 @@ func (q *Queries) UpdateConversation(ctx context.Context, arg UpdateConversation
 		&i.UpdatedBy,
 		&i.CreateTime,
 		&i.UpdateTime,
+		&i.TitleUserSet,
 	)
 	return i, err
 }

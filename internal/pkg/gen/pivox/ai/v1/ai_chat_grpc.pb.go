@@ -47,16 +47,24 @@ const (
 	AiChat_GetArtifactVersion_FullMethodName    = "/pivox.ai.v1.AiChat/GetArtifactVersion"
 	AiChat_ListArtifactVersions_FullMethodName  = "/pivox.ai.v1.AiChat/ListArtifactVersions"
 	AiChat_DeleteArtifactVersion_FullMethodName = "/pivox.ai.v1.AiChat/DeleteArtifactVersion"
-	AiChat_Stream_FullMethodName                = "/pivox.ai.v1.AiChat/Stream"
+	AiChat_GenerateContent_FullMethodName       = "/pivox.ai.v1.AiChat/GenerateContent"
+	AiChat_StreamGenerateContent_FullMethodName = "/pivox.ai.v1.AiChat/StreamGenerateContent"
+	AiChat_SummarizeConversation_FullMethodName = "/pivox.ai.v1.AiChat/SummarizeConversation"
 )
 
 // AiChatClient is the client API for AiChat service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// AI chat service providing conversation management and real-time streaming.
-// Resource methods follow AIP conventions. The Stream method is a non-AIP
-// bidi RPC for live chat transport.
+// AI chat service providing conversation management and content generation.
+//
+// Resource methods follow AIP conventions. `StreamGenerateContent` is a
+// non-AIP server-streaming RPC for live chat transport — it shares a
+// request shape with the unary `GenerateContent` so callers can reuse
+// request construction across streaming and non-streaming contexts (the
+// same pattern the Vercel AI SDK uses with `streamText` / `generateText`,
+// and Google's own `models.generateContent` /
+// `models.streamGenerateContent`).
 type AiChatClient interface {
 	// Gets a conversation by resource name.
 	GetConversation(ctx context.Context, in *GetConversationRequest, opts ...grpc.CallOption) (*Conversation, error)
@@ -85,30 +93,49 @@ type AiChatClient interface {
 	// Deletes an artifact version. If the last version is deleted, the parent
 	// artifact is also deleted.
 	DeleteArtifactVersion(ctx context.Context, in *DeleteArtifactVersionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	// Server-streaming RPC for AI chat. Each call sends one client event
-	// (user message or tool output) and receives the model's response as
-	// a stream of server events. Native clients use this directly. Web
-	// clients use the SSE adapter at POST /v1/ai:stream instead.
-	// (-- api-linter: core::0136::verb-noun=disabled
+	// Generates assistant content for the given input. Unary: collects
+	// the full response and returns it as a single `Message`. Use this
+	// for stateless one-shot completions (title summarization, intent
+	// classification, etc.) and for stateful turns where the caller
+	// doesn't need streaming. Mirrors `generateText` in the Vercel AI
+	// SDK and `models.generateContent` in Google's AI APIs.
+	GenerateContent(ctx context.Context, in *GenerateContentRequest, opts ...grpc.CallOption) (*GenerateContentResponse, error)
+	// Server-streaming counterpart to `GenerateContent`. Same request
+	// shape; emits the response as a sequence of `ServerEvent`s
+	// (text/reasoning/tool/artifact deltas, lifecycle markers, and a
+	// terminal `done`). Native clients use this directly. Web clients
+	// use the SSE adapter at `POST /v1/ai:streamGenerateContent`.
+	//
+	// The request name, response name, and HTTP suffix are
+	// intentionally non-AIP — server-streaming custom methods aren't
+	// covered by AIP-136. The streaming variant deliberately reuses
+	// `GenerateContentRequest` so callers can construct the request
+	// once and pick streaming vs unary at call time. The unary
+	// `GenerateContent` above is AIP-clean.
+	// (-- api-linter: core::0136::http-uri-suffix=disabled
 	//
 	//	aip.dev/not-precedent: server-streaming custom method for live chat transport. --)
 	//
 	// (-- api-linter: core::0136::request-message-name=disabled
 	//
-	//	aip.dev/not-precedent: uses ClientEvent/ServerEvent, not StreamRequest/StreamResponse. --)
+	//	aip.dev/not-precedent: shares GenerateContentRequest with the unary variant by design. --)
 	//
 	// (-- api-linter: core::0136::response-message-name=disabled
 	//
-	//	aip.dev/not-precedent: uses ClientEvent/ServerEvent, not StreamRequest/StreamResponse. --)
+	//	aip.dev/not-precedent: server-streaming variant returns ServerEvent stream, not StreamGenerateContentResponse. --)
+	StreamGenerateContent(ctx context.Context, in *GenerateContentRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ServerEvent], error)
+	// Generates a short title for the conversation by summarizing its
+	// current contents, persists the result to `Conversation.title`,
+	// and returns the updated `Conversation`.
 	//
-	// (-- api-linter: core::0136::http-method=disabled
+	// No-ops (returns the conversation unchanged) when
+	// `title_set_by_user` is true — never overwrites a user-curated
+	// title. Idempotent in spirit: re-running on the same conversation
+	// produces a (possibly updated) title from the latest contents.
 	//
-	//	aip.dev/not-precedent: server-streaming custom method for live chat transport. --)
-	//
-	// (-- api-linter: core::0136::http-uri-suffix=disabled
-	//
-	//	aip.dev/not-precedent: server-streaming custom method for live chat transport. --)
-	Stream(ctx context.Context, in *ClientEvent, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ServerEvent], error)
+	// Typical callers: clients fire this after the first turn of a
+	// brand-new conversation, or as a "Regenerate title" action.
+	SummarizeConversation(ctx context.Context, in *SummarizeConversationRequest, opts ...grpc.CallOption) (*Conversation, error)
 }
 
 type aiChatClient struct {
@@ -249,13 +276,23 @@ func (c *aiChatClient) DeleteArtifactVersion(ctx context.Context, in *DeleteArti
 	return out, nil
 }
 
-func (c *aiChatClient) Stream(ctx context.Context, in *ClientEvent, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ServerEvent], error) {
+func (c *aiChatClient) GenerateContent(ctx context.Context, in *GenerateContentRequest, opts ...grpc.CallOption) (*GenerateContentResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &AiChat_ServiceDesc.Streams[0], AiChat_Stream_FullMethodName, cOpts...)
+	out := new(GenerateContentResponse)
+	err := c.cc.Invoke(ctx, AiChat_GenerateContent_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[ClientEvent, ServerEvent]{ClientStream: stream}
+	return out, nil
+}
+
+func (c *aiChatClient) StreamGenerateContent(ctx context.Context, in *GenerateContentRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ServerEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &AiChat_ServiceDesc.Streams[0], AiChat_StreamGenerateContent_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[GenerateContentRequest, ServerEvent]{ClientStream: stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -266,15 +303,31 @@ func (c *aiChatClient) Stream(ctx context.Context, in *ClientEvent, opts ...grpc
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type AiChat_StreamClient = grpc.ServerStreamingClient[ServerEvent]
+type AiChat_StreamGenerateContentClient = grpc.ServerStreamingClient[ServerEvent]
+
+func (c *aiChatClient) SummarizeConversation(ctx context.Context, in *SummarizeConversationRequest, opts ...grpc.CallOption) (*Conversation, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Conversation)
+	err := c.cc.Invoke(ctx, AiChat_SummarizeConversation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
 
 // AiChatServer is the server API for AiChat service.
 // All implementations must embed UnimplementedAiChatServer
 // for forward compatibility.
 //
-// AI chat service providing conversation management and real-time streaming.
-// Resource methods follow AIP conventions. The Stream method is a non-AIP
-// bidi RPC for live chat transport.
+// AI chat service providing conversation management and content generation.
+//
+// Resource methods follow AIP conventions. `StreamGenerateContent` is a
+// non-AIP server-streaming RPC for live chat transport — it shares a
+// request shape with the unary `GenerateContent` so callers can reuse
+// request construction across streaming and non-streaming contexts (the
+// same pattern the Vercel AI SDK uses with `streamText` / `generateText`,
+// and Google's own `models.generateContent` /
+// `models.streamGenerateContent`).
 type AiChatServer interface {
 	// Gets a conversation by resource name.
 	GetConversation(context.Context, *GetConversationRequest) (*Conversation, error)
@@ -303,30 +356,49 @@ type AiChatServer interface {
 	// Deletes an artifact version. If the last version is deleted, the parent
 	// artifact is also deleted.
 	DeleteArtifactVersion(context.Context, *DeleteArtifactVersionRequest) (*emptypb.Empty, error)
-	// Server-streaming RPC for AI chat. Each call sends one client event
-	// (user message or tool output) and receives the model's response as
-	// a stream of server events. Native clients use this directly. Web
-	// clients use the SSE adapter at POST /v1/ai:stream instead.
-	// (-- api-linter: core::0136::verb-noun=disabled
+	// Generates assistant content for the given input. Unary: collects
+	// the full response and returns it as a single `Message`. Use this
+	// for stateless one-shot completions (title summarization, intent
+	// classification, etc.) and for stateful turns where the caller
+	// doesn't need streaming. Mirrors `generateText` in the Vercel AI
+	// SDK and `models.generateContent` in Google's AI APIs.
+	GenerateContent(context.Context, *GenerateContentRequest) (*GenerateContentResponse, error)
+	// Server-streaming counterpart to `GenerateContent`. Same request
+	// shape; emits the response as a sequence of `ServerEvent`s
+	// (text/reasoning/tool/artifact deltas, lifecycle markers, and a
+	// terminal `done`). Native clients use this directly. Web clients
+	// use the SSE adapter at `POST /v1/ai:streamGenerateContent`.
+	//
+	// The request name, response name, and HTTP suffix are
+	// intentionally non-AIP — server-streaming custom methods aren't
+	// covered by AIP-136. The streaming variant deliberately reuses
+	// `GenerateContentRequest` so callers can construct the request
+	// once and pick streaming vs unary at call time. The unary
+	// `GenerateContent` above is AIP-clean.
+	// (-- api-linter: core::0136::http-uri-suffix=disabled
 	//
 	//	aip.dev/not-precedent: server-streaming custom method for live chat transport. --)
 	//
 	// (-- api-linter: core::0136::request-message-name=disabled
 	//
-	//	aip.dev/not-precedent: uses ClientEvent/ServerEvent, not StreamRequest/StreamResponse. --)
+	//	aip.dev/not-precedent: shares GenerateContentRequest with the unary variant by design. --)
 	//
 	// (-- api-linter: core::0136::response-message-name=disabled
 	//
-	//	aip.dev/not-precedent: uses ClientEvent/ServerEvent, not StreamRequest/StreamResponse. --)
+	//	aip.dev/not-precedent: server-streaming variant returns ServerEvent stream, not StreamGenerateContentResponse. --)
+	StreamGenerateContent(*GenerateContentRequest, grpc.ServerStreamingServer[ServerEvent]) error
+	// Generates a short title for the conversation by summarizing its
+	// current contents, persists the result to `Conversation.title`,
+	// and returns the updated `Conversation`.
 	//
-	// (-- api-linter: core::0136::http-method=disabled
+	// No-ops (returns the conversation unchanged) when
+	// `title_set_by_user` is true — never overwrites a user-curated
+	// title. Idempotent in spirit: re-running on the same conversation
+	// produces a (possibly updated) title from the latest contents.
 	//
-	//	aip.dev/not-precedent: server-streaming custom method for live chat transport. --)
-	//
-	// (-- api-linter: core::0136::http-uri-suffix=disabled
-	//
-	//	aip.dev/not-precedent: server-streaming custom method for live chat transport. --)
-	Stream(*ClientEvent, grpc.ServerStreamingServer[ServerEvent]) error
+	// Typical callers: clients fire this after the first turn of a
+	// brand-new conversation, or as a "Regenerate title" action.
+	SummarizeConversation(context.Context, *SummarizeConversationRequest) (*Conversation, error)
 	mustEmbedUnimplementedAiChatServer()
 }
 
@@ -376,8 +448,14 @@ func (UnimplementedAiChatServer) ListArtifactVersions(context.Context, *ListArti
 func (UnimplementedAiChatServer) DeleteArtifactVersion(context.Context, *DeleteArtifactVersionRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteArtifactVersion not implemented")
 }
-func (UnimplementedAiChatServer) Stream(*ClientEvent, grpc.ServerStreamingServer[ServerEvent]) error {
-	return status.Error(codes.Unimplemented, "method Stream not implemented")
+func (UnimplementedAiChatServer) GenerateContent(context.Context, *GenerateContentRequest) (*GenerateContentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GenerateContent not implemented")
+}
+func (UnimplementedAiChatServer) StreamGenerateContent(*GenerateContentRequest, grpc.ServerStreamingServer[ServerEvent]) error {
+	return status.Error(codes.Unimplemented, "method StreamGenerateContent not implemented")
+}
+func (UnimplementedAiChatServer) SummarizeConversation(context.Context, *SummarizeConversationRequest) (*Conversation, error) {
+	return nil, status.Error(codes.Unimplemented, "method SummarizeConversation not implemented")
 }
 func (UnimplementedAiChatServer) mustEmbedUnimplementedAiChatServer() {}
 func (UnimplementedAiChatServer) testEmbeddedByValue()                {}
@@ -634,16 +712,52 @@ func _AiChat_DeleteArtifactVersion_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
-func _AiChat_Stream_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(ClientEvent)
+func _AiChat_GenerateContent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GenerateContentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AiChatServer).GenerateContent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AiChat_GenerateContent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AiChatServer).GenerateContent(ctx, req.(*GenerateContentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AiChat_StreamGenerateContent_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(GenerateContentRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(AiChatServer).Stream(m, &grpc.GenericServerStream[ClientEvent, ServerEvent]{ServerStream: stream})
+	return srv.(AiChatServer).StreamGenerateContent(m, &grpc.GenericServerStream[GenerateContentRequest, ServerEvent]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type AiChat_StreamServer = grpc.ServerStreamingServer[ServerEvent]
+type AiChat_StreamGenerateContentServer = grpc.ServerStreamingServer[ServerEvent]
+
+func _AiChat_SummarizeConversation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SummarizeConversationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AiChatServer).SummarizeConversation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AiChat_SummarizeConversation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AiChatServer).SummarizeConversation(ctx, req.(*SummarizeConversationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
 
 // AiChat_ServiceDesc is the grpc.ServiceDesc for AiChat service.
 // It's only intended for direct use with grpc.RegisterService,
@@ -704,11 +818,19 @@ var AiChat_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "DeleteArtifactVersion",
 			Handler:    _AiChat_DeleteArtifactVersion_Handler,
 		},
+		{
+			MethodName: "GenerateContent",
+			Handler:    _AiChat_GenerateContent_Handler,
+		},
+		{
+			MethodName: "SummarizeConversation",
+			Handler:    _AiChat_SummarizeConversation_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "Stream",
-			Handler:       _AiChat_Stream_Handler,
+			StreamName:    "StreamGenerateContent",
+			Handler:       _AiChat_StreamGenerateContent_Handler,
 			ServerStreams: true,
 		},
 	},

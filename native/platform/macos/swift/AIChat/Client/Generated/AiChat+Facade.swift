@@ -5,7 +5,7 @@
 import Foundation
 import PivoxModels
 
-private final class _StreamCtx_Stream {
+private final class _StreamCtx_StreamGenerateContent {
     let continuation: AsyncThrowingStream<Pivox_Ai_V1_ServerEvent, Error>.Continuation
     init(continuation: AsyncThrowingStream<Pivox_Ai_V1_ServerEvent, Error>.Continuation) {
         self.continuation = continuation
@@ -189,20 +189,37 @@ public extension ChatClient {
 
     // pivox.ai.v1.AiChat.DeleteArtifactVersion — skipped: input/output type lives outside PivoxModels
 
-    // pivox.ai.v1.AiChat.Stream
-    func stream(
-        _ request: Pivox_Ai_V1_ClientEvent
+    // pivox.ai.v1.AiChat.GenerateContent
+    func generateContent(
+        _ request: Pivox_Ai_V1_GenerateContentRequest
+    ) async throws -> Pivox_Ai_V1_GenerateContentResponse {
+        var req = request
+        var resp = Pivox_Ai_V1_GenerateContentResponse()
+        let status = withUnsafePointer(to: &req) { reqPtr in
+            withUnsafeMutablePointer(to: &resp) { respPtr in
+                cpp.GenerateContent(OpaquePointer(reqPtr), OpaquePointer(respPtr))
+            }
+        }
+        if status.code != 0 {
+            throw GRPCError(code: status.code, message: String(status.message))
+        }
+        return resp
+    }
+
+    // pivox.ai.v1.AiChat.StreamGenerateContent
+    func streamGenerateContent(
+        _ request: Pivox_Ai_V1_GenerateContentRequest
     ) -> AsyncThrowingStream<Pivox_Ai_V1_ServerEvent, Error> {
         return AsyncThrowingStream { continuation in
-            let ctx = Unmanaged.passRetained(_StreamCtx_Stream(continuation: continuation))
+            let ctx = Unmanaged.passRetained(_StreamCtx_StreamGenerateContent(continuation: continuation))
             var requestCopy = request
             withUnsafePointer(to: &requestCopy) { reqPtr in
-                cpp.Stream(
+                cpp.StreamGenerateContent(
                     OpaquePointer(reqPtr),
                     ctx.toOpaque(),
                     { rawCtx, eventOpaque in
                         guard let rawCtx else { return }
-                        let c = Unmanaged<_StreamCtx_Stream>.fromOpaque(rawCtx).takeUnretainedValue()
+                        let c = Unmanaged<_StreamCtx_StreamGenerateContent>.fromOpaque(rawCtx).takeUnretainedValue()
                         if let op = eventOpaque {
                             let typedPtr = UnsafePointer<Pivox_Ai_V1_ServerEvent>(op)
                             c.continuation.yield(typedPtr.pointee)
@@ -210,13 +227,13 @@ public extension ChatClient {
                     },
                     { rawCtx, code, msg in
                         guard let rawCtx else { return }
-                        let c = Unmanaged<_StreamCtx_Stream>.fromOpaque(rawCtx).takeRetainedValue()
+                        let c = Unmanaged<_StreamCtx_StreamGenerateContent>.fromOpaque(rawCtx).takeRetainedValue()
                         let text = msg.map { String(cString: $0) } ?? "stream error"
                         c.continuation.finish(throwing: GRPCError(code: code, message: text))
                     },
                     { rawCtx in
                         guard let rawCtx else { return }
-                        let c = Unmanaged<_StreamCtx_Stream>.fromOpaque(rawCtx).takeRetainedValue()
+                        let c = Unmanaged<_StreamCtx_StreamGenerateContent>.fromOpaque(rawCtx).takeRetainedValue()
                         c.continuation.finish()
                     }
                 )
@@ -224,6 +241,23 @@ public extension ChatClient {
             let client = cpp
             continuation.onTermination = { _ in client.Cancel() }
         }
+    }
+
+    // pivox.ai.v1.AiChat.SummarizeConversation
+    func summarizeConversation(
+        _ request: Pivox_Ai_V1_SummarizeConversationRequest
+    ) async throws -> Pivox_Ai_V1_Conversation {
+        var req = request
+        var resp = Pivox_Ai_V1_Conversation()
+        let status = withUnsafePointer(to: &req) { reqPtr in
+            withUnsafeMutablePointer(to: &resp) { respPtr in
+                cpp.SummarizeConversation(OpaquePointer(reqPtr), OpaquePointer(respPtr))
+            }
+        }
+        if status.code != 0 {
+            throw GRPCError(code: status.code, message: String(status.message))
+        }
+        return resp
     }
 
 }

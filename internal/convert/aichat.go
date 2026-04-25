@@ -18,6 +18,7 @@ func ConversationToProto(row db.AiConversation, orgName string) *aiv1.Conversati
 		Name:         fmt.Sprintf("organizations/%s/conversations/%s", orgName, row.Name),
 		Creator:      fmt.Sprintf("organizations/%s/users/%s", orgName, row.CreatedBy),
 		Title:        row.Title,
+		TitleUserSet: row.TitleUserSet,
 		Description:  row.Description,
 		Archived:     row.Archived,
 		Pinned:       row.Pinned,

@@ -13,8 +13,9 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-// SSEHandler serves the POST /v1/ai:stream endpoint using Server-Sent Events.
-// It self-dials the local gRPC AiChat.Stream method and translates proto
+// SSEHandler serves the POST /v1/ai:streamGenerateContent endpoint
+// using Server-Sent Events. It self-dials the local gRPC
+// AiChat.StreamGenerateContent method and translates proto
 // ServerEvents to Vercel AI SDK UI message stream format.
 type SSEHandler struct {
 	grpcClient aiv1.AiChatClient
@@ -26,14 +27,18 @@ func NewSSEHandler(client aiv1.AiChatClient, logger *slog.Logger) *SSEHandler {
 	return &SSEHandler{grpcClient: client, logger: logger}
 }
 
-// sseStreamRequest is the JSON body for POST /v1/ai:stream.
+// sseStreamRequest is the JSON body for POST /v1/ai:streamGenerateContent.
+// Matches the shape of the underlying GenerateContentRequest, with
+// `messages` allowed as either the new InputMessage[] form or the
+// older single-message form for transitional clients.
 type sseStreamRequest struct {
-	ConversationName string         `json:"conversation_name"`
-	Message          sseUserMessage `json:"message"`
-	Model            string         `json:"model,omitempty"`
+	Parent            string            `json:"parent"`
+	Conversation      string            `json:"conversation,omitempty"`
+	Messages          []sseInputMessage `json:"messages"`
+	SystemInstruction string            `json:"system_instruction,omitempty"`
 }
 
-type sseUserMessage struct {
+type sseInputMessage struct {
 	Role  string          `json:"role"`
 	Parts json.RawMessage `json:"parts"`
 }
@@ -50,12 +55,32 @@ func (h *SSEHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-
-	// Parse the parts from the JSON body into proto MessageParts.
-	parts, err := unmarshalParts(req.Message.Parts)
-	if err != nil {
-		http.Error(w, "invalid message parts", http.StatusBadRequest)
+	if req.Parent == "" {
+		http.Error(w, "parent is required", http.StatusBadRequest)
 		return
+	}
+	if len(req.Messages) == 0 {
+		http.Error(w, "messages must not be empty", http.StatusBadRequest)
+		return
+	}
+
+	// Convert each input message's parts JSON to proto.
+	protoMessages := make([]*aiv1.InputMessage, 0, len(req.Messages))
+	for _, m := range req.Messages {
+		role, ok := protoRoleFromString(m.Role)
+		if !ok {
+			http.Error(w, fmt.Sprintf("invalid role %q", m.Role), http.StatusBadRequest)
+			return
+		}
+		parts, err := unmarshalParts(m.Parts)
+		if err != nil {
+			http.Error(w, "invalid message parts", http.StatusBadRequest)
+			return
+		}
+		protoMessages = append(protoMessages, &aiv1.InputMessage{
+			Role:  role,
+			Parts: parts,
+		})
 	}
 
 	// SSE headers.
@@ -71,13 +96,13 @@ func (h *SSEHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Open server-streaming call, forwarding the auth token.
 	authHeader := r.Header.Get("Authorization")
 	ctx := metadata.AppendToOutgoingContext(r.Context(), "authorization", authHeader)
-	clientEvent := &aiv1.ClientEvent{
-		Event: &aiv1.ClientEvent_Message{Message: &aiv1.UserMessage{
-			Conversation: req.ConversationName,
-			Parts:        parts,
-		}},
-	}
-	stream, err := h.grpcClient.Stream(ctx, clientEvent, grpc.WaitForReady(true))
+
+	stream, err := h.grpcClient.StreamGenerateContent(ctx, &aiv1.GenerateContentRequest{
+		Parent:            req.Parent,
+		Conversation:      req.Conversation,
+		Messages:          protoMessages,
+		SystemInstruction: req.SystemInstruction,
+	}, grpc.WaitForReady(true))
 	if err != nil {
 		sseError(w, flusher, err)
 		return
@@ -96,6 +121,27 @@ func (h *SSEHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		sseLine := translateToSSE(ev)
 		fmt.Fprintf(w, "data: %s\n\n", sseLine)
 		flusher.Flush()
+	}
+}
+
+// protoRoleFromString maps the JSON-side role string to the proto
+// Role enum. Unrecognized values fail with `ok=false` so the SSE
+// handler can return 400 — silently coercing to USER would let
+// clients smuggle assistant-tagged turns into the request and have
+// them written as user-role on the wire (which the gRPC layer would
+// also reject, but earlier-validation is friendlier).
+func protoRoleFromString(s string) (aiv1.Role, bool) {
+	switch s {
+	case "user", "":
+		return aiv1.Role_USER, true
+	case "assistant":
+		return aiv1.Role_ASSISTANT, true
+	case "system":
+		return aiv1.Role_SYSTEM, true
+	case "tool":
+		return aiv1.Role_TOOL, true
+	default:
+		return aiv1.Role_ROLE_UNSPECIFIED, false
 	}
 }
 

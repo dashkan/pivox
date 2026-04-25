@@ -82,7 +82,7 @@ public struct IconButton: View {
 
     private var hoverBackgroundColor: Color {
         guard showsHoverBackground, isHovered else { return .clear }
-        return Color.secondary.opacity(0.12)
+        return theme.hoverFill
     }
 }
 

@@ -13,13 +13,33 @@ SELECT * FROM ai_conversations WHERE id = $1;
 -- service layer — see internal/filter/declarations.go ConversationFilter.
 
 -- name: UpdateConversation :one
+-- A user-driven title write (UpdateConversation with `title` in the
+-- update mask) flips `title_user_set` to true so subsequent
+-- `:summarize` calls won't overwrite it. The boolean is only ever
+-- raised here, never lowered — once a user has curated a title, that
+-- intent is sticky.
 UPDATE ai_conversations
 SET title = COALESCE(sqlc.narg('title'), title),
+    title_user_set = CASE
+        WHEN sqlc.narg('title')::text IS NOT NULL THEN TRUE
+        ELSE title_user_set
+    END,
     description = COALESCE(sqlc.narg('description'), description),
     archived = COALESCE(sqlc.narg('archived'), archived),
     pinned = COALESCE(sqlc.narg('pinned'), pinned),
     revision = revision + 1,
     updated_by = $2,
+    update_time = now(),
+    etag = md5(now()::text)
+WHERE id = $1
+RETURNING *;
+
+-- name: SetAutoTitle :one
+-- Server-driven title write (the `:summarize` path). Does NOT flip
+-- `title_user_set` — that's the whole point of the flag.
+UPDATE ai_conversations
+SET title = $2,
+    revision = revision + 1,
     update_time = now(),
     etag = md5(now()::text)
 WHERE id = $1

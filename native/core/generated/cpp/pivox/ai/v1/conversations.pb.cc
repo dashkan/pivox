@@ -140,9 +140,10 @@ inline constexpr Conversation::Impl_::Impl_(
         last_message_time_{nullptr},
         create_time_{nullptr},
         update_time_{nullptr},
+        message_count_{0},
+        title_user_set_{false},
         archived_{false},
-        pinned_{false},
-        message_count_{0} {}
+        pinned_{false} {}
 
 template <typename>
 PROTOBUF_CONSTEXPR Conversation::Conversation(::_pbi::ConstantInitialized)
@@ -266,6 +267,7 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::Conversation, _impl_.name_),
         PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::Conversation, _impl_.creator_),
         PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::Conversation, _impl_.title_),
+        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::Conversation, _impl_.title_user_set_),
         PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::Conversation, _impl_.description_),
         PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::Conversation, _impl_.archived_),
         PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::Conversation, _impl_.pinned_),
@@ -274,6 +276,7 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::Conversation, _impl_.create_time_),
         PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::Conversation, _impl_.update_time_),
         PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::Conversation, _impl_.etag_),
+        ~0u,
         ~0u,
         ~0u,
         ~0u,
@@ -354,13 +357,13 @@ const ::uint32_t
 
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
-        {0, 19, -1, sizeof(::pivox::ai::v1::Conversation)},
-        {30, -1, -1, sizeof(::pivox::ai::v1::GetConversationRequest)},
-        {39, -1, -1, sizeof(::pivox::ai::v1::ListConversationsRequest)},
-        {52, -1, -1, sizeof(::pivox::ai::v1::ListConversationsResponse)},
-        {62, 72, -1, sizeof(::pivox::ai::v1::CreateConversationRequest)},
-        {74, 84, -1, sizeof(::pivox::ai::v1::UpdateConversationRequest)},
-        {86, -1, -1, sizeof(::pivox::ai::v1::DeleteConversationRequest)},
+        {0, 20, -1, sizeof(::pivox::ai::v1::Conversation)},
+        {32, -1, -1, sizeof(::pivox::ai::v1::GetConversationRequest)},
+        {41, -1, -1, sizeof(::pivox::ai::v1::ListConversationsRequest)},
+        {54, -1, -1, sizeof(::pivox::ai::v1::ListConversationsResponse)},
+        {64, 74, -1, sizeof(::pivox::ai::v1::CreateConversationRequest)},
+        {76, 86, -1, sizeof(::pivox::ai::v1::UpdateConversationRequest)},
+        {88, -1, -1, sizeof(::pivox::ai::v1::DeleteConversationRequest)},
 };
 static const ::_pb::Message* const file_default_instances[] = {
     &::pivox::ai::v1::_Conversation_default_instance_._instance,
@@ -378,46 +381,47 @@ const char descriptor_table_protodef_pivox_2fai_2fv1_2fconversations_2eproto[] A
     "gle/api/field_behavior.proto\032\031google/api"
     "/resource.proto\032 google/protobuf/field_m"
     "ask.proto\032\037google/protobuf/timestamp.pro"
-    "to\"\316\004\n\014Conversation\022\027\n\004name\030\001 \001(\tB\003\340A\010R\004"
+    "to\"\371\004\n\014Conversation\022\027\n\004name\030\001 \001(\tB\003\340A\010R\004"
     "name\022\035\n\007creator\030\002 \001(\tB\003\340A\003R\007creator\022\031\n\005t"
-    "itle\030\003 \001(\tB\003\340A\001R\005title\022%\n\013description\030\004 "
-    "\001(\tB\003\340A\001R\013description\022\037\n\010archived\030\005 \001(\010B"
-    "\003\340A\001R\010archived\022\033\n\006pinned\030\006 \001(\010B\003\340A\001R\006pin"
-    "ned\022(\n\rmessage_count\030\007 \001(\005B\003\340A\003R\014message"
-    "Count\022K\n\021last_message_time\030\010 \001(\0132\032.googl"
-    "e.protobuf.TimestampB\003\340A\003R\017lastMessageTi"
-    "me\022@\n\013create_time\030\t \001(\0132\032.google.protobu"
-    "f.TimestampB\003\340A\003R\ncreateTime\022@\n\013update_t"
-    "ime\030\n \001(\0132\032.google.protobuf.TimestampB\003\340"
-    "A\003R\nupdateTime\022\027\n\004etag\030\013 \001(\tB\003\340A\003R\004etag:"
-    "r\352Ao\n\025pivox.ai/Conversation\0229organizatio"
-    "ns/{organization}/conversations/{convers"
-    "ation}*\rconversations2\014conversation\"Q\n\026G"
-    "etConversationRequest\0227\n\004name\030\001 \001(\tB#\340A\002"
-    "\372A\027\n\025pivox.ai/Conversation\272H\003\310\001\001R\004name\"\344"
-    "\001\n\030ListConversationsRequest\022;\n\006parent\030\001 "
-    "\001(\tB#\340A\002\372A\027\022\025pivox.ai/Conversation\272H\003\310\001\001"
-    "R\006parent\022*\n\tpage_size\030\002 \001(\005B\r\340A\001\272H\007\032\005\030\350\007"
-    "(\000R\010pageSize\022\"\n\npage_token\030\003 \001(\tB\003\340A\001R\tp"
-    "ageToken\022\033\n\006filter\030\004 \001(\tB\003\340A\001R\006filter\022\036\n"
-    "\010order_by\030\005 \001(\tB\003\340A\001R\007orderBy\"\204\001\n\031ListCo"
-    "nversationsResponse\022\?\n\rconversations\030\001 \003"
-    "(\0132\031.pivox.ai.v1.ConversationR\rconversat"
-    "ions\022&\n\017next_page_token\030\002 \001(\tR\rnextPageT"
-    "oken\"\234\001\n\031CreateConversationRequest\022;\n\006pa"
-    "rent\030\001 \001(\tB#\340A\002\372A\027\022\025pivox.ai/Conversatio"
-    "n\272H\003\310\001\001R\006parent\022B\n\014conversation\030\002 \001(\0132\031."
-    "pivox.ai.v1.ConversationB\003\340A\002R\014conversat"
-    "ion\"\241\001\n\031UpdateConversationRequest\022B\n\014con"
-    "versation\030\001 \001(\0132\031.pivox.ai.v1.Conversati"
-    "onB\003\340A\002R\014conversation\022@\n\013update_mask\030\002 \001"
-    "(\0132\032.google.protobuf.FieldMaskB\003\340A\001R\nupd"
-    "ateMask\"T\n\031DeleteConversationRequest\0227\n\004"
-    "name\030\001 \001(\tB#\340A\002\372A\027\n\025pivox.ai/Conversatio"
-    "n\272H\003\310\001\001R\004nameB\205\001\n\017com.pivox.ai.v1B\022Conve"
-    "rsationsProtoP\001Z\020pivox/ai/v1;aiv1\242\002\003PAX\252"
-    "\002\013Pivox.Ai.V1\312\002\013Pivox\\Ai\\V1\342\002\027Pivox\\Ai\\V"
-    "1\\GPBMetadata\352\002\rPivox::Ai::V1b\006proto3"
+    "itle\030\003 \001(\tB\003\340A\001R\005title\022)\n\016title_user_set"
+    "\030\014 \001(\010B\003\340A\003R\014titleUserSet\022%\n\013description"
+    "\030\004 \001(\tB\003\340A\001R\013description\022\037\n\010archived\030\005 \001"
+    "(\010B\003\340A\001R\010archived\022\033\n\006pinned\030\006 \001(\010B\003\340A\001R\006"
+    "pinned\022(\n\rmessage_count\030\007 \001(\005B\003\340A\003R\014mess"
+    "ageCount\022K\n\021last_message_time\030\010 \001(\0132\032.go"
+    "ogle.protobuf.TimestampB\003\340A\003R\017lastMessag"
+    "eTime\022@\n\013create_time\030\t \001(\0132\032.google.prot"
+    "obuf.TimestampB\003\340A\003R\ncreateTime\022@\n\013updat"
+    "e_time\030\n \001(\0132\032.google.protobuf.Timestamp"
+    "B\003\340A\003R\nupdateTime\022\027\n\004etag\030\013 \001(\tB\003\340A\003R\004et"
+    "ag:r\352Ao\n\025pivox.ai/Conversation\0229organiza"
+    "tions/{organization}/conversations/{conv"
+    "ersation}*\rconversations2\014conversation\"Q"
+    "\n\026GetConversationRequest\0227\n\004name\030\001 \001(\tB#"
+    "\340A\002\372A\027\n\025pivox.ai/Conversation\272H\003\310\001\001R\004nam"
+    "e\"\344\001\n\030ListConversationsRequest\022;\n\006parent"
+    "\030\001 \001(\tB#\340A\002\372A\027\022\025pivox.ai/Conversation\272H\003"
+    "\310\001\001R\006parent\022*\n\tpage_size\030\002 \001(\005B\r\340A\001\272H\007\032\005"
+    "\030\350\007(\000R\010pageSize\022\"\n\npage_token\030\003 \001(\tB\003\340A\001"
+    "R\tpageToken\022\033\n\006filter\030\004 \001(\tB\003\340A\001R\006filter"
+    "\022\036\n\010order_by\030\005 \001(\tB\003\340A\001R\007orderBy\"\204\001\n\031Lis"
+    "tConversationsResponse\022\?\n\rconversations\030"
+    "\001 \003(\0132\031.pivox.ai.v1.ConversationR\rconver"
+    "sations\022&\n\017next_page_token\030\002 \001(\tR\rnextPa"
+    "geToken\"\234\001\n\031CreateConversationRequest\022;\n"
+    "\006parent\030\001 \001(\tB#\340A\002\372A\027\022\025pivox.ai/Conversa"
+    "tion\272H\003\310\001\001R\006parent\022B\n\014conversation\030\002 \001(\013"
+    "2\031.pivox.ai.v1.ConversationB\003\340A\002R\014conver"
+    "sation\"\241\001\n\031UpdateConversationRequest\022B\n\014"
+    "conversation\030\001 \001(\0132\031.pivox.ai.v1.Convers"
+    "ationB\003\340A\002R\014conversation\022@\n\013update_mask\030"
+    "\002 \001(\0132\032.google.protobuf.FieldMaskB\003\340A\001R\n"
+    "updateMask\"T\n\031DeleteConversationRequest\022"
+    "7\n\004name\030\001 \001(\tB#\340A\002\372A\027\n\025pivox.ai/Conversa"
+    "tion\272H\003\310\001\001R\004nameB\205\001\n\017com.pivox.ai.v1B\022Co"
+    "nversationsProtoP\001Z\020pivox/ai/v1;aiv1\242\002\003P"
+    "AX\252\002\013Pivox.Ai.V1\312\002\013Pivox\\Ai\\V1\342\002\027Pivox\\A"
+    "i\\V1\\GPBMetadata\352\002\rPivox::Ai::V1b\006proto3"
 };
 static const ::_pbi::DescriptorTable* const descriptor_table_pivox_2fai_2fv1_2fconversations_2eproto_deps[5] =
     {
@@ -431,7 +435,7 @@ static ::absl::once_flag descriptor_table_pivox_2fai_2fv1_2fconversations_2eprot
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_pivox_2fai_2fv1_2fconversations_2eproto = {
     false,
     false,
-    1797,
+    1840,
     descriptor_table_protodef_pivox_2fai_2fv1_2fconversations_2eproto,
     "pivox/ai/v1/conversations.proto",
     &descriptor_table_pivox_2fai_2fv1_2fconversations_2eproto_once,
@@ -516,12 +520,12 @@ Conversation::Conversation(
                               arena, *from._impl_.update_time_)
                         : nullptr;
   ::memcpy(reinterpret_cast<char *>(&_impl_) +
-               offsetof(Impl_, archived_),
+               offsetof(Impl_, message_count_),
            reinterpret_cast<const char *>(&from._impl_) +
-               offsetof(Impl_, archived_),
-           offsetof(Impl_, message_count_) -
-               offsetof(Impl_, archived_) +
-               sizeof(Impl_::message_count_));
+               offsetof(Impl_, message_count_),
+           offsetof(Impl_, pinned_) -
+               offsetof(Impl_, message_count_) +
+               sizeof(Impl_::pinned_));
 
   // @@protoc_insertion_point(copy_constructor:pivox.ai.v1.Conversation)
 }
@@ -540,9 +544,9 @@ inline void Conversation::SharedCtor(::_pb::Arena* arena) {
   ::memset(reinterpret_cast<char *>(&_impl_) +
                offsetof(Impl_, last_message_time_),
            0,
-           offsetof(Impl_, message_count_) -
+           offsetof(Impl_, pinned_) -
                offsetof(Impl_, last_message_time_) +
-               sizeof(Impl_::message_count_));
+               sizeof(Impl_::pinned_));
 }
 Conversation::~Conversation() {
   // @@protoc_insertion_point(destructor:pivox.ai.v1.Conversation)
@@ -599,15 +603,15 @@ const ::google::protobuf::internal::ClassData* Conversation::GetClassData() cons
   return _class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<4, 11, 3, 72, 2> Conversation::_table_ = {
+const ::_pbi::TcParseTable<4, 12, 3, 72, 2> Conversation::_table_ = {
   {
     PROTOBUF_FIELD_OFFSET(Conversation, _impl_._has_bits_),
     0, // no _extensions_
-    11, 120,  // max_field_number, fast_idx_mask
+    12, 120,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294965248,  // skipmap
+    4294963200,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    11,  // num_field_entries
+    12,  // num_field_entries
     3,  // num_aux_entries
     offsetof(decltype(_table_), aux_entries),
     _class_data_.base(),
@@ -651,7 +655,9 @@ const ::_pbi::TcParseTable<4, 11, 3, 72, 2> Conversation::_table_ = {
     // string etag = 11 [json_name = "etag", (.google.api.field_behavior) = OUTPUT_ONLY];
     {::_pbi::TcParser::FastUS1,
      {90, 63, 0, PROTOBUF_FIELD_OFFSET(Conversation, _impl_.etag_)}},
-    {::_pbi::TcParser::MiniParse, {}},
+    // bool title_user_set = 12 [json_name = "titleUserSet", (.google.api.field_behavior) = OUTPUT_ONLY];
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(Conversation, _impl_.title_user_set_), 63>(),
+     {96, 63, 0, PROTOBUF_FIELD_OFFSET(Conversation, _impl_.title_user_set_)}},
     {::_pbi::TcParser::MiniParse, {}},
     {::_pbi::TcParser::MiniParse, {}},
     {::_pbi::TcParser::MiniParse, {}},
@@ -691,6 +697,9 @@ const ::_pbi::TcParseTable<4, 11, 3, 72, 2> Conversation::_table_ = {
     // string etag = 11 [json_name = "etag", (.google.api.field_behavior) = OUTPUT_ONLY];
     {PROTOBUF_FIELD_OFFSET(Conversation, _impl_.etag_), -1, 0,
     (0 | ::_fl::kFcSingular | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // bool title_user_set = 12 [json_name = "titleUserSet", (.google.api.field_behavior) = OUTPUT_ONLY];
+    {PROTOBUF_FIELD_OFFSET(Conversation, _impl_.title_user_set_), -1, 0,
+    (0 | ::_fl::kFcSingular | ::_fl::kBool)},
   }}, {{
     {::_pbi::TcParser::GetTable<::google::protobuf::Timestamp>()},
     {::_pbi::TcParser::GetTable<::google::protobuf::Timestamp>()},
@@ -733,9 +742,9 @@ PROTOBUF_NOINLINE void Conversation::Clear() {
       _impl_.update_time_->Clear();
     }
   }
-  ::memset(&_impl_.archived_, 0, static_cast<::size_t>(
-      reinterpret_cast<char*>(&_impl_.message_count_) -
-      reinterpret_cast<char*>(&_impl_.archived_)) + sizeof(_impl_.message_count_));
+  ::memset(&_impl_.message_count_, 0, static_cast<::size_t>(
+      reinterpret_cast<char*>(&_impl_.pinned_) -
+      reinterpret_cast<char*>(&_impl_.message_count_)) + sizeof(_impl_.pinned_));
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -838,6 +847,13 @@ PROTOBUF_NOINLINE void Conversation::Clear() {
             target = stream->WriteStringMaybeAliased(11, _s, target);
           }
 
+          // bool title_user_set = 12 [json_name = "titleUserSet", (.google.api.field_behavior) = OUTPUT_ONLY];
+          if (this_._internal_title_user_set() != 0) {
+            target = stream->EnsureSpace(target);
+            target = ::_pbi::WireFormatLite::WriteBoolToArray(
+                12, this_._internal_title_user_set(), target);
+          }
+
           if (PROTOBUF_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
             target =
                 ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
@@ -908,6 +924,15 @@ PROTOBUF_NOINLINE void Conversation::Clear() {
             }
           }
            {
+            // int32 message_count = 7 [json_name = "messageCount", (.google.api.field_behavior) = OUTPUT_ONLY];
+            if (this_._internal_message_count() != 0) {
+              total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+                  this_._internal_message_count());
+            }
+            // bool title_user_set = 12 [json_name = "titleUserSet", (.google.api.field_behavior) = OUTPUT_ONLY];
+            if (this_._internal_title_user_set() != 0) {
+              total_size += 2;
+            }
             // bool archived = 5 [json_name = "archived", (.google.api.field_behavior) = OPTIONAL];
             if (this_._internal_archived() != 0) {
               total_size += 2;
@@ -915,11 +940,6 @@ PROTOBUF_NOINLINE void Conversation::Clear() {
             // bool pinned = 6 [json_name = "pinned", (.google.api.field_behavior) = OPTIONAL];
             if (this_._internal_pinned() != 0) {
               total_size += 2;
-            }
-            // int32 message_count = 7 [json_name = "messageCount", (.google.api.field_behavior) = OUTPUT_ONLY];
-            if (this_._internal_message_count() != 0) {
-              total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-                  this_._internal_message_count());
             }
           }
           return this_.MaybeComputeUnknownFieldsSize(total_size,
@@ -980,14 +1000,17 @@ void Conversation::MergeImpl(::google::protobuf::MessageLite& to_msg, const ::go
       }
     }
   }
+  if (from._internal_message_count() != 0) {
+    _this->_impl_.message_count_ = from._impl_.message_count_;
+  }
+  if (from._internal_title_user_set() != 0) {
+    _this->_impl_.title_user_set_ = from._impl_.title_user_set_;
+  }
   if (from._internal_archived() != 0) {
     _this->_impl_.archived_ = from._impl_.archived_;
   }
   if (from._internal_pinned() != 0) {
     _this->_impl_.pinned_ = from._impl_.pinned_;
-  }
-  if (from._internal_message_count() != 0) {
-    _this->_impl_.message_count_ = from._impl_.message_count_;
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
   _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(from._internal_metadata_);
@@ -1013,8 +1036,8 @@ void Conversation::InternalSwap(Conversation* PROTOBUF_RESTRICT other) {
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.description_, &other->_impl_.description_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.etag_, &other->_impl_.etag_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(Conversation, _impl_.message_count_)
-      + sizeof(Conversation::_impl_.message_count_)
+      PROTOBUF_FIELD_OFFSET(Conversation, _impl_.pinned_)
+      + sizeof(Conversation::_impl_.pinned_)
       - PROTOBUF_FIELD_OFFSET(Conversation, _impl_.last_message_time_)>(
           reinterpret_cast<char*>(&_impl_.last_message_time_),
           reinterpret_cast<char*>(&other->_impl_.last_message_time_));

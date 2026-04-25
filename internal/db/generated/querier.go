@@ -153,6 +153,9 @@ type Querier interface {
 	NextVersionNumber(ctx context.Context, assetID uuid.UUID) (int32, error)
 	RotateRegistrationToken(ctx context.Context, arg RotateRegistrationTokenParams) (StorageGateway, error)
 	SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]Asset, error)
+	// Server-driven title write (the `:summarize` path). Does NOT flip
+	// `title_user_set` — that's the whole point of the flag.
+	SetAutoTitle(ctx context.Context, arg SetAutoTitleParams) (AiConversation, error)
 	SetOrganizationTenantID(ctx context.Context, arg SetOrganizationTenantIDParams) error
 	SoftDeleteApiKey(ctx context.Context, arg SoftDeleteApiKeyParams) (ApiKey, error)
 	SoftDeleteAsset(ctx context.Context, arg SoftDeleteAssetParams) error
@@ -169,6 +172,11 @@ type Querier interface {
 	UpdateAssetVersionError(ctx context.Context, arg UpdateAssetVersionErrorParams) error
 	// ListConversations/CountConversations replaced by filter.Query in the
 	// service layer — see internal/filter/declarations.go ConversationFilter.
+	// A user-driven title write (UpdateConversation with `title` in the
+	// update mask) flips `title_user_set` to true so subsequent
+	// `:summarize` calls won't overwrite it. The boolean is only ever
+	// raised here, never lowered — once a user has curated a title, that
+	// intent is sticky.
 	UpdateConversation(ctx context.Context, arg UpdateConversationParams) (AiConversation, error)
 	UpdateLineItem(ctx context.Context, arg UpdateLineItemParams) (AssetRequestLineItem, error)
 	UpdateLineItemState(ctx context.Context, arg UpdateLineItemStateParams) error

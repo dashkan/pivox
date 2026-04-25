@@ -19,119 +19,175 @@ import (
 const defaultModelContextBudget = 22500
 const defaultMaxHistoryRows = 500
 
-func (s *Server) Stream(req *aiv1.ClientEvent, stream grpc.ServerStreamingServer[aiv1.ServerEvent]) error {
+// StreamGenerateContent is the server-streaming variant of
+// `GenerateContent`. Same request shape; emits the response as a
+// sequence of `ServerEvent`s. The unary `GenerateContent` below
+// shares the same core via `runGenerate`.
+func (s *Server) StreamGenerateContent(req *aiv1.GenerateContentRequest, stream grpc.ServerStreamingServer[aiv1.ServerEvent]) error {
 	ctx := stream.Context()
-	uid := server.MustAuthenticatedUID(ctx)
-	s.logger.Info("Stream: connection opened", "uid", uid)
-
-	// 1. Read the client event — either a user message starting a new turn,
-	// or a tool output resuming generation after a client-side tool call.
-	var convRef, role, logText string
-	var parts []*aiv1.MessagePart
-	switch ev := req.GetEvent().(type) {
-	case *aiv1.ClientEvent_Message:
-		um := ev.Message
-		if um == nil {
-			return status.Error(codes.InvalidArgument, "user message is empty")
-		}
-		convRef = um.GetConversation()
-		role = "user"
-		parts = um.GetParts()
-		logText = extractText(parts)
-	case *aiv1.ClientEvent_ToolOutput:
-		to := ev.ToolOutput
-		if to == nil {
-			return status.Error(codes.InvalidArgument, "tool output is empty")
-		}
-		if to.GetToolCallId() == "" {
-			return status.Error(codes.InvalidArgument, "tool output missing tool_call_id")
-		}
-		convRef = to.GetConversation()
-		role = "tool"
-		parts = []*aiv1.MessagePart{{Part: &aiv1.MessagePart_ToolResult{
-			ToolResult: &aiv1.ToolResultPart{
-				ToolCallId: to.GetToolCallId(),
-				ResultJson: to.GetResultJson(),
-				IsError:    to.GetIsError(),
-			},
-		}}}
-		logText = to.GetResultJson()
-	default:
-		return status.Error(codes.InvalidArgument,
-			"request must contain a user message or tool output")
-	}
-
-	// 2. Load conversation, verify ownership.
-	orgName, convName, err := parseConversationName(convRef)
-	if err != nil {
-		return status.Errorf(codes.InvalidArgument, "invalid conversation: %v", err)
-	}
-
-	conv, err := s.resolveConversation(ctx, orgName, convName, uid)
-	if err != nil {
-		return err
-	}
-
-	// 3. Get next sequence number and persist the inbound message.
-	nextSeq, err := s.queries.GetNextSequenceForConversation(ctx, conv.ID)
-	if err != nil {
-		return status.Errorf(codes.Internal, "failed to get sequence: %v", err)
-	}
-
-	inboundPartsJSON, err := marshalParts(parts)
-	if err != nil {
-		return status.Errorf(codes.Internal, "failed to marshal parts: %v", err)
-	}
-
-	_, err = s.queries.CreateMessage(ctx, db.CreateMessageParams{
-		ConversationID: conv.ID,
-		Name:           uuid.New().String()[:12],
-		Role:           role,
-		Parts:          inboundPartsJSON,
-		Sequence:       int64(nextSeq),
-		TokenCount:     int32(estimateTokens(logText)),
+	_, _, _, err := s.runGenerate(ctx, req, func(ev *aiv1.ServerEvent) error {
+		return stream.Send(ev)
 	})
 	if err != nil {
-		return status.Errorf(codes.Internal, "failed to persist inbound message: %v", err)
-	}
-	_ = s.queries.IncrementConversationMessageCount(ctx, conv.ID)
-
-	// 4. Load conversation history for the model call.
-	history, err := s.loadModelHistory(ctx, conv.ID)
-	if err != nil {
-		return status.Errorf(codes.Internal, "failed to load history: %v", err)
-	}
-
-	s.logger.Info("Stream: inbound event received",
-		"conv", conv.Name,
-		"role", role,
-		"text", logText,
-		"seq", nextSeq)
-
-	// 5. Emit TextStart for the assistant response.
-	assistantMsgID := uuid.New().String()[:12]
-	if err := stream.Send(&aiv1.ServerEvent{
-		Event: &aiv1.ServerEvent_TextStart{TextStart: &aiv1.TextStart{MessageId: assistantMsgID}},
-	}); err != nil {
 		return err
 	}
+	return stream.Send(&aiv1.ServerEvent{
+		Event: &aiv1.ServerEvent_Done{Done: &aiv1.Done{}},
+	})
+}
 
-	// 6. Call the model.
-	s.logger.Info("Stream: calling model", "history_len", len(history))
+// GenerateContent is the unary counterpart to `StreamGenerateContent`.
+// Runs the same generation flow but accumulates the response into a
+// single `Message` and returns it. Use this for one-shot completions
+// (title summarization, classification, etc.) and stateful turns
+// where the caller doesn't need streaming.
+func (s *Server) GenerateContent(ctx context.Context, req *aiv1.GenerateContentRequest) (*aiv1.GenerateContentResponse, error) {
+	msg, usage, modelName, err := s.runGenerate(ctx, req, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &aiv1.GenerateContentResponse{
+		Message: msg,
+		Usage:   usage,
+		Model:   modelName,
+	}, nil
+}
+
+// runGenerate is the shared core for `StreamGenerateContent` and
+// `GenerateContent`. The `emit` callback, when non-nil, is invoked
+// for each `ServerEvent` produced during generation; pass nil to
+// suppress event emission (the unary path collects the assistant
+// text into the returned `Message` directly).
+//
+// Flow:
+//
+//  1. Validate the request and resolve org/conversation context.
+//  2. If a `conversation` is set, persist the inbound `messages` to
+//     the DB and load the full conversation history from there.
+//     Otherwise (stateless), use the inbound `messages` as-is and
+//     skip persistence.
+//  3. Call the language model with the assembled context.
+//  4. Stream the response: emit events via `emit` (when set) and
+//     accumulate text into the returned `Message`.
+//  5. If stateful, persist the assistant response.
+//
+// Returns the assistant `Message` (with name set when persisted),
+// token usage, and the model identifier.
+func (s *Server) runGenerate(
+	ctx context.Context,
+	req *aiv1.GenerateContentRequest,
+	emit func(*aiv1.ServerEvent) error,
+) (*aiv1.Message, *aiv1.TokenUsage, string, error) {
+	if req == nil {
+		return nil, nil, "", status.Error(codes.InvalidArgument, "request is nil")
+	}
+	if req.GetParent() == "" {
+		return nil, nil, "", status.Error(codes.InvalidArgument, "parent is required")
+	}
+	if len(req.GetMessages()) == 0 {
+		return nil, nil, "", status.Error(codes.InvalidArgument, "messages must not be empty")
+	}
+
+	uid := server.MustAuthenticatedUID(ctx)
+
+	// Validate the parent org regardless of stateful/stateless —
+	// without this the stateless path would happily run inference
+	// for any org name a caller invents, including ones they don't
+	// belong to. resolveOrg returns NotFound for unknown names and
+	// is the closest membership signal this service has today
+	// (per-user org-membership IAM is a future addition).
+	orgName, err := parseConversationParent(req.GetParent())
+	if err != nil {
+		return nil, nil, "", status.Errorf(codes.InvalidArgument, "invalid parent: %v", err)
+	}
+	if _, err := s.resolveOrg(ctx, orgName); err != nil {
+		return nil, nil, "", err
+	}
+
+	// Stateful when conversation is set; stateless otherwise.
+	var conv *db.AiConversation
+	if convRef := req.GetConversation(); convRef != "" {
+		convOrgName, convName, err := parseConversationName(convRef)
+		if err != nil {
+			return nil, nil, "", status.Errorf(codes.InvalidArgument, "invalid conversation: %v", err)
+		}
+		// Cross-check: conversation's org must match the request's
+		// parent. Without this a caller could pass parent=A and
+		// conversation under org B and write into B.
+		if convOrgName != orgName {
+			return nil, nil, "", status.Error(codes.InvalidArgument,
+				"conversation's organization does not match request parent")
+		}
+		row, err := s.resolveConversation(ctx, convOrgName, convName, uid)
+		if err != nil {
+			return nil, nil, "", err
+		}
+		conv = &row
+
+		// Persist each inbound message in order. The most common
+		// case is a single user turn, but the request shape allows
+		// multiple (e.g. catching up after a tool round trip).
+		for _, m := range req.GetMessages() {
+			if err := s.persistInputMessage(ctx, conv.ID, m); err != nil {
+				return nil, nil, "", err
+			}
+		}
+	}
+
+	// Build the model context. Stateful: load history from DB
+	// (already includes the just-persisted inbound messages).
+	// Stateless: use inbound messages directly.
+	var history []model.Message
+	if conv != nil {
+		h, err := s.loadModelHistory(ctx, conv.ID)
+		if err != nil {
+			return nil, nil, "", status.Errorf(codes.Internal, "failed to load history: %v", err)
+		}
+		history = h
+	} else {
+		h, err := inputMessagesToModel(req.GetMessages())
+		if err != nil {
+			return nil, nil, "", err
+		}
+		history = h
+	}
+
+	// Resolve system instruction: per-call override wins; otherwise
+	// fall back to the server default. (Stored conversation-level
+	// system instruction is a future addition.)
+	systemPrompt := req.GetSystemInstruction()
+	if systemPrompt == "" {
+		systemPrompt = s.defaultSystemPrompt()
+	}
+
+	// Emit TextStart up front so streaming clients can show a
+	// placeholder bubble immediately, before the first delta lands.
+	assistantMsgID := uuid.New().String()[:12]
+	if emit != nil {
+		if err := emit(&aiv1.ServerEvent{
+			Event: &aiv1.ServerEvent_TextStart{TextStart: &aiv1.TextStart{MessageId: assistantMsgID}},
+		}); err != nil {
+			return nil, nil, "", err
+		}
+	}
+
+	// Call the model.
 	modelReq := model.StreamRequest{
 		Messages:     history,
 		Tools:        s.tools.ToDefinitions(),
-		SystemPrompt: s.defaultSystemPrompt(),
+		SystemPrompt: systemPrompt,
 	}
 	reader, err := s.model.Stream(ctx, modelReq)
 	if err != nil {
-		s.logger.Error("Stream: model.Stream failed", "error", err)
-		return s.sendStreamError(stream, err)
+		if emit != nil {
+			_ = s.sendStreamErrorEmit(emit, err)
+		}
+		return nil, nil, "", status.Errorf(codes.Internal, "model stream: %v", err)
 	}
-	s.logger.Info("Stream: model stream opened, pumping events")
 	defer reader.Close()
 
-	// 7. Pump model events → ServerEvents.
+	// Pump model events; accumulate text for the unary return path
+	// and for persistence.
 	var assistantText strings.Builder
 	for {
 		evt, err := reader.Next(ctx)
@@ -139,22 +195,35 @@ func (s *Server) Stream(req *aiv1.ClientEvent, stream grpc.ServerStreamingServer
 			break
 		}
 		if err != nil {
-			return s.sendStreamError(stream, err)
+			if emit != nil {
+				_ = s.sendStreamErrorEmit(emit, err)
+			}
+			return nil, nil, "", err
 		}
 
 		switch evt.Kind {
 		case "text_delta":
 			assistantText.WriteString(evt.Text)
-			s.logger.Debug("Stream: text_delta", "len", len(evt.Text))
-			if err := stream.Send(&aiv1.ServerEvent{
-				Event: &aiv1.ServerEvent_TextDelta{TextDelta: &aiv1.TextDelta{Delta: evt.Text}},
-			}); err != nil {
-				return err
+			if emit != nil {
+				if err := emit(&aiv1.ServerEvent{
+					Event: &aiv1.ServerEvent_TextDelta{TextDelta: &aiv1.TextDelta{Delta: evt.Text}},
+				}); err != nil {
+					// emit failures here mean the client stream is
+					// already dead (broken pipe / cancellation) —
+					// trying to send StreamError back through the
+					// same channel would also fail. Surface the
+					// error to the caller; gRPC's transport layer
+					// reports the disconnection to its peer via
+					// trailers.
+					return nil, nil, "", err
+				}
 			}
 
 		case "tool_call_complete":
-			if err := s.handleToolCall(stream, evt.ToolCall); err != nil {
-				return err
+			if emit != nil {
+				if err := s.emitToolCall(ctx, emit, evt.ToolCall); err != nil {
+					return nil, nil, "", err
+				}
 			}
 
 		case "finish":
@@ -162,48 +231,219 @@ func (s *Server) Stream(req *aiv1.ClientEvent, stream grpc.ServerStreamingServer
 		}
 	}
 
-	s.logger.Info("Stream: model done",
-		"assistant_text_len", assistantText.Len(),
-		"conv", conv.Name)
-
-	// 8. Emit TextEnd, persist assistant message, emit Done.
-	if err := stream.Send(&aiv1.ServerEvent{
-		Event: &aiv1.ServerEvent_TextEnd{TextEnd: &aiv1.TextEnd{}},
-	}); err != nil {
-		return err
+	if emit != nil {
+		if err := emit(&aiv1.ServerEvent{
+			Event: &aiv1.ServerEvent_TextEnd{TextEnd: &aiv1.TextEnd{}},
+		}); err != nil {
+			return nil, nil, "", err
+		}
 	}
 
-	assistantSeq := int64(nextSeq) + 1
-	assistantPartsJSON, _ := marshalParts([]*aiv1.MessagePart{
+	// Build the assistant message proto.
+	assistantParts := []*aiv1.MessagePart{
 		{Part: &aiv1.MessagePart_Text{Text: &aiv1.TextPart{Text: assistantText.String()}}},
-	})
-	_, err = s.queries.CreateMessage(ctx, db.CreateMessageParams{
-		ConversationID: conv.ID,
-		Name:           assistantMsgID,
-		Role:           "assistant",
-		Parts:          assistantPartsJSON,
-		Sequence:       assistantSeq,
-		TokenCount:     int32(estimateTokens(assistantText.String())),
-	})
-	if err != nil {
-		s.logger.Error("failed to persist assistant message", "error", err)
 	}
-	_ = s.queries.IncrementConversationMessageCount(ctx, conv.ID)
+	assistantMsg := &aiv1.Message{
+		Role:  aiv1.Role_ASSISTANT,
+		Parts: assistantParts,
+	}
 
-	s.logger.Info("Stream: sending Done", "conv", conv.Name)
-	return stream.Send(&aiv1.ServerEvent{
-		Event: &aiv1.ServerEvent_Done{Done: &aiv1.Done{}},
-	})
+	// Persist assistant response when stateful.
+	if conv != nil {
+		nextSeq, err := s.queries.GetNextSequenceForConversation(ctx, conv.ID)
+		if err != nil {
+			return nil, nil, "", status.Errorf(codes.Internal, "get sequence: %v", err)
+		}
+		assistantPartsJSON, _ := marshalParts(assistantParts)
+		_, err = s.queries.CreateMessage(ctx, db.CreateMessageParams{
+			ConversationID: conv.ID,
+			Name:           assistantMsgID,
+			Role:           "assistant",
+			Parts:          assistantPartsJSON,
+			Sequence:       int64(nextSeq),
+			TokenCount:     int32(estimateTokens(assistantText.String())),
+		})
+		if err != nil {
+			return nil, nil, "", status.Errorf(codes.Internal, "persist assistant message: %v", err)
+		}
+		_ = s.queries.IncrementConversationMessageCount(ctx, conv.ID)
+
+		// Full AIP-122 resource name. We have orgName resolved
+		// upstream from `req.GetParent()`.
+		assistantMsg.Name = buildMessageName(orgName, conv.Name, assistantMsgID)
+	}
+
+	usage := &aiv1.TokenUsage{
+		InputTokens:  estimateInputTokens(history, systemPrompt),
+		OutputTokens: int32(estimateTokens(assistantText.String())),
+	}
+	return assistantMsg, usage, s.model.Name(), nil
 }
 
-// handleToolCall dispatches a tool call to the server registry or forwards to the client.
-func (s *Server) handleToolCall(stream grpc.ServerStreamingServer[aiv1.ServerEvent], tc *model.ToolCall) error {
+// persistInputMessage writes a single InputMessage to the conversation
+// history, picking a sequence number and counting tokens.
+func (s *Server) persistInputMessage(ctx context.Context, convID uuid.UUID, in *aiv1.InputMessage) error {
+	if in == nil {
+		return status.Error(codes.InvalidArgument, "input message is nil")
+	}
+	if len(in.GetParts()) == 0 {
+		return status.Error(codes.InvalidArgument, "input message has no parts")
+	}
+
+	role, err := dbRoleForInputMessage(in.GetRole())
+	if err != nil {
+		return err
+	}
+	parts := in.GetParts()
+	if err := validateInputParts(role, parts); err != nil {
+		return err
+	}
+	logText := extractText(parts)
+
+	nextSeq, err := s.queries.GetNextSequenceForConversation(ctx, convID)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failed to get sequence: %v", err)
+	}
+
+	partsJSON, err := marshalParts(parts)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failed to marshal parts: %v", err)
+	}
+
+	_, err = s.queries.CreateMessage(ctx, db.CreateMessageParams{
+		ConversationID: convID,
+		Name:           uuid.New().String()[:12],
+		Role:           role,
+		Parts:          partsJSON,
+		Sequence:       int64(nextSeq),
+		TokenCount:     int32(estimateTokens(logText)),
+	})
+	if err != nil {
+		return status.Errorf(codes.Internal, "failed to persist message: %v", err)
+	}
+	_ = s.queries.IncrementConversationMessageCount(ctx, convID)
+	return nil
+}
+
+// dbRoleForInputMessage maps a proto Role to the string the DB layer
+// expects. Only USER and TOOL are valid on input:
+//
+//   - ASSISTANT turns are server-produced (via the model) and must
+//     never be client-supplied — accepting one would let a caller
+//     inject fake assistant context to manipulate later turns.
+//   - SYSTEM instructions arrive via `system_instruction` on the
+//     request, not as a message in the array.
+//   - ROLE_UNSPECIFIED is treated as USER for forward-compat with
+//     older clients that didn't set the field.
+//
+// Anything else fails fast with InvalidArgument.
+func dbRoleForInputMessage(r aiv1.Role) (string, error) {
+	switch r {
+	case aiv1.Role_TOOL:
+		return "tool", nil
+	case aiv1.Role_USER, aiv1.Role_ROLE_UNSPECIFIED:
+		return "user", nil
+	case aiv1.Role_ASSISTANT:
+		return "", status.Error(codes.InvalidArgument,
+			"assistant role is not valid on input messages — assistant turns are server-produced")
+	case aiv1.Role_SYSTEM:
+		return "", status.Error(codes.InvalidArgument,
+			"system role is not valid on input messages — use system_instruction on the request instead")
+	default:
+		return "", status.Errorf(codes.InvalidArgument, "unsupported role: %v", r)
+	}
+}
+
+// validateInputParts enforces semantic constraints we can't express
+// in the proto schema. Currently: TOOL-role messages must carry at
+// least one ToolResultPart, and every ToolResultPart must have a
+// non-empty tool_call_id (otherwise the model has no way to match
+// the result to its earlier tool call).
+func validateInputParts(role string, parts []*aiv1.MessagePart) error {
+	if role != "tool" {
+		return nil
+	}
+	sawToolResult := false
+	for _, p := range parts {
+		tr := p.GetToolResult()
+		if tr == nil {
+			continue
+		}
+		sawToolResult = true
+		if strings.TrimSpace(tr.GetToolCallId()) == "" {
+			return status.Error(codes.InvalidArgument,
+				"tool result part missing tool_call_id")
+		}
+	}
+	if !sawToolResult {
+		return status.Error(codes.InvalidArgument,
+			"tool-role message must include at least one tool_result part")
+	}
+	return nil
+}
+
+// inputMessagesToModel converts a list of proto InputMessages to the
+// internal model layer's representation, used by the stateless path.
+// Returns InvalidArgument if any role is invalid (assistant/system on
+// input is rejected — see `dbRoleForInputMessage` for rationale) or
+// if a TOOL-role message is malformed.
+func inputMessagesToModel(in []*aiv1.InputMessage) ([]model.Message, error) {
+	out := make([]model.Message, 0, len(in))
+	for _, m := range in {
+		role, err := dbRoleForInputMessage(m.GetRole())
+		if err != nil {
+			return nil, err
+		}
+		if err := validateInputParts(role, m.GetParts()); err != nil {
+			return nil, err
+		}
+		mm := model.Message{Role: role}
+		for _, p := range m.GetParts() {
+			switch {
+			case p.GetText() != nil:
+				mm.Parts = append(mm.Parts, model.MessagePart{
+					Type: "text",
+					Text: p.GetText().GetText(),
+				})
+			case p.GetToolCall() != nil:
+				tc := p.GetToolCall()
+				mm.Parts = append(mm.Parts, model.MessagePart{
+					Type: "tool_call",
+					ToolCall: &model.ToolCall{
+						ID:        tc.GetToolCallId(),
+						Name:      tc.GetTool(),
+						InputJSON: tc.GetInputJson(),
+					},
+				})
+			case p.GetToolResult() != nil:
+				tr := p.GetToolResult()
+				mm.Parts = append(mm.Parts, model.MessagePart{
+					Type: "tool_result",
+					ToolResult: &model.ToolResult{
+						CallID:     tr.GetToolCallId(),
+						Name:       tr.GetTool(),
+						ResultJSON: tr.GetResultJson(),
+						IsError:    tr.GetIsError(),
+					},
+				})
+			}
+		}
+		out = append(out, mm)
+	}
+	return out, nil
+}
+
+// emitToolCall emits the ToolInputAvailable event and, for server-side
+// tools, also runs the tool and emits its output. Takes the parent
+// `ctx` so server-side tool execution inherits the call's deadline,
+// cancellation, and authenticated UID — without this the tool would
+// outlive client disconnects (resource leak) and run unauthenticated.
+func (s *Server) emitToolCall(ctx context.Context, emit func(*aiv1.ServerEvent) error, tc *model.ToolCall) error {
 	if tc == nil {
 		return nil
 	}
-
 	isServer := s.tools.IsServerTool(tc.Name)
-	if err := stream.Send(&aiv1.ServerEvent{
+	if err := emit(&aiv1.ServerEvent{
 		Event: &aiv1.ServerEvent_ToolInputAvailable{ToolInputAvailable: &aiv1.ToolInputAvailable{
 			ToolCallId: tc.ID,
 			Tool:       tc.Name,
@@ -213,29 +453,39 @@ func (s *Server) handleToolCall(stream grpc.ServerStreamingServer[aiv1.ServerEve
 	}); err != nil {
 		return err
 	}
-
-	if isServer {
-		tool := s.tools.Get(tc.Name)
-		result, execErr := tool.Execute(stream.Context(), tc.InputJSON)
-		if execErr != nil {
-			return stream.Send(&aiv1.ServerEvent{
-				Event: &aiv1.ServerEvent_ToolError{ToolError: &aiv1.ToolError{
-					ToolCallId:   tc.ID,
-					ErrorMessage: execErr.Error(),
-				}},
-			})
-		}
-		return stream.Send(&aiv1.ServerEvent{
-			Event: &aiv1.ServerEvent_ToolOutputAvailable{ToolOutputAvailable: &aiv1.ToolOutputAvailable{
-				ToolCallId: tc.ID,
-				ResultJson: result,
+	if !isServer {
+		// Client executes; the round-trip happens via a follow-up
+		// StreamGenerateContent call carrying the tool result.
+		return nil
+	}
+	tool := s.tools.Get(tc.Name)
+	result, execErr := tool.Execute(ctx, tc.InputJSON)
+	if execErr != nil {
+		return emit(&aiv1.ServerEvent{
+			Event: &aiv1.ServerEvent_ToolError{ToolError: &aiv1.ToolError{
+				ToolCallId:   tc.ID,
+				ErrorMessage: execErr.Error(),
 			}},
 		})
 	}
+	return emit(&aiv1.ServerEvent{
+		Event: &aiv1.ServerEvent_ToolOutputAvailable{ToolOutputAvailable: &aiv1.ToolOutputAvailable{
+			ToolCallId: tc.ID,
+			ResultJson: result,
+		}},
+	})
+}
 
-	// Client-side tool: the ToolInputAvailable was already sent.
-	// Client executes the tool locally and sends a ToolOutput in a new stream.
-	return nil
+func (s *Server) sendStreamErrorEmit(emit func(*aiv1.ServerEvent) error, err error) error {
+	st, ok := status.FromError(err)
+	if !ok {
+		st = status.New(codes.Internal, err.Error())
+	}
+	return emit(&aiv1.ServerEvent{
+		Event: &aiv1.ServerEvent_StreamError{StreamError: &aiv1.StreamError{
+			Status: st.Proto(),
+		}},
+	})
 }
 
 // loadModelHistory fetches recent messages and truncates to fit the token budget.
@@ -265,7 +515,6 @@ func (s *Server) loadModelHistory(ctx context.Context, convID uuid.UUID) ([]mode
 		kept[i], kept[j] = kept[j], kept[i]
 	}
 
-	// Convert to model messages.
 	msgs := make([]model.Message, 0, len(kept))
 	for _, row := range kept {
 		msgs = append(msgs, dbMessageToModel(row))
@@ -324,19 +573,6 @@ func (s *Server) defaultSystemPrompt() string {
 	return "You are a helpful AI assistant in Pivox."
 }
 
-func (s *Server) sendStreamError(stream grpc.ServerStreamingServer[aiv1.ServerEvent], err error) error {
-	st, ok := status.FromError(err)
-	if !ok {
-		st = status.New(codes.Internal, err.Error())
-	}
-	_ = stream.Send(&aiv1.ServerEvent{
-		Event: &aiv1.ServerEvent_StreamError{StreamError: &aiv1.StreamError{
-			Status: st.Proto(),
-		}},
-	})
-	return err
-}
-
 // extractText concatenates all text parts from a list of message parts.
 func extractText(parts []*aiv1.MessagePart) string {
 	var sb strings.Builder
@@ -346,4 +582,34 @@ func extractText(parts []*aiv1.MessagePart) string {
 		}
 	}
 	return sb.String()
+}
+
+// estimateInputTokens approximates the prompt-side token count from the
+// model history plus system prompt. Coarse but enough for billing/UX
+// observability.
+// estimateInputTokens approximates prompt-side tokens across all
+// part types. Tool-heavy turns (where the conversation is mostly
+// JSON tool calls + results, with little prose) would otherwise
+// under-report by ~10x because text-only counting misses the JSON
+// payloads that the model actually consumes. Coarse but correct
+// enough for billing/observability.
+func estimateInputTokens(history []model.Message, systemPrompt string) int32 {
+	total := estimateTokens(systemPrompt)
+	for _, m := range history {
+		for _, p := range m.Parts {
+			switch p.Type {
+			case "text":
+				total += estimateTokens(p.Text)
+			case "tool_call":
+				if p.ToolCall != nil {
+					total += estimateTokens(p.ToolCall.Name) + estimateTokens(p.ToolCall.InputJSON)
+				}
+			case "tool_result":
+				if p.ToolResult != nil {
+					total += estimateTokens(p.ToolResult.Name) + estimateTokens(p.ToolResult.ResultJSON)
+				}
+			}
+		}
+	}
+	return int32(total)
 }

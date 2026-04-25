@@ -28,6 +28,7 @@ import (
 type mockLanguageModel struct {
 	events []model.ModelEvent
 	err    error
+	name   string
 }
 
 func (m *mockLanguageModel) Stream(_ context.Context, _ model.StreamRequest) (model.StreamReader, error) {
@@ -35,6 +36,13 @@ func (m *mockLanguageModel) Stream(_ context.Context, _ model.StreamRequest) (mo
 		return nil, m.err
 	}
 	return &sliceReader{events: m.events}, nil
+}
+
+func (m *mockLanguageModel) Name() string {
+	if m.name == "" {
+		return "mock-llm"
+	}
+	return m.name
 }
 
 type sliceReader struct {
@@ -94,7 +102,47 @@ func testConversation(orgID uuid.UUID, uid string) db.AiConversation {
 	}
 }
 
-func TestStream_HappyPath(t *testing.T) {
+// userTextRequest builds a stateful GenerateContentRequest with a
+// single user message containing one text part. Mirrors the most
+// common inbound shape from the Swift client.
+func userTextRequest(conversationName, text string) *aiv1.GenerateContentRequest {
+	return &aiv1.GenerateContentRequest{
+		Parent:       "organizations/acme",
+		Conversation: conversationName,
+		Messages: []*aiv1.InputMessage{
+			{
+				Role: aiv1.Role_USER,
+				Parts: []*aiv1.MessagePart{
+					{Part: &aiv1.MessagePart_Text{Text: &aiv1.TextPart{Text: text}}},
+				},
+			},
+		},
+	}
+}
+
+// toolResultRequest builds a stateful request continuing a turn after
+// a client-side tool ran — a TOOL-role message carrying a
+// ToolResultPart. Replaces the bidi-era `ClientEvent_ToolOutput`
+// envelope.
+func toolResultRequest(conversationName, callID, resultJSON string) *aiv1.GenerateContentRequest {
+	return &aiv1.GenerateContentRequest{
+		Parent:       "organizations/acme",
+		Conversation: conversationName,
+		Messages: []*aiv1.InputMessage{
+			{
+				Role: aiv1.Role_TOOL,
+				Parts: []*aiv1.MessagePart{
+					{Part: &aiv1.MessagePart_ToolResult{ToolResult: &aiv1.ToolResultPart{
+						ToolCallId: callID,
+						ResultJson: resultJSON,
+					}}},
+				},
+			},
+		},
+	}
+}
+
+func TestStreamGenerateContent_HappyPath(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{
 		events: []model.ModelEvent{
@@ -119,21 +167,14 @@ func TestStream_HappyPath(t *testing.T) {
 	q.On("IncrementConversationMessageCount", mock.Anything, conv.ID).Return(nil)
 	q.On("ListMessagesNewestFirst", mock.Anything, mock.Anything).Return([]db.AiMessage{}, nil)
 
-	clientEvent := &aiv1.ClientEvent{
-		Event: &aiv1.ClientEvent_Message{Message: &aiv1.UserMessage{
-			Conversation: "organizations/acme/conversations/conv1",
-			Parts: []*aiv1.MessagePart{
-				{Part: &aiv1.MessagePart_Text{Text: &aiv1.TextPart{Text: "Hi"}}},
-			},
-		}},
-	}
+	req := userTextRequest("organizations/acme/conversations/conv1", "Hi")
 	stream := &mockServerStream{ctx: ctx}
 
-	err := srv.Stream(clientEvent, stream)
+	err := srv.StreamGenerateContent(req, stream)
 	require.NoError(t, err)
 
 	// Verify event sequence: TextStart, TextDelta("Hello "), TextDelta("world!"), TextEnd, Done
-	require.GreaterOrEqual(t, len(stream.sent), 4)
+	require.GreaterOrEqual(t, len(stream.sent), 5)
 	assert.NotNil(t, stream.sent[0].GetTextStart())
 	assert.Equal(t, "Hello ", stream.sent[1].GetTextDelta().GetDelta())
 	assert.Equal(t, "world!", stream.sent[2].GetTextDelta().GetDelta())
@@ -150,7 +191,7 @@ func TestStream_HappyPath(t *testing.T) {
 	assert.Equal(t, 2, calls)
 }
 
-func TestStream_EmptyEventReturnsInvalidArgument(t *testing.T) {
+func TestStreamGenerateContent_EmptyMessagesReturnsInvalidArgument(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
 	srv := NewServer(nil, q, llm, nil, nil, slog.Default())
@@ -158,14 +199,14 @@ func TestStream_EmptyEventReturnsInvalidArgument(t *testing.T) {
 	ctx := authenticatedCtx("user1")
 	stream := &mockServerStream{ctx: ctx}
 
-	err := srv.Stream(&aiv1.ClientEvent{}, stream)
+	err := srv.StreamGenerateContent(&aiv1.GenerateContentRequest{Parent: "organizations/acme"}, stream)
 	require.Error(t, err)
 	st, ok := status.FromError(err)
 	require.True(t, ok)
 	assert.Equal(t, codes.InvalidArgument, st.Code())
 }
 
-func TestStream_ToolOutputMissingCallIDReturnsInvalidArgument(t *testing.T) {
+func TestStreamGenerateContent_MissingParentReturnsInvalidArgument(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
 	srv := NewServer(nil, q, llm, nil, nil, slog.Default())
@@ -173,17 +214,17 @@ func TestStream_ToolOutputMissingCallIDReturnsInvalidArgument(t *testing.T) {
 	ctx := authenticatedCtx("user1")
 	stream := &mockServerStream{ctx: ctx}
 
-	err := srv.Stream(&aiv1.ClientEvent{
-		Event: &aiv1.ClientEvent_ToolOutput{ToolOutput: &aiv1.ToolOutput{
-			Conversation: "organizations/acme/conversations/conv1",
-		}},
+	err := srv.StreamGenerateContent(&aiv1.GenerateContentRequest{
+		Messages: []*aiv1.InputMessage{
+			{Role: aiv1.Role_USER, Parts: []*aiv1.MessagePart{{Part: &aiv1.MessagePart_Text{Text: &aiv1.TextPart{Text: "hi"}}}}},
+		},
 	}, stream)
 	require.Error(t, err)
 	st, _ := status.FromError(err)
 	assert.Equal(t, codes.InvalidArgument, st.Code())
 }
 
-func TestStream_ToolOutputResumesGeneration(t *testing.T) {
+func TestStreamGenerateContent_ToolResultResumesGeneration(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{
 		events: []model.ModelEvent{
@@ -207,16 +248,10 @@ func TestStream_ToolOutputResumesGeneration(t *testing.T) {
 	q.On("IncrementConversationMessageCount", mock.Anything, conv.ID).Return(nil)
 	q.On("ListMessagesNewestFirst", mock.Anything, mock.Anything).Return([]db.AiMessage{}, nil)
 
-	clientEvent := &aiv1.ClientEvent{
-		Event: &aiv1.ClientEvent_ToolOutput{ToolOutput: &aiv1.ToolOutput{
-			Conversation: "organizations/acme/conversations/conv1",
-			ToolCallId:   "call-123",
-			ResultJson:   `{"ok":true}`,
-		}},
-	}
+	req := toolResultRequest("organizations/acme/conversations/conv1", "call-123", `{"ok":true}`)
 	stream := &mockServerStream{ctx: ctx}
 
-	err := srv.Stream(clientEvent, stream)
+	err := srv.StreamGenerateContent(req, stream)
 	require.NoError(t, err)
 
 	// Verify the inbound message was persisted with role="tool" and
@@ -250,7 +285,7 @@ func TestStream_ToolOutputResumesGeneration(t *testing.T) {
 	assert.True(t, gotDone, "stream must emit Done after model finish")
 }
 
-func TestStream_WrongOwner(t *testing.T) {
+func TestStreamGenerateContent_WrongOwner(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
 	srv := NewServer(nil, q, llm, nil, nil, slog.Default())
@@ -262,15 +297,8 @@ func TestStream_WrongOwner(t *testing.T) {
 	q.On("GetOrganizationByName", mock.Anything, "acme").Return(org, nil)
 	q.On("GetConversationByName", mock.Anything, mock.Anything).Return(conv, nil)
 
-	clientEvent := &aiv1.ClientEvent{
-		Event: &aiv1.ClientEvent_Message{Message: &aiv1.UserMessage{
-			Conversation: "organizations/acme/conversations/conv1",
-			Parts:        []*aiv1.MessagePart{{Part: &aiv1.MessagePart_Text{Text: &aiv1.TextPart{Text: "Hi"}}}},
-		}},
-	}
 	stream := &mockServerStream{ctx: ctx}
-
-	err := srv.Stream(clientEvent, stream)
+	err := srv.StreamGenerateContent(userTextRequest("organizations/acme/conversations/conv1", "Hi"), stream)
 	require.Error(t, err)
 	st, _ := status.FromError(err)
 	// resolveConversation returns NotFound rather than PermissionDenied on
@@ -278,7 +306,7 @@ func TestStream_WrongOwner(t *testing.T) {
 	assert.Equal(t, codes.NotFound, st.Code())
 }
 
-func TestStream_ModelError(t *testing.T) {
+func TestStreamGenerateContent_ModelError(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{err: io.ErrUnexpectedEOF}
 	srv := NewServer(nil, q, llm, nil, nil, slog.Default())
@@ -295,15 +323,8 @@ func TestStream_ModelError(t *testing.T) {
 	q.On("IncrementConversationMessageCount", mock.Anything, conv.ID).Return(nil)
 	q.On("ListMessagesNewestFirst", mock.Anything, mock.Anything).Return([]db.AiMessage{}, nil)
 
-	clientEvent := &aiv1.ClientEvent{
-		Event: &aiv1.ClientEvent_Message{Message: &aiv1.UserMessage{
-			Conversation: "organizations/acme/conversations/conv1",
-			Parts:        []*aiv1.MessagePart{{Part: &aiv1.MessagePart_Text{Text: &aiv1.TextPart{Text: "Hi"}}}},
-		}},
-	}
 	stream := &mockServerStream{ctx: ctx}
-
-	err := srv.Stream(clientEvent, stream)
+	err := srv.StreamGenerateContent(userTextRequest("organizations/acme/conversations/conv1", "Hi"), stream)
 	require.Error(t, err)
 	// Verify a StreamError event was sent before the error return.
 	var gotStreamError bool
@@ -313,6 +334,187 @@ func TestStream_ModelError(t *testing.T) {
 		}
 	}
 	assert.True(t, gotStreamError)
+}
+
+// GenerateContent (unary) shares the runGenerate core with
+// StreamGenerateContent — this test confirms the unary path
+// accumulates text deltas into the returned Message instead of
+// emitting them, and that no events leak through.
+func TestGenerateContent_UnaryAccumulatesText(t *testing.T) {
+	q := new(mocks.MockQuerier)
+	llm := &mockLanguageModel{
+		events: []model.ModelEvent{
+			{Kind: "text_delta", Text: "Hello "},
+			{Kind: "text_delta", Text: "world"},
+			{Kind: "finish"},
+		},
+	}
+	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, slog.Default())
+
+	org := testOrg()
+	uid := "user1"
+	conv := testConversation(org.ID, uid)
+	ctx := authenticatedCtx(uid)
+
+	q.On("GetOrganizationByName", mock.Anything, "acme").Return(org, nil)
+	q.On("GetConversationByName", mock.Anything, mock.Anything).Return(conv, nil)
+	q.On("GetNextSequenceForConversation", mock.Anything, conv.ID).Return(int32(1), nil)
+	q.On("CreateMessage", mock.Anything, mock.Anything).Return(db.AiMessage{}, nil)
+	q.On("IncrementConversationMessageCount", mock.Anything, conv.ID).Return(nil)
+	q.On("ListMessagesNewestFirst", mock.Anything, mock.Anything).Return([]db.AiMessage{}, nil)
+
+	resp, err := srv.GenerateContent(ctx, userTextRequest("organizations/acme/conversations/conv1", "Hi"))
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.NotNil(t, resp.GetMessage())
+
+	// The accumulated text from the deltas should land as a single
+	// text part on the returned assistant Message.
+	require.Len(t, resp.GetMessage().GetParts(), 1)
+	tp := resp.GetMessage().GetParts()[0].GetText()
+	require.NotNil(t, tp)
+	assert.Equal(t, "Hello world", tp.GetText())
+
+	// Token usage should be populated (coarse — values are
+	// estimate-only but must be non-zero on output).
+	require.NotNil(t, resp.GetUsage())
+	assert.Greater(t, resp.GetUsage().GetOutputTokens(), int32(0))
+}
+
+// GenerateContent in stateless mode (no `conversation`) uses inline
+// `messages` directly without persistence. Confirms no DB writes
+// happen and the response is still produced.
+func TestGenerateContent_StatelessSkipsPersistence(t *testing.T) {
+	q := new(mocks.MockQuerier)
+	llm := &mockLanguageModel{
+		events: []model.ModelEvent{
+			{Kind: "text_delta", Text: "Brief"},
+			{Kind: "finish"},
+		},
+	}
+	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, slog.Default())
+
+	org := testOrg()
+	ctx := authenticatedCtx("user1")
+	// Org membership check is required even for stateless calls —
+	// otherwise a caller could pass any phantom parent and burn
+	// model budget against orgs they don't belong to.
+	q.On("GetOrganizationByName", mock.Anything, "acme").Return(org, nil)
+
+	req := &aiv1.GenerateContentRequest{
+		Parent:            "organizations/acme",
+		SystemInstruction: "Be brief.",
+		Messages: []*aiv1.InputMessage{
+			{Role: aiv1.Role_USER, Parts: []*aiv1.MessagePart{
+				{Part: &aiv1.MessagePart_Text{Text: &aiv1.TextPart{Text: "Hi"}}},
+			}},
+		},
+	}
+
+	resp, err := srv.GenerateContent(ctx, req)
+	require.NoError(t, err)
+	assert.Equal(t, "Brief", extractTextFromMessage(resp.GetMessage()))
+	// Model name should round-trip from the LLM adapter.
+	assert.Equal(t, "mock-llm", resp.GetModel())
+
+	// No persistence calls should fire in stateless mode. We allow
+	// the org-membership check via GetOrganizationByName but
+	// nothing else.
+	for _, c := range q.Calls {
+		switch c.Method {
+		case "GetOrganizationByName":
+			// expected
+		default:
+			t.Errorf("unexpected DB call in stateless mode: %s", c.Method)
+		}
+	}
+}
+
+func TestStreamGenerateContent_RejectsAssistantRoleInput(t *testing.T) {
+	q := new(mocks.MockQuerier)
+	llm := &mockLanguageModel{}
+	srv := NewServer(nil, q, llm, nil, nil, slog.Default())
+
+	org := testOrg()
+	uid := "user1"
+	conv := testConversation(org.ID, uid)
+	ctx := authenticatedCtx(uid)
+	q.On("GetOrganizationByName", mock.Anything, "acme").Return(org, nil)
+	q.On("GetConversationByName", mock.Anything, mock.Anything).Return(conv, nil)
+
+	req := &aiv1.GenerateContentRequest{
+		Parent:       "organizations/acme",
+		Conversation: "organizations/acme/conversations/conv1",
+		Messages: []*aiv1.InputMessage{
+			{Role: aiv1.Role_ASSISTANT, Parts: []*aiv1.MessagePart{
+				{Part: &aiv1.MessagePart_Text{Text: &aiv1.TextPart{Text: "I am the assistant"}}},
+			}},
+		},
+	}
+	stream := &mockServerStream{ctx: ctx}
+	err := srv.StreamGenerateContent(req, stream)
+	require.Error(t, err)
+	st, _ := status.FromError(err)
+	assert.Equal(t, codes.InvalidArgument, st.Code(),
+		"client-supplied assistant turns must be rejected — they're a context-injection vector")
+}
+
+func TestStreamGenerateContent_RejectsToolResultMissingCallID(t *testing.T) {
+	q := new(mocks.MockQuerier)
+	llm := &mockLanguageModel{}
+	srv := NewServer(nil, q, llm, nil, nil, slog.Default())
+
+	org := testOrg()
+	uid := "user1"
+	conv := testConversation(org.ID, uid)
+	ctx := authenticatedCtx(uid)
+	q.On("GetOrganizationByName", mock.Anything, "acme").Return(org, nil)
+	q.On("GetConversationByName", mock.Anything, mock.Anything).Return(conv, nil)
+
+	req := &aiv1.GenerateContentRequest{
+		Parent:       "organizations/acme",
+		Conversation: "organizations/acme/conversations/conv1",
+		Messages: []*aiv1.InputMessage{
+			{Role: aiv1.Role_TOOL, Parts: []*aiv1.MessagePart{
+				{Part: &aiv1.MessagePart_ToolResult{ToolResult: &aiv1.ToolResultPart{
+					ToolCallId: "", // missing — must reject
+					ResultJson: `{"ok":true}`,
+				}}},
+			}},
+		},
+	}
+	stream := &mockServerStream{ctx: ctx}
+	err := srv.StreamGenerateContent(req, stream)
+	require.Error(t, err)
+	st, _ := status.FromError(err)
+	assert.Equal(t, codes.InvalidArgument, st.Code())
+}
+
+func TestStreamGenerateContent_ConversationOrgMismatchRejected(t *testing.T) {
+	q := new(mocks.MockQuerier)
+	llm := &mockLanguageModel{}
+	srv := NewServer(nil, q, llm, nil, nil, slog.Default())
+
+	org := testOrg()
+	ctx := authenticatedCtx("user1")
+	q.On("GetOrganizationByName", mock.Anything, "acme").Return(org, nil)
+
+	// parent=acme but conversation under a different org. Without
+	// the cross-check a caller could write into someone else's org.
+	req := &aiv1.GenerateContentRequest{
+		Parent:       "organizations/acme",
+		Conversation: "organizations/competitor/conversations/leaked",
+		Messages: []*aiv1.InputMessage{
+			{Role: aiv1.Role_USER, Parts: []*aiv1.MessagePart{
+				{Part: &aiv1.MessagePart_Text{Text: &aiv1.TextPart{Text: "Hi"}}},
+			}},
+		},
+	}
+	stream := &mockServerStream{ctx: ctx}
+	err := srv.StreamGenerateContent(req, stream)
+	require.Error(t, err)
+	st, _ := status.FromError(err)
+	assert.Equal(t, codes.InvalidArgument, st.Code())
 }
 
 func TestExtractText(t *testing.T) {
@@ -386,7 +588,7 @@ func TestDbMessageToModel(t *testing.T) {
 	assert.Equal(t, "search", m.Parts[1].ToolCall.Name)
 }
 
-func TestStream_InvalidConversationReturnsNotFound(t *testing.T) {
+func TestStreamGenerateContent_InvalidConversationReturnsNotFound(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
 	srv := NewServer(nil, q, llm, nil, nil, slog.Default())
@@ -398,36 +600,26 @@ func TestStream_InvalidConversationReturnsNotFound(t *testing.T) {
 	q.On("GetConversationByName", mock.Anything, mock.Anything).Return(
 		db.AiConversation{}, pgx.ErrNoRows)
 
-	clientEvent := &aiv1.ClientEvent{
-		Event: &aiv1.ClientEvent_Message{Message: &aiv1.UserMessage{
-			Conversation: "organizations/acme/conversations/nonexistent",
-			Parts:        []*aiv1.MessagePart{{Part: &aiv1.MessagePart_Text{Text: &aiv1.TextPart{Text: "Hi"}}}},
-		}},
-	}
 	stream := &mockServerStream{ctx: ctx}
-
-	err := srv.Stream(clientEvent, stream)
+	err := srv.StreamGenerateContent(userTextRequest("organizations/acme/conversations/nonexistent", "Hi"), stream)
 	require.Error(t, err)
 	st, _ := status.FromError(err)
 	assert.Equal(t, codes.NotFound, st.Code())
 }
 
-func TestStream_InvalidConversationNameReturnsInvalidArgument(t *testing.T) {
+func TestStreamGenerateContent_InvalidConversationNameReturnsInvalidArgument(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
 	srv := NewServer(nil, q, llm, nil, nil, slog.Default())
 
+	org := testOrg()
 	ctx := authenticatedCtx("user1")
-
-	clientEvent := &aiv1.ClientEvent{
-		Event: &aiv1.ClientEvent_Message{Message: &aiv1.UserMessage{
-			Conversation: "garbage/name",
-			Parts:        []*aiv1.MessagePart{{Part: &aiv1.MessagePart_Text{Text: &aiv1.TextPart{Text: "Hi"}}}},
-		}},
-	}
+	// Org-membership check runs first; mock so we reach the
+	// conversation-name parsing step that this test targets.
+	q.On("GetOrganizationByName", mock.Anything, "acme").Return(org, nil)
 	stream := &mockServerStream{ctx: ctx}
 
-	err := srv.Stream(clientEvent, stream)
+	err := srv.StreamGenerateContent(userTextRequest("garbage/name", "Hi"), stream)
 	require.Error(t, err)
 	st, _ := status.FromError(err)
 	assert.Equal(t, codes.InvalidArgument, st.Code())

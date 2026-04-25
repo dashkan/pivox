@@ -4,7 +4,21 @@ import PivoxModels
 /// Protocol abstracting ChatClient for testability.
 /// View models depend on this protocol, not the concrete ChatClient.
 public protocol ChatClientProtocol: Sendable {
-    func stream(_ event: Pivox_Ai_V1_ClientEvent) -> AsyncThrowingStream<Pivox_Ai_V1_ServerEvent, Error>
+    func streamGenerateContent(
+        _ request: Pivox_Ai_V1_GenerateContentRequest
+    ) -> AsyncThrowingStream<Pivox_Ai_V1_ServerEvent, Error>
+
+    func generateContent(
+        _ request: Pivox_Ai_V1_GenerateContentRequest
+    ) async throws -> Pivox_Ai_V1_GenerateContentResponse
+
+    func summarizeConversation(
+        _ request: Pivox_Ai_V1_SummarizeConversationRequest
+    ) async throws -> Pivox_Ai_V1_Conversation
+
+    func getConversation(
+        _ request: Pivox_Ai_V1_GetConversationRequest
+    ) async throws -> Pivox_Ai_V1_Conversation
 
     func listConversations(
         _ request: Pivox_Ai_V1_ListConversationsRequest

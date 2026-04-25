@@ -44,9 +44,16 @@ extension NSEvent: @retroactive @unchecked Sendable {}
 ///   4. Lazy width-aware height refresh (resize stays interactive on
 ///      large conversations).
 ///
-/// Streaming, bottom-pin-when-short, edit/regenerate callbacks, and
-/// nested scroll-event forwarding are deliberately NOT in this file
-/// yet. They layer in as subsequent phases with their own gates.
+/// Edit/regenerate callbacks are deliberately NOT in this file yet.
+/// They layer in as subsequent phases with their own gates.
+///
+/// Bottom-pin-when-short: handled by `BottomPinClipView` (below),
+/// which overrides `constrainBoundsRect` to force a negative
+/// `bounds.origin.y` when the document is shorter than the
+/// viewport. The viewport then "looks at" coordinates above the
+/// document, naturally placing the rows flush at the bottom of the
+/// visible area. NSScrollView's normal scroll-clamping resumes the
+/// moment content outgrows the viewport (the override no-ops).
 ///
 /// # Why DEBUG page boundaries
 ///
@@ -73,7 +80,14 @@ struct ConversationTranscriptView: NSViewRepresentable {
         // dark mode, visible as a dark edge against the parent panel).
         scrollView.drawsBackground = false
         scrollView.backgroundColor = .clear
-        scrollView.contentView.drawsBackground = false
+
+        // Swap the default clip view for our bottom-pinning subclass
+        // BEFORE attaching the document view, so the documentView
+        // setter wires the table to our custom clip view from the
+        // start. Inherits transparent drawing.
+        let clipView = BottomPinClipView()
+        clipView.drawsBackground = false
+        scrollView.contentView = clipView
 
         let tableView = NSTableView()
         tableView.headerView = nil
@@ -115,6 +129,18 @@ struct ConversationTranscriptView: NSViewRepresentable {
             selector: #selector(Coordinator.scrollViewFrameDidChange(_:)),
             name: NSView.frameDidChangeNotification,
             object: scrollView)
+
+        // Document view frame changes → docHeight changed →
+        // bottom-pin needs re-application. `constrainBoundsRect` is
+        // a passive filter; we have to actively poke the clip view
+        // by re-writing its bounds via `bounds = constrainBoundsRect(bounds)`.
+        // See `tableViewFrameDidChange` below for the trigger.
+        tableView.postsFrameChangedNotifications = true
+        NotificationCenter.default.addObserver(
+            context.coordinator,
+            selector: #selector(Coordinator.tableViewFrameDidChange(_:)),
+            name: NSView.frameDidChangeNotification,
+            object: tableView)
 
         // Content view bounds change on every user scroll. We use
         // this for two purposes: (a) fire load-older when the user
@@ -427,6 +453,14 @@ struct ConversationTranscriptView: NSViewRepresentable {
                     // to `contentHeight - clipHeight`.
                     DispatchQueue.main.async { [weak self] in
                         self?.scrollToBottom()
+                        // Bottom-pin for short conversations:
+                        // `scrollToBottom` early-returns when
+                        // docHeight ≤ clipHeight, so we still need
+                        // to apply the negative-origin pin
+                        // explicitly. `applyBottomPin` no-ops when
+                        // content fills the viewport, so calling it
+                        // unconditionally is safe.
+                        self?.applyBottomPin()
                     }
                 }
             } else if prependCount > 0 {
@@ -662,9 +696,79 @@ struct ConversationTranscriptView: NSViewRepresentable {
             // Width changes trigger height invalidation; pure height
             // changes (window vertical resize) don't need
             // remeasurement because row heights depend only on width.
-            guard abs(newWidth - cachedWidth) > 0.5 else { return }
-            cachedWidth = newWidth
-            refreshVisibleRowHeights()
+            if abs(newWidth - cachedWidth) > 0.5 {
+                cachedWidth = newWidth
+                refreshVisibleRowHeights()
+            }
+            // Vertical resize changes clipHeight → re-apply bottom-pin.
+            applyBottomPin()
+        }
+
+        /// Document view frame changes (rows added, removed, height
+        /// invalidated). docHeight just changed; force-apply the
+        /// bottom-pin so the clip view's bounds re-evaluate against
+        /// the new height.
+        @objc func tableViewFrameDidChange(_ notification: Notification) {
+            applyBottomPin()
+        }
+
+        /// Bottom-pin-when-short: when the document is shorter than
+        /// the viewport, we write the clip view's bounds origin to
+        /// a NEGATIVE Y value so the viewport "looks at" coordinates
+        /// above the document. The document — anchored at y=0 in
+        /// flipped coordinates — then renders flush against the
+        /// bottom of the visible area, with empty space above.
+        ///
+        /// Why we don't rely on `BottomPinClipView.constrainBoundsRect`
+        /// alone: the override is a passive filter; AppKit only
+        /// invokes it when an active scroll proposal needs
+        /// validation. Initial layout and `reloadData`-driven docHeight
+        /// changes don't trigger that path, so we have to write the
+        /// bounds directly. We use `bounds = ...` (not `scroll(to:)`)
+        /// to skip AppKit's animation interpolation during streaming
+        /// row growth and live-resize.
+        ///
+        /// When content overflows the viewport (`docHeight >=
+        /// clipHeight`), we restore origin.y to 0 if it's currently
+        /// negative — otherwise the negative origin from a previous
+        /// short-content state would persist past the threshold.
+        private func applyBottomPin() {
+            guard let scrollView else { return }
+            let clipView = scrollView.contentView
+            // Use the actual content extent (bottom of the last
+            // row), NOT documentView.frame.height. NSTableView pads
+            // its own frame to the clip height when content is
+            // short, so frame.height always reads >= clipHeight and
+            // the bottom-pin check would never trigger.
+            let docHeight = totalContentHeight()
+            let clipHeight = clipView.bounds.height
+            var newBounds = clipView.bounds
+            if docHeight < clipHeight {
+                newBounds.origin.y = docHeight - clipHeight
+            } else if clipView.bounds.origin.y < 0 {
+                newBounds.origin.y = 0
+            } else {
+                return
+            }
+            if newBounds != clipView.bounds {
+                clipView.bounds = newBounds
+                scrollView.reflectScrolledClipView(clipView)
+            }
+        }
+
+        /// Sum of all row heights + intercell spacing — the *actual*
+        /// rendered content extent. NSTableView reports
+        /// `frame.height` as the larger of (natural content,
+        /// clipView height), which makes it useless for detecting
+        /// "content shorter than viewport".
+        private func totalContentHeight() -> CGFloat {
+            guard let tableView else { return 0 }
+            let rowCount = tableView.numberOfRows
+            guard rowCount > 0 else { return 0 }
+            // `rect(ofRow:)` returns the row's frame in document
+            // coordinates. The last row's maxY is the bottom of all
+            // content, accounting for intercell spacing.
+            return tableView.rect(ofRow: rowCount - 1).maxY
         }
 
         /// Jump-to-latest pill clicked. Force re-engage stickiness
@@ -955,4 +1059,53 @@ private struct PageBoundaryRowView: View {
 
 private extension NSUserInterfaceItemIdentifier {
     static let messageColumn = NSUserInterfaceItemIdentifier("message")
+}
+
+/// Clip view that bottom-pins short content.
+///
+/// `NSClipView.constrainBoundsRect(_:)` is AppKit's hook for
+/// validating any proposed scroll position. The default
+/// implementation clamps `origin.y` to `[0, max(0, docHeight -
+/// clipHeight)]`, which collapses to just `0` when content fits in
+/// the viewport — leaving the document top-aligned with empty space
+/// below. We override to force `origin.y = docHeight - clipHeight`
+/// (NEGATIVE) when the document is shorter than the viewport: the
+/// clip view then "looks at" a region above the document, and the
+/// document renders flush against the bottom of the visible area.
+/// Same effect `.defaultScrollAnchor(.bottom)` gave us in the
+/// pre-AppKit SwiftUI version.
+///
+/// # Why the coordinator drives application
+///
+/// `constrainBoundsRect` is a passive filter — only called when a
+/// scroll change is actively proposed. On initial layout and during
+/// data mutations, the clip view's origin stays at `(0,0)`, AppKit
+/// never asks the override to weigh in, and the bottom-pin never
+/// applies. Forcing it requires an explicit
+/// `clipView.bounds = clipView.constrainBoundsRect(clipView.bounds)`
+/// after the layout settles. The coordinator's frame-change
+/// observers are the right hook — overriding the clip view's
+/// `frame` / `documentView` properties to self-observe doesn't
+/// reliably fire when AppKit sets those via Obj-C internals.
+///
+/// The override is a no-op once content outgrows the viewport
+/// (`docHeight >= clipHeight`); `super`'s default clamping resumes
+/// and normal scrolling works.
+private final class BottomPinClipView: NSClipView {
+    override func constrainBoundsRect(_ proposedBounds: NSRect) -> NSRect {
+        var rect = super.constrainBoundsRect(proposedBounds)
+        guard let table = documentView as? NSTableView else { return rect }
+
+        // True content extent — `frame.height` lies (NSTableView
+        // pads its frame to clip height when content is short).
+        let rowCount = table.numberOfRows
+        guard rowCount > 0 else { return rect }
+        let docHeight = table.rect(ofRow: rowCount - 1).maxY
+        let clipHeight = proposedBounds.height
+
+        if docHeight < clipHeight {
+            rect.origin.y = docHeight - clipHeight
+        }
+        return rect
+    }
 }

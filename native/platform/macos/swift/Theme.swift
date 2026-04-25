@@ -75,6 +75,11 @@ public struct PivoxTheme: Sendable {
     public let borderSubtle: Color
     public let accent: Color
     public let accentSubtle: Color
+    /// Subtle fill used on hover affordances (button hover backgrounds,
+    /// click-to-edit hints). Adapts in light/dark mode via the
+    /// secondary-label color at low opacity so the hint reads as
+    /// chrome rather than a colored highlight.
+    public let hoverFill: Color
     /// Destructive / danger actions (delete account, remove, etc).
     public let destructive: Color
     public let destructiveSubtle: Color
@@ -150,6 +155,7 @@ public struct PivoxTheme: Sendable {
         borderSubtle: Color(nsColor: .quaternaryLabelColor),
         accent: Color.accentColor,
         accentSubtle: Color.accentColor.opacity(0.15),
+        hoverFill: Color(nsColor: .secondaryLabelColor).opacity(0.12),
         destructive: Color(nsColor: .systemRed),
         destructiveSubtle: Color(nsColor: .systemRed).opacity(0.15),
         success: Color(nsColor: .systemGreen),

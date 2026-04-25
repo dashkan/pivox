@@ -42,7 +42,22 @@ message Conversation {
   string creator = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // The conversation title. May be set by the user or auto-generated.
+  //
+  // A title supplied at `CreateConversation` time does NOT mark the
+  // conversation as user-titled (`title_user_set` stays false), so
+  // the auto-summarization path is free to overwrite it once the
+  // first turn lands. Only an explicit `UpdateConversation` whose
+  // update mask covers `title` flips `title_user_set` to true and
+  // makes the title sticky against future `:summarize` calls.
   string title = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Output only. Whether the user has set the title via an explicit
+  // `UpdateConversation` call (mask covering `title`) — as opposed
+  // to a heuristic stub from `CreateConversation` or a server-side
+  // summary from `:summarize`. Used to suppress regeneration:
+  // re-running `:summarize` on a conversation whose title the user
+  // has already curated would overwrite their work.
+  bool title_user_set = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // An optional description of the conversation.
   string description = 4 [(google.api.field_behavior) = OPTIONAL];

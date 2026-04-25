@@ -49,7 +49,21 @@ type Conversation struct {
 	// Format: `organizations/{organization}/users/{user}`
 	Creator string `protobuf:"bytes,2,opt,name=creator,proto3" json:"creator,omitempty"`
 	// The conversation title. May be set by the user or auto-generated.
+	//
+	// A title supplied at `CreateConversation` time does NOT mark the
+	// conversation as user-titled (`title_user_set` stays false), so
+	// the auto-summarization path is free to overwrite it once the
+	// first turn lands. Only an explicit `UpdateConversation` whose
+	// update mask covers `title` flips `title_user_set` to true and
+	// makes the title sticky against future `:summarize` calls.
 	Title string `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	// Output only. Whether the user has set the title via an explicit
+	// `UpdateConversation` call (mask covering `title`) — as opposed
+	// to a heuristic stub from `CreateConversation` or a server-side
+	// summary from `:summarize`. Used to suppress regeneration:
+	// re-running `:summarize` on a conversation whose title the user
+	// has already curated would overwrite their work.
+	TitleUserSet bool `protobuf:"varint,12,opt,name=title_user_set,json=titleUserSet,proto3" json:"title_user_set,omitempty"`
 	// An optional description of the conversation.
 	Description string `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
 	// Whether the conversation is archived.
@@ -120,6 +134,13 @@ func (x *Conversation) GetTitle() string {
 		return x.Title
 	}
 	return ""
+}
+
+func (x *Conversation) GetTitleUserSet() bool {
+	if x != nil {
+		return x.TitleUserSet
+	}
+	return false
 }
 
 func (x *Conversation) GetDescription() string {
@@ -548,11 +569,12 @@ var File_pivox_ai_v1_conversations_proto protoreflect.FileDescriptor
 
 const file_pivox_ai_v1_conversations_proto_rawDesc = "" +
 	"\n" +
-	"\x1fpivox/ai/v1/conversations.proto\x12\vpivox.ai.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xce\x04\n" +
+	"\x1fpivox/ai/v1/conversations.proto\x12\vpivox.ai.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xf9\x04\n" +
 	"\fConversation\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12\x1d\n" +
 	"\acreator\x18\x02 \x01(\tB\x03\xe0A\x03R\acreator\x12\x19\n" +
-	"\x05title\x18\x03 \x01(\tB\x03\xe0A\x01R\x05title\x12%\n" +
+	"\x05title\x18\x03 \x01(\tB\x03\xe0A\x01R\x05title\x12)\n" +
+	"\x0etitle_user_set\x18\f \x01(\bB\x03\xe0A\x03R\ftitleUserSet\x12%\n" +
 	"\vdescription\x18\x04 \x01(\tB\x03\xe0A\x01R\vdescription\x12\x1f\n" +
 	"\barchived\x18\x05 \x01(\bB\x03\xe0A\x01R\barchived\x12\x1b\n" +
 	"\x06pinned\x18\x06 \x01(\bB\x03\xe0A\x01R\x06pinned\x12(\n" +

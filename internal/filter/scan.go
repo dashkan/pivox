@@ -81,6 +81,12 @@ func ScanArtifactVersions(rows pgx.Rows) ([]db.AiArtifactVersion, error) {
 }
 
 // ScanConversations scans rows into db.AiConversation structs.
+//
+// The destination order MUST match the column order in
+// `ai_conversations` exactly — this scans `SELECT *` from the
+// filter query, so adding a new column to the table without adding
+// a destination here causes pgx to fail with a column-count
+// mismatch and the gRPC call to abort.
 func ScanConversations(rows pgx.Rows) ([]db.AiConversation, error) {
 	defer rows.Close()
 	var results []db.AiConversation
@@ -102,6 +108,7 @@ func ScanConversations(rows pgx.Rows) ([]db.AiConversation, error) {
 			&c.UpdatedBy,
 			&c.CreateTime,
 			&c.UpdateTime,
+			&c.TitleUserSet,
 		); err != nil {
 			return nil, err
 		}

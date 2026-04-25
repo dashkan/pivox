@@ -49,7 +49,22 @@ public struct Pivox_Ai_V1_Conversation: Sendable {
   public var creator: String = String()
 
   /// The conversation title. May be set by the user or auto-generated.
+  ///
+  /// A title supplied at `CreateConversation` time does NOT mark the
+  /// conversation as user-titled (`title_user_set` stays false), so
+  /// the auto-summarization path is free to overwrite it once the
+  /// first turn lands. Only an explicit `UpdateConversation` whose
+  /// update mask covers `title` flips `title_user_set` to true and
+  /// makes the title sticky against future `:summarize` calls.
   public var title: String = String()
+
+  /// Output only. Whether the user has set the title via an explicit
+  /// `UpdateConversation` call (mask covering `title`) — as opposed
+  /// to a heuristic stub from `CreateConversation` or a server-side
+  /// summary from `:summarize`. Used to suppress regeneration:
+  /// re-running `:summarize` on a conversation whose title the user
+  /// has already curated would overwrite their work.
+  public var titleUserSet: Bool = false
 
   /// An optional description of the conversation.
   public var description_p: String = String()
@@ -270,7 +285,7 @@ fileprivate let _protobuf_package = "pivox.ai.v1"
 
 extension Pivox_Ai_V1_Conversation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".Conversation"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}creator\0\u{1}title\0\u{1}description\0\u{1}archived\0\u{1}pinned\0\u{3}message_count\0\u{3}last_message_time\0\u{3}create_time\0\u{3}update_time\0\u{1}etag\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}creator\0\u{1}title\0\u{1}description\0\u{1}archived\0\u{1}pinned\0\u{3}message_count\0\u{3}last_message_time\0\u{3}create_time\0\u{3}update_time\0\u{1}etag\0\u{3}title_user_set\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -289,6 +304,7 @@ extension Pivox_Ai_V1_Conversation: SwiftProtobuf.Message, SwiftProtobuf._Messag
       case 9: try { try decoder.decodeSingularMessageField(value: &self._createTime) }()
       case 10: try { try decoder.decodeSingularMessageField(value: &self._updateTime) }()
       case 11: try { try decoder.decodeSingularStringField(value: &self.etag) }()
+      case 12: try { try decoder.decodeSingularBoolField(value: &self.titleUserSet) }()
       default: break
       }
     }
@@ -332,6 +348,9 @@ extension Pivox_Ai_V1_Conversation: SwiftProtobuf.Message, SwiftProtobuf._Messag
     if !self.etag.isEmpty {
       try visitor.visitSingularStringField(value: self.etag, fieldNumber: 11)
     }
+    if self.titleUserSet != false {
+      try visitor.visitSingularBoolField(value: self.titleUserSet, fieldNumber: 12)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -339,6 +358,7 @@ extension Pivox_Ai_V1_Conversation: SwiftProtobuf.Message, SwiftProtobuf._Messag
     if lhs.name != rhs.name {return false}
     if lhs.creator != rhs.creator {return false}
     if lhs.title != rhs.title {return false}
+    if lhs.titleUserSet != rhs.titleUserSet {return false}
     if lhs.description_p != rhs.description_p {return false}
     if lhs.archived != rhs.archived {return false}
     if lhs.pinned != rhs.pinned {return false}

@@ -231,7 +231,12 @@
                 },
                 "title": {
                   "type": "string",
-                  "description": "The conversation title. May be set by the user or auto-generated."
+                  "description": "The conversation title. May be set by the user or auto-generated.\n\nA title supplied at `CreateConversation` time does NOT mark the\nconversation as user-titled (`title_user_set` stays false), so\nthe auto-summarization path is free to overwrite it once the\nfirst turn lands. Only an explicit `UpdateConversation` whose\nupdate mask covers `title` flips `title_user_set` to true and\nmakes the title sticky against future `:summarize` calls."
+                },
+                "titleUserSet": {
+                  "type": "boolean",
+                  "description": "Output only. Whether the user has set the title via an explicit\n`UpdateConversation` call (mask covering `title`) — as opposed\nto a heuristic stub from `CreateConversation` or a server-side\nsummary from `:summarize`. Used to suppress regeneration:\nre-running `:summarize` on a conversation whose title the user\nhas already curated would overwrite their work.",
+                  "readOnly": true
                 },
                 "description": {
                   "type": "string",
@@ -719,9 +724,233 @@
           "AiChat"
         ]
       }
+    },
+    "/v1/organizations/{organization}/conversations/{conversation}:summarize": {
+      "post": {
+        "summary": "Generates a short title for the conversation by summarizing its\ncurrent contents, persists the result to `Conversation.title`,\nand returns the updated `Conversation`.",
+        "description": "No-ops (returns the conversation unchanged) when\n`title_set_by_user` is true — never overwrites a user-curated\ntitle. Idempotent in spirit: re-running on the same conversation\nproduces a (possibly updated) title from the latest contents.\n\nTypical callers: clients fire this after the first turn of a\nbrand-new conversation, or as a \"Regenerate title\" action.",
+        "operationId": "AiChat_SummarizeConversation",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Conversation"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "conversation",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AiChatSummarizeConversationBody"
+            }
+          }
+        ],
+        "tags": [
+          "AiChat"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}:generateContent": {
+      "post": {
+        "summary": "Generates assistant content for the given input. Unary: collects\nthe full response and returns it as a single `Message`. Use this\nfor stateless one-shot completions (title summarization, intent\nclassification, etc.) and for stateful turns where the caller\ndoesn't need streaming. Mirrors `generateText` in the Vercel AI\nSDK and `models.generateContent` in Google's AI APIs.",
+        "operationId": "AiChat_GenerateContent",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1GenerateContentResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AiChatGenerateContentBody"
+            }
+          }
+        ],
+        "tags": [
+          "AiChat"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}:streamGenerateContent": {
+      "post": {
+        "summary": "Server-streaming counterpart to `GenerateContent`. Same request\nshape; emits the response as a sequence of `ServerEvent`s\n(text/reasoning/tool/artifact deltas, lifecycle markers, and a\nterminal `done`). Native clients use this directly. Web clients\nuse the SSE adapter at `POST /v1/ai:streamGenerateContent`.",
+        "description": "The request name, response name, and HTTP suffix are\nintentionally non-AIP — server-streaming custom methods aren't\ncovered by AIP-136. The streaming variant deliberately reuses\n`GenerateContentRequest` so callers can construct the request\nonce and pick streaming vs unary at call time. The unary\n`GenerateContent` above is AIP-clean.",
+        "operationId": "AiChat_StreamGenerateContent",
+        "responses": {
+          "200": {
+            "description": "A successful response.(streaming responses)",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "result": {
+                  "$ref": "#/definitions/v1ServerEvent"
+                },
+                "error": {
+                  "$ref": "#/definitions/rpcStatus"
+                }
+              },
+              "title": "Stream result of v1ServerEvent"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AiChatStreamGenerateContentBody"
+            }
+          }
+        ],
+        "tags": [
+          "AiChat"
+        ]
+      }
     }
   },
   "definitions": {
+    "AiChatGenerateContentBody": {
+      "type": "object",
+      "properties": {
+        "conversation": {
+          "type": "string",
+          "title": "Optional. The conversation to attach this turn to. When set, the\nserver hydrates history from the conversation and persists the\nnew turn(s) on success. When unset, the call is stateless.\nFormat: `organizations/{organization}/conversations/{conversation}`"
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1InputMessage"
+          },
+          "description": "Required. The new turn(s) the caller wants the model to act on.\nFor stateful calls (`conversation` set), this is typically a\nsingle user message. For stateless calls, this is the full\nconversation history with the final user turn at the end."
+        },
+        "systemInstruction": {
+          "type": "string",
+          "description": "Optional. System instruction applied to this generation. For\nstateful calls, overrides the conversation's stored system\ninstruction for THIS call only. For stateless calls, this is the\nonly system prompt the model sees."
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1ToolDefinition"
+          },
+          "description": "Optional. Tools the model may call during this generation."
+        },
+        "temperature": {
+          "type": "number",
+          "format": "float",
+          "description": "Optional. Sampling temperature. Server picks a sensible default\nwhen unset."
+        },
+        "maxOutputTokens": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Optional. Maximum output tokens. Server caps this if unset or\nabove its policy limit."
+        }
+      },
+      "description": "Input to `GenerateContent` and `StreamGenerateContent`. Mirrors the\nshape of the Vercel AI SDK's `streamText` / `generateText` params\nand Google's `GenerateContentRequest`: a list of role-tagged\nmessages (the conversation turns), an optional system instruction,\noptional tool definitions, and standard generation parameters.\n\nPivox-specific: `parent` carries the org for routing, and\n`conversation` (optional) opts the call into stateful behavior —\nwhen set, the server prepends the conversation's stored history\n(and stored system instruction, if any) before the inline\n`messages`, and persists the resulting turn(s) on success. When\nunset, the call is fully stateless: the caller provides whatever\nhistory is needed inline.",
+      "required": [
+        "messages"
+      ]
+    },
+    "AiChatStreamGenerateContentBody": {
+      "type": "object",
+      "properties": {
+        "conversation": {
+          "type": "string",
+          "title": "Optional. The conversation to attach this turn to. When set, the\nserver hydrates history from the conversation and persists the\nnew turn(s) on success. When unset, the call is stateless.\nFormat: `organizations/{organization}/conversations/{conversation}`"
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1InputMessage"
+          },
+          "description": "Required. The new turn(s) the caller wants the model to act on.\nFor stateful calls (`conversation` set), this is typically a\nsingle user message. For stateless calls, this is the full\nconversation history with the final user turn at the end."
+        },
+        "systemInstruction": {
+          "type": "string",
+          "description": "Optional. System instruction applied to this generation. For\nstateful calls, overrides the conversation's stored system\ninstruction for THIS call only. For stateless calls, this is the\nonly system prompt the model sees."
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1ToolDefinition"
+          },
+          "description": "Optional. Tools the model may call during this generation."
+        },
+        "temperature": {
+          "type": "number",
+          "format": "float",
+          "description": "Optional. Sampling temperature. Server picks a sensible default\nwhen unset."
+        },
+        "maxOutputTokens": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Optional. Maximum output tokens. Server caps this if unset or\nabove its policy limit."
+        }
+      },
+      "description": "Input to `GenerateContent` and `StreamGenerateContent`. Mirrors the\nshape of the Vercel AI SDK's `streamText` / `generateText` params\nand Google's `GenerateContentRequest`: a list of role-tagged\nmessages (the conversation turns), an optional system instruction,\noptional tool definitions, and standard generation parameters.\n\nPivox-specific: `parent` carries the org for routing, and\n`conversation` (optional) opts the call into stateful behavior —\nwhen set, the server prepends the conversation's stored history\n(and stored system instruction, if any) before the inline\n`messages`, and persists the resulting turn(s) on success. When\nunset, the call is fully stateless: the caller provides whatever\nhistory is needed inline.",
+      "required": [
+        "messages"
+      ]
+    },
+    "AiChatSummarizeConversationBody": {
+      "type": "object",
+      "description": "Request message for `SummarizeConversation`."
+    },
     "protobufAny": {
       "type": "object",
       "properties": {
@@ -798,6 +1027,75 @@
       },
       "description": "An artifact is a structured output produced during a conversation, such\nas a code snippet, markdown document, or SVG graphic. Artifacts are\nversioned — each edit produces a new ArtifactVersion."
     },
+    "v1ArtifactDelta": {
+      "type": "object",
+      "properties": {
+        "artifactId": {
+          "type": "string",
+          "description": "The artifact ID this delta belongs to."
+        },
+        "delta": {
+          "type": "string",
+          "description": "A chunk of the content."
+        }
+      },
+      "description": "A chunk of artifact content."
+    },
+    "v1ArtifactEnd": {
+      "type": "object",
+      "properties": {
+        "artifactId": {
+          "type": "string",
+          "description": "The artifact ID."
+        },
+        "artifactVersion": {
+          "type": "string",
+          "title": "The persisted artifact version.\nFormat: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`"
+        },
+        "mimeType": {
+          "type": "string",
+          "description": "The MIME type of the artifact."
+        },
+        "sizeBytes": {
+          "type": "string",
+          "format": "int64",
+          "description": "The size in bytes of the artifact content."
+        }
+      },
+      "description": "Signals the end of an artifact, including its persisted version info."
+    },
+    "v1ArtifactError": {
+      "type": "object",
+      "properties": {
+        "artifactId": {
+          "type": "string",
+          "description": "The artifact ID that errored."
+        },
+        "status": {
+          "$ref": "#/definitions/rpcStatus",
+          "description": "The error details."
+        }
+      },
+      "description": "An error during artifact production."
+    },
+    "v1ArtifactStart": {
+      "type": "object",
+      "properties": {
+        "artifactId": {
+          "type": "string",
+          "description": "The artifact ID being produced."
+        },
+        "type": {
+          "type": "string",
+          "description": "The type of artifact (e.g. \"code\", \"markdown\", \"svg\")."
+        },
+        "title": {
+          "type": "string",
+          "description": "A human-readable title."
+        }
+      },
+      "description": "Signals the start of an artifact being produced."
+    },
     "v1ArtifactVersion": {
       "type": "object",
       "properties": {
@@ -836,7 +1134,12 @@
         },
         "title": {
           "type": "string",
-          "description": "The conversation title. May be set by the user or auto-generated."
+          "description": "The conversation title. May be set by the user or auto-generated.\n\nA title supplied at `CreateConversation` time does NOT mark the\nconversation as user-titled (`title_user_set` stays false), so\nthe auto-summarization path is free to overwrite it once the\nfirst turn lands. Only an explicit `UpdateConversation` whose\nupdate mask covers `title` flips `title_user_set` to true and\nmakes the title sticky against future `:summarize` calls."
+        },
+        "titleUserSet": {
+          "type": "boolean",
+          "description": "Output only. Whether the user has set the title via an explicit\n`UpdateConversation` call (mask covering `title`) — as opposed\nto a heuristic stub from `CreateConversation` or a server-side\nsummary from `:summarize`. Used to suppress regeneration:\nre-running `:summarize` on a conversation whose title the user\nhas already curated would overwrite their work.",
+          "readOnly": true
         },
         "description": {
           "type": "string",
@@ -882,6 +1185,24 @@
       },
       "description": "A conversation represents a single chat thread between a user and the AI."
     },
+    "v1DataPart": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "The data type identifier."
+        },
+        "dataJson": {
+          "type": "string",
+          "description": "The JSON-encoded payload."
+        }
+      },
+      "description": "An opaque data part for future extensions (engine status, rundown\nupdates, etc.). Follows Vercel AI SDK's DataPart convention."
+    },
+    "v1Done": {
+      "type": "object",
+      "description": "The stream is complete. No more events will be sent."
+    },
     "v1FilePart": {
       "type": "object",
       "properties": {
@@ -897,6 +1218,24 @@
         }
       },
       "description": "A file reference within a message."
+    },
+    "v1GenerateContentResponse": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "$ref": "#/definitions/v1Message",
+          "description": "The assistant message produced by this generation."
+        },
+        "usage": {
+          "$ref": "#/definitions/v1TokenUsage",
+          "description": "Token accounting for billing/observability."
+        },
+        "model": {
+          "type": "string",
+          "description": "The model that produced the response."
+        }
+      },
+      "description": "Response from the unary `GenerateContent`. The streaming variant\n(`StreamGenerateContent`) emits the same content as a sequence of\n`ServerEvent`s instead."
     },
     "v1InlineContent": {
       "type": "object",
@@ -917,6 +1256,28 @@
         }
       },
       "description": "Inline content stored directly in the artifact version.\nCapped at 1 MB for text-only artifacts."
+    },
+    "v1InputMessage": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "$ref": "#/definitions/v1Role",
+          "description": "Required. The role of this message's author."
+        },
+        "parts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1MessagePart"
+          },
+          "description": "Required. The structured parts of this message."
+        }
+      },
+      "description": "A single conversation turn supplied as input to a generation. The\nrole-and-parts shape mirrors the Vercel AI SDK's `UIMessage` and\nGoogle's `Content`: tool calls, tool results, files, reasoning,\nand text are all represented as `MessagePart` variants — no\nseparate request envelopes for tool flows.",
+      "required": [
+        "role",
+        "parts"
+      ]
     },
     "v1ListArtifactVersionsResponse": {
       "type": "object",
@@ -1020,6 +1381,30 @@
       },
       "description": "A message within a conversation. Messages are produced by the streaming\npath and are read-only through this API."
     },
+    "v1MessageMetadata": {
+      "type": "object",
+      "properties": {
+        "messageId": {
+          "type": "string",
+          "description": "The message ID this metadata is for."
+        },
+        "model": {
+          "type": "string",
+          "description": "The model that generated the response."
+        },
+        "inputTokens": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Input token count (approximate)."
+        },
+        "outputTokens": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Output token count (approximate)."
+        }
+      },
+      "description": "Metadata about the assistant message."
+    },
     "v1MessagePart": {
       "type": "object",
       "properties": {
@@ -1046,6 +1431,20 @@
       },
       "description": "A single part of a message. Messages can contain multiple parts of\ndifferent types (text, tool calls, tool results, file references)."
     },
+    "v1ReasoningDelta": {
+      "type": "object",
+      "properties": {
+        "delta": {
+          "type": "string",
+          "description": "The reasoning text content of this chunk."
+        }
+      },
+      "description": "A chunk of reasoning text."
+    },
+    "v1ReasoningEnd": {
+      "type": "object",
+      "description": "Signals the end of reasoning output."
+    },
     "v1ReasoningPart": {
       "type": "object",
       "properties": {
@@ -1056,6 +1455,16 @@
         }
       },
       "description": "A reasoning/thinking part of a message."
+    },
+    "v1ReasoningStart": {
+      "type": "object",
+      "properties": {
+        "messageId": {
+          "type": "string",
+          "description": "The message ID for the reasoning block."
+        }
+      },
+      "description": "Signals the start of reasoning/thinking output."
     },
     "v1Role": {
       "type": "string",
@@ -1069,6 +1478,116 @@
       "default": "ROLE_UNSPECIFIED",
       "description": "The role of a message author.\n\n - ROLE_UNSPECIFIED: Unspecified role.\n - USER: A message from the user.\n - ASSISTANT: A message from the AI assistant.\n - SYSTEM: A system prompt message.\n - TOOL: A tool result message."
     },
+    "v1ServerEvent": {
+      "type": "object",
+      "properties": {
+        "textStart": {
+          "$ref": "#/definitions/v1TextStart",
+          "description": "Signals the start of an assistant text response."
+        },
+        "textDelta": {
+          "$ref": "#/definitions/v1TextDelta",
+          "description": "A chunk of assistant text."
+        },
+        "textEnd": {
+          "$ref": "#/definitions/v1TextEnd",
+          "description": "Signals the end of the assistant text response."
+        },
+        "reasoningStart": {
+          "$ref": "#/definitions/v1ReasoningStart",
+          "description": "Signals the start of reasoning/thinking output."
+        },
+        "reasoningDelta": {
+          "$ref": "#/definitions/v1ReasoningDelta",
+          "description": "A chunk of reasoning text."
+        },
+        "reasoningEnd": {
+          "$ref": "#/definitions/v1ReasoningEnd",
+          "description": "Signals the end of reasoning output."
+        },
+        "toolCallStart": {
+          "$ref": "#/definitions/v1ToolCallStart",
+          "description": "Signals the start of a tool call with partial input."
+        },
+        "toolCallDelta": {
+          "$ref": "#/definitions/v1ToolCallDelta",
+          "description": "A chunk of tool call input JSON."
+        },
+        "toolInputAvailable": {
+          "$ref": "#/definitions/v1ToolInputAvailable",
+          "description": "The tool call input is complete and ready for execution."
+        },
+        "toolOutputAvailable": {
+          "$ref": "#/definitions/v1ToolOutputAvailable",
+          "description": "A tool execution result (from a server-side tool)."
+        },
+        "toolError": {
+          "$ref": "#/definitions/v1ToolError",
+          "description": "A tool execution error."
+        },
+        "toolApprovalRequested": {
+          "$ref": "#/definitions/v1ToolApprovalRequested",
+          "description": "A tool requires user approval before execution."
+        },
+        "artifactStart": {
+          "$ref": "#/definitions/v1ArtifactStart",
+          "description": "Signals the start of an artifact being produced."
+        },
+        "artifactDelta": {
+          "$ref": "#/definitions/v1ArtifactDelta",
+          "description": "A chunk of artifact content."
+        },
+        "artifactEnd": {
+          "$ref": "#/definitions/v1ArtifactEnd",
+          "description": "Signals the end of an artifact, including its persisted version."
+        },
+        "artifactError": {
+          "$ref": "#/definitions/v1ArtifactError",
+          "description": "An error during artifact production."
+        },
+        "messageMetadata": {
+          "$ref": "#/definitions/v1MessageMetadata",
+          "description": "Metadata about the assistant message (token counts, model info)."
+        },
+        "done": {
+          "$ref": "#/definitions/v1Done",
+          "description": "The stream is complete."
+        },
+        "streamError": {
+          "$ref": "#/definitions/v1StreamError",
+          "description": "A stream-level error."
+        },
+        "dataPart": {
+          "$ref": "#/definitions/v1DataPart",
+          "description": "An opaque data part for future extensions (engine status, etc.)."
+        }
+      },
+      "description": "An event sent by the server during a streaming chat session."
+    },
+    "v1StreamError": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "$ref": "#/definitions/rpcStatus",
+          "description": "The error details."
+        }
+      },
+      "description": "A stream-level error."
+    },
+    "v1TextDelta": {
+      "type": "object",
+      "properties": {
+        "delta": {
+          "type": "string",
+          "description": "The text content of this chunk."
+        }
+      },
+      "description": "A chunk of assistant text."
+    },
+    "v1TextEnd": {
+      "type": "object",
+      "description": "Signals the end of the assistant text response."
+    },
     "v1TextPart": {
       "type": "object",
       "properties": {
@@ -1079,6 +1598,64 @@
         }
       },
       "description": "A text part of a message."
+    },
+    "v1TextStart": {
+      "type": "object",
+      "properties": {
+        "messageId": {
+          "type": "string",
+          "description": "The message ID being generated."
+        }
+      },
+      "description": "Signals the start of an assistant text response."
+    },
+    "v1TokenUsage": {
+      "type": "object",
+      "properties": {
+        "inputTokens": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Approximate input token count (prompt + history + system)."
+        },
+        "outputTokens": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Approximate output token count (the generated response)."
+        }
+      },
+      "description": "Token usage accounting for a generation."
+    },
+    "v1ToolApprovalRequested": {
+      "type": "object",
+      "properties": {
+        "toolCallId": {
+          "type": "string",
+          "description": "The unique ID of this tool call."
+        },
+        "tool": {
+          "type": "string",
+          "description": "The tool requesting approval."
+        },
+        "inputJson": {
+          "type": "string",
+          "description": "The complete JSON-encoded input arguments for review."
+        }
+      },
+      "description": "A tool that requires user approval before execution."
+    },
+    "v1ToolCallDelta": {
+      "type": "object",
+      "properties": {
+        "toolCallId": {
+          "type": "string",
+          "description": "The tool call ID this delta belongs to."
+        },
+        "delta": {
+          "type": "string",
+          "description": "A chunk of the JSON input."
+        }
+      },
+      "description": "A chunk of tool call input JSON being streamed."
     },
     "v1ToolCallPart": {
       "type": "object",
@@ -1100,6 +1677,92 @@
         }
       },
       "description": "A tool call issued by the assistant."
+    },
+    "v1ToolCallStart": {
+      "type": "object",
+      "properties": {
+        "toolCallId": {
+          "type": "string",
+          "description": "The unique ID of this tool call."
+        },
+        "tool": {
+          "type": "string",
+          "description": "The tool being called."
+        }
+      },
+      "description": "Signals the start of a tool call."
+    },
+    "v1ToolDefinition": {
+      "type": "object",
+      "properties": {
+        "tool": {
+          "type": "string",
+          "description": "Required. The tool's identifier, as the model will reference it."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional. A natural-language description shown to the model."
+        },
+        "inputSchemaJson": {
+          "type": "string",
+          "description": "Required. JSON Schema describing the tool's input arguments,\nencoded as a JSON string."
+        }
+      },
+      "description": "A tool the model may invoke during generation. Schemas are\nexpressed as JSON Schema (encoded as a JSON string) so this proto\ndoesn't need to model the schema language directly.\n\nThe identifier field is named `tool` (not `name`) to match the\nexisting convention in `ToolCallPart` / `ToolResultPart` and to\navoid AIP-122's resource-annotation expectation triggered by\nmessages containing a `name` field.",
+      "required": [
+        "tool",
+        "inputSchemaJson"
+      ]
+    },
+    "v1ToolError": {
+      "type": "object",
+      "properties": {
+        "toolCallId": {
+          "type": "string",
+          "description": "The tool call ID that errored."
+        },
+        "errorMessage": {
+          "type": "string",
+          "description": "The error message."
+        }
+      },
+      "description": "A tool execution error."
+    },
+    "v1ToolInputAvailable": {
+      "type": "object",
+      "properties": {
+        "toolCallId": {
+          "type": "string",
+          "description": "The unique ID of this tool call."
+        },
+        "tool": {
+          "type": "string",
+          "description": "The tool to execute."
+        },
+        "inputJson": {
+          "type": "string",
+          "description": "The complete JSON-encoded input arguments."
+        },
+        "serverSide": {
+          "type": "boolean",
+          "description": "Whether this tool is executed server-side (true) or client-side (false)."
+        }
+      },
+      "description": "The tool call input is fully available and ready for execution."
+    },
+    "v1ToolOutputAvailable": {
+      "type": "object",
+      "properties": {
+        "toolCallId": {
+          "type": "string",
+          "description": "The tool call ID this output is for."
+        },
+        "resultJson": {
+          "type": "string",
+          "description": "The JSON-encoded tool result."
+        }
+      },
+      "description": "A tool execution result from a server-side tool."
     },
     "v1ToolResultPart": {
       "type": "object",

@@ -905,9 +905,10 @@ class Conversation final : public ::google::protobuf::Message
     kLastMessageTimeFieldNumber = 8,
     kCreateTimeFieldNumber = 9,
     kUpdateTimeFieldNumber = 10,
+    kMessageCountFieldNumber = 7,
+    kTitleUserSetFieldNumber = 12,
     kArchivedFieldNumber = 5,
     kPinnedFieldNumber = 6,
-    kMessageCountFieldNumber = 7,
   };
   // string name = 1 [json_name = "name", (.google.api.field_behavior) = IDENTIFIER];
   void clear_name() ;
@@ -1034,6 +1035,26 @@ class Conversation final : public ::google::protobuf::Message
   ::google::protobuf::Timestamp* _internal_mutable_update_time();
 
   public:
+  // int32 message_count = 7 [json_name = "messageCount", (.google.api.field_behavior) = OUTPUT_ONLY];
+  void clear_message_count() ;
+  ::int32_t message_count() const;
+  void set_message_count(::int32_t value);
+
+  private:
+  ::int32_t _internal_message_count() const;
+  void _internal_set_message_count(::int32_t value);
+
+  public:
+  // bool title_user_set = 12 [json_name = "titleUserSet", (.google.api.field_behavior) = OUTPUT_ONLY];
+  void clear_title_user_set() ;
+  bool title_user_set() const;
+  void set_title_user_set(bool value);
+
+  private:
+  bool _internal_title_user_set() const;
+  void _internal_set_title_user_set(bool value);
+
+  public:
   // bool archived = 5 [json_name = "archived", (.google.api.field_behavior) = OPTIONAL];
   void clear_archived() ;
   bool archived() const;
@@ -1054,22 +1075,12 @@ class Conversation final : public ::google::protobuf::Message
   void _internal_set_pinned(bool value);
 
   public:
-  // int32 message_count = 7 [json_name = "messageCount", (.google.api.field_behavior) = OUTPUT_ONLY];
-  void clear_message_count() ;
-  ::int32_t message_count() const;
-  void set_message_count(::int32_t value);
-
-  private:
-  ::int32_t _internal_message_count() const;
-  void _internal_set_message_count(::int32_t value);
-
-  public:
   // @@protoc_insertion_point(class_scope:pivox.ai.v1.Conversation)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
   static const ::google::protobuf::internal::TcParseTable<
-      4, 11, 3,
+      4, 12, 3,
       72, 2>
       _table_;
 
@@ -1097,9 +1108,10 @@ class Conversation final : public ::google::protobuf::Message
     ::google::protobuf::Timestamp* last_message_time_;
     ::google::protobuf::Timestamp* create_time_;
     ::google::protobuf::Timestamp* update_time_;
+    ::int32_t message_count_;
+    bool title_user_set_;
     bool archived_;
     bool pinned_;
-    ::int32_t message_count_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1906,6 +1918,28 @@ inline void Conversation::set_allocated_title(std::string* value) {
     _impl_.title_.Set("", GetArena());
   }
   // @@protoc_insertion_point(field_set_allocated:pivox.ai.v1.Conversation.title)
+}
+
+// bool title_user_set = 12 [json_name = "titleUserSet", (.google.api.field_behavior) = OUTPUT_ONLY];
+inline void Conversation::clear_title_user_set() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.title_user_set_ = false;
+}
+inline bool Conversation::title_user_set() const {
+  // @@protoc_insertion_point(field_get:pivox.ai.v1.Conversation.title_user_set)
+  return _internal_title_user_set();
+}
+inline void Conversation::set_title_user_set(bool value) {
+  _internal_set_title_user_set(value);
+  // @@protoc_insertion_point(field_set:pivox.ai.v1.Conversation.title_user_set)
+}
+inline bool Conversation::_internal_title_user_set() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.title_user_set_;
+}
+inline void Conversation::_internal_set_title_user_set(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.title_user_set_ = value;
 }
 
 // string description = 4 [json_name = "description", (.google.api.field_behavior) = OPTIONAL];

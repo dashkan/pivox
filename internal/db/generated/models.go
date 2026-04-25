@@ -909,6 +909,7 @@ type AiConversation struct {
 	UpdatedBy       string             `json:"updated_by"`
 	CreateTime      time.Time          `json:"create_time"`
 	UpdateTime      time.Time          `json:"update_time"`
+	TitleUserSet    bool               `json:"title_user_set"`
 }
 
 type AiMessage struct {

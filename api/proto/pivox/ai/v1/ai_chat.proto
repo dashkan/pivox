@@ -16,6 +16,7 @@ syntax = "proto3";
 
 package pivox.ai.v1;
 
+import "buf/validate/validate.proto";
 import "google/api/annotations.proto";
 import "google/api/client.proto";
 import "google/api/field_behavior.proto";
@@ -28,9 +29,15 @@ import "pivox/ai/v1/messages.proto";
 
 option go_package = "pivox/ai/v1;aiv1";
 
-// AI chat service providing conversation management and real-time streaming.
-// Resource methods follow AIP conventions. The Stream method is a non-AIP
-// bidi RPC for live chat transport.
+// AI chat service providing conversation management and content generation.
+//
+// Resource methods follow AIP conventions. `StreamGenerateContent` is a
+// non-AIP server-streaming RPC for live chat transport — it shares a
+// request shape with the unary `GenerateContent` so callers can reuse
+// request construction across streaming and non-streaming contexts (the
+// same pattern the Vercel AI SDK uses with `streamText` / `generateText`,
+// and Google's own `models.generateContent` /
+// `models.streamGenerateContent`).
 service AiChat {
   option (google.api.default_host) = "api.pivox.io";
 
@@ -119,76 +126,187 @@ service AiChat {
     option (google.api.method_signature) = "name";
   }
 
-  // Server-streaming RPC for AI chat. Each call sends one client event
-  // (user message or tool output) and receives the model's response as
-  // a stream of server events. Native clients use this directly. Web
-  // clients use the SSE adapter at POST /v1/ai:stream instead.
-  // (-- api-linter: core::0136::verb-noun=disabled
-  //     aip.dev/not-precedent: server-streaming custom method for live chat transport. --)
-  // (-- api-linter: core::0136::request-message-name=disabled
-  //     aip.dev/not-precedent: uses ClientEvent/ServerEvent, not StreamRequest/StreamResponse. --)
-  // (-- api-linter: core::0136::response-message-name=disabled
-  //     aip.dev/not-precedent: uses ClientEvent/ServerEvent, not StreamRequest/StreamResponse. --)
-  // (-- api-linter: core::0136::http-method=disabled
-  //     aip.dev/not-precedent: server-streaming custom method for live chat transport. --)
+  // Generates assistant content for the given input. Unary: collects
+  // the full response and returns it as a single `Message`. Use this
+  // for stateless one-shot completions (title summarization, intent
+  // classification, etc.) and for stateful turns where the caller
+  // doesn't need streaming. Mirrors `generateText` in the Vercel AI
+  // SDK and `models.generateContent` in Google's AI APIs.
+  rpc GenerateContent(GenerateContentRequest) returns (GenerateContentResponse) {
+    option (google.api.http) = {
+      post: "/v1/{parent=organizations/*}:generateContent"
+      body: "*"
+    };
+  }
+
+  // Server-streaming counterpart to `GenerateContent`. Same request
+  // shape; emits the response as a sequence of `ServerEvent`s
+  // (text/reasoning/tool/artifact deltas, lifecycle markers, and a
+  // terminal `done`). Native clients use this directly. Web clients
+  // use the SSE adapter at `POST /v1/ai:streamGenerateContent`.
+  //
+  // The request name, response name, and HTTP suffix are
+  // intentionally non-AIP — server-streaming custom methods aren't
+  // covered by AIP-136. The streaming variant deliberately reuses
+  // `GenerateContentRequest` so callers can construct the request
+  // once and pick streaming vs unary at call time. The unary
+  // `GenerateContent` above is AIP-clean.
   // (-- api-linter: core::0136::http-uri-suffix=disabled
   //     aip.dev/not-precedent: server-streaming custom method for live chat transport. --)
-  rpc Stream(ClientEvent) returns (stream ServerEvent) {}
-}
+  // (-- api-linter: core::0136::request-message-name=disabled
+  //     aip.dev/not-precedent: shares GenerateContentRequest with the unary variant by design. --)
+  // (-- api-linter: core::0136::response-message-name=disabled
+  //     aip.dev/not-precedent: server-streaming variant returns ServerEvent stream, not StreamGenerateContentResponse. --)
+  rpc StreamGenerateContent(GenerateContentRequest) returns (stream ServerEvent) {
+    option (google.api.http) = {
+      post: "/v1/{parent=organizations/*}:streamGenerateContent"
+      body: "*"
+    };
+  }
 
-// An event sent by the client during a streaming chat session.
-message ClientEvent {
-  oneof event {
-    // A user message to send to the model.
-    UserMessage message = 1;
-
-    // A tool output provided by the client in response to a tool call.
-    ToolOutput tool_output = 2;
-
-    // A tool approval response from the user.
-    ToolApprovalResponse tool_approval_response = 3;
+  // Generates a short title for the conversation by summarizing its
+  // current contents, persists the result to `Conversation.title`,
+  // and returns the updated `Conversation`.
+  //
+  // No-ops (returns the conversation unchanged) when
+  // `title_set_by_user` is true — never overwrites a user-curated
+  // title. Idempotent in spirit: re-running on the same conversation
+  // produces a (possibly updated) title from the latest contents.
+  //
+  // Typical callers: clients fire this after the first turn of a
+  // brand-new conversation, or as a "Regenerate title" action.
+  rpc SummarizeConversation(SummarizeConversationRequest) returns (Conversation) {
+    option (google.api.http) = {
+      post: "/v1/{name=organizations/*/conversations/*}:summarize"
+      body: "*"
+    };
+    option (google.api.method_signature) = "name";
   }
 }
 
-// A user message submitted to the AI.
-message UserMessage {
-  // Required. The conversation to send the message to.
-  // Format: `organizations/{organization}/conversations/{conversation}`
-  string conversation = 1 [
+// Input to `GenerateContent` and `StreamGenerateContent`. Mirrors the
+// shape of the Vercel AI SDK's `streamText` / `generateText` params
+// and Google's `GenerateContentRequest`: a list of role-tagged
+// messages (the conversation turns), an optional system instruction,
+// optional tool definitions, and standard generation parameters.
+//
+// Pivox-specific: `parent` carries the org for routing, and
+// `conversation` (optional) opts the call into stateful behavior —
+// when set, the server prepends the conversation's stored history
+// (and stored system instruction, if any) before the inline
+// `messages`, and persists the resulting turn(s) on success. When
+// unset, the call is fully stateless: the caller provides whatever
+// history is needed inline.
+message GenerateContentRequest {
+  // Required. The parent organization that scopes this call.
+  // Format: `organizations/{organization}`
+  string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "cloudresourcemanager.googleapis.com/Organization"},
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. The conversation to attach this turn to. When set, the
+  // server hydrates history from the conversation and persists the
+  // new turn(s) on success. When unset, the call is stateless.
+  // Format: `organizations/{organization}/conversations/{conversation}`
+  string conversation = 2 [
+    (google.api.field_behavior) = OPTIONAL,
     (google.api.resource_reference) = {type: "pivox.ai/Conversation"}
   ];
 
-  // Required. The message parts.
+  // Required. The new turn(s) the caller wants the model to act on.
+  // For stateful calls (`conversation` set), this is typically a
+  // single user message. For stateless calls, this is the full
+  // conversation history with the final user turn at the end.
+  repeated InputMessage messages = 3 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).repeated.min_items = 1
+  ];
+
+  // Optional. System instruction applied to this generation. For
+  // stateful calls, overrides the conversation's stored system
+  // instruction for THIS call only. For stateless calls, this is the
+  // only system prompt the model sees.
+  string system_instruction = 4 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Tools the model may call during this generation.
+  repeated ToolDefinition tools = 5 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Sampling temperature. Server picks a sensible default
+  // when unset.
+  float temperature = 6 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Maximum output tokens. Server caps this if unset or
+  // above its policy limit.
+  int32 max_output_tokens = 7 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// Response from the unary `GenerateContent`. The streaming variant
+// (`StreamGenerateContent`) emits the same content as a sequence of
+// `ServerEvent`s instead.
+message GenerateContentResponse {
+  // The assistant message produced by this generation.
+  Message message = 1;
+
+  // Token accounting for billing/observability.
+  TokenUsage usage = 2;
+
+  // The model that produced the response.
+  string model = 3;
+}
+
+// A single conversation turn supplied as input to a generation. The
+// role-and-parts shape mirrors the Vercel AI SDK's `UIMessage` and
+// Google's `Content`: tool calls, tool results, files, reasoning,
+// and text are all represented as `MessagePart` variants — no
+// separate request envelopes for tool flows.
+message InputMessage {
+  // Required. The role of this message's author.
+  Role role = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // Required. The structured parts of this message.
   repeated MessagePart parts = 2 [(google.api.field_behavior) = REQUIRED];
 }
 
-// A tool output provided by the client after executing a client-side tool.
-message ToolOutput {
-  // Required. The ID of the tool call this output is for.
-  string tool_call_id = 1 [(google.api.field_behavior) = REQUIRED];
+// A tool the model may invoke during generation. Schemas are
+// expressed as JSON Schema (encoded as a JSON string) so this proto
+// doesn't need to model the schema language directly.
+//
+// The identifier field is named `tool` (not `name`) to match the
+// existing convention in `ToolCallPart` / `ToolResultPart` and to
+// avoid AIP-122's resource-annotation expectation triggered by
+// messages containing a `name` field.
+message ToolDefinition {
+  // Required. The tool's identifier, as the model will reference it.
+  string tool = 1 [(google.api.field_behavior) = REQUIRED];
 
-  // Required. The conversation this tool output belongs to.
-  // Format: `organizations/{organization}/conversations/{conversation}`
-  string conversation = 2 [
-    (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {type: "pivox.ai/Conversation"}
-  ];
+  // Optional. A natural-language description shown to the model.
+  string description = 2 [(google.api.field_behavior) = OPTIONAL];
 
-  // Optional. The JSON-encoded tool result.
-  string result_json = 3 [(google.api.field_behavior) = OPTIONAL];
-
-  // Optional. Whether the tool execution resulted in an error.
-  bool is_error = 4 [(google.api.field_behavior) = OPTIONAL];
+  // Required. JSON Schema describing the tool's input arguments,
+  // encoded as a JSON string.
+  string input_schema_json = 3 [(google.api.field_behavior) = REQUIRED];
 }
 
-// A response to a tool approval request.
-message ToolApprovalResponse {
-  // Required. The ID of the tool call being approved or denied.
-  string tool_call_id = 1 [(google.api.field_behavior) = REQUIRED];
+// Token usage accounting for a generation.
+message TokenUsage {
+  // Approximate input token count (prompt + history + system).
+  int32 input_tokens = 1;
 
-  // Required. Whether the tool execution is approved.
-  bool approved = 2 [(google.api.field_behavior) = REQUIRED];
+  // Approximate output token count (the generated response).
+  int32 output_tokens = 2;
+}
+
+// Request message for `SummarizeConversation`.
+message SummarizeConversationRequest {
+  // Required. The conversation to summarize.
+  // Format: `organizations/{organization}/conversations/{conversation}`
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.ai/Conversation"},
+    (buf.validate.field).required = true
+  ];
 }
 
 // An event sent by the server during a streaming chat session.

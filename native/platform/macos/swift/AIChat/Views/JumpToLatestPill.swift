@@ -19,18 +19,18 @@ struct JumpToLatestPill: View {
             NotificationCenter.default.post(
                 name: .aiChatJumpToLatest, object: nil)
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: theme.spacingXS) {
                 Image(systemName: "arrow.down")
                 Text("Jump to latest")
             }
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 7)
+            .font(theme.statusBadgeFont)
+            .foregroundStyle(theme.prominentButtonText)
+            .padding(.horizontal, theme.spacingLG)
+            .padding(.vertical, theme.spacingSM)
             .background(theme.accent, in: Capsule())
             .overlay(
                 Capsule()
-                    .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5))
+                    .strokeBorder(theme.prominentButtonText.opacity(0.15), lineWidth: 0.5))
             .shadow(color: .black.opacity(hovered ? 0.30 : 0.18),
                     radius: hovered ? 6 : 4, y: 2)
             .scaleEffect(hovered ? 1.04 : 1.0)

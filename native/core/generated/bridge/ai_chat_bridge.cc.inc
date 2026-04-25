@@ -238,9 +238,32 @@ UnaryStatus ChatClient::ListArtifactVersions(
   return UnaryStatus{0, std::string{}};
 }
 
-// pivox.ai.v1.AiChat.Stream
-void ChatClient::Stream(
-    const PivoxModels::Pivox_Ai_V1_ClientEvent* request,
+// pivox.ai.v1.AiChat.GenerateContent
+UnaryStatus ChatClient::GenerateContent(
+    const PivoxModels::Pivox_Ai_V1_GenerateContentRequest* request,
+    PivoxModels::Pivox_Ai_V1_GenerateContentResponse* response_out) {
+  if (!request || !response_out) {
+    return UnaryStatus{3 /* INVALID_ARGUMENT */, "null request or response_out"};
+  }
+
+  auto req_bytes = SwiftArrayToVector(request->serializedBytesArray());
+  std::vector<uint8_t> resp_bytes;
+  auto status = DoUnaryCall("/pivox.ai.v1.AiChat/GenerateContent",
+      req_bytes.data(), req_bytes.size(), &resp_bytes);
+
+  if (!status.ok()) {
+    return UnaryStatus{static_cast<int32_t>(status.error_code()), status.error_message()};
+  }
+
+  auto arr = swift::Array<uint8_t>::init();
+  for (auto b : resp_bytes) arr.append(b);
+  *response_out = PivoxModels::Pivox_Ai_V1_GenerateContentResponse::parse(arr);
+  return UnaryStatus{0, std::string{}};
+}
+
+// pivox.ai.v1.AiChat.StreamGenerateContent
+void ChatClient::StreamGenerateContent(
+    const PivoxModels::Pivox_Ai_V1_GenerateContentRequest* request,
     void* ctx,
     void (*on_event)(void* ctx, const PivoxModels::Pivox_Ai_V1_ServerEvent* event),
     void (*on_error)(void* ctx, int32_t code, const char* message),
@@ -265,5 +288,28 @@ void ChatClient::Stream(
       [ctx, on_complete]() {
         if (on_complete) on_complete(ctx);
       });
+}
+
+// pivox.ai.v1.AiChat.SummarizeConversation
+UnaryStatus ChatClient::SummarizeConversation(
+    const PivoxModels::Pivox_Ai_V1_SummarizeConversationRequest* request,
+    PivoxModels::Pivox_Ai_V1_Conversation* response_out) {
+  if (!request || !response_out) {
+    return UnaryStatus{3 /* INVALID_ARGUMENT */, "null request or response_out"};
+  }
+
+  auto req_bytes = SwiftArrayToVector(request->serializedBytesArray());
+  std::vector<uint8_t> resp_bytes;
+  auto status = DoUnaryCall("/pivox.ai.v1.AiChat/SummarizeConversation",
+      req_bytes.data(), req_bytes.size(), &resp_bytes);
+
+  if (!status.ok()) {
+    return UnaryStatus{static_cast<int32_t>(status.error_code()), status.error_message()};
+  }
+
+  auto arr = swift::Array<uint8_t>::init();
+  for (auto b : resp_bytes) arr.append(b);
+  *response_out = PivoxModels::Pivox_Ai_V1_Conversation::parse(arr);
+  return UnaryStatus{0, std::string{}};
 }
 

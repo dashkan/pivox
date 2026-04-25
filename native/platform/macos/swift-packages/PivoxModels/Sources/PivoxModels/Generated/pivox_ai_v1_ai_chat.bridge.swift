@@ -3,38 +3,56 @@
 
 import SwiftProtobuf
 
-public extension Pivox_Ai_V1_ClientEvent {
+public extension Pivox_Ai_V1_GenerateContentRequest {
     func serializedBytesArray() -> [UInt8] {
         (try? serializedBytes()) ?? []
     }
-    static func parse(fromBytes b: [UInt8]) -> Pivox_Ai_V1_ClientEvent {
+    static func parse(fromBytes b: [UInt8]) -> Pivox_Ai_V1_GenerateContentRequest {
         (try? Self(serializedBytes: b)) ?? Self()
     }
 }
 
-public extension Pivox_Ai_V1_UserMessage {
+public extension Pivox_Ai_V1_GenerateContentResponse {
     func serializedBytesArray() -> [UInt8] {
         (try? serializedBytes()) ?? []
     }
-    static func parse(fromBytes b: [UInt8]) -> Pivox_Ai_V1_UserMessage {
+    static func parse(fromBytes b: [UInt8]) -> Pivox_Ai_V1_GenerateContentResponse {
         (try? Self(serializedBytes: b)) ?? Self()
     }
 }
 
-public extension Pivox_Ai_V1_ToolOutput {
+public extension Pivox_Ai_V1_InputMessage {
     func serializedBytesArray() -> [UInt8] {
         (try? serializedBytes()) ?? []
     }
-    static func parse(fromBytes b: [UInt8]) -> Pivox_Ai_V1_ToolOutput {
+    static func parse(fromBytes b: [UInt8]) -> Pivox_Ai_V1_InputMessage {
         (try? Self(serializedBytes: b)) ?? Self()
     }
 }
 
-public extension Pivox_Ai_V1_ToolApprovalResponse {
+public extension Pivox_Ai_V1_ToolDefinition {
     func serializedBytesArray() -> [UInt8] {
         (try? serializedBytes()) ?? []
     }
-    static func parse(fromBytes b: [UInt8]) -> Pivox_Ai_V1_ToolApprovalResponse {
+    static func parse(fromBytes b: [UInt8]) -> Pivox_Ai_V1_ToolDefinition {
+        (try? Self(serializedBytes: b)) ?? Self()
+    }
+}
+
+public extension Pivox_Ai_V1_TokenUsage {
+    func serializedBytesArray() -> [UInt8] {
+        (try? serializedBytes()) ?? []
+    }
+    static func parse(fromBytes b: [UInt8]) -> Pivox_Ai_V1_TokenUsage {
+        (try? Self(serializedBytes: b)) ?? Self()
+    }
+}
+
+public extension Pivox_Ai_V1_SummarizeConversationRequest {
+    func serializedBytesArray() -> [UInt8] {
+        (try? serializedBytes()) ?? []
+    }
+    static func parse(fromBytes b: [UInt8]) -> Pivox_Ai_V1_SummarizeConversationRequest {
         (try? Self(serializedBytes: b)) ?? Self()
     }
 }

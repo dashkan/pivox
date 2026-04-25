@@ -107,8 +107,16 @@ struct AIChatPanel: View {
 
                 Spacer()
 
-                Text(conversationName != nil ? "Chat" : "New Chat")
-                    .font(.headline)
+                if let name = conversationName,
+                   let vm = AIChatService.shared.viewModel(for: name, isNew: false) {
+                    ConversationTitleHeader(
+                        client: client,
+                        conversationName: name,
+                        viewModel: vm)
+                } else {
+                    Text("New Conversation")
+                        .font(.headline)
+                }
 
                 Spacer()
 

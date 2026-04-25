@@ -391,8 +391,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     // Edit menu
     let editMenu = NSMenu(title: "Edit")
-    editMenu.addItem(withTitle: "Undo", action: #selector(UndoManager.undo), keyEquivalent: "z")
-    editMenu.addItem(withTitle: "Redo", action: #selector(UndoManager.redo), keyEquivalent: "Z")
+    // `undo:` / `redo:` are NSResponder-chain actions handled by
+    // the focused field editor (NSTextView with `allowsUndo=true`),
+    // not methods on `UndoManager`. Using `#selector(UndoManager.undo)`
+    // here would dispatch to a method that nothing in the chain
+    // responds to, silently dropping ⌘Z. Use `NSSelectorFromString`
+    // so the responder-chain dispatch finds the right handler.
+    editMenu.addItem(
+      withTitle: "Undo", action: NSSelectorFromString("undo:"), keyEquivalent: "z")
+    editMenu.addItem(
+      withTitle: "Redo", action: NSSelectorFromString("redo:"), keyEquivalent: "Z")
     editMenu.addItem(NSMenuItem.separator())
     editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
     editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")

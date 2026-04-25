@@ -60,11 +60,21 @@ UnaryStatus ListArtifactVersions(
 
 // pivox.ai.v1.AiChat.DeleteArtifactVersion — skipped: input/output type lives outside PivoxModels
 
-// pivox.ai.v1.AiChat.Stream
-void Stream(
-    const PivoxModels::Pivox_Ai_V1_ClientEvent* request,
+// pivox.ai.v1.AiChat.GenerateContent
+UnaryStatus GenerateContent(
+    const PivoxModels::Pivox_Ai_V1_GenerateContentRequest* request,
+    PivoxModels::Pivox_Ai_V1_GenerateContentResponse* response_out);
+
+// pivox.ai.v1.AiChat.StreamGenerateContent
+void StreamGenerateContent(
+    const PivoxModels::Pivox_Ai_V1_GenerateContentRequest* request,
     void* ctx,
     void (*on_event)(void* ctx, const PivoxModels::Pivox_Ai_V1_ServerEvent* event),
     void (*on_error)(void* ctx, int32_t code, const char* message),
     void (*on_complete)(void* ctx));
+
+// pivox.ai.v1.AiChat.SummarizeConversation
+UnaryStatus SummarizeConversation(
+    const PivoxModels::Pivox_Ai_V1_SummarizeConversationRequest* request,
+    PivoxModels::Pivox_Ai_V1_Conversation* response_out);
 

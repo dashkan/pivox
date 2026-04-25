@@ -9,6 +9,11 @@ import (
 type LanguageModel interface {
 	// Stream starts a streaming model call and returns a reader for events.
 	Stream(ctx context.Context, req StreamRequest) (StreamReader, error)
+
+	// Name returns a stable identifier for the underlying model
+	// (e.g., "llama3.1", "claude-3-5-sonnet"). Surfaced to clients
+	// via `GenerateContentResponse.Model` for billing/observability.
+	Name() string
 }
 
 // StreamRequest is the input to a model streaming call.

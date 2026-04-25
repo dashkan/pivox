@@ -128,7 +128,12 @@ public struct ConversationHistoryPopover: View {
                 .foregroundStyle(.red)
                 .font(.footnote)
                 .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                // `maxHeight: .infinity` so the error fills the
+                // popover's reserved area and pins to top — without
+                // it the VStack collapses to intrinsic height and
+                // SwiftUI vertically centers everything in the
+                // popover's `minHeight: 280` frame.
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         default:
             rows
         }

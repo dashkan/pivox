@@ -58,40 +58,6 @@ struct ToolOutputAvailableDefaultTypeInternal {
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 ToolOutputAvailableDefaultTypeInternal _ToolOutputAvailable_default_instance_;
 
-inline constexpr ToolOutput::Impl_::Impl_(
-    ::_pbi::ConstantInitialized) noexcept
-      : tool_call_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        conversation_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        result_json_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        is_error_{false},
-        _cached_size_{0} {}
-
-template <typename>
-PROTOBUF_CONSTEXPR ToolOutput::ToolOutput(::_pbi::ConstantInitialized)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(_class_data_.base()),
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(),
-#endif  // PROTOBUF_CUSTOM_VTABLE
-      _impl_(::_pbi::ConstantInitialized()) {
-}
-struct ToolOutputDefaultTypeInternal {
-  PROTOBUF_CONSTEXPR ToolOutputDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
-  ~ToolOutputDefaultTypeInternal() {}
-  union {
-    ToolOutput _instance;
-  };
-};
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 ToolOutputDefaultTypeInternal _ToolOutput_default_instance_;
-
 inline constexpr ToolInputAvailable::Impl_::Impl_(
     ::_pbi::ConstantInitialized) noexcept
       : tool_call_id_(
@@ -156,6 +122,39 @@ struct ToolErrorDefaultTypeInternal {
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 ToolErrorDefaultTypeInternal _ToolError_default_instance_;
 
+inline constexpr ToolDefinition::Impl_::Impl_(
+    ::_pbi::ConstantInitialized) noexcept
+      : tool_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        description_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        input_schema_json_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        _cached_size_{0} {}
+
+template <typename>
+PROTOBUF_CONSTEXPR ToolDefinition::ToolDefinition(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(::_pbi::ConstantInitialized()) {
+}
+struct ToolDefinitionDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR ToolDefinitionDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~ToolDefinitionDefaultTypeInternal() {}
+  union {
+    ToolDefinition _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 ToolDefinitionDefaultTypeInternal _ToolDefinition_default_instance_;
+
 inline constexpr ToolCallStart::Impl_::Impl_(
     ::_pbi::ConstantInitialized) noexcept
       : tool_call_id_(
@@ -216,34 +215,6 @@ struct ToolCallDeltaDefaultTypeInternal {
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 ToolCallDeltaDefaultTypeInternal _ToolCallDelta_default_instance_;
 
-inline constexpr ToolApprovalResponse::Impl_::Impl_(
-    ::_pbi::ConstantInitialized) noexcept
-      : tool_call_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        approved_{false},
-        _cached_size_{0} {}
-
-template <typename>
-PROTOBUF_CONSTEXPR ToolApprovalResponse::ToolApprovalResponse(::_pbi::ConstantInitialized)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(_class_data_.base()),
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(),
-#endif  // PROTOBUF_CUSTOM_VTABLE
-      _impl_(::_pbi::ConstantInitialized()) {
-}
-struct ToolApprovalResponseDefaultTypeInternal {
-  PROTOBUF_CONSTEXPR ToolApprovalResponseDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
-  ~ToolApprovalResponseDefaultTypeInternal() {}
-  union {
-    ToolApprovalResponse _instance;
-  };
-};
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 ToolApprovalResponseDefaultTypeInternal _ToolApprovalResponse_default_instance_;
-
 inline constexpr ToolApprovalRequested::Impl_::Impl_(
     ::_pbi::ConstantInitialized) noexcept
       : tool_call_id_(
@@ -276,6 +247,32 @@ struct ToolApprovalRequestedDefaultTypeInternal {
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 ToolApprovalRequestedDefaultTypeInternal _ToolApprovalRequested_default_instance_;
+
+inline constexpr TokenUsage::Impl_::Impl_(
+    ::_pbi::ConstantInitialized) noexcept
+      : input_tokens_{0},
+        output_tokens_{0},
+        _cached_size_{0} {}
+
+template <typename>
+PROTOBUF_CONSTEXPR TokenUsage::TokenUsage(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(::_pbi::ConstantInitialized()) {
+}
+struct TokenUsageDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR TokenUsageDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~TokenUsageDefaultTypeInternal() {}
+  union {
+    TokenUsage _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 TokenUsageDefaultTypeInternal _TokenUsage_default_instance_;
 
 inline constexpr TextStart::Impl_::Impl_(
     ::_pbi::ConstantInitialized) noexcept
@@ -348,6 +345,33 @@ struct TextDeltaDefaultTypeInternal {
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 TextDeltaDefaultTypeInternal _TextDelta_default_instance_;
+
+inline constexpr SummarizeConversationRequest::Impl_::Impl_(
+    ::_pbi::ConstantInitialized) noexcept
+      : name_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        _cached_size_{0} {}
+
+template <typename>
+PROTOBUF_CONSTEXPR SummarizeConversationRequest::SummarizeConversationRequest(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(::_pbi::ConstantInitialized()) {
+}
+struct SummarizeConversationRequestDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR SummarizeConversationRequestDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~SummarizeConversationRequestDefaultTypeInternal() {}
+  union {
+    SummarizeConversationRequest _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 SummarizeConversationRequestDefaultTypeInternal _SummarizeConversationRequest_default_instance_;
 
 inline constexpr ReasoningStart::Impl_::Impl_(
     ::_pbi::ConstantInitialized) noexcept
@@ -598,34 +622,6 @@ struct ArtifactDeltaDefaultTypeInternal {
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 ArtifactDeltaDefaultTypeInternal _ArtifactDelta_default_instance_;
 
-inline constexpr UserMessage::Impl_::Impl_(
-    ::_pbi::ConstantInitialized) noexcept
-      : parts_{},
-        conversation_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        _cached_size_{0} {}
-
-template <typename>
-PROTOBUF_CONSTEXPR UserMessage::UserMessage(::_pbi::ConstantInitialized)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(_class_data_.base()),
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(),
-#endif  // PROTOBUF_CUSTOM_VTABLE
-      _impl_(::_pbi::ConstantInitialized()) {
-}
-struct UserMessageDefaultTypeInternal {
-  PROTOBUF_CONSTEXPR UserMessageDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
-  ~UserMessageDefaultTypeInternal() {}
-  union {
-    UserMessage _instance;
-  };
-};
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 UserMessageDefaultTypeInternal _UserMessage_default_instance_;
-
 inline constexpr StreamError::Impl_::Impl_(
     ::_pbi::ConstantInitialized) noexcept
       : _cached_size_{0},
@@ -650,6 +646,32 @@ struct StreamErrorDefaultTypeInternal {
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 StreamErrorDefaultTypeInternal _StreamError_default_instance_;
+
+inline constexpr InputMessage::Impl_::Impl_(
+    ::_pbi::ConstantInitialized) noexcept
+      : parts_{},
+        role_{static_cast< ::pivox::ai::v1::Role >(0)},
+        _cached_size_{0} {}
+
+template <typename>
+PROTOBUF_CONSTEXPR InputMessage::InputMessage(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(::_pbi::ConstantInitialized()) {
+}
+struct InputMessageDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR InputMessageDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~InputMessageDefaultTypeInternal() {}
+  union {
+    InputMessage _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 InputMessageDefaultTypeInternal _InputMessage_default_instance_;
 
 inline constexpr ArtifactError::Impl_::Impl_(
     ::_pbi::ConstantInitialized) noexcept
@@ -705,14 +727,17 @@ struct ServerEventDefaultTypeInternal {
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 ServerEventDefaultTypeInternal _ServerEvent_default_instance_;
 
-inline constexpr ClientEvent::Impl_::Impl_(
+inline constexpr GenerateContentResponse::Impl_::Impl_(
     ::_pbi::ConstantInitialized) noexcept
-      : event_{},
-        _cached_size_{0},
-        _oneof_case_{} {}
+      : _cached_size_{0},
+        model_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        message_{nullptr},
+        usage_{nullptr} {}
 
 template <typename>
-PROTOBUF_CONSTEXPR ClientEvent::ClientEvent(::_pbi::ConstantInitialized)
+PROTOBUF_CONSTEXPR GenerateContentResponse::GenerateContentResponse(::_pbi::ConstantInitialized)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(_class_data_.base()),
 #else   // PROTOBUF_CUSTOM_VTABLE
@@ -720,16 +745,53 @@ PROTOBUF_CONSTEXPR ClientEvent::ClientEvent(::_pbi::ConstantInitialized)
 #endif  // PROTOBUF_CUSTOM_VTABLE
       _impl_(::_pbi::ConstantInitialized()) {
 }
-struct ClientEventDefaultTypeInternal {
-  PROTOBUF_CONSTEXPR ClientEventDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
-  ~ClientEventDefaultTypeInternal() {}
+struct GenerateContentResponseDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR GenerateContentResponseDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~GenerateContentResponseDefaultTypeInternal() {}
   union {
-    ClientEvent _instance;
+    GenerateContentResponse _instance;
   };
 };
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 ClientEventDefaultTypeInternal _ClientEvent_default_instance_;
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 GenerateContentResponseDefaultTypeInternal _GenerateContentResponse_default_instance_;
+
+inline constexpr GenerateContentRequest::Impl_::Impl_(
+    ::_pbi::ConstantInitialized) noexcept
+      : messages_{},
+        tools_{},
+        parent_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        conversation_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        system_instruction_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        temperature_{0},
+        max_output_tokens_{0},
+        _cached_size_{0} {}
+
+template <typename>
+PROTOBUF_CONSTEXPR GenerateContentRequest::GenerateContentRequest(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(::_pbi::ConstantInitialized()) {
+}
+struct GenerateContentRequestDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR GenerateContentRequestDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~GenerateContentRequestDefaultTypeInternal() {}
+  union {
+    GenerateContentRequest _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 GenerateContentRequestDefaultTypeInternal _GenerateContentRequest_default_instance_;
 }  // namespace v1
 }  // namespace ai
 }  // namespace pivox
@@ -741,49 +803,74 @@ const ::uint32_t
     TableStruct_pivox_2fai_2fv1_2fai_5fchat_2eproto::offsets[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
         protodesc_cold) = {
         ~0u,  // no _has_bits_
-        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::ClientEvent, _internal_metadata_),
-        ~0u,  // no _extensions_
-        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::ClientEvent, _impl_._oneof_case_[0]),
-        ~0u,  // no _weak_field_map_
-        ~0u,  // no _inlined_string_donated_
-        ~0u,  // no _split_
-        ~0u,  // no sizeof(Split)
-        ::_pbi::kInvalidFieldOffsetTag,
-        ::_pbi::kInvalidFieldOffsetTag,
-        ::_pbi::kInvalidFieldOffsetTag,
-        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::ClientEvent, _impl_.event_),
-        ~0u,  // no _has_bits_
-        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::UserMessage, _internal_metadata_),
+        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::GenerateContentRequest, _internal_metadata_),
         ~0u,  // no _extensions_
         ~0u,  // no _oneof_case_
         ~0u,  // no _weak_field_map_
         ~0u,  // no _inlined_string_donated_
         ~0u,  // no _split_
         ~0u,  // no sizeof(Split)
-        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::UserMessage, _impl_.conversation_),
-        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::UserMessage, _impl_.parts_),
-        ~0u,  // no _has_bits_
-        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::ToolOutput, _internal_metadata_),
+        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::GenerateContentRequest, _impl_.parent_),
+        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::GenerateContentRequest, _impl_.conversation_),
+        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::GenerateContentRequest, _impl_.messages_),
+        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::GenerateContentRequest, _impl_.system_instruction_),
+        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::GenerateContentRequest, _impl_.tools_),
+        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::GenerateContentRequest, _impl_.temperature_),
+        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::GenerateContentRequest, _impl_.max_output_tokens_),
+        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::GenerateContentResponse, _impl_._has_bits_),
+        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::GenerateContentResponse, _internal_metadata_),
         ~0u,  // no _extensions_
         ~0u,  // no _oneof_case_
         ~0u,  // no _weak_field_map_
         ~0u,  // no _inlined_string_donated_
         ~0u,  // no _split_
         ~0u,  // no sizeof(Split)
-        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::ToolOutput, _impl_.tool_call_id_),
-        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::ToolOutput, _impl_.conversation_),
-        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::ToolOutput, _impl_.result_json_),
-        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::ToolOutput, _impl_.is_error_),
+        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::GenerateContentResponse, _impl_.message_),
+        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::GenerateContentResponse, _impl_.usage_),
+        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::GenerateContentResponse, _impl_.model_),
+        0,
+        1,
+        ~0u,
         ~0u,  // no _has_bits_
-        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::ToolApprovalResponse, _internal_metadata_),
+        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::InputMessage, _internal_metadata_),
         ~0u,  // no _extensions_
         ~0u,  // no _oneof_case_
         ~0u,  // no _weak_field_map_
         ~0u,  // no _inlined_string_donated_
         ~0u,  // no _split_
         ~0u,  // no sizeof(Split)
-        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::ToolApprovalResponse, _impl_.tool_call_id_),
-        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::ToolApprovalResponse, _impl_.approved_),
+        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::InputMessage, _impl_.role_),
+        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::InputMessage, _impl_.parts_),
+        ~0u,  // no _has_bits_
+        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::ToolDefinition, _internal_metadata_),
+        ~0u,  // no _extensions_
+        ~0u,  // no _oneof_case_
+        ~0u,  // no _weak_field_map_
+        ~0u,  // no _inlined_string_donated_
+        ~0u,  // no _split_
+        ~0u,  // no sizeof(Split)
+        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::ToolDefinition, _impl_.tool_),
+        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::ToolDefinition, _impl_.description_),
+        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::ToolDefinition, _impl_.input_schema_json_),
+        ~0u,  // no _has_bits_
+        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::TokenUsage, _internal_metadata_),
+        ~0u,  // no _extensions_
+        ~0u,  // no _oneof_case_
+        ~0u,  // no _weak_field_map_
+        ~0u,  // no _inlined_string_donated_
+        ~0u,  // no _split_
+        ~0u,  // no sizeof(Split)
+        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::TokenUsage, _impl_.input_tokens_),
+        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::TokenUsage, _impl_.output_tokens_),
+        ~0u,  // no _has_bits_
+        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::SummarizeConversationRequest, _internal_metadata_),
+        ~0u,  // no _extensions_
+        ~0u,  // no _oneof_case_
+        ~0u,  // no _weak_field_map_
+        ~0u,  // no _inlined_string_donated_
+        ~0u,  // no _split_
+        ~0u,  // no sizeof(Split)
+        PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::SummarizeConversationRequest, _impl_.name_),
         ~0u,  // no _has_bits_
         PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::ServerEvent, _internal_metadata_),
         ~0u,  // no _extensions_
@@ -1017,37 +1104,41 @@ const ::uint32_t
 
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
-        {0, -1, -1, sizeof(::pivox::ai::v1::ClientEvent)},
-        {12, -1, -1, sizeof(::pivox::ai::v1::UserMessage)},
-        {22, -1, -1, sizeof(::pivox::ai::v1::ToolOutput)},
-        {34, -1, -1, sizeof(::pivox::ai::v1::ToolApprovalResponse)},
-        {44, -1, -1, sizeof(::pivox::ai::v1::ServerEvent)},
-        {73, -1, -1, sizeof(::pivox::ai::v1::TextStart)},
-        {82, -1, -1, sizeof(::pivox::ai::v1::TextDelta)},
-        {91, -1, -1, sizeof(::pivox::ai::v1::TextEnd)},
-        {99, -1, -1, sizeof(::pivox::ai::v1::ReasoningStart)},
-        {108, -1, -1, sizeof(::pivox::ai::v1::ReasoningDelta)},
-        {117, -1, -1, sizeof(::pivox::ai::v1::ReasoningEnd)},
-        {125, -1, -1, sizeof(::pivox::ai::v1::ToolCallStart)},
-        {135, -1, -1, sizeof(::pivox::ai::v1::ToolCallDelta)},
-        {145, -1, -1, sizeof(::pivox::ai::v1::ToolInputAvailable)},
-        {157, -1, -1, sizeof(::pivox::ai::v1::ToolOutputAvailable)},
-        {167, -1, -1, sizeof(::pivox::ai::v1::ToolError)},
-        {177, -1, -1, sizeof(::pivox::ai::v1::ToolApprovalRequested)},
-        {188, -1, -1, sizeof(::pivox::ai::v1::ArtifactStart)},
-        {199, -1, -1, sizeof(::pivox::ai::v1::ArtifactDelta)},
-        {209, -1, -1, sizeof(::pivox::ai::v1::ArtifactEnd)},
-        {221, 231, -1, sizeof(::pivox::ai::v1::ArtifactError)},
-        {233, -1, -1, sizeof(::pivox::ai::v1::MessageMetadata)},
-        {245, -1, -1, sizeof(::pivox::ai::v1::Done)},
-        {253, 262, -1, sizeof(::pivox::ai::v1::StreamError)},
-        {263, -1, -1, sizeof(::pivox::ai::v1::DataPart)},
+        {0, -1, -1, sizeof(::pivox::ai::v1::GenerateContentRequest)},
+        {15, 26, -1, sizeof(::pivox::ai::v1::GenerateContentResponse)},
+        {29, -1, -1, sizeof(::pivox::ai::v1::InputMessage)},
+        {39, -1, -1, sizeof(::pivox::ai::v1::ToolDefinition)},
+        {50, -1, -1, sizeof(::pivox::ai::v1::TokenUsage)},
+        {60, -1, -1, sizeof(::pivox::ai::v1::SummarizeConversationRequest)},
+        {69, -1, -1, sizeof(::pivox::ai::v1::ServerEvent)},
+        {98, -1, -1, sizeof(::pivox::ai::v1::TextStart)},
+        {107, -1, -1, sizeof(::pivox::ai::v1::TextDelta)},
+        {116, -1, -1, sizeof(::pivox::ai::v1::TextEnd)},
+        {124, -1, -1, sizeof(::pivox::ai::v1::ReasoningStart)},
+        {133, -1, -1, sizeof(::pivox::ai::v1::ReasoningDelta)},
+        {142, -1, -1, sizeof(::pivox::ai::v1::ReasoningEnd)},
+        {150, -1, -1, sizeof(::pivox::ai::v1::ToolCallStart)},
+        {160, -1, -1, sizeof(::pivox::ai::v1::ToolCallDelta)},
+        {170, -1, -1, sizeof(::pivox::ai::v1::ToolInputAvailable)},
+        {182, -1, -1, sizeof(::pivox::ai::v1::ToolOutputAvailable)},
+        {192, -1, -1, sizeof(::pivox::ai::v1::ToolError)},
+        {202, -1, -1, sizeof(::pivox::ai::v1::ToolApprovalRequested)},
+        {213, -1, -1, sizeof(::pivox::ai::v1::ArtifactStart)},
+        {224, -1, -1, sizeof(::pivox::ai::v1::ArtifactDelta)},
+        {234, -1, -1, sizeof(::pivox::ai::v1::ArtifactEnd)},
+        {246, 256, -1, sizeof(::pivox::ai::v1::ArtifactError)},
+        {258, -1, -1, sizeof(::pivox::ai::v1::MessageMetadata)},
+        {270, -1, -1, sizeof(::pivox::ai::v1::Done)},
+        {278, 287, -1, sizeof(::pivox::ai::v1::StreamError)},
+        {288, -1, -1, sizeof(::pivox::ai::v1::DataPart)},
 };
 static const ::_pb::Message* const file_default_instances[] = {
-    &::pivox::ai::v1::_ClientEvent_default_instance_._instance,
-    &::pivox::ai::v1::_UserMessage_default_instance_._instance,
-    &::pivox::ai::v1::_ToolOutput_default_instance_._instance,
-    &::pivox::ai::v1::_ToolApprovalResponse_default_instance_._instance,
+    &::pivox::ai::v1::_GenerateContentRequest_default_instance_._instance,
+    &::pivox::ai::v1::_GenerateContentResponse_default_instance_._instance,
+    &::pivox::ai::v1::_InputMessage_default_instance_._instance,
+    &::pivox::ai::v1::_ToolDefinition_default_instance_._instance,
+    &::pivox::ai::v1::_TokenUsage_default_instance_._instance,
+    &::pivox::ai::v1::_SummarizeConversationRequest_default_instance_._instance,
     &::pivox::ai::v1::_ServerEvent_default_instance_._instance,
     &::pivox::ai::v1::_TextStart_default_instance_._instance,
     &::pivox::ai::v1::_TextDelta_default_instance_._instance,
@@ -1073,162 +1164,183 @@ static const ::_pb::Message* const file_default_instances[] = {
 const char descriptor_table_protodef_pivox_2fai_2fv1_2fai_5fchat_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n\031pivox/ai/v1/ai_chat.proto\022\013pivox.ai.v1"
-    "\032\034google/api/annotations.proto\032\027google/a"
-    "pi/client.proto\032\037google/api/field_behavi"
-    "or.proto\032\031google/api/resource.proto\032\033goo"
-    "gle/protobuf/empty.proto\032\027google/rpc/sta"
-    "tus.proto\032\033pivox/ai/v1/artifacts.proto\032\037"
-    "pivox/ai/v1/conversations.proto\032\032pivox/a"
-    "i/v1/messages.proto\"\343\001\n\013ClientEvent\0224\n\007m"
-    "essage\030\001 \001(\0132\030.pivox.ai.v1.UserMessageH\000"
-    "R\007message\022:\n\013tool_output\030\002 \001(\0132\027.pivox.a"
-    "i.v1.ToolOutputH\000R\ntoolOutput\022Y\n\026tool_ap"
-    "proval_response\030\003 \001(\0132!.pivox.ai.v1.Tool"
-    "ApprovalResponseH\000R\024toolApprovalResponse"
-    "B\007\n\005event\"\205\001\n\013UserMessage\022A\n\014conversatio"
-    "n\030\001 \001(\tB\035\340A\002\372A\027\n\025pivox.ai/ConversationR\014"
-    "conversation\0223\n\005parts\030\002 \003(\0132\030.pivox.ai.v"
-    "1.MessagePartB\003\340A\002R\005parts\"\274\001\n\nToolOutput"
-    "\022%\n\014tool_call_id\030\001 \001(\tB\003\340A\002R\ntoolCallId\022"
-    "A\n\014conversation\030\002 \001(\tB\035\340A\002\372A\027\n\025pivox.ai/"
-    "ConversationR\014conversation\022$\n\013result_jso"
-    "n\030\003 \001(\tB\003\340A\001R\nresultJson\022\036\n\010is_error\030\004 \001"
-    "(\010B\003\340A\001R\007isError\"^\n\024ToolApprovalResponse"
-    "\022%\n\014tool_call_id\030\001 \001(\tB\003\340A\002R\ntoolCallId\022"
-    "\037\n\010approved\030\002 \001(\010B\003\340A\002R\010approved\"\324\n\n\013Ser"
-    "verEvent\0227\n\ntext_start\030\001 \001(\0132\026.pivox.ai."
-    "v1.TextStartH\000R\ttextStart\0227\n\ntext_delta\030"
-    "\002 \001(\0132\026.pivox.ai.v1.TextDeltaH\000R\ttextDel"
-    "ta\0221\n\010text_end\030\003 \001(\0132\024.pivox.ai.v1.TextE"
-    "ndH\000R\007textEnd\022F\n\017reasoning_start\030\004 \001(\0132\033"
-    ".pivox.ai.v1.ReasoningStartH\000R\016reasoning"
-    "Start\022F\n\017reasoning_delta\030\005 \001(\0132\033.pivox.a"
-    "i.v1.ReasoningDeltaH\000R\016reasoningDelta\022@\n"
-    "\rreasoning_end\030\006 \001(\0132\031.pivox.ai.v1.Reaso"
-    "ningEndH\000R\014reasoningEnd\022D\n\017tool_call_sta"
-    "rt\030\007 \001(\0132\032.pivox.ai.v1.ToolCallStartH\000R\r"
-    "toolCallStart\022D\n\017tool_call_delta\030\010 \001(\0132\032"
-    ".pivox.ai.v1.ToolCallDeltaH\000R\rtoolCallDe"
-    "lta\022S\n\024tool_input_available\030\t \001(\0132\037.pivo"
-    "x.ai.v1.ToolInputAvailableH\000R\022toolInputA"
-    "vailable\022V\n\025tool_output_available\030\n \001(\0132"
-    " .pivox.ai.v1.ToolOutputAvailableH\000R\023too"
-    "lOutputAvailable\0227\n\ntool_error\030\013 \001(\0132\026.p"
-    "ivox.ai.v1.ToolErrorH\000R\ttoolError\022\\\n\027too"
-    "l_approval_requested\030\014 \001(\0132\".pivox.ai.v1"
-    ".ToolApprovalRequestedH\000R\025toolApprovalRe"
-    "quested\022C\n\016artifact_start\030\r \001(\0132\032.pivox."
-    "ai.v1.ArtifactStartH\000R\rartifactStart\022C\n\016"
-    "artifact_delta\030\016 \001(\0132\032.pivox.ai.v1.Artif"
-    "actDeltaH\000R\rartifactDelta\022=\n\014artifact_en"
-    "d\030\017 \001(\0132\030.pivox.ai.v1.ArtifactEndH\000R\013art"
-    "ifactEnd\022C\n\016artifact_error\030\020 \001(\0132\032.pivox"
-    ".ai.v1.ArtifactErrorH\000R\rartifactError\022I\n"
-    "\020message_metadata\030\021 \001(\0132\034.pivox.ai.v1.Me"
-    "ssageMetadataH\000R\017messageMetadata\022\'\n\004done"
-    "\030\022 \001(\0132\021.pivox.ai.v1.DoneH\000R\004done\022=\n\014str"
-    "eam_error\030\023 \001(\0132\030.pivox.ai.v1.StreamErro"
-    "rH\000R\013streamError\0224\n\tdata_part\030\024 \001(\0132\025.pi"
-    "vox.ai.v1.DataPartH\000R\010dataPartB\007\n\005event\""
-    "*\n\tTextStart\022\035\n\nmessage_id\030\001 \001(\tR\tmessag"
-    "eId\"!\n\tTextDelta\022\024\n\005delta\030\001 \001(\tR\005delta\"\t"
-    "\n\007TextEnd\"/\n\016ReasoningStart\022\035\n\nmessage_i"
-    "d\030\001 \001(\tR\tmessageId\"&\n\016ReasoningDelta\022\024\n\005"
-    "delta\030\001 \001(\tR\005delta\"\016\n\014ReasoningEnd\"E\n\rTo"
-    "olCallStart\022 \n\014tool_call_id\030\001 \001(\tR\ntoolC"
-    "allId\022\022\n\004tool\030\002 \001(\tR\004tool\"G\n\rToolCallDel"
-    "ta\022 \n\014tool_call_id\030\001 \001(\tR\ntoolCallId\022\024\n\005"
-    "delta\030\002 \001(\tR\005delta\"\212\001\n\022ToolInputAvailabl"
-    "e\022 \n\014tool_call_id\030\001 \001(\tR\ntoolCallId\022\022\n\004t"
-    "ool\030\002 \001(\tR\004tool\022\035\n\ninput_json\030\003 \001(\tR\tinp"
-    "utJson\022\037\n\013server_side\030\004 \001(\010R\nserverSide\""
-    "X\n\023ToolOutputAvailable\022 \n\014tool_call_id\030\001"
-    " \001(\tR\ntoolCallId\022\037\n\013result_json\030\002 \001(\tR\nr"
-    "esultJson\"R\n\tToolError\022 \n\014tool_call_id\030\001"
-    " \001(\tR\ntoolCallId\022#\n\rerror_message\030\002 \001(\tR"
-    "\014errorMessage\"l\n\025ToolApprovalRequested\022 "
+    "\032\033buf/validate/validate.proto\032\034google/ap"
+    "i/annotations.proto\032\027google/api/client.p"
+    "roto\032\037google/api/field_behavior.proto\032\031g"
+    "oogle/api/resource.proto\032\033google/protobu"
+    "f/empty.proto\032\027google/rpc/status.proto\032\033"
+    "pivox/ai/v1/artifacts.proto\032\037pivox/ai/v1"
+    "/conversations.proto\032\032pivox/ai/v1/messag"
+    "es.proto\"\273\003\n\026GenerateContentRequest\022V\n\006p"
+    "arent\030\001 \001(\tB>\340A\002\372A2\n0cloudresourcemanage"
+    "r.googleapis.com/Organization\272H\003\310\001\001R\006par"
+    "ent\022A\n\014conversation\030\002 \001(\tB\035\340A\001\372A\027\n\025pivox"
+    ".ai/ConversationR\014conversation\022B\n\010messag"
+    "es\030\003 \003(\0132\031.pivox.ai.v1.InputMessageB\013\340A\002"
+    "\272H\005\222\001\002\010\001R\010messages\0222\n\022system_instruction"
+    "\030\004 \001(\tB\003\340A\001R\021systemInstruction\0226\n\005tools\030"
+    "\005 \003(\0132\033.pivox.ai.v1.ToolDefinitionB\003\340A\001R"
+    "\005tools\022%\n\013temperature\030\006 \001(\002B\003\340A\001R\013temper"
+    "ature\022/\n\021max_output_tokens\030\007 \001(\005B\003\340A\001R\017m"
+    "axOutputTokens\"\216\001\n\027GenerateContentRespon"
+    "se\022.\n\007message\030\001 \001(\0132\024.pivox.ai.v1.Messag"
+    "eR\007message\022-\n\005usage\030\002 \001(\0132\027.pivox.ai.v1."
+    "TokenUsageR\005usage\022\024\n\005model\030\003 \001(\tR\005model\""
+    "o\n\014InputMessage\022*\n\004role\030\001 \001(\0162\021.pivox.ai"
+    ".v1.RoleB\003\340A\002R\004role\0223\n\005parts\030\002 \003(\0132\030.piv"
+    "ox.ai.v1.MessagePartB\003\340A\002R\005parts\"\201\001\n\016Too"
+    "lDefinition\022\027\n\004tool\030\001 \001(\tB\003\340A\002R\004tool\022%\n\013"
+    "description\030\002 \001(\tB\003\340A\001R\013description\022/\n\021i"
+    "nput_schema_json\030\003 \001(\tB\003\340A\002R\017inputSchema"
+    "Json\"T\n\nTokenUsage\022!\n\014input_tokens\030\001 \001(\005"
+    "R\013inputTokens\022#\n\routput_tokens\030\002 \001(\005R\014ou"
+    "tputTokens\"W\n\034SummarizeConversationReque"
+    "st\0227\n\004name\030\001 \001(\tB#\340A\002\372A\027\n\025pivox.ai/Conve"
+    "rsation\272H\003\310\001\001R\004name\"\324\n\n\013ServerEvent\0227\n\nt"
+    "ext_start\030\001 \001(\0132\026.pivox.ai.v1.TextStartH"
+    "\000R\ttextStart\0227\n\ntext_delta\030\002 \001(\0132\026.pivox"
+    ".ai.v1.TextDeltaH\000R\ttextDelta\0221\n\010text_en"
+    "d\030\003 \001(\0132\024.pivox.ai.v1.TextEndH\000R\007textEnd"
+    "\022F\n\017reasoning_start\030\004 \001(\0132\033.pivox.ai.v1."
+    "ReasoningStartH\000R\016reasoningStart\022F\n\017reas"
+    "oning_delta\030\005 \001(\0132\033.pivox.ai.v1.Reasonin"
+    "gDeltaH\000R\016reasoningDelta\022@\n\rreasoning_en"
+    "d\030\006 \001(\0132\031.pivox.ai.v1.ReasoningEndH\000R\014re"
+    "asoningEnd\022D\n\017tool_call_start\030\007 \001(\0132\032.pi"
+    "vox.ai.v1.ToolCallStartH\000R\rtoolCallStart"
+    "\022D\n\017tool_call_delta\030\010 \001(\0132\032.pivox.ai.v1."
+    "ToolCallDeltaH\000R\rtoolCallDelta\022S\n\024tool_i"
+    "nput_available\030\t \001(\0132\037.pivox.ai.v1.ToolI"
+    "nputAvailableH\000R\022toolInputAvailable\022V\n\025t"
+    "ool_output_available\030\n \001(\0132 .pivox.ai.v1"
+    ".ToolOutputAvailableH\000R\023toolOutputAvaila"
+    "ble\0227\n\ntool_error\030\013 \001(\0132\026.pivox.ai.v1.To"
+    "olErrorH\000R\ttoolError\022\\\n\027tool_approval_re"
+    "quested\030\014 \001(\0132\".pivox.ai.v1.ToolApproval"
+    "RequestedH\000R\025toolApprovalRequested\022C\n\016ar"
+    "tifact_start\030\r \001(\0132\032.pivox.ai.v1.Artifac"
+    "tStartH\000R\rartifactStart\022C\n\016artifact_delt"
+    "a\030\016 \001(\0132\032.pivox.ai.v1.ArtifactDeltaH\000R\ra"
+    "rtifactDelta\022=\n\014artifact_end\030\017 \001(\0132\030.piv"
+    "ox.ai.v1.ArtifactEndH\000R\013artifactEnd\022C\n\016a"
+    "rtifact_error\030\020 \001(\0132\032.pivox.ai.v1.Artifa"
+    "ctErrorH\000R\rartifactError\022I\n\020message_meta"
+    "data\030\021 \001(\0132\034.pivox.ai.v1.MessageMetadata"
+    "H\000R\017messageMetadata\022\'\n\004done\030\022 \001(\0132\021.pivo"
+    "x.ai.v1.DoneH\000R\004done\022=\n\014stream_error\030\023 \001"
+    "(\0132\030.pivox.ai.v1.StreamErrorH\000R\013streamEr"
+    "ror\0224\n\tdata_part\030\024 \001(\0132\025.pivox.ai.v1.Dat"
+    "aPartH\000R\010dataPartB\007\n\005event\"*\n\tTextStart\022"
+    "\035\n\nmessage_id\030\001 \001(\tR\tmessageId\"!\n\tTextDe"
+    "lta\022\024\n\005delta\030\001 \001(\tR\005delta\"\t\n\007TextEnd\"/\n\016"
+    "ReasoningStart\022\035\n\nmessage_id\030\001 \001(\tR\tmess"
+    "ageId\"&\n\016ReasoningDelta\022\024\n\005delta\030\001 \001(\tR\005"
+    "delta\"\016\n\014ReasoningEnd\"E\n\rToolCallStart\022 "
     "\n\014tool_call_id\030\001 \001(\tR\ntoolCallId\022\022\n\004tool"
-    "\030\002 \001(\tR\004tool\022\035\n\ninput_json\030\003 \001(\tR\tinputJ"
-    "son\"Z\n\rArtifactStart\022\037\n\013artifact_id\030\001 \001("
-    "\tR\nartifactId\022\022\n\004type\030\002 \001(\tR\004type\022\024\n\005tit"
-    "le\030\003 \001(\tR\005title\"F\n\rArtifactDelta\022\037\n\013arti"
-    "fact_id\030\001 \001(\tR\nartifactId\022\024\n\005delta\030\002 \001(\t"
-    "R\005delta\"\264\001\n\013ArtifactEnd\022\037\n\013artifact_id\030\001"
-    " \001(\tR\nartifactId\022H\n\020artifact_version\030\002 \001"
-    "(\tB\035\372A\032\n\030pivox.ai/ArtifactVersionR\017artif"
-    "actVersion\022\033\n\tmime_type\030\003 \001(\tR\010mimeType\022"
-    "\035\n\nsize_bytes\030\004 \001(\003R\tsizeBytes\"\\\n\rArtifa"
-    "ctError\022\037\n\013artifact_id\030\001 \001(\tR\nartifactId"
-    "\022*\n\006status\030\002 \001(\0132\022.google.rpc.StatusR\006st"
-    "atus\"\216\001\n\017MessageMetadata\022\035\n\nmessage_id\030\001"
-    " \001(\tR\tmessageId\022\024\n\005model\030\002 \001(\tR\005model\022!\n"
-    "\014input_tokens\030\003 \001(\005R\013inputTokens\022#\n\routp"
-    "ut_tokens\030\004 \001(\005R\014outputTokens\"\006\n\004Done\"9\n"
-    "\013StreamError\022*\n\006status\030\001 \001(\0132\022.google.rp"
-    "c.StatusR\006status\";\n\010DataPart\022\022\n\004type\030\001 \001"
-    "(\tR\004type\022\033\n\tdata_json\030\002 \001(\tR\010dataJson2\244\021"
-    "\n\006AiChat\022\214\001\n\017GetConversation\022#.pivox.ai."
-    "v1.GetConversationRequest\032\031.pivox.ai.v1."
-    "Conversation\"9\332A\004name\202\323\344\223\002,\022*/v1/{name=o"
-    "rganizations/*/conversations/*}\022\237\001\n\021List"
-    "Conversations\022%.pivox.ai.v1.ListConversa"
-    "tionsRequest\032&.pivox.ai.v1.ListConversat"
-    "ionsResponse\";\332A\006parent\202\323\344\223\002,\022*/v1/{pare"
-    "nt=organizations/*}/conversations\022\257\001\n\022Cr"
-    "eateConversation\022&.pivox.ai.v1.CreateCon"
-    "versationRequest\032\031.pivox.ai.v1.Conversat"
-    "ion\"V\332A\023parent,conversation\202\323\344\223\002:\"*/v1/{"
-    "parent=organizations/*}/conversations:\014c"
-    "onversation\022\301\001\n\022UpdateConversation\022&.piv"
-    "ox.ai.v1.UpdateConversationRequest\032\031.piv"
-    "ox.ai.v1.Conversation\"h\332A\030conversation,u"
-    "pdate_mask\202\323\344\223\002G27/v1/{conversation.name"
-    "=organizations/*/conversations/*}:\014conve"
-    "rsation\022\217\001\n\022DeleteConversation\022&.pivox.a"
-    "i.v1.DeleteConversationRequest\032\026.google."
-    "protobuf.Empty\"9\332A\004name\202\323\344\223\002,**/v1/{name"
-    "=organizations/*/conversations/*}\022\210\001\n\nGe"
-    "tMessage\022\036.pivox.ai.v1.GetMessageRequest"
-    "\032\024.pivox.ai.v1.Message\"D\332A\004name\202\323\344\223\0027\0225/"
-    "v1/{name=organizations/*/conversations/*"
-    "/messages/*}\022\233\001\n\014ListMessages\022 .pivox.ai"
-    ".v1.ListMessagesRequest\032!.pivox.ai.v1.Li"
-    "stMessagesResponse\"F\332A\006parent\202\323\344\223\0027\0225/v1"
-    "/{parent=organizations/*/conversations/*"
-    "}/messages\022\214\001\n\013GetArtifact\022\037.pivox.ai.v1"
-    ".GetArtifactRequest\032\025.pivox.ai.v1.Artifa"
-    "ct\"E\332A\004name\202\323\344\223\0028\0226/v1/{name=organizatio"
-    "ns/*/conversations/*/artifacts/*}\022\237\001\n\rLi"
-    "stArtifacts\022!.pivox.ai.v1.ListArtifactsR"
-    "equest\032\".pivox.ai.v1.ListArtifactsRespon"
-    "se\"G\332A\006parent\202\323\344\223\0028\0226/v1/{parent=organiz"
-    "ations/*/conversations/*}/artifacts\022\223\001\n\016"
-    "DeleteArtifact\022\".pivox.ai.v1.DeleteArtif"
-    "actRequest\032\026.google.protobuf.Empty\"E\332A\004n"
-    "ame\202\323\344\223\0028*6/v1/{name=organizations/*/con"
-    "versations/*/artifacts/*}\022\254\001\n\022GetArtifac"
-    "tVersion\022&.pivox.ai.v1.GetArtifactVersio"
-    "nRequest\032\034.pivox.ai.v1.ArtifactVersion\"P"
-    "\332A\004name\202\323\344\223\002C\022A/v1/{name=organizations/*"
-    "/conversations/*/artifacts/*/versions/*}"
-    "\022\277\001\n\024ListArtifactVersions\022(.pivox.ai.v1."
-    "ListArtifactVersionsRequest\032).pivox.ai.v"
-    "1.ListArtifactVersionsResponse\"R\332A\006paren"
-    "t\202\323\344\223\002C\022A/v1/{parent=organizations/*/con"
-    "versations/*/artifacts/*}/versions\022\254\001\n\025D"
-    "eleteArtifactVersion\022).pivox.ai.v1.Delet"
-    "eArtifactVersionRequest\032\026.google.protobu"
-    "f.Empty\"P\332A\004name\202\323\344\223\002C*A/v1/{name=organi"
-    "zations/*/conversations/*/artifacts/*/ve"
-    "rsions/*}\022@\n\006Stream\022\030.pivox.ai.v1.Client"
-    "Event\032\030.pivox.ai.v1.ServerEvent\"\0000\001\032\017\312A\014"
-    "api.pivox.ioB~\n\017com.pivox.ai.v1B\013AiChatP"
-    "rotoP\001Z\020pivox/ai/v1;aiv1\242\002\003PAX\252\002\013Pivox.A"
-    "i.V1\312\002\013Pivox\\Ai\\V1\342\002\027Pivox\\Ai\\V1\\GPBMeta"
-    "data\352\002\rPivox::Ai::V1b\006proto3"
+    "\030\002 \001(\tR\004tool\"G\n\rToolCallDelta\022 \n\014tool_ca"
+    "ll_id\030\001 \001(\tR\ntoolCallId\022\024\n\005delta\030\002 \001(\tR\005"
+    "delta\"\212\001\n\022ToolInputAvailable\022 \n\014tool_cal"
+    "l_id\030\001 \001(\tR\ntoolCallId\022\022\n\004tool\030\002 \001(\tR\004to"
+    "ol\022\035\n\ninput_json\030\003 \001(\tR\tinputJson\022\037\n\013ser"
+    "ver_side\030\004 \001(\010R\nserverSide\"X\n\023ToolOutput"
+    "Available\022 \n\014tool_call_id\030\001 \001(\tR\ntoolCal"
+    "lId\022\037\n\013result_json\030\002 \001(\tR\nresultJson\"R\n\t"
+    "ToolError\022 \n\014tool_call_id\030\001 \001(\tR\ntoolCal"
+    "lId\022#\n\rerror_message\030\002 \001(\tR\014errorMessage"
+    "\"l\n\025ToolApprovalRequested\022 \n\014tool_call_i"
+    "d\030\001 \001(\tR\ntoolCallId\022\022\n\004tool\030\002 \001(\tR\004tool\022"
+    "\035\n\ninput_json\030\003 \001(\tR\tinputJson\"Z\n\rArtifa"
+    "ctStart\022\037\n\013artifact_id\030\001 \001(\tR\nartifactId"
+    "\022\022\n\004type\030\002 \001(\tR\004type\022\024\n\005title\030\003 \001(\tR\005tit"
+    "le\"F\n\rArtifactDelta\022\037\n\013artifact_id\030\001 \001(\t"
+    "R\nartifactId\022\024\n\005delta\030\002 \001(\tR\005delta\"\264\001\n\013A"
+    "rtifactEnd\022\037\n\013artifact_id\030\001 \001(\tR\nartifac"
+    "tId\022H\n\020artifact_version\030\002 \001(\tB\035\372A\032\n\030pivo"
+    "x.ai/ArtifactVersionR\017artifactVersion\022\033\n"
+    "\tmime_type\030\003 \001(\tR\010mimeType\022\035\n\nsize_bytes"
+    "\030\004 \001(\003R\tsizeBytes\"\\\n\rArtifactError\022\037\n\013ar"
+    "tifact_id\030\001 \001(\tR\nartifactId\022*\n\006status\030\002 "
+    "\001(\0132\022.google.rpc.StatusR\006status\"\216\001\n\017Mess"
+    "ageMetadata\022\035\n\nmessage_id\030\001 \001(\tR\tmessage"
+    "Id\022\024\n\005model\030\002 \001(\tR\005model\022!\n\014input_tokens"
+    "\030\003 \001(\005R\013inputTokens\022#\n\routput_tokens\030\004 \001"
+    "(\005R\014outputTokens\"\006\n\004Done\"9\n\013StreamError\022"
+    "*\n\006status\030\001 \001(\0132\022.google.rpc.StatusR\006sta"
+    "tus\";\n\010DataPart\022\022\n\004type\030\001 \001(\tR\004type\022\033\n\td"
+    "ata_json\030\002 \001(\tR\010dataJson2\274\024\n\006AiChat\022\214\001\n\017"
+    "GetConversation\022#.pivox.ai.v1.GetConvers"
+    "ationRequest\032\031.pivox.ai.v1.Conversation\""
+    "9\332A\004name\202\323\344\223\002,\022*/v1/{name=organizations/"
+    "*/conversations/*}\022\237\001\n\021ListConversations"
+    "\022%.pivox.ai.v1.ListConversationsRequest\032"
+    "&.pivox.ai.v1.ListConversationsResponse\""
+    ";\332A\006parent\202\323\344\223\002,\022*/v1/{parent=organizati"
+    "ons/*}/conversations\022\257\001\n\022CreateConversat"
+    "ion\022&.pivox.ai.v1.CreateConversationRequ"
+    "est\032\031.pivox.ai.v1.Conversation\"V\332A\023paren"
+    "t,conversation\202\323\344\223\002:\"*/v1/{parent=organi"
+    "zations/*}/conversations:\014conversation\022\301"
+    "\001\n\022UpdateConversation\022&.pivox.ai.v1.Upda"
+    "teConversationRequest\032\031.pivox.ai.v1.Conv"
+    "ersation\"h\332A\030conversation,update_mask\202\323\344"
+    "\223\002G27/v1/{conversation.name=organization"
+    "s/*/conversations/*}:\014conversation\022\217\001\n\022D"
+    "eleteConversation\022&.pivox.ai.v1.DeleteCo"
+    "nversationRequest\032\026.google.protobuf.Empt"
+    "y\"9\332A\004name\202\323\344\223\002,**/v1/{name=organization"
+    "s/*/conversations/*}\022\210\001\n\nGetMessage\022\036.pi"
+    "vox.ai.v1.GetMessageRequest\032\024.pivox.ai.v"
+    "1.Message\"D\332A\004name\202\323\344\223\0027\0225/v1/{name=orga"
+    "nizations/*/conversations/*/messages/*}\022"
+    "\233\001\n\014ListMessages\022 .pivox.ai.v1.ListMessa"
+    "gesRequest\032!.pivox.ai.v1.ListMessagesRes"
+    "ponse\"F\332A\006parent\202\323\344\223\0027\0225/v1/{parent=orga"
+    "nizations/*/conversations/*}/messages\022\214\001"
+    "\n\013GetArtifact\022\037.pivox.ai.v1.GetArtifactR"
+    "equest\032\025.pivox.ai.v1.Artifact\"E\332A\004name\202\323"
+    "\344\223\0028\0226/v1/{name=organizations/*/conversa"
+    "tions/*/artifacts/*}\022\237\001\n\rListArtifacts\022!"
+    ".pivox.ai.v1.ListArtifactsRequest\032\".pivo"
+    "x.ai.v1.ListArtifactsResponse\"G\332A\006parent"
+    "\202\323\344\223\0028\0226/v1/{parent=organizations/*/conv"
+    "ersations/*}/artifacts\022\223\001\n\016DeleteArtifac"
+    "t\022\".pivox.ai.v1.DeleteArtifactRequest\032\026."
+    "google.protobuf.Empty\"E\332A\004name\202\323\344\223\0028*6/v"
+    "1/{name=organizations/*/conversations/*/"
+    "artifacts/*}\022\254\001\n\022GetArtifactVersion\022&.pi"
+    "vox.ai.v1.GetArtifactVersionRequest\032\034.pi"
+    "vox.ai.v1.ArtifactVersion\"P\332A\004name\202\323\344\223\002C"
+    "\022A/v1/{name=organizations/*/conversation"
+    "s/*/artifacts/*/versions/*}\022\277\001\n\024ListArti"
+    "factVersions\022(.pivox.ai.v1.ListArtifactV"
+    "ersionsRequest\032).pivox.ai.v1.ListArtifac"
+    "tVersionsResponse\"R\332A\006parent\202\323\344\223\002C\022A/v1/"
+    "{parent=organizations/*/conversations/*/"
+    "artifacts/*}/versions\022\254\001\n\025DeleteArtifact"
+    "Version\022).pivox.ai.v1.DeleteArtifactVers"
+    "ionRequest\032\026.google.protobuf.Empty\"P\332A\004n"
+    "ame\202\323\344\223\002C*A/v1/{name=organizations/*/con"
+    "versations/*/artifacts/*/versions/*}\022\225\001\n"
+    "\017GenerateContent\022#.pivox.ai.v1.GenerateC"
+    "ontentRequest\032$.pivox.ai.v1.GenerateCont"
+    "entResponse\"7\202\323\344\223\0021\",/v1/{parent=organiz"
+    "ations/*}:generateContent:\001*\022\227\001\n\025StreamG"
+    "enerateContent\022#.pivox.ai.v1.GenerateCon"
+    "tentRequest\032\030.pivox.ai.v1.ServerEvent\"=\202"
+    "\323\344\223\0027\"2/v1/{parent=organizations/*}:stre"
+    "amGenerateContent:\001*0\001\022\245\001\n\025SummarizeConv"
+    "ersation\022).pivox.ai.v1.SummarizeConversa"
+    "tionRequest\032\031.pivox.ai.v1.Conversation\"F"
+    "\332A\004name\202\323\344\223\0029\"4/v1/{name=organizations/*"
+    "/conversations/*}:summarize:\001*\032\017\312A\014api.p"
+    "ivox.ioB~\n\017com.pivox.ai.v1B\013AiChatProtoP"
+    "\001Z\020pivox/ai/v1;aiv1\242\002\003PAX\252\002\013Pivox.Ai.V1\312"
+    "\002\013Pivox\\Ai\\V1\342\002\027Pivox\\Ai\\V1\\GPBMetadata\352"
+    "\002\rPivox::Ai::V1b\006proto3"
 };
-static const ::_pbi::DescriptorTable* const descriptor_table_pivox_2fai_2fv1_2fai_5fchat_2eproto_deps[9] =
+static const ::_pbi::DescriptorTable* const descriptor_table_pivox_2fai_2fv1_2fai_5fchat_2eproto_deps[10] =
     {
+        &::descriptor_table_buf_2fvalidate_2fvalidate_2eproto,
         &::descriptor_table_google_2fapi_2fannotations_2eproto,
         &::descriptor_table_google_2fapi_2fclient_2eproto,
         &::descriptor_table_google_2fapi_2ffield_5fbehavior_2eproto,
@@ -1243,13 +1355,13 @@ static ::absl::once_flag descriptor_table_pivox_2fai_2fv1_2fai_5fchat_2eproto_on
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_pivox_2fai_2fv1_2fai_5fchat_2eproto = {
     false,
     false,
-    6148,
+    6943,
     descriptor_table_protodef_pivox_2fai_2fv1_2fai_5fchat_2eproto,
     "pivox/ai/v1/ai_chat.proto",
     &descriptor_table_pivox_2fai_2fv1_2fai_5fchat_2eproto_once,
     descriptor_table_pivox_2fai_2fv1_2fai_5fchat_2eproto_deps,
-    9,
-    25,
+    10,
+    27,
     schemas,
     file_default_instances,
     TableStruct_pivox_2fai_2fv1_2fai_5fchat_2eproto::offsets,
@@ -1261,514 +1373,888 @@ namespace ai {
 namespace v1 {
 // ===================================================================
 
-class ClientEvent::_Internal {
+class GenerateContentRequest::_Internal {
  public:
-  static constexpr ::int32_t kOneofCaseOffset =
-      PROTOBUF_FIELD_OFFSET(::pivox::ai::v1::ClientEvent, _impl_._oneof_case_);
 };
 
-void ClientEvent::set_allocated_message(::pivox::ai::v1::UserMessage* message) {
-  ::google::protobuf::Arena* message_arena = GetArena();
-  clear_event();
-  if (message) {
-    ::google::protobuf::Arena* submessage_arena = message->GetArena();
-    if (message_arena != submessage_arena) {
-      message = ::google::protobuf::internal::GetOwnedMessage(message_arena, message, submessage_arena);
-    }
-    set_has_message();
-    _impl_.event_.message_ = message;
-  }
-  // @@protoc_insertion_point(field_set_allocated:pivox.ai.v1.ClientEvent.message)
-}
-void ClientEvent::set_allocated_tool_output(::pivox::ai::v1::ToolOutput* tool_output) {
-  ::google::protobuf::Arena* message_arena = GetArena();
-  clear_event();
-  if (tool_output) {
-    ::google::protobuf::Arena* submessage_arena = tool_output->GetArena();
-    if (message_arena != submessage_arena) {
-      tool_output = ::google::protobuf::internal::GetOwnedMessage(message_arena, tool_output, submessage_arena);
-    }
-    set_has_tool_output();
-    _impl_.event_.tool_output_ = tool_output;
-  }
-  // @@protoc_insertion_point(field_set_allocated:pivox.ai.v1.ClientEvent.tool_output)
-}
-void ClientEvent::set_allocated_tool_approval_response(::pivox::ai::v1::ToolApprovalResponse* tool_approval_response) {
-  ::google::protobuf::Arena* message_arena = GetArena();
-  clear_event();
-  if (tool_approval_response) {
-    ::google::protobuf::Arena* submessage_arena = tool_approval_response->GetArena();
-    if (message_arena != submessage_arena) {
-      tool_approval_response = ::google::protobuf::internal::GetOwnedMessage(message_arena, tool_approval_response, submessage_arena);
-    }
-    set_has_tool_approval_response();
-    _impl_.event_.tool_approval_response_ = tool_approval_response;
-  }
-  // @@protoc_insertion_point(field_set_allocated:pivox.ai.v1.ClientEvent.tool_approval_response)
-}
-ClientEvent::ClientEvent(::google::protobuf::Arena* arena)
+GenerateContentRequest::GenerateContentRequest(::google::protobuf::Arena* arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, _class_data_.base()) {
 #else   // PROTOBUF_CUSTOM_VTABLE
     : ::google::protobuf::Message(arena) {
 #endif  // PROTOBUF_CUSTOM_VTABLE
   SharedCtor(arena);
-  // @@protoc_insertion_point(arena_constructor:pivox.ai.v1.ClientEvent)
+  // @@protoc_insertion_point(arena_constructor:pivox.ai.v1.GenerateContentRequest)
 }
-inline PROTOBUF_NDEBUG_INLINE ClientEvent::Impl_::Impl_(
+inline PROTOBUF_NDEBUG_INLINE GenerateContentRequest::Impl_::Impl_(
     ::google::protobuf::internal::InternalVisibility visibility, ::google::protobuf::Arena* arena,
-    const Impl_& from, const ::pivox::ai::v1::ClientEvent& from_msg)
-      : event_{},
-        _cached_size_{0},
-        _oneof_case_{from._oneof_case_[0]} {}
+    const Impl_& from, const ::pivox::ai::v1::GenerateContentRequest& from_msg)
+      : messages_{visibility, arena, from.messages_},
+        tools_{visibility, arena, from.tools_},
+        parent_(arena, from.parent_),
+        conversation_(arena, from.conversation_),
+        system_instruction_(arena, from.system_instruction_),
+        _cached_size_{0} {}
 
-ClientEvent::ClientEvent(
+GenerateContentRequest::GenerateContentRequest(
     ::google::protobuf::Arena* arena,
-    const ClientEvent& from)
+    const GenerateContentRequest& from)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, _class_data_.base()) {
 #else   // PROTOBUF_CUSTOM_VTABLE
     : ::google::protobuf::Message(arena) {
 #endif  // PROTOBUF_CUSTOM_VTABLE
-  ClientEvent* const _this = this;
+  GenerateContentRequest* const _this = this;
   (void)_this;
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  switch (event_case()) {
-    case EVENT_NOT_SET:
-      break;
-      case kMessage:
-        _impl_.event_.message_ = ::google::protobuf::Message::CopyConstruct<::pivox::ai::v1::UserMessage>(arena, *from._impl_.event_.message_);
-        break;
-      case kToolOutput:
-        _impl_.event_.tool_output_ = ::google::protobuf::Message::CopyConstruct<::pivox::ai::v1::ToolOutput>(arena, *from._impl_.event_.tool_output_);
-        break;
-      case kToolApprovalResponse:
-        _impl_.event_.tool_approval_response_ = ::google::protobuf::Message::CopyConstruct<::pivox::ai::v1::ToolApprovalResponse>(arena, *from._impl_.event_.tool_approval_response_);
-        break;
-  }
+  ::memcpy(reinterpret_cast<char *>(&_impl_) +
+               offsetof(Impl_, temperature_),
+           reinterpret_cast<const char *>(&from._impl_) +
+               offsetof(Impl_, temperature_),
+           offsetof(Impl_, max_output_tokens_) -
+               offsetof(Impl_, temperature_) +
+               sizeof(Impl_::max_output_tokens_));
 
-  // @@protoc_insertion_point(copy_constructor:pivox.ai.v1.ClientEvent)
+  // @@protoc_insertion_point(copy_constructor:pivox.ai.v1.GenerateContentRequest)
 }
-inline PROTOBUF_NDEBUG_INLINE ClientEvent::Impl_::Impl_(
+inline PROTOBUF_NDEBUG_INLINE GenerateContentRequest::Impl_::Impl_(
     ::google::protobuf::internal::InternalVisibility visibility,
     ::google::protobuf::Arena* arena)
-      : event_{},
-        _cached_size_{0},
-        _oneof_case_{} {}
+      : messages_{visibility, arena},
+        tools_{visibility, arena},
+        parent_(arena),
+        conversation_(arena),
+        system_instruction_(arena),
+        _cached_size_{0} {}
 
-inline void ClientEvent::SharedCtor(::_pb::Arena* arena) {
+inline void GenerateContentRequest::SharedCtor(::_pb::Arena* arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
+  ::memset(reinterpret_cast<char *>(&_impl_) +
+               offsetof(Impl_, temperature_),
+           0,
+           offsetof(Impl_, max_output_tokens_) -
+               offsetof(Impl_, temperature_) +
+               sizeof(Impl_::max_output_tokens_));
 }
-ClientEvent::~ClientEvent() {
-  // @@protoc_insertion_point(destructor:pivox.ai.v1.ClientEvent)
+GenerateContentRequest::~GenerateContentRequest() {
+  // @@protoc_insertion_point(destructor:pivox.ai.v1.GenerateContentRequest)
   SharedDtor(*this);
 }
-inline void ClientEvent::SharedDtor(MessageLite& self) {
-  ClientEvent& this_ = static_cast<ClientEvent&>(self);
+inline void GenerateContentRequest::SharedDtor(MessageLite& self) {
+  GenerateContentRequest& this_ = static_cast<GenerateContentRequest&>(self);
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
-  if (this_.has_event()) {
-    this_.clear_event();
-  }
+  this_._impl_.parent_.Destroy();
+  this_._impl_.conversation_.Destroy();
+  this_._impl_.system_instruction_.Destroy();
   this_._impl_.~Impl_();
 }
 
-void ClientEvent::clear_event() {
-// @@protoc_insertion_point(one_of_clear_start:pivox.ai.v1.ClientEvent)
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  switch (event_case()) {
-    case kMessage: {
-      if (GetArena() == nullptr) {
-        delete _impl_.event_.message_;
-      } else if (::google::protobuf::internal::DebugHardenClearOneofMessageOnArena()) {
-        ::google::protobuf::internal::MaybePoisonAfterClear(_impl_.event_.message_);
-      }
-      break;
-    }
-    case kToolOutput: {
-      if (GetArena() == nullptr) {
-        delete _impl_.event_.tool_output_;
-      } else if (::google::protobuf::internal::DebugHardenClearOneofMessageOnArena()) {
-        ::google::protobuf::internal::MaybePoisonAfterClear(_impl_.event_.tool_output_);
-      }
-      break;
-    }
-    case kToolApprovalResponse: {
-      if (GetArena() == nullptr) {
-        delete _impl_.event_.tool_approval_response_;
-      } else if (::google::protobuf::internal::DebugHardenClearOneofMessageOnArena()) {
-        ::google::protobuf::internal::MaybePoisonAfterClear(_impl_.event_.tool_approval_response_);
-      }
-      break;
-    }
-    case EVENT_NOT_SET: {
-      break;
-    }
-  }
-  _impl_._oneof_case_[0] = EVENT_NOT_SET;
-}
-
-
-inline void* ClientEvent::PlacementNew_(const void*, void* mem,
+inline void* GenerateContentRequest::PlacementNew_(const void*, void* mem,
                                         ::google::protobuf::Arena* arena) {
-  return ::new (mem) ClientEvent(arena);
+  return ::new (mem) GenerateContentRequest(arena);
 }
-constexpr auto ClientEvent::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::ZeroInit(sizeof(ClientEvent),
-                                            alignof(ClientEvent));
+constexpr auto GenerateContentRequest::InternalNewImpl_() {
+  constexpr auto arena_bits = ::google::protobuf::internal::EncodePlacementArenaOffsets({
+      PROTOBUF_FIELD_OFFSET(GenerateContentRequest, _impl_.messages_) +
+          decltype(GenerateContentRequest::_impl_.messages_)::
+              InternalGetArenaOffset(
+                  ::google::protobuf::Message::internal_visibility()),
+      PROTOBUF_FIELD_OFFSET(GenerateContentRequest, _impl_.tools_) +
+          decltype(GenerateContentRequest::_impl_.tools_)::
+              InternalGetArenaOffset(
+                  ::google::protobuf::Message::internal_visibility()),
+  });
+  if (arena_bits.has_value()) {
+    return ::google::protobuf::internal::MessageCreator::CopyInit(
+        sizeof(GenerateContentRequest), alignof(GenerateContentRequest), *arena_bits);
+  } else {
+    return ::google::protobuf::internal::MessageCreator(&GenerateContentRequest::PlacementNew_,
+                                 sizeof(GenerateContentRequest),
+                                 alignof(GenerateContentRequest));
+  }
 }
 PROTOBUF_CONSTINIT
 PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::google::protobuf::internal::ClassDataFull ClientEvent::_class_data_ = {
+const ::google::protobuf::internal::ClassDataFull GenerateContentRequest::_class_data_ = {
     ::google::protobuf::internal::ClassData{
-        &_ClientEvent_default_instance_._instance,
+        &_GenerateContentRequest_default_instance_._instance,
         &_table_.header,
         nullptr,  // OnDemandRegisterArenaDtor
         nullptr,  // IsInitialized
-        &ClientEvent::MergeImpl,
-        ::google::protobuf::Message::GetNewImpl<ClientEvent>(),
+        &GenerateContentRequest::MergeImpl,
+        ::google::protobuf::Message::GetNewImpl<GenerateContentRequest>(),
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-        &ClientEvent::SharedDtor,
-        ::google::protobuf::Message::GetClearImpl<ClientEvent>(), &ClientEvent::ByteSizeLong,
-            &ClientEvent::_InternalSerialize,
+        &GenerateContentRequest::SharedDtor,
+        ::google::protobuf::Message::GetClearImpl<GenerateContentRequest>(), &GenerateContentRequest::ByteSizeLong,
+            &GenerateContentRequest::_InternalSerialize,
 #endif  // PROTOBUF_CUSTOM_VTABLE
-        PROTOBUF_FIELD_OFFSET(ClientEvent, _impl_._cached_size_),
+        PROTOBUF_FIELD_OFFSET(GenerateContentRequest, _impl_._cached_size_),
         false,
     },
-    &ClientEvent::kDescriptorMethods,
+    &GenerateContentRequest::kDescriptorMethods,
     &descriptor_table_pivox_2fai_2fv1_2fai_5fchat_2eproto,
     nullptr,  // tracker
 };
-const ::google::protobuf::internal::ClassData* ClientEvent::GetClassData() const {
+const ::google::protobuf::internal::ClassData* GenerateContentRequest::GetClassData() const {
   ::google::protobuf::internal::PrefetchToLocalCache(&_class_data_);
   ::google::protobuf::internal::PrefetchToLocalCache(_class_data_.tc_table);
   return _class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<0, 3, 3, 0, 2> ClientEvent::_table_ = {
+const ::_pbi::TcParseTable<3, 7, 2, 79, 2> GenerateContentRequest::_table_ = {
   {
     0,  // no _has_bits_
     0, // no _extensions_
-    3, 0,  // max_field_number, fast_idx_mask
+    7, 56,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967288,  // skipmap
+    4294967168,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    3,  // num_field_entries
-    3,  // num_aux_entries
+    7,  // num_field_entries
+    2,  // num_aux_entries
     offsetof(decltype(_table_), aux_entries),
     _class_data_.base(),
     nullptr,  // post_loop_handler
     ::_pbi::TcParser::GenericFallback,  // fallback
     #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-    ::_pbi::TcParser::GetTable<::pivox::ai::v1::ClientEvent>(),  // to_prefetch
+    ::_pbi::TcParser::GetTable<::pivox::ai::v1::GenerateContentRequest>(),  // to_prefetch
     #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
   }, {{
     {::_pbi::TcParser::MiniParse, {}},
+    // string parent = 1 [json_name = "parent", (.google.api.field_behavior) = REQUIRED, (.google.api.resource_reference) = {
+    {::_pbi::TcParser::FastUS1,
+     {10, 63, 0, PROTOBUF_FIELD_OFFSET(GenerateContentRequest, _impl_.parent_)}},
+    // string conversation = 2 [json_name = "conversation", (.google.api.field_behavior) = OPTIONAL, (.google.api.resource_reference) = {
+    {::_pbi::TcParser::FastUS1,
+     {18, 63, 0, PROTOBUF_FIELD_OFFSET(GenerateContentRequest, _impl_.conversation_)}},
+    // repeated .pivox.ai.v1.InputMessage messages = 3 [json_name = "messages", (.google.api.field_behavior) = REQUIRED, (.buf.validate.field) = {
+    {::_pbi::TcParser::FastMtR1,
+     {26, 63, 0, PROTOBUF_FIELD_OFFSET(GenerateContentRequest, _impl_.messages_)}},
+    // string system_instruction = 4 [json_name = "systemInstruction", (.google.api.field_behavior) = OPTIONAL];
+    {::_pbi::TcParser::FastUS1,
+     {34, 63, 0, PROTOBUF_FIELD_OFFSET(GenerateContentRequest, _impl_.system_instruction_)}},
+    // repeated .pivox.ai.v1.ToolDefinition tools = 5 [json_name = "tools", (.google.api.field_behavior) = OPTIONAL];
+    {::_pbi::TcParser::FastMtR1,
+     {42, 63, 1, PROTOBUF_FIELD_OFFSET(GenerateContentRequest, _impl_.tools_)}},
+    // float temperature = 6 [json_name = "temperature", (.google.api.field_behavior) = OPTIONAL];
+    {::_pbi::TcParser::FastF32S1,
+     {53, 63, 0, PROTOBUF_FIELD_OFFSET(GenerateContentRequest, _impl_.temperature_)}},
+    // int32 max_output_tokens = 7 [json_name = "maxOutputTokens", (.google.api.field_behavior) = OPTIONAL];
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(GenerateContentRequest, _impl_.max_output_tokens_), 63>(),
+     {56, 63, 0, PROTOBUF_FIELD_OFFSET(GenerateContentRequest, _impl_.max_output_tokens_)}},
   }}, {{
     65535, 65535
   }}, {{
-    // .pivox.ai.v1.UserMessage message = 1 [json_name = "message"];
-    {PROTOBUF_FIELD_OFFSET(ClientEvent, _impl_.event_.message_), _Internal::kOneofCaseOffset + 0, 0,
-    (0 | ::_fl::kFcOneof | ::_fl::kMessage | ::_fl::kTvTable)},
-    // .pivox.ai.v1.ToolOutput tool_output = 2 [json_name = "toolOutput"];
-    {PROTOBUF_FIELD_OFFSET(ClientEvent, _impl_.event_.tool_output_), _Internal::kOneofCaseOffset + 0, 1,
-    (0 | ::_fl::kFcOneof | ::_fl::kMessage | ::_fl::kTvTable)},
-    // .pivox.ai.v1.ToolApprovalResponse tool_approval_response = 3 [json_name = "toolApprovalResponse"];
-    {PROTOBUF_FIELD_OFFSET(ClientEvent, _impl_.event_.tool_approval_response_), _Internal::kOneofCaseOffset + 0, 2,
-    (0 | ::_fl::kFcOneof | ::_fl::kMessage | ::_fl::kTvTable)},
+    // string parent = 1 [json_name = "parent", (.google.api.field_behavior) = REQUIRED, (.google.api.resource_reference) = {
+    {PROTOBUF_FIELD_OFFSET(GenerateContentRequest, _impl_.parent_), 0, 0,
+    (0 | ::_fl::kFcSingular | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // string conversation = 2 [json_name = "conversation", (.google.api.field_behavior) = OPTIONAL, (.google.api.resource_reference) = {
+    {PROTOBUF_FIELD_OFFSET(GenerateContentRequest, _impl_.conversation_), 0, 0,
+    (0 | ::_fl::kFcSingular | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // repeated .pivox.ai.v1.InputMessage messages = 3 [json_name = "messages", (.google.api.field_behavior) = REQUIRED, (.buf.validate.field) = {
+    {PROTOBUF_FIELD_OFFSET(GenerateContentRequest, _impl_.messages_), 0, 0,
+    (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
+    // string system_instruction = 4 [json_name = "systemInstruction", (.google.api.field_behavior) = OPTIONAL];
+    {PROTOBUF_FIELD_OFFSET(GenerateContentRequest, _impl_.system_instruction_), 0, 0,
+    (0 | ::_fl::kFcSingular | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // repeated .pivox.ai.v1.ToolDefinition tools = 5 [json_name = "tools", (.google.api.field_behavior) = OPTIONAL];
+    {PROTOBUF_FIELD_OFFSET(GenerateContentRequest, _impl_.tools_), 0, 1,
+    (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
+    // float temperature = 6 [json_name = "temperature", (.google.api.field_behavior) = OPTIONAL];
+    {PROTOBUF_FIELD_OFFSET(GenerateContentRequest, _impl_.temperature_), 0, 0,
+    (0 | ::_fl::kFcSingular | ::_fl::kFloat)},
+    // int32 max_output_tokens = 7 [json_name = "maxOutputTokens", (.google.api.field_behavior) = OPTIONAL];
+    {PROTOBUF_FIELD_OFFSET(GenerateContentRequest, _impl_.max_output_tokens_), 0, 0,
+    (0 | ::_fl::kFcSingular | ::_fl::kInt32)},
   }}, {{
-    {::_pbi::TcParser::GetTable<::pivox::ai::v1::UserMessage>()},
-    {::_pbi::TcParser::GetTable<::pivox::ai::v1::ToolOutput>()},
-    {::_pbi::TcParser::GetTable<::pivox::ai::v1::ToolApprovalResponse>()},
+    {::_pbi::TcParser::GetTable<::pivox::ai::v1::InputMessage>()},
+    {::_pbi::TcParser::GetTable<::pivox::ai::v1::ToolDefinition>()},
   }}, {{
+    "\42\6\14\0\22\0\0\0"
+    "pivox.ai.v1.GenerateContentRequest"
+    "parent"
+    "conversation"
+    "system_instruction"
   }},
 };
 
-PROTOBUF_NOINLINE void ClientEvent::Clear() {
-// @@protoc_insertion_point(message_clear_start:pivox.ai.v1.ClientEvent)
+PROTOBUF_NOINLINE void GenerateContentRequest::Clear() {
+// @@protoc_insertion_point(message_clear_start:pivox.ai.v1.GenerateContentRequest)
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::uint32_t cached_has_bits = 0;
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
-  clear_event();
+  _impl_.messages_.Clear();
+  _impl_.tools_.Clear();
+  _impl_.parent_.ClearToEmpty();
+  _impl_.conversation_.ClearToEmpty();
+  _impl_.system_instruction_.ClearToEmpty();
+  ::memset(&_impl_.temperature_, 0, static_cast<::size_t>(
+      reinterpret_cast<char*>(&_impl_.max_output_tokens_) -
+      reinterpret_cast<char*>(&_impl_.temperature_)) + sizeof(_impl_.max_output_tokens_));
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
 
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-        ::uint8_t* ClientEvent::_InternalSerialize(
+        ::uint8_t* GenerateContentRequest::_InternalSerialize(
             const MessageLite& base, ::uint8_t* target,
             ::google::protobuf::io::EpsCopyOutputStream* stream) {
-          const ClientEvent& this_ = static_cast<const ClientEvent&>(base);
+          const GenerateContentRequest& this_ = static_cast<const GenerateContentRequest&>(base);
 #else   // PROTOBUF_CUSTOM_VTABLE
-        ::uint8_t* ClientEvent::_InternalSerialize(
+        ::uint8_t* GenerateContentRequest::_InternalSerialize(
             ::uint8_t* target,
             ::google::protobuf::io::EpsCopyOutputStream* stream) const {
-          const ClientEvent& this_ = *this;
+          const GenerateContentRequest& this_ = *this;
 #endif  // PROTOBUF_CUSTOM_VTABLE
-          // @@protoc_insertion_point(serialize_to_array_start:pivox.ai.v1.ClientEvent)
+          // @@protoc_insertion_point(serialize_to_array_start:pivox.ai.v1.GenerateContentRequest)
           ::uint32_t cached_has_bits = 0;
           (void)cached_has_bits;
 
-          switch (this_.event_case()) {
-            case kMessage: {
-              target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
-                  1, *this_._impl_.event_.message_, this_._impl_.event_.message_->GetCachedSize(), target,
-                  stream);
-              break;
-            }
-            case kToolOutput: {
-              target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
-                  2, *this_._impl_.event_.tool_output_, this_._impl_.event_.tool_output_->GetCachedSize(), target,
-                  stream);
-              break;
-            }
-            case kToolApprovalResponse: {
-              target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
-                  3, *this_._impl_.event_.tool_approval_response_, this_._impl_.event_.tool_approval_response_->GetCachedSize(), target,
-                  stream);
-              break;
-            }
-            default:
-              break;
+          // string parent = 1 [json_name = "parent", (.google.api.field_behavior) = REQUIRED, (.google.api.resource_reference) = {
+          if (!this_._internal_parent().empty()) {
+            const std::string& _s = this_._internal_parent();
+            ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+                _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "pivox.ai.v1.GenerateContentRequest.parent");
+            target = stream->WriteStringMaybeAliased(1, _s, target);
           }
+
+          // string conversation = 2 [json_name = "conversation", (.google.api.field_behavior) = OPTIONAL, (.google.api.resource_reference) = {
+          if (!this_._internal_conversation().empty()) {
+            const std::string& _s = this_._internal_conversation();
+            ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+                _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "pivox.ai.v1.GenerateContentRequest.conversation");
+            target = stream->WriteStringMaybeAliased(2, _s, target);
+          }
+
+          // repeated .pivox.ai.v1.InputMessage messages = 3 [json_name = "messages", (.google.api.field_behavior) = REQUIRED, (.buf.validate.field) = {
+          for (unsigned i = 0, n = static_cast<unsigned>(
+                                   this_._internal_messages_size());
+               i < n; i++) {
+            const auto& repfield = this_._internal_messages().Get(i);
+            target =
+                ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+                    3, repfield, repfield.GetCachedSize(),
+                    target, stream);
+          }
+
+          // string system_instruction = 4 [json_name = "systemInstruction", (.google.api.field_behavior) = OPTIONAL];
+          if (!this_._internal_system_instruction().empty()) {
+            const std::string& _s = this_._internal_system_instruction();
+            ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+                _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "pivox.ai.v1.GenerateContentRequest.system_instruction");
+            target = stream->WriteStringMaybeAliased(4, _s, target);
+          }
+
+          // repeated .pivox.ai.v1.ToolDefinition tools = 5 [json_name = "tools", (.google.api.field_behavior) = OPTIONAL];
+          for (unsigned i = 0, n = static_cast<unsigned>(
+                                   this_._internal_tools_size());
+               i < n; i++) {
+            const auto& repfield = this_._internal_tools().Get(i);
+            target =
+                ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+                    5, repfield, repfield.GetCachedSize(),
+                    target, stream);
+          }
+
+          // float temperature = 6 [json_name = "temperature", (.google.api.field_behavior) = OPTIONAL];
+          if (::absl::bit_cast<::uint32_t>(this_._internal_temperature()) != 0) {
+            target = stream->EnsureSpace(target);
+            target = ::_pbi::WireFormatLite::WriteFloatToArray(
+                6, this_._internal_temperature(), target);
+          }
+
+          // int32 max_output_tokens = 7 [json_name = "maxOutputTokens", (.google.api.field_behavior) = OPTIONAL];
+          if (this_._internal_max_output_tokens() != 0) {
+            target = ::google::protobuf::internal::WireFormatLite::
+                WriteInt32ToArrayWithField<7>(
+                    stream, this_._internal_max_output_tokens(), target);
+          }
+
           if (PROTOBUF_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
             target =
                 ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
                     this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
           }
-          // @@protoc_insertion_point(serialize_to_array_end:pivox.ai.v1.ClientEvent)
+          // @@protoc_insertion_point(serialize_to_array_end:pivox.ai.v1.GenerateContentRequest)
           return target;
         }
 
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-        ::size_t ClientEvent::ByteSizeLong(const MessageLite& base) {
-          const ClientEvent& this_ = static_cast<const ClientEvent&>(base);
+        ::size_t GenerateContentRequest::ByteSizeLong(const MessageLite& base) {
+          const GenerateContentRequest& this_ = static_cast<const GenerateContentRequest&>(base);
 #else   // PROTOBUF_CUSTOM_VTABLE
-        ::size_t ClientEvent::ByteSizeLong() const {
-          const ClientEvent& this_ = *this;
+        ::size_t GenerateContentRequest::ByteSizeLong() const {
+          const GenerateContentRequest& this_ = *this;
 #endif  // PROTOBUF_CUSTOM_VTABLE
-          // @@protoc_insertion_point(message_byte_size_start:pivox.ai.v1.ClientEvent)
+          // @@protoc_insertion_point(message_byte_size_start:pivox.ai.v1.GenerateContentRequest)
           ::size_t total_size = 0;
 
           ::uint32_t cached_has_bits = 0;
           // Prevent compiler warnings about cached_has_bits being unused
           (void)cached_has_bits;
 
-          switch (this_.event_case()) {
-            // .pivox.ai.v1.UserMessage message = 1 [json_name = "message"];
-            case kMessage: {
-              total_size += 1 +
-                            ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.event_.message_);
-              break;
+          ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+           {
+            // repeated .pivox.ai.v1.InputMessage messages = 3 [json_name = "messages", (.google.api.field_behavior) = REQUIRED, (.buf.validate.field) = {
+            {
+              total_size += 1UL * this_._internal_messages_size();
+              for (const auto& msg : this_._internal_messages()) {
+                total_size += ::google::protobuf::internal::WireFormatLite::MessageSize(msg);
+              }
             }
-            // .pivox.ai.v1.ToolOutput tool_output = 2 [json_name = "toolOutput"];
-            case kToolOutput: {
-              total_size += 1 +
-                            ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.event_.tool_output_);
-              break;
+            // repeated .pivox.ai.v1.ToolDefinition tools = 5 [json_name = "tools", (.google.api.field_behavior) = OPTIONAL];
+            {
+              total_size += 1UL * this_._internal_tools_size();
+              for (const auto& msg : this_._internal_tools()) {
+                total_size += ::google::protobuf::internal::WireFormatLite::MessageSize(msg);
+              }
             }
-            // .pivox.ai.v1.ToolApprovalResponse tool_approval_response = 3 [json_name = "toolApprovalResponse"];
-            case kToolApprovalResponse: {
-              total_size += 1 +
-                            ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.event_.tool_approval_response_);
-              break;
+          }
+           {
+            // string parent = 1 [json_name = "parent", (.google.api.field_behavior) = REQUIRED, (.google.api.resource_reference) = {
+            if (!this_._internal_parent().empty()) {
+              total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                              this_._internal_parent());
             }
-            case EVENT_NOT_SET: {
-              break;
+            // string conversation = 2 [json_name = "conversation", (.google.api.field_behavior) = OPTIONAL, (.google.api.resource_reference) = {
+            if (!this_._internal_conversation().empty()) {
+              total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                              this_._internal_conversation());
+            }
+            // string system_instruction = 4 [json_name = "systemInstruction", (.google.api.field_behavior) = OPTIONAL];
+            if (!this_._internal_system_instruction().empty()) {
+              total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                              this_._internal_system_instruction());
+            }
+            // float temperature = 6 [json_name = "temperature", (.google.api.field_behavior) = OPTIONAL];
+            if (::absl::bit_cast<::uint32_t>(this_._internal_temperature()) != 0) {
+              total_size += 5;
+            }
+            // int32 max_output_tokens = 7 [json_name = "maxOutputTokens", (.google.api.field_behavior) = OPTIONAL];
+            if (this_._internal_max_output_tokens() != 0) {
+              total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+                  this_._internal_max_output_tokens());
             }
           }
           return this_.MaybeComputeUnknownFieldsSize(total_size,
                                                      &this_._impl_._cached_size_);
         }
 
-void ClientEvent::MergeImpl(::google::protobuf::MessageLite& to_msg, const ::google::protobuf::MessageLite& from_msg) {
-  auto* const _this = static_cast<ClientEvent*>(&to_msg);
-  auto& from = static_cast<const ClientEvent&>(from_msg);
-  ::google::protobuf::Arena* arena = _this->GetArena();
-  // @@protoc_insertion_point(class_specific_merge_from_start:pivox.ai.v1.ClientEvent)
+void GenerateContentRequest::MergeImpl(::google::protobuf::MessageLite& to_msg, const ::google::protobuf::MessageLite& from_msg) {
+  auto* const _this = static_cast<GenerateContentRequest*>(&to_msg);
+  auto& from = static_cast<const GenerateContentRequest&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:pivox.ai.v1.GenerateContentRequest)
   ABSL_DCHECK_NE(&from, _this);
   ::uint32_t cached_has_bits = 0;
   (void) cached_has_bits;
 
-  if (const uint32_t oneof_from_case = from._impl_._oneof_case_[0]) {
-    const uint32_t oneof_to_case = _this->_impl_._oneof_case_[0];
-    const bool oneof_needs_init = oneof_to_case != oneof_from_case;
-    if (oneof_needs_init) {
-      if (oneof_to_case != 0) {
-        _this->clear_event();
-      }
-      _this->_impl_._oneof_case_[0] = oneof_from_case;
-    }
-
-    switch (oneof_from_case) {
-      case kMessage: {
-        if (oneof_needs_init) {
-          _this->_impl_.event_.message_ =
-              ::google::protobuf::Message::CopyConstruct<::pivox::ai::v1::UserMessage>(arena, *from._impl_.event_.message_);
-        } else {
-          _this->_impl_.event_.message_->MergeFrom(from._internal_message());
-        }
-        break;
-      }
-      case kToolOutput: {
-        if (oneof_needs_init) {
-          _this->_impl_.event_.tool_output_ =
-              ::google::protobuf::Message::CopyConstruct<::pivox::ai::v1::ToolOutput>(arena, *from._impl_.event_.tool_output_);
-        } else {
-          _this->_impl_.event_.tool_output_->MergeFrom(from._internal_tool_output());
-        }
-        break;
-      }
-      case kToolApprovalResponse: {
-        if (oneof_needs_init) {
-          _this->_impl_.event_.tool_approval_response_ =
-              ::google::protobuf::Message::CopyConstruct<::pivox::ai::v1::ToolApprovalResponse>(arena, *from._impl_.event_.tool_approval_response_);
-        } else {
-          _this->_impl_.event_.tool_approval_response_->MergeFrom(from._internal_tool_approval_response());
-        }
-        break;
-      }
-      case EVENT_NOT_SET:
-        break;
-    }
+  _this->_internal_mutable_messages()->MergeFrom(
+      from._internal_messages());
+  _this->_internal_mutable_tools()->MergeFrom(
+      from._internal_tools());
+  if (!from._internal_parent().empty()) {
+    _this->_internal_set_parent(from._internal_parent());
+  }
+  if (!from._internal_conversation().empty()) {
+    _this->_internal_set_conversation(from._internal_conversation());
+  }
+  if (!from._internal_system_instruction().empty()) {
+    _this->_internal_set_system_instruction(from._internal_system_instruction());
+  }
+  if (::absl::bit_cast<::uint32_t>(from._internal_temperature()) != 0) {
+    _this->_impl_.temperature_ = from._impl_.temperature_;
+  }
+  if (from._internal_max_output_tokens() != 0) {
+    _this->_impl_.max_output_tokens_ = from._impl_.max_output_tokens_;
   }
   _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(from._internal_metadata_);
 }
 
-void ClientEvent::CopyFrom(const ClientEvent& from) {
-// @@protoc_insertion_point(class_specific_copy_from_start:pivox.ai.v1.ClientEvent)
+void GenerateContentRequest::CopyFrom(const GenerateContentRequest& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:pivox.ai.v1.GenerateContentRequest)
   if (&from == this) return;
   Clear();
   MergeFrom(from);
 }
 
 
-void ClientEvent::InternalSwap(ClientEvent* PROTOBUF_RESTRICT other) {
+void GenerateContentRequest::InternalSwap(GenerateContentRequest* PROTOBUF_RESTRICT other) {
   using std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  swap(_impl_.event_, other->_impl_.event_);
-  swap(_impl_._oneof_case_[0], other->_impl_._oneof_case_[0]);
+  _impl_.messages_.InternalSwap(&other->_impl_.messages_);
+  _impl_.tools_.InternalSwap(&other->_impl_.tools_);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.parent_, &other->_impl_.parent_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.conversation_, &other->_impl_.conversation_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.system_instruction_, &other->_impl_.system_instruction_, arena);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(GenerateContentRequest, _impl_.max_output_tokens_)
+      + sizeof(GenerateContentRequest::_impl_.max_output_tokens_)
+      - PROTOBUF_FIELD_OFFSET(GenerateContentRequest, _impl_.temperature_)>(
+          reinterpret_cast<char*>(&_impl_.temperature_),
+          reinterpret_cast<char*>(&other->_impl_.temperature_));
 }
 
-::google::protobuf::Metadata ClientEvent::GetMetadata() const {
+::google::protobuf::Metadata GenerateContentRequest::GetMetadata() const {
   return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // ===================================================================
 
-class UserMessage::_Internal {
+class GenerateContentResponse::_Internal {
  public:
+  using HasBits =
+      decltype(std::declval<GenerateContentResponse>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(GenerateContentResponse, _impl_._has_bits_);
 };
 
-void UserMessage::clear_parts() {
+void GenerateContentResponse::clear_message() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.parts_.Clear();
+  if (_impl_.message_ != nullptr) _impl_.message_->Clear();
+  _impl_._has_bits_[0] &= ~0x00000001u;
 }
-UserMessage::UserMessage(::google::protobuf::Arena* arena)
+GenerateContentResponse::GenerateContentResponse(::google::protobuf::Arena* arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, _class_data_.base()) {
 #else   // PROTOBUF_CUSTOM_VTABLE
     : ::google::protobuf::Message(arena) {
 #endif  // PROTOBUF_CUSTOM_VTABLE
   SharedCtor(arena);
-  // @@protoc_insertion_point(arena_constructor:pivox.ai.v1.UserMessage)
+  // @@protoc_insertion_point(arena_constructor:pivox.ai.v1.GenerateContentResponse)
 }
-inline PROTOBUF_NDEBUG_INLINE UserMessage::Impl_::Impl_(
+inline PROTOBUF_NDEBUG_INLINE GenerateContentResponse::Impl_::Impl_(
     ::google::protobuf::internal::InternalVisibility visibility, ::google::protobuf::Arena* arena,
-    const Impl_& from, const ::pivox::ai::v1::UserMessage& from_msg)
-      : parts_{visibility, arena, from.parts_},
-        conversation_(arena, from.conversation_),
-        _cached_size_{0} {}
+    const Impl_& from, const ::pivox::ai::v1::GenerateContentResponse& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        model_(arena, from.model_) {}
 
-UserMessage::UserMessage(
+GenerateContentResponse::GenerateContentResponse(
     ::google::protobuf::Arena* arena,
-    const UserMessage& from)
+    const GenerateContentResponse& from)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, _class_data_.base()) {
 #else   // PROTOBUF_CUSTOM_VTABLE
     : ::google::protobuf::Message(arena) {
 #endif  // PROTOBUF_CUSTOM_VTABLE
-  UserMessage* const _this = this;
+  GenerateContentResponse* const _this = this;
   (void)_this;
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::uint32_t cached_has_bits = _impl_._has_bits_[0];
+  _impl_.message_ = (cached_has_bits & 0x00000001u) ? ::google::protobuf::Message::CopyConstruct<::pivox::ai::v1::Message>(
+                              arena, *from._impl_.message_)
+                        : nullptr;
+  _impl_.usage_ = (cached_has_bits & 0x00000002u) ? ::google::protobuf::Message::CopyConstruct<::pivox::ai::v1::TokenUsage>(
+                              arena, *from._impl_.usage_)
+                        : nullptr;
 
-  // @@protoc_insertion_point(copy_constructor:pivox.ai.v1.UserMessage)
+  // @@protoc_insertion_point(copy_constructor:pivox.ai.v1.GenerateContentResponse)
 }
-inline PROTOBUF_NDEBUG_INLINE UserMessage::Impl_::Impl_(
+inline PROTOBUF_NDEBUG_INLINE GenerateContentResponse::Impl_::Impl_(
     ::google::protobuf::internal::InternalVisibility visibility,
     ::google::protobuf::Arena* arena)
-      : parts_{visibility, arena},
-        conversation_(arena),
-        _cached_size_{0} {}
+      : _cached_size_{0},
+        model_(arena) {}
 
-inline void UserMessage::SharedCtor(::_pb::Arena* arena) {
+inline void GenerateContentResponse::SharedCtor(::_pb::Arena* arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
+  ::memset(reinterpret_cast<char *>(&_impl_) +
+               offsetof(Impl_, message_),
+           0,
+           offsetof(Impl_, usage_) -
+               offsetof(Impl_, message_) +
+               sizeof(Impl_::usage_));
 }
-UserMessage::~UserMessage() {
-  // @@protoc_insertion_point(destructor:pivox.ai.v1.UserMessage)
+GenerateContentResponse::~GenerateContentResponse() {
+  // @@protoc_insertion_point(destructor:pivox.ai.v1.GenerateContentResponse)
   SharedDtor(*this);
 }
-inline void UserMessage::SharedDtor(MessageLite& self) {
-  UserMessage& this_ = static_cast<UserMessage&>(self);
+inline void GenerateContentResponse::SharedDtor(MessageLite& self) {
+  GenerateContentResponse& this_ = static_cast<GenerateContentResponse&>(self);
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
-  this_._impl_.conversation_.Destroy();
+  this_._impl_.model_.Destroy();
+  delete this_._impl_.message_;
+  delete this_._impl_.usage_;
   this_._impl_.~Impl_();
 }
 
-inline void* UserMessage::PlacementNew_(const void*, void* mem,
+inline void* GenerateContentResponse::PlacementNew_(const void*, void* mem,
                                         ::google::protobuf::Arena* arena) {
-  return ::new (mem) UserMessage(arena);
+  return ::new (mem) GenerateContentResponse(arena);
 }
-constexpr auto UserMessage::InternalNewImpl_() {
-  constexpr auto arena_bits = ::google::protobuf::internal::EncodePlacementArenaOffsets({
-      PROTOBUF_FIELD_OFFSET(UserMessage, _impl_.parts_) +
-          decltype(UserMessage::_impl_.parts_)::
-              InternalGetArenaOffset(
-                  ::google::protobuf::Message::internal_visibility()),
-  });
-  if (arena_bits.has_value()) {
-    return ::google::protobuf::internal::MessageCreator::CopyInit(
-        sizeof(UserMessage), alignof(UserMessage), *arena_bits);
-  } else {
-    return ::google::protobuf::internal::MessageCreator(&UserMessage::PlacementNew_,
-                                 sizeof(UserMessage),
-                                 alignof(UserMessage));
-  }
+constexpr auto GenerateContentResponse::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(GenerateContentResponse),
+                                            alignof(GenerateContentResponse));
 }
 PROTOBUF_CONSTINIT
 PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::google::protobuf::internal::ClassDataFull UserMessage::_class_data_ = {
+const ::google::protobuf::internal::ClassDataFull GenerateContentResponse::_class_data_ = {
     ::google::protobuf::internal::ClassData{
-        &_UserMessage_default_instance_._instance,
+        &_GenerateContentResponse_default_instance_._instance,
         &_table_.header,
         nullptr,  // OnDemandRegisterArenaDtor
         nullptr,  // IsInitialized
-        &UserMessage::MergeImpl,
-        ::google::protobuf::Message::GetNewImpl<UserMessage>(),
+        &GenerateContentResponse::MergeImpl,
+        ::google::protobuf::Message::GetNewImpl<GenerateContentResponse>(),
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-        &UserMessage::SharedDtor,
-        ::google::protobuf::Message::GetClearImpl<UserMessage>(), &UserMessage::ByteSizeLong,
-            &UserMessage::_InternalSerialize,
+        &GenerateContentResponse::SharedDtor,
+        ::google::protobuf::Message::GetClearImpl<GenerateContentResponse>(), &GenerateContentResponse::ByteSizeLong,
+            &GenerateContentResponse::_InternalSerialize,
 #endif  // PROTOBUF_CUSTOM_VTABLE
-        PROTOBUF_FIELD_OFFSET(UserMessage, _impl_._cached_size_),
+        PROTOBUF_FIELD_OFFSET(GenerateContentResponse, _impl_._cached_size_),
         false,
     },
-    &UserMessage::kDescriptorMethods,
+    &GenerateContentResponse::kDescriptorMethods,
     &descriptor_table_pivox_2fai_2fv1_2fai_5fchat_2eproto,
     nullptr,  // tracker
 };
-const ::google::protobuf::internal::ClassData* UserMessage::GetClassData() const {
+const ::google::protobuf::internal::ClassData* GenerateContentResponse::GetClassData() const {
   ::google::protobuf::internal::PrefetchToLocalCache(&_class_data_);
   ::google::protobuf::internal::PrefetchToLocalCache(_class_data_.tc_table);
   return _class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<1, 2, 1, 44, 2> UserMessage::_table_ = {
+const ::_pbi::TcParseTable<2, 3, 2, 49, 2> GenerateContentResponse::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(GenerateContentResponse, _impl_._has_bits_),
+    0, // no _extensions_
+    3, 24,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967288,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    3,  // num_field_entries
+    2,  // num_aux_entries
+    offsetof(decltype(_table_), aux_entries),
+    _class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::pivox::ai::v1::GenerateContentResponse>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    {::_pbi::TcParser::MiniParse, {}},
+    // .pivox.ai.v1.Message message = 1 [json_name = "message"];
+    {::_pbi::TcParser::FastMtS1,
+     {10, 0, 0, PROTOBUF_FIELD_OFFSET(GenerateContentResponse, _impl_.message_)}},
+    // .pivox.ai.v1.TokenUsage usage = 2 [json_name = "usage"];
+    {::_pbi::TcParser::FastMtS1,
+     {18, 1, 1, PROTOBUF_FIELD_OFFSET(GenerateContentResponse, _impl_.usage_)}},
+    // string model = 3 [json_name = "model"];
+    {::_pbi::TcParser::FastUS1,
+     {26, 63, 0, PROTOBUF_FIELD_OFFSET(GenerateContentResponse, _impl_.model_)}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // .pivox.ai.v1.Message message = 1 [json_name = "message"];
+    {PROTOBUF_FIELD_OFFSET(GenerateContentResponse, _impl_.message_), _Internal::kHasBitsOffset + 0, 0,
+    (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+    // .pivox.ai.v1.TokenUsage usage = 2 [json_name = "usage"];
+    {PROTOBUF_FIELD_OFFSET(GenerateContentResponse, _impl_.usage_), _Internal::kHasBitsOffset + 1, 1,
+    (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+    // string model = 3 [json_name = "model"];
+    {PROTOBUF_FIELD_OFFSET(GenerateContentResponse, _impl_.model_), -1, 0,
+    (0 | ::_fl::kFcSingular | ::_fl::kUtf8String | ::_fl::kRepAString)},
+  }}, {{
+    {::_pbi::TcParser::GetTable<::pivox::ai::v1::Message>()},
+    {::_pbi::TcParser::GetTable<::pivox::ai::v1::TokenUsage>()},
+  }}, {{
+    "\43\0\0\5\0\0\0\0"
+    "pivox.ai.v1.GenerateContentResponse"
+    "model"
+  }},
+};
+
+PROTOBUF_NOINLINE void GenerateContentResponse::Clear() {
+// @@protoc_insertion_point(message_clear_start:pivox.ai.v1.GenerateContentResponse)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  _impl_.model_.ClearToEmpty();
+  cached_has_bits = _impl_._has_bits_[0];
+  if (cached_has_bits & 0x00000003u) {
+    if (cached_has_bits & 0x00000001u) {
+      ABSL_DCHECK(_impl_.message_ != nullptr);
+      _impl_.message_->Clear();
+    }
+    if (cached_has_bits & 0x00000002u) {
+      ABSL_DCHECK(_impl_.usage_ != nullptr);
+      _impl_.usage_->Clear();
+    }
+  }
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+        ::uint8_t* GenerateContentResponse::_InternalSerialize(
+            const MessageLite& base, ::uint8_t* target,
+            ::google::protobuf::io::EpsCopyOutputStream* stream) {
+          const GenerateContentResponse& this_ = static_cast<const GenerateContentResponse&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+        ::uint8_t* GenerateContentResponse::_InternalSerialize(
+            ::uint8_t* target,
+            ::google::protobuf::io::EpsCopyOutputStream* stream) const {
+          const GenerateContentResponse& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          // @@protoc_insertion_point(serialize_to_array_start:pivox.ai.v1.GenerateContentResponse)
+          ::uint32_t cached_has_bits = 0;
+          (void)cached_has_bits;
+
+          cached_has_bits = this_._impl_._has_bits_[0];
+          // .pivox.ai.v1.Message message = 1 [json_name = "message"];
+          if (cached_has_bits & 0x00000001u) {
+            target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+                1, *this_._impl_.message_, this_._impl_.message_->GetCachedSize(), target,
+                stream);
+          }
+
+          // .pivox.ai.v1.TokenUsage usage = 2 [json_name = "usage"];
+          if (cached_has_bits & 0x00000002u) {
+            target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+                2, *this_._impl_.usage_, this_._impl_.usage_->GetCachedSize(), target,
+                stream);
+          }
+
+          // string model = 3 [json_name = "model"];
+          if (!this_._internal_model().empty()) {
+            const std::string& _s = this_._internal_model();
+            ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+                _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "pivox.ai.v1.GenerateContentResponse.model");
+            target = stream->WriteStringMaybeAliased(3, _s, target);
+          }
+
+          if (PROTOBUF_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+            target =
+                ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+                    this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+          }
+          // @@protoc_insertion_point(serialize_to_array_end:pivox.ai.v1.GenerateContentResponse)
+          return target;
+        }
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+        ::size_t GenerateContentResponse::ByteSizeLong(const MessageLite& base) {
+          const GenerateContentResponse& this_ = static_cast<const GenerateContentResponse&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+        ::size_t GenerateContentResponse::ByteSizeLong() const {
+          const GenerateContentResponse& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          // @@protoc_insertion_point(message_byte_size_start:pivox.ai.v1.GenerateContentResponse)
+          ::size_t total_size = 0;
+
+          ::uint32_t cached_has_bits = 0;
+          // Prevent compiler warnings about cached_has_bits being unused
+          (void)cached_has_bits;
+
+          ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+           {
+            // string model = 3 [json_name = "model"];
+            if (!this_._internal_model().empty()) {
+              total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                              this_._internal_model());
+            }
+          }
+          cached_has_bits = this_._impl_._has_bits_[0];
+          if (cached_has_bits & 0x00000003u) {
+            // .pivox.ai.v1.Message message = 1 [json_name = "message"];
+            if (cached_has_bits & 0x00000001u) {
+              total_size += 1 +
+                            ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.message_);
+            }
+            // .pivox.ai.v1.TokenUsage usage = 2 [json_name = "usage"];
+            if (cached_has_bits & 0x00000002u) {
+              total_size += 1 +
+                            ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.usage_);
+            }
+          }
+          return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                                     &this_._impl_._cached_size_);
+        }
+
+void GenerateContentResponse::MergeImpl(::google::protobuf::MessageLite& to_msg, const ::google::protobuf::MessageLite& from_msg) {
+  auto* const _this = static_cast<GenerateContentResponse*>(&to_msg);
+  auto& from = static_cast<const GenerateContentResponse&>(from_msg);
+  ::google::protobuf::Arena* arena = _this->GetArena();
+  // @@protoc_insertion_point(class_specific_merge_from_start:pivox.ai.v1.GenerateContentResponse)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  if (!from._internal_model().empty()) {
+    _this->_internal_set_model(from._internal_model());
+  }
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (cached_has_bits & 0x00000003u) {
+    if (cached_has_bits & 0x00000001u) {
+      ABSL_DCHECK(from._impl_.message_ != nullptr);
+      if (_this->_impl_.message_ == nullptr) {
+        _this->_impl_.message_ =
+            ::google::protobuf::Message::CopyConstruct<::pivox::ai::v1::Message>(arena, *from._impl_.message_);
+      } else {
+        _this->_impl_.message_->MergeFrom(*from._impl_.message_);
+      }
+    }
+    if (cached_has_bits & 0x00000002u) {
+      ABSL_DCHECK(from._impl_.usage_ != nullptr);
+      if (_this->_impl_.usage_ == nullptr) {
+        _this->_impl_.usage_ =
+            ::google::protobuf::Message::CopyConstruct<::pivox::ai::v1::TokenUsage>(arena, *from._impl_.usage_);
+      } else {
+        _this->_impl_.usage_->MergeFrom(*from._impl_.usage_);
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(from._internal_metadata_);
+}
+
+void GenerateContentResponse::CopyFrom(const GenerateContentResponse& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:pivox.ai.v1.GenerateContentResponse)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void GenerateContentResponse::InternalSwap(GenerateContentResponse* PROTOBUF_RESTRICT other) {
+  using std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_, &other->_impl_.model_, arena);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(GenerateContentResponse, _impl_.usage_)
+      + sizeof(GenerateContentResponse::_impl_.usage_)
+      - PROTOBUF_FIELD_OFFSET(GenerateContentResponse, _impl_.message_)>(
+          reinterpret_cast<char*>(&_impl_.message_),
+          reinterpret_cast<char*>(&other->_impl_.message_));
+}
+
+::google::protobuf::Metadata GenerateContentResponse::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+class InputMessage::_Internal {
+ public:
+};
+
+void InputMessage::clear_parts() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.parts_.Clear();
+}
+InputMessage::InputMessage(::google::protobuf::Arena* arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, _class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:pivox.ai.v1.InputMessage)
+}
+inline PROTOBUF_NDEBUG_INLINE InputMessage::Impl_::Impl_(
+    ::google::protobuf::internal::InternalVisibility visibility, ::google::protobuf::Arena* arena,
+    const Impl_& from, const ::pivox::ai::v1::InputMessage& from_msg)
+      : parts_{visibility, arena, from.parts_},
+        _cached_size_{0} {}
+
+InputMessage::InputMessage(
+    ::google::protobuf::Arena* arena,
+    const InputMessage& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, _class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  InputMessage* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  _impl_.role_ = from._impl_.role_;
+
+  // @@protoc_insertion_point(copy_constructor:pivox.ai.v1.InputMessage)
+}
+inline PROTOBUF_NDEBUG_INLINE InputMessage::Impl_::Impl_(
+    ::google::protobuf::internal::InternalVisibility visibility,
+    ::google::protobuf::Arena* arena)
+      : parts_{visibility, arena},
+        _cached_size_{0} {}
+
+inline void InputMessage::SharedCtor(::_pb::Arena* arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  _impl_.role_ = {};
+}
+InputMessage::~InputMessage() {
+  // @@protoc_insertion_point(destructor:pivox.ai.v1.InputMessage)
+  SharedDtor(*this);
+}
+inline void InputMessage::SharedDtor(MessageLite& self) {
+  InputMessage& this_ = static_cast<InputMessage&>(self);
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.~Impl_();
+}
+
+inline void* InputMessage::PlacementNew_(const void*, void* mem,
+                                        ::google::protobuf::Arena* arena) {
+  return ::new (mem) InputMessage(arena);
+}
+constexpr auto InputMessage::InternalNewImpl_() {
+  constexpr auto arena_bits = ::google::protobuf::internal::EncodePlacementArenaOffsets({
+      PROTOBUF_FIELD_OFFSET(InputMessage, _impl_.parts_) +
+          decltype(InputMessage::_impl_.parts_)::
+              InternalGetArenaOffset(
+                  ::google::protobuf::Message::internal_visibility()),
+  });
+  if (arena_bits.has_value()) {
+    return ::google::protobuf::internal::MessageCreator::ZeroInit(
+        sizeof(InputMessage), alignof(InputMessage), *arena_bits);
+  } else {
+    return ::google::protobuf::internal::MessageCreator(&InputMessage::PlacementNew_,
+                                 sizeof(InputMessage),
+                                 alignof(InputMessage));
+  }
+}
+PROTOBUF_CONSTINIT
+PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::google::protobuf::internal::ClassDataFull InputMessage::_class_data_ = {
+    ::google::protobuf::internal::ClassData{
+        &_InputMessage_default_instance_._instance,
+        &_table_.header,
+        nullptr,  // OnDemandRegisterArenaDtor
+        nullptr,  // IsInitialized
+        &InputMessage::MergeImpl,
+        ::google::protobuf::Message::GetNewImpl<InputMessage>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+        &InputMessage::SharedDtor,
+        ::google::protobuf::Message::GetClearImpl<InputMessage>(), &InputMessage::ByteSizeLong,
+            &InputMessage::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+        PROTOBUF_FIELD_OFFSET(InputMessage, _impl_._cached_size_),
+        false,
+    },
+    &InputMessage::kDescriptorMethods,
+    &descriptor_table_pivox_2fai_2fv1_2fai_5fchat_2eproto,
+    nullptr,  // tracker
+};
+const ::google::protobuf::internal::ClassData* InputMessage::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(_class_data_.tc_table);
+  return _class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<1, 2, 1, 0, 2> InputMessage::_table_ = {
   {
     0,  // no _has_bits_
     0, // no _extensions_
@@ -1783,66 +2269,62 @@ const ::_pbi::TcParseTable<1, 2, 1, 44, 2> UserMessage::_table_ = {
     nullptr,  // post_loop_handler
     ::_pbi::TcParser::GenericFallback,  // fallback
     #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-    ::_pbi::TcParser::GetTable<::pivox::ai::v1::UserMessage>(),  // to_prefetch
+    ::_pbi::TcParser::GetTable<::pivox::ai::v1::InputMessage>(),  // to_prefetch
     #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
   }, {{
     // repeated .pivox.ai.v1.MessagePart parts = 2 [json_name = "parts", (.google.api.field_behavior) = REQUIRED];
     {::_pbi::TcParser::FastMtR1,
-     {18, 63, 0, PROTOBUF_FIELD_OFFSET(UserMessage, _impl_.parts_)}},
-    // string conversation = 1 [json_name = "conversation", (.google.api.field_behavior) = REQUIRED, (.google.api.resource_reference) = {
-    {::_pbi::TcParser::FastUS1,
-     {10, 63, 0, PROTOBUF_FIELD_OFFSET(UserMessage, _impl_.conversation_)}},
+     {18, 63, 0, PROTOBUF_FIELD_OFFSET(InputMessage, _impl_.parts_)}},
+    // .pivox.ai.v1.Role role = 1 [json_name = "role", (.google.api.field_behavior) = REQUIRED];
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(InputMessage, _impl_.role_), 63>(),
+     {8, 63, 0, PROTOBUF_FIELD_OFFSET(InputMessage, _impl_.role_)}},
   }}, {{
     65535, 65535
   }}, {{
-    // string conversation = 1 [json_name = "conversation", (.google.api.field_behavior) = REQUIRED, (.google.api.resource_reference) = {
-    {PROTOBUF_FIELD_OFFSET(UserMessage, _impl_.conversation_), 0, 0,
-    (0 | ::_fl::kFcSingular | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // .pivox.ai.v1.Role role = 1 [json_name = "role", (.google.api.field_behavior) = REQUIRED];
+    {PROTOBUF_FIELD_OFFSET(InputMessage, _impl_.role_), 0, 0,
+    (0 | ::_fl::kFcSingular | ::_fl::kOpenEnum)},
     // repeated .pivox.ai.v1.MessagePart parts = 2 [json_name = "parts", (.google.api.field_behavior) = REQUIRED];
-    {PROTOBUF_FIELD_OFFSET(UserMessage, _impl_.parts_), 0, 0,
+    {PROTOBUF_FIELD_OFFSET(InputMessage, _impl_.parts_), 0, 0,
     (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
   }}, {{
     {::_pbi::TcParser::GetTable<::pivox::ai::v1::MessagePart>()},
   }}, {{
-    "\27\14\0\0\0\0\0\0"
-    "pivox.ai.v1.UserMessage"
-    "conversation"
   }},
 };
 
-PROTOBUF_NOINLINE void UserMessage::Clear() {
-// @@protoc_insertion_point(message_clear_start:pivox.ai.v1.UserMessage)
+PROTOBUF_NOINLINE void InputMessage::Clear() {
+// @@protoc_insertion_point(message_clear_start:pivox.ai.v1.InputMessage)
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::uint32_t cached_has_bits = 0;
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
   _impl_.parts_.Clear();
-  _impl_.conversation_.ClearToEmpty();
+  _impl_.role_ = 0;
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
 
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-        ::uint8_t* UserMessage::_InternalSerialize(
+        ::uint8_t* InputMessage::_InternalSerialize(
             const MessageLite& base, ::uint8_t* target,
             ::google::protobuf::io::EpsCopyOutputStream* stream) {
-          const UserMessage& this_ = static_cast<const UserMessage&>(base);
+          const InputMessage& this_ = static_cast<const InputMessage&>(base);
 #else   // PROTOBUF_CUSTOM_VTABLE
-        ::uint8_t* UserMessage::_InternalSerialize(
+        ::uint8_t* InputMessage::_InternalSerialize(
             ::uint8_t* target,
             ::google::protobuf::io::EpsCopyOutputStream* stream) const {
-          const UserMessage& this_ = *this;
+          const InputMessage& this_ = *this;
 #endif  // PROTOBUF_CUSTOM_VTABLE
-          // @@protoc_insertion_point(serialize_to_array_start:pivox.ai.v1.UserMessage)
+          // @@protoc_insertion_point(serialize_to_array_start:pivox.ai.v1.InputMessage)
           ::uint32_t cached_has_bits = 0;
           (void)cached_has_bits;
 
-          // string conversation = 1 [json_name = "conversation", (.google.api.field_behavior) = REQUIRED, (.google.api.resource_reference) = {
-          if (!this_._internal_conversation().empty()) {
-            const std::string& _s = this_._internal_conversation();
-            ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-                _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "pivox.ai.v1.UserMessage.conversation");
-            target = stream->WriteStringMaybeAliased(1, _s, target);
+          // .pivox.ai.v1.Role role = 1 [json_name = "role", (.google.api.field_behavior) = REQUIRED];
+          if (this_._internal_role() != 0) {
+            target = stream->EnsureSpace(target);
+            target = ::_pbi::WireFormatLite::WriteEnumToArray(
+                1, this_._internal_role(), target);
           }
 
           // repeated .pivox.ai.v1.MessagePart parts = 2 [json_name = "parts", (.google.api.field_behavior) = REQUIRED];
@@ -1861,18 +2343,18 @@ PROTOBUF_NOINLINE void UserMessage::Clear() {
                 ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
                     this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
           }
-          // @@protoc_insertion_point(serialize_to_array_end:pivox.ai.v1.UserMessage)
+          // @@protoc_insertion_point(serialize_to_array_end:pivox.ai.v1.InputMessage)
           return target;
         }
 
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-        ::size_t UserMessage::ByteSizeLong(const MessageLite& base) {
-          const UserMessage& this_ = static_cast<const UserMessage&>(base);
+        ::size_t InputMessage::ByteSizeLong(const MessageLite& base) {
+          const InputMessage& this_ = static_cast<const InputMessage&>(base);
 #else   // PROTOBUF_CUSTOM_VTABLE
-        ::size_t UserMessage::ByteSizeLong() const {
-          const UserMessage& this_ = *this;
+        ::size_t InputMessage::ByteSizeLong() const {
+          const InputMessage& this_ = *this;
 #endif  // PROTOBUF_CUSTOM_VTABLE
-          // @@protoc_insertion_point(message_byte_size_start:pivox.ai.v1.UserMessage)
+          // @@protoc_insertion_point(message_byte_size_start:pivox.ai.v1.InputMessage)
           ::size_t total_size = 0;
 
           ::uint32_t cached_has_bits = 0;
@@ -1890,268 +2372,251 @@ PROTOBUF_NOINLINE void UserMessage::Clear() {
             }
           }
            {
-            // string conversation = 1 [json_name = "conversation", (.google.api.field_behavior) = REQUIRED, (.google.api.resource_reference) = {
-            if (!this_._internal_conversation().empty()) {
-              total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                              this_._internal_conversation());
+            // .pivox.ai.v1.Role role = 1 [json_name = "role", (.google.api.field_behavior) = REQUIRED];
+            if (this_._internal_role() != 0) {
+              total_size += 1 +
+                            ::_pbi::WireFormatLite::EnumSize(this_._internal_role());
             }
           }
           return this_.MaybeComputeUnknownFieldsSize(total_size,
                                                      &this_._impl_._cached_size_);
         }
 
-void UserMessage::MergeImpl(::google::protobuf::MessageLite& to_msg, const ::google::protobuf::MessageLite& from_msg) {
-  auto* const _this = static_cast<UserMessage*>(&to_msg);
-  auto& from = static_cast<const UserMessage&>(from_msg);
-  // @@protoc_insertion_point(class_specific_merge_from_start:pivox.ai.v1.UserMessage)
+void InputMessage::MergeImpl(::google::protobuf::MessageLite& to_msg, const ::google::protobuf::MessageLite& from_msg) {
+  auto* const _this = static_cast<InputMessage*>(&to_msg);
+  auto& from = static_cast<const InputMessage&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:pivox.ai.v1.InputMessage)
   ABSL_DCHECK_NE(&from, _this);
   ::uint32_t cached_has_bits = 0;
   (void) cached_has_bits;
 
   _this->_internal_mutable_parts()->MergeFrom(
       from._internal_parts());
-  if (!from._internal_conversation().empty()) {
-    _this->_internal_set_conversation(from._internal_conversation());
+  if (from._internal_role() != 0) {
+    _this->_impl_.role_ = from._impl_.role_;
   }
   _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(from._internal_metadata_);
 }
 
-void UserMessage::CopyFrom(const UserMessage& from) {
-// @@protoc_insertion_point(class_specific_copy_from_start:pivox.ai.v1.UserMessage)
+void InputMessage::CopyFrom(const InputMessage& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:pivox.ai.v1.InputMessage)
   if (&from == this) return;
   Clear();
   MergeFrom(from);
 }
 
 
-void UserMessage::InternalSwap(UserMessage* PROTOBUF_RESTRICT other) {
+void InputMessage::InternalSwap(InputMessage* PROTOBUF_RESTRICT other) {
   using std::swap;
-  auto* arena = GetArena();
-  ABSL_DCHECK_EQ(arena, other->GetArena());
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   _impl_.parts_.InternalSwap(&other->_impl_.parts_);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.conversation_, &other->_impl_.conversation_, arena);
+  swap(_impl_.role_, other->_impl_.role_);
 }
 
-::google::protobuf::Metadata UserMessage::GetMetadata() const {
+::google::protobuf::Metadata InputMessage::GetMetadata() const {
   return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // ===================================================================
 
-class ToolOutput::_Internal {
+class ToolDefinition::_Internal {
  public:
 };
 
-ToolOutput::ToolOutput(::google::protobuf::Arena* arena)
+ToolDefinition::ToolDefinition(::google::protobuf::Arena* arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, _class_data_.base()) {
 #else   // PROTOBUF_CUSTOM_VTABLE
     : ::google::protobuf::Message(arena) {
 #endif  // PROTOBUF_CUSTOM_VTABLE
   SharedCtor(arena);
-  // @@protoc_insertion_point(arena_constructor:pivox.ai.v1.ToolOutput)
+  // @@protoc_insertion_point(arena_constructor:pivox.ai.v1.ToolDefinition)
 }
-inline PROTOBUF_NDEBUG_INLINE ToolOutput::Impl_::Impl_(
+inline PROTOBUF_NDEBUG_INLINE ToolDefinition::Impl_::Impl_(
     ::google::protobuf::internal::InternalVisibility visibility, ::google::protobuf::Arena* arena,
-    const Impl_& from, const ::pivox::ai::v1::ToolOutput& from_msg)
-      : tool_call_id_(arena, from.tool_call_id_),
-        conversation_(arena, from.conversation_),
-        result_json_(arena, from.result_json_),
+    const Impl_& from, const ::pivox::ai::v1::ToolDefinition& from_msg)
+      : tool_(arena, from.tool_),
+        description_(arena, from.description_),
+        input_schema_json_(arena, from.input_schema_json_),
         _cached_size_{0} {}
 
-ToolOutput::ToolOutput(
+ToolDefinition::ToolDefinition(
     ::google::protobuf::Arena* arena,
-    const ToolOutput& from)
+    const ToolDefinition& from)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, _class_data_.base()) {
 #else   // PROTOBUF_CUSTOM_VTABLE
     : ::google::protobuf::Message(arena) {
 #endif  // PROTOBUF_CUSTOM_VTABLE
-  ToolOutput* const _this = this;
+  ToolDefinition* const _this = this;
   (void)_this;
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  _impl_.is_error_ = from._impl_.is_error_;
 
-  // @@protoc_insertion_point(copy_constructor:pivox.ai.v1.ToolOutput)
+  // @@protoc_insertion_point(copy_constructor:pivox.ai.v1.ToolDefinition)
 }
-inline PROTOBUF_NDEBUG_INLINE ToolOutput::Impl_::Impl_(
+inline PROTOBUF_NDEBUG_INLINE ToolDefinition::Impl_::Impl_(
     ::google::protobuf::internal::InternalVisibility visibility,
     ::google::protobuf::Arena* arena)
-      : tool_call_id_(arena),
-        conversation_(arena),
-        result_json_(arena),
+      : tool_(arena),
+        description_(arena),
+        input_schema_json_(arena),
         _cached_size_{0} {}
 
-inline void ToolOutput::SharedCtor(::_pb::Arena* arena) {
+inline void ToolDefinition::SharedCtor(::_pb::Arena* arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
-  _impl_.is_error_ = {};
 }
-ToolOutput::~ToolOutput() {
-  // @@protoc_insertion_point(destructor:pivox.ai.v1.ToolOutput)
+ToolDefinition::~ToolDefinition() {
+  // @@protoc_insertion_point(destructor:pivox.ai.v1.ToolDefinition)
   SharedDtor(*this);
 }
-inline void ToolOutput::SharedDtor(MessageLite& self) {
-  ToolOutput& this_ = static_cast<ToolOutput&>(self);
+inline void ToolDefinition::SharedDtor(MessageLite& self) {
+  ToolDefinition& this_ = static_cast<ToolDefinition&>(self);
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
-  this_._impl_.tool_call_id_.Destroy();
-  this_._impl_.conversation_.Destroy();
-  this_._impl_.result_json_.Destroy();
+  this_._impl_.tool_.Destroy();
+  this_._impl_.description_.Destroy();
+  this_._impl_.input_schema_json_.Destroy();
   this_._impl_.~Impl_();
 }
 
-inline void* ToolOutput::PlacementNew_(const void*, void* mem,
+inline void* ToolDefinition::PlacementNew_(const void*, void* mem,
                                         ::google::protobuf::Arena* arena) {
-  return ::new (mem) ToolOutput(arena);
+  return ::new (mem) ToolDefinition(arena);
 }
-constexpr auto ToolOutput::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(ToolOutput),
-                                            alignof(ToolOutput));
+constexpr auto ToolDefinition::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(ToolDefinition),
+                                            alignof(ToolDefinition));
 }
 PROTOBUF_CONSTINIT
 PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::google::protobuf::internal::ClassDataFull ToolOutput::_class_data_ = {
+const ::google::protobuf::internal::ClassDataFull ToolDefinition::_class_data_ = {
     ::google::protobuf::internal::ClassData{
-        &_ToolOutput_default_instance_._instance,
+        &_ToolDefinition_default_instance_._instance,
         &_table_.header,
         nullptr,  // OnDemandRegisterArenaDtor
         nullptr,  // IsInitialized
-        &ToolOutput::MergeImpl,
-        ::google::protobuf::Message::GetNewImpl<ToolOutput>(),
+        &ToolDefinition::MergeImpl,
+        ::google::protobuf::Message::GetNewImpl<ToolDefinition>(),
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-        &ToolOutput::SharedDtor,
-        ::google::protobuf::Message::GetClearImpl<ToolOutput>(), &ToolOutput::ByteSizeLong,
-            &ToolOutput::_InternalSerialize,
+        &ToolDefinition::SharedDtor,
+        ::google::protobuf::Message::GetClearImpl<ToolDefinition>(), &ToolDefinition::ByteSizeLong,
+            &ToolDefinition::_InternalSerialize,
 #endif  // PROTOBUF_CUSTOM_VTABLE
-        PROTOBUF_FIELD_OFFSET(ToolOutput, _impl_._cached_size_),
+        PROTOBUF_FIELD_OFFSET(ToolDefinition, _impl_._cached_size_),
         false,
     },
-    &ToolOutput::kDescriptorMethods,
+    &ToolDefinition::kDescriptorMethods,
     &descriptor_table_pivox_2fai_2fv1_2fai_5fchat_2eproto,
     nullptr,  // tracker
 };
-const ::google::protobuf::internal::ClassData* ToolOutput::GetClassData() const {
+const ::google::protobuf::internal::ClassData* ToolDefinition::GetClassData() const {
   ::google::protobuf::internal::PrefetchToLocalCache(&_class_data_);
   ::google::protobuf::internal::PrefetchToLocalCache(_class_data_.tc_table);
   return _class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<2, 4, 0, 66, 2> ToolOutput::_table_ = {
+const ::_pbi::TcParseTable<2, 3, 0, 67, 2> ToolDefinition::_table_ = {
   {
     0,  // no _has_bits_
     0, // no _extensions_
-    4, 24,  // max_field_number, fast_idx_mask
+    3, 24,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967280,  // skipmap
+    4294967288,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    4,  // num_field_entries
+    3,  // num_field_entries
     0,  // num_aux_entries
     offsetof(decltype(_table_), field_names),  // no aux_entries
     _class_data_.base(),
     nullptr,  // post_loop_handler
     ::_pbi::TcParser::GenericFallback,  // fallback
     #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-    ::_pbi::TcParser::GetTable<::pivox::ai::v1::ToolOutput>(),  // to_prefetch
+    ::_pbi::TcParser::GetTable<::pivox::ai::v1::ToolDefinition>(),  // to_prefetch
     #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
   }, {{
-    // bool is_error = 4 [json_name = "isError", (.google.api.field_behavior) = OPTIONAL];
-    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(ToolOutput, _impl_.is_error_), 63>(),
-     {32, 63, 0, PROTOBUF_FIELD_OFFSET(ToolOutput, _impl_.is_error_)}},
-    // string tool_call_id = 1 [json_name = "toolCallId", (.google.api.field_behavior) = REQUIRED];
+    {::_pbi::TcParser::MiniParse, {}},
+    // string tool = 1 [json_name = "tool", (.google.api.field_behavior) = REQUIRED];
     {::_pbi::TcParser::FastUS1,
-     {10, 63, 0, PROTOBUF_FIELD_OFFSET(ToolOutput, _impl_.tool_call_id_)}},
-    // string conversation = 2 [json_name = "conversation", (.google.api.field_behavior) = REQUIRED, (.google.api.resource_reference) = {
+     {10, 63, 0, PROTOBUF_FIELD_OFFSET(ToolDefinition, _impl_.tool_)}},
+    // string description = 2 [json_name = "description", (.google.api.field_behavior) = OPTIONAL];
     {::_pbi::TcParser::FastUS1,
-     {18, 63, 0, PROTOBUF_FIELD_OFFSET(ToolOutput, _impl_.conversation_)}},
-    // string result_json = 3 [json_name = "resultJson", (.google.api.field_behavior) = OPTIONAL];
+     {18, 63, 0, PROTOBUF_FIELD_OFFSET(ToolDefinition, _impl_.description_)}},
+    // string input_schema_json = 3 [json_name = "inputSchemaJson", (.google.api.field_behavior) = REQUIRED];
     {::_pbi::TcParser::FastUS1,
-     {26, 63, 0, PROTOBUF_FIELD_OFFSET(ToolOutput, _impl_.result_json_)}},
+     {26, 63, 0, PROTOBUF_FIELD_OFFSET(ToolDefinition, _impl_.input_schema_json_)}},
   }}, {{
     65535, 65535
   }}, {{
-    // string tool_call_id = 1 [json_name = "toolCallId", (.google.api.field_behavior) = REQUIRED];
-    {PROTOBUF_FIELD_OFFSET(ToolOutput, _impl_.tool_call_id_), 0, 0,
+    // string tool = 1 [json_name = "tool", (.google.api.field_behavior) = REQUIRED];
+    {PROTOBUF_FIELD_OFFSET(ToolDefinition, _impl_.tool_), 0, 0,
     (0 | ::_fl::kFcSingular | ::_fl::kUtf8String | ::_fl::kRepAString)},
-    // string conversation = 2 [json_name = "conversation", (.google.api.field_behavior) = REQUIRED, (.google.api.resource_reference) = {
-    {PROTOBUF_FIELD_OFFSET(ToolOutput, _impl_.conversation_), 0, 0,
+    // string description = 2 [json_name = "description", (.google.api.field_behavior) = OPTIONAL];
+    {PROTOBUF_FIELD_OFFSET(ToolDefinition, _impl_.description_), 0, 0,
     (0 | ::_fl::kFcSingular | ::_fl::kUtf8String | ::_fl::kRepAString)},
-    // string result_json = 3 [json_name = "resultJson", (.google.api.field_behavior) = OPTIONAL];
-    {PROTOBUF_FIELD_OFFSET(ToolOutput, _impl_.result_json_), 0, 0,
+    // string input_schema_json = 3 [json_name = "inputSchemaJson", (.google.api.field_behavior) = REQUIRED];
+    {PROTOBUF_FIELD_OFFSET(ToolDefinition, _impl_.input_schema_json_), 0, 0,
     (0 | ::_fl::kFcSingular | ::_fl::kUtf8String | ::_fl::kRepAString)},
-    // bool is_error = 4 [json_name = "isError", (.google.api.field_behavior) = OPTIONAL];
-    {PROTOBUF_FIELD_OFFSET(ToolOutput, _impl_.is_error_), 0, 0,
-    (0 | ::_fl::kFcSingular | ::_fl::kBool)},
   }},
   // no aux_entries
   {{
-    "\26\14\14\13\0\0\0\0"
-    "pivox.ai.v1.ToolOutput"
-    "tool_call_id"
-    "conversation"
-    "result_json"
+    "\32\4\13\21\0\0\0\0"
+    "pivox.ai.v1.ToolDefinition"
+    "tool"
+    "description"
+    "input_schema_json"
   }},
 };
 
-PROTOBUF_NOINLINE void ToolOutput::Clear() {
-// @@protoc_insertion_point(message_clear_start:pivox.ai.v1.ToolOutput)
+PROTOBUF_NOINLINE void ToolDefinition::Clear() {
+// @@protoc_insertion_point(message_clear_start:pivox.ai.v1.ToolDefinition)
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::uint32_t cached_has_bits = 0;
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
-  _impl_.tool_call_id_.ClearToEmpty();
-  _impl_.conversation_.ClearToEmpty();
-  _impl_.result_json_.ClearToEmpty();
-  _impl_.is_error_ = false;
+  _impl_.tool_.ClearToEmpty();
+  _impl_.description_.ClearToEmpty();
+  _impl_.input_schema_json_.ClearToEmpty();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
 
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-        ::uint8_t* ToolOutput::_InternalSerialize(
+        ::uint8_t* ToolDefinition::_InternalSerialize(
             const MessageLite& base, ::uint8_t* target,
             ::google::protobuf::io::EpsCopyOutputStream* stream) {
-          const ToolOutput& this_ = static_cast<const ToolOutput&>(base);
+          const ToolDefinition& this_ = static_cast<const ToolDefinition&>(base);
 #else   // PROTOBUF_CUSTOM_VTABLE
-        ::uint8_t* ToolOutput::_InternalSerialize(
+        ::uint8_t* ToolDefinition::_InternalSerialize(
             ::uint8_t* target,
             ::google::protobuf::io::EpsCopyOutputStream* stream) const {
-          const ToolOutput& this_ = *this;
+          const ToolDefinition& this_ = *this;
 #endif  // PROTOBUF_CUSTOM_VTABLE
-          // @@protoc_insertion_point(serialize_to_array_start:pivox.ai.v1.ToolOutput)
+          // @@protoc_insertion_point(serialize_to_array_start:pivox.ai.v1.ToolDefinition)
           ::uint32_t cached_has_bits = 0;
           (void)cached_has_bits;
 
-          // string tool_call_id = 1 [json_name = "toolCallId", (.google.api.field_behavior) = REQUIRED];
-          if (!this_._internal_tool_call_id().empty()) {
-            const std::string& _s = this_._internal_tool_call_id();
+          // string tool = 1 [json_name = "tool", (.google.api.field_behavior) = REQUIRED];
+          if (!this_._internal_tool().empty()) {
+            const std::string& _s = this_._internal_tool();
             ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-                _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "pivox.ai.v1.ToolOutput.tool_call_id");
+                _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "pivox.ai.v1.ToolDefinition.tool");
             target = stream->WriteStringMaybeAliased(1, _s, target);
           }
 
-          // string conversation = 2 [json_name = "conversation", (.google.api.field_behavior) = REQUIRED, (.google.api.resource_reference) = {
-          if (!this_._internal_conversation().empty()) {
-            const std::string& _s = this_._internal_conversation();
+          // string description = 2 [json_name = "description", (.google.api.field_behavior) = OPTIONAL];
+          if (!this_._internal_description().empty()) {
+            const std::string& _s = this_._internal_description();
             ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-                _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "pivox.ai.v1.ToolOutput.conversation");
+                _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "pivox.ai.v1.ToolDefinition.description");
             target = stream->WriteStringMaybeAliased(2, _s, target);
           }
 
-          // string result_json = 3 [json_name = "resultJson", (.google.api.field_behavior) = OPTIONAL];
-          if (!this_._internal_result_json().empty()) {
-            const std::string& _s = this_._internal_result_json();
+          // string input_schema_json = 3 [json_name = "inputSchemaJson", (.google.api.field_behavior) = REQUIRED];
+          if (!this_._internal_input_schema_json().empty()) {
+            const std::string& _s = this_._internal_input_schema_json();
             ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-                _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "pivox.ai.v1.ToolOutput.result_json");
+                _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "pivox.ai.v1.ToolDefinition.input_schema_json");
             target = stream->WriteStringMaybeAliased(3, _s, target);
-          }
-
-          // bool is_error = 4 [json_name = "isError", (.google.api.field_behavior) = OPTIONAL];
-          if (this_._internal_is_error() != 0) {
-            target = stream->EnsureSpace(target);
-            target = ::_pbi::WireFormatLite::WriteBoolToArray(
-                4, this_._internal_is_error(), target);
           }
 
           if (PROTOBUF_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -2159,18 +2624,18 @@ PROTOBUF_NOINLINE void ToolOutput::Clear() {
                 ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
                     this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
           }
-          // @@protoc_insertion_point(serialize_to_array_end:pivox.ai.v1.ToolOutput)
+          // @@protoc_insertion_point(serialize_to_array_end:pivox.ai.v1.ToolDefinition)
           return target;
         }
 
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-        ::size_t ToolOutput::ByteSizeLong(const MessageLite& base) {
-          const ToolOutput& this_ = static_cast<const ToolOutput&>(base);
+        ::size_t ToolDefinition::ByteSizeLong(const MessageLite& base) {
+          const ToolDefinition& this_ = static_cast<const ToolDefinition&>(base);
 #else   // PROTOBUF_CUSTOM_VTABLE
-        ::size_t ToolOutput::ByteSizeLong() const {
-          const ToolOutput& this_ = *this;
+        ::size_t ToolDefinition::ByteSizeLong() const {
+          const ToolDefinition& this_ = *this;
 #endif  // PROTOBUF_CUSTOM_VTABLE
-          // @@protoc_insertion_point(message_byte_size_start:pivox.ai.v1.ToolOutput)
+          // @@protoc_insertion_point(message_byte_size_start:pivox.ai.v1.ToolDefinition)
           ::size_t total_size = 0;
 
           ::uint32_t cached_has_bits = 0;
@@ -2179,172 +2644,149 @@ PROTOBUF_NOINLINE void ToolOutput::Clear() {
 
           ::_pbi::Prefetch5LinesFrom7Lines(&this_);
            {
-            // string tool_call_id = 1 [json_name = "toolCallId", (.google.api.field_behavior) = REQUIRED];
-            if (!this_._internal_tool_call_id().empty()) {
+            // string tool = 1 [json_name = "tool", (.google.api.field_behavior) = REQUIRED];
+            if (!this_._internal_tool().empty()) {
               total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                              this_._internal_tool_call_id());
+                                              this_._internal_tool());
             }
-            // string conversation = 2 [json_name = "conversation", (.google.api.field_behavior) = REQUIRED, (.google.api.resource_reference) = {
-            if (!this_._internal_conversation().empty()) {
+            // string description = 2 [json_name = "description", (.google.api.field_behavior) = OPTIONAL];
+            if (!this_._internal_description().empty()) {
               total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                              this_._internal_conversation());
+                                              this_._internal_description());
             }
-            // string result_json = 3 [json_name = "resultJson", (.google.api.field_behavior) = OPTIONAL];
-            if (!this_._internal_result_json().empty()) {
+            // string input_schema_json = 3 [json_name = "inputSchemaJson", (.google.api.field_behavior) = REQUIRED];
+            if (!this_._internal_input_schema_json().empty()) {
               total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                              this_._internal_result_json());
-            }
-            // bool is_error = 4 [json_name = "isError", (.google.api.field_behavior) = OPTIONAL];
-            if (this_._internal_is_error() != 0) {
-              total_size += 2;
+                                              this_._internal_input_schema_json());
             }
           }
           return this_.MaybeComputeUnknownFieldsSize(total_size,
                                                      &this_._impl_._cached_size_);
         }
 
-void ToolOutput::MergeImpl(::google::protobuf::MessageLite& to_msg, const ::google::protobuf::MessageLite& from_msg) {
-  auto* const _this = static_cast<ToolOutput*>(&to_msg);
-  auto& from = static_cast<const ToolOutput&>(from_msg);
-  // @@protoc_insertion_point(class_specific_merge_from_start:pivox.ai.v1.ToolOutput)
+void ToolDefinition::MergeImpl(::google::protobuf::MessageLite& to_msg, const ::google::protobuf::MessageLite& from_msg) {
+  auto* const _this = static_cast<ToolDefinition*>(&to_msg);
+  auto& from = static_cast<const ToolDefinition&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:pivox.ai.v1.ToolDefinition)
   ABSL_DCHECK_NE(&from, _this);
   ::uint32_t cached_has_bits = 0;
   (void) cached_has_bits;
 
-  if (!from._internal_tool_call_id().empty()) {
-    _this->_internal_set_tool_call_id(from._internal_tool_call_id());
+  if (!from._internal_tool().empty()) {
+    _this->_internal_set_tool(from._internal_tool());
   }
-  if (!from._internal_conversation().empty()) {
-    _this->_internal_set_conversation(from._internal_conversation());
+  if (!from._internal_description().empty()) {
+    _this->_internal_set_description(from._internal_description());
   }
-  if (!from._internal_result_json().empty()) {
-    _this->_internal_set_result_json(from._internal_result_json());
-  }
-  if (from._internal_is_error() != 0) {
-    _this->_impl_.is_error_ = from._impl_.is_error_;
+  if (!from._internal_input_schema_json().empty()) {
+    _this->_internal_set_input_schema_json(from._internal_input_schema_json());
   }
   _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(from._internal_metadata_);
 }
 
-void ToolOutput::CopyFrom(const ToolOutput& from) {
-// @@protoc_insertion_point(class_specific_copy_from_start:pivox.ai.v1.ToolOutput)
+void ToolDefinition::CopyFrom(const ToolDefinition& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:pivox.ai.v1.ToolDefinition)
   if (&from == this) return;
   Clear();
   MergeFrom(from);
 }
 
 
-void ToolOutput::InternalSwap(ToolOutput* PROTOBUF_RESTRICT other) {
+void ToolDefinition::InternalSwap(ToolDefinition* PROTOBUF_RESTRICT other) {
   using std::swap;
   auto* arena = GetArena();
   ABSL_DCHECK_EQ(arena, other->GetArena());
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.tool_call_id_, &other->_impl_.tool_call_id_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.conversation_, &other->_impl_.conversation_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.result_json_, &other->_impl_.result_json_, arena);
-        swap(_impl_.is_error_, other->_impl_.is_error_);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.tool_, &other->_impl_.tool_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.description_, &other->_impl_.description_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.input_schema_json_, &other->_impl_.input_schema_json_, arena);
 }
 
-::google::protobuf::Metadata ToolOutput::GetMetadata() const {
+::google::protobuf::Metadata ToolDefinition::GetMetadata() const {
   return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // ===================================================================
 
-class ToolApprovalResponse::_Internal {
+class TokenUsage::_Internal {
  public:
 };
 
-ToolApprovalResponse::ToolApprovalResponse(::google::protobuf::Arena* arena)
+TokenUsage::TokenUsage(::google::protobuf::Arena* arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, _class_data_.base()) {
 #else   // PROTOBUF_CUSTOM_VTABLE
     : ::google::protobuf::Message(arena) {
 #endif  // PROTOBUF_CUSTOM_VTABLE
   SharedCtor(arena);
-  // @@protoc_insertion_point(arena_constructor:pivox.ai.v1.ToolApprovalResponse)
+  // @@protoc_insertion_point(arena_constructor:pivox.ai.v1.TokenUsage)
 }
-inline PROTOBUF_NDEBUG_INLINE ToolApprovalResponse::Impl_::Impl_(
-    ::google::protobuf::internal::InternalVisibility visibility, ::google::protobuf::Arena* arena,
-    const Impl_& from, const ::pivox::ai::v1::ToolApprovalResponse& from_msg)
-      : tool_call_id_(arena, from.tool_call_id_),
-        _cached_size_{0} {}
-
-ToolApprovalResponse::ToolApprovalResponse(
-    ::google::protobuf::Arena* arena,
-    const ToolApprovalResponse& from)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, _class_data_.base()) {
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  ToolApprovalResponse* const _this = this;
-  (void)_this;
-  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  _impl_.approved_ = from._impl_.approved_;
-
-  // @@protoc_insertion_point(copy_constructor:pivox.ai.v1.ToolApprovalResponse)
+TokenUsage::TokenUsage(
+    ::google::protobuf::Arena* arena, const TokenUsage& from)
+    : TokenUsage(arena) {
+  MergeFrom(from);
 }
-inline PROTOBUF_NDEBUG_INLINE ToolApprovalResponse::Impl_::Impl_(
+inline PROTOBUF_NDEBUG_INLINE TokenUsage::Impl_::Impl_(
     ::google::protobuf::internal::InternalVisibility visibility,
     ::google::protobuf::Arena* arena)
-      : tool_call_id_(arena),
-        _cached_size_{0} {}
+      : _cached_size_{0} {}
 
-inline void ToolApprovalResponse::SharedCtor(::_pb::Arena* arena) {
+inline void TokenUsage::SharedCtor(::_pb::Arena* arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
-  _impl_.approved_ = {};
+  ::memset(reinterpret_cast<char *>(&_impl_) +
+               offsetof(Impl_, input_tokens_),
+           0,
+           offsetof(Impl_, output_tokens_) -
+               offsetof(Impl_, input_tokens_) +
+               sizeof(Impl_::output_tokens_));
 }
-ToolApprovalResponse::~ToolApprovalResponse() {
-  // @@protoc_insertion_point(destructor:pivox.ai.v1.ToolApprovalResponse)
+TokenUsage::~TokenUsage() {
+  // @@protoc_insertion_point(destructor:pivox.ai.v1.TokenUsage)
   SharedDtor(*this);
 }
-inline void ToolApprovalResponse::SharedDtor(MessageLite& self) {
-  ToolApprovalResponse& this_ = static_cast<ToolApprovalResponse&>(self);
+inline void TokenUsage::SharedDtor(MessageLite& self) {
+  TokenUsage& this_ = static_cast<TokenUsage&>(self);
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
-  this_._impl_.tool_call_id_.Destroy();
   this_._impl_.~Impl_();
 }
 
-inline void* ToolApprovalResponse::PlacementNew_(const void*, void* mem,
+inline void* TokenUsage::PlacementNew_(const void*, void* mem,
                                         ::google::protobuf::Arena* arena) {
-  return ::new (mem) ToolApprovalResponse(arena);
+  return ::new (mem) TokenUsage(arena);
 }
-constexpr auto ToolApprovalResponse::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(ToolApprovalResponse),
-                                            alignof(ToolApprovalResponse));
+constexpr auto TokenUsage::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::ZeroInit(sizeof(TokenUsage),
+                                            alignof(TokenUsage));
 }
 PROTOBUF_CONSTINIT
 PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::google::protobuf::internal::ClassDataFull ToolApprovalResponse::_class_data_ = {
+const ::google::protobuf::internal::ClassDataFull TokenUsage::_class_data_ = {
     ::google::protobuf::internal::ClassData{
-        &_ToolApprovalResponse_default_instance_._instance,
+        &_TokenUsage_default_instance_._instance,
         &_table_.header,
         nullptr,  // OnDemandRegisterArenaDtor
         nullptr,  // IsInitialized
-        &ToolApprovalResponse::MergeImpl,
-        ::google::protobuf::Message::GetNewImpl<ToolApprovalResponse>(),
+        &TokenUsage::MergeImpl,
+        ::google::protobuf::Message::GetNewImpl<TokenUsage>(),
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-        &ToolApprovalResponse::SharedDtor,
-        ::google::protobuf::Message::GetClearImpl<ToolApprovalResponse>(), &ToolApprovalResponse::ByteSizeLong,
-            &ToolApprovalResponse::_InternalSerialize,
+        &TokenUsage::SharedDtor,
+        ::google::protobuf::Message::GetClearImpl<TokenUsage>(), &TokenUsage::ByteSizeLong,
+            &TokenUsage::_InternalSerialize,
 #endif  // PROTOBUF_CUSTOM_VTABLE
-        PROTOBUF_FIELD_OFFSET(ToolApprovalResponse, _impl_._cached_size_),
+        PROTOBUF_FIELD_OFFSET(TokenUsage, _impl_._cached_size_),
         false,
     },
-    &ToolApprovalResponse::kDescriptorMethods,
+    &TokenUsage::kDescriptorMethods,
     &descriptor_table_pivox_2fai_2fv1_2fai_5fchat_2eproto,
     nullptr,  // tracker
 };
-const ::google::protobuf::internal::ClassData* ToolApprovalResponse::GetClassData() const {
+const ::google::protobuf::internal::ClassData* TokenUsage::GetClassData() const {
   ::google::protobuf::internal::PrefetchToLocalCache(&_class_data_);
   ::google::protobuf::internal::PrefetchToLocalCache(_class_data_.tc_table);
   return _class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<1, 2, 0, 53, 2> ToolApprovalResponse::_table_ = {
+const ::_pbi::TcParseTable<1, 2, 0, 0, 2> TokenUsage::_table_ = {
   {
     0,  // no _has_bits_
     0, // no _extensions_
@@ -2359,73 +2801,70 @@ const ::_pbi::TcParseTable<1, 2, 0, 53, 2> ToolApprovalResponse::_table_ = {
     nullptr,  // post_loop_handler
     ::_pbi::TcParser::GenericFallback,  // fallback
     #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-    ::_pbi::TcParser::GetTable<::pivox::ai::v1::ToolApprovalResponse>(),  // to_prefetch
+    ::_pbi::TcParser::GetTable<::pivox::ai::v1::TokenUsage>(),  // to_prefetch
     #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
   }, {{
-    // bool approved = 2 [json_name = "approved", (.google.api.field_behavior) = REQUIRED];
-    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(ToolApprovalResponse, _impl_.approved_), 63>(),
-     {16, 63, 0, PROTOBUF_FIELD_OFFSET(ToolApprovalResponse, _impl_.approved_)}},
-    // string tool_call_id = 1 [json_name = "toolCallId", (.google.api.field_behavior) = REQUIRED];
-    {::_pbi::TcParser::FastUS1,
-     {10, 63, 0, PROTOBUF_FIELD_OFFSET(ToolApprovalResponse, _impl_.tool_call_id_)}},
+    // int32 output_tokens = 2 [json_name = "outputTokens"];
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(TokenUsage, _impl_.output_tokens_), 63>(),
+     {16, 63, 0, PROTOBUF_FIELD_OFFSET(TokenUsage, _impl_.output_tokens_)}},
+    // int32 input_tokens = 1 [json_name = "inputTokens"];
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(TokenUsage, _impl_.input_tokens_), 63>(),
+     {8, 63, 0, PROTOBUF_FIELD_OFFSET(TokenUsage, _impl_.input_tokens_)}},
   }}, {{
     65535, 65535
   }}, {{
-    // string tool_call_id = 1 [json_name = "toolCallId", (.google.api.field_behavior) = REQUIRED];
-    {PROTOBUF_FIELD_OFFSET(ToolApprovalResponse, _impl_.tool_call_id_), 0, 0,
-    (0 | ::_fl::kFcSingular | ::_fl::kUtf8String | ::_fl::kRepAString)},
-    // bool approved = 2 [json_name = "approved", (.google.api.field_behavior) = REQUIRED];
-    {PROTOBUF_FIELD_OFFSET(ToolApprovalResponse, _impl_.approved_), 0, 0,
-    (0 | ::_fl::kFcSingular | ::_fl::kBool)},
+    // int32 input_tokens = 1 [json_name = "inputTokens"];
+    {PROTOBUF_FIELD_OFFSET(TokenUsage, _impl_.input_tokens_), 0, 0,
+    (0 | ::_fl::kFcSingular | ::_fl::kInt32)},
+    // int32 output_tokens = 2 [json_name = "outputTokens"];
+    {PROTOBUF_FIELD_OFFSET(TokenUsage, _impl_.output_tokens_), 0, 0,
+    (0 | ::_fl::kFcSingular | ::_fl::kInt32)},
   }},
   // no aux_entries
   {{
-    "\40\14\0\0\0\0\0\0"
-    "pivox.ai.v1.ToolApprovalResponse"
-    "tool_call_id"
   }},
 };
 
-PROTOBUF_NOINLINE void ToolApprovalResponse::Clear() {
-// @@protoc_insertion_point(message_clear_start:pivox.ai.v1.ToolApprovalResponse)
+PROTOBUF_NOINLINE void TokenUsage::Clear() {
+// @@protoc_insertion_point(message_clear_start:pivox.ai.v1.TokenUsage)
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::uint32_t cached_has_bits = 0;
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
-  _impl_.tool_call_id_.ClearToEmpty();
-  _impl_.approved_ = false;
+  ::memset(&_impl_.input_tokens_, 0, static_cast<::size_t>(
+      reinterpret_cast<char*>(&_impl_.output_tokens_) -
+      reinterpret_cast<char*>(&_impl_.input_tokens_)) + sizeof(_impl_.output_tokens_));
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
 
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-        ::uint8_t* ToolApprovalResponse::_InternalSerialize(
+        ::uint8_t* TokenUsage::_InternalSerialize(
             const MessageLite& base, ::uint8_t* target,
             ::google::protobuf::io::EpsCopyOutputStream* stream) {
-          const ToolApprovalResponse& this_ = static_cast<const ToolApprovalResponse&>(base);
+          const TokenUsage& this_ = static_cast<const TokenUsage&>(base);
 #else   // PROTOBUF_CUSTOM_VTABLE
-        ::uint8_t* ToolApprovalResponse::_InternalSerialize(
+        ::uint8_t* TokenUsage::_InternalSerialize(
             ::uint8_t* target,
             ::google::protobuf::io::EpsCopyOutputStream* stream) const {
-          const ToolApprovalResponse& this_ = *this;
+          const TokenUsage& this_ = *this;
 #endif  // PROTOBUF_CUSTOM_VTABLE
-          // @@protoc_insertion_point(serialize_to_array_start:pivox.ai.v1.ToolApprovalResponse)
+          // @@protoc_insertion_point(serialize_to_array_start:pivox.ai.v1.TokenUsage)
           ::uint32_t cached_has_bits = 0;
           (void)cached_has_bits;
 
-          // string tool_call_id = 1 [json_name = "toolCallId", (.google.api.field_behavior) = REQUIRED];
-          if (!this_._internal_tool_call_id().empty()) {
-            const std::string& _s = this_._internal_tool_call_id();
-            ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-                _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "pivox.ai.v1.ToolApprovalResponse.tool_call_id");
-            target = stream->WriteStringMaybeAliased(1, _s, target);
+          // int32 input_tokens = 1 [json_name = "inputTokens"];
+          if (this_._internal_input_tokens() != 0) {
+            target = ::google::protobuf::internal::WireFormatLite::
+                WriteInt32ToArrayWithField<1>(
+                    stream, this_._internal_input_tokens(), target);
           }
 
-          // bool approved = 2 [json_name = "approved", (.google.api.field_behavior) = REQUIRED];
-          if (this_._internal_approved() != 0) {
-            target = stream->EnsureSpace(target);
-            target = ::_pbi::WireFormatLite::WriteBoolToArray(
-                2, this_._internal_approved(), target);
+          // int32 output_tokens = 2 [json_name = "outputTokens"];
+          if (this_._internal_output_tokens() != 0) {
+            target = ::google::protobuf::internal::WireFormatLite::
+                WriteInt32ToArrayWithField<2>(
+                    stream, this_._internal_output_tokens(), target);
           }
 
           if (PROTOBUF_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -2433,18 +2872,18 @@ PROTOBUF_NOINLINE void ToolApprovalResponse::Clear() {
                 ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
                     this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
           }
-          // @@protoc_insertion_point(serialize_to_array_end:pivox.ai.v1.ToolApprovalResponse)
+          // @@protoc_insertion_point(serialize_to_array_end:pivox.ai.v1.TokenUsage)
           return target;
         }
 
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-        ::size_t ToolApprovalResponse::ByteSizeLong(const MessageLite& base) {
-          const ToolApprovalResponse& this_ = static_cast<const ToolApprovalResponse&>(base);
+        ::size_t TokenUsage::ByteSizeLong(const MessageLite& base) {
+          const TokenUsage& this_ = static_cast<const TokenUsage&>(base);
 #else   // PROTOBUF_CUSTOM_VTABLE
-        ::size_t ToolApprovalResponse::ByteSizeLong() const {
-          const ToolApprovalResponse& this_ = *this;
+        ::size_t TokenUsage::ByteSizeLong() const {
+          const TokenUsage& this_ = *this;
 #endif  // PROTOBUF_CUSTOM_VTABLE
-          // @@protoc_insertion_point(message_byte_size_start:pivox.ai.v1.ToolApprovalResponse)
+          // @@protoc_insertion_point(message_byte_size_start:pivox.ai.v1.TokenUsage)
           ::size_t total_size = 0;
 
           ::uint32_t cached_has_bits = 0;
@@ -2453,55 +2892,289 @@ PROTOBUF_NOINLINE void ToolApprovalResponse::Clear() {
 
           ::_pbi::Prefetch5LinesFrom7Lines(&this_);
            {
-            // string tool_call_id = 1 [json_name = "toolCallId", (.google.api.field_behavior) = REQUIRED];
-            if (!this_._internal_tool_call_id().empty()) {
-              total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                              this_._internal_tool_call_id());
+            // int32 input_tokens = 1 [json_name = "inputTokens"];
+            if (this_._internal_input_tokens() != 0) {
+              total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+                  this_._internal_input_tokens());
             }
-            // bool approved = 2 [json_name = "approved", (.google.api.field_behavior) = REQUIRED];
-            if (this_._internal_approved() != 0) {
-              total_size += 2;
+            // int32 output_tokens = 2 [json_name = "outputTokens"];
+            if (this_._internal_output_tokens() != 0) {
+              total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+                  this_._internal_output_tokens());
             }
           }
           return this_.MaybeComputeUnknownFieldsSize(total_size,
                                                      &this_._impl_._cached_size_);
         }
 
-void ToolApprovalResponse::MergeImpl(::google::protobuf::MessageLite& to_msg, const ::google::protobuf::MessageLite& from_msg) {
-  auto* const _this = static_cast<ToolApprovalResponse*>(&to_msg);
-  auto& from = static_cast<const ToolApprovalResponse&>(from_msg);
-  // @@protoc_insertion_point(class_specific_merge_from_start:pivox.ai.v1.ToolApprovalResponse)
+void TokenUsage::MergeImpl(::google::protobuf::MessageLite& to_msg, const ::google::protobuf::MessageLite& from_msg) {
+  auto* const _this = static_cast<TokenUsage*>(&to_msg);
+  auto& from = static_cast<const TokenUsage&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:pivox.ai.v1.TokenUsage)
   ABSL_DCHECK_NE(&from, _this);
   ::uint32_t cached_has_bits = 0;
   (void) cached_has_bits;
 
-  if (!from._internal_tool_call_id().empty()) {
-    _this->_internal_set_tool_call_id(from._internal_tool_call_id());
+  if (from._internal_input_tokens() != 0) {
+    _this->_impl_.input_tokens_ = from._impl_.input_tokens_;
   }
-  if (from._internal_approved() != 0) {
-    _this->_impl_.approved_ = from._impl_.approved_;
+  if (from._internal_output_tokens() != 0) {
+    _this->_impl_.output_tokens_ = from._impl_.output_tokens_;
   }
   _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(from._internal_metadata_);
 }
 
-void ToolApprovalResponse::CopyFrom(const ToolApprovalResponse& from) {
-// @@protoc_insertion_point(class_specific_copy_from_start:pivox.ai.v1.ToolApprovalResponse)
+void TokenUsage::CopyFrom(const TokenUsage& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:pivox.ai.v1.TokenUsage)
   if (&from == this) return;
   Clear();
   MergeFrom(from);
 }
 
 
-void ToolApprovalResponse::InternalSwap(ToolApprovalResponse* PROTOBUF_RESTRICT other) {
+void TokenUsage::InternalSwap(TokenUsage* PROTOBUF_RESTRICT other) {
+  using std::swap;
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(TokenUsage, _impl_.output_tokens_)
+      + sizeof(TokenUsage::_impl_.output_tokens_)
+      - PROTOBUF_FIELD_OFFSET(TokenUsage, _impl_.input_tokens_)>(
+          reinterpret_cast<char*>(&_impl_.input_tokens_),
+          reinterpret_cast<char*>(&other->_impl_.input_tokens_));
+}
+
+::google::protobuf::Metadata TokenUsage::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+class SummarizeConversationRequest::_Internal {
+ public:
+};
+
+SummarizeConversationRequest::SummarizeConversationRequest(::google::protobuf::Arena* arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, _class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:pivox.ai.v1.SummarizeConversationRequest)
+}
+inline PROTOBUF_NDEBUG_INLINE SummarizeConversationRequest::Impl_::Impl_(
+    ::google::protobuf::internal::InternalVisibility visibility, ::google::protobuf::Arena* arena,
+    const Impl_& from, const ::pivox::ai::v1::SummarizeConversationRequest& from_msg)
+      : name_(arena, from.name_),
+        _cached_size_{0} {}
+
+SummarizeConversationRequest::SummarizeConversationRequest(
+    ::google::protobuf::Arena* arena,
+    const SummarizeConversationRequest& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, _class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SummarizeConversationRequest* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+
+  // @@protoc_insertion_point(copy_constructor:pivox.ai.v1.SummarizeConversationRequest)
+}
+inline PROTOBUF_NDEBUG_INLINE SummarizeConversationRequest::Impl_::Impl_(
+    ::google::protobuf::internal::InternalVisibility visibility,
+    ::google::protobuf::Arena* arena)
+      : name_(arena),
+        _cached_size_{0} {}
+
+inline void SummarizeConversationRequest::SharedCtor(::_pb::Arena* arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+}
+SummarizeConversationRequest::~SummarizeConversationRequest() {
+  // @@protoc_insertion_point(destructor:pivox.ai.v1.SummarizeConversationRequest)
+  SharedDtor(*this);
+}
+inline void SummarizeConversationRequest::SharedDtor(MessageLite& self) {
+  SummarizeConversationRequest& this_ = static_cast<SummarizeConversationRequest&>(self);
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.name_.Destroy();
+  this_._impl_.~Impl_();
+}
+
+inline void* SummarizeConversationRequest::PlacementNew_(const void*, void* mem,
+                                        ::google::protobuf::Arena* arena) {
+  return ::new (mem) SummarizeConversationRequest(arena);
+}
+constexpr auto SummarizeConversationRequest::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(SummarizeConversationRequest),
+                                            alignof(SummarizeConversationRequest));
+}
+PROTOBUF_CONSTINIT
+PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::google::protobuf::internal::ClassDataFull SummarizeConversationRequest::_class_data_ = {
+    ::google::protobuf::internal::ClassData{
+        &_SummarizeConversationRequest_default_instance_._instance,
+        &_table_.header,
+        nullptr,  // OnDemandRegisterArenaDtor
+        nullptr,  // IsInitialized
+        &SummarizeConversationRequest::MergeImpl,
+        ::google::protobuf::Message::GetNewImpl<SummarizeConversationRequest>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+        &SummarizeConversationRequest::SharedDtor,
+        ::google::protobuf::Message::GetClearImpl<SummarizeConversationRequest>(), &SummarizeConversationRequest::ByteSizeLong,
+            &SummarizeConversationRequest::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+        PROTOBUF_FIELD_OFFSET(SummarizeConversationRequest, _impl_._cached_size_),
+        false,
+    },
+    &SummarizeConversationRequest::kDescriptorMethods,
+    &descriptor_table_pivox_2fai_2fv1_2fai_5fchat_2eproto,
+    nullptr,  // tracker
+};
+const ::google::protobuf::internal::ClassData* SummarizeConversationRequest::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(_class_data_.tc_table);
+  return _class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<0, 1, 0, 53, 2> SummarizeConversationRequest::_table_ = {
+  {
+    0,  // no _has_bits_
+    0, // no _extensions_
+    1, 0,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967294,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    1,  // num_field_entries
+    0,  // num_aux_entries
+    offsetof(decltype(_table_), field_names),  // no aux_entries
+    _class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::pivox::ai::v1::SummarizeConversationRequest>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    // string name = 1 [json_name = "name", (.google.api.field_behavior) = REQUIRED, (.google.api.resource_reference) = {
+    {::_pbi::TcParser::FastUS1,
+     {10, 63, 0, PROTOBUF_FIELD_OFFSET(SummarizeConversationRequest, _impl_.name_)}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // string name = 1 [json_name = "name", (.google.api.field_behavior) = REQUIRED, (.google.api.resource_reference) = {
+    {PROTOBUF_FIELD_OFFSET(SummarizeConversationRequest, _impl_.name_), 0, 0,
+    (0 | ::_fl::kFcSingular | ::_fl::kUtf8String | ::_fl::kRepAString)},
+  }},
+  // no aux_entries
+  {{
+    "\50\4\0\0\0\0\0\0"
+    "pivox.ai.v1.SummarizeConversationRequest"
+    "name"
+  }},
+};
+
+PROTOBUF_NOINLINE void SummarizeConversationRequest::Clear() {
+// @@protoc_insertion_point(message_clear_start:pivox.ai.v1.SummarizeConversationRequest)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  _impl_.name_.ClearToEmpty();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+        ::uint8_t* SummarizeConversationRequest::_InternalSerialize(
+            const MessageLite& base, ::uint8_t* target,
+            ::google::protobuf::io::EpsCopyOutputStream* stream) {
+          const SummarizeConversationRequest& this_ = static_cast<const SummarizeConversationRequest&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+        ::uint8_t* SummarizeConversationRequest::_InternalSerialize(
+            ::uint8_t* target,
+            ::google::protobuf::io::EpsCopyOutputStream* stream) const {
+          const SummarizeConversationRequest& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          // @@protoc_insertion_point(serialize_to_array_start:pivox.ai.v1.SummarizeConversationRequest)
+          ::uint32_t cached_has_bits = 0;
+          (void)cached_has_bits;
+
+          // string name = 1 [json_name = "name", (.google.api.field_behavior) = REQUIRED, (.google.api.resource_reference) = {
+          if (!this_._internal_name().empty()) {
+            const std::string& _s = this_._internal_name();
+            ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+                _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "pivox.ai.v1.SummarizeConversationRequest.name");
+            target = stream->WriteStringMaybeAliased(1, _s, target);
+          }
+
+          if (PROTOBUF_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+            target =
+                ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+                    this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+          }
+          // @@protoc_insertion_point(serialize_to_array_end:pivox.ai.v1.SummarizeConversationRequest)
+          return target;
+        }
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+        ::size_t SummarizeConversationRequest::ByteSizeLong(const MessageLite& base) {
+          const SummarizeConversationRequest& this_ = static_cast<const SummarizeConversationRequest&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+        ::size_t SummarizeConversationRequest::ByteSizeLong() const {
+          const SummarizeConversationRequest& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          // @@protoc_insertion_point(message_byte_size_start:pivox.ai.v1.SummarizeConversationRequest)
+          ::size_t total_size = 0;
+
+          ::uint32_t cached_has_bits = 0;
+          // Prevent compiler warnings about cached_has_bits being unused
+          (void)cached_has_bits;
+
+           {
+            // string name = 1 [json_name = "name", (.google.api.field_behavior) = REQUIRED, (.google.api.resource_reference) = {
+            if (!this_._internal_name().empty()) {
+              total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                              this_._internal_name());
+            }
+          }
+          return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                                     &this_._impl_._cached_size_);
+        }
+
+void SummarizeConversationRequest::MergeImpl(::google::protobuf::MessageLite& to_msg, const ::google::protobuf::MessageLite& from_msg) {
+  auto* const _this = static_cast<SummarizeConversationRequest*>(&to_msg);
+  auto& from = static_cast<const SummarizeConversationRequest&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:pivox.ai.v1.SummarizeConversationRequest)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  if (!from._internal_name().empty()) {
+    _this->_internal_set_name(from._internal_name());
+  }
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(from._internal_metadata_);
+}
+
+void SummarizeConversationRequest::CopyFrom(const SummarizeConversationRequest& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:pivox.ai.v1.SummarizeConversationRequest)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void SummarizeConversationRequest::InternalSwap(SummarizeConversationRequest* PROTOBUF_RESTRICT other) {
   using std::swap;
   auto* arena = GetArena();
   ABSL_DCHECK_EQ(arena, other->GetArena());
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.tool_call_id_, &other->_impl_.tool_call_id_, arena);
-        swap(_impl_.approved_, other->_impl_.approved_);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.name_, &other->_impl_.name_, arena);
 }
 
-::google::protobuf::Metadata ToolApprovalResponse::GetMetadata() const {
+::google::protobuf::Metadata SummarizeConversationRequest::GetMetadata() const {
   return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // ===================================================================

@@ -186,7 +186,7 @@ void ChatClient::OpenStream() {
   grpc::GenericStub stub(channel_);
   stub.PrepareBidiStreamingCall(
       raw_ctx,
-      "/pivox.ai.v1.AiChat/Stream",
+      "/pivox.ai.v1.AiChat/StreamGenerateContent",
       grpc::StubOptions(),
       r.get());
 

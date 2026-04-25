@@ -28,6 +28,9 @@ func NewOllamaAdapter(baseURL, modelName string) (*OllamaAdapter, error) {
 	return &OllamaAdapter{client: client, model: modelName}, nil
 }
 
+// Name returns the configured model identifier (e.g. "llama3.1").
+func (o *OllamaAdapter) Name() string { return o.model }
+
 func (o *OllamaAdapter) Stream(ctx context.Context, req StreamRequest) (StreamReader, error) {
 	ollamaReq := &api.ChatRequest{
 		Model:    o.model,

@@ -222,11 +222,16 @@ func serve(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("create validator: %w", err)
 	}
 	grpcServer := grpc.NewServer(
+		// Logging is FIRST so it sees every RPC including the ones
+		// auth/validate reject — those would otherwise fail silently
+		// from the operator's perspective.
 		grpc.ChainUnaryInterceptor(
+			server.LoggingUnaryInterceptor(logger),
 			server.AuthInterceptor(authSvc),
 			server.FieldMaskAwareValidationInterceptor(validator),
 		),
 		grpc.ChainStreamInterceptor(
+			server.LoggingStreamInterceptor(logger),
 			server.AuthStreamInterceptor(authSvc),
 		),
 	)
@@ -322,7 +327,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	sseHandler := aichat.NewSSEHandler(aiv1.NewAiChatClient(grpcConn), logger)
 	if err := gwMux.HandlePath(
 		"POST",
-		"/v1/ai:stream",
+		"/v1/ai:streamGenerateContent",
 		func(w http.ResponseWriter, r *http.Request, _ map[string]string) {
 			sseHandler.ServeHTTP(w, r)
 		},

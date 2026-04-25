@@ -25,6 +25,13 @@ public final class ConversationViewModel: ObservableObject {
     /// and message appends gates on it.
     @Published public var stickToBottom: Bool = true
 
+    /// Latest server-side title for this conversation. Set by the
+    /// auto-summarize path after the first turn completes. The
+    /// header view observes this and fades in the new title; the
+    /// header's bound title elsewhere (from `Conversation.title`)
+    /// updates on the next list/get refresh.
+    @Published public private(set) var latestTitle: String?
+
     private let client: any ChatClientProtocol
     public let conversationName: String
     /// True when the conversation was just created in this session (via the
@@ -204,31 +211,87 @@ public final class ConversationViewModel: ObservableObject {
         state = .streaming
         inFlightText = ""
 
-        let event = Pivox_Ai_V1_ClientEvent.with {
-            $0.message = Pivox_Ai_V1_UserMessage.with {
-                $0.conversation = conversationName
-                $0.parts = [
-                    Pivox_Ai_V1_MessagePart.with {
-                        $0.text = Pivox_Ai_V1_TextPart.with { $0.text = text }
-                    },
-                ]
-            }
+        let request = Pivox_Ai_V1_GenerateContentRequest.with {
+            // Parent is the org segment of the conversation name.
+            // Server uses it for routing and tenancy; conversation
+            // tells it to load history and persist this turn.
+            $0.parent = parentOrgName(from: conversationName)
+            $0.conversation = conversationName
+            $0.messages = [
+                Pivox_Ai_V1_InputMessage.with {
+                    $0.role = .user
+                    $0.parts = [
+                        Pivox_Ai_V1_MessagePart.with {
+                            $0.text = Pivox_Ai_V1_TextPart.with { $0.text = text }
+                        },
+                    ]
+                },
+            ]
         }
 
+        // First-turn detection: the obvious check is
+        // `messages.count == 1` (we just appended the user msg).
+        // That's correct for the new-conversation path because
+        // `isNew` skips `loadHistory`. The defensive `isNew` arm
+        // covers the case where a future change lifts the
+        // `loadHistory` skip and history loads in parallel — count
+        // would then exceed 1 and auto-summarize would never run
+        // for a brand-new conversation. Belt-and-suspenders against
+        // a heuristic that would be silently wrong.
+        let isFirstTurn = isNew || messages.count == 1
         streamTask = Task {
             do {
-                let eventStream = client.stream(event)
+                let eventStream = client.streamGenerateContent(request)
 
                 for try await serverEvent in eventStream {
                     handle(serverEvent)
                 }
                 commitInFlight()
+                if isFirstTurn {
+                    // Brand-new conversation just finished its first
+                    // turn. Trigger auto-summarize in the background;
+                    // the title fades in when the response lands.
+                    // Server short-circuits if `title_user_set` is
+                    // already true (e.g. user typed a title before
+                    // sending), so this is safe to fire blindly.
+                    Task { await self.autoSummarizeIfNeeded() }
+                }
             } catch is CancellationError {
                 commitInFlight()
             } catch {
                 state = .error(error.localizedDescription)
             }
         }
+    }
+
+    /// Calls `:summarize` for the current conversation and publishes
+    /// the new title via `latestTitle`. Failures are swallowed —
+    /// title generation is a side-effect, never blocking the chat
+    /// experience. The header falls back to the heuristic prefix
+    /// title (or "New Conversation") if this never succeeds.
+    private func autoSummarizeIfNeeded() async {
+        do {
+            let req = Pivox_Ai_V1_SummarizeConversationRequest.with {
+                $0.name = self.conversationName
+            }
+            let updated = try await client.summarizeConversation(req)
+            await MainActor.run {
+                self.latestTitle = updated.title
+            }
+        } catch {
+            // Intentional silent failure — see docstring.
+        }
+    }
+
+    /// Extracts the `organizations/{org}` parent prefix from a full
+    /// conversation resource name `organizations/{org}/conversations/{conv}`.
+    /// The server requires `parent` on `GenerateContentRequest`.
+    private func parentOrgName(from convName: String) -> String {
+        // Conversation names are exactly `organizations/{org}/conversations/{c}`.
+        // Take the first two path segments.
+        let parts = convName.split(separator: "/")
+        guard parts.count >= 2 else { return "" }
+        return "\(parts[0])/\(parts[1])"
     }
 
     public func cancel() {
