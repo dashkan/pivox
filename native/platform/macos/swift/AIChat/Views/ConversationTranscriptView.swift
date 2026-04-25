@@ -733,14 +733,32 @@ struct ConversationTranscriptView: NSViewRepresentable {
         /// negative — otherwise the negative origin from a previous
         /// short-content state would persist past the threshold.
         private func applyBottomPin() {
-            guard let scrollView else { return }
+            guard let scrollView, let tableView else { return }
+            // Layout-in-progress guard. `tableView.rect(ofRow:)`
+            // returns NSZeroRect for rows that haven't been laid
+            // out yet, which happens transiently during the
+            // noteHeightOfRows / reloadData passes that scroll-time
+            // width-aware height refresh triggers. Without this
+            // guard, the table-frame notification that fires
+            // mid-relayout would read docHeight as 0, decide
+            // content is "short", and snap origin.y to `-clipHeight`
+            // — producing visible scroll stutter on long transcripts
+            // as the user scrolls up. Skipping here is safe because
+            // a follow-up frame-change notification fires after
+            // layout settles, and we apply the pin then.
+            let rowCount = tableView.numberOfRows
+            guard rowCount > 0 else { return }
+            let lastRect = tableView.rect(ofRow: rowCount - 1)
+            guard lastRect.maxY > 0 else { return }
+
             let clipView = scrollView.contentView
-            // Use the actual content extent (bottom of the last
-            // row), NOT documentView.frame.height. NSTableView pads
-            // its own frame to the clip height when content is
-            // short, so frame.height always reads >= clipHeight and
-            // the bottom-pin check would never trigger.
-            let docHeight = totalContentHeight()
+            // True content extent (bottom of last row in document
+            // coords). We deliberately don't use
+            // `documentView.frame.height` — NSTableView pads its
+            // own frame to the clip height when content is short,
+            // so frame.height always reads >= clipHeight and the
+            // bottom-pin check would never trigger.
+            let docHeight = lastRect.maxY
             let clipHeight = clipView.bounds.height
             var newBounds = clipView.bounds
             if docHeight < clipHeight {
@@ -754,21 +772,6 @@ struct ConversationTranscriptView: NSViewRepresentable {
                 clipView.bounds = newBounds
                 scrollView.reflectScrolledClipView(clipView)
             }
-        }
-
-        /// Sum of all row heights + intercell spacing — the *actual*
-        /// rendered content extent. NSTableView reports
-        /// `frame.height` as the larger of (natural content,
-        /// clipView height), which makes it useless for detecting
-        /// "content shorter than viewport".
-        private func totalContentHeight() -> CGFloat {
-            guard let tableView else { return 0 }
-            let rowCount = tableView.numberOfRows
-            guard rowCount > 0 else { return 0 }
-            // `rect(ofRow:)` returns the row's frame in document
-            // coordinates. The last row's maxY is the bottom of all
-            // content, accounting for intercell spacing.
-            return tableView.rect(ofRow: rowCount - 1).maxY
         }
 
         /// Jump-to-latest pill clicked. Force re-engage stickiness
