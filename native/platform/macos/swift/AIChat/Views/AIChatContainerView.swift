@@ -10,9 +10,18 @@ extension Notification.Name {
     static let aiChatFocusRequested = Notification.Name("pivox.aiChat.focusRequested")
 
     /// Posted by the jump-to-latest pill in the transcript when the
-    /// user clicks it. The transcript coordinator listens, scrolls
-    /// to bottom, and re-engages stick-to-bottom.
+    /// user clicks it (and by the ⌘↓ keyboard shortcut). The
+    /// transcript coordinator listens, scrolls to bottom, and
+    /// re-engages stick-to-bottom.
     static let aiChatJumpToLatest = Notification.Name("pivox.aiChat.jumpToLatest")
+
+    /// Posted by the ⌘↑ keyboard shortcut. The transcript
+    /// coordinator advances toward the top in tiered steps — first
+    /// to just above the pagination trigger, then a single explicit
+    /// `loadOlder()` if more pages exist, finally to absolute top
+    /// when no older pages remain. Tiered so a single keypress
+    /// never cascades multiple pagination loads.
+    static let aiChatScrollUp = Notification.Name("pivox.aiChat.scrollUp")
 }
 
 /// AI chat surface. Renders whichever stage the shared
@@ -108,7 +117,17 @@ struct AIChatPanel: View {
                 Spacer()
 
                 if let name = conversationName,
-                   let vm = AIChatService.shared.viewModel(for: name, isNew: false) {
+                   // Pass the same `isNew` semantics here as
+                   // `ActiveConversationView` uses below — without
+                   // this, the title header runs first in the
+                   // render pass and creates the VM with
+                   // `isNew=false`, after which `ActiveConversationView`
+                   // gets a cached VM that's already wrong.
+                   // `loadHistory()` then runs on a brand-new
+                   // conversation and races the just-sent first
+                   // message.
+                   let vm = AIChatService.shared.viewModel(
+                    for: name, isNew: pendingMessage != nil) {
                     ConversationTitleHeader(
                         client: client,
                         conversationName: name,
@@ -133,17 +152,32 @@ struct AIChatPanel: View {
                     }
                 }
 
-                // Detach button: only visible while docked. Detached
-                // mode has its own dock button in the window's
-                // titlebar toolbar, so showing one here would be
-                // confusing (clicking it would do nothing useful).
+                // Mode-toggle pair. We render whichever direction
+                // makes sense for the current mode in the SwiftUI
+                // header (rather than putting either action in the
+                // floating panel's NSToolbar) so both buttons use
+                // the same IconButton component, the same theme
+                // size, and visually match every other icon in
+                // this row. NSToolbar items in `.utilityWindow`
+                // panels render small by AppKit design — HIG-correct
+                // for tool palettes — but mixing those small icons
+                // with the rest of the header's IconButton sizing
+                // looks inconsistent.
                 if AIChatState.shared.mode == .docked {
                     IconButton(
                         systemName: "arrow.up.right.square",
-                        label: "Detach AI Chat into its own window",
-                        help: "Pop out into a new window"
+                        label: "Open AI Chat in a floating window",
+                        help: "Open in window"
                     ) {
                         AppDelegate.shared?.detachAIChat()
+                    }
+                } else {
+                    IconButton(
+                        systemName: "arrow.down.left.square",
+                        label: "Move AI Chat back into the main window",
+                        help: "Show in main window"
+                    ) {
+                        AppDelegate.shared?.dockAIChat()
                     }
                 }
             }
@@ -238,27 +272,26 @@ struct NewChatView: View {
 
             Spacer()
 
-            // Prompt input at the bottom
-            HStack(spacing: 8) {
-                ShimmerPromptField(
-                    text: $inputText,
-                    placeholder: "Message...",
-                    isEnabled: !isCreating,
-                    onSubmit: sendFirst,
-                    focused: $inputFocused)
-
-                IconButton(systemName: "paperplane.fill", label: "Send", help: "Send") {
-                    sendFirst()
+            // Prompt input at the bottom. New-chat flow has no
+            // streaming state of its own — the conversation is
+            // created on send, and from there `ConversationView`
+            // takes over with the live composer.
+            ShimmerPromptField(
+                text: $inputText,
+                placeholder: "Message...",
+                isEnabled: !isCreating,
+                isStreaming: false,
+                onSubmit: sendFirst,
+                onCancel: {},
+                focused: $inputFocused,
+                toolItems: { ChatAttachmentMenuButton() })
+                .padding(12)
+                .onReceive(NotificationCenter.default.publisher(for: .aiChatFocusRequested)) { _ in
+                    // Only the hotkey path posts this; clicking or
+                    // Space-activating the toolbar button opens the
+                    // chat without stealing focus.
+                    DispatchQueue.main.async { inputFocused = true }
                 }
-                .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isCreating)
-            }
-            .padding(12)
-            .onReceive(NotificationCenter.default.publisher(for: .aiChatFocusRequested)) { _ in
-                // Only the hotkey path posts this; clicking or Space-
-                // activating the toolbar button opens the chat without
-                // stealing focus.
-                DispatchQueue.main.async { inputFocused = true }
-            }
         }
     }
 

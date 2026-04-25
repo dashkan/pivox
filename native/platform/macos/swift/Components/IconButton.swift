@@ -70,7 +70,7 @@ public struct IconButton: View {
                 )
         }
         .buttonStyle(.plain)
-        .foregroundStyle(isOn ? theme.accent : theme.textSecondary)
+        .foregroundStyle(foregroundColor)
         // reliableHelp routes through an AppKit tooltip shim because
         // SwiftUI's native .help() fails to register on plain-style
         // buttons with no background fill.
@@ -78,6 +78,20 @@ public struct IconButton: View {
         .accessibilityLabel(label)
         .pointingHandCursor()
         .onHover { isHovered = $0 }
+    }
+
+    /// Foreground color resolution, in priority order:
+    ///   1. `role == .destructive` → `theme.destructive` so stop /
+    ///      delete glyphs read as decisive.
+    ///   2. `isOn` → `theme.accent` for latched / "primary action
+    ///      enabled" states (e.g. the chat composer's send glyph
+    ///      while text is non-empty).
+    ///   3. Default → `theme.textSecondary` so dormant icons sit
+    ///      quietly in the chrome.
+    private var foregroundColor: Color {
+        if role == .destructive { return theme.destructive }
+        if isOn { return theme.accent }
+        return theme.textSecondary
     }
 
     private var hoverBackgroundColor: Color {

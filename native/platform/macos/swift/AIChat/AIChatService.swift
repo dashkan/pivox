@@ -30,17 +30,22 @@ final class AIChatService {
     let orgName = "local-corp"
     private let endpoint = "localhost:50051"
 
-    /// Long-lived `ConversationViewModel` cache keyed by
-    /// conversation name. Lifting these out of the view tree is
-    /// what makes dock/detach safe for in-flight requests — the
-    /// streaming Task lives on the view model, and the view model
-    /// lives here, so re-mounting the panel after a mode swap
+    /// Single-slot `ConversationViewModel` cache for the
+    /// currently-viewed conversation. Lifting it out of the view
+    /// tree is what makes dock/detach safe for in-flight requests —
+    /// the streaming Task lives on the view model, and the view
+    /// model lives here, so re-mounting the panel after a mode swap
     /// re-attaches to the same stream rather than tearing it down.
     ///
-    /// Entries persist for the lifetime of the app session, which
-    /// is fine for normal use (conversations are scoped per
-    /// session). `reset()` clears them on sign-out.
-    private var viewModels: [String: ConversationViewModel] = [:]
+    /// We intentionally keep only ONE cached VM at a time: switching
+    /// to a different conversation evicts the previous cache and
+    /// builds a fresh VM (which then re-fetches history from the
+    /// server). This means revisiting a conversation after viewing
+    /// another one always shows the latest server-side state —
+    /// important for any future multi-client editing case where
+    /// another device may have written into the conversation while
+    /// you were away. Re-selecting the SAME conversation is a no-op.
+    private var current: (name: String, vm: ConversationViewModel)?
 
     private init() {}
 
@@ -60,26 +65,37 @@ final class AIChatService {
         }
     }
 
-    /// Get or create the view model for a conversation. Same
-    /// instance returned across calls so multiple views (or the
-    /// same view re-mounted after a mode swap) observe the same
-    /// streaming state.
+    /// Get or create the view model for a conversation.
+    ///
+    /// Same-name calls return the existing instance — important for
+    /// dock/detach (the panel re-mounts but stays on the same
+    /// conversation, so we want to re-attach to the same in-flight
+    /// stream). Different-name calls evict the previous VM
+    /// (canceling any in-flight stream) and build a fresh one,
+    /// triggering a re-fetch when the new view's `loadHistory()`
+    /// runs.
     func viewModel(for conversationName: String, isNew: Bool = false) -> ConversationViewModel? {
-        if let existing = viewModels[conversationName] {
-            return existing
+        if let cur = current, cur.name == conversationName {
+            return cur.vm
         }
+        // Different conversation — drop the previous cache.
+        // `cancel()` tears down any in-flight streaming Task so the
+        // gRPC call doesn't keep running for a conversation the
+        // user has navigated away from.
+        current?.vm.cancel()
+
         guard let client else { return nil }
         let vm = ConversationViewModel(
             client: client, conversationName: conversationName, isNew: isNew)
-        viewModels[conversationName] = vm
+        current = (conversationName, vm)
         return vm
     }
 
     /// Reset state — use only when the signed-in user changes,
     /// since the gRPC channel is bound to that user's auth token.
     func reset() {
-        viewModels.values.forEach { $0.cancel() }
-        viewModels.removeAll()
+        current?.vm.cancel()
+        current = nil
         client = nil
         initError = nil
     }

@@ -167,6 +167,11 @@ struct ConversationTranscriptView: NSViewRepresentable {
             selector: #selector(Coordinator.handleJumpToLatest(_:)),
             name: .aiChatJumpToLatest,
             object: nil)
+        NotificationCenter.default.addObserver(
+            context.coordinator,
+            selector: #selector(Coordinator.handleScrollUp(_:)),
+            name: .aiChatScrollUp,
+            object: nil)
 
         // Install the scroll-event forwarder so vertical scrolls over
         // nested horizontal scroll views (code blocks) reach our
@@ -242,6 +247,23 @@ struct ConversationTranscriptView: NSViewRepresentable {
         /// instantly and produce a spurious second-page fetch on
         /// first open.
         private var hasScrolledToBottomOnce = false
+
+        /// Latch — set the first time we observe the document being
+        /// at least as tall as the clip view. Once set, `applyBottomPin`
+        /// short-circuits forever. The latch defends against the
+        /// scroll-stutter regression: width-aware height refresh
+        /// during the first scroll-up invalidates rows tick-by-tick,
+        /// briefly flickering `tableView.frame` to a smaller value
+        /// before relayout settles, and `tableView.rect(ofRow: last)`
+        /// can return stale-but-nonzero numbers in that window. The
+        /// `maxY > 0` guard skips the all-zero case but not the
+        /// stale-nonzero case. We don't legitimately need to
+        /// re-engage the pin once content has ever filled the
+        /// viewport — messages are append-only, conversation
+        /// switches re-mount the coordinator from scratch (via
+        /// `.id(name)` on `ActiveConversationView`), so the latch
+        /// resets where it should.
+        private var docHasEverOverflowed = false
 
         /// Latches between "fired loadOlder" and "prepend applied or
         /// end-of-history detected". Critical because:
@@ -343,6 +365,17 @@ struct ConversationTranscriptView: NSViewRepresentable {
         // MARK: - Sync
 
         func sync(viewModel: ConversationViewModel) {
+            // VM identity change → fresh conversation in this
+            // coordinator. Reset the bottom-pin overflow latch so
+            // a short conversation can pin again. Today this only
+            // fires if `.id(name)` is removed from
+            // `ActiveConversationView` and the same coordinator is
+            // reused across conversations — defensive against a
+            // future tree restructure that would silently break
+            // bottom-pin without this guard.
+            if self.viewModel !== viewModel {
+                docHasEverOverflowed = false
+            }
             self.viewModel = viewModel
             let new = viewModel.messages
 
@@ -733,6 +766,11 @@ struct ConversationTranscriptView: NSViewRepresentable {
         /// negative — otherwise the negative origin from a previous
         /// short-content state would persist past the threshold.
         private func applyBottomPin() {
+            // Once the document has ever exceeded the clip view's
+            // height, the pin is permanently disengaged for this
+            // coordinator's lifetime. See `docHasEverOverflowed`
+            // for why this latch exists.
+            if docHasEverOverflowed { return }
             guard let scrollView, let tableView else { return }
             // Layout-in-progress guard. `tableView.rect(ofRow:)`
             // returns NSZeroRect for rows that haven't been laid
@@ -741,11 +779,9 @@ struct ConversationTranscriptView: NSViewRepresentable {
             // width-aware height refresh triggers. Without this
             // guard, the table-frame notification that fires
             // mid-relayout would read docHeight as 0, decide
-            // content is "short", and snap origin.y to `-clipHeight`
-            // — producing visible scroll stutter on long transcripts
-            // as the user scrolls up. Skipping here is safe because
-            // a follow-up frame-change notification fires after
-            // layout settles, and we apply the pin then.
+            // content is "short", and snap origin.y to `-clipHeight`.
+            // A follow-up frame-change notification fires after
+            // layout settles and we apply the pin then.
             let rowCount = tableView.numberOfRows
             guard rowCount > 0 else { return }
             let lastRect = tableView.rect(ofRow: rowCount - 1)
@@ -760,6 +796,15 @@ struct ConversationTranscriptView: NSViewRepresentable {
             // bottom-pin check would never trigger.
             let docHeight = lastRect.maxY
             let clipHeight = clipView.bounds.height
+
+            // Latch first. Even on a "no-op" overflow path (origin
+            // already 0, content fills viewport), set the flag so
+            // future calls during scroll-driven height refresh skip
+            // the function entirely.
+            if docHeight >= clipHeight {
+                docHasEverOverflowed = true
+            }
+
             var newBounds = clipView.bounds
             if docHeight < clipHeight {
                 newBounds.origin.y = docHeight - clipHeight
@@ -780,6 +825,31 @@ struct ConversationTranscriptView: NSViewRepresentable {
         @objc func handleJumpToLatest(_ notification: Notification) {
             viewModel.stickToBottom = true
             scrollToBottom()
+        }
+
+        /// ⌘↑ keyboard shortcut. Single decisive action: scroll to
+        /// the top of currently-loaded content. The existing
+        /// scroll-position observer in `contentViewBoundsDidChange`
+        /// notices `origin.y < 300` and fires one `loadOlder()`
+        /// (gated by `expectingPrepend`, so no cascading). After
+        /// the prepend's scroll-preservation shifts the viewport
+        /// down to the boundary between old and new pages, the
+        /// next ⌘↑ press starts the cycle again — one press per
+        /// page traversal. When no more pages remain, `loadOlder`
+        /// gates itself off via `canLoadOlder`, and ⌘↑ just sits
+        /// at the absolute top.
+        ///
+        /// We deliberately don't fire `loadOlder()` directly here.
+        /// The bounds-change observer's path is already correct;
+        /// re-implementing it would mean two places to keep in
+        /// sync with the prepend / latch logic.
+        @objc func handleScrollUp(_ notification: Notification) {
+            guard let scrollView else { return }
+            let clipView = scrollView.contentView
+            if clipView.bounds.origin.y > 0 {
+                clipView.scroll(to: .zero)
+                scrollView.reflectScrolledClipView(clipView)
+            }
         }
 
         /// Whether the visible rect's bottom is essentially at the
