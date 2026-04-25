@@ -34,6 +34,9 @@ type Querier interface {
 	CountFulfilledLineItems(ctx context.Context, requestID uuid.UUID) (int64, error)
 	CountLineItemsByRequest(ctx context.Context, requestID uuid.UUID) (int64, error)
 	CountMessagesByConversation(ctx context.Context, conversationID uuid.UUID) (int64, error)
+	// Used by membership-mutation handlers to enforce "≥1 owner" — call
+	// before any role-change or delete that would reduce the owner count.
+	CountOwnersByOrg(ctx context.Context, orgID uuid.UUID) (int64, error)
 	CountRequestsByProject(ctx context.Context, projectID uuid.UUID) (int64, error)
 	CountStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) (int64, error)
 	CountTagBindingsByTagValue(ctx context.Context, tagValueID uuid.UUID) (int64, error)
@@ -64,6 +67,10 @@ type Querier interface {
 	CreateTagBinding(ctx context.Context, arg CreateTagBindingParams) (TagBinding, error)
 	CreateTagKey(ctx context.Context, arg CreateTagKeyParams) (TagKey, error)
 	CreateTagValue(ctx context.Context, arg CreateTagValueParams) (TagValue, error)
+	// Creates a per-org membership row joining an account to an org with a role.
+	// Used by `CreateOrganization` (founder, role='owner') and the future
+	// `AcceptInvitation` flow (invitee, role from invite).
+	CreateUserMembership(ctx context.Context, arg CreateUserMembershipParams) (User, error)
 	DeleteArtifact(ctx context.Context, id uuid.UUID) error
 	DeleteArtifactVersion(ctx context.Context, id uuid.UUID) error
 	DeleteAssetRenditionsByVersion(ctx context.Context, versionID uuid.UUID) error
@@ -84,6 +91,7 @@ type Querier interface {
 	DeleteTagBinding(ctx context.Context, id uuid.UUID) error
 	DeleteTagKey(ctx context.Context, id uuid.UUID) error
 	DeleteTagValue(ctx context.Context, id uuid.UUID) error
+	DeleteUserMembership(ctx context.Context, arg DeleteUserMembershipParams) error
 	FailOperation(ctx context.Context, arg FailOperationParams) (Operation, error)
 	GetAccountByFirebaseUID(ctx context.Context, firebaseUid string) (Account, error)
 	GetApiKey(ctx context.Context, id uuid.UUID) (ApiKey, error)
@@ -130,6 +138,7 @@ type Querier interface {
 	GetTagKeyByNamespacedName(ctx context.Context, namespacedName string) (TagKey, error)
 	GetTagValue(ctx context.Context, id uuid.UUID) (TagValue, error)
 	GetTagValueByNamespacedName(ctx context.Context, namespacedName string) (TagValue, error)
+	GetUserMembership(ctx context.Context, arg GetUserMembershipParams) (User, error)
 	IncrementConversationMessageCount(ctx context.Context, id uuid.UUID) error
 	IsOnlyArtifactVersion(ctx context.Context, artifactID uuid.UUID) (bool, error)
 	ListAssetRenditions(ctx context.Context, versionID uuid.UUID) ([]AssetRendition, error)
@@ -149,6 +158,11 @@ type Querier interface {
 	ListStorageAgentAuditByGateway(ctx context.Context, arg ListStorageAgentAuditByGatewayParams) ([]StorageAgentAudit, error)
 	ListStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageAgent, error)
 	ListStorageEndpointsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageEndpoint, error)
+	// Lists all org memberships for an account. Used by the native app's
+	// "which orgs am I in?" query — drives the org selector and the
+	// "zero orgs → onboarding" detection.
+	ListUsersByAccount(ctx context.Context, accountID uuid.UUID) ([]User, error)
+	ListUsersByOrg(ctx context.Context, orgID uuid.UUID) ([]User, error)
 	LookupApiKeyByKeyString(ctx context.Context, keyString string) (ApiKey, error)
 	NextVersionNumber(ctx context.Context, assetID uuid.UUID) (int32, error)
 	RotateRegistrationToken(ctx context.Context, arg RotateRegistrationTokenParams) (StorageGateway, error)
@@ -200,6 +214,7 @@ type Querier interface {
 	UpdateStorageGatewayVersion(ctx context.Context, arg UpdateStorageGatewayVersionParams) error
 	UpdateTagKey(ctx context.Context, arg UpdateTagKeyParams) (TagKey, error)
 	UpdateTagValue(ctx context.Context, arg UpdateTagValueParams) (TagValue, error)
+	UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) (User, error)
 	// Upserts an account synced from Firebase Auth.
 	// On conflict (same firebase_uid), updates all mutable fields.
 	UpsertAccount(ctx context.Context, arg UpsertAccountParams) (Account, error)

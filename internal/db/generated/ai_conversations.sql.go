@@ -15,7 +15,7 @@ import (
 const createConversation = `-- name: CreateConversation :one
 INSERT INTO ai_conversations (org_id, name, title, description, created_by, updated_by)
 VALUES ($1, $2, $3, $4, $5, $5)
-RETURNING id, org_id, name, title, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time, title_user_set
+RETURNING id, org_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time
 `
 
 type CreateConversationParams struct {
@@ -40,6 +40,7 @@ func (q *Queries) CreateConversation(ctx context.Context, arg CreateConversation
 		&i.OrgID,
 		&i.Name,
 		&i.Title,
+		&i.TitleUserSet,
 		&i.Description,
 		&i.Archived,
 		&i.Pinned,
@@ -51,7 +52,6 @@ func (q *Queries) CreateConversation(ctx context.Context, arg CreateConversation
 		&i.UpdatedBy,
 		&i.CreateTime,
 		&i.UpdateTime,
-		&i.TitleUserSet,
 	)
 	return i, err
 }
@@ -66,7 +66,7 @@ func (q *Queries) DeleteConversation(ctx context.Context, id uuid.UUID) error {
 }
 
 const getConversationByID = `-- name: GetConversationByID :one
-SELECT id, org_id, name, title, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time, title_user_set FROM ai_conversations WHERE id = $1
+SELECT id, org_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time FROM ai_conversations WHERE id = $1
 `
 
 func (q *Queries) GetConversationByID(ctx context.Context, id uuid.UUID) (AiConversation, error) {
@@ -77,6 +77,7 @@ func (q *Queries) GetConversationByID(ctx context.Context, id uuid.UUID) (AiConv
 		&i.OrgID,
 		&i.Name,
 		&i.Title,
+		&i.TitleUserSet,
 		&i.Description,
 		&i.Archived,
 		&i.Pinned,
@@ -88,13 +89,12 @@ func (q *Queries) GetConversationByID(ctx context.Context, id uuid.UUID) (AiConv
 		&i.UpdatedBy,
 		&i.CreateTime,
 		&i.UpdateTime,
-		&i.TitleUserSet,
 	)
 	return i, err
 }
 
 const getConversationByName = `-- name: GetConversationByName :one
-SELECT id, org_id, name, title, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time, title_user_set FROM ai_conversations WHERE org_id = $1 AND name = $2
+SELECT id, org_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time FROM ai_conversations WHERE org_id = $1 AND name = $2
 `
 
 type GetConversationByNameParams struct {
@@ -110,6 +110,7 @@ func (q *Queries) GetConversationByName(ctx context.Context, arg GetConversation
 		&i.OrgID,
 		&i.Name,
 		&i.Title,
+		&i.TitleUserSet,
 		&i.Description,
 		&i.Archived,
 		&i.Pinned,
@@ -121,7 +122,6 @@ func (q *Queries) GetConversationByName(ctx context.Context, arg GetConversation
 		&i.UpdatedBy,
 		&i.CreateTime,
 		&i.UpdateTime,
-		&i.TitleUserSet,
 	)
 	return i, err
 }
@@ -146,7 +146,7 @@ SET title = $2,
     update_time = now(),
     etag = md5(now()::text)
 WHERE id = $1
-RETURNING id, org_id, name, title, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time, title_user_set
+RETURNING id, org_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time
 `
 
 type SetAutoTitleParams struct {
@@ -164,6 +164,7 @@ func (q *Queries) SetAutoTitle(ctx context.Context, arg SetAutoTitleParams) (AiC
 		&i.OrgID,
 		&i.Name,
 		&i.Title,
+		&i.TitleUserSet,
 		&i.Description,
 		&i.Archived,
 		&i.Pinned,
@@ -175,7 +176,6 @@ func (q *Queries) SetAutoTitle(ctx context.Context, arg SetAutoTitleParams) (AiC
 		&i.UpdatedBy,
 		&i.CreateTime,
 		&i.UpdateTime,
-		&i.TitleUserSet,
 	)
 	return i, err
 }
@@ -196,7 +196,7 @@ SET title = COALESCE($3, title),
     update_time = now(),
     etag = md5(now()::text)
 WHERE id = $1
-RETURNING id, org_id, name, title, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time, title_user_set
+RETURNING id, org_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time
 `
 
 type UpdateConversationParams struct {
@@ -230,6 +230,7 @@ func (q *Queries) UpdateConversation(ctx context.Context, arg UpdateConversation
 		&i.OrgID,
 		&i.Name,
 		&i.Title,
+		&i.TitleUserSet,
 		&i.Description,
 		&i.Archived,
 		&i.Pinned,
@@ -241,7 +242,6 @@ func (q *Queries) UpdateConversation(ctx context.Context, arg UpdateConversation
 		&i.UpdatedBy,
 		&i.CreateTime,
 		&i.UpdateTime,
-		&i.TitleUserSet,
 	)
 	return i, err
 }

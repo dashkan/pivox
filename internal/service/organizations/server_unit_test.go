@@ -308,14 +308,64 @@ func (m *mockAuthService) DeleteTenant(ctx context.Context, tenantID string) err
 	return args.Error(0)
 }
 
-// newCreateOrgServer builds an OrganizationsServer wired with the mock pool
-// and auth service needed by CreateOrganization.
-func newCreateOrgServer(pool TxBeginner, auth authn.Service) *OrganizationsServer {
+// newCreateOrgServer builds an OrganizationsServer wired with the mock pool,
+// auth service, and querier needed by CreateOrganization. The querier is
+// where `GetAccountByFirebaseUID` (the pre-tx caller-resolution lookup)
+// fires; the readUID closure stubs the auth-context UID extraction so
+// tests don't need to wire the production interceptor.
+func newCreateOrgServer(pool TxBeginner, auth authn.Service, q db.Querier) *OrganizationsServer {
 	return &OrganizationsServer{
-		pool:   pool,
-		auth:   auth,
-		filter: filter.OrganizationFilter(),
+		pool:    pool,
+		auth:    auth,
+		queries: q,
+		filter:  filter.OrganizationFilter(),
+		readUID: func(_ context.Context) (string, bool) { return testFirebaseUID, true },
 	}
+}
+
+// testFirebaseUID is the canonical caller UID used by all
+// CreateOrganization unit tests. The matching account row is
+// returned by the GetAccountByFirebaseUID mock setup.
+const testFirebaseUID = "fb-test-uid"
+
+// testCallerAccount is the canonical caller account returned by
+// `GetAccountByFirebaseUID` in CreateOrganization unit tests. Tests
+// that exercise the founder-pointer / membership path can compare
+// against `testCallerAccount.ID`.
+var testCallerAccount = db.Account{
+	ID:          uuid.MustParse("0192a000-aaaa-7000-8000-000000000001"),
+	FirebaseUid: testFirebaseUID,
+	Email:       "test@example.com",
+}
+
+// expectGetAccount sets up the standard caller-resolution mock that
+// fires before the tx begins. Every CreateOrganization test that
+// passes `WithAuthenticatedUID`-equivalent context needs this.
+func expectGetAccount(q *mocks.MockQuerier) {
+	q.On("GetAccountByFirebaseUID", mock.Anything, testFirebaseUID).
+		Return(testCallerAccount, nil).Once()
+}
+
+// membershipRow returns a mockRow whose Scan populates a db.User
+// with the given values. Column order matches the sqlc-generated
+// RETURNING clause for CreateUserMembership.
+func membershipRow(u db.User) *mockRow {
+	return &mockRow{scanFunc: func(dest ...interface{}) error {
+		// Column order: id, org_id, account_id, role, etag,
+		// revision, create_time, update_time
+		if len(dest) != 8 {
+			return errors.New("unexpected number of scan destinations")
+		}
+		*dest[0].(*uuid.UUID) = u.ID
+		*dest[1].(*uuid.UUID) = u.OrgID
+		*dest[2].(*uuid.UUID) = u.AccountID
+		*dest[3].(*db.OrgRole) = u.Role
+		*dest[4].(*string) = u.Etag
+		*dest[5].(*int32) = u.Revision
+		*dest[6].(*time.Time) = u.CreateTime
+		*dest[7].(*time.Time) = u.UpdateTime
+		return nil
+	}}
 }
 
 // orgRow returns a mockRow whose Scan populates a db.Organization with the
@@ -357,7 +407,9 @@ func TestUnit_CreateOrganization_Success(t *testing.T) {
 	pool := new(mockTxBeginner)
 	tx := new(mockTx)
 	auth := new(mockAuthService)
-	srv := newCreateOrgServer(pool, auth)
+	mockQ := new(mocks.MockQuerier)
+	expectGetAccount(mockQ)
+	srv := newCreateOrgServer(pool, auth, mockQ)
 
 	createdOrg := db.Organization{
 		ID:          uuid.MustParse("0192a000-0002-7000-8000-000000000002"),
@@ -377,6 +429,17 @@ func TestUnit_CreateOrganization_Success(t *testing.T) {
 	// 2. CreateOrganization via qtx — calls QueryRow on the tx
 	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
 		Return(orgRow(createdOrg)).Once()
+	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
+		Return(membershipRow(db.User{
+			ID:         uuid.New(),
+			OrgID:      createdOrg.ID,
+			AccountID:  testCallerAccount.ID,
+			Role:       db.OrgRoleOwner,
+			Etag:       "etag-membership",
+			Revision:   1,
+			CreateTime: createdOrg.CreateTime,
+			UpdateTime: createdOrg.UpdateTime,
+		})).Once()
 
 	// 3. CreateTenant
 	auth.On("CreateTenant", mock.Anything, "neworg").Return("tenant-abc", nil)
@@ -411,13 +474,121 @@ func TestUnit_CreateOrganization_Success(t *testing.T) {
 	auth.AssertExpectations(t)
 }
 
+// TestUnit_CreateOrganization_CreatesOwnerMembership is the focused
+// behavioral test for the org-creation owner-membership rule:
+// the founder of an org is automatically added as a `users` row with
+// `role='owner'`, in the same transaction as the org create. This is
+// the structural foundation for "≥1 owner per org" — by this rule no
+// org ever exists without an owner.
+//
+// Distinguished from `TestUnit_CreateOrganization_Success` because
+// that test verifies the gRPC response shape; this one cuts at the
+// SQL boundary and asserts the exact `CreateUserMembership` params
+// that hit the tx.
+func TestUnit_CreateOrganization_CreatesOwnerMembership(t *testing.T) {
+	ctx := context.Background()
+
+	pool := new(mockTxBeginner)
+	tx := new(mockTx)
+	auth := new(mockAuthService)
+	mockQ := new(mocks.MockQuerier)
+	expectGetAccount(mockQ)
+	srv := newCreateOrgServer(pool, auth, mockQ)
+
+	createdOrg := db.Organization{
+		ID:          uuid.MustParse("0192a000-bbbb-7000-8000-000000000001"),
+		Name:        "ownerorg",
+		DisplayName: "Owner Org",
+		Annotations: json.RawMessage(`{}`),
+		State:       db.ResourceStateACTIVE,
+		Etag:        "etag-owner",
+		Revision:    1,
+		CreateTime:  time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC),
+		UpdateTime:  time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC),
+	}
+
+	pool.On("Begin", mock.Anything).Return(tx, nil)
+
+	// First QueryRow: org create.
+	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
+		Return(orgRow(createdOrg)).Once()
+
+	// Second QueryRow: membership create. Capture the args so the
+	// test can assert role='owner', org_id, and account_id reach the
+	// tx exactly as expected.
+	var capturedMembershipArgs []interface{}
+	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			capturedMembershipArgs = args.Get(2).([]interface{})
+		}).
+		Return(membershipRow(db.User{
+			ID:         uuid.New(),
+			OrgID:      createdOrg.ID,
+			AccountID:  testCallerAccount.ID,
+			Role:       db.OrgRoleOwner,
+			Etag:       "etag-membership",
+			Revision:   1,
+			CreateTime: createdOrg.CreateTime,
+			UpdateTime: createdOrg.UpdateTime,
+		})).Once()
+
+	auth.On("CreateTenant", mock.Anything, "ownerorg").Return("tenant-owner", nil)
+	tx.On("Exec", mock.Anything, mock.Anything, mock.Anything).
+		Return(pgconn.NewCommandTag("UPDATE 1"), nil)
+	tx.On("Commit", mock.Anything).Return(nil)
+	tx.On("Rollback", mock.Anything).Return(pgx.ErrTxClosed)
+
+	_, err := srv.CreateOrganization(ctx, &apiv1.CreateOrganizationRequest{
+		OrganizationId: "ownerorg",
+		Organization:   &apiv1.Organization{DisplayName: "Owner Org"},
+	})
+	require.NoError(t, err)
+
+	// CreateUserMembership SQL args order: id, org_id, account_id, role.
+	// We don't pin the membership UUID (it's randomly generated), so
+	// args[0] is just asserted non-zero. The remaining three are the
+	// load-bearing invariants this test guards.
+	require.Len(t, capturedMembershipArgs, 4,
+		"CreateUserMembership should receive 4 args: id, org_id, account_id, role")
+	assert.NotEqual(t, uuid.Nil, capturedMembershipArgs[0],
+		"membership id must be assigned")
+	assert.Equal(t, createdOrg.ID, capturedMembershipArgs[1],
+		"org_id must reference the just-created org")
+	assert.Equal(t, testCallerAccount.ID, capturedMembershipArgs[2],
+		"account_id must reference the authenticated caller")
+	assert.Equal(t, db.OrgRoleOwner, capturedMembershipArgs[3],
+		"role must be 'owner' for the founder")
+}
+
+// TestUnit_CreateOrganization_NoAuthContext asserts that the handler
+// rejects calls without an authenticated UID. Without this guard, an
+// unauthenticated caller could end up provisioning orgs they have no
+// claim to.
+func TestUnit_CreateOrganization_NoAuthContext(t *testing.T) {
+	srv := &OrganizationsServer{
+		filter:  filter.OrganizationFilter(),
+		readUID: func(_ context.Context) (string, bool) { return "", false },
+	}
+
+	_, err := srv.CreateOrganization(context.Background(), &apiv1.CreateOrganizationRequest{
+		OrganizationId: "noauth",
+		Organization:   &apiv1.Organization{DisplayName: "No Auth"},
+	})
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.Unauthenticated, st.Code())
+}
+
 func TestUnit_CreateOrganization_TenantCreateFailure(t *testing.T) {
 	ctx := context.Background()
 
 	pool := new(mockTxBeginner)
 	tx := new(mockTx)
 	auth := new(mockAuthService)
-	srv := newCreateOrgServer(pool, auth)
+	mockQ := new(mocks.MockQuerier)
+	expectGetAccount(mockQ)
+	srv := newCreateOrgServer(pool, auth, mockQ)
 
 	createdOrg := db.Organization{
 		ID:          uuid.MustParse("0192a000-0003-7000-8000-000000000003"),
@@ -436,6 +607,17 @@ func TestUnit_CreateOrganization_TenantCreateFailure(t *testing.T) {
 	// CreateOrganization in DB succeeds.
 	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
 		Return(orgRow(createdOrg)).Once()
+	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
+		Return(membershipRow(db.User{
+			ID:         uuid.New(),
+			OrgID:      createdOrg.ID,
+			AccountID:  testCallerAccount.ID,
+			Role:       db.OrgRoleOwner,
+			Etag:       "etag-membership",
+			Revision:   1,
+			CreateTime: createdOrg.CreateTime,
+			UpdateTime: createdOrg.UpdateTime,
+		})).Once()
 
 	// CreateTenant fails.
 	auth.On("CreateTenant", mock.Anything, "failorg").
@@ -469,7 +651,9 @@ func TestUnit_CreateOrganization_CommitFailure(t *testing.T) {
 	pool := new(mockTxBeginner)
 	tx := new(mockTx)
 	auth := new(mockAuthService)
-	srv := newCreateOrgServer(pool, auth)
+	mockQ := new(mocks.MockQuerier)
+	expectGetAccount(mockQ)
+	srv := newCreateOrgServer(pool, auth, mockQ)
 
 	createdOrg := db.Organization{
 		ID:          uuid.MustParse("0192a000-0004-7000-8000-000000000004"),
@@ -488,6 +672,17 @@ func TestUnit_CreateOrganization_CommitFailure(t *testing.T) {
 	// CreateOrganization in DB succeeds.
 	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
 		Return(orgRow(createdOrg)).Once()
+	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
+		Return(membershipRow(db.User{
+			ID:         uuid.New(),
+			OrgID:      createdOrg.ID,
+			AccountID:  testCallerAccount.ID,
+			Role:       db.OrgRoleOwner,
+			Etag:       "etag-membership",
+			Revision:   1,
+			CreateTime: createdOrg.CreateTime,
+			UpdateTime: createdOrg.UpdateTime,
+		})).Once()
 
 	// CreateTenant succeeds.
 	auth.On("CreateTenant", mock.Anything, "commitfail").Return("tenant-xyz", nil)
@@ -530,7 +725,9 @@ func TestUnit_CreateOrganization_AutoGeneratedSlug(t *testing.T) {
 	pool := new(mockTxBeginner)
 	tx := new(mockTx)
 	auth := new(mockAuthService)
-	srv := newCreateOrgServer(pool, auth)
+	mockQ := new(mocks.MockQuerier)
+	expectGetAccount(mockQ)
+	srv := newCreateOrgServer(pool, auth, mockQ)
 
 	// Begin tx succeeds.
 	pool.On("Begin", mock.Anything).Return(tx, nil)
@@ -572,6 +769,19 @@ func TestUnit_CreateOrganization_AutoGeneratedSlug(t *testing.T) {
 			return nil
 		}}).Once()
 
+	// Owner membership row created in the same tx.
+	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
+		Return(membershipRow(db.User{
+			ID:         uuid.New(),
+			OrgID:      uuid.MustParse("0192a000-0005-7000-8000-000000000005"),
+			AccountID:  testCallerAccount.ID,
+			Role:       db.OrgRoleOwner,
+			Etag:       "etag-membership",
+			Revision:   1,
+			CreateTime: time.Date(2025, 8, 1, 10, 0, 0, 0, time.UTC),
+			UpdateTime: time.Date(2025, 8, 1, 10, 0, 0, 0, time.UTC),
+		})).Once()
+
 	// CreateTenant — called with whatever auto-slug was generated.
 	auth.On("CreateTenant", mock.Anything, mock.MatchedBy(func(s string) bool {
 		capturedSlug = s
@@ -608,7 +818,9 @@ func TestUnit_CreateOrganization_BeginTransactionError(t *testing.T) {
 
 	pool := new(mockTxBeginner)
 	auth := new(mockAuthService)
-	srv := newCreateOrgServer(pool, auth)
+	mockQ := new(mocks.MockQuerier)
+	expectGetAccount(mockQ)
+	srv := newCreateOrgServer(pool, auth, mockQ)
 
 	// Begin fails — no tx is returned.
 	pool.On("Begin", mock.Anything).Return(nil, errors.New("pool exhausted"))
@@ -635,7 +847,9 @@ func TestUnit_CreateOrganization_SetTenantIDFailure(t *testing.T) {
 	pool := new(mockTxBeginner)
 	tx := new(mockTx)
 	auth := new(mockAuthService)
-	srv := newCreateOrgServer(pool, auth)
+	mockQ := new(mocks.MockQuerier)
+	expectGetAccount(mockQ)
+	srv := newCreateOrgServer(pool, auth, mockQ)
 
 	createdOrg := db.Organization{
 		ID:          uuid.MustParse("0192a000-0006-7000-8000-000000000006"),
@@ -654,6 +868,17 @@ func TestUnit_CreateOrganization_SetTenantIDFailure(t *testing.T) {
 	// CreateOrganization in DB succeeds.
 	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
 		Return(orgRow(createdOrg)).Once()
+	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
+		Return(membershipRow(db.User{
+			ID:         uuid.New(),
+			OrgID:      createdOrg.ID,
+			AccountID:  testCallerAccount.ID,
+			Role:       db.OrgRoleOwner,
+			Etag:       "etag-membership",
+			Revision:   1,
+			CreateTime: createdOrg.CreateTime,
+			UpdateTime: createdOrg.UpdateTime,
+		})).Once()
 
 	// CreateTenant succeeds.
 	auth.On("CreateTenant", mock.Anything, "settenantfail").Return("tenant-stf", nil)
@@ -993,7 +1218,9 @@ func TestUnit_CreateOrganization_DBCreateError(t *testing.T) {
 	pool := new(mockTxBeginner)
 	tx := new(mockTx)
 	auth := new(mockAuthService)
-	srv := newCreateOrgServer(pool, auth)
+	mockQ := new(mocks.MockQuerier)
+	expectGetAccount(mockQ)
+	srv := newCreateOrgServer(pool, auth, mockQ)
 
 	pool.On("Begin", mock.Anything).Return(tx, nil)
 
@@ -1032,7 +1259,9 @@ func TestUnit_CreateOrganization_SetTenantIDFailureWithDeleteTenantError(t *test
 	pool := new(mockTxBeginner)
 	tx := new(mockTx)
 	auth := new(mockAuthService)
-	srv := newCreateOrgServer(pool, auth)
+	mockQ := new(mocks.MockQuerier)
+	expectGetAccount(mockQ)
+	srv := newCreateOrgServer(pool, auth, mockQ)
 
 	createdOrg := db.Organization{
 		ID:          uuid.MustParse("0192a000-0007-7000-8000-000000000007"),
@@ -1049,6 +1278,17 @@ func TestUnit_CreateOrganization_SetTenantIDFailureWithDeleteTenantError(t *test
 	pool.On("Begin", mock.Anything).Return(tx, nil)
 	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
 		Return(orgRow(createdOrg)).Once()
+	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
+		Return(membershipRow(db.User{
+			ID:         uuid.New(),
+			OrgID:      createdOrg.ID,
+			AccountID:  testCallerAccount.ID,
+			Role:       db.OrgRoleOwner,
+			Etag:       "etag-membership",
+			Revision:   1,
+			CreateTime: createdOrg.CreateTime,
+			UpdateTime: createdOrg.UpdateTime,
+		})).Once()
 	auth.On("CreateTenant", mock.Anything, "dblefail").Return("tenant-df", nil)
 
 	// SetOrganizationTenantID fails.
@@ -1085,7 +1325,9 @@ func TestUnit_CreateOrganization_CommitFailureWithDeleteTenantError(t *testing.T
 	pool := new(mockTxBeginner)
 	tx := new(mockTx)
 	auth := new(mockAuthService)
-	srv := newCreateOrgServer(pool, auth)
+	mockQ := new(mocks.MockQuerier)
+	expectGetAccount(mockQ)
+	srv := newCreateOrgServer(pool, auth, mockQ)
 
 	createdOrg := db.Organization{
 		ID:          uuid.MustParse("0192a000-0008-7000-8000-000000000008"),
@@ -1102,6 +1344,17 @@ func TestUnit_CreateOrganization_CommitFailureWithDeleteTenantError(t *testing.T
 	pool.On("Begin", mock.Anything).Return(tx, nil)
 	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
 		Return(orgRow(createdOrg)).Once()
+	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
+		Return(membershipRow(db.User{
+			ID:         uuid.New(),
+			OrgID:      createdOrg.ID,
+			AccountID:  testCallerAccount.ID,
+			Role:       db.OrgRoleOwner,
+			Etag:       "etag-membership",
+			Revision:   1,
+			CreateTime: createdOrg.CreateTime,
+			UpdateTime: createdOrg.UpdateTime,
+		})).Once()
 	auth.On("CreateTenant", mock.Anything, "commitdelf").Return("tenant-cdf", nil)
 	tx.On("Exec", mock.Anything, mock.Anything, mock.Anything).
 		Return(pgconn.NewCommandTag("UPDATE 1"), nil)
@@ -1143,7 +1396,7 @@ func TestUnit_NewOrganizationsServer_Constructor(t *testing.T) {
 	auth := new(mockAuthService)
 
 	// NewOrganizationsServer with nil pool exercises the constructor code path.
-	srv := NewOrganizationsServer(nil, mockQ, iamHelper, auth, nil)
+	srv := NewOrganizationsServer(nil, mockQ, iamHelper, auth, nil, nil)
 
 	require.NotNil(t, srv)
 	assert.NotNil(t, srv.filter)

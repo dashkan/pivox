@@ -27,8 +27,6 @@ DROP TABLE IF EXISTS permissions;
 DROP TABLE IF EXISTS group_members;
 DROP TABLE IF EXISTS groups;
 DROP TABLE IF EXISTS project_members;
--- Drop deferred FK before dropping users/organizations
-ALTER TABLE IF EXISTS organizations DROP CONSTRAINT IF EXISTS fk_organizations_owner;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS accounts;
 DROP TABLE IF EXISTS iam_policies;
@@ -65,3 +63,4 @@ DROP TYPE IF EXISTS project_role;
 DROP TYPE IF EXISTS role_member_type;
 DROP TYPE IF EXISTS custom_domain_state;
 DROP TYPE IF EXISTS resource_state;
+DROP TYPE IF EXISTS org_role;

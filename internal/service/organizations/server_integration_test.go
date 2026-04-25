@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -14,6 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/dashkan/pivox/internal/authn"
+	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/iam"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
@@ -38,6 +40,29 @@ func (n noopAuthService) CreateTenant(_ context.Context, displayName string) (st
 
 func (n noopAuthService) DeleteTenant(_ context.Context, _ string) error {
 	return nil
+}
+
+// testReadUID is the AuthContextReader used by integration tests. It
+// always returns the canonical test caller's UID, since these tests
+// build the gRPC server directly without the production AuthInterceptor
+// in the chain. The matching `accounts` row is seeded by `seedTestCaller`.
+const testCallerUID = "test-user"
+
+func testReadUID(_ context.Context) (string, bool) { return testCallerUID, true }
+
+// seedTestCaller upserts an `accounts` row for testCallerUID so
+// `CreateOrganization`'s `GetAccountByFirebaseUID` lookup succeeds.
+// Returns the seeded account's id.
+func seedTestCaller(t *testing.T, queries db.Querier) uuid.UUID {
+	t.Helper()
+	acct, err := queries.UpsertAccount(context.Background(), db.UpsertAccountParams{
+		FirebaseUid:   testCallerUID,
+		Email:         "test@example.com",
+		EmailVerified: true,
+		DisplayName:   "Test Caller",
+	})
+	require.NoError(t, err)
+	return acct.ID
 }
 
 // failingAuthService returns errors from CreateTenant for rollback testing.
@@ -68,9 +93,10 @@ func TestIntegration_CreateOrganization_DuplicateName(t *testing.T) {
 	defer cleanup()
 
 	iamHelper := iam.NewHelper(queries)
+	seedTestCaller(t, queries)
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, iamHelper, noopAuthService{}, nil))
+		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, iamHelper, noopAuthService{}, nil, testReadUID))
 	})
 
 	client := apiv1.NewOrganizationsClient(conn)
@@ -103,9 +129,10 @@ func TestIntegration_CreateOrganization_TenantFailure(t *testing.T) {
 	defer cleanup()
 
 	iamHelper := iam.NewHelper(queries)
+	seedTestCaller(t, queries)
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, iamHelper, failingAuthService{}, nil))
+		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, iamHelper, failingAuthService{}, nil, testReadUID))
 	})
 
 	client := apiv1.NewOrganizationsClient(conn)
@@ -140,9 +167,10 @@ func TestIntegration_Organizations(t *testing.T) {
 	defer cleanup()
 
 	iamHelper := iam.NewHelper(queries)
+	seedTestCaller(t, queries)
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, iamHelper, noopAuthService{}, nil))
+		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, iamHelper, noopAuthService{}, nil, testReadUID))
 	})
 
 	client := apiv1.NewOrganizationsClient(conn)

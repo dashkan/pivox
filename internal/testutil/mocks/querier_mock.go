@@ -141,6 +141,49 @@ func (m *MockQuerier) SetOrganizationTenantID(ctx context.Context, arg db.SetOrg
 	return args.Error(0)
 }
 
+// --- Users (per-org membership) ---
+
+func (m *MockQuerier) CreateUserMembership(ctx context.Context, arg db.CreateUserMembershipParams) (db.User, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.User), args.Error(1)
+}
+
+func (m *MockQuerier) GetUserMembership(ctx context.Context, arg db.GetUserMembershipParams) (db.User, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.User), args.Error(1)
+}
+
+func (m *MockQuerier) ListUsersByOrg(ctx context.Context, orgID uuid.UUID) ([]db.User, error) {
+	args := m.Called(ctx, orgID)
+	if v := args.Get(0); v != nil {
+		return v.([]db.User), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockQuerier) ListUsersByAccount(ctx context.Context, accountID uuid.UUID) ([]db.User, error) {
+	args := m.Called(ctx, accountID)
+	if v := args.Get(0); v != nil {
+		return v.([]db.User), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockQuerier) CountOwnersByOrg(ctx context.Context, orgID uuid.UUID) (int64, error) {
+	args := m.Called(ctx, orgID)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+func (m *MockQuerier) UpdateUserRole(ctx context.Context, arg db.UpdateUserRoleParams) (db.User, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.User), args.Error(1)
+}
+
+func (m *MockQuerier) DeleteUserMembership(ctx context.Context, arg db.DeleteUserMembershipParams) error {
+	args := m.Called(ctx, arg)
+	return args.Error(0)
+}
+
 // --- Projects ---
 
 func (m *MockQuerier) CreateProject(ctx context.Context, arg db.CreateProjectParams) (db.Project, error) {

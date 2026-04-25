@@ -8,6 +8,7 @@ import (
 	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -24,6 +25,12 @@ import (
 	"github.com/dashkan/pivox/internal/resource"
 )
 
+// AuthContextReader extracts the caller's Firebase UID from the
+// request context. Injected so unit tests can stub the auth context
+// without wiring the gRPC interceptor. Production wires this to
+// `server.AuthenticatedUID` (set by AuthInterceptor).
+type AuthContextReader func(ctx context.Context) (uid string, ok bool)
+
 // TxBeginner abstracts transaction creation for testability.
 // *pgxpool.Pool satisfies this interface.
 type TxBeginner interface {
@@ -39,9 +46,10 @@ type OrganizationsServer struct {
 	auth    authn.Service
 	filter  *filter.ResourceFilter
 	codec   *appkey.Codec
+	readUID AuthContextReader
 }
 
-func NewOrganizationsServer(pool *pgxpool.Pool, queries db.Querier, iam *iam.Helper, auth authn.Service, codec *appkey.Codec) *OrganizationsServer {
+func NewOrganizationsServer(pool *pgxpool.Pool, queries db.Querier, iam *iam.Helper, auth authn.Service, codec *appkey.Codec, readUID AuthContextReader) *OrganizationsServer {
 	return &OrganizationsServer{
 		db:      pool,
 		pool:    pool,
@@ -50,6 +58,7 @@ func NewOrganizationsServer(pool *pgxpool.Pool, queries db.Querier, iam *iam.Hel
 		auth:    auth,
 		filter:  filter.OrganizationFilter(),
 		codec:   codec,
+		readUID: readUID,
 	}
 }
 
@@ -114,6 +123,19 @@ func (s *OrganizationsServer) ListOrganizations(ctx context.Context, req *apiv1.
 }
 
 func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1.CreateOrganizationRequest) (*longrunningpb.Operation, error) {
+	// Resolve caller → account row. The caller's Firebase UID comes
+	// from the auth interceptor; we map it to a Pivox `accounts` row
+	// so the new org can record both the immutable founder pointer
+	// (`created_by_account_id`) and the per-org owner membership.
+	uid, ok := s.readUID(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "missing authenticated caller")
+	}
+	caller, err := s.queries.GetAccountByFirebaseUID(ctx, uid)
+	if err != nil {
+		return nil, apierr.HandleResourceError(err, "Account", uid)
+	}
+
 	orgSlug := req.GetOrganizationId()
 	if orgSlug == "" {
 		orgSlug = uuid.New().String()[:8]
@@ -128,13 +150,26 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 	qtx := db.New(tx)
 
 	org, err := qtx.CreateOrganization(ctx, db.CreateOrganizationParams{
-		ID:          uuid.New(),
-		Name:        orgSlug,
-		DisplayName: req.GetOrganization().GetDisplayName(),
-		CreatedBy:   "",
+		ID:                 uuid.New(),
+		Name:               orgSlug,
+		DisplayName:        req.GetOrganization().GetDisplayName(),
+		CreatedByAccountID: pgtype.UUID{Bytes: caller.ID, Valid: true},
+		CreatedBy:          caller.ID.String(),
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Organization", orgSlug)
+	}
+
+	// Founder gets an `owner` membership row in the same transaction.
+	// "≥1 owner per org" is preserved by definition for new orgs;
+	// future role-mutation code enforces it at the boundary.
+	if _, err := qtx.CreateUserMembership(ctx, db.CreateUserMembershipParams{
+		ID:        uuid.New(),
+		OrgID:     org.ID,
+		AccountID: caller.ID,
+		Role:      db.OrgRoleOwner,
+	}); err != nil {
+		return nil, status.Errorf(codes.Internal, "create owner membership: %v", err)
 	}
 
 	tenantID, err := s.auth.CreateTenant(ctx, orgSlug)

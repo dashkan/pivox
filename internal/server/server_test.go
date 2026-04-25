@@ -64,7 +64,7 @@ func setupTestServer(t *testing.T) *grpc.ClientConn {
 
 	// Register all servers.
 	apiv1.RegisterProjectsServer(grpcServer, projects.NewProjectsServer(pool, queries, iamHelper, nil))
-	apiv1.RegisterOrganizationsServer(grpcServer, organizations.NewOrganizationsServer(pool, queries, iamHelper, nil, nil))
+	apiv1.RegisterOrganizationsServer(grpcServer, organizations.NewOrganizationsServer(pool, queries, iamHelper, nil, nil, AuthenticatedUID))
 	apiv1.RegisterTagKeysServer(grpcServer, tags.NewTagKeysServer(pool, queries, iamHelper, nil))
 	apiv1.RegisterTagValuesServer(grpcServer, tags.NewTagValuesServer(pool, queries, iamHelper, nil))
 	apiv1.RegisterTagBindingsServer(grpcServer, tags.NewTagBindingsServer(pool, queries, nil))

@@ -458,6 +458,48 @@ func (ns NullLineItemState) Value() (driver.Value, error) {
 	return string(ns.LineItemState), nil
 }
 
+type OrgRole string
+
+const (
+	OrgRoleOwner  OrgRole = "owner"
+	OrgRoleMember OrgRole = "member"
+)
+
+func (e *OrgRole) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = OrgRole(s)
+	case string:
+		*e = OrgRole(s)
+	default:
+		return fmt.Errorf("unsupported scan type for OrgRole: %T", src)
+	}
+	return nil
+}
+
+type NullOrgRole struct {
+	OrgRole OrgRole `json:"org_role"`
+	Valid   bool    `json:"valid"` // Valid is true if OrgRole is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullOrgRole) Scan(value interface{}) error {
+	if value == nil {
+		ns.OrgRole, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.OrgRole.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullOrgRole) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.OrgRole), nil
+}
+
 type ProjectMemberType string
 
 const (
@@ -898,6 +940,7 @@ type AiConversation struct {
 	OrgID           uuid.UUID          `json:"org_id"`
 	Name            string             `json:"name"`
 	Title           string             `json:"title"`
+	TitleUserSet    bool               `json:"title_user_set"`
 	Description     string             `json:"description"`
 	Archived        bool               `json:"archived"`
 	Pinned          bool               `json:"pinned"`
@@ -909,7 +952,6 @@ type AiConversation struct {
 	UpdatedBy       string             `json:"updated_by"`
 	CreateTime      time.Time          `json:"create_time"`
 	UpdateTime      time.Time          `json:"update_time"`
-	TitleUserSet    bool               `json:"title_user_set"`
 }
 
 type AiMessage struct {
@@ -1138,22 +1180,22 @@ type Operation struct {
 }
 
 type Organization struct {
-	ID          uuid.UUID          `json:"id"`
-	Name        string             `json:"name"`
-	DisplayName string             `json:"display_name"`
-	Annotations json.RawMessage    `json:"annotations"`
-	TenantID    string             `json:"tenant_id"`
-	OwnerID     pgtype.UUID        `json:"owner_id"`
-	State       ResourceState      `json:"state"`
-	Etag        string             `json:"etag"`
-	Revision    int32              `json:"revision"`
-	CreatedBy   string             `json:"created_by"`
-	UpdatedBy   string             `json:"updated_by"`
-	DeletedBy   string             `json:"deleted_by"`
-	CreateTime  time.Time          `json:"create_time"`
-	UpdateTime  time.Time          `json:"update_time"`
-	DeleteTime  pgtype.Timestamptz `json:"delete_time"`
-	PurgeTime   pgtype.Timestamptz `json:"purge_time"`
+	ID                 uuid.UUID          `json:"id"`
+	Name               string             `json:"name"`
+	DisplayName        string             `json:"display_name"`
+	Annotations        json.RawMessage    `json:"annotations"`
+	TenantID           string             `json:"tenant_id"`
+	CreatedByAccountID pgtype.UUID        `json:"created_by_account_id"`
+	State              ResourceState      `json:"state"`
+	Etag               string             `json:"etag"`
+	Revision           int32              `json:"revision"`
+	CreatedBy          string             `json:"created_by"`
+	UpdatedBy          string             `json:"updated_by"`
+	DeletedBy          string             `json:"deleted_by"`
+	CreateTime         time.Time          `json:"create_time"`
+	UpdateTime         time.Time          `json:"update_time"`
+	DeleteTime         pgtype.Timestamptz `json:"delete_time"`
+	PurgeTime          pgtype.Timestamptz `json:"purge_time"`
 }
 
 type Permission struct {
@@ -1337,6 +1379,7 @@ type User struct {
 	ID         uuid.UUID `json:"id"`
 	OrgID      uuid.UUID `json:"org_id"`
 	AccountID  uuid.UUID `json:"account_id"`
+	Role       OrgRole   `json:"role"`
 	Etag       string    `json:"etag"`
 	Revision   int32     `json:"revision"`
 	CreateTime time.Time `json:"create_time"`

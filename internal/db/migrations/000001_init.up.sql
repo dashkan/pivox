@@ -73,7 +73,14 @@ CREATE TABLE organizations (
     display_name          TEXT NOT NULL DEFAULT '',
     annotations           JSONB NOT NULL DEFAULT '{}',
     tenant_id             TEXT NOT NULL DEFAULT '',
-    owner_id              UUID,  -- FK to users(id), added after users table exists
+    -- Immutable founder pointer. `created_by_account_id` references the
+    -- account row of whoever created this org (FK added after the
+    -- `accounts` table is declared further down). Survives membership
+    -- changes (the user can leave the org without breaking this FK).
+    -- Owners are tracked separately via `users.role = 'owner'`; an
+    -- org can have N owners and "≥1 owner" is enforced at the service
+    -- mutation boundary, not here.
+    created_by_account_id UUID,
     -- state
     state                 resource_state NOT NULL DEFAULT 'ACTIVE',
     -- versioning
@@ -416,13 +423,27 @@ CREATE TABLE accounts (
 CREATE INDEX idx_accounts_email ON accounts (email);
 
 -- ============================================================================
--- users (per-org membership, created on invitation accept)
+-- users (per-org membership)
+--
+-- One row per (org, account) pairing — the join that says "this account
+-- has access to this org". Created in two ways:
+--   1. By `CreateOrganization` for the founder, with role='owner'.
+--   2. By `AcceptInvitation` (future) for invitees, role from the invite.
+--
+-- "≥1 owner per org" is invariant; enforced at the service mutation
+-- boundary (role-change / membership-delete handlers reject ops that
+-- would zero out owners). Not enforced by DB triggers — triggers
+-- surprise readers and complicate test setup.
 -- ============================================================================
+CREATE TYPE org_role AS ENUM ('owner', 'member');
+
 CREATE TABLE users (
     id         UUID PRIMARY KEY DEFAULT uuidv7(),
     -- relationships
     org_id     UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    -- domain
+    role       org_role NOT NULL DEFAULT 'member',
     -- versioning
     etag       TEXT NOT NULL DEFAULT md5(now()::text),
     revision   INTEGER NOT NULL DEFAULT 1,
@@ -434,13 +455,17 @@ CREATE TABLE users (
 );
 CREATE INDEX idx_users_org ON users (org_id);
 CREATE INDEX idx_users_account ON users (account_id);
+-- Lets us cheaply enforce "≥1 owner per org" by counting owner rows.
+CREATE INDEX idx_users_org_owner ON users (org_id) WHERE role = 'owner';
 
--- Deferred FK: organizations.owner_id -> users.id
--- (org and owner user are created in the same transaction)
+-- FK from organizations.created_by_account_id → accounts.id, added
+-- here because `accounts` was declared after `organizations` in this
+-- migration. ON DELETE SET NULL: deleting an account preserves the
+-- org but nulls out the founder pointer (the org survives, ownership
+-- is tracked via `users.role` anyway).
 ALTER TABLE organizations
-  ADD CONSTRAINT fk_organizations_owner
-  FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE SET NULL
-  DEFERRABLE INITIALLY DEFERRED;
+  ADD CONSTRAINT fk_organizations_created_by_account
+  FOREIGN KEY (created_by_account_id) REFERENCES accounts(id) ON DELETE SET NULL;
 
 -- ============================================================================
 -- project_members (user or group <-> project, fixed roles)
@@ -975,6 +1000,9 @@ CREATE TABLE ai_conversations (
     name            TEXT NOT NULL,  -- stable ID used in resource name
     -- domain
     title           TEXT NOT NULL DEFAULT '',
+    -- True when the user explicitly set the title; tells the
+    -- summarization path to skip auto-regeneration.
+    title_user_set  BOOLEAN NOT NULL DEFAULT FALSE,
     description     TEXT NOT NULL DEFAULT '',
     archived        BOOLEAN NOT NULL DEFAULT FALSE,
     pinned          BOOLEAN NOT NULL DEFAULT FALSE,
