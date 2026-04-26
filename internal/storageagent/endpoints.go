@@ -121,7 +121,7 @@ func (s *EndpointStore) serveS3(w http.ResponseWriter, r *http.Request, ep *endp
 		http.Error(w, "upstream error", http.StatusBadGateway)
 		return
 	}
-	defer obj.Close()
+	defer func() { _ = obj.Close() }()
 
 	info, err := obj.Stat()
 	if err != nil {
@@ -186,7 +186,7 @@ func (s *EndpointStore) serveFilesystem(w http.ResponseWriter, r *http.Request, 
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	stat, err := f.Stat()
 	if err != nil || stat.IsDir() {

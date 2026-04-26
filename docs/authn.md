@@ -389,11 +389,13 @@ Wraps the Firebase Admin SDK for server-side auth operations.
 | `UpdateTenantDisplayName(ctx, id, name)` | Update tenant name |
 | `DeleteTenant(ctx, id)` | Delete tenant |
 
-**Credential resolution order:**
-1. `ServiceAccountKey` — inline JSON (for containers, CI)
-2. `ServiceAccountFile` — path to JSON key file
-3. `GOOGLE_APPLICATION_CREDENTIALS` env var — standard ADC
-4. Application Default Credentials — metadata server, gcloud CLI, workload identity
+**Credentials** are resolved via Google's standard Application Default
+Credentials (ADC) chain:
+1. `GOOGLE_APPLICATION_CREDENTIALS` env var → service account JSON file
+2. Workload identity / metadata server (Cloud Run, GKE, App Engine, GCE)
+3. `gcloud auth application-default login` — local dev fallback
+
+No Pivox-named credential env vars; operators set the standard one.
 
 ### Token Exchange Endpoint
 

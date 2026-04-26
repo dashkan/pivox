@@ -188,7 +188,12 @@ func (s *Server) runGenerate(
 		slog.ErrorContext(ctx, "model stream failed", "error", err)
 		return nil, nil, "", apierr.Internal("model stream")
 	}
-	defer reader.Close()
+	defer func() {
+		// Best-effort close on the model stream reader; the model
+		// client returns "already closed" errors here on shutdown
+		// races which aren't actionable.
+		_ = reader.Close()
+	}()
 
 	// Pump model events; accumulate text for the unary return path
 	// and for persistence.

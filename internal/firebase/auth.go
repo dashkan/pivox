@@ -3,15 +3,20 @@ package firebase
 import (
 	"context"
 	"fmt"
-	"os"
 
+	"cloud.google.com/go/auth/credentials"
 	fb "firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/auth"
 	"google.golang.org/api/option"
 
 	"github.com/dashkan/pivox/internal/authn"
-	"github.com/dashkan/pivox/internal/config"
 )
+
+// firebaseScope is the OAuth scope Firebase Admin SDK uses internally
+// (Identity Platform, Firebase Auth, IAM). The legacy
+// option.WithCredentials{JSON,File} APIs inferred this from the
+// credential; credentials.DetectDefault requires it explicit.
+const firebaseScope = "https://www.googleapis.com/auth/cloud-platform"
 
 // Compile-time check: *AuthService implements authn.Service.
 var _ authn.Service = (*AuthService)(nil)
@@ -25,32 +30,27 @@ type AuthService struct {
 
 // NewAuthService initializes a Firebase app and returns an AuthService.
 //
-// Credential resolution order:
-//  1. Inline service account key JSON (GoogleCloud.ServiceAccountKey)
-//  2. Service account key file path (GoogleCloud.ServiceAccountFile)
-//  3. GOOGLE_APPLICATION_CREDENTIALS env var (standard ADC)
-//  4. Application Default Credentials (metadata server, gcloud CLI, etc.)
-func NewAuthService(ctx context.Context, gc config.GoogleCloudConfig) (*AuthService, error) {
-	var opts []option.ClientOption
-
-	switch {
-	case gc.ServiceAccountKey != "":
-		opts = append(opts, option.WithCredentialsJSON([]byte(gc.ServiceAccountKey)))
-	case gc.ServiceAccountFile != "":
-		// Validate the file exists early for a clear error message.
-		if _, err := os.Stat(gc.ServiceAccountFile); err != nil {
-			return nil, fmt.Errorf("firebase: service account file: %w", err)
-		}
-		opts = append(opts, option.WithCredentialsFile(gc.ServiceAccountFile))
-		// Otherwise fall through to ADC (GOOGLE_APPLICATION_CREDENTIALS or metadata server).
+// Both credentials AND project ID are resolved via Google's standard
+// Application Default Credentials chain — no Pivox-named config:
+//   - Local dev: `gcloud auth application-default login` writes a
+//     user credential and sets a quota project.
+//   - CI: `GOOGLE_APPLICATION_CREDENTIALS` points at a service
+//     account JSON whose `project_id` field is read.
+//   - Production: workload identity / metadata server provides both.
+//
+// Firebase Admin SDK falls through these sources for the project:
+// service-account JSON → metadata server → GOOGLE_CLOUD_PROJECT env
+// var → gcloud quota project. One of them always has it in any
+// reasonable setup.
+func NewAuthService(ctx context.Context) (*AuthService, error) {
+	creds, err := credentials.DetectDefault(&credentials.DetectOptions{
+		Scopes: []string{firebaseScope},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("firebase: detect credentials: %w", err)
 	}
 
-	fbConfig := &fb.Config{}
-	if gc.ProjectID != "" {
-		fbConfig.ProjectID = gc.ProjectID
-	}
-
-	app, err := fb.NewApp(ctx, fbConfig, opts...)
+	app, err := fb.NewApp(ctx, nil, option.WithAuthCredentials(creds))
 	if err != nil {
 		return nil, fmt.Errorf("firebase: init app: %w", err)
 	}

@@ -53,7 +53,7 @@ func Connect(ctx context.Context, addr string, useTLS bool, token string, cfg *C
 	if err != nil {
 		return fmt.Errorf("dial %s: %w", addr, err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	client := agentv1.NewAgentServiceClient(conn)
 

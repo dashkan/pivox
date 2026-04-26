@@ -119,7 +119,10 @@ func (h *SSEHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		sseLine := translateToSSE(ev)
-		fmt.Fprintf(w, "data: %s\n\n", sseLine)
+		// Best-effort write — if the client has hung up the next loop
+		// iteration's emit will surface the disconnect via an
+		// upstream gRPC error.
+		_, _ = fmt.Fprintf(w, "data: %s\n\n", sseLine)
 		flusher.Flush()
 	}
 }
@@ -150,6 +153,6 @@ func sseError(w http.ResponseWriter, flusher http.Flusher, err error) {
 		"type":  "error",
 		"error": err.Error(),
 	})
-	fmt.Fprintf(w, "data: %s\n\n", errJSON)
+	_, _ = fmt.Fprintf(w, "data: %s\n\n", errJSON)
 	flusher.Flush()
 }

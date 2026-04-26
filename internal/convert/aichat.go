@@ -70,10 +70,9 @@ func ArtifactToProto(row db.AiArtifact, convName string) *aiv1.Artifact {
 		CreateTime:  timestamppb.New(row.CreateTime),
 		UpdateTime:  timestamppb.New(row.UpdateTime),
 	}
-	if row.LatestVersionID.Valid {
-		// The actual version name requires a lookup; set to empty for now.
-		// The caller populates LatestVersion separately if needed.
-	}
+	// LatestVersionID exists on `row` but the version's resource name
+	// requires a separate lookup. Caller populates `pb.LatestVersion`
+	// when it needs that field set.
 	return pb
 }
 

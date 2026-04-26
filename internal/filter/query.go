@@ -129,7 +129,7 @@ func buildQuery(rf *ResourceFilter, params QueryParams) (string, []any, error) {
 		sb.WriteString(orderBy)
 	}
 
-	sb.WriteString(fmt.Sprintf(" LIMIT $%d", paramIdx))
+	fmt.Fprintf(&sb, " LIMIT $%d", paramIdx)
 	args = append(args, limit)
 
 	return sb.String(), args, nil

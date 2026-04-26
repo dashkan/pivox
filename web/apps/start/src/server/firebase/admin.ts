@@ -6,13 +6,12 @@ import fs from 'node:fs'
  * Firebase Admin singleton for server routes.
  *
  * Init strategy:
- *   - Prefer `PIVOX_GCP_SERVICE_ACCOUNT_FILE` (path to a service
- *     account JSON) — matches the pattern already used elsewhere in
- *     the repo (.envrc.ngrok).
- *   - Fall back to `GOOGLE_APPLICATION_CREDENTIALS` if set.
- *   - If neither is set and we're on GCP (Cloud Run / GKE / App
- *     Engine), `initializeApp()` without args uses Application
- *     Default Credentials.
+ *   - `GOOGLE_APPLICATION_CREDENTIALS` (path to a service account
+ *     JSON) — standard Google ADC env var, set by operators for
+ *     local dev and CI.
+ *   - If unset and we're on GCP (Cloud Run / GKE / App Engine),
+ *     `initializeApp()` without args uses workload identity / the
+ *     metadata server.
  *
  * Used by the OAuth callback to mint a Firebase custom token from a
  * provider-issued credential. Native/web then call
@@ -28,8 +27,7 @@ export function firebaseAdmin(): App {
     return cached
   }
 
-  const saPath =
-    process.env.PIVOX_GCP_SERVICE_ACCOUNT_FILE || process.env.GOOGLE_APPLICATION_CREDENTIALS
+  const saPath = process.env.GOOGLE_APPLICATION_CREDENTIALS
 
   if (saPath && fs.existsSync(saPath)) {
     const json = JSON.parse(fs.readFileSync(saPath, 'utf8')) as {

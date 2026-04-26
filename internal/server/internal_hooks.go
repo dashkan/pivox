@@ -114,9 +114,11 @@ func (h *InternalHooks) syncAccount(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"account_id": account.ID.String(),
-	})
+	}); err != nil {
+		h.logger.Warn("write account-sync response failed", "error", err)
+	}
 }
 
 // exchangeToken verifies a Firebase ID token and returns a custom token.
@@ -150,9 +152,11 @@ func (h *InternalHooks) exchangeToken(w http.ResponseWriter, r *http.Request) {
 	h.logger.Info("token exchanged", "uid", identity.UID)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"custom_token": customToken,
-	})
+	}); err != nil {
+		h.logger.Warn("write exchange-token response failed", "error", err)
+	}
 }
 
 // depositTokenRequest is the payload for the token deposit endpoint.
@@ -193,9 +197,11 @@ func (h *InternalHooks) depositToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"code": code.Code.String(),
-	})
+	}); err != nil {
+		h.logger.Warn("write deposit-token response failed", "error", err)
+	}
 }
 
 // consumeTokenRequest is the payload for the token consume endpoint.
@@ -229,9 +235,11 @@ func (h *InternalHooks) consumeToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"id_token": tokenCode.IDToken,
-	})
+	}); err != nil {
+		h.logger.Warn("write consume-token response failed", "error", err)
+	}
 }
 
 // ---------------------------------------------------------------------------

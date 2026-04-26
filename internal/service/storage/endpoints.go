@@ -122,7 +122,7 @@ func (s *EndpointsServer) CreateEndpoint(ctx context.Context, req *storagev1.Cre
 	// Map cache config from proto to DB fields.
 	var cacheEnabled bool
 	var cacheMaxSizeGb int32
-	var cacheEviction db.EvictionPolicy = db.EvictionPolicyLRU
+	cacheEviction := db.EvictionPolicyLRU
 	var cacheTtlHours int32
 	if cc := endpoint.GetCacheConfig(); cc != nil {
 		cacheEnabled = cc.GetEnabled()

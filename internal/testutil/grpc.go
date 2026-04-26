@@ -22,9 +22,9 @@ func SetupGRPCServer(t *testing.T, registerFn func(s *grpc.Server)) *grpc.Client
 	registerFn(srv)
 
 	go func() {
-		if err := srv.Serve(lis); err != nil {
-			// Server stopped; this is expected during cleanup.
-		}
+		// Errors here are expected during cleanup (server stopped) —
+		// nothing to do.
+		_ = srv.Serve(lis)
 	}()
 
 	conn, err := grpc.NewClient(
@@ -39,7 +39,7 @@ func SetupGRPCServer(t *testing.T, registerFn func(s *grpc.Server)) *grpc.Client
 	}
 
 	t.Cleanup(func() {
-		conn.Close()
+		_ = conn.Close()
 		srv.GracefulStop()
 	})
 

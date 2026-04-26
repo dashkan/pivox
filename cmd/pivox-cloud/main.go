@@ -75,9 +75,10 @@ func main() {
 	f.String("rest-port", envOrDefault("PIVOX_REST_PORT", ":8080"), "REST gateway listen address")
 	f.String("debug-port", envOrDefault("PIVOX_DEBUG_PORT", ":9090"), "Debug/health listen address")
 	f.String("log-level", envOrDefault("PIVOX_LOG_LEVEL", "info"), "Log level (debug, info, warn, error)")
-	f.String("gcp-project-id", envOrDefault("PIVOX_GCP_PROJECT_ID", ""), "Google Cloud project ID")
-	f.String("gcp-service-account-key", envOrDefault("PIVOX_GCP_SERVICE_ACCOUNT_KEY", ""), "Google Cloud service account key (inline JSON)")
-	f.String("gcp-service-account-file", envOrDefault("PIVOX_GCP_SERVICE_ACCOUNT_FILE", ""), "Google Cloud service account key file path")
+	// Firebase credentials AND project ID resolve entirely through
+	// Google's standard ADC chain (service-account JSON → metadata
+	// server → gcloud user identity + quota project). No Pivox-named
+	// credential flag — operators set the standard env var.
 	f.Duration("delegated-auth-session-ttl", envOrDuration("PIVOX_DELEGATED_AUTH_SESSION_TTL", 5*time.Minute), "How long a delegated auth session code remains valid")
 	f.Duration("delegated-auth-poll-interval", envOrDuration("PIVOX_DELEGATED_AUTH_POLL_INTERVAL", 5*time.Second), "Poll interval returned to delegated auth clients")
 	f.Bool("rate-limit-enabled", envOrBool("PIVOX_RATE_LIMIT_ENABLED", true), "Enable in-process per-IP rate limiting on internal endpoints (disable when a reverse proxy handles it)")
@@ -131,12 +132,7 @@ func serve(cmd *cobra.Command, args []string) error {
 		DebugPort:        must(f.GetString("debug-port")),
 		LogLevel:         must(f.GetString("log-level")),
 		RateLimitEnabled: rateLimitEnabled,
-		GoogleCloud: config.GoogleCloudConfig{
-			ProjectID:          must(f.GetString("gcp-project-id")),
-			ServiceAccountKey:  must(f.GetString("gcp-service-account-key")),
-			ServiceAccountFile: must(f.GetString("gcp-service-account-file")),
-		},
-		SyncAuth: loadSyncAuthConfig(cmd),
+		SyncAuth:         loadSyncAuthConfig(cmd),
 		DelegatedAuth: config.DelegatedAuthConfig{
 			SessionTTL:   sessionTTL,
 			PollInterval: pollInterval,
@@ -221,7 +217,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	}()
 
 	// Firebase
-	authSvc, err := firebase.NewAuthService(ctx, cfg.GoogleCloud)
+	authSvc, err := firebase.NewAuthService(ctx)
 	if err != nil {
 		return fmt.Errorf("initialize Firebase auth: %w", err)
 	}
@@ -404,18 +400,20 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	// Debug server (health/readiness)
 	debugMux := http.NewServeMux()
-	debugMux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+	debugMux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, "ok")
+		// Best-effort write; the client hanging up before we finish
+		// is not actionable for a health endpoint.
+		_, _ = fmt.Fprintln(w, "ok")
 	})
 	debugMux.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
 		if err := pool.Ping(r.Context()); err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			fmt.Fprintln(w, "not ready")
+			_, _ = fmt.Fprintln(w, "not ready")
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, "ready")
+		_, _ = fmt.Fprintln(w, "ready")
 	})
 	debugServer := &http.Server{
 		Addr:    cfg.DebugPort,

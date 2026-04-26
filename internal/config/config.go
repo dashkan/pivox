@@ -4,6 +4,12 @@ import "time"
 
 // Config holds all server configuration. Populated from cobra flags
 // in cmd/pivox-cloud/main.go, with env var fallbacks.
+//
+// Note: there is no GoogleCloudConfig — Firebase credentials and
+// project ID resolve entirely through Google's standard Application
+// Default Credentials chain (service-account JSON → metadata server →
+// gcloud user identity). Operators do not configure GCP knobs in
+// Pivox-named env vars.
 type Config struct {
 	DatabaseURL      string
 	GRPCPort         string
@@ -12,7 +18,6 @@ type Config struct {
 	DebugPort        string
 	LogLevel         string
 	RateLimitEnabled bool
-	GoogleCloud      GoogleCloudConfig
 	SyncAuth         SyncAuthConfig
 	DelegatedAuth    DelegatedAuthConfig
 }
@@ -28,21 +33,4 @@ type DelegatedAuthConfig struct {
 	// PollInterval is returned to clients in the createDelegatedAuthSession
 	// response so they poll at a rate the server is comfortable with.
 	PollInterval time.Duration
-}
-
-// GoogleCloudConfig holds Google Cloud / Firebase configuration.
-// Credential resolution order:
-//  1. ServiceAccountKey (inline JSON) — useful for containers / CI
-//  2. ServiceAccountFile (path to JSON key file) — local dev with explicit key
-//  3. GOOGLE_APPLICATION_CREDENTIALS env var — standard ADC file-based auth
-//  4. Application Default Credentials — metadata server, gcloud auth, workload identity
-//
-// ProjectID is always required for Firebase Auth token verification. It is
-// auto-detected from a service account key if provided, but must be set
-// explicitly when using ADC on environments where it cannot be inferred
-// (e.g. local dev without gcloud project configured).
-type GoogleCloudConfig struct {
-	ProjectID          string
-	ServiceAccountKey  string
-	ServiceAccountFile string
 }
