@@ -8,25 +8,27 @@ inputs:
       - api/proto/pivox
       - api/proto/google/rpc
       - api/proto/google/type
+      - api/proto/google/longrunning
+      - api/proto/google/api
 plugins:
-  # Swift proto types — consumed by the macOS SwiftUI app and surfaced to the
-  # shared C++ chat client via Swift↔C++ interop.
-  - remote: buf.build/apple/swift:v1.36.1
+  # Swift proto types — message structs, enums, oneofs. Generated into
+  # the PivoxModels SwiftPM package; the macOS app does `import
+  # PivoxModels` to get all message types and gRPC client stubs.
+  - remote: buf.build/apple/swift:v1.37.0
     out: native/platform/macos/swift-packages/PivoxModels/Sources/PivoxModels/Generated
     opt:
       - Visibility=Public
       - FileNaming=PathToUnderscores
 
-  # Swift proto-bridge extensions — non-generic, non-throwing serializer
-  # wrappers so C++ can read/write proto bytes through interop. Source in
-  # tools/cmd/protoc-gen-pivox-swift-protobridge/. Binary built by Makefile.
-  - local: bin/protoc-gen-pivox-swift-protobridge
+  # grpc-swift-2 client stubs — typed async clients with AsyncSequence
+  # streaming. Server side stays off; the cloud is Go. The plugin
+  # binary is built once from grpc-swift-protobuf's SwiftPM checkout
+  # (see PivoxModels/.build/checkouts/) — there is no public BSR
+  # plugin for grpc-swift-2 yet (only v1 at buf.build/grpc/swift).
+  - local: bin/protoc-gen-grpc-swift-2
     out: native/platform/macos/swift-packages/PivoxModels/Sources/PivoxModels/Generated
     opt:
-      - swift_module=PivoxModels
-
-  # NOTE: the Swift facade runs from a separate template
-  # (buf.gen.native.facade.yaml) so it can use the narrow scope that
-  # matches the C++ bridge (only services with a C++ counterpart —
-  # currently pivox.ai.v1.AiChat). Broaden both together when you want
-  # the facade to cover additional services.
+      - Visibility=Public
+      - FileNaming=PathToUnderscores
+      - Client=true
+      - Server=false

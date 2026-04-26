@@ -8,7 +8,7 @@ public final class ConversationListViewModel: ObservableObject {
     @Published public var state: ListState = .idle
     @Published public var isLoadingMore: Bool = false
 
-    private let client: any ChatClientProtocol
+    private let client: ChatClient
     private let orgName: String
     private var nextPageToken: String = ""
     private var hasMore: Bool = true
@@ -31,7 +31,7 @@ public final class ConversationListViewModel: ObservableObject {
         }
     }
 
-    public init(client: any ChatClientProtocol, orgName: String) {
+    public init(client: ChatClient, orgName: String) {
         self.client = client
         self.orgName = orgName
     }

@@ -163,19 +163,11 @@ xcodebuild test \
 **C++ (gtest):**
 
 ```sh
-# Build test targets
-xcodebuild build \
-  -project build-xcode/Pivox.xcodeproj \
-  -target pivox_ai_chat_client_tests \
-  -configuration Debug
-
 xcodebuild build \
   -project build-xcode/Pivox.xcodeproj \
   -target pivox_markdown_tests \
   -configuration Debug
 
-# Run
-./build-xcode/core/ai_chat/client/Debug/pivox_ai_chat_client_tests
 ./build-xcode/core/ai_elements/markdown/Debug/pivox_markdown_tests
 ```
 

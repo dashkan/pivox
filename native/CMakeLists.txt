@@ -123,9 +123,8 @@ if(APPLE)
     set(FIREBASE_PLIST "${CMAKE_SOURCE_DIR}/configs/firebase/GoogleService-Info.plist")
 
     # Swift executable (SwiftUI app). All .swift under platform/macos/swift
-    # is picked up recursively — including files generated into per-feature
-    # `Generated/` subdirs by the protoc-gen-pivox-swift-facade plugin.
-    # CONFIGURE_DEPENDS re-triggers CMake when files appear/disappear.
+    # is picked up recursively. CONFIGURE_DEPENDS re-triggers CMake when
+    # files appear/disappear.
     set(SWIFT_DIR "platform/macos/swift")
     file(GLOB_RECURSE APP_SWIFT_SOURCES
         CONFIGURE_DEPENDS
@@ -143,65 +142,41 @@ if(APPLE)
         MACOSX_PACKAGE_LOCATION Resources
     )
 
-    # App imports PivoxModels which is built with C++ interop. Consumers of
-    # an interop-enabled module must enable the same mode.
-    target_compile_options(${APP_TARGET} PRIVATE
-        "$<$<COMPILE_LANGUAGE:Swift>:-cxx-interoperability-mode=default>"
-    )
-
-    # SwiftProtobuf — compiled from vendored SPM checkout.
-    # PivoxModels' `swift build` fetches swift-protobuf into .build/checkouts/.
-    # We compile it as a CMake Swift static library so the Xcode project links it.
-    # Resolve SPM dependencies first so the checkout exists on fresh clones.
+    # PivoxModels — built via SwiftPM (`swift build`) so transitive Swift
+    # AND C dependencies (SwiftProtobuf, grpc-swift-2, NIO, BoringSSL via
+    # swift-nio-ssl) are all resolved. The package emits a single dylib
+    # bundling its own code plus all transitive deps; the app links it
+    # and embeds it under Contents/Frameworks/ at build time. Static
+    # linking would require each transitive dep as its own .a, which
+    # SwiftPM doesn't expose.
     set(PIVOX_MODELS_PKG "${CMAKE_SOURCE_DIR}/platform/macos/swift-packages/PivoxModels")
+    set(PIVOX_MODELS_BUILD_DIR "${PIVOX_MODELS_PKG}/.build/arm64-apple-macosx/release")
+    set(PIVOX_MODELS_MODULES_DIR "${PIVOX_MODELS_BUILD_DIR}/Modules")
+    set(PIVOX_MODELS_DYLIB "${PIVOX_MODELS_BUILD_DIR}/libPivoxModels.dylib")
+
+    # Build at configure time so the dylib + .swiftmodule files exist
+    # before CMake's -I/-L paths get evaluated.
     execute_process(
-        COMMAND swift package resolve
+        COMMAND swift build -c release
         WORKING_DIRECTORY "${PIVOX_MODELS_PKG}"
-        RESULT_VARIABLE SPM_RESOLVE_RESULT
+        RESULT_VARIABLE PIVOX_MODELS_BUILD_RESULT
     )
-    if(NOT SPM_RESOLVE_RESULT EQUAL 0)
-        message(FATAL_ERROR "swift package resolve failed in PivoxModels")
+    if(NOT PIVOX_MODELS_BUILD_RESULT EQUAL 0)
+        message(FATAL_ERROR "swift build of PivoxModels failed")
     endif()
-    set(SWIFT_PROTOBUF_DIR "${PIVOX_MODELS_PKG}/.build/checkouts/swift-protobuf/Sources/SwiftProtobuf")
-    file(GLOB SWIFT_PROTOBUF_SOURCES "${SWIFT_PROTOBUF_DIR}/*.swift")
-    add_library(SwiftProtobuf STATIC ${SWIFT_PROTOBUF_SOURCES})
-    target_compile_options(SwiftProtobuf PRIVATE
-        "$<$<COMPILE_LANGUAGE:Swift>:-package-name;SwiftProtobuf>")
-    set_target_properties(SwiftProtobuf PROPERTIES
-        CMAKE_Swift_LANGUAGE_VERSION 6
-        XCODE_ATTRIBUTE_ENABLE_TESTABILITY "NO"
+
+    # Custom target so build-time changes to PivoxModels sources (e.g.
+    # after `make proto-generate-native`) propagate via xcodebuild too.
+    add_custom_target(PivoxModelsSwiftBuild
+        COMMAND swift build -c release
+        WORKING_DIRECTORY "${PIVOX_MODELS_PKG}"
+        USES_TERMINAL
+        COMMENT "Building PivoxModels (SwiftPM)"
     )
 
-    # PivoxModels — Swift proto types as a proper module, with C++ interop
-    # enabled so the emitted PivoxModels-Swift.h is consumable from C++.
-    # The shared C++ chat client uses it to accept typed Swift proto values
-    # at the Swift↔C++ bridge.
-    set(PIVOX_MODELS_SRC "${PIVOX_MODELS_PKG}/Sources/PivoxModels")
-    # Recursive — swift-protobuf emits flat, but our bridge plugin's output
-    # lands under Generated/<package>/<file>.bridge.swift. Both picked up.
-    file(GLOB_RECURSE PIVOX_MODELS_GEN_SOURCES
-        CONFIGURE_DEPENDS
-        "${PIVOX_MODELS_SRC}/Generated/*.swift"
-    )
-
-    add_library(PivoxModels STATIC
-        ${PIVOX_MODELS_GEN_SOURCES}
-    )
-    target_link_libraries(PivoxModels PUBLIC SwiftProtobuf)
-    target_compile_options(PivoxModels PRIVATE
-        "$<$<COMPILE_LANGUAGE:Swift>:-cxx-interoperability-mode=default>"
-    )
-    set_target_properties(PivoxModels PROPERTIES
-        CMAKE_Swift_LANGUAGE_VERSION 6
-        XCODE_ATTRIBUTE_SWIFT_INSTALL_OBJC_HEADER "YES"
-        XCODE_ATTRIBUTE_SWIFT_OBJC_INTERFACE_HEADER_NAME "PivoxModels-Swift.h"
-    )
-
-    # The shared C++ chat client's Apple bridge consumes PivoxModels-Swift.h,
-    # so chat client compilation must wait for PivoxModels to have emitted it.
-    add_dependencies(pivox_ai_chat_client PivoxModels)
-
-    target_link_libraries(${APP_TARGET} PRIVATE pivox_bridge pivox_ai_chat_client pivox_markdown pivox_highlight_wrapper SwiftProtobuf PivoxModels
+    target_link_libraries(${APP_TARGET} PRIVATE
+        pivox_bridge pivox_markdown pivox_highlight_wrapper
+        "${PIVOX_MODELS_DYLIB}"
         # Firebase Core (from Analytics bundle)
         "${FB_ANALYTICS}/FirebaseCore.xcframework"
         "${FB_ANALYTICS}/FirebaseCoreInternal.xcframework"
@@ -218,16 +193,65 @@ if(APPLE)
         # RecaptchaInterop.xcframework is header-only (iOS slices only) — not linked.
         # Google Sign-In uses ASWebAuthenticationSession (built-in, no extra SDK).
     )
+    add_dependencies(${APP_TARGET} PivoxModelsSwiftBuild)
     target_link_options(${APP_TARGET} PRIVATE "LINKER:-ObjC")
+
+    # SwiftPM emits a `module.modulemap` per C module under
+    # .build/<arch>/release/<Module>.build/. The Swift compiler needs
+    # one `-Xcc -fmodule-map-file=<path>` per modulemap so it can
+    # resolve transitive `@import CNIOAtomics`-style imports embedded
+    # in NIO's binary swiftmodule files. SHELL: keeps each pair on the
+    # same command line as Xcode passes them through.
+    # SwiftPM emits/locates module.modulemap files in two places: it
+    # generates them under .build/<arch>/release/<Module>.build/ for C
+    # modules whose package didn't ship one, and it consumes the
+    # original modulemap from the checkout for packages that did
+    # (swift-atomics, swift-nio-ssl). We need both on the swiftc
+    # search path; deduplicate by module name to avoid "redefinition"
+    # errors from `<X>-tool.build/` plugin variants.
+    file(GLOB_RECURSE PIVOX_MODELS_C_MODULEMAPS_RAW
+        "${PIVOX_MODELS_PKG}/.build/arm64-apple-macosx/release/*.build/module.modulemap"
+        "${PIVOX_MODELS_PKG}/.build/checkouts/*/Sources/*/include/module.modulemap"
+    )
+    set(PIVOX_MODELS_MODULEMAP_FLAGS "")
+    set(_seen_modules "")
+    foreach(mm ${PIVOX_MODELS_C_MODULEMAPS_RAW})
+        # Extract the module name from the modulemap's first `module X` line.
+        file(STRINGS "${mm}" _first_module_line REGEX "^module +[A-Za-z_][A-Za-z0-9_]*" LIMIT_COUNT 1)
+        if(_first_module_line MATCHES "^module +([A-Za-z_][A-Za-z0-9_]*)")
+            set(_module_name "${CMAKE_MATCH_1}")
+            if(NOT _module_name IN_LIST _seen_modules)
+                list(APPEND _seen_modules "${_module_name}")
+                list(APPEND PIVOX_MODELS_MODULEMAP_FLAGS
+                    "SHELL:$<$<COMPILE_LANGUAGE:Swift>:-Xcc -fmodule-map-file=${mm}>"
+                )
+                # Also add the modulemap's parent dir as -Xcc -I so the
+                # umbrella header references resolve.
+                get_filename_component(_mm_dir "${mm}" DIRECTORY)
+                list(APPEND PIVOX_MODELS_MODULEMAP_FLAGS
+                    "SHELL:$<$<COMPILE_LANGUAGE:Swift>:-Xcc -I${_mm_dir}>"
+                )
+            endif()
+        endif()
+    endforeach()
 
     target_compile_options(${APP_TARGET} PRIVATE
         "SHELL:-import-objc-header ${CMAKE_SOURCE_DIR}/platform/macos/Bridging-Header.h"
+        # `-I` so `import PivoxModels` (and any other modules SwiftPM
+        # built — SwiftProtobuf, GRPCCore, etc.) resolves against
+        # SwiftPM's emitted .swiftmodule files.
+        "$<$<COMPILE_LANGUAGE:Swift>:-I${PIVOX_MODELS_MODULES_DIR}>"
+        ${PIVOX_MODELS_MODULEMAP_FLAGS}
     )
     target_include_directories(${APP_TARGET} PRIVATE
         "${CMAKE_SOURCE_DIR}/platform/macos/objcpp"
-        "${CMAKE_SOURCE_DIR}/core/ai_chat/client"
         "${CMAKE_SOURCE_DIR}/core/ai_elements/highlight/include"
     )
+
+    # Embed libPivoxModels.dylib alongside libpivox_highlight.dylib in
+    # Contents/Frameworks/. The post-build step below already handles
+    # Rust highlight; this adds the SwiftPM-built dylib to the same
+    # destination + sign step.
 
     set_target_properties(${APP_TARGET} PROPERTIES
         MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/platform/macos/Info.plist.in
@@ -258,11 +282,15 @@ if(APPLE)
         XCODE_ATTRIBUTE_LD_RUNPATH_SEARCH_PATHS "@executable_path/../Frameworks"
     )
 
-    # Embed the Rust highlight dylib into Contents/Frameworks and
-    # re-sign. Corrosion's aggregated output lives at a stable path
-    # relative to CMAKE_BINARY_DIR; IMPORTED_LOCATION is empty for the
-    # multi-config Xcode generator at build-time expansion, so we
-    # reference the known path directly.
+    # Embed the Rust highlight dylib + the SwiftPM-built PivoxModels
+    # dylib into Contents/Frameworks/. Both already carry the right
+    # install_name (`@rpath/lib<name>.dylib`) at link time — SwiftPM
+    # sets it for libPivoxModels.dylib, Corrosion sets it for
+    # libpivox_highlight.dylib — so no install_name_tool rewrite is
+    # needed. Sign each copied dylib; do NOT re-sign the main app
+    # executable here (Xcode's own codesign step at the end of the
+    # build target handles the bundle signature correctly, including
+    # nested xctest bundles in Contents/PlugIns/).
     set(PIVOX_HIGHLIGHT_DYLIB_SRC
         "${CMAKE_BINARY_DIR}/core/ai_elements/highlight/libpivox_highlight.dylib")
     set(PIVOX_APP_FRAMEWORKS_DIR "$<TARGET_BUNDLE_CONTENT_DIR:${APP_TARGET}>/Frameworks")
@@ -271,9 +299,14 @@ if(APPLE)
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${PIVOX_HIGHLIGHT_DYLIB_SRC}"
             "${PIVOX_APP_FRAMEWORKS_DIR}/"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${PIVOX_MODELS_DYLIB}"
+            "${PIVOX_APP_FRAMEWORKS_DIR}/"
         COMMAND codesign --force --sign -
             "${PIVOX_APP_FRAMEWORKS_DIR}/libpivox_highlight.dylib"
-        COMMENT "Embedding + signing Rust highlight dylib"
+        COMMAND codesign --force --sign -
+            "${PIVOX_APP_FRAMEWORKS_DIR}/libPivoxModels.dylib"
+        COMMENT "Embedding + signing Rust highlight + PivoxModels dylibs"
         VERBATIM
     )
     add_dependencies(${APP_TARGET} cargo-build_pivox_highlight)
@@ -300,8 +333,11 @@ if(APPLE)
     find_package(XCTest REQUIRED)
 
     xctest_add_bundle(PivoxTests ${APP_TARGET}
-        tests/macos/MockChatClient.swift
-        tests/macos/AIChatStateTests.swift
+        tests/macos/AuthServiceTests.swift
+        tests/macos/AuthViewModelTests.swift
+        tests/macos/CoreTests.swift
+        tests/macos/DelegatedAuthTests.swift
+        tests/macos/ImageEditorBridgeTests.swift
     )
     # Copy conversation fixture into the test bundle's Resources so
     # `Bundle(for:).url(forResource:)` can find it at test runtime.
@@ -315,15 +351,19 @@ if(APPLE)
 
     target_compile_options(PivoxTests PRIVATE
         "SHELL:-import-objc-header ${CMAKE_SOURCE_DIR}/platform/macos/Bridging-Header.h"
-        "$<$<COMPILE_LANGUAGE:Swift>:-cxx-interoperability-mode=default>"
+        "$<$<COMPILE_LANGUAGE:Swift>:-I${PIVOX_MODELS_MODULES_DIR}>"
+        ${PIVOX_MODELS_MODULEMAP_FLAGS}
     )
     target_include_directories(PivoxTests PRIVATE
         "${CMAKE_SOURCE_DIR}/platform/macos/objcpp"
-        "${CMAKE_SOURCE_DIR}/core/ai_chat/client"
         "${CMAKE_SOURCE_DIR}/core/ai_elements/markdown"
         "${CMAKE_SOURCE_DIR}/core/ai_elements/highlight/include"
     )
-    target_link_libraries(PivoxTests PRIVATE pivox_bridge pivox_ai_chat_client pivox_markdown pivox_highlight_wrapper SwiftProtobuf PivoxModels)
+    target_link_libraries(PivoxTests PRIVATE
+        pivox_bridge pivox_markdown pivox_highlight_wrapper
+        "${PIVOX_MODELS_DYLIB}"
+    )
+    add_dependencies(PivoxTests PivoxModelsSwiftBuild)
 
     xctest_add_test(PivoxUnitTests PivoxTests)
 
@@ -342,7 +382,6 @@ if(APPLE)
     )
     target_include_directories(PivoxUITests PRIVATE
         "${CMAKE_SOURCE_DIR}/platform/macos/objcpp"
-        "${CMAKE_SOURCE_DIR}/core/ai_chat/client"
     )
 
     # Mark as UI test bundle — XCUITest launches the app itself.
@@ -429,7 +468,7 @@ if(WIN32)
     set(FB_LINK_DIR "${FB_CPP_ROOT}/libs/windows/VS2019/MD/${FB_ARCH}/$<CONFIG>")
 
     # Common link libraries for Windows targets.
-    set(WIN_LINK_LIBS pivox_core pivox_auth crypt32 advapi32 firebase_app firebase_auth ws2_32 userenv)
+    set(WIN_LINK_LIBS pivox_core crypt32 advapi32 firebase_app firebase_auth ws2_32 userenv)
 
     option(PIVOX_BUILD_ACTIVEX "Build ActiveX plugin (x86 only)" OFF)
 
@@ -456,11 +495,10 @@ if(GTest_FOUND)
         tests/core/core_tests.cpp
         tests/core/auth_validation_tests.cpp
         tests/core/app_state_tests.cpp
-        tests/core/auth_constants_tests.cpp
         tests/core/crop_math_tests.cpp
         tests/core/image_editor_engine_tests.cpp
     )
-    target_link_libraries(pivox_core_tests PRIVATE pivox_core pivox_auth GTest::gtest_main)
+    target_link_libraries(pivox_core_tests PRIVATE pivox_core GTest::gtest_main)
 
     include(GoogleTest)
     gtest_discover_tests(pivox_core_tests DISCOVERY_MODE PRE_TEST)

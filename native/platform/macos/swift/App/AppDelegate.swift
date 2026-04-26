@@ -93,10 +93,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     // Initialize Firebase before any UI.
     AuthService.shared.configure()
 
-    // Install the shared gRPC auth token provider. Every RPC client
-    // (ChatClient and future services) reads tokens through this —
-    // ChatClient no longer takes an authToken parameter.
-    PivoxAuthBridge.registerTokenProvider()
+    // gRPC auth lives inside ChatClient now via FirebaseAuthInterceptor
+    // (a grpc-swift-2 ClientInterceptor that fetches the current
+    // Firebase user's ID token per RPC). No global registration needed.
 
     // If a delegated signin/signout link was captured during will-launch,
     // skip creating the main window entirely — there is no Pivox UI the user

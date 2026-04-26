@@ -56,9 +56,8 @@ final class AIChatService {
     func connect() async {
         guard client == nil, initError == nil else { return }
         do {
-            // Auth header is attached per-RPC by the shared auth
-            // interceptor (see PivoxAuthBridge); ChatClient
-            // construction is synchronous from our perspective.
+            // Auth header is attached per-RPC by ChatClient's own
+            // FirebaseAuthInterceptor; construction is synchronous.
             client = try ChatClient(endpoint: endpoint)
         } catch {
             initError = error.localizedDescription

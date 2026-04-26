@@ -32,7 +32,7 @@ public final class ConversationViewModel: ObservableObject {
     /// updates on the next list/get refresh.
     @Published public private(set) var latestTitle: String?
 
-    private let client: any ChatClientProtocol
+    private let client: ChatClient
     public let conversationName: String
     /// True when the conversation was just created in this session (via the
     /// new-chat flow) and has no server-side history to load. Prevents a
@@ -82,7 +82,7 @@ public final class ConversationViewModel: ObservableObject {
         }
     }
 
-    public init(client: any ChatClientProtocol, conversationName: String, isNew: Bool = false) {
+    public init(client: ChatClient, conversationName: String, isNew: Bool = false) {
         self.client = client
         self.conversationName = conversationName
         self.isNew = isNew
