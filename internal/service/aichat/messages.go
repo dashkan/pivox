@@ -3,9 +3,6 @@ package aichat
 import (
 	"context"
 
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
@@ -65,7 +62,7 @@ func (s *Server) ListMessages(ctx context.Context, req *aiv1.ListMessagesRequest
 		Codec:    s.codec,
 	})
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid list params: %v", err)
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("filter", err.Error()))
 	}
 
 	results, err := filter.ScanMessages(rows)

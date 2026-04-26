@@ -3,12 +3,11 @@ package aichat
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/dashkan/pivox/internal/apierr"
@@ -57,15 +56,13 @@ func (s *Server) ListConversations(ctx context.Context, req *aiv1.ListConversati
 		Codec:    s.codec,
 	})
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid list params: %v", err)
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("filter", err.Error()))
 	}
 
 	results, err := filter.ScanConversations(rows)
 	if err != nil {
-		// Wrap so the interceptor's error log surfaces the
-		// underlying DB cause — `apierr.Internal("database error")`
-		// would mask it.
-		return nil, status.Errorf(codes.Internal, "scan conversations: %v", err)
+		slog.ErrorContext(ctx, "scan conversations failed", "error", err)
+		return nil, apierr.Internal("scan conversations")
 	}
 
 	pageSize := req.GetPageSize()
@@ -154,8 +151,8 @@ func (s *Server) UpdateConversation(ctx context.Context, req *aiv1.UpdateConvers
 	// ambiguous case explicitly.
 	mask := req.GetUpdateMask()
 	if mask == nil || len(mask.GetPaths()) == 0 {
-		return nil, status.Error(codes.InvalidArgument,
-			"update_mask is required and must list at least one field")
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("update_mask",
+			"update_mask is required and must list at least one field"))
 	}
 
 	params := db.UpdateConversationParams{
@@ -173,8 +170,8 @@ func (s *Server) UpdateConversation(ctx context.Context, req *aiv1.UpdateConvers
 		case "pinned":
 			params.Pinned = pgtype.Bool{Bool: conv.GetPinned(), Valid: true}
 		default:
-			return nil, status.Errorf(codes.InvalidArgument,
-				"update_mask contains unknown field %q", path)
+			return nil, apierr.InvalidArgument(apierr.FieldViolation("update_mask",
+				fmt.Sprintf("unknown field %q", path)))
 		}
 	}
 
@@ -221,7 +218,8 @@ func (s *Server) SummarizeConversation(ctx context.Context, req *aiv1.SummarizeC
 	// being summarized.
 	history, err := s.loadModelHistory(ctx, row.ID)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to load history: %v", err)
+		slog.ErrorContext(ctx, "load history failed", "conversation_id", row.ID, "error", err)
+		return nil, apierr.Internal("failed to load history")
 	}
 
 	transcript := renderTranscriptForSummary(history)
@@ -248,7 +246,8 @@ func (s *Server) SummarizeConversation(ctx context.Context, req *aiv1.SummarizeC
 
 	msg, _, _, err := s.runGenerate(ctx, genReq, nil)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "summarize failed: %v", err)
+		slog.ErrorContext(ctx, "summarize failed", "conversation_id", row.ID, "error", err)
+		return nil, apierr.Internal("summarize failed")
 	}
 
 	title := sanitizeTitle(extractTextFromMessage(msg))

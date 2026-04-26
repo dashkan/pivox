@@ -2,12 +2,28 @@ package server
 
 import (
 	"context"
+	"errors"
+	"log/slog"
 
+	"github.com/jackc/pgx/v5"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
+	"github.com/dashkan/pivox/internal/apierr"
 	db "github.com/dashkan/pivox/internal/db/generated"
+)
+
+// Canonical messages. Centralized so the unary and stream interceptors
+// can't drift, and so the wording is one-edit-away.
+const (
+	errMissingAuthenticatedCaller = "missing authenticated caller"
+
+	// memberlessRecoveryMessage is returned for both "caller has no
+	// account row yet" (race with the /internal/sync-account webhook
+	// on a freshly-Firebase-registered user) AND "caller has an
+	// account but zero memberships". Same code, same message — both
+	// states route the caller through the same recovery path (the
+	// bootstrap allowlist).
+	memberlessRecoveryMessage = "caller has no organization membership; create or accept an invitation to an organization first"
 )
 
 // membershipExemptMethods is the bootstrap allowlist — RPCs that an
@@ -39,6 +55,38 @@ var membershipExemptMethods = map[string]bool{
 	"/pivox.api.v1.Organizations/GetInvitation":      true,
 }
 
+// requireMembership is the shared body for both unary and stream
+// membership interceptors. Returns nil if the caller has at least one
+// membership (or if the method is on the bootstrap allowlist), or an
+// apierr.* error otherwise. Single source of truth so unary and
+// stream chains can't drift.
+func requireMembership(ctx context.Context, queries db.Querier, fullMethod string) error {
+	if membershipExemptMethods[fullMethod] {
+		return nil
+	}
+	uid, ok := AuthenticatedUID(ctx)
+	if !ok {
+		return apierr.Unauthenticated(errMissingAuthenticatedCaller)
+	}
+	account, err := queries.GetAccountByFirebaseUID(ctx, uid)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apierr.PermissionDenied(memberlessRecoveryMessage)
+		}
+		slog.ErrorContext(ctx, "membership: lookup account failed", "uid", uid, "error", err)
+		return apierr.Internal("lookup account")
+	}
+	memberships, err := queries.ListUsersByAccount(ctx, account.ID)
+	if err != nil {
+		slog.ErrorContext(ctx, "membership: lookup memberships failed", "account_id", account.ID, "error", err)
+		return apierr.Internal("lookup memberships")
+	}
+	if len(memberships) == 0 {
+		return apierr.PermissionDenied(memberlessRecoveryMessage)
+	}
+	return nil
+}
+
 // MembershipRequiredInterceptor returns a gRPC unary server interceptor
 // that enforces the system-wide invariant: every authenticated caller
 // has at least one org membership before any RPC outside the bootstrap
@@ -61,24 +109,8 @@ func MembershipRequiredInterceptor(queries db.Querier) grpc.UnaryServerIntercept
 		info *grpc.UnaryServerInfo,
 		handler grpc.UnaryHandler,
 	) (any, error) {
-		if membershipExemptMethods[info.FullMethod] {
-			return handler(ctx, req)
-		}
-		uid, ok := AuthenticatedUID(ctx)
-		if !ok {
-			return nil, status.Error(codes.Unauthenticated, "missing authenticated caller")
-		}
-		account, err := queries.GetAccountByFirebaseUID(ctx, uid)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "lookup account: %v", err)
-		}
-		memberships, err := queries.ListUsersByAccount(ctx, account.ID)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "lookup memberships: %v", err)
-		}
-		if len(memberships) == 0 {
-			return nil, status.Error(codes.PermissionDenied,
-				"caller has no organization membership; create or accept an invitation to an organization first")
+		if err := requireMembership(ctx, queries, info.FullMethod); err != nil {
+			return nil, err
 		}
 		return handler(ctx, req)
 	}
@@ -93,25 +125,8 @@ func MembershipRequiredStreamInterceptor(queries db.Querier) grpc.StreamServerIn
 		info *grpc.StreamServerInfo,
 		handler grpc.StreamHandler,
 	) error {
-		if membershipExemptMethods[info.FullMethod] {
-			return handler(srv, ss)
-		}
-		ctx := ss.Context()
-		uid, ok := AuthenticatedUID(ctx)
-		if !ok {
-			return status.Error(codes.Unauthenticated, "missing authenticated caller")
-		}
-		account, err := queries.GetAccountByFirebaseUID(ctx, uid)
-		if err != nil {
-			return status.Errorf(codes.Internal, "lookup account: %v", err)
-		}
-		memberships, err := queries.ListUsersByAccount(ctx, account.ID)
-		if err != nil {
-			return status.Errorf(codes.Internal, "lookup memberships: %v", err)
-		}
-		if len(memberships) == 0 {
-			return status.Error(codes.PermissionDenied,
-				"caller has no organization membership; create or accept an invitation to an organization first")
+		if err := requireMembership(ss.Context(), queries, info.FullMethod); err != nil {
+			return err
 		}
 		return handler(srv, ss)
 	}

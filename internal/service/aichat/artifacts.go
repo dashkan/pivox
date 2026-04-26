@@ -2,10 +2,9 @@ package aichat
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jackc/pgx/v5"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/dashkan/pivox/internal/apierr"
@@ -63,7 +62,7 @@ func (s *Server) ListArtifacts(ctx context.Context, req *aiv1.ListArtifactsReque
 		Codec:    s.codec,
 	})
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid list params: %v", err)
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("filter", err.Error()))
 	}
 
 	results, err := filter.ScanArtifacts(rows)
@@ -128,8 +127,7 @@ func (s *Server) DeleteArtifact(ctx context.Context, req *aiv1.DeleteArtifactReq
 			return nil, apierr.Internal("database error")
 		}
 		if count > 0 {
-			return nil, status.Errorf(codes.FailedPrecondition,
-				"artifact has %d version(s); set force=true to delete", count)
+			return nil, apierr.FailedPrecondition(fmt.Sprintf("artifact has %d version(s); set force=true to delete", count))
 		}
 	}
 

@@ -329,7 +329,7 @@ func TestUnit_CreateKey_ErrorPaths(t *testing.T) {
 		wantCode codes.Code
 	}{
 		{
-			name:  "org not found",
+			name: "org not found",
 			setup: func(mockQ *mocks.MockQuerier) {
 				mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(db.Organization{}, pgx.ErrNoRows)
 			},
@@ -380,9 +380,9 @@ func TestUnit_GetKeyString_ErrorPaths(t *testing.T) {
 		wantCode codes.Code
 	}{
 		{
-			name:  "invalid name",
-			setup: func(mockQ *mocks.MockQuerier) {},
-			req:   &apiv1.GetKeyStringRequest{Name: "bad-name"},
+			name:     "invalid name",
+			setup:    func(mockQ *mocks.MockQuerier) {},
+			req:      &apiv1.GetKeyStringRequest{Name: "bad-name"},
 			wantCode: codes.Internal,
 		},
 		{

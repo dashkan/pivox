@@ -152,15 +152,26 @@ type Querier interface {
 	// Caller walks rows accumulating token_count and stops when budget is exceeded.
 	ListMessagesNewestFirst(ctx context.Context, arg ListMessagesNewestFirstParams) ([]AiMessage, error)
 	ListOperations(ctx context.Context, arg ListOperationsParams) ([]Operation, error)
+	// Lists all organizations the given account has membership in.
+	// Caller-scoped for `ListOrganizations`: every authenticated user is
+	// only ever shown orgs they belong to. Excludes soft-deleted orgs.
+	// No pagination — typical users are in 1-3 orgs. The 1000-row LIMIT
+	// is a defensive backstop, not a paging mechanism; if anyone ever
+	// needs more we'll know because something is very wrong.
+	ListOrganizationsForAccount(ctx context.Context, accountID uuid.UUID) ([]Organization, error)
 	ListPendingOperations(ctx context.Context) ([]Operation, error)
 	ListRequestsByProject(ctx context.Context, arg ListRequestsByProjectParams) ([]AssetRequest, error)
 	ListStorageAgentAuditByAgent(ctx context.Context, arg ListStorageAgentAuditByAgentParams) ([]StorageAgentAudit, error)
 	ListStorageAgentAuditByGateway(ctx context.Context, arg ListStorageAgentAuditByGatewayParams) ([]StorageAgentAudit, error)
 	ListStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageAgent, error)
 	ListStorageEndpointsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageEndpoint, error)
-	// Lists all org memberships for an account. Used by the native app's
-	// "which orgs am I in?" query — drives the org selector and the
-	// "zero orgs → onboarding" detection.
+	// Lists all live org memberships for an account, excluding memberships
+	// in soft-deleted orgs. Used by the membership interceptor's gate and
+	// by any consumer that needs the "is this caller in any active org?"
+	// signal. Joining out the deleted orgs here keeps that signal in sync
+	// with `ListOrganizationsForAccount` — without it, a caller whose only
+	// memberships are in deleted orgs would pass the membership check but
+	// see an empty org list, soft-bricking onboarding.
 	ListUsersByAccount(ctx context.Context, accountID uuid.UUID) ([]User, error)
 	ListUsersByOrg(ctx context.Context, orgID uuid.UUID) ([]User, error)
 	LookupApiKeyByKeyString(ctx context.Context, keyString string) (ApiKey, error)

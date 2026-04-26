@@ -126,12 +126,29 @@ public final class ChatClient {
     }
 }
 
-enum ChatClientError: Error, CustomStringConvertible {
+/// Errors surfaced by `ChatClient` to UI code.
+///
+/// User-visible `description` strings are deliberately generic — they
+/// never echo Firebase SDK error details (e.g. "email not found",
+/// "invalid credential") because that would let an attacker probing
+/// from a compromised client distinguish "user exists but wrong
+/// password" from "no such user". Detailed error info is logged
+/// internally (see `signpostAuthFailure` below) for diagnostics.
+public enum ChatClientError: Error, CustomStringConvertible {
     case invalidEndpoint(String)
+    /// No Firebase user is signed in. Caller (UI) should route to the
+    /// sign-in screen.
+    case notSignedIn
+    /// The Firebase ID-token fetch failed (network outage, expired
+    /// session, revoked refresh token, clock skew, etc.). Caller should
+    /// prompt for re-authentication.
+    case authenticationRequired
 
-    var description: String {
+    public var description: String {
         switch self {
         case .invalidEndpoint(let s): return "invalid endpoint: \(s)"
+        case .notSignedIn: return "Sign in to continue."
+        case .authenticationRequired: return "Authentication failed. Please sign in again."
         }
     }
 }
@@ -139,12 +156,20 @@ enum ChatClientError: Error, CustomStringConvertible {
 // MARK: - Auth interceptor
 
 /// Attaches the current Firebase user's ID token as an `authorization:
-/// Bearer <token>` metadata header on every outbound RPC. If no user is
-/// signed in, no header is attached — the server-side AuthInterceptor
-/// rejects it (as it should).
+/// Bearer <token>` metadata header on every outbound RPC.
 ///
-/// Firebase's `getIDToken(forcingRefresh: false)` returns a cached token
-/// if it has more than ~5 minutes of validity left, otherwise refreshes
+/// Two failure modes are kept distinct so the UI can route correctly:
+///   - no signed-in user → throw `notSignedIn` before the wire call
+///   - Firebase token-fetch threw (network, expired session, revoked
+///     refresh, etc.) → log internally, throw `authenticationRequired`
+///
+/// In both cases the user sees a generic message; the underlying
+/// Firebase SDK error is not echoed to the UI (and not visible from
+/// any RPC reply path) because that would leak account-existence
+/// signal to anyone running a compromised client.
+///
+/// Firebase's `getIDToken(forcingRefresh: false)` returns a cached
+/// token if it has >~5 min validity left, otherwise refreshes
 /// transparently. We don't need to manage expiry ourselves.
 struct FirebaseAuthInterceptor: ClientInterceptor {
     func intercept<Input: Sendable, Output: Sendable>(
@@ -155,15 +180,23 @@ struct FirebaseAuthInterceptor: ClientInterceptor {
             ClientContext
         ) async throws -> StreamingClientResponse<Output>
     ) async throws -> StreamingClientResponse<Output> {
+        let token = try await Self.fetchToken()
         var req = request
-        if let token = await Self.fetchToken() {
-            req.metadata.addString("Bearer \(token)", forKey: "authorization")
-        }
+        req.metadata.addString("Bearer \(token)", forKey: "authorization")
         return try await next(req, context)
     }
 
-    private static func fetchToken() async -> String? {
-        guard let user = Auth.auth().currentUser else { return nil }
-        return try? await user.getIDToken()
+    private static func fetchToken() async throws -> String {
+        guard let user = Auth.auth().currentUser else {
+            throw ChatClientError.notSignedIn
+        }
+        do {
+            return try await user.getIDToken()
+        } catch {
+            // Log the underlying error for diagnostics; surface only the
+            // generic ChatClientError to the caller.
+            NSLog("[ChatClient] Firebase getIDToken failed: %@", String(describing: error))
+            throw ChatClientError.authenticationRequired
+        }
     }
 }

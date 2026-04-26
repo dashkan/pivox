@@ -915,6 +915,7 @@ class AuthService: NSObject {
 
   // MARK: - Sign Out
 
+  @MainActor
   func signOut() {
     errorMessage = nil
     do {
@@ -924,6 +925,16 @@ class AuthService: NSObject {
         appState.deleteSecure(forKey: "firebase_id_token")
         appState.deleteSecure(forKey: "firebase_refresh_token")
       }
+      // Tear down auth-bound singletons. The chat client's gRPC channel
+      // is bound to the previous user's ID token and must not survive
+      // across user identities — leaving it up would let in-flight
+      // streams keep running and any newly-signed-in user reuse the
+      // channel with their token attached to the prior user's
+      // long-lived connection.
+      //
+      // signOut is @MainActor so this call is statically guaranteed
+      // to be on the main actor — no runtime assertion needed.
+      AIChatService.shared.reset()
     } catch {
       errorMessage = "Failed to sign out: \(error.localizedDescription)"
     }

@@ -474,7 +474,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
   /// "Sign Out" item — same effect, different entry point. No
   /// confirmation dialog: signing out is non-destructive (no data
   /// loss, can sign back in immediately).
-  @objc private func signOutAction(_ sender: Any?) {
+  @objc @MainActor private func signOutAction(_ sender: Any?) {
     AuthService.shared.signOut()
   }
 

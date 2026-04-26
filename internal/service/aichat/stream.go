@@ -2,7 +2,9 @@ package aichat
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 
 	"github.com/google/uuid"
@@ -10,6 +12,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/dashkan/pivox/internal/apierr"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	aiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1"
 	"github.com/dashkan/pivox/internal/server"
@@ -79,13 +82,13 @@ func (s *Server) runGenerate(
 	emit func(*aiv1.ServerEvent) error,
 ) (*aiv1.Message, *aiv1.TokenUsage, string, error) {
 	if req == nil {
-		return nil, nil, "", status.Error(codes.InvalidArgument, "request is nil")
+		return nil, nil, "", apierr.BadRequest("request is nil")
 	}
 	if req.GetParent() == "" {
-		return nil, nil, "", status.Error(codes.InvalidArgument, "parent is required")
+		return nil, nil, "", apierr.BadRequest("parent is required")
 	}
 	if len(req.GetMessages()) == 0 {
-		return nil, nil, "", status.Error(codes.InvalidArgument, "messages must not be empty")
+		return nil, nil, "", apierr.BadRequest("messages must not be empty")
 	}
 
 	uid := server.MustAuthenticatedUID(ctx)
@@ -98,7 +101,7 @@ func (s *Server) runGenerate(
 	// (per-user org-membership IAM is a future addition).
 	orgName, err := parseConversationParent(req.GetParent())
 	if err != nil {
-		return nil, nil, "", status.Errorf(codes.InvalidArgument, "invalid parent: %v", err)
+		return nil, nil, "", apierr.InvalidArgument(apierr.FieldViolation("parent", err.Error()))
 	}
 	if _, err := s.resolveOrg(ctx, orgName); err != nil {
 		return nil, nil, "", err
@@ -109,14 +112,13 @@ func (s *Server) runGenerate(
 	if convRef := req.GetConversation(); convRef != "" {
 		convOrgName, convName, err := parseConversationName(convRef)
 		if err != nil {
-			return nil, nil, "", status.Errorf(codes.InvalidArgument, "invalid conversation: %v", err)
+			return nil, nil, "", apierr.InvalidArgument(apierr.FieldViolation("conversation", err.Error()))
 		}
 		// Cross-check: conversation's org must match the request's
 		// parent. Without this a caller could pass parent=A and
 		// conversation under org B and write into B.
 		if convOrgName != orgName {
-			return nil, nil, "", status.Error(codes.InvalidArgument,
-				"conversation's organization does not match request parent")
+			return nil, nil, "", apierr.BadRequest("conversation's organization does not match request parent")
 		}
 		row, err := s.resolveConversation(ctx, convOrgName, convName, uid)
 		if err != nil {
@@ -141,7 +143,8 @@ func (s *Server) runGenerate(
 	if conv != nil {
 		h, err := s.loadModelHistory(ctx, conv.ID)
 		if err != nil {
-			return nil, nil, "", status.Errorf(codes.Internal, "failed to load history: %v", err)
+			slog.ErrorContext(ctx, "load history failed", "conversation_id", conv.ID, "error", err)
+			return nil, nil, "", apierr.Internal("failed to load history")
 		}
 		history = h
 	} else {
@@ -182,7 +185,8 @@ func (s *Server) runGenerate(
 		if emit != nil {
 			_ = s.sendStreamErrorEmit(emit, err)
 		}
-		return nil, nil, "", status.Errorf(codes.Internal, "model stream: %v", err)
+		slog.ErrorContext(ctx, "model stream failed", "error", err)
+		return nil, nil, "", apierr.Internal("model stream")
 	}
 	defer reader.Close()
 
@@ -252,7 +256,8 @@ func (s *Server) runGenerate(
 	if conv != nil {
 		nextSeq, err := s.queries.GetNextSequenceForConversation(ctx, conv.ID)
 		if err != nil {
-			return nil, nil, "", status.Errorf(codes.Internal, "get sequence: %v", err)
+			slog.ErrorContext(ctx, "get sequence failed", "conversation_id", conv.ID, "error", err)
+			return nil, nil, "", apierr.Internal("get sequence")
 		}
 		assistantPartsJSON, _ := marshalParts(assistantParts)
 		_, err = s.queries.CreateMessage(ctx, db.CreateMessageParams{
@@ -264,7 +269,8 @@ func (s *Server) runGenerate(
 			TokenCount:     int32(estimateTokens(assistantText.String())),
 		})
 		if err != nil {
-			return nil, nil, "", status.Errorf(codes.Internal, "persist assistant message: %v", err)
+			slog.ErrorContext(ctx, "persist assistant message failed", "conversation_id", conv.ID, "error", err)
+			return nil, nil, "", apierr.Internal("persist assistant message")
 		}
 		_ = s.queries.IncrementConversationMessageCount(ctx, conv.ID)
 
@@ -284,10 +290,10 @@ func (s *Server) runGenerate(
 // history, picking a sequence number and counting tokens.
 func (s *Server) persistInputMessage(ctx context.Context, convID uuid.UUID, in *aiv1.InputMessage) error {
 	if in == nil {
-		return status.Error(codes.InvalidArgument, "input message is nil")
+		return apierr.BadRequest("input message is nil")
 	}
 	if len(in.GetParts()) == 0 {
-		return status.Error(codes.InvalidArgument, "input message has no parts")
+		return apierr.BadRequest("input message has no parts")
 	}
 
 	role, err := dbRoleForInputMessage(in.GetRole())
@@ -302,12 +308,14 @@ func (s *Server) persistInputMessage(ctx context.Context, convID uuid.UUID, in *
 
 	nextSeq, err := s.queries.GetNextSequenceForConversation(ctx, convID)
 	if err != nil {
-		return status.Errorf(codes.Internal, "failed to get sequence: %v", err)
+		slog.ErrorContext(ctx, "get sequence failed", "conversation_id", convID, "error", err)
+		return apierr.Internal("failed to get sequence")
 	}
 
 	partsJSON, err := marshalParts(parts)
 	if err != nil {
-		return status.Errorf(codes.Internal, "failed to marshal parts: %v", err)
+		slog.ErrorContext(ctx, "marshal parts failed", "error", err)
+		return apierr.Internal("failed to marshal parts")
 	}
 
 	_, err = s.queries.CreateMessage(ctx, db.CreateMessageParams{
@@ -319,7 +327,8 @@ func (s *Server) persistInputMessage(ctx context.Context, convID uuid.UUID, in *
 		TokenCount:     int32(estimateTokens(logText)),
 	})
 	if err != nil {
-		return status.Errorf(codes.Internal, "failed to persist message: %v", err)
+		slog.ErrorContext(ctx, "persist message failed", "conversation_id", convID, "error", err)
+		return apierr.Internal("failed to persist message")
 	}
 	_ = s.queries.IncrementConversationMessageCount(ctx, convID)
 	return nil
@@ -344,13 +353,11 @@ func dbRoleForInputMessage(r aiv1.Role) (string, error) {
 	case aiv1.Role_USER, aiv1.Role_ROLE_UNSPECIFIED:
 		return "user", nil
 	case aiv1.Role_ASSISTANT:
-		return "", status.Error(codes.InvalidArgument,
-			"assistant role is not valid on input messages — assistant turns are server-produced")
+		return "", apierr.BadRequest("assistant role is not valid on input messages — assistant turns are server-produced")
 	case aiv1.Role_SYSTEM:
-		return "", status.Error(codes.InvalidArgument,
-			"system role is not valid on input messages — use system_instruction on the request instead")
+		return "", apierr.BadRequest("system role is not valid on input messages — use system_instruction on the request instead")
 	default:
-		return "", status.Errorf(codes.InvalidArgument, "unsupported role: %v", r)
+		return "", apierr.BadRequest(fmt.Sprintf("unsupported role: %v", r))
 	}
 }
 
@@ -371,13 +378,11 @@ func validateInputParts(role string, parts []*aiv1.MessagePart) error {
 		}
 		sawToolResult = true
 		if strings.TrimSpace(tr.GetToolCallId()) == "" {
-			return status.Error(codes.InvalidArgument,
-				"tool result part missing tool_call_id")
+			return apierr.BadRequest("tool result part missing tool_call_id")
 		}
 	}
 	if !sawToolResult {
-		return status.Error(codes.InvalidArgument,
-			"tool-role message must include at least one tool_result part")
+		return apierr.BadRequest("tool-role message must include at least one tool_result part")
 	}
 	return nil
 }
@@ -477,6 +482,11 @@ func (s *Server) emitToolCall(ctx context.Context, emit func(*aiv1.ServerEvent) 
 }
 
 func (s *Server) sendStreamErrorEmit(emit func(*aiv1.ServerEvent) error, err error) error {
+	// Building a Status proto for embedding in a StreamError event,
+	// not returning an RPC-level error — so apierr's generic-message
+	// helpers don't apply. The client wants the actual error text to
+	// surface in the streamed event for display; if `err` already
+	// carries a status (e.g. from a downstream RPC), preserve it.
 	st, ok := status.FromError(err)
 	if !ok {
 		st = status.New(codes.Internal, err.Error())

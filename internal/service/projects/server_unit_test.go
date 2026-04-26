@@ -352,10 +352,10 @@ func TestUnit_UpdateProject_ErrorPaths(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		name         string
-		setupMocks   func(*mocks.MockQuerier)
-		req          *apiv1.UpdateProjectRequest
-		wantCode     codes.Code
+		name       string
+		setupMocks func(*mocks.MockQuerier)
+		req        *apiv1.UpdateProjectRequest
+		wantCode   codes.Code
 	}{
 		{
 			name:       "invalid project name format",

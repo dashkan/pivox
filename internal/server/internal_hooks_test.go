@@ -918,7 +918,7 @@ func TestPollDelegatedAuthSession(t *testing.T) {
 				mq.On("ConsumeDelegatedAuthSession", mock.Anything, validCode).
 					Return(pgtype.Text{}, errors.New("no rows"))
 				mq.On("GetDelegatedAuthSessionState", mock.Anything, validCode).
-		Return(db.DelegatedAuthSessionState(""), errors.New("no rows"))
+					Return(db.DelegatedAuthSessionState(""), errors.New("no rows"))
 			},
 			wantStatus: http.StatusNotFound,
 		},

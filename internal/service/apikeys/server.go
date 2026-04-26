@@ -10,8 +10,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/dashkan/pivox/internal/apierr"
@@ -106,12 +104,12 @@ func (s *ApiKeysServer) ListKeys(ctx context.Context, req *apiv1.ListKeysRequest
 		Codec:       s.codec,
 	})
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid filter: %v", err)
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("filter", err.Error()))
 	}
 
 	results, err := filter.ScanApiKeys(rows)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "database error")
+		return nil, apierr.Internal("database error")
 	}
 
 	pageSize := req.GetPageSize()

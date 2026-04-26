@@ -923,10 +923,10 @@ func TestUnit_GetInstallScript_WithProxyFlags(t *testing.T) {
 	}).Return(testGateway, nil)
 
 	resp, err := srv.GetInstallScript(ctx, &storagev1.GetInstallScriptRequest{
-		Name:        "organizations/acme/storageGateways/gw-1",
-		HttpProxy:   "http://proxy:3128",
-		HttpsProxy:  "https://proxy:3128",
-		NoProxy:     "localhost,127.0.0.1",
+		Name:       "organizations/acme/storageGateways/gw-1",
+		HttpProxy:  "http://proxy:3128",
+		HttpsProxy: "https://proxy:3128",
+		NoProxy:    "localhost,127.0.0.1",
 	})
 
 	require.NoError(t, err)

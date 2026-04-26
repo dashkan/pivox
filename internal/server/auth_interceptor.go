@@ -5,15 +5,24 @@ import (
 	"strings"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/status"
 
+	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/authn"
 )
 
 // authContextKey is the context key for the authenticated UID.
 type authContextKey struct{}
+
+// Canonical Unauthenticated messages. Centralized so both the unary
+// and stream interceptors return identical errors and so any future
+// reword happens in one place.
+const (
+	errMissingMetadata    = "missing metadata"
+	errMissingAuthHeader  = "missing authorization header"
+	errInvalidAuthFormat  = "invalid authorization format"
+	errInvalidOrExpiredID = "invalid or expired token"
+)
 
 // AuthenticatedUID extracts the verified UID from the context.
 // Returns the UID and true if present, or an empty string and false if the
@@ -40,6 +49,32 @@ func MustAuthenticatedUID(ctx context.Context) string {
 	return uid
 }
 
+// authenticate is the shared body for both unary and stream auth
+// interceptors. Returns the augmented context (with the verified UID)
+// or an apierr.Unauthenticated error. Single source of truth for
+// "Firebase bearer auth" — unary/stream chains can't drift.
+func authenticate(ctx context.Context, auth authn.Service) (context.Context, error) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, apierr.Unauthenticated(errMissingMetadata)
+	}
+	authHeaders := md.Get("authorization")
+	if len(authHeaders) == 0 {
+		return nil, apierr.Unauthenticated(errMissingAuthHeader)
+	}
+	bearer := authHeaders[0]
+	if !strings.HasPrefix(bearer, "Bearer ") {
+		return nil, apierr.Unauthenticated(errInvalidAuthFormat)
+	}
+	idToken := strings.TrimPrefix(bearer, "Bearer ")
+
+	identity, err := auth.VerifyToken(ctx, idToken)
+	if err != nil {
+		return nil, apierr.Unauthenticated(errInvalidOrExpiredID)
+	}
+	return context.WithValue(ctx, authContextKey{}, identity.UID), nil
+}
+
 // AuthInterceptor returns a gRPC unary server interceptor that verifies
 // Firebase bearer tokens via the provided authn.Service.
 //
@@ -49,41 +84,17 @@ func MustAuthenticatedUID(ctx context.Context) string {
 // and server.AgentAuthStreamInterceptor.
 //
 // Reflection and health checks are handled by gRPC itself.
-//
-// The interceptor:
-//  1. Extracts the Bearer token from the "authorization" metadata.
-//  2. Verifies the token via the auth service.
-//  3. Injects the authenticated UID into the context.
 func AuthInterceptor(auth authn.Service) grpc.UnaryServerInterceptor {
 	return func(
 		ctx context.Context,
 		req any,
-		info *grpc.UnaryServerInfo,
+		_ *grpc.UnaryServerInfo,
 		handler grpc.UnaryHandler,
 	) (any, error) {
-
-		md, ok := metadata.FromIncomingContext(ctx)
-		if !ok {
-			return nil, status.Error(codes.Unauthenticated, "missing metadata")
-		}
-
-		authHeaders := md.Get("authorization")
-		if len(authHeaders) == 0 {
-			return nil, status.Error(codes.Unauthenticated, "missing authorization header")
-		}
-
-		bearer := authHeaders[0]
-		if !strings.HasPrefix(bearer, "Bearer ") {
-			return nil, status.Error(codes.Unauthenticated, "invalid authorization format")
-		}
-		idToken := strings.TrimPrefix(bearer, "Bearer ")
-
-		identity, err := auth.VerifyToken(ctx, idToken)
+		ctx, err := authenticate(ctx, auth)
 		if err != nil {
-			return nil, status.Error(codes.Unauthenticated, "invalid or expired token")
+			return nil, err
 		}
-
-		ctx = context.WithValue(ctx, authContextKey{}, identity.UID)
 		return handler(ctx, req)
 	}
 }
@@ -94,33 +105,14 @@ func AuthStreamInterceptor(auth authn.Service) grpc.StreamServerInterceptor {
 	return func(
 		srv any,
 		ss grpc.ServerStream,
-		info *grpc.StreamServerInfo,
+		_ *grpc.StreamServerInfo,
 		handler grpc.StreamHandler,
 	) error {
-		md, ok := metadata.FromIncomingContext(ss.Context())
-		if !ok {
-			return status.Error(codes.Unauthenticated, "missing metadata")
-		}
-
-		authHeaders := md.Get("authorization")
-		if len(authHeaders) == 0 {
-			return status.Error(codes.Unauthenticated, "missing authorization header")
-		}
-
-		bearer := authHeaders[0]
-		if !strings.HasPrefix(bearer, "Bearer ") {
-			return status.Error(codes.Unauthenticated, "invalid authorization format")
-		}
-		idToken := strings.TrimPrefix(bearer, "Bearer ")
-
-		identity, err := auth.VerifyToken(ss.Context(), idToken)
+		ctx, err := authenticate(ss.Context(), auth)
 		if err != nil {
-			return status.Error(codes.Unauthenticated, "invalid or expired token")
+			return err
 		}
-
-		ctx := context.WithValue(ss.Context(), authContextKey{}, identity.UID)
-		wrapped := &wrappedStream{ServerStream: ss, ctx: ctx}
-		return handler(srv, wrapped)
+		return handler(srv, &wrappedStream{ServerStream: ss, ctx: ctx})
 	}
 }
 

@@ -3,14 +3,21 @@ package server
 import (
 	"context"
 	"errors"
+	"log/slog"
 
 	"github.com/jackc/pgx/v5"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/status"
 
+	"github.com/dashkan/pivox/internal/apierr"
 	db "github.com/dashkan/pivox/internal/db/generated"
+)
+
+// Canonical messages.
+const (
+	errAgentMissingMetadata = "missing metadata"
+	errAgentMissingToken    = "missing agent registration token"
+	errAgentInvalidToken    = "invalid agent registration token"
 )
 
 // AgentTokenMetadataKey is the gRPC metadata header that carries an agent's
@@ -60,19 +67,20 @@ func AgentAuthStreamInterceptor(queries db.Querier) grpc.StreamServerInterceptor
 	) error {
 		md, ok := metadata.FromIncomingContext(ss.Context())
 		if !ok {
-			return status.Error(codes.Unauthenticated, "missing metadata")
+			return apierr.Unauthenticated(errAgentMissingMetadata)
 		}
 		tokens := md.Get(AgentTokenMetadataKey)
 		if len(tokens) == 0 || tokens[0] == "" {
-			return status.Error(codes.Unauthenticated, "missing agent registration token")
+			return apierr.Unauthenticated(errAgentMissingToken)
 		}
 
 		gateway, err := queries.GetStorageGatewayByToken(ss.Context(), tokens[0])
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				return status.Error(codes.Unauthenticated, "invalid agent registration token")
+				return apierr.Unauthenticated(errAgentInvalidToken)
 			}
-			return status.Errorf(codes.Internal, "lookup agent gateway: %v", err)
+			slog.ErrorContext(ss.Context(), "agent auth: lookup gateway failed", "error", err)
+			return apierr.Internal("lookup agent gateway")
 		}
 
 		ctx := context.WithValue(ss.Context(), agentGatewayKey{}, gateway)

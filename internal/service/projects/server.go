@@ -10,8 +10,6 @@ import (
 	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/appkey"
@@ -87,12 +85,12 @@ func (s *ProjectsServer) ListProjects(ctx context.Context, req *apiv1.ListProjec
 		Codec:       s.codec,
 	})
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid filter: %v", err)
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("filter", err.Error()))
 	}
 
 	results, err := filter.ScanProjects(rows)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "database error")
+		return nil, apierr.Internal("database error")
 	}
 
 	pageSize := req.GetPageSize()

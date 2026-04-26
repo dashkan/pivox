@@ -2,6 +2,7 @@ package organizations
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
@@ -10,8 +11,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/appkey"
@@ -76,50 +75,48 @@ func (s *OrganizationsServer) GetOrganization(ctx context.Context, req *apiv1.Ge
 	return convert.OrganizationToProto(org), nil
 }
 
+// ListOrganizations is the post-signin "which orgs am I in?" query.
+// Always caller-scoped: returns only orgs the authenticated user has
+// a membership row for. Memberless callers (and freshly-Firebase-
+// registered users whose account row hasn't been synced yet) get an
+// empty list, which the native client uses to detect the
+// zero-membership state and route to the org-creation screen.
+//
+// `page_size`, `page_token`, `filter`, `order_by`, `show_deleted`
+// from the request are intentionally ignored — typical users are in
+// 1-3 orgs and we always return them all (capped at 1000 in the
+// underlying query as a defensive backstop). If a real user ever hits
+// that ceiling, something else is wrong.
 func (s *OrganizationsServer) ListOrganizations(ctx context.Context, req *apiv1.ListOrganizationsRequest) (*apiv1.ListOrganizationsResponse, error) {
-	rows, err := filter.Query(ctx, s.db, s.filter, filter.QueryParams{
-		Filter:      req.GetFilter(),
-		OrderBy:     req.GetOrderBy(),
-		PageSize:    req.GetPageSize(),
-		Cursor:      req.GetPageToken(),
-		ShowDeleted: req.GetShowDeleted(),
-		Codec:       s.codec,
-	})
+	_ = req // request fields intentionally unused; see method comment
+	uid, ok := s.readUID(ctx)
+	if !ok {
+		return nil, apierr.Unauthenticated("missing authenticated caller")
+	}
+
+	caller, err := s.queries.GetAccountByFirebaseUID(ctx, uid)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid filter: %v", err)
-	}
-
-	results, err := filter.ScanOrganizations(rows)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "database error")
-	}
-
-	pageSize := req.GetPageSize()
-	if pageSize <= 0 {
-		pageSize = 100
-	}
-	if pageSize > 1000 {
-		pageSize = 1000
-	}
-
-	var nextPageToken string
-	if int32(len(results)) > pageSize {
-		nextPageToken, err = filter.EncodeNextPageToken(s.codec, results[pageSize].ID)
-		if err != nil {
-			return nil, apierr.Internal("encode page token")
+		// No account row yet (race with the /internal/sync-account
+		// webhook on a freshly-Firebase-registered user). Memberless
+		// state — return an empty list so the client routes through
+		// the org-creation bootstrap path.
+		if errors.Is(err, pgx.ErrNoRows) {
+			return &apiv1.ListOrganizationsResponse{}, nil
 		}
-		results = results[:pageSize]
+		return nil, apierr.HandleResourceError(err, "Account", uid)
 	}
 
-	orgs := make([]*apiv1.Organization, 0, len(results))
-	for _, o := range results {
+	rows, err := s.queries.ListOrganizationsForAccount(ctx, caller.ID)
+	if err != nil {
+		slog.ErrorContext(ctx, "list organizations failed", "account_id", caller.ID, "error", err)
+		return nil, apierr.Internal("list organizations")
+	}
+
+	orgs := make([]*apiv1.Organization, 0, len(rows))
+	for _, o := range rows {
 		orgs = append(orgs, convert.OrganizationToProto(o))
 	}
-
-	return &apiv1.ListOrganizationsResponse{
-		Organizations: orgs,
-		NextPageToken: nextPageToken,
-	}, nil
+	return &apiv1.ListOrganizationsResponse{Organizations: orgs}, nil
 }
 
 func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1.CreateOrganizationRequest) (*longrunningpb.Operation, error) {
@@ -129,7 +126,7 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 	// (`created_by_account_id`) and the per-org owner membership.
 	uid, ok := s.readUID(ctx)
 	if !ok {
-		return nil, status.Error(codes.Unauthenticated, "missing authenticated caller")
+		return nil, apierr.Unauthenticated("missing authenticated caller")
 	}
 	caller, err := s.queries.GetAccountByFirebaseUID(ctx, uid)
 	if err != nil {
@@ -143,7 +140,8 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "begin transaction: %v", err)
+		slog.ErrorContext(ctx, "begin transaction failed", "error", err)
+		return nil, apierr.Internal("begin transaction")
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
@@ -169,13 +167,14 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 		AccountID: caller.ID,
 		Role:      db.OrgRoleOwner,
 	}); err != nil {
-		return nil, status.Errorf(codes.Internal, "create owner membership: %v", err)
+		slog.ErrorContext(ctx, "create owner membership failed", "org_id", org.ID, "account_id", caller.ID, "error", err)
+		return nil, apierr.Internal("create owner membership")
 	}
 
 	tenantID, err := s.auth.CreateTenant(ctx, orgSlug)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to create Firebase tenant", "org", orgSlug, "error", err)
-		return nil, status.Errorf(codes.Internal, "create auth tenant: %v", err)
+		return nil, apierr.Internal("create auth tenant")
 	}
 
 	if err := qtx.SetOrganizationTenantID(ctx, db.SetOrganizationTenantIDParams{
@@ -186,7 +185,8 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 		if delErr := s.auth.DeleteTenant(ctx, tenantID); delErr != nil {
 			slog.ErrorContext(ctx, "failed to clean up Firebase tenant", "tenantID", tenantID, "error", delErr)
 		}
-		return nil, status.Errorf(codes.Internal, "set tenant id: %v", err)
+		slog.ErrorContext(ctx, "set tenant id failed", "org_id", org.ID, "error", err)
+		return nil, apierr.Internal("set tenant id")
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -194,7 +194,8 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 		if delErr := s.auth.DeleteTenant(ctx, tenantID); delErr != nil {
 			slog.ErrorContext(ctx, "failed to clean up Firebase tenant after commit failure", "tenantID", tenantID, "error", delErr)
 		}
-		return nil, status.Errorf(codes.Internal, "commit transaction: %v", err)
+		slog.ErrorContext(ctx, "commit transaction failed", "org_id", org.ID, "error", err)
+		return nil, apierr.Internal("commit transaction")
 	}
 
 	org.TenantID = tenantID

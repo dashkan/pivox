@@ -90,6 +90,37 @@ func Internal(msg string) error {
 	return st.Err()
 }
 
+// Unauthenticated returns codes.Unauthenticated with a canonical
+// message. Use for "no caller identity established" — missing token,
+// invalid token, no auth context. Not for "caller is identified but
+// lacks permission" — that's PermissionDenied.
+func Unauthenticated(msg string) error {
+	return status.Error(codes.Unauthenticated, msg)
+}
+
+// PermissionDenied returns codes.PermissionDenied with a canonical
+// message. Use for "caller is authenticated but not permitted" —
+// no membership, role too low, IAM denial.
+func PermissionDenied(msg string) error {
+	return status.Error(codes.PermissionDenied, msg)
+}
+
+// Unimplemented returns codes.Unimplemented for RPCs declared in the
+// proto but not yet served. Distinct from FailedPrecondition (the
+// caller can fix it) and Internal (server bug).
+func Unimplemented(msg string) error {
+	return status.Error(codes.Unimplemented, msg)
+}
+
+// BadRequest returns codes.InvalidArgument with a free-form message,
+// for cases where the failure isn't tied to a specific field (and
+// thus a typed FieldViolation isn't a natural fit). For field-level
+// validation errors prefer `InvalidArgument(FieldViolation(...))` —
+// clients can switch on the typed details.
+func BadRequest(msg string) error {
+	return status.Error(codes.InvalidArgument, msg)
+}
+
 func QuotaExceeded(subject, description string, retryDelay time.Duration) error {
 	st := status.New(codes.ResourceExhausted, "quota exceeded")
 	st, _ = st.WithDetails(

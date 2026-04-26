@@ -169,6 +169,14 @@ func (m *MockQuerier) ListUsersByAccount(ctx context.Context, accountID uuid.UUI
 	return nil, args.Error(1)
 }
 
+func (m *MockQuerier) ListOrganizationsForAccount(ctx context.Context, accountID uuid.UUID) ([]db.Organization, error) {
+	args := m.Called(ctx, accountID)
+	if v := args.Get(0); v != nil {
+		return v.([]db.Organization), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 func (m *MockQuerier) CountOwnersByOrg(ctx context.Context, orgID uuid.UUID) (int64, error) {
 	args := m.Called(ctx, orgID)
 	return args.Get(0).(int64), args.Error(1)

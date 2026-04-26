@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -915,301 +914,128 @@ func TestUnit_CreateOrganization_SetTenantIDFailure(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// ListOrganizations — mock infrastructure
-// ---------------------------------------------------------------------------
-
-// mockListDBTX is a minimal db.DBTX implementation for ListOrganizations tests.
-// It controls whether Query returns an error or a given pgx.Rows value.
-type mockListDBTX struct {
-	queryErr  error
-	queryRows pgx.Rows
-}
-
-func (m *mockListDBTX) Exec(_ context.Context, _ string, _ ...interface{}) (pgconn.CommandTag, error) {
-	return pgconn.CommandTag{}, nil
-}
-
-func (m *mockListDBTX) Query(_ context.Context, _ string, _ ...interface{}) (pgx.Rows, error) {
-	if m.queryErr != nil {
-		return nil, m.queryErr
-	}
-	return m.queryRows, nil
-}
-
-func (m *mockListDBTX) QueryRow(_ context.Context, _ string, _ ...interface{}) pgx.Row {
-	return nil
-}
-
-// errRows is a pgx.Rows implementation that reports an error via Err() but
-// returns no data rows. This exercises the ScanOrganizations error path.
-type errRows struct {
-	err error
-}
-
-func (r *errRows) Close()                                       {}
-func (r *errRows) Err() error                                   { return r.err }
-func (r *errRows) CommandTag() pgconn.CommandTag                { return pgconn.CommandTag{} }
-func (r *errRows) FieldDescriptions() []pgconn.FieldDescription { return nil }
-func (r *errRows) Next() bool                                   { return false }
-func (r *errRows) Scan(dest ...any) error                       { return r.err }
-func (r *errRows) Values() ([]any, error)                       { return nil, r.err }
-func (r *errRows) RawValues() [][]byte                          { return nil }
-func (r *errRows) Conn() *pgx.Conn                              { return nil }
-
-// emptyRows is a pgx.Rows that returns no rows and no error.
-type emptyRows struct{}
-
-func (r *emptyRows) Close()                                       {}
-func (r *emptyRows) Err() error                                   { return nil }
-func (r *emptyRows) CommandTag() pgconn.CommandTag                { return pgconn.CommandTag{} }
-func (r *emptyRows) FieldDescriptions() []pgconn.FieldDescription { return nil }
-func (r *emptyRows) Next() bool                                   { return false }
-func (r *emptyRows) Scan(dest ...any) error                       { return nil }
-func (r *emptyRows) Values() ([]any, error)                       { return nil, nil }
-func (r *emptyRows) RawValues() [][]byte                          { return nil }
-func (r *emptyRows) Conn() *pgx.Conn                              { return nil }
-
-// dataRows is a pgx.Rows that returns a fixed slice of organizations.
-// Each call to Next() advances to the next organization; Scan() populates
-// the destination variables using the same column order as ScanOrganizations.
-type dataRows struct {
-	orgs   []db.Organization
-	idx    int
-	closed bool
-}
-
-func newDataRows(orgs []db.Organization) *dataRows { return &dataRows{orgs: orgs, idx: -1} }
-
-func (r *dataRows) Close()                                       { r.closed = true }
-func (r *dataRows) Err() error                                   { return nil }
-func (r *dataRows) CommandTag() pgconn.CommandTag                { return pgconn.CommandTag{} }
-func (r *dataRows) FieldDescriptions() []pgconn.FieldDescription { return nil }
-func (r *dataRows) Next() bool {
-	r.idx++
-	return r.idx < len(r.orgs)
-}
-func (r *dataRows) Scan(dest ...any) error {
-	o := r.orgs[r.idx]
-	// Column order matches ScanOrganizations:
-	// id, name, display_name, annotations, tenant_id, owner_id,
-	// state, etag, revision, created_by, updated_by, deleted_by,
-	// create_time, update_time, delete_time, purge_time
-	if len(dest) != 16 {
-		return errors.New("unexpected scan destination count")
-	}
-	*dest[0].(*uuid.UUID) = o.ID
-	*dest[1].(*string) = o.Name
-	*dest[2].(*string) = o.DisplayName
-	*dest[3].(*json.RawMessage) = o.Annotations
-	*dest[4].(*string) = o.TenantID
-	// dest[5] is pgtype.UUID (owner_id) — leave as zero value
-	*dest[6].(*db.ResourceState) = o.State
-	*dest[7].(*string) = o.Etag
-	*dest[8].(*int32) = o.Revision
-	*dest[9].(*string) = o.CreatedBy
-	*dest[10].(*string) = o.UpdatedBy
-	*dest[11].(*string) = o.DeletedBy
-	*dest[12].(*time.Time) = o.CreateTime
-	*dest[13].(*time.Time) = o.UpdateTime
-	// dest[14], dest[15] are pgtype.Timestamptz — leave as zero
-	return nil
-}
-func (r *dataRows) Values() ([]any, error) { return nil, nil }
-func (r *dataRows) RawValues() [][]byte    { return nil }
-func (r *dataRows) Conn() *pgx.Conn        { return nil }
-
-// ---------------------------------------------------------------------------
 // ListOrganizations
 // ---------------------------------------------------------------------------
+//
+// ListOrganizations is caller-scoped: returns only orgs the
+// authenticated user has a membership row for. The handler ignores
+// page_size / page_token / filter / order_by — typical users are in
+// 1-3 orgs and we always return them all.
 
-func TestUnit_ListOrganizations_FilterQueryBuildError(t *testing.T) {
-	// An invalid AIP-160 filter expression causes filter.Query to return an
-	// error before ever hitting the database.
-	ctx := context.Background()
-
-	dbtx := &mockListDBTX{queryRows: &emptyRows{}}
-	srv := &OrganizationsServer{
-		db:     dbtx,
-		filter: filter.OrganizationFilter(),
+func newListOrgsServer(mockQ *mocks.MockQuerier) *OrganizationsServer {
+	return &OrganizationsServer{
+		queries: mockQ,
+		filter:  filter.OrganizationFilter(),
+		readUID: func(_ context.Context) (string, bool) { return testFirebaseUID, true },
 	}
+}
 
-	_, err := srv.ListOrganizations(ctx, &apiv1.ListOrganizationsRequest{
-		// This filter references a field that doesn't exist in OrganizationFilter,
-		// causing the transpiler to return an error.
-		Filter: "unknownField = \"value\"",
-	})
+func TestUnit_ListOrganizations_Unauthenticated(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	srv := newListOrgsServer(mockQ)
+	srv.readUID = func(_ context.Context) (string, bool) { return "", false }
 
+	_, err := srv.ListOrganizations(context.Background(), &apiv1.ListOrganizationsRequest{})
 	require.Error(t, err)
 	st, ok := status.FromError(err)
 	require.True(t, ok)
-	assert.Equal(t, codes.InvalidArgument, st.Code())
-	assert.Contains(t, st.Message(), "invalid filter")
+	assert.Equal(t, codes.Unauthenticated, st.Code())
+	mockQ.AssertExpectations(t)
 }
 
-func TestUnit_ListOrganizations_QueryExecutionError(t *testing.T) {
-	// filter.Query itself returns an error (e.g. database connectivity failure).
-	ctx := context.Background()
+func TestUnit_ListOrganizations_NoAccountRowReturnsEmpty(t *testing.T) {
+	// Race with the /internal/sync-account webhook on a freshly-Firebase-
+	// registered user: caller has a valid token but no `accounts` row
+	// yet. Memberless state — must return empty list, not an error.
+	mockQ := new(mocks.MockQuerier)
+	mockQ.On("GetAccountByFirebaseUID", mock.Anything, testFirebaseUID).
+		Return(db.Account{}, pgx.ErrNoRows)
+	srv := newListOrgsServer(mockQ)
 
-	dbtx := &mockListDBTX{queryErr: errors.New("connection refused")}
-	srv := &OrganizationsServer{
-		db:     dbtx,
-		filter: filter.OrganizationFilter(),
-	}
-
-	_, err := srv.ListOrganizations(ctx, &apiv1.ListOrganizationsRequest{})
-
-	require.Error(t, err)
-	st, ok := status.FromError(err)
-	require.True(t, ok)
-	assert.Equal(t, codes.InvalidArgument, st.Code())
+	resp, err := srv.ListOrganizations(context.Background(), &apiv1.ListOrganizationsRequest{})
+	require.NoError(t, err)
+	assert.Empty(t, resp.GetOrganizations())
+	assert.Empty(t, resp.GetNextPageToken())
+	mockQ.AssertExpectations(t)
 }
 
-func TestUnit_ListOrganizations_ScanError(t *testing.T) {
-	// filter.Query succeeds but the rows report an error via Err(), which
-	// ScanOrganizations surfaces after iterating.
-	ctx := context.Background()
+func TestUnit_ListOrganizations_AccountLookupError(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	mockQ.On("GetAccountByFirebaseUID", mock.Anything, mock.Anything).
+		Return(db.Account{}, errors.New("connection refused"))
+	srv := newListOrgsServer(mockQ)
 
-	dbtx := &mockListDBTX{queryRows: &errRows{err: errors.New("scan failed")}}
-	srv := &OrganizationsServer{
-		db:     dbtx,
-		filter: filter.OrganizationFilter(),
-	}
-
-	_, err := srv.ListOrganizations(ctx, &apiv1.ListOrganizationsRequest{})
-
+	_, err := srv.ListOrganizations(context.Background(), &apiv1.ListOrganizationsRequest{})
 	require.Error(t, err)
 	st, ok := status.FromError(err)
 	require.True(t, ok)
 	assert.Equal(t, codes.Internal, st.Code())
-	assert.Contains(t, st.Message(), "database error")
+	mockQ.AssertExpectations(t)
 }
 
-func TestUnit_ListOrganizations_EmptyResult(t *testing.T) {
-	// Happy path with no results.
-	ctx := context.Background()
+func TestUnit_ListOrganizations_OnlyReturnsCallerOrgs(t *testing.T) {
+	// Tenant-isolation: the handler MUST scope through
+	// ListOrganizationsForAccount, which JOINs users → organizations
+	// on account_id. Caller never sees orgs they aren't a member of.
+	mockQ := new(mocks.MockQuerier)
+	expectGetAccount(mockQ)
 
-	dbtx := &mockListDBTX{queryRows: &emptyRows{}}
-	srv := &OrganizationsServer{
-		db:     dbtx,
-		filter: filter.OrganizationFilter(),
-	}
-
-	resp, err := srv.ListOrganizations(ctx, &apiv1.ListOrganizationsRequest{})
-
-	require.NoError(t, err)
-	assert.Empty(t, resp.GetOrganizations())
-	assert.Empty(t, resp.GetNextPageToken())
-}
-
-func TestUnit_ListOrganizations_WithResults(t *testing.T) {
-	// Returns rows and verifies they are converted to protos correctly.
-	ctx := context.Background()
-
-	orgs := []db.Organization{
+	callerOrgs := []db.Organization{
 		{
 			ID:          uuid.MustParse("0192a000-0010-7000-8000-000000000010"),
-			Name:        "org-one",
-			DisplayName: "Org One",
+			Name:        "my-org",
+			DisplayName: "My Org",
 			Annotations: json.RawMessage(`{}`),
 			State:       db.ResourceStateACTIVE,
-			Etag:        "etag-one",
+			Etag:        "e1",
 			Revision:    1,
 			CreateTime:  time.Date(2025, 9, 1, 0, 0, 0, 0, time.UTC),
 			UpdateTime:  time.Date(2025, 9, 1, 0, 0, 0, 0, time.UTC),
 		},
-		{
-			ID:          uuid.MustParse("0192a000-0011-7000-8000-000000000011"),
-			Name:        "org-two",
-			DisplayName: "Org Two",
-			Annotations: json.RawMessage(`{}`),
-			State:       db.ResourceStateACTIVE,
-			Etag:        "etag-two",
-			Revision:    1,
-			CreateTime:  time.Date(2025, 9, 2, 0, 0, 0, 0, time.UTC),
-			UpdateTime:  time.Date(2025, 9, 2, 0, 0, 0, 0, time.UTC),
-		},
 	}
+	mockQ.On("ListOrganizationsForAccount", mock.Anything, testCallerAccount.ID).Return(callerOrgs, nil)
 
-	dbtx := &mockListDBTX{queryRows: newDataRows(orgs)}
-	srv := &OrganizationsServer{
-		db:     dbtx,
-		filter: filter.OrganizationFilter(),
-	}
-
-	resp, err := srv.ListOrganizations(ctx, &apiv1.ListOrganizationsRequest{})
-
+	srv := newListOrgsServer(mockQ)
+	resp, err := srv.ListOrganizations(context.Background(), &apiv1.ListOrganizationsRequest{})
 	require.NoError(t, err)
-	require.Len(t, resp.GetOrganizations(), 2)
-	assert.Equal(t, "organizations/org-one", resp.GetOrganizations()[0].GetName())
-	assert.Equal(t, "organizations/org-two", resp.GetOrganizations()[1].GetName())
+	require.Len(t, resp.GetOrganizations(), 1)
+	assert.Equal(t, "organizations/my-org", resp.GetOrganizations()[0].GetName())
 	assert.Empty(t, resp.GetNextPageToken())
+	mockQ.AssertExpectations(t)
 }
 
-func TestUnit_ListOrganizations_Pagination(t *testing.T) {
-	// When query returns pageSize+1 rows, the server sets NextPageToken and
-	// trims the result to pageSize.
-	ctx := context.Background()
+func TestUnit_ListOrganizations_QueryError(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	expectGetAccount(mockQ)
+	mockQ.On("ListOrganizationsForAccount", mock.Anything, testCallerAccount.ID).
+		Return(nil, errors.New("connection refused"))
+	srv := newListOrgsServer(mockQ)
 
-	// Build pageSize+1 organizations so the server sets nextPageToken.
-	const pageSize = 2
-	orgs := make([]db.Organization, pageSize+1)
-	for i := 0; i <= pageSize; i++ {
-		id := uuid.MustParse("0192a000-0020-7000-8000-00000000" + fmt.Sprintf("%04d", i))
-		orgs[i] = db.Organization{
-			ID:          id,
-			Name:        fmt.Sprintf("paged-org-%d", i),
-			DisplayName: fmt.Sprintf("Paged Org %d", i),
-			Annotations: json.RawMessage(`{}`),
-			State:       db.ResourceStateACTIVE,
-			Etag:        fmt.Sprintf("etag-%d", i),
-			Revision:    1,
-			CreateTime:  time.Date(2025, 9, 1, 0, 0, 0, 0, time.UTC),
-			UpdateTime:  time.Date(2025, 9, 1, 0, 0, 0, 0, time.UTC),
-		}
-	}
-
-	dbtx := &mockListDBTX{queryRows: newDataRows(orgs)}
-	codec, _ := appkey.NewFromHex(strings.Repeat("ab", 32))
-	srv := &OrganizationsServer{
-		db:     dbtx,
-		filter: filter.OrganizationFilter(),
-		codec:  codec,
-	}
-
-	resp, err := srv.ListOrganizations(ctx, &apiv1.ListOrganizationsRequest{
-		PageSize: pageSize,
-	})
-
-	require.NoError(t, err)
-	// Should only return pageSize results.
-	assert.Len(t, resp.GetOrganizations(), pageSize)
-	// NextPageToken is opaque — decrypt it to verify it encodes the expected ID.
-	require.NotEmpty(t, resp.GetNextPageToken())
-	raw, err := codec.Decrypt(resp.GetNextPageToken())
-	require.NoError(t, err)
-	var decodedID uuid.UUID
-	copy(decodedID[:], raw)
-	assert.Equal(t, orgs[pageSize].ID, decodedID)
+	_, err := srv.ListOrganizations(context.Background(), &apiv1.ListOrganizationsRequest{})
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.Internal, st.Code())
+	mockQ.AssertExpectations(t)
 }
 
-func TestUnit_ListOrganizations_PageSizeClamped(t *testing.T) {
-	// A page_size > 1000 is clamped to 1000; fewer results than 1000 means
-	// no next page token.
-	ctx := context.Background()
+func TestUnit_ListOrganizations_IgnoresPaginationFields(t *testing.T) {
+	// PageSize, PageToken, Filter from the request must NOT affect the
+	// query — handler returns all caller's orgs regardless.
+	mockQ := new(mocks.MockQuerier)
+	expectGetAccount(mockQ)
+	mockQ.On("ListOrganizationsForAccount", mock.Anything, testCallerAccount.ID).
+		Return([]db.Organization{}, nil)
 
-	dbtx := &mockListDBTX{queryRows: &emptyRows{}}
-	srv := &OrganizationsServer{
-		db:     dbtx,
-		filter: filter.OrganizationFilter(),
-	}
-
-	resp, err := srv.ListOrganizations(ctx, &apiv1.ListOrganizationsRequest{
-		PageSize: 9999,
+	srv := newListOrgsServer(mockQ)
+	resp, err := srv.ListOrganizations(context.Background(), &apiv1.ListOrganizationsRequest{
+		PageSize:  9999,
+		PageToken: "garbage-but-ignored",
+		Filter:    "displayName = \"anything\"",
 	})
-
 	require.NoError(t, err)
-	assert.Empty(t, resp.GetOrganizations())
 	assert.Empty(t, resp.GetNextPageToken())
+	mockQ.AssertExpectations(t)
 }
 
 func TestUnit_CreateOrganization_DBCreateError(t *testing.T) {

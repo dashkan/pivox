@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -18,6 +19,31 @@ import (
 	"github.com/dashkan/pivox/internal/lro"
 	"github.com/dashkan/pivox/internal/testutil/mocks"
 )
+
+// assertNameRequiredViolation checks that err is an InvalidArgument
+// status carrying a typed BadRequest detail with a field-level
+// "name is required" violation on the `name` field. This is the
+// AIP-193 shape produced by apierr.InvalidArgument(FieldViolation(...))
+// — assert on the typed details, not the wire message string.
+func assertNameRequiredViolation(t *testing.T, err error) {
+	t.Helper()
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, st.Code())
+	var found bool
+	for _, d := range st.Details() {
+		br, ok := d.(*errdetails.BadRequest)
+		if !ok {
+			continue
+		}
+		for _, fv := range br.GetFieldViolations() {
+			if fv.GetField() == "name" && fv.GetDescription() == "name is required" {
+				found = true
+			}
+		}
+	}
+	assert.True(t, found, "expected BadRequest detail with field=name, description='name is required'; got details: %+v", st.Details())
+}
 
 // --- Mock LROManager ---
 
@@ -75,10 +101,7 @@ func TestUnit_GetOperation_EmptyName(t *testing.T) {
 	})
 
 	require.Error(t, err)
-	st, ok := status.FromError(err)
-	require.True(t, ok)
-	assert.Equal(t, codes.InvalidArgument, st.Code())
-	assert.Contains(t, st.Message(), "name is required")
+	assertNameRequiredViolation(t, err)
 }
 
 func TestUnit_GetOperation_Success(t *testing.T) {
@@ -198,10 +221,7 @@ func TestUnit_DeleteOperation_EmptyName(t *testing.T) {
 	})
 
 	require.Error(t, err)
-	st, ok := status.FromError(err)
-	require.True(t, ok)
-	assert.Equal(t, codes.InvalidArgument, st.Code())
-	assert.Contains(t, st.Message(), "name is required")
+	assertNameRequiredViolation(t, err)
 }
 
 func TestUnit_CancelOperation_EmptyName(t *testing.T) {
@@ -213,10 +233,7 @@ func TestUnit_CancelOperation_EmptyName(t *testing.T) {
 	})
 
 	require.Error(t, err)
-	st, ok := status.FromError(err)
-	require.True(t, ok)
-	assert.Equal(t, codes.InvalidArgument, st.Code())
-	assert.Contains(t, st.Message(), "name is required")
+	assertNameRequiredViolation(t, err)
 }
 
 func TestUnit_ListOperations_DefaultPageSize(t *testing.T) {

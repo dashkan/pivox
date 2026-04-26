@@ -9,8 +9,6 @@ import (
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/convert"
@@ -346,7 +344,7 @@ func (s *RequestsServer) AssignRequest(ctx context.Context, req *assetsv1.Assign
 	}
 
 	if existing.State != db.RequestStateOPEN && existing.State != db.RequestStateINPROGRESS {
-		return nil, status.Errorf(codes.FailedPrecondition, "request must be OPEN or IN_PROGRESS to assign, got %s", existing.State)
+		return nil, apierr.FailedPrecondition(fmt.Sprintf("request must be OPEN or IN_PROGRESS to assign, got %s", existing.State))
 	}
 
 	result, err := s.queries.UpdateRequestAssignee(ctx, db.UpdateRequestAssigneeParams{
@@ -380,7 +378,7 @@ func (s *RequestsServer) ClaimRequest(ctx context.Context, req *assetsv1.ClaimRe
 	}
 
 	if existing.State != db.RequestStateOPEN {
-		return nil, status.Errorf(codes.FailedPrecondition, "can only claim OPEN requests, got %s", existing.State)
+		return nil, apierr.FailedPrecondition(fmt.Sprintf("can only claim OPEN requests, got %s", existing.State))
 	}
 
 	// TODO: get caller identity from context
@@ -437,7 +435,7 @@ func (s *RequestsServer) CancelRequest(ctx context.Context, req *assetsv1.Cancel
 	}
 
 	if existing.State == db.RequestStateAPPROVED || existing.State == db.RequestStateCANCELLED {
-		return nil, status.Errorf(codes.FailedPrecondition, "cannot cancel a request in state %s", existing.State)
+		return nil, apierr.FailedPrecondition(fmt.Sprintf("cannot cancel a request in state %s", existing.State))
 	}
 
 	result, err := s.queries.UpdateRequestState(ctx, db.UpdateRequestStateParams{
@@ -470,7 +468,7 @@ func (s *RequestsServer) transitionRequest(ctx context.Context, name string, fro
 	}
 
 	if existing.State != fromState {
-		return nil, status.Errorf(codes.FailedPrecondition, "request must be in state %s, got %s", fromState, existing.State)
+		return nil, apierr.FailedPrecondition(fmt.Sprintf("request must be in state %s, got %s", fromState, existing.State))
 	}
 
 	result, err := s.queries.UpdateRequestState(ctx, db.UpdateRequestStateParams{

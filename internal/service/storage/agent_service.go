@@ -11,11 +11,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/dashkan/pivox/internal/agentstream"
+	"github.com/dashkan/pivox/internal/apierr"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	agentv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/agent/v1"
 	"github.com/dashkan/pivox/internal/server"
@@ -56,7 +55,7 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 	gateway, ok := server.AuthenticatedGateway(ctx)
 	if !ok {
 		s.logger.ErrorContext(ctx, "agent connect reached handler without authenticated gateway in context")
-		return status.Error(codes.Internal, "agent gateway context missing")
+		return apierr.Internal("agent gateway context missing")
 	}
 
 	// -----------------------------------------------------------------------
@@ -65,12 +64,12 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 	firstMsg, err := stream.Recv()
 	if err != nil {
 		s.logger.ErrorContext(ctx, "failed to receive first message", "error", err)
-		return status.Error(codes.Internal, "failed to receive first message")
+		return apierr.Internal("failed to receive first message")
 	}
 
 	hs := firstMsg.GetHandshake()
 	if hs == nil {
-		return status.Error(codes.InvalidArgument, "first message must be handshake")
+		return apierr.BadRequest("first message must be handshake")
 	}
 
 	// -----------------------------------------------------------------------
@@ -84,7 +83,7 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 	})
 	if lookupErr != nil && !errors.Is(lookupErr, pgx.ErrNoRows) {
 		s.logger.ErrorContext(ctx, "failed to look up existing agent", "error", lookupErr)
-		return status.Error(codes.Internal, "failed to look up agent")
+		return apierr.Internal("failed to look up agent")
 	}
 
 	if errors.Is(lookupErr, pgx.ErrNoRows) {
@@ -98,7 +97,7 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 		})
 		if err != nil {
 			s.logger.ErrorContext(ctx, "failed to create agent", "error", err)
-			return status.Error(codes.Internal, "failed to create agent record")
+			return apierr.Internal("failed to create agent record")
 		}
 	} else {
 		// Reconnecting agent -- update state to CONNECTED.
@@ -108,7 +107,7 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 		})
 		if err != nil {
 			s.logger.ErrorContext(ctx, "failed to update agent state", "error", err)
-			return status.Error(codes.Internal, "failed to update agent state")
+			return apierr.Internal("failed to update agent state")
 		}
 	}
 
@@ -123,13 +122,13 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 	endpoints, err := s.queries.ListStorageEndpointsByGateway(ctx, gateway.ID)
 	if err != nil {
 		s.logger.ErrorContext(ctx, "failed to list endpoints", "error", err)
-		return status.Error(codes.Internal, "failed to list endpoints")
+		return apierr.Internal("failed to list endpoints")
 	}
 
 	endpointConfigs, err := buildEndpointConfigs(endpoints)
 	if err != nil {
 		s.logger.ErrorContext(ctx, "failed to build endpoint configs", "error", err)
-		return status.Error(codes.Internal, "failed to build endpoint configs")
+		return apierr.Internal("failed to build endpoint configs")
 	}
 
 	ack := &agentv1.ControlMessage{
@@ -147,7 +146,7 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 	// -----------------------------------------------------------------------
 	if err := stream.Send(ack); err != nil {
 		s.logger.ErrorContext(ctx, "failed to send handshake ack", "error", err)
-		return status.Error(codes.Internal, "failed to send handshake ack")
+		return apierr.Internal("failed to send handshake ack")
 	}
 
 	// -----------------------------------------------------------------------

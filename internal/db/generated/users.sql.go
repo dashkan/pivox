@@ -100,13 +100,75 @@ func (q *Queries) GetUserMembership(ctx context.Context, arg GetUserMembershipPa
 	return i, err
 }
 
-const listUsersByAccount = `-- name: ListUsersByAccount :many
-SELECT id, org_id, account_id, role, etag, revision, create_time, update_time FROM users WHERE account_id = $1 ORDER BY create_time
+const listOrganizationsForAccount = `-- name: ListOrganizationsForAccount :many
+SELECT o.id, o.name, o.display_name, o.annotations, o.tenant_id, o.created_by_account_id, o.state, o.etag, o.revision, o.created_by, o.updated_by, o.deleted_by, o.create_time, o.update_time, o.delete_time, o.purge_time
+  FROM organizations o
+  JOIN users u ON u.org_id = o.id
+ WHERE u.account_id = $1
+   AND o.delete_time IS NULL
+ ORDER BY o.id ASC
+ LIMIT 1000
 `
 
-// Lists all org memberships for an account. Used by the native app's
-// "which orgs am I in?" query — drives the org selector and the
-// "zero orgs → onboarding" detection.
+// Lists all organizations the given account has membership in.
+// Caller-scoped for `ListOrganizations`: every authenticated user is
+// only ever shown orgs they belong to. Excludes soft-deleted orgs.
+// No pagination — typical users are in 1-3 orgs. The 1000-row LIMIT
+// is a defensive backstop, not a paging mechanism; if anyone ever
+// needs more we'll know because something is very wrong.
+func (q *Queries) ListOrganizationsForAccount(ctx context.Context, accountID uuid.UUID) ([]Organization, error) {
+	rows, err := q.db.Query(ctx, listOrganizationsForAccount, accountID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Organization{}
+	for rows.Next() {
+		var i Organization
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.DisplayName,
+			&i.Annotations,
+			&i.TenantID,
+			&i.CreatedByAccountID,
+			&i.State,
+			&i.Etag,
+			&i.Revision,
+			&i.CreatedBy,
+			&i.UpdatedBy,
+			&i.DeletedBy,
+			&i.CreateTime,
+			&i.UpdateTime,
+			&i.DeleteTime,
+			&i.PurgeTime,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUsersByAccount = `-- name: ListUsersByAccount :many
+SELECT u.id, u.org_id, u.account_id, u.role, u.etag, u.revision, u.create_time, u.update_time
+  FROM users u
+  JOIN organizations o ON o.id = u.org_id
+ WHERE u.account_id = $1
+   AND o.delete_time IS NULL
+ ORDER BY u.create_time
+`
+
+// Lists all live org memberships for an account, excluding memberships
+// in soft-deleted orgs. Used by the membership interceptor's gate and
+// by any consumer that needs the "is this caller in any active org?"
+// signal. Joining out the deleted orgs here keeps that signal in sync
+// with `ListOrganizationsForAccount` — without it, a caller whose only
+// memberships are in deleted orgs would pass the membership check but
+// see an empty org list, soft-bricking onboarding.
 func (q *Queries) ListUsersByAccount(ctx context.Context, accountID uuid.UUID) ([]User, error) {
 	rows, err := q.db.Query(ctx, listUsersByAccount, accountID)
 	if err != nil {

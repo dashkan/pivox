@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
+
+	"github.com/dashkan/pivox/internal/apierr"
 )
 
 // LROManager defines the long-running operation methods the server needs.
@@ -34,7 +34,7 @@ func NewOperationsServer(lro LROManager) *OperationsServer {
 // GetOperation returns the latest state of a long-running operation.
 func (s *OperationsServer) GetOperation(ctx context.Context, req *longrunningpb.GetOperationRequest) (*longrunningpb.Operation, error) {
 	if req.GetName() == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "name is required")
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("name", "name is required"))
 	}
 	return s.lro.GetOperation(ctx, req.GetName())
 }
@@ -73,7 +73,7 @@ func (s *OperationsServer) WaitOperation(ctx context.Context, req *longrunningpb
 // the client is no longer interested in the operation result.
 func (s *OperationsServer) DeleteOperation(ctx context.Context, req *longrunningpb.DeleteOperationRequest) (*emptypb.Empty, error) {
 	if req.GetName() == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "name is required")
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("name", "name is required"))
 	}
 	if err := s.lro.DeleteOperation(ctx, req.GetName()); err != nil {
 		return nil, err
@@ -85,7 +85,7 @@ func (s *OperationsServer) DeleteOperation(ctx context.Context, req *longrunning
 // operation.
 func (s *OperationsServer) CancelOperation(ctx context.Context, req *longrunningpb.CancelOperationRequest) (*emptypb.Empty, error) {
 	if req.GetName() == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "name is required")
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("name", "name is required"))
 	}
 	if err := s.lro.CancelOperation(ctx, req.GetName()); err != nil {
 		return nil, err

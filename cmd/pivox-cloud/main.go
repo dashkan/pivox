@@ -63,7 +63,15 @@ func main() {
 	f := rootCmd.Flags()
 	f.String("database-url", envOrDefault("PIVOX_DATABASE_URL", "postgres://localhost:5432/pivox?sslmode=disable"), "PostgreSQL connection URL")
 	f.String("grpc-port", envOrDefault("PIVOX_GRPC_PORT", ":50051"), "Public gRPC listen address (Firebase-authenticated)")
-	f.String("service-grpc-port", envOrDefault("PIVOX_SERVICE_GRPC_PORT", ":50052"), "Service-to-service gRPC listen address (AgentService et al., registration-token authenticated)")
+	// Service-to-service surface defaults to loopback. Production binds via
+	// nginx (configs/nginx.conf maps /pivox.agent.v1.AgentService/ to this
+	// port), so external reach is opt-in by either changing this flag or
+	// terminating at a reverse proxy. Token validation in
+	// AgentAuthStreamInterceptor still gates direct connections — defense
+	// in depth — but defaulting to 0.0.0.0 contradicts the design intent
+	// of "internal-only listener" and would require every operator to
+	// remember to firewall it.
+	f.String("service-grpc-port", envOrDefault("PIVOX_SERVICE_GRPC_PORT", "127.0.0.1:50052"), "Service-to-service gRPC listen address (AgentService et al., registration-token authenticated)")
 	f.String("rest-port", envOrDefault("PIVOX_REST_PORT", ":8080"), "REST gateway listen address")
 	f.String("debug-port", envOrDefault("PIVOX_DEBUG_PORT", ":9090"), "Debug/health listen address")
 	f.String("log-level", envOrDefault("PIVOX_LOG_LEVEL", "info"), "Log level (debug, info, warn, error)")

@@ -5,8 +5,6 @@ import (
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/uuid"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/appkey"
@@ -42,15 +40,15 @@ func (s *TagBindingsServer) ListTagBindings(ctx context.Context, req *apiv1.List
 		OrderBy:  req.GetOrderBy(),
 		PageSize: req.GetPageSize(),
 		Cursor:   req.GetPageToken(),
-		Codec:       s.codec,
+		Codec:    s.codec,
 	})
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid filter: %v", err)
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("filter", err.Error()))
 	}
 
 	results, err := filter.ScanTagBindings(rows)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "database error")
+		return nil, apierr.Internal("database error")
 	}
 
 	pageSize := req.GetPageSize()
@@ -153,7 +151,7 @@ func (s *TagBindingsServer) DeleteTagBinding(ctx context.Context, req *apiv1.Del
 func (s *TagBindingsServer) ListEffectiveTags(ctx context.Context, req *apiv1.ListEffectiveTagsRequest) (*apiv1.ListEffectiveTagsResponse, error) {
 	rows, err := s.queries.ListEffectiveTags(ctx, req.GetParent())
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "database error")
+		return nil, apierr.Internal("database error")
 	}
 
 	effectiveTags := make([]*apiv1.EffectiveTag, 0, len(rows))

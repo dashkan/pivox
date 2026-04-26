@@ -14,9 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/dashkan/pivox/internal/agentstream"
@@ -121,7 +119,7 @@ func (s *StorageGatewaysServer) GetStorageGateway(ctx context.Context, req *stor
 }
 
 func (s *StorageGatewaysServer) ListStorageGateways(_ context.Context, _ *storagev1.ListStorageGatewaysRequest) (*storagev1.ListStorageGatewaysResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "ListStorageGateways not yet implemented")
+	return nil, apierr.Unimplemented("ListStorageGateways not yet implemented")
 }
 
 func (s *StorageGatewaysServer) UpdateStorageGateway(ctx context.Context, req *storagev1.UpdateStorageGatewayRequest) (*longrunningpb.Operation, error) {
@@ -162,7 +160,7 @@ func (s *StorageGatewaysServer) UpdateStorageGateway(ctx context.Context, req *s
 			case "annotations":
 				annotationsJSON, err := json.Marshal(gw.GetAnnotations())
 				if err != nil {
-					return nil, status.Errorf(codes.Internal, "failed to marshal annotations")
+					return nil, apierr.Internal("failed to marshal annotations")
 				}
 				updateParams.Annotations = annotationsJSON
 			}
@@ -327,7 +325,7 @@ func (s *StorageGatewaysServer) GetUninstallScript(ctx context.Context, req *sto
 }
 
 func (s *StorageGatewaysServer) UpgradeGateway(_ context.Context, _ *storagev1.UpgradeGatewayRequest) (*longrunningpb.Operation, error) {
-	return nil, status.Errorf(codes.Unimplemented, "UpgradeGateway not yet implemented")
+	return nil, apierr.Unimplemented("UpgradeGateway not yet implemented")
 }
 
 func (s *StorageGatewaysServer) CreateStorageSession(ctx context.Context, req *storagev1.CreateStorageSessionRequest) (*storagev1.CreateStorageSessionResponse, error) {

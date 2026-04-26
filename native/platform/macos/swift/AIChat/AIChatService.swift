@@ -90,11 +90,19 @@ final class AIChatService {
         return vm
     }
 
-    /// Reset state — use only when the signed-in user changes,
-    /// since the gRPC channel is bound to that user's auth token.
+    /// Reset state — call on sign-out (and any other point where the
+    /// signed-in user changes). The gRPC channel is bound to that user's
+    /// auth token and must not survive across user identities; in-flight
+    /// streaming RPCs must be cancelled. Idempotent.
     func reset() {
         current?.vm.cancel()
         current = nil
+        // `cancel()` tears down the run-task and begins graceful
+        // shutdown of the underlying HTTP/2 channel. Without this the
+        // background `runConnections()` task would leak past sign-out
+        // and any persistent stream would keep running until it
+        // organically completed.
+        client?.cancel()
         client = nil
         initError = nil
     }
