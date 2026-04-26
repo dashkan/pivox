@@ -140,6 +140,11 @@ public struct Pivox_Ai_V1_InputMessage: Sendable {
   // methods supported on all messages.
 
   /// Required. The role of this message's author.
+  /// ASSISTANT (2) and SYSTEM (3) are not valid on input — assistant
+  /// turns are server-produced (accepting one would let a caller
+  /// inject fake context); system instructions arrive via
+  /// `system_instruction` on the request, not as a message.
+  /// ROLE_UNSPECIFIED (0) is treated as USER for forward-compat.
   public var role: Pivox_Ai_V1_Role = .unspecified
 
   /// Required. The structured parts of this message.

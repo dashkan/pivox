@@ -21,6 +21,7 @@
 package iamv1
 
 import (
+	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	expr "google.golang.org/genproto/googleapis/type/expr"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -132,6 +133,9 @@ type Binding struct {
 	//
 	//   - `domain:{domain}`: The domain (primary) that represents all the
 	//     users of that domain. For example, `example.com`.
+	//
+	// Every binding must contain at least one principal — empty bindings
+	// are rejected at the validation interceptor.
 	Members []string `protobuf:"bytes,2,rep,name=members,proto3" json:"members,omitempty"`
 	// Optional. The condition that is associated with this binding.
 	//
@@ -201,13 +205,13 @@ var File_pivox_iam_v1_policy_proto protoreflect.FileDescriptor
 
 const file_pivox_iam_v1_policy_proto_rawDesc = "" +
 	"\n" +
-	"\x19pivox/iam/v1/policy.proto\x12\fpivox.iam.v1\x1a\x16google/type/expr.proto\"O\n" +
+	"\x19pivox/iam/v1/policy.proto\x12\fpivox.iam.v1\x1a\x1bbuf/validate/validate.proto\x1a\x16google/type/expr.proto\"O\n" +
 	"\x06Policy\x121\n" +
 	"\bbindings\x18\x04 \x03(\v2\x15.pivox.iam.v1.BindingR\bbindings\x12\x12\n" +
-	"\x04etag\x18\x03 \x01(\tR\x04etag\"h\n" +
-	"\aBinding\x12\x12\n" +
-	"\x04role\x18\x01 \x01(\tR\x04role\x12\x18\n" +
-	"\amembers\x18\x02 \x03(\tR\amembers\x12/\n" +
+	"\x04etag\x18\x03 \x01(\tR\x04etag\"{\n" +
+	"\aBinding\x12\x1b\n" +
+	"\x04role\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x04role\x12\"\n" +
+	"\amembers\x18\x02 \x03(\tB\b\xbaH\x05\x92\x01\x02\b\x01R\amembers\x12/\n" +
 	"\tcondition\x18\x03 \x01(\v2\x11.google.type.ExprR\tconditionB\xaf\x01\n" +
 	"\x10com.pivox.iam.v1B\vPolicyProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1;iamv1\xa2\x02\x03PIX\xaa\x02\fPivox.Iam.V1\xca\x02\fPivox\\Iam\\V1\xe2\x02\x18Pivox\\Iam\\V1\\GPBMetadata\xea\x02\x0ePivox::Iam::V1b\x06proto3"
 

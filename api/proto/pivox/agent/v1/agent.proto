@@ -16,6 +16,7 @@ syntax = "proto3";
 
 package pivox.agent.v1;
 
+import "buf/validate/validate.proto";
 import "google/api/client.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
@@ -86,19 +87,19 @@ message AgentMessage {
 // resolved.
 message Handshake {
   // Semantic version of the agent binary (e.g. "1.4.2").
-  string agent_version = 2;
+  string agent_version = 2 [(buf.validate.field).string.min_len = 1];
 
   // Public IP address of the agent host as observed by the agent itself.
-  string ip_address = 3;
+  string ip_address = 3 [(buf.validate.field).string.min_len = 1];
 
   // Hostname of the machine running the agent.
-  string hostname = 4;
+  string hostname = 4 [(buf.validate.field).string.min_len = 1];
 
   // Operating system identifier (e.g. "linux", "darwin").
-  string os = 5;
+  string os = 5 [(buf.validate.field).string.min_len = 1];
 
   // CPU architecture (e.g. "amd64", "arm64").
-  string arch = 6;
+  string arch = 6 [(buf.validate.field).string.min_len = 1];
 
   // The role this agent should perform. Defaults to BOTH.
   AgentRole role = 7;

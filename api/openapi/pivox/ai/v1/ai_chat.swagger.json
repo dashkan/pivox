@@ -1262,7 +1262,7 @@
       "properties": {
         "role": {
           "$ref": "#/definitions/v1Role",
-          "description": "Required. The role of this message's author."
+          "description": "Required. The role of this message's author.\nASSISTANT (2) and SYSTEM (3) are not valid on input — assistant\nturns are server-produced (accepting one would let a caller\ninject fake context); system instructions arrive via\n`system_instruction` on the request, not as a message.\nROLE_UNSPECIFIED (0) is treated as USER for forward-compat."
         },
         "parts": {
           "type": "array",
@@ -1769,8 +1769,7 @@
       "properties": {
         "toolCallId": {
           "type": "string",
-          "description": "Output only. The ID of the tool call this result is for.",
-          "readOnly": true
+          "description": "The ID of the tool call this result is for. Required on input —\nevery tool_result must reference an earlier tool_call so the model\ncan match them. Server populates the field on output."
         },
         "tool": {
           "type": "string",

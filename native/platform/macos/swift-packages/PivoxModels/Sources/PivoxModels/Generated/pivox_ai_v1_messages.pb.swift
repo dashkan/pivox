@@ -252,7 +252,9 @@ public struct Pivox_Ai_V1_ToolResultPart: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Output only. The ID of the tool call this result is for.
+  /// The ID of the tool call this result is for. Required on input —
+  /// every tool_result must reference an earlier tool_call so the model
+  /// can match them. Server populates the field on output.
   public var toolCallID: String = String()
 
   /// Output only. The tool that produced this result.

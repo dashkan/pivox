@@ -21,6 +21,7 @@
 package iamv1
 
 import (
+	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -266,20 +267,20 @@ var File_pivox_iam_v1_iam_policy_proto protoreflect.FileDescriptor
 
 const file_pivox_iam_v1_iam_policy_proto_rawDesc = "" +
 	"\n" +
-	"\x1dpivox/iam/v1/iam_policy.proto\x12\fpivox.iam.v1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a google/protobuf/field_mask.proto\x1a\x19pivox/iam/v1/policy.proto\"\xac\x01\n" +
-	"\x13SetIamPolicyRequest\x12%\n" +
-	"\bresource\x18\x01 \x01(\tB\t\xe0A\x02\xfaA\x03\n" +
-	"\x01*R\bresource\x121\n" +
-	"\x06policy\x18\x02 \x01(\v2\x14.pivox.iam.v1.PolicyB\x03\xe0A\x02R\x06policy\x12;\n" +
+	"\x1dpivox/iam/v1/iam_policy.proto\x12\fpivox.iam.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a google/protobuf/field_mask.proto\x1a\x19pivox/iam/v1/policy.proto\"\xb9\x01\n" +
+	"\x13SetIamPolicyRequest\x12,\n" +
+	"\bresource\x18\x01 \x01(\tB\x10\xe0A\x02\xfaA\x03\n" +
+	"\x01*\xbaH\x04r\x02\x10\x01R\bresource\x127\n" +
+	"\x06policy\x18\x02 \x01(\v2\x14.pivox.iam.v1.PolicyB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\x06policy\x12;\n" +
 	"\vupdate_mask\x18\x03 \x01(\v2\x1a.google.protobuf.FieldMaskR\n" +
-	"updateMask\"4\n" +
-	"\x13GetIamPolicyRequest\x12\x1d\n" +
-	"\x04name\x18\x01 \x01(\tB\t\xe0A\x02\xfaA\x03\n" +
-	"\x01*R\x04name\"i\n" +
-	"\x19TestIamPermissionsRequest\x12%\n" +
-	"\bresource\x18\x01 \x01(\tB\t\xe0A\x02\xfaA\x03\n" +
-	"\x01*R\bresource\x12%\n" +
-	"\vpermissions\x18\x02 \x03(\tB\x03\xe0A\x02R\vpermissions\">\n" +
+	"updateMask\";\n" +
+	"\x13GetIamPolicyRequest\x12$\n" +
+	"\x04name\x18\x01 \x01(\tB\x10\xe0A\x02\xfaA\x03\n" +
+	"\x01*\xbaH\x04r\x02\x10\x01R\x04name\"~\n" +
+	"\x19TestIamPermissionsRequest\x12,\n" +
+	"\bresource\x18\x01 \x01(\tB\x10\xe0A\x02\xfaA\x03\n" +
+	"\x01*\xbaH\x04r\x02\x10\x01R\bresource\x123\n" +
+	"\vpermissions\x18\x02 \x03(\tB\x11\xe0A\x02\xbaH\v\x92\x01\b\b\x01\"\x04r\x02\x10\x01R\vpermissions\">\n" +
 	"\x1aTestIamPermissionsResponse\x12 \n" +
 	"\vpermissions\x18\x01 \x03(\tR\vpermissionsB\xb2\x01\n" +
 	"\x10com.pivox.iam.v1B\x0eIamPolicyProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1;iamv1\xa2\x02\x03PIX\xaa\x02\fPivox.Iam.V1\xca\x02\fPivox\\Iam\\V1\xe2\x02\x18Pivox\\Iam\\V1\\GPBMetadata\xea\x02\x0ePivox::Iam::V1b\x06proto3"

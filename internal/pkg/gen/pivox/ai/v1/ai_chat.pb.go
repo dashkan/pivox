@@ -237,6 +237,11 @@ func (x *GenerateContentResponse) GetModel() string {
 type InputMessage struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The role of this message's author.
+	// ASSISTANT (2) and SYSTEM (3) are not valid on input — assistant
+	// turns are server-produced (accepting one would let a caller
+	// inject fake context); system instructions arrive via
+	// `system_instruction` on the request, not as a message.
+	// ROLE_UNSPECIFIED (0) is treated as USER for forward-compat.
 	Role Role `protobuf:"varint,1,opt,name=role,proto3,enum=pivox.ai.v1.Role" json:"role,omitempty"`
 	// Required. The structured parts of this message.
 	Parts         []*MessagePart `protobuf:"bytes,2,rep,name=parts,proto3" json:"parts,omitempty"`
@@ -1946,10 +1951,11 @@ const file_pivox_ai_v1_ai_chat_proto_rawDesc = "" +
 	"\x17GenerateContentResponse\x12.\n" +
 	"\amessage\x18\x01 \x01(\v2\x14.pivox.ai.v1.MessageR\amessage\x12-\n" +
 	"\x05usage\x18\x02 \x01(\v2\x17.pivox.ai.v1.TokenUsageR\x05usage\x12\x14\n" +
-	"\x05model\x18\x03 \x01(\tR\x05model\"o\n" +
-	"\fInputMessage\x12*\n" +
-	"\x04role\x18\x01 \x01(\x0e2\x11.pivox.ai.v1.RoleB\x03\xe0A\x02R\x04role\x123\n" +
-	"\x05parts\x18\x02 \x03(\v2\x18.pivox.ai.v1.MessagePartB\x03\xe0A\x02R\x05parts\"\x81\x01\n" +
+	"\x05model\x18\x03 \x01(\tR\x05model\"\xb4\x02\n" +
+	"\fInputMessage\x124\n" +
+	"\x04role\x18\x01 \x01(\x0e2\x11.pivox.ai.v1.RoleB\r\xe0A\x02\xbaH\a\x82\x01\x04 \x02 \x03R\x04role\x12;\n" +
+	"\x05parts\x18\x02 \x03(\v2\x18.pivox.ai.v1.MessagePartB\v\xe0A\x02\xbaH\x05\x92\x01\x02\b\x01R\x05parts:\xb0\x01\xbaH\xac\x01\x1a\xa9\x01\n" +
+	"-input_message.tool_role_must_have_tool_result\x12<tool-role message must include at least one tool_result part\x1a:this.role != 4 || this.parts.exists(p, has(p.tool_result))\"\x81\x01\n" +
 	"\x0eToolDefinition\x12\x17\n" +
 	"\x04tool\x18\x01 \x01(\tB\x03\xe0A\x02R\x04tool\x12%\n" +
 	"\vdescription\x18\x02 \x01(\tB\x03\xe0A\x01R\vdescription\x12/\n" +

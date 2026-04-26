@@ -470,7 +470,9 @@ func (x *ToolCallPart) GetInputJson() string {
 // A tool result produced by executing a tool call.
 type ToolResultPart struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Output only. The ID of the tool call this result is for.
+	// The ID of the tool call this result is for. Required on input —
+	// every tool_result must reference an earlier tool_call so the model
+	// can match them. Server populates the field on output.
 	ToolCallId string `protobuf:"bytes,1,opt,name=tool_call_id,json=toolCallId,proto3" json:"tool_call_id,omitempty"`
 	// Output only. The tool that produced this result.
 	Tool string `protobuf:"bytes,2,opt,name=tool,proto3" json:"tool,omitempty"`
@@ -810,9 +812,9 @@ const file_pivox_ai_v1_messages_proto_rawDesc = "" +
 	"toolCallId\x12\x17\n" +
 	"\x04tool\x18\x02 \x01(\tB\x03\xe0A\x03R\x04tool\x12\"\n" +
 	"\n" +
-	"input_json\x18\x03 \x01(\tB\x03\xe0A\x03R\tinputJson\"\x96\x01\n" +
-	"\x0eToolResultPart\x12%\n" +
-	"\ftool_call_id\x18\x01 \x01(\tB\x03\xe0A\x03R\n" +
+	"input_json\x18\x03 \x01(\tB\x03\xe0A\x03R\tinputJson\"\x9a\x01\n" +
+	"\x0eToolResultPart\x12)\n" +
+	"\ftool_call_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\n" +
 	"toolCallId\x12\x17\n" +
 	"\x04tool\x18\x02 \x01(\tB\x03\xe0A\x03R\x04tool\x12$\n" +
 	"\vresult_json\x18\x03 \x01(\tB\x03\xe0A\x03R\n" +

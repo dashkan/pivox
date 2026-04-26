@@ -21,6 +21,7 @@
 package apiv1
 
 import (
+	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -127,6 +128,8 @@ type WatchRequest struct {
 	// target contains a special character, it must be %-encoded. We recommend
 	// that clients and servers use their runtime's URL library to produce and
 	// consume target values.
+	//
+	// At least one target is required.
 	Targets []string `protobuf:"bytes,1,rep,name=targets,proto3" json:"targets,omitempty"`
 	// The `resume_marker` specifies how much of the existing underlying state is
 	// delivered to the client when the watch request is received by the
@@ -347,9 +350,9 @@ var File_pivox_api_v1_watch_proto protoreflect.FileDescriptor
 
 const file_pivox_api_v1_watch_proto_rawDesc = "" +
 	"\n" +
-	"\x18pivox/api/v1/watch.proto\x12\fpivox.api.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x19google/protobuf/any.proto\x1a\x1bgoogle/protobuf/empty.proto\"M\n" +
-	"\fWatchRequest\x12\x18\n" +
-	"\atargets\x18\x01 \x03(\tR\atargets\x12#\n" +
+	"\x18pivox/api/v1/watch.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x19google/protobuf/any.proto\x1a\x1bgoogle/protobuf/empty.proto\"]\n" +
+	"\fWatchRequest\x12(\n" +
+	"\atargets\x18\x01 \x03(\tB\x0e\xbaH\v\x92\x01\b\b\x01\"\x04r\x02\x10\x01R\atargets\x12#\n" +
 	"\rresume_marker\x18\x02 \x01(\fR\fresumeMarker\"=\n" +
 	"\vChangeBatch\x12.\n" +
 	"\achanges\x18\x01 \x03(\v2\x14.pivox.api.v1.ChangeR\achanges\"\x90\x02\n" +

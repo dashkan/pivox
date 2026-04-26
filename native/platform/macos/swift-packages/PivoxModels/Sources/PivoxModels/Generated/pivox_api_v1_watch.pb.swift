@@ -69,6 +69,8 @@ public struct Pivox_Api_V1_WatchRequest: Sendable {
   /// target contains a special character, it must be %-encoded. We recommend
   /// that clients and servers use their runtime's URL library to produce and
   /// consume target values.
+  ///
+  /// At least one target is required.
   public var targets: [String] = []
 
   /// The `resume_marker` specifies how much of the existing underlying state is

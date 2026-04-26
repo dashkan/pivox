@@ -2,7 +2,6 @@ package aichat
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log/slog"
 	"strings"
@@ -81,16 +80,10 @@ func (s *Server) runGenerate(
 	req *aiv1.GenerateContentRequest,
 	emit func(*aiv1.ServerEvent) error,
 ) (*aiv1.Message, *aiv1.TokenUsage, string, error) {
-	if req == nil {
-		return nil, nil, "", apierr.BadRequest("request is nil")
-	}
-	if req.GetParent() == "" {
-		return nil, nil, "", apierr.BadRequest("parent is required")
-	}
-	if len(req.GetMessages()) == 0 {
-		return nil, nil, "", apierr.BadRequest("messages must not be empty")
-	}
-
+	// Field-shape validation (parent non-empty, messages.min_items=1,
+	// InputMessage.role not in {ASSISTANT, SYSTEM}, tool-role has a
+	// tool_result with tool_call_id) is enforced by the protovalidate
+	// interceptor — by the time this runs, the request is well-formed.
 	uid := server.MustAuthenticatedUID(ctx)
 
 	// Validate the parent org regardless of stateful/stateless —
@@ -292,23 +285,13 @@ func (s *Server) runGenerate(
 }
 
 // persistInputMessage writes a single InputMessage to the conversation
-// history, picking a sequence number and counting tokens.
+// history, picking a sequence number and counting tokens. The
+// validation interceptor has already enforced the message-shape
+// invariants (non-nil, non-empty parts, role is USER/TOOL, tool-role
+// has a tool_result part with tool_call_id) by the time this runs.
 func (s *Server) persistInputMessage(ctx context.Context, convID uuid.UUID, in *aiv1.InputMessage) error {
-	if in == nil {
-		return apierr.BadRequest("input message is nil")
-	}
-	if len(in.GetParts()) == 0 {
-		return apierr.BadRequest("input message has no parts")
-	}
-
-	role, err := dbRoleForInputMessage(in.GetRole())
-	if err != nil {
-		return err
-	}
+	role := dbRoleForInputMessage(in.GetRole())
 	parts := in.GetParts()
-	if err := validateInputParts(role, parts); err != nil {
-		return err
-	}
 	logText := extractText(parts)
 
 	nextSeq, err := s.queries.GetNextSequenceForConversation(ctx, convID)
@@ -340,73 +323,31 @@ func (s *Server) persistInputMessage(ctx context.Context, convID uuid.UUID, in *
 }
 
 // dbRoleForInputMessage maps a proto Role to the string the DB layer
-// expects. Only USER and TOOL are valid on input:
-//
-//   - ASSISTANT turns are server-produced (via the model) and must
-//     never be client-supplied — accepting one would let a caller
-//     inject fake assistant context to manipulate later turns.
-//   - SYSTEM instructions arrive via `system_instruction` on the
-//     request, not as a message in the array.
-//   - ROLE_UNSPECIFIED is treated as USER for forward-compat with
-//     older clients that didn't set the field.
-//
-// Anything else fails fast with InvalidArgument.
-func dbRoleForInputMessage(r aiv1.Role) (string, error) {
-	switch r {
-	case aiv1.Role_TOOL:
-		return "tool", nil
-	case aiv1.Role_USER, aiv1.Role_ROLE_UNSPECIFIED:
-		return "user", nil
-	case aiv1.Role_ASSISTANT:
-		return "", apierr.BadRequest("assistant role is not valid on input messages — assistant turns are server-produced")
-	case aiv1.Role_SYSTEM:
-		return "", apierr.BadRequest("system role is not valid on input messages — use system_instruction on the request instead")
-	default:
-		return "", apierr.BadRequest(fmt.Sprintf("unsupported role: %v", r))
+// expects. ASSISTANT and SYSTEM are rejected at the validation
+// interceptor (see `(buf.validate.field).enum.not_in` on
+// InputMessage.role) — they can't reach this handler. ROLE_UNSPECIFIED
+// is treated as USER for forward-compat with older clients that
+// didn't set the field. Unknown values (future enum additions) fall
+// back to USER as well; if a future role needs explicit handling it
+// must be added here AND removed from the InputMessage.role
+// not_in list as appropriate.
+func dbRoleForInputMessage(r aiv1.Role) string {
+	if r == aiv1.Role_TOOL {
+		return "tool"
 	}
-}
-
-// validateInputParts enforces semantic constraints we can't express
-// in the proto schema. Currently: TOOL-role messages must carry at
-// least one ToolResultPart, and every ToolResultPart must have a
-// non-empty tool_call_id (otherwise the model has no way to match
-// the result to its earlier tool call).
-func validateInputParts(role string, parts []*aiv1.MessagePart) error {
-	if role != "tool" {
-		return nil
-	}
-	sawToolResult := false
-	for _, p := range parts {
-		tr := p.GetToolResult()
-		if tr == nil {
-			continue
-		}
-		sawToolResult = true
-		if strings.TrimSpace(tr.GetToolCallId()) == "" {
-			return apierr.BadRequest("tool result part missing tool_call_id")
-		}
-	}
-	if !sawToolResult {
-		return apierr.BadRequest("tool-role message must include at least one tool_result part")
-	}
-	return nil
+	return "user"
 }
 
 // inputMessagesToModel converts a list of proto InputMessages to the
 // internal model layer's representation, used by the stateless path.
-// Returns InvalidArgument if any role is invalid (assistant/system on
-// input is rejected — see `dbRoleForInputMessage` for rationale) or
-// if a TOOL-role message is malformed.
+// Cross-field constraints (TOOL-role must include a tool_result part;
+// every tool_result must carry a tool_call_id) are enforced at the
+// validation interceptor via buf-validate annotations on InputMessage
+// and ToolResultPart, so they don't need to be re-checked here.
 func inputMessagesToModel(in []*aiv1.InputMessage) ([]model.Message, error) {
 	out := make([]model.Message, 0, len(in))
 	for _, m := range in {
-		role, err := dbRoleForInputMessage(m.GetRole())
-		if err != nil {
-			return nil, err
-		}
-		if err := validateInputParts(role, m.GetParts()); err != nil {
-			return nil, err
-		}
+		role := dbRoleForInputMessage(m.GetRole())
 		mm := model.Message{Role: role}
 		for _, p := range m.GetParts() {
 			switch {

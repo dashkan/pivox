@@ -16,6 +16,7 @@ syntax = "proto3";
 
 package pivox.iam.v1;
 
+import "buf/validate/validate.proto";
 import "google/type/expr.proto";
 
 option go_package = "pivox/iam/v1;iampb";
@@ -48,7 +49,7 @@ message Policy {
 message Binding {
   // Role that is assigned to the list of `members`, or principals.
   // For example, `roles/viewer`, `roles/editor`, or `roles/owner`.
-  string role = 1;
+  string role = 1 [(buf.validate.field).string.min_len = 1];
 
   // Specifies the principals requesting access for a Pivox resource.
   // `members` can have the following values:
@@ -70,7 +71,10 @@ message Binding {
   //
   // * `domain:{domain}`: The domain (primary) that represents all the
   //    users of that domain. For example, `example.com`.
-  repeated string members = 2;
+  //
+  // Every binding must contain at least one principal — empty bindings
+  // are rejected at the validation interceptor.
+  repeated string members = 2 [(buf.validate.field).repeated.min_items = 1];
 
   // Optional. The condition that is associated with this binding.
   //

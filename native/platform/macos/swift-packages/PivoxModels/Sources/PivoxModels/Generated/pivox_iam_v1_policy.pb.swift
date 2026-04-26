@@ -96,6 +96,9 @@ public struct Pivox_Iam_V1_Binding: Sendable {
   ///
   /// * `domain:{domain}`: The domain (primary) that represents all the
   ///    users of that domain. For example, `example.com`.
+  ///
+  /// Every binding must contain at least one principal — empty bindings
+  /// are rejected at the validation interceptor.
   public var members: [String] = []
 
   /// Optional. The condition that is associated with this binding.

@@ -94,8 +94,10 @@ message ToolCallPart {
 
 // A tool result produced by executing a tool call.
 message ToolResultPart {
-  // Output only. The ID of the tool call this result is for.
-  string tool_call_id = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // The ID of the tool call this result is for. Required on input —
+  // every tool_result must reference an earlier tool_call so the model
+  // can match them. Server populates the field on output.
+  string tool_call_id = 1 [(buf.validate.field).string.min_len = 1];
 
   // Output only. The tool that produced this result.
   string tool = 2 [(google.api.field_behavior) = OUTPUT_ONLY];

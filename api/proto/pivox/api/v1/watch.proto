@@ -16,6 +16,7 @@ syntax = "proto3";
 
 package pivox.api.v1;
 
+import "buf/validate/validate.proto";
 import "google/api/annotations.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/empty.proto";
@@ -193,7 +194,12 @@ message WatchRequest {
   // target contains a special character, it must be %-encoded. We recommend
   // that clients and servers use their runtime's URL library to produce and
   // consume target values.
-  repeated string targets = 1;
+  //
+  // At least one target is required.
+  repeated string targets = 1 [
+    (buf.validate.field).repeated.min_items = 1,
+    (buf.validate.field).repeated.items.string.min_len = 1
+  ];
 
   // The `resume_marker` specifies how much of the existing underlying state is
   // delivered to the client when the watch request is received by the

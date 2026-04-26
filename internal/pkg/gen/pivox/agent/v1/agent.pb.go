@@ -21,6 +21,7 @@
 package agentv1
 
 import (
+	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -2156,7 +2157,7 @@ var File_pivox_agent_v1_agent_proto protoreflect.FileDescriptor
 
 const file_pivox_agent_v1_agent_proto_rawDesc = "" +
 	"\n" +
-	"\x1apivox/agent/v1/agent.proto\x12\x0epivox.agent.v1\x1a\x17google/api/client.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xac\x03\n" +
+	"\x1apivox/agent/v1/agent.proto\x12\x0epivox.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x17google/api/client.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xac\x03\n" +
 	"\fAgentMessage\x12\x0e\n" +
 	"\x02id\x18\a \x01(\tR\x02id\x129\n" +
 	"\thandshake\x18\x01 \x01(\v2\x19.pivox.agent.v1.HandshakeH\x00R\thandshake\x129\n" +
@@ -2166,14 +2167,14 @@ const file_pivox_agent_v1_agent_proto_rawDesc = "" +
 	"syncStatus\x12F\n" +
 	"\x0eupgrade_status\x18\x05 \x01(\v2\x1d.pivox.agent.v1.UpgradeStatusH\x00R\rupgradeStatus\x129\n" +
 	"\ttelemetry\x18\x06 \x01(\v2\x19.pivox.agent.v1.TelemetryH\x00R\ttelemetryB\t\n" +
-	"\amessage\"\xbe\x01\n" +
-	"\tHandshake\x12#\n" +
-	"\ragent_version\x18\x02 \x01(\tR\fagentVersion\x12\x1d\n" +
+	"\amessage\"\xeb\x01\n" +
+	"\tHandshake\x12,\n" +
+	"\ragent_version\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\fagentVersion\x12&\n" +
 	"\n" +
-	"ip_address\x18\x03 \x01(\tR\tipAddress\x12\x1a\n" +
-	"\bhostname\x18\x04 \x01(\tR\bhostname\x12\x0e\n" +
-	"\x02os\x18\x05 \x01(\tR\x02os\x12\x12\n" +
-	"\x04arch\x18\x06 \x01(\tR\x04arch\x12-\n" +
+	"ip_address\x18\x03 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\tipAddress\x12#\n" +
+	"\bhostname\x18\x04 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\bhostname\x12\x17\n" +
+	"\x02os\x18\x05 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x02os\x12\x1b\n" +
+	"\x04arch\x18\x06 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x04arch\x12-\n" +
 	"\x04role\x18\a \x01(\x0e2\x19.pivox.agent.v1.AgentRoleR\x04role\"T\n" +
 	"\tHeartbeat\x12\x14\n" +
 	"\x05state\x18\x01 \x01(\tR\x05state\x121\n" +

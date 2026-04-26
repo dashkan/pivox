@@ -191,38 +191,14 @@ func TestStreamGenerateContent_HappyPath(t *testing.T) {
 	assert.Equal(t, 2, calls)
 }
 
-func TestStreamGenerateContent_EmptyMessagesReturnsInvalidArgument(t *testing.T) {
-	q := new(mocks.MockQuerier)
-	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, nil, nil, slog.Default())
-
-	ctx := authenticatedCtx("user1")
-	stream := &mockServerStream{ctx: ctx}
-
-	err := srv.StreamGenerateContent(&aiv1.GenerateContentRequest{Parent: "organizations/acme"}, stream)
-	require.Error(t, err)
-	st, ok := status.FromError(err)
-	require.True(t, ok)
-	assert.Equal(t, codes.InvalidArgument, st.Code())
-}
-
-func TestStreamGenerateContent_MissingParentReturnsInvalidArgument(t *testing.T) {
-	q := new(mocks.MockQuerier)
-	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, nil, nil, slog.Default())
-
-	ctx := authenticatedCtx("user1")
-	stream := &mockServerStream{ctx: ctx}
-
-	err := srv.StreamGenerateContent(&aiv1.GenerateContentRequest{
-		Messages: []*aiv1.InputMessage{
-			{Role: aiv1.Role_USER, Parts: []*aiv1.MessagePart{{Part: &aiv1.MessagePart_Text{Text: &aiv1.TextPart{Text: "hi"}}}}},
-		},
-	}, stream)
-	require.Error(t, err)
-	st, _ := status.FromError(err)
-	assert.Equal(t, codes.InvalidArgument, st.Code())
-}
+// Field-shape validation (parent required, messages min_items=1,
+// InputMessage.role not in {ASSISTANT, SYSTEM}, ToolResultPart.tool_call_id
+// non-empty, tool-role must include a tool_result part) is enforced
+// by the protovalidate interceptor via buf-validate annotations on
+// the proto. Direct handler-level tests of those rejections were
+// dropped — they exercised handler branches that no longer exist.
+// Cross-cutting validation behavior is covered by protovalidate's
+// own test suite + integration tests of the full RPC pipeline.
 
 func TestStreamGenerateContent_ToolResultResumesGeneration(t *testing.T) {
 	q := new(mocks.MockQuerier)
@@ -430,65 +406,12 @@ func TestGenerateContent_StatelessSkipsPersistence(t *testing.T) {
 	}
 }
 
-func TestStreamGenerateContent_RejectsAssistantRoleInput(t *testing.T) {
-	q := new(mocks.MockQuerier)
-	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, nil, nil, slog.Default())
-
-	org := testOrg()
-	uid := "user1"
-	conv := testConversation(org.ID, uid)
-	ctx := authenticatedCtx(uid)
-	q.On("GetOrganizationByName", mock.Anything, "acme").Return(org, nil)
-	q.On("GetConversationByName", mock.Anything, mock.Anything).Return(conv, nil)
-
-	req := &aiv1.GenerateContentRequest{
-		Parent:       "organizations/acme",
-		Conversation: "organizations/acme/conversations/conv1",
-		Messages: []*aiv1.InputMessage{
-			{Role: aiv1.Role_ASSISTANT, Parts: []*aiv1.MessagePart{
-				{Part: &aiv1.MessagePart_Text{Text: &aiv1.TextPart{Text: "I am the assistant"}}},
-			}},
-		},
-	}
-	stream := &mockServerStream{ctx: ctx}
-	err := srv.StreamGenerateContent(req, stream)
-	require.Error(t, err)
-	st, _ := status.FromError(err)
-	assert.Equal(t, codes.InvalidArgument, st.Code(),
-		"client-supplied assistant turns must be rejected — they're a context-injection vector")
-}
-
-func TestStreamGenerateContent_RejectsToolResultMissingCallID(t *testing.T) {
-	q := new(mocks.MockQuerier)
-	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, nil, nil, slog.Default())
-
-	org := testOrg()
-	uid := "user1"
-	conv := testConversation(org.ID, uid)
-	ctx := authenticatedCtx(uid)
-	q.On("GetOrganizationByName", mock.Anything, "acme").Return(org, nil)
-	q.On("GetConversationByName", mock.Anything, mock.Anything).Return(conv, nil)
-
-	req := &aiv1.GenerateContentRequest{
-		Parent:       "organizations/acme",
-		Conversation: "organizations/acme/conversations/conv1",
-		Messages: []*aiv1.InputMessage{
-			{Role: aiv1.Role_TOOL, Parts: []*aiv1.MessagePart{
-				{Part: &aiv1.MessagePart_ToolResult{ToolResult: &aiv1.ToolResultPart{
-					ToolCallId: "", // missing — must reject
-					ResultJson: `{"ok":true}`,
-				}}},
-			}},
-		},
-	}
-	stream := &mockServerStream{ctx: ctx}
-	err := srv.StreamGenerateContent(req, stream)
-	require.Error(t, err)
-	st, _ := status.FromError(err)
-	assert.Equal(t, codes.InvalidArgument, st.Code())
-}
+// Tests for `Role=ASSISTANT/SYSTEM rejected on input` and
+// `ToolResultPart missing tool_call_id rejected` were dropped — those
+// constraints are now enforced by the protovalidate interceptor (see
+// `(buf.validate.field).enum.not_in` on InputMessage.role and
+// `(buf.validate.field).string.min_len = 1` on ToolResultPart.tool_call_id).
+// Handler-level checks no longer exist.
 
 func TestStreamGenerateContent_ConversationOrgMismatchRejected(t *testing.T) {
 	q := new(mocks.MockQuerier)

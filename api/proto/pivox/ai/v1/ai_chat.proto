@@ -262,11 +262,34 @@ message GenerateContentResponse {
 // and text are all represented as `MessagePart` variants — no
 // separate request envelopes for tool flows.
 message InputMessage {
+  // Cross-field constraint: TOOL-role messages must include at least
+  // one ToolResultPart. Without that, the model has no way to match
+  // the result to its earlier tool call. Encoded as CEL because the
+  // shape is "if role is TOOL, then parts must contain a tool_result"
+  // — single-field constraints can't express it.
+  option (buf.validate.message).cel = {
+    id: "input_message.tool_role_must_have_tool_result"
+    message: "tool-role message must include at least one tool_result part"
+    expression: "this.role != 4 || this.parts.exists(p, has(p.tool_result))"
+  };
+
   // Required. The role of this message's author.
-  Role role = 1 [(google.api.field_behavior) = REQUIRED];
+  // ASSISTANT (2) and SYSTEM (3) are not valid on input — assistant
+  // turns are server-produced (accepting one would let a caller
+  // inject fake context); system instructions arrive via
+  // `system_instruction` on the request, not as a message.
+  // ROLE_UNSPECIFIED (0) is treated as USER for forward-compat.
+  Role role = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).enum.not_in = 2,
+    (buf.validate.field).enum.not_in = 3
+  ];
 
   // Required. The structured parts of this message.
-  repeated MessagePart parts = 2 [(google.api.field_behavior) = REQUIRED];
+  repeated MessagePart parts = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).repeated.min_items = 1
+  ];
 }
 
 // A tool the model may invoke during generation. Schemas are
