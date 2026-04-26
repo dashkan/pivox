@@ -65,11 +65,11 @@ func (m *mockBidiStream) CloseSend() error {
 }
 
 // Header, Trailer, Context, RecvMsg, SendMsg satisfy the grpc.ClientStream interface.
-func (m *mockBidiStream) Header() (metadata.MD, error)   { return nil, nil }
-func (m *mockBidiStream) Trailer() metadata.MD            { return nil }
-func (m *mockBidiStream) Context() context.Context        { return context.Background() }
-func (m *mockBidiStream) RecvMsg(any) error               { return nil }
-func (m *mockBidiStream) SendMsg(any) error               { return nil }
+func (m *mockBidiStream) Header() (metadata.MD, error) { return nil, nil }
+func (m *mockBidiStream) Trailer() metadata.MD         { return nil }
+func (m *mockBidiStream) Context() context.Context     { return context.Background() }
+func (m *mockBidiStream) RecvMsg(any) error            { return nil }
+func (m *mockBidiStream) SendMsg(any) error            { return nil }
 
 func (m *mockBidiStream) sentMessages() []*agentv1.AgentMessage {
 	m.mu.Lock()
@@ -202,8 +202,7 @@ func TestHandshake_Success(t *testing.T) {
 	}()
 
 	ack, err := s.Handshake(ctx, &agentv1.Handshake{
-		RegistrationToken: "tok-123",
-		AgentVersion:      "dev",
+		AgentVersion: "dev",
 	})
 
 	require.NoError(t, err)

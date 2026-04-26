@@ -7,6 +7,7 @@ import "time"
 type Config struct {
 	DatabaseURL      string
 	GRPCPort         string
+	ServiceGRPCPort  string // service-to-service gRPC listener (AgentService et al.)
 	RESTPort         string
 	DebugPort        string
 	LogLevel         string

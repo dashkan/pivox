@@ -4,7 +4,10 @@ package main
 
 import "github.com/spf13/pflag"
 
-var cloudHost = "localhost:50051"
+// Service-to-service port (:50052), not the public gRPC port (:50051).
+// AgentService lives on its own listener with registration-token auth;
+// see cmd/pivox-cloud/main.go and configs/nginx.conf.
+var cloudHost = "localhost:50052"
 
 const defaultPort = 8443
 

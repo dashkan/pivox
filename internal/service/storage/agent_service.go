@@ -18,6 +18,7 @@ import (
 	"github.com/dashkan/pivox/internal/agentstream"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	agentv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/agent/v1"
+	"github.com/dashkan/pivox/internal/server"
 )
 
 // AgentServiceServer implements the bidirectional streaming AgentService for
@@ -46,7 +47,20 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 	ctx := stream.Context()
 
 	// -----------------------------------------------------------------------
-	// 1. Wait for the first message -- must be a Handshake.
+	// 1. Resolve the authenticated gateway. The gRPC interceptor
+	//    (server.AgentAuthStreamInterceptor) has already validated the
+	//    registration token from initial metadata and put the matching
+	//    gateway in context — if it's not there, this RPC bypassed auth,
+	//    which should be impossible on the service-to-service listener.
+	// -----------------------------------------------------------------------
+	gateway, ok := server.AuthenticatedGateway(ctx)
+	if !ok {
+		s.logger.ErrorContext(ctx, "agent connect reached handler without authenticated gateway in context")
+		return status.Error(codes.Internal, "agent gateway context missing")
+	}
+
+	// -----------------------------------------------------------------------
+	// 2. Wait for the first message -- must be a Handshake.
 	// -----------------------------------------------------------------------
 	firstMsg, err := stream.Recv()
 	if err != nil {
@@ -57,18 +71,6 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 	hs := firstMsg.GetHandshake()
 	if hs == nil {
 		return status.Error(codes.InvalidArgument, "first message must be handshake")
-	}
-
-	// -----------------------------------------------------------------------
-	// 2. Validate registration_token against DB.
-	// -----------------------------------------------------------------------
-	gateway, err := s.queries.GetStorageGatewayByToken(ctx, hs.GetRegistrationToken())
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return status.Error(codes.Unauthenticated, "invalid registration token")
-		}
-		s.logger.ErrorContext(ctx, "failed to look up gateway by token", "error", err)
-		return status.Error(codes.Internal, "failed to validate registration token")
 	}
 
 	// -----------------------------------------------------------------------

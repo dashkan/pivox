@@ -303,17 +303,18 @@ public struct Pivox_Agent_V1_AgentMessage: Sendable {
 }
 
 /// Handshake is the first message an agent MUST send after opening the Connect
-/// stream. It carries a one-time registration token and basic host metadata so
-/// the control plane can authenticate and register the agent.
+/// stream. It carries basic host metadata so the control plane can register the
+/// agent against the gateway already authenticated at the gRPC layer.
+///
+/// Authentication does NOT live in this message: the agent attaches a
+/// registration token in the `x-pivox-agent-token` initial-metadata header,
+/// which the server's per-service auth interceptor validates before the
+/// handler runs. By the time this message is read, the gateway is already
+/// resolved.
 public struct Pivox_Agent_V1_Handshake: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
-
-  /// One-time token obtained from the Pivox console or CLI during agent
-  /// provisioning. The control plane validates and invalidates the token on
-  /// first use.
-  public var registrationToken: String = String()
 
   /// Semantic version of the agent binary (e.g. "1.4.2").
   public var agentVersion: String = String()
@@ -1163,7 +1164,7 @@ extension Pivox_Agent_V1_AgentMessage: SwiftProtobuf.Message, SwiftProtobuf._Mes
 
 extension Pivox_Agent_V1_Handshake: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".Handshake"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}registration_token\0\u{3}agent_version\0\u{3}ip_address\0\u{1}hostname\0\u{1}os\0\u{1}arch\0\u{1}role\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}agent_version\0\u{3}ip_address\0\u{1}hostname\0\u{1}os\0\u{1}arch\0\u{1}role\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1171,7 +1172,6 @@ extension Pivox_Agent_V1_Handshake: SwiftProtobuf.Message, SwiftProtobuf._Messag
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.registrationToken) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.agentVersion) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.ipAddress) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self.hostname) }()
@@ -1184,9 +1184,6 @@ extension Pivox_Agent_V1_Handshake: SwiftProtobuf.Message, SwiftProtobuf._Messag
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.registrationToken.isEmpty {
-      try visitor.visitSingularStringField(value: self.registrationToken, fieldNumber: 1)
-    }
     if !self.agentVersion.isEmpty {
       try visitor.visitSingularStringField(value: self.agentVersion, fieldNumber: 2)
     }
@@ -1209,7 +1206,6 @@ extension Pivox_Agent_V1_Handshake: SwiftProtobuf.Message, SwiftProtobuf._Messag
   }
 
   public static func ==(lhs: Pivox_Agent_V1_Handshake, rhs: Pivox_Agent_V1_Handshake) -> Bool {
-    if lhs.registrationToken != rhs.registrationToken {return false}
     if lhs.agentVersion != rhs.agentVersion {return false}
     if lhs.ipAddress != rhs.ipAddress {return false}
     if lhs.hostname != rhs.hostname {return false}

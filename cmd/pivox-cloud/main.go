@@ -62,7 +62,8 @@ func main() {
 
 	f := rootCmd.Flags()
 	f.String("database-url", envOrDefault("PIVOX_DATABASE_URL", "postgres://localhost:5432/pivox?sslmode=disable"), "PostgreSQL connection URL")
-	f.String("grpc-port", envOrDefault("PIVOX_GRPC_PORT", ":50051"), "gRPC listen address")
+	f.String("grpc-port", envOrDefault("PIVOX_GRPC_PORT", ":50051"), "Public gRPC listen address (Firebase-authenticated)")
+	f.String("service-grpc-port", envOrDefault("PIVOX_SERVICE_GRPC_PORT", ":50052"), "Service-to-service gRPC listen address (AgentService et al., registration-token authenticated)")
 	f.String("rest-port", envOrDefault("PIVOX_REST_PORT", ":8080"), "REST gateway listen address")
 	f.String("debug-port", envOrDefault("PIVOX_DEBUG_PORT", ":9090"), "Debug/health listen address")
 	f.String("log-level", envOrDefault("PIVOX_LOG_LEVEL", "info"), "Log level (debug, info, warn, error)")
@@ -117,6 +118,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	cfg := &config.Config{
 		DatabaseURL:      must(f.GetString("database-url")),
 		GRPCPort:         must(f.GetString("grpc-port")),
+		ServiceGRPCPort:  must(f.GetString("service-grpc-port")),
 		RESTPort:         must(f.GetString("rest-port")),
 		DebugPort:        must(f.GetString("debug-port")),
 		LogLevel:         must(f.GetString("log-level")),
@@ -273,12 +275,9 @@ func serve(cmd *cobra.Command, args []string) error {
 	aiChatServer := aichat.NewServer(pool, queries, llm, toolRegistry, appCodec, logger)
 	aiv1.RegisterAiChatServer(grpcServer, aiChatServer)
 
-	// Agent bidi streaming service (agents authenticate via registration token, not Firebase)
-	agentv1.RegisterAgentServiceServer(grpcServer, storage.NewAgentServiceServer(queries, logger, connMgr))
-
 	reflection.Register(grpcServer)
 
-	// Start gRPC listener
+	// Start gRPC listener (public surface)
 	grpcLis, err := net.Listen("tcp", cfg.GRPCPort)
 	if err != nil {
 		return fmt.Errorf("listen on gRPC port %s: %w", cfg.GRPCPort, err)
@@ -288,6 +287,39 @@ func serve(cmd *cobra.Command, args []string) error {
 		logger.Info("gRPC server listening", "addr", cfg.GRPCPort)
 		if err := grpcServer.Serve(grpcLis); err != nil {
 			logger.Error("gRPC server stopped", "error", err)
+		}
+	}()
+
+	// ----------------------------------------------------------------------
+	// Service-to-service gRPC server (AgentService et al.)
+	//
+	// Distinct from the public server because the auth model is different:
+	// agents present a registration token in initial metadata, validated by
+	// AgentAuthStreamInterceptor. Putting it on its own listener means the
+	// public chain (Firebase auth + membership) never has to special-case
+	// agent traffic, and operators can apply different network policy
+	// (firewall, mTLS termination, separate ingress) to internal-only RPCs
+	// without restructuring the proto surface.
+	//
+	// Not exposed via grpc-gateway — REST is for public clients only.
+	// ----------------------------------------------------------------------
+	serviceGRPCServer := grpc.NewServer(
+		grpc.ChainStreamInterceptor(
+			server.LoggingStreamInterceptor(logger),
+			server.AgentAuthStreamInterceptor(queries),
+		),
+	)
+	agentv1.RegisterAgentServiceServer(serviceGRPCServer, storage.NewAgentServiceServer(queries, logger, connMgr))
+	reflection.Register(serviceGRPCServer)
+
+	serviceGRPCLis, err := net.Listen("tcp", cfg.ServiceGRPCPort)
+	if err != nil {
+		return fmt.Errorf("listen on service gRPC port %s: %w", cfg.ServiceGRPCPort, err)
+	}
+	go func() {
+		logger.Info("service gRPC server listening", "addr", cfg.ServiceGRPCPort)
+		if err := serviceGRPCServer.Serve(serviceGRPCLis); err != nil {
+			logger.Error("service gRPC server stopped", "error", err)
 		}
 	}()
 

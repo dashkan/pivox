@@ -12,6 +12,9 @@ import (
 
 // membershipExemptMethods is the bootstrap allowlist — RPCs that an
 // authenticated caller with zero org memberships is permitted to call.
+// All methods reaching this interceptor have already passed Firebase
+// AuthInterceptor; service-to-service surfaces (AgentService) live on a
+// separate gRPC server and never reach this chain.
 //
 // Adding to this list is a security-sensitive change. Each entry must
 // be safe to invoke without org context, and ideally must be on the

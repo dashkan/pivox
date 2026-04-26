@@ -12,10 +12,17 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	agentv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/agent/v1"
 )
+
+// agentTokenMetadataKey must match server-side server.AgentTokenMetadataKey.
+// Duplicated as a literal here to avoid importing the cloud server package
+// from the agent binary (separate deployable surfaces, separate go modules
+// in the long run).
+const agentTokenMetadataKey = "x-pivox-agent-token"
 
 const (
 	handshakeTimeout  = 10 * time.Second
@@ -50,7 +57,13 @@ func Connect(ctx context.Context, addr string, useTLS bool, token string, cfg *C
 
 	client := agentv1.NewAgentServiceClient(conn)
 
-	bidi, err := client.Connect(ctx)
+	// Attach the registration token to outgoing initial metadata. The cloud
+	// server's per-service interceptor validates and resolves the gateway
+	// before the Connect handler runs; the token is no longer carried in
+	// the Handshake proto message.
+	streamCtx := metadata.AppendToOutgoingContext(ctx, agentTokenMetadataKey, token)
+
+	bidi, err := client.Connect(streamCtx)
 	if err != nil {
 		return fmt.Errorf("open stream: %w", err)
 	}
@@ -68,12 +81,11 @@ func Connect(ctx context.Context, addr string, useTLS bool, token string, cfg *C
 	hostname, _ := os.Hostname()
 
 	ack, err := stream.Handshake(ctx, &agentv1.Handshake{
-		RegistrationToken: token,
-		AgentVersion:      version(),
-		IpAddress:         "0.0.0.0",
-		Hostname:          hostname,
-		Os:                runtime.GOOS,
-		Arch:              runtime.GOARCH,
+		AgentVersion: version(),
+		IpAddress:    "0.0.0.0",
+		Hostname:     hostname,
+		Os:           runtime.GOOS,
+		Arch:         runtime.GOARCH,
 	})
 	if err != nil {
 		return fmt.Errorf("handshake: %w", err)

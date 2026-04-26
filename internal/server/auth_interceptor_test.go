@@ -88,29 +88,9 @@ func TestMustAuthenticatedUID_Panics(t *testing.T) {
 
 // --- Unary interceptor tests ---
 
-func TestAuthInterceptor_PublicMethod(t *testing.T) {
-	auth := new(mockAuthService)
-	interceptor := AuthInterceptor(auth)
-	ctx := context.Background()
-
-	handlerCalled := false
-	handler := func(ctx context.Context, req any) (any, error) {
-		handlerCalled = true
-		return "ok", nil
-	}
-
-	info := &grpc.UnaryServerInfo{
-		FullMethod: "/pivox.agent.v1.AgentService/Connect",
-	}
-
-	resp, err := interceptor(ctx, nil, info, handler)
-
-	require.NoError(t, err)
-	assert.Equal(t, "ok", resp)
-	assert.True(t, handlerCalled)
-	// VerifyToken should NOT have been called.
-	auth.AssertNotCalled(t, "VerifyToken")
-}
+// AgentService no longer participates in the public AuthInterceptor chain
+// — it lives on a separate gRPC server with its own AgentAuthStreamInterceptor.
+// See cmd/pivox-cloud/main.go.
 
 func TestAuthInterceptor_ValidToken(t *testing.T) {
 	auth := new(mockAuthService)
@@ -226,28 +206,6 @@ func TestAuthInterceptor_InvalidToken(t *testing.T) {
 }
 
 // --- Stream interceptor tests ---
-
-func TestAuthStreamInterceptor_PublicMethod(t *testing.T) {
-	auth := new(mockAuthService)
-	interceptor := AuthStreamInterceptor(auth)
-
-	handlerCalled := false
-	handler := func(srv any, stream grpc.ServerStream) error {
-		handlerCalled = true
-		return nil
-	}
-
-	info := &grpc.StreamServerInfo{
-		FullMethod: "/pivox.agent.v1.AgentService/Connect",
-	}
-
-	ss := &mockServerStream{ctx: context.Background()}
-	err := interceptor(nil, ss, info, handler)
-
-	require.NoError(t, err)
-	assert.True(t, handlerCalled)
-	auth.AssertNotCalled(t, "VerifyToken")
-}
 
 func TestAuthStreamInterceptor_ValidToken(t *testing.T) {
 	auth := new(mockAuthService)

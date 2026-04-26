@@ -76,14 +76,15 @@ message AgentMessage {
 }
 
 // Handshake is the first message an agent MUST send after opening the Connect
-// stream. It carries a one-time registration token and basic host metadata so
-// the control plane can authenticate and register the agent.
+// stream. It carries basic host metadata so the control plane can register the
+// agent against the gateway already authenticated at the gRPC layer.
+//
+// Authentication does NOT live in this message: the agent attaches a
+// registration token in the `x-pivox-agent-token` initial-metadata header,
+// which the server's per-service auth interceptor validates before the
+// handler runs. By the time this message is read, the gateway is already
+// resolved.
 message Handshake {
-  // One-time token obtained from the Pivox console or CLI during agent
-  // provisioning. The control plane validates and invalidates the token on
-  // first use.
-  string registration_token = 1;
-
   // Semantic version of the agent binary (e.g. "1.4.2").
   string agent_version = 2;
 

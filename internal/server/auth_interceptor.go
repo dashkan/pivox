@@ -40,22 +40,20 @@ func MustAuthenticatedUID(ctx context.Context) string {
 	return uid
 }
 
-// publicMethods lists gRPC full method names that skip authentication.
-// Reflection and health checks are handled separately by gRPC itself.
-var publicMethods = map[string]bool{
-	// AgentService.Connect authenticates via registration_token in the
-	// Handshake message, not via bearer tokens.
-	"/pivox.agent.v1.AgentService/Connect": true,
-}
-
 // AuthInterceptor returns a gRPC unary server interceptor that verifies
-// bearer tokens via the provided authn.Service.
+// Firebase bearer tokens via the provided authn.Service.
+//
+// Scope: this interceptor is registered on the public gRPC server only.
+// Service-to-service traffic (e.g. AgentService) lives on a separate
+// gRPC server with its own interceptor chain — see cmd/pivox-cloud/main.go
+// and server.AgentAuthStreamInterceptor.
+//
+// Reflection and health checks are handled by gRPC itself.
 //
 // The interceptor:
-//  1. Skips methods listed in publicMethods.
-//  2. Extracts the Bearer token from the "authorization" metadata.
-//  3. Verifies the token via the auth service.
-//  4. Injects the authenticated UID into the context.
+//  1. Extracts the Bearer token from the "authorization" metadata.
+//  2. Verifies the token via the auth service.
+//  3. Injects the authenticated UID into the context.
 func AuthInterceptor(auth authn.Service) grpc.UnaryServerInterceptor {
 	return func(
 		ctx context.Context,
@@ -63,9 +61,6 @@ func AuthInterceptor(auth authn.Service) grpc.UnaryServerInterceptor {
 		info *grpc.UnaryServerInfo,
 		handler grpc.UnaryHandler,
 	) (any, error) {
-		if publicMethods[info.FullMethod] {
-			return handler(ctx, req)
-		}
 
 		md, ok := metadata.FromIncomingContext(ctx)
 		if !ok {
@@ -102,10 +97,6 @@ func AuthStreamInterceptor(auth authn.Service) grpc.StreamServerInterceptor {
 		info *grpc.StreamServerInfo,
 		handler grpc.StreamHandler,
 	) error {
-		if publicMethods[info.FullMethod] {
-			return handler(srv, ss)
-		}
-
 		md, ok := metadata.FromIncomingContext(ss.Context())
 		if !ok {
 			return status.Error(codes.Unauthenticated, "missing metadata")

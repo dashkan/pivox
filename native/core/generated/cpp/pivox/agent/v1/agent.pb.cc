@@ -272,10 +272,7 @@ PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
 
 inline constexpr Handshake::Impl_::Impl_(
     ::_pbi::ConstantInitialized) noexcept
-      : registration_token_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        agent_version_(
+      : agent_version_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
         ip_address_(
@@ -758,7 +755,6 @@ const ::uint32_t
         ~0u,  // no _inlined_string_donated_
         ~0u,  // no _split_
         ~0u,  // no sizeof(Split)
-        PROTOBUF_FIELD_OFFSET(::pivox::agent::v1::Handshake, _impl_.registration_token_),
         PROTOBUF_FIELD_OFFSET(::pivox::agent::v1::Handshake, _impl_.agent_version_),
         PROTOBUF_FIELD_OFFSET(::pivox::agent::v1::Handshake, _impl_.ip_address_),
         PROTOBUF_FIELD_OFFSET(::pivox::agent::v1::Handshake, _impl_.hostname_),
@@ -1031,27 +1027,27 @@ static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, -1, -1, sizeof(::pivox::agent::v1::AgentMessage)},
         {16, -1, -1, sizeof(::pivox::agent::v1::Handshake)},
-        {31, 41, -1, sizeof(::pivox::agent::v1::Heartbeat)},
-        {43, -1, -1, sizeof(::pivox::agent::v1::EndpointHealth)},
-        {55, -1, -1, sizeof(::pivox::agent::v1::SyncStatus)},
-        {66, -1, -1, sizeof(::pivox::agent::v1::UpgradeStatus)},
-        {78, -1, -1, sizeof(::pivox::agent::v1::Telemetry)},
-        {90, -1, -1, sizeof(::pivox::agent::v1::CacheStats)},
-        {102, -1, -1, sizeof(::pivox::agent::v1::RequestMetrics)},
-        {115, -1, -1, sizeof(::pivox::agent::v1::SystemMetrics)},
-        {130, -1, -1, sizeof(::pivox::agent::v1::ControlMessage)},
-        {148, -1, -1, sizeof(::pivox::agent::v1::HandshakeAck)},
-        {163, 174, -1, sizeof(::pivox::agent::v1::SessionGrant)},
-        {177, -1, -1, sizeof(::pivox::agent::v1::SessionRevoke)},
-        {186, 197, -1, sizeof(::pivox::agent::v1::CertDelivery)},
-        {200, -1, -1, sizeof(::pivox::agent::v1::DrainRequest)},
-        {209, -1, -1, sizeof(::pivox::agent::v1::UpgradeRequest)},
-        {222, -1, -1, sizeof(::pivox::agent::v1::ConfigUpdate)},
-        {232, 245, -1, sizeof(::pivox::agent::v1::EndpointConfig)},
-        {249, -1, -1, sizeof(::pivox::agent::v1::S3EndpointConfig)},
-        {262, -1, -1, sizeof(::pivox::agent::v1::FileSystemEndpointConfig)},
-        {271, -1, -1, sizeof(::pivox::agent::v1::EndpointCacheConfig)},
-        {283, -1, -1, sizeof(::pivox::agent::v1::ServerHeartbeat)},
+        {30, 40, -1, sizeof(::pivox::agent::v1::Heartbeat)},
+        {42, -1, -1, sizeof(::pivox::agent::v1::EndpointHealth)},
+        {54, -1, -1, sizeof(::pivox::agent::v1::SyncStatus)},
+        {65, -1, -1, sizeof(::pivox::agent::v1::UpgradeStatus)},
+        {77, -1, -1, sizeof(::pivox::agent::v1::Telemetry)},
+        {89, -1, -1, sizeof(::pivox::agent::v1::CacheStats)},
+        {101, -1, -1, sizeof(::pivox::agent::v1::RequestMetrics)},
+        {114, -1, -1, sizeof(::pivox::agent::v1::SystemMetrics)},
+        {129, -1, -1, sizeof(::pivox::agent::v1::ControlMessage)},
+        {147, -1, -1, sizeof(::pivox::agent::v1::HandshakeAck)},
+        {162, 173, -1, sizeof(::pivox::agent::v1::SessionGrant)},
+        {176, -1, -1, sizeof(::pivox::agent::v1::SessionRevoke)},
+        {185, 196, -1, sizeof(::pivox::agent::v1::CertDelivery)},
+        {199, -1, -1, sizeof(::pivox::agent::v1::DrainRequest)},
+        {208, -1, -1, sizeof(::pivox::agent::v1::UpgradeRequest)},
+        {221, -1, -1, sizeof(::pivox::agent::v1::ConfigUpdate)},
+        {231, 244, -1, sizeof(::pivox::agent::v1::EndpointConfig)},
+        {248, -1, -1, sizeof(::pivox::agent::v1::S3EndpointConfig)},
+        {261, -1, -1, sizeof(::pivox::agent::v1::FileSystemEndpointConfig)},
+        {270, -1, -1, sizeof(::pivox::agent::v1::EndpointCacheConfig)},
+        {282, -1, -1, sizeof(::pivox::agent::v1::ServerHeartbeat)},
 };
 static const ::_pb::Message* const file_default_instances[] = {
     &::pivox::agent::v1::_AgentMessage_default_instance_._instance,
@@ -1094,117 +1090,116 @@ const char descriptor_table_protodef_pivox_2fagent_2fv1_2fagent_2eproto[] ABSL_A
     "s\030\005 \001(\0132\035.pivox.agent.v1.UpgradeStatusH\000"
     "R\rupgradeStatus\0229\n\ttelemetry\030\006 \001(\0132\031.piv"
     "ox.agent.v1.TelemetryH\000R\ttelemetryB\t\n\007me"
-    "ssage\"\355\001\n\tHandshake\022-\n\022registration_toke"
-    "n\030\001 \001(\tR\021registrationToken\022#\n\ragent_vers"
-    "ion\030\002 \001(\tR\014agentVersion\022\035\n\nip_address\030\003 "
-    "\001(\tR\tipAddress\022\032\n\010hostname\030\004 \001(\tR\010hostna"
-    "me\022\016\n\002os\030\005 \001(\tR\002os\022\022\n\004arch\030\006 \001(\tR\004arch\022-"
-    "\n\004role\030\007 \001(\0162\031.pivox.agent.v1.AgentRoleR"
-    "\004role\"T\n\tHeartbeat\022\024\n\005state\030\001 \001(\tR\005state"
-    "\0221\n\006uptime\030\002 \001(\0132\031.google.protobuf.Durat"
-    "ionR\006uptime\"\210\001\n\016EndpointHealth\022#\n\rendpoi"
-    "nt_name\030\001 \001(\tR\014endpointName\022\034\n\treachable"
-    "\030\002 \001(\010R\treachable\022\035\n\nlatency_ms\030\003 \001(\003R\tl"
-    "atencyMs\022\024\n\005error\030\004 \001(\tR\005error\"n\n\nSyncSt"
-    "atus\022%\n\016pending_writes\030\001 \001(\003R\rpendingWri"
-    "tes\022#\n\rsynced_writes\030\002 \001(\003R\014syncedWrites"
-    "\022\024\n\005error\030\003 \001(\tR\005error\"\236\001\n\rUpgradeStatus"
-    "\0222\n\005phase\030\001 \001(\0162\034.pivox.agent.v1.Upgrade"
-    "PhaseR\005phase\022\030\n\007version\030\002 \001(\tR\007version\022\024"
-    "\n\005error\030\003 \001(\tR\005error\022)\n\020download_percent"
-    "\030\004 \001(\005R\017downloadPercent\"\345\001\n\tTelemetry\022=\n"
-    "\013cache_stats\030\001 \001(\0132\032.pivox.agent.v1.Cach"
-    "eStatsH\000R\ncacheStats\022I\n\017request_metrics\030"
-    "\002 \001(\0132\036.pivox.agent.v1.RequestMetricsH\000R"
-    "\016requestMetrics\022F\n\016system_metrics\030\003 \001(\0132"
-    "\035.pivox.agent.v1.SystemMetricsH\000R\rsystem"
-    "MetricsB\006\n\004data\"\210\001\n\nCacheStats\022\027\n\007used_g"
-    "b\030\001 \001(\005R\006usedGb\022\033\n\thit_count\030\002 \001(\003R\010hitC"
-    "ount\022\035\n\nmiss_count\030\003 \001(\003R\tmissCount\022%\n\016e"
-    "viction_count\030\004 \001(\003R\revictionCount\"\307\001\n\016R"
-    "equestMetrics\022%\n\016total_requests\030\001 \001(\003R\rt"
-    "otalRequests\022!\n\014bytes_served\030\002 \001(\003R\013byte"
-    "sServed\022\037\n\013error_count\030\003 \001(\003R\nerrorCount"
-    "\022$\n\016latency_p50_ms\030\004 \001(\001R\014latencyP50Ms\022$"
-    "\n\016latency_p99_ms\030\005 \001(\001R\014latencyP99Ms\"\260\002\n"
-    "\rSystemMetrics\022\037\n\013cpu_percent\030\001 \001(\001R\ncpu"
-    "Percent\022*\n\021memory_used_bytes\030\002 \001(\003R\017memo"
-    "ryUsedBytes\022,\n\022memory_total_bytes\030\003 \001(\003R"
-    "\020memoryTotalBytes\022&\n\017disk_read_bytes\030\004 \001"
-    "(\003R\rdiskReadBytes\022(\n\020disk_write_bytes\030\005 "
-    "\001(\003R\016diskWriteBytes\022(\n\020network_rx_bytes\030"
-    "\006 \001(\003R\016networkRxBytes\022(\n\020network_tx_byte"
-    "s\030\007 \001(\003R\016networkTxBytes\"\345\004\n\016ControlMessa"
-    "ge\022\016\n\002id\030\007 \001(\tR\002id\022C\n\rhandshake_ack\030\001 \001("
-    "\0132\034.pivox.agent.v1.HandshakeAckH\000R\014hands"
-    "hakeAck\022C\n\rcert_delivery\030\002 \001(\0132\034.pivox.a"
-    "gent.v1.CertDeliveryH\000R\014certDelivery\022C\n\r"
-    "drain_request\030\003 \001(\0132\034.pivox.agent.v1.Dra"
-    "inRequestH\000R\014drainRequest\022I\n\017upgrade_req"
-    "uest\030\004 \001(\0132\036.pivox.agent.v1.UpgradeReque"
-    "stH\000R\016upgradeRequest\022C\n\rconfig_update\030\005 "
-    "\001(\0132\034.pivox.agent.v1.ConfigUpdateH\000R\014con"
-    "figUpdate\022L\n\020server_heartbeat\030\006 \001(\0132\037.pi"
-    "vox.agent.v1.ServerHeartbeatH\000R\017serverHe"
-    "artbeat\022C\n\rsession_grant\030\010 \001(\0132\034.pivox.a"
-    "gent.v1.SessionGrantH\000R\014sessionGrant\022F\n\016"
-    "session_revoke\030\t \001(\0132\035.pivox.agent.v1.Se"
-    "ssionRevokeH\000R\rsessionRevokeB\t\n\007message\""
-    "\231\002\n\014HandshakeAck\022\035\n\nagent_name\030\001 \001(\tR\tag"
-    "entName\022\031\n\010tls_cert\030\002 \001(\014R\007tlsCert\022\027\n\007tl"
-    "s_key\030\003 \001(\014R\006tlsKey\022<\n\tendpoints\030\004 \003(\0132\036"
-    ".pivox.agent.v1.EndpointConfigR\tendpoint"
-    "s\022.\n\023session_signing_key\030\005 \001(\014R\021sessionS"
-    "igningKey\022\037\n\013cors_origin\030\006 \001(\tR\ncorsOrig"
-    "in\022\'\n\017denied_patterns\030\007 \003(\tR\016deniedPatte"
-    "rns\"t\n\014SessionGrant\022\024\n\005token\030\001 \001(\tR\005toke"
-    "n\022\032\n\010patterns\030\002 \003(\tR\010patterns\0222\n\006expiry\030"
-    "\003 \001(\0132\032.google.protobuf.TimestampR\006expir"
-    "y\"%\n\rSessionRevoke\022\024\n\005token\030\001 \001(\tR\005token"
-    "\"v\n\014CertDelivery\022\031\n\010tls_cert\030\001 \001(\014R\007tlsC"
-    "ert\022\027\n\007tls_key\030\002 \001(\014R\006tlsKey\0222\n\006expiry\030\003"
-    " \001(\0132\032.google.protobuf.TimestampR\006expiry"
-    "\"&\n\014DrainRequest\022\026\n\006reason\030\001 \001(\tR\006reason"
-    "\"\352\001\n\016UpgradeRequest\0228\n\007command\030\001 \001(\0162\036.p"
-    "ivox.agent.v1.UpgradeCommandR\007command\022%\n"
-    "\016target_version\030\002 \001(\tR\rtargetVersion\022!\n\014"
-    "download_url\030\003 \001(\tR\013downloadUrl\022\'\n\017check"
-    "sum_sha256\030\004 \001(\tR\016checksumSha256\022+\n\021sign"
-    "ature_ed25519\030\005 \001(\tR\020signatureEd25519\"u\n"
-    "\014ConfigUpdate\022<\n\tendpoints\030\001 \003(\0132\036.pivox"
-    ".agent.v1.EndpointConfigR\tendpoints\022\'\n\017d"
-    "enied_patterns\030\002 \003(\tR\016deniedPatterns\"\375\001\n"
-    "\016EndpointConfig\022\022\n\004name\030\001 \001(\tR\004name\0222\n\002s"
-    "3\030\002 \001(\0132 .pivox.agent.v1.S3EndpointConfi"
-    "gH\000R\002s3\022J\n\nfilesystem\030\003 \001(\0132(.pivox.agen"
-    "t.v1.FileSystemEndpointConfigH\000R\nfilesys"
-    "tem\022F\n\014cache_config\030\004 \001(\0132#.pivox.agent."
-    "v1.EndpointCacheConfigR\013cacheConfigB\017\n\rc"
-    "onfiguration\"\265\001\n\020S3EndpointConfig\022!\n\014end"
-    "point_uri\030\001 \001(\tR\013endpointUri\022\026\n\006bucket\030\002"
-    " \001(\tR\006bucket\022\026\n\006region\030\003 \001(\tR\006region\022\"\n\r"
-    "access_key_id\030\004 \001(\tR\013accessKeyId\022*\n\021secr"
-    "et_access_key\030\005 \001(\tR\017secretAccessKey\".\n\030"
-    "FileSystemEndpointConfig\022\022\n\004path\030\001 \001(\tR\004"
-    "path\"\225\001\n\023EndpointCacheConfig\022\030\n\007enabled\030"
-    "\001 \001(\010R\007enabled\022\036\n\013max_size_gb\030\002 \001(\005R\tmax"
-    "SizeGb\022\'\n\017eviction_policy\030\003 \001(\tR\016evictio"
-    "nPolicy\022\033\n\tttl_hours\030\004 \001(\005R\010ttlHours\"\021\n\017"
-    "ServerHeartbeat*H\n\tAgentRole\022\032\n\026AGENT_RO"
-    "LE_UNSPECIFIED\020\000\022\010\n\004BOTH\020\001\022\t\n\005SERVE\020\002\022\n\n"
-    "\006WORKER\020\003*\177\n\014UpgradePhase\022\035\n\031UPGRADE_PHA"
-    "SE_UNSPECIFIED\020\000\022\017\n\013DOWNLOADING\020\001\022\t\n\005REA"
-    "DY\020\002\022\013\n\007DRAINED\020\003\022\014\n\010APPLYING\020\004\022\r\n\tCOMPL"
-    "ETED\020\005\022\n\n\006FAILED\020\006*X\n\016UpgradeCommand\022\037\n\033"
-    "UPGRADE_COMMAND_UNSPECIFIED\020\000\022\014\n\010DOWNLOA"
-    "D\020\001\022\t\n\005APPLY\020\002\022\014\n\010ROLLBACK\020\0032l\n\014AgentSer"
-    "vice\022K\n\007Connect\022\034.pivox.agent.v1.AgentMe"
-    "ssage\032\036.pivox.agent.v1.ControlMessage(\0010"
-    "\001\032\017\312A\014api.pivox.ioB\222\001\n\022com.pivox.agent.v"
-    "1B\nAgentProtoP\001Z\026pivox/agent/v1;agentv1\242"
-    "\002\003PAX\252\002\016Pivox.Agent.V1\312\002\016Pivox\\Agent\\V1\342"
-    "\002\032Pivox\\Agent\\V1\\GPBMetadata\352\002\020Pivox::Ag"
-    "ent::V1b\006proto3"
+    "ssage\"\276\001\n\tHandshake\022#\n\ragent_version\030\002 \001"
+    "(\tR\014agentVersion\022\035\n\nip_address\030\003 \001(\tR\tip"
+    "Address\022\032\n\010hostname\030\004 \001(\tR\010hostname\022\016\n\002o"
+    "s\030\005 \001(\tR\002os\022\022\n\004arch\030\006 \001(\tR\004arch\022-\n\004role\030"
+    "\007 \001(\0162\031.pivox.agent.v1.AgentRoleR\004role\"T"
+    "\n\tHeartbeat\022\024\n\005state\030\001 \001(\tR\005state\0221\n\006upt"
+    "ime\030\002 \001(\0132\031.google.protobuf.DurationR\006up"
+    "time\"\210\001\n\016EndpointHealth\022#\n\rendpoint_name"
+    "\030\001 \001(\tR\014endpointName\022\034\n\treachable\030\002 \001(\010R"
+    "\treachable\022\035\n\nlatency_ms\030\003 \001(\003R\tlatencyM"
+    "s\022\024\n\005error\030\004 \001(\tR\005error\"n\n\nSyncStatus\022%\n"
+    "\016pending_writes\030\001 \001(\003R\rpendingWrites\022#\n\r"
+    "synced_writes\030\002 \001(\003R\014syncedWrites\022\024\n\005err"
+    "or\030\003 \001(\tR\005error\"\236\001\n\rUpgradeStatus\0222\n\005pha"
+    "se\030\001 \001(\0162\034.pivox.agent.v1.UpgradePhaseR\005"
+    "phase\022\030\n\007version\030\002 \001(\tR\007version\022\024\n\005error"
+    "\030\003 \001(\tR\005error\022)\n\020download_percent\030\004 \001(\005R"
+    "\017downloadPercent\"\345\001\n\tTelemetry\022=\n\013cache_"
+    "stats\030\001 \001(\0132\032.pivox.agent.v1.CacheStatsH"
+    "\000R\ncacheStats\022I\n\017request_metrics\030\002 \001(\0132\036"
+    ".pivox.agent.v1.RequestMetricsH\000R\016reques"
+    "tMetrics\022F\n\016system_metrics\030\003 \001(\0132\035.pivox"
+    ".agent.v1.SystemMetricsH\000R\rsystemMetrics"
+    "B\006\n\004data\"\210\001\n\nCacheStats\022\027\n\007used_gb\030\001 \001(\005"
+    "R\006usedGb\022\033\n\thit_count\030\002 \001(\003R\010hitCount\022\035\n"
+    "\nmiss_count\030\003 \001(\003R\tmissCount\022%\n\016eviction"
+    "_count\030\004 \001(\003R\revictionCount\"\307\001\n\016RequestM"
+    "etrics\022%\n\016total_requests\030\001 \001(\003R\rtotalReq"
+    "uests\022!\n\014bytes_served\030\002 \001(\003R\013bytesServed"
+    "\022\037\n\013error_count\030\003 \001(\003R\nerrorCount\022$\n\016lat"
+    "ency_p50_ms\030\004 \001(\001R\014latencyP50Ms\022$\n\016laten"
+    "cy_p99_ms\030\005 \001(\001R\014latencyP99Ms\"\260\002\n\rSystem"
+    "Metrics\022\037\n\013cpu_percent\030\001 \001(\001R\ncpuPercent"
+    "\022*\n\021memory_used_bytes\030\002 \001(\003R\017memoryUsedB"
+    "ytes\022,\n\022memory_total_bytes\030\003 \001(\003R\020memory"
+    "TotalBytes\022&\n\017disk_read_bytes\030\004 \001(\003R\rdis"
+    "kReadBytes\022(\n\020disk_write_bytes\030\005 \001(\003R\016di"
+    "skWriteBytes\022(\n\020network_rx_bytes\030\006 \001(\003R\016"
+    "networkRxBytes\022(\n\020network_tx_bytes\030\007 \001(\003"
+    "R\016networkTxBytes\"\345\004\n\016ControlMessage\022\016\n\002i"
+    "d\030\007 \001(\tR\002id\022C\n\rhandshake_ack\030\001 \001(\0132\034.piv"
+    "ox.agent.v1.HandshakeAckH\000R\014handshakeAck"
+    "\022C\n\rcert_delivery\030\002 \001(\0132\034.pivox.agent.v1"
+    ".CertDeliveryH\000R\014certDelivery\022C\n\rdrain_r"
+    "equest\030\003 \001(\0132\034.pivox.agent.v1.DrainReque"
+    "stH\000R\014drainRequest\022I\n\017upgrade_request\030\004 "
+    "\001(\0132\036.pivox.agent.v1.UpgradeRequestH\000R\016u"
+    "pgradeRequest\022C\n\rconfig_update\030\005 \001(\0132\034.p"
+    "ivox.agent.v1.ConfigUpdateH\000R\014configUpda"
+    "te\022L\n\020server_heartbeat\030\006 \001(\0132\037.pivox.age"
+    "nt.v1.ServerHeartbeatH\000R\017serverHeartbeat"
+    "\022C\n\rsession_grant\030\010 \001(\0132\034.pivox.agent.v1"
+    ".SessionGrantH\000R\014sessionGrant\022F\n\016session"
+    "_revoke\030\t \001(\0132\035.pivox.agent.v1.SessionRe"
+    "vokeH\000R\rsessionRevokeB\t\n\007message\"\231\002\n\014Han"
+    "dshakeAck\022\035\n\nagent_name\030\001 \001(\tR\tagentName"
+    "\022\031\n\010tls_cert\030\002 \001(\014R\007tlsCert\022\027\n\007tls_key\030\003"
+    " \001(\014R\006tlsKey\022<\n\tendpoints\030\004 \003(\0132\036.pivox."
+    "agent.v1.EndpointConfigR\tendpoints\022.\n\023se"
+    "ssion_signing_key\030\005 \001(\014R\021sessionSigningK"
+    "ey\022\037\n\013cors_origin\030\006 \001(\tR\ncorsOrigin\022\'\n\017d"
+    "enied_patterns\030\007 \003(\tR\016deniedPatterns\"t\n\014"
+    "SessionGrant\022\024\n\005token\030\001 \001(\tR\005token\022\032\n\010pa"
+    "tterns\030\002 \003(\tR\010patterns\0222\n\006expiry\030\003 \001(\0132\032"
+    ".google.protobuf.TimestampR\006expiry\"%\n\rSe"
+    "ssionRevoke\022\024\n\005token\030\001 \001(\tR\005token\"v\n\014Cer"
+    "tDelivery\022\031\n\010tls_cert\030\001 \001(\014R\007tlsCert\022\027\n\007"
+    "tls_key\030\002 \001(\014R\006tlsKey\0222\n\006expiry\030\003 \001(\0132\032."
+    "google.protobuf.TimestampR\006expiry\"&\n\014Dra"
+    "inRequest\022\026\n\006reason\030\001 \001(\tR\006reason\"\352\001\n\016Up"
+    "gradeRequest\0228\n\007command\030\001 \001(\0162\036.pivox.ag"
+    "ent.v1.UpgradeCommandR\007command\022%\n\016target"
+    "_version\030\002 \001(\tR\rtargetVersion\022!\n\014downloa"
+    "d_url\030\003 \001(\tR\013downloadUrl\022\'\n\017checksum_sha"
+    "256\030\004 \001(\tR\016checksumSha256\022+\n\021signature_e"
+    "d25519\030\005 \001(\tR\020signatureEd25519\"u\n\014Config"
+    "Update\022<\n\tendpoints\030\001 \003(\0132\036.pivox.agent."
+    "v1.EndpointConfigR\tendpoints\022\'\n\017denied_p"
+    "atterns\030\002 \003(\tR\016deniedPatterns\"\375\001\n\016Endpoi"
+    "ntConfig\022\022\n\004name\030\001 \001(\tR\004name\0222\n\002s3\030\002 \001(\013"
+    "2 .pivox.agent.v1.S3EndpointConfigH\000R\002s3"
+    "\022J\n\nfilesystem\030\003 \001(\0132(.pivox.agent.v1.Fi"
+    "leSystemEndpointConfigH\000R\nfilesystem\022F\n\014"
+    "cache_config\030\004 \001(\0132#.pivox.agent.v1.Endp"
+    "ointCacheConfigR\013cacheConfigB\017\n\rconfigur"
+    "ation\"\265\001\n\020S3EndpointConfig\022!\n\014endpoint_u"
+    "ri\030\001 \001(\tR\013endpointUri\022\026\n\006bucket\030\002 \001(\tR\006b"
+    "ucket\022\026\n\006region\030\003 \001(\tR\006region\022\"\n\raccess_"
+    "key_id\030\004 \001(\tR\013accessKeyId\022*\n\021secret_acce"
+    "ss_key\030\005 \001(\tR\017secretAccessKey\".\n\030FileSys"
+    "temEndpointConfig\022\022\n\004path\030\001 \001(\tR\004path\"\225\001"
+    "\n\023EndpointCacheConfig\022\030\n\007enabled\030\001 \001(\010R\007"
+    "enabled\022\036\n\013max_size_gb\030\002 \001(\005R\tmaxSizeGb\022"
+    "\'\n\017eviction_policy\030\003 \001(\tR\016evictionPolicy"
+    "\022\033\n\tttl_hours\030\004 \001(\005R\010ttlHours\"\021\n\017ServerH"
+    "eartbeat*H\n\tAgentRole\022\032\n\026AGENT_ROLE_UNSP"
+    "ECIFIED\020\000\022\010\n\004BOTH\020\001\022\t\n\005SERVE\020\002\022\n\n\006WORKER"
+    "\020\003*\177\n\014UpgradePhase\022\035\n\031UPGRADE_PHASE_UNSP"
+    "ECIFIED\020\000\022\017\n\013DOWNLOADING\020\001\022\t\n\005READY\020\002\022\013\n"
+    "\007DRAINED\020\003\022\014\n\010APPLYING\020\004\022\r\n\tCOMPLETED\020\005\022"
+    "\n\n\006FAILED\020\006*X\n\016UpgradeCommand\022\037\n\033UPGRADE"
+    "_COMMAND_UNSPECIFIED\020\000\022\014\n\010DOWNLOAD\020\001\022\t\n\005"
+    "APPLY\020\002\022\014\n\010ROLLBACK\020\0032l\n\014AgentService\022K\n"
+    "\007Connect\022\034.pivox.agent.v1.AgentMessage\032\036"
+    ".pivox.agent.v1.ControlMessage(\0010\001\032\017\312A\014a"
+    "pi.pivox.ioB\222\001\n\022com.pivox.agent.v1B\nAgen"
+    "tProtoP\001Z\026pivox/agent/v1;agentv1\242\002\003PAX\252\002"
+    "\016Pivox.Agent.V1\312\002\016Pivox\\Agent\\V1\342\002\032Pivox"
+    "\\Agent\\V1\\GPBMetadata\352\002\020Pivox::Agent::V1"
+    "b\006proto3"
 };
 static const ::_pbi::DescriptorTable* const descriptor_table_pivox_2fagent_2fv1_2fagent_2eproto_deps[3] =
     {
@@ -1216,7 +1211,7 @@ static ::absl::once_flag descriptor_table_pivox_2fagent_2fv1_2fagent_2eproto_onc
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_pivox_2fagent_2fv1_2fagent_2eproto = {
     false,
     false,
-    4975,
+    4928,
     descriptor_table_protodef_pivox_2fagent_2fv1_2fagent_2eproto,
     "pivox/agent/v1/agent.proto",
     &descriptor_table_pivox_2fagent_2fv1_2fagent_2eproto_once,
@@ -1854,8 +1849,7 @@ Handshake::Handshake(::google::protobuf::Arena* arena)
 inline PROTOBUF_NDEBUG_INLINE Handshake::Impl_::Impl_(
     ::google::protobuf::internal::InternalVisibility visibility, ::google::protobuf::Arena* arena,
     const Impl_& from, const ::pivox::agent::v1::Handshake& from_msg)
-      : registration_token_(arena, from.registration_token_),
-        agent_version_(arena, from.agent_version_),
+      : agent_version_(arena, from.agent_version_),
         ip_address_(arena, from.ip_address_),
         hostname_(arena, from.hostname_),
         os_(arena, from.os_),
@@ -1882,8 +1876,7 @@ Handshake::Handshake(
 inline PROTOBUF_NDEBUG_INLINE Handshake::Impl_::Impl_(
     ::google::protobuf::internal::InternalVisibility visibility,
     ::google::protobuf::Arena* arena)
-      : registration_token_(arena),
-        agent_version_(arena),
+      : agent_version_(arena),
         ip_address_(arena),
         hostname_(arena),
         os_(arena),
@@ -1902,7 +1895,6 @@ inline void Handshake::SharedDtor(MessageLite& self) {
   Handshake& this_ = static_cast<Handshake&>(self);
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
-  this_._impl_.registration_token_.Destroy();
   this_._impl_.agent_version_.Destroy();
   this_._impl_.ip_address_.Destroy();
   this_._impl_.hostname_.Destroy();
@@ -1947,15 +1939,15 @@ const ::google::protobuf::internal::ClassData* Handshake::GetClassData() const {
   return _class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<3, 7, 0, 88, 2> Handshake::_table_ = {
+const ::_pbi::TcParseTable<3, 6, 0, 70, 2> Handshake::_table_ = {
   {
     0,  // no _has_bits_
     0, // no _extensions_
     7, 56,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967168,  // skipmap
+    4294967169,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    7,  // num_field_entries
+    6,  // num_field_entries
     0,  // num_aux_entries
     offsetof(decltype(_table_), field_names),  // no aux_entries
     _class_data_.base(),
@@ -1966,9 +1958,7 @@ const ::_pbi::TcParseTable<3, 7, 0, 88, 2> Handshake::_table_ = {
     #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
   }, {{
     {::_pbi::TcParser::MiniParse, {}},
-    // string registration_token = 1 [json_name = "registrationToken"];
-    {::_pbi::TcParser::FastUS1,
-     {10, 63, 0, PROTOBUF_FIELD_OFFSET(Handshake, _impl_.registration_token_)}},
+    {::_pbi::TcParser::MiniParse, {}},
     // string agent_version = 2 [json_name = "agentVersion"];
     {::_pbi::TcParser::FastUS1,
      {18, 63, 0, PROTOBUF_FIELD_OFFSET(Handshake, _impl_.agent_version_)}},
@@ -1990,9 +1980,6 @@ const ::_pbi::TcParseTable<3, 7, 0, 88, 2> Handshake::_table_ = {
   }}, {{
     65535, 65535
   }}, {{
-    // string registration_token = 1 [json_name = "registrationToken"];
-    {PROTOBUF_FIELD_OFFSET(Handshake, _impl_.registration_token_), 0, 0,
-    (0 | ::_fl::kFcSingular | ::_fl::kUtf8String | ::_fl::kRepAString)},
     // string agent_version = 2 [json_name = "agentVersion"];
     {PROTOBUF_FIELD_OFFSET(Handshake, _impl_.agent_version_), 0, 0,
     (0 | ::_fl::kFcSingular | ::_fl::kUtf8String | ::_fl::kRepAString)},
@@ -2014,9 +2001,8 @@ const ::_pbi::TcParseTable<3, 7, 0, 88, 2> Handshake::_table_ = {
   }},
   // no aux_entries
   {{
-    "\30\22\15\12\10\2\4\0"
+    "\30\15\12\10\2\4\0\0"
     "pivox.agent.v1.Handshake"
-    "registration_token"
     "agent_version"
     "ip_address"
     "hostname"
@@ -2032,7 +2018,6 @@ PROTOBUF_NOINLINE void Handshake::Clear() {
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
-  _impl_.registration_token_.ClearToEmpty();
   _impl_.agent_version_.ClearToEmpty();
   _impl_.ip_address_.ClearToEmpty();
   _impl_.hostname_.ClearToEmpty();
@@ -2056,14 +2041,6 @@ PROTOBUF_NOINLINE void Handshake::Clear() {
           // @@protoc_insertion_point(serialize_to_array_start:pivox.agent.v1.Handshake)
           ::uint32_t cached_has_bits = 0;
           (void)cached_has_bits;
-
-          // string registration_token = 1 [json_name = "registrationToken"];
-          if (!this_._internal_registration_token().empty()) {
-            const std::string& _s = this_._internal_registration_token();
-            ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-                _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "pivox.agent.v1.Handshake.registration_token");
-            target = stream->WriteStringMaybeAliased(1, _s, target);
-          }
 
           // string agent_version = 2 [json_name = "agentVersion"];
           if (!this_._internal_agent_version().empty()) {
@@ -2137,11 +2114,6 @@ PROTOBUF_NOINLINE void Handshake::Clear() {
 
           ::_pbi::Prefetch5LinesFrom7Lines(&this_);
            {
-            // string registration_token = 1 [json_name = "registrationToken"];
-            if (!this_._internal_registration_token().empty()) {
-              total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                              this_._internal_registration_token());
-            }
             // string agent_version = 2 [json_name = "agentVersion"];
             if (!this_._internal_agent_version().empty()) {
               total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
@@ -2185,9 +2157,6 @@ void Handshake::MergeImpl(::google::protobuf::MessageLite& to_msg, const ::googl
   ::uint32_t cached_has_bits = 0;
   (void) cached_has_bits;
 
-  if (!from._internal_registration_token().empty()) {
-    _this->_internal_set_registration_token(from._internal_registration_token());
-  }
   if (!from._internal_agent_version().empty()) {
     _this->_internal_set_agent_version(from._internal_agent_version());
   }
@@ -2222,7 +2191,6 @@ void Handshake::InternalSwap(Handshake* PROTOBUF_RESTRICT other) {
   auto* arena = GetArena();
   ABSL_DCHECK_EQ(arena, other->GetArena());
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.registration_token_, &other->_impl_.registration_token_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.agent_version_, &other->_impl_.agent_version_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.ip_address_, &other->_impl_.ip_address_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.hostname_, &other->_impl_.hostname_, arena);

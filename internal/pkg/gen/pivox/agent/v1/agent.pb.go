@@ -391,14 +391,16 @@ func (*AgentMessage_UpgradeStatus) isAgentMessage_Message() {}
 func (*AgentMessage_Telemetry) isAgentMessage_Message() {}
 
 // Handshake is the first message an agent MUST send after opening the Connect
-// stream. It carries a one-time registration token and basic host metadata so
-// the control plane can authenticate and register the agent.
+// stream. It carries basic host metadata so the control plane can register the
+// agent against the gateway already authenticated at the gRPC layer.
+//
+// Authentication does NOT live in this message: the agent attaches a
+// registration token in the `x-pivox-agent-token` initial-metadata header,
+// which the server's per-service auth interceptor validates before the
+// handler runs. By the time this message is read, the gateway is already
+// resolved.
 type Handshake struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// One-time token obtained from the Pivox console or CLI during agent
-	// provisioning. The control plane validates and invalidates the token on
-	// first use.
-	RegistrationToken string `protobuf:"bytes,1,opt,name=registration_token,json=registrationToken,proto3" json:"registration_token,omitempty"`
 	// Semantic version of the agent binary (e.g. "1.4.2").
 	AgentVersion string `protobuf:"bytes,2,opt,name=agent_version,json=agentVersion,proto3" json:"agent_version,omitempty"`
 	// Public IP address of the agent host as observed by the agent itself.
@@ -443,13 +445,6 @@ func (x *Handshake) ProtoReflect() protoreflect.Message {
 // Deprecated: Use Handshake.ProtoReflect.Descriptor instead.
 func (*Handshake) Descriptor() ([]byte, []int) {
 	return file_pivox_agent_v1_agent_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *Handshake) GetRegistrationToken() string {
-	if x != nil {
-		return x.RegistrationToken
-	}
-	return ""
 }
 
 func (x *Handshake) GetAgentVersion() string {
@@ -2171,9 +2166,8 @@ const file_pivox_agent_v1_agent_proto_rawDesc = "" +
 	"syncStatus\x12F\n" +
 	"\x0eupgrade_status\x18\x05 \x01(\v2\x1d.pivox.agent.v1.UpgradeStatusH\x00R\rupgradeStatus\x129\n" +
 	"\ttelemetry\x18\x06 \x01(\v2\x19.pivox.agent.v1.TelemetryH\x00R\ttelemetryB\t\n" +
-	"\amessage\"\xed\x01\n" +
-	"\tHandshake\x12-\n" +
-	"\x12registration_token\x18\x01 \x01(\tR\x11registrationToken\x12#\n" +
+	"\amessage\"\xbe\x01\n" +
+	"\tHandshake\x12#\n" +
 	"\ragent_version\x18\x02 \x01(\tR\fagentVersion\x12\x1d\n" +
 	"\n" +
 	"ip_address\x18\x03 \x01(\tR\tipAddress\x12\x1a\n" +

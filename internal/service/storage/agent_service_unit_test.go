@@ -20,6 +20,7 @@ import (
 	"github.com/dashkan/pivox/internal/agentstream"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	agentv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/agent/v1"
+	"github.com/dashkan/pivox/internal/server"
 	"github.com/dashkan/pivox/internal/testutil/mocks"
 )
 
@@ -220,12 +221,12 @@ func (s *mockConnectStream) Recv() (*agentv1.AgentMessage, error) {
 	return msg, nil
 }
 
-func (s *mockConnectStream) Context() context.Context      { return s.ctx }
-func (s *mockConnectStream) SetHeader(metadata.MD) error   { return nil }
-func (s *mockConnectStream) SendHeader(metadata.MD) error  { return nil }
-func (s *mockConnectStream) SetTrailer(metadata.MD)        {}
-func (s *mockConnectStream) SendMsg(any) error             { return nil }
-func (s *mockConnectStream) RecvMsg(any) error             { return nil }
+func (s *mockConnectStream) Context() context.Context     { return s.ctx }
+func (s *mockConnectStream) SetHeader(metadata.MD) error  { return nil }
+func (s *mockConnectStream) SendHeader(metadata.MD) error { return nil }
+func (s *mockConnectStream) SetTrailer(metadata.MD)       {}
+func (s *mockConnectStream) SendMsg(any) error            { return nil }
+func (s *mockConnectStream) RecvMsg(any) error            { return nil }
 
 // ---------------------------------------------------------------------------
 // Connect — InvalidFirstMessage
@@ -236,8 +237,10 @@ func TestConnect_InvalidFirstMessage(t *testing.T) {
 	conns := agentstream.NewConnectionManager()
 	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
 
+	gateway := db.StorageGateway{ID: uuid.New(), Name: "gw-bad-first"}
+
 	stream := &mockConnectStream{
-		ctx: context.Background(),
+		ctx: server.WithAuthenticatedGateway(context.Background(), gateway),
 		recvQueue: []*agentv1.AgentMessage{
 			{
 				Id: "msg-1",
@@ -254,41 +257,6 @@ func TestConnect_InvalidFirstMessage(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, codes.InvalidArgument, st.Code())
 	assert.Contains(t, st.Message(), "first message must be handshake")
-}
-
-// ---------------------------------------------------------------------------
-// Connect — InvalidToken
-// ---------------------------------------------------------------------------
-
-func TestConnect_InvalidToken(t *testing.T) {
-	mockQ := new(mocks.MockQuerier)
-	conns := agentstream.NewConnectionManager()
-	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
-
-	mockQ.On("GetStorageGatewayByToken", mock.Anything, "bad-token").
-		Return(db.StorageGateway{}, pgx.ErrNoRows)
-
-	stream := &mockConnectStream{
-		ctx: context.Background(),
-		recvQueue: []*agentv1.AgentMessage{
-			{
-				Id: "msg-1",
-				Message: &agentv1.AgentMessage_Handshake{
-					Handshake: &agentv1.Handshake{
-						RegistrationToken: "bad-token",
-						IpAddress:         "10.0.0.1",
-					},
-				},
-			},
-		},
-	}
-
-	err := srv.Connect(stream)
-	require.Error(t, err)
-	st, ok := status.FromError(err)
-	require.True(t, ok)
-	assert.Equal(t, codes.Unauthenticated, st.Code())
-	mockQ.AssertExpectations(t)
 }
 
 // ---------------------------------------------------------------------------
@@ -317,7 +285,6 @@ func TestConnect_HandshakeAndHeartbeat(t *testing.T) {
 	}
 
 	// Handshake flow
-	mockQ.On("GetStorageGatewayByToken", mock.Anything, "valid-token").Return(gateway, nil)
 	mockQ.On("GetStorageAgentByGatewayAndIP", mock.Anything, mock.Anything).Return(db.StorageAgent{}, pgx.ErrNoRows)
 	mockQ.On("CreateStorageAgent", mock.Anything, mock.Anything).Return(agent, nil)
 	mockQ.On("CreateStorageAgentAudit", mock.Anything, mock.Anything).Return(nil)
@@ -342,16 +309,15 @@ func TestConnect_HandshakeAndHeartbeat(t *testing.T) {
 	}).Return(nil)
 
 	stream := &mockConnectStream{
-		ctx: context.Background(),
+		ctx: server.WithAuthenticatedGateway(context.Background(), gateway),
 		recvQueue: []*agentv1.AgentMessage{
 			{
 				Id: "msg-hs",
 				Message: &agentv1.AgentMessage_Handshake{
 					Handshake: &agentv1.Handshake{
-						RegistrationToken: "valid-token",
-						IpAddress:         "10.0.0.5",
-						Hostname:          "agent-host",
-						AgentVersion:      "1.0.0",
+						IpAddress:    "10.0.0.5",
+						Hostname:     "agent-host",
+						AgentVersion: "1.0.0",
 					},
 				},
 			},
@@ -402,7 +368,6 @@ func TestConnect_GatewayActivation(t *testing.T) {
 		State:     db.AgentStateCONNECTED,
 	}
 
-	mockQ.On("GetStorageGatewayByToken", mock.Anything, "new-token").Return(gateway, nil)
 	mockQ.On("GetStorageAgentByGatewayAndIP", mock.Anything, mock.Anything).Return(db.StorageAgent{}, pgx.ErrNoRows)
 	mockQ.On("CreateStorageAgent", mock.Anything, mock.Anything).Return(agent, nil)
 	mockQ.On("CreateStorageAgentAudit", mock.Anything, mock.Anything).Return(nil)
@@ -421,14 +386,13 @@ func TestConnect_GatewayActivation(t *testing.T) {
 	}).Return(nil)
 
 	stream := &mockConnectStream{
-		ctx: context.Background(),
+		ctx: server.WithAuthenticatedGateway(context.Background(), gateway),
 		recvQueue: []*agentv1.AgentMessage{
 			{
 				Id: "msg-hs",
 				Message: &agentv1.AgentMessage_Handshake{
 					Handshake: &agentv1.Handshake{
-						RegistrationToken: "new-token",
-						IpAddress:         "10.0.0.10",
+						IpAddress: "10.0.0.10",
 					},
 				},
 			},
@@ -492,30 +456,21 @@ func TestAuditMessage_DBError(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Connect — token DB error (non-ErrNoRows)
+// Connect — handler invoked without an authenticated gateway in context
 // ---------------------------------------------------------------------------
 
-func TestConnect_TokenDBError(t *testing.T) {
+// AgentAuthStreamInterceptor is the only path that puts a gateway in context.
+// If the handler is somehow reached without one (interceptor misconfigured /
+// removed from the chain), it must fail closed rather than panic or leak.
+// Token validation errors at the interceptor layer are covered separately
+// by TestAgentAuthInterceptor_DBError in the server package.
+func TestConnect_NoAuthenticatedGateway(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	conns := agentstream.NewConnectionManager()
 	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
 
-	mockQ.On("GetStorageGatewayByToken", mock.Anything, "any-token").
-		Return(db.StorageGateway{}, errors.New("db connection error"))
-
 	stream := &mockConnectStream{
 		ctx: context.Background(),
-		recvQueue: []*agentv1.AgentMessage{
-			{
-				Id: "msg-1",
-				Message: &agentv1.AgentMessage_Handshake{
-					Handshake: &agentv1.Handshake{
-						RegistrationToken: "any-token",
-						IpAddress:         "10.0.0.1",
-					},
-				},
-			},
-		},
 	}
 
 	err := srv.Connect(stream)
@@ -523,7 +478,6 @@ func TestConnect_TokenDBError(t *testing.T) {
 	st, ok := status.FromError(err)
 	require.True(t, ok)
 	assert.Equal(t, codes.Internal, st.Code())
-	mockQ.AssertExpectations(t)
 }
 
 // ---------------------------------------------------------------------------
@@ -542,19 +496,17 @@ func TestConnect_AgentLookupDBError(t *testing.T) {
 		State: db.StorageGatewayStateACTIVE,
 	}
 
-	mockQ.On("GetStorageGatewayByToken", mock.Anything, "valid-token").Return(gateway, nil)
 	mockQ.On("GetStorageAgentByGatewayAndIP", mock.Anything, mock.Anything).
 		Return(db.StorageAgent{}, errors.New("db connection error"))
 
 	stream := &mockConnectStream{
-		ctx: context.Background(),
+		ctx: server.WithAuthenticatedGateway(context.Background(), gateway),
 		recvQueue: []*agentv1.AgentMessage{
 			{
 				Id: "msg-1",
 				Message: &agentv1.AgentMessage_Handshake{
 					Handshake: &agentv1.Handshake{
-						RegistrationToken: "valid-token",
-						IpAddress:         "10.0.0.5",
+						IpAddress: "10.0.0.5",
 					},
 				},
 			},
@@ -585,21 +537,19 @@ func TestConnect_CreateAgentDBError(t *testing.T) {
 		State: db.StorageGatewayStateACTIVE,
 	}
 
-	mockQ.On("GetStorageGatewayByToken", mock.Anything, "valid-token").Return(gateway, nil)
 	mockQ.On("GetStorageAgentByGatewayAndIP", mock.Anything, mock.Anything).
 		Return(db.StorageAgent{}, pgx.ErrNoRows)
 	mockQ.On("CreateStorageAgent", mock.Anything, mock.Anything).
 		Return(db.StorageAgent{}, errors.New("db error"))
 
 	stream := &mockConnectStream{
-		ctx: context.Background(),
+		ctx: server.WithAuthenticatedGateway(context.Background(), gateway),
 		recvQueue: []*agentv1.AgentMessage{
 			{
 				Id: "msg-1",
 				Message: &agentv1.AgentMessage_Handshake{
 					Handshake: &agentv1.Handshake{
-						RegistrationToken: "valid-token",
-						IpAddress:         "10.0.0.5",
+						IpAddress: "10.0.0.5",
 					},
 				},
 			},
@@ -637,7 +587,6 @@ func TestConnect_ReconnectingAgentStateUpdateError(t *testing.T) {
 		State:     db.AgentStateDISCONNECTED,
 	}
 
-	mockQ.On("GetStorageGatewayByToken", mock.Anything, "valid-token").Return(gateway, nil)
 	mockQ.On("GetStorageAgentByGatewayAndIP", mock.Anything, mock.Anything).Return(existingAgent, nil)
 	mockQ.On("UpdateStorageAgentState", mock.Anything, db.UpdateStorageAgentStateParams{
 		ID:    existingAgentID,
@@ -645,14 +594,13 @@ func TestConnect_ReconnectingAgentStateUpdateError(t *testing.T) {
 	}).Return(db.StorageAgent{}, errors.New("db error"))
 
 	stream := &mockConnectStream{
-		ctx: context.Background(),
+		ctx: server.WithAuthenticatedGateway(context.Background(), gateway),
 		recvQueue: []*agentv1.AgentMessage{
 			{
 				Id: "msg-1",
 				Message: &agentv1.AgentMessage_Handshake{
 					Handshake: &agentv1.Handshake{
-						RegistrationToken: "valid-token",
-						IpAddress:         "10.0.0.5",
+						IpAddress: "10.0.0.5",
 					},
 				},
 			},
@@ -690,21 +638,19 @@ func TestConnect_ListEndpointsError(t *testing.T) {
 		State:     db.AgentStateCONNECTED,
 	}
 
-	mockQ.On("GetStorageGatewayByToken", mock.Anything, "valid-token").Return(gateway, nil)
 	mockQ.On("GetStorageAgentByGatewayAndIP", mock.Anything, mock.Anything).Return(db.StorageAgent{}, pgx.ErrNoRows)
 	mockQ.On("CreateStorageAgent", mock.Anything, mock.Anything).Return(agent, nil)
 	mockQ.On("CreateStorageAgentAudit", mock.Anything, mock.Anything).Return(nil)
 	mockQ.On("ListStorageEndpointsByGateway", mock.Anything, gatewayID).Return([]db.StorageEndpoint{}, errors.New("db error"))
 
 	stream := &mockConnectStream{
-		ctx: context.Background(),
+		ctx: server.WithAuthenticatedGateway(context.Background(), gateway),
 		recvQueue: []*agentv1.AgentMessage{
 			{
 				Id: "msg-1",
 				Message: &agentv1.AgentMessage_Handshake{
 					Handshake: &agentv1.Handshake{
-						RegistrationToken: "valid-token",
-						IpAddress:         "10.0.0.5",
+						IpAddress: "10.0.0.5",
 					},
 				},
 			},
@@ -742,7 +688,6 @@ func TestConnect_ReconnectingAgent(t *testing.T) {
 		State:     db.AgentStateCONNECTED,
 	}
 
-	mockQ.On("GetStorageGatewayByToken", mock.Anything, "reconnect-token").Return(gateway, nil)
 	mockQ.On("GetStorageAgentByGatewayAndIP", mock.Anything, mock.Anything).Return(existingAgent, nil)
 	mockQ.On("UpdateStorageAgentState", mock.Anything, db.UpdateStorageAgentStateParams{
 		ID:    existingAgentID,
@@ -759,14 +704,13 @@ func TestConnect_ReconnectingAgent(t *testing.T) {
 	mockQ.On("CountConnectedStorageAgentsByGateway", mock.Anything, gatewayID).Return(int64(1), nil)
 
 	stream := &mockConnectStream{
-		ctx: context.Background(),
+		ctx: server.WithAuthenticatedGateway(context.Background(), gateway),
 		recvQueue: []*agentv1.AgentMessage{
 			{
 				Id: "msg-hs",
 				Message: &agentv1.AgentMessage_Handshake{
 					Handshake: &agentv1.Handshake{
-						RegistrationToken: "reconnect-token",
-						IpAddress:         "10.0.0.7",
+						IpAddress: "10.0.0.7",
 					},
 				},
 			},
@@ -802,7 +746,6 @@ func TestConnect_ReceiveLoop_MessageTypes(t *testing.T) {
 		State:     db.AgentStateCONNECTED,
 	}
 
-	mockQ.On("GetStorageGatewayByToken", mock.Anything, "token-msg").Return(gateway, nil)
 	mockQ.On("GetStorageAgentByGatewayAndIP", mock.Anything, mock.Anything).Return(db.StorageAgent{}, pgx.ErrNoRows)
 	mockQ.On("CreateStorageAgent", mock.Anything, mock.Anything).Return(agent, nil)
 	mockQ.On("CreateStorageAgentAudit", mock.Anything, mock.Anything).Return(nil)
@@ -823,14 +766,13 @@ func TestConnect_ReceiveLoop_MessageTypes(t *testing.T) {
 	}).Return(nil)
 
 	stream := &mockConnectStream{
-		ctx: context.Background(),
+		ctx: server.WithAuthenticatedGateway(context.Background(), gateway),
 		recvQueue: []*agentv1.AgentMessage{
 			{
 				Id: "msg-hs",
 				Message: &agentv1.AgentMessage_Handshake{
 					Handshake: &agentv1.Handshake{
-						RegistrationToken: "token-msg",
-						IpAddress:         "10.0.0.8",
+						IpAddress: "10.0.0.8",
 					},
 				},
 			},
@@ -915,7 +857,6 @@ func TestConnect_SendAckError(t *testing.T) {
 		State:     db.AgentStateCONNECTED,
 	}
 
-	mockQ.On("GetStorageGatewayByToken", mock.Anything, "send-err-token").Return(gateway, nil)
 	mockQ.On("GetStorageAgentByGatewayAndIP", mock.Anything, mock.Anything).Return(db.StorageAgent{}, pgx.ErrNoRows)
 	mockQ.On("CreateStorageAgent", mock.Anything, mock.Anything).Return(agent, nil)
 	mockQ.On("CreateStorageAgentAudit", mock.Anything, mock.Anything).Return(nil)
@@ -923,14 +864,13 @@ func TestConnect_SendAckError(t *testing.T) {
 
 	stream := &mockConnectStreamWithSendError{
 		mockConnectStream: mockConnectStream{
-			ctx: context.Background(),
+			ctx: server.WithAuthenticatedGateway(context.Background(), gateway),
 			recvQueue: []*agentv1.AgentMessage{
 				{
 					Id: "msg-hs",
 					Message: &agentv1.AgentMessage_Handshake{
 						Handshake: &agentv1.Handshake{
-							RegistrationToken: "send-err-token",
-							IpAddress:         "10.0.0.9",
+							IpAddress: "10.0.0.9",
 						},
 					},
 				},
@@ -1003,7 +943,6 @@ func TestConnect_RecvLoopError(t *testing.T) {
 		State:     db.AgentStateCONNECTED,
 	}
 
-	mockQ.On("GetStorageGatewayByToken", mock.Anything, "recv-err-token").Return(gateway, nil)
 	mockQ.On("GetStorageAgentByGatewayAndIP", mock.Anything, mock.Anything).Return(db.StorageAgent{}, pgx.ErrNoRows)
 	mockQ.On("CreateStorageAgent", mock.Anything, mock.Anything).Return(agent, nil)
 	mockQ.On("CreateStorageAgentAudit", mock.Anything, mock.Anything).Return(nil)
@@ -1021,13 +960,12 @@ func TestConnect_RecvLoopError(t *testing.T) {
 	}).Return(nil)
 
 	stream := &mockConnectStreamWithRecvError{
-		ctx: context.Background(),
+		ctx: server.WithAuthenticatedGateway(context.Background(), gateway),
 		hs: &agentv1.AgentMessage{
 			Id: "msg-hs",
 			Message: &agentv1.AgentMessage_Handshake{
 				Handshake: &agentv1.Handshake{
-					RegistrationToken: "recv-err-token",
-					IpAddress:         "10.0.0.10",
+					IpAddress: "10.0.0.10",
 				},
 			},
 		},
@@ -1062,7 +1000,6 @@ func TestConnect_HeartbeatUpdateError(t *testing.T) {
 		State:     db.AgentStateCONNECTED,
 	}
 
-	mockQ.On("GetStorageGatewayByToken", mock.Anything, "hb-err-token").Return(gateway, nil)
 	mockQ.On("GetStorageAgentByGatewayAndIP", mock.Anything, mock.Anything).Return(db.StorageAgent{}, pgx.ErrNoRows)
 	mockQ.On("CreateStorageAgent", mock.Anything, mock.Anything).Return(agent, nil)
 	mockQ.On("CreateStorageAgentAudit", mock.Anything, mock.Anything).Return(nil)
@@ -1083,14 +1020,13 @@ func TestConnect_HeartbeatUpdateError(t *testing.T) {
 	}).Return(nil)
 
 	stream := &mockConnectStream{
-		ctx: context.Background(),
+		ctx: server.WithAuthenticatedGateway(context.Background(), gateway),
 		recvQueue: []*agentv1.AgentMessage{
 			{
 				Id: "msg-hs",
 				Message: &agentv1.AgentMessage_Handshake{
 					Handshake: &agentv1.Handshake{
-						RegistrationToken: "hb-err-token",
-						IpAddress:         "10.0.0.11",
+						IpAddress: "10.0.0.11",
 					},
 				},
 			},
@@ -1129,7 +1065,6 @@ func TestConnect_DisconnectErrors(t *testing.T) {
 		State:     db.AgentStateCONNECTED,
 	}
 
-	mockQ.On("GetStorageGatewayByToken", mock.Anything, "dc-err-token").Return(gateway, nil)
 	mockQ.On("GetStorageAgentByGatewayAndIP", mock.Anything, mock.Anything).Return(db.StorageAgent{}, pgx.ErrNoRows)
 	mockQ.On("CreateStorageAgent", mock.Anything, mock.Anything).Return(agent, nil)
 	mockQ.On("CreateStorageAgentAudit", mock.Anything, mock.Anything).Return(nil)
@@ -1144,14 +1079,13 @@ func TestConnect_DisconnectErrors(t *testing.T) {
 	mockQ.On("CountConnectedStorageAgentsByGateway", mock.Anything, gatewayID).Return(int64(0), errors.New("db error"))
 
 	stream := &mockConnectStream{
-		ctx: context.Background(),
+		ctx: server.WithAuthenticatedGateway(context.Background(), gateway),
 		recvQueue: []*agentv1.AgentMessage{
 			{
 				Id: "msg-hs",
 				Message: &agentv1.AgentMessage_Handshake{
 					Handshake: &agentv1.Handshake{
-						RegistrationToken: "dc-err-token",
-						IpAddress:         "10.0.0.12",
+						IpAddress: "10.0.0.12",
 					},
 				},
 			},
@@ -1186,7 +1120,6 @@ func TestConnect_GatewayOfflineUpdateError(t *testing.T) {
 		State:     db.AgentStateCONNECTED,
 	}
 
-	mockQ.On("GetStorageGatewayByToken", mock.Anything, "offline-err-token").Return(gateway, nil)
 	mockQ.On("GetStorageAgentByGatewayAndIP", mock.Anything, mock.Anything).Return(db.StorageAgent{}, pgx.ErrNoRows)
 	mockQ.On("CreateStorageAgent", mock.Anything, mock.Anything).Return(agent, nil)
 	mockQ.On("CreateStorageAgentAudit", mock.Anything, mock.Anything).Return(nil)
@@ -1204,14 +1137,13 @@ func TestConnect_GatewayOfflineUpdateError(t *testing.T) {
 	}).Return(errors.New("db error"))
 
 	stream := &mockConnectStream{
-		ctx: context.Background(),
+		ctx: server.WithAuthenticatedGateway(context.Background(), gateway),
 		recvQueue: []*agentv1.AgentMessage{
 			{
 				Id: "msg-hs",
 				Message: &agentv1.AgentMessage_Handshake{
 					Handshake: &agentv1.Handshake{
-						RegistrationToken: "offline-err-token",
-						IpAddress:         "10.0.0.13",
+						IpAddress: "10.0.0.13",
 					},
 				},
 			},
@@ -1253,21 +1185,19 @@ func TestConnect_BuildEndpointConfigsError(t *testing.T) {
 		CacheEviction: db.EvictionPolicyLRU,
 	}
 
-	mockQ.On("GetStorageGatewayByToken", mock.Anything, "cfg-err-token").Return(gateway, nil)
 	mockQ.On("GetStorageAgentByGatewayAndIP", mock.Anything, mock.Anything).Return(db.StorageAgent{}, pgx.ErrNoRows)
 	mockQ.On("CreateStorageAgent", mock.Anything, mock.Anything).Return(agent, nil)
 	mockQ.On("CreateStorageAgentAudit", mock.Anything, mock.Anything).Return(nil)
 	mockQ.On("ListStorageEndpointsByGateway", mock.Anything, gatewayID).Return([]db.StorageEndpoint{badEndpoint}, nil)
 
 	stream := &mockConnectStream{
-		ctx: context.Background(),
+		ctx: server.WithAuthenticatedGateway(context.Background(), gateway),
 		recvQueue: []*agentv1.AgentMessage{
 			{
 				Id: "msg-hs",
 				Message: &agentv1.AgentMessage_Handshake{
 					Handshake: &agentv1.Handshake{
-						RegistrationToken: "cfg-err-token",
-						IpAddress:         "10.0.0.14",
+						IpAddress: "10.0.0.14",
 					},
 				},
 			},
@@ -1287,9 +1217,9 @@ func TestConnect_BuildEndpointConfigsError(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockConnectStreamImmediateErr struct {
-	ctx    context.Context
+	ctx     context.Context
 	recvErr error
-	sent   []*agentv1.ControlMessage
+	sent    []*agentv1.ControlMessage
 }
 
 func (s *mockConnectStreamImmediateErr) Send(msg *agentv1.ControlMessage) error {
@@ -1311,8 +1241,10 @@ func TestConnect_InitialRecvError(t *testing.T) {
 	conns := agentstream.NewConnectionManager()
 	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
 
+	gateway := db.StorageGateway{ID: uuid.New(), Name: "gw-recv-init-err"}
+
 	stream := &mockConnectStreamImmediateErr{
-		ctx:     context.Background(),
+		ctx:     server.WithAuthenticatedGateway(context.Background(), gateway),
 		recvErr: errors.New("transport error"),
 	}
 
@@ -1348,7 +1280,6 @@ func TestConnect_GatewayActivationError(t *testing.T) {
 		State:     db.AgentStateCONNECTED,
 	}
 
-	mockQ.On("GetStorageGatewayByToken", mock.Anything, "act-err-token").Return(gateway, nil)
 	mockQ.On("GetStorageAgentByGatewayAndIP", mock.Anything, mock.Anything).Return(db.StorageAgent{}, pgx.ErrNoRows)
 	mockQ.On("CreateStorageAgent", mock.Anything, mock.Anything).Return(agent, nil)
 	mockQ.On("CreateStorageAgentAudit", mock.Anything, mock.Anything).Return(nil)
@@ -1372,14 +1303,13 @@ func TestConnect_GatewayActivationError(t *testing.T) {
 	}).Return(nil)
 
 	stream := &mockConnectStream{
-		ctx: context.Background(),
+		ctx: server.WithAuthenticatedGateway(context.Background(), gateway),
 		recvQueue: []*agentv1.AgentMessage{
 			{
 				Id: "msg-hs",
 				Message: &agentv1.AgentMessage_Handshake{
 					Handshake: &agentv1.Handshake{
-						RegistrationToken: "act-err-token",
-						IpAddress:         "10.0.0.15",
+						IpAddress: "10.0.0.15",
 					},
 				},
 			},

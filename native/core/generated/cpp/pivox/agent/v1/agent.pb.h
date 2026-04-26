@@ -2228,7 +2228,6 @@ class Handshake final : public ::google::protobuf::Message
 
   // accessors -------------------------------------------------------
   enum : int {
-    kRegistrationTokenFieldNumber = 1,
     kAgentVersionFieldNumber = 2,
     kIpAddressFieldNumber = 3,
     kHostnameFieldNumber = 4,
@@ -2236,22 +2235,6 @@ class Handshake final : public ::google::protobuf::Message
     kArchFieldNumber = 6,
     kRoleFieldNumber = 7,
   };
-  // string registration_token = 1 [json_name = "registrationToken"];
-  void clear_registration_token() ;
-  const std::string& registration_token() const;
-  template <typename Arg_ = const std::string&, typename... Args_>
-  void set_registration_token(Arg_&& arg, Args_... args);
-  std::string* mutable_registration_token();
-  PROTOBUF_NODISCARD std::string* release_registration_token();
-  void set_allocated_registration_token(std::string* value);
-
-  private:
-  const std::string& _internal_registration_token() const;
-  inline PROTOBUF_ALWAYS_INLINE void _internal_set_registration_token(
-      const std::string& value);
-  std::string* _internal_mutable_registration_token();
-
-  public:
   // string agent_version = 2 [json_name = "agentVersion"];
   void clear_agent_version() ;
   const std::string& agent_version() const;
@@ -2347,8 +2330,8 @@ class Handshake final : public ::google::protobuf::Message
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
   static const ::google::protobuf::internal::TcParseTable<
-      3, 7, 0,
-      88, 2>
+      3, 6, 0,
+      70, 2>
       _table_;
 
   friend class ::google::protobuf::MessageLite;
@@ -2365,7 +2348,6 @@ class Handshake final : public ::google::protobuf::Message
     inline explicit Impl_(::google::protobuf::internal::InternalVisibility visibility,
                           ::google::protobuf::Arena* arena, const Impl_& from,
                           const Handshake& from_msg);
-    ::google::protobuf::internal::ArenaStringPtr registration_token_;
     ::google::protobuf::internal::ArenaStringPtr agent_version_;
     ::google::protobuf::internal::ArenaStringPtr ip_address_;
     ::google::protobuf::internal::ArenaStringPtr hostname_;
@@ -6502,54 +6484,6 @@ inline AgentMessage::MessageCase AgentMessage::message_case() const {
 // -------------------------------------------------------------------
 
 // Handshake
-
-// string registration_token = 1 [json_name = "registrationToken"];
-inline void Handshake::clear_registration_token() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.registration_token_.ClearToEmpty();
-}
-inline const std::string& Handshake::registration_token() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:pivox.agent.v1.Handshake.registration_token)
-  return _internal_registration_token();
-}
-template <typename Arg_, typename... Args_>
-inline PROTOBUF_ALWAYS_INLINE void Handshake::set_registration_token(Arg_&& arg,
-                                                     Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.registration_token_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:pivox.agent.v1.Handshake.registration_token)
-}
-inline std::string* Handshake::mutable_registration_token() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  std::string* _s = _internal_mutable_registration_token();
-  // @@protoc_insertion_point(field_mutable:pivox.agent.v1.Handshake.registration_token)
-  return _s;
-}
-inline const std::string& Handshake::_internal_registration_token() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.registration_token_.Get();
-}
-inline void Handshake::_internal_set_registration_token(const std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.registration_token_.Set(value, GetArena());
-}
-inline std::string* Handshake::_internal_mutable_registration_token() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.registration_token_.Mutable( GetArena());
-}
-inline std::string* Handshake::release_registration_token() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:pivox.agent.v1.Handshake.registration_token)
-  return _impl_.registration_token_.Release();
-}
-inline void Handshake::set_allocated_registration_token(std::string* value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.registration_token_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.registration_token_.IsDefault()) {
-    _impl_.registration_token_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:pivox.agent.v1.Handshake.registration_token)
-}
 
 // string agent_version = 2 [json_name = "agentVersion"];
 inline void Handshake::clear_agent_version() {
