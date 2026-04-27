@@ -107,7 +107,7 @@
           },
           {
             "name": "organizationId",
-            "description": "Optional. A unique identifier for the organization. If not provided, the\nserver will generate one. Must start with a letter, contain only lowercase\nletters, digits, and hyphens, and be between 4 and 20 characters long.\nThis value is also used as the Firebase Auth tenant display name.",
+            "description": "Optional. A unique identifier for the organization. If not provided, the\nserver will generate one. Must start with a letter, contain only lowercase\nletters, digits, and hyphens, and be between 4 and 20 characters long.",
             "in": "query",
             "required": false,
             "type": "string"
@@ -237,192 +237,6 @@
               },
               "description": "Required. The new definition of the organization. The `name` field must\nbe populated to identify the organization to update."
             }
-          },
-          {
-            "name": "validateOnly",
-            "description": "Optional. If set to true, the request will only validate the request\nwithout persisting it.",
-            "in": "query",
-            "required": false,
-            "type": "boolean"
-          }
-        ],
-        "tags": [
-          "Organizations"
-        ]
-      }
-    },
-    "/v1/organizations/{organization}/customDomains": {
-      "get": {
-        "summary": "Lists custom domains associated with an organization.",
-        "operationId": "Organizations_ListCustomDomains",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/v1ListCustomDomainsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "organization",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "pageSize",
-            "description": "Optional. The maximum number of custom domains to return in the response.\nThe server can return fewer custom domains than requested. If unspecified,\nthe server picks an appropriate default.",
-            "in": "query",
-            "required": false,
-            "type": "integer",
-            "format": "int32"
-          },
-          {
-            "name": "pageToken",
-            "description": "Optional. A pagination token returned from a previous call to\n`ListCustomDomains` that indicates from where listing should continue.",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Organizations"
-        ]
-      },
-      "post": {
-        "summary": "Creates a custom domain for an organization. Once created, the domain\nenters the `PENDING` state and the response includes the DNS records\nthat the domain owner must configure. After DNS verification succeeds,\nthe server automatically provisions a TLS certificate and transitions\nthe domain to `ACTIVE`.",
-        "description": "The caller must have `resourcemanager.customDomains.create` permission\non the parent organization.",
-        "operationId": "Organizations_CreateCustomDomain",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/longrunningOperation"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "organization",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "customDomain",
-            "description": "Required. The custom domain to create. The `domain` field must be set.",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/v1CustomDomain"
-            }
-          },
-          {
-            "name": "customDomainId",
-            "description": "Optional. A unique identifier for the custom domain. If not provided,\nthe server will generate one.",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "validateOnly",
-            "description": "Optional. If set to true, the request will only validate the request\nwithout persisting it.",
-            "in": "query",
-            "required": false,
-            "type": "boolean"
-          }
-        ],
-        "tags": [
-          "Organizations"
-        ]
-      }
-    },
-    "/v1/organizations/{organization}/customDomains/{customDomain}": {
-      "get": {
-        "summary": "Retrieves a custom domain associated with an organization.",
-        "operationId": "Organizations_GetCustomDomain",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/v1CustomDomain"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "organization",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "customDomain",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Organizations"
-        ]
-      },
-      "delete": {
-        "summary": "Deletes a custom domain from an organization, including TLS certificate\nrevocation and routing removal.",
-        "description": "The caller must have `resourcemanager.customDomains.delete` permission\non the parent organization.",
-        "operationId": "Organizations_DeleteCustomDomain",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/longrunningOperation"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "organization",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "customDomain",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "etag",
-            "description": "Optional. The etag known to the client for the expected state of the\ncustom domain. This is to be used for optimistic concurrency.",
-            "in": "query",
-            "required": false,
-            "type": "string"
           },
           {
             "name": "validateOnly",
@@ -1057,77 +871,6 @@
       },
       "description": "Associates `members`, or principals, with a `role`."
     },
-    "v1CustomDomain": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "title": "Output only. The resource name of the custom domain. Format:\n`organizations/{organization}/customDomains/{custom_domain}`",
-          "readOnly": true
-        },
-        "domain": {
-          "type": "string",
-          "description": "Immutable. The fully qualified domain name, for example\n`pivox.acme.com`. Cannot be changed after creation — delete and\nrecreate the resource to use a different domain."
-        },
-        "state": {
-          "$ref": "#/definitions/v1CustomDomainState",
-          "description": "Output only. The current lifecycle state of the custom domain.",
-          "readOnly": true
-        },
-        "requiredDnsRecords": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/v1DnsRecord"
-          },
-          "description": "Output only. The DNS records that the domain owner must create to verify\nownership and route traffic. Typically includes a `TXT` record for\nverification and a `CNAME` record for routing.",
-          "readOnly": true
-        },
-        "createTime": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Output only. Timestamp when the custom domain was created.",
-          "readOnly": true
-        },
-        "updateTime": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Output only. Timestamp when the custom domain was last modified.",
-          "readOnly": true
-        },
-        "deleteTime": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Output only. Timestamp when the custom domain was requested for deletion.",
-          "readOnly": true
-        },
-        "verifyTime": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Output only. Timestamp when DNS verification was last confirmed.",
-          "readOnly": true
-        },
-        "etag": {
-          "type": "string",
-          "description": "Output only. A checksum computed by the server based on the current value\nof the CustomDomain resource. This may be sent on delete requests to\nensure the client has an up-to-date value before proceeding.",
-          "readOnly": true
-        }
-      },
-      "description": "A custom domain associated with an organization. Custom domains allow\norganizations to serve Pivox services under their own domain name\n(for example, `pivox.acme.com`). The server handles DNS verification\nand TLS certificate provisioning automatically."
-    },
-    "v1CustomDomainState": {
-      "type": "string",
-      "enum": [
-        "STATE_UNSPECIFIED",
-        "PENDING",
-        "PROVISIONING",
-        "ACTIVE",
-        "FAILED",
-        "DEACTIVATED"
-      ],
-      "default": "STATE_UNSPECIFIED",
-      "description": "The lifecycle state of a custom domain.\n\n - STATE_UNSPECIFIED: Unspecified state. This is only useful for distinguishing unset values.\n - PENDING: The domain has been created and is waiting for the owner to configure\nthe required DNS records.\n - PROVISIONING: The DNS records have been verified. The server is provisioning a TLS\ncertificate via the ACME protocol.\n - ACTIVE: The domain is fully verified, the TLS certificate has been issued, and\ntraffic is being served.\n - FAILED: DNS verification or TLS certificate provisioning failed. Inspect the\n`required_dns_records` to ensure records are configured correctly.\n - DEACTIVATED: The domain was previously active but has been deactivated because DNS\nrecords were removed or the TLS certificate could not be renewed."
-    },
     "v1DeclineInvitationResponse": {
       "type": "object",
       "properties": {
@@ -1137,27 +880,6 @@
         }
       },
       "description": "Response message for `DeclineInvitation`."
-    },
-    "v1DnsRecord": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string",
-          "description": "The DNS record type, for example `CNAME`, `TXT`, or `A`.",
-          "readOnly": true
-        },
-        "host": {
-          "type": "string",
-          "description": "The hostname to create the record on, for example\n`_pivox.acme.com` or `pivox.acme.com`.",
-          "readOnly": true
-        },
-        "value": {
-          "type": "string",
-          "description": "The value for the DNS record, for example\n`pivox-verify=abc123` or `custom.pivox.io`.",
-          "readOnly": true
-        }
-      },
-      "description": "A DNS record that a domain owner must configure in their DNS provider\nto verify ownership or route traffic."
     },
     "v1Invitation": {
       "type": "object",
@@ -1266,24 +988,6 @@
       ],
       "default": "STATE_UNSPECIFIED",
       "description": "Invitation lifecycle states.\n\n - STATE_UNSPECIFIED: Unspecified state.\n - PENDING: The invitation is pending acceptance.\n - ACCEPTED: The invitation has been accepted and a user membership was created.\n - DECLINED: The invitation was declined by the recipient.\n - REVOKED: The invitation was revoked by an org admin.\n - EXPIRED: The invitation expired before being accepted or declined."
-    },
-    "v1ListCustomDomainsResponse": {
-      "type": "object",
-      "properties": {
-        "customDomains": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/v1CustomDomain"
-          },
-          "description": "The list of custom domains for the specified organization."
-        },
-        "nextPageToken": {
-          "type": "string",
-          "description": "A pagination token to be used to retrieve the next page of results.\nIf empty, this response contains the last page of results."
-        }
-      },
-      "description": "The response returned from the\n[ListCustomDomains][pivox.api.v1.Organizations.ListCustomDomains]\nmethod."
     },
     "v1ListInvitationsResponse": {
       "type": "object",

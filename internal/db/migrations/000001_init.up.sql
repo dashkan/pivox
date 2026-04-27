@@ -21,9 +21,6 @@
 -- Enum types
 -- ============================================================================
 CREATE TYPE resource_state AS ENUM ('ACTIVE', 'DELETE_REQUESTED');
-CREATE TYPE custom_domain_state AS ENUM (
-    'PENDING', 'PROVISIONING', 'ACTIVE', 'FAILED', 'DEACTIVATED'
-);
 CREATE TYPE role_member_type AS ENUM ('user', 'group');
 CREATE TYPE project_role AS ENUM ('ADMIN', 'EDITOR', 'VIEWER');
 CREATE TYPE project_member_type AS ENUM ('user', 'group');
@@ -96,32 +93,6 @@ CREATE TABLE organizations (
     purge_time            TIMESTAMPTZ
 );
 CREATE INDEX idx_organizations_name ON organizations (name) WHERE delete_time IS NULL;
-
--- ============================================================================
--- custom_domains (per-org, LRO-managed)
--- ============================================================================
-CREATE TABLE custom_domains (
-    id          UUID PRIMARY KEY DEFAULT uuidv7(),
-    -- relationships
-    org_id      UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-    -- identity
-    domain      TEXT NOT NULL,
-    -- state
-    state       custom_domain_state NOT NULL DEFAULT 'PENDING',
-    -- domain
-    dns_records JSONB NOT NULL DEFAULT '[]',
-    -- versioning
-    etag        TEXT NOT NULL DEFAULT md5(now()::text),
-    -- audit
-    created_by  TEXT NOT NULL DEFAULT '',
-    -- timestamps
-    create_time TIMESTAMPTZ NOT NULL DEFAULT now(),
-    verify_time TIMESTAMPTZ,
-    -- constraints
-    UNIQUE(org_id, domain)
-);
-CREATE INDEX idx_custom_domains_org ON custom_domains (org_id);
-CREATE UNIQUE INDEX idx_custom_domains_domain ON custom_domains (domain);
 
 -- ============================================================================
 -- projects

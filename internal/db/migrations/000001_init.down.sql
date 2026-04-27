@@ -39,7 +39,6 @@ DROP TABLE IF EXISTS storage_endpoints;
 DROP TABLE IF EXISTS storage_agents;
 DROP TABLE IF EXISTS storage_gateways;
 DROP TABLE IF EXISTS projects;
-DROP TABLE IF EXISTS custom_domains;
 DROP TABLE IF EXISTS organizations;
 DROP TABLE IF EXISTS operations;
 
@@ -61,6 +60,5 @@ DROP TYPE IF EXISTS invitation_state;
 DROP TYPE IF EXISTS project_member_type;
 DROP TYPE IF EXISTS project_role;
 DROP TYPE IF EXISTS role_member_type;
-DROP TYPE IF EXISTS custom_domain_state;
 DROP TYPE IF EXISTS resource_state;
 DROP TYPE IF EXISTS org_role;

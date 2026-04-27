@@ -50,10 +50,6 @@ const (
 	Organizations_DeleteInvitation_FullMethodName       = "/pivox.api.v1.Organizations/DeleteInvitation"
 	Organizations_GetInvitationPolicy_FullMethodName    = "/pivox.api.v1.Organizations/GetInvitationPolicy"
 	Organizations_UpdateInvitationPolicy_FullMethodName = "/pivox.api.v1.Organizations/UpdateInvitationPolicy"
-	Organizations_GetCustomDomain_FullMethodName        = "/pivox.api.v1.Organizations/GetCustomDomain"
-	Organizations_ListCustomDomains_FullMethodName      = "/pivox.api.v1.Organizations/ListCustomDomains"
-	Organizations_CreateCustomDomain_FullMethodName     = "/pivox.api.v1.Organizations/CreateCustomDomain"
-	Organizations_DeleteCustomDomain_FullMethodName     = "/pivox.api.v1.Organizations/DeleteCustomDomain"
 )
 
 // OrganizationsClient is the client API for Organizations service.
@@ -130,25 +126,6 @@ type OrganizationsClient interface {
 	//
 	//	aip.dev/not-precedent: UpdateInvitationPolicy is a singleton sub-resource update. --)
 	UpdateInvitationPolicy(ctx context.Context, in *UpdateInvitationPolicyRequest, opts ...grpc.CallOption) (*InvitationPolicy, error)
-	// Retrieves a custom domain associated with an organization.
-	GetCustomDomain(ctx context.Context, in *GetCustomDomainRequest, opts ...grpc.CallOption) (*CustomDomain, error)
-	// Lists custom domains associated with an organization.
-	ListCustomDomains(ctx context.Context, in *ListCustomDomainsRequest, opts ...grpc.CallOption) (*ListCustomDomainsResponse, error)
-	// Creates a custom domain for an organization. Once created, the domain
-	// enters the `PENDING` state and the response includes the DNS records
-	// that the domain owner must configure. After DNS verification succeeds,
-	// the server automatically provisions a TLS certificate and transitions
-	// the domain to `ACTIVE`.
-	//
-	// The caller must have `resourcemanager.customDomains.create` permission
-	// on the parent organization.
-	CreateCustomDomain(ctx context.Context, in *CreateCustomDomainRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
-	// Deletes a custom domain from an organization, including TLS certificate
-	// revocation and routing removal.
-	//
-	// The caller must have `resourcemanager.customDomains.delete` permission
-	// on the parent organization.
-	DeleteCustomDomain(ctx context.Context, in *DeleteCustomDomainRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
 }
 
 type organizationsClient struct {
@@ -309,46 +286,6 @@ func (c *organizationsClient) UpdateInvitationPolicy(ctx context.Context, in *Up
 	return out, nil
 }
 
-func (c *organizationsClient) GetCustomDomain(ctx context.Context, in *GetCustomDomainRequest, opts ...grpc.CallOption) (*CustomDomain, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CustomDomain)
-	err := c.cc.Invoke(ctx, Organizations_GetCustomDomain_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *organizationsClient) ListCustomDomains(ctx context.Context, in *ListCustomDomainsRequest, opts ...grpc.CallOption) (*ListCustomDomainsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListCustomDomainsResponse)
-	err := c.cc.Invoke(ctx, Organizations_ListCustomDomains_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *organizationsClient) CreateCustomDomain(ctx context.Context, in *CreateCustomDomainRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(longrunningpb.Operation)
-	err := c.cc.Invoke(ctx, Organizations_CreateCustomDomain_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *organizationsClient) DeleteCustomDomain(ctx context.Context, in *DeleteCustomDomainRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(longrunningpb.Operation)
-	err := c.cc.Invoke(ctx, Organizations_DeleteCustomDomain_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // OrganizationsServer is the server API for Organizations service.
 // All implementations must embed UnimplementedOrganizationsServer
 // for forward compatibility.
@@ -423,25 +360,6 @@ type OrganizationsServer interface {
 	//
 	//	aip.dev/not-precedent: UpdateInvitationPolicy is a singleton sub-resource update. --)
 	UpdateInvitationPolicy(context.Context, *UpdateInvitationPolicyRequest) (*InvitationPolicy, error)
-	// Retrieves a custom domain associated with an organization.
-	GetCustomDomain(context.Context, *GetCustomDomainRequest) (*CustomDomain, error)
-	// Lists custom domains associated with an organization.
-	ListCustomDomains(context.Context, *ListCustomDomainsRequest) (*ListCustomDomainsResponse, error)
-	// Creates a custom domain for an organization. Once created, the domain
-	// enters the `PENDING` state and the response includes the DNS records
-	// that the domain owner must configure. After DNS verification succeeds,
-	// the server automatically provisions a TLS certificate and transitions
-	// the domain to `ACTIVE`.
-	//
-	// The caller must have `resourcemanager.customDomains.create` permission
-	// on the parent organization.
-	CreateCustomDomain(context.Context, *CreateCustomDomainRequest) (*longrunningpb.Operation, error)
-	// Deletes a custom domain from an organization, including TLS certificate
-	// revocation and routing removal.
-	//
-	// The caller must have `resourcemanager.customDomains.delete` permission
-	// on the parent organization.
-	DeleteCustomDomain(context.Context, *DeleteCustomDomainRequest) (*longrunningpb.Operation, error)
 	mustEmbedUnimplementedOrganizationsServer()
 }
 
@@ -496,18 +414,6 @@ func (UnimplementedOrganizationsServer) GetInvitationPolicy(context.Context, *Ge
 }
 func (UnimplementedOrganizationsServer) UpdateInvitationPolicy(context.Context, *UpdateInvitationPolicyRequest) (*InvitationPolicy, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateInvitationPolicy not implemented")
-}
-func (UnimplementedOrganizationsServer) GetCustomDomain(context.Context, *GetCustomDomainRequest) (*CustomDomain, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetCustomDomain not implemented")
-}
-func (UnimplementedOrganizationsServer) ListCustomDomains(context.Context, *ListCustomDomainsRequest) (*ListCustomDomainsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method ListCustomDomains not implemented")
-}
-func (UnimplementedOrganizationsServer) CreateCustomDomain(context.Context, *CreateCustomDomainRequest) (*longrunningpb.Operation, error) {
-	return nil, status.Error(codes.Unimplemented, "method CreateCustomDomain not implemented")
-}
-func (UnimplementedOrganizationsServer) DeleteCustomDomain(context.Context, *DeleteCustomDomainRequest) (*longrunningpb.Operation, error) {
-	return nil, status.Error(codes.Unimplemented, "method DeleteCustomDomain not implemented")
 }
 func (UnimplementedOrganizationsServer) mustEmbedUnimplementedOrganizationsServer() {}
 func (UnimplementedOrganizationsServer) testEmbeddedByValue()                       {}
@@ -800,78 +706,6 @@ func _Organizations_UpdateInvitationPolicy_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Organizations_GetCustomDomain_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetCustomDomainRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(OrganizationsServer).GetCustomDomain(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Organizations_GetCustomDomain_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OrganizationsServer).GetCustomDomain(ctx, req.(*GetCustomDomainRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Organizations_ListCustomDomains_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListCustomDomainsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(OrganizationsServer).ListCustomDomains(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Organizations_ListCustomDomains_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OrganizationsServer).ListCustomDomains(ctx, req.(*ListCustomDomainsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Organizations_CreateCustomDomain_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CreateCustomDomainRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(OrganizationsServer).CreateCustomDomain(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Organizations_CreateCustomDomain_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OrganizationsServer).CreateCustomDomain(ctx, req.(*CreateCustomDomainRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Organizations_DeleteCustomDomain_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DeleteCustomDomainRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(OrganizationsServer).DeleteCustomDomain(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Organizations_DeleteCustomDomain_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OrganizationsServer).DeleteCustomDomain(ctx, req.(*DeleteCustomDomainRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // Organizations_ServiceDesc is the grpc.ServiceDesc for Organizations service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -938,22 +772,6 @@ var Organizations_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateInvitationPolicy",
 			Handler:    _Organizations_UpdateInvitationPolicy_Handler,
-		},
-		{
-			MethodName: "GetCustomDomain",
-			Handler:    _Organizations_GetCustomDomain_Handler,
-		},
-		{
-			MethodName: "ListCustomDomains",
-			Handler:    _Organizations_ListCustomDomains_Handler,
-		},
-		{
-			MethodName: "CreateCustomDomain",
-			Handler:    _Organizations_CreateCustomDomain_Handler,
-		},
-		{
-			MethodName: "DeleteCustomDomain",
-			Handler:    _Organizations_DeleteCustomDomain_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

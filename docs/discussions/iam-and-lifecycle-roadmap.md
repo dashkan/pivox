@@ -92,14 +92,14 @@ Pure removal/rename. Smallest blast radius. No new APIs.
 - [x] Removed `Identity.TenantID` from `authn.Identity` (Firebase tenant claim no longer relevant).
 - [x] Removed tenant comment in `organizations.proto`.
 
-### CustomDomain rip
+### CustomDomain rip ✅
 
-- [ ] Tests: remove CustomDomain test files.
-- [ ] Delete CustomDomain RPCs + messages from `pivox/api/v1/organizations.proto` (or wherever defined).
-- [ ] Drop `custom_domains` table, `custom_domain_state` and `cert_state` enums from migration.
-- [ ] Remove ACME / DNS verification scaffolding (Go code).
-- [ ] Drop sqlc queries for custom domains.
-- [ ] Remove from generated code (auto via `make proto-generate`).
+- [x] No CustomDomain test files existed (verified via grep).
+- [x] Deleted CustomDomain RPCs + messages from `pivox/api/v1/organizations.proto`.
+- [x] Dropped `custom_domains` table + `custom_domain_state` enum from migration. **Kept `cert_state` — shared with `storage_gateways`.**
+- [x] No ACME / DNS verification Go code existed (handlers were never implemented).
+- [x] No sqlc queries existed for custom domains.
+- [x] Generated Go regenerated via `make proto-generate-go` + sqlc.
 
 ### `accounts` → `firebase_identities` rename
 

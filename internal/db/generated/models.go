@@ -194,51 +194,6 @@ func (ns NullCertState) Value() (driver.Value, error) {
 	return string(ns.CertState), nil
 }
 
-type CustomDomainState string
-
-const (
-	CustomDomainStatePENDING      CustomDomainState = "PENDING"
-	CustomDomainStatePROVISIONING CustomDomainState = "PROVISIONING"
-	CustomDomainStateACTIVE       CustomDomainState = "ACTIVE"
-	CustomDomainStateFAILED       CustomDomainState = "FAILED"
-	CustomDomainStateDEACTIVATED  CustomDomainState = "DEACTIVATED"
-)
-
-func (e *CustomDomainState) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = CustomDomainState(s)
-	case string:
-		*e = CustomDomainState(s)
-	default:
-		return fmt.Errorf("unsupported scan type for CustomDomainState: %T", src)
-	}
-	return nil
-}
-
-type NullCustomDomainState struct {
-	CustomDomainState CustomDomainState `json:"custom_domain_state"`
-	Valid             bool              `json:"valid"` // Valid is true if CustomDomainState is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullCustomDomainState) Scan(value interface{}) error {
-	if value == nil {
-		ns.CustomDomainState, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.CustomDomainState.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullCustomDomainState) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.CustomDomainState), nil
-}
-
 type DelegatedAuthSessionState string
 
 const (
@@ -1086,18 +1041,6 @@ type AuthTokenCode struct {
 	Consumed   bool      `json:"consumed"`
 	CreateTime time.Time `json:"create_time"`
 	ExpireTime time.Time `json:"expire_time"`
-}
-
-type CustomDomain struct {
-	ID         uuid.UUID          `json:"id"`
-	OrgID      uuid.UUID          `json:"org_id"`
-	Domain     string             `json:"domain"`
-	State      CustomDomainState  `json:"state"`
-	DnsRecords json.RawMessage    `json:"dns_records"`
-	Etag       string             `json:"etag"`
-	CreatedBy  string             `json:"created_by"`
-	CreateTime time.Time          `json:"create_time"`
-	VerifyTime pgtype.Timestamptz `json:"verify_time"`
 }
 
 type DelegatedAuthSession struct {
