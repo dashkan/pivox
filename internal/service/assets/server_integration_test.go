@@ -31,18 +31,18 @@ func createIntegrationOrg(t *testing.T, queries *db.Queries, name string) db.Org
 	return org
 }
 
-func createIntegrationProject(t *testing.T, queries *db.Queries, orgID uuid.UUID, name string) db.Project {
+func createIntegrationSpace(t *testing.T, queries *db.Queries, orgID uuid.UUID, name string) db.Space {
 	t.Helper()
-	project, err := queries.CreateProject(context.Background(), db.CreateProjectParams{
+	space, err := queries.CreateSpace(context.Background(), db.CreateSpaceParams{
 		ID:          uuid.New(),
 		OrgID:       orgID,
 		Name:        name,
-		DisplayName: "Test Project " + name,
+		DisplayName: "Test Space " + name,
 		Labels:      json.RawMessage("{}"),
 		CreatedBy:   "test",
 	})
 	require.NoError(t, err)
-	return project
+	return space
 }
 
 func TestIntegration_Assets_PlaceholderLifecycle(t *testing.T) {
@@ -60,11 +60,11 @@ func TestIntegration_Assets_PlaceholderLifecycle(t *testing.T) {
 	client := assetsv1.NewAssetsClient(conn)
 	ctx := context.Background()
 
-	// Prerequisite: create org and project.
+	// Prerequisite: create org and space.
 	org := createIntegrationOrg(t, queries, "acme")
-	createIntegrationProject(t, queries, org.ID, "proj1")
+	createIntegrationSpace(t, queries, org.ID, "proj1")
 
-	parent := "organizations/acme/projects/proj1"
+	parent := "organizations/acme/spaces/proj1"
 	var assetName string
 
 	t.Run("CreatePlaceholder", func(t *testing.T) {
@@ -151,8 +151,8 @@ func TestIntegration_Assets_ListAssets(t *testing.T) {
 	ctx := context.Background()
 
 	org := createIntegrationOrg(t, queries, "acme")
-	createIntegrationProject(t, queries, org.ID, "proj1")
-	parent := "organizations/acme/projects/proj1"
+	createIntegrationSpace(t, queries, org.ID, "proj1")
+	parent := "organizations/acme/spaces/proj1"
 
 	// Create multiple assets.
 	var assetNames []string
@@ -227,9 +227,9 @@ func TestIntegration_Assets_WithFile(t *testing.T) {
 	ctx := context.Background()
 
 	org := createIntegrationOrg(t, queries, "acme")
-	createIntegrationProject(t, queries, org.ID, "proj1")
+	createIntegrationSpace(t, queries, org.ID, "proj1")
 
-	parent := "organizations/acme/projects/proj1"
+	parent := "organizations/acme/spaces/proj1"
 
 	t.Run("CreateWithFile_ProcessingToActive", func(t *testing.T) {
 		op, err := client.CreateAsset(ctx, &assetsv1.CreateAssetRequest{

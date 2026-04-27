@@ -37,8 +37,8 @@ type ResourceFilter struct {
 	UserColumn      string   // column name for implicit user-scoped access control (e.g. "created_by"); QueryParams.UserID is required when set
 }
 
-// ProjectFilter returns the filter config for projects.
-func ProjectFilter() *ResourceFilter {
+// SpaceFilter returns the filter config for spaces.
+func SpaceFilter() *ResourceFilter {
 	return &ResourceFilter{
 		Filterable: map[string]FilterableField{
 			"displayName": {Column: "display_name", Type: filtering.TypeString, AllowPartial: true},
@@ -52,7 +52,7 @@ func ProjectFilter() *ResourceFilter {
 			"name":        {Column: "name"},
 			"createTime":  {Column: "create_time"},
 		},
-		Table:         "projects",
+		Table:         "spaces",
 		SoftDelete:    true,
 		OrderBy:       "id ASC",
 		CursorColumn:  "id",

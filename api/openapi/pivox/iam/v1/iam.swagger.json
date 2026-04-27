@@ -512,7 +512,7 @@
     },
     "/v1/organizations/{organization}/roles/{role}": {
       "get": {
-        "summary": "Gets a role by resource name.",
+        "summary": "Gets a role by resource name. v1 returns only system roles\n(owner, admin, editor, viewer); custom roles are deferred.",
         "operationId": "Iam_GetRole",
         "responses": {
           "200": {
@@ -609,7 +609,7 @@
     },
     "/v1/organizations/{organization}/users/{user}": {
       "get": {
-        "summary": "Gets a user by resource name.",
+        "summary": "Gets a user by resource name. Users are synced from Firebase Auth\nand are read-only through this API.",
         "operationId": "Iam_GetUser",
         "responses": {
           "200": {
@@ -646,7 +646,7 @@
     },
     "/v1/permissions": {
       "get": {
-        "summary": "Lists all available system-defined permissions.",
+        "summary": "Lists all system-defined permissions. Permissions are global and\ncode-defined; the catalog is identical for every caller.",
         "operationId": "Iam_ListPermissions",
         "responses": {
           "200": {
@@ -921,7 +921,7 @@
       "properties": {
         "name": {
           "type": "string",
-          "title": "The resource name of the permission.\nFormat: `permissions/{permission}` (e.g. `permissions/projects.create`)"
+          "title": "The resource name of the permission.\nFormat: `permissions/{permission}` (e.g. `permissions/spaces.create`)"
         },
         "displayName": {
           "type": "string",

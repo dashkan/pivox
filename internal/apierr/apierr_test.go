@@ -37,13 +37,13 @@ func TestNotFound(t *testing.T) {
 }
 
 func TestAlreadyExists(t *testing.T) {
-	err := AlreadyExists("Project", "projects/abc")
+	err := AlreadyExists("Space", "spaces/abc")
 	require.Error(t, err)
 
 	st := status.Convert(err)
 	assert.Equal(t, codes.AlreadyExists, st.Code())
-	assert.Contains(t, st.Message(), "Project")
-	assert.Contains(t, st.Message(), "projects/abc")
+	assert.Contains(t, st.Message(), "Space")
+	assert.Contains(t, st.Message(), "spaces/abc")
 
 	details := st.Details()
 	require.NotEmpty(t, details)
@@ -52,8 +52,8 @@ func TestAlreadyExists(t *testing.T) {
 	for _, d := range details {
 		if ri, ok := d.(*errdetails.ResourceInfo); ok {
 			foundResourceInfo = true
-			assert.Equal(t, "Project", ri.ResourceType)
-			assert.Equal(t, "projects/abc", ri.ResourceName)
+			assert.Equal(t, "Space", ri.ResourceType)
+			assert.Equal(t, "spaces/abc", ri.ResourceName)
 		}
 	}
 	assert.True(t, foundResourceInfo, "expected ResourceInfo detail")

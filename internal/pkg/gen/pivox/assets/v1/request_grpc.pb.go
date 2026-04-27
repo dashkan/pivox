@@ -59,7 +59,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// Manages asset requests within a project. Requests represent the
+// Manages asset requests within a space. Requests represent the
 // order workflow: a producer creates a request describing needed
 // assets, optionally assigns an artist, the artist delivers assets
 // for each line item, and the producer approves or requests revisions.
@@ -68,16 +68,16 @@ const (
 // creates a PLACEHOLDER asset that is fulfilled when the artist
 // uploads the deliverable.
 type RequestsClient interface {
-	// Creates a new request in the specified project. Line items can be
+	// Creates a new request in the specified space. Line items can be
 	// included in the request body — each line item creates a
-	// PLACEHOLDER asset in the project.
+	// PLACEHOLDER asset in the space.
 	//
 	// The caller must have `assets.requests.create` permission on the
-	// parent project.
+	// parent space.
 	CreateRequest(ctx context.Context, in *CreateRequestRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
 	// Retrieves a request by resource name.
 	GetRequest(ctx context.Context, in *GetRequestRequest, opts ...grpc.CallOption) (*Request, error)
-	// Lists requests in a project.
+	// Lists requests in a space.
 	ListRequests(ctx context.Context, in *ListRequestsRequest, opts ...grpc.CallOption) (*ListRequestsResponse, error)
 	// Updates a request's mutable fields (display_name, description,
 	// priority, due_time).
@@ -155,7 +155,7 @@ type RequestsClient interface {
 	//	aip.dev/not-precedent: Returns the updated Request resource. --)
 	CancelRequest(ctx context.Context, in *CancelRequestRequest, opts ...grpc.CallOption) (*Request, error)
 	// Creates a new line item on a request. A PLACEHOLDER asset is
-	// created in the project and linked to the line item.
+	// created in the space and linked to the line item.
 	//
 	// The caller must have `assets.lineItems.create` permission.
 	CreateLineItem(ctx context.Context, in *CreateLineItemRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
@@ -378,7 +378,7 @@ func (c *requestsClient) FulfillLineItem(ctx context.Context, in *FulfillLineIte
 // All implementations must embed UnimplementedRequestsServer
 // for forward compatibility.
 //
-// Manages asset requests within a project. Requests represent the
+// Manages asset requests within a space. Requests represent the
 // order workflow: a producer creates a request describing needed
 // assets, optionally assigns an artist, the artist delivers assets
 // for each line item, and the producer approves or requests revisions.
@@ -387,16 +387,16 @@ func (c *requestsClient) FulfillLineItem(ctx context.Context, in *FulfillLineIte
 // creates a PLACEHOLDER asset that is fulfilled when the artist
 // uploads the deliverable.
 type RequestsServer interface {
-	// Creates a new request in the specified project. Line items can be
+	// Creates a new request in the specified space. Line items can be
 	// included in the request body — each line item creates a
-	// PLACEHOLDER asset in the project.
+	// PLACEHOLDER asset in the space.
 	//
 	// The caller must have `assets.requests.create` permission on the
-	// parent project.
+	// parent space.
 	CreateRequest(context.Context, *CreateRequestRequest) (*longrunningpb.Operation, error)
 	// Retrieves a request by resource name.
 	GetRequest(context.Context, *GetRequestRequest) (*Request, error)
-	// Lists requests in a project.
+	// Lists requests in a space.
 	ListRequests(context.Context, *ListRequestsRequest) (*ListRequestsResponse, error)
 	// Updates a request's mutable fields (display_name, description,
 	// priority, due_time).
@@ -474,7 +474,7 @@ type RequestsServer interface {
 	//	aip.dev/not-precedent: Returns the updated Request resource. --)
 	CancelRequest(context.Context, *CancelRequestRequest) (*Request, error)
 	// Creates a new line item on a request. A PLACEHOLDER asset is
-	// created in the project and linked to the line item.
+	// created in the space and linked to the line item.
 	//
 	// The caller must have `assets.lineItems.create` permission.
 	CreateLineItem(context.Context, *CreateLineItemRequest) (*longrunningpb.Operation, error)

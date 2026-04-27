@@ -101,7 +101,7 @@ type StorageGatewaysClient interface {
 	// version. The upgrade is performed as a rolling update across all agents.
 	UpgradeGateway(ctx context.Context, in *UpgradeGatewayRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
 	// Creates a storage session for the authenticated user. Computes
-	// access patterns based on the user's org and project memberships,
+	// access patterns based on the user's org and space memberships,
 	// pushes session grants to connected gateways, and returns a JWT
 	// cookie for browser-based storage access.
 	//
@@ -273,7 +273,7 @@ type StorageGatewaysServer interface {
 	// version. The upgrade is performed as a rolling update across all agents.
 	UpgradeGateway(context.Context, *UpgradeGatewayRequest) (*longrunningpb.Operation, error)
 	// Creates a storage session for the authenticated user. Computes
-	// access patterns based on the user's org and project memberships,
+	// access patterns based on the user's org and space memberships,
 	// pushes session grants to connected gateways, and returns a JWT
 	// cookie for browser-based storage access.
 	//

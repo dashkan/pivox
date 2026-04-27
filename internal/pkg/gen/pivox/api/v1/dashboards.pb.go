@@ -39,11 +39,11 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// A custom dashboard belonging to a project.
+// A custom dashboard belonging to a space.
 type Dashboard struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Immutable. The resource name of the dashboard.
-	// Format: `organizations/{organization}/projects/{project}/dashboards/{dashboard}`
+	// Format: `organizations/{organization}/spaces/{space}/dashboards/{dashboard}`
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Required. A human-readable name for the dashboard.
 	DisplayName string `protobuf:"bytes,3,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
@@ -259,8 +259,8 @@ func (x *DashboardVariable) GetAllowedValues() []string {
 // Request message for ListDashboards.
 type ListDashboardsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Required. The parent project.
-	// Format: `organizations/{organization}/projects/{project}`
+	// Required. The parent space.
+	// Format: `organizations/{organization}/spaces/{space}`
 	Parent string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
 	// Optional. Maximum number of dashboards to return.
 	PageSize int32 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
@@ -362,7 +362,7 @@ func (x *ListDashboardsRequest) GetOrderBy() string {
 // Response message for ListDashboards.
 type ListDashboardsResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// The dashboards in the project.
+	// The dashboards in the space.
 	Dashboards []*Dashboard `protobuf:"bytes,1,rep,name=dashboards,proto3" json:"dashboards,omitempty"`
 	// Token for the next page of results.
 	NextPageToken string `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
@@ -463,8 +463,8 @@ func (x *GetDashboardRequest) GetName() string {
 // Request message for CreateDashboard.
 type CreateDashboardRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Required. The parent project.
-	// Format: `organizations/{organization}/projects/{project}`
+	// Required. The parent space.
+	// Format: `organizations/{organization}/spaces/{space}`
 	Parent string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
 	// Required. The dashboard to create.
 	Dashboard *Dashboard `protobuf:"bytes,2,opt,name=dashboard,proto3" json:"dashboard,omitempty"`
@@ -677,7 +677,7 @@ var File_pivox_api_v1_dashboards_proto protoreflect.FileDescriptor
 
 const file_pivox_api_v1_dashboards_proto_rawDesc = "" +
 	"\n" +
-	"\x1dpivox/api/v1/dashboards.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1apivox/api/v1/widgets.proto\"\xb7\x05\n" +
+	"\x1dpivox/api/v1/dashboards.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1apivox/api/v1/widgets.proto\"\xb3\x05\n" +
 	"\tDashboard\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x120\n" +
 	"\fdisplay_name\x18\x03 \x01(\tB\r\xe0A\x02\xbaH\ar\x05\x10\x01\x18\x80\x01R\vdisplayName\x12-\n" +
@@ -694,8 +694,8 @@ const file_pivox_api_v1_dashboards_proto_rawDesc = "" +
 	" \x03(\v2(.pivox.api.v1.Dashboard.AnnotationsEntryB\x03\xe0A\x01R\vannotations\x1a>\n" +
 	"\x10AnnotationsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01:w\xeaAt\n" +
-	"\x13pivox.api/Dashboard\x12Forganizations/{organization}/projects/{project}/dashboards/{dashboard}*\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01:s\xeaAp\n" +
+	"\x13pivox.api/Dashboard\x12Borganizations/{organization}/spaces/{space}/dashboards/{dashboard}*\n" +
 	"dashboards2\tdashboardB\b\n" +
 	"\x06layout\"\xaf\x01\n" +
 	"\x11DashboardVariable\x12\x1c\n" +
@@ -734,14 +734,14 @@ const file_pivox_api_v1_dashboards_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tB!\xe0A\x02\xfaA\x15\n" +
 	"\x13pivox.api/Dashboard\xbaH\x03\xc8\x01\x01R\x04name\x12(\n" +
 	"\rvalidate_only\x18\x02 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\x12\x17\n" +
-	"\x04etag\x18\x03 \x01(\tB\x03\xe0A\x01R\x04etag2\xdc\x06\n" +
+	"\x04etag\x18\x03 \x01(\tB\x03\xe0A\x01R\x04etag2\xd2\x06\n" +
 	"\n" +
-	"Dashboards\x12\xa0\x01\n" +
-	"\x0eListDashboards\x12#.pivox.api.v1.ListDashboardsRequest\x1a$.pivox.api.v1.ListDashboardsResponse\"C\xdaA\x06parent\x82\xd3\xe4\x93\x024\x122/v1/{parent=organizations/*/projects/*}/dashboards\x12\x8d\x01\n" +
-	"\fGetDashboard\x12!.pivox.api.v1.GetDashboardRequest\x1a\x17.pivox.api.v1.Dashboard\"A\xdaA\x04name\x82\xd3\xe4\x93\x024\x122/v1/{name=organizations/*/projects/*/dashboards/*}\x12\xb7\x01\n" +
-	"\x0fCreateDashboard\x12$.pivox.api.v1.CreateDashboardRequest\x1a\x17.pivox.api.v1.Dashboard\"e\xdaA\x1dparent,dashboard,dashboard_id\x82\xd3\xe4\x93\x02?:\tdashboard\"2/v1/{parent=organizations/*/projects/*}/dashboards\x12\xb9\x01\n" +
-	"\x0fUpdateDashboard\x12$.pivox.api.v1.UpdateDashboardRequest\x1a\x17.pivox.api.v1.Dashboard\"g\xdaA\x15dashboard,update_mask\x82\xd3\xe4\x93\x02I:\tdashboard2</v1/{dashboard.name=organizations/*/projects/*/dashboards/*}\x12\x93\x01\n" +
-	"\x0fDeleteDashboard\x12$.pivox.api.v1.DeleteDashboardRequest\x1a\x17.pivox.api.v1.Dashboard\"A\xdaA\x04name\x82\xd3\xe4\x93\x024*2/v1/{name=organizations/*/projects/*/dashboards/*}\x1a\x0f\xcaA\fapi.pivox.ioB\xb3\x01\n" +
+	"Dashboards\x12\x9e\x01\n" +
+	"\x0eListDashboards\x12#.pivox.api.v1.ListDashboardsRequest\x1a$.pivox.api.v1.ListDashboardsResponse\"A\xdaA\x06parent\x82\xd3\xe4\x93\x022\x120/v1/{parent=organizations/*/spaces/*}/dashboards\x12\x8b\x01\n" +
+	"\fGetDashboard\x12!.pivox.api.v1.GetDashboardRequest\x1a\x17.pivox.api.v1.Dashboard\"?\xdaA\x04name\x82\xd3\xe4\x93\x022\x120/v1/{name=organizations/*/spaces/*/dashboards/*}\x12\xb5\x01\n" +
+	"\x0fCreateDashboard\x12$.pivox.api.v1.CreateDashboardRequest\x1a\x17.pivox.api.v1.Dashboard\"c\xdaA\x1dparent,dashboard,dashboard_id\x82\xd3\xe4\x93\x02=:\tdashboard\"0/v1/{parent=organizations/*/spaces/*}/dashboards\x12\xb7\x01\n" +
+	"\x0fUpdateDashboard\x12$.pivox.api.v1.UpdateDashboardRequest\x1a\x17.pivox.api.v1.Dashboard\"e\xdaA\x15dashboard,update_mask\x82\xd3\xe4\x93\x02G:\tdashboard2:/v1/{dashboard.name=organizations/*/spaces/*/dashboards/*}\x12\x91\x01\n" +
+	"\x0fDeleteDashboard\x12$.pivox.api.v1.DeleteDashboardRequest\x1a\x17.pivox.api.v1.Dashboard\"?\xdaA\x04name\x82\xd3\xe4\x93\x022*0/v1/{name=organizations/*/spaces/*/dashboards/*}\x1a\x0f\xcaA\fapi.pivox.ioB\xb3\x01\n" +
 	"\x10com.pivox.api.v1B\x0fDashboardsProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
 
 var (

@@ -41,10 +41,10 @@ func TestApiKeyFilter(t *testing.T) {
 	assert.NotEmpty(t, rf.Filterable)
 }
 
-func TestProjectFilter(t *testing.T) {
-	rf := ProjectFilter()
+func TestSpaceFilter(t *testing.T) {
+	rf := SpaceFilter()
 	require.NotNil(t, rf)
-	assert.Equal(t, "projects", rf.Table)
+	assert.Equal(t, "spaces", rf.Table)
 	assert.True(t, rf.SoftDelete)
 	assert.Contains(t, rf.Filterable, "labels")
 	assert.True(t, rf.Filterable["labels"].JSONB)
@@ -71,7 +71,7 @@ func TestTagKeyFilter(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestParseOrderBy(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 
 	tests := []struct {
 		name    string
@@ -154,7 +154,7 @@ func TestParseOrderBy(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestTranspile_TimestampFunction(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 
 	// timestamp() as a standalone expression (not in a comparison).
 	// This exercises the transpileTimestamp path via transpileCall.
@@ -165,7 +165,7 @@ func TestTranspile_TimestampFunction(t *testing.T) {
 }
 
 func TestTranspile_TimestampInvalid(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 
 	_, err := Transpile(rf, `createTime = timestamp("not-a-timestamp")`, 1)
 	require.Error(t, err)
@@ -173,7 +173,7 @@ func TestTranspile_TimestampInvalid(t *testing.T) {
 }
 
 func TestTranspile_InvalidFilterSyntax(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 
 	_, err := Transpile(rf, `"unclosed string`, 1)
 	require.Error(t, err)
@@ -181,7 +181,7 @@ func TestTranspile_InvalidFilterSyntax(t *testing.T) {
 }
 
 func TestTranspile_SelectExpression(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 
 	// labels.env (select expression as an ident in traversal).
 	wc, err := Transpile(rf, `labels.env = "prod"`, 1)
@@ -191,7 +191,7 @@ func TestTranspile_SelectExpression(t *testing.T) {
 }
 
 func TestTranspile_SelectOnNonJSONB_Error(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 
 	// state is not JSONB — traversal should fail.
 	_, err := Transpile(rf, `state.sub = "val"`, 1)
@@ -212,7 +212,7 @@ func TestTranspile_BareLiteral_NoDefaultFields_Error(t *testing.T) {
 }
 
 func TestTranspile_HasSelectOnNonJSONB_Error(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 
 	// displayName is not JSONB — has-select should fail.
 	_, err := Transpile(rf, `displayName.sub : "val"`, 1)
@@ -226,7 +226,7 @@ func TestTranspile_HasSelectOnNonJSONB_Error(t *testing.T) {
 
 func TestTranspile_ConstTypes(t *testing.T) {
 	// Create a custom filter with numeric-typed field to test int/float constants.
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 
 	// Bool constant via bare identifier in value position (e.g., state = true).
 	// The AIP parser interprets `true` as an ident, resolved via resolveValue.
@@ -263,7 +263,7 @@ func TestTranspile_TimestampStandalone(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rf := ProjectFilter()
+			rf := SpaceFilter()
 			wc, err := Transpile(rf, tt.filter, 1)
 			if tt.wantErr {
 				require.Error(t, err)
@@ -289,7 +289,7 @@ func TestTranspile_ConstIntLiteral(t *testing.T) {
 	// The AIP parser produces an Int64Value ConstExpr for bare integer literals.
 	// When it appears as the root expression, transpileExpr → transpileConst →
 	// Int64Value branch → nextParam(int64).
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	wc, err := Transpile(rf, `42`, 1)
 	require.NoError(t, err)
 	assert.Equal(t, "$1", wc.SQL)
@@ -299,7 +299,7 @@ func TestTranspile_ConstIntLiteral(t *testing.T) {
 
 func TestTranspile_ConstFloatLiteral(t *testing.T) {
 	// The AIP parser produces a DoubleValue ConstExpr for floating-point literals.
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	wc, err := Transpile(rf, `3.14`, 1)
 	require.NoError(t, err)
 	assert.Equal(t, "$1", wc.SQL)
@@ -309,8 +309,8 @@ func TestTranspile_ConstFloatLiteral(t *testing.T) {
 
 func TestTranspile_ConstStringLiteral(t *testing.T) {
 	// A quoted string at root → transpileConst StringValue → expandBareLiteral.
-	// ProjectFilter has displayName as the only default field.
-	rf := ProjectFilter()
+	// SpaceFilter has displayName as the only default field.
+	rf := SpaceFilter()
 	wc, err := Transpile(rf, `"hello"`, 1)
 	require.NoError(t, err)
 	assert.Equal(t, `display_name ILIKE $1`, wc.SQL)
@@ -321,7 +321,7 @@ func TestTranspileConst_BoolValue(t *testing.T) {
 	// The AIP parser never produces a BoolValue constant from filter strings
 	// (bare `true`/`false` parse as IdentExpr). Test the branch directly by
 	// constructing a Transpiler and calling transpileConst with a BoolValue.
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	tr := &Transpiler{filter: rf, startIdx: 1}
 
 	c := &expr.Constant{
@@ -360,7 +360,7 @@ func TestTranspile_SelectStandalone(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rf := ProjectFilter()
+			rf := SpaceFilter()
 			wc, err := Transpile(rf, tt.filter, 1)
 			if tt.wantErr {
 				require.Error(t, err)
@@ -434,11 +434,11 @@ func TestFilterSortSplit_SortOnlyField_FilterRejected(t *testing.T) {
 	require.Error(t, err)
 }
 
-// ProjectFilter's `labels` is JSONB (filterable) but must NOT be sortable —
+// SpaceFilter's `labels` is JSONB (filterable) but must NOT be sortable —
 // the previous impl special-cased this via rf.Fields[x].JSONB; the new
 // design enforces it by simply not listing it in Sortable.
-func TestProjectFilter_JSONBLabelsNotSortable(t *testing.T) {
-	rf := ProjectFilter()
+func TestSpaceFilter_JSONBLabelsNotSortable(t *testing.T) {
+	rf := SpaceFilter()
 	assert.Contains(t, rf.Filterable, "labels")
 	assert.NotContains(t, rf.Sortable, "labels")
 	_, err := ParseOrderBy(rf, "labels")

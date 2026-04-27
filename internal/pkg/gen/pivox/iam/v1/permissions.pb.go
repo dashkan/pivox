@@ -43,7 +43,7 @@ const (
 type Permission struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The resource name of the permission.
-	// Format: `permissions/{permission}` (e.g. `permissions/projects.create`)
+	// Format: `permissions/{permission}` (e.g. `permissions/spaces.create`)
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// A human-readable name for the permission.
 	DisplayName string `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`

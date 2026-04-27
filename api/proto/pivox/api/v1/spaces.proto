@@ -27,135 +27,135 @@ import "google/protobuf/timestamp.proto";
 
 option go_package = "pivox/api/v1;apiv1";
 
-// Manages Pivox Projects.
-service Projects {
+// Manages Pivox Spaces.
+service Spaces {
   option (google.api.default_host) = "api.pivox.io";
 
-  // Retrieves the project identified by the specified `name` (for example,
-  // `organizations/123/projects/my-project`).
+  // Retrieves the space identified by the specified `name` (for example,
+  // `organizations/123/spaces/my-space`).
   //
-  // The caller must have `resourcemanager.projects.get` permission
-  // for this project.
-  rpc GetProject(GetProjectRequest) returns (Project) {
-    option (google.api.http) = {get: "/v1/{name=organizations/*/projects/*}"};
+  // The caller must have `resourcemanager.spaces.get` permission
+  // for this space.
+  rpc GetSpace(GetSpaceRequest) returns (Space) {
+    option (google.api.http) = {get: "/v1/{name=organizations/*/spaces/*}"};
     option (google.api.method_signature) = "name";
   }
 
-  // Lists projects that are direct children of the specified organization
+  // Lists spaces that are direct children of the specified organization
   // resource. `list()` provides a strongly consistent view of the
-  // projects underneath the specified parent resource. `list()` returns
-  // projects sorted based upon the (ascending) lexical ordering of their
-  // `display_name`. The caller must have `resourcemanager.projects.list`
+  // spaces underneath the specified parent resource. `list()` returns
+  // spaces sorted based upon the (ascending) lexical ordering of their
+  // `display_name`. The caller must have `resourcemanager.spaces.list`
   // permission on the identified parent.
-  rpc ListProjects(ListProjectsRequest) returns (ListProjectsResponse) {
-    option (google.api.http) = {get: "/v1/{parent=organizations/*}/projects"};
+  rpc ListSpaces(ListSpacesRequest) returns (ListSpacesResponse) {
+    option (google.api.http) = {get: "/v1/{parent=organizations/*}/spaces"};
     option (google.api.method_signature) = "parent";
   }
 
-  // Creates a new project under the specified organization.
-  rpc CreateProject(CreateProjectRequest) returns (google.longrunning.Operation) {
+  // Creates a new space under the specified organization.
+  rpc CreateSpace(CreateSpaceRequest) returns (google.longrunning.Operation) {
     option (google.api.http) = {
-      post: "/v1/{parent=organizations/*}/projects"
-      body: "project"
+      post: "/v1/{parent=organizations/*}/spaces"
+      body: "space"
     };
-    option (google.api.method_signature) = "parent,project,project_id";
+    option (google.api.method_signature) = "parent,space,space_id";
     option (google.longrunning.operation_info) = {
-      response_type: "Project"
-      metadata_type: "CreateProjectMetadata"
+      response_type: "Space"
+      metadata_type: "CreateSpaceMetadata"
     };
   }
 
-  // Updates the `display_name` and labels of the project identified by the
-  // specified `name` (for example, `organizations/123/projects/my-project`).
+  // Updates the `display_name` and labels of the space identified by the
+  // specified `name` (for example, `organizations/123/spaces/my-space`).
   // Deleting all labels requires an update mask for labels field.
   //
-  // The caller must have `resourcemanager.projects.update` permission for this
-  // project.
-  rpc UpdateProject(UpdateProjectRequest) returns (google.longrunning.Operation) {
+  // The caller must have `resourcemanager.spaces.update` permission for this
+  // space.
+  rpc UpdateSpace(UpdateSpaceRequest) returns (google.longrunning.Operation) {
     option (google.api.http) = {
-      patch: "/v1/{project.name=organizations/*/projects/*}"
-      body: "project"
+      patch: "/v1/{space.name=organizations/*/spaces/*}"
+      body: "space"
     };
-    option (google.api.method_signature) = "project,update_mask";
+    option (google.api.method_signature) = "space,update_mask";
     option (google.longrunning.operation_info) = {
-      response_type: "Project"
-      metadata_type: "UpdateProjectMetadata"
+      response_type: "Space"
+      metadata_type: "UpdateSpaceMetadata"
     };
   }
 
-  // Marks the project identified by the specified
-  // `name` (for example, `organizations/123/projects/my-project`) for deletion.
+  // Marks the space identified by the specified
+  // `name` (for example, `organizations/123/spaces/my-space`) for deletion.
   //
-  // This method will only affect the project if it has a lifecycle state of
-  // [ACTIVE][pivox.api.v1.Project.State.ACTIVE].
+  // This method will only affect the space if it has a lifecycle state of
+  // [ACTIVE][pivox.api.v1.Space.State.ACTIVE].
   //
-  // This method changes the Project's lifecycle state from
-  // [ACTIVE][pivox.api.v1.Project.State.ACTIVE]
+  // This method changes the Space's lifecycle state from
+  // [ACTIVE][pivox.api.v1.Space.State.ACTIVE]
   // to
-  // [DELETE_REQUESTED][pivox.api.v1.Project.State.DELETE_REQUESTED].
+  // [DELETE_REQUESTED][pivox.api.v1.Space.State.DELETE_REQUESTED].
   // The deletion starts at an unspecified time,
-  // at which point the Project is no longer accessible.
+  // at which point the Space is no longer accessible.
   //
   // Until the deletion completes, you can check the lifecycle state
-  // checked by retrieving the project with [GetProject]
-  // [pivox.api.v1.Projects.GetProject],
-  // and the project remains visible to [ListProjects]
-  // [pivox.api.v1.Projects.ListProjects].
-  // However, you cannot update the project.
+  // checked by retrieving the space with [GetSpace]
+  // [pivox.api.v1.Spaces.GetSpace],
+  // and the space remains visible to [ListSpaces]
+  // [pivox.api.v1.Spaces.ListSpaces].
+  // However, you cannot update the space.
   //
-  // After the deletion completes, the project is not retrievable by
-  // the [GetProject]
-  // [pivox.api.v1.Projects.GetProject] and
-  // [ListProjects]
-  // [pivox.api.v1.Projects.ListProjects] method.
+  // After the deletion completes, the space is not retrievable by
+  // the [GetSpace]
+  // [pivox.api.v1.Spaces.GetSpace] and
+  // [ListSpaces]
+  // [pivox.api.v1.Spaces.ListSpaces] method.
   //
   // This method behaves idempotently, such that deleting a `DELETE_REQUESTED`
-  // project will not cause an error, but also won't do anything.
+  // space will not cause an error, but also won't do anything.
   //
-  // The caller must have `resourcemanager.projects.delete` permissions for this
-  // project.
-  rpc DeleteProject(DeleteProjectRequest) returns (google.longrunning.Operation) {
-    option (google.api.http) = {delete: "/v1/{name=organizations/*/projects/*}"};
+  // The caller must have `resourcemanager.spaces.delete` permissions for this
+  // space.
+  rpc DeleteSpace(DeleteSpaceRequest) returns (google.longrunning.Operation) {
+    option (google.api.http) = {delete: "/v1/{name=organizations/*/spaces/*}"};
     option (google.api.method_signature) = "name";
     option (google.longrunning.operation_info) = {
-      response_type: "Project"
-      metadata_type: "DeleteProjectMetadata"
+      response_type: "Space"
+      metadata_type: "DeleteSpaceMetadata"
     };
   }
 
-  // Restores the project identified by the specified
-  // `name` (for example, `organizations/123/projects/my-project`).
-  // You can only use this method for a project that has a lifecycle state of
+  // Restores the space identified by the specified
+  // `name` (for example, `organizations/123/spaces/my-space`).
+  // You can only use this method for a space that has a lifecycle state of
   // [DELETE_REQUESTED]
-  // [Projects.State.DELETE_REQUESTED].
-  // After deletion starts, the project cannot be restored.
+  // [Spaces.State.DELETE_REQUESTED].
+  // After deletion starts, the space cannot be restored.
   //
-  // The caller must have `resourcemanager.projects.undelete` permission for
-  // this project.
-  rpc UndeleteProject(UndeleteProjectRequest) returns (google.longrunning.Operation) {
+  // The caller must have `resourcemanager.spaces.undelete` permission for
+  // this space.
+  rpc UndeleteSpace(UndeleteSpaceRequest) returns (google.longrunning.Operation) {
     option (google.api.http) = {
-      post: "/v1/{name=organizations/*/projects/*}:undelete"
+      post: "/v1/{name=organizations/*/spaces/*}:undelete"
       body: "*"
     };
     option (google.api.method_signature) = "name";
     option (google.longrunning.operation_info) = {
-      response_type: "Project"
-      metadata_type: "UndeleteProjectMetadata"
+      response_type: "Space"
+      metadata_type: "UndeleteSpaceMetadata"
     };
   }
 }
 
-// A project is a high-level Pivox entity. It is a
+// A space is a high-level Pivox entity. It is a
 // container for ACLs, APIs, and other Pivox resources.
-message Project {
+message Space {
   option (google.api.resource) = {
-    type: "pivox.api/Project"
-    pattern: "organizations/{organization}/projects/{project}"
-    plural: "projects"
-    singular: "project"
+    type: "pivox.api/Space"
+    pattern: "organizations/{organization}/spaces/{space}"
+    plural: "spaces"
+    singular: "space"
   };
 
-  // Project lifecycle states.
+  // Space lifecycle states.
   enum State {
     // Unspecified state.  This is only used/useful for distinguishing
     // unset values.
@@ -164,29 +164,29 @@ message Project {
     // The normal and active state.
     ACTIVE = 1;
 
-    // The project has been marked for deletion by the user
+    // The space has been marked for deletion by the user
     // (by invoking
-    // [DeleteProject][pivox.api.v1.Projects.DeleteProject])
+    // [DeleteSpace][pivox.api.v1.Spaces.DeleteSpace])
     // or by the system (Pivox).
-    // This can generally be reversed by invoking [UndeleteProject]
-    // [pivox.api.v1.Projects.UndeleteProject].
+    // This can generally be reversed by invoking [UndeleteSpace]
+    // [pivox.api.v1.Spaces.UndeleteSpace].
     DELETE_REQUESTED = 2;
   }
 
-  // Output only. The unique resource name of the project.
+  // Output only. The unique resource name of the space.
   //
-  // Example: `organizations/123/projects/my-project`
+  // Example: `organizations/123/spaces/my-space`
   string name = 1 [(google.api.field_behavior) = IDENTIFIER];
 
-  // Output only. The project lifecycle state.
+  // Output only. The space lifecycle state.
   State state = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  // Optional. A user-assigned display name of the project.
+  // Optional. A user-assigned display name of the space.
   // When present it must be between 4 to 30 characters.
   // Allowed characters are: lowercase and uppercase letters, numbers,
   // hyphen, single-quote, double-quote, space, and exclamation point.
   //
-  // Example: `My Project`
+  // Example: `My Space`
   string display_name = 5 [
     (google.api.field_behavior) = OPTIONAL,
     (buf.validate.field).string.max_len = 30
@@ -201,16 +201,16 @@ message Project {
   // Output only. The time at which this resource was requested for deletion.
   google.protobuf.Timestamp delete_time = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  // Output only. The time at which this project will be purged.
+  // Output only. The time at which this space will be purged.
   // Approximately 30 days after deletion.
   google.protobuf.Timestamp purge_time = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. A checksum computed by the server based on the current value
-  // of the Project resource. This may be sent on update and delete requests to
+  // of the Space resource. This may be sent on update and delete requests to
   // ensure the client has an up-to-date value before proceeding.
   string etag = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  // Optional. The labels associated with this project.
+  // Optional. The labels associated with this space.
   //
   // Label keys must be between 1 and 63 characters long and must conform
   // to the following regular expression: \[a-z\](\[-a-z0-9\]*\[a-z0-9\])?.
@@ -228,40 +228,40 @@ message Project {
 }
 
 // The request sent to the
-// [GetProject][pivox.api.v1.Projects.GetProject]
+// [GetSpace][pivox.api.v1.Spaces.GetSpace]
 // method.
-message GetProjectRequest {
-  // Required. The name of the project (for example,
-  // `organizations/123/projects/my-project`).
+message GetSpaceRequest {
+  // Required. The name of the space (for example,
+  // `organizations/123/spaces/my-space`).
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {type: "pivox.api/Project"},
+    (google.api.resource_reference) = {type: "pivox.api/Space"},
     (buf.validate.field).required = true
   ];
 }
 
 // The request sent to the
-// [ListProjects][pivox.api.v1.Projects.ListProjects]
+// [ListSpaces][pivox.api.v1.Spaces.ListSpaces]
 // method.
-message ListProjectsRequest {
-  // Required. The name of the parent resource whose projects are being listed.
+message ListSpacesRequest {
+  // Required. The name of the parent resource whose spaces are being listed.
   // Only children of this parent resource are listed; descendants are not
   // listed.
   //
   // Use the value `organizations/{org_id}`.
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {child_type: "pivox.api/Project"},
+    (google.api.resource_reference) = {child_type: "pivox.api/Space"},
     (buf.validate.field).required = true
   ];
 
   // Optional. A pagination token returned from a previous call to
-  // [ListProjects] [pivox.api.v1.Projects.ListProjects] that
+  // [ListSpaces] [pivox.api.v1.Spaces.ListSpaces] that
   // indicates from where listing should continue.
   string page_token = 2 [(google.api.field_behavior) = OPTIONAL];
 
-  // Optional. The maximum number of projects to return in the response.
-  // The server can return fewer projects than requested.
+  // Optional. The maximum number of spaces to return in the response.
+  // The server can return fewer spaces than requested.
   // If unspecified, server picks an appropriate default.
   int32 page_size = 3 [
     (google.api.field_behavior) = OPTIONAL,
@@ -271,8 +271,8 @@ message ListProjectsRequest {
     }
   ];
 
-  // Optional. Indicate that projects in the `DELETE_REQUESTED` state should
-  // also be returned. Normally only `ACTIVE` projects are returned.
+  // Optional. Indicate that spaces in the `DELETE_REQUESTED` state should
+  // also be returned. Normally only `ACTIVE` spaces are returned.
   bool show_deleted = 4 [(google.api.field_behavior) = OPTIONAL];
 
   // Optional. An expression for filtering the results of the request.
@@ -285,14 +285,14 @@ message ListProjectsRequest {
   //
   // Some examples of filter strings:
   //
-  // + `displayName = "My Project"` - returns projects with display name
-  //   "My Project".
-  // + `displayName = "My*"` - returns projects whose display name starts
+  // + `displayName = "My Space"` - returns spaces with display name
+  //   "My Space".
+  // + `displayName = "My*"` - returns spaces whose display name starts
   //   with "My".
-  // + `state = ACTIVE` - returns only active projects.
-  // + `labels.color:*` - returns projects that have the label "color".
-  // + `labels.color = red` - returns projects where label "color" is "red".
-  // + `createTime > "2024-01-01T00:00:00Z"` - returns projects created
+  // + `state = ACTIVE` - returns only active spaces.
+  // + `labels.color:*` - returns spaces that have the label "color".
+  // + `labels.color = red` - returns spaces where label "color" is "red".
+  // + `createTime > "2024-01-01T00:00:00Z"` - returns spaces created
   //   after the given timestamp.
   //
   // For more information, see [AIP-160](https://aip.dev/160).
@@ -313,7 +313,7 @@ message ListProjectsRequest {
 }
 
 // A page of the response received from the
-// [ListProjects][pivox.api.v1.Projects.ListProjects]
+// [ListSpaces][pivox.api.v1.Spaces.ListSpaces]
 // method.
 //
 // A paginated response where more pages are available has
@@ -322,9 +322,9 @@ message ListProjectsRequest {
 //
 // NOTE: A response may contain fewer elements than the request `page_size` and
 // still have a `next_page_token`.
-message ListProjectsResponse {
-  // The list of Projects under the parent. This list can be paginated.
-  repeated Project projects = 1;
+message ListSpacesResponse {
+  // The list of Spaces under the parent. This list can be paginated.
+  repeated Space spaces = 1;
 
   // Pagination token.
   //
@@ -341,29 +341,29 @@ message ListProjectsResponse {
 }
 
 // The request sent to the
-// [CreateProject][pivox.api.v1.Projects.CreateProject]
+// [CreateSpace][pivox.api.v1.Spaces.CreateSpace]
 // method.
-message CreateProjectRequest {
-  // Required. The parent organization for the project.
+message CreateSpaceRequest {
+  // Required. The parent organization for the space.
   // Must be of the form `organizations/{org_id}`.
   string parent = 4 [
     (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {child_type: "pivox.api/Project"},
+    (google.api.resource_reference) = {child_type: "pivox.api/Space"},
     (buf.validate.field).required = true
   ];
 
-  // Required. The Project to create.
+  // Required. The Space to create.
   //
-  // Project ID is required. If the requested ID is unavailable, the request
+  // Space ID is required. If the requested ID is unavailable, the request
   // fails.
-  Project project = 1 [
+  Space space = 1 [
     (google.api.field_behavior) = REQUIRED,
     (buf.validate.field).required = true
   ];
 
-  // Optional. A unique identifier for the project. If not provided, the server will
+  // Optional. A unique identifier for the space. If not provided, the server will
   // generate one.
-  string project_id = 2 [(google.api.field_behavior) = OPTIONAL];
+  string space_id = 2 [(google.api.field_behavior) = OPTIONAL];
 
   // Optional. If set to true, the request will only validate the request
   // without persisting it.
@@ -371,13 +371,13 @@ message CreateProjectRequest {
 }
 
 // The request sent to the
-// [UpdateProject][pivox.api.v1.Projects.UpdateProject]
+// [UpdateSpace][pivox.api.v1.Spaces.UpdateSpace]
 // method.
 //
 // Only the `display_name` and `labels` fields can be changed.
-message UpdateProjectRequest {
-  // Required. The new definition of the project.
-  Project project = 1 [
+message UpdateSpaceRequest {
+  // Required. The new definition of the space.
+  Space space = 1 [
     (google.api.field_behavior) = REQUIRED,
     (buf.validate.field).required = true
   ];
@@ -385,7 +385,7 @@ message UpdateProjectRequest {
   // Optional. An update mask to selectively update fields.
   google.protobuf.FieldMask update_mask = 2 [(google.api.field_behavior) = OPTIONAL];
 
-  // Optional. If set to true, and the project is not found, a new project will be created.
+  // Optional. If set to true, and the space is not found, a new space will be created.
   // In this situation, update_mask is ignored.
   bool allow_missing = 3 [(google.api.field_behavior) = OPTIONAL];
 
@@ -394,18 +394,18 @@ message UpdateProjectRequest {
   bool validate_only = 4 [(google.api.field_behavior) = OPTIONAL];
 }
 
-// [DeleteProject][pivox.api.v1.Projects.DeleteProject]
+// [DeleteSpace][pivox.api.v1.Spaces.DeleteSpace]
 // method.
-message DeleteProjectRequest {
-  // Required. The name of the Project (for example,
-  // `organizations/123/projects/my-project`).
+message DeleteSpaceRequest {
+  // Required. The name of the Space (for example,
+  // `organizations/123/spaces/my-space`).
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {type: "pivox.api/Project"},
+    (google.api.resource_reference) = {type: "pivox.api/Space"},
     (buf.validate.field).required = true
   ];
 
-  // Optional. The etag known to the client for the expected state of the project.
+  // Optional. The etag known to the client for the expected state of the space.
   // This is to be used for optimistic concurrency.
   string etag = 2 [(google.api.field_behavior) = OPTIONAL];
 
@@ -414,19 +414,19 @@ message DeleteProjectRequest {
   bool validate_only = 3 [(google.api.field_behavior) = OPTIONAL];
 }
 
-// The request sent to the [UndeleteProject]
-// [pivox.api.v1.Projects.UndeleteProject]
+// The request sent to the [UndeleteSpace]
+// [pivox.api.v1.Spaces.UndeleteSpace]
 // method.
-message UndeleteProjectRequest {
-  // Required. The name of the project (for example,
-  // `organizations/123/projects/my-project`).
+message UndeleteSpaceRequest {
+  // Required. The name of the space (for example,
+  // `organizations/123/spaces/my-space`).
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {type: "pivox.api/Project"},
+    (google.api.resource_reference) = {type: "pivox.api/Space"},
     (buf.validate.field).required = true
   ];
 
-  // Optional. The etag known to the client for the expected state of the project.
+  // Optional. The etag known to the client for the expected state of the space.
   // This is to be used for optimistic concurrency.
   string etag = 2 [(google.api.field_behavior) = OPTIONAL];
 
@@ -436,17 +436,17 @@ message UndeleteProjectRequest {
 }
 
 // A status object which is used as the `metadata` field for the Operation
-// returned by CreateProject.
-message CreateProjectMetadata {}
+// returned by CreateSpace.
+message CreateSpaceMetadata {}
 
 // A status object which is used as the `metadata` field for the Operation
-// returned by UpdateProject.
-message UpdateProjectMetadata {}
+// returned by UpdateSpace.
+message UpdateSpaceMetadata {}
 
 // A status object which is used as the `metadata` field for the Operation
-// returned by DeleteProject.
-message DeleteProjectMetadata {}
+// returned by DeleteSpace.
+message DeleteSpaceMetadata {}
 
 // A status object which is used as the `metadata` field for the Operation
-// returned by UndeleteProject.
-message UndeleteProjectMetadata {}
+// returned by UndeleteSpace.
+message UndeleteSpaceMetadata {}

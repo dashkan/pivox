@@ -251,7 +251,7 @@ func (LineItem_State) EnumDescriptor() ([]byte, []int) {
 type Request struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Output only. The resource name of the request. Format:
-	// `organizations/{organization}/projects/{project}/requests/{request}`
+	// `organizations/{organization}/spaces/{space}/requests/{request}`
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Required. A human-readable title for the request.
 	DisplayName string `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
@@ -475,7 +475,7 @@ func (x *Request) GetPurgeTime() *timestamppb.Timestamp {
 type LineItem struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Output only. The resource name of the line item. Format:
-	// `organizations/{organization}/projects/{project}/requests/{request}/lineItems/{line_item}`
+	// `organizations/{organization}/spaces/{space}/requests/{request}/lineItems/{line_item}`
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Required. A human-readable name for the deliverable.
 	DisplayName string `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
@@ -604,8 +604,8 @@ func (x *LineItem) GetUpdateTime() *timestamppb.Timestamp {
 // The request sent to the CreateRequest method.
 type CreateRequestRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Required. The parent project. Format:
-	// `organizations/{organization}/projects/{project}`
+	// Required. The parent space. Format:
+	// `organizations/{organization}/spaces/{space}`
 	Parent string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
 	// Required. The request to create. May include line items in the
 	// line_items field — each will create a PLACEHOLDER asset.
@@ -753,7 +753,7 @@ func (x *GetRequestRequest) GetName() string {
 // The request sent to the ListRequests method.
 type ListRequestsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Required. The parent project whose requests are being listed.
+	// Required. The parent space whose requests are being listed.
 	Parent string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
 	// Optional. The maximum number of requests to return.
 	PageSize int32 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
@@ -872,7 +872,7 @@ func (x *ListRequestsRequest) GetShowDeleted() bool {
 // The response from the ListRequests method.
 type ListRequestsResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// The requests belonging to the specified project.
+	// The requests belonging to the specified space.
 	Requests []*Request `protobuf:"bytes,1,rep,name=requests,proto3" json:"requests,omitempty"`
 	// A pagination token for the next page.
 	NextPageToken string `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
@@ -1534,7 +1534,7 @@ func (x *CancelRequestRequest) GetName() string {
 type CreateLineItemRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The parent request. Format:
-	// `organizations/{organization}/projects/{project}/requests/{request}`
+	// `organizations/{organization}/spaces/{space}/requests/{request}`
 	Parent string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
 	// Required. The line item to create.
 	LineItem *LineItem `protobuf:"bytes,2,opt,name=line_item,json=lineItem,proto3" json:"line_item,omitempty"`
@@ -2126,7 +2126,7 @@ var File_pivox_assets_v1_request_proto protoreflect.FileDescriptor
 
 const file_pivox_assets_v1_request_proto_rawDesc = "" +
 	"\n" +
-	"\x1dpivox/assets/v1/request.proto\x12\x0fpivox.assets.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bpivox/assets/v1/asset.proto\"\xd0\v\n" +
+	"\x1dpivox/assets/v1/request.proto\x12\x0fpivox.assets.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bpivox/assets/v1/asset.proto\"\xcc\v\n" +
 	"\aRequest\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12.\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\v\xe0A\x02\xbaH\x05r\x03\x18\xff\x01R\vdisplayName\x12-\n" +
@@ -2174,8 +2174,8 @@ const file_pivox_assets_v1_request_proto_rawDesc = "" +
 	"\x06NORMAL\x10\x02\x12\b\n" +
 	"\x04HIGH\x10\x03\x12\n" +
 	"\n" +
-	"\x06URGENT\x10\x04:p\xeaAm\n" +
-	"\x14pivox.assets/Request\x12Borganizations/{organization}/projects/{project}/requests/{request}*\brequests2\arequest\"\xec\x06\n" +
+	"\x06URGENT\x10\x04:l\xeaAi\n" +
+	"\x14pivox.assets/Request\x12>organizations/{organization}/spaces/{space}/requests/{request}*\brequests2\arequest\"\xe8\x06\n" +
 	"\bLineItem\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12.\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\v\xe0A\x02\xbaH\x05r\x03\x18\xff\x01R\vdisplayName\x12-\n" +
@@ -2201,8 +2201,8 @@ const file_pivox_assets_v1_request_proto_rawDesc = "" +
 	"\vIN_PROGRESS\x10\x02\x12\r\n" +
 	"\tDELIVERED\x10\x03\x12\f\n" +
 	"\bAPPROVED\x10\x04\x12\x16\n" +
-	"\x12REVISION_REQUESTED\x10\x05:\x8a\x01\xeaA\x86\x01\n" +
-	"\x15pivox.assets/LineItem\x12Xorganizations/{organization}/projects/{project}/requests/{request}/lineItems/{line_item}*\tlineItems2\blineItem\"\xbb\x01\n" +
+	"\x12REVISION_REQUESTED\x10\x05:\x86\x01\xeaA\x82\x01\n" +
+	"\x15pivox.assets/LineItem\x12Torganizations/{organization}/spaces/{space}/requests/{request}/lineItems/{line_item}*\tlineItems2\blineItem\"\xbb\x01\n" +
 	"\x14CreateRequestRequest\x12:\n" +
 	"\x06parent\x18\x01 \x01(\tB\"\xe0A\x02\xfaA\x16\x12\x14pivox.assets/Request\xbaH\x03\xc8\x01\x01R\x06parent\x12=\n" +
 	"\arequest\x18\x02 \x01(\v2\x18.pivox.assets.v1.RequestB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\arequest\x12(\n" +
@@ -2301,35 +2301,35 @@ const file_pivox_assets_v1_request_proto_rawDesc = "" +
 	"\x04step\x18\x01 \x01(\x0e2).pivox.assets.v1.CreateAssetMetadata.StepR\x04step\x12<\n" +
 	"\vupload_info\x18\x02 \x01(\v2\x1b.pivox.assets.v1.UploadInfoR\n" +
 	"uploadInfo\x12)\n" +
-	"\x10progress_percent\x18\x03 \x01(\x05R\x0fprogressPercent2\x85\x1b\n" +
-	"\bRequests\x12\xcc\x01\n" +
-	"\rCreateRequest\x12%.pivox.assets.v1.CreateRequestRequest\x1a\x1d.google.longrunning.Operation\"u\xcaA \n" +
-	"\aRequest\x12\x15CreateRequestMetadata\xdaA\x0eparent,request\x82\xd3\xe4\x93\x02;:\arequest\"0/v1/{parent=organizations/*/projects/*}/requests\x12\x8b\x01\n" +
+	"\x10progress_percent\x18\x03 \x01(\x05R\x0fprogressPercent2\xdf\x1a\n" +
+	"\bRequests\x12\xca\x01\n" +
+	"\rCreateRequest\x12%.pivox.assets.v1.CreateRequestRequest\x1a\x1d.google.longrunning.Operation\"s\xcaA \n" +
+	"\aRequest\x12\x15CreateRequestMetadata\xdaA\x0eparent,request\x82\xd3\xe4\x93\x029:\arequest\"./v1/{parent=organizations/*/spaces/*}/requests\x12\x89\x01\n" +
 	"\n" +
-	"GetRequest\x12\".pivox.assets.v1.GetRequestRequest\x1a\x18.pivox.assets.v1.Request\"?\xdaA\x04name\x82\xd3\xe4\x93\x022\x120/v1/{name=organizations/*/projects/*/requests/*}\x12\x9e\x01\n" +
-	"\fListRequests\x12$.pivox.assets.v1.ListRequestsRequest\x1a%.pivox.assets.v1.ListRequestsResponse\"A\xdaA\x06parent\x82\xd3\xe4\x93\x022\x120/v1/{parent=organizations/*/projects/*}/requests\x12\xda\x01\n" +
-	"\rUpdateRequest\x12%.pivox.assets.v1.UpdateRequestRequest\x1a\x1d.google.longrunning.Operation\"\x82\x01\xcaA \n" +
-	"\aRequest\x12\x15UpdateRequestMetadata\xdaA\x13request,update_mask\x82\xd3\xe4\x93\x02C:\arequest28/v1/{request.name=organizations/*/projects/*/requests/*}\x12\xb9\x01\n" +
-	"\rDeleteRequest\x12%.pivox.assets.v1.DeleteRequestRequest\x1a\x1d.google.longrunning.Operation\"b\xcaA \n" +
-	"\aRequest\x12\x15DeleteRequestMetadata\xdaA\x04name\x82\xd3\xe4\x93\x022*0/v1/{name=organizations/*/projects/*/requests/*}\x12\x9b\x01\n" +
-	"\rSubmitRequest\x12%.pivox.assets.v1.SubmitRequestRequest\x1a\x18.pivox.assets.v1.Request\"I\xdaA\x04name\x82\xd3\xe4\x93\x02<:\x01*\"7/v1/{name=organizations/*/projects/*/requests/*}:submit\x12\xa4\x01\n" +
-	"\rAssignRequest\x12%.pivox.assets.v1.AssignRequestRequest\x1a\x18.pivox.assets.v1.Request\"R\xdaA\rname,assignee\x82\xd3\xe4\x93\x02<:\x01*\"7/v1/{name=organizations/*/projects/*/requests/*}:assign\x12\x98\x01\n" +
-	"\fClaimRequest\x12$.pivox.assets.v1.ClaimRequestRequest\x1a\x18.pivox.assets.v1.Request\"H\xdaA\x04name\x82\xd3\xe4\x93\x02;:\x01*\"6/v1/{name=organizations/*/projects/*/requests/*}:claim\x12\x9e\x01\n" +
-	"\x0eDeliverRequest\x12&.pivox.assets.v1.DeliverRequestRequest\x1a\x18.pivox.assets.v1.Request\"J\xdaA\x04name\x82\xd3\xe4\x93\x02=:\x01*\"8/v1/{name=organizations/*/projects/*/requests/*}:deliver\x12\x9e\x01\n" +
-	"\x0eApproveRequest\x12&.pivox.assets.v1.ApproveRequestRequest\x1a\x18.pivox.assets.v1.Request\"J\xdaA\x04name\x82\xd3\xe4\x93\x02=:\x01*\"8/v1/{name=organizations/*/projects/*/requests/*}:approve\x12\xa8\x01\n" +
-	"\x0fRequestRevision\x12'.pivox.assets.v1.RequestRevisionRequest\x1a\x18.pivox.assets.v1.Request\"R\xdaA\x04name\x82\xd3\xe4\x93\x02E:\x01*\"@/v1/{name=organizations/*/projects/*/requests/*}:requestRevision\x12\x9b\x01\n" +
-	"\rRejectRequest\x12%.pivox.assets.v1.RejectRequestRequest\x1a\x18.pivox.assets.v1.Request\"I\xdaA\x04name\x82\xd3\xe4\x93\x02<:\x01*\"7/v1/{name=organizations/*/projects/*/requests/*}:reject\x12\x9b\x01\n" +
-	"\rCancelRequest\x12%.pivox.assets.v1.CancelRequestRequest\x1a\x18.pivox.assets.v1.Request\"I\xdaA\x04name\x82\xd3\xe4\x93\x02<:\x01*\"7/v1/{name=organizations/*/projects/*/requests/*}:cancel\x12\xe1\x01\n" +
-	"\x0eCreateLineItem\x12&.pivox.assets.v1.CreateLineItemRequest\x1a\x1d.google.longrunning.Operation\"\x87\x01\xcaA\"\n" +
-	"\bLineItem\x12\x16CreateLineItemMetadata\xdaA\x10parent,line_item\x82\xd3\xe4\x93\x02I:\tline_item\"</v1/{parent=organizations/*/projects/*/requests/*}/lineItems\x12\x9a\x01\n" +
-	"\vGetLineItem\x12#.pivox.assets.v1.GetLineItemRequest\x1a\x19.pivox.assets.v1.LineItem\"K\xdaA\x04name\x82\xd3\xe4\x93\x02>\x12</v1/{name=organizations/*/projects/*/requests/*/lineItems/*}\x12\xad\x01\n" +
-	"\rListLineItems\x12%.pivox.assets.v1.ListLineItemsRequest\x1a&.pivox.assets.v1.ListLineItemsResponse\"M\xdaA\x06parent\x82\xd3\xe4\x93\x02>\x12</v1/{parent=organizations/*/projects/*/requests/*}/lineItems\x12\xf0\x01\n" +
-	"\x0eUpdateLineItem\x12&.pivox.assets.v1.UpdateLineItemRequest\x1a\x1d.google.longrunning.Operation\"\x96\x01\xcaA\"\n" +
-	"\bLineItem\x12\x16UpdateLineItemMetadata\xdaA\x15line_item,update_mask\x82\xd3\xe4\x93\x02S:\tline_item2F/v1/{line_item.name=organizations/*/projects/*/requests/*/lineItems/*}\x12\xc9\x01\n" +
-	"\x0eDeleteLineItem\x12&.pivox.assets.v1.DeleteLineItemRequest\x1a\x1d.google.longrunning.Operation\"p\xcaA\"\n" +
-	"\bLineItem\x12\x16DeleteLineItemMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02>*</v1/{name=organizations/*/projects/*/requests/*/lineItems/*}\x12\xd7\x01\n" +
-	"\x0fFulfillLineItem\x12'.pivox.assets.v1.FulfillLineItemRequest\x1a\x1d.google.longrunning.Operation\"|\xcaA#\n" +
-	"\bLineItem\x12\x17FulfillLineItemMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02I:\x01*\"D/v1/{name=organizations/*/projects/*/requests/*/lineItems/*}:fulfill\x1a\x0f\xcaA\fapi.pivox.ioB\xc5\x01\n" +
+	"GetRequest\x12\".pivox.assets.v1.GetRequestRequest\x1a\x18.pivox.assets.v1.Request\"=\xdaA\x04name\x82\xd3\xe4\x93\x020\x12./v1/{name=organizations/*/spaces/*/requests/*}\x12\x9c\x01\n" +
+	"\fListRequests\x12$.pivox.assets.v1.ListRequestsRequest\x1a%.pivox.assets.v1.ListRequestsResponse\"?\xdaA\x06parent\x82\xd3\xe4\x93\x020\x12./v1/{parent=organizations/*/spaces/*}/requests\x12\xd8\x01\n" +
+	"\rUpdateRequest\x12%.pivox.assets.v1.UpdateRequestRequest\x1a\x1d.google.longrunning.Operation\"\x80\x01\xcaA \n" +
+	"\aRequest\x12\x15UpdateRequestMetadata\xdaA\x13request,update_mask\x82\xd3\xe4\x93\x02A:\arequest26/v1/{request.name=organizations/*/spaces/*/requests/*}\x12\xb7\x01\n" +
+	"\rDeleteRequest\x12%.pivox.assets.v1.DeleteRequestRequest\x1a\x1d.google.longrunning.Operation\"`\xcaA \n" +
+	"\aRequest\x12\x15DeleteRequestMetadata\xdaA\x04name\x82\xd3\xe4\x93\x020*./v1/{name=organizations/*/spaces/*/requests/*}\x12\x99\x01\n" +
+	"\rSubmitRequest\x12%.pivox.assets.v1.SubmitRequestRequest\x1a\x18.pivox.assets.v1.Request\"G\xdaA\x04name\x82\xd3\xe4\x93\x02::\x01*\"5/v1/{name=organizations/*/spaces/*/requests/*}:submit\x12\xa2\x01\n" +
+	"\rAssignRequest\x12%.pivox.assets.v1.AssignRequestRequest\x1a\x18.pivox.assets.v1.Request\"P\xdaA\rname,assignee\x82\xd3\xe4\x93\x02::\x01*\"5/v1/{name=organizations/*/spaces/*/requests/*}:assign\x12\x96\x01\n" +
+	"\fClaimRequest\x12$.pivox.assets.v1.ClaimRequestRequest\x1a\x18.pivox.assets.v1.Request\"F\xdaA\x04name\x82\xd3\xe4\x93\x029:\x01*\"4/v1/{name=organizations/*/spaces/*/requests/*}:claim\x12\x9c\x01\n" +
+	"\x0eDeliverRequest\x12&.pivox.assets.v1.DeliverRequestRequest\x1a\x18.pivox.assets.v1.Request\"H\xdaA\x04name\x82\xd3\xe4\x93\x02;:\x01*\"6/v1/{name=organizations/*/spaces/*/requests/*}:deliver\x12\x9c\x01\n" +
+	"\x0eApproveRequest\x12&.pivox.assets.v1.ApproveRequestRequest\x1a\x18.pivox.assets.v1.Request\"H\xdaA\x04name\x82\xd3\xe4\x93\x02;:\x01*\"6/v1/{name=organizations/*/spaces/*/requests/*}:approve\x12\xa6\x01\n" +
+	"\x0fRequestRevision\x12'.pivox.assets.v1.RequestRevisionRequest\x1a\x18.pivox.assets.v1.Request\"P\xdaA\x04name\x82\xd3\xe4\x93\x02C:\x01*\">/v1/{name=organizations/*/spaces/*/requests/*}:requestRevision\x12\x99\x01\n" +
+	"\rRejectRequest\x12%.pivox.assets.v1.RejectRequestRequest\x1a\x18.pivox.assets.v1.Request\"G\xdaA\x04name\x82\xd3\xe4\x93\x02::\x01*\"5/v1/{name=organizations/*/spaces/*/requests/*}:reject\x12\x99\x01\n" +
+	"\rCancelRequest\x12%.pivox.assets.v1.CancelRequestRequest\x1a\x18.pivox.assets.v1.Request\"G\xdaA\x04name\x82\xd3\xe4\x93\x02::\x01*\"5/v1/{name=organizations/*/spaces/*/requests/*}:cancel\x12\xdf\x01\n" +
+	"\x0eCreateLineItem\x12&.pivox.assets.v1.CreateLineItemRequest\x1a\x1d.google.longrunning.Operation\"\x85\x01\xcaA\"\n" +
+	"\bLineItem\x12\x16CreateLineItemMetadata\xdaA\x10parent,line_item\x82\xd3\xe4\x93\x02G:\tline_item\":/v1/{parent=organizations/*/spaces/*/requests/*}/lineItems\x12\x98\x01\n" +
+	"\vGetLineItem\x12#.pivox.assets.v1.GetLineItemRequest\x1a\x19.pivox.assets.v1.LineItem\"I\xdaA\x04name\x82\xd3\xe4\x93\x02<\x12:/v1/{name=organizations/*/spaces/*/requests/*/lineItems/*}\x12\xab\x01\n" +
+	"\rListLineItems\x12%.pivox.assets.v1.ListLineItemsRequest\x1a&.pivox.assets.v1.ListLineItemsResponse\"K\xdaA\x06parent\x82\xd3\xe4\x93\x02<\x12:/v1/{parent=organizations/*/spaces/*/requests/*}/lineItems\x12\xee\x01\n" +
+	"\x0eUpdateLineItem\x12&.pivox.assets.v1.UpdateLineItemRequest\x1a\x1d.google.longrunning.Operation\"\x94\x01\xcaA\"\n" +
+	"\bLineItem\x12\x16UpdateLineItemMetadata\xdaA\x15line_item,update_mask\x82\xd3\xe4\x93\x02Q:\tline_item2D/v1/{line_item.name=organizations/*/spaces/*/requests/*/lineItems/*}\x12\xc7\x01\n" +
+	"\x0eDeleteLineItem\x12&.pivox.assets.v1.DeleteLineItemRequest\x1a\x1d.google.longrunning.Operation\"n\xcaA\"\n" +
+	"\bLineItem\x12\x16DeleteLineItemMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02<*:/v1/{name=organizations/*/spaces/*/requests/*/lineItems/*}\x12\xd5\x01\n" +
+	"\x0fFulfillLineItem\x12'.pivox.assets.v1.FulfillLineItemRequest\x1a\x1d.google.longrunning.Operation\"z\xcaA#\n" +
+	"\bLineItem\x12\x17FulfillLineItemMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02G:\x01*\"B/v1/{name=organizations/*/spaces/*/requests/*/lineItems/*}:fulfill\x1a\x0f\xcaA\fapi.pivox.ioB\xc5\x01\n" +
 	"\x13com.pivox.assets.v1B\fRequestProtoP\x01ZBgithub.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1;assetsv1\xa2\x02\x03PAX\xaa\x02\x0fPivox.Assets.V1\xca\x02\x0fPivox\\Assets\\V1\xe2\x02\x1bPivox\\Assets\\V1\\GPBMetadata\xea\x02\x11Pivox::Assets::V1b\x06proto3"
 
 var (

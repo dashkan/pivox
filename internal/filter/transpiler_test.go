@@ -9,7 +9,7 @@ import (
 )
 
 func TestTranspile_EmptyFilter(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	wc, err := Transpile(rf, "", 1)
 	require.NoError(t, err)
 	assert.Equal(t, "", wc.SQL)
@@ -17,7 +17,7 @@ func TestTranspile_EmptyFilter(t *testing.T) {
 }
 
 func TestTranspile_SimpleEquals(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	wc, err := Transpile(rf, `state = "ACTIVE"`, 1)
 	require.NoError(t, err)
 	assert.Equal(t, `state = $1`, wc.SQL)
@@ -25,7 +25,7 @@ func TestTranspile_SimpleEquals(t *testing.T) {
 }
 
 func TestTranspile_WildcardILIKE(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	wc, err := Transpile(rf, `displayName = "Test*"`, 1)
 	require.NoError(t, err)
 	assert.Equal(t, `display_name ILIKE $1`, wc.SQL)
@@ -33,7 +33,7 @@ func TestTranspile_WildcardILIKE(t *testing.T) {
 }
 
 func TestTranspile_WildcardEscapesMetachars(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	wc, err := Transpile(rf, `displayName = "100%_done*"`, 1)
 	require.NoError(t, err)
 	assert.Equal(t, `display_name ILIKE $1`, wc.SQL)
@@ -41,7 +41,7 @@ func TestTranspile_WildcardEscapesMetachars(t *testing.T) {
 }
 
 func TestTranspile_NoWildcardOnNonPartialField(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	// state does not have AllowPartial, so wildcard is treated literally.
 	wc, err := Transpile(rf, `state = "ACT*"`, 1)
 	require.NoError(t, err)
@@ -50,7 +50,7 @@ func TestTranspile_NoWildcardOnNonPartialField(t *testing.T) {
 }
 
 func TestTranspile_AND(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	wc, err := Transpile(rf, `displayName = "Test*" AND state = "ACTIVE"`, 1)
 	require.NoError(t, err)
 	assert.Equal(t, `(display_name ILIKE $1 AND state = $2)`, wc.SQL)
@@ -58,7 +58,7 @@ func TestTranspile_AND(t *testing.T) {
 }
 
 func TestTranspile_OR(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	wc, err := Transpile(rf, `state = "ACTIVE" OR state = "DELETE_REQUESTED"`, 1)
 	require.NoError(t, err)
 	assert.Equal(t, `(state = $1 OR state = $2)`, wc.SQL)
@@ -66,7 +66,7 @@ func TestTranspile_OR(t *testing.T) {
 }
 
 func TestTranspile_NOT(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	wc, err := Transpile(rf, `NOT state = "DELETE_REQUESTED"`, 1)
 	require.NoError(t, err)
 	assert.Equal(t, `(NOT state = $1)`, wc.SQL)
@@ -74,7 +74,7 @@ func TestTranspile_NOT(t *testing.T) {
 }
 
 func TestTranspile_NotEquals(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	wc, err := Transpile(rf, `state != "DELETE_REQUESTED"`, 1)
 	require.NoError(t, err)
 	assert.Equal(t, `state != $1`, wc.SQL)
@@ -115,7 +115,7 @@ func TestTranspile_ComparisonOperators(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rf := ProjectFilter()
+			rf := SpaceFilter()
 			wc, err := Transpile(rf, tt.filter, 1)
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantSQL, wc.SQL)
@@ -125,7 +125,7 @@ func TestTranspile_ComparisonOperators(t *testing.T) {
 }
 
 func TestTranspile_HasOperator_StringContains(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	wc, err := Transpile(rf, `displayName : "test"`, 1)
 	require.NoError(t, err)
 	assert.Equal(t, `display_name ILIKE $1`, wc.SQL)
@@ -133,7 +133,7 @@ func TestTranspile_HasOperator_StringContains(t *testing.T) {
 }
 
 func TestTranspile_HasOperator_JSONBKeyExists(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	wc, err := Transpile(rf, `labels : "env"`, 1)
 	require.NoError(t, err)
 	assert.Equal(t, `labels ? $1`, wc.SQL)
@@ -141,7 +141,7 @@ func TestTranspile_HasOperator_JSONBKeyExists(t *testing.T) {
 }
 
 func TestTranspile_JSONB_DotTraversal_Equals(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	wc, err := Transpile(rf, `labels.env = "production"`, 1)
 	require.NoError(t, err)
 	assert.Equal(t, `labels->>'env' = $1`, wc.SQL)
@@ -149,7 +149,7 @@ func TestTranspile_JSONB_DotTraversal_Equals(t *testing.T) {
 }
 
 func TestTranspile_JSONB_DotTraversal_Has(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	wc, err := Transpile(rf, `labels.env : "prod"`, 1)
 	require.NoError(t, err)
 	assert.Equal(t, `labels->>'env' ILIKE $1`, wc.SQL)
@@ -157,7 +157,7 @@ func TestTranspile_JSONB_DotTraversal_Has(t *testing.T) {
 }
 
 func TestTranspile_Complex(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	wc, err := Transpile(rf, `displayName = "My*" AND (state = "ACTIVE" OR name = "proj-123")`, 1)
 	require.NoError(t, err)
 	assert.Equal(t, `(display_name ILIKE $1 AND (state = $2 OR name = $3))`, wc.SQL)
@@ -165,7 +165,7 @@ func TestTranspile_Complex(t *testing.T) {
 }
 
 func TestTranspile_StartIdx(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	// Simulate prior params by starting at $3.
 	wc, err := Transpile(rf, `state = "ACTIVE"`, 3)
 	require.NoError(t, err)
@@ -174,13 +174,13 @@ func TestTranspile_StartIdx(t *testing.T) {
 }
 
 func TestTranspile_UnknownField(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	_, err := Transpile(rf, `unknownField = "x"`, 1)
 	require.Error(t, err)
 }
 
 func TestTranspile_BareLiteral(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	wc, err := Transpile(rf, `news`, 1)
 	require.NoError(t, err)
 	assert.Equal(t, `display_name ILIKE $1`, wc.SQL)
@@ -196,7 +196,7 @@ func TestTranspile_BareLiteral_MultipleDefaultFields(t *testing.T) {
 }
 
 func TestTranspile_BareLiteralWithImplicitAnd(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	// Two bare words = implicit AND, each expanded against default fields.
 	wc, err := Transpile(rf, `news article`, 1)
 	require.NoError(t, err)
@@ -205,7 +205,7 @@ func TestTranspile_BareLiteralWithImplicitAnd(t *testing.T) {
 }
 
 func TestTranspile_BareLiteralAndCondition(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	wc, err := Transpile(rf, `news AND state = "ACTIVE"`, 1)
 	require.NoError(t, err)
 	assert.Equal(t, `(display_name ILIKE $1 AND state = $2)`, wc.SQL)
@@ -213,7 +213,7 @@ func TestTranspile_BareLiteralAndCondition(t *testing.T) {
 }
 
 func TestTranspile_BareLiteralValue_InComparison(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	// Bare value on RHS: state = ACTIVE (without quotes).
 	wc, err := Transpile(rf, `state = ACTIVE`, 1)
 	require.NoError(t, err)
@@ -222,7 +222,7 @@ func TestTranspile_BareLiteralValue_InComparison(t *testing.T) {
 }
 
 func TestTranspile_NotBareLiteral(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	wc, err := Transpile(rf, `NOT news`, 1)
 	require.NoError(t, err)
 	assert.Equal(t, `(NOT display_name ILIKE $1)`, wc.SQL)
@@ -230,7 +230,7 @@ func TestTranspile_NotBareLiteral(t *testing.T) {
 }
 
 func TestTranspile_BareLiteralMixedWithStructured(t *testing.T) {
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	wc, err := Transpile(rf, `myproject AND labels.env = production`, 1)
 	require.NoError(t, err)
 	assert.Equal(t, `(display_name ILIKE $1 AND labels->>'env' = $2)`, wc.SQL)

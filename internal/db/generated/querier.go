@@ -29,7 +29,7 @@ type Querier interface {
 	CountArtifactVersionsByArtifact(ctx context.Context, artifactID uuid.UUID) (int64, error)
 	CountArtifactsByConversation(ctx context.Context, conversationID uuid.UUID) (int64, error)
 	CountAssetVersions(ctx context.Context, assetID uuid.UUID) (int64, error)
-	CountAssetsByProject(ctx context.Context, projectID uuid.UUID) (int64, error)
+	CountAssetsBySpace(ctx context.Context, spaceID uuid.UUID) (int64, error)
 	CountConnectedStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) (int64, error)
 	CountFulfilledLineItems(ctx context.Context, requestID uuid.UUID) (int64, error)
 	CountLineItemsByRequest(ctx context.Context, requestID uuid.UUID) (int64, error)
@@ -37,7 +37,7 @@ type Querier interface {
 	// Used by membership-mutation handlers to enforce "≥1 owner" — call
 	// before any role-change or delete that would reduce the owner count.
 	CountOwnersByOrg(ctx context.Context, orgID uuid.UUID) (int64, error)
-	CountRequestsByProject(ctx context.Context, projectID uuid.UUID) (int64, error)
+	CountRequestsBySpace(ctx context.Context, spaceID uuid.UUID) (int64, error)
 	CountStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) (int64, error)
 	CountTagBindingsByTagValue(ctx context.Context, tagValueID uuid.UUID) (int64, error)
 	CountTagValuesByTagKey(ctx context.Context, tagKeyID uuid.UUID) (int64, error)
@@ -58,8 +58,8 @@ type Querier interface {
 	CreateMessage(ctx context.Context, arg CreateMessageParams) (AiMessage, error)
 	CreateOperation(ctx context.Context, arg CreateOperationParams) (Operation, error)
 	CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error)
-	CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error)
 	CreateRequest(ctx context.Context, arg CreateRequestParams) (AssetRequest, error)
+	CreateSpace(ctx context.Context, arg CreateSpaceParams) (Space, error)
 	CreateStorageAgent(ctx context.Context, arg CreateStorageAgentParams) (StorageAgent, error)
 	CreateStorageAgentAudit(ctx context.Context, arg CreateStorageAgentAuditParams) error
 	CreateStorageEndpoint(ctx context.Context, arg CreateStorageEndpointParams) (StorageEndpoint, error)
@@ -119,11 +119,11 @@ type Querier interface {
 	GetOperation(ctx context.Context, id uuid.UUID) (Operation, error)
 	GetOrganization(ctx context.Context, id uuid.UUID) (Organization, error)
 	GetOrganizationByName(ctx context.Context, name string) (Organization, error)
-	GetProject(ctx context.Context, id uuid.UUID) (Project, error)
-	GetProjectByName(ctx context.Context, arg GetProjectByNameParams) (Project, error)
-	GetProjectIncludingDeleted(ctx context.Context, id uuid.UUID) (Project, error)
 	GetRequest(ctx context.Context, id uuid.UUID) (AssetRequest, error)
 	GetRequestByName(ctx context.Context, arg GetRequestByNameParams) (AssetRequest, error)
+	GetSpace(ctx context.Context, id uuid.UUID) (Space, error)
+	GetSpaceByName(ctx context.Context, arg GetSpaceByNameParams) (Space, error)
+	GetSpaceIncludingDeleted(ctx context.Context, id uuid.UUID) (Space, error)
 	GetStorageAgent(ctx context.Context, id uuid.UUID) (StorageAgent, error)
 	GetStorageAgentByGatewayAndIP(ctx context.Context, arg GetStorageAgentByGatewayAndIPParams) (StorageAgent, error)
 	GetStorageEndpoint(ctx context.Context, id uuid.UUID) (StorageEndpoint, error)
@@ -141,8 +141,8 @@ type Querier interface {
 	IsOnlyArtifactVersion(ctx context.Context, artifactID uuid.UUID) (bool, error)
 	ListAssetRenditions(ctx context.Context, versionID uuid.UUID) ([]AssetRendition, error)
 	ListAssetVersions(ctx context.Context, arg ListAssetVersionsParams) ([]AssetVersion, error)
-	ListAssetsByProject(ctx context.Context, arg ListAssetsByProjectParams) ([]Asset, error)
-	ListAssetsByProjectWithDeleted(ctx context.Context, arg ListAssetsByProjectWithDeletedParams) ([]Asset, error)
+	ListAssetsBySpace(ctx context.Context, arg ListAssetsBySpaceParams) ([]Asset, error)
+	ListAssetsBySpaceWithDeleted(ctx context.Context, arg ListAssetsBySpaceWithDeletedParams) ([]Asset, error)
 	ListEffectiveTags(ctx context.Context, parentResource string) ([]ListEffectiveTagsRow, error)
 	ListExpiredAssets(ctx context.Context, limit int32) ([]Asset, error)
 	ListLineItemsByRequest(ctx context.Context, arg ListLineItemsByRequestParams) ([]AssetRequestLineItem, error)
@@ -158,7 +158,7 @@ type Querier interface {
 	// needs more we'll know because something is very wrong.
 	ListOrganizationsForFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) ([]Organization, error)
 	ListPendingOperations(ctx context.Context) ([]Operation, error)
-	ListRequestsByProject(ctx context.Context, arg ListRequestsByProjectParams) ([]AssetRequest, error)
+	ListRequestsBySpace(ctx context.Context, arg ListRequestsBySpaceParams) ([]AssetRequest, error)
 	ListStorageAgentAuditByAgent(ctx context.Context, arg ListStorageAgentAuditByAgentParams) ([]StorageAgentAudit, error)
 	ListStorageAgentAuditByGateway(ctx context.Context, arg ListStorageAgentAuditByGatewayParams) ([]StorageAgentAudit, error)
 	ListStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageAgent, error)
@@ -181,11 +181,11 @@ type Querier interface {
 	SetAutoTitle(ctx context.Context, arg SetAutoTitleParams) (AiConversation, error)
 	SoftDeleteApiKey(ctx context.Context, arg SoftDeleteApiKeyParams) (ApiKey, error)
 	SoftDeleteAsset(ctx context.Context, arg SoftDeleteAssetParams) error
-	SoftDeleteProject(ctx context.Context, arg SoftDeleteProjectParams) (Project, error)
+	SoftDeleteSpace(ctx context.Context, arg SoftDeleteSpaceParams) (Space, error)
 	SumTokensByConversation(ctx context.Context, conversationID uuid.UUID) (int64, error)
 	UndeleteApiKey(ctx context.Context, arg UndeleteApiKeyParams) (ApiKey, error)
 	UndeleteAsset(ctx context.Context, id uuid.UUID) error
-	UndeleteProject(ctx context.Context, arg UndeleteProjectParams) (Project, error)
+	UndeleteSpace(ctx context.Context, arg UndeleteSpaceParams) (Space, error)
 	UpdateApiKey(ctx context.Context, arg UpdateApiKeyParams) (ApiKey, error)
 	UpdateArtifactLatestVersion(ctx context.Context, arg UpdateArtifactLatestVersionParams) error
 	UpdateAsset(ctx context.Context, arg UpdateAssetParams) (Asset, error)
@@ -203,12 +203,12 @@ type Querier interface {
 	UpdateLineItem(ctx context.Context, arg UpdateLineItemParams) (AssetRequestLineItem, error)
 	UpdateLineItemState(ctx context.Context, arg UpdateLineItemStateParams) error
 	UpdateOperationMetadata(ctx context.Context, arg UpdateOperationMetadataParams) error
-	UpdateProject(ctx context.Context, arg UpdateProjectParams) (Project, error)
 	UpdateRequest(ctx context.Context, arg UpdateRequestParams) (AssetRequest, error)
 	UpdateRequestApproved(ctx context.Context, arg UpdateRequestApprovedParams) (AssetRequest, error)
 	UpdateRequestAssignee(ctx context.Context, arg UpdateRequestAssigneeParams) (AssetRequest, error)
 	UpdateRequestDelivered(ctx context.Context, arg UpdateRequestDeliveredParams) (AssetRequest, error)
 	UpdateRequestState(ctx context.Context, arg UpdateRequestStateParams) (AssetRequest, error)
+	UpdateSpace(ctx context.Context, arg UpdateSpaceParams) (Space, error)
 	UpdateStorageAgentCacheUsed(ctx context.Context, arg UpdateStorageAgentCacheUsedParams) error
 	UpdateStorageAgentCert(ctx context.Context, arg UpdateStorageAgentCertParams) error
 	UpdateStorageAgentHeartbeat(ctx context.Context, id uuid.UUID) error

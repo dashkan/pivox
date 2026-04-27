@@ -1008,7 +1008,7 @@ func RegisterRequestsHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/CreateRequest", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/projects/*}/requests"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/CreateRequest", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/spaces/*}/requests"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1028,7 +1028,7 @@ func RegisterRequestsHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/GetRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/requests/*}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/GetRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/requests/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1048,7 +1048,7 @@ func RegisterRequestsHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/ListRequests", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/projects/*}/requests"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/ListRequests", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/spaces/*}/requests"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1068,7 +1068,7 @@ func RegisterRequestsHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/UpdateRequest", runtime.WithHTTPPathPattern("/v1/{request.name=organizations/*/projects/*/requests/*}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/UpdateRequest", runtime.WithHTTPPathPattern("/v1/{request.name=organizations/*/spaces/*/requests/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1088,7 +1088,7 @@ func RegisterRequestsHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/DeleteRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/requests/*}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/DeleteRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/requests/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1108,7 +1108,7 @@ func RegisterRequestsHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/SubmitRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/requests/*}:submit"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/SubmitRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/requests/*}:submit"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1128,7 +1128,7 @@ func RegisterRequestsHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/AssignRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/requests/*}:assign"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/AssignRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/requests/*}:assign"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1148,7 +1148,7 @@ func RegisterRequestsHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/ClaimRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/requests/*}:claim"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/ClaimRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/requests/*}:claim"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1168,7 +1168,7 @@ func RegisterRequestsHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/DeliverRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/requests/*}:deliver"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/DeliverRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/requests/*}:deliver"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1188,7 +1188,7 @@ func RegisterRequestsHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/ApproveRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/requests/*}:approve"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/ApproveRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/requests/*}:approve"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1208,7 +1208,7 @@ func RegisterRequestsHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/RequestRevision", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/requests/*}:requestRevision"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/RequestRevision", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/requests/*}:requestRevision"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1228,7 +1228,7 @@ func RegisterRequestsHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/RejectRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/requests/*}:reject"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/RejectRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/requests/*}:reject"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1248,7 +1248,7 @@ func RegisterRequestsHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/CancelRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/requests/*}:cancel"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/CancelRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/requests/*}:cancel"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1268,7 +1268,7 @@ func RegisterRequestsHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/CreateLineItem", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/projects/*/requests/*}/lineItems"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/CreateLineItem", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/spaces/*/requests/*}/lineItems"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1288,7 +1288,7 @@ func RegisterRequestsHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/GetLineItem", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/requests/*/lineItems/*}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/GetLineItem", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/requests/*/lineItems/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1308,7 +1308,7 @@ func RegisterRequestsHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/ListLineItems", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/projects/*/requests/*}/lineItems"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/ListLineItems", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/spaces/*/requests/*}/lineItems"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1328,7 +1328,7 @@ func RegisterRequestsHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/UpdateLineItem", runtime.WithHTTPPathPattern("/v1/{line_item.name=organizations/*/projects/*/requests/*/lineItems/*}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/UpdateLineItem", runtime.WithHTTPPathPattern("/v1/{line_item.name=organizations/*/spaces/*/requests/*/lineItems/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1348,7 +1348,7 @@ func RegisterRequestsHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/DeleteLineItem", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/requests/*/lineItems/*}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/DeleteLineItem", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/requests/*/lineItems/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1368,7 +1368,7 @@ func RegisterRequestsHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/FulfillLineItem", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/requests/*/lineItems/*}:fulfill"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Requests/FulfillLineItem", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/requests/*/lineItems/*}:fulfill"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1426,7 +1426,7 @@ func RegisterRequestsHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/CreateRequest", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/projects/*}/requests"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/CreateRequest", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/spaces/*}/requests"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1443,7 +1443,7 @@ func RegisterRequestsHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/GetRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/requests/*}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/GetRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/requests/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1460,7 +1460,7 @@ func RegisterRequestsHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/ListRequests", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/projects/*}/requests"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/ListRequests", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/spaces/*}/requests"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1477,7 +1477,7 @@ func RegisterRequestsHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/UpdateRequest", runtime.WithHTTPPathPattern("/v1/{request.name=organizations/*/projects/*/requests/*}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/UpdateRequest", runtime.WithHTTPPathPattern("/v1/{request.name=organizations/*/spaces/*/requests/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1494,7 +1494,7 @@ func RegisterRequestsHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/DeleteRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/requests/*}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/DeleteRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/requests/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1511,7 +1511,7 @@ func RegisterRequestsHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/SubmitRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/requests/*}:submit"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/SubmitRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/requests/*}:submit"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1528,7 +1528,7 @@ func RegisterRequestsHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/AssignRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/requests/*}:assign"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/AssignRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/requests/*}:assign"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1545,7 +1545,7 @@ func RegisterRequestsHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/ClaimRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/requests/*}:claim"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/ClaimRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/requests/*}:claim"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1562,7 +1562,7 @@ func RegisterRequestsHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/DeliverRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/requests/*}:deliver"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/DeliverRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/requests/*}:deliver"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1579,7 +1579,7 @@ func RegisterRequestsHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/ApproveRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/requests/*}:approve"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/ApproveRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/requests/*}:approve"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1596,7 +1596,7 @@ func RegisterRequestsHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/RequestRevision", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/requests/*}:requestRevision"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/RequestRevision", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/requests/*}:requestRevision"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1613,7 +1613,7 @@ func RegisterRequestsHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/RejectRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/requests/*}:reject"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/RejectRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/requests/*}:reject"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1630,7 +1630,7 @@ func RegisterRequestsHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/CancelRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/requests/*}:cancel"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/CancelRequest", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/requests/*}:cancel"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1647,7 +1647,7 @@ func RegisterRequestsHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/CreateLineItem", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/projects/*/requests/*}/lineItems"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/CreateLineItem", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/spaces/*/requests/*}/lineItems"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1664,7 +1664,7 @@ func RegisterRequestsHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/GetLineItem", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/requests/*/lineItems/*}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/GetLineItem", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/requests/*/lineItems/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1681,7 +1681,7 @@ func RegisterRequestsHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/ListLineItems", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/projects/*/requests/*}/lineItems"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/ListLineItems", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/spaces/*/requests/*}/lineItems"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1698,7 +1698,7 @@ func RegisterRequestsHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/UpdateLineItem", runtime.WithHTTPPathPattern("/v1/{line_item.name=organizations/*/projects/*/requests/*/lineItems/*}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/UpdateLineItem", runtime.WithHTTPPathPattern("/v1/{line_item.name=organizations/*/spaces/*/requests/*/lineItems/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1715,7 +1715,7 @@ func RegisterRequestsHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/DeleteLineItem", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/requests/*/lineItems/*}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/DeleteLineItem", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/requests/*/lineItems/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1732,7 +1732,7 @@ func RegisterRequestsHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/FulfillLineItem", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/requests/*/lineItems/*}:fulfill"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Requests/FulfillLineItem", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/requests/*/lineItems/*}:fulfill"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1749,25 +1749,25 @@ func RegisterRequestsHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 }
 
 var (
-	pattern_Requests_CreateRequest_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3, 2, 4}, []string{"v1", "organizations", "projects", "parent", "requests"}, ""))
-	pattern_Requests_GetRequest_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "projects", "requests", "name"}, ""))
-	pattern_Requests_ListRequests_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3, 2, 4}, []string{"v1", "organizations", "projects", "parent", "requests"}, ""))
-	pattern_Requests_UpdateRequest_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "projects", "requests", "request.name"}, ""))
-	pattern_Requests_DeleteRequest_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "projects", "requests", "name"}, ""))
-	pattern_Requests_SubmitRequest_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "projects", "requests", "name"}, "submit"))
-	pattern_Requests_AssignRequest_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "projects", "requests", "name"}, "assign"))
-	pattern_Requests_ClaimRequest_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "projects", "requests", "name"}, "claim"))
-	pattern_Requests_DeliverRequest_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "projects", "requests", "name"}, "deliver"))
-	pattern_Requests_ApproveRequest_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "projects", "requests", "name"}, "approve"))
-	pattern_Requests_RequestRevision_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "projects", "requests", "name"}, "requestRevision"))
-	pattern_Requests_RejectRequest_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "projects", "requests", "name"}, "reject"))
-	pattern_Requests_CancelRequest_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "projects", "requests", "name"}, "cancel"))
-	pattern_Requests_CreateLineItem_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4, 2, 5}, []string{"v1", "organizations", "projects", "requests", "parent", "lineItems"}, ""))
-	pattern_Requests_GetLineItem_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 2, 4, 1, 0, 4, 8, 5, 5}, []string{"v1", "organizations", "projects", "requests", "lineItems", "name"}, ""))
-	pattern_Requests_ListLineItems_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4, 2, 5}, []string{"v1", "organizations", "projects", "requests", "parent", "lineItems"}, ""))
-	pattern_Requests_UpdateLineItem_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 2, 4, 1, 0, 4, 8, 5, 5}, []string{"v1", "organizations", "projects", "requests", "lineItems", "line_item.name"}, ""))
-	pattern_Requests_DeleteLineItem_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 2, 4, 1, 0, 4, 8, 5, 5}, []string{"v1", "organizations", "projects", "requests", "lineItems", "name"}, ""))
-	pattern_Requests_FulfillLineItem_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 2, 4, 1, 0, 4, 8, 5, 5}, []string{"v1", "organizations", "projects", "requests", "lineItems", "name"}, "fulfill"))
+	pattern_Requests_CreateRequest_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3, 2, 4}, []string{"v1", "organizations", "spaces", "parent", "requests"}, ""))
+	pattern_Requests_GetRequest_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "spaces", "requests", "name"}, ""))
+	pattern_Requests_ListRequests_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3, 2, 4}, []string{"v1", "organizations", "spaces", "parent", "requests"}, ""))
+	pattern_Requests_UpdateRequest_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "spaces", "requests", "request.name"}, ""))
+	pattern_Requests_DeleteRequest_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "spaces", "requests", "name"}, ""))
+	pattern_Requests_SubmitRequest_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "spaces", "requests", "name"}, "submit"))
+	pattern_Requests_AssignRequest_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "spaces", "requests", "name"}, "assign"))
+	pattern_Requests_ClaimRequest_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "spaces", "requests", "name"}, "claim"))
+	pattern_Requests_DeliverRequest_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "spaces", "requests", "name"}, "deliver"))
+	pattern_Requests_ApproveRequest_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "spaces", "requests", "name"}, "approve"))
+	pattern_Requests_RequestRevision_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "spaces", "requests", "name"}, "requestRevision"))
+	pattern_Requests_RejectRequest_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "spaces", "requests", "name"}, "reject"))
+	pattern_Requests_CancelRequest_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "spaces", "requests", "name"}, "cancel"))
+	pattern_Requests_CreateLineItem_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4, 2, 5}, []string{"v1", "organizations", "spaces", "requests", "parent", "lineItems"}, ""))
+	pattern_Requests_GetLineItem_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 2, 4, 1, 0, 4, 8, 5, 5}, []string{"v1", "organizations", "spaces", "requests", "lineItems", "name"}, ""))
+	pattern_Requests_ListLineItems_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4, 2, 5}, []string{"v1", "organizations", "spaces", "requests", "parent", "lineItems"}, ""))
+	pattern_Requests_UpdateLineItem_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 2, 4, 1, 0, 4, 8, 5, 5}, []string{"v1", "organizations", "spaces", "requests", "lineItems", "line_item.name"}, ""))
+	pattern_Requests_DeleteLineItem_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 2, 4, 1, 0, 4, 8, 5, 5}, []string{"v1", "organizations", "spaces", "requests", "lineItems", "name"}, ""))
+	pattern_Requests_FulfillLineItem_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 2, 4, 1, 0, 4, 8, 5, 5}, []string{"v1", "organizations", "spaces", "requests", "lineItems", "name"}, "fulfill"))
 )
 
 var (

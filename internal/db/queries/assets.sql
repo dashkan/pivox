@@ -1,5 +1,5 @@
 -- name: CreateAsset :one
-INSERT INTO assets (id, project_id, endpoint_id, name, display_name, import_path, filename, state, annotations, created_by, updated_by)
+INSERT INTO assets (id, space_id, endpoint_id, name, display_name, import_path, filename, state, annotations, created_by, updated_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
 RETURNING *;
 
@@ -7,25 +7,25 @@ RETURNING *;
 SELECT * FROM assets WHERE id = $1;
 
 -- name: GetAssetByName :one
-SELECT * FROM assets WHERE project_id = $1 AND name = $2;
+SELECT * FROM assets WHERE space_id = $1 AND name = $2;
 
 -- name: GetAssetByChecksum :one
-SELECT * FROM assets WHERE project_id = $1 AND checksum_sha256 = $2 AND delete_time IS NULL;
+SELECT * FROM assets WHERE space_id = $1 AND checksum_sha256 = $2 AND delete_time IS NULL;
 
--- name: ListAssetsByProject :many
+-- name: ListAssetsBySpace :many
 SELECT * FROM assets
-WHERE project_id = $1 AND delete_time IS NULL
+WHERE space_id = $1 AND delete_time IS NULL
 ORDER BY create_time DESC
 LIMIT $2 OFFSET $3;
 
--- name: ListAssetsByProjectWithDeleted :many
+-- name: ListAssetsBySpaceWithDeleted :many
 SELECT * FROM assets
-WHERE project_id = $1
+WHERE space_id = $1
 ORDER BY create_time DESC
 LIMIT $2 OFFSET $3;
 
--- name: CountAssetsByProject :one
-SELECT count(*) FROM assets WHERE project_id = $1 AND delete_time IS NULL;
+-- name: CountAssetsBySpace :one
+SELECT count(*) FROM assets WHERE space_id = $1 AND delete_time IS NULL;
 
 -- name: UpdateAsset :one
 UPDATE assets
@@ -89,7 +89,7 @@ LIMIT $1;
 
 -- name: SearchAssets :many
 SELECT * FROM assets
-WHERE project_id = $1
+WHERE space_id = $1
   AND delete_time IS NULL
   AND search_vector @@ plainto_tsquery('english', $2)
 ORDER BY ts_rank(search_vector, plainto_tsquery('english', $2)) DESC

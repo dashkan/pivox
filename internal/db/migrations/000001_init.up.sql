@@ -22,8 +22,8 @@
 -- ============================================================================
 CREATE TYPE resource_state AS ENUM ('ACTIVE', 'DELETE_REQUESTED');
 CREATE TYPE role_member_type AS ENUM ('user', 'group');
-CREATE TYPE project_role AS ENUM ('ADMIN', 'EDITOR', 'VIEWER');
-CREATE TYPE project_member_type AS ENUM ('user', 'group');
+CREATE TYPE space_role AS ENUM ('ADMIN', 'EDITOR', 'VIEWER');
+CREATE TYPE space_member_type AS ENUM ('user', 'group');
 CREATE TYPE invitation_state AS ENUM (
     'PENDING', 'ACCEPTED', 'DECLINED', 'REVOKED', 'EXPIRED'
 );
@@ -95,9 +95,9 @@ CREATE TABLE organizations (
 CREATE INDEX idx_organizations_name ON organizations (name) WHERE delete_time IS NULL;
 
 -- ============================================================================
--- projects
+-- spaces
 -- ============================================================================
-CREATE TABLE projects (
+CREATE TABLE spaces (
     id             UUID PRIMARY KEY DEFAULT uuidv7(),
     -- relationships
     org_id         UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
@@ -123,7 +123,7 @@ CREATE TABLE projects (
     -- constraints
     UNIQUE(org_id, name)
 );
-CREATE INDEX idx_projects_org ON projects (org_id) WHERE delete_time IS NULL;
+CREATE INDEX idx_spaces_org ON spaces (org_id) WHERE delete_time IS NULL;
 
 -- ============================================================================
 -- storage_gateways (per-org, on-prem S3 reverse proxy + cache cluster)
@@ -419,23 +419,23 @@ ALTER TABLE organizations
   FOREIGN KEY (created_by_firebase_identity_id) REFERENCES firebase_identities(id) ON DELETE SET NULL;
 
 -- ============================================================================
--- project_members (user or group <-> project, fixed roles)
+-- space_members (user or group <-> space, fixed roles)
 -- ============================================================================
-CREATE TABLE project_members (
+CREATE TABLE space_members (
     -- relationships
-    project_id  UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    space_id    UUID NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
     member_id   UUID NOT NULL,
-    member_type project_member_type NOT NULL,
+    member_type space_member_type NOT NULL,
     -- domain
-    role        project_role NOT NULL,
+    role        space_role NOT NULL,
     -- audit
     created_by  TEXT NOT NULL DEFAULT '',
     -- timestamps
     create_time TIMESTAMPTZ NOT NULL DEFAULT now(),
     -- constraints
-    PRIMARY KEY (project_id, member_id, member_type)
+    PRIMARY KEY (space_id, member_id, member_type)
 );
-CREATE INDEX idx_project_members_member ON project_members (member_id, member_type);
+CREATE INDEX idx_space_members_member ON space_members (member_id, member_type);
 
 -- ============================================================================
 -- groups
@@ -632,15 +632,15 @@ INSERT INTO public_email_domains (domain) VALUES
   ('tuta.com');
 
 -- ============================================================================
--- Seed: permissions (org-level only; project access uses project_members roles)
+-- Seed: permissions (org-level only; space access uses space_members roles)
 -- ============================================================================
 INSERT INTO permissions (permission_id, display_name, description) VALUES
   -- Organization management
   ('organizations.get', 'Get Organization', 'View organization details'),
   ('organizations.update', 'Update Organization', 'Modify organization settings'),
   ('organizations.delete', 'Delete Organization', 'Delete the organization'),
-  -- Project creation (org-level; within-project access is project-role based)
-  ('projects.create', 'Create Project', 'Create new projects in the organization'),
+  -- Space creation (org-level; within-space access is space-role based)
+  ('spaces.create', 'Create Space', 'Create new spaces in the organization'),
   -- User management
   ('users.get', 'Get User', 'View user details'),
   ('users.list', 'List Users', 'List users in the organization'),
@@ -751,7 +751,7 @@ CREATE TYPE line_item_state AS ENUM (
 CREATE TABLE assets (
     id                  UUID PRIMARY KEY DEFAULT uuidv7(),
     -- relationships
-    project_id          UUID NOT NULL REFERENCES projects(id),
+    space_id            UUID NOT NULL REFERENCES spaces(id),
     endpoint_id         UUID REFERENCES storage_endpoints(id),
     -- identity
     name                TEXT NOT NULL,
@@ -793,13 +793,13 @@ CREATE TABLE assets (
     purge_time          TIMESTAMPTZ,
     expire_time         TIMESTAMPTZ,
     -- constraints
-    UNIQUE(project_id, name)
+    UNIQUE(space_id, name)
 );
-CREATE INDEX idx_assets_project ON assets (project_id, create_time DESC) WHERE delete_time IS NULL;
-CREATE INDEX idx_assets_state ON assets (project_id, state) WHERE delete_time IS NULL;
-CREATE INDEX idx_assets_checksum ON assets (project_id, checksum_sha256) WHERE checksum_sha256 != '';
+CREATE INDEX idx_assets_space ON assets (space_id, create_time DESC) WHERE delete_time IS NULL;
+CREATE INDEX idx_assets_state ON assets (space_id, state) WHERE delete_time IS NULL;
+CREATE INDEX idx_assets_checksum ON assets (space_id, checksum_sha256) WHERE checksum_sha256 != '';
 CREATE INDEX idx_assets_search ON assets USING GIN (search_vector);
-CREATE INDEX idx_assets_import_path ON assets (project_id, import_path) WHERE delete_time IS NULL AND import_path != '';
+CREATE INDEX idx_assets_import_path ON assets (space_id, import_path) WHERE delete_time IS NULL AND import_path != '';
 CREATE INDEX idx_assets_expire ON assets (expire_time) WHERE expire_time IS NOT NULL AND delete_time IS NULL;
 
 -- ============================================================================
@@ -849,7 +849,7 @@ CREATE INDEX idx_renditions_version ON asset_renditions (version_id);
 CREATE TABLE asset_requests (
     id                UUID PRIMARY KEY DEFAULT uuidv7(),
     -- relationships
-    project_id        UUID NOT NULL REFERENCES projects(id),
+    space_id          UUID NOT NULL REFERENCES spaces(id),
     -- identity
     name              TEXT NOT NULL,
     -- domain
@@ -873,10 +873,10 @@ CREATE TABLE asset_requests (
     delivered_time    TIMESTAMPTZ,
     approved_time     TIMESTAMPTZ,
     -- constraints
-    UNIQUE(project_id, name)
+    UNIQUE(space_id, name)
 );
-CREATE INDEX idx_asset_requests_project ON asset_requests (project_id, create_time DESC);
-CREATE INDEX idx_asset_requests_state ON asset_requests (project_id, state);
+CREATE INDEX idx_asset_requests_space ON asset_requests (space_id, create_time DESC);
+CREATE INDEX idx_asset_requests_state ON asset_requests (space_id, state);
 CREATE INDEX idx_asset_requests_assignee ON asset_requests (assignee, state) WHERE assignee != '';
 
 -- ============================================================================
@@ -913,14 +913,14 @@ CREATE INDEX idx_asset_request_line_items_asset ON asset_request_line_items (ass
 -- ============================================================================
 INSERT INTO permissions (permission_id, display_name, description) VALUES
   ('assets.assets.get', 'Get Asset', 'View asset details'),
-  ('assets.assets.list', 'List Assets', 'List assets in a project'),
+  ('assets.assets.list', 'List Assets', 'List assets in a space'),
   ('assets.assets.create', 'Create Asset', 'Create assets'),
   ('assets.assets.update', 'Update Asset', 'Modify asset metadata'),
   ('assets.assets.delete', 'Delete Asset', 'Soft-delete assets'),
   ('assets.assets.undelete', 'Undelete Asset', 'Restore soft-deleted assets'),
   ('assets.assets.import', 'Import Assets', 'Import assets from storage endpoint'),
   ('assets.requests.get', 'Get Request', 'View request details'),
-  ('assets.requests.list', 'List Requests', 'List requests in a project'),
+  ('assets.requests.list', 'List Requests', 'List requests in a space'),
   ('assets.requests.create', 'Create Request', 'Create asset requests'),
   ('assets.requests.update', 'Update Request', 'Modify request details'),
   ('assets.requests.delete', 'Delete Request', 'Soft-delete requests'),

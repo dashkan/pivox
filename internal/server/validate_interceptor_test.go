@@ -19,12 +19,12 @@ func newValidator(t *testing.T) protovalidate.Validator {
 }
 
 func TestFindFieldMaskAndResource(t *testing.T) {
-	t.Run("UpdateProjectRequest", func(t *testing.T) {
-		maskFD, resourceFD := findFieldMaskAndResource((&apiv1.UpdateProjectRequest{}).ProtoReflect().Descriptor())
+	t.Run("UpdateSpaceRequest", func(t *testing.T) {
+		maskFD, resourceFD := findFieldMaskAndResource((&apiv1.UpdateSpaceRequest{}).ProtoReflect().Descriptor())
 		require.NotNil(t, maskFD)
 		require.NotNil(t, resourceFD)
 		assert.Equal(t, "update_mask", string(maskFD.Name()))
-		assert.Equal(t, "project", string(resourceFD.Name()))
+		assert.Equal(t, "space", string(resourceFD.Name()))
 	})
 
 	t.Run("UpdateTagKeyRequest", func(t *testing.T) {
@@ -35,8 +35,8 @@ func TestFindFieldMaskAndResource(t *testing.T) {
 		assert.Equal(t, "tag_key", string(resourceFD.Name()))
 	})
 
-	t.Run("GetProjectRequest_NoMask", func(t *testing.T) {
-		maskFD, resourceFD := findFieldMaskAndResource((&apiv1.GetProjectRequest{}).ProtoReflect().Descriptor())
+	t.Run("GetSpaceRequest_NoMask", func(t *testing.T) {
+		maskFD, resourceFD := findFieldMaskAndResource((&apiv1.GetSpaceRequest{}).ProtoReflect().Descriptor())
 		assert.Nil(t, maskFD)
 		assert.Nil(t, resourceFD)
 	})
@@ -46,11 +46,11 @@ func TestValidateWithFieldMaskAwareness(t *testing.T) {
 	v := newValidator(t)
 
 	t.Run("UpdateWithMask_SkipsResourceValidation", func(t *testing.T) {
-		// Only name + display_name — no project_id (which has min_len: 6).
+		// Only name + display_name — no space_id (which has min_len: 6).
 		// Should pass because the mask makes us skip resource validation.
-		err := validateWithFieldMaskAwareness(&apiv1.UpdateProjectRequest{
-			Project: &apiv1.Project{
-				Name:        "projects/123",
+		err := validateWithFieldMaskAwareness(&apiv1.UpdateSpaceRequest{
+			Space: &apiv1.Space{
+				Name:        "spaces/123",
 				DisplayName: "Updated",
 			},
 			UpdateMask: &fieldmaskpb.FieldMask{
@@ -61,7 +61,7 @@ func TestValidateWithFieldMaskAwareness(t *testing.T) {
 	})
 
 	t.Run("UpdateWithMask_NilResource_Fails", func(t *testing.T) {
-		err := validateWithFieldMaskAwareness(&apiv1.UpdateProjectRequest{
+		err := validateWithFieldMaskAwareness(&apiv1.UpdateSpaceRequest{
 			UpdateMask: &fieldmaskpb.FieldMask{
 				Paths: []string{"display_name"},
 			},
@@ -72,10 +72,10 @@ func TestValidateWithFieldMaskAwareness(t *testing.T) {
 
 	t.Run("UpdateWithoutMask_ValidatesNormally", func(t *testing.T) {
 		// No mask — should validate the full resource normally.
-		// With no mask, a valid project should pass.
-		err := validateWithFieldMaskAwareness(&apiv1.UpdateProjectRequest{
-			Project: &apiv1.Project{
-				Name:        "projects/123",
+		// With no mask, a valid space should pass.
+		err := validateWithFieldMaskAwareness(&apiv1.UpdateSpaceRequest{
+			Space: &apiv1.Space{
+				Name:        "spaces/123",
 				DisplayName: "Updated",
 			},
 		}, v)
@@ -83,8 +83,8 @@ func TestValidateWithFieldMaskAwareness(t *testing.T) {
 	})
 
 	t.Run("NonUpdateRequest_ValidatesNormally", func(t *testing.T) {
-		// GetProjectRequest with empty name — should fail validation.
-		err := validateWithFieldMaskAwareness(&apiv1.GetProjectRequest{
+		// GetSpaceRequest with empty name — should fail validation.
+		err := validateWithFieldMaskAwareness(&apiv1.GetSpaceRequest{
 			Name: "",
 		}, v)
 		assert.Error(t, err)
@@ -107,7 +107,7 @@ func TestValidateWithFieldMaskAwareness(t *testing.T) {
 	t.Run("UpdateKey_SkipsResourceValidation", func(t *testing.T) {
 		err := validateWithFieldMaskAwareness(&apiv1.UpdateKeyRequest{
 			Key: &apiv1.Key{
-				Name:        "projects/123/keys/456",
+				Name:        "spaces/123/keys/456",
 				DisplayName: "updated",
 			},
 			UpdateMask: &fieldmaskpb.FieldMask{
@@ -120,9 +120,9 @@ func TestValidateWithFieldMaskAwareness(t *testing.T) {
 	t.Run("UpdateWithMask_ValidatesMaskedField", func(t *testing.T) {
 		// display_name has max_len: 30. Sending a value that exceeds it
 		// in the mask should fail — proving masked fields ARE validated.
-		err := validateWithFieldMaskAwareness(&apiv1.UpdateProjectRequest{
-			Project: &apiv1.Project{
-				Name:        "projects/123",
+		err := validateWithFieldMaskAwareness(&apiv1.UpdateSpaceRequest{
+			Space: &apiv1.Space{
+				Name:        "spaces/123",
 				DisplayName: "This display name is way too long to pass validation",
 			},
 			UpdateMask: &fieldmaskpb.FieldMask{

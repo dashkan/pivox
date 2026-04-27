@@ -32,7 +32,7 @@ import (
 	"github.com/dashkan/pivox/internal/service/apikeys"
 	"github.com/dashkan/pivox/internal/service/operations"
 	"github.com/dashkan/pivox/internal/service/organizations"
-	"github.com/dashkan/pivox/internal/service/projects"
+	"github.com/dashkan/pivox/internal/service/spaces"
 	"github.com/dashkan/pivox/internal/service/storage"
 	"github.com/dashkan/pivox/internal/service/tags"
 
@@ -74,9 +74,9 @@ func main() {
 	f.String("rest-port", envOrDefault("PIVOX_REST_PORT", ":8080"), "REST gateway listen address")
 	f.String("debug-port", envOrDefault("PIVOX_DEBUG_PORT", ":9090"), "Debug/health listen address")
 	f.String("log-level", envOrDefault("PIVOX_LOG_LEVEL", "info"), "Log level (debug, info, warn, error)")
-	// Firebase credentials AND project ID resolve entirely through
+	// Firebase credentials AND space ID resolve entirely through
 	// Google's standard ADC chain (service-account JSON → metadata
-	// server → gcloud user identity + quota project). No Pivox-named
+	// server → gcloud user identity + quota space). No Pivox-named
 	// credential flag — operators set the standard env var.
 	f.Duration("delegated-auth-session-ttl", envOrDuration("PIVOX_DELEGATED_AUTH_SESSION_TTL", 5*time.Minute), "How long a delegated auth session code remains valid")
 	f.Duration("delegated-auth-poll-interval", envOrDuration("PIVOX_DELEGATED_AUTH_POLL_INTERVAL", 5*time.Second), "Poll interval returned to delegated auth clients")
@@ -249,7 +249,7 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	// Register all services
 	longrunningpb.RegisterOperationsServer(grpcServer, operations.NewOperationsServer(lroManager))
-	apiv1.RegisterProjectsServer(grpcServer, projects.NewProjectsServer(pool, queries, appCodec))
+	apiv1.RegisterSpacesServer(grpcServer, spaces.NewSpacesServer(pool, queries, appCodec))
 	apiv1.RegisterOrganizationsServer(grpcServer, organizations.NewOrganizationsServer(pool, queries, authSvc, appCodec, server.AuthenticatedUID))
 	apiv1.RegisterTagKeysServer(grpcServer, tags.NewTagKeysServer(pool, queries, appCodec))
 	apiv1.RegisterTagValuesServer(grpcServer, tags.NewTagValuesServer(pool, queries, appCodec))
@@ -331,7 +331,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	grpcEndpoint := fmt.Sprintf("localhost%s", cfg.GRPCPort)
 
 	for _, reg := range []func(context.Context, *runtime.ServeMux, string, []grpc.DialOption) error{
-		apiv1.RegisterProjectsHandlerFromEndpoint,
+		apiv1.RegisterSpacesHandlerFromEndpoint,
 		apiv1.RegisterOrganizationsHandlerFromEndpoint,
 		apiv1.RegisterTagKeysHandlerFromEndpoint,
 		apiv1.RegisterTagValuesHandlerFromEndpoint,

@@ -29,7 +29,7 @@ import "google/protobuf/timestamp.proto";
 
 option go_package = "pivox/assets/v1;assetsv1";
 
-// Manages media assets within a project. Assets represent media files
+// Manages media assets within a space. Assets represent media files
 // (images, video, audio, graphics) with rich metadata, versioning,
 // and AI-generated descriptions. Creation is an LRO that runs the
 // full ingestion pipeline: validation, metadata extraction, thumbnail
@@ -38,7 +38,7 @@ option go_package = "pivox/assets/v1;assetsv1";
 service Assets {
   option (google.api.default_host) = "api.pivox.io";
 
-  // Creates a new asset in the specified project. The asset undergoes
+  // Creates a new asset in the specified space. The asset undergoes
   // a full ingestion pipeline as a long-running operation including
   // format validation, metadata extraction, thumbnail generation,
   // and AI processing.
@@ -47,10 +47,10 @@ service Assets {
   // created for the Request workflow.
   //
   // The caller must have `assets.assets.create` permission on the parent
-  // project.
+  // space.
   rpc CreateAsset(CreateAssetRequest) returns (google.longrunning.Operation) {
     option (google.api.http) = {
-      post: "/v1/{parent=organizations/*/projects/*}/assets"
+      post: "/v1/{parent=organizations/*/spaces/*}/assets"
       body: "asset"
     };
     option (google.api.method_signature) = "parent,asset";
@@ -62,13 +62,13 @@ service Assets {
 
   // Retrieves an asset by resource name.
   rpc GetAsset(GetAssetRequest) returns (Asset) {
-    option (google.api.http) = {get: "/v1/{name=organizations/*/projects/*/assets/*}"};
+    option (google.api.http) = {get: "/v1/{name=organizations/*/spaces/*/assets/*}"};
     option (google.api.method_signature) = "name";
   }
 
-  // Lists assets in a project.
+  // Lists assets in a space.
   rpc ListAssets(ListAssetsRequest) returns (ListAssetsResponse) {
-    option (google.api.http) = {get: "/v1/{parent=organizations/*/projects/*}/assets"};
+    option (google.api.http) = {get: "/v1/{parent=organizations/*/spaces/*}/assets"};
     option (google.api.method_signature) = "parent";
   }
 
@@ -76,7 +76,7 @@ service Assets {
   // File content is immutable — create a new version instead.
   rpc UpdateAsset(UpdateAssetRequest) returns (google.longrunning.Operation) {
     option (google.api.http) = {
-      patch: "/v1/{asset.name=organizations/*/projects/*/assets/*}"
+      patch: "/v1/{asset.name=organizations/*/spaces/*/assets/*}"
       body: "asset"
     };
     option (google.api.method_signature) = "asset,update_mask";
@@ -90,7 +90,7 @@ service Assets {
   // will be purged after the retention period. Can be restored with
   // UndeleteAsset before purge.
   rpc DeleteAsset(DeleteAssetRequest) returns (google.longrunning.Operation) {
-    option (google.api.http) = {delete: "/v1/{name=organizations/*/projects/*/assets/*}"};
+    option (google.api.http) = {delete: "/v1/{name=organizations/*/spaces/*/assets/*}"};
     option (google.api.method_signature) = "name";
     option (google.longrunning.operation_info) = {
       response_type: "Asset"
@@ -101,7 +101,7 @@ service Assets {
   // Restores a soft-deleted asset.
   rpc UndeleteAsset(UndeleteAssetRequest) returns (google.longrunning.Operation) {
     option (google.api.http) = {
-      post: "/v1/{name=organizations/*/projects/*/assets/*}:undelete"
+      post: "/v1/{name=organizations/*/spaces/*/assets/*}:undelete"
       body: "*"
     };
     option (google.api.method_signature) = "name";
@@ -116,7 +116,7 @@ service Assets {
   // Previous versions remain accessible.
   rpc CreateAssetVersion(CreateAssetVersionRequest) returns (google.longrunning.Operation) {
     option (google.api.http) = {
-      post: "/v1/{parent=organizations/*/projects/*/assets/*}/versions"
+      post: "/v1/{parent=organizations/*/spaces/*/assets/*}/versions"
       body: "asset_version"
     };
     option (google.api.method_signature) = "parent,asset_version";
@@ -128,13 +128,13 @@ service Assets {
 
   // Retrieves a specific version of an asset.
   rpc GetAssetVersion(GetAssetVersionRequest) returns (AssetVersion) {
-    option (google.api.http) = {get: "/v1/{name=organizations/*/projects/*/assets/*/versions/*}"};
+    option (google.api.http) = {get: "/v1/{name=organizations/*/spaces/*/assets/*/versions/*}"};
     option (google.api.method_signature) = "name";
   }
 
   // Lists all versions of an asset.
   rpc ListAssetVersions(ListAssetVersionsRequest) returns (ListAssetVersionsResponse) {
-    option (google.api.http) = {get: "/v1/{parent=organizations/*/projects/*/assets/*}/versions"};
+    option (google.api.http) = {get: "/v1/{parent=organizations/*/spaces/*/assets/*}/versions"};
     option (google.api.method_signature) = "parent";
   }
 
@@ -144,10 +144,10 @@ service Assets {
   // import progress.
   //
   // The caller must have `assets.assets.create` permission on the
-  // parent project and `storage.endpoints.get` on the source endpoint.
+  // parent space and `storage.endpoints.get` on the source endpoint.
   rpc ImportAssets(ImportAssetsRequest) returns (google.longrunning.Operation) {
     option (google.api.http) = {
-      post: "/v1/{parent=organizations/*/projects/*}/assets:import"
+      post: "/v1/{parent=organizations/*/spaces/*}/assets:import"
       body: "*"
     };
     // (-- api-linter: client-libraries::4232::required-fields=disabled
@@ -163,7 +163,7 @@ service Assets {
   // Metadata is a singleton sub-resource — not included in Get/List
   // Asset responses to keep them lightweight.
   rpc GetAssetMetadata(GetAssetMetadataRequest) returns (AssetMetadata) {
-    option (google.api.http) = {get: "/v1/{name=organizations/*/projects/*/assets/*/metadata}"};
+    option (google.api.http) = {get: "/v1/{name=organizations/*/spaces/*/assets/*/metadata}"};
     option (google.api.method_signature) = "name";
   }
 }
@@ -175,7 +175,7 @@ service Assets {
 message Asset {
   option (google.api.resource) = {
     type: "pivox.assets/Asset"
-    pattern: "organizations/{organization}/projects/{project}/assets/{asset}"
+    pattern: "organizations/{organization}/spaces/{space}/assets/{asset}"
     plural: "assets"
     singular: "asset"
   };
@@ -226,7 +226,7 @@ message Asset {
   }
 
   // Output only. The resource name of the asset. Format:
-  // `organizations/{organization}/projects/{project}/assets/{asset}`
+  // `organizations/{organization}/spaces/{space}/assets/{asset}`
   string name = 1 [(google.api.field_behavior) = IDENTIFIER];
 
   // Required. A human-readable name for the asset.
@@ -267,7 +267,7 @@ message Asset {
 
   // Output only. SHA-256 checksum of the original file. Used for
   // deduplication — if a file with the same checksum already exists
-  // in the project, the existing asset is returned instead of creating
+  // in the space, the existing asset is returned instead of creating
   // a duplicate.
   string checksum_sha256 = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 
@@ -337,13 +337,13 @@ message Asset {
 message AssetVersion {
   option (google.api.resource) = {
     type: "pivox.assets/AssetVersion"
-    pattern: "organizations/{organization}/projects/{project}/assets/{asset}/versions/{version}"
+    pattern: "organizations/{organization}/spaces/{space}/assets/{asset}/versions/{version}"
     plural: "versions"
     singular: "assetVersion"
   };
 
   // Output only. The resource name of the version. Format:
-  // `organizations/{organization}/projects/{project}/assets/{asset}/versions/{version}`
+  // `organizations/{organization}/spaces/{space}/assets/{asset}/versions/{version}`
   string name = 1 [(google.api.field_behavior) = IDENTIFIER];
 
   // Output only. The sequential version number (1, 2, 3...).
@@ -537,8 +537,8 @@ message UploadPart {
 // (-- api-linter: core::0133::request-unknown-fields=disabled
 //     aip.dev/not-precedent: endpoint, filename, size_bytes needed for upload flow. --)
 message CreateAssetRequest {
-  // Required. The parent project. Format:
-  // `organizations/{organization}/projects/{project}`
+  // Required. The parent space. Format:
+  // `organizations/{organization}/spaces/{space}`
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {child_type: "pivox.assets/Asset"},
@@ -637,8 +637,8 @@ message GetAssetRequest {
 
 // The request sent to the ListAssets method.
 message ListAssetsRequest {
-  // Required. The parent project whose assets are being listed.
-  // Format: `organizations/{organization}/projects/{project}`
+  // Required. The parent space whose assets are being listed.
+  // Format: `organizations/{organization}/spaces/{space}`
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {child_type: "pivox.assets/Asset"},
@@ -696,7 +696,7 @@ message ListAssetsRequest {
 
 // The response from the ListAssets method.
 message ListAssetsResponse {
-  // The assets belonging to the specified project.
+  // The assets belonging to the specified space.
   repeated Asset assets = 1;
 
   // A pagination token for the next page.
@@ -769,7 +769,7 @@ message UndeleteAssetMetadata {}
 //     aip.dev/not-precedent: filename, size_bytes, source_version, crop needed for version creation flow. --)
 message CreateAssetVersionRequest {
   // Required. The parent asset. Format:
-  // `organizations/{organization}/projects/{project}/assets/{asset}`
+  // `organizations/{organization}/spaces/{space}/assets/{asset}`
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {child_type: "pivox.assets/AssetVersion"},
@@ -861,8 +861,8 @@ message ListAssetVersionsResponse {
 
 // The request sent to the ImportAssets method.
 message ImportAssetsRequest {
-  // Required. The parent project to import assets into. Format:
-  // `organizations/{organization}/projects/{project}`
+  // Required. The parent space to import assets into. Format:
+  // `organizations/{organization}/spaces/{space}`
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {child_type: "pivox.assets/Asset"},
@@ -941,7 +941,7 @@ message ImportAssetsMetadata {
 // The request sent to the GetAssetMetadata method.
 message GetAssetMetadataRequest {
   // Required. The resource name of the asset metadata. Format:
-  // `organizations/{organization}/projects/{project}/assets/{asset}/metadata`
+  // `organizations/{organization}/spaces/{space}/assets/{asset}/metadata`
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.assets/AssetMetadata"},
@@ -956,13 +956,13 @@ message GetAssetMetadataRequest {
 message AssetMetadata {
   option (google.api.resource) = {
     type: "pivox.assets/AssetMetadata"
-    pattern: "organizations/{organization}/projects/{project}/assets/{asset}/metadata"
+    pattern: "organizations/{organization}/spaces/{space}/assets/{asset}/metadata"
     plural: "metadata"
     singular: "metadata"
   };
 
   // Output only. The resource name. Format:
-  // `organizations/{organization}/projects/{project}/assets/{asset}/metadata`
+  // `organizations/{organization}/spaces/{space}/assets/{asset}/metadata`
   string name = 1 [(google.api.field_behavior) = IDENTIFIER];
 
   // Output only. The extracted metadata as a structured JSON object.

@@ -82,7 +82,7 @@ message ArtifactVersion {
     InlineContent inline = 2;
 
     // Resource name of the asset version for binary artifacts.
-    // Format: `organizations/{organization}/projects/{project}/assets/{asset}/versions/{version}`
+    // Format: `organizations/{organization}/spaces/{space}/assets/{asset}/versions/{version}`
     string asset_version = 3;
   }
 

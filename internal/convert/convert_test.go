@@ -34,7 +34,7 @@ func TestAssetToProto(t *testing.T) {
 	tests := []struct {
 		name        string
 		row         db.Asset
-		projectName string
+		spaceName string
 		wantName    string
 		wantState   assetsv1.Asset_State
 		checkFunc   func(t *testing.T, pb *assetsv1.Asset)
@@ -65,8 +65,8 @@ func TestAssetToProto(t *testing.T) {
 				PurgeTime:       pgtype.Timestamptz{Time: purgeTime, Valid: true},
 				ExpireTime:      pgtype.Timestamptz{Time: expireTime, Valid: true},
 			},
-			projectName: "organizations/acme/projects/my-project",
-			wantName:    "organizations/acme/projects/my-project/assets/abc123",
+			spaceName: "organizations/acme/spaces/my-space",
+			wantName:    "organizations/acme/spaces/my-space/assets/abc123",
 			wantState:   assetsv1.Asset_ACTIVE,
 			checkFunc: func(t *testing.T, pb *assetsv1.Asset) {
 				assert.Equal(t, assetsv1.Asset_IMAGE, pb.MediaType)
@@ -100,8 +100,8 @@ func TestAssetToProto(t *testing.T) {
 				PurgeTime:       pgtype.Timestamptz{Valid: false},
 				ExpireTime:      pgtype.Timestamptz{Valid: false},
 			},
-			projectName: "organizations/acme/projects/my-project",
-			wantName:    "organizations/acme/projects/my-project/assets/def456",
+			spaceName: "organizations/acme/spaces/my-space",
+			wantName:    "organizations/acme/spaces/my-space/assets/def456",
 			wantState:   assetsv1.Asset_PLACEHOLDER,
 			checkFunc: func(t *testing.T, pb *assetsv1.Asset) {
 				assert.Equal(t, assetsv1.Asset_MEDIA_TYPE_UNSPECIFIED, pb.MediaType)
@@ -123,8 +123,8 @@ func TestAssetToProto(t *testing.T) {
 				CreateTime: now,
 				UpdateTime: updated,
 			},
-			projectName: "organizations/acme/projects/p1",
-			wantName:    "organizations/acme/projects/p1/assets/proc1",
+			spaceName: "organizations/acme/spaces/p1",
+			wantName:    "organizations/acme/spaces/p1/assets/proc1",
 			wantState:   assetsv1.Asset_PROCESSING,
 		},
 		{
@@ -136,8 +136,8 @@ func TestAssetToProto(t *testing.T) {
 				CreateTime: now,
 				UpdateTime: updated,
 			},
-			projectName: "organizations/acme/projects/p1",
-			wantName:    "organizations/acme/projects/p1/assets/fail1",
+			spaceName: "organizations/acme/spaces/p1",
+			wantName:    "organizations/acme/spaces/p1/assets/fail1",
 			wantState:   assetsv1.Asset_FAILED,
 		},
 		{
@@ -149,15 +149,15 @@ func TestAssetToProto(t *testing.T) {
 				CreateTime: now,
 				UpdateTime: updated,
 			},
-			projectName: "organizations/acme/projects/p1",
-			wantName:    "organizations/acme/projects/p1/assets/del1",
+			spaceName: "organizations/acme/spaces/p1",
+			wantName:    "organizations/acme/spaces/p1/assets/del1",
 			wantState:   assetsv1.Asset_DELETE_REQUESTED,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pb := AssetToProto(tt.row, tt.projectName)
+			pb := AssetToProto(tt.row, tt.spaceName)
 			require.NotNil(t, pb)
 			assert.Equal(t, tt.wantName, pb.Name)
 			assert.Equal(t, tt.wantState, pb.State)
@@ -201,7 +201,7 @@ func TestAssetVersionToProto(t *testing.T) {
 				CreatedBy:      "editor@test.com",
 				CreateTime:     now,
 			},
-			assetName: "organizations/acme/projects/p1/assets/abc",
+			assetName: "organizations/acme/spaces/p1/assets/abc",
 		},
 		{
 			name: "version with ingestion error",
@@ -215,7 +215,7 @@ func TestAssetVersionToProto(t *testing.T) {
 				CreatedBy:      "user@test.com",
 				CreateTime:     now,
 			},
-			assetName: "organizations/acme/projects/p1/assets/def",
+			assetName: "organizations/acme/spaces/p1/assets/def",
 		},
 	}
 
@@ -480,7 +480,7 @@ func TestRequestToProto(t *testing.T) {
 	tests := []struct {
 		name        string
 		row         db.AssetRequest
-		projectName string
+		spaceName string
 		wantState   assetsv1.Request_State
 		checkFunc   func(t *testing.T, pb *assetsv1.Request)
 	}{
@@ -504,7 +504,7 @@ func TestRequestToProto(t *testing.T) {
 				ApprovedTime:  pgtype.Timestamptz{Time: approvedTime, Valid: true},
 				Annotations:   annotationsJSON,
 			},
-			projectName: "organizations/acme/projects/p1",
+			spaceName: "organizations/acme/spaces/p1",
 			wantState:   assetsv1.Request_OPEN,
 			checkFunc: func(t *testing.T, pb *assetsv1.Request) {
 				assert.NotNil(t, pb.DueTime)
@@ -526,7 +526,7 @@ func TestRequestToProto(t *testing.T) {
 				CreateTime:  now,
 				UpdateTime:  updated,
 			},
-			projectName: "organizations/acme/projects/p1",
+			spaceName: "organizations/acme/spaces/p1",
 			wantState:   assetsv1.Request_DRAFT,
 			checkFunc: func(t *testing.T, pb *assetsv1.Request) {
 				assert.Nil(t, pb.DeleteTime)
@@ -541,9 +541,9 @@ func TestRequestToProto(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pb := RequestToProto(tt.row, tt.projectName)
+			pb := RequestToProto(tt.row, tt.spaceName)
 			require.NotNil(t, pb)
-			assert.Equal(t, tt.projectName+"/requests/"+tt.row.Name, pb.Name)
+			assert.Equal(t, tt.spaceName+"/requests/"+tt.row.Name, pb.Name)
 			assert.Equal(t, tt.row.DisplayName, pb.DisplayName)
 			assert.Equal(t, tt.row.Description, pb.Description)
 			assert.Equal(t, tt.wantState, pb.State)
@@ -569,7 +569,7 @@ func TestLineItemToProto(t *testing.T) {
 		name        string
 		row         db.AssetRequestLineItem
 		requestName string
-		projectName string
+		spaceName string
 		checkFunc   func(t *testing.T, pb *assetsv1.LineItem)
 	}{
 		{
@@ -587,8 +587,8 @@ func TestLineItemToProto(t *testing.T) {
 				CreateTime:  now,
 				UpdateTime:  updated,
 			},
-			requestName: "organizations/acme/projects/p1/requests/req-1",
-			projectName: "organizations/acme/projects/p1",
+			requestName: "organizations/acme/spaces/p1/requests/req-1",
+			spaceName: "organizations/acme/spaces/p1",
 			checkFunc: func(t *testing.T, pb *assetsv1.LineItem) {
 				assert.Equal(t, assetsv1.Asset_IMAGE, pb.MediaType)
 				assert.NotEmpty(t, pb.Asset)
@@ -608,8 +608,8 @@ func TestLineItemToProto(t *testing.T) {
 				CreateTime:  now,
 				UpdateTime:  updated,
 			},
-			requestName: "organizations/acme/projects/p1/requests/req-1",
-			projectName: "organizations/acme/projects/p1",
+			requestName: "organizations/acme/spaces/p1/requests/req-1",
+			spaceName: "organizations/acme/spaces/p1",
 			checkFunc: func(t *testing.T, pb *assetsv1.LineItem) {
 				assert.Equal(t, assetsv1.Asset_MEDIA_TYPE_UNSPECIFIED, pb.MediaType)
 				assert.Empty(t, pb.Asset)
@@ -620,7 +620,7 @@ func TestLineItemToProto(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pb := LineItemToProto(tt.row, tt.requestName, tt.projectName)
+			pb := LineItemToProto(tt.row, tt.requestName, tt.spaceName)
 			require.NotNil(t, pb)
 			assert.Equal(t, tt.requestName+"/lineItems/"+tt.row.Name, pb.Name)
 			assert.Equal(t, tt.row.DisplayName, pb.DisplayName)
@@ -1171,10 +1171,10 @@ func TestOrgState(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Projects
+// Spaces
 // ---------------------------------------------------------------------------
 
-func TestProjectToProto(t *testing.T) {
+func TestSpaceToProto(t *testing.T) {
 	now := time.Date(2025, 6, 15, 10, 30, 0, 0, time.UTC)
 	updated := now.Add(1 * time.Hour)
 
@@ -1184,17 +1184,17 @@ func TestProjectToProto(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		project   db.Project
+		space   db.Space
 		orgName   string
-		checkFunc func(t *testing.T, pb *apiv1.Project)
+		checkFunc func(t *testing.T, pb *apiv1.Space)
 	}{
 		{
-			name: "active project with labels",
-			project: db.Project{
+			name: "active space with labels",
+			space: db.Space{
 				ID:          uuid.New(),
 				OrgID:       uuid.New(),
-				Name:        "my-project",
-				DisplayName: "My Project",
+				Name:        "my-space",
+				DisplayName: "My Space",
 				State:       db.ResourceStateACTIVE,
 				Etag:        "etag-proj",
 				Labels:      labelsJSON,
@@ -1205,21 +1205,21 @@ func TestProjectToProto(t *testing.T) {
 				PurgeTime:   pgtype.Timestamptz{Valid: false},
 			},
 			orgName: "my-org",
-			checkFunc: func(t *testing.T, pb *apiv1.Project) {
-				assert.Equal(t, "organizations/my-org/projects/my-project", pb.Name)
-				assert.Equal(t, apiv1.Project_ACTIVE, pb.State)
+			checkFunc: func(t *testing.T, pb *apiv1.Space) {
+				assert.Equal(t, "organizations/my-org/spaces/my-space", pb.Name)
+				assert.Equal(t, apiv1.Space_ACTIVE, pb.State)
 				assert.Equal(t, map[string]string{"env": "prod"}, pb.Labels)
 				assert.Nil(t, pb.DeleteTime)
 				assert.Nil(t, pb.PurgeTime)
 			},
 		},
 		{
-			name: "delete-requested project with timestamps",
-			project: db.Project{
+			name: "delete-requested space with timestamps",
+			space: db.Space{
 				ID:          uuid.New(),
 				OrgID:       uuid.New(),
 				Name:        "deleted-proj",
-				DisplayName: "Deleted Project",
+				DisplayName: "Deleted Space",
 				State:       db.ResourceStateDELETEREQUESTED,
 				Etag:        "etag-del",
 				Labels:      nil,
@@ -1230,8 +1230,8 @@ func TestProjectToProto(t *testing.T) {
 				PurgeTime:   pgtype.Timestamptz{Time: now.Add(48 * time.Hour), Valid: true},
 			},
 			orgName: "my-org",
-			checkFunc: func(t *testing.T, pb *apiv1.Project) {
-				assert.Equal(t, apiv1.Project_DELETE_REQUESTED, pb.State)
+			checkFunc: func(t *testing.T, pb *apiv1.Space) {
+				assert.Equal(t, apiv1.Space_DELETE_REQUESTED, pb.State)
 				assert.Nil(t, pb.Labels)
 				assert.NotNil(t, pb.DeleteTime)
 				assert.NotNil(t, pb.PurgeTime)
@@ -1241,10 +1241,10 @@ func TestProjectToProto(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pb := ProjectToProto(tt.project, tt.orgName)
+			pb := SpaceToProto(tt.space, tt.orgName)
 			require.NotNil(t, pb)
-			assert.Equal(t, tt.project.DisplayName, pb.DisplayName)
-			assert.Equal(t, tt.project.Etag, pb.Etag)
+			assert.Equal(t, tt.space.DisplayName, pb.DisplayName)
+			assert.Equal(t, tt.space.Etag, pb.Etag)
 			if tt.checkFunc != nil {
 				tt.checkFunc(t, pb)
 			}
@@ -1252,20 +1252,20 @@ func TestProjectToProto(t *testing.T) {
 	}
 }
 
-func TestProjectState(t *testing.T) {
+func TestSpaceState(t *testing.T) {
 	tests := []struct {
 		name string
 		db   db.ResourceState
-		want apiv1.Project_State
+		want apiv1.Space_State
 	}{
-		{"ACTIVE", db.ResourceStateACTIVE, apiv1.Project_ACTIVE},
-		{"DELETE_REQUESTED", db.ResourceStateDELETEREQUESTED, apiv1.Project_DELETE_REQUESTED},
-		{"unknown defaults to STATE_UNSPECIFIED", db.ResourceState("BOGUS"), apiv1.Project_STATE_UNSPECIFIED},
+		{"ACTIVE", db.ResourceStateACTIVE, apiv1.Space_ACTIVE},
+		{"DELETE_REQUESTED", db.ResourceStateDELETEREQUESTED, apiv1.Space_DELETE_REQUESTED},
+		{"unknown defaults to STATE_UNSPECIFIED", db.ResourceState("BOGUS"), apiv1.Space_STATE_UNSPECIFIED},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := projectState(tt.db)
+			got := spaceState(tt.db)
 			assert.Equal(t, tt.want, got)
 		})
 	}
@@ -1334,7 +1334,7 @@ func TestTagBindingToProto(t *testing.T) {
 
 	tb := db.TagBinding{
 		ID:             tbID,
-		ParentResource: "//pivox.api/organizations/meridian/projects/corp-site",
+		ParentResource: "//pivox.api/organizations/meridian/spaces/corp-site",
 		TagValueID:     tvID,
 		Etag:           "etag-tb",
 		CreateTime:     now,

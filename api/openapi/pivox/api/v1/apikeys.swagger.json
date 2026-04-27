@@ -149,7 +149,7 @@
           },
           {
             "name": "keyId",
-            "description": "User specified key id (optional). If specified, it will become the final\ncomponent of the key resource name.\n\nThe id must be unique within the project, must conform with RFC-1034,\nis restricted to lower-cased letters, and has a maximum length of 63\ncharacters. In another word, the id must match the regular\nexpression: `[a-z]([a-z0-9-]{0,61}[a-z0-9])?`.\n\nThe id must NOT be a UUID-like string.",
+            "description": "User specified key id (optional). If specified, it will become the final\ncomponent of the key resource name.\n\nThe id must be unique within the space, must conform with RFC-1034,\nis restricted to lower-cased letters, and has a maximum length of 63\ncharacters. In another word, the id must match the regular\nexpression: `[a-z]([a-z0-9-]{0,61}[a-z0-9])?`.\n\nThe id must NOT be a UUID-like string.",
             "in": "query",
             "required": false,
             "type": "string"

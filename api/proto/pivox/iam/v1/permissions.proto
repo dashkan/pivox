@@ -34,7 +34,7 @@ message Permission {
   };
 
   // The resource name of the permission.
-  // Format: `permissions/{permission}` (e.g. `permissions/projects.create`)
+  // Format: `permissions/{permission}` (e.g. `permissions/spaces.create`)
   string name = 1 [(google.api.field_behavior) = IDENTIFIER];
 
   // A human-readable name for the permission.

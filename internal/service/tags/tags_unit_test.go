@@ -562,7 +562,7 @@ func TestUnit_CreateTagKey_InvalidParent(t *testing.T) {
 	}{
 		{
 			name:     "wrong collection",
-			parent:   "projects/acme",
+			parent:   "spaces/acme",
 			wantCode: codes.InvalidArgument,
 		},
 		{
@@ -815,7 +815,7 @@ func TestUnit_ListTagKeys_InvalidParent(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := srv.ListTagKeys(ctx, &apiv1.ListTagKeysRequest{
-		Parent: "projects/acme",
+		Parent: "spaces/acme",
 	})
 
 	require.Error(t, err)

@@ -1,4 +1,4 @@
-package projects
+package spaces
 
 import (
 	"context"
@@ -32,11 +32,11 @@ var (
 		CreateTime:  time.Date(2025, 6, 15, 10, 0, 0, 0, time.UTC),
 		UpdateTime:  time.Date(2025, 6, 15, 10, 0, 0, 0, time.UTC),
 	}
-	testDBProject = db.Project{
+	testDBSpace = db.Space{
 		ID:          testProjID,
 		OrgID:       testOrgID,
-		Name:        "my-project",
-		DisplayName: "My Project",
+		Name:        "my-space",
+		DisplayName: "My Space",
 		Labels:      json.RawMessage(`{"env":"prod"}`),
 		State:       db.ResourceStateACTIVE,
 		Etag:        "etag-proj",
@@ -46,36 +46,36 @@ var (
 	}
 )
 
-func TestUnit_GetProject_Success(t *testing.T) {
+func TestUnit_GetSpace_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil)
+	srv := NewSpacesServer(nil, mockQ, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
-	mockQ.On("GetProjectByName", mock.Anything, db.GetProjectByNameParams{
+	mockQ.On("GetSpaceByName", mock.Anything, db.GetSpaceByNameParams{
 		OrgID: testOrgID,
-		Name:  "my-project",
-	}).Return(testDBProject, nil)
+		Name:  "my-space",
+	}).Return(testDBSpace, nil)
 
-	resp, err := srv.GetProject(ctx, &apiv1.GetProjectRequest{
-		Name: "organizations/acme/projects/my-project",
+	resp, err := srv.GetSpace(ctx, &apiv1.GetSpaceRequest{
+		Name: "organizations/acme/spaces/my-space",
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, "organizations/acme/projects/my-project", resp.GetName())
-	assert.Equal(t, "My Project", resp.GetDisplayName())
-	assert.Equal(t, apiv1.Project_ACTIVE, resp.GetState())
+	assert.Equal(t, "organizations/acme/spaces/my-space", resp.GetName())
+	assert.Equal(t, "My Space", resp.GetDisplayName())
+	assert.Equal(t, apiv1.Space_ACTIVE, resp.GetState())
 	assert.Equal(t, "etag-proj", resp.GetEtag())
 	assert.Equal(t, map[string]string{"env": "prod"}, resp.GetLabels())
 	mockQ.AssertExpectations(t)
 }
 
-func TestUnit_GetProject_InvalidName(t *testing.T) {
+func TestUnit_GetSpace_InvalidName(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil)
+	srv := NewSpacesServer(nil, mockQ, nil)
 	ctx := context.Background()
 
-	_, err := srv.GetProject(ctx, &apiv1.GetProjectRequest{
+	_, err := srv.GetSpace(ctx, &apiv1.GetSpaceRequest{
 		Name: "invalid/format",
 	})
 
@@ -85,19 +85,19 @@ func TestUnit_GetProject_InvalidName(t *testing.T) {
 	assert.NotEqual(t, codes.OK, st.Code())
 }
 
-func TestUnit_GetProject_NotFound(t *testing.T) {
+func TestUnit_GetSpace_NotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil)
+	srv := NewSpacesServer(nil, mockQ, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
-	mockQ.On("GetProjectByName", mock.Anything, db.GetProjectByNameParams{
+	mockQ.On("GetSpaceByName", mock.Anything, db.GetSpaceByNameParams{
 		OrgID: testOrgID,
 		Name:  "nonexistent",
-	}).Return(db.Project{}, pgx.ErrNoRows)
+	}).Return(db.Space{}, pgx.ErrNoRows)
 
-	_, err := srv.GetProject(ctx, &apiv1.GetProjectRequest{
-		Name: "organizations/acme/projects/nonexistent",
+	_, err := srv.GetSpace(ctx, &apiv1.GetSpaceRequest{
+		Name: "organizations/acme/spaces/nonexistent",
 	})
 
 	require.Error(t, err)
@@ -106,46 +106,46 @@ func TestUnit_GetProject_NotFound(t *testing.T) {
 	assert.Equal(t, codes.NotFound, st.Code())
 }
 
-func TestUnit_CreateProject_Success(t *testing.T) {
+func TestUnit_CreateSpace_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil)
+	srv := NewSpacesServer(nil, mockQ, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
-	mockQ.On("CreateProject", mock.Anything, mock.MatchedBy(func(p db.CreateProjectParams) bool {
-		return p.OrgID == testOrgID && p.Name == "new-proj" && p.DisplayName == "New Project"
-	})).Return(db.Project{
+	mockQ.On("CreateSpace", mock.Anything, mock.MatchedBy(func(p db.CreateSpaceParams) bool {
+		return p.OrgID == testOrgID && p.Name == "new-proj" && p.DisplayName == "New Space"
+	})).Return(db.Space{
 		ID:          uuid.New(),
 		OrgID:       testOrgID,
 		Name:        "new-proj",
-		DisplayName: "New Project",
+		DisplayName: "New Space",
 		Labels:      json.RawMessage(`{}`),
 		State:       db.ResourceStateACTIVE,
 		CreateTime:  time.Now(),
 		UpdateTime:  time.Now(),
 	}, nil)
 
-	resp, err := srv.CreateProject(ctx, &apiv1.CreateProjectRequest{
+	resp, err := srv.CreateSpace(ctx, &apiv1.CreateSpaceRequest{
 		Parent:    "organizations/acme",
-		Project:   &apiv1.Project{DisplayName: "New Project"},
-		ProjectId: "new-proj",
+		Space:          &apiv1.Space{DisplayName: "New Space"},
+		SpaceId: "new-proj",
 	})
 
 	require.NoError(t, err)
-	// CreateProject returns a longrunning.Operation (DoneOperation wrapping the project)
+	// CreateSpace returns a longrunning.Operation (DoneOperation wrapping the space)
 	assert.True(t, resp.GetDone(), "operation should be done (synchronous)")
 	assert.NotNil(t, resp.GetResponse(), "operation should contain a response")
 	mockQ.AssertExpectations(t)
 }
 
-func TestUnit_CreateProject_InvalidParent(t *testing.T) {
+func TestUnit_CreateSpace_InvalidParent(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil)
+	srv := NewSpacesServer(nil, mockQ, nil)
 	ctx := context.Background()
 
-	_, err := srv.CreateProject(ctx, &apiv1.CreateProjectRequest{
+	_, err := srv.CreateSpace(ctx, &apiv1.CreateSpaceRequest{
 		Parent:  "bad/parent/format",
-		Project: &apiv1.Project{DisplayName: "Test"},
+		Space:        &apiv1.Space{DisplayName: "Test"},
 	})
 
 	require.Error(t, err)
@@ -154,29 +154,29 @@ func TestUnit_CreateProject_InvalidParent(t *testing.T) {
 	assert.Equal(t, codes.InvalidArgument, st.Code())
 }
 
-func TestUnit_UpdateProject_WithFieldMask(t *testing.T) {
+func TestUnit_UpdateSpace_WithFieldMask(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil)
+	srv := NewSpacesServer(nil, mockQ, nil)
 	ctx := context.Background()
 
-	updatedProject := testDBProject
-	updatedProject.DisplayName = "Updated Name"
+	updatedSpace := testDBSpace
+	updatedSpace.DisplayName = "Updated Name"
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
-	mockQ.On("GetProjectByName", mock.Anything, db.GetProjectByNameParams{
+	mockQ.On("GetSpaceByName", mock.Anything, db.GetSpaceByNameParams{
 		OrgID: testOrgID,
-		Name:  "my-project",
-	}).Return(testDBProject, nil)
-	mockQ.On("UpdateProject", mock.Anything, mock.MatchedBy(func(p db.UpdateProjectParams) bool {
+		Name:  "my-space",
+	}).Return(testDBSpace, nil)
+	mockQ.On("UpdateSpace", mock.Anything, mock.MatchedBy(func(p db.UpdateSpaceParams) bool {
 		return p.ID == testProjID &&
 			p.DisplayName.Valid &&
 			p.DisplayName.String == "Updated Name" &&
 			p.Labels == nil // not in mask
-	})).Return(updatedProject, nil)
+	})).Return(updatedSpace, nil)
 
-	resp, err := srv.UpdateProject(ctx, &apiv1.UpdateProjectRequest{
-		Project: &apiv1.Project{
-			Name:        "organizations/acme/projects/my-project",
+	resp, err := srv.UpdateSpace(ctx, &apiv1.UpdateSpaceRequest{
+		Space:        &apiv1.Space{
+			Name:        "organizations/acme/spaces/my-space",
 			DisplayName: "Updated Name",
 		},
 		UpdateMask: &fieldmaskpb.FieldMask{
@@ -189,27 +189,27 @@ func TestUnit_UpdateProject_WithFieldMask(t *testing.T) {
 	mockQ.AssertExpectations(t)
 }
 
-func TestUnit_DeleteProject_Success(t *testing.T) {
+func TestUnit_DeleteSpace_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil)
+	srv := NewSpacesServer(nil, mockQ, nil)
 	ctx := context.Background()
 
-	deletedProject := testDBProject
-	deletedProject.DeleteTime = pgtype.Timestamptz{Time: time.Now(), Valid: true}
-	deletedProject.State = db.ResourceStateDELETEREQUESTED
+	deletedSpace := testDBSpace
+	deletedSpace.DeleteTime = pgtype.Timestamptz{Time: time.Now(), Valid: true}
+	deletedSpace.State = db.ResourceStateDELETEREQUESTED
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
-	mockQ.On("GetProjectByName", mock.Anything, db.GetProjectByNameParams{
+	mockQ.On("GetSpaceByName", mock.Anything, db.GetSpaceByNameParams{
 		OrgID: testOrgID,
-		Name:  "my-project",
-	}).Return(testDBProject, nil)
-	mockQ.On("SoftDeleteProject", mock.Anything, db.SoftDeleteProjectParams{
+		Name:  "my-space",
+	}).Return(testDBSpace, nil)
+	mockQ.On("SoftDeleteSpace", mock.Anything, db.SoftDeleteSpaceParams{
 		ID:        testProjID,
 		DeletedBy: "",
-	}).Return(deletedProject, nil)
+	}).Return(deletedSpace, nil)
 
-	resp, err := srv.DeleteProject(ctx, &apiv1.DeleteProjectRequest{
-		Name: "organizations/acme/projects/my-project",
+	resp, err := srv.DeleteSpace(ctx, &apiv1.DeleteSpaceRequest{
+		Name: "organizations/acme/spaces/my-space",
 	})
 
 	require.NoError(t, err)
@@ -217,29 +217,29 @@ func TestUnit_DeleteProject_Success(t *testing.T) {
 	mockQ.AssertExpectations(t)
 }
 
-func TestUnit_UpdateProject_NoMask(t *testing.T) {
+func TestUnit_UpdateSpace_NoMask(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil)
+	srv := NewSpacesServer(nil, mockQ, nil)
 	ctx := context.Background()
 
-	updatedProject := testDBProject
-	updatedProject.DisplayName = "Updated Name"
+	updatedSpace := testDBSpace
+	updatedSpace.DisplayName = "Updated Name"
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
-	mockQ.On("GetProjectByName", mock.Anything, db.GetProjectByNameParams{
+	mockQ.On("GetSpaceByName", mock.Anything, db.GetSpaceByNameParams{
 		OrgID: testOrgID,
-		Name:  "my-project",
-	}).Return(testDBProject, nil)
-	mockQ.On("UpdateProject", mock.Anything, mock.MatchedBy(func(p db.UpdateProjectParams) bool {
+		Name:  "my-space",
+	}).Return(testDBSpace, nil)
+	mockQ.On("UpdateSpace", mock.Anything, mock.MatchedBy(func(p db.UpdateSpaceParams) bool {
 		return p.ID == testProjID &&
 			p.DisplayName.Valid &&
 			p.DisplayName.String == "Updated Name" &&
 			p.Labels != nil // labels preserved from existing when nil in request
-	})).Return(updatedProject, nil)
+	})).Return(updatedSpace, nil)
 
-	resp, err := srv.UpdateProject(ctx, &apiv1.UpdateProjectRequest{
-		Project: &apiv1.Project{
-			Name:        "organizations/acme/projects/my-project",
+	resp, err := srv.UpdateSpace(ctx, &apiv1.UpdateSpaceRequest{
+		Space:        &apiv1.Space{
+			Name:        "organizations/acme/spaces/my-space",
 			DisplayName: "Updated Name",
 		},
 		// No UpdateMask — full update
@@ -250,27 +250,27 @@ func TestUnit_UpdateProject_NoMask(t *testing.T) {
 	mockQ.AssertExpectations(t)
 }
 
-func TestUnit_UndeleteProject_Success(t *testing.T) {
+func TestUnit_UndeleteSpace_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil)
+	srv := NewSpacesServer(nil, mockQ, nil)
 	ctx := context.Background()
 
-	undeletedProject := testDBProject
-	undeletedProject.DeleteTime = pgtype.Timestamptz{} // cleared
-	undeletedProject.State = db.ResourceStateACTIVE
+	undeletedSpace := testDBSpace
+	undeletedSpace.DeleteTime = pgtype.Timestamptz{} // cleared
+	undeletedSpace.State = db.ResourceStateACTIVE
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
-	mockQ.On("GetProjectByName", mock.Anything, db.GetProjectByNameParams{
+	mockQ.On("GetSpaceByName", mock.Anything, db.GetSpaceByNameParams{
 		OrgID: testOrgID,
-		Name:  "my-project",
-	}).Return(testDBProject, nil)
-	mockQ.On("UndeleteProject", mock.Anything, db.UndeleteProjectParams{
+		Name:  "my-space",
+	}).Return(testDBSpace, nil)
+	mockQ.On("UndeleteSpace", mock.Anything, db.UndeleteSpaceParams{
 		ID:        testProjID,
 		UpdatedBy: "",
-	}).Return(undeletedProject, nil)
+	}).Return(undeletedSpace, nil)
 
-	resp, err := srv.UndeleteProject(ctx, &apiv1.UndeleteProjectRequest{
-		Name: "organizations/acme/projects/my-project",
+	resp, err := srv.UndeleteSpace(ctx, &apiv1.UndeleteSpaceRequest{
+		Name: "organizations/acme/spaces/my-space",
 	})
 
 	require.NoError(t, err)
@@ -278,20 +278,20 @@ func TestUnit_UndeleteProject_Success(t *testing.T) {
 	mockQ.AssertExpectations(t)
 }
 
-func TestUnit_UpdateProject_ErrorPaths(t *testing.T) {
+func TestUnit_UpdateSpace_ErrorPaths(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
 		name       string
 		setupMocks func(*mocks.MockQuerier)
-		req        *apiv1.UpdateProjectRequest
+		req        *apiv1.UpdateSpaceRequest
 		wantCode   codes.Code
 	}{
 		{
-			name:       "invalid project name format",
+			name:       "invalid space name format",
 			setupMocks: func(mockQ *mocks.MockQuerier) {},
-			req: &apiv1.UpdateProjectRequest{
-				Project: &apiv1.Project{Name: "bad/format"},
+			req: &apiv1.UpdateSpaceRequest{
+				Space:        &apiv1.Space{Name: "bad/format"},
 			},
 			wantCode: codes.Internal,
 		},
@@ -301,23 +301,23 @@ func TestUnit_UpdateProject_ErrorPaths(t *testing.T) {
 				mockQ.On("GetOrganizationByName", mock.Anything, "acme").
 					Return(db.Organization{}, pgx.ErrNoRows)
 			},
-			req: &apiv1.UpdateProjectRequest{
-				Project: &apiv1.Project{Name: "organizations/acme/projects/my-project"},
+			req: &apiv1.UpdateSpaceRequest{
+				Space:        &apiv1.Space{Name: "organizations/acme/spaces/my-space"},
 			},
 			wantCode: codes.NotFound,
 		},
 		{
-			name: "project not found",
+			name: "space not found",
 			setupMocks: func(mockQ *mocks.MockQuerier) {
 				mockQ.On("GetOrganizationByName", mock.Anything, "acme").
 					Return(testOrg, nil)
-				mockQ.On("GetProjectByName", mock.Anything, db.GetProjectByNameParams{
+				mockQ.On("GetSpaceByName", mock.Anything, db.GetSpaceByNameParams{
 					OrgID: testOrgID,
 					Name:  "missing-proj",
-				}).Return(db.Project{}, pgx.ErrNoRows)
+				}).Return(db.Space{}, pgx.ErrNoRows)
 			},
-			req: &apiv1.UpdateProjectRequest{
-				Project: &apiv1.Project{Name: "organizations/acme/projects/missing-proj"},
+			req: &apiv1.UpdateSpaceRequest{
+				Space:        &apiv1.Space{Name: "organizations/acme/spaces/missing-proj"},
 			},
 			wantCode: codes.NotFound,
 		},
@@ -326,17 +326,17 @@ func TestUnit_UpdateProject_ErrorPaths(t *testing.T) {
 			setupMocks: func(mockQ *mocks.MockQuerier) {
 				mockQ.On("GetOrganizationByName", mock.Anything, "acme").
 					Return(testOrg, nil)
-				mockQ.On("GetProjectByName", mock.Anything, db.GetProjectByNameParams{
+				mockQ.On("GetSpaceByName", mock.Anything, db.GetSpaceByNameParams{
 					OrgID: testOrgID,
-					Name:  "my-project",
-				}).Return(testDBProject, nil)
-				mockQ.On("UpdateProject", mock.Anything, mock.MatchedBy(func(p db.UpdateProjectParams) bool {
+					Name:  "my-space",
+				}).Return(testDBSpace, nil)
+				mockQ.On("UpdateSpace", mock.Anything, mock.MatchedBy(func(p db.UpdateSpaceParams) bool {
 					return p.ID == testProjID
-				})).Return(db.Project{}, pgx.ErrNoRows)
+				})).Return(db.Space{}, pgx.ErrNoRows)
 			},
-			req: &apiv1.UpdateProjectRequest{
-				Project: &apiv1.Project{
-					Name:        "organizations/acme/projects/my-project",
+			req: &apiv1.UpdateSpaceRequest{
+				Space:        &apiv1.Space{
+					Name:        "organizations/acme/spaces/my-space",
 					DisplayName: "New Name",
 				},
 			},
@@ -348,9 +348,9 @@ func TestUnit_UpdateProject_ErrorPaths(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
 			tc.setupMocks(mockQ)
-			srv := NewProjectsServer(nil, mockQ, nil)
+			srv := NewSpacesServer(nil, mockQ, nil)
 
-			_, err := srv.UpdateProject(ctx, tc.req)
+			_, err := srv.UpdateSpace(ctx, tc.req)
 
 			require.Error(t, err)
 			st, ok := status.FromError(err)
@@ -361,19 +361,19 @@ func TestUnit_UpdateProject_ErrorPaths(t *testing.T) {
 	}
 }
 
-func TestUnit_DeleteProject_ErrorPaths(t *testing.T) {
+func TestUnit_DeleteSpace_ErrorPaths(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
 		name       string
 		setupMocks func(*mocks.MockQuerier)
-		req        *apiv1.DeleteProjectRequest
+		req        *apiv1.DeleteSpaceRequest
 		wantCode   codes.Code
 	}{
 		{
-			name:       "invalid project name format",
+			name:       "invalid space name format",
 			setupMocks: func(mockQ *mocks.MockQuerier) {},
-			req:        &apiv1.DeleteProjectRequest{Name: "bad/format"},
+			req:        &apiv1.DeleteSpaceRequest{Name: "bad/format"},
 			wantCode:   codes.Internal,
 		},
 		{
@@ -382,20 +382,20 @@ func TestUnit_DeleteProject_ErrorPaths(t *testing.T) {
 				mockQ.On("GetOrganizationByName", mock.Anything, "acme").
 					Return(db.Organization{}, pgx.ErrNoRows)
 			},
-			req:      &apiv1.DeleteProjectRequest{Name: "organizations/acme/projects/my-project"},
+			req:      &apiv1.DeleteSpaceRequest{Name: "organizations/acme/spaces/my-space"},
 			wantCode: codes.NotFound,
 		},
 		{
-			name: "project not found",
+			name: "space not found",
 			setupMocks: func(mockQ *mocks.MockQuerier) {
 				mockQ.On("GetOrganizationByName", mock.Anything, "acme").
 					Return(testOrg, nil)
-				mockQ.On("GetProjectByName", mock.Anything, db.GetProjectByNameParams{
+				mockQ.On("GetSpaceByName", mock.Anything, db.GetSpaceByNameParams{
 					OrgID: testOrgID,
 					Name:  "missing-proj",
-				}).Return(db.Project{}, pgx.ErrNoRows)
+				}).Return(db.Space{}, pgx.ErrNoRows)
 			},
-			req:      &apiv1.DeleteProjectRequest{Name: "organizations/acme/projects/missing-proj"},
+			req:      &apiv1.DeleteSpaceRequest{Name: "organizations/acme/spaces/missing-proj"},
 			wantCode: codes.NotFound,
 		},
 		{
@@ -403,16 +403,16 @@ func TestUnit_DeleteProject_ErrorPaths(t *testing.T) {
 			setupMocks: func(mockQ *mocks.MockQuerier) {
 				mockQ.On("GetOrganizationByName", mock.Anything, "acme").
 					Return(testOrg, nil)
-				mockQ.On("GetProjectByName", mock.Anything, db.GetProjectByNameParams{
+				mockQ.On("GetSpaceByName", mock.Anything, db.GetSpaceByNameParams{
 					OrgID: testOrgID,
-					Name:  "my-project",
-				}).Return(testDBProject, nil)
-				mockQ.On("SoftDeleteProject", mock.Anything, db.SoftDeleteProjectParams{
+					Name:  "my-space",
+				}).Return(testDBSpace, nil)
+				mockQ.On("SoftDeleteSpace", mock.Anything, db.SoftDeleteSpaceParams{
 					ID:        testProjID,
 					DeletedBy: "",
-				}).Return(db.Project{}, pgx.ErrNoRows)
+				}).Return(db.Space{}, pgx.ErrNoRows)
 			},
-			req:      &apiv1.DeleteProjectRequest{Name: "organizations/acme/projects/my-project"},
+			req:      &apiv1.DeleteSpaceRequest{Name: "organizations/acme/spaces/my-space"},
 			wantCode: codes.NotFound,
 		},
 	}
@@ -421,9 +421,9 @@ func TestUnit_DeleteProject_ErrorPaths(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
 			tc.setupMocks(mockQ)
-			srv := NewProjectsServer(nil, mockQ, nil)
+			srv := NewSpacesServer(nil, mockQ, nil)
 
-			_, err := srv.DeleteProject(ctx, tc.req)
+			_, err := srv.DeleteSpace(ctx, tc.req)
 
 			require.Error(t, err)
 			st, ok := status.FromError(err)
@@ -434,19 +434,19 @@ func TestUnit_DeleteProject_ErrorPaths(t *testing.T) {
 	}
 }
 
-func TestUnit_UndeleteProject_ErrorPaths(t *testing.T) {
+func TestUnit_UndeleteSpace_ErrorPaths(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
 		name       string
 		setupMocks func(*mocks.MockQuerier)
-		req        *apiv1.UndeleteProjectRequest
+		req        *apiv1.UndeleteSpaceRequest
 		wantCode   codes.Code
 	}{
 		{
-			name:       "invalid project name format",
+			name:       "invalid space name format",
 			setupMocks: func(mockQ *mocks.MockQuerier) {},
-			req:        &apiv1.UndeleteProjectRequest{Name: "bad/format"},
+			req:        &apiv1.UndeleteSpaceRequest{Name: "bad/format"},
 			wantCode:   codes.Internal,
 		},
 		{
@@ -455,20 +455,20 @@ func TestUnit_UndeleteProject_ErrorPaths(t *testing.T) {
 				mockQ.On("GetOrganizationByName", mock.Anything, "acme").
 					Return(db.Organization{}, pgx.ErrNoRows)
 			},
-			req:      &apiv1.UndeleteProjectRequest{Name: "organizations/acme/projects/my-project"},
+			req:      &apiv1.UndeleteSpaceRequest{Name: "organizations/acme/spaces/my-space"},
 			wantCode: codes.NotFound,
 		},
 		{
-			name: "project not found",
+			name: "space not found",
 			setupMocks: func(mockQ *mocks.MockQuerier) {
 				mockQ.On("GetOrganizationByName", mock.Anything, "acme").
 					Return(testOrg, nil)
-				mockQ.On("GetProjectByName", mock.Anything, db.GetProjectByNameParams{
+				mockQ.On("GetSpaceByName", mock.Anything, db.GetSpaceByNameParams{
 					OrgID: testOrgID,
 					Name:  "missing-proj",
-				}).Return(db.Project{}, pgx.ErrNoRows)
+				}).Return(db.Space{}, pgx.ErrNoRows)
 			},
-			req:      &apiv1.UndeleteProjectRequest{Name: "organizations/acme/projects/missing-proj"},
+			req:      &apiv1.UndeleteSpaceRequest{Name: "organizations/acme/spaces/missing-proj"},
 			wantCode: codes.NotFound,
 		},
 		{
@@ -476,16 +476,16 @@ func TestUnit_UndeleteProject_ErrorPaths(t *testing.T) {
 			setupMocks: func(mockQ *mocks.MockQuerier) {
 				mockQ.On("GetOrganizationByName", mock.Anything, "acme").
 					Return(testOrg, nil)
-				mockQ.On("GetProjectByName", mock.Anything, db.GetProjectByNameParams{
+				mockQ.On("GetSpaceByName", mock.Anything, db.GetSpaceByNameParams{
 					OrgID: testOrgID,
-					Name:  "my-project",
-				}).Return(testDBProject, nil)
-				mockQ.On("UndeleteProject", mock.Anything, db.UndeleteProjectParams{
+					Name:  "my-space",
+				}).Return(testDBSpace, nil)
+				mockQ.On("UndeleteSpace", mock.Anything, db.UndeleteSpaceParams{
 					ID:        testProjID,
 					UpdatedBy: "",
-				}).Return(db.Project{}, pgx.ErrNoRows)
+				}).Return(db.Space{}, pgx.ErrNoRows)
 			},
-			req:      &apiv1.UndeleteProjectRequest{Name: "organizations/acme/projects/my-project"},
+			req:      &apiv1.UndeleteSpaceRequest{Name: "organizations/acme/spaces/my-space"},
 			wantCode: codes.NotFound,
 		},
 	}
@@ -494,9 +494,9 @@ func TestUnit_UndeleteProject_ErrorPaths(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
 			tc.setupMocks(mockQ)
-			srv := NewProjectsServer(nil, mockQ, nil)
+			srv := NewSpacesServer(nil, mockQ, nil)
 
-			_, err := srv.UndeleteProject(ctx, tc.req)
+			_, err := srv.UndeleteSpace(ctx, tc.req)
 
 			require.Error(t, err)
 			st, ok := status.FromError(err)
@@ -507,19 +507,19 @@ func TestUnit_UndeleteProject_ErrorPaths(t *testing.T) {
 	}
 }
 
-func TestUnit_ListProjects_InvalidParent(t *testing.T) {
+func TestUnit_ListSpaces_InvalidParent(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
 		name       string
 		setupMocks func(*mocks.MockQuerier)
-		req        *apiv1.ListProjectsRequest
+		req        *apiv1.ListSpacesRequest
 		wantCode   codes.Code
 	}{
 		{
 			name:       "invalid parent prefix",
 			setupMocks: func(mockQ *mocks.MockQuerier) {},
-			req:        &apiv1.ListProjectsRequest{Parent: "badprefix/acme"},
+			req:        &apiv1.ListSpacesRequest{Parent: "badprefix/acme"},
 			wantCode:   codes.InvalidArgument,
 		},
 		{
@@ -528,7 +528,7 @@ func TestUnit_ListProjects_InvalidParent(t *testing.T) {
 				mockQ.On("GetOrganizationByName", mock.Anything, "acme").
 					Return(db.Organization{}, pgx.ErrNoRows)
 			},
-			req:      &apiv1.ListProjectsRequest{Parent: "organizations/acme"},
+			req:      &apiv1.ListSpacesRequest{Parent: "organizations/acme"},
 			wantCode: codes.NotFound,
 		},
 	}
@@ -537,9 +537,9 @@ func TestUnit_ListProjects_InvalidParent(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
 			tc.setupMocks(mockQ)
-			srv := NewProjectsServer(nil, mockQ, nil)
+			srv := NewSpacesServer(nil, mockQ, nil)
 
-			_, err := srv.ListProjects(ctx, tc.req)
+			_, err := srv.ListSpaces(ctx, tc.req)
 
 			require.Error(t, err)
 			st, ok := status.FromError(err)
@@ -550,26 +550,26 @@ func TestUnit_ListProjects_InvalidParent(t *testing.T) {
 	}
 }
 
-func TestUnit_UpdateProject_LabelsMask(t *testing.T) {
+func TestUnit_UpdateSpace_LabelsMask(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil)
+	srv := NewSpacesServer(nil, mockQ, nil)
 	ctx := context.Background()
 
-	updatedProject := testDBProject
-	updatedProject.Labels = json.RawMessage(`{"tier":"gold"}`)
+	updatedSpace := testDBSpace
+	updatedSpace.Labels = json.RawMessage(`{"tier":"gold"}`)
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
-	mockQ.On("GetProjectByName", mock.Anything, db.GetProjectByNameParams{
+	mockQ.On("GetSpaceByName", mock.Anything, db.GetSpaceByNameParams{
 		OrgID: testOrgID,
-		Name:  "my-project",
-	}).Return(testDBProject, nil)
-	mockQ.On("UpdateProject", mock.Anything, mock.MatchedBy(func(p db.UpdateProjectParams) bool {
+		Name:  "my-space",
+	}).Return(testDBSpace, nil)
+	mockQ.On("UpdateSpace", mock.Anything, mock.MatchedBy(func(p db.UpdateSpaceParams) bool {
 		return p.ID == testProjID && p.Labels != nil && !p.DisplayName.Valid
-	})).Return(updatedProject, nil)
+	})).Return(updatedSpace, nil)
 
-	resp, err := srv.UpdateProject(ctx, &apiv1.UpdateProjectRequest{
-		Project: &apiv1.Project{
-			Name:   "organizations/acme/projects/my-project",
+	resp, err := srv.UpdateSpace(ctx, &apiv1.UpdateSpaceRequest{
+		Space:        &apiv1.Space{
+			Name:   "organizations/acme/spaces/my-space",
 			Labels: map[string]string{"tier": "gold"},
 		},
 		UpdateMask: &fieldmaskpb.FieldMask{
@@ -582,26 +582,26 @@ func TestUnit_UpdateProject_LabelsMask(t *testing.T) {
 	mockQ.AssertExpectations(t)
 }
 
-func TestUnit_UpdateProject_NoMaskWithLabels(t *testing.T) {
+func TestUnit_UpdateSpace_NoMaskWithLabels(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil)
+	srv := NewSpacesServer(nil, mockQ, nil)
 	ctx := context.Background()
 
-	updatedProject := testDBProject
-	updatedProject.Labels = json.RawMessage(`{"region":"us"}`)
+	updatedSpace := testDBSpace
+	updatedSpace.Labels = json.RawMessage(`{"region":"us"}`)
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
-	mockQ.On("GetProjectByName", mock.Anything, db.GetProjectByNameParams{
+	mockQ.On("GetSpaceByName", mock.Anything, db.GetSpaceByNameParams{
 		OrgID: testOrgID,
-		Name:  "my-project",
-	}).Return(testDBProject, nil)
-	mockQ.On("UpdateProject", mock.Anything, mock.MatchedBy(func(p db.UpdateProjectParams) bool {
+		Name:  "my-space",
+	}).Return(testDBSpace, nil)
+	mockQ.On("UpdateSpace", mock.Anything, mock.MatchedBy(func(p db.UpdateSpaceParams) bool {
 		return p.ID == testProjID && p.Labels != nil
-	})).Return(updatedProject, nil)
+	})).Return(updatedSpace, nil)
 
-	resp, err := srv.UpdateProject(ctx, &apiv1.UpdateProjectRequest{
-		Project: &apiv1.Project{
-			Name:   "organizations/acme/projects/my-project",
+	resp, err := srv.UpdateSpace(ctx, &apiv1.UpdateSpaceRequest{
+		Space:        &apiv1.Space{
+			Name:   "organizations/acme/spaces/my-space",
 			Labels: map[string]string{"region": "us"},
 		},
 		// No UpdateMask — full update with explicit labels
@@ -612,16 +612,16 @@ func TestUnit_UpdateProject_NoMaskWithLabels(t *testing.T) {
 	mockQ.AssertExpectations(t)
 }
 
-func TestUnit_GetProject_OrgNotFound(t *testing.T) {
+func TestUnit_GetSpace_OrgNotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil)
+	srv := NewSpacesServer(nil, mockQ, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "unknown-org").
 		Return(db.Organization{}, pgx.ErrNoRows)
 
-	_, err := srv.GetProject(ctx, &apiv1.GetProjectRequest{
-		Name: "organizations/unknown-org/projects/my-project",
+	_, err := srv.GetSpace(ctx, &apiv1.GetSpaceRequest{
+		Name: "organizations/unknown-org/spaces/my-space",
 	})
 
 	require.Error(t, err)
@@ -631,29 +631,29 @@ func TestUnit_GetProject_OrgNotFound(t *testing.T) {
 	mockQ.AssertExpectations(t)
 }
 
-func TestUnit_CreateProject_AutoGeneratedID(t *testing.T) {
+func TestUnit_CreateSpace_AutoGeneratedID(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil)
+	srv := NewSpacesServer(nil, mockQ, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
-	mockQ.On("CreateProject", mock.Anything, mock.MatchedBy(func(p db.CreateProjectParams) bool {
+	mockQ.On("CreateSpace", mock.Anything, mock.MatchedBy(func(p db.CreateSpaceParams) bool {
 		return p.OrgID == testOrgID && p.Name != "" && len(p.Name) == 8
-	})).Return(db.Project{
+	})).Return(db.Space{
 		ID:          uuid.New(),
 		OrgID:       testOrgID,
 		Name:        "abcd1234",
-		DisplayName: "Auto ID Project",
+		DisplayName: "Auto ID Space",
 		Labels:      json.RawMessage(`{}`),
 		State:       db.ResourceStateACTIVE,
 		CreateTime:  time.Now(),
 		UpdateTime:  time.Now(),
 	}, nil)
 
-	resp, err := srv.CreateProject(ctx, &apiv1.CreateProjectRequest{
+	resp, err := srv.CreateSpace(ctx, &apiv1.CreateSpaceRequest{
 		Parent:  "organizations/acme",
-		Project: &apiv1.Project{DisplayName: "Auto ID Project"},
-		// No ProjectId — server auto-generates one
+		Space:        &apiv1.Space{DisplayName: "Auto ID Space"},
+		// No SpaceId — server auto-generates one
 	})
 
 	require.NoError(t, err)
@@ -661,20 +661,20 @@ func TestUnit_CreateProject_AutoGeneratedID(t *testing.T) {
 	mockQ.AssertExpectations(t)
 }
 
-func TestUnit_CreateProject_DBError(t *testing.T) {
+func TestUnit_CreateSpace_DBError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil)
+	srv := NewSpacesServer(nil, mockQ, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
-	mockQ.On("CreateProject", mock.Anything, mock.MatchedBy(func(p db.CreateProjectParams) bool {
+	mockQ.On("CreateSpace", mock.Anything, mock.MatchedBy(func(p db.CreateSpaceParams) bool {
 		return p.OrgID == testOrgID
-	})).Return(db.Project{}, pgx.ErrNoRows)
+	})).Return(db.Space{}, pgx.ErrNoRows)
 
-	_, err := srv.CreateProject(ctx, &apiv1.CreateProjectRequest{
+	_, err := srv.CreateSpace(ctx, &apiv1.CreateSpaceRequest{
 		Parent:    "organizations/acme",
-		Project:   &apiv1.Project{DisplayName: "Test"},
-		ProjectId: "dup-proj",
+		Space:          &apiv1.Space{DisplayName: "Test"},
+		SpaceId: "dup-proj",
 	})
 
 	require.Error(t, err)

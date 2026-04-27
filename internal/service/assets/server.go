@@ -30,52 +30,52 @@ func NewAssetsServer(pool db.DBTX, queries db.Querier) *AssetsServer {
 	}
 }
 
-// parseAssetName parses "organizations/{org}/projects/{project}/assets/{asset}".
-func parseAssetName(name string) (orgName, projectName, assetName string, err error) {
+// parseAssetName parses "organizations/{org}/spaces/{space}/assets/{asset}".
+func parseAssetName(name string) (orgName, spaceName, assetName string, err error) {
 	parts := strings.Split(name, "/")
-	if len(parts) != 6 || parts[0] != "organizations" || parts[2] != "projects" || parts[4] != "assets" {
+	if len(parts) != 6 || parts[0] != "organizations" || parts[2] != "spaces" || parts[4] != "assets" {
 		return "", "", "", fmt.Errorf("invalid asset name %q", name)
 	}
 	return parts[1], parts[3], parts[5], nil
 }
 
-// parseAssetParent parses "organizations/{org}/projects/{project}".
-func parseAssetParent(parent string) (orgName, projectName string, err error) {
+// parseAssetParent parses "organizations/{org}/spaces/{space}".
+func parseAssetParent(parent string) (orgName, spaceName string, err error) {
 	parts := strings.Split(parent, "/")
-	if len(parts) != 4 || parts[0] != "organizations" || parts[2] != "projects" {
+	if len(parts) != 4 || parts[0] != "organizations" || parts[2] != "spaces" {
 		return "", "", fmt.Errorf("invalid parent %q", parent)
 	}
 	return parts[1], parts[3], nil
 }
 
-// resolveProject resolves org name + project name to project UUID.
-func (s *AssetsServer) resolveProject(ctx context.Context, orgName, projectName string) (uuid.UUID, error) {
+// resolveSpace resolves org name + space name to space UUID.
+func (s *AssetsServer) resolveSpace(ctx context.Context, orgName, spaceName string) (uuid.UUID, error) {
 	org, err := s.queries.GetOrganizationByName(ctx, orgName)
 	if err != nil {
 		return uuid.Nil, apierr.HandleResourceError(err, "Organization", orgName)
 	}
-	project, err := s.queries.GetProjectByName(ctx, db.GetProjectByNameParams{OrgID: org.ID, Name: projectName})
+	space, err := s.queries.GetSpaceByName(ctx, db.GetSpaceByNameParams{OrgID: org.ID, Name: spaceName})
 	if err != nil {
-		return uuid.Nil, apierr.HandleResourceError(err, "Project", fmt.Sprintf("organizations/%s/projects/%s", orgName, projectName))
+		return uuid.Nil, apierr.HandleResourceError(err, "Space", fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName))
 	}
-	return project.ID, nil
+	return space.ID, nil
 }
 
 func (s *AssetsServer) GetAsset(ctx context.Context, req *assetsv1.GetAssetRequest) (*assetsv1.Asset, error) {
-	orgName, projectName, assetName, err := parseAssetName(req.GetName())
+	orgName, spaceName, assetName, err := parseAssetName(req.GetName())
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Asset", req.GetName())
 	}
-	projectID, err := s.resolveProject(ctx, orgName, projectName)
+	spaceID, err := s.resolveSpace(ctx, orgName, spaceName)
 	if err != nil {
 		return nil, err
 	}
-	asset, err := s.queries.GetAssetByName(ctx, db.GetAssetByNameParams{ProjectID: projectID, Name: assetName})
+	asset, err := s.queries.GetAssetByName(ctx, db.GetAssetByNameParams{SpaceID: spaceID, Name: assetName})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Asset", req.GetName())
 	}
 
-	parentName := fmt.Sprintf("organizations/%s/projects/%s", orgName, projectName)
+	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
 	proto := convert.AssetToProto(asset, parentName)
 
 	// Populate latest version and version count.
@@ -98,11 +98,11 @@ func (s *AssetsServer) GetAsset(ctx context.Context, req *assetsv1.GetAssetReque
 }
 
 func (s *AssetsServer) ListAssets(ctx context.Context, req *assetsv1.ListAssetsRequest) (*assetsv1.ListAssetsResponse, error) {
-	orgName, projectName, err := parseAssetParent(req.GetParent())
+	orgName, spaceName, err := parseAssetParent(req.GetParent())
 	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Project", req.GetParent())
+		return nil, apierr.HandleResourceError(err, "Space", req.GetParent())
 	}
-	projectID, err := s.resolveProject(ctx, orgName, projectName)
+	spaceID, err := s.resolveSpace(ctx, orgName, spaceName)
 	if err != nil {
 		return nil, err
 	}
@@ -117,14 +117,14 @@ func (s *AssetsServer) ListAssets(ctx context.Context, req *assetsv1.ListAssetsR
 
 	var rows []db.Asset
 	if req.GetShowDeleted() {
-		rows, err = s.queries.ListAssetsByProjectWithDeleted(ctx, db.ListAssetsByProjectWithDeletedParams{
-			ProjectID: projectID,
+		rows, err = s.queries.ListAssetsBySpaceWithDeleted(ctx, db.ListAssetsBySpaceWithDeletedParams{
+			SpaceID: spaceID,
 			Limit:     pageSize + 1,
 			Offset:    0,
 		})
 	} else {
-		rows, err = s.queries.ListAssetsByProject(ctx, db.ListAssetsByProjectParams{
-			ProjectID: projectID,
+		rows, err = s.queries.ListAssetsBySpace(ctx, db.ListAssetsBySpaceParams{
+			SpaceID: spaceID,
 			Limit:     pageSize + 1,
 			Offset:    0,
 		})
@@ -139,7 +139,7 @@ func (s *AssetsServer) ListAssets(ctx context.Context, req *assetsv1.ListAssetsR
 		rows = rows[:pageSize]
 	}
 
-	parentName := fmt.Sprintf("organizations/%s/projects/%s", orgName, projectName)
+	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
 	assets := make([]*assetsv1.Asset, 0, len(rows))
 	for _, r := range rows {
 		assets = append(assets, convert.AssetToProto(r, parentName))
@@ -153,11 +153,11 @@ func (s *AssetsServer) ListAssets(ctx context.Context, req *assetsv1.ListAssetsR
 
 func (s *AssetsServer) CreateAsset(ctx context.Context, req *assetsv1.CreateAssetRequest) (*longrunningpb.Operation, error) {
 	asset := req.GetAsset()
-	orgName, projectName, err := parseAssetParent(req.GetParent())
+	orgName, spaceName, err := parseAssetParent(req.GetParent())
 	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Project", req.GetParent())
+		return nil, apierr.HandleResourceError(err, "Space", req.GetParent())
 	}
-	projectID, err := s.resolveProject(ctx, orgName, projectName)
+	spaceID, err := s.resolveSpace(ctx, orgName, spaceName)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +187,7 @@ func (s *AssetsServer) CreateAsset(ctx context.Context, req *assetsv1.CreateAsse
 
 	result, err := s.queries.CreateAsset(ctx, db.CreateAssetParams{
 		ID:          uuid.New(),
-		ProjectID:   projectID,
+		SpaceID:   spaceID,
 		EndpointID:  endpointID,
 		Name:        assetName,
 		DisplayName: asset.GetDisplayName(),
@@ -201,7 +201,7 @@ func (s *AssetsServer) CreateAsset(ctx context.Context, req *assetsv1.CreateAsse
 		return nil, apierr.HandleResourceError(err, "Asset", "")
 	}
 
-	parentName := fmt.Sprintf("organizations/%s/projects/%s", orgName, projectName)
+	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
 
 	if isPlaceholder {
 		return lro.DoneOperation(convert.AssetToProto(result, parentName))
@@ -218,16 +218,16 @@ func (s *AssetsServer) CreateAsset(ctx context.Context, req *assetsv1.CreateAsse
 
 func (s *AssetsServer) UpdateAsset(ctx context.Context, req *assetsv1.UpdateAssetRequest) (*longrunningpb.Operation, error) {
 	asset := req.GetAsset()
-	orgName, projectName, assetName, err := parseAssetName(asset.GetName())
+	orgName, spaceName, assetName, err := parseAssetName(asset.GetName())
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Asset", asset.GetName())
 	}
-	projectID, err := s.resolveProject(ctx, orgName, projectName)
+	spaceID, err := s.resolveSpace(ctx, orgName, spaceName)
 	if err != nil {
 		return nil, err
 	}
 
-	existing, err := s.queries.GetAssetByName(ctx, db.GetAssetByNameParams{ProjectID: projectID, Name: assetName})
+	existing, err := s.queries.GetAssetByName(ctx, db.GetAssetByNameParams{SpaceID: spaceID, Name: assetName})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Asset", asset.GetName())
 	}
@@ -261,21 +261,21 @@ func (s *AssetsServer) UpdateAsset(ctx context.Context, req *assetsv1.UpdateAsse
 		return nil, apierr.HandleResourceError(err, "Asset", asset.GetName())
 	}
 
-	parentName := fmt.Sprintf("organizations/%s/projects/%s", orgName, projectName)
+	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
 	return lro.DoneOperation(convert.AssetToProto(result, parentName))
 }
 
 func (s *AssetsServer) DeleteAsset(ctx context.Context, req *assetsv1.DeleteAssetRequest) (*longrunningpb.Operation, error) {
-	orgName, projectName, assetName, err := parseAssetName(req.GetName())
+	orgName, spaceName, assetName, err := parseAssetName(req.GetName())
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Asset", req.GetName())
 	}
-	projectID, err := s.resolveProject(ctx, orgName, projectName)
+	spaceID, err := s.resolveSpace(ctx, orgName, spaceName)
 	if err != nil {
 		return nil, err
 	}
 
-	existing, err := s.queries.GetAssetByName(ctx, db.GetAssetByNameParams{ProjectID: projectID, Name: assetName})
+	existing, err := s.queries.GetAssetByName(ctx, db.GetAssetByNameParams{SpaceID: spaceID, Name: assetName})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Asset", req.GetName())
 	}
@@ -288,22 +288,22 @@ func (s *AssetsServer) DeleteAsset(ctx context.Context, req *assetsv1.DeleteAsse
 		return nil, apierr.HandleResourceError(err, "Asset", req.GetName())
 	}
 
-	parentName := fmt.Sprintf("organizations/%s/projects/%s", orgName, projectName)
+	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
 	existing.State = db.AssetStateDELETEREQUESTED
 	return lro.DoneOperation(convert.AssetToProto(existing, parentName))
 }
 
 func (s *AssetsServer) UndeleteAsset(ctx context.Context, req *assetsv1.UndeleteAssetRequest) (*longrunningpb.Operation, error) {
-	orgName, projectName, assetName, err := parseAssetName(req.GetName())
+	orgName, spaceName, assetName, err := parseAssetName(req.GetName())
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Asset", req.GetName())
 	}
-	projectID, err := s.resolveProject(ctx, orgName, projectName)
+	spaceID, err := s.resolveSpace(ctx, orgName, spaceName)
 	if err != nil {
 		return nil, err
 	}
 
-	existing, err := s.queries.GetAssetByName(ctx, db.GetAssetByNameParams{ProjectID: projectID, Name: assetName})
+	existing, err := s.queries.GetAssetByName(ctx, db.GetAssetByNameParams{SpaceID: spaceID, Name: assetName})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Asset", req.GetName())
 	}
@@ -322,6 +322,6 @@ func (s *AssetsServer) UndeleteAsset(ctx context.Context, req *assetsv1.Undelete
 		return nil, apierr.HandleResourceError(err, "Asset", req.GetName())
 	}
 
-	parentName := fmt.Sprintf("organizations/%s/projects/%s", orgName, projectName)
+	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
 	return lro.DoneOperation(convert.AssetToProto(updated, parentName))
 }

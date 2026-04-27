@@ -104,7 +104,7 @@ type TagBinding struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Output only. The name of the TagBinding. Format:
 	// `organizations/{organization}/tagBindings/{tag_binding}` or
-	// `organizations/{organization}/projects/{project}/tagBindings/{tag_binding}`.
+	// `organizations/{organization}/spaces/{space}/tagBindings/{tag_binding}`.
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Immutable. The TagValue of the TagBinding.
 	// Must be of the form `organizations/{org}/tagKeys/{key}/tagValues/{value}`.
@@ -210,7 +210,7 @@ type GetTagBindingRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The name of the TagBinding to retrieve. Format:
 	// `organizations/{organization}/tagBindings/{tag_binding}` or
-	// `organizations/{organization}/projects/{project}/tagBindings/{tag_binding}`.
+	// `organizations/{organization}/spaces/{space}/tagBindings/{tag_binding}`.
 	Name          string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -258,7 +258,7 @@ type CreateTagBindingRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The parent resource to create the TagBinding under. Format:
 	// `organizations/{organization}` or
-	// `organizations/{organization}/projects/{project}`.
+	// `organizations/{organization}/spaces/{space}`.
 	Parent string `protobuf:"bytes,4,opt,name=parent,proto3" json:"parent,omitempty"`
 	// Required. The TagBinding to be created.
 	TagBinding *TagBinding `protobuf:"bytes,1,opt,name=tag_binding,json=tagBinding,proto3" json:"tag_binding,omitempty"`
@@ -335,7 +335,7 @@ type DeleteTagBindingRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The name of the TagBinding to delete. Format:
 	// `organizations/{organization}/tagBindings/{tag_binding}` or
-	// `organizations/{organization}/projects/{project}/tagBindings/{tag_binding}`.
+	// `organizations/{organization}/spaces/{space}/tagBindings/{tag_binding}`.
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Optional. The etag known to the client for the expected state of the tag binding.
 	// This is to be used for optimistic concurrency.
@@ -403,7 +403,7 @@ type ListTagBindingsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The parent resource for which you want to list existing
 	// TagBindings. Format: `organizations/{organization}` or
-	// `organizations/{organization}/projects/{project}`.
+	// `organizations/{organization}/spaces/{space}`.
 	Parent string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
 	// Optional. The maximum number of TagBindings to return in the response. The
 	// server allows a maximum of 300 TagBindings to return. If unspecified, the
@@ -419,7 +419,7 @@ type ListTagBindingsRequest struct {
 	//
 	// Examples:
 	//
-	//   - `parentResource = "organizations/123/projects/my-project"` —
+	//   - `parentResource = "organizations/123/spaces/my-space"` —
 	//     bindings for a specific resource.
 	//
 	// For more information, see [AIP-160](https://aip.dev/160).
@@ -573,7 +573,7 @@ type ListEffectiveTagsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The parent resource for which you want to list the effective
 	// tags. Format: `organizations/{organization}` or
-	// `organizations/{organization}/projects/{project}`.
+	// `organizations/{organization}/spaces/{space}`.
 	Parent string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
 	// Optional. The maximum number of effective tags to return in the response.
 	// The server allows a maximum of 300 effective tags to return in a single
@@ -855,7 +855,7 @@ var File_pivox_api_v1_tag_bindings_proto protoreflect.FileDescriptor
 
 const file_pivox_api_v1_tag_bindings_proto_rawDesc = "" +
 	"\n" +
-	"\x1fpivox/api/v1/tag_bindings.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa4\x06\n" +
+	"\x1fpivox/api/v1/tag_bindings.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9c\x06\n" +
 	"\n" +
 	"TagBinding\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12=\n" +
@@ -877,8 +877,8 @@ const file_pivox_api_v1_tag_bindings_proto_rawDesc = "" +
 	"\x04USER\x10\x01\x12\n" +
 	"\n" +
 	"\x06SYSTEM\x10\x02\x12\x06\n" +
-	"\x02AI\x10\x03:\x90\x02\xeaA\x8c\x02\n" +
-	"\x14pivox.api/TagBinding\x126organizations/{organization}/tagBindings/{tag_binding}\x12Iorganizations/{organization}/projects/{project}/tagBindings/{tag_binding}\x12Xorganizations/{organization}/projects/{project}/assets/{asset}/tagBindings/{tag_binding}*\vtagBindings2\n" +
+	"\x02AI\x10\x03:\x88\x02\xeaA\x84\x02\n" +
+	"\x14pivox.api/TagBinding\x126organizations/{organization}/tagBindings/{tag_binding}\x12Eorganizations/{organization}/spaces/{space}/tagBindings/{tag_binding}\x12Torganizations/{organization}/spaces/{space}/assets/{asset}/tagBindings/{tag_binding}*\vtagBindings2\n" +
 	"tagBinding\"N\n" +
 	"\x14GetTagBindingRequest\x126\n" +
 	"\x04name\x18\x01 \x01(\tB\"\xe0A\x02\xfaA\x16\n" +
@@ -919,17 +919,17 @@ const file_pivox_api_v1_tag_bindings_proto_rawDesc = "" +
 	"\x10pivox.api/TagKeyR\x06tagKey\x12\x1c\n" +
 	"\tinherited\x18\x05 \x01(\bR\tinherited\"\x1a\n" +
 	"\x18CreateTagBindingMetadata\"\x1a\n" +
-	"\x18DeleteTagBindingMetadata2\x86\f\n" +
-	"\vTagBindings\x12\x92\x02\n" +
-	"\x0fListTagBindings\x12$.pivox.api.v1.ListTagBindingsRequest\x1a%.pivox.api.v1.ListTagBindingsResponse\"\xb1\x01\xdaA\x06parent\x82\xd3\xe4\x93\x02\xa1\x01Z5\x123/v1/{parent=organizations/*/projects/*}/tagBindingsZ>\x12</v1/{parent=organizations/*/projects/*/assets/*}/tagBindings\x12(/v1/{parent=organizations/*}/tagBindings\x12\xff\x01\n" +
-	"\rGetTagBinding\x12\".pivox.api.v1.GetTagBindingRequest\x1a\x18.pivox.api.v1.TagBinding\"\xaf\x01\xdaA\x04name\x82\xd3\xe4\x93\x02\xa1\x01Z5\x123/v1/{name=organizations/*/projects/*/tagBindings/*}Z>\x12</v1/{name=organizations/*/projects/*/assets/*/tagBindings/*}\x12(/v1/{name=organizations/*/tagBindings/*}\x12\xf7\x02\n" +
-	"\x10CreateTagBinding\x12%.pivox.api.v1.CreateTagBindingRequest\x1a\x1d.google.longrunning.Operation\"\x9c\x02\xcaA&\n" +
+	"\x18DeleteTagBindingMetadata2\xf2\v\n" +
+	"\vTagBindings\x12\x8e\x02\n" +
+	"\x0fListTagBindings\x12$.pivox.api.v1.ListTagBindingsRequest\x1a%.pivox.api.v1.ListTagBindingsResponse\"\xad\x01\xdaA\x06parent\x82\xd3\xe4\x93\x02\x9d\x01Z3\x121/v1/{parent=organizations/*/spaces/*}/tagBindingsZ<\x12:/v1/{parent=organizations/*/spaces/*/assets/*}/tagBindings\x12(/v1/{parent=organizations/*}/tagBindings\x12\xfb\x01\n" +
+	"\rGetTagBinding\x12\".pivox.api.v1.GetTagBindingRequest\x1a\x18.pivox.api.v1.TagBinding\"\xab\x01\xdaA\x04name\x82\xd3\xe4\x93\x02\x9d\x01Z3\x121/v1/{name=organizations/*/spaces/*/tagBindings/*}Z<\x12:/v1/{name=organizations/*/spaces/*/assets/*/tagBindings/*}\x12(/v1/{name=organizations/*/tagBindings/*}\x12\xf3\x02\n" +
+	"\x10CreateTagBinding\x12%.pivox.api.v1.CreateTagBindingRequest\x1a\x1d.google.longrunning.Operation\"\x98\x02\xcaA&\n" +
 	"\n" +
-	"TagBinding\x12\x18CreateTagBindingMetadata\xdaA!parent,tag_binding,tag_binding_id\x82\xd3\xe4\x93\x02\xc8\x01:\vtag_bindingZB:\vtag_binding\"3/v1/{parent=organizations/*/projects/*}/tagBindingsZK:\vtag_binding\"</v1/{parent=organizations/*/projects/*/assets/*}/tagBindings\"(/v1/{parent=organizations/*}/tagBindings\x12\xb3\x02\n" +
-	"\x10DeleteTagBinding\x12%.pivox.api.v1.DeleteTagBindingRequest\x1a\x1d.google.longrunning.Operation\"\xd8\x01\xcaA&\n" +
+	"TagBinding\x12\x18CreateTagBindingMetadata\xdaA!parent,tag_binding,tag_binding_id\x82\xd3\xe4\x93\x02\xc4\x01:\vtag_bindingZ@:\vtag_binding\"1/v1/{parent=organizations/*/spaces/*}/tagBindingsZI:\vtag_binding\":/v1/{parent=organizations/*/spaces/*/assets/*}/tagBindings\"(/v1/{parent=organizations/*}/tagBindings\x12\xaf\x02\n" +
+	"\x10DeleteTagBinding\x12%.pivox.api.v1.DeleteTagBindingRequest\x1a\x1d.google.longrunning.Operation\"\xd4\x01\xcaA&\n" +
 	"\n" +
-	"TagBinding\x12\x18DeleteTagBindingMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02\xa1\x01Z5*3/v1/{name=organizations/*/projects/*/tagBindings/*}Z>*</v1/{name=organizations/*/projects/*/assets/*/tagBindings/*}*(/v1/{name=organizations/*/tagBindings/*}\x12\x9e\x02\n" +
-	"\x11ListEffectiveTags\x12&.pivox.api.v1.ListEffectiveTagsRequest\x1a'.pivox.api.v1.ListEffectiveTagsResponse\"\xb7\x01\xdaA\x06parent\x82\xd3\xe4\x93\x02\xa7\x01Z7\x125/v1/{parent=organizations/*/projects/*}/effectiveTagsZ@\x12>/v1/{parent=organizations/*/projects/*/assets/*}/effectiveTags\x12*/v1/{parent=organizations/*}/effectiveTags\x1a\x0f\xcaA\fapi.pivox.ioB\xb4\x01\n" +
+	"TagBinding\x12\x18DeleteTagBindingMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02\x9d\x01Z3*1/v1/{name=organizations/*/spaces/*/tagBindings/*}Z<*:/v1/{name=organizations/*/spaces/*/assets/*/tagBindings/*}*(/v1/{name=organizations/*/tagBindings/*}\x12\x9a\x02\n" +
+	"\x11ListEffectiveTags\x12&.pivox.api.v1.ListEffectiveTagsRequest\x1a'.pivox.api.v1.ListEffectiveTagsResponse\"\xb3\x01\xdaA\x06parent\x82\xd3\xe4\x93\x02\xa3\x01Z5\x123/v1/{parent=organizations/*/spaces/*}/effectiveTagsZ>\x12</v1/{parent=organizations/*/spaces/*/assets/*}/effectiveTags\x12*/v1/{parent=organizations/*}/effectiveTags\x1a\x0f\xcaA\fapi.pivox.ioB\xb4\x01\n" +
 	"\x10com.pivox.api.v1B\x10TagBindingsProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
 
 var (

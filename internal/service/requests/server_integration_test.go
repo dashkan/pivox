@@ -31,18 +31,18 @@ func createTestOrg(t *testing.T, queries *db.Queries, name string) db.Organizati
 	return org
 }
 
-func createTestProject(t *testing.T, queries *db.Queries, orgID uuid.UUID, name string) db.Project {
+func createTestSpace(t *testing.T, queries *db.Queries, orgID uuid.UUID, name string) db.Space {
 	t.Helper()
-	project, err := queries.CreateProject(context.Background(), db.CreateProjectParams{
+	space, err := queries.CreateSpace(context.Background(), db.CreateSpaceParams{
 		ID:          uuid.New(),
 		OrgID:       orgID,
 		Name:        name,
-		DisplayName: "Test Project " + name,
+		DisplayName: "Test Space " + name,
 		Labels:      json.RawMessage("{}"),
 		CreatedBy:   "test",
 	})
 	require.NoError(t, err)
-	return project
+	return space
 }
 
 func TestIntegration_Requests_ApproveWorkflow(t *testing.T) {
@@ -60,11 +60,11 @@ func TestIntegration_Requests_ApproveWorkflow(t *testing.T) {
 	client := assetsv1.NewRequestsClient(conn)
 	ctx := context.Background()
 
-	// Prerequisite: create org and project directly via DB.
+	// Prerequisite: create org and space directly via DB.
 	org := createTestOrg(t, queries, "acme")
-	createTestProject(t, queries, org.ID, "proj1")
+	createTestSpace(t, queries, org.ID, "proj1")
 
-	parent := "organizations/acme/projects/proj1"
+	parent := "organizations/acme/spaces/proj1"
 	var requestName string
 
 	t.Run("Create", func(t *testing.T) {
@@ -151,8 +151,8 @@ func TestIntegration_Requests_ListRequests(t *testing.T) {
 	ctx := context.Background()
 
 	org := createTestOrg(t, queries, "acme")
-	createTestProject(t, queries, org.ID, "proj1")
-	parent := "organizations/acme/projects/proj1"
+	createTestSpace(t, queries, org.ID, "proj1")
+	parent := "organizations/acme/spaces/proj1"
 
 	// Create multiple requests.
 	for i := range 3 {
@@ -224,9 +224,9 @@ func TestIntegration_Requests_RejectWorkflow(t *testing.T) {
 	ctx := context.Background()
 
 	org := createTestOrg(t, queries, "acme")
-	createTestProject(t, queries, org.ID, "proj1")
+	createTestSpace(t, queries, org.ID, "proj1")
 
-	parent := "organizations/acme/projects/proj1"
+	parent := "organizations/acme/spaces/proj1"
 
 	// Create and drive to DELIVERED, then reject.
 	op, err := client.CreateRequest(ctx, &assetsv1.CreateRequestRequest{
@@ -269,9 +269,9 @@ func TestIntegration_Requests_CancelWorkflow(t *testing.T) {
 	ctx := context.Background()
 
 	org := createTestOrg(t, queries, "acme")
-	createTestProject(t, queries, org.ID, "proj1")
+	createTestSpace(t, queries, org.ID, "proj1")
 
-	parent := "organizations/acme/projects/proj1"
+	parent := "organizations/acme/spaces/proj1"
 
 	op, err := client.CreateRequest(ctx, &assetsv1.CreateRequestRequest{
 		Parent: parent,

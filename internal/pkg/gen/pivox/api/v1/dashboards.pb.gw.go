@@ -332,7 +332,7 @@ func RegisterDashboardsHandlerServer(ctx context.Context, mux *runtime.ServeMux,
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.api.v1.Dashboards/ListDashboards", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/projects/*}/dashboards"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.api.v1.Dashboards/ListDashboards", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/spaces/*}/dashboards"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -352,7 +352,7 @@ func RegisterDashboardsHandlerServer(ctx context.Context, mux *runtime.ServeMux,
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.api.v1.Dashboards/GetDashboard", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/dashboards/*}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.api.v1.Dashboards/GetDashboard", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/dashboards/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -372,7 +372,7 @@ func RegisterDashboardsHandlerServer(ctx context.Context, mux *runtime.ServeMux,
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.api.v1.Dashboards/CreateDashboard", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/projects/*}/dashboards"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.api.v1.Dashboards/CreateDashboard", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/spaces/*}/dashboards"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -392,7 +392,7 @@ func RegisterDashboardsHandlerServer(ctx context.Context, mux *runtime.ServeMux,
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.api.v1.Dashboards/UpdateDashboard", runtime.WithHTTPPathPattern("/v1/{dashboard.name=organizations/*/projects/*/dashboards/*}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.api.v1.Dashboards/UpdateDashboard", runtime.WithHTTPPathPattern("/v1/{dashboard.name=organizations/*/spaces/*/dashboards/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -412,7 +412,7 @@ func RegisterDashboardsHandlerServer(ctx context.Context, mux *runtime.ServeMux,
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.api.v1.Dashboards/DeleteDashboard", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/dashboards/*}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.api.v1.Dashboards/DeleteDashboard", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/dashboards/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -470,7 +470,7 @@ func RegisterDashboardsHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.api.v1.Dashboards/ListDashboards", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/projects/*}/dashboards"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.api.v1.Dashboards/ListDashboards", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/spaces/*}/dashboards"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -487,7 +487,7 @@ func RegisterDashboardsHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.api.v1.Dashboards/GetDashboard", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/dashboards/*}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.api.v1.Dashboards/GetDashboard", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/dashboards/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -504,7 +504,7 @@ func RegisterDashboardsHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.api.v1.Dashboards/CreateDashboard", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/projects/*}/dashboards"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.api.v1.Dashboards/CreateDashboard", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/spaces/*}/dashboards"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -521,7 +521,7 @@ func RegisterDashboardsHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.api.v1.Dashboards/UpdateDashboard", runtime.WithHTTPPathPattern("/v1/{dashboard.name=organizations/*/projects/*/dashboards/*}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.api.v1.Dashboards/UpdateDashboard", runtime.WithHTTPPathPattern("/v1/{dashboard.name=organizations/*/spaces/*/dashboards/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -538,7 +538,7 @@ func RegisterDashboardsHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.api.v1.Dashboards/DeleteDashboard", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/dashboards/*}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.api.v1.Dashboards/DeleteDashboard", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/dashboards/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -555,11 +555,11 @@ func RegisterDashboardsHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 }
 
 var (
-	pattern_Dashboards_ListDashboards_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3, 2, 4}, []string{"v1", "organizations", "projects", "parent", "dashboards"}, ""))
-	pattern_Dashboards_GetDashboard_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "projects", "dashboards", "name"}, ""))
-	pattern_Dashboards_CreateDashboard_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3, 2, 4}, []string{"v1", "organizations", "projects", "parent", "dashboards"}, ""))
-	pattern_Dashboards_UpdateDashboard_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "projects", "dashboards", "dashboard.name"}, ""))
-	pattern_Dashboards_DeleteDashboard_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "projects", "dashboards", "name"}, ""))
+	pattern_Dashboards_ListDashboards_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3, 2, 4}, []string{"v1", "organizations", "spaces", "parent", "dashboards"}, ""))
+	pattern_Dashboards_GetDashboard_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "spaces", "dashboards", "name"}, ""))
+	pattern_Dashboards_CreateDashboard_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3, 2, 4}, []string{"v1", "organizations", "spaces", "parent", "dashboards"}, ""))
+	pattern_Dashboards_UpdateDashboard_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "spaces", "dashboards", "dashboard.name"}, ""))
+	pattern_Dashboards_DeleteDashboard_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "spaces", "dashboards", "name"}, ""))
 )
 
 var (

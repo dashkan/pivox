@@ -11,11 +11,11 @@ import (
 )
 
 // RequestToProto converts a DB request to proto.
-// projectName is the full resource name of the parent project
-// (e.g. "organizations/acme/projects/my-project").
-func RequestToProto(row db.AssetRequest, projectName string) *assetsv1.Request {
+// spaceName is the full resource name of the parent space
+// (e.g. "organizations/acme/spaces/my-space").
+func RequestToProto(row db.AssetRequest, spaceName string) *assetsv1.Request {
 	pb := &assetsv1.Request{
-		Name:        fmt.Sprintf("%s/requests/%s", projectName, row.Name),
+		Name:        fmt.Sprintf("%s/requests/%s", spaceName, row.Name),
 		DisplayName: row.DisplayName,
 		Description: row.Description,
 		State:       requestState(row.State),
@@ -46,10 +46,10 @@ func RequestToProto(row db.AssetRequest, projectName string) *assetsv1.Request {
 
 // LineItemToProto converts a DB line item to proto.
 // requestName is the full resource name of the parent request
-// (e.g. "organizations/acme/projects/my-project/requests/req-1").
-// projectName is the full resource name of the parent project
-// (e.g. "organizations/acme/projects/my-project").
-func LineItemToProto(row db.AssetRequestLineItem, requestName string, projectName string) *assetsv1.LineItem {
+// (e.g. "organizations/acme/spaces/my-space/requests/req-1").
+// spaceName is the full resource name of the parent space
+// (e.g. "organizations/acme/spaces/my-space").
+func LineItemToProto(row db.AssetRequestLineItem, requestName string, spaceName string) *assetsv1.LineItem {
 	pb := &assetsv1.LineItem{
 		Name:        fmt.Sprintf("%s/lineItems/%s", requestName, row.Name),
 		DisplayName: row.DisplayName,
@@ -63,7 +63,7 @@ func LineItemToProto(row db.AssetRequestLineItem, requestName string, projectNam
 		pb.MediaType = assetMediaType(row.MediaType.AssetMediaType)
 	}
 	if row.AssetID.Valid {
-		pb.Asset = fmt.Sprintf("%s/assets/%s", projectName, row.Name)
+		pb.Asset = fmt.Sprintf("%s/assets/%s", spaceName, row.Name)
 	}
 	if len(row.Annotations) > 0 {
 		annotations := make(map[string]string)

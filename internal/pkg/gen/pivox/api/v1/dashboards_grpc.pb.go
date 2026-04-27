@@ -44,13 +44,13 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// Manages custom dashboards within a project.
+// Manages custom dashboards within a space.
 type DashboardsClient interface {
-	// Lists dashboards in a project.
+	// Lists dashboards in a space.
 	ListDashboards(ctx context.Context, in *ListDashboardsRequest, opts ...grpc.CallOption) (*ListDashboardsResponse, error)
 	// Retrieves a dashboard by name.
 	GetDashboard(ctx context.Context, in *GetDashboardRequest, opts ...grpc.CallOption) (*Dashboard, error)
-	// Creates a new dashboard in a project.
+	// Creates a new dashboard in a space.
 	CreateDashboard(ctx context.Context, in *CreateDashboardRequest, opts ...grpc.CallOption) (*Dashboard, error)
 	// Updates an existing dashboard.
 	UpdateDashboard(ctx context.Context, in *UpdateDashboardRequest, opts ...grpc.CallOption) (*Dashboard, error)
@@ -120,13 +120,13 @@ func (c *dashboardsClient) DeleteDashboard(ctx context.Context, in *DeleteDashbo
 // All implementations must embed UnimplementedDashboardsServer
 // for forward compatibility.
 //
-// Manages custom dashboards within a project.
+// Manages custom dashboards within a space.
 type DashboardsServer interface {
-	// Lists dashboards in a project.
+	// Lists dashboards in a space.
 	ListDashboards(context.Context, *ListDashboardsRequest) (*ListDashboardsResponse, error)
 	// Retrieves a dashboard by name.
 	GetDashboard(context.Context, *GetDashboardRequest) (*Dashboard, error)
-	// Creates a new dashboard in a project.
+	// Creates a new dashboard in a space.
 	CreateDashboard(context.Context, *CreateDashboardRequest) (*Dashboard, error)
 	// Updates an existing dashboard.
 	UpdateDashboard(context.Context, *UpdateDashboardRequest) (*Dashboard, error)

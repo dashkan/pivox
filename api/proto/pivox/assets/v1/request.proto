@@ -28,7 +28,7 @@ import "pivox/assets/v1/asset.proto";
 
 option go_package = "pivox/assets/v1;assetsv1";
 
-// Manages asset requests within a project. Requests represent the
+// Manages asset requests within a space. Requests represent the
 // order workflow: a producer creates a request describing needed
 // assets, optionally assigns an artist, the artist delivers assets
 // for each line item, and the producer approves or requests revisions.
@@ -39,15 +39,15 @@ option go_package = "pivox/assets/v1;assetsv1";
 service Requests {
   option (google.api.default_host) = "api.pivox.io";
 
-  // Creates a new request in the specified project. Line items can be
+  // Creates a new request in the specified space. Line items can be
   // included in the request body — each line item creates a
-  // PLACEHOLDER asset in the project.
+  // PLACEHOLDER asset in the space.
   //
   // The caller must have `assets.requests.create` permission on the
-  // parent project.
+  // parent space.
   rpc CreateRequest(CreateRequestRequest) returns (google.longrunning.Operation) {
     option (google.api.http) = {
-      post: "/v1/{parent=organizations/*/projects/*}/requests"
+      post: "/v1/{parent=organizations/*/spaces/*}/requests"
       body: "request"
     };
     option (google.api.method_signature) = "parent,request";
@@ -59,13 +59,13 @@ service Requests {
 
   // Retrieves a request by resource name.
   rpc GetRequest(GetRequestRequest) returns (Request) {
-    option (google.api.http) = {get: "/v1/{name=organizations/*/projects/*/requests/*}"};
+    option (google.api.http) = {get: "/v1/{name=organizations/*/spaces/*/requests/*}"};
     option (google.api.method_signature) = "name";
   }
 
-  // Lists requests in a project.
+  // Lists requests in a space.
   rpc ListRequests(ListRequestsRequest) returns (ListRequestsResponse) {
-    option (google.api.http) = {get: "/v1/{parent=organizations/*/projects/*}/requests"};
+    option (google.api.http) = {get: "/v1/{parent=organizations/*/spaces/*}/requests"};
     option (google.api.method_signature) = "parent";
   }
 
@@ -73,7 +73,7 @@ service Requests {
   // priority, due_time).
   rpc UpdateRequest(UpdateRequestRequest) returns (google.longrunning.Operation) {
     option (google.api.http) = {
-      patch: "/v1/{request.name=organizations/*/projects/*/requests/*}"
+      patch: "/v1/{request.name=organizations/*/spaces/*/requests/*}"
       body: "request"
     };
     option (google.api.method_signature) = "request,update_mask";
@@ -86,7 +86,7 @@ service Requests {
   // Soft-deletes a request. Also soft-deletes any unfulfilled
   // PLACEHOLDER assets linked to its line items.
   rpc DeleteRequest(DeleteRequestRequest) returns (google.longrunning.Operation) {
-    option (google.api.http) = {delete: "/v1/{name=organizations/*/projects/*/requests/*}"};
+    option (google.api.http) = {delete: "/v1/{name=organizations/*/spaces/*/requests/*}"};
     option (google.api.method_signature) = "name";
     option (google.longrunning.operation_info) = {
       response_type: "Request"
@@ -100,7 +100,7 @@ service Requests {
   //     aip.dev/not-precedent: Returns the updated Request resource. --)
   rpc SubmitRequest(SubmitRequestRequest) returns (Request) {
     option (google.api.http) = {
-      post: "/v1/{name=organizations/*/projects/*/requests/*}:submit"
+      post: "/v1/{name=organizations/*/spaces/*/requests/*}:submit"
       body: "*"
     };
     option (google.api.method_signature) = "name";
@@ -115,7 +115,7 @@ service Requests {
   //     aip.dev/not-precedent: Returns the updated Request resource. --)
   rpc AssignRequest(AssignRequestRequest) returns (Request) {
     option (google.api.http) = {
-      post: "/v1/{name=organizations/*/projects/*/requests/*}:assign"
+      post: "/v1/{name=organizations/*/spaces/*/requests/*}:assign"
       body: "*"
     };
     option (google.api.method_signature) = "name,assignee";
@@ -129,7 +129,7 @@ service Requests {
   //     aip.dev/not-precedent: Returns the updated Request resource. --)
   rpc ClaimRequest(ClaimRequestRequest) returns (Request) {
     option (google.api.http) = {
-      post: "/v1/{name=organizations/*/projects/*/requests/*}:claim"
+      post: "/v1/{name=organizations/*/spaces/*/requests/*}:claim"
       body: "*"
     };
     option (google.api.method_signature) = "name";
@@ -143,7 +143,7 @@ service Requests {
   //     aip.dev/not-precedent: Returns the updated Request resource. --)
   rpc DeliverRequest(DeliverRequestRequest) returns (Request) {
     option (google.api.http) = {
-      post: "/v1/{name=organizations/*/projects/*/requests/*}:deliver"
+      post: "/v1/{name=organizations/*/spaces/*/requests/*}:deliver"
       body: "*"
     };
     option (google.api.method_signature) = "name";
@@ -157,7 +157,7 @@ service Requests {
   //     aip.dev/not-precedent: Returns the updated Request resource. --)
   rpc ApproveRequest(ApproveRequestRequest) returns (Request) {
     option (google.api.http) = {
-      post: "/v1/{name=organizations/*/projects/*/requests/*}:approve"
+      post: "/v1/{name=organizations/*/spaces/*/requests/*}:approve"
       body: "*"
     };
     option (google.api.method_signature) = "name";
@@ -174,7 +174,7 @@ service Requests {
   //     aip.dev/not-precedent: requestRevision is more descriptive than request. --)
   rpc RequestRevision(RequestRevisionRequest) returns (Request) {
     option (google.api.http) = {
-      post: "/v1/{name=organizations/*/projects/*/requests/*}:requestRevision"
+      post: "/v1/{name=organizations/*/spaces/*/requests/*}:requestRevision"
       body: "*"
     };
     option (google.api.method_signature) = "name";
@@ -188,7 +188,7 @@ service Requests {
   //     aip.dev/not-precedent: Returns the updated Request resource. --)
   rpc RejectRequest(RejectRequestRequest) returns (Request) {
     option (google.api.http) = {
-      post: "/v1/{name=organizations/*/projects/*/requests/*}:reject"
+      post: "/v1/{name=organizations/*/spaces/*/requests/*}:reject"
       body: "*"
     };
     option (google.api.method_signature) = "name";
@@ -203,19 +203,19 @@ service Requests {
   //     aip.dev/not-precedent: Returns the updated Request resource. --)
   rpc CancelRequest(CancelRequestRequest) returns (Request) {
     option (google.api.http) = {
-      post: "/v1/{name=organizations/*/projects/*/requests/*}:cancel"
+      post: "/v1/{name=organizations/*/spaces/*/requests/*}:cancel"
       body: "*"
     };
     option (google.api.method_signature) = "name";
   }
 
   // Creates a new line item on a request. A PLACEHOLDER asset is
-  // created in the project and linked to the line item.
+  // created in the space and linked to the line item.
   //
   // The caller must have `assets.lineItems.create` permission.
   rpc CreateLineItem(CreateLineItemRequest) returns (google.longrunning.Operation) {
     option (google.api.http) = {
-      post: "/v1/{parent=organizations/*/projects/*/requests/*}/lineItems"
+      post: "/v1/{parent=organizations/*/spaces/*/requests/*}/lineItems"
       body: "line_item"
     };
     option (google.api.method_signature) = "parent,line_item";
@@ -227,20 +227,20 @@ service Requests {
 
   // Retrieves a line item by resource name.
   rpc GetLineItem(GetLineItemRequest) returns (LineItem) {
-    option (google.api.http) = {get: "/v1/{name=organizations/*/projects/*/requests/*/lineItems/*}"};
+    option (google.api.http) = {get: "/v1/{name=organizations/*/spaces/*/requests/*/lineItems/*}"};
     option (google.api.method_signature) = "name";
   }
 
   // Lists line items in a request.
   rpc ListLineItems(ListLineItemsRequest) returns (ListLineItemsResponse) {
-    option (google.api.http) = {get: "/v1/{parent=organizations/*/projects/*/requests/*}/lineItems"};
+    option (google.api.http) = {get: "/v1/{parent=organizations/*/spaces/*/requests/*}/lineItems"};
     option (google.api.method_signature) = "parent";
   }
 
   // Updates a line item's mutable fields (display_name, description).
   rpc UpdateLineItem(UpdateLineItemRequest) returns (google.longrunning.Operation) {
     option (google.api.http) = {
-      patch: "/v1/{line_item.name=organizations/*/projects/*/requests/*/lineItems/*}"
+      patch: "/v1/{line_item.name=organizations/*/spaces/*/requests/*/lineItems/*}"
       body: "line_item"
     };
     option (google.api.method_signature) = "line_item,update_mask";
@@ -253,7 +253,7 @@ service Requests {
   // Deletes a line item. Only allowed when the request is in DRAFT
   // or OPEN state. Also soft-deletes the linked PLACEHOLDER asset.
   rpc DeleteLineItem(DeleteLineItemRequest) returns (google.longrunning.Operation) {
-    option (google.api.http) = {delete: "/v1/{name=organizations/*/projects/*/requests/*/lineItems/*}"};
+    option (google.api.http) = {delete: "/v1/{name=organizations/*/spaces/*/requests/*/lineItems/*}"};
     option (google.api.method_signature) = "name";
     option (google.longrunning.operation_info) = {
       response_type: "LineItem"
@@ -268,7 +268,7 @@ service Requests {
   // The caller must have `assets.lineItems.fulfill` permission.
   rpc FulfillLineItem(FulfillLineItemRequest) returns (google.longrunning.Operation) {
     option (google.api.http) = {
-      post: "/v1/{name=organizations/*/projects/*/requests/*/lineItems/*}:fulfill"
+      post: "/v1/{name=organizations/*/spaces/*/requests/*/lineItems/*}:fulfill"
       body: "*"
     };
     // (-- api-linter: client-libraries::4232::required-fields=disabled
@@ -288,7 +288,7 @@ service Requests {
 message Request {
   option (google.api.resource) = {
     type: "pivox.assets/Request"
-    pattern: "organizations/{organization}/projects/{project}/requests/{request}"
+    pattern: "organizations/{organization}/spaces/{space}/requests/{request}"
     plural: "requests"
     singular: "request"
   };
@@ -343,7 +343,7 @@ message Request {
   }
 
   // Output only. The resource name of the request. Format:
-  // `organizations/{organization}/projects/{project}/requests/{request}`
+  // `organizations/{organization}/spaces/{space}/requests/{request}`
   string name = 1 [(google.api.field_behavior) = IDENTIFIER];
 
   // Required. A human-readable title for the request.
@@ -419,7 +419,7 @@ message Request {
 message LineItem {
   option (google.api.resource) = {
     type: "pivox.assets/LineItem"
-    pattern: "organizations/{organization}/projects/{project}/requests/{request}/lineItems/{line_item}"
+    pattern: "organizations/{organization}/spaces/{space}/requests/{request}/lineItems/{line_item}"
     plural: "lineItems"
     singular: "lineItem"
   };
@@ -446,7 +446,7 @@ message LineItem {
   }
 
   // Output only. The resource name of the line item. Format:
-  // `organizations/{organization}/projects/{project}/requests/{request}/lineItems/{line_item}`
+  // `organizations/{organization}/spaces/{space}/requests/{request}/lineItems/{line_item}`
   string name = 1 [(google.api.field_behavior) = IDENTIFIER];
 
   // Required. A human-readable name for the deliverable.
@@ -490,8 +490,8 @@ message LineItem {
 
 // The request sent to the CreateRequest method.
 message CreateRequestRequest {
-  // Required. The parent project. Format:
-  // `organizations/{organization}/projects/{project}`
+  // Required. The parent space. Format:
+  // `organizations/{organization}/spaces/{space}`
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {child_type: "pivox.assets/Request"},
@@ -524,7 +524,7 @@ message GetRequestRequest {
 
 // The request sent to the ListRequests method.
 message ListRequestsRequest {
-  // Required. The parent project whose requests are being listed.
+  // Required. The parent space whose requests are being listed.
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {child_type: "pivox.assets/Request"},
@@ -583,7 +583,7 @@ message ListRequestsRequest {
 
 // The response from the ListRequests method.
 message ListRequestsResponse {
-  // The requests belonging to the specified project.
+  // The requests belonging to the specified space.
   repeated Request requests = 1;
 
   // A pagination token for the next page.
@@ -725,7 +725,7 @@ message CancelRequestRequest {
 // The request sent to the CreateLineItem method.
 message CreateLineItemRequest {
   // Required. The parent request. Format:
-  // `organizations/{organization}/projects/{project}/requests/{request}`
+  // `organizations/{organization}/spaces/{space}/requests/{request}`
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {child_type: "pivox.assets/LineItem"},

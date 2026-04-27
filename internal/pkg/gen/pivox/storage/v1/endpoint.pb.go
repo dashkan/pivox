@@ -498,7 +498,7 @@ func (x *S3AccessKeyCredentials) GetSecretAccessKey() string {
 //
 // Assets are stored as immutable versioned files:
 //
-//	{path}/{org_id}/{project_id}/assets/{asset_id}/v1.ext
+//	{path}/{org_id}/{space_id}/assets/{asset_id}/v1.ext
 //
 // No credentials are needed — the agent accesses files using the
 // pivox system user's permissions on the mounted filesystem.

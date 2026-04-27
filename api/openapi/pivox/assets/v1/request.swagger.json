@@ -16,9 +16,9 @@
     "application/json"
   ],
   "paths": {
-    "/v1/organizations/{organization}/projects/{project}/requests": {
+    "/v1/organizations/{organization}/spaces/{space}/requests": {
       "get": {
-        "summary": "Lists requests in a project.",
+        "summary": "Lists requests in a space.",
         "operationId": "Requests_ListRequests",
         "responses": {
           "200": {
@@ -42,7 +42,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -89,8 +89,8 @@
         ]
       },
       "post": {
-        "summary": "Creates a new request in the specified project. Line items can be\nincluded in the request body — each line item creates a\nPLACEHOLDER asset in the project.",
-        "description": "The caller must have `assets.requests.create` permission on the\nparent project.",
+        "summary": "Creates a new request in the specified space. Line items can be\nincluded in the request body — each line item creates a\nPLACEHOLDER asset in the space.",
+        "description": "The caller must have `assets.requests.create` permission on the\nparent space.",
         "operationId": "Requests_CreateRequest",
         "responses": {
           "200": {
@@ -114,7 +114,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -141,7 +141,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}/requests/{request}": {
+    "/v1/organizations/{organization}/spaces/{space}/requests/{request}": {
       "get": {
         "summary": "Retrieves a request by resource name.",
         "operationId": "Requests_GetRequest",
@@ -167,7 +167,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -208,7 +208,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -270,7 +270,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -414,7 +414,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}/requests/{request}/lineItems": {
+    "/v1/organizations/{organization}/spaces/{space}/requests/{request}/lineItems": {
       "get": {
         "summary": "Lists line items in a request.",
         "operationId": "Requests_ListLineItems",
@@ -440,7 +440,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -472,7 +472,7 @@
         ]
       },
       "post": {
-        "summary": "Creates a new line item on a request. A PLACEHOLDER asset is\ncreated in the project and linked to the line item.",
+        "summary": "Creates a new line item on a request. A PLACEHOLDER asset is\ncreated in the space and linked to the line item.",
         "description": "The caller must have `assets.lineItems.create` permission.",
         "operationId": "Requests_CreateLineItem",
         "responses": {
@@ -497,7 +497,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -530,7 +530,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}/requests/{request}/lineItems/{lineItem}": {
+    "/v1/organizations/{organization}/spaces/{space}/requests/{request}/lineItems/{lineItem}": {
       "get": {
         "summary": "Retrieves a line item by resource name.",
         "operationId": "Requests_GetLineItem",
@@ -556,7 +556,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -603,7 +603,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -650,7 +650,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -741,7 +741,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}/requests/{request}/lineItems/{lineItem}:fulfill": {
+    "/v1/organizations/{organization}/spaces/{space}/requests/{request}/lineItems/{lineItem}:fulfill": {
       "post": {
         "summary": "Fulfills a line item by uploading a deliverable. The linked\nPLACEHOLDER asset transitions to PROCESSING and runs the\ningestion pipeline. Returns an LRO tracking the ingestion.",
         "description": "The caller must have `assets.lineItems.fulfill` permission.",
@@ -768,7 +768,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -799,7 +799,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}/requests/{request}:approve": {
+    "/v1/organizations/{organization}/spaces/{space}/requests/{request}:approve": {
       "post": {
         "summary": "Approves the delivered request. Transitions the request from\nDELIVERED to APPROVED.",
         "description": "The caller must have `assets.requests.approve` permission.",
@@ -826,7 +826,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -851,7 +851,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}/requests/{request}:assign": {
+    "/v1/organizations/{organization}/spaces/{space}/requests/{request}:assign": {
       "post": {
         "summary": "Assigns an artist to the request. Transitions the request to\nIN_PROGRESS if currently OPEN. Can also reassign during\nIN_PROGRESS.",
         "description": "The caller must have `assets.requests.assign` permission.",
@@ -878,7 +878,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -903,7 +903,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}/requests/{request}:cancel": {
+    "/v1/organizations/{organization}/spaces/{space}/requests/{request}:cancel": {
       "post": {
         "summary": "Cancels the request at any point. Transitions the request to\nCANCELLED. Unfulfilled PLACEHOLDER assets remain but are not\ndeleted.",
         "description": "The caller must have `assets.requests.cancel` permission.",
@@ -930,7 +930,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -955,7 +955,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}/requests/{request}:claim": {
+    "/v1/organizations/{organization}/spaces/{space}/requests/{request}:claim": {
       "post": {
         "summary": "Self-assigns the calling user to an open request. Transitions the\nrequest from OPEN to IN_PROGRESS with the caller as assignee.",
         "description": "The caller must have `assets.requests.claim` permission.",
@@ -982,7 +982,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -1007,7 +1007,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}/requests/{request}:deliver": {
+    "/v1/organizations/{organization}/spaces/{space}/requests/{request}:deliver": {
       "post": {
         "summary": "Marks the request as delivered by the artist. Transitions the\nrequest from IN_PROGRESS to DELIVERED.",
         "description": "The caller must have `assets.requests.deliver` permission.",
@@ -1034,7 +1034,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -1059,7 +1059,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}/requests/{request}:reject": {
+    "/v1/organizations/{organization}/spaces/{space}/requests/{request}:reject": {
       "post": {
         "summary": "Rejects the delivered request. Transitions the request from\nDELIVERED to REJECTED.",
         "description": "The caller must have `assets.requests.reject` permission.",
@@ -1086,7 +1086,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -1111,7 +1111,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}/requests/{request}:requestRevision": {
+    "/v1/organizations/{organization}/spaces/{space}/requests/{request}:requestRevision": {
       "post": {
         "summary": "Requests revisions from the artist. Transitions the request from\nDELIVERED to REVISION_REQUESTED. The artist picks it up and it\nmoves back to IN_PROGRESS.",
         "description": "The caller must have `assets.requests.approve` permission.",
@@ -1138,7 +1138,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -1163,7 +1163,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}/requests/{request}:submit": {
+    "/v1/organizations/{organization}/spaces/{space}/requests/{request}:submit": {
       "post": {
         "summary": "Submits a draft request, making it visible to artists.\nTransitions the request from DRAFT to OPEN.",
         "operationId": "Requests_SubmitRequest",
@@ -1189,7 +1189,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -1380,7 +1380,7 @@
       "properties": {
         "name": {
           "type": "string",
-          "title": "Output only. The resource name of the line item. Format:\n`organizations/{organization}/projects/{project}/requests/{request}/lineItems/{line_item}`",
+          "title": "Output only. The resource name of the line item. Format:\n`organizations/{organization}/spaces/{space}/requests/{request}/lineItems/{line_item}`",
           "readOnly": true
         },
         "displayName": {
@@ -1475,7 +1475,7 @@
             "type": "object",
             "$ref": "#/definitions/v1Request"
           },
-          "description": "The requests belonging to the specified project."
+          "description": "The requests belonging to the specified space."
         },
         "nextPageToken": {
           "type": "string",
@@ -1489,7 +1489,7 @@
       "properties": {
         "name": {
           "type": "string",
-          "title": "Output only. The resource name of the request. Format:\n`organizations/{organization}/projects/{project}/requests/{request}`",
+          "title": "Output only. The resource name of the request. Format:\n`organizations/{organization}/spaces/{space}/requests/{request}`",
           "readOnly": true
         },
         "displayName": {

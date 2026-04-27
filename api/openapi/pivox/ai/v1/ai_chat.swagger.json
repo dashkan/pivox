@@ -1109,7 +1109,7 @@
         },
         "assetVersion": {
           "type": "string",
-          "title": "Resource name of the asset version for binary artifacts.\nFormat: `organizations/{organization}/projects/{project}/assets/{asset}/versions/{version}`"
+          "title": "Resource name of the asset version for binary artifacts.\nFormat: `organizations/{organization}/spaces/{space}/assets/{asset}/versions/{version}`"
         },
         "createTime": {
           "type": "string",

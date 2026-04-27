@@ -34,13 +34,13 @@ func createTestOrg(t *testing.T, queries *db.Queries, suffix string) db.Organiza
 	return org
 }
 
-func createTestProject(t *testing.T, queries *db.Queries, orgID uuid.UUID, displayName string) db.Project {
+func createTestSpace(t *testing.T, queries *db.Queries, orgID uuid.UUID, displayName string) db.Space {
 	t.Helper()
 	id := uuid.New()
-	p, err := queries.CreateProject(context.Background(), db.CreateProjectParams{
+	p, err := queries.CreateSpace(context.Background(), db.CreateSpaceParams{
 		ID:          id,
 		OrgID:       orgID,
-		Name:        "projects/" + id.String()[:8],
+		Name:        "spaces/" + id.String()[:8],
 		DisplayName: displayName,
 		Labels:      json.RawMessage("{}"),
 		CreatedBy:   "test",
@@ -190,10 +190,10 @@ func TestQueryIntegration_Organizations_Pagination(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Query + ScanProjects
+// Query + ScanSpaces
 // ---------------------------------------------------------------------------
 
-func TestQueryIntegration_Projects_NoFilter(t *testing.T) {
+func TestQueryIntegration_Spaces_NoFilter(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
@@ -203,23 +203,23 @@ func TestQueryIntegration_Projects_NoFilter(t *testing.T) {
 	ctx := context.Background()
 
 	org := createTestOrg(t, queries, uuid.New().String()[:8])
-	p1 := createTestProject(t, queries, org.ID, "Project Alpha")
-	p2 := createTestProject(t, queries, org.ID, "Project Beta")
+	p1 := createTestSpace(t, queries, org.ID, "Space Alpha")
+	p2 := createTestSpace(t, queries, org.ID, "Space Beta")
 
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	rows, err := Query(ctx, pool, rf, QueryParams{ParentID: org.ID.String()})
 	require.NoError(t, err)
 
-	projects, err := ScanProjects(rows)
+	spaces, err := ScanSpaces(rows)
 	require.NoError(t, err)
 
-	require.Len(t, projects, 2)
-	ids := map[uuid.UUID]bool{projects[0].ID: true, projects[1].ID: true}
+	require.Len(t, spaces, 2)
+	ids := map[uuid.UUID]bool{spaces[0].ID: true, spaces[1].ID: true}
 	assert.True(t, ids[p1.ID])
 	assert.True(t, ids[p2.ID])
 }
 
-func TestQueryIntegration_Projects_SoftDelete(t *testing.T) {
+func TestQueryIntegration_Spaces_SoftDelete(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
@@ -229,33 +229,33 @@ func TestQueryIntegration_Projects_SoftDelete(t *testing.T) {
 	ctx := context.Background()
 
 	org := createTestOrg(t, queries, uuid.New().String()[:8])
-	p := createTestProject(t, queries, org.ID, "Doomed Project")
+	p := createTestSpace(t, queries, org.ID, "Doomed Space")
 
-	_, err := queries.SoftDeleteProject(ctx, db.SoftDeleteProjectParams{
+	_, err := queries.SoftDeleteSpace(ctx, db.SoftDeleteSpaceParams{
 		ID:        p.ID,
 		DeletedBy: "test",
 	})
 	require.NoError(t, err)
 
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 
 	// Without ShowDeleted: should return 0.
 	rows, err := Query(ctx, pool, rf, QueryParams{ParentID: org.ID.String()})
 	require.NoError(t, err)
-	projects, err := ScanProjects(rows)
+	spaces, err := ScanSpaces(rows)
 	require.NoError(t, err)
-	assert.Empty(t, projects, "soft-deleted project should be hidden")
+	assert.Empty(t, spaces, "soft-deleted space should be hidden")
 
 	// With ShowDeleted: should return 1.
 	rows, err = Query(ctx, pool, rf, QueryParams{ParentID: org.ID.String(), ShowDeleted: true})
 	require.NoError(t, err)
-	projects, err = ScanProjects(rows)
+	spaces, err = ScanSpaces(rows)
 	require.NoError(t, err)
-	require.Len(t, projects, 1)
-	assert.Equal(t, p.ID, projects[0].ID)
+	require.Len(t, spaces, 1)
+	assert.Equal(t, p.ID, spaces[0].ID)
 }
 
-func TestQueryIntegration_Projects_OrderBy(t *testing.T) {
+func TestQueryIntegration_Spaces_OrderBy(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
@@ -265,22 +265,22 @@ func TestQueryIntegration_Projects_OrderBy(t *testing.T) {
 	ctx := context.Background()
 
 	org := createTestOrg(t, queries, uuid.New().String()[:8])
-	createTestProject(t, queries, org.ID, "Alpha")
-	createTestProject(t, queries, org.ID, "Zeta")
+	createTestSpace(t, queries, org.ID, "Alpha")
+	createTestSpace(t, queries, org.ID, "Zeta")
 
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	rows, err := Query(ctx, pool, rf, QueryParams{
 		ParentID: org.ID.String(),
 		OrderBy:  "displayName desc",
 	})
 	require.NoError(t, err)
 
-	projects, err := ScanProjects(rows)
+	spaces, err := ScanSpaces(rows)
 	require.NoError(t, err)
 
-	require.Len(t, projects, 2)
-	assert.Equal(t, "Zeta", projects[0].DisplayName)
-	assert.Equal(t, "Alpha", projects[1].DisplayName)
+	require.Len(t, spaces, 2)
+	assert.Equal(t, "Zeta", spaces[0].DisplayName)
+	assert.Equal(t, "Alpha", spaces[1].DisplayName)
 }
 
 // ---------------------------------------------------------------------------
@@ -362,7 +362,7 @@ func TestQueryIntegration_TagBindings(t *testing.T) {
 	tk := createTestTagKey(t, queries, org.ID, "env-"+uuid.New().String()[:6])
 	tv := createTestTagValue(t, queries, tk.ID, "prod", tk.NamespacedName)
 
-	parentRes := "//pivox.dashkan.com/projects/" + uuid.New().String()
+	parentRes := "//pivox.dashkan.com/spaces/" + uuid.New().String()
 	tb := createTestTagBinding(t, queries, parentRes, tv.ID)
 
 	rf := TagBindingFilter()
@@ -459,7 +459,7 @@ func TestQueryIntegration_InvalidFilter(t *testing.T) {
 	defer cleanup()
 	ctx := context.Background()
 
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	_, err := Query(ctx, pool, rf, QueryParams{
 		Filter: `"unclosed string`,
 	})
@@ -475,7 +475,7 @@ func TestQueryIntegration_InvalidOrderBy(t *testing.T) {
 	defer cleanup()
 	ctx := context.Background()
 
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 	_, err := Query(ctx, pool, rf, QueryParams{
 		OrderBy: "nonExistentField",
 	})
@@ -492,23 +492,23 @@ func TestQueryIntegration_CursorPagination(t *testing.T) {
 	ctx := context.Background()
 
 	org := createTestOrg(t, queries, uuid.New().String()[:8])
-	createTestProject(t, queries, org.ID, "P1")
-	createTestProject(t, queries, org.ID, "P2")
-	createTestProject(t, queries, org.ID, "P3")
+	createTestSpace(t, queries, org.ID, "P1")
+	createTestSpace(t, queries, org.ID, "P2")
+	createTestSpace(t, queries, org.ID, "P3")
 
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 
-	// First, fetch all projects ordered by id ASC to discover the actual order.
+	// First, fetch all spaces ordered by id ASC to discover the actual order.
 	rows, err := Query(ctx, pool, rf, QueryParams{ParentID: org.ID.String()})
 	require.NoError(t, err)
-	allProjects, err := ScanProjects(rows)
+	allSpaces, err := ScanSpaces(rows)
 	require.NoError(t, err)
-	require.Len(t, allProjects, 3)
+	require.Len(t, allSpaces, 3)
 
-	// Use the first project's ID as cursor — should get items after it.
+	// Use the first space's ID as cursor — should get items after it.
 	codec, err := appkey.NewFromHex(strings.Repeat("ab", 32))
 	require.NoError(t, err)
-	cursorID := allProjects[0].ID
+	cursorID := allSpaces[0].ID
 	cursorTok, err := EncodeNextPageToken(codec, cursorID)
 	require.NoError(t, err)
 	rows, err = Query(ctx, pool, rf, QueryParams{
@@ -518,14 +518,14 @@ func TestQueryIntegration_CursorPagination(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	remaining, err := ScanProjects(rows)
+	remaining, err := ScanSpaces(rows)
 	require.NoError(t, err)
 
 	require.Len(t, remaining, 2)
 	ids := map[uuid.UUID]bool{remaining[0].ID: true, remaining[1].ID: true}
-	assert.True(t, ids[allProjects[1].ID], "second project should appear after cursor")
-	assert.True(t, ids[allProjects[2].ID], "third project should appear after cursor")
-	assert.False(t, ids[cursorID], "cursor project should NOT appear")
+	assert.True(t, ids[allSpaces[1].ID], "second space should appear after cursor")
+	assert.True(t, ids[allSpaces[2].ID], "third space should appear after cursor")
+	assert.False(t, ids[cursorID], "cursor space should NOT appear")
 }
 
 func TestQueryIntegration_PageSizeClamping(t *testing.T) {
@@ -538,30 +538,30 @@ func TestQueryIntegration_PageSizeClamping(t *testing.T) {
 	ctx := context.Background()
 
 	org := createTestOrg(t, queries, uuid.New().String()[:8])
-	// Create 2 projects so we have something to query.
-	createTestProject(t, queries, org.ID, "P1")
-	createTestProject(t, queries, org.ID, "P2")
+	// Create 2 spaces so we have something to query.
+	createTestSpace(t, queries, org.ID, "P1")
+	createTestSpace(t, queries, org.ID, "P2")
 
-	rf := ProjectFilter()
+	rf := SpaceFilter()
 
 	// pageSize=0 should default to 100 (LIMIT 101). With only 2 rows, both returned.
 	rows, err := Query(ctx, pool, rf, QueryParams{ParentID: org.ID.String(), PageSize: 0})
 	require.NoError(t, err)
-	projects, err := ScanProjects(rows)
+	spaces, err := ScanSpaces(rows)
 	require.NoError(t, err)
-	assert.Len(t, projects, 2, "pageSize=0 defaults to 100, so both projects returned")
+	assert.Len(t, spaces, 2, "pageSize=0 defaults to 100, so both spaces returned")
 
 	// pageSize=9999 should clamp to 1000 (LIMIT 1001). With only 2 rows, both returned.
 	rows, err = Query(ctx, pool, rf, QueryParams{ParentID: org.ID.String(), PageSize: 9999})
 	require.NoError(t, err)
-	projects, err = ScanProjects(rows)
+	spaces, err = ScanSpaces(rows)
 	require.NoError(t, err)
-	assert.Len(t, projects, 2, "pageSize=9999 clamps to 1000, so both projects returned")
+	assert.Len(t, spaces, 2, "pageSize=9999 clamps to 1000, so both spaces returned")
 
 	// pageSize=1 should return 2 rows (LIMIT 2 = pageSize+1).
 	rows, err = Query(ctx, pool, rf, QueryParams{ParentID: org.ID.String(), PageSize: 1})
 	require.NoError(t, err)
-	projects, err = ScanProjects(rows)
+	spaces, err = ScanSpaces(rows)
 	require.NoError(t, err)
-	assert.Len(t, projects, 2, "pageSize=1 → LIMIT 2 → 2 rows returned (next-token detection)")
+	assert.Len(t, spaces, 2, "pageSize=1 → LIMIT 2 → 2 rows returned (next-token detection)")
 }

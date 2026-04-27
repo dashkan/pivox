@@ -120,12 +120,12 @@ func ScanConversations(rows pgx.Rows) ([]db.AiConversation, error) {
 	return results, rows.Err()
 }
 
-// ScanProjects scans rows into db.Project structs.
-func ScanProjects(rows pgx.Rows) ([]db.Project, error) {
+// ScanSpaces scans rows into db.Space structs.
+func ScanSpaces(rows pgx.Rows) ([]db.Space, error) {
 	defer rows.Close()
-	var results []db.Project
+	var results []db.Space
 	for rows.Next() {
-		var p db.Project
+		var p db.Space
 		if err := rows.Scan(
 			&p.ID,
 			&p.OrgID,

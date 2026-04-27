@@ -586,7 +586,7 @@
     },
     "/v1/storageSession": {
       "post": {
-        "summary": "Creates a storage session for the authenticated user. Computes\naccess patterns based on the user's org and project memberships,\npushes session grants to connected gateways, and returns a JWT\ncookie for browser-based storage access.",
+        "summary": "Creates a storage session for the authenticated user. Computes\naccess patterns based on the user's org and space memberships,\npushes session grants to connected gateways, and returns a JWT\ncookie for browser-based storage access.",
         "description": "The response includes a Set-Cookie header (via gRPC metadata) with\nthe session JWT scoped to .pivox.app domain.",
         "operationId": "StorageGateways_CreateStorageSession",
         "responses": {

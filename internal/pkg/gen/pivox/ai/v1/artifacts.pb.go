@@ -243,7 +243,7 @@ type ArtifactVersion_Inline struct {
 
 type ArtifactVersion_AssetVersion struct {
 	// Resource name of the asset version for binary artifacts.
-	// Format: `organizations/{organization}/projects/{project}/assets/{asset}/versions/{version}`
+	// Format: `organizations/{organization}/spaces/{space}/assets/{asset}/versions/{version}`
 	AssetVersion string `protobuf:"bytes,3,opt,name=asset_version,json=assetVersion,proto3,oneof"`
 }
 

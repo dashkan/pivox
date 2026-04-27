@@ -67,15 +67,18 @@ const (
 //	carries no additional information beyond what the catalog
 //	already exposes. --)
 type IamClient interface {
-	// Gets a user by resource name.
+	// Gets a user by resource name. Users are synced from Firebase Auth
+	// and are read-only through this API.
 	GetUser(ctx context.Context, in *GetUserRequest, opts ...grpc.CallOption) (*User, error)
 	// Lists users in an organization.
 	ListUsers(ctx context.Context, in *ListUsersRequest, opts ...grpc.CallOption) (*ListUsersResponse, error)
-	// Gets a role by resource name.
+	// Gets a role by resource name. v1 returns only system roles
+	// (owner, admin, editor, viewer); custom roles are deferred.
 	GetRole(ctx context.Context, in *GetRoleRequest, opts ...grpc.CallOption) (*Role, error)
 	// Lists roles in an organization.
 	ListRoles(ctx context.Context, in *ListRolesRequest, opts ...grpc.CallOption) (*ListRolesResponse, error)
-	// Lists all available system-defined permissions.
+	// Lists all system-defined permissions. Permissions are global and
+	// code-defined; the catalog is identical for every caller.
 	ListPermissions(ctx context.Context, in *ListPermissionsRequest, opts ...grpc.CallOption) (*ListPermissionsResponse, error)
 	// Gets a group by resource name.
 	GetGroup(ctx context.Context, in *GetGroupRequest, opts ...grpc.CallOption) (*Group, error)
@@ -252,15 +255,18 @@ func (c *iamClient) ListGroupMembers(ctx context.Context, in *ListGroupMembersRe
 //	carries no additional information beyond what the catalog
 //	already exposes. --)
 type IamServer interface {
-	// Gets a user by resource name.
+	// Gets a user by resource name. Users are synced from Firebase Auth
+	// and are read-only through this API.
 	GetUser(context.Context, *GetUserRequest) (*User, error)
 	// Lists users in an organization.
 	ListUsers(context.Context, *ListUsersRequest) (*ListUsersResponse, error)
-	// Gets a role by resource name.
+	// Gets a role by resource name. v1 returns only system roles
+	// (owner, admin, editor, viewer); custom roles are deferred.
 	GetRole(context.Context, *GetRoleRequest) (*Role, error)
 	// Lists roles in an organization.
 	ListRoles(context.Context, *ListRolesRequest) (*ListRolesResponse, error)
-	// Lists all available system-defined permissions.
+	// Lists all system-defined permissions. Permissions are global and
+	// code-defined; the catalog is identical for every caller.
 	ListPermissions(context.Context, *ListPermissionsRequest) (*ListPermissionsResponse, error)
 	// Gets a group by resource name.
 	GetGroup(context.Context, *GetGroupRequest) (*Group, error)

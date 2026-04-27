@@ -1343,8 +1343,8 @@ type HandshakeAck struct {
 	CorsOrigin string `protobuf:"bytes,6,opt,name=cors_origin,json=corsOrigin,proto3" json:"cors_origin,omitempty"`
 	// Full set of denied access patterns. Requests matching any pattern
 	// are rejected with 404. Patterns use glob syntax (e.g.
-	// "projects/proj1/*" denies all assets in a deleted project,
-	// "projects/proj1/assets/abc123/*" denies a single deleted asset).
+	// "spaces/space1/*" denies all assets in a deleted space,
+	// "spaces/space1/assets/abc123/*" denies a single deleted asset).
 	// The agent persists these in local SQLite for crash resilience.
 	DeniedPatterns []string `protobuf:"bytes,7,rep,name=denied_patterns,json=deniedPatterns,proto3" json:"denied_patterns,omitempty"`
 	unknownFields  protoimpl.UnknownFields

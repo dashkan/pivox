@@ -455,91 +455,6 @@ func (ns NullOrgRole) Value() (driver.Value, error) {
 	return string(ns.OrgRole), nil
 }
 
-type ProjectMemberType string
-
-const (
-	ProjectMemberTypeUser  ProjectMemberType = "user"
-	ProjectMemberTypeGroup ProjectMemberType = "group"
-)
-
-func (e *ProjectMemberType) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = ProjectMemberType(s)
-	case string:
-		*e = ProjectMemberType(s)
-	default:
-		return fmt.Errorf("unsupported scan type for ProjectMemberType: %T", src)
-	}
-	return nil
-}
-
-type NullProjectMemberType struct {
-	ProjectMemberType ProjectMemberType `json:"project_member_type"`
-	Valid             bool              `json:"valid"` // Valid is true if ProjectMemberType is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullProjectMemberType) Scan(value interface{}) error {
-	if value == nil {
-		ns.ProjectMemberType, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.ProjectMemberType.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullProjectMemberType) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.ProjectMemberType), nil
-}
-
-type ProjectRole string
-
-const (
-	ProjectRoleADMIN  ProjectRole = "ADMIN"
-	ProjectRoleEDITOR ProjectRole = "EDITOR"
-	ProjectRoleVIEWER ProjectRole = "VIEWER"
-)
-
-func (e *ProjectRole) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = ProjectRole(s)
-	case string:
-		*e = ProjectRole(s)
-	default:
-		return fmt.Errorf("unsupported scan type for ProjectRole: %T", src)
-	}
-	return nil
-}
-
-type NullProjectRole struct {
-	ProjectRole ProjectRole `json:"project_role"`
-	Valid       bool        `json:"valid"` // Valid is true if ProjectRole is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullProjectRole) Scan(value interface{}) error {
-	if value == nil {
-		ns.ProjectRole, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.ProjectRole.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullProjectRole) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.ProjectRole), nil
-}
-
 type RenditionType string
 
 const (
@@ -763,6 +678,91 @@ func (ns NullRoleMemberType) Value() (driver.Value, error) {
 	return string(ns.RoleMemberType), nil
 }
 
+type SpaceMemberType string
+
+const (
+	SpaceMemberTypeUser  SpaceMemberType = "user"
+	SpaceMemberTypeGroup SpaceMemberType = "group"
+)
+
+func (e *SpaceMemberType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = SpaceMemberType(s)
+	case string:
+		*e = SpaceMemberType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for SpaceMemberType: %T", src)
+	}
+	return nil
+}
+
+type NullSpaceMemberType struct {
+	SpaceMemberType SpaceMemberType `json:"space_member_type"`
+	Valid           bool            `json:"valid"` // Valid is true if SpaceMemberType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullSpaceMemberType) Scan(value interface{}) error {
+	if value == nil {
+		ns.SpaceMemberType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.SpaceMemberType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullSpaceMemberType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.SpaceMemberType), nil
+}
+
+type SpaceRole string
+
+const (
+	SpaceRoleADMIN  SpaceRole = "ADMIN"
+	SpaceRoleEDITOR SpaceRole = "EDITOR"
+	SpaceRoleVIEWER SpaceRole = "VIEWER"
+)
+
+func (e *SpaceRole) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = SpaceRole(s)
+	case string:
+		*e = SpaceRole(s)
+	default:
+		return fmt.Errorf("unsupported scan type for SpaceRole: %T", src)
+	}
+	return nil
+}
+
+type NullSpaceRole struct {
+	SpaceRole SpaceRole `json:"space_role"`
+	Valid     bool      `json:"valid"` // Valid is true if SpaceRole is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullSpaceRole) Scan(value interface{}) error {
+	if value == nil {
+		ns.SpaceRole, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.SpaceRole.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullSpaceRole) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.SpaceRole), nil
+}
+
 type StorageGatewayState string
 
 const (
@@ -928,7 +928,7 @@ type ApiKey struct {
 
 type Asset struct {
 	ID                uuid.UUID          `json:"id"`
-	ProjectID         uuid.UUID          `json:"project_id"`
+	SpaceID           uuid.UUID          `json:"space_id"`
 	EndpointID        pgtype.UUID        `json:"endpoint_id"`
 	Name              string             `json:"name"`
 	DisplayName       string             `json:"display_name"`
@@ -973,7 +973,7 @@ type AssetRendition struct {
 
 type AssetRequest struct {
 	ID            uuid.UUID          `json:"id"`
-	ProjectID     uuid.UUID          `json:"project_id"`
+	SpaceID       uuid.UUID          `json:"space_id"`
 	Name          string             `json:"name"`
 	DisplayName   string             `json:"display_name"`
 	Description   string             `json:"description"`
@@ -1137,33 +1137,6 @@ type Permission struct {
 	CreateTime   time.Time `json:"create_time"`
 }
 
-type Project struct {
-	ID          uuid.UUID          `json:"id"`
-	OrgID       uuid.UUID          `json:"org_id"`
-	Name        string             `json:"name"`
-	DisplayName string             `json:"display_name"`
-	Labels      json.RawMessage    `json:"labels"`
-	State       ResourceState      `json:"state"`
-	Etag        string             `json:"etag"`
-	Revision    int32              `json:"revision"`
-	CreatedBy   string             `json:"created_by"`
-	UpdatedBy   string             `json:"updated_by"`
-	DeletedBy   string             `json:"deleted_by"`
-	CreateTime  time.Time          `json:"create_time"`
-	UpdateTime  time.Time          `json:"update_time"`
-	DeleteTime  pgtype.Timestamptz `json:"delete_time"`
-	PurgeTime   pgtype.Timestamptz `json:"purge_time"`
-}
-
-type ProjectMember struct {
-	ProjectID  uuid.UUID         `json:"project_id"`
-	MemberID   uuid.UUID         `json:"member_id"`
-	MemberType ProjectMemberType `json:"member_type"`
-	Role       ProjectRole       `json:"role"`
-	CreatedBy  string            `json:"created_by"`
-	CreateTime time.Time         `json:"create_time"`
-}
-
 type PublicEmailDomain struct {
 	Domain     string    `json:"domain"`
 	CreateTime time.Time `json:"create_time"`
@@ -1197,6 +1170,33 @@ type RoleMember struct {
 type RolePermission struct {
 	RoleID       uuid.UUID `json:"role_id"`
 	PermissionID uuid.UUID `json:"permission_id"`
+}
+
+type Space struct {
+	ID          uuid.UUID          `json:"id"`
+	OrgID       uuid.UUID          `json:"org_id"`
+	Name        string             `json:"name"`
+	DisplayName string             `json:"display_name"`
+	Labels      json.RawMessage    `json:"labels"`
+	State       ResourceState      `json:"state"`
+	Etag        string             `json:"etag"`
+	Revision    int32              `json:"revision"`
+	CreatedBy   string             `json:"created_by"`
+	UpdatedBy   string             `json:"updated_by"`
+	DeletedBy   string             `json:"deleted_by"`
+	CreateTime  time.Time          `json:"create_time"`
+	UpdateTime  time.Time          `json:"update_time"`
+	DeleteTime  pgtype.Timestamptz `json:"delete_time"`
+	PurgeTime   pgtype.Timestamptz `json:"purge_time"`
+}
+
+type SpaceMember struct {
+	SpaceID    uuid.UUID       `json:"space_id"`
+	MemberID   uuid.UUID       `json:"member_id"`
+	MemberType SpaceMemberType `json:"member_type"`
+	Role       SpaceRole       `json:"role"`
+	CreatedBy  string          `json:"created_by"`
+	CreateTime time.Time       `json:"create_time"`
 }
 
 type StorageAgent struct {

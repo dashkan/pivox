@@ -72,7 +72,7 @@ func TestContentHandler_AssetBacked(t *testing.T) {
 	q.On("GetArtifactVersionForContent", mock.Anything, mock.Anything).Return(db.GetArtifactVersionForContentRow{
 		ID:               uuid.New(),
 		ArtifactID:       artID,
-		AssetVersionName: pgtype.Text{String: "organizations/acme/projects/p1/assets/a1/versions/1", Valid: true},
+		AssetVersionName: pgtype.Text{String: "organizations/acme/spaces/p1/assets/a1/versions/1", Valid: true},
 	}, nil)
 
 	req := httptest.NewRequest("GET",

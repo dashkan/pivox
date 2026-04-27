@@ -62,7 +62,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}/assets/{asset}/effectiveTags": {
+    "/v1/organizations/{organization}/spaces/{space}/assets/{asset}/effectiveTags": {
       "get": {
         "summary": "Return a list of effective tags for the given Pivox resource, as\nspecified in `parent`.",
         "operationId": "TagBindings_ListEffectiveTags3",
@@ -88,7 +88,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -120,7 +120,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}/assets/{asset}/tagBindings": {
+    "/v1/organizations/{organization}/spaces/{space}/assets/{asset}/tagBindings": {
       "get": {
         "summary": "Lists the TagBindings for the given Pivox resource, as specified\nwith `parent`.",
         "operationId": "TagBindings_ListTagBindings3",
@@ -146,7 +146,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -174,7 +174,7 @@
           },
           {
             "name": "filter",
-            "description": "Optional. An expression for filtering the results of the request.\nFilter rules are case insensitive. Filterable fields:\n\n+ `parentResource`\n\nExamples:\n\n+ `parentResource = \"organizations/123/projects/my-project\"` —\n  bindings for a specific resource.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
+            "description": "Optional. An expression for filtering the results of the request.\nFilter rules are case insensitive. Filterable fields:\n\n+ `parentResource`\n\nExamples:\n\n+ `parentResource = \"organizations/123/spaces/my-space\"` —\n  bindings for a specific resource.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
             "in": "query",
             "required": false,
             "type": "string"
@@ -216,7 +216,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -256,7 +256,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}/assets/{asset}/tagBindings/{tagBinding}": {
+    "/v1/organizations/{organization}/spaces/{space}/assets/{asset}/tagBindings/{tagBinding}": {
       "get": {
         "summary": "Retrieves a TagBinding.",
         "operationId": "TagBindings_GetTagBinding3",
@@ -282,7 +282,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -329,7 +329,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -366,7 +366,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}/effectiveTags": {
+    "/v1/organizations/{organization}/spaces/{space}/effectiveTags": {
       "get": {
         "summary": "Return a list of effective tags for the given Pivox resource, as\nspecified in `parent`.",
         "operationId": "TagBindings_ListEffectiveTags2",
@@ -392,7 +392,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -418,7 +418,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}/tagBindings": {
+    "/v1/organizations/{organization}/spaces/{space}/tagBindings": {
       "get": {
         "summary": "Lists the TagBindings for the given Pivox resource, as specified\nwith `parent`.",
         "operationId": "TagBindings_ListTagBindings2",
@@ -444,7 +444,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -466,7 +466,7 @@
           },
           {
             "name": "filter",
-            "description": "Optional. An expression for filtering the results of the request.\nFilter rules are case insensitive. Filterable fields:\n\n+ `parentResource`\n\nExamples:\n\n+ `parentResource = \"organizations/123/projects/my-project\"` —\n  bindings for a specific resource.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
+            "description": "Optional. An expression for filtering the results of the request.\nFilter rules are case insensitive. Filterable fields:\n\n+ `parentResource`\n\nExamples:\n\n+ `parentResource = \"organizations/123/spaces/my-space\"` —\n  bindings for a specific resource.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
             "in": "query",
             "required": false,
             "type": "string"
@@ -508,7 +508,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -542,7 +542,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}/tagBindings/{tagBinding}": {
+    "/v1/organizations/{organization}/spaces/{space}/tagBindings/{tagBinding}": {
       "get": {
         "summary": "Retrieves a TagBinding.",
         "operationId": "TagBindings_GetTagBinding2",
@@ -568,7 +568,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -609,7 +609,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -682,7 +682,7 @@
           },
           {
             "name": "filter",
-            "description": "Optional. An expression for filtering the results of the request.\nFilter rules are case insensitive. Filterable fields:\n\n+ `parentResource`\n\nExamples:\n\n+ `parentResource = \"organizations/123/projects/my-project\"` —\n  bindings for a specific resource.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
+            "description": "Optional. An expression for filtering the results of the request.\nFilter rules are case insensitive. Filterable fields:\n\n+ `parentResource`\n\nExamples:\n\n+ `parentResource = \"organizations/123/spaces/my-space\"` —\n  bindings for a specific resource.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
             "in": "query",
             "required": false,
             "type": "string"
@@ -970,7 +970,7 @@
       "properties": {
         "name": {
           "type": "string",
-          "description": "Output only. The name of the TagBinding. Format:\n`organizations/{organization}/tagBindings/{tag_binding}` or\n`organizations/{organization}/projects/{project}/tagBindings/{tag_binding}`.",
+          "description": "Output only. The name of the TagBinding. Format:\n`organizations/{organization}/tagBindings/{tag_binding}` or\n`organizations/{organization}/spaces/{space}/tagBindings/{tag_binding}`.",
           "readOnly": true
         },
         "tagValue": {

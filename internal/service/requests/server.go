@@ -28,53 +28,53 @@ func NewRequestsServer(queries db.Querier) *RequestsServer {
 	}
 }
 
-// parseRequestName parses "organizations/{org}/projects/{project}/requests/{request}".
-func parseRequestName(name string) (orgName, projectName, requestName string, err error) {
+// parseRequestName parses "organizations/{org}/spaces/{space}/requests/{request}".
+func parseRequestName(name string) (orgName, spaceName, requestName string, err error) {
 	parts := strings.Split(name, "/")
-	if len(parts) != 6 || parts[0] != "organizations" || parts[2] != "projects" || parts[4] != "requests" {
+	if len(parts) != 6 || parts[0] != "organizations" || parts[2] != "spaces" || parts[4] != "requests" {
 		return "", "", "", fmt.Errorf("invalid request name %q", name)
 	}
 	return parts[1], parts[3], parts[5], nil
 }
 
-// parseRequestParent parses "organizations/{org}/projects/{project}".
-func parseRequestParent(parent string) (orgName, projectName string, err error) {
+// parseRequestParent parses "organizations/{org}/spaces/{space}".
+func parseRequestParent(parent string) (orgName, spaceName string, err error) {
 	parts := strings.Split(parent, "/")
-	if len(parts) != 4 || parts[0] != "organizations" || parts[2] != "projects" {
+	if len(parts) != 4 || parts[0] != "organizations" || parts[2] != "spaces" {
 		return "", "", fmt.Errorf("invalid parent %q", parent)
 	}
 	return parts[1], parts[3], nil
 }
 
-// resolveProject resolves org name + project name to project UUID.
-func (s *RequestsServer) resolveProject(ctx context.Context, orgName, projectName string) (uuid.UUID, error) {
+// resolveSpace resolves org name + space name to space UUID.
+func (s *RequestsServer) resolveSpace(ctx context.Context, orgName, spaceName string) (uuid.UUID, error) {
 	org, err := s.queries.GetOrganizationByName(ctx, orgName)
 	if err != nil {
 		return uuid.Nil, apierr.HandleResourceError(err, "Organization", orgName)
 	}
-	project, err := s.queries.GetProjectByName(ctx, db.GetProjectByNameParams{OrgID: org.ID, Name: projectName})
+	space, err := s.queries.GetSpaceByName(ctx, db.GetSpaceByNameParams{OrgID: org.ID, Name: spaceName})
 	if err != nil {
-		return uuid.Nil, apierr.HandleResourceError(err, "Project", fmt.Sprintf("organizations/%s/projects/%s", orgName, projectName))
+		return uuid.Nil, apierr.HandleResourceError(err, "Space", fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName))
 	}
-	return project.ID, nil
+	return space.ID, nil
 }
 
 func (s *RequestsServer) GetRequest(ctx context.Context, req *assetsv1.GetRequestRequest) (*assetsv1.Request, error) {
-	orgName, projectName, requestName, err := parseRequestName(req.GetName())
+	orgName, spaceName, requestName, err := parseRequestName(req.GetName())
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Request", req.GetName())
 	}
-	projectID, err := s.resolveProject(ctx, orgName, projectName)
+	spaceID, err := s.resolveSpace(ctx, orgName, spaceName)
 	if err != nil {
 		return nil, err
 	}
 
-	request, err := s.queries.GetRequestByName(ctx, db.GetRequestByNameParams{ProjectID: projectID, Name: requestName})
+	request, err := s.queries.GetRequestByName(ctx, db.GetRequestByNameParams{SpaceID: spaceID, Name: requestName})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Request", req.GetName())
 	}
 
-	parentName := fmt.Sprintf("organizations/%s/projects/%s", orgName, projectName)
+	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
 	proto := convert.RequestToProto(request, parentName)
 
 	// Populate line items, counts.
@@ -100,11 +100,11 @@ func (s *RequestsServer) GetRequest(ctx context.Context, req *assetsv1.GetReques
 }
 
 func (s *RequestsServer) ListRequests(ctx context.Context, req *assetsv1.ListRequestsRequest) (*assetsv1.ListRequestsResponse, error) {
-	orgName, projectName, err := parseRequestParent(req.GetParent())
+	orgName, spaceName, err := parseRequestParent(req.GetParent())
 	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Project", req.GetParent())
+		return nil, apierr.HandleResourceError(err, "Space", req.GetParent())
 	}
-	projectID, err := s.resolveProject(ctx, orgName, projectName)
+	spaceID, err := s.resolveSpace(ctx, orgName, spaceName)
 	if err != nil {
 		return nil, err
 	}
@@ -118,8 +118,8 @@ func (s *RequestsServer) ListRequests(ctx context.Context, req *assetsv1.ListReq
 	}
 
 	var rows []db.AssetRequest
-	rows, err = s.queries.ListRequestsByProject(ctx, db.ListRequestsByProjectParams{
-		ProjectID: projectID,
+	rows, err = s.queries.ListRequestsBySpace(ctx, db.ListRequestsBySpaceParams{
+		SpaceID: spaceID,
 		Limit:     pageSize + 1,
 		Offset:    0,
 	})
@@ -134,7 +134,7 @@ func (s *RequestsServer) ListRequests(ctx context.Context, req *assetsv1.ListReq
 		rows = rows[:pageSize]
 	}
 
-	parentName := fmt.Sprintf("organizations/%s/projects/%s", orgName, projectName)
+	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
 	requests := make([]*assetsv1.Request, 0, len(rows))
 	for _, r := range rows {
 		requests = append(requests, convert.RequestToProto(r, parentName))
@@ -148,11 +148,11 @@ func (s *RequestsServer) ListRequests(ctx context.Context, req *assetsv1.ListReq
 
 func (s *RequestsServer) CreateRequest(ctx context.Context, req *assetsv1.CreateRequestRequest) (*longrunningpb.Operation, error) {
 	request := req.GetRequest()
-	orgName, projectName, err := parseRequestParent(req.GetParent())
+	orgName, spaceName, err := parseRequestParent(req.GetParent())
 	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Project", req.GetParent())
+		return nil, apierr.HandleResourceError(err, "Space", req.GetParent())
 	}
-	projectID, err := s.resolveProject(ctx, orgName, projectName)
+	spaceID, err := s.resolveSpace(ctx, orgName, spaceName)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +171,7 @@ func (s *RequestsServer) CreateRequest(ctx context.Context, req *assetsv1.Create
 
 	result, err := s.queries.CreateRequest(ctx, db.CreateRequestParams{
 		ID:          uuid.New(),
-		ProjectID:   projectID,
+		SpaceID:   spaceID,
 		Name:        requestName,
 		DisplayName: request.GetDisplayName(),
 		Description: request.GetDescription(),
@@ -185,7 +185,7 @@ func (s *RequestsServer) CreateRequest(ctx context.Context, req *assetsv1.Create
 		return nil, apierr.HandleResourceError(err, "Request", "")
 	}
 
-	parentName := fmt.Sprintf("organizations/%s/projects/%s", orgName, projectName)
+	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
 
 	// Create line items and placeholder assets for each.
 	for _, li := range request.GetLineItems() {
@@ -195,7 +195,7 @@ func (s *RequestsServer) CreateRequest(ctx context.Context, req *assetsv1.Create
 		// Create placeholder asset.
 		asset, err := s.queries.CreateAsset(ctx, db.CreateAssetParams{
 			ID:          uuid.New(),
-			ProjectID:   projectID,
+			SpaceID:   spaceID,
 			Name:        assetName,
 			DisplayName: li.GetDisplayName(),
 			State:       db.AssetStatePLACEHOLDER,
@@ -242,16 +242,16 @@ func (s *RequestsServer) CreateRequest(ctx context.Context, req *assetsv1.Create
 
 func (s *RequestsServer) UpdateRequest(ctx context.Context, req *assetsv1.UpdateRequestRequest) (*longrunningpb.Operation, error) {
 	request := req.GetRequest()
-	orgName, projectName, requestName, err := parseRequestName(request.GetName())
+	orgName, spaceName, requestName, err := parseRequestName(request.GetName())
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Request", request.GetName())
 	}
-	projectID, err := s.resolveProject(ctx, orgName, projectName)
+	spaceID, err := s.resolveSpace(ctx, orgName, spaceName)
 	if err != nil {
 		return nil, err
 	}
 
-	existing, err := s.queries.GetRequestByName(ctx, db.GetRequestByNameParams{ProjectID: projectID, Name: requestName})
+	existing, err := s.queries.GetRequestByName(ctx, db.GetRequestByNameParams{SpaceID: spaceID, Name: requestName})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Request", request.GetName())
 	}
@@ -293,21 +293,21 @@ func (s *RequestsServer) UpdateRequest(ctx context.Context, req *assetsv1.Update
 		return nil, apierr.HandleResourceError(err, "Request", request.GetName())
 	}
 
-	parentName := fmt.Sprintf("organizations/%s/projects/%s", orgName, projectName)
+	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
 	return lro.DoneOperation(convert.RequestToProto(result, parentName))
 }
 
 func (s *RequestsServer) DeleteRequest(ctx context.Context, req *assetsv1.DeleteRequestRequest) (*longrunningpb.Operation, error) {
-	orgName, projectName, requestName, err := parseRequestName(req.GetName())
+	orgName, spaceName, requestName, err := parseRequestName(req.GetName())
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Request", req.GetName())
 	}
-	projectID, err := s.resolveProject(ctx, orgName, projectName)
+	spaceID, err := s.resolveSpace(ctx, orgName, spaceName)
 	if err != nil {
 		return nil, err
 	}
 
-	existing, err := s.queries.GetRequestByName(ctx, db.GetRequestByNameParams{ProjectID: projectID, Name: requestName})
+	existing, err := s.queries.GetRequestByName(ctx, db.GetRequestByNameParams{SpaceID: spaceID, Name: requestName})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Request", req.GetName())
 	}
@@ -317,7 +317,7 @@ func (s *RequestsServer) DeleteRequest(ctx context.Context, req *assetsv1.Delete
 		return nil, apierr.HandleResourceError(err, "Request", req.GetName())
 	}
 
-	parentName := fmt.Sprintf("organizations/%s/projects/%s", orgName, projectName)
+	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
 	existing.State = db.RequestStateCANCELLED
 	return lro.DoneOperation(convert.RequestToProto(existing, parentName))
 }
@@ -329,16 +329,16 @@ func (s *RequestsServer) SubmitRequest(ctx context.Context, req *assetsv1.Submit
 
 // AssignRequest sets the assignee and transitions OPEN → IN_PROGRESS.
 func (s *RequestsServer) AssignRequest(ctx context.Context, req *assetsv1.AssignRequestRequest) (*assetsv1.Request, error) {
-	orgName, projectName, requestName, err := parseRequestName(req.GetName())
+	orgName, spaceName, requestName, err := parseRequestName(req.GetName())
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Request", req.GetName())
 	}
-	projectID, err := s.resolveProject(ctx, orgName, projectName)
+	spaceID, err := s.resolveSpace(ctx, orgName, spaceName)
 	if err != nil {
 		return nil, err
 	}
 
-	existing, err := s.queries.GetRequestByName(ctx, db.GetRequestByNameParams{ProjectID: projectID, Name: requestName})
+	existing, err := s.queries.GetRequestByName(ctx, db.GetRequestByNameParams{SpaceID: spaceID, Name: requestName})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Request", req.GetName())
 	}
@@ -357,22 +357,22 @@ func (s *RequestsServer) AssignRequest(ctx context.Context, req *assetsv1.Assign
 		return nil, apierr.HandleResourceError(err, "Request", req.GetName())
 	}
 
-	parentName := fmt.Sprintf("organizations/%s/projects/%s", orgName, projectName)
+	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
 	return convert.RequestToProto(result, parentName), nil
 }
 
 // ClaimRequest self-assigns the caller.
 func (s *RequestsServer) ClaimRequest(ctx context.Context, req *assetsv1.ClaimRequestRequest) (*assetsv1.Request, error) {
-	orgName, projectName, requestName, err := parseRequestName(req.GetName())
+	orgName, spaceName, requestName, err := parseRequestName(req.GetName())
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Request", req.GetName())
 	}
-	projectID, err := s.resolveProject(ctx, orgName, projectName)
+	spaceID, err := s.resolveSpace(ctx, orgName, spaceName)
 	if err != nil {
 		return nil, err
 	}
 
-	existing, err := s.queries.GetRequestByName(ctx, db.GetRequestByNameParams{ProjectID: projectID, Name: requestName})
+	existing, err := s.queries.GetRequestByName(ctx, db.GetRequestByNameParams{SpaceID: spaceID, Name: requestName})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Request", req.GetName())
 	}
@@ -394,7 +394,7 @@ func (s *RequestsServer) ClaimRequest(ctx context.Context, req *assetsv1.ClaimRe
 		return nil, apierr.HandleResourceError(err, "Request", req.GetName())
 	}
 
-	parentName := fmt.Sprintf("organizations/%s/projects/%s", orgName, projectName)
+	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
 	return convert.RequestToProto(result, parentName), nil
 }
 
@@ -420,16 +420,16 @@ func (s *RequestsServer) RejectRequest(ctx context.Context, req *assetsv1.Reject
 
 // CancelRequest transitions any state → CANCELLED.
 func (s *RequestsServer) CancelRequest(ctx context.Context, req *assetsv1.CancelRequestRequest) (*assetsv1.Request, error) {
-	orgName, projectName, requestName, err := parseRequestName(req.GetName())
+	orgName, spaceName, requestName, err := parseRequestName(req.GetName())
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Request", req.GetName())
 	}
-	projectID, err := s.resolveProject(ctx, orgName, projectName)
+	spaceID, err := s.resolveSpace(ctx, orgName, spaceName)
 	if err != nil {
 		return nil, err
 	}
 
-	existing, err := s.queries.GetRequestByName(ctx, db.GetRequestByNameParams{ProjectID: projectID, Name: requestName})
+	existing, err := s.queries.GetRequestByName(ctx, db.GetRequestByNameParams{SpaceID: spaceID, Name: requestName})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Request", req.GetName())
 	}
@@ -447,22 +447,22 @@ func (s *RequestsServer) CancelRequest(ctx context.Context, req *assetsv1.Cancel
 		return nil, apierr.HandleResourceError(err, "Request", req.GetName())
 	}
 
-	parentName := fmt.Sprintf("organizations/%s/projects/%s", orgName, projectName)
+	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
 	return convert.RequestToProto(result, parentName), nil
 }
 
 // transitionRequest is a helper for simple state transitions.
 func (s *RequestsServer) transitionRequest(ctx context.Context, name string, fromState, toState db.RequestState) (*assetsv1.Request, error) {
-	orgName, projectName, requestName, err := parseRequestName(name)
+	orgName, spaceName, requestName, err := parseRequestName(name)
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Request", name)
 	}
-	projectID, err := s.resolveProject(ctx, orgName, projectName)
+	spaceID, err := s.resolveSpace(ctx, orgName, spaceName)
 	if err != nil {
 		return nil, err
 	}
 
-	existing, err := s.queries.GetRequestByName(ctx, db.GetRequestByNameParams{ProjectID: projectID, Name: requestName})
+	existing, err := s.queries.GetRequestByName(ctx, db.GetRequestByNameParams{SpaceID: spaceID, Name: requestName})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Request", name)
 	}
@@ -480,6 +480,6 @@ func (s *RequestsServer) transitionRequest(ctx context.Context, name string, fro
 		return nil, apierr.HandleResourceError(err, "Request", name)
 	}
 
-	parentName := fmt.Sprintf("organizations/%s/projects/%s", orgName, projectName)
+	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
 	return convert.RequestToProto(result, parentName), nil
 }

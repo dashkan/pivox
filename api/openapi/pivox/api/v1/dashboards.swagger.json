@@ -16,9 +16,9 @@
     "application/json"
   ],
   "paths": {
-    "/v1/organizations/{organization}/projects/{project}/dashboards": {
+    "/v1/organizations/{organization}/spaces/{space}/dashboards": {
       "get": {
-        "summary": "Lists dashboards in a project.",
+        "summary": "Lists dashboards in a space.",
         "operationId": "Dashboards_ListDashboards",
         "responses": {
           "200": {
@@ -42,7 +42,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -82,7 +82,7 @@
         ]
       },
       "post": {
-        "summary": "Creates a new dashboard in a project.",
+        "summary": "Creates a new dashboard in a space.",
         "operationId": "Dashboards_CreateDashboard",
         "responses": {
           "200": {
@@ -106,7 +106,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -140,7 +140,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}/dashboards/{dashboard}": {
+    "/v1/organizations/{organization}/spaces/{space}/dashboards/{dashboard}": {
       "get": {
         "summary": "Retrieves a dashboard by name.",
         "operationId": "Dashboards_GetDashboard",
@@ -166,7 +166,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -207,7 +207,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -262,7 +262,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -562,7 +562,7 @@
       "properties": {
         "name": {
           "type": "string",
-          "title": "Immutable. The resource name of the dashboard.\nFormat: `organizations/{organization}/projects/{project}/dashboards/{dashboard}`"
+          "title": "Immutable. The resource name of the dashboard.\nFormat: `organizations/{organization}/spaces/{space}/dashboards/{dashboard}`"
         },
         "displayName": {
           "type": "string",
@@ -609,7 +609,7 @@
           "description": "Optional. Free-form annotations for the dashboard."
         }
       },
-      "description": "A custom dashboard belonging to a project.",
+      "description": "A custom dashboard belonging to a space.",
       "required": [
         "displayName"
       ]
@@ -684,7 +684,7 @@
             "type": "object",
             "$ref": "#/definitions/v1Dashboard"
           },
-          "description": "The dashboards in the project."
+          "description": "The dashboards in the space."
         },
         "nextPageToken": {
           "type": "string",

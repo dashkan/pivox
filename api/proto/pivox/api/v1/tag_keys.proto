@@ -35,7 +35,7 @@ service TagKeys {
   rpc ListTagKeys(ListTagKeysRequest) returns (ListTagKeysResponse) {
     option (google.api.http) = {
       get: "/v1/{parent=organizations/*}/tagKeys"
-      additional_bindings: {get: "/v1/{parent=organizations/*/projects/*}/tagKeys"}
+      additional_bindings: {get: "/v1/{parent=organizations/*/spaces/*}/tagKeys"}
     };
     option (google.api.method_signature) = "parent";
   }
@@ -45,7 +45,7 @@ service TagKeys {
   rpc GetTagKey(GetTagKeyRequest) returns (TagKey) {
     option (google.api.http) = {
       get: "/v1/{name=organizations/*/tagKeys/*}"
-      additional_bindings: {get: "/v1/{name=organizations/*/projects/*/tagKeys/*}"}
+      additional_bindings: {get: "/v1/{name=organizations/*/spaces/*/tagKeys/*}"}
     };
     option (google.api.method_signature) = "name";
   }
@@ -59,7 +59,7 @@ service TagKeys {
       post: "/v1/{parent=organizations/*}/tagKeys"
       body: "tag_key"
       additional_bindings: {
-        post: "/v1/{parent=organizations/*/projects/*}/tagKeys"
+        post: "/v1/{parent=organizations/*/spaces/*}/tagKeys"
         body: "tag_key"
       }
     };
@@ -76,7 +76,7 @@ service TagKeys {
       patch: "/v1/{tag_key.name=organizations/*/tagKeys/*}"
       body: "tag_key"
       additional_bindings: {
-        patch: "/v1/{tag_key.name=organizations/*/projects/*/tagKeys/*}"
+        patch: "/v1/{tag_key.name=organizations/*/spaces/*/tagKeys/*}"
         body: "tag_key"
       }
     };
@@ -92,7 +92,7 @@ service TagKeys {
   rpc DeleteTagKey(DeleteTagKeyRequest) returns (google.longrunning.Operation) {
     option (google.api.http) = {
       delete: "/v1/{name=organizations/*/tagKeys/*}"
-      additional_bindings: {delete: "/v1/{name=organizations/*/projects/*/tagKeys/*}"}
+      additional_bindings: {delete: "/v1/{name=organizations/*/spaces/*/tagKeys/*}"}
     };
     option (google.api.method_signature) = "name";
     option (google.longrunning.operation_info) = {
@@ -107,14 +107,14 @@ message TagKey {
   option (google.api.resource) = {
     type: "pivox.api/TagKey"
     pattern: "organizations/{organization}/tagKeys/{tag_key}"
-    pattern: "organizations/{organization}/projects/{project}/tagKeys/{tag_key}"
+    pattern: "organizations/{organization}/spaces/{space}/tagKeys/{tag_key}"
     plural: "tagKeys"
     singular: "tagKey"
   };
 
   // Immutable. The resource name for a TagKey. Must be in the format
   // `organizations/{organization}/tagKeys/{tag_key}` or
-  // `organizations/{organization}/projects/{project}/tagKeys/{tag_key}`.
+  // `organizations/{organization}/spaces/{space}/tagKeys/{tag_key}`.
   string name = 1 [(google.api.field_behavior) = IDENTIFIER];
 
   // Optional. User-assigned description of the TagKey. Must not exceed 256
@@ -146,7 +146,7 @@ message TagKey {
 message ListTagKeysRequest {
   // Required. The resource name of the TagKey's parent.
   // Must be of the form `organizations/{org_id}` or
-  // `organizations/{org_id}/projects/{project_id}`.
+  // `organizations/{org_id}/spaces/{space_id}`.
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {child_type: "pivox.api/TagKey"},
@@ -220,7 +220,7 @@ message GetTagKeyRequest {
 message CreateTagKeyRequest {
   // Required. The resource name of the parent. Must be of the form
   // `organizations/{org_id}` or
-  // `organizations/{org_id}/projects/{project_id}`.
+  // `organizations/{org_id}/spaces/{space_id}`.
   string parent = 4 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {child_type: "pivox.api/TagKey"},

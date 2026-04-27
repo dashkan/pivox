@@ -25,7 +25,7 @@ func TestParseSegment(t *testing.T) {
 	}{
 		{"valid org name", "organizations/meridian", "meridian", false},
 		{"valid tag key", "tagKeys/550e8400-e29b-41d4-a716-446655440000", "550e8400-e29b-41d4-a716-446655440000", false},
-		{"nested path", "organizations/acme/projects/p1", "acme/projects/p1", false},
+		{"nested path", "organizations/acme/spaces/p1", "acme/spaces/p1", false},
 		{"no slash", "invalid", "", true},
 		{"trailing slash empty segment", "organizations/", "", true},
 		{"empty string", "", "", true},
@@ -85,7 +85,7 @@ func TestResolveOrgParent_WrongCollection(t *testing.T) {
 	ctx := context.Background()
 	mock := new(mocks.MockQuerier)
 
-	_, err := ResolveOrgParent(ctx, mock, "projects/acme")
+	_, err := ResolveOrgParent(ctx, mock, "spaces/acme")
 	require.Error(t, err)
 	st := status.Convert(err)
 	assert.Equal(t, codes.InvalidArgument, st.Code())

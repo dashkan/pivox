@@ -187,41 +187,41 @@ func (m *MockQuerier) DeleteUserMembership(ctx context.Context, arg db.DeleteUse
 	return args.Error(0)
 }
 
-// --- Projects ---
+// --- Spaces ---
 
-func (m *MockQuerier) CreateProject(ctx context.Context, arg db.CreateProjectParams) (db.Project, error) {
+func (m *MockQuerier) CreateSpace(ctx context.Context, arg db.CreateSpaceParams) (db.Space, error) {
 	args := m.Called(ctx, arg)
-	return args.Get(0).(db.Project), args.Error(1)
+	return args.Get(0).(db.Space), args.Error(1)
 }
 
-func (m *MockQuerier) GetProject(ctx context.Context, id uuid.UUID) (db.Project, error) {
+func (m *MockQuerier) GetSpace(ctx context.Context, id uuid.UUID) (db.Space, error) {
 	args := m.Called(ctx, id)
-	return args.Get(0).(db.Project), args.Error(1)
+	return args.Get(0).(db.Space), args.Error(1)
 }
 
-func (m *MockQuerier) GetProjectByName(ctx context.Context, arg db.GetProjectByNameParams) (db.Project, error) {
+func (m *MockQuerier) GetSpaceByName(ctx context.Context, arg db.GetSpaceByNameParams) (db.Space, error) {
 	args := m.Called(ctx, arg)
-	return args.Get(0).(db.Project), args.Error(1)
+	return args.Get(0).(db.Space), args.Error(1)
 }
 
-func (m *MockQuerier) GetProjectIncludingDeleted(ctx context.Context, id uuid.UUID) (db.Project, error) {
+func (m *MockQuerier) GetSpaceIncludingDeleted(ctx context.Context, id uuid.UUID) (db.Space, error) {
 	args := m.Called(ctx, id)
-	return args.Get(0).(db.Project), args.Error(1)
+	return args.Get(0).(db.Space), args.Error(1)
 }
 
-func (m *MockQuerier) UpdateProject(ctx context.Context, arg db.UpdateProjectParams) (db.Project, error) {
+func (m *MockQuerier) UpdateSpace(ctx context.Context, arg db.UpdateSpaceParams) (db.Space, error) {
 	args := m.Called(ctx, arg)
-	return args.Get(0).(db.Project), args.Error(1)
+	return args.Get(0).(db.Space), args.Error(1)
 }
 
-func (m *MockQuerier) SoftDeleteProject(ctx context.Context, arg db.SoftDeleteProjectParams) (db.Project, error) {
+func (m *MockQuerier) SoftDeleteSpace(ctx context.Context, arg db.SoftDeleteSpaceParams) (db.Space, error) {
 	args := m.Called(ctx, arg)
-	return args.Get(0).(db.Project), args.Error(1)
+	return args.Get(0).(db.Space), args.Error(1)
 }
 
-func (m *MockQuerier) UndeleteProject(ctx context.Context, arg db.UndeleteProjectParams) (db.Project, error) {
+func (m *MockQuerier) UndeleteSpace(ctx context.Context, arg db.UndeleteSpaceParams) (db.Space, error) {
 	args := m.Called(ctx, arg)
-	return args.Get(0).(db.Project), args.Error(1)
+	return args.Get(0).(db.Space), args.Error(1)
 }
 
 // --- API Keys ---
@@ -400,12 +400,12 @@ func (m *MockQuerier) UndeleteAsset(ctx context.Context, id uuid.UUID) error {
 	return args.Error(0)
 }
 
-func (m *MockQuerier) ListAssetsByProject(ctx context.Context, arg db.ListAssetsByProjectParams) ([]db.Asset, error) {
+func (m *MockQuerier) ListAssetsBySpace(ctx context.Context, arg db.ListAssetsBySpaceParams) ([]db.Asset, error) {
 	args := m.Called(ctx, arg)
 	return args.Get(0).([]db.Asset), args.Error(1)
 }
 
-func (m *MockQuerier) ListAssetsByProjectWithDeleted(ctx context.Context, arg db.ListAssetsByProjectWithDeletedParams) ([]db.Asset, error) {
+func (m *MockQuerier) ListAssetsBySpaceWithDeleted(ctx context.Context, arg db.ListAssetsBySpaceWithDeletedParams) ([]db.Asset, error) {
 	args := m.Called(ctx, arg)
 	return args.Get(0).([]db.Asset), args.Error(1)
 }
@@ -420,8 +420,8 @@ func (m *MockQuerier) SearchAssets(ctx context.Context, arg db.SearchAssetsParam
 	return args.Get(0).([]db.Asset), args.Error(1)
 }
 
-func (m *MockQuerier) CountAssetsByProject(ctx context.Context, projectID uuid.UUID) (int64, error) {
-	args := m.Called(ctx, projectID)
+func (m *MockQuerier) CountAssetsBySpace(ctx context.Context, spaceID uuid.UUID) (int64, error) {
+	args := m.Called(ctx, spaceID)
 	return args.Get(0).(int64), args.Error(1)
 }
 
@@ -531,13 +531,13 @@ func (m *MockQuerier) DeleteRequest(ctx context.Context, id uuid.UUID) error {
 	return args.Error(0)
 }
 
-func (m *MockQuerier) ListRequestsByProject(ctx context.Context, arg db.ListRequestsByProjectParams) ([]db.AssetRequest, error) {
+func (m *MockQuerier) ListRequestsBySpace(ctx context.Context, arg db.ListRequestsBySpaceParams) ([]db.AssetRequest, error) {
 	args := m.Called(ctx, arg)
 	return args.Get(0).([]db.AssetRequest), args.Error(1)
 }
 
-func (m *MockQuerier) CountRequestsByProject(ctx context.Context, projectID uuid.UUID) (int64, error) {
-	args := m.Called(ctx, projectID)
+func (m *MockQuerier) CountRequestsBySpace(ctx context.Context, spaceID uuid.UUID) (int64, error) {
+	args := m.Called(ctx, spaceID)
 	return args.Get(0).(int64), args.Error(1)
 }
 

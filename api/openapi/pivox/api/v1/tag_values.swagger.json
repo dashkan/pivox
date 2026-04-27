@@ -16,7 +16,7 @@
     "application/json"
   ],
   "paths": {
-    "/v1/organizations/{organization}/projects/{project}/tagKeys/{tagKey}/tagValues": {
+    "/v1/organizations/{organization}/spaces/{space}/tagKeys/{tagKey}/tagValues": {
       "get": {
         "summary": "Lists all TagValues for a specific TagKey.",
         "operationId": "TagValues_ListTagValues2",
@@ -42,7 +42,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -112,7 +112,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -152,7 +152,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}/tagKeys/{tagKey}/tagValues/{tagValue}": {
+    "/v1/organizations/{organization}/spaces/{space}/tagKeys/{tagKey}/tagValues/{tagValue}": {
       "get": {
         "summary": "Retrieves a TagValue. This method will return `PERMISSION_DENIED` if the\nvalue does not exist or the user does not have permission to view it.",
         "operationId": "TagValues_GetTagValue2",
@@ -178,7 +178,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -225,7 +225,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -286,7 +286,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"

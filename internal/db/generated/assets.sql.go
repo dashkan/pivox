@@ -13,26 +13,26 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const countAssetsByProject = `-- name: CountAssetsByProject :one
-SELECT count(*) FROM assets WHERE project_id = $1 AND delete_time IS NULL
+const countAssetsBySpace = `-- name: CountAssetsBySpace :one
+SELECT count(*) FROM assets WHERE space_id = $1 AND delete_time IS NULL
 `
 
-func (q *Queries) CountAssetsByProject(ctx context.Context, projectID uuid.UUID) (int64, error) {
-	row := q.db.QueryRow(ctx, countAssetsByProject, projectID)
+func (q *Queries) CountAssetsBySpace(ctx context.Context, spaceID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countAssetsBySpace, spaceID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
 }
 
 const createAsset = `-- name: CreateAsset :one
-INSERT INTO assets (id, project_id, endpoint_id, name, display_name, import_path, filename, state, annotations, created_by, updated_by)
+INSERT INTO assets (id, space_id, endpoint_id, name, display_name, import_path, filename, state, annotations, created_by, updated_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
-RETURNING id, project_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time
+RETURNING id, space_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time
 `
 
 type CreateAssetParams struct {
 	ID          uuid.UUID       `json:"id"`
-	ProjectID   uuid.UUID       `json:"project_id"`
+	SpaceID     uuid.UUID       `json:"space_id"`
 	EndpointID  pgtype.UUID     `json:"endpoint_id"`
 	Name        string          `json:"name"`
 	DisplayName string          `json:"display_name"`
@@ -46,7 +46,7 @@ type CreateAssetParams struct {
 func (q *Queries) CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset, error) {
 	row := q.db.QueryRow(ctx, createAsset,
 		arg.ID,
-		arg.ProjectID,
+		arg.SpaceID,
 		arg.EndpointID,
 		arg.Name,
 		arg.DisplayName,
@@ -59,7 +59,7 @@ func (q *Queries) CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset
 	var i Asset
 	err := row.Scan(
 		&i.ID,
-		&i.ProjectID,
+		&i.SpaceID,
 		&i.EndpointID,
 		&i.Name,
 		&i.DisplayName,
@@ -94,7 +94,7 @@ func (q *Queries) CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset
 }
 
 const getAsset = `-- name: GetAsset :one
-SELECT id, project_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets WHERE id = $1
+SELECT id, space_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets WHERE id = $1
 `
 
 func (q *Queries) GetAsset(ctx context.Context, id uuid.UUID) (Asset, error) {
@@ -102,7 +102,7 @@ func (q *Queries) GetAsset(ctx context.Context, id uuid.UUID) (Asset, error) {
 	var i Asset
 	err := row.Scan(
 		&i.ID,
-		&i.ProjectID,
+		&i.SpaceID,
 		&i.EndpointID,
 		&i.Name,
 		&i.DisplayName,
@@ -137,20 +137,20 @@ func (q *Queries) GetAsset(ctx context.Context, id uuid.UUID) (Asset, error) {
 }
 
 const getAssetByChecksum = `-- name: GetAssetByChecksum :one
-SELECT id, project_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets WHERE project_id = $1 AND checksum_sha256 = $2 AND delete_time IS NULL
+SELECT id, space_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets WHERE space_id = $1 AND checksum_sha256 = $2 AND delete_time IS NULL
 `
 
 type GetAssetByChecksumParams struct {
-	ProjectID      uuid.UUID `json:"project_id"`
+	SpaceID        uuid.UUID `json:"space_id"`
 	ChecksumSha256 string    `json:"checksum_sha256"`
 }
 
 func (q *Queries) GetAssetByChecksum(ctx context.Context, arg GetAssetByChecksumParams) (Asset, error) {
-	row := q.db.QueryRow(ctx, getAssetByChecksum, arg.ProjectID, arg.ChecksumSha256)
+	row := q.db.QueryRow(ctx, getAssetByChecksum, arg.SpaceID, arg.ChecksumSha256)
 	var i Asset
 	err := row.Scan(
 		&i.ID,
-		&i.ProjectID,
+		&i.SpaceID,
 		&i.EndpointID,
 		&i.Name,
 		&i.DisplayName,
@@ -185,20 +185,20 @@ func (q *Queries) GetAssetByChecksum(ctx context.Context, arg GetAssetByChecksum
 }
 
 const getAssetByName = `-- name: GetAssetByName :one
-SELECT id, project_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets WHERE project_id = $1 AND name = $2
+SELECT id, space_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets WHERE space_id = $1 AND name = $2
 `
 
 type GetAssetByNameParams struct {
-	ProjectID uuid.UUID `json:"project_id"`
-	Name      string    `json:"name"`
+	SpaceID uuid.UUID `json:"space_id"`
+	Name    string    `json:"name"`
 }
 
 func (q *Queries) GetAssetByName(ctx context.Context, arg GetAssetByNameParams) (Asset, error) {
-	row := q.db.QueryRow(ctx, getAssetByName, arg.ProjectID, arg.Name)
+	row := q.db.QueryRow(ctx, getAssetByName, arg.SpaceID, arg.Name)
 	var i Asset
 	err := row.Scan(
 		&i.ID,
-		&i.ProjectID,
+		&i.SpaceID,
 		&i.EndpointID,
 		&i.Name,
 		&i.DisplayName,
@@ -232,21 +232,21 @@ func (q *Queries) GetAssetByName(ctx context.Context, arg GetAssetByNameParams) 
 	return i, err
 }
 
-const listAssetsByProject = `-- name: ListAssetsByProject :many
-SELECT id, project_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets
-WHERE project_id = $1 AND delete_time IS NULL
+const listAssetsBySpace = `-- name: ListAssetsBySpace :many
+SELECT id, space_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets
+WHERE space_id = $1 AND delete_time IS NULL
 ORDER BY create_time DESC
 LIMIT $2 OFFSET $3
 `
 
-type ListAssetsByProjectParams struct {
-	ProjectID uuid.UUID `json:"project_id"`
-	Limit     int32     `json:"limit"`
-	Offset    int32     `json:"offset"`
+type ListAssetsBySpaceParams struct {
+	SpaceID uuid.UUID `json:"space_id"`
+	Limit   int32     `json:"limit"`
+	Offset  int32     `json:"offset"`
 }
 
-func (q *Queries) ListAssetsByProject(ctx context.Context, arg ListAssetsByProjectParams) ([]Asset, error) {
-	rows, err := q.db.Query(ctx, listAssetsByProject, arg.ProjectID, arg.Limit, arg.Offset)
+func (q *Queries) ListAssetsBySpace(ctx context.Context, arg ListAssetsBySpaceParams) ([]Asset, error) {
+	rows, err := q.db.Query(ctx, listAssetsBySpace, arg.SpaceID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +256,7 @@ func (q *Queries) ListAssetsByProject(ctx context.Context, arg ListAssetsByProje
 		var i Asset
 		if err := rows.Scan(
 			&i.ID,
-			&i.ProjectID,
+			&i.SpaceID,
 			&i.EndpointID,
 			&i.Name,
 			&i.DisplayName,
@@ -297,21 +297,21 @@ func (q *Queries) ListAssetsByProject(ctx context.Context, arg ListAssetsByProje
 	return items, nil
 }
 
-const listAssetsByProjectWithDeleted = `-- name: ListAssetsByProjectWithDeleted :many
-SELECT id, project_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets
-WHERE project_id = $1
+const listAssetsBySpaceWithDeleted = `-- name: ListAssetsBySpaceWithDeleted :many
+SELECT id, space_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets
+WHERE space_id = $1
 ORDER BY create_time DESC
 LIMIT $2 OFFSET $3
 `
 
-type ListAssetsByProjectWithDeletedParams struct {
-	ProjectID uuid.UUID `json:"project_id"`
-	Limit     int32     `json:"limit"`
-	Offset    int32     `json:"offset"`
+type ListAssetsBySpaceWithDeletedParams struct {
+	SpaceID uuid.UUID `json:"space_id"`
+	Limit   int32     `json:"limit"`
+	Offset  int32     `json:"offset"`
 }
 
-func (q *Queries) ListAssetsByProjectWithDeleted(ctx context.Context, arg ListAssetsByProjectWithDeletedParams) ([]Asset, error) {
-	rows, err := q.db.Query(ctx, listAssetsByProjectWithDeleted, arg.ProjectID, arg.Limit, arg.Offset)
+func (q *Queries) ListAssetsBySpaceWithDeleted(ctx context.Context, arg ListAssetsBySpaceWithDeletedParams) ([]Asset, error) {
+	rows, err := q.db.Query(ctx, listAssetsBySpaceWithDeleted, arg.SpaceID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -321,7 +321,7 @@ func (q *Queries) ListAssetsByProjectWithDeleted(ctx context.Context, arg ListAs
 		var i Asset
 		if err := rows.Scan(
 			&i.ID,
-			&i.ProjectID,
+			&i.SpaceID,
 			&i.EndpointID,
 			&i.Name,
 			&i.DisplayName,
@@ -363,7 +363,7 @@ func (q *Queries) ListAssetsByProjectWithDeleted(ctx context.Context, arg ListAs
 }
 
 const listExpiredAssets = `-- name: ListExpiredAssets :many
-SELECT id, project_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets
+SELECT id, space_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets
 WHERE expire_time IS NOT NULL AND expire_time < now() AND delete_time IS NULL
 LIMIT $1
 `
@@ -379,7 +379,7 @@ func (q *Queries) ListExpiredAssets(ctx context.Context, limit int32) ([]Asset, 
 		var i Asset
 		if err := rows.Scan(
 			&i.ID,
-			&i.ProjectID,
+			&i.SpaceID,
 			&i.EndpointID,
 			&i.Name,
 			&i.DisplayName,
@@ -421,8 +421,8 @@ func (q *Queries) ListExpiredAssets(ctx context.Context, limit int32) ([]Asset, 
 }
 
 const searchAssets = `-- name: SearchAssets :many
-SELECT id, project_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets
-WHERE project_id = $1
+SELECT id, space_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets
+WHERE space_id = $1
   AND delete_time IS NULL
   AND search_vector @@ plainto_tsquery('english', $2)
 ORDER BY ts_rank(search_vector, plainto_tsquery('english', $2)) DESC
@@ -430,7 +430,7 @@ LIMIT $3 OFFSET $4
 `
 
 type SearchAssetsParams struct {
-	ProjectID      uuid.UUID `json:"project_id"`
+	SpaceID        uuid.UUID `json:"space_id"`
 	PlaintoTsquery string    `json:"plainto_tsquery"`
 	Limit          int32     `json:"limit"`
 	Offset         int32     `json:"offset"`
@@ -438,7 +438,7 @@ type SearchAssetsParams struct {
 
 func (q *Queries) SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]Asset, error) {
 	rows, err := q.db.Query(ctx, searchAssets,
-		arg.ProjectID,
+		arg.SpaceID,
 		arg.PlaintoTsquery,
 		arg.Limit,
 		arg.Offset,
@@ -452,7 +452,7 @@ func (q *Queries) SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]A
 		var i Asset
 		if err := rows.Scan(
 			&i.ID,
-			&i.ProjectID,
+			&i.SpaceID,
 			&i.EndpointID,
 			&i.Name,
 			&i.DisplayName,
@@ -540,7 +540,7 @@ SET display_name = COALESCE($3, display_name),
     update_time = now(),
     etag = md5(now()::text)
 WHERE id = $1
-RETURNING id, project_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time
+RETURNING id, space_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time
 `
 
 type UpdateAssetParams struct {
@@ -562,7 +562,7 @@ func (q *Queries) UpdateAsset(ctx context.Context, arg UpdateAssetParams) (Asset
 	var i Asset
 	err := row.Scan(
 		&i.ID,
-		&i.ProjectID,
+		&i.SpaceID,
 		&i.EndpointID,
 		&i.Name,
 		&i.DisplayName,

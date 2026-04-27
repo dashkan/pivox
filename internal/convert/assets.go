@@ -14,11 +14,11 @@ import (
 )
 
 // AssetToProto converts a DB asset to proto.
-// projectName is the full resource name of the parent project
-// (e.g. "organizations/acme/projects/my-project").
-func AssetToProto(row db.Asset, projectName string) *assetsv1.Asset {
+// spaceName is the full resource name of the parent space
+// (e.g. "organizations/acme/spaces/my-space").
+func AssetToProto(row db.Asset, spaceName string) *assetsv1.Asset {
 	pb := &assetsv1.Asset{
-		Name:           fmt.Sprintf("%s/assets/%s", projectName, row.Name),
+		Name:           fmt.Sprintf("%s/assets/%s", spaceName, row.Name),
 		DisplayName:    row.DisplayName,
 		State:          assetState(row.State),
 		ContentType:    row.ContentType,
@@ -69,7 +69,7 @@ func AssetToProto(row db.Asset, projectName string) *assetsv1.Asset {
 
 // AssetVersionToProto converts a DB asset version to proto.
 // assetName is the full resource name of the parent asset
-// (e.g. "organizations/acme/projects/my-project/assets/abc123").
+// (e.g. "organizations/acme/spaces/my-space/assets/abc123").
 func AssetVersionToProto(row db.AssetVersion, assetName string) *assetsv1.AssetVersion {
 	return &assetsv1.AssetVersion{
 		Name:           fmt.Sprintf("%s/versions/%s", assetName, row.ID.String()),

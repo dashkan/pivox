@@ -1,5 +1,5 @@
 -- name: CreateRequest :one
-INSERT INTO asset_requests (id, project_id, name, display_name, description, state, priority, assignee, due_time, created_by, updated_by)
+INSERT INTO asset_requests (id, space_id, name, display_name, description, state, priority, assignee, due_time, created_by, updated_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
 RETURNING *;
 
@@ -7,16 +7,16 @@ RETURNING *;
 SELECT * FROM asset_requests WHERE id = $1;
 
 -- name: GetRequestByName :one
-SELECT * FROM asset_requests WHERE project_id = $1 AND name = $2;
+SELECT * FROM asset_requests WHERE space_id = $1 AND name = $2;
 
--- name: ListRequestsByProject :many
+-- name: ListRequestsBySpace :many
 SELECT * FROM asset_requests
-WHERE project_id = $1
+WHERE space_id = $1
 ORDER BY create_time DESC
 LIMIT $2 OFFSET $3;
 
--- name: CountRequestsByProject :one
-SELECT count(*) FROM asset_requests WHERE project_id = $1;
+-- name: CountRequestsBySpace :one
+SELECT count(*) FROM asset_requests WHERE space_id = $1;
 
 -- name: UpdateRequest :one
 UPDATE asset_requests

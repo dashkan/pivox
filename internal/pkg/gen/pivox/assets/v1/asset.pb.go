@@ -452,7 +452,7 @@ func (ImportAssetsMetadata_Phase) EnumDescriptor() ([]byte, []int) {
 type Asset struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Output only. The resource name of the asset. Format:
-	// `organizations/{organization}/projects/{project}/assets/{asset}`
+	// `organizations/{organization}/spaces/{space}/assets/{asset}`
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Required. A human-readable name for the asset.
 	DisplayName string `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
@@ -480,7 +480,7 @@ type Asset struct {
 	Endpoint string `protobuf:"bytes,7,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
 	// Output only. SHA-256 checksum of the original file. Used for
 	// deduplication — if a file with the same checksum already exists
-	// in the project, the existing asset is returned instead of creating
+	// in the space, the existing asset is returned instead of creating
 	// a duplicate.
 	ChecksumSha256 string `protobuf:"bytes,8,opt,name=checksum_sha256,json=checksumSha256,proto3" json:"checksum_sha256,omitempty"`
 	// Output only. Size of the original file in bytes.
@@ -739,7 +739,7 @@ func (x *Asset) GetPurgeTime() *timestamppb.Timestamp {
 type AssetVersion struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Output only. The resource name of the version. Format:
-	// `organizations/{organization}/projects/{project}/assets/{asset}/versions/{version}`
+	// `organizations/{organization}/spaces/{space}/assets/{asset}/versions/{version}`
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Output only. The sequential version number (1, 2, 3...).
 	VersionNumber int32 `protobuf:"varint,2,opt,name=version_number,json=versionNumber,proto3" json:"version_number,omitempty"`
@@ -1303,8 +1303,8 @@ func (x *UploadPart) GetSize() int64 {
 //	aip.dev/not-precedent: endpoint, filename, size_bytes needed for upload flow. --)
 type CreateAssetRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Required. The parent project. Format:
-	// `organizations/{organization}/projects/{project}`
+	// Required. The parent space. Format:
+	// `organizations/{organization}/spaces/{space}`
 	Parent string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
 	// Required. The asset to create. Must include display_name. If no
 	// endpoint/filename/size_bytes are provided, a PLACEHOLDER asset is
@@ -1515,8 +1515,8 @@ func (x *GetAssetRequest) GetName() string {
 // The request sent to the ListAssets method.
 type ListAssetsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Required. The parent project whose assets are being listed.
-	// Format: `organizations/{organization}/projects/{project}`
+	// Required. The parent space whose assets are being listed.
+	// Format: `organizations/{organization}/spaces/{space}`
 	Parent string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
 	// Optional. The maximum number of assets to return.
 	PageSize int32 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
@@ -1634,7 +1634,7 @@ func (x *ListAssetsRequest) GetShowDeleted() bool {
 // The response from the ListAssets method.
 type ListAssetsResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// The assets belonging to the specified project.
+	// The assets belonging to the specified space.
 	Assets []*Asset `protobuf:"bytes,1,rep,name=assets,proto3" json:"assets,omitempty"`
 	// A pagination token for the next page.
 	NextPageToken string `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
@@ -2001,7 +2001,7 @@ func (*UndeleteAssetMetadata) Descriptor() ([]byte, []int) {
 type CreateAssetVersionRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The parent asset. Format:
-	// `organizations/{organization}/projects/{project}/assets/{asset}`
+	// `organizations/{organization}/spaces/{space}/assets/{asset}`
 	Parent string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
 	// Required. The version to create. Only change_note is user-settable.
 	// (-- api-linter: core::0133::request-required-fields=disabled
@@ -2331,8 +2331,8 @@ func (x *ListAssetVersionsResponse) GetNextPageToken() string {
 // The request sent to the ImportAssets method.
 type ImportAssetsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Required. The parent project to import assets into. Format:
-	// `organizations/{organization}/projects/{project}`
+	// Required. The parent space to import assets into. Format:
+	// `organizations/{organization}/spaces/{space}`
 	Parent string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
 	// Required. The storage endpoint to scan. Format:
 	// `organizations/{organization}/storageGateways/{gateway}/endpoints/{endpoint}`
@@ -2574,7 +2574,7 @@ func (x *ImportAssetsMetadata) GetFailedFiles() int32 {
 type GetAssetMetadataRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The resource name of the asset metadata. Format:
-	// `organizations/{organization}/projects/{project}/assets/{asset}/metadata`
+	// `organizations/{organization}/spaces/{space}/assets/{asset}/metadata`
 	Name          string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2624,7 +2624,7 @@ func (x *GetAssetMetadataRequest) GetName() string {
 type AssetMetadata struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Output only. The resource name. Format:
-	// `organizations/{organization}/projects/{project}/assets/{asset}/metadata`
+	// `organizations/{organization}/spaces/{space}/assets/{asset}/metadata`
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Output only. The extracted metadata as a structured JSON object.
 	// Fields vary by media type and file format.
@@ -2681,7 +2681,7 @@ var File_pivox_assets_v1_asset_proto protoreflect.FileDescriptor
 
 const file_pivox_assets_v1_asset_proto_rawDesc = "" +
 	"\n" +
-	"\x1bpivox/assets/v1/asset.proto\x12\x0fpivox.assets.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xc8\f\n" +
+	"\x1bpivox/assets/v1/asset.proto\x12\x0fpivox.assets.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xc4\f\n" +
 	"\x05Asset\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12.\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\v\xe0A\x02\xbaH\x05r\x03\x18\xff\x01R\vdisplayName\x127\n" +
@@ -2736,8 +2736,8 @@ const file_pivox_assets_v1_asset_proto_rawDesc = "" +
 	"\x05IMAGE\x10\x01\x12\t\n" +
 	"\x05VIDEO\x10\x02\x12\t\n" +
 	"\x05AUDIO\x10\x03\x12\f\n" +
-	"\bDOCUMENT\x10\x04:f\xeaAc\n" +
-	"\x12pivox.assets/Asset\x12>organizations/{organization}/projects/{project}/assets/{asset}*\x06assets2\x05asset\"\xea\x05\n" +
+	"\bDOCUMENT\x10\x04:b\xeaA_\n" +
+	"\x12pivox.assets/Asset\x12:organizations/{organization}/spaces/{space}/assets/{asset}*\x06assets2\x05asset\"\xe6\x05\n" +
 	"\fAssetVersion\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12*\n" +
 	"\x0eversion_number\x18\x02 \x01(\x05B\x03\xe0A\x03R\rversionNumber\x12,\n" +
@@ -2759,8 +2759,8 @@ const file_pivox_assets_v1_asset_proto_rawDesc = "" +
 	"createTime\x12H\n" +
 	"\x0esource_version\x18\f \x01(\tB!\xe0A\x03\xfaA\x1b\n" +
 	"\x19pivox.assets/AssetVersionR\rsourceVersion\x12.\n" +
-	"\x04crop\x18\r \x01(\v2\x15.pivox.assets.v1.CropB\x03\xe0A\x03R\x04crop:\x8a\x01\xeaA\x86\x01\n" +
-	"\x19pivox.assets/AssetVersion\x12Qorganizations/{organization}/projects/{project}/assets/{asset}/versions/{version}*\bversions2\fassetVersion\"\xd8\x01\n" +
+	"\x04crop\x18\r \x01(\v2\x15.pivox.assets.v1.CropB\x03\xe0A\x03R\x04crop:\x86\x01\xeaA\x82\x01\n" +
+	"\x19pivox.assets/AssetVersion\x12Morganizations/{organization}/spaces/{space}/assets/{asset}/versions/{version}*\bversions2\fassetVersion\"\xd8\x01\n" +
 	"\x04Crop\x122\n" +
 	"\x04area\x18\x01 \x01(\v2\x19.pivox.assets.v1.CropAreaB\x03\xe0A\x01R\x04area\x12#\n" +
 	"\n" +
@@ -2929,30 +2929,30 @@ const file_pivox_assets_v1_asset_proto_rawDesc = "" +
 	"\x04DONE\x10\x03\"W\n" +
 	"\x17GetAssetMetadataRequest\x12<\n" +
 	"\x04name\x18\x01 \x01(\tB(\xe0A\x02\xfaA\x1c\n" +
-	"\x1apivox.assets/AssetMetadata\xbaH\x03\xc8\x01\x01R\x04name\"\xe0\x01\n" +
+	"\x1apivox.assets/AssetMetadata\xbaH\x03\xc8\x01\x01R\x04name\"\xdc\x01\n" +
 	"\rAssetMetadata\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x128\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x17.google.protobuf.StructB\x03\xe0A\x03R\bmetadata:|\xeaAy\n" +
-	"\x1apivox.assets/AssetMetadata\x12Gorganizations/{organization}/projects/{project}/assets/{asset}/metadata*\bmetadata2\bmetadata2\x8a\x10\n" +
-	"\x06Assets\x12\xbe\x01\n" +
-	"\vCreateAsset\x12#.pivox.assets.v1.CreateAssetRequest\x1a\x1d.google.longrunning.Operation\"k\xcaA\x1c\n" +
-	"\x05Asset\x12\x13CreateAssetMetadata\xdaA\fparent,asset\x82\xd3\xe4\x93\x027:\x05asset\"./v1/{parent=organizations/*/projects/*}/assets\x12\x83\x01\n" +
-	"\bGetAsset\x12 .pivox.assets.v1.GetAssetRequest\x1a\x16.pivox.assets.v1.Asset\"=\xdaA\x04name\x82\xd3\xe4\x93\x020\x12./v1/{name=organizations/*/projects/*/assets/*}\x12\x96\x01\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x17.google.protobuf.StructB\x03\xe0A\x03R\bmetadata:x\xeaAu\n" +
+	"\x1apivox.assets/AssetMetadata\x12Corganizations/{organization}/spaces/{space}/assets/{asset}/metadata*\bmetadata2\bmetadata2\xf4\x0f\n" +
+	"\x06Assets\x12\xbc\x01\n" +
+	"\vCreateAsset\x12#.pivox.assets.v1.CreateAssetRequest\x1a\x1d.google.longrunning.Operation\"i\xcaA\x1c\n" +
+	"\x05Asset\x12\x13CreateAssetMetadata\xdaA\fparent,asset\x82\xd3\xe4\x93\x025:\x05asset\",/v1/{parent=organizations/*/spaces/*}/assets\x12\x81\x01\n" +
+	"\bGetAsset\x12 .pivox.assets.v1.GetAssetRequest\x1a\x16.pivox.assets.v1.Asset\";\xdaA\x04name\x82\xd3\xe4\x93\x02.\x12,/v1/{name=organizations/*/spaces/*/assets/*}\x12\x94\x01\n" +
 	"\n" +
-	"ListAssets\x12\".pivox.assets.v1.ListAssetsRequest\x1a#.pivox.assets.v1.ListAssetsResponse\"?\xdaA\x06parent\x82\xd3\xe4\x93\x020\x12./v1/{parent=organizations/*/projects/*}/assets\x12\xc9\x01\n" +
-	"\vUpdateAsset\x12#.pivox.assets.v1.UpdateAssetRequest\x1a\x1d.google.longrunning.Operation\"v\xcaA\x1c\n" +
-	"\x05Asset\x12\x13UpdateAssetMetadata\xdaA\x11asset,update_mask\x82\xd3\xe4\x93\x02=:\x05asset24/v1/{asset.name=organizations/*/projects/*/assets/*}\x12\xaf\x01\n" +
-	"\vDeleteAsset\x12#.pivox.assets.v1.DeleteAssetRequest\x1a\x1d.google.longrunning.Operation\"\\\xcaA\x1c\n" +
-	"\x05Asset\x12\x13DeleteAssetMetadata\xdaA\x04name\x82\xd3\xe4\x93\x020*./v1/{name=organizations/*/projects/*/assets/*}\x12\xc1\x01\n" +
-	"\rUndeleteAsset\x12%.pivox.assets.v1.UndeleteAssetRequest\x1a\x1d.google.longrunning.Operation\"j\xcaA\x1e\n" +
-	"\x05Asset\x12\x15UndeleteAssetMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02<:\x01*\"7/v1/{name=organizations/*/projects/*/assets/*}:undelete\x12\xf6\x01\n" +
-	"\x12CreateAssetVersion\x12*.pivox.assets.v1.CreateAssetVersionRequest\x1a\x1d.google.longrunning.Operation\"\x94\x01\xcaA*\n" +
-	"\fAssetVersion\x12\x1aCreateAssetVersionMetadata\xdaA\x14parent,asset_version\x82\xd3\xe4\x93\x02J:\rasset_version\"9/v1/{parent=organizations/*/projects/*/assets/*}/versions\x12\xa3\x01\n" +
-	"\x0fGetAssetVersion\x12'.pivox.assets.v1.GetAssetVersionRequest\x1a\x1d.pivox.assets.v1.AssetVersion\"H\xdaA\x04name\x82\xd3\xe4\x93\x02;\x129/v1/{name=organizations/*/projects/*/assets/*/versions/*}\x12\xb6\x01\n" +
-	"\x11ListAssetVersions\x12).pivox.assets.v1.ListAssetVersionsRequest\x1a*.pivox.assets.v1.ListAssetVersionsResponse\"J\xdaA\x06parent\x82\xd3\xe4\x93\x02;\x129/v1/{parent=organizations/*/projects/*/assets/*}/versions\x12\xcd\x01\n" +
-	"\fImportAssets\x12$.pivox.assets.v1.ImportAssetsRequest\x1a\x1d.google.longrunning.Operation\"x\xcaA,\n" +
-	"\x14ImportAssetsResponse\x12\x14ImportAssetsMetadata\xdaA\x06parent\x82\xd3\xe4\x93\x02::\x01*\"5/v1/{parent=organizations/*/projects/*}/assets:import\x12\xa4\x01\n" +
-	"\x10GetAssetMetadata\x12(.pivox.assets.v1.GetAssetMetadataRequest\x1a\x1e.pivox.assets.v1.AssetMetadata\"F\xdaA\x04name\x82\xd3\xe4\x93\x029\x127/v1/{name=organizations/*/projects/*/assets/*/metadata}\x1a\x0f\xcaA\fapi.pivox.ioB\xc3\x01\n" +
+	"ListAssets\x12\".pivox.assets.v1.ListAssetsRequest\x1a#.pivox.assets.v1.ListAssetsResponse\"=\xdaA\x06parent\x82\xd3\xe4\x93\x02.\x12,/v1/{parent=organizations/*/spaces/*}/assets\x12\xc7\x01\n" +
+	"\vUpdateAsset\x12#.pivox.assets.v1.UpdateAssetRequest\x1a\x1d.google.longrunning.Operation\"t\xcaA\x1c\n" +
+	"\x05Asset\x12\x13UpdateAssetMetadata\xdaA\x11asset,update_mask\x82\xd3\xe4\x93\x02;:\x05asset22/v1/{asset.name=organizations/*/spaces/*/assets/*}\x12\xad\x01\n" +
+	"\vDeleteAsset\x12#.pivox.assets.v1.DeleteAssetRequest\x1a\x1d.google.longrunning.Operation\"Z\xcaA\x1c\n" +
+	"\x05Asset\x12\x13DeleteAssetMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02.*,/v1/{name=organizations/*/spaces/*/assets/*}\x12\xbf\x01\n" +
+	"\rUndeleteAsset\x12%.pivox.assets.v1.UndeleteAssetRequest\x1a\x1d.google.longrunning.Operation\"h\xcaA\x1e\n" +
+	"\x05Asset\x12\x15UndeleteAssetMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02::\x01*\"5/v1/{name=organizations/*/spaces/*/assets/*}:undelete\x12\xf4\x01\n" +
+	"\x12CreateAssetVersion\x12*.pivox.assets.v1.CreateAssetVersionRequest\x1a\x1d.google.longrunning.Operation\"\x92\x01\xcaA*\n" +
+	"\fAssetVersion\x12\x1aCreateAssetVersionMetadata\xdaA\x14parent,asset_version\x82\xd3\xe4\x93\x02H:\rasset_version\"7/v1/{parent=organizations/*/spaces/*/assets/*}/versions\x12\xa1\x01\n" +
+	"\x0fGetAssetVersion\x12'.pivox.assets.v1.GetAssetVersionRequest\x1a\x1d.pivox.assets.v1.AssetVersion\"F\xdaA\x04name\x82\xd3\xe4\x93\x029\x127/v1/{name=organizations/*/spaces/*/assets/*/versions/*}\x12\xb4\x01\n" +
+	"\x11ListAssetVersions\x12).pivox.assets.v1.ListAssetVersionsRequest\x1a*.pivox.assets.v1.ListAssetVersionsResponse\"H\xdaA\x06parent\x82\xd3\xe4\x93\x029\x127/v1/{parent=organizations/*/spaces/*/assets/*}/versions\x12\xcb\x01\n" +
+	"\fImportAssets\x12$.pivox.assets.v1.ImportAssetsRequest\x1a\x1d.google.longrunning.Operation\"v\xcaA,\n" +
+	"\x14ImportAssetsResponse\x12\x14ImportAssetsMetadata\xdaA\x06parent\x82\xd3\xe4\x93\x028:\x01*\"3/v1/{parent=organizations/*/spaces/*}/assets:import\x12\xa2\x01\n" +
+	"\x10GetAssetMetadata\x12(.pivox.assets.v1.GetAssetMetadataRequest\x1a\x1e.pivox.assets.v1.AssetMetadata\"D\xdaA\x04name\x82\xd3\xe4\x93\x027\x125/v1/{name=organizations/*/spaces/*/assets/*/metadata}\x1a\x0f\xcaA\fapi.pivox.ioB\xc3\x01\n" +
 	"\x13com.pivox.assets.v1B\n" +
 	"AssetProtoP\x01ZBgithub.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1;assetsv1\xa2\x02\x03PAX\xaa\x02\x0fPivox.Assets.V1\xca\x02\x0fPivox\\Assets\\V1\xe2\x02\x1bPivox\\Assets\\V1\\GPBMetadata\xea\x02\x11Pivox::Assets::V1b\x06proto3"
 

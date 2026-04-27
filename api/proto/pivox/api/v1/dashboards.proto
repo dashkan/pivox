@@ -27,26 +27,26 @@ import "pivox/api/v1/widgets.proto";
 
 option go_package = "pivox/api/v1;apiv1";
 
-// Manages custom dashboards within a project.
+// Manages custom dashboards within a space.
 service Dashboards {
   option (google.api.default_host) = "api.pivox.io";
 
-  // Lists dashboards in a project.
+  // Lists dashboards in a space.
   rpc ListDashboards(ListDashboardsRequest) returns (ListDashboardsResponse) {
-    option (google.api.http) = {get: "/v1/{parent=organizations/*/projects/*}/dashboards"};
+    option (google.api.http) = {get: "/v1/{parent=organizations/*/spaces/*}/dashboards"};
     option (google.api.method_signature) = "parent";
   }
 
   // Retrieves a dashboard by name.
   rpc GetDashboard(GetDashboardRequest) returns (Dashboard) {
-    option (google.api.http) = {get: "/v1/{name=organizations/*/projects/*/dashboards/*}"};
+    option (google.api.http) = {get: "/v1/{name=organizations/*/spaces/*/dashboards/*}"};
     option (google.api.method_signature) = "name";
   }
 
-  // Creates a new dashboard in a project.
+  // Creates a new dashboard in a space.
   rpc CreateDashboard(CreateDashboardRequest) returns (Dashboard) {
     option (google.api.http) = {
-      post: "/v1/{parent=organizations/*/projects/*}/dashboards"
+      post: "/v1/{parent=organizations/*/spaces/*}/dashboards"
       body: "dashboard"
     };
     option (google.api.method_signature) = "parent,dashboard,dashboard_id";
@@ -55,7 +55,7 @@ service Dashboards {
   // Updates an existing dashboard.
   rpc UpdateDashboard(UpdateDashboardRequest) returns (Dashboard) {
     option (google.api.http) = {
-      patch: "/v1/{dashboard.name=organizations/*/projects/*/dashboards/*}"
+      patch: "/v1/{dashboard.name=organizations/*/spaces/*/dashboards/*}"
       body: "dashboard"
     };
     option (google.api.method_signature) = "dashboard,update_mask";
@@ -63,22 +63,22 @@ service Dashboards {
 
   // Deletes a dashboard.
   rpc DeleteDashboard(DeleteDashboardRequest) returns (Dashboard) {
-    option (google.api.http) = {delete: "/v1/{name=organizations/*/projects/*/dashboards/*}"};
+    option (google.api.http) = {delete: "/v1/{name=organizations/*/spaces/*/dashboards/*}"};
     option (google.api.method_signature) = "name";
   }
 }
 
-// A custom dashboard belonging to a project.
+// A custom dashboard belonging to a space.
 message Dashboard {
   option (google.api.resource) = {
     type: "pivox.api/Dashboard"
-    pattern: "organizations/{organization}/projects/{project}/dashboards/{dashboard}"
+    pattern: "organizations/{organization}/spaces/{space}/dashboards/{dashboard}"
     plural: "dashboards"
     singular: "dashboard"
   };
 
   // Immutable. The resource name of the dashboard.
-  // Format: `organizations/{organization}/projects/{project}/dashboards/{dashboard}`
+  // Format: `organizations/{organization}/spaces/{space}/dashboards/{dashboard}`
   string name = 1 [(google.api.field_behavior) = IDENTIFIER];
 
   // Required. A human-readable name for the dashboard.
@@ -139,8 +139,8 @@ message DashboardVariable {
 
 // Request message for ListDashboards.
 message ListDashboardsRequest {
-  // Required. The parent project.
-  // Format: `organizations/{organization}/projects/{project}`
+  // Required. The parent space.
+  // Format: `organizations/{organization}/spaces/{space}`
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {child_type: "pivox.api/Dashboard"},
@@ -188,7 +188,7 @@ message ListDashboardsRequest {
 
 // Response message for ListDashboards.
 message ListDashboardsResponse {
-  // The dashboards in the project.
+  // The dashboards in the space.
   repeated Dashboard dashboards = 1;
 
   // Token for the next page of results.
@@ -207,8 +207,8 @@ message GetDashboardRequest {
 
 // Request message for CreateDashboard.
 message CreateDashboardRequest {
-  // Required. The parent project.
-  // Format: `organizations/{organization}/projects/{project}`
+  // Required. The parent space.
+  // Format: `organizations/{organization}/spaces/{space}`
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {child_type: "pivox.api/Dashboard"},

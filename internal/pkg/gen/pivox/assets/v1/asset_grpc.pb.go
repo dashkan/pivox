@@ -51,14 +51,14 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// Manages media assets within a project. Assets represent media files
+// Manages media assets within a space. Assets represent media files
 // (images, video, audio, graphics) with rich metadata, versioning,
 // and AI-generated descriptions. Creation is an LRO that runs the
 // full ingestion pipeline: validation, metadata extraction, thumbnail
 // generation, proxy creation, AI description, transcription, and
 // auto-tagging.
 type AssetsClient interface {
-	// Creates a new asset in the specified project. The asset undergoes
+	// Creates a new asset in the specified space. The asset undergoes
 	// a full ingestion pipeline as a long-running operation including
 	// format validation, metadata extraction, thumbnail generation,
 	// and AI processing.
@@ -67,11 +67,11 @@ type AssetsClient interface {
 	// created for the Request workflow.
 	//
 	// The caller must have `assets.assets.create` permission on the parent
-	// project.
+	// space.
 	CreateAsset(ctx context.Context, in *CreateAssetRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
 	// Retrieves an asset by resource name.
 	GetAsset(ctx context.Context, in *GetAssetRequest, opts ...grpc.CallOption) (*Asset, error)
-	// Lists assets in a project.
+	// Lists assets in a space.
 	ListAssets(ctx context.Context, in *ListAssetsRequest, opts ...grpc.CallOption) (*ListAssetsResponse, error)
 	// Updates an asset's mutable fields (display_name, path, annotations).
 	// File content is immutable — create a new version instead.
@@ -96,7 +96,7 @@ type AssetsClient interface {
 	// import progress.
 	//
 	// The caller must have `assets.assets.create` permission on the
-	// parent project and `storage.endpoints.get` on the source endpoint.
+	// parent space and `storage.endpoints.get` on the source endpoint.
 	ImportAssets(ctx context.Context, in *ImportAssetsRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
 	// Retrieves the extracted metadata for an asset (EXIF, XMP, etc.).
 	// Metadata is a singleton sub-resource — not included in Get/List
@@ -226,14 +226,14 @@ func (c *assetsClient) GetAssetMetadata(ctx context.Context, in *GetAssetMetadat
 // All implementations must embed UnimplementedAssetsServer
 // for forward compatibility.
 //
-// Manages media assets within a project. Assets represent media files
+// Manages media assets within a space. Assets represent media files
 // (images, video, audio, graphics) with rich metadata, versioning,
 // and AI-generated descriptions. Creation is an LRO that runs the
 // full ingestion pipeline: validation, metadata extraction, thumbnail
 // generation, proxy creation, AI description, transcription, and
 // auto-tagging.
 type AssetsServer interface {
-	// Creates a new asset in the specified project. The asset undergoes
+	// Creates a new asset in the specified space. The asset undergoes
 	// a full ingestion pipeline as a long-running operation including
 	// format validation, metadata extraction, thumbnail generation,
 	// and AI processing.
@@ -242,11 +242,11 @@ type AssetsServer interface {
 	// created for the Request workflow.
 	//
 	// The caller must have `assets.assets.create` permission on the parent
-	// project.
+	// space.
 	CreateAsset(context.Context, *CreateAssetRequest) (*longrunningpb.Operation, error)
 	// Retrieves an asset by resource name.
 	GetAsset(context.Context, *GetAssetRequest) (*Asset, error)
-	// Lists assets in a project.
+	// Lists assets in a space.
 	ListAssets(context.Context, *ListAssetsRequest) (*ListAssetsResponse, error)
 	// Updates an asset's mutable fields (display_name, path, annotations).
 	// File content is immutable — create a new version instead.
@@ -271,7 +271,7 @@ type AssetsServer interface {
 	// import progress.
 	//
 	// The caller must have `assets.assets.create` permission on the
-	// parent project and `storage.endpoints.get` on the source endpoint.
+	// parent space and `storage.endpoints.get` on the source endpoint.
 	ImportAssets(context.Context, *ImportAssetsRequest) (*longrunningpb.Operation, error)
 	// Retrieves the extracted metadata for an asset (EXIF, XMP, etc.).
 	// Metadata is a singleton sub-resource — not included in Get/List

@@ -612,7 +612,7 @@ func RegisterAssetsHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Assets/CreateAsset", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/projects/*}/assets"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Assets/CreateAsset", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/spaces/*}/assets"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -632,7 +632,7 @@ func RegisterAssetsHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Assets/GetAsset", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/assets/*}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Assets/GetAsset", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/assets/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -652,7 +652,7 @@ func RegisterAssetsHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Assets/ListAssets", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/projects/*}/assets"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Assets/ListAssets", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/spaces/*}/assets"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -672,7 +672,7 @@ func RegisterAssetsHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Assets/UpdateAsset", runtime.WithHTTPPathPattern("/v1/{asset.name=organizations/*/projects/*/assets/*}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Assets/UpdateAsset", runtime.WithHTTPPathPattern("/v1/{asset.name=organizations/*/spaces/*/assets/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -692,7 +692,7 @@ func RegisterAssetsHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Assets/DeleteAsset", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/assets/*}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Assets/DeleteAsset", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/assets/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -712,7 +712,7 @@ func RegisterAssetsHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Assets/UndeleteAsset", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/assets/*}:undelete"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Assets/UndeleteAsset", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/assets/*}:undelete"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -732,7 +732,7 @@ func RegisterAssetsHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Assets/CreateAssetVersion", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/projects/*/assets/*}/versions"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Assets/CreateAssetVersion", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/spaces/*/assets/*}/versions"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -752,7 +752,7 @@ func RegisterAssetsHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Assets/GetAssetVersion", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/assets/*/versions/*}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Assets/GetAssetVersion", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/assets/*/versions/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -772,7 +772,7 @@ func RegisterAssetsHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Assets/ListAssetVersions", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/projects/*/assets/*}/versions"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Assets/ListAssetVersions", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/spaces/*/assets/*}/versions"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -792,7 +792,7 @@ func RegisterAssetsHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Assets/ImportAssets", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/projects/*}/assets:import"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Assets/ImportAssets", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/spaces/*}/assets:import"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -812,7 +812,7 @@ func RegisterAssetsHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Assets/GetAssetMetadata", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/assets/*/metadata}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.assets.v1.Assets/GetAssetMetadata", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/assets/*/metadata}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -870,7 +870,7 @@ func RegisterAssetsHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Assets/CreateAsset", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/projects/*}/assets"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Assets/CreateAsset", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/spaces/*}/assets"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -887,7 +887,7 @@ func RegisterAssetsHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Assets/GetAsset", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/assets/*}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Assets/GetAsset", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/assets/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -904,7 +904,7 @@ func RegisterAssetsHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Assets/ListAssets", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/projects/*}/assets"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Assets/ListAssets", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/spaces/*}/assets"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -921,7 +921,7 @@ func RegisterAssetsHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Assets/UpdateAsset", runtime.WithHTTPPathPattern("/v1/{asset.name=organizations/*/projects/*/assets/*}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Assets/UpdateAsset", runtime.WithHTTPPathPattern("/v1/{asset.name=organizations/*/spaces/*/assets/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -938,7 +938,7 @@ func RegisterAssetsHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Assets/DeleteAsset", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/assets/*}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Assets/DeleteAsset", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/assets/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -955,7 +955,7 @@ func RegisterAssetsHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Assets/UndeleteAsset", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/assets/*}:undelete"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Assets/UndeleteAsset", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/assets/*}:undelete"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -972,7 +972,7 @@ func RegisterAssetsHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Assets/CreateAssetVersion", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/projects/*/assets/*}/versions"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Assets/CreateAssetVersion", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/spaces/*/assets/*}/versions"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -989,7 +989,7 @@ func RegisterAssetsHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Assets/GetAssetVersion", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/assets/*/versions/*}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Assets/GetAssetVersion", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/assets/*/versions/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1006,7 +1006,7 @@ func RegisterAssetsHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Assets/ListAssetVersions", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/projects/*/assets/*}/versions"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Assets/ListAssetVersions", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/spaces/*/assets/*}/versions"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1023,7 +1023,7 @@ func RegisterAssetsHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Assets/ImportAssets", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/projects/*}/assets:import"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Assets/ImportAssets", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/spaces/*}/assets:import"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1040,7 +1040,7 @@ func RegisterAssetsHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Assets/GetAssetMetadata", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/assets/*/metadata}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.assets.v1.Assets/GetAssetMetadata", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/assets/*/metadata}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1057,17 +1057,17 @@ func RegisterAssetsHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 }
 
 var (
-	pattern_Assets_CreateAsset_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3, 2, 4}, []string{"v1", "organizations", "projects", "parent", "assets"}, ""))
-	pattern_Assets_GetAsset_0           = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "projects", "assets", "name"}, ""))
-	pattern_Assets_ListAssets_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3, 2, 4}, []string{"v1", "organizations", "projects", "parent", "assets"}, ""))
-	pattern_Assets_UpdateAsset_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "projects", "assets", "asset.name"}, ""))
-	pattern_Assets_DeleteAsset_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "projects", "assets", "name"}, ""))
-	pattern_Assets_UndeleteAsset_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "projects", "assets", "name"}, "undelete"))
-	pattern_Assets_CreateAssetVersion_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4, 2, 5}, []string{"v1", "organizations", "projects", "assets", "parent", "versions"}, ""))
-	pattern_Assets_GetAssetVersion_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 2, 4, 1, 0, 4, 8, 5, 5}, []string{"v1", "organizations", "projects", "assets", "versions", "name"}, ""))
-	pattern_Assets_ListAssetVersions_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4, 2, 5}, []string{"v1", "organizations", "projects", "assets", "parent", "versions"}, ""))
-	pattern_Assets_ImportAssets_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3, 2, 4}, []string{"v1", "organizations", "projects", "parent", "assets"}, "import"))
-	pattern_Assets_GetAssetMetadata_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 2, 4, 4, 7, 5, 5}, []string{"v1", "organizations", "projects", "assets", "metadata", "name"}, ""))
+	pattern_Assets_CreateAsset_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3, 2, 4}, []string{"v1", "organizations", "spaces", "parent", "assets"}, ""))
+	pattern_Assets_GetAsset_0           = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "spaces", "assets", "name"}, ""))
+	pattern_Assets_ListAssets_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3, 2, 4}, []string{"v1", "organizations", "spaces", "parent", "assets"}, ""))
+	pattern_Assets_UpdateAsset_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "spaces", "assets", "asset.name"}, ""))
+	pattern_Assets_DeleteAsset_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "spaces", "assets", "name"}, ""))
+	pattern_Assets_UndeleteAsset_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "spaces", "assets", "name"}, "undelete"))
+	pattern_Assets_CreateAssetVersion_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4, 2, 5}, []string{"v1", "organizations", "spaces", "assets", "parent", "versions"}, ""))
+	pattern_Assets_GetAssetVersion_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 2, 4, 1, 0, 4, 8, 5, 5}, []string{"v1", "organizations", "spaces", "assets", "versions", "name"}, ""))
+	pattern_Assets_ListAssetVersions_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4, 2, 5}, []string{"v1", "organizations", "spaces", "assets", "parent", "versions"}, ""))
+	pattern_Assets_ImportAssets_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3, 2, 4}, []string{"v1", "organizations", "spaces", "parent", "assets"}, "import"))
+	pattern_Assets_GetAssetMetadata_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 2, 4, 4, 7, 5, 5}, []string{"v1", "organizations", "spaces", "assets", "metadata", "name"}, ""))
 )
 
 var (

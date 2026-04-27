@@ -53,7 +53,7 @@ func TestDbToProto_CompletedWithResult(t *testing.T) {
 
 	dbOp := db.Operation{
 		ID:           opID,
-		Prefix:       "projects",
+		Prefix:       "spaces",
 		Done:         true,
 		Metadata:     nil,
 		Result:       resultBytes,
@@ -67,7 +67,7 @@ func TestDbToProto_CompletedWithResult(t *testing.T) {
 	op, err := dbToProto(dbOp)
 	require.NoError(t, err)
 
-	assert.Equal(t, "operations/projects/"+opID.String(), op.Name)
+	assert.Equal(t, "operations/spaces/"+opID.String(), op.Name)
 	assert.True(t, op.Done)
 	assert.NotNil(t, op.GetResponse())
 	assert.Nil(t, op.GetError())

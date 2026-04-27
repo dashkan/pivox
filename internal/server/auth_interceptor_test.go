@@ -113,7 +113,7 @@ func TestAuthInterceptor_ValidToken(t *testing.T) {
 	}
 
 	info := &grpc.UnaryServerInfo{
-		FullMethod: "/pivox.api.v1.Projects/GetProject",
+		FullMethod: "/pivox.api.v1.Spaces/GetSpace",
 	}
 
 	resp, err := interceptor(ctx, nil, info, handler)
@@ -130,7 +130,7 @@ func TestAuthInterceptor_MissingMetadata(t *testing.T) {
 	ctx := context.Background() // no metadata
 
 	info := &grpc.UnaryServerInfo{
-		FullMethod: "/pivox.api.v1.Projects/GetProject",
+		FullMethod: "/pivox.api.v1.Spaces/GetSpace",
 	}
 
 	_, err := interceptor(ctx, nil, info, nil)
@@ -150,7 +150,7 @@ func TestAuthInterceptor_MissingAuthHeader(t *testing.T) {
 	ctx := metadata.NewIncomingContext(context.Background(), md)
 
 	info := &grpc.UnaryServerInfo{
-		FullMethod: "/pivox.api.v1.Projects/GetProject",
+		FullMethod: "/pivox.api.v1.Spaces/GetSpace",
 	}
 
 	_, err := interceptor(ctx, nil, info, nil)
@@ -170,7 +170,7 @@ func TestAuthInterceptor_InvalidFormat(t *testing.T) {
 	ctx := metadata.NewIncomingContext(context.Background(), md)
 
 	info := &grpc.UnaryServerInfo{
-		FullMethod: "/pivox.api.v1.Projects/GetProject",
+		FullMethod: "/pivox.api.v1.Spaces/GetSpace",
 	}
 
 	_, err := interceptor(ctx, nil, info, nil)
@@ -192,7 +192,7 @@ func TestAuthInterceptor_InvalidToken(t *testing.T) {
 	auth.On("VerifyToken", mock.Anything, "bad-token").Return(nil, fmt.Errorf("invalid token"))
 
 	info := &grpc.UnaryServerInfo{
-		FullMethod: "/pivox.api.v1.Projects/GetProject",
+		FullMethod: "/pivox.api.v1.Spaces/GetSpace",
 	}
 
 	_, err := interceptor(ctx, nil, info, nil)
@@ -227,7 +227,7 @@ func TestAuthStreamInterceptor_ValidToken(t *testing.T) {
 	}
 
 	info := &grpc.StreamServerInfo{
-		FullMethod: "/pivox.api.v1.Projects/StreamProjects",
+		FullMethod: "/pivox.api.v1.Spaces/StreamSpaces",
 	}
 
 	ss := &mockServerStream{ctx: ctx}

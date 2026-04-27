@@ -12,26 +12,26 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const countRequestsByProject = `-- name: CountRequestsByProject :one
-SELECT count(*) FROM asset_requests WHERE project_id = $1
+const countRequestsBySpace = `-- name: CountRequestsBySpace :one
+SELECT count(*) FROM asset_requests WHERE space_id = $1
 `
 
-func (q *Queries) CountRequestsByProject(ctx context.Context, projectID uuid.UUID) (int64, error) {
-	row := q.db.QueryRow(ctx, countRequestsByProject, projectID)
+func (q *Queries) CountRequestsBySpace(ctx context.Context, spaceID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countRequestsBySpace, spaceID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
 }
 
 const createRequest = `-- name: CreateRequest :one
-INSERT INTO asset_requests (id, project_id, name, display_name, description, state, priority, assignee, due_time, created_by, updated_by)
+INSERT INTO asset_requests (id, space_id, name, display_name, description, state, priority, assignee, due_time, created_by, updated_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
-RETURNING id, project_id, name, display_name, description, priority, assignee, annotations, state, etag, revision, created_by, updated_by, create_time, update_time, due_time, delivered_time, approved_time
+RETURNING id, space_id, name, display_name, description, priority, assignee, annotations, state, etag, revision, created_by, updated_by, create_time, update_time, due_time, delivered_time, approved_time
 `
 
 type CreateRequestParams struct {
 	ID          uuid.UUID          `json:"id"`
-	ProjectID   uuid.UUID          `json:"project_id"`
+	SpaceID     uuid.UUID          `json:"space_id"`
 	Name        string             `json:"name"`
 	DisplayName string             `json:"display_name"`
 	Description string             `json:"description"`
@@ -45,7 +45,7 @@ type CreateRequestParams struct {
 func (q *Queries) CreateRequest(ctx context.Context, arg CreateRequestParams) (AssetRequest, error) {
 	row := q.db.QueryRow(ctx, createRequest,
 		arg.ID,
-		arg.ProjectID,
+		arg.SpaceID,
 		arg.Name,
 		arg.DisplayName,
 		arg.Description,
@@ -58,7 +58,7 @@ func (q *Queries) CreateRequest(ctx context.Context, arg CreateRequestParams) (A
 	var i AssetRequest
 	err := row.Scan(
 		&i.ID,
-		&i.ProjectID,
+		&i.SpaceID,
 		&i.Name,
 		&i.DisplayName,
 		&i.Description,
@@ -89,7 +89,7 @@ func (q *Queries) DeleteRequest(ctx context.Context, id uuid.UUID) error {
 }
 
 const getRequest = `-- name: GetRequest :one
-SELECT id, project_id, name, display_name, description, priority, assignee, annotations, state, etag, revision, created_by, updated_by, create_time, update_time, due_time, delivered_time, approved_time FROM asset_requests WHERE id = $1
+SELECT id, space_id, name, display_name, description, priority, assignee, annotations, state, etag, revision, created_by, updated_by, create_time, update_time, due_time, delivered_time, approved_time FROM asset_requests WHERE id = $1
 `
 
 func (q *Queries) GetRequest(ctx context.Context, id uuid.UUID) (AssetRequest, error) {
@@ -97,7 +97,7 @@ func (q *Queries) GetRequest(ctx context.Context, id uuid.UUID) (AssetRequest, e
 	var i AssetRequest
 	err := row.Scan(
 		&i.ID,
-		&i.ProjectID,
+		&i.SpaceID,
 		&i.Name,
 		&i.DisplayName,
 		&i.Description,
@@ -119,20 +119,20 @@ func (q *Queries) GetRequest(ctx context.Context, id uuid.UUID) (AssetRequest, e
 }
 
 const getRequestByName = `-- name: GetRequestByName :one
-SELECT id, project_id, name, display_name, description, priority, assignee, annotations, state, etag, revision, created_by, updated_by, create_time, update_time, due_time, delivered_time, approved_time FROM asset_requests WHERE project_id = $1 AND name = $2
+SELECT id, space_id, name, display_name, description, priority, assignee, annotations, state, etag, revision, created_by, updated_by, create_time, update_time, due_time, delivered_time, approved_time FROM asset_requests WHERE space_id = $1 AND name = $2
 `
 
 type GetRequestByNameParams struct {
-	ProjectID uuid.UUID `json:"project_id"`
-	Name      string    `json:"name"`
+	SpaceID uuid.UUID `json:"space_id"`
+	Name    string    `json:"name"`
 }
 
 func (q *Queries) GetRequestByName(ctx context.Context, arg GetRequestByNameParams) (AssetRequest, error) {
-	row := q.db.QueryRow(ctx, getRequestByName, arg.ProjectID, arg.Name)
+	row := q.db.QueryRow(ctx, getRequestByName, arg.SpaceID, arg.Name)
 	var i AssetRequest
 	err := row.Scan(
 		&i.ID,
-		&i.ProjectID,
+		&i.SpaceID,
 		&i.Name,
 		&i.DisplayName,
 		&i.Description,
@@ -153,21 +153,21 @@ func (q *Queries) GetRequestByName(ctx context.Context, arg GetRequestByNamePara
 	return i, err
 }
 
-const listRequestsByProject = `-- name: ListRequestsByProject :many
-SELECT id, project_id, name, display_name, description, priority, assignee, annotations, state, etag, revision, created_by, updated_by, create_time, update_time, due_time, delivered_time, approved_time FROM asset_requests
-WHERE project_id = $1
+const listRequestsBySpace = `-- name: ListRequestsBySpace :many
+SELECT id, space_id, name, display_name, description, priority, assignee, annotations, state, etag, revision, created_by, updated_by, create_time, update_time, due_time, delivered_time, approved_time FROM asset_requests
+WHERE space_id = $1
 ORDER BY create_time DESC
 LIMIT $2 OFFSET $3
 `
 
-type ListRequestsByProjectParams struct {
-	ProjectID uuid.UUID `json:"project_id"`
-	Limit     int32     `json:"limit"`
-	Offset    int32     `json:"offset"`
+type ListRequestsBySpaceParams struct {
+	SpaceID uuid.UUID `json:"space_id"`
+	Limit   int32     `json:"limit"`
+	Offset  int32     `json:"offset"`
 }
 
-func (q *Queries) ListRequestsByProject(ctx context.Context, arg ListRequestsByProjectParams) ([]AssetRequest, error) {
-	rows, err := q.db.Query(ctx, listRequestsByProject, arg.ProjectID, arg.Limit, arg.Offset)
+func (q *Queries) ListRequestsBySpace(ctx context.Context, arg ListRequestsBySpaceParams) ([]AssetRequest, error) {
+	rows, err := q.db.Query(ctx, listRequestsBySpace, arg.SpaceID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +177,7 @@ func (q *Queries) ListRequestsByProject(ctx context.Context, arg ListRequestsByP
 		var i AssetRequest
 		if err := rows.Scan(
 			&i.ID,
-			&i.ProjectID,
+			&i.SpaceID,
 			&i.Name,
 			&i.DisplayName,
 			&i.Description,
@@ -217,7 +217,7 @@ SET display_name = COALESCE($3, display_name),
     update_time = now(),
     etag = md5(now()::text)
 WHERE id = $1
-RETURNING id, project_id, name, display_name, description, priority, assignee, annotations, state, etag, revision, created_by, updated_by, create_time, update_time, due_time, delivered_time, approved_time
+RETURNING id, space_id, name, display_name, description, priority, assignee, annotations, state, etag, revision, created_by, updated_by, create_time, update_time, due_time, delivered_time, approved_time
 `
 
 type UpdateRequestParams struct {
@@ -243,7 +243,7 @@ func (q *Queries) UpdateRequest(ctx context.Context, arg UpdateRequestParams) (A
 	var i AssetRequest
 	err := row.Scan(
 		&i.ID,
-		&i.ProjectID,
+		&i.SpaceID,
 		&i.Name,
 		&i.DisplayName,
 		&i.Description,
@@ -273,7 +273,7 @@ SET state = 'APPROVED',
     update_time = now(),
     etag = md5(now()::text)
 WHERE id = $1
-RETURNING id, project_id, name, display_name, description, priority, assignee, annotations, state, etag, revision, created_by, updated_by, create_time, update_time, due_time, delivered_time, approved_time
+RETURNING id, space_id, name, display_name, description, priority, assignee, annotations, state, etag, revision, created_by, updated_by, create_time, update_time, due_time, delivered_time, approved_time
 `
 
 type UpdateRequestApprovedParams struct {
@@ -286,7 +286,7 @@ func (q *Queries) UpdateRequestApproved(ctx context.Context, arg UpdateRequestAp
 	var i AssetRequest
 	err := row.Scan(
 		&i.ID,
-		&i.ProjectID,
+		&i.SpaceID,
 		&i.Name,
 		&i.DisplayName,
 		&i.Description,
@@ -316,7 +316,7 @@ SET assignee = $2,
     update_time = now(),
     etag = md5(now()::text)
 WHERE id = $1
-RETURNING id, project_id, name, display_name, description, priority, assignee, annotations, state, etag, revision, created_by, updated_by, create_time, update_time, due_time, delivered_time, approved_time
+RETURNING id, space_id, name, display_name, description, priority, assignee, annotations, state, etag, revision, created_by, updated_by, create_time, update_time, due_time, delivered_time, approved_time
 `
 
 type UpdateRequestAssigneeParams struct {
@@ -336,7 +336,7 @@ func (q *Queries) UpdateRequestAssignee(ctx context.Context, arg UpdateRequestAs
 	var i AssetRequest
 	err := row.Scan(
 		&i.ID,
-		&i.ProjectID,
+		&i.SpaceID,
 		&i.Name,
 		&i.DisplayName,
 		&i.Description,
@@ -366,7 +366,7 @@ SET state = 'DELIVERED',
     update_time = now(),
     etag = md5(now()::text)
 WHERE id = $1
-RETURNING id, project_id, name, display_name, description, priority, assignee, annotations, state, etag, revision, created_by, updated_by, create_time, update_time, due_time, delivered_time, approved_time
+RETURNING id, space_id, name, display_name, description, priority, assignee, annotations, state, etag, revision, created_by, updated_by, create_time, update_time, due_time, delivered_time, approved_time
 `
 
 type UpdateRequestDeliveredParams struct {
@@ -379,7 +379,7 @@ func (q *Queries) UpdateRequestDelivered(ctx context.Context, arg UpdateRequestD
 	var i AssetRequest
 	err := row.Scan(
 		&i.ID,
-		&i.ProjectID,
+		&i.SpaceID,
 		&i.Name,
 		&i.DisplayName,
 		&i.Description,
@@ -408,7 +408,7 @@ SET state = $2,
     update_time = now(),
     etag = md5(now()::text)
 WHERE id = $1
-RETURNING id, project_id, name, display_name, description, priority, assignee, annotations, state, etag, revision, created_by, updated_by, create_time, update_time, due_time, delivered_time, approved_time
+RETURNING id, space_id, name, display_name, description, priority, assignee, annotations, state, etag, revision, created_by, updated_by, create_time, update_time, due_time, delivered_time, approved_time
 `
 
 type UpdateRequestStateParams struct {
@@ -422,7 +422,7 @@ func (q *Queries) UpdateRequestState(ctx context.Context, arg UpdateRequestState
 	var i AssetRequest
 	err := row.Scan(
 		&i.ID,
-		&i.ProjectID,
+		&i.SpaceID,
 		&i.Name,
 		&i.DisplayName,
 		&i.Description,

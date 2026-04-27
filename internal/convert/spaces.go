@@ -10,13 +10,13 @@ import (
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 )
 
-// ProjectToProto converts a DB project to proto.
+// SpaceToProto converts a DB space to proto.
 // orgName is the organization slug (e.g. "meridian-broadcasting").
-func ProjectToProto(p db.Project, orgName string) *apiv1.Project {
-	pb := &apiv1.Project{
-		Name:        fmt.Sprintf("organizations/%s/projects/%s", orgName, p.Name),
+func SpaceToProto(p db.Space, orgName string) *apiv1.Space {
+	pb := &apiv1.Space{
+		Name:        fmt.Sprintf("organizations/%s/spaces/%s", orgName, p.Name),
 		DisplayName: p.DisplayName,
-		State:       projectState(p.State),
+		State:       spaceState(p.State),
 		Etag:        p.Etag,
 		CreateTime:  timestamppb.New(p.CreateTime),
 		UpdateTime:  timestamppb.New(p.UpdateTime),
@@ -35,13 +35,13 @@ func ProjectToProto(p db.Project, orgName string) *apiv1.Project {
 	return pb
 }
 
-func projectState(s db.ResourceState) apiv1.Project_State {
+func spaceState(s db.ResourceState) apiv1.Space_State {
 	switch s {
 	case db.ResourceStateACTIVE:
-		return apiv1.Project_ACTIVE
+		return apiv1.Space_ACTIVE
 	case db.ResourceStateDELETEREQUESTED:
-		return apiv1.Project_DELETE_REQUESTED
+		return apiv1.Space_DELETE_REQUESTED
 	default:
-		return apiv1.Project_STATE_UNSPECIFIED
+		return apiv1.Space_STATE_UNSPECIFIED
 	}
 }

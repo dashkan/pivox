@@ -16,9 +16,9 @@
     "application/json"
   ],
   "paths": {
-    "/v1/organizations/{organization}/projects/{project}/assets": {
+    "/v1/organizations/{organization}/spaces/{space}/assets": {
       "get": {
-        "summary": "Lists assets in a project.",
+        "summary": "Lists assets in a space.",
         "operationId": "Assets_ListAssets",
         "responses": {
           "200": {
@@ -42,7 +42,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -89,8 +89,8 @@
         ]
       },
       "post": {
-        "summary": "Creates a new asset in the specified project. The asset undergoes\na full ingestion pipeline as a long-running operation including\nformat validation, metadata extraction, thumbnail generation,\nand AI processing.",
-        "description": "If no endpoint or filename is provided, a PLACEHOLDER asset is\ncreated for the Request workflow.\n\nThe caller must have `assets.assets.create` permission on the parent\nproject.",
+        "summary": "Creates a new asset in the specified space. The asset undergoes\na full ingestion pipeline as a long-running operation including\nformat validation, metadata extraction, thumbnail generation,\nand AI processing.",
+        "description": "If no endpoint or filename is provided, a PLACEHOLDER asset is\ncreated for the Request workflow.\n\nThe caller must have `assets.assets.create` permission on the parent\nspace.",
         "operationId": "Assets_CreateAsset",
         "responses": {
           "200": {
@@ -114,7 +114,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -163,7 +163,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}/assets/{asset}": {
+    "/v1/organizations/{organization}/spaces/{space}/assets/{asset}": {
       "get": {
         "summary": "Retrieves an asset by resource name.",
         "operationId": "Assets_GetAsset",
@@ -189,7 +189,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -230,7 +230,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -292,7 +292,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -347,7 +347,7 @@
                 },
                 "checksumSha256": {
                   "type": "string",
-                  "description": "Output only. SHA-256 checksum of the original file. Used for\ndeduplication — if a file with the same checksum already exists\nin the project, the existing asset is returned instead of creating\na duplicate.",
+                  "description": "Output only. SHA-256 checksum of the original file. Used for\ndeduplication — if a file with the same checksum already exists\nin the space, the existing asset is returned instead of creating\na duplicate.",
                   "readOnly": true
                 },
                 "sizeBytes": {
@@ -459,7 +459,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}/assets/{asset}/metadata": {
+    "/v1/organizations/{organization}/spaces/{space}/assets/{asset}/metadata": {
       "get": {
         "summary": "Retrieves the extracted metadata for an asset (EXIF, XMP, etc.).\nMetadata is a singleton sub-resource — not included in Get/List\nAsset responses to keep them lightweight.",
         "operationId": "Assets_GetAssetMetadata",
@@ -485,7 +485,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -502,7 +502,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}/assets/{asset}/versions": {
+    "/v1/organizations/{organization}/spaces/{space}/assets/{asset}/versions": {
       "get": {
         "summary": "Lists all versions of an asset.",
         "operationId": "Assets_ListAssetVersions",
@@ -528,7 +528,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -584,7 +584,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -694,7 +694,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}/assets/{asset}/versions/{version}": {
+    "/v1/organizations/{organization}/spaces/{space}/assets/{asset}/versions/{version}": {
       "get": {
         "summary": "Retrieves a specific version of an asset.",
         "operationId": "Assets_GetAssetVersion",
@@ -720,7 +720,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -743,7 +743,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}/assets/{asset}:undelete": {
+    "/v1/organizations/{organization}/spaces/{space}/assets/{asset}:undelete": {
       "post": {
         "summary": "Restores a soft-deleted asset.",
         "operationId": "Assets_UndeleteAsset",
@@ -769,7 +769,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -794,10 +794,10 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}/assets:import": {
+    "/v1/organizations/{organization}/spaces/{space}/assets:import": {
       "post": {
         "summary": "Imports assets from a storage endpoint path. Recursively scans\nthe path, creates asset resources, and runs the ingestion pipeline\nfor each discovered file. Returns an LRO that tracks overall\nimport progress.",
-        "description": "The caller must have `assets.assets.create` permission on the\nparent project and `storage.endpoints.get` on the source endpoint.",
+        "description": "The caller must have `assets.assets.create` permission on the\nparent space and `storage.endpoints.get` on the source endpoint.",
         "operationId": "Assets_ImportAssets",
         "responses": {
           "200": {
@@ -821,7 +821,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -962,7 +962,7 @@
       "properties": {
         "name": {
           "type": "string",
-          "title": "Output only. The resource name of the asset. Format:\n`organizations/{organization}/projects/{project}/assets/{asset}`",
+          "title": "Output only. The resource name of the asset. Format:\n`organizations/{organization}/spaces/{space}/assets/{asset}`",
           "readOnly": true
         },
         "displayName": {
@@ -1001,7 +1001,7 @@
         },
         "checksumSha256": {
           "type": "string",
-          "description": "Output only. SHA-256 checksum of the original file. Used for\ndeduplication — if a file with the same checksum already exists\nin the project, the existing asset is returned instead of creating\na duplicate.",
+          "description": "Output only. SHA-256 checksum of the original file. Used for\ndeduplication — if a file with the same checksum already exists\nin the space, the existing asset is returned instead of creating\na duplicate.",
           "readOnly": true
         },
         "sizeBytes": {
@@ -1104,7 +1104,7 @@
       "properties": {
         "name": {
           "type": "string",
-          "title": "Output only. The resource name. Format:\n`organizations/{organization}/projects/{project}/assets/{asset}/metadata`",
+          "title": "Output only. The resource name. Format:\n`organizations/{organization}/spaces/{space}/assets/{asset}/metadata`",
           "readOnly": true
         },
         "metadata": {
@@ -1133,7 +1133,7 @@
       "properties": {
         "name": {
           "type": "string",
-          "title": "Output only. The resource name of the version. Format:\n`organizations/{organization}/projects/{project}/assets/{asset}/versions/{version}`",
+          "title": "Output only. The resource name of the version. Format:\n`organizations/{organization}/spaces/{space}/assets/{asset}/versions/{version}`",
           "readOnly": true
         },
         "versionNumber": {
@@ -1292,7 +1292,7 @@
             "type": "object",
             "$ref": "#/definitions/v1Asset"
           },
-          "description": "The assets belonging to the specified project."
+          "description": "The assets belonging to the specified space."
         },
         "nextPageToken": {
           "type": "string",

@@ -34,7 +34,7 @@ type AuthService struct {
 //   - Local dev: `gcloud auth application-default login` writes a
 //     user credential and sets a quota project.
 //   - CI: `GOOGLE_APPLICATION_CREDENTIALS` points at a service
-//     account JSON whose `project_id` field is read.
+//     account JSON whose `space_id` field is read.
 //   - Production: workload identity / metadata server provides both.
 //
 // Firebase Admin SDK falls through these sources for the project:

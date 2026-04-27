@@ -27,15 +27,15 @@ import (
 
 const (
 	testOrg     = "acme"
-	testProject = "proj1"
+	testSpace = "proj1"
 	testReqName = "req-abc123"
-	testParent  = "organizations/acme/projects/proj1"
-	testFull    = "organizations/acme/projects/proj1/requests/req-abc123"
+	testParent  = "organizations/acme/spaces/proj1"
+	testFull    = "organizations/acme/spaces/proj1/requests/req-abc123"
 )
 
 type requestFixture struct {
 	orgID     uuid.UUID
-	projectID uuid.UUID
+	spaceID uuid.UUID
 	requestID uuid.UUID
 	mockQ     *mocks.MockQuerier
 	server    *RequestsServer
@@ -45,7 +45,7 @@ func setupRequestFixture(t *testing.T) requestFixture {
 	t.Helper()
 	f := requestFixture{
 		orgID:     uuid.New(),
-		projectID: uuid.New(),
+		spaceID: uuid.New(),
 		requestID: uuid.New(),
 		mockQ:     new(mocks.MockQuerier),
 	}
@@ -53,19 +53,19 @@ func setupRequestFixture(t *testing.T) requestFixture {
 	return f
 }
 
-// mockResolveProject sets up the standard org+project resolution mocks.
-func (f *requestFixture) mockResolveProject() {
+// mockResolveSpace sets up the standard org+space resolution mocks.
+func (f *requestFixture) mockResolveSpace() {
 	f.mockQ.On("GetOrganizationByName", mock.Anything, testOrg).
 		Return(db.Organization{ID: f.orgID, Name: testOrg}, nil)
-	f.mockQ.On("GetProjectByName", mock.Anything, db.GetProjectByNameParams{OrgID: f.orgID, Name: testProject}).
-		Return(db.Project{ID: f.projectID, Name: testProject, OrgID: f.orgID}, nil)
+	f.mockQ.On("GetSpaceByName", mock.Anything, db.GetSpaceByNameParams{OrgID: f.orgID, Name: testSpace}).
+		Return(db.Space{ID: f.spaceID, Name: testSpace, OrgID: f.orgID}, nil)
 }
 
-func makeRequest(id, projectID uuid.UUID, name string, state db.RequestState) db.AssetRequest {
+func makeRequest(id, spaceID uuid.UUID, name string, state db.RequestState) db.AssetRequest {
 	now := time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC)
 	return db.AssetRequest{
 		ID:          id,
-		ProjectID:   projectID,
+		SpaceID:   spaceID,
 		Name:        name,
 		DisplayName: "Test Request",
 		Description: "A test request",
@@ -82,18 +82,18 @@ func makeRequest(id, projectID uuid.UUID, name string, state db.RequestState) db
 
 func TestCreateRequest_Success(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	created := makeRequest(f.requestID, f.projectID, "placeholder", db.RequestStateDRAFT)
+	created := makeRequest(f.requestID, f.spaceID, "placeholder", db.RequestStateDRAFT)
 
 	f.mockQ.On("CreateRequest", mock.Anything, mock.MatchedBy(func(p db.CreateRequestParams) bool {
-		return p.ProjectID == f.projectID && p.State == db.RequestStateDRAFT && p.DisplayName == "New Request"
+		return p.SpaceID == f.spaceID && p.State == db.RequestStateDRAFT && p.DisplayName == "New Request"
 	})).Return(created, nil)
 
 	// Line item creation: asset then line item.
 	assetID := uuid.New()
 	f.mockQ.On("CreateAsset", mock.Anything, mock.MatchedBy(func(p db.CreateAssetParams) bool {
-		return p.ProjectID == f.projectID && p.State == db.AssetStatePLACEHOLDER
+		return p.SpaceID == f.spaceID && p.State == db.AssetStatePLACEHOLDER
 	})).Return(db.Asset{ID: assetID, Name: "asset-1", State: db.AssetStatePLACEHOLDER, Annotations: json.RawMessage("{}")}, nil)
 
 	f.mockQ.On("CreateLineItem", mock.Anything, mock.MatchedBy(func(p db.CreateLineItemParams) bool {
@@ -135,10 +135,10 @@ func TestCreateRequest_InvalidParent(t *testing.T) {
 
 func TestGetRequest_Success(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateOPEN)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateOPEN)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	li := db.AssetRequestLineItem{
@@ -175,10 +175,10 @@ func TestGetRequest_Success(t *testing.T) {
 
 func TestSubmitRequest_ValidTransition(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateDRAFT)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateDRAFT)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	transitioned := existing
@@ -200,10 +200,10 @@ func TestSubmitRequest_ValidTransition(t *testing.T) {
 
 func TestSubmitRequest_InvalidState(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateINPROGRESS)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateINPROGRESS)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	_, err := f.server.SubmitRequest(context.Background(), &assetsv1.SubmitRequestRequest{
@@ -219,10 +219,10 @@ func TestSubmitRequest_InvalidState(t *testing.T) {
 
 func TestAssignRequest_FromOpen(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateOPEN)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateOPEN)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	assigned := existing
@@ -248,11 +248,11 @@ func TestAssignRequest_FromOpen(t *testing.T) {
 
 func TestAssignRequest_FromInProgress(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateINPROGRESS)
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateINPROGRESS)
 	existing.Assignee = "users/jane"
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	reassigned := existing
@@ -277,10 +277,10 @@ func TestAssignRequest_FromInProgress(t *testing.T) {
 
 func TestAssignRequest_InvalidState(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateDRAFT)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateDRAFT)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	_, err := f.server.AssignRequest(context.Background(), &assetsv1.AssignRequestRequest{
@@ -297,10 +297,10 @@ func TestAssignRequest_InvalidState(t *testing.T) {
 
 func TestClaimRequest_Success(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateOPEN)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateOPEN)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	claimed := existing
@@ -323,10 +323,10 @@ func TestClaimRequest_Success(t *testing.T) {
 
 func TestClaimRequest_InvalidState(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateINPROGRESS)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateINPROGRESS)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	_, err := f.server.ClaimRequest(context.Background(), &assetsv1.ClaimRequestRequest{
@@ -342,10 +342,10 @@ func TestClaimRequest_InvalidState(t *testing.T) {
 
 func TestDeliverRequest_Success(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateINPROGRESS)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateINPROGRESS)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	delivered := existing
@@ -367,10 +367,10 @@ func TestDeliverRequest_Success(t *testing.T) {
 
 func TestDeliverRequest_InvalidState(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateOPEN)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateOPEN)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	_, err := f.server.DeliverRequest(context.Background(), &assetsv1.DeliverRequestRequest{
@@ -386,10 +386,10 @@ func TestDeliverRequest_InvalidState(t *testing.T) {
 
 func TestApproveRequest_Success(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateDELIVERED)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateDELIVERED)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	approved := existing
@@ -411,10 +411,10 @@ func TestApproveRequest_Success(t *testing.T) {
 
 func TestApproveRequest_InvalidState(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateINPROGRESS)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateINPROGRESS)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	_, err := f.server.ApproveRequest(context.Background(), &assetsv1.ApproveRequestRequest{
@@ -430,10 +430,10 @@ func TestApproveRequest_InvalidState(t *testing.T) {
 
 func TestRequestRevision_Success(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateDELIVERED)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateDELIVERED)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	revised := existing
@@ -457,10 +457,10 @@ func TestRequestRevision_Success(t *testing.T) {
 
 func TestRejectRequest_Success(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateDELIVERED)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateDELIVERED)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	rejected := existing
@@ -484,10 +484,10 @@ func TestRejectRequest_Success(t *testing.T) {
 
 func TestCancelRequest_FromDraft(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateDRAFT)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateDRAFT)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	cancelled := existing
@@ -509,10 +509,10 @@ func TestCancelRequest_FromDraft(t *testing.T) {
 
 func TestCancelRequest_FromOpen(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateOPEN)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateOPEN)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	cancelled := existing
@@ -534,10 +534,10 @@ func TestCancelRequest_FromOpen(t *testing.T) {
 
 func TestCancelRequest_FromInProgress(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateINPROGRESS)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateINPROGRESS)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	cancelled := existing
@@ -559,10 +559,10 @@ func TestCancelRequest_FromInProgress(t *testing.T) {
 
 func TestCancelRequest_InvalidState_Approved(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateAPPROVED)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateAPPROVED)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	_, err := f.server.CancelRequest(context.Background(), &assetsv1.CancelRequestRequest{
@@ -576,10 +576,10 @@ func TestCancelRequest_InvalidState_Approved(t *testing.T) {
 
 func TestCancelRequest_InvalidState_Cancelled(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateCANCELLED)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateCANCELLED)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	_, err := f.server.CancelRequest(context.Background(), &assetsv1.CancelRequestRequest{
@@ -595,10 +595,10 @@ func TestCancelRequest_InvalidState_Cancelled(t *testing.T) {
 
 func TestUpdateRequest_WithFieldMask(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateDRAFT)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateDRAFT)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	updated := existing
@@ -630,10 +630,10 @@ func TestUpdateRequest_WithFieldMask(t *testing.T) {
 
 func TestUpdateRequest_NoMask(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateDRAFT)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateDRAFT)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	updated := existing
@@ -663,10 +663,10 @@ func TestUpdateRequest_NoMask(t *testing.T) {
 
 func TestDeleteRequest_Success(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateDRAFT)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateDRAFT)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	f.mockQ.On("DeleteRequest", mock.Anything, f.requestID).Return(nil)
@@ -705,7 +705,7 @@ func TestCreateRequest_OrgNotFound(t *testing.T) {
 
 func TestCreateRequest_DBError(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
 	f.mockQ.On("CreateRequest", mock.Anything, mock.Anything).
 		Return(db.AssetRequest{}, errors.New("connection reset"))
@@ -723,9 +723,9 @@ func TestCreateRequest_DBError(t *testing.T) {
 
 func TestCreateRequest_CreateAssetError(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	created := makeRequest(f.requestID, f.projectID, "placeholder", db.RequestStateDRAFT)
+	created := makeRequest(f.requestID, f.spaceID, "placeholder", db.RequestStateDRAFT)
 	f.mockQ.On("CreateRequest", mock.Anything, mock.Anything).Return(created, nil)
 
 	f.mockQ.On("CreateAsset", mock.Anything, mock.Anything).
@@ -747,9 +747,9 @@ func TestCreateRequest_CreateAssetError(t *testing.T) {
 
 func TestCreateRequest_CreateLineItemError(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	created := makeRequest(f.requestID, f.projectID, "placeholder", db.RequestStateDRAFT)
+	created := makeRequest(f.requestID, f.spaceID, "placeholder", db.RequestStateDRAFT)
 	f.mockQ.On("CreateRequest", mock.Anything, mock.Anything).Return(created, nil)
 
 	assetID := uuid.New()
@@ -775,9 +775,9 @@ func TestCreateRequest_CreateLineItemError(t *testing.T) {
 
 func TestCreateRequest_NoLineItems_Success(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	created := makeRequest(f.requestID, f.projectID, "placeholder", db.RequestStateDRAFT)
+	created := makeRequest(f.requestID, f.spaceID, "placeholder", db.RequestStateDRAFT)
 	f.mockQ.On("CreateRequest", mock.Anything, mock.Anything).Return(created, nil)
 
 	op, err := f.server.CreateRequest(context.Background(), &assetsv1.CreateRequestRequest{
@@ -821,9 +821,9 @@ func TestGetRequest_OrgNotFound(t *testing.T) {
 
 func TestGetRequest_NotFound(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(db.AssetRequest{}, pgx.ErrNoRows)
 
 	_, err := f.server.GetRequest(context.Background(), &assetsv1.GetRequestRequest{
@@ -852,9 +852,9 @@ func TestUpdateRequest_InvalidName(t *testing.T) {
 
 func TestUpdateRequest_NotFound(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(db.AssetRequest{}, pgx.ErrNoRows)
 
 	_, err := f.server.UpdateRequest(context.Background(), &assetsv1.UpdateRequestRequest{
@@ -869,10 +869,10 @@ func TestUpdateRequest_NotFound(t *testing.T) {
 
 func TestUpdateRequest_DBError(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateDRAFT)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateDRAFT)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	f.mockQ.On("UpdateRequest", mock.Anything, mock.Anything).
@@ -890,10 +890,10 @@ func TestUpdateRequest_DBError(t *testing.T) {
 
 func TestUpdateRequest_DueTimeFieldMask(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateDRAFT)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateDRAFT)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	due := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
@@ -917,10 +917,10 @@ func TestUpdateRequest_DueTimeFieldMask(t *testing.T) {
 
 func TestUpdateRequest_AnnotationsFieldMask(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateDRAFT)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateDRAFT)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	updated := existing
@@ -956,9 +956,9 @@ func TestDeleteRequest_InvalidName(t *testing.T) {
 
 func TestDeleteRequest_NotFound(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(db.AssetRequest{}, pgx.ErrNoRows)
 
 	_, err := f.server.DeleteRequest(context.Background(), &assetsv1.DeleteRequestRequest{
@@ -973,10 +973,10 @@ func TestDeleteRequest_NotFound(t *testing.T) {
 
 func TestDeleteRequest_SoftDeleteError(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateDRAFT)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateDRAFT)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	f.mockQ.On("DeleteRequest", mock.Anything, f.requestID).Return(errors.New("db failure"))
@@ -1008,9 +1008,9 @@ func TestAssignRequest_InvalidName(t *testing.T) {
 
 func TestAssignRequest_NotFound(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(db.AssetRequest{}, pgx.ErrNoRows)
 
 	_, err := f.server.AssignRequest(context.Background(), &assetsv1.AssignRequestRequest{
@@ -1026,10 +1026,10 @@ func TestAssignRequest_NotFound(t *testing.T) {
 
 func TestAssignRequest_UpdateAssigneeDBError(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateOPEN)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateOPEN)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	f.mockQ.On("UpdateRequestAssignee", mock.Anything, mock.Anything).
@@ -1062,9 +1062,9 @@ func TestClaimRequest_InvalidName(t *testing.T) {
 
 func TestClaimRequest_NotFound(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(db.AssetRequest{}, pgx.ErrNoRows)
 
 	_, err := f.server.ClaimRequest(context.Background(), &assetsv1.ClaimRequestRequest{
@@ -1079,10 +1079,10 @@ func TestClaimRequest_NotFound(t *testing.T) {
 
 func TestClaimRequest_UpdateAssigneeDBError(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateOPEN)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateOPEN)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	f.mockQ.On("UpdateRequestAssignee", mock.Anything, mock.Anything).
@@ -1114,9 +1114,9 @@ func TestCancelRequest_InvalidName(t *testing.T) {
 
 func TestCancelRequest_NotFound(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(db.AssetRequest{}, pgx.ErrNoRows)
 
 	_, err := f.server.CancelRequest(context.Background(), &assetsv1.CancelRequestRequest{
@@ -1131,10 +1131,10 @@ func TestCancelRequest_NotFound(t *testing.T) {
 
 func TestCancelRequest_UpdateStateDBError(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateOPEN)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateOPEN)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	f.mockQ.On("UpdateRequestState", mock.Anything, mock.Anything).
@@ -1166,9 +1166,9 @@ func TestSubmitRequest_InvalidName(t *testing.T) {
 
 func TestSubmitRequest_NotFound(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(db.AssetRequest{}, pgx.ErrNoRows)
 
 	_, err := f.server.SubmitRequest(context.Background(), &assetsv1.SubmitRequestRequest{
@@ -1183,10 +1183,10 @@ func TestSubmitRequest_NotFound(t *testing.T) {
 
 func TestSubmitRequest_UpdateStateDBError(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateDRAFT)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{ProjectID: f.projectID, Name: testReqName}).
+	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateDRAFT)
+	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	f.mockQ.On("UpdateRequestState", mock.Anything, mock.Anything).
@@ -1233,9 +1233,9 @@ func TestListRequests_OrgNotFound(t *testing.T) {
 
 func TestListRequests_DBError(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	f.mockQ.On("ListRequestsByProject", mock.Anything, mock.Anything).
+	f.mockQ.On("ListRequestsBySpace", mock.Anything, mock.Anything).
 		Return([]db.AssetRequest{}, errors.New("db failure"))
 
 	_, err := f.server.ListRequests(context.Background(), &assetsv1.ListRequestsRequest{
@@ -1250,12 +1250,12 @@ func TestListRequests_DBError(t *testing.T) {
 
 func TestListRequests_ShowDeleted(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
 	rows := []db.AssetRequest{
-		makeRequest(f.requestID, f.projectID, testReqName, db.RequestStateCANCELLED),
+		makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateCANCELLED),
 	}
-	f.mockQ.On("ListRequestsByProject", mock.Anything, mock.Anything).
+	f.mockQ.On("ListRequestsBySpace", mock.Anything, mock.Anything).
 		Return(rows, nil)
 
 	resp, err := f.server.ListRequests(context.Background(), &assetsv1.ListRequestsRequest{
@@ -1270,9 +1270,9 @@ func TestListRequests_ShowDeleted(t *testing.T) {
 
 func TestListRequests_ShowDeleted_DBError(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	f.mockQ.On("ListRequestsByProject", mock.Anything, mock.Anything).
+	f.mockQ.On("ListRequestsBySpace", mock.Anything, mock.Anything).
 		Return([]db.AssetRequest{}, errors.New("db failure"))
 
 	_, err := f.server.ListRequests(context.Background(), &assetsv1.ListRequestsRequest{
@@ -1288,15 +1288,15 @@ func TestListRequests_ShowDeleted_DBError(t *testing.T) {
 
 func TestListRequests_Pagination(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
 	// Return pageSize+1 rows to trigger next page token.
 	rows := make([]db.AssetRequest, 3)
 	for i := range rows {
-		rows[i] = makeRequest(uuid.New(), f.projectID, "req-"+uuid.New().String()[:8], db.RequestStateOPEN)
+		rows[i] = makeRequest(uuid.New(), f.spaceID, "req-"+uuid.New().String()[:8], db.RequestStateOPEN)
 	}
-	f.mockQ.On("ListRequestsByProject", mock.Anything, mock.MatchedBy(func(p db.ListRequestsByProjectParams) bool {
-		return p.ProjectID == f.projectID && p.Limit == 3
+	f.mockQ.On("ListRequestsBySpace", mock.Anything, mock.MatchedBy(func(p db.ListRequestsBySpaceParams) bool {
+		return p.SpaceID == f.spaceID && p.Limit == 3
 	})).Return(rows, nil)
 
 	resp, err := f.server.ListRequests(context.Background(), &assetsv1.ListRequestsRequest{
@@ -1312,9 +1312,9 @@ func TestListRequests_Pagination(t *testing.T) {
 
 func TestListRequests_PageSizeClamped(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	f.mockQ.On("ListRequestsByProject", mock.Anything, mock.MatchedBy(func(p db.ListRequestsByProjectParams) bool {
+	f.mockQ.On("ListRequestsBySpace", mock.Anything, mock.MatchedBy(func(p db.ListRequestsBySpaceParams) bool {
 		return p.Limit == 1001 // 1000 + 1 for next-page detection
 	})).Return([]db.AssetRequest{}, nil)
 
@@ -1329,9 +1329,9 @@ func TestListRequests_PageSizeClamped(t *testing.T) {
 
 func TestListRequests_DefaultPageSize(t *testing.T) {
 	f := setupRequestFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	f.mockQ.On("ListRequestsByProject", mock.Anything, mock.MatchedBy(func(p db.ListRequestsByProjectParams) bool {
+	f.mockQ.On("ListRequestsBySpace", mock.Anything, mock.MatchedBy(func(p db.ListRequestsBySpaceParams) bool {
 		return p.Limit == 101 // default 100 + 1
 	})).Return([]db.AssetRequest{}, nil)
 
@@ -1343,14 +1343,14 @@ func TestListRequests_DefaultPageSize(t *testing.T) {
 	f.mockQ.AssertExpectations(t)
 }
 
-// --- resolveProject error paths ---
+// --- resolveSpace error paths ---
 
-func TestResolveProject_ProjectNotFound(t *testing.T) {
+func TestResolveSpace_SpaceNotFound(t *testing.T) {
 	f := setupRequestFixture(t)
 	f.mockQ.On("GetOrganizationByName", mock.Anything, testOrg).
 		Return(db.Organization{ID: f.orgID, Name: testOrg}, nil)
-	f.mockQ.On("GetProjectByName", mock.Anything, db.GetProjectByNameParams{OrgID: f.orgID, Name: testProject}).
-		Return(db.Project{}, pgx.ErrNoRows)
+	f.mockQ.On("GetSpaceByName", mock.Anything, db.GetSpaceByNameParams{OrgID: f.orgID, Name: testSpace}).
+		Return(db.Space{}, pgx.ErrNoRows)
 
 	_, err := f.server.GetRequest(context.Background(), &assetsv1.GetRequestRequest{
 		Name: testFull,

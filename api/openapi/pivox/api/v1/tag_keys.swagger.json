@@ -16,7 +16,7 @@
     "application/json"
   ],
   "paths": {
-    "/v1/organizations/{organization}/projects/{project}/tagKeys": {
+    "/v1/organizations/{organization}/spaces/{space}/tagKeys": {
       "get": {
         "summary": "Lists all TagKeys for a parent resource.",
         "operationId": "TagKeys_ListTagKeys2",
@@ -42,7 +42,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -106,7 +106,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -140,7 +140,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}/tagKeys/{tagKey}": {
+    "/v1/organizations/{organization}/spaces/{space}/tagKeys/{tagKey}": {
       "get": {
         "summary": "Retrieves a TagKey. This method will return `PERMISSION_DENIED` if the\nkey does not exist or the user does not have permission to view it.",
         "operationId": "TagKeys_GetTagKey2",
@@ -166,7 +166,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -207,7 +207,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -262,7 +262,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -703,7 +703,7 @@
       "properties": {
         "name": {
           "type": "string",
-          "description": "Immutable. The resource name for a TagKey. Must be in the format\n`organizations/{organization}/tagKeys/{tag_key}` or\n`organizations/{organization}/projects/{project}/tagKeys/{tag_key}`."
+          "description": "Immutable. The resource name for a TagKey. Must be in the format\n`organizations/{organization}/tagKeys/{tag_key}` or\n`organizations/{organization}/spaces/{space}/tagKeys/{tag_key}`."
         },
         "description": {
           "type": "string",

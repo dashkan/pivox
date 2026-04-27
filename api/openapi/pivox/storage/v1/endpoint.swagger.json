@@ -543,7 +543,7 @@
           "description": "Required. Immutable. The mount point path on the agent server\n(e.g. `/mnt/nfs/pivox-assets`). Must be accessible by the pivox\nuser on all agents in the gateway pool."
         }
       },
-      "description": "Configuration for a local or network-mounted filesystem endpoint.\nThe path must be mounted on all agents in the gateway pool before\nadding the endpoint. The agent validates shared access by writing\na marker file during endpoint creation.\n\nAssets are stored as immutable versioned files:\n  {path}/{org_id}/{project_id}/assets/{asset_id}/v1.ext\n\nNo credentials are needed — the agent accesses files using the\npivox system user's permissions on the mounted filesystem.",
+      "description": "Configuration for a local or network-mounted filesystem endpoint.\nThe path must be mounted on all agents in the gateway pool before\nadding the endpoint. The agent validates shared access by writing\na marker file during endpoint creation.\n\nAssets are stored as immutable versioned files:\n  {path}/{org_id}/{space_id}/assets/{asset_id}/v1.ext\n\nNo credentials are needed — the agent accesses files using the\npivox system user's permissions on the mounted filesystem.",
       "required": [
         "path"
       ]

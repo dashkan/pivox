@@ -1,12 +1,12 @@
 {
   "swagger": "2.0",
   "info": {
-    "title": "pivox/api/v1/projects.proto",
+    "title": "pivox/api/v1/spaces.proto",
     "version": "version not set"
   },
   "tags": [
     {
-      "name": "Projects"
+      "name": "Spaces"
     }
   ],
   "consumes": [
@@ -16,15 +16,15 @@
     "application/json"
   ],
   "paths": {
-    "/v1/organizations/{organization}/projects": {
+    "/v1/organizations/{organization}/spaces": {
       "get": {
-        "summary": "Lists projects that are direct children of the specified organization\nresource. `list()` provides a strongly consistent view of the\nprojects underneath the specified parent resource. `list()` returns\nprojects sorted based upon the (ascending) lexical ordering of their\n`display_name`. The caller must have `resourcemanager.projects.list`\npermission on the identified parent.",
-        "operationId": "Projects_ListProjects",
+        "summary": "Lists spaces that are direct children of the specified organization\nresource. `list()` provides a strongly consistent view of the\nspaces underneath the specified parent resource. `list()` returns\nspaces sorted based upon the (ascending) lexical ordering of their\n`display_name`. The caller must have `resourcemanager.spaces.list`\npermission on the identified parent.",
+        "operationId": "Spaces_ListSpaces",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/v1ListProjectsResponse"
+              "$ref": "#/definitions/v1ListSpacesResponse"
             }
           },
           "default": {
@@ -43,14 +43,14 @@
           },
           {
             "name": "pageToken",
-            "description": "Optional. A pagination token returned from a previous call to\n[ListProjects] [pivox.api.v1.Projects.ListProjects] that\nindicates from where listing should continue.",
+            "description": "Optional. A pagination token returned from a previous call to\n[ListSpaces] [pivox.api.v1.Spaces.ListSpaces] that\nindicates from where listing should continue.",
             "in": "query",
             "required": false,
             "type": "string"
           },
           {
             "name": "pageSize",
-            "description": "Optional. The maximum number of projects to return in the response.\nThe server can return fewer projects than requested.\nIf unspecified, server picks an appropriate default.",
+            "description": "Optional. The maximum number of spaces to return in the response.\nThe server can return fewer spaces than requested.\nIf unspecified, server picks an appropriate default.",
             "in": "query",
             "required": false,
             "type": "integer",
@@ -58,14 +58,14 @@
           },
           {
             "name": "showDeleted",
-            "description": "Optional. Indicate that projects in the `DELETE_REQUESTED` state should\nalso be returned. Normally only `ACTIVE` projects are returned.",
+            "description": "Optional. Indicate that spaces in the `DELETE_REQUESTED` state should\nalso be returned. Normally only `ACTIVE` spaces are returned.",
             "in": "query",
             "required": false,
             "type": "boolean"
           },
           {
             "name": "filter",
-            "description": "Optional. An expression for filtering the results of the request.\nFilter rules are case insensitive. Some eligible fields for filtering are:\n\n+ `displayName`\n+ `state`\n+ `labels` (supports key and key=value matching)\n+ `createTime` (supports comparison operators)\n\nSome examples of filter strings:\n\n+ `displayName = \"My Project\"` - returns projects with display name\n  \"My Project\".\n+ `displayName = \"My*\"` - returns projects whose display name starts\n  with \"My\".\n+ `state = ACTIVE` - returns only active projects.\n+ `labels.color:*` - returns projects that have the label \"color\".\n+ `labels.color = red` - returns projects where label \"color\" is \"red\".\n+ `createTime \u003e \"2024-01-01T00:00:00Z\"` - returns projects created\n  after the given timestamp.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
+            "description": "Optional. An expression for filtering the results of the request.\nFilter rules are case insensitive. Some eligible fields for filtering are:\n\n+ `displayName`\n+ `state`\n+ `labels` (supports key and key=value matching)\n+ `createTime` (supports comparison operators)\n\nSome examples of filter strings:\n\n+ `displayName = \"My Space\"` - returns spaces with display name\n  \"My Space\".\n+ `displayName = \"My*\"` - returns spaces whose display name starts\n  with \"My\".\n+ `state = ACTIVE` - returns only active spaces.\n+ `labels.color:*` - returns spaces that have the label \"color\".\n+ `labels.color = red` - returns spaces where label \"color\" is \"red\".\n+ `createTime \u003e \"2024-01-01T00:00:00Z\"` - returns spaces created\n  after the given timestamp.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
             "in": "query",
             "required": false,
             "type": "string"
@@ -79,12 +79,12 @@
           }
         ],
         "tags": [
-          "Projects"
+          "Spaces"
         ]
       },
       "post": {
-        "summary": "Creates a new project under the specified organization.",
-        "operationId": "Projects_CreateProject",
+        "summary": "Creates a new space under the specified organization.",
+        "operationId": "Spaces_CreateSpace",
         "responses": {
           "200": {
             "description": "A successful response.",
@@ -107,17 +107,17 @@
             "type": "string"
           },
           {
-            "name": "project",
-            "description": "Required. The Project to create.\n\nProject ID is required. If the requested ID is unavailable, the request\nfails.",
+            "name": "space",
+            "description": "Required. The Space to create.\n\nSpace ID is required. If the requested ID is unavailable, the request\nfails.",
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/v1Project"
+              "$ref": "#/definitions/v1Space"
             }
           },
           {
-            "name": "projectId",
-            "description": "Optional. A unique identifier for the project. If not provided, the server will\ngenerate one.",
+            "name": "spaceId",
+            "description": "Optional. A unique identifier for the space. If not provided, the server will\ngenerate one.",
             "in": "query",
             "required": false,
             "type": "string"
@@ -131,20 +131,20 @@
           }
         ],
         "tags": [
-          "Projects"
+          "Spaces"
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}": {
+    "/v1/organizations/{organization}/spaces/{space}": {
       "get": {
-        "summary": "Retrieves the project identified by the specified `name` (for example,\n`organizations/123/projects/my-project`).",
-        "description": "The caller must have `resourcemanager.projects.get` permission\nfor this project.",
-        "operationId": "Projects_GetProject",
+        "summary": "Retrieves the space identified by the specified `name` (for example,\n`organizations/123/spaces/my-space`).",
+        "description": "The caller must have `resourcemanager.spaces.get` permission\nfor this space.",
+        "operationId": "Spaces_GetSpace",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/v1Project"
+              "$ref": "#/definitions/v1Space"
             }
           },
           "default": {
@@ -162,20 +162,20 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
           }
         ],
         "tags": [
-          "Projects"
+          "Spaces"
         ]
       },
       "delete": {
-        "summary": "Marks the project identified by the specified\n`name` (for example, `organizations/123/projects/my-project`) for deletion.",
-        "description": "This method will only affect the project if it has a lifecycle state of\n[ACTIVE][pivox.api.v1.Project.State.ACTIVE].\n\nThis method changes the Project's lifecycle state from\n[ACTIVE][pivox.api.v1.Project.State.ACTIVE]\nto\n[DELETE_REQUESTED][pivox.api.v1.Project.State.DELETE_REQUESTED].\nThe deletion starts at an unspecified time,\nat which point the Project is no longer accessible.\n\nUntil the deletion completes, you can check the lifecycle state\nchecked by retrieving the project with [GetProject]\n[pivox.api.v1.Projects.GetProject],\nand the project remains visible to [ListProjects]\n[pivox.api.v1.Projects.ListProjects].\nHowever, you cannot update the project.\n\nAfter the deletion completes, the project is not retrievable by\nthe [GetProject]\n[pivox.api.v1.Projects.GetProject] and\n[ListProjects]\n[pivox.api.v1.Projects.ListProjects] method.\n\nThis method behaves idempotently, such that deleting a `DELETE_REQUESTED`\nproject will not cause an error, but also won't do anything.\n\nThe caller must have `resourcemanager.projects.delete` permissions for this\nproject.",
-        "operationId": "Projects_DeleteProject",
+        "summary": "Marks the space identified by the specified\n`name` (for example, `organizations/123/spaces/my-space`) for deletion.",
+        "description": "This method will only affect the space if it has a lifecycle state of\n[ACTIVE][pivox.api.v1.Space.State.ACTIVE].\n\nThis method changes the Space's lifecycle state from\n[ACTIVE][pivox.api.v1.Space.State.ACTIVE]\nto\n[DELETE_REQUESTED][pivox.api.v1.Space.State.DELETE_REQUESTED].\nThe deletion starts at an unspecified time,\nat which point the Space is no longer accessible.\n\nUntil the deletion completes, you can check the lifecycle state\nchecked by retrieving the space with [GetSpace]\n[pivox.api.v1.Spaces.GetSpace],\nand the space remains visible to [ListSpaces]\n[pivox.api.v1.Spaces.ListSpaces].\nHowever, you cannot update the space.\n\nAfter the deletion completes, the space is not retrievable by\nthe [GetSpace]\n[pivox.api.v1.Spaces.GetSpace] and\n[ListSpaces]\n[pivox.api.v1.Spaces.ListSpaces] method.\n\nThis method behaves idempotently, such that deleting a `DELETE_REQUESTED`\nspace will not cause an error, but also won't do anything.\n\nThe caller must have `resourcemanager.spaces.delete` permissions for this\nspace.",
+        "operationId": "Spaces_DeleteSpace",
         "responses": {
           "200": {
             "description": "A successful response.",
@@ -198,14 +198,14 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
           },
           {
             "name": "etag",
-            "description": "Optional. The etag known to the client for the expected state of the project.\nThis is to be used for optimistic concurrency.",
+            "description": "Optional. The etag known to the client for the expected state of the space.\nThis is to be used for optimistic concurrency.",
             "in": "query",
             "required": false,
             "type": "string"
@@ -219,13 +219,13 @@
           }
         ],
         "tags": [
-          "Projects"
+          "Spaces"
         ]
       },
       "patch": {
-        "summary": "Updates the `display_name` and labels of the project identified by the\nspecified `name` (for example, `organizations/123/projects/my-project`).\nDeleting all labels requires an update mask for labels field.",
-        "description": "The caller must have `resourcemanager.projects.update` permission for this\nproject.",
-        "operationId": "Projects_UpdateProject",
+        "summary": "Updates the `display_name` and labels of the space identified by the\nspecified `name` (for example, `organizations/123/spaces/my-space`).\nDeleting all labels requires an update mask for labels field.",
+        "description": "The caller must have `resourcemanager.spaces.update` permission for this\nspace.",
+        "operationId": "Spaces_UpdateSpace",
         "responses": {
           "200": {
             "description": "A successful response.",
@@ -248,27 +248,27 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
           },
           {
-            "name": "project",
-            "description": "Required. The new definition of the project.",
+            "name": "space",
+            "description": "Required. The new definition of the space.",
             "in": "body",
             "required": true,
             "schema": {
               "type": "object",
               "properties": {
                 "state": {
-                  "$ref": "#/definitions/v1ProjectState",
-                  "description": "Output only. The project lifecycle state.",
+                  "$ref": "#/definitions/v1SpaceState",
+                  "description": "Output only. The space lifecycle state.",
                   "readOnly": true
                 },
                 "displayName": {
                   "type": "string",
-                  "description": "Optional. A user-assigned display name of the project.\nWhen present it must be between 4 to 30 characters.\nAllowed characters are: lowercase and uppercase letters, numbers,\nhyphen, single-quote, double-quote, space, and exclamation point.\n\nExample: `My Project`"
+                  "description": "Optional. A user-assigned display name of the space.\nWhen present it must be between 4 to 30 characters.\nAllowed characters are: lowercase and uppercase letters, numbers,\nhyphen, single-quote, double-quote, space, and exclamation point.\n\nExample: `My Space`"
                 },
                 "createTime": {
                   "type": "string",
@@ -291,12 +291,12 @@
                 "purgeTime": {
                   "type": "string",
                   "format": "date-time",
-                  "description": "Output only. The time at which this project will be purged.\nApproximately 30 days after deletion.",
+                  "description": "Output only. The time at which this space will be purged.\nApproximately 30 days after deletion.",
                   "readOnly": true
                 },
                 "etag": {
                   "type": "string",
-                  "description": "Output only. A checksum computed by the server based on the current value\nof the Project resource. This may be sent on update and delete requests to\nensure the client has an up-to-date value before proceeding.",
+                  "description": "Output only. A checksum computed by the server based on the current value\nof the Space resource. This may be sent on update and delete requests to\nensure the client has an up-to-date value before proceeding.",
                   "readOnly": true
                 },
                 "labels": {
@@ -304,15 +304,15 @@
                   "additionalProperties": {
                     "type": "string"
                   },
-                  "description": "Optional. The labels associated with this project.\n\nLabel keys must be between 1 and 63 characters long and must conform\nto the following regular expression: \\[a-z\\](\\[-a-z0-9\\]*\\[a-z0-9\\])?.\n\nLabel values must be between 0 and 63 characters long and must conform\nto the regular expression (\\[a-z\\](\\[-a-z0-9\\]*\\[a-z0-9\\])?)?.\n\nNo more than 64 labels can be associated with a given resource.\n\nClients should store labels in a representation such as JSON that does not\ndepend on specific characters being disallowed.\n\nExample: `\"myBusinessDimension\" : \"businessValue\"`"
+                  "description": "Optional. The labels associated with this space.\n\nLabel keys must be between 1 and 63 characters long and must conform\nto the following regular expression: \\[a-z\\](\\[-a-z0-9\\]*\\[a-z0-9\\])?.\n\nLabel values must be between 0 and 63 characters long and must conform\nto the regular expression (\\[a-z\\](\\[-a-z0-9\\]*\\[a-z0-9\\])?)?.\n\nNo more than 64 labels can be associated with a given resource.\n\nClients should store labels in a representation such as JSON that does not\ndepend on specific characters being disallowed.\n\nExample: `\"myBusinessDimension\" : \"businessValue\"`"
                 }
               },
-              "title": "Required. The new definition of the project."
+              "title": "Required. The new definition of the space."
             }
           },
           {
             "name": "allowMissing",
-            "description": "Optional. If set to true, and the project is not found, a new project will be created.\nIn this situation, update_mask is ignored.",
+            "description": "Optional. If set to true, and the space is not found, a new space will be created.\nIn this situation, update_mask is ignored.",
             "in": "query",
             "required": false,
             "type": "boolean"
@@ -326,15 +326,15 @@
           }
         ],
         "tags": [
-          "Projects"
+          "Spaces"
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}:undelete": {
+    "/v1/organizations/{organization}/spaces/{space}:undelete": {
       "post": {
-        "summary": "Restores the project identified by the specified\n`name` (for example, `organizations/123/projects/my-project`).\nYou can only use this method for a project that has a lifecycle state of\n[DELETE_REQUESTED]\n[Projects.State.DELETE_REQUESTED].\nAfter deletion starts, the project cannot be restored.",
-        "description": "The caller must have `resourcemanager.projects.undelete` permission for\nthis project.",
-        "operationId": "Projects_UndeleteProject",
+        "summary": "Restores the space identified by the specified\n`name` (for example, `organizations/123/spaces/my-space`).\nYou can only use this method for a space that has a lifecycle state of\n[DELETE_REQUESTED]\n[Spaces.State.DELETE_REQUESTED].\nAfter deletion starts, the space cannot be restored.",
+        "description": "The caller must have `resourcemanager.spaces.undelete` permission for\nthis space.",
+        "operationId": "Spaces_UndeleteSpace",
         "responses": {
           "200": {
             "description": "A successful response.",
@@ -357,7 +357,7 @@
             "type": "string"
           },
           {
-            "name": "project",
+            "name": "space",
             "in": "path",
             "required": true,
             "type": "string"
@@ -367,30 +367,30 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/ProjectsUndeleteProjectBody"
+              "$ref": "#/definitions/SpacesUndeleteSpaceBody"
             }
           }
         ],
         "tags": [
-          "Projects"
+          "Spaces"
         ]
       }
     }
   },
   "definitions": {
-    "ProjectsUndeleteProjectBody": {
+    "SpacesUndeleteSpaceBody": {
       "type": "object",
       "properties": {
         "etag": {
           "type": "string",
-          "description": "Optional. The etag known to the client for the expected state of the project.\nThis is to be used for optimistic concurrency."
+          "description": "Optional. The etag known to the client for the expected state of the space.\nThis is to be used for optimistic concurrency."
         },
         "validateOnly": {
           "type": "boolean",
           "description": "Optional. If set to true, the request will only validate the request\nwithout persisting it."
         }
       },
-      "description": "The request sent to the [UndeleteProject]\n[pivox.api.v1.Projects.UndeleteProject]\nmethod."
+      "description": "The request sent to the [UndeleteSpace]\n[pivox.api.v1.Spaces.UndeleteSpace]\nmethod."
     },
     "longrunningOperation": {
       "type": "object",
@@ -452,40 +452,40 @@
       },
       "description": "The `Status` type defines a logical error model that is suitable for\ndifferent programming environments, including REST APIs and RPC APIs. It is\nused by [gRPC](https://github.com/grpc). Each `Status` message contains\nthree pieces of data: error code, error message, and error details.\n\nYou can find out more about this error model and how to work with it in the\n[API Design Guide](https://cloud.google.com/apis/design/errors)."
     },
-    "v1ListProjectsResponse": {
+    "v1ListSpacesResponse": {
       "type": "object",
       "properties": {
-        "projects": {
+        "spaces": {
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/v1Project"
+            "$ref": "#/definitions/v1Space"
           },
-          "description": "The list of Projects under the parent. This list can be paginated."
+          "description": "The list of Spaces under the parent. This list can be paginated."
         },
         "nextPageToken": {
           "type": "string",
           "description": "Pagination token.\n\nIf the result set is too large to fit in a single response, this token\nis returned. It encodes the position of the current result cursor.\nFeeding this value into a new list request with the `page_token` parameter\ngives the next page of the results.\n\nWhen `next_page_token` is not filled in, there is no next page and\nthe list returned is the last page in the result set.\n\nPagination tokens have a limited lifetime."
         }
       },
-      "description": "A page of the response received from the\n[ListProjects][pivox.api.v1.Projects.ListProjects]\nmethod.\n\nA paginated response where more pages are available has\n`next_page_token` set. This token can be used in a subsequent request to\nretrieve the next request page.\n\nNOTE: A response may contain fewer elements than the request `page_size` and\nstill have a `next_page_token`."
+      "description": "A page of the response received from the\n[ListSpaces][pivox.api.v1.Spaces.ListSpaces]\nmethod.\n\nA paginated response where more pages are available has\n`next_page_token` set. This token can be used in a subsequent request to\nretrieve the next request page.\n\nNOTE: A response may contain fewer elements than the request `page_size` and\nstill have a `next_page_token`."
     },
-    "v1Project": {
+    "v1Space": {
       "type": "object",
       "properties": {
         "name": {
           "type": "string",
-          "description": "Output only. The unique resource name of the project.\n\nExample: `organizations/123/projects/my-project`",
+          "description": "Output only. The unique resource name of the space.\n\nExample: `organizations/123/spaces/my-space`",
           "readOnly": true
         },
         "state": {
-          "$ref": "#/definitions/v1ProjectState",
-          "description": "Output only. The project lifecycle state.",
+          "$ref": "#/definitions/v1SpaceState",
+          "description": "Output only. The space lifecycle state.",
           "readOnly": true
         },
         "displayName": {
           "type": "string",
-          "description": "Optional. A user-assigned display name of the project.\nWhen present it must be between 4 to 30 characters.\nAllowed characters are: lowercase and uppercase letters, numbers,\nhyphen, single-quote, double-quote, space, and exclamation point.\n\nExample: `My Project`"
+          "description": "Optional. A user-assigned display name of the space.\nWhen present it must be between 4 to 30 characters.\nAllowed characters are: lowercase and uppercase letters, numbers,\nhyphen, single-quote, double-quote, space, and exclamation point.\n\nExample: `My Space`"
         },
         "createTime": {
           "type": "string",
@@ -508,12 +508,12 @@
         "purgeTime": {
           "type": "string",
           "format": "date-time",
-          "description": "Output only. The time at which this project will be purged.\nApproximately 30 days after deletion.",
+          "description": "Output only. The time at which this space will be purged.\nApproximately 30 days after deletion.",
           "readOnly": true
         },
         "etag": {
           "type": "string",
-          "description": "Output only. A checksum computed by the server based on the current value\nof the Project resource. This may be sent on update and delete requests to\nensure the client has an up-to-date value before proceeding.",
+          "description": "Output only. A checksum computed by the server based on the current value\nof the Space resource. This may be sent on update and delete requests to\nensure the client has an up-to-date value before proceeding.",
           "readOnly": true
         },
         "labels": {
@@ -521,12 +521,12 @@
           "additionalProperties": {
             "type": "string"
           },
-          "description": "Optional. The labels associated with this project.\n\nLabel keys must be between 1 and 63 characters long and must conform\nto the following regular expression: \\[a-z\\](\\[-a-z0-9\\]*\\[a-z0-9\\])?.\n\nLabel values must be between 0 and 63 characters long and must conform\nto the regular expression (\\[a-z\\](\\[-a-z0-9\\]*\\[a-z0-9\\])?)?.\n\nNo more than 64 labels can be associated with a given resource.\n\nClients should store labels in a representation such as JSON that does not\ndepend on specific characters being disallowed.\n\nExample: `\"myBusinessDimension\" : \"businessValue\"`"
+          "description": "Optional. The labels associated with this space.\n\nLabel keys must be between 1 and 63 characters long and must conform\nto the following regular expression: \\[a-z\\](\\[-a-z0-9\\]*\\[a-z0-9\\])?.\n\nLabel values must be between 0 and 63 characters long and must conform\nto the regular expression (\\[a-z\\](\\[-a-z0-9\\]*\\[a-z0-9\\])?)?.\n\nNo more than 64 labels can be associated with a given resource.\n\nClients should store labels in a representation such as JSON that does not\ndepend on specific characters being disallowed.\n\nExample: `\"myBusinessDimension\" : \"businessValue\"`"
         }
       },
-      "description": "A project is a high-level Pivox entity. It is a\ncontainer for ACLs, APIs, and other Pivox resources."
+      "description": "A space is a high-level Pivox entity. It is a\ncontainer for ACLs, APIs, and other Pivox resources."
     },
-    "v1ProjectState": {
+    "v1SpaceState": {
       "type": "string",
       "enum": [
         "STATE_UNSPECIFIED",
@@ -534,7 +534,7 @@
         "DELETE_REQUESTED"
       ],
       "default": "STATE_UNSPECIFIED",
-      "description": "Project lifecycle states.\n\n - STATE_UNSPECIFIED: Unspecified state.  This is only used/useful for distinguishing\nunset values.\n - ACTIVE: The normal and active state.\n - DELETE_REQUESTED: The project has been marked for deletion by the user\n(by invoking\n[DeleteProject][pivox.api.v1.Projects.DeleteProject])\nor by the system (Pivox).\nThis can generally be reversed by invoking [UndeleteProject]\n[pivox.api.v1.Projects.UndeleteProject]."
+      "description": "Space lifecycle states.\n\n - STATE_UNSPECIFIED: Unspecified state.  This is only used/useful for distinguishing\nunset values.\n - ACTIVE: The normal and active state.\n - DELETE_REQUESTED: The space has been marked for deletion by the user\n(by invoking\n[DeleteSpace][pivox.api.v1.Spaces.DeleteSpace])\nor by the system (Pivox).\nThis can generally be reversed by invoking [UndeleteSpace]\n[pivox.api.v1.Spaces.UndeleteSpace]."
     }
   }
 }

@@ -27,15 +27,15 @@ import (
 
 const (
 	testOrg       = "acme"
-	testProject   = "proj1"
+	testSpace   = "proj1"
 	testAssetName = "asset-abc123"
-	testParent    = "organizations/acme/projects/proj1"
-	testAssetFull = "organizations/acme/projects/proj1/assets/asset-abc123"
+	testParent    = "organizations/acme/spaces/proj1"
+	testAssetFull = "organizations/acme/spaces/proj1/assets/asset-abc123"
 )
 
 type assetFixture struct {
 	orgID     uuid.UUID
-	projectID uuid.UUID
+	spaceID uuid.UUID
 	assetID   uuid.UUID
 	mockQ     *mocks.MockQuerier
 	server    *AssetsServer
@@ -45,7 +45,7 @@ func setupAssetFixture(t *testing.T) assetFixture {
 	t.Helper()
 	f := assetFixture{
 		orgID:     uuid.New(),
-		projectID: uuid.New(),
+		spaceID: uuid.New(),
 		assetID:   uuid.New(),
 		mockQ:     new(mocks.MockQuerier),
 	}
@@ -53,18 +53,18 @@ func setupAssetFixture(t *testing.T) assetFixture {
 	return f
 }
 
-func (f *assetFixture) mockResolveProject() {
+func (f *assetFixture) mockResolveSpace() {
 	f.mockQ.On("GetOrganizationByName", mock.Anything, testOrg).
 		Return(db.Organization{ID: f.orgID, Name: testOrg}, nil)
-	f.mockQ.On("GetProjectByName", mock.Anything, db.GetProjectByNameParams{OrgID: f.orgID, Name: testProject}).
-		Return(db.Project{ID: f.projectID, Name: testProject, OrgID: f.orgID}, nil)
+	f.mockQ.On("GetSpaceByName", mock.Anything, db.GetSpaceByNameParams{OrgID: f.orgID, Name: testSpace}).
+		Return(db.Space{ID: f.spaceID, Name: testSpace, OrgID: f.orgID}, nil)
 }
 
-func makeAsset(id, projectID uuid.UUID, name string, state db.AssetState) db.Asset {
+func makeAsset(id, spaceID uuid.UUID, name string, state db.AssetState) db.Asset {
 	now := time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC)
 	return db.Asset{
 		ID:          id,
-		ProjectID:   projectID,
+		SpaceID:   spaceID,
 		Name:        name,
 		DisplayName: "Test Asset",
 		State:       state,
@@ -78,12 +78,12 @@ func makeAsset(id, projectID uuid.UUID, name string, state db.AssetState) db.Ass
 
 func TestCreateAsset_Placeholder(t *testing.T) {
 	f := setupAssetFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	created := makeAsset(f.assetID, f.projectID, "placeholder", db.AssetStatePLACEHOLDER)
+	created := makeAsset(f.assetID, f.spaceID, "placeholder", db.AssetStatePLACEHOLDER)
 
 	f.mockQ.On("CreateAsset", mock.Anything, mock.MatchedBy(func(p db.CreateAssetParams) bool {
-		return p.ProjectID == f.projectID && p.State == db.AssetStatePLACEHOLDER && p.DisplayName == "Logo Placeholder"
+		return p.SpaceID == f.spaceID && p.State == db.AssetStatePLACEHOLDER && p.DisplayName == "Logo Placeholder"
 	})).Return(created, nil)
 
 	op, err := f.server.CreateAsset(context.Background(), &assetsv1.CreateAssetRequest{
@@ -101,12 +101,12 @@ func TestCreateAsset_Placeholder(t *testing.T) {
 
 func TestCreateAsset_WithFile(t *testing.T) {
 	f := setupAssetFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	created := makeAsset(f.assetID, f.projectID, "file-asset", db.AssetStatePROCESSING)
+	created := makeAsset(f.assetID, f.spaceID, "file-asset", db.AssetStatePROCESSING)
 
 	f.mockQ.On("CreateAsset", mock.Anything, mock.MatchedBy(func(p db.CreateAssetParams) bool {
-		return p.ProjectID == f.projectID && p.State == db.AssetStatePROCESSING && p.Filename == "logo.png"
+		return p.SpaceID == f.spaceID && p.State == db.AssetStatePROCESSING && p.Filename == "logo.png"
 	})).Return(created, nil)
 
 	f.mockQ.On("UpdateAssetState", mock.Anything, db.UpdateAssetStateParams{
@@ -146,10 +146,10 @@ func TestCreateAsset_InvalidParent(t *testing.T) {
 
 func TestGetAsset_Success(t *testing.T) {
 	f := setupAssetFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeAsset(f.assetID, f.projectID, testAssetName, db.AssetStateACTIVE)
-	f.mockQ.On("GetAssetByName", mock.Anything, db.GetAssetByNameParams{ProjectID: f.projectID, Name: testAssetName}).
+	existing := makeAsset(f.assetID, f.spaceID, testAssetName, db.AssetStateACTIVE)
+	f.mockQ.On("GetAssetByName", mock.Anything, db.GetAssetByNameParams{SpaceID: f.spaceID, Name: testAssetName}).
 		Return(existing, nil)
 
 	f.mockQ.On("CountAssetVersions", mock.Anything, f.assetID).Return(int64(3), nil)
@@ -194,10 +194,10 @@ func TestGetAsset_Success(t *testing.T) {
 
 func TestUpdateAsset_WithFieldMask(t *testing.T) {
 	f := setupAssetFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeAsset(f.assetID, f.projectID, testAssetName, db.AssetStateACTIVE)
-	f.mockQ.On("GetAssetByName", mock.Anything, db.GetAssetByNameParams{ProjectID: f.projectID, Name: testAssetName}).
+	existing := makeAsset(f.assetID, f.spaceID, testAssetName, db.AssetStateACTIVE)
+	f.mockQ.On("GetAssetByName", mock.Anything, db.GetAssetByNameParams{SpaceID: f.spaceID, Name: testAssetName}).
 		Return(existing, nil)
 
 	updated := existing
@@ -221,10 +221,10 @@ func TestUpdateAsset_WithFieldMask(t *testing.T) {
 
 func TestUpdateAsset_NoMask(t *testing.T) {
 	f := setupAssetFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeAsset(f.assetID, f.projectID, testAssetName, db.AssetStateACTIVE)
-	f.mockQ.On("GetAssetByName", mock.Anything, db.GetAssetByNameParams{ProjectID: f.projectID, Name: testAssetName}).
+	existing := makeAsset(f.assetID, f.spaceID, testAssetName, db.AssetStateACTIVE)
+	f.mockQ.On("GetAssetByName", mock.Anything, db.GetAssetByNameParams{SpaceID: f.spaceID, Name: testAssetName}).
 		Return(existing, nil)
 
 	updated := existing
@@ -251,10 +251,10 @@ func TestUpdateAsset_NoMask(t *testing.T) {
 
 func TestUpdateAsset_ExpireTime(t *testing.T) {
 	f := setupAssetFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeAsset(f.assetID, f.projectID, testAssetName, db.AssetStateACTIVE)
-	f.mockQ.On("GetAssetByName", mock.Anything, db.GetAssetByNameParams{ProjectID: f.projectID, Name: testAssetName}).
+	existing := makeAsset(f.assetID, f.spaceID, testAssetName, db.AssetStateACTIVE)
+	f.mockQ.On("GetAssetByName", mock.Anything, db.GetAssetByNameParams{SpaceID: f.spaceID, Name: testAssetName}).
 		Return(existing, nil)
 
 	updated := existing
@@ -278,10 +278,10 @@ func TestUpdateAsset_ExpireTime(t *testing.T) {
 
 func TestUpdateAsset_Annotations(t *testing.T) {
 	f := setupAssetFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeAsset(f.assetID, f.projectID, testAssetName, db.AssetStateACTIVE)
-	f.mockQ.On("GetAssetByName", mock.Anything, db.GetAssetByNameParams{ProjectID: f.projectID, Name: testAssetName}).
+	existing := makeAsset(f.assetID, f.spaceID, testAssetName, db.AssetStateACTIVE)
+	f.mockQ.On("GetAssetByName", mock.Anything, db.GetAssetByNameParams{SpaceID: f.spaceID, Name: testAssetName}).
 		Return(existing, nil)
 
 	updated := existing
@@ -306,10 +306,10 @@ func TestUpdateAsset_Annotations(t *testing.T) {
 
 func TestDeleteAsset_Success(t *testing.T) {
 	f := setupAssetFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeAsset(f.assetID, f.projectID, testAssetName, db.AssetStateACTIVE)
-	f.mockQ.On("GetAssetByName", mock.Anything, db.GetAssetByNameParams{ProjectID: f.projectID, Name: testAssetName}).
+	existing := makeAsset(f.assetID, f.spaceID, testAssetName, db.AssetStateACTIVE)
+	f.mockQ.On("GetAssetByName", mock.Anything, db.GetAssetByNameParams{SpaceID: f.spaceID, Name: testAssetName}).
 		Return(existing, nil)
 
 	f.mockQ.On("SoftDeleteAsset", mock.Anything, db.SoftDeleteAssetParams{
@@ -330,18 +330,18 @@ func TestDeleteAsset_Success(t *testing.T) {
 
 func TestUndeleteAsset_Success(t *testing.T) {
 	f := setupAssetFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
 	deletedAt := time.Date(2026, 1, 10, 12, 0, 0, 0, time.UTC)
-	existing := makeAsset(f.assetID, f.projectID, testAssetName, db.AssetStateDELETEREQUESTED)
+	existing := makeAsset(f.assetID, f.spaceID, testAssetName, db.AssetStateDELETEREQUESTED)
 	existing.DeleteTime = pgtype.Timestamptz{Time: deletedAt, Valid: true}
 
-	f.mockQ.On("GetAssetByName", mock.Anything, db.GetAssetByNameParams{ProjectID: f.projectID, Name: testAssetName}).
+	f.mockQ.On("GetAssetByName", mock.Anything, db.GetAssetByNameParams{SpaceID: f.spaceID, Name: testAssetName}).
 		Return(existing, nil)
 
 	f.mockQ.On("UndeleteAsset", mock.Anything, f.assetID).Return(nil)
 
-	restored := makeAsset(f.assetID, f.projectID, testAssetName, db.AssetStateACTIVE)
+	restored := makeAsset(f.assetID, f.spaceID, testAssetName, db.AssetStateACTIVE)
 	f.mockQ.On("GetAsset", mock.Anything, f.assetID).Return(restored, nil)
 
 	op, err := f.server.UndeleteAsset(context.Background(), &assetsv1.UndeleteAssetRequest{
@@ -368,7 +368,7 @@ func TestGetAsset_InvalidName(t *testing.T) {
 
 func TestGetAsset_NotFound(t *testing.T) {
 	f := setupAssetFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
 	f.mockQ.On("GetAssetByName", mock.Anything, mock.Anything).
 		Return(db.Asset{}, pgx.ErrNoRows)
@@ -397,9 +397,9 @@ func TestListAssets_InvalidParent(t *testing.T) {
 
 func TestListAssets_DBError(t *testing.T) {
 	f := setupAssetFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	f.mockQ.On("ListAssetsByProject", mock.Anything, mock.Anything).
+	f.mockQ.On("ListAssetsBySpace", mock.Anything, mock.Anything).
 		Return([]db.Asset(nil), fmt.Errorf("db down"))
 
 	_, err := f.server.ListAssets(context.Background(), &assetsv1.ListAssetsRequest{
@@ -415,7 +415,7 @@ func TestListAssets_DBError(t *testing.T) {
 
 func TestCreateAsset_DBError(t *testing.T) {
 	f := setupAssetFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
 	f.mockQ.On("CreateAsset", mock.Anything, mock.Anything).
 		Return(db.Asset{}, fmt.Errorf("db error"))
@@ -443,7 +443,7 @@ func TestUpdateAsset_InvalidName(t *testing.T) {
 
 func TestUpdateAsset_NotFound(t *testing.T) {
 	f := setupAssetFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
 	f.mockQ.On("GetAssetByName", mock.Anything, mock.Anything).
 		Return(db.Asset{}, pgx.ErrNoRows)
@@ -470,7 +470,7 @@ func TestDeleteAsset_InvalidName(t *testing.T) {
 
 func TestDeleteAsset_NotFound(t *testing.T) {
 	f := setupAssetFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
 	f.mockQ.On("GetAssetByName", mock.Anything, mock.Anything).
 		Return(db.Asset{}, pgx.ErrNoRows)
@@ -486,9 +486,9 @@ func TestDeleteAsset_NotFound(t *testing.T) {
 
 func TestDeleteAsset_SoftDeleteError(t *testing.T) {
 	f := setupAssetFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeAsset(f.assetID, f.projectID, testAssetName, db.AssetStateACTIVE)
+	existing := makeAsset(f.assetID, f.spaceID, testAssetName, db.AssetStateACTIVE)
 	f.mockQ.On("GetAssetByName", mock.Anything, mock.Anything).Return(existing, nil)
 	f.mockQ.On("SoftDeleteAsset", mock.Anything, mock.Anything).
 		Return(fmt.Errorf("constraint error"))
@@ -513,7 +513,7 @@ func TestUndeleteAsset_InvalidName(t *testing.T) {
 
 func TestUndeleteAsset_NotFound(t *testing.T) {
 	f := setupAssetFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
 	f.mockQ.On("GetAssetByName", mock.Anything, mock.Anything).
 		Return(db.Asset{}, pgx.ErrNoRows)
@@ -529,11 +529,11 @@ func TestUndeleteAsset_NotFound(t *testing.T) {
 
 func TestUndeleteAsset_NotDeleted(t *testing.T) {
 	f := setupAssetFixture(t)
-	f.mockResolveProject()
+	f.mockResolveSpace()
 
-	existing := makeAsset(f.assetID, f.projectID, testAssetName, db.AssetStateACTIVE)
+	existing := makeAsset(f.assetID, f.spaceID, testAssetName, db.AssetStateACTIVE)
 	// DeleteTime.Valid is false by default (not deleted).
-	f.mockQ.On("GetAssetByName", mock.Anything, db.GetAssetByNameParams{ProjectID: f.projectID, Name: testAssetName}).
+	f.mockQ.On("GetAssetByName", mock.Anything, db.GetAssetByNameParams{SpaceID: f.spaceID, Name: testAssetName}).
 		Return(existing, nil)
 
 	_, err := f.server.UndeleteAsset(context.Background(), &assetsv1.UndeleteAssetRequest{

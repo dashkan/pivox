@@ -637,7 +637,7 @@ func RegisterTagValuesHandlerServer(ctx context.Context, mux *runtime.ServeMux, 
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.api.v1.TagValues/ListTagValues", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/projects/*/tagKeys/*}/tagValues"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.api.v1.TagValues/ListTagValues", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/spaces/*/tagKeys/*}/tagValues"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -677,7 +677,7 @@ func RegisterTagValuesHandlerServer(ctx context.Context, mux *runtime.ServeMux, 
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.api.v1.TagValues/GetTagValue", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/tagKeys/*/tagValues/*}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.api.v1.TagValues/GetTagValue", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/tagKeys/*/tagValues/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -717,7 +717,7 @@ func RegisterTagValuesHandlerServer(ctx context.Context, mux *runtime.ServeMux, 
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.api.v1.TagValues/CreateTagValue", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/projects/*/tagKeys/*}/tagValues"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.api.v1.TagValues/CreateTagValue", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/spaces/*/tagKeys/*}/tagValues"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -757,7 +757,7 @@ func RegisterTagValuesHandlerServer(ctx context.Context, mux *runtime.ServeMux, 
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.api.v1.TagValues/UpdateTagValue", runtime.WithHTTPPathPattern("/v1/{tag_value.name=organizations/*/projects/*/tagKeys/*/tagValues/*}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.api.v1.TagValues/UpdateTagValue", runtime.WithHTTPPathPattern("/v1/{tag_value.name=organizations/*/spaces/*/tagKeys/*/tagValues/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -797,7 +797,7 @@ func RegisterTagValuesHandlerServer(ctx context.Context, mux *runtime.ServeMux, 
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.api.v1.TagValues/DeleteTagValue", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/tagKeys/*/tagValues/*}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.api.v1.TagValues/DeleteTagValue", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/tagKeys/*/tagValues/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -872,7 +872,7 @@ func RegisterTagValuesHandlerClient(ctx context.Context, mux *runtime.ServeMux, 
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.api.v1.TagValues/ListTagValues", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/projects/*/tagKeys/*}/tagValues"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.api.v1.TagValues/ListTagValues", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/spaces/*/tagKeys/*}/tagValues"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -906,7 +906,7 @@ func RegisterTagValuesHandlerClient(ctx context.Context, mux *runtime.ServeMux, 
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.api.v1.TagValues/GetTagValue", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/tagKeys/*/tagValues/*}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.api.v1.TagValues/GetTagValue", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/tagKeys/*/tagValues/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -940,7 +940,7 @@ func RegisterTagValuesHandlerClient(ctx context.Context, mux *runtime.ServeMux, 
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.api.v1.TagValues/CreateTagValue", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/projects/*/tagKeys/*}/tagValues"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.api.v1.TagValues/CreateTagValue", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*/spaces/*/tagKeys/*}/tagValues"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -974,7 +974,7 @@ func RegisterTagValuesHandlerClient(ctx context.Context, mux *runtime.ServeMux, 
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.api.v1.TagValues/UpdateTagValue", runtime.WithHTTPPathPattern("/v1/{tag_value.name=organizations/*/projects/*/tagKeys/*/tagValues/*}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.api.v1.TagValues/UpdateTagValue", runtime.WithHTTPPathPattern("/v1/{tag_value.name=organizations/*/spaces/*/tagKeys/*/tagValues/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1008,7 +1008,7 @@ func RegisterTagValuesHandlerClient(ctx context.Context, mux *runtime.ServeMux, 
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.api.v1.TagValues/DeleteTagValue", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/projects/*/tagKeys/*/tagValues/*}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.api.v1.TagValues/DeleteTagValue", runtime.WithHTTPPathPattern("/v1/{name=organizations/*/spaces/*/tagKeys/*/tagValues/*}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1026,15 +1026,15 @@ func RegisterTagValuesHandlerClient(ctx context.Context, mux *runtime.ServeMux, 
 
 var (
 	pattern_TagValues_ListTagValues_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3, 2, 4}, []string{"v1", "organizations", "tagKeys", "parent", "tagValues"}, ""))
-	pattern_TagValues_ListTagValues_1  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4, 2, 5}, []string{"v1", "organizations", "projects", "tagKeys", "parent", "tagValues"}, ""))
+	pattern_TagValues_ListTagValues_1  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4, 2, 5}, []string{"v1", "organizations", "spaces", "tagKeys", "parent", "tagValues"}, ""))
 	pattern_TagValues_GetTagValue_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "tagKeys", "tagValues", "name"}, ""))
-	pattern_TagValues_GetTagValue_1    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 2, 4, 1, 0, 4, 8, 5, 5}, []string{"v1", "organizations", "projects", "tagKeys", "tagValues", "name"}, ""))
+	pattern_TagValues_GetTagValue_1    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 2, 4, 1, 0, 4, 8, 5, 5}, []string{"v1", "organizations", "spaces", "tagKeys", "tagValues", "name"}, ""))
 	pattern_TagValues_CreateTagValue_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3, 2, 4}, []string{"v1", "organizations", "tagKeys", "parent", "tagValues"}, ""))
-	pattern_TagValues_CreateTagValue_1 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4, 2, 5}, []string{"v1", "organizations", "projects", "tagKeys", "parent", "tagValues"}, ""))
+	pattern_TagValues_CreateTagValue_1 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4, 2, 5}, []string{"v1", "organizations", "spaces", "tagKeys", "parent", "tagValues"}, ""))
 	pattern_TagValues_UpdateTagValue_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "tagKeys", "tagValues", "tag_value.name"}, ""))
-	pattern_TagValues_UpdateTagValue_1 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 2, 4, 1, 0, 4, 8, 5, 5}, []string{"v1", "organizations", "projects", "tagKeys", "tagValues", "tag_value.name"}, ""))
+	pattern_TagValues_UpdateTagValue_1 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 2, 4, 1, 0, 4, 8, 5, 5}, []string{"v1", "organizations", "spaces", "tagKeys", "tagValues", "tag_value.name"}, ""))
 	pattern_TagValues_DeleteTagValue_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 4, 6, 5, 4}, []string{"v1", "organizations", "tagKeys", "tagValues", "name"}, ""))
-	pattern_TagValues_DeleteTagValue_1 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 2, 4, 1, 0, 4, 8, 5, 5}, []string{"v1", "organizations", "projects", "tagKeys", "tagValues", "name"}, ""))
+	pattern_TagValues_DeleteTagValue_1 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 2, 4, 1, 0, 4, 8, 5, 5}, []string{"v1", "organizations", "spaces", "tagKeys", "tagValues", "name"}, ""))
 )
 
 var (
