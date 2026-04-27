@@ -18,7 +18,7 @@ import (
 )
 
 // NewInternalHooks creates a new internal hooks handler with Google Cloud OIDC
-// identity token verification for the accounts:sync endpoint.
+// identity token verification for the auth:syncFirebaseIdentity endpoint.
 func NewInternalHooks(
 	queries db.Querier,
 	cfg config.SyncAuthConfig,

@@ -2,7 +2,7 @@
        lint-proto proto-format proto-breaking proto-generate \
        proto-generate-go proto-generate-native build-grpc-swift-2-plugin api-lint \
        db-up db-down db-migrate db-force db-seed db-clear db-drop db-create \
-       docker-up docker-down firebase-emu firebase-deploy \
+       docker-up docker-down firebase-emu firebase-deploy clean-fn-revisions \
        proxy-nginx proxy-nginx-stop proxy-ngrok \
        test-native-ui
 
@@ -123,6 +123,13 @@ firebase-emu:
 
 firebase-deploy:
 	pnpm --dir ./deployments/firebase/functions run deploy
+
+# Clean up Firebase Functions deployments in Cloud Run:
+#   - delete services orphaned by source-side renames or removals
+#   - prune non-active revisions of surviving services
+# Dry-run by default; set FORCE=1 to actually delete.
+clean-fn-revisions:
+	@scripts/clean-fn-revisions.sh
 
 # Native UI Tests (macOS)
 

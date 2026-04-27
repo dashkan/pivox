@@ -1,4 +1,4 @@
-import { HttpsError, onRequest } from "firebase-functions/v2/https";
+import { HttpsError } from "firebase-functions/v2/https";
 import { setGlobalOptions } from "firebase-functions";
 import {
   beforeUserCreated,
@@ -47,10 +47,10 @@ async function getAuthorizationHeader(targetAudience: string): Promise<string> {
 }
 
 /**
- * Calls the Pivox internal sync endpoint to upsert an account.
+ * Calls the Pivox internal sync endpoint to upsert a firebase_identity row.
  * Throws on failure so blocking functions reject the auth operation.
  */
-async function syncAccount(
+async function syncFirebaseIdentity(
   firebaseUid: string,
   fields: {
     email: string;
@@ -60,7 +60,7 @@ async function syncAccount(
     disabled: boolean;
   },
 ): Promise<void> {
-  const url = `${pivoxApiUrl.value()}/internal/v1/accounts:sync`;
+  const url = `${pivoxApiUrl.value()}/internal/v1/auth:syncFirebaseIdentity`;
   const payload = { firebase_uid: firebaseUid, ...fields };
 
   // The audience for the OIDC token is the base URL of the API server.
@@ -77,29 +77,29 @@ async function syncAccount(
 
   if (!res.ok) {
     const body = await res.text();
-    logger.error("Failed to sync account", {
+    logger.error("Failed to sync firebase identity", {
       status: res.status,
       body,
       firebaseUid,
     });
-    throw new HttpsError("internal", "Failed to sync account");
+    throw new HttpsError("internal", "Failed to sync firebase identity");
   }
 
-  const data = (await res.json()) as { account_id: string };
-  logger.info("Account synced", {
+  const data = (await res.json()) as { firebase_identity_id: string };
+  logger.info("Firebase identity synced", {
     firebaseUid,
-    accountId: data.account_id,
+    firebaseIdentityId: data.firebase_identity_id,
   });
 }
 
 /**
- * Blocks user creation until the account is synced to Pivox.
+ * Blocks user creation until the firebase_identity is synced to Pivox.
  * If the API is unreachable or returns an error, user creation fails.
  */
-export const syncAccountOnCreate = beforeUserCreated(async (event) => {
+export const syncFirebaseIdentityOnCreate = beforeUserCreated(async (event) => {
   const user = event.data!;
 
-  await syncAccount(user.uid, {
+  await syncFirebaseIdentity(user.uid, {
     email: user.email ?? "",
     email_verified: user.emailVerified ?? false,
     display_name: user.displayName ?? "",
@@ -109,14 +109,14 @@ export const syncAccountOnCreate = beforeUserCreated(async (event) => {
 });
 
 /**
- * Syncs account fields on every sign-in. Catches up on any changes
- * made in Firebase (email, display name, photo, disabled, etc.)
+ * Syncs firebase_identity fields on every sign-in. Catches up on any
+ * changes made in Firebase (email, display name, photo, disabled, etc.)
  * since the last sync.
  */
-export const syncAccountOnSignIn = beforeUserSignedIn(async (event) => {
+export const syncFirebaseIdentityOnSignIn = beforeUserSignedIn(async (event) => {
   const user = event.data!;
 
-  await syncAccount(user.uid, {
+  await syncFirebaseIdentity(user.uid, {
     email: user.email ?? "",
     email_verified: user.emailVerified ?? false,
     display_name: user.displayName ?? "",

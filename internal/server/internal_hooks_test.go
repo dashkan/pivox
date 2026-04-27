@@ -78,7 +78,7 @@ func TestRegister_AllRoutes(t *testing.T) {
 		method string
 		path   string
 	}{
-		{"POST", "/internal/v1/accounts:sync"},
+		{"POST", "/internal/v1/auth:syncFirebaseIdentity"},
 		{"POST", "/internal/v1/auth:exchangeToken"},
 		{"POST", "/internal/v1/auth:depositToken"},
 		{"POST", "/internal/v1/auth:consumeToken"},
@@ -144,7 +144,7 @@ func TestRequireSecret_MissingHeader(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// syncAccount
+// syncFirebaseIdentity
 // ---------------------------------------------------------------------------
 
 func newTestHooks(t *testing.T, mockQ *mocks.MockQuerier, auth *mockAuthService) *InternalHooks {
@@ -159,58 +159,58 @@ func newTestHooksWithConfig(t *testing.T, mockQ *mocks.MockQuerier, auth *mockAu
 	return h
 }
 
-func TestSyncAccount_Success(t *testing.T) {
+func TestSyncFirebaseIdentity_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	auth := new(mockAuthService)
 	h := newTestHooks(t, mockQ, auth)
 
-	accountID := uuid.New()
+	identityID := uuid.New()
 	mockQ.On("UpsertFirebaseIdentity", mock.Anything, mock.MatchedBy(func(p db.UpsertFirebaseIdentityParams) bool {
 		return p.FirebaseUid == "uid-123" && p.Email == "test@example.com"
-	})).Return(db.FirebaseIdentity{ID: accountID, FirebaseUid: "uid-123"}, nil)
+	})).Return(db.FirebaseIdentity{ID: identityID, FirebaseUid: "uid-123"}, nil)
 
 	body := `{"firebase_uid":"uid-123","email":"test@example.com","display_name":"Test User"}`
-	req := httptest.NewRequest("POST", "/internal/v1/accounts:sync", strings.NewReader(body))
+	req := httptest.NewRequest("POST", "/internal/v1/auth:syncFirebaseIdentity", strings.NewReader(body))
 	rr := httptest.NewRecorder()
 
-	h.syncAccount(rr, req)
+	h.syncFirebaseIdentity(rr, req)
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 	var resp map[string]string
 	require.NoError(t, json.NewDecoder(rr.Body).Decode(&resp))
-	assert.Equal(t, accountID.String(), resp["account_id"])
+	assert.Equal(t, identityID.String(), resp["firebase_identity_id"])
 	mockQ.AssertExpectations(t)
 }
 
-func TestSyncAccount_InvalidJSON(t *testing.T) {
+func TestSyncFirebaseIdentity_InvalidJSON(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	auth := new(mockAuthService)
 	h := newTestHooks(t, mockQ, auth)
 
-	req := httptest.NewRequest("POST", "/internal/v1/accounts:sync", strings.NewReader("not json"))
+	req := httptest.NewRequest("POST", "/internal/v1/auth:syncFirebaseIdentity", strings.NewReader("not json"))
 	rr := httptest.NewRecorder()
 
-	h.syncAccount(rr, req)
+	h.syncFirebaseIdentity(rr, req)
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 }
 
-func TestSyncAccount_MissingUID(t *testing.T) {
+func TestSyncFirebaseIdentity_MissingUID(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	auth := new(mockAuthService)
 	h := newTestHooks(t, mockQ, auth)
 
 	body := `{"email":"test@example.com"}`
-	req := httptest.NewRequest("POST", "/internal/v1/accounts:sync", strings.NewReader(body))
+	req := httptest.NewRequest("POST", "/internal/v1/auth:syncFirebaseIdentity", strings.NewReader(body))
 	rr := httptest.NewRecorder()
 
-	h.syncAccount(rr, req)
+	h.syncFirebaseIdentity(rr, req)
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 	assert.Contains(t, rr.Body.String(), "firebase_uid is required")
 }
 
-func TestSyncAccount_DBError(t *testing.T) {
+func TestSyncFirebaseIdentity_DBError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	auth := new(mockAuthService)
 	h := newTestHooks(t, mockQ, auth)
@@ -219,10 +219,10 @@ func TestSyncAccount_DBError(t *testing.T) {
 		Return(db.FirebaseIdentity{}, errors.New("db down"))
 
 	body := `{"firebase_uid":"uid-123","email":"test@example.com"}`
-	req := httptest.NewRequest("POST", "/internal/v1/accounts:sync", strings.NewReader(body))
+	req := httptest.NewRequest("POST", "/internal/v1/auth:syncFirebaseIdentity", strings.NewReader(body))
 	rr := httptest.NewRecorder()
 
-	h.syncAccount(rr, req)
+	h.syncFirebaseIdentity(rr, req)
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	mockQ.AssertExpectations(t)

@@ -110,13 +110,20 @@ Pure removal/rename. Smallest blast radius. No new APIs.
 - [x] Updated Go references throughout `internal/server`, `internal/service/organizations`, `internal/filter`, `internal/testutil/mocks`.
 - Note: public webhook URL (`/internal/v1/accounts:sync`), handler function name (`syncAccount`), request struct (`syncAccountRequest`), and response field (`account_id`) intentionally retained for phase 1.4 — coordinated with the Firebase Function redeploy.
 
-### `syncAccount` → `syncFirebaseIdentity` endpoint rename
+### `syncAccount` → `syncFirebaseIdentity` endpoint rename ✅
 
-- [ ] Add new handler at `/internal/v1/syncFirebaseIdentity`. Old handler keeps working (dual-route).
-- [ ] Update Firebase Function source to call new URL.
-- [ ] Deploy via root make target.
-- [ ] Verify with a registration roundtrip.
-- [ ] Delete old route and old handler.
+Direct rename (no dual-route) per pre-prod / solo-dev constraints — brief deploy window is acceptable.
+
+- [x] Server URL `/internal/v1/accounts:sync` → `/internal/v1/auth:syncFirebaseIdentity`. Handler `syncAccount` → `syncFirebaseIdentity`. Request struct, response field (`firebase_identity_id`), log keys, doc comments updated.
+- [x] Firebase Function (`deployments/firebase/functions/src/index.ts`): URL string updated, response field parsing updated, internal helper `syncAccount` → `syncFirebaseIdentity`, exports `syncAccountOnCreate` / `syncAccountOnSignIn` → `syncFirebaseIdentityOnCreate` / `syncFirebaseIdentityOnSignIn`. `pnpm run build` verifies TypeScript.
+- [x] Test names `TestSyncAccount_*` → `TestSyncFirebaseIdentity_*`; URL strings + response field assertions updated.
+- [x] **Deployed server** (live ngrok endpoint).
+- [x] **Deployed Firebase Functions** via `make firebase-deploy`. Old `syncAccountOn*` and the dead `githubOAuthCallback` cleaned up in the same deploy.
+- [x] **Verified post-deploy via gcloud**:
+  - Cloud Run services list: only the two new `syncfirebaseidentity*` services remain.
+  - `gcloud functions list --v2` shows both `syncFirebaseIdentityOnCreate` and `syncFirebaseIdentityOnSignIn` ACTIVE.
+  - Identity Platform blocking triggers (`identitytoolkit.googleapis.com/admin/v2/projects/<id>/config`) point at the new function URIs — `beforeCreate` and `beforeSignIn` rewired to `syncFirebaseIdentity*` URLs, fresh updateTime.
+- [x] **New tooling**: `scripts/clean-fn-revisions.sh` + `make clean-fn-revisions` target. Auto-discovers Firebase-managed Cloud Run services from gcloud, deletes orphans (services not in `firebase functions:list`) and trims stale revisions (anything not actively serving). Dry-run by default; `FORCE=1` to delete.
 
 ### IAM proto trim (set up phase 2 cleanly)
 

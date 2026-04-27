@@ -34,8 +34,8 @@ type InternalHooks struct {
 	// a reverse proxy owns rate limiting.
 	rateLimitEnabled bool
 
-	// syncAuth protects the accounts:sync endpoint. The implementation is
-	// selected at compile time via build tags:
+	// syncAuth protects the auth:syncFirebaseIdentity endpoint. The
+	// implementation is selected at compile time via build tags:
 	//   - Production (default): Google Cloud OIDC identity token verification
 	//   - Dev (go build -tags dev): static shared secret
 	syncAuth func(http.HandlerFunc) http.HandlerFunc
@@ -56,7 +56,7 @@ type InternalHooks struct {
 
 // Register mounts the internal endpoints on the given mux.
 func (h *InternalHooks) Register(mux *http.ServeMux) {
-	mux.HandleFunc("POST /internal/v1/accounts:sync", h.syncAuth(h.syncAccount))
+	mux.HandleFunc("POST /internal/v1/auth:syncFirebaseIdentity", h.syncAuth(h.syncFirebaseIdentity))
 	mux.HandleFunc("POST /internal/v1/auth:exchangeToken", h.rateLimit(h.exchangeToken))
 	mux.HandleFunc("POST /internal/v1/auth:depositToken", h.depositToken)
 	mux.HandleFunc("POST /internal/v1/auth:consumeToken", h.consumeToken)
@@ -68,8 +68,9 @@ func (h *InternalHooks) Register(mux *http.ServeMux) {
 		h.rateLimitWith(h.delegatedPollLimiter, h.pollDelegatedAuthSession))
 }
 
-// syncAccountRequest is the payload sent by the Firebase onUserCreated function.
-type syncAccountRequest struct {
+// syncFirebaseIdentityRequest is the payload sent by the Firebase
+// onUserCreated / onUserSignedIn blocking functions.
+type syncFirebaseIdentityRequest struct {
 	FirebaseUID   string `json:"firebase_uid"`
 	Email         string `json:"email"`
 	EmailVerified bool   `json:"email_verified"`
@@ -78,16 +79,15 @@ type syncAccountRequest struct {
 	Disabled      bool   `json:"disabled"`
 }
 
-// syncAccount upserts a Firebase Auth user into the firebase_identities table.
-//
-// Handler / URL still named "account" pending phase 1.4, which renames the
-// public endpoint to /internal/v1/auth:syncFirebaseIdentity in coordination
-// with a Firebase Function redeploy.
-func (h *InternalHooks) syncAccount(w http.ResponseWriter, r *http.Request) {
+// syncFirebaseIdentity upserts a Firebase Auth user into the
+// firebase_identities table. Called by the Firebase Function blocking
+// triggers on user create / sign-in so the cloud has a Pivox-side
+// identity row before any org-scoped RPC runs.
+func (h *InternalHooks) syncFirebaseIdentity(w http.ResponseWriter, r *http.Request) {
 	// AUTHN-05: Limit request body to 8 KB (sync payloads are small JSON).
 	r.Body = http.MaxBytesReader(w, r.Body, 8<<10)
 
-	var req syncAccountRequest
+	var req syncFirebaseIdentityRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.logger.Warn("invalid sync identity request", "error", err)
 		http.Error(w, "invalid request body", http.StatusBadRequest)
@@ -116,16 +116,12 @@ func (h *InternalHooks) syncAccount(w http.ResponseWriter, r *http.Request) {
 
 	h.logger.Info("firebase identity synced", "firebase_uid", req.FirebaseUID, "firebase_identity_id", identity.ID)
 
-	// Response keeps the `account_id` JSON field for now to preserve the
-	// wire contract with the deployed Firebase Function. Phase 1.4 lands
-	// the new endpoint with a `firebase_identity_id` response field as
-	// part of the coordinated rename + redeploy.
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(map[string]string{
-		"account_id": identity.ID.String(),
+		"firebase_identity_id": identity.ID.String(),
 	}); err != nil {
-		h.logger.Warn("write account-sync response failed", "error", err)
+		h.logger.Warn("write sync-identity response failed", "error", err)
 	}
 }
 
