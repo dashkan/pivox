@@ -1,0 +1,227 @@
+// Copyright 2025 Pivox
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package pivox.iam.v1;
+
+import "buf/validate/validate.proto";
+import "google/api/field_behavior.proto";
+import "google/api/resource.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "pivox/iam/v1;iampb";
+
+// A Member binds a principal (user or group) to a role at a scope
+// (organization or space). The single source of truth for "who has
+// what role where."
+//
+// Multi-parent: a Member lives under either an organization or a space.
+// The URL segment `{member}` encodes the principal as `user-{user_id}`
+// or `group-{group_id}` — uniqueness by construction means a given
+// principal can hold at most one role per scope.
+//
+// Permission resolution unions org-level and space-level Member
+// bindings: an org owner is implicitly a space owner. Server-side
+// resolver is the source of truth; this proto defines only the wire
+// shape.
+message Member {
+  option (google.api.resource) = {
+    type: "pivox.iam/Member"
+    pattern: "organizations/{organization}/members/{member}"
+    pattern: "organizations/{organization}/spaces/{space}/members/{member}"
+    plural: "members"
+    singular: "member"
+  };
+
+  // The resource name of the member.
+  // Format: `organizations/{organization}/members/{member}` or
+  //         `organizations/{organization}/spaces/{space}/members/{member}`
+  // where `{member}` is `user-{user_id}` or `group-{group_id}`.
+  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // The principal granted access at this scope. Exactly one of `user`
+  // or `group` is set, enforced by the protobuf wire format.
+  //
+  // The principal MUST agree with the principal encoded in `name` —
+  // setting one without the other (or with a mismatch) is rejected on
+  // Create. On read, the server populates this field from `name`.
+  oneof principal {
+    // The user principal. Format: `organizations/{organization}/users/{user}`.
+    string user = 2 [(google.api.resource_reference) = {type: "pivox.iam/User"}];
+
+    // The group principal. Format: `organizations/{organization}/groups/{group}`.
+    string group = 3 [(google.api.resource_reference) = {type: "pivox.iam/Group"}];
+  }
+
+  // Required. Reference to the role this principal holds at this scope.
+  // Format: `organizations/{organization}/roles/{role}`. v1 accepts only
+  // system roles (`owner`, `admin`, `editor`, `viewer`).
+  string role = 4 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.iam/Role"},
+    (buf.validate.field).required = true
+  ];
+
+  // Output only. Timestamp when this binding was created.
+  google.protobuf.Timestamp create_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Timestamp when this binding was last modified.
+  google.protobuf.Timestamp update_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. A checksum computed by the server based on the current
+  // value of the Member resource. Sent on update and delete requests for
+  // optimistic concurrency control.
+  string etag = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Request message for `Iam.GetMember`.
+message GetMemberRequest {
+  // Required. The resource name of the member. Format:
+  // `organizations/{organization}/members/{member}` or
+  // `organizations/{organization}/spaces/{space}/members/{member}`.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.iam/Member"},
+    (buf.validate.field).required = true
+  ];
+}
+
+// Request message for `Iam.ListMembers`.
+message ListMembersRequest {
+  // Required. The parent scope whose members are being listed. Format:
+  // `organizations/{organization}` or
+  // `organizations/{organization}/spaces/{space}`.
+  string parent = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {child_type: "pivox.iam/Member"},
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. Maximum number of members to return.
+  int32 page_size = 2 [
+    (google.api.field_behavior) = OPTIONAL,
+    (buf.validate.field).int32 = {
+      gte: 0
+      lte: 1000
+    }
+  ];
+
+  // Optional. Page token from a previous ListMembers call.
+  string page_token = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. An expression for filtering the results of the request.
+  // Filterable fields:
+  //
+  // + `role` — exact match on a role resource name.
+  // + `principal_kind` — `user` or `group`.
+  //
+  // For more information, see [AIP-160](https://aip.dev/160).
+  string filter = 4 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. A comma-separated list of fields to order by. Supported
+  // fields: `createTime`, `role`. Default: `createTime` ascending.
+  string order_by = 5 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// Response message for `Iam.ListMembers`.
+message ListMembersResponse {
+  // The members of the scope.
+  repeated Member members = 1;
+
+  // Token for the next page of results.
+  string next_page_token = 2;
+}
+
+// Request message for `Iam.CreateMember`.
+message CreateMemberRequest {
+  // Required. The parent scope. Format:
+  // `organizations/{organization}` or
+  // `organizations/{organization}/spaces/{space}`.
+  string parent = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {child_type: "pivox.iam/Member"},
+    (buf.validate.field).required = true
+  ];
+
+  // Required. The Member to create. The `principal` oneof must be set
+  // and `role` must reference an existing system role.
+  Member member = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. A client-specified member ID. If provided, must be
+  // `user-{user_id}` or `group-{group_id}` and must agree with the
+  // `principal` oneof. If omitted, the server derives it from
+  // `member.principal`.
+  string member_id = 3 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// Request message for `Iam.UpdateMember`.
+//
+// Only the `role` field is mutable. To change the principal, delete
+// and recreate the Member.
+message UpdateMemberRequest {
+  // Required. The Member with updated fields. The `name` field must
+  // identify the existing member.
+  Member member = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. The fields to update. Only `role` may be updated. If
+  // omitted, only `role` is updated.
+  google.protobuf.FieldMask update_mask = 2 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// Request message for `Iam.DeleteMember`.
+message DeleteMemberRequest {
+  // Required. The resource name of the member to delete. Format:
+  // `organizations/{organization}/members/{member}` or
+  // `organizations/{organization}/spaces/{space}/members/{member}`.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.iam/Member"},
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. The etag known to the client for optimistic concurrency.
+  string etag = 2 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// Request message for `Iam.TransferOwnership`.
+//
+// Promotes the named Member to `owner` role and demotes the previous
+// sole owner to `admin`. Both updates happen in a single transaction.
+// If the scope already has multiple owners, the call returns
+// `FAILED_PRECONDITION` — explicit demotion via `UpdateMember` is the
+// right path in that case.
+//
+// (-- api-linter: core::0136::http-uri-suffix=disabled
+//     aip.dev/not-precedent: TransferOwnership operates on the target
+//     Member resource; the verb describes the broader transfer. --)
+message TransferOwnershipRequest {
+  // Required. The Member to promote to `owner`. Must be an existing
+  // member of the scope and not already an owner.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.iam/Member"},
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. Etag of the target Member for optimistic concurrency.
+  string etag = 2 [(google.api.field_behavior) = OPTIONAL];
+}

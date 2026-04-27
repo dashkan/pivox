@@ -18,19 +18,28 @@ package pivox.iam.v1;
 
 import "google/api/annotations.proto";
 import "google/api/client.proto";
+import "google/longrunning/operations.proto";
+import "google/protobuf/empty.proto";
 import "pivox/iam/v1/groups.proto";
+import "pivox/iam/v1/members.proto";
 import "pivox/iam/v1/permissions.proto";
 import "pivox/iam/v1/roles.proto";
 import "pivox/iam/v1/users.proto";
 
 option go_package = "pivox/iam/v1;iampb";
 
-// Iam is the single entry point for all IAM-related RPCs. It hosts the
-// read paths for `User`, `Role`, and `Permission` resources alongside
-// the read+write paths for `Group` and group membership.
+// Iam is the single entry point for all IAM-related RPCs. It hosts:
 //
-// Resource definitions live in their per-resource files
-// (`users.proto`, `roles.proto`, `groups.proto`, `permissions.proto`).
+//   - read paths for `User`, `Role`, and `Permission`;
+//   - read+write for `Group` and group membership;
+//   - read+write for `Member` (the principal-to-role binding at org or
+//     space scope);
+//   - the user lifecycle LRO (`DeleteUser`);
+//   - `TransferOwnership` for atomic ownership swaps;
+//   - `TestIamPermissions` for UI gating.
+//
+// Resource definitions live in their per-resource files (`users.proto`,
+// `roles.proto`, `groups.proto`, `permissions.proto`, `members.proto`).
 // This file contains only the service contract.
 //
 // (-- api-linter: core::0121::resource-must-support-get=disabled
@@ -54,6 +63,23 @@ service Iam {
     option (google.api.method_signature) = "parent";
   }
 
+  // Deletes a user (LRO). Cascades through Pivox-side state and
+  // finishes by deleting the underlying Firebase Auth identity.
+  // Self-delete: address `organizations/{org}/users/me`.
+  //
+  // Sole-owner blocking: if the caller owns any active org with no
+  // other owners, the LRO completes with FAILED_PRECONDITION listing
+  // affected orgs. Resolve via TransferOwnership or DeleteOrganization
+  // (phase 3) first.
+  rpc DeleteUser(DeleteUserRequest) returns (google.longrunning.Operation) {
+    option (google.api.http) = {delete: "/v1/{name=organizations/*/users/*}"};
+    option (google.api.method_signature) = "name";
+    option (google.longrunning.operation_info) = {
+      response_type: "google.protobuf.Empty"
+      metadata_type: "DeleteUserMetadata"
+    };
+  }
+
   // Gets a role by resource name. v1 returns only system roles
   // (owner, admin, editor, viewer); custom roles are deferred.
   rpc GetRole(GetRoleRequest) returns (Role) {
@@ -71,6 +97,103 @@ service Iam {
   // code-defined; the catalog is identical for every caller.
   rpc ListPermissions(ListPermissionsRequest) returns (ListPermissionsResponse) {
     option (google.api.http) = {get: "/v1/permissions"};
+  }
+
+  // Returns the subset of requested permissions that the caller
+  // actually has on the named resource. Used by UI layers to gate
+  // buttons and menus. Returns an empty list (not an error) for
+  // unknown resources or no-permission callers.
+  rpc TestIamPermissions(TestIamPermissionsRequest) returns (TestIamPermissionsResponse) {
+    option (google.api.http) = {
+      post: "/v1/{resource=organizations/*}:testIamPermissions"
+      body: "*"
+      additional_bindings: {
+        post: "/v1/{resource=organizations/*/spaces/*}:testIamPermissions"
+        body: "*"
+      }
+    };
+    option (google.api.method_signature) = "resource,permissions";
+  }
+
+  // Gets a member by resource name. Multi-parent: members live under
+  // either an organization or a space.
+  rpc GetMember(GetMemberRequest) returns (Member) {
+    option (google.api.http) = {
+      get: "/v1/{name=organizations/*/members/*}"
+      additional_bindings: {get: "/v1/{name=organizations/*/spaces/*/members/*}"}
+    };
+    option (google.api.method_signature) = "name";
+  }
+
+  // Lists members of a scope (organization or space).
+  rpc ListMembers(ListMembersRequest) returns (ListMembersResponse) {
+    option (google.api.http) = {
+      get: "/v1/{parent=organizations/*}/members"
+      additional_bindings: {get: "/v1/{parent=organizations/*/spaces/*}/members"}
+    };
+    option (google.api.method_signature) = "parent";
+  }
+
+  // Creates a Member binding at the given scope. The principal (user
+  // or group) must already exist; the Member resource simply binds it
+  // to a role.
+  rpc CreateMember(CreateMemberRequest) returns (Member) {
+    option (google.api.http) = {
+      post: "/v1/{parent=organizations/*}/members"
+      body: "member"
+      additional_bindings: {
+        post: "/v1/{parent=organizations/*/spaces/*}/members"
+        body: "member"
+      }
+    };
+    option (google.api.method_signature) = "parent,member,member_id";
+  }
+
+  // Updates a Member's role. Only the `role` field is mutable; to
+  // change the principal, delete and recreate the Member.
+  //
+  // Refuses to demote the sole owner of a scope; use TransferOwnership
+  // for that path.
+  rpc UpdateMember(UpdateMemberRequest) returns (Member) {
+    option (google.api.http) = {
+      patch: "/v1/{member.name=organizations/*/members/*}"
+      body: "member"
+      additional_bindings: {
+        patch: "/v1/{member.name=organizations/*/spaces/*/members/*}"
+        body: "member"
+      }
+    };
+    option (google.api.method_signature) = "member,update_mask";
+  }
+
+  // Deletes a Member binding. Refuses to delete the sole owner of a
+  // scope; use TransferOwnership first.
+  rpc DeleteMember(DeleteMemberRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      delete: "/v1/{name=organizations/*/members/*}"
+      additional_bindings: {delete: "/v1/{name=organizations/*/spaces/*/members/*}"}
+    };
+    option (google.api.method_signature) = "name";
+  }
+
+  // Atomically promotes a Member to `owner` and demotes the previous
+  // sole owner to `admin`. Use this when leaving a scope as the sole
+  // owner — handles the role swap in a single transaction so the
+  // scope is never left ownerless.
+  //
+  // Returns FAILED_PRECONDITION if the scope already has multiple
+  // owners (use UpdateMember directly) or if `name` is already the
+  // owner.
+  rpc TransferOwnership(TransferOwnershipRequest) returns (Member) {
+    option (google.api.http) = {
+      post: "/v1/{name=organizations/*/members/*}:transferOwnership"
+      body: "*"
+      additional_bindings: {
+        post: "/v1/{name=organizations/*/spaces/*/members/*}:transferOwnership"
+        body: "*"
+      }
+    };
+    option (google.api.method_signature) = "name";
   }
 
   // Gets a group by resource name.

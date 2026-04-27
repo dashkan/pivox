@@ -73,3 +73,43 @@ message ListPermissionsResponse {
   // Token for the next page of results.
   string next_page_token = 2;
 }
+
+// Request message for `Iam.TestIamPermissions`.
+//
+// Used by clients (notably UI layers) to ask the server: "out of this
+// list of permissions, which ones does the caller actually have on
+// this resource?" The server resolves the caller's effective role at
+// the resource and returns the subset of requested permissions that
+// role grants.
+message TestIamPermissionsRequest {
+  // Required. The resource to test permissions on. Typically an
+  // organization or space:
+  //   `organizations/{organization}`
+  //   `organizations/{organization}/spaces/{space}`
+  string resource = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).string.min_len = 1
+  ];
+
+  // Required. The permissions to check. Each entry is a permission ID
+  // (e.g. `spaces.create`, `assets.assets.list`). Wildcards are not
+  // supported.
+  repeated string permissions = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).repeated = {
+      min_items: 1
+      max_items: 100
+      items: {
+        string: {min_len: 1}
+      }
+    }
+  ];
+}
+
+// Response message for `Iam.TestIamPermissions`.
+message TestIamPermissionsResponse {
+  // The subset of `TestIamPermissionsRequest.permissions` that the
+  // caller is allowed on the resource. Permissions not in this list
+  // are denied (or unknown).
+  repeated string permissions = 1;
+}

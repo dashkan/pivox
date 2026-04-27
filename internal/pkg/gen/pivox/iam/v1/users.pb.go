@@ -38,6 +38,71 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// Output only. The phase of the cascade currently executing.
+type DeleteUserMetadata_Phase int32
+
+const (
+	// Default; not used.
+	DeleteUserMetadata_PHASE_UNSPECIFIED DeleteUserMetadata_Phase = 0
+	// Validating preconditions (sole-owner check).
+	DeleteUserMetadata_VALIDATING DeleteUserMetadata_Phase = 1
+	// Removing role / group memberships.
+	DeleteUserMetadata_REVOKING_MEMBERSHIPS DeleteUserMetadata_Phase = 2
+	// Deleting Pivox-side records.
+	DeleteUserMetadata_DELETING_PIVOX_RECORDS DeleteUserMetadata_Phase = 3
+	// Deleting the Firebase Auth identity (last step).
+	DeleteUserMetadata_DELETING_FIREBASE_IDENTITY DeleteUserMetadata_Phase = 4
+	// Done.
+	DeleteUserMetadata_COMPLETED DeleteUserMetadata_Phase = 5
+)
+
+// Enum value maps for DeleteUserMetadata_Phase.
+var (
+	DeleteUserMetadata_Phase_name = map[int32]string{
+		0: "PHASE_UNSPECIFIED",
+		1: "VALIDATING",
+		2: "REVOKING_MEMBERSHIPS",
+		3: "DELETING_PIVOX_RECORDS",
+		4: "DELETING_FIREBASE_IDENTITY",
+		5: "COMPLETED",
+	}
+	DeleteUserMetadata_Phase_value = map[string]int32{
+		"PHASE_UNSPECIFIED":          0,
+		"VALIDATING":                 1,
+		"REVOKING_MEMBERSHIPS":       2,
+		"DELETING_PIVOX_RECORDS":     3,
+		"DELETING_FIREBASE_IDENTITY": 4,
+		"COMPLETED":                  5,
+	}
+)
+
+func (x DeleteUserMetadata_Phase) Enum() *DeleteUserMetadata_Phase {
+	p := new(DeleteUserMetadata_Phase)
+	*p = x
+	return p
+}
+
+func (x DeleteUserMetadata_Phase) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (DeleteUserMetadata_Phase) Descriptor() protoreflect.EnumDescriptor {
+	return file_pivox_iam_v1_users_proto_enumTypes[0].Descriptor()
+}
+
+func (DeleteUserMetadata_Phase) Type() protoreflect.EnumType {
+	return &file_pivox_iam_v1_users_proto_enumTypes[0]
+}
+
+func (x DeleteUserMetadata_Phase) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use DeleteUserMetadata_Phase.Descriptor instead.
+func (DeleteUserMetadata_Phase) EnumDescriptor() ([]byte, []int) {
+	return file_pivox_iam_v1_users_proto_rawDescGZIP(), []int{5, 0}
+}
+
 // A user within an organization. Users are synced from Firebase Auth and
 // are read-only via `Iam.GetUser` / `Iam.ListUsers`.
 type User struct {
@@ -374,6 +439,140 @@ func (x *ListUsersResponse) GetNextPageToken() string {
 	return ""
 }
 
+// Request message for `Iam.DeleteUser`.
+//
+// Self-delete: address `organizations/{organization}/users/me`. The
+// server resolves `me` to the authenticated caller.
+//
+// Sole-owner blocking: if the caller is the sole `owner` of any
+// active organization, the LRO completes with `FAILED_PRECONDITION`
+// and a structured detail listing the blocking org names. Resolve by
+// `TransferOwnership` (promote another member) or by deleting those
+// orgs first.
+//
+// Cascade order inside the LRO:
+//  1. Cancel in-flight LROs scoped to the user.
+//  2. Delete org-level Member bindings (org_members where principal = this user).
+//  3. Delete space-level Member bindings (space_members where principal = this user).
+//  4. Delete group memberships.
+//  5. Delete the User row.
+//  6. Delete the firebase_identity row.
+//  7. firebase.Auth.DeleteUser(uid) — last, so a partial failure
+//     leaves us in a recoverable state with the Firebase identity
+//     still alive.
+type DeleteUserRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Required. The user to delete. Format:
+	// `organizations/{organization}/users/{user}` or
+	// `organizations/{organization}/users/me` for self-delete.
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// Optional. Etag of the user for optimistic concurrency.
+	Etag          string `protobuf:"bytes,2,opt,name=etag,proto3" json:"etag,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteUserRequest) Reset() {
+	*x = DeleteUserRequest{}
+	mi := &file_pivox_iam_v1_users_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteUserRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteUserRequest) ProtoMessage() {}
+
+func (x *DeleteUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_iam_v1_users_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteUserRequest.ProtoReflect.Descriptor instead.
+func (*DeleteUserRequest) Descriptor() ([]byte, []int) {
+	return file_pivox_iam_v1_users_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *DeleteUserRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *DeleteUserRequest) GetEtag() string {
+	if x != nil {
+		return x.Etag
+	}
+	return ""
+}
+
+// A status object used as the `metadata` field for the Operation
+// returned by `Iam.DeleteUser`. Surfaces incremental progress through
+// the cascade phases.
+type DeleteUserMetadata struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Output only. Current phase of the cascade.
+	Phase DeleteUserMetadata_Phase `protobuf:"varint,1,opt,name=phase,proto3,enum=pivox.iam.v1.DeleteUserMetadata_Phase" json:"phase,omitempty"`
+	// Output only. Resource name of the user being deleted.
+	User          string `protobuf:"bytes,2,opt,name=user,proto3" json:"user,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteUserMetadata) Reset() {
+	*x = DeleteUserMetadata{}
+	mi := &file_pivox_iam_v1_users_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteUserMetadata) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteUserMetadata) ProtoMessage() {}
+
+func (x *DeleteUserMetadata) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_iam_v1_users_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteUserMetadata.ProtoReflect.Descriptor instead.
+func (*DeleteUserMetadata) Descriptor() ([]byte, []int) {
+	return file_pivox_iam_v1_users_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *DeleteUserMetadata) GetPhase() DeleteUserMetadata_Phase {
+	if x != nil {
+		return x.Phase
+	}
+	return DeleteUserMetadata_PHASE_UNSPECIFIED
+}
+
+func (x *DeleteUserMetadata) GetUser() string {
+	if x != nil {
+		return x.User
+	}
+	return ""
+}
+
 var File_pivox_iam_v1_users_proto protoreflect.FileDescriptor
 
 const file_pivox_iam_v1_users_proto_rawDesc = "" +
@@ -406,7 +605,22 @@ const file_pivox_iam_v1_users_proto_rawDesc = "" +
 	"\border_by\x18\x05 \x01(\tB\x03\xe0A\x01R\aorderBy\"e\n" +
 	"\x11ListUsersResponse\x12(\n" +
 	"\x05users\x18\x01 \x03(\v2\x12.pivox.iam.v1.UserR\x05users\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageTokenB\xae\x01\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"^\n" +
+	"\x11DeleteUserRequest\x120\n" +
+	"\x04name\x18\x01 \x01(\tB\x1c\xe0A\x02\xfaA\x10\n" +
+	"\x0epivox.iam/User\xbaH\x03\xc8\x01\x01R\x04name\x12\x17\n" +
+	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x01R\x04etag\"\x86\x02\n" +
+	"\x12DeleteUserMetadata\x12A\n" +
+	"\x05phase\x18\x01 \x01(\x0e2&.pivox.iam.v1.DeleteUserMetadata.PhaseB\x03\xe0A\x03R\x05phase\x12\x17\n" +
+	"\x04user\x18\x02 \x01(\tB\x03\xe0A\x03R\x04user\"\x93\x01\n" +
+	"\x05Phase\x12\x15\n" +
+	"\x11PHASE_UNSPECIFIED\x10\x00\x12\x0e\n" +
+	"\n" +
+	"VALIDATING\x10\x01\x12\x18\n" +
+	"\x14REVOKING_MEMBERSHIPS\x10\x02\x12\x1a\n" +
+	"\x16DELETING_PIVOX_RECORDS\x10\x03\x12\x1e\n" +
+	"\x1aDELETING_FIREBASE_IDENTITY\x10\x04\x12\r\n" +
+	"\tCOMPLETED\x10\x05B\xae\x01\n" +
 	"\x10com.pivox.iam.v1B\n" +
 	"UsersProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1;iamv1\xa2\x02\x03PIX\xaa\x02\fPivox.Iam.V1\xca\x02\fPivox\\Iam\\V1\xe2\x02\x18Pivox\\Iam\\V1\\GPBMetadata\xea\x02\x0ePivox::Iam::V1b\x06proto3"
 
@@ -422,24 +636,29 @@ func file_pivox_iam_v1_users_proto_rawDescGZIP() []byte {
 	return file_pivox_iam_v1_users_proto_rawDescData
 }
 
-var file_pivox_iam_v1_users_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_pivox_iam_v1_users_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_pivox_iam_v1_users_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_pivox_iam_v1_users_proto_goTypes = []any{
-	(*User)(nil),                  // 0: pivox.iam.v1.User
-	(*GetUserRequest)(nil),        // 1: pivox.iam.v1.GetUserRequest
-	(*ListUsersRequest)(nil),      // 2: pivox.iam.v1.ListUsersRequest
-	(*ListUsersResponse)(nil),     // 3: pivox.iam.v1.ListUsersResponse
-	(*timestamppb.Timestamp)(nil), // 4: google.protobuf.Timestamp
+	(DeleteUserMetadata_Phase)(0), // 0: pivox.iam.v1.DeleteUserMetadata.Phase
+	(*User)(nil),                  // 1: pivox.iam.v1.User
+	(*GetUserRequest)(nil),        // 2: pivox.iam.v1.GetUserRequest
+	(*ListUsersRequest)(nil),      // 3: pivox.iam.v1.ListUsersRequest
+	(*ListUsersResponse)(nil),     // 4: pivox.iam.v1.ListUsersResponse
+	(*DeleteUserRequest)(nil),     // 5: pivox.iam.v1.DeleteUserRequest
+	(*DeleteUserMetadata)(nil),    // 6: pivox.iam.v1.DeleteUserMetadata
+	(*timestamppb.Timestamp)(nil), // 7: google.protobuf.Timestamp
 }
 var file_pivox_iam_v1_users_proto_depIdxs = []int32{
-	4, // 0: pivox.iam.v1.User.create_time:type_name -> google.protobuf.Timestamp
-	4, // 1: pivox.iam.v1.User.update_time:type_name -> google.protobuf.Timestamp
-	4, // 2: pivox.iam.v1.User.last_login_time:type_name -> google.protobuf.Timestamp
-	0, // 3: pivox.iam.v1.ListUsersResponse.users:type_name -> pivox.iam.v1.User
-	4, // [4:4] is the sub-list for method output_type
-	4, // [4:4] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	7, // 0: pivox.iam.v1.User.create_time:type_name -> google.protobuf.Timestamp
+	7, // 1: pivox.iam.v1.User.update_time:type_name -> google.protobuf.Timestamp
+	7, // 2: pivox.iam.v1.User.last_login_time:type_name -> google.protobuf.Timestamp
+	1, // 3: pivox.iam.v1.ListUsersResponse.users:type_name -> pivox.iam.v1.User
+	0, // 4: pivox.iam.v1.DeleteUserMetadata.phase:type_name -> pivox.iam.v1.DeleteUserMetadata.Phase
+	5, // [5:5] is the sub-list for method output_type
+	5, // [5:5] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_pivox_iam_v1_users_proto_init() }
@@ -452,13 +671,14 @@ func file_pivox_iam_v1_users_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pivox_iam_v1_users_proto_rawDesc), len(file_pivox_iam_v1_users_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   4,
+			NumEnums:      1,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_pivox_iam_v1_users_proto_goTypes,
 		DependencyIndexes: file_pivox_iam_v1_users_proto_depIdxs,
+		EnumInfos:         file_pivox_iam_v1_users_proto_enumTypes,
 		MessageInfos:      file_pivox_iam_v1_users_proto_msgTypes,
 	}.Build()
 	File_pivox_iam_v1_users_proto = out.File

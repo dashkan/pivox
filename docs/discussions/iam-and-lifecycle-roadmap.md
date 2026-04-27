@@ -48,6 +48,8 @@ The `Iam` service exposes:
 
 **Permission resolution** at runtime (interceptor): union of direct Member + Group-derived bindings. Space scope inherits from org (decision to lock — see open decisions).
 
+**Member backing schema (locked for phase 4): two tables — `org_members` and `space_members`.** No nullable polymorphic FK, no `scope_kind` column. Each table has a real FK to its parent (`org_members.org_id → organizations.id`, `space_members.space_id → spaces.id`) with `ON DELETE CASCADE`. Why two tables: structural integrity by design beats integrity by CHECK constraint — an `org_members` row physically cannot be misinterpreted as a space membership, closing a class of permission-table bugs that's expensive in IAM specifically. Adding new scope kinds later (if ever) is purely additive (new table, no migration of existing rows). The `Member` *proto* stays unified (one resource, multi-parent pattern); the two-table backing is a server-side implementation detail.
+
 ### Project → Space rename
 
 `Project` is dev-coded and doesn't fit broadcast-media use cases (a sub-unit can be a brand, a show, or an event — News, Dateline, Elections). Renamed to **`Space`** (chosen over `Workspace` for being shorter and less corporate).
@@ -200,37 +202,36 @@ Mechanical sweep across **9 protos, 1 migration, ~10+ Go service/convert/test di
 
 ---
 
-## Phase 2 — IAM v1 proto
+## Phase 2 — IAM v1 proto ✅
 
-Land the new `Iam` service shape. Proto-only; server impl follows in phase 4.
+Decisions locked before sweeping:
 
-### File layout
+1. Space role inheritance: **union with org-level** (org owners are space owners by inheritance).
+2. `{member}` URL segment: **`user-{id}` or `group-{id}`** (singular typed prefix). `Member.principal` is a **oneof** with `user` and `group` branches, each carrying its own `resource_reference` annotation.
+3. `TransferOwnership`: **dedicated atomic RPC** (single transaction; never leaves a scope ownerless).
+4. `DeleteUser`: **all through LRO** (cascade is a server-side state machine; phases surfaced via `DeleteUserMetadata.Phase` enum).
+5. `Member` schema backing (phase 4): **two tables** (`org_members`, `space_members`) — structural integrity by design, no nullable polymorphic FK.
 
-- [ ] Decide: single `pivox/iam/v1/iam.proto` for the service + all messages, OR keep `users.proto`/`groups.proto`/`roles.proto`/`permissions.proto`/`members.proto` split with one `Iam` service spanning files. Recommend split for readability.
-- [ ] Create / update files.
+### Files
 
-### Resources
+- [x] `pivox/iam/v1/members.proto` (NEW): `Member` message + 5 CRUD request/response messages + `TransferOwnershipRequest`.
+- [x] `pivox/iam/v1/users.proto`: added `DeleteUserRequest` + `DeleteUserMetadata` (with `Phase` enum: `VALIDATING`, `REVOKING_MEMBERSHIPS`, `DELETING_PIVOX_RECORDS`, `DELETING_FIREBASE_IDENTITY`, `COMPLETED`).
+- [x] `pivox/iam/v1/permissions.proto`: added `TestIamPermissionsRequest` + `TestIamPermissionsResponse`.
+- [x] `pivox/iam/v1/iam.proto`: extended `Iam` service with new RPCs.
 
-- [ ] `Member` message with multi-parent pattern: `organizations/{org}/members/{member}` + `organizations/{org}/spaces/{space}/members/{member}`. Fields: `principal` (string ref to `users/*` or `groups/*`), `role` (ref to `organizations/*/roles/*`), `create_time`, `etag`.
-- [ ] `Group` message + per-group user list (or `GroupMember` sub-resource — decide).
-- [ ] `Role` message: read-only fields, `system: true` for v1.
-- [ ] `Permission` message: global pattern `permissions/{permission}`.
-- [ ] `User` message updated: drop in-line role field if any (role lives on Member).
+### RPCs added
 
-### Service RPCs
+- [x] **Members** (5 multi-parent RPCs): `GetMember`, `ListMembers`, `CreateMember`, `UpdateMember`, `DeleteMember` — all bind both `organizations/*/members/*` and `organizations/*/spaces/*/members/*`.
+- [x] **Lifecycle**: `DeleteUser` returning `google.longrunning.Operation`; `TransferOwnership` returning `Member` (atomic role swap).
+- [x] **Permission gating**: `TestIamPermissions` — multi-parent (org and space resource).
 
-- [ ] Members: `GetMember`, `ListMembers`, `CreateMember`, `UpdateMember`, `DeleteMember`.
-- [ ] Groups: `GetGroup`, `ListGroups`, `CreateGroup`, `UpdateGroup`, `DeleteGroup`, group-membership RPCs.
-- [ ] Roles: `GetRole`, `ListRoles`. (`Create/Update/DeleteRole` stubbed to UNIMPLEMENTED in phase 4.)
-- [ ] Permissions: `GetPermission`, `ListPermissions`.
-- [ ] Users: `GetUser`, `ListUsers`, `CreateUser` (or fold into Member.Create), `DeleteUser` returning `google.longrunning.Operation`.
-- [ ] `TestIamPermissions` (ported from old iam_policy.proto).
+### Phase 2 exit criteria ✅
 
-### Phase 2 exit criteria
-
-- [ ] Proto pipeline clean.
-- [ ] Generated Go + Swift compile.
-- [ ] No callers yet — server returns UNIMPLEMENTED for all new RPCs.
+- [x] `make proto-format && make lint-proto && make proto-generate-go` clean.
+- [x] `make api-lint`: all six iam/v1 protos `problems: []` (groups, iam, members, permissions, roles, users). Pre-existing failures elsewhere (storage/asset/ai/agent) unchanged.
+- [x] `go build ./...` clean — generated stubs compile.
+- [x] `go test ./...` clean.
+- No server impl — phase 4 wires up handlers.
 
 ---
 

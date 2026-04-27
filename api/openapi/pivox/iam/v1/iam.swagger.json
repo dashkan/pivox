@@ -443,6 +443,318 @@
         ]
       }
     },
+    "/v1/organizations/{organization}/members": {
+      "get": {
+        "summary": "Lists members of a scope (organization or space).",
+        "operationId": "Iam_ListMembers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListMembersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Optional. Maximum number of members to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. Page token from a previous ListMembers call.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "filter",
+            "description": "Optional. An expression for filtering the results of the request.\nFilterable fields:\n\n+ `role` — exact match on a role resource name.\n+ `principal_kind` — `user` or `group`.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "description": "Optional. A comma-separated list of fields to order by. Supported\nfields: `createTime`, `role`. Default: `createTime` ascending.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
+      },
+      "post": {
+        "summary": "Creates a Member binding at the given scope. The principal (user\nor group) must already exist; the Member resource simply binds it\nto a role.",
+        "operationId": "Iam_CreateMember",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Member"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "member",
+            "description": "Required. The Member to create. The `principal` oneof must be set\nand `role` must reference an existing system role.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1Member"
+            }
+          },
+          {
+            "name": "memberId",
+            "description": "Optional. A client-specified member ID. If provided, must be\n`user-{user_id}` or `group-{group_id}` and must agree with the\n`principal` oneof. If omitted, the server derives it from\n`member.principal`.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/members/{member}": {
+      "get": {
+        "summary": "Gets a member by resource name. Multi-parent: members live under\neither an organization or a space.",
+        "operationId": "Iam_GetMember",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Member"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "member",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
+      },
+      "delete": {
+        "summary": "Deletes a Member binding. Refuses to delete the sole owner of a\nscope; use TransferOwnership first.",
+        "operationId": "Iam_DeleteMember",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "member",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "etag",
+            "description": "Optional. The etag known to the client for optimistic concurrency.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
+      },
+      "patch": {
+        "summary": "Updates a Member's role. Only the `role` field is mutable; to\nchange the principal, delete and recreate the Member.",
+        "description": "Refuses to demote the sole owner of a scope; use TransferOwnership\nfor that path.",
+        "operationId": "Iam_UpdateMember",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Member"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "member",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "member",
+            "description": "A Member binds a principal (user or group) to a role at a scope\n(organization or space). The single source of truth for \"who has\nwhat role where.\"\n\nRequired. The Member with updated fields. The `name` field must\nidentify the existing member.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "user": {
+                  "type": "string",
+                  "description": "The user principal. Format: `organizations/{organization}/users/{user}`."
+                },
+                "group": {
+                  "type": "string",
+                  "description": "The group principal. Format: `organizations/{organization}/groups/{group}`."
+                },
+                "role": {
+                  "type": "string",
+                  "description": "Required. Reference to the role this principal holds at this scope.\nFormat: `organizations/{organization}/roles/{role}`. v1 accepts only\nsystem roles (`owner`, `admin`, `editor`, `viewer`)."
+                },
+                "createTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when this binding was created.",
+                  "readOnly": true
+                },
+                "updateTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when this binding was last modified.",
+                  "readOnly": true
+                },
+                "etag": {
+                  "type": "string",
+                  "description": "Output only. A checksum computed by the server based on the current\nvalue of the Member resource. Sent on update and delete requests for\noptimistic concurrency control.",
+                  "readOnly": true
+                }
+              },
+              "description": "Required. The Member with updated fields. The `name` field must\nidentify the existing member.",
+              "title": "A Member binds a principal (user or group) to a role at a scope\n(organization or space). The single source of truth for \"who has\nwhat role where.\"",
+              "required": [
+                "role"
+              ]
+            }
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/members/{member}:transferOwnership": {
+      "post": {
+        "summary": "Atomically promotes a Member to `owner` and demotes the previous\nsole owner to `admin`. Use this when leaving a scope as the sole\nowner — handles the role swap in a single transaction so the\nscope is never left ownerless.",
+        "description": "Returns FAILED_PRECONDITION if the scope already has multiple\nowners (use UpdateMember directly) or if `name` is already the\nowner.",
+        "operationId": "Iam_TransferOwnership",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Member"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "member",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/IamTransferOwnershipBody"
+            }
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
+      }
+    },
     "/v1/organizations/{organization}/roles": {
       "get": {
         "summary": "Lists roles in an organization.",
@@ -547,6 +859,399 @@
         ]
       }
     },
+    "/v1/organizations/{organization}/spaces/{space}/members": {
+      "get": {
+        "summary": "Lists members of a scope (organization or space).",
+        "operationId": "Iam_ListMembers2",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListMembersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "space",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Optional. Maximum number of members to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. Page token from a previous ListMembers call.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "filter",
+            "description": "Optional. An expression for filtering the results of the request.\nFilterable fields:\n\n+ `role` — exact match on a role resource name.\n+ `principal_kind` — `user` or `group`.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "description": "Optional. A comma-separated list of fields to order by. Supported\nfields: `createTime`, `role`. Default: `createTime` ascending.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
+      },
+      "post": {
+        "summary": "Creates a Member binding at the given scope. The principal (user\nor group) must already exist; the Member resource simply binds it\nto a role.",
+        "operationId": "Iam_CreateMember2",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Member"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "space",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "member",
+            "description": "Required. The Member to create. The `principal` oneof must be set\nand `role` must reference an existing system role.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1Member"
+            }
+          },
+          {
+            "name": "memberId",
+            "description": "Optional. A client-specified member ID. If provided, must be\n`user-{user_id}` or `group-{group_id}` and must agree with the\n`principal` oneof. If omitted, the server derives it from\n`member.principal`.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/spaces/{space}/members/{member}": {
+      "get": {
+        "summary": "Gets a member by resource name. Multi-parent: members live under\neither an organization or a space.",
+        "operationId": "Iam_GetMember2",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Member"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "space",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "member",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
+      },
+      "delete": {
+        "summary": "Deletes a Member binding. Refuses to delete the sole owner of a\nscope; use TransferOwnership first.",
+        "operationId": "Iam_DeleteMember2",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "space",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "member",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "etag",
+            "description": "Optional. The etag known to the client for optimistic concurrency.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
+      },
+      "patch": {
+        "summary": "Updates a Member's role. Only the `role` field is mutable; to\nchange the principal, delete and recreate the Member.",
+        "description": "Refuses to demote the sole owner of a scope; use TransferOwnership\nfor that path.",
+        "operationId": "Iam_UpdateMember2",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Member"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "space",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "member",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "member",
+            "description": "A Member binds a principal (user or group) to a role at a scope\n(organization or space). The single source of truth for \"who has\nwhat role where.\"\n\nRequired. The Member with updated fields. The `name` field must\nidentify the existing member.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "user": {
+                  "type": "string",
+                  "description": "The user principal. Format: `organizations/{organization}/users/{user}`."
+                },
+                "group": {
+                  "type": "string",
+                  "description": "The group principal. Format: `organizations/{organization}/groups/{group}`."
+                },
+                "role": {
+                  "type": "string",
+                  "description": "Required. Reference to the role this principal holds at this scope.\nFormat: `organizations/{organization}/roles/{role}`. v1 accepts only\nsystem roles (`owner`, `admin`, `editor`, `viewer`)."
+                },
+                "createTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when this binding was created.",
+                  "readOnly": true
+                },
+                "updateTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when this binding was last modified.",
+                  "readOnly": true
+                },
+                "etag": {
+                  "type": "string",
+                  "description": "Output only. A checksum computed by the server based on the current\nvalue of the Member resource. Sent on update and delete requests for\noptimistic concurrency control.",
+                  "readOnly": true
+                }
+              },
+              "description": "Required. The Member with updated fields. The `name` field must\nidentify the existing member.",
+              "title": "A Member binds a principal (user or group) to a role at a scope\n(organization or space). The single source of truth for \"who has\nwhat role where.\"",
+              "required": [
+                "role"
+              ]
+            }
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/spaces/{space}/members/{member}:transferOwnership": {
+      "post": {
+        "summary": "Atomically promotes a Member to `owner` and demotes the previous\nsole owner to `admin`. Use this when leaving a scope as the sole\nowner — handles the role swap in a single transaction so the\nscope is never left ownerless.",
+        "description": "Returns FAILED_PRECONDITION if the scope already has multiple\nowners (use UpdateMember directly) or if `name` is already the\nowner.",
+        "operationId": "Iam_TransferOwnership2",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Member"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "space",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "member",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/IamTransferOwnershipBody"
+            }
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/spaces/{space}:testIamPermissions": {
+      "post": {
+        "summary": "Returns the subset of requested permissions that the caller\nactually has on the named resource. Used by UI layers to gate\nbuttons and menus. Returns an empty list (not an error) for\nunknown resources or no-permission callers.",
+        "operationId": "Iam_TestIamPermissions2",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1TestIamPermissionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "space",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/IamTestIamPermissionsBody"
+            }
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
+      }
+    },
     "/v1/organizations/{organization}/users": {
       "get": {
         "summary": "Lists users in an organization.",
@@ -642,6 +1347,88 @@
         "tags": [
           "Iam"
         ]
+      },
+      "delete": {
+        "summary": "Deletes a user (LRO). Cascades through Pivox-side state and\nfinishes by deleting the underlying Firebase Auth identity.\nSelf-delete: address `organizations/{org}/users/me`.",
+        "description": "Sole-owner blocking: if the caller owns any active org with no\nother owners, the LRO completes with FAILED_PRECONDITION listing\naffected orgs. Resolve via TransferOwnership or DeleteOrganization\n(phase 3) first.",
+        "operationId": "Iam_DeleteUser",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/longrunningOperation"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "user",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "etag",
+            "description": "Optional. Etag of the user for optimistic concurrency.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}:testIamPermissions": {
+      "post": {
+        "summary": "Returns the subset of requested permissions that the caller\nactually has on the named resource. Used by UI layers to gate\nbuttons and menus. Returns an empty list (not an error) for\nunknown resources or no-permission callers.",
+        "operationId": "Iam_TestIamPermissions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1TestIamPermissionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/IamTestIamPermissionsBody"
+            }
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
       }
     },
     "/v1/permissions": {
@@ -718,33 +1505,91 @@
         "members"
       ]
     },
+    "IamTestIamPermissionsBody": {
+      "type": "object",
+      "properties": {
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Required. The permissions to check. Each entry is a permission ID\n(e.g. `spaces.create`, `assets.assets.list`). Wildcards are not\nsupported."
+        }
+      },
+      "description": "Request message for `Iam.TestIamPermissions`.\n\nUsed by clients (notably UI layers) to ask the server: \"out of this\nlist of permissions, which ones does the caller actually have on\nthis resource?\" The server resolves the caller's effective role at\nthe resource and returns the subset of requested permissions that\nrole grants.",
+      "required": [
+        "permissions"
+      ]
+    },
+    "IamTransferOwnershipBody": {
+      "type": "object",
+      "properties": {
+        "etag": {
+          "type": "string",
+          "description": "Optional. Etag of the target Member for optimistic concurrency."
+        }
+      },
+      "description": "Request message for `Iam.TransferOwnership`.\n\nPromotes the named Member to `owner` role and demotes the previous\nsole owner to `admin`. Both updates happen in a single transaction.\nIf the scope already has multiple owners, the call returns\n`FAILED_PRECONDITION` — explicit demotion via `UpdateMember` is the\nright path in that case.\n"
+    },
+    "longrunningOperation": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The server-assigned name, which is only unique within the same service that\noriginally returns it. If you use the default HTTP mapping, the\n`name` should be a resource name ending with `operations/{unique_id}`."
+        },
+        "metadata": {
+          "$ref": "#/definitions/protobufAny",
+          "description": "Service-specific metadata associated with the operation.  It typically\ncontains progress information and common metadata such as create time.\nSome services might not provide such metadata.  Any method that returns a\nlong-running operation should document the metadata type, if any."
+        },
+        "done": {
+          "type": "boolean",
+          "description": "If the value is `false`, it means the operation is still in progress.\nIf `true`, the operation is completed, and either `error` or `response` is\navailable."
+        },
+        "error": {
+          "$ref": "#/definitions/rpcStatus",
+          "description": "The error result of the operation in case of failure or cancellation."
+        },
+        "response": {
+          "$ref": "#/definitions/protobufAny",
+          "description": "The normal, successful response of the operation.  If the original\nmethod returns no data on success, such as `Delete`, the response is\n`google.protobuf.Empty`.  If the original method is standard\n`Get`/`Create`/`Update`, the response should be the resource.  For other\nmethods, the response should have the type `XxxResponse`, where `Xxx`\nis the original method name.  For example, if the original method name\nis `TakeSnapshot()`, the inferred response type is\n`TakeSnapshotResponse`."
+        }
+      },
+      "description": "This resource represents a long-running operation that is the result of a\nnetwork API call."
+    },
     "protobufAny": {
       "type": "object",
       "properties": {
         "@type": {
-          "type": "string"
+          "type": "string",
+          "description": "A URL/resource name that uniquely identifies the type of the serialized\nprotocol buffer message. This string must contain at least\none \"/\" character. The last segment of the URL's path must represent\nthe fully qualified name of the type (as in\n`path/google.protobuf.Duration`). The name should be in a canonical form\n(e.g., leading \".\" is not accepted).\n\nIn practice, teams usually precompile into the binary all types that they\nexpect it to use in the context of Any. However, for URLs which use the\nscheme `http`, `https`, or no scheme, one can optionally set up a type\nserver that maps type URLs to message definitions as follows:\n\n* If no scheme is provided, `https` is assumed.\n* An HTTP GET on the URL must yield a [google.protobuf.Type][]\n  value in binary format, or produce an error.\n* Applications are allowed to cache lookup results based on the\n  URL, or have them precompiled into a binary to avoid any\n  lookup. Therefore, binary compatibility needs to be preserved\n  on changes to types. (Use versioned type names to manage\n  breaking changes.)\n\nNote: this functionality is not currently available in the official\nprotobuf release, and it is not used for type URLs beginning with\ntype.googleapis.com. As of May 2023, there are no widely used type server\nimplementations and no plans to implement one.\n\nSchemes other than `http`, `https` (or the empty scheme) might be\nused with implementation specific semantics."
         }
       },
-      "additionalProperties": {}
+      "additionalProperties": {},
+      "description": "`Any` contains an arbitrary serialized protocol buffer message along with a\nURL that describes the type of the serialized message.\n\nProtobuf library provides support to pack/unpack Any values in the form\nof utility functions or additional generated methods of the Any type.\n\nExample 1: Pack and unpack a message in C++.\n\n    Foo foo = ...;\n    Any any;\n    any.PackFrom(foo);\n    ...\n    if (any.UnpackTo(\u0026foo)) {\n      ...\n    }\n\nExample 2: Pack and unpack a message in Java.\n\n    Foo foo = ...;\n    Any any = Any.pack(foo);\n    ...\n    if (any.is(Foo.class)) {\n      foo = any.unpack(Foo.class);\n    }\n    // or ...\n    if (any.isSameTypeAs(Foo.getDefaultInstance())) {\n      foo = any.unpack(Foo.getDefaultInstance());\n    }\n\n Example 3: Pack and unpack a message in Python.\n\n    foo = Foo(...)\n    any = Any()\n    any.Pack(foo)\n    ...\n    if any.Is(Foo.DESCRIPTOR):\n      any.Unpack(foo)\n      ...\n\n Example 4: Pack and unpack a message in Go\n\n     foo := \u0026pb.Foo{...}\n     any, err := anypb.New(foo)\n     if err != nil {\n       ...\n     }\n     ...\n     foo := \u0026pb.Foo{}\n     if err := any.UnmarshalTo(foo); err != nil {\n       ...\n     }\n\nThe pack methods provided by protobuf library will by default use\n'type.googleapis.com/full.type.name' as the type URL and the unpack\nmethods only use the fully qualified type name after the last '/'\nin the type URL, for example \"foo.bar.com/x/y.z\" will yield type\nname \"y.z\".\n\nJSON\n====\nThe JSON representation of an `Any` value uses the regular\nrepresentation of the deserialized, embedded message, with an\nadditional field `@type` which contains the type URL. Example:\n\n    package google.profile;\n    message Person {\n      string first_name = 1;\n      string last_name = 2;\n    }\n\n    {\n      \"@type\": \"type.googleapis.com/google.profile.Person\",\n      \"firstName\": \u003cstring\u003e,\n      \"lastName\": \u003cstring\u003e\n    }\n\nIf the embedded message type is well-known and has a custom JSON\nrepresentation, that representation will be embedded adding a field\n`value` which holds the custom JSON in addition to the `@type`\nfield. Example (for message [google.protobuf.Duration][]):\n\n    {\n      \"@type\": \"type.googleapis.com/google.protobuf.Duration\",\n      \"value\": \"1.212s\"\n    }"
     },
     "rpcStatus": {
       "type": "object",
       "properties": {
         "code": {
           "type": "integer",
-          "format": "int32"
+          "format": "int32",
+          "description": "The status code, which should be an enum value of\n[google.rpc.Code][google.rpc.Code]."
         },
         "message": {
-          "type": "string"
+          "type": "string",
+          "description": "A developer-facing error message, which should be in English. Any\nuser-facing error message should be localized and sent in the\n[google.rpc.Status.details][google.rpc.Status.details] field, or localized\nby the client."
         },
         "details": {
           "type": "array",
           "items": {
             "type": "object",
             "$ref": "#/definitions/protobufAny"
-          }
+          },
+          "description": "A list of messages that carry the error details.  There is a common set of\nmessage types for APIs to use."
         }
-      }
+      },
+      "description": "The `Status` type defines a logical error model that is suitable for\ndifferent programming environments, including REST APIs and RPC APIs. It is\nused by [gRPC](https://github.com/grpc). Each `Status` message contains\nthree pieces of data: error code, error message, and error details.\n\nYou can find out more about this error model and how to work with it in the\n[API Design Guide](https://cloud.google.com/apis/design/errors)."
     },
     "v1AddGroupMembersResponse": {
       "type": "object",
@@ -862,6 +1707,24 @@
       },
       "description": "Response message for `Iam.ListGroups`."
     },
+    "v1ListMembersResponse": {
+      "type": "object",
+      "properties": {
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Member"
+          },
+          "description": "The members of the scope."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for the next page of results."
+        }
+      },
+      "description": "Response message for `Iam.ListMembers`."
+    },
     "v1ListPermissionsResponse": {
       "type": "object",
       "properties": {
@@ -915,6 +1778,49 @@
         }
       },
       "description": "Response message for `Iam.ListUsers`."
+    },
+    "v1Member": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The resource name of the member.\nFormat: `organizations/{organization}/members/{member}` or\n        `organizations/{organization}/spaces/{space}/members/{member}`\nwhere `{member}` is `user-{user_id}` or `group-{group_id}`."
+        },
+        "user": {
+          "type": "string",
+          "description": "The user principal. Format: `organizations/{organization}/users/{user}`."
+        },
+        "group": {
+          "type": "string",
+          "description": "The group principal. Format: `organizations/{organization}/groups/{group}`."
+        },
+        "role": {
+          "type": "string",
+          "description": "Required. Reference to the role this principal holds at this scope.\nFormat: `organizations/{organization}/roles/{role}`. v1 accepts only\nsystem roles (`owner`, `admin`, `editor`, `viewer`)."
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when this binding was created.",
+          "readOnly": true
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when this binding was last modified.",
+          "readOnly": true
+        },
+        "etag": {
+          "type": "string",
+          "description": "Output only. A checksum computed by the server based on the current\nvalue of the Member resource. Sent on update and delete requests for\noptimistic concurrency control.",
+          "readOnly": true
+        }
+      },
+      "description": "Multi-parent: a Member lives under either an organization or a space.\nThe URL segment `{member}` encodes the principal as `user-{user_id}`\nor `group-{group_id}` — uniqueness by construction means a given\nprincipal can hold at most one role per scope.\n\nPermission resolution unions org-level and space-level Member\nbindings: an org owner is implicitly a space owner. Server-side\nresolver is the source of truth; this proto defines only the wire\nshape.",
+      "title": "A Member binds a principal (user or group) to a role at a scope\n(organization or space). The single source of truth for \"who has\nwhat role where.\"",
+      "required": [
+        "role"
+      ]
     },
     "v1Permission": {
       "type": "object",
@@ -1009,6 +1915,19 @@
       "required": [
         "displayName"
       ]
+    },
+    "v1TestIamPermissionsResponse": {
+      "type": "object",
+      "properties": {
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The subset of `TestIamPermissionsRequest.permissions` that the\ncaller is allowed on the resource. Permissions not in this list\nare denied (or unknown)."
+        }
+      },
+      "description": "Response message for `Iam.TestIamPermissions`."
     },
     "v1User": {
       "type": "object",

@@ -21,10 +21,12 @@
 package iamv1
 
 import (
+	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
 	context "context"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -35,9 +37,17 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	Iam_GetUser_FullMethodName            = "/pivox.iam.v1.Iam/GetUser"
 	Iam_ListUsers_FullMethodName          = "/pivox.iam.v1.Iam/ListUsers"
+	Iam_DeleteUser_FullMethodName         = "/pivox.iam.v1.Iam/DeleteUser"
 	Iam_GetRole_FullMethodName            = "/pivox.iam.v1.Iam/GetRole"
 	Iam_ListRoles_FullMethodName          = "/pivox.iam.v1.Iam/ListRoles"
 	Iam_ListPermissions_FullMethodName    = "/pivox.iam.v1.Iam/ListPermissions"
+	Iam_TestIamPermissions_FullMethodName = "/pivox.iam.v1.Iam/TestIamPermissions"
+	Iam_GetMember_FullMethodName          = "/pivox.iam.v1.Iam/GetMember"
+	Iam_ListMembers_FullMethodName        = "/pivox.iam.v1.Iam/ListMembers"
+	Iam_CreateMember_FullMethodName       = "/pivox.iam.v1.Iam/CreateMember"
+	Iam_UpdateMember_FullMethodName       = "/pivox.iam.v1.Iam/UpdateMember"
+	Iam_DeleteMember_FullMethodName       = "/pivox.iam.v1.Iam/DeleteMember"
+	Iam_TransferOwnership_FullMethodName  = "/pivox.iam.v1.Iam/TransferOwnership"
 	Iam_GetGroup_FullMethodName           = "/pivox.iam.v1.Iam/GetGroup"
 	Iam_ListGroups_FullMethodName         = "/pivox.iam.v1.Iam/ListGroups"
 	Iam_CreateGroup_FullMethodName        = "/pivox.iam.v1.Iam/CreateGroup"
@@ -52,12 +62,18 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// Iam is the single entry point for all IAM-related RPCs. It hosts the
-// read paths for `User`, `Role`, and `Permission` resources alongside
-// the read+write paths for `Group` and group membership.
+// Iam is the single entry point for all IAM-related RPCs. It hosts:
 //
-// Resource definitions live in their per-resource files
-// (`users.proto`, `roles.proto`, `groups.proto`, `permissions.proto`).
+//   - read paths for `User`, `Role`, and `Permission`;
+//   - read+write for `Group` and group membership;
+//   - read+write for `Member` (the principal-to-role binding at org or
+//     space scope);
+//   - the user lifecycle LRO (`DeleteUser`);
+//   - `TransferOwnership` for atomic ownership swaps;
+//   - `TestIamPermissions` for UI gating.
+//
+// Resource definitions live in their per-resource files (`users.proto`,
+// `roles.proto`, `groups.proto`, `permissions.proto`, `members.proto`).
 // This file contains only the service contract.
 //
 // (-- api-linter: core::0121::resource-must-support-get=disabled
@@ -72,6 +88,15 @@ type IamClient interface {
 	GetUser(ctx context.Context, in *GetUserRequest, opts ...grpc.CallOption) (*User, error)
 	// Lists users in an organization.
 	ListUsers(ctx context.Context, in *ListUsersRequest, opts ...grpc.CallOption) (*ListUsersResponse, error)
+	// Deletes a user (LRO). Cascades through Pivox-side state and
+	// finishes by deleting the underlying Firebase Auth identity.
+	// Self-delete: address `organizations/{org}/users/me`.
+	//
+	// Sole-owner blocking: if the caller owns any active org with no
+	// other owners, the LRO completes with FAILED_PRECONDITION listing
+	// affected orgs. Resolve via TransferOwnership or DeleteOrganization
+	// (phase 3) first.
+	DeleteUser(ctx context.Context, in *DeleteUserRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
 	// Gets a role by resource name. v1 returns only system roles
 	// (owner, admin, editor, viewer); custom roles are deferred.
 	GetRole(ctx context.Context, in *GetRoleRequest, opts ...grpc.CallOption) (*Role, error)
@@ -80,6 +105,38 @@ type IamClient interface {
 	// Lists all system-defined permissions. Permissions are global and
 	// code-defined; the catalog is identical for every caller.
 	ListPermissions(ctx context.Context, in *ListPermissionsRequest, opts ...grpc.CallOption) (*ListPermissionsResponse, error)
+	// Returns the subset of requested permissions that the caller
+	// actually has on the named resource. Used by UI layers to gate
+	// buttons and menus. Returns an empty list (not an error) for
+	// unknown resources or no-permission callers.
+	TestIamPermissions(ctx context.Context, in *TestIamPermissionsRequest, opts ...grpc.CallOption) (*TestIamPermissionsResponse, error)
+	// Gets a member by resource name. Multi-parent: members live under
+	// either an organization or a space.
+	GetMember(ctx context.Context, in *GetMemberRequest, opts ...grpc.CallOption) (*Member, error)
+	// Lists members of a scope (organization or space).
+	ListMembers(ctx context.Context, in *ListMembersRequest, opts ...grpc.CallOption) (*ListMembersResponse, error)
+	// Creates a Member binding at the given scope. The principal (user
+	// or group) must already exist; the Member resource simply binds it
+	// to a role.
+	CreateMember(ctx context.Context, in *CreateMemberRequest, opts ...grpc.CallOption) (*Member, error)
+	// Updates a Member's role. Only the `role` field is mutable; to
+	// change the principal, delete and recreate the Member.
+	//
+	// Refuses to demote the sole owner of a scope; use TransferOwnership
+	// for that path.
+	UpdateMember(ctx context.Context, in *UpdateMemberRequest, opts ...grpc.CallOption) (*Member, error)
+	// Deletes a Member binding. Refuses to delete the sole owner of a
+	// scope; use TransferOwnership first.
+	DeleteMember(ctx context.Context, in *DeleteMemberRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Atomically promotes a Member to `owner` and demotes the previous
+	// sole owner to `admin`. Use this when leaving a scope as the sole
+	// owner — handles the role swap in a single transaction so the
+	// scope is never left ownerless.
+	//
+	// Returns FAILED_PRECONDITION if the scope already has multiple
+	// owners (use UpdateMember directly) or if `name` is already the
+	// owner.
+	TransferOwnership(ctx context.Context, in *TransferOwnershipRequest, opts ...grpc.CallOption) (*Member, error)
 	// Gets a group by resource name.
 	GetGroup(ctx context.Context, in *GetGroupRequest, opts ...grpc.CallOption) (*Group, error)
 	// Lists groups in an organization.
@@ -126,6 +183,16 @@ func (c *iamClient) ListUsers(ctx context.Context, in *ListUsersRequest, opts ..
 	return out, nil
 }
 
+func (c *iamClient) DeleteUser(ctx context.Context, in *DeleteUserRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(longrunningpb.Operation)
+	err := c.cc.Invoke(ctx, Iam_DeleteUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *iamClient) GetRole(ctx context.Context, in *GetRoleRequest, opts ...grpc.CallOption) (*Role, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Role)
@@ -150,6 +217,76 @@ func (c *iamClient) ListPermissions(ctx context.Context, in *ListPermissionsRequ
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListPermissionsResponse)
 	err := c.cc.Invoke(ctx, Iam_ListPermissions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *iamClient) TestIamPermissions(ctx context.Context, in *TestIamPermissionsRequest, opts ...grpc.CallOption) (*TestIamPermissionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TestIamPermissionsResponse)
+	err := c.cc.Invoke(ctx, Iam_TestIamPermissions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *iamClient) GetMember(ctx context.Context, in *GetMemberRequest, opts ...grpc.CallOption) (*Member, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Member)
+	err := c.cc.Invoke(ctx, Iam_GetMember_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *iamClient) ListMembers(ctx context.Context, in *ListMembersRequest, opts ...grpc.CallOption) (*ListMembersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListMembersResponse)
+	err := c.cc.Invoke(ctx, Iam_ListMembers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *iamClient) CreateMember(ctx context.Context, in *CreateMemberRequest, opts ...grpc.CallOption) (*Member, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Member)
+	err := c.cc.Invoke(ctx, Iam_CreateMember_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *iamClient) UpdateMember(ctx context.Context, in *UpdateMemberRequest, opts ...grpc.CallOption) (*Member, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Member)
+	err := c.cc.Invoke(ctx, Iam_UpdateMember_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *iamClient) DeleteMember(ctx context.Context, in *DeleteMemberRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, Iam_DeleteMember_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *iamClient) TransferOwnership(ctx context.Context, in *TransferOwnershipRequest, opts ...grpc.CallOption) (*Member, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Member)
+	err := c.cc.Invoke(ctx, Iam_TransferOwnership_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -240,12 +377,18 @@ func (c *iamClient) ListGroupMembers(ctx context.Context, in *ListGroupMembersRe
 // All implementations must embed UnimplementedIamServer
 // for forward compatibility.
 //
-// Iam is the single entry point for all IAM-related RPCs. It hosts the
-// read paths for `User`, `Role`, and `Permission` resources alongside
-// the read+write paths for `Group` and group membership.
+// Iam is the single entry point for all IAM-related RPCs. It hosts:
 //
-// Resource definitions live in their per-resource files
-// (`users.proto`, `roles.proto`, `groups.proto`, `permissions.proto`).
+//   - read paths for `User`, `Role`, and `Permission`;
+//   - read+write for `Group` and group membership;
+//   - read+write for `Member` (the principal-to-role binding at org or
+//     space scope);
+//   - the user lifecycle LRO (`DeleteUser`);
+//   - `TransferOwnership` for atomic ownership swaps;
+//   - `TestIamPermissions` for UI gating.
+//
+// Resource definitions live in their per-resource files (`users.proto`,
+// `roles.proto`, `groups.proto`, `permissions.proto`, `members.proto`).
 // This file contains only the service contract.
 //
 // (-- api-linter: core::0121::resource-must-support-get=disabled
@@ -260,6 +403,15 @@ type IamServer interface {
 	GetUser(context.Context, *GetUserRequest) (*User, error)
 	// Lists users in an organization.
 	ListUsers(context.Context, *ListUsersRequest) (*ListUsersResponse, error)
+	// Deletes a user (LRO). Cascades through Pivox-side state and
+	// finishes by deleting the underlying Firebase Auth identity.
+	// Self-delete: address `organizations/{org}/users/me`.
+	//
+	// Sole-owner blocking: if the caller owns any active org with no
+	// other owners, the LRO completes with FAILED_PRECONDITION listing
+	// affected orgs. Resolve via TransferOwnership or DeleteOrganization
+	// (phase 3) first.
+	DeleteUser(context.Context, *DeleteUserRequest) (*longrunningpb.Operation, error)
 	// Gets a role by resource name. v1 returns only system roles
 	// (owner, admin, editor, viewer); custom roles are deferred.
 	GetRole(context.Context, *GetRoleRequest) (*Role, error)
@@ -268,6 +420,38 @@ type IamServer interface {
 	// Lists all system-defined permissions. Permissions are global and
 	// code-defined; the catalog is identical for every caller.
 	ListPermissions(context.Context, *ListPermissionsRequest) (*ListPermissionsResponse, error)
+	// Returns the subset of requested permissions that the caller
+	// actually has on the named resource. Used by UI layers to gate
+	// buttons and menus. Returns an empty list (not an error) for
+	// unknown resources or no-permission callers.
+	TestIamPermissions(context.Context, *TestIamPermissionsRequest) (*TestIamPermissionsResponse, error)
+	// Gets a member by resource name. Multi-parent: members live under
+	// either an organization or a space.
+	GetMember(context.Context, *GetMemberRequest) (*Member, error)
+	// Lists members of a scope (organization or space).
+	ListMembers(context.Context, *ListMembersRequest) (*ListMembersResponse, error)
+	// Creates a Member binding at the given scope. The principal (user
+	// or group) must already exist; the Member resource simply binds it
+	// to a role.
+	CreateMember(context.Context, *CreateMemberRequest) (*Member, error)
+	// Updates a Member's role. Only the `role` field is mutable; to
+	// change the principal, delete and recreate the Member.
+	//
+	// Refuses to demote the sole owner of a scope; use TransferOwnership
+	// for that path.
+	UpdateMember(context.Context, *UpdateMemberRequest) (*Member, error)
+	// Deletes a Member binding. Refuses to delete the sole owner of a
+	// scope; use TransferOwnership first.
+	DeleteMember(context.Context, *DeleteMemberRequest) (*emptypb.Empty, error)
+	// Atomically promotes a Member to `owner` and demotes the previous
+	// sole owner to `admin`. Use this when leaving a scope as the sole
+	// owner — handles the role swap in a single transaction so the
+	// scope is never left ownerless.
+	//
+	// Returns FAILED_PRECONDITION if the scope already has multiple
+	// owners (use UpdateMember directly) or if `name` is already the
+	// owner.
+	TransferOwnership(context.Context, *TransferOwnershipRequest) (*Member, error)
 	// Gets a group by resource name.
 	GetGroup(context.Context, *GetGroupRequest) (*Group, error)
 	// Lists groups in an organization.
@@ -300,6 +484,9 @@ func (UnimplementedIamServer) GetUser(context.Context, *GetUserRequest) (*User, 
 func (UnimplementedIamServer) ListUsers(context.Context, *ListUsersRequest) (*ListUsersResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListUsers not implemented")
 }
+func (UnimplementedIamServer) DeleteUser(context.Context, *DeleteUserRequest) (*longrunningpb.Operation, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteUser not implemented")
+}
 func (UnimplementedIamServer) GetRole(context.Context, *GetRoleRequest) (*Role, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetRole not implemented")
 }
@@ -308,6 +495,27 @@ func (UnimplementedIamServer) ListRoles(context.Context, *ListRolesRequest) (*Li
 }
 func (UnimplementedIamServer) ListPermissions(context.Context, *ListPermissionsRequest) (*ListPermissionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListPermissions not implemented")
+}
+func (UnimplementedIamServer) TestIamPermissions(context.Context, *TestIamPermissionsRequest) (*TestIamPermissionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method TestIamPermissions not implemented")
+}
+func (UnimplementedIamServer) GetMember(context.Context, *GetMemberRequest) (*Member, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetMember not implemented")
+}
+func (UnimplementedIamServer) ListMembers(context.Context, *ListMembersRequest) (*ListMembersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListMembers not implemented")
+}
+func (UnimplementedIamServer) CreateMember(context.Context, *CreateMemberRequest) (*Member, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateMember not implemented")
+}
+func (UnimplementedIamServer) UpdateMember(context.Context, *UpdateMemberRequest) (*Member, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateMember not implemented")
+}
+func (UnimplementedIamServer) DeleteMember(context.Context, *DeleteMemberRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteMember not implemented")
+}
+func (UnimplementedIamServer) TransferOwnership(context.Context, *TransferOwnershipRequest) (*Member, error) {
+	return nil, status.Error(codes.Unimplemented, "method TransferOwnership not implemented")
 }
 func (UnimplementedIamServer) GetGroup(context.Context, *GetGroupRequest) (*Group, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetGroup not implemented")
@@ -390,6 +598,24 @@ func _Iam_ListUsers_Handler(srv interface{}, ctx context.Context, dec func(inter
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Iam_DeleteUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IamServer).DeleteUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Iam_DeleteUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IamServer).DeleteUser(ctx, req.(*DeleteUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Iam_GetRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetRoleRequest)
 	if err := dec(in); err != nil {
@@ -440,6 +666,132 @@ func _Iam_ListPermissions_Handler(srv interface{}, ctx context.Context, dec func
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(IamServer).ListPermissions(ctx, req.(*ListPermissionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Iam_TestIamPermissions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TestIamPermissionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IamServer).TestIamPermissions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Iam_TestIamPermissions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IamServer).TestIamPermissions(ctx, req.(*TestIamPermissionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Iam_GetMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMemberRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IamServer).GetMember(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Iam_GetMember_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IamServer).GetMember(ctx, req.(*GetMemberRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Iam_ListMembers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMembersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IamServer).ListMembers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Iam_ListMembers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IamServer).ListMembers(ctx, req.(*ListMembersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Iam_CreateMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateMemberRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IamServer).CreateMember(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Iam_CreateMember_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IamServer).CreateMember(ctx, req.(*CreateMemberRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Iam_UpdateMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateMemberRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IamServer).UpdateMember(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Iam_UpdateMember_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IamServer).UpdateMember(ctx, req.(*UpdateMemberRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Iam_DeleteMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteMemberRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IamServer).DeleteMember(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Iam_DeleteMember_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IamServer).DeleteMember(ctx, req.(*DeleteMemberRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Iam_TransferOwnership_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TransferOwnershipRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IamServer).TransferOwnership(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Iam_TransferOwnership_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IamServer).TransferOwnership(ctx, req.(*TransferOwnershipRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -604,6 +956,10 @@ var Iam_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Iam_ListUsers_Handler,
 		},
 		{
+			MethodName: "DeleteUser",
+			Handler:    _Iam_DeleteUser_Handler,
+		},
+		{
 			MethodName: "GetRole",
 			Handler:    _Iam_GetRole_Handler,
 		},
@@ -614,6 +970,34 @@ var Iam_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListPermissions",
 			Handler:    _Iam_ListPermissions_Handler,
+		},
+		{
+			MethodName: "TestIamPermissions",
+			Handler:    _Iam_TestIamPermissions_Handler,
+		},
+		{
+			MethodName: "GetMember",
+			Handler:    _Iam_GetMember_Handler,
+		},
+		{
+			MethodName: "ListMembers",
+			Handler:    _Iam_ListMembers_Handler,
+		},
+		{
+			MethodName: "CreateMember",
+			Handler:    _Iam_CreateMember_Handler,
+		},
+		{
+			MethodName: "UpdateMember",
+			Handler:    _Iam_UpdateMember_Handler,
+		},
+		{
+			MethodName: "DeleteMember",
+			Handler:    _Iam_DeleteMember_Handler,
+		},
+		{
+			MethodName: "TransferOwnership",
+			Handler:    _Iam_TransferOwnership_Handler,
 		},
 		{
 			MethodName: "GetGroup",

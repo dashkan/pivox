@@ -224,6 +224,121 @@ func (x *ListPermissionsResponse) GetNextPageToken() string {
 	return ""
 }
 
+// Request message for `Iam.TestIamPermissions`.
+//
+// Used by clients (notably UI layers) to ask the server: "out of this
+// list of permissions, which ones does the caller actually have on
+// this resource?" The server resolves the caller's effective role at
+// the resource and returns the subset of requested permissions that
+// role grants.
+type TestIamPermissionsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Required. The resource to test permissions on. Typically an
+	// organization or space:
+	//
+	//	`organizations/{organization}`
+	//	`organizations/{organization}/spaces/{space}`
+	Resource string `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
+	// Required. The permissions to check. Each entry is a permission ID
+	// (e.g. `spaces.create`, `assets.assets.list`). Wildcards are not
+	// supported.
+	Permissions   []string `protobuf:"bytes,2,rep,name=permissions,proto3" json:"permissions,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TestIamPermissionsRequest) Reset() {
+	*x = TestIamPermissionsRequest{}
+	mi := &file_pivox_iam_v1_permissions_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TestIamPermissionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TestIamPermissionsRequest) ProtoMessage() {}
+
+func (x *TestIamPermissionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_iam_v1_permissions_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TestIamPermissionsRequest.ProtoReflect.Descriptor instead.
+func (*TestIamPermissionsRequest) Descriptor() ([]byte, []int) {
+	return file_pivox_iam_v1_permissions_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *TestIamPermissionsRequest) GetResource() string {
+	if x != nil {
+		return x.Resource
+	}
+	return ""
+}
+
+func (x *TestIamPermissionsRequest) GetPermissions() []string {
+	if x != nil {
+		return x.Permissions
+	}
+	return nil
+}
+
+// Response message for `Iam.TestIamPermissions`.
+type TestIamPermissionsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The subset of `TestIamPermissionsRequest.permissions` that the
+	// caller is allowed on the resource. Permissions not in this list
+	// are denied (or unknown).
+	Permissions   []string `protobuf:"bytes,1,rep,name=permissions,proto3" json:"permissions,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TestIamPermissionsResponse) Reset() {
+	*x = TestIamPermissionsResponse{}
+	mi := &file_pivox_iam_v1_permissions_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TestIamPermissionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TestIamPermissionsResponse) ProtoMessage() {}
+
+func (x *TestIamPermissionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_iam_v1_permissions_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TestIamPermissionsResponse.ProtoReflect.Descriptor instead.
+func (*TestIamPermissionsResponse) Descriptor() ([]byte, []int) {
+	return file_pivox_iam_v1_permissions_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *TestIamPermissionsResponse) GetPermissions() []string {
+	if x != nil {
+		return x.Permissions
+	}
+	return nil
+}
+
 var File_pivox_iam_v1_permissions_proto protoreflect.FileDescriptor
 
 const file_pivox_iam_v1_permissions_proto_rawDesc = "" +
@@ -242,7 +357,14 @@ const file_pivox_iam_v1_permissions_proto_rawDesc = "" +
 	"page_token\x18\x02 \x01(\tB\x03\xe0A\x01R\tpageToken\"}\n" +
 	"\x17ListPermissionsResponse\x12:\n" +
 	"\vpermissions\x18\x01 \x03(\v2\x18.pivox.iam.v1.PermissionR\vpermissions\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageTokenB\xb4\x01\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"z\n" +
+	"\x19TestIamPermissionsRequest\x12&\n" +
+	"\bresource\x18\x01 \x01(\tB\n" +
+	"\xe0A\x02\xbaH\x04r\x02\x10\x01R\bresource\x125\n" +
+	"\vpermissions\x18\x02 \x03(\tB\x13\xe0A\x02\xbaH\r\x92\x01\n" +
+	"\b\x01\x10d\"\x04r\x02\x10\x01R\vpermissions\">\n" +
+	"\x1aTestIamPermissionsResponse\x12 \n" +
+	"\vpermissions\x18\x01 \x03(\tR\vpermissionsB\xb4\x01\n" +
 	"\x10com.pivox.iam.v1B\x10PermissionsProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1;iamv1\xa2\x02\x03PIX\xaa\x02\fPivox.Iam.V1\xca\x02\fPivox\\Iam\\V1\xe2\x02\x18Pivox\\Iam\\V1\\GPBMetadata\xea\x02\x0ePivox::Iam::V1b\x06proto3"
 
 var (
@@ -257,11 +379,13 @@ func file_pivox_iam_v1_permissions_proto_rawDescGZIP() []byte {
 	return file_pivox_iam_v1_permissions_proto_rawDescData
 }
 
-var file_pivox_iam_v1_permissions_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_pivox_iam_v1_permissions_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_pivox_iam_v1_permissions_proto_goTypes = []any{
-	(*Permission)(nil),              // 0: pivox.iam.v1.Permission
-	(*ListPermissionsRequest)(nil),  // 1: pivox.iam.v1.ListPermissionsRequest
-	(*ListPermissionsResponse)(nil), // 2: pivox.iam.v1.ListPermissionsResponse
+	(*Permission)(nil),                 // 0: pivox.iam.v1.Permission
+	(*ListPermissionsRequest)(nil),     // 1: pivox.iam.v1.ListPermissionsRequest
+	(*ListPermissionsResponse)(nil),    // 2: pivox.iam.v1.ListPermissionsResponse
+	(*TestIamPermissionsRequest)(nil),  // 3: pivox.iam.v1.TestIamPermissionsRequest
+	(*TestIamPermissionsResponse)(nil), // 4: pivox.iam.v1.TestIamPermissionsResponse
 }
 var file_pivox_iam_v1_permissions_proto_depIdxs = []int32{
 	0, // 0: pivox.iam.v1.ListPermissionsResponse.permissions:type_name -> pivox.iam.v1.Permission
@@ -283,7 +407,7 @@ func file_pivox_iam_v1_permissions_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pivox_iam_v1_permissions_proto_rawDesc), len(file_pivox_iam_v1_permissions_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
