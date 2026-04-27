@@ -25,33 +25,33 @@ func (q *Queries) CountOwnersByOrg(ctx context.Context, orgID uuid.UUID) (int64,
 }
 
 const createUserMembership = `-- name: CreateUserMembership :one
-INSERT INTO users (id, org_id, account_id, role)
+INSERT INTO users (id, org_id, firebase_identity_id, role)
 VALUES ($1, $2, $3, $4)
-RETURNING id, org_id, account_id, role, etag, revision, create_time, update_time
+RETURNING id, org_id, firebase_identity_id, role, etag, revision, create_time, update_time
 `
 
 type CreateUserMembershipParams struct {
-	ID        uuid.UUID `json:"id"`
-	OrgID     uuid.UUID `json:"org_id"`
-	AccountID uuid.UUID `json:"account_id"`
-	Role      OrgRole   `json:"role"`
+	ID                 uuid.UUID `json:"id"`
+	OrgID              uuid.UUID `json:"org_id"`
+	FirebaseIdentityID uuid.UUID `json:"firebase_identity_id"`
+	Role               OrgRole   `json:"role"`
 }
 
-// Creates a per-org membership row joining an account to an org with a role.
-// Used by `CreateOrganization` (founder, role='owner') and the future
-// `AcceptInvitation` flow (invitee, role from invite).
+// Creates a per-org membership row joining a firebase_identity to an
+// org with a role. Used by `CreateOrganization` (founder, role='owner')
+// and the future `AcceptInvitation` flow (invitee, role from invite).
 func (q *Queries) CreateUserMembership(ctx context.Context, arg CreateUserMembershipParams) (User, error) {
 	row := q.db.QueryRow(ctx, createUserMembership,
 		arg.ID,
 		arg.OrgID,
-		arg.AccountID,
+		arg.FirebaseIdentityID,
 		arg.Role,
 	)
 	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.OrgID,
-		&i.AccountID,
+		&i.FirebaseIdentityID,
 		&i.Role,
 		&i.Etag,
 		&i.Revision,
@@ -62,35 +62,35 @@ func (q *Queries) CreateUserMembership(ctx context.Context, arg CreateUserMember
 }
 
 const deleteUserMembership = `-- name: DeleteUserMembership :exec
-DELETE FROM users WHERE org_id = $1 AND account_id = $2
+DELETE FROM users WHERE org_id = $1 AND firebase_identity_id = $2
 `
 
 type DeleteUserMembershipParams struct {
-	OrgID     uuid.UUID `json:"org_id"`
-	AccountID uuid.UUID `json:"account_id"`
+	OrgID              uuid.UUID `json:"org_id"`
+	FirebaseIdentityID uuid.UUID `json:"firebase_identity_id"`
 }
 
 func (q *Queries) DeleteUserMembership(ctx context.Context, arg DeleteUserMembershipParams) error {
-	_, err := q.db.Exec(ctx, deleteUserMembership, arg.OrgID, arg.AccountID)
+	_, err := q.db.Exec(ctx, deleteUserMembership, arg.OrgID, arg.FirebaseIdentityID)
 	return err
 }
 
 const getUserMembership = `-- name: GetUserMembership :one
-SELECT id, org_id, account_id, role, etag, revision, create_time, update_time FROM users WHERE org_id = $1 AND account_id = $2
+SELECT id, org_id, firebase_identity_id, role, etag, revision, create_time, update_time FROM users WHERE org_id = $1 AND firebase_identity_id = $2
 `
 
 type GetUserMembershipParams struct {
-	OrgID     uuid.UUID `json:"org_id"`
-	AccountID uuid.UUID `json:"account_id"`
+	OrgID              uuid.UUID `json:"org_id"`
+	FirebaseIdentityID uuid.UUID `json:"firebase_identity_id"`
 }
 
 func (q *Queries) GetUserMembership(ctx context.Context, arg GetUserMembershipParams) (User, error) {
-	row := q.db.QueryRow(ctx, getUserMembership, arg.OrgID, arg.AccountID)
+	row := q.db.QueryRow(ctx, getUserMembership, arg.OrgID, arg.FirebaseIdentityID)
 	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.OrgID,
-		&i.AccountID,
+		&i.FirebaseIdentityID,
 		&i.Role,
 		&i.Etag,
 		&i.Revision,
@@ -100,24 +100,24 @@ func (q *Queries) GetUserMembership(ctx context.Context, arg GetUserMembershipPa
 	return i, err
 }
 
-const listOrganizationsForAccount = `-- name: ListOrganizationsForAccount :many
-SELECT o.id, o.name, o.display_name, o.annotations, o.created_by_account_id, o.state, o.etag, o.revision, o.created_by, o.updated_by, o.deleted_by, o.create_time, o.update_time, o.delete_time, o.purge_time
+const listOrganizationsForFirebaseIdentity = `-- name: ListOrganizationsForFirebaseIdentity :many
+SELECT o.id, o.name, o.display_name, o.annotations, o.created_by_firebase_identity_id, o.state, o.etag, o.revision, o.created_by, o.updated_by, o.deleted_by, o.create_time, o.update_time, o.delete_time, o.purge_time
   FROM organizations o
   JOIN users u ON u.org_id = o.id
- WHERE u.account_id = $1
+ WHERE u.firebase_identity_id = $1
    AND o.delete_time IS NULL
  ORDER BY o.id ASC
  LIMIT 1000
 `
 
-// Lists all organizations the given account has membership in.
+// Lists all organizations the given firebase_identity has membership in.
 // Caller-scoped for `ListOrganizations`: every authenticated user is
 // only ever shown orgs they belong to. Excludes soft-deleted orgs.
 // No pagination — typical users are in 1-3 orgs. The 1000-row LIMIT
 // is a defensive backstop, not a paging mechanism; if anyone ever
 // needs more we'll know because something is very wrong.
-func (q *Queries) ListOrganizationsForAccount(ctx context.Context, accountID uuid.UUID) ([]Organization, error) {
-	rows, err := q.db.Query(ctx, listOrganizationsForAccount, accountID)
+func (q *Queries) ListOrganizationsForFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) ([]Organization, error) {
+	rows, err := q.db.Query(ctx, listOrganizationsForFirebaseIdentity, firebaseIdentityID)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ func (q *Queries) ListOrganizationsForAccount(ctx context.Context, accountID uui
 			&i.Name,
 			&i.DisplayName,
 			&i.Annotations,
-			&i.CreatedByAccountID,
+			&i.CreatedByFirebaseIdentityID,
 			&i.State,
 			&i.Etag,
 			&i.Revision,
@@ -152,24 +152,24 @@ func (q *Queries) ListOrganizationsForAccount(ctx context.Context, accountID uui
 	return items, nil
 }
 
-const listUsersByAccount = `-- name: ListUsersByAccount :many
-SELECT u.id, u.org_id, u.account_id, u.role, u.etag, u.revision, u.create_time, u.update_time
+const listUsersByFirebaseIdentity = `-- name: ListUsersByFirebaseIdentity :many
+SELECT u.id, u.org_id, u.firebase_identity_id, u.role, u.etag, u.revision, u.create_time, u.update_time
   FROM users u
   JOIN organizations o ON o.id = u.org_id
- WHERE u.account_id = $1
+ WHERE u.firebase_identity_id = $1
    AND o.delete_time IS NULL
  ORDER BY u.create_time
 `
 
-// Lists all live org memberships for an account, excluding memberships
-// in soft-deleted orgs. Used by the membership interceptor's gate and
-// by any consumer that needs the "is this caller in any active org?"
-// signal. Joining out the deleted orgs here keeps that signal in sync
-// with `ListOrganizationsForAccount` — without it, a caller whose only
-// memberships are in deleted orgs would pass the membership check but
-// see an empty org list, soft-bricking onboarding.
-func (q *Queries) ListUsersByAccount(ctx context.Context, accountID uuid.UUID) ([]User, error) {
-	rows, err := q.db.Query(ctx, listUsersByAccount, accountID)
+// Lists all live org memberships for a firebase_identity, excluding
+// memberships in soft-deleted orgs. Used by the membership interceptor's
+// gate and by any consumer that needs the "is this caller in any active
+// org?" signal. Joining out the deleted orgs here keeps that signal in
+// sync with `ListOrganizationsForFirebaseIdentity` — without it, a
+// caller whose only memberships are in deleted orgs would pass the
+// membership check but see an empty org list, soft-bricking onboarding.
+func (q *Queries) ListUsersByFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) ([]User, error) {
+	rows, err := q.db.Query(ctx, listUsersByFirebaseIdentity, firebaseIdentityID)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +180,7 @@ func (q *Queries) ListUsersByAccount(ctx context.Context, accountID uuid.UUID) (
 		if err := rows.Scan(
 			&i.ID,
 			&i.OrgID,
-			&i.AccountID,
+			&i.FirebaseIdentityID,
 			&i.Role,
 			&i.Etag,
 			&i.Revision,
@@ -198,7 +198,7 @@ func (q *Queries) ListUsersByAccount(ctx context.Context, accountID uuid.UUID) (
 }
 
 const listUsersByOrg = `-- name: ListUsersByOrg :many
-SELECT id, org_id, account_id, role, etag, revision, create_time, update_time FROM users WHERE org_id = $1 ORDER BY create_time
+SELECT id, org_id, firebase_identity_id, role, etag, revision, create_time, update_time FROM users WHERE org_id = $1 ORDER BY create_time
 `
 
 func (q *Queries) ListUsersByOrg(ctx context.Context, orgID uuid.UUID) ([]User, error) {
@@ -213,7 +213,7 @@ func (q *Queries) ListUsersByOrg(ctx context.Context, orgID uuid.UUID) ([]User, 
 		if err := rows.Scan(
 			&i.ID,
 			&i.OrgID,
-			&i.AccountID,
+			&i.FirebaseIdentityID,
 			&i.Role,
 			&i.Etag,
 			&i.Revision,
@@ -233,23 +233,23 @@ func (q *Queries) ListUsersByOrg(ctx context.Context, orgID uuid.UUID) ([]User, 
 const updateUserRole = `-- name: UpdateUserRole :one
 UPDATE users
    SET role = $3, update_time = now(), revision = revision + 1
- WHERE org_id = $1 AND account_id = $2
- RETURNING id, org_id, account_id, role, etag, revision, create_time, update_time
+ WHERE org_id = $1 AND firebase_identity_id = $2
+ RETURNING id, org_id, firebase_identity_id, role, etag, revision, create_time, update_time
 `
 
 type UpdateUserRoleParams struct {
-	OrgID     uuid.UUID `json:"org_id"`
-	AccountID uuid.UUID `json:"account_id"`
-	Role      OrgRole   `json:"role"`
+	OrgID              uuid.UUID `json:"org_id"`
+	FirebaseIdentityID uuid.UUID `json:"firebase_identity_id"`
+	Role               OrgRole   `json:"role"`
 }
 
 func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) (User, error) {
-	row := q.db.QueryRow(ctx, updateUserRole, arg.OrgID, arg.AccountID, arg.Role)
+	row := q.db.QueryRow(ctx, updateUserRole, arg.OrgID, arg.FirebaseIdentityID, arg.Role)
 	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.OrgID,
-		&i.AccountID,
+		&i.FirebaseIdentityID,
 		&i.Role,
 		&i.Etag,
 		&i.Revision,

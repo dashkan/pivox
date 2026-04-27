@@ -109,14 +109,14 @@ func (m *MockQuerier) DeleteExpiredDelegatedAuthSessions(ctx context.Context) er
 	return args.Error(0)
 }
 
-func (m *MockQuerier) UpsertAccount(ctx context.Context, arg db.UpsertAccountParams) (db.Account, error) {
+func (m *MockQuerier) UpsertFirebaseIdentity(ctx context.Context, arg db.UpsertFirebaseIdentityParams) (db.FirebaseIdentity, error) {
 	args := m.Called(ctx, arg)
-	return args.Get(0).(db.Account), args.Error(1)
+	return args.Get(0).(db.FirebaseIdentity), args.Error(1)
 }
 
-func (m *MockQuerier) GetAccountByFirebaseUID(ctx context.Context, firebaseUid string) (db.Account, error) {
+func (m *MockQuerier) GetFirebaseIdentityByUID(ctx context.Context, firebaseUid string) (db.FirebaseIdentity, error) {
 	args := m.Called(ctx, firebaseUid)
-	return args.Get(0).(db.Account), args.Error(1)
+	return args.Get(0).(db.FirebaseIdentity), args.Error(1)
 }
 
 // --- Organizations ---
@@ -156,16 +156,16 @@ func (m *MockQuerier) ListUsersByOrg(ctx context.Context, orgID uuid.UUID) ([]db
 	return nil, args.Error(1)
 }
 
-func (m *MockQuerier) ListUsersByAccount(ctx context.Context, accountID uuid.UUID) ([]db.User, error) {
-	args := m.Called(ctx, accountID)
+func (m *MockQuerier) ListUsersByFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) ([]db.User, error) {
+	args := m.Called(ctx, firebaseIdentityID)
 	if v := args.Get(0); v != nil {
 		return v.([]db.User), args.Error(1)
 	}
 	return nil, args.Error(1)
 }
 
-func (m *MockQuerier) ListOrganizationsForAccount(ctx context.Context, accountID uuid.UUID) ([]db.Organization, error) {
-	args := m.Called(ctx, accountID)
+func (m *MockQuerier) ListOrganizationsForFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) ([]db.Organization, error) {
+	args := m.Called(ctx, firebaseIdentityID)
 	if v := args.Get(0); v != nil {
 		return v.([]db.Organization), args.Error(1)
 	}

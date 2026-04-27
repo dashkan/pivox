@@ -1,7 +1,7 @@
--- name: UpsertAccount :one
--- Upserts an account synced from Firebase Auth.
+-- name: UpsertFirebaseIdentity :one
+-- Upserts a firebase_identity row synced from Firebase Auth.
 -- On conflict (same firebase_uid), updates all mutable fields.
-INSERT INTO accounts (
+INSERT INTO firebase_identities (
     firebase_uid,
     email,
     email_verified,
@@ -16,9 +16,9 @@ ON CONFLICT (firebase_uid) DO UPDATE SET
     display_name   = EXCLUDED.display_name,
     photo_url      = EXCLUDED.photo_url,
     disabled       = EXCLUDED.disabled,
-    last_login_time = COALESCE(EXCLUDED.last_login_time, accounts.last_login_time),
+    last_login_time = COALESCE(EXCLUDED.last_login_time, firebase_identities.last_login_time),
     update_time    = now()
 RETURNING *;
 
--- name: GetAccountByFirebaseUID :one
-SELECT * FROM accounts WHERE firebase_uid = $1;
+-- name: GetFirebaseIdentityByUID :one
+SELECT * FROM firebase_identities WHERE firebase_uid = $1;

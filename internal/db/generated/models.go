@@ -850,19 +850,6 @@ func (ns NullTagBindingOrigin) Value() (driver.Value, error) {
 	return string(ns.TagBindingOrigin), nil
 }
 
-type Account struct {
-	ID            uuid.UUID          `json:"id"`
-	FirebaseUid   string             `json:"firebase_uid"`
-	Email         string             `json:"email"`
-	EmailVerified bool               `json:"email_verified"`
-	DisplayName   string             `json:"display_name"`
-	PhotoUrl      string             `json:"photo_url"`
-	Disabled      bool               `json:"disabled"`
-	CreateTime    time.Time          `json:"create_time"`
-	UpdateTime    time.Time          `json:"update_time"`
-	LastLoginTime pgtype.Timestamptz `json:"last_login_time"`
-}
-
 type AiArtifact struct {
 	ID              uuid.UUID   `json:"id"`
 	ConversationID  uuid.UUID   `json:"conversation_id"`
@@ -1051,6 +1038,19 @@ type DelegatedAuthSession struct {
 	ExpireTime  time.Time                 `json:"expire_time"`
 }
 
+type FirebaseIdentity struct {
+	ID            uuid.UUID          `json:"id"`
+	FirebaseUid   string             `json:"firebase_uid"`
+	Email         string             `json:"email"`
+	EmailVerified bool               `json:"email_verified"`
+	DisplayName   string             `json:"display_name"`
+	PhotoUrl      string             `json:"photo_url"`
+	Disabled      bool               `json:"disabled"`
+	CreateTime    time.Time          `json:"create_time"`
+	UpdateTime    time.Time          `json:"update_time"`
+	LastLoginTime pgtype.Timestamptz `json:"last_login_time"`
+}
+
 type Group struct {
 	ID          uuid.UUID       `json:"id"`
 	OrgID       uuid.UUID       `json:"org_id"`
@@ -1123,21 +1123,21 @@ type Operation struct {
 }
 
 type Organization struct {
-	ID                 uuid.UUID          `json:"id"`
-	Name               string             `json:"name"`
-	DisplayName        string             `json:"display_name"`
-	Annotations        json.RawMessage    `json:"annotations"`
-	CreatedByAccountID pgtype.UUID        `json:"created_by_account_id"`
-	State              ResourceState      `json:"state"`
-	Etag               string             `json:"etag"`
-	Revision           int32              `json:"revision"`
-	CreatedBy          string             `json:"created_by"`
-	UpdatedBy          string             `json:"updated_by"`
-	DeletedBy          string             `json:"deleted_by"`
-	CreateTime         time.Time          `json:"create_time"`
-	UpdateTime         time.Time          `json:"update_time"`
-	DeleteTime         pgtype.Timestamptz `json:"delete_time"`
-	PurgeTime          pgtype.Timestamptz `json:"purge_time"`
+	ID                          uuid.UUID          `json:"id"`
+	Name                        string             `json:"name"`
+	DisplayName                 string             `json:"display_name"`
+	Annotations                 json.RawMessage    `json:"annotations"`
+	CreatedByFirebaseIdentityID pgtype.UUID        `json:"created_by_firebase_identity_id"`
+	State                       ResourceState      `json:"state"`
+	Etag                        string             `json:"etag"`
+	Revision                    int32              `json:"revision"`
+	CreatedBy                   string             `json:"created_by"`
+	UpdatedBy                   string             `json:"updated_by"`
+	DeletedBy                   string             `json:"deleted_by"`
+	CreateTime                  time.Time          `json:"create_time"`
+	UpdateTime                  time.Time          `json:"update_time"`
+	DeleteTime                  pgtype.Timestamptz `json:"delete_time"`
+	PurgeTime                   pgtype.Timestamptz `json:"purge_time"`
 }
 
 type Permission struct {
@@ -1318,12 +1318,12 @@ type TagValue struct {
 }
 
 type User struct {
-	ID         uuid.UUID `json:"id"`
-	OrgID      uuid.UUID `json:"org_id"`
-	AccountID  uuid.UUID `json:"account_id"`
-	Role       OrgRole   `json:"role"`
-	Etag       string    `json:"etag"`
-	Revision   int32     `json:"revision"`
-	CreateTime time.Time `json:"create_time"`
-	UpdateTime time.Time `json:"update_time"`
+	ID                 uuid.UUID `json:"id"`
+	OrgID              uuid.UUID `json:"org_id"`
+	FirebaseIdentityID uuid.UUID `json:"firebase_identity_id"`
+	Role               OrgRole   `json:"role"`
+	Etag               string    `json:"etag"`
+	Revision           int32     `json:"revision"`
+	CreateTime         time.Time `json:"create_time"`
+	UpdateTime         time.Time `json:"update_time"`
 }

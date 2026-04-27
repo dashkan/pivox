@@ -67,9 +67,9 @@ type Querier interface {
 	CreateTagBinding(ctx context.Context, arg CreateTagBindingParams) (TagBinding, error)
 	CreateTagKey(ctx context.Context, arg CreateTagKeyParams) (TagKey, error)
 	CreateTagValue(ctx context.Context, arg CreateTagValueParams) (TagValue, error)
-	// Creates a per-org membership row joining an account to an org with a role.
-	// Used by `CreateOrganization` (founder, role='owner') and the future
-	// `AcceptInvitation` flow (invitee, role from invite).
+	// Creates a per-org membership row joining a firebase_identity to an
+	// org with a role. Used by `CreateOrganization` (founder, role='owner')
+	// and the future `AcceptInvitation` flow (invitee, role from invite).
 	CreateUserMembership(ctx context.Context, arg CreateUserMembershipParams) (User, error)
 	DeleteArtifact(ctx context.Context, id uuid.UUID) error
 	DeleteArtifactVersion(ctx context.Context, id uuid.UUID) error
@@ -93,7 +93,6 @@ type Querier interface {
 	DeleteTagValue(ctx context.Context, id uuid.UUID) error
 	DeleteUserMembership(ctx context.Context, arg DeleteUserMembershipParams) error
 	FailOperation(ctx context.Context, arg FailOperationParams) (Operation, error)
-	GetAccountByFirebaseUID(ctx context.Context, firebaseUid string) (Account, error)
 	GetApiKey(ctx context.Context, id uuid.UUID) (ApiKey, error)
 	GetApiKeyByOrgAndKeyID(ctx context.Context, arg GetApiKeyByOrgAndKeyIDParams) (ApiKey, error)
 	GetApiKeyIncludingDeleted(ctx context.Context, id uuid.UUID) (ApiKey, error)
@@ -112,6 +111,7 @@ type Querier interface {
 	// Returns the state of a session without mutating it. Used by pollers to
 	// distinguish "still pending" from "expired/unknown" after a failed consume.
 	GetDelegatedAuthSessionState(ctx context.Context, code uuid.UUID) (DelegatedAuthSessionState, error)
+	GetFirebaseIdentityByUID(ctx context.Context, firebaseUid string) (FirebaseIdentity, error)
 	GetIamPolicy(ctx context.Context, resourceID uuid.UUID) (IamPolicy, error)
 	GetLatestAssetVersion(ctx context.Context, assetID uuid.UUID) (AssetVersion, error)
 	GetLineItem(ctx context.Context, id uuid.UUID) (AssetRequestLineItem, error)
@@ -152,27 +152,27 @@ type Querier interface {
 	// Caller walks rows accumulating token_count and stops when budget is exceeded.
 	ListMessagesNewestFirst(ctx context.Context, arg ListMessagesNewestFirstParams) ([]AiMessage, error)
 	ListOperations(ctx context.Context, arg ListOperationsParams) ([]Operation, error)
-	// Lists all organizations the given account has membership in.
+	// Lists all organizations the given firebase_identity has membership in.
 	// Caller-scoped for `ListOrganizations`: every authenticated user is
 	// only ever shown orgs they belong to. Excludes soft-deleted orgs.
 	// No pagination — typical users are in 1-3 orgs. The 1000-row LIMIT
 	// is a defensive backstop, not a paging mechanism; if anyone ever
 	// needs more we'll know because something is very wrong.
-	ListOrganizationsForAccount(ctx context.Context, accountID uuid.UUID) ([]Organization, error)
+	ListOrganizationsForFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) ([]Organization, error)
 	ListPendingOperations(ctx context.Context) ([]Operation, error)
 	ListRequestsByProject(ctx context.Context, arg ListRequestsByProjectParams) ([]AssetRequest, error)
 	ListStorageAgentAuditByAgent(ctx context.Context, arg ListStorageAgentAuditByAgentParams) ([]StorageAgentAudit, error)
 	ListStorageAgentAuditByGateway(ctx context.Context, arg ListStorageAgentAuditByGatewayParams) ([]StorageAgentAudit, error)
 	ListStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageAgent, error)
 	ListStorageEndpointsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageEndpoint, error)
-	// Lists all live org memberships for an account, excluding memberships
-	// in soft-deleted orgs. Used by the membership interceptor's gate and
-	// by any consumer that needs the "is this caller in any active org?"
-	// signal. Joining out the deleted orgs here keeps that signal in sync
-	// with `ListOrganizationsForAccount` — without it, a caller whose only
-	// memberships are in deleted orgs would pass the membership check but
-	// see an empty org list, soft-bricking onboarding.
-	ListUsersByAccount(ctx context.Context, accountID uuid.UUID) ([]User, error)
+	// Lists all live org memberships for a firebase_identity, excluding
+	// memberships in soft-deleted orgs. Used by the membership interceptor's
+	// gate and by any consumer that needs the "is this caller in any active
+	// org?" signal. Joining out the deleted orgs here keeps that signal in
+	// sync with `ListOrganizationsForFirebaseIdentity` — without it, a
+	// caller whose only memberships are in deleted orgs would pass the
+	// membership check but see an empty org list, soft-bricking onboarding.
+	ListUsersByFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) ([]User, error)
 	ListUsersByOrg(ctx context.Context, orgID uuid.UUID) ([]User, error)
 	LookupApiKeyByKeyString(ctx context.Context, keyString string) (ApiKey, error)
 	NextVersionNumber(ctx context.Context, assetID uuid.UUID) (int32, error)
@@ -225,9 +225,9 @@ type Querier interface {
 	UpdateTagKey(ctx context.Context, arg UpdateTagKeyParams) (TagKey, error)
 	UpdateTagValue(ctx context.Context, arg UpdateTagValueParams) (TagValue, error)
 	UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) (User, error)
-	// Upserts an account synced from Firebase Auth.
+	// Upserts a firebase_identity row synced from Firebase Auth.
 	// On conflict (same firebase_uid), updates all mutable fields.
-	UpsertAccount(ctx context.Context, arg UpsertAccountParams) (Account, error)
+	UpsertFirebaseIdentity(ctx context.Context, arg UpsertFirebaseIdentityParams) (FirebaseIdentity, error)
 	UpsertIamPolicy(ctx context.Context, arg UpsertIamPolicyParams) (IamPolicy, error)
 }
 

@@ -299,7 +299,7 @@ func (m *mockAuthService) CreateCustomToken(ctx context.Context, uid string) (st
 
 // newCreateOrgServer builds an OrganizationsServer wired with the mock pool,
 // auth service, and querier needed by CreateOrganization. The querier is
-// where `GetAccountByFirebaseUID` (the pre-tx caller-resolution lookup)
+// where `GetFirebaseIdentityByUID` (the pre-tx caller-resolution lookup)
 // fires; the readUID closure stubs the auth-context UID extraction so
 // tests don't need to wire the production interceptor.
 func newCreateOrgServer(pool TxBeginner, auth authn.Service, q db.Querier) *OrganizationsServer {
@@ -313,26 +313,26 @@ func newCreateOrgServer(pool TxBeginner, auth authn.Service, q db.Querier) *Orga
 }
 
 // testFirebaseUID is the canonical caller UID used by all
-// CreateOrganization unit tests. The matching account row is
-// returned by the GetAccountByFirebaseUID mock setup.
+// CreateOrganization unit tests. The matching firebase_identity row
+// is returned by the GetFirebaseIdentityByUID mock setup.
 const testFirebaseUID = "fb-test-uid"
 
-// testCallerAccount is the canonical caller account returned by
-// `GetAccountByFirebaseUID` in CreateOrganization unit tests. Tests
-// that exercise the founder-pointer / membership path can compare
-// against `testCallerAccount.ID`.
-var testCallerAccount = db.Account{
+// testCallerIdentity is the canonical caller firebase_identity
+// returned by `GetFirebaseIdentityByUID` in CreateOrganization unit
+// tests. Tests that exercise the founder-pointer / membership path
+// can compare against `testCallerIdentity.ID`.
+var testCallerIdentity = db.FirebaseIdentity{
 	ID:          uuid.MustParse("0192a000-aaaa-7000-8000-000000000001"),
 	FirebaseUid: testFirebaseUID,
 	Email:       "test@example.com",
 }
 
-// expectGetAccount sets up the standard caller-resolution mock that
+// expectGetIdentity sets up the standard caller-resolution mock that
 // fires before the tx begins. Every CreateOrganization test that
 // passes `WithAuthenticatedUID`-equivalent context needs this.
-func expectGetAccount(q *mocks.MockQuerier) {
-	q.On("GetAccountByFirebaseUID", mock.Anything, testFirebaseUID).
-		Return(testCallerAccount, nil).Once()
+func expectGetIdentity(q *mocks.MockQuerier) {
+	q.On("GetFirebaseIdentityByUID", mock.Anything, testFirebaseUID).
+		Return(testCallerIdentity, nil).Once()
 }
 
 // membershipRow returns a mockRow whose Scan populates a db.User
@@ -340,14 +340,14 @@ func expectGetAccount(q *mocks.MockQuerier) {
 // RETURNING clause for CreateUserMembership.
 func membershipRow(u db.User) *mockRow {
 	return &mockRow{scanFunc: func(dest ...interface{}) error {
-		// Column order: id, org_id, account_id, role, etag,
-		// revision, create_time, update_time
+		// Column order: id, org_id, firebase_identity_id, role,
+		// etag, revision, create_time, update_time
 		if len(dest) != 8 {
 			return errors.New("unexpected number of scan destinations")
 		}
 		*dest[0].(*uuid.UUID) = u.ID
 		*dest[1].(*uuid.UUID) = u.OrgID
-		*dest[2].(*uuid.UUID) = u.AccountID
+		*dest[2].(*uuid.UUID) = u.FirebaseIdentityID
 		*dest[3].(*db.OrgRole) = u.Role
 		*dest[4].(*string) = u.Etag
 		*dest[5].(*int32) = u.Revision
@@ -362,9 +362,9 @@ func membershipRow(u db.User) *mockRow {
 func orgRow(org db.Organization) *mockRow {
 	return &mockRow{scanFunc: func(dest ...interface{}) error {
 		// Column order: id, name, display_name, annotations,
-		// created_by_account_id, state, etag, revision, created_by,
-		// updated_by, deleted_by, create_time, update_time, delete_time,
-		// purge_time
+		// created_by_firebase_identity_id, state, etag, revision,
+		// created_by, updated_by, deleted_by, create_time, update_time,
+		// delete_time, purge_time
 		if len(dest) != 15 {
 			return errors.New("unexpected number of scan destinations")
 		}
@@ -397,7 +397,7 @@ func TestUnit_CreateOrganization_Success(t *testing.T) {
 	tx := new(mockTx)
 	auth := new(mockAuthService)
 	mockQ := new(mocks.MockQuerier)
-	expectGetAccount(mockQ)
+	expectGetIdentity(mockQ)
 	srv := newCreateOrgServer(pool, auth, mockQ)
 
 	createdOrg := db.Organization{
@@ -420,14 +420,14 @@ func TestUnit_CreateOrganization_Success(t *testing.T) {
 		Return(orgRow(createdOrg)).Once()
 	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
 		Return(membershipRow(db.User{
-			ID:         uuid.New(),
-			OrgID:      createdOrg.ID,
-			AccountID:  testCallerAccount.ID,
-			Role:       db.OrgRoleOwner,
-			Etag:       "etag-membership",
-			Revision:   1,
-			CreateTime: createdOrg.CreateTime,
-			UpdateTime: createdOrg.UpdateTime,
+			ID:                 uuid.New(),
+			OrgID:              createdOrg.ID,
+			FirebaseIdentityID: testCallerIdentity.ID,
+			Role:               db.OrgRoleOwner,
+			Etag:               "etag-membership",
+			Revision:           1,
+			CreateTime:         createdOrg.CreateTime,
+			UpdateTime:         createdOrg.UpdateTime,
 		})).Once()
 
 	// 3. Commit
@@ -474,7 +474,7 @@ func TestUnit_CreateOrganization_CreatesOwnerMembership(t *testing.T) {
 	tx := new(mockTx)
 	auth := new(mockAuthService)
 	mockQ := new(mocks.MockQuerier)
-	expectGetAccount(mockQ)
+	expectGetIdentity(mockQ)
 	srv := newCreateOrgServer(pool, auth, mockQ)
 
 	createdOrg := db.Organization{
@@ -496,22 +496,22 @@ func TestUnit_CreateOrganization_CreatesOwnerMembership(t *testing.T) {
 		Return(orgRow(createdOrg)).Once()
 
 	// Second QueryRow: membership create. Capture the args so the
-	// test can assert role='owner', org_id, and account_id reach the
-	// tx exactly as expected.
+	// test can assert role='owner', org_id, and firebase_identity_id
+	// reach the tx exactly as expected.
 	var capturedMembershipArgs []interface{}
 	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			capturedMembershipArgs = args.Get(2).([]interface{})
 		}).
 		Return(membershipRow(db.User{
-			ID:         uuid.New(),
-			OrgID:      createdOrg.ID,
-			AccountID:  testCallerAccount.ID,
-			Role:       db.OrgRoleOwner,
-			Etag:       "etag-membership",
-			Revision:   1,
-			CreateTime: createdOrg.CreateTime,
-			UpdateTime: createdOrg.UpdateTime,
+			ID:                 uuid.New(),
+			OrgID:              createdOrg.ID,
+			FirebaseIdentityID: testCallerIdentity.ID,
+			Role:               db.OrgRoleOwner,
+			Etag:               "etag-membership",
+			Revision:           1,
+			CreateTime:         createdOrg.CreateTime,
+			UpdateTime:         createdOrg.UpdateTime,
 		})).Once()
 
 	tx.On("Commit", mock.Anything).Return(nil)
@@ -523,18 +523,19 @@ func TestUnit_CreateOrganization_CreatesOwnerMembership(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// CreateUserMembership SQL args order: id, org_id, account_id, role.
-	// We don't pin the membership UUID (it's randomly generated), so
-	// args[0] is just asserted non-zero. The remaining three are the
-	// load-bearing invariants this test guards.
+	// CreateUserMembership SQL args order: id, org_id,
+	// firebase_identity_id, role. We don't pin the membership UUID
+	// (it's randomly generated), so args[0] is just asserted non-zero.
+	// The remaining three are the load-bearing invariants this test
+	// guards.
 	require.Len(t, capturedMembershipArgs, 4,
-		"CreateUserMembership should receive 4 args: id, org_id, account_id, role")
+		"CreateUserMembership should receive 4 args: id, org_id, firebase_identity_id, role")
 	assert.NotEqual(t, uuid.Nil, capturedMembershipArgs[0],
 		"membership id must be assigned")
 	assert.Equal(t, createdOrg.ID, capturedMembershipArgs[1],
 		"org_id must reference the just-created org")
-	assert.Equal(t, testCallerAccount.ID, capturedMembershipArgs[2],
-		"account_id must reference the authenticated caller")
+	assert.Equal(t, testCallerIdentity.ID, capturedMembershipArgs[2],
+		"firebase_identity_id must reference the authenticated caller")
 	assert.Equal(t, db.OrgRoleOwner, capturedMembershipArgs[3],
 		"role must be 'owner' for the founder")
 }
@@ -566,7 +567,7 @@ func TestUnit_CreateOrganization_CommitFailure(t *testing.T) {
 	tx := new(mockTx)
 	auth := new(mockAuthService)
 	mockQ := new(mocks.MockQuerier)
-	expectGetAccount(mockQ)
+	expectGetIdentity(mockQ)
 	srv := newCreateOrgServer(pool, auth, mockQ)
 
 	createdOrg := db.Organization{
@@ -588,14 +589,14 @@ func TestUnit_CreateOrganization_CommitFailure(t *testing.T) {
 		Return(orgRow(createdOrg)).Once()
 	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
 		Return(membershipRow(db.User{
-			ID:         uuid.New(),
-			OrgID:      createdOrg.ID,
-			AccountID:  testCallerAccount.ID,
-			Role:       db.OrgRoleOwner,
-			Etag:       "etag-membership",
-			Revision:   1,
-			CreateTime: createdOrg.CreateTime,
-			UpdateTime: createdOrg.UpdateTime,
+			ID:                 uuid.New(),
+			OrgID:              createdOrg.ID,
+			FirebaseIdentityID: testCallerIdentity.ID,
+			Role:               db.OrgRoleOwner,
+			Etag:               "etag-membership",
+			Revision:           1,
+			CreateTime:         createdOrg.CreateTime,
+			UpdateTime:         createdOrg.UpdateTime,
 		})).Once()
 
 	// Commit fails.
@@ -627,7 +628,7 @@ func TestUnit_CreateOrganization_AutoGeneratedSlug(t *testing.T) {
 	tx := new(mockTx)
 	auth := new(mockAuthService)
 	mockQ := new(mocks.MockQuerier)
-	expectGetAccount(mockQ)
+	expectGetIdentity(mockQ)
 	srv := newCreateOrgServer(pool, auth, mockQ)
 
 	// Begin tx succeeds.
@@ -655,14 +656,14 @@ func TestUnit_CreateOrganization_AutoGeneratedSlug(t *testing.T) {
 	// Owner membership row created in the same tx.
 	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
 		Return(membershipRow(db.User{
-			ID:         uuid.New(),
-			OrgID:      uuid.MustParse("0192a000-0005-7000-8000-000000000005"),
-			AccountID:  testCallerAccount.ID,
-			Role:       db.OrgRoleOwner,
-			Etag:       "etag-membership",
-			Revision:   1,
-			CreateTime: time.Date(2025, 8, 1, 10, 0, 0, 0, time.UTC),
-			UpdateTime: time.Date(2025, 8, 1, 10, 0, 0, 0, time.UTC),
+			ID:                 uuid.New(),
+			OrgID:              uuid.MustParse("0192a000-0005-7000-8000-000000000005"),
+			FirebaseIdentityID: testCallerIdentity.ID,
+			Role:               db.OrgRoleOwner,
+			Etag:               "etag-membership",
+			Revision:           1,
+			CreateTime:         time.Date(2025, 8, 1, 10, 0, 0, 0, time.UTC),
+			UpdateTime:         time.Date(2025, 8, 1, 10, 0, 0, 0, time.UTC),
 		})).Once()
 
 	// Commit succeeds.
@@ -693,7 +694,7 @@ func TestUnit_CreateOrganization_BeginTransactionError(t *testing.T) {
 	pool := new(mockTxBeginner)
 	auth := new(mockAuthService)
 	mockQ := new(mocks.MockQuerier)
-	expectGetAccount(mockQ)
+	expectGetIdentity(mockQ)
 	srv := newCreateOrgServer(pool, auth, mockQ)
 
 	// Begin fails — no tx is returned.
@@ -743,13 +744,14 @@ func TestUnit_ListOrganizations_Unauthenticated(t *testing.T) {
 	mockQ.AssertExpectations(t)
 }
 
-func TestUnit_ListOrganizations_NoAccountRowReturnsEmpty(t *testing.T) {
-	// Race with the /internal/sync-account webhook on a freshly-Firebase-
-	// registered user: caller has a valid token but no `accounts` row
-	// yet. Memberless state — must return empty list, not an error.
+func TestUnit_ListOrganizations_NoIdentityRowReturnsEmpty(t *testing.T) {
+	// Race with the sync-identity webhook on a freshly-Firebase-
+	// registered user: caller has a valid token but no
+	// `firebase_identities` row yet. Memberless state — must return
+	// empty list, not an error.
 	mockQ := new(mocks.MockQuerier)
-	mockQ.On("GetAccountByFirebaseUID", mock.Anything, testFirebaseUID).
-		Return(db.Account{}, pgx.ErrNoRows)
+	mockQ.On("GetFirebaseIdentityByUID", mock.Anything, testFirebaseUID).
+		Return(db.FirebaseIdentity{}, pgx.ErrNoRows)
 	srv := newListOrgsServer(mockQ)
 
 	resp, err := srv.ListOrganizations(context.Background(), &apiv1.ListOrganizationsRequest{})
@@ -759,10 +761,10 @@ func TestUnit_ListOrganizations_NoAccountRowReturnsEmpty(t *testing.T) {
 	mockQ.AssertExpectations(t)
 }
 
-func TestUnit_ListOrganizations_AccountLookupError(t *testing.T) {
+func TestUnit_ListOrganizations_IdentityLookupError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	mockQ.On("GetAccountByFirebaseUID", mock.Anything, mock.Anything).
-		Return(db.Account{}, errors.New("connection refused"))
+	mockQ.On("GetFirebaseIdentityByUID", mock.Anything, mock.Anything).
+		Return(db.FirebaseIdentity{}, errors.New("connection refused"))
 	srv := newListOrgsServer(mockQ)
 
 	_, err := srv.ListOrganizations(context.Background(), &apiv1.ListOrganizationsRequest{})
@@ -775,10 +777,11 @@ func TestUnit_ListOrganizations_AccountLookupError(t *testing.T) {
 
 func TestUnit_ListOrganizations_OnlyReturnsCallerOrgs(t *testing.T) {
 	// Caller-scoping: the handler MUST scope through
-	// ListOrganizationsForAccount, which JOINs users → organizations
-	// on account_id. Caller never sees orgs they aren't a member of.
+	// ListOrganizationsForFirebaseIdentity, which JOINs users →
+	// organizations on firebase_identity_id. Caller never sees orgs
+	// they aren't a member of.
 	mockQ := new(mocks.MockQuerier)
-	expectGetAccount(mockQ)
+	expectGetIdentity(mockQ)
 
 	callerOrgs := []db.Organization{
 		{
@@ -793,7 +796,7 @@ func TestUnit_ListOrganizations_OnlyReturnsCallerOrgs(t *testing.T) {
 			UpdateTime:  time.Date(2025, 9, 1, 0, 0, 0, 0, time.UTC),
 		},
 	}
-	mockQ.On("ListOrganizationsForAccount", mock.Anything, testCallerAccount.ID).Return(callerOrgs, nil)
+	mockQ.On("ListOrganizationsForFirebaseIdentity", mock.Anything, testCallerIdentity.ID).Return(callerOrgs, nil)
 
 	srv := newListOrgsServer(mockQ)
 	resp, err := srv.ListOrganizations(context.Background(), &apiv1.ListOrganizationsRequest{})
@@ -806,8 +809,8 @@ func TestUnit_ListOrganizations_OnlyReturnsCallerOrgs(t *testing.T) {
 
 func TestUnit_ListOrganizations_QueryError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	expectGetAccount(mockQ)
-	mockQ.On("ListOrganizationsForAccount", mock.Anything, testCallerAccount.ID).
+	expectGetIdentity(mockQ)
+	mockQ.On("ListOrganizationsForFirebaseIdentity", mock.Anything, testCallerIdentity.ID).
 		Return(nil, errors.New("connection refused"))
 	srv := newListOrgsServer(mockQ)
 
@@ -823,8 +826,8 @@ func TestUnit_ListOrganizations_IgnoresPaginationFields(t *testing.T) {
 	// PageSize, PageToken, Filter from the request must NOT affect the
 	// query — handler returns all caller's orgs regardless.
 	mockQ := new(mocks.MockQuerier)
-	expectGetAccount(mockQ)
-	mockQ.On("ListOrganizationsForAccount", mock.Anything, testCallerAccount.ID).
+	expectGetIdentity(mockQ)
+	mockQ.On("ListOrganizationsForFirebaseIdentity", mock.Anything, testCallerIdentity.ID).
 		Return([]db.Organization{}, nil)
 
 	srv := newListOrgsServer(mockQ)
@@ -845,7 +848,7 @@ func TestUnit_CreateOrganization_DBCreateError(t *testing.T) {
 	tx := new(mockTx)
 	auth := new(mockAuthService)
 	mockQ := new(mocks.MockQuerier)
-	expectGetAccount(mockQ)
+	expectGetIdentity(mockQ)
 	srv := newCreateOrgServer(pool, auth, mockQ)
 
 	pool.On("Begin", mock.Anything).Return(tx, nil)

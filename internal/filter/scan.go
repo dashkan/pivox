@@ -161,7 +161,7 @@ func ScanOrganizations(rows pgx.Rows) ([]db.Organization, error) {
 			&o.Name,
 			&o.DisplayName,
 			&o.Annotations,
-			&o.CreatedByAccountID,
+			&o.CreatedByFirebaseIdentityID,
 			&o.State,
 			&o.Etag,
 			&o.Revision,

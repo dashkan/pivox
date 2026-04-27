@@ -165,9 +165,9 @@ func TestSyncAccount_Success(t *testing.T) {
 	h := newTestHooks(t, mockQ, auth)
 
 	accountID := uuid.New()
-	mockQ.On("UpsertAccount", mock.Anything, mock.MatchedBy(func(p db.UpsertAccountParams) bool {
+	mockQ.On("UpsertFirebaseIdentity", mock.Anything, mock.MatchedBy(func(p db.UpsertFirebaseIdentityParams) bool {
 		return p.FirebaseUid == "uid-123" && p.Email == "test@example.com"
-	})).Return(db.Account{ID: accountID, FirebaseUid: "uid-123"}, nil)
+	})).Return(db.FirebaseIdentity{ID: accountID, FirebaseUid: "uid-123"}, nil)
 
 	body := `{"firebase_uid":"uid-123","email":"test@example.com","display_name":"Test User"}`
 	req := httptest.NewRequest("POST", "/internal/v1/accounts:sync", strings.NewReader(body))
@@ -215,8 +215,8 @@ func TestSyncAccount_DBError(t *testing.T) {
 	auth := new(mockAuthService)
 	h := newTestHooks(t, mockQ, auth)
 
-	mockQ.On("UpsertAccount", mock.Anything, mock.Anything).
-		Return(db.Account{}, errors.New("db down"))
+	mockQ.On("UpsertFirebaseIdentity", mock.Anything, mock.Anything).
+		Return(db.FirebaseIdentity{}, errors.New("db down"))
 
 	body := `{"firebase_uid":"uid-123","email":"test@example.com"}`
 	req := httptest.NewRequest("POST", "/internal/v1/accounts:sync", strings.NewReader(body))

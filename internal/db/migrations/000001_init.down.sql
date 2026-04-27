@@ -28,7 +28,7 @@ DROP TABLE IF EXISTS group_members;
 DROP TABLE IF EXISTS groups;
 DROP TABLE IF EXISTS project_members;
 DROP TABLE IF EXISTS users;
-DROP TABLE IF EXISTS accounts;
+DROP TABLE IF EXISTS firebase_identities;
 DROP TABLE IF EXISTS iam_policies;
 DROP TABLE IF EXISTS api_keys;
 DROP TABLE IF EXISTS tag_bindings;

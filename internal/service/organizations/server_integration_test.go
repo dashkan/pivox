@@ -41,19 +41,19 @@ const testCallerUID = "test-user"
 
 func testReadUID(_ context.Context) (string, bool) { return testCallerUID, true }
 
-// seedTestCaller upserts an `accounts` row for testCallerUID so
-// `CreateOrganization`'s `GetAccountByFirebaseUID` lookup succeeds.
-// Returns the seeded account's id.
+// seedTestCaller upserts a `firebase_identities` row for testCallerUID
+// so `CreateOrganization`'s `GetFirebaseIdentityByUID` lookup
+// succeeds. Returns the seeded identity's id.
 func seedTestCaller(t *testing.T, queries db.Querier) uuid.UUID {
 	t.Helper()
-	acct, err := queries.UpsertAccount(context.Background(), db.UpsertAccountParams{
+	identity, err := queries.UpsertFirebaseIdentity(context.Background(), db.UpsertFirebaseIdentityParams{
 		FirebaseUid:   testCallerUID,
 		Email:         "test@example.com",
 		EmailVerified: true,
 		DisplayName:   "Test Caller",
 	})
 	require.NoError(t, err)
-	return acct.ID
+	return identity.ID
 }
 
 func TestIntegration_CreateOrganization_DuplicateName(t *testing.T) {

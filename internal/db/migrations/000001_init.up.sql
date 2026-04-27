@@ -69,14 +69,14 @@ CREATE TABLE organizations (
     -- domain
     display_name          TEXT NOT NULL DEFAULT '',
     annotations           JSONB NOT NULL DEFAULT '{}',
-    -- Immutable founder pointer. `created_by_account_id` references the
-    -- account row of whoever created this org (FK added after the
-    -- `accounts` table is declared further down). Survives membership
-    -- changes (the user can leave the org without breaking this FK).
-    -- Owners are tracked separately via `users.role = 'owner'`; an
-    -- org can have N owners and "≥1 owner" is enforced at the service
-    -- mutation boundary, not here.
-    created_by_account_id UUID,
+    -- Immutable founder pointer. `created_by_firebase_identity_id`
+    -- references the firebase_identities row of whoever created this
+    -- org (FK added after the `firebase_identities` table is declared
+    -- further down). Survives membership changes (the user can leave
+    -- the org without breaking this FK). Owners are tracked separately
+    -- via `users.role = 'owner'`; an org can have N owners and "≥1
+    -- owner" is enforced at the service mutation boundary, not here.
+    created_by_firebase_identity_id UUID,
     -- state
     state                 resource_state NOT NULL DEFAULT 'ACTIVE',
     -- versioning
@@ -371,9 +371,9 @@ CREATE TABLE iam_policies (
 CREATE INDEX idx_iam_policies_type ON iam_policies (resource_type);
 
 -- ============================================================================
--- accounts (global Firebase Auth cache — internal, no proto)
+-- firebase_identities (global Firebase Auth cache — internal, no proto)
 -- ============================================================================
-CREATE TABLE accounts (
+CREATE TABLE firebase_identities (
     id              UUID PRIMARY KEY DEFAULT uuidv7(),
     -- identity (Firebase)
     firebase_uid    TEXT NOT NULL UNIQUE,
@@ -388,13 +388,13 @@ CREATE TABLE accounts (
     update_time     TIMESTAMPTZ NOT NULL DEFAULT now(),
     last_login_time TIMESTAMPTZ
 );
-CREATE INDEX idx_accounts_email ON accounts (email);
+CREATE INDEX idx_firebase_identities_email ON firebase_identities (email);
 
 -- ============================================================================
 -- users (per-org membership)
 --
--- One row per (org, account) pairing — the join that says "this account
--- has access to this org". Created in two ways:
+-- One row per (org, firebase_identity) pairing — the join that says
+-- "this identity has access to this org". Created in two ways:
 --   1. By `CreateOrganization` for the founder, with role='owner'.
 --   2. By `AcceptInvitation` (future) for invitees, role from the invite.
 --
@@ -406,34 +406,34 @@ CREATE INDEX idx_accounts_email ON accounts (email);
 CREATE TYPE org_role AS ENUM ('owner', 'member');
 
 CREATE TABLE users (
-    id         UUID PRIMARY KEY DEFAULT uuidv7(),
+    id                   UUID PRIMARY KEY DEFAULT uuidv7(),
     -- relationships
-    org_id     UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    org_id               UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    firebase_identity_id UUID NOT NULL REFERENCES firebase_identities(id) ON DELETE CASCADE,
     -- domain
-    role       org_role NOT NULL DEFAULT 'member',
+    role                 org_role NOT NULL DEFAULT 'member',
     -- versioning
-    etag       TEXT NOT NULL DEFAULT md5(now()::text),
-    revision   INTEGER NOT NULL DEFAULT 1,
+    etag                 TEXT NOT NULL DEFAULT md5(now()::text),
+    revision             INTEGER NOT NULL DEFAULT 1,
     -- timestamps
-    create_time TIMESTAMPTZ NOT NULL DEFAULT now(),
-    update_time TIMESTAMPTZ NOT NULL DEFAULT now(),
+    create_time          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    update_time          TIMESTAMPTZ NOT NULL DEFAULT now(),
     -- constraints
-    UNIQUE(org_id, account_id)
+    UNIQUE(org_id, firebase_identity_id)
 );
 CREATE INDEX idx_users_org ON users (org_id);
-CREATE INDEX idx_users_account ON users (account_id);
+CREATE INDEX idx_users_firebase_identity ON users (firebase_identity_id);
 -- Lets us cheaply enforce "≥1 owner per org" by counting owner rows.
 CREATE INDEX idx_users_org_owner ON users (org_id) WHERE role = 'owner';
 
--- FK from organizations.created_by_account_id → accounts.id, added
--- here because `accounts` was declared after `organizations` in this
--- migration. ON DELETE SET NULL: deleting an account preserves the
--- org but nulls out the founder pointer (the org survives, ownership
--- is tracked via `users.role` anyway).
+-- FK from organizations.created_by_firebase_identity_id → firebase_identities.id,
+-- added here because `firebase_identities` was declared after `organizations` in
+-- this migration. ON DELETE SET NULL: deleting a firebase_identity preserves the
+-- org but nulls out the founder pointer (the org survives, ownership is tracked
+-- via `users.role` anyway).
 ALTER TABLE organizations
-  ADD CONSTRAINT fk_organizations_created_by_account
-  FOREIGN KEY (created_by_account_id) REFERENCES accounts(id) ON DELETE SET NULL;
+  ADD CONSTRAINT fk_organizations_created_by_firebase_identity
+  FOREIGN KEY (created_by_firebase_identity_id) REFERENCES firebase_identities(id) ON DELETE SET NULL;
 
 -- ============================================================================
 -- project_members (user or group <-> project, fixed roles)

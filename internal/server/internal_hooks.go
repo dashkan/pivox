@@ -78,14 +78,18 @@ type syncAccountRequest struct {
 	Disabled      bool   `json:"disabled"`
 }
 
-// syncAccount upserts a Firebase Auth user into the accounts table.
+// syncAccount upserts a Firebase Auth user into the firebase_identities table.
+//
+// Handler / URL still named "account" pending phase 1.4, which renames the
+// public endpoint to /internal/v1/auth:syncFirebaseIdentity in coordination
+// with a Firebase Function redeploy.
 func (h *InternalHooks) syncAccount(w http.ResponseWriter, r *http.Request) {
 	// AUTHN-05: Limit request body to 8 KB (sync payloads are small JSON).
 	r.Body = http.MaxBytesReader(w, r.Body, 8<<10)
 
 	var req syncAccountRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.logger.Warn("invalid sync account request", "error", err)
+		h.logger.Warn("invalid sync identity request", "error", err)
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -95,7 +99,7 @@ func (h *InternalHooks) syncAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	account, err := h.queries.UpsertAccount(r.Context(), db.UpsertAccountParams{
+	identity, err := h.queries.UpsertFirebaseIdentity(r.Context(), db.UpsertFirebaseIdentityParams{
 		FirebaseUid:   req.FirebaseUID,
 		Email:         req.Email,
 		EmailVerified: req.EmailVerified,
@@ -105,17 +109,21 @@ func (h *InternalHooks) syncAccount(w http.ResponseWriter, r *http.Request) {
 		LastLoginTime: pgtype.Timestamptz{}, // not set on creation
 	})
 	if err != nil {
-		h.logger.Error("failed to upsert account", "firebase_uid", req.FirebaseUID, "error", err)
+		h.logger.Error("failed to upsert firebase identity", "firebase_uid", req.FirebaseUID, "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
-	h.logger.Info("account synced", "firebase_uid", req.FirebaseUID, "account_id", account.ID)
+	h.logger.Info("firebase identity synced", "firebase_uid", req.FirebaseUID, "firebase_identity_id", identity.ID)
 
+	// Response keeps the `account_id` JSON field for now to preserve the
+	// wire contract with the deployed Firebase Function. Phase 1.4 lands
+	// the new endpoint with a `firebase_identity_id` response field as
+	// part of the coordinated rename + redeploy.
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(map[string]string{
-		"account_id": account.ID.String(),
+		"account_id": identity.ID.String(),
 	}); err != nil {
 		h.logger.Warn("write account-sync response failed", "error", err)
 	}

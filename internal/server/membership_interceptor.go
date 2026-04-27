@@ -18,9 +18,9 @@ const (
 	errMissingAuthenticatedCaller = "missing authenticated caller"
 
 	// memberlessRecoveryMessage is returned for both "caller has no
-	// account row yet" (race with the /internal/sync-account webhook
+	// firebase_identity row yet" (race with the sync-identity webhook
 	// on a freshly-Firebase-registered user) AND "caller has an
-	// account but zero memberships". Same code, same message — both
+	// identity but zero memberships". Same code, same message — both
 	// states route the caller through the same recovery path (the
 	// bootstrap allowlist).
 	memberlessRecoveryMessage = "caller has no organization membership; create or accept an invitation to an organization first"
@@ -68,17 +68,17 @@ func requireMembership(ctx context.Context, queries db.Querier, fullMethod strin
 	if !ok {
 		return apierr.Unauthenticated(errMissingAuthenticatedCaller)
 	}
-	account, err := queries.GetAccountByFirebaseUID(ctx, uid)
+	identity, err := queries.GetFirebaseIdentityByUID(ctx, uid)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apierr.PermissionDenied(memberlessRecoveryMessage)
 		}
-		slog.ErrorContext(ctx, "membership: lookup account failed", "uid", uid, "error", err)
-		return apierr.Internal("lookup account")
+		slog.ErrorContext(ctx, "membership: lookup firebase identity failed", "uid", uid, "error", err)
+		return apierr.Internal("lookup firebase identity")
 	}
-	memberships, err := queries.ListUsersByAccount(ctx, account.ID)
+	memberships, err := queries.ListUsersByFirebaseIdentity(ctx, identity.ID)
 	if err != nil {
-		slog.ErrorContext(ctx, "membership: lookup memberships failed", "account_id", account.ID, "error", err)
+		slog.ErrorContext(ctx, "membership: lookup memberships failed", "firebase_identity_id", identity.ID, "error", err)
 		return apierr.Internal("lookup memberships")
 	}
 	if len(memberships) == 0 {

@@ -101,13 +101,14 @@ Pure removal/rename. Smallest blast radius. No new APIs.
 - [x] No sqlc queries existed for custom domains.
 - [x] Generated Go regenerated via `make proto-generate-go` + sqlc.
 
-### `accounts` → `firebase_identities` rename
+### `accounts` → `firebase_identities` rename ✅
 
-- [ ] Tests: update fixtures + assertions.
-- [ ] Rename `accounts` table → `firebase_identities` in migration.
-- [ ] Update FK references (`organizations.created_by_account_id` → `created_by_firebase_identity_id`).
-- [ ] Rename sqlc queries + regenerate Go.
-- [ ] Update Go references throughout `internal/`.
+- [x] Tests: fixtures + assertions updated; `db.Account` → `db.FirebaseIdentity`, `AccountID` field → `FirebaseIdentityID`, helpers and mocks renamed.
+- [x] Renamed `accounts` table → `firebase_identities` in migration. Index `idx_accounts_email` → `idx_firebase_identities_email`.
+- [x] Updated FK references: `organizations.created_by_account_id` → `created_by_firebase_identity_id`. Constraint name + ON DELETE SET NULL behavior preserved. `users.account_id` → `firebase_identity_id`.
+- [x] Renamed sqlc queries (`UpsertAccount` → `UpsertFirebaseIdentity`, `GetAccountByFirebaseUID` → `GetFirebaseIdentityByUID`, `ListUsersByAccount` → `ListUsersByFirebaseIdentity`, `ListOrganizationsForAccount` → `ListOrganizationsForFirebaseIdentity`); query file `accounts.sql` → `firebase_identities.sql`. Regenerated.
+- [x] Updated Go references throughout `internal/server`, `internal/service/organizations`, `internal/filter`, `internal/testutil/mocks`.
+- Note: public webhook URL (`/internal/v1/accounts:sync`), handler function name (`syncAccount`), request struct (`syncAccountRequest`), and response field (`account_id`) intentionally retained for phase 1.4 — coordinated with the Firebase Function redeploy.
 
 ### `syncAccount` → `syncFirebaseIdentity` endpoint rename
 
@@ -368,6 +369,42 @@ macOS-first; Windows shell mirrors after.
 - [ ] Re-import `google/iam/v1/iam_policy.proto` for full `GetIamPolicy`/`SetIamPolicy` projection over `members` table — when fine-grain sharing arrives.
 - [ ] `Group` cross-org? Today scoped to single org. Cross-org sharing is a future feature.
 - [ ] Audit log for IAM mutations.
+
+---
+
+## Pre-existing test failures (address before phase 1 ships)
+
+Surfaced during phase 1 but predate this roadmap. Confirmed broken on `HEAD~2` (i.e., before phase 1 work began). Tracking here so they don't get lost — fix before we cut a release.
+
+### `internal/service/aichat/server_integration_test.go` — compile failure (`-tags dev` only)
+
+The test references proto + interface shapes that have since been refactored:
+
+- `aiv1.ClientEvent`, `aiv1.ClientEvent_Message`, `aiv1.UserMessage` — old proto message names from before the bidi-stream conversion.
+- `client.Stream` — old RPC name; current shape uses `Send`-style API.
+- `*fixedModel does not implement model.LanguageModel (missing method Name)` — `LanguageModel` interface gained a `Name()` method; the test stub wasn't updated.
+
+Gated by `//go:build dev` so `go test ./...` (no tags) skips it. Surfaces only on `go test -tags dev`.
+
+**Fix:** rewrite the test against the current `AiChat` service shape and update `fixedModel` to satisfy the current `model.LanguageModel` interface.
+
+- [ ] Repair or rewrite `internal/service/aichat/server_integration_test.go` against current proto + `LanguageModel` interface.
+
+### `internal/storageagent/TestConnect_FullHandshake` — runtime failure
+
+Mock expectations not satisfied:
+
+```
+handshake: handshake: stream closed while waiting for response
+Expected "ListStorageEndpointsByGateway" to have been called with: [...]
+but no actual calls happened
+```
+
+The handshake completes early (or silently fails), so the post-handshake `ListStorageEndpointsByGateway` mock is never invoked. Could be timing-dependent flake or test drift from current handshake flow.
+
+**Fix:** debug-session on the handshake stream lifecycle, then either repair the mock setup or replace the brittle stream-mocking with a real-loopback test fixture.
+
+- [ ] Diagnose and fix `internal/storageagent/TestConnect_FullHandshake`.
 
 ---
 

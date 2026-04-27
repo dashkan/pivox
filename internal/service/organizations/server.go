@@ -78,8 +78,8 @@ func (s *OrganizationsServer) GetOrganization(ctx context.Context, req *apiv1.Ge
 // ListOrganizations is the post-signin "which orgs am I in?" query.
 // Always caller-scoped: returns only orgs the authenticated user has
 // a membership row for. Memberless callers (and freshly-Firebase-
-// registered users whose account row hasn't been synced yet) get an
-// empty list, which the native client uses to detect the
+// registered users whose firebase_identity row hasn't been synced yet)
+// get an empty list, which the native client uses to detect the
 // zero-membership state and route to the org-creation screen.
 //
 // `page_size`, `page_token`, `filter`, `order_by`, `show_deleted`
@@ -94,21 +94,21 @@ func (s *OrganizationsServer) ListOrganizations(ctx context.Context, req *apiv1.
 		return nil, apierr.Unauthenticated("missing authenticated caller")
 	}
 
-	caller, err := s.queries.GetAccountByFirebaseUID(ctx, uid)
+	caller, err := s.queries.GetFirebaseIdentityByUID(ctx, uid)
 	if err != nil {
-		// No account row yet (race with the /internal/sync-account
+		// No firebase_identity row yet (race with the sync-identity
 		// webhook on a freshly-Firebase-registered user). Memberless
 		// state — return an empty list so the client routes through
 		// the org-creation bootstrap path.
 		if errors.Is(err, pgx.ErrNoRows) {
 			return &apiv1.ListOrganizationsResponse{}, nil
 		}
-		return nil, apierr.HandleResourceError(err, "Account", uid)
+		return nil, apierr.HandleResourceError(err, "FirebaseIdentity", uid)
 	}
 
-	rows, err := s.queries.ListOrganizationsForAccount(ctx, caller.ID)
+	rows, err := s.queries.ListOrganizationsForFirebaseIdentity(ctx, caller.ID)
 	if err != nil {
-		slog.ErrorContext(ctx, "list organizations failed", "account_id", caller.ID, "error", err)
+		slog.ErrorContext(ctx, "list organizations failed", "firebase_identity_id", caller.ID, "error", err)
 		return nil, apierr.Internal("list organizations")
 	}
 
@@ -120,17 +120,18 @@ func (s *OrganizationsServer) ListOrganizations(ctx context.Context, req *apiv1.
 }
 
 func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1.CreateOrganizationRequest) (*longrunningpb.Operation, error) {
-	// Resolve caller → account row. The caller's Firebase UID comes
-	// from the auth interceptor; we map it to a Pivox `accounts` row
-	// so the new org can record both the immutable founder pointer
-	// (`created_by_account_id`) and the per-org owner membership.
+	// Resolve caller → firebase_identity row. The caller's Firebase
+	// UID comes from the auth interceptor; we map it to a Pivox
+	// `firebase_identities` row so the new org can record both the
+	// immutable founder pointer (`created_by_firebase_identity_id`)
+	// and the per-org owner membership.
 	uid, ok := s.readUID(ctx)
 	if !ok {
 		return nil, apierr.Unauthenticated("missing authenticated caller")
 	}
-	caller, err := s.queries.GetAccountByFirebaseUID(ctx, uid)
+	caller, err := s.queries.GetFirebaseIdentityByUID(ctx, uid)
 	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Account", uid)
+		return nil, apierr.HandleResourceError(err, "FirebaseIdentity", uid)
 	}
 
 	orgSlug := req.GetOrganizationId()
@@ -148,11 +149,11 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 	qtx := db.New(tx)
 
 	org, err := qtx.CreateOrganization(ctx, db.CreateOrganizationParams{
-		ID:                 uuid.New(),
-		Name:               orgSlug,
-		DisplayName:        req.GetOrganization().GetDisplayName(),
-		CreatedByAccountID: pgtype.UUID{Bytes: caller.ID, Valid: true},
-		CreatedBy:          caller.ID.String(),
+		ID:                          uuid.New(),
+		Name:                        orgSlug,
+		DisplayName:                 req.GetOrganization().GetDisplayName(),
+		CreatedByFirebaseIdentityID: pgtype.UUID{Bytes: caller.ID, Valid: true},
+		CreatedBy:                   caller.ID.String(),
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Organization", orgSlug)
@@ -162,12 +163,12 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 	// "≥1 owner per org" is preserved by definition for new orgs;
 	// future role-mutation code enforces it at the boundary.
 	if _, err := qtx.CreateUserMembership(ctx, db.CreateUserMembershipParams{
-		ID:        uuid.New(),
-		OrgID:     org.ID,
-		AccountID: caller.ID,
-		Role:      db.OrgRoleOwner,
+		ID:                 uuid.New(),
+		OrgID:              org.ID,
+		FirebaseIdentityID: caller.ID,
+		Role:               db.OrgRoleOwner,
 	}); err != nil {
-		slog.ErrorContext(ctx, "create owner membership failed", "org_id", org.ID, "account_id", caller.ID, "error", err)
+		slog.ErrorContext(ctx, "create owner membership failed", "org_id", org.ID, "firebase_identity_id", caller.ID, "error", err)
 		return nil, apierr.Internal("create owner membership")
 	}
 
