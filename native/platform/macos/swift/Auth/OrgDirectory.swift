@@ -1,45 +1,160 @@
 import Foundation
 import Observation
+import PivoxModels
 
-/// Placeholder organization directory + current-selection state.
+/// Backend-backed organization directory + current-selection state.
 ///
-/// The real implementation will front-end a Firestore-backed
-/// service that lists the orgs the signed-in user is a member of
-/// and the org currently active for requests (RBAC, data scoping,
-/// etc.). This fake fills in for UI work — the sidebar profile bar
-/// and its menu can render final-looking content while the server
-/// side is still being designed.
+/// Loaded after sign-in via `bootstrap()`. The cloud `ListOrganizations`
+/// RPC scopes to the caller's account (server filters by membership),
+/// so the result is exactly the orgs the signed-in user can act in.
 ///
-/// Shared singleton so that ProfileBar and anything that needs the
-/// current org name (detail headers, request scoping, etc.) all
-/// read from the same source. `@Observable` makes the rendered
-/// name refresh automatically when `current` flips.
+/// Loading lifecycle:
+///   - `.idle`     → before sign-in or after sign-out
+///   - `.loading`  → bootstrap in flight
+///   - `.ready`    → at least one membership; `current` is a member org
+///   - `.empty`    → signed in but memberless → routed to onboarding
+///   - `.error`    → bootstrap failed; surfaced to UI
+///
+/// `@Observable` so SwiftUI views (ProfileBar, ContentView routing)
+/// react automatically to state changes.
 @Observable
 @MainActor
-final class OrgDirectory {
-    static let shared = OrgDirectory()
+final class OrgService {
+    static let shared = OrgService()
+
+    enum LoadState {
+        case idle
+        case loading
+        case ready
+        case empty
+        case error(String)
+    }
 
     struct Org: Identifiable, Hashable {
+        /// Stable resource ID — the trailing segment of `name`,
+        /// e.g. "acme" for "organizations/acme".
         let id: String
-        let name: String
+        /// Full resource name, e.g. "organizations/acme". This is
+        /// what downstream services (AIChat, etc.) scope requests by.
+        let resourceName: String
+        let displayName: String
     }
 
-    private(set) var all: [Org]
-    private(set) var current: Org
+    private(set) var state: LoadState = .idle
+    private(set) var all: [Org] = []
+    /// The currently-active org. `nil` until `bootstrap()` succeeds
+    /// with at least one membership. UI should not render org-scoped
+    /// surfaces while this is `nil`.
+    private(set) var current: Org?
 
-    private init() {
-        let seeded = [
-            Org(id: "acme", name: "Acme Inc"),
-            Org(id: "widgets", name: "Widgets Corp"),
-            Org(id: "personal", name: "Personal"),
-        ]
-        self.all = seeded
-        self.current = seeded.first!
+    private var client: OrgsClient?
+    private let appState = AppStateBridge.shared()
+    private static let selectedOrgKey = "selected_org_id"
+
+    private init() {}
+
+    /// Call after a successful sign-in. Fetches memberships and
+    /// promotes the persisted (or first) org to `current`. Idempotent
+    /// — re-bootstrapping after `.ready` is a no-op; call `reload()`
+    /// to force a refresh (e.g. after creating an org).
+    func bootstrap() async {
+        if case .ready = state { return }
+        if case .loading = state { return }
+        await reload()
     }
 
-    /// Switch the active org. Unknown IDs are no-ops.
+    /// Force a refresh from the server. Used after creating an org or
+    /// when the user retries from an error state.
+    func reload() async {
+        state = .loading
+        do {
+            let client = try resolveClient()
+            let orgs = try await client.listOrganizations()
+            let mapped = orgs.map(Self.mapOrg)
+            all = mapped
+            if mapped.isEmpty {
+                current = nil
+                state = .empty
+                return
+            }
+            // Restore persisted selection if still a member, else
+            // pick the first org. The directory order is server-
+            // chosen (id ASC); fine as a default.
+            let savedID = appState.loadString(forKey: Self.selectedOrgKey) ?? ""
+            current = mapped.first { $0.id == savedID } ?? mapped.first
+            state = .ready
+        } catch {
+            current = nil
+            state = .error(Self.userFacing(error))
+        }
+    }
+
+    /// Switch the active org. Unknown IDs are no-ops. Persists the
+    /// new selection so it survives relaunches.
     func switchTo(_ id: String) {
         guard let next = all.first(where: { $0.id == id }) else { return }
         current = next
+        appState.save(id, forKey: Self.selectedOrgKey)
+    }
+
+    /// Create an org via the cloud and adopt it as `current`.
+    /// Surfaces a user-facing message on failure; throws so the
+    /// onboarding form can drive its own error state.
+    func create(displayName: String, organizationID: String) async throws {
+        let client = try resolveClient()
+        let created = try await client.createOrganization(
+            displayName: displayName,
+            organizationID: organizationID
+        )
+        let org = Self.mapOrg(created)
+        all.append(org)
+        current = org
+        appState.save(org.id, forKey: Self.selectedOrgKey)
+        state = .ready
+    }
+
+    /// Tear down on sign-out. Cancels the gRPC channel and clears
+    /// state so a future sign-in re-bootstraps cleanly with the new
+    /// user's memberships.
+    func reset() {
+        client?.cancel()
+        client = nil
+        all = []
+        current = nil
+        state = .idle
+    }
+
+    // MARK: -
+
+    private func resolveClient() throws -> OrgsClient {
+        if let client = client { return client }
+        let new = try OrgsClient()
+        client = new
+        return new
+    }
+
+    private static func mapOrg(_ pb: Pivox_Api_V1_Organization) -> Org {
+        // Resource name is "organizations/<id>"; the id is the
+        // trailing segment.
+        let id = pb.name.split(separator: "/").last.map(String.init) ?? pb.name
+        return Org(
+            id: id,
+            resourceName: pb.name,
+            displayName: pb.displayName.isEmpty ? id : pb.displayName
+        )
+    }
+
+    private static func userFacing(_ error: Error) -> String {
+        // Generic fallback — Firebase/auth errors are mapped inside
+        // FirebaseAuthInterceptor and surface here as
+        // ChatClientError; everything else is a network/server fault.
+        if let chatErr = error as? ChatClientError {
+            return chatErr.description
+        }
+        return "Couldn't load your organizations. Try again."
     }
 }
+
+// Backwards-compatible alias for the previous placeholder type. Keeps
+// existing call sites (ProfileBar) working without churn.
+typealias OrgDirectory = OrgService

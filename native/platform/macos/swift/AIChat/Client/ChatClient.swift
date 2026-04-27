@@ -21,14 +21,13 @@ public final class ChatClient {
     private let aiChat: Pivox_Ai_V1_AiChat.Client<HTTP2ClientTransport.Posix>
     private var runTask: Task<Void, Error>?
 
-    public init(endpoint: String) throws {
-        let (host, port) = try Self.parseEndpoint(endpoint)
+    public init() throws {
+        let (host, port) = try CloudConfig.parsedEndpoint()
         let transport = try HTTP2ClientTransport.Posix(
             target: .dns(host: host, port: port),
-            // Local dev cluster runs plaintext on :50051. Prod terminates
-            // TLS at nginx; the Pivox cloud server itself stays plaintext.
-            // Add a TLS config option here when we wire prod direct-dial.
-            transportSecurity: .plaintext
+            // Endpoint + TLS choice resolved through `CloudConfig`
+            // so chat + orgs + any future gRPC client stay in sync.
+            transportSecurity: CloudConfig.transportSecurity
         )
         self.grpc = GRPCClient(
             transport: transport,
@@ -117,13 +116,6 @@ public final class ChatClient {
 
     // MARK: -
 
-    private static func parseEndpoint(_ s: String) throws -> (String, Int) {
-        let parts = s.split(separator: ":", maxSplits: 1).map(String.init)
-        guard parts.count == 2, let port = Int(parts[1]) else {
-            throw ChatClientError.invalidEndpoint(s)
-        }
-        return (parts[0], port)
-    }
 }
 
 /// Errors surfaced by `ChatClient` to UI code.
@@ -135,7 +127,6 @@ public final class ChatClient {
 /// password" from "no such user". Detailed error info is logged
 /// internally (see `signpostAuthFailure` below) for diagnostics.
 public enum ChatClientError: Error, CustomStringConvertible {
-    case invalidEndpoint(String)
     /// No Firebase user is signed in. Caller (UI) should route to the
     /// sign-in screen.
     case notSignedIn
@@ -146,7 +137,6 @@ public enum ChatClientError: Error, CustomStringConvertible {
 
     public var description: String {
         switch self {
-        case .invalidEndpoint(let s): return "invalid endpoint: \(s)"
         case .notSignedIn: return "Sign in to continue."
         case .authenticationRequired: return "Authentication failed. Please sign in again."
         }

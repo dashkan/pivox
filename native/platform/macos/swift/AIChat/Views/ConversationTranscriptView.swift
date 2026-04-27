@@ -998,10 +998,25 @@ struct ConversationTranscriptView: NSViewRepresentable {
         func tableView(_ tableView: NSTableView, viewFor column: NSTableColumn?, row: Int) -> NSView? {
             switch rows[row] {
             case .message(let msg):
-                return makeMessageCell(message: msg)
+                return makeMessageCell(message: msg, pinActions: msg.name == lastAssistantName)
             case .boundary(let page):
                 return makeBoundaryCell(pageNumber: page)
             }
+        }
+
+        /// Resource name of the most recent assistant message in the
+        /// transcript, or empty if there isn't one. Used to pin the
+        /// action row on that message so the user always has copy /
+        /// regenerate / feedback affordances on the latest reply
+        /// without hovering — Gemini-style. Earlier assistant turns
+        /// keep the hover-reveal behavior to stay visually quiet.
+        private var lastAssistantName: String {
+            for row in rows.reversed() {
+                if case .message(let m) = row, m.role == .assistant {
+                    return m.name
+                }
+            }
+            return ""
         }
 
         // MARK: - Cell construction
@@ -1020,10 +1035,10 @@ struct ConversationTranscriptView: NSViewRepresentable {
         /// now. When we wire them, we'll need to stabilize the
         /// closure identity or NSHostingView will re-render every
         /// row on every mutation. Deferred to a later phase.
-        private func makeMessageCell(message: Pivox_Ai_V1_Message) -> NSView {
+        private func makeMessageCell(message: Pivox_Ai_V1_Message, pinActions: Bool) -> NSView {
             let hosting = NSHostingView(rootView: Message(
                 message: message,
-                pinActions: false,
+                pinActions: pinActions,
                 onEditSubmit: nil,
                 onRegenerate: nil))
             return wrapInCell(hosting)

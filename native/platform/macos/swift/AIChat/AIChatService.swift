@@ -25,10 +25,14 @@ final class AIChatService {
     /// the container view in place of the chat panel.
     private(set) var initError: String?
 
-    // TODO: resolve from authenticated user's org membership
-    // instead of a hardcoded value.
-    let orgName = "local-corp"
-    private let endpoint = "localhost:50051"
+    /// Org slug used as the parent when scoping AI Chat resources
+    /// (e.g. `organizations/<orgName>/conversations/...`). Resolved
+    /// from `OrgService.shared.current` — guaranteed non-nil because
+    /// the chat surface only mounts inside `mainAppView`, which is
+    /// only routed to once `OrgService.state == .ready`.
+    var orgName: String {
+        OrgService.shared.current?.id ?? ""
+    }
 
     /// Single-slot `ConversationViewModel` cache for the
     /// currently-viewed conversation. Lifting it out of the view
@@ -58,7 +62,7 @@ final class AIChatService {
         do {
             // Auth header is attached per-RPC by ChatClient's own
             // FirebaseAuthInterceptor; construction is synchronous.
-            client = try ChatClient(endpoint: endpoint)
+            client = try ChatClient()
         } catch {
             initError = error.localizedDescription
         }

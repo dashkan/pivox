@@ -44,6 +44,7 @@ struct ContentView: View {
   @State private var chatPanelWidth: CGFloat = Self.loadChatPanelWidth()
   private var auth = AuthService.shared
   private var aiChatState = AIChatState.shared
+  private var orgs = OrgService.shared
   private let appState = AppStateBridge.shared()
 
   /// Clamp range for the persisted sidebar width. Matches the
@@ -95,7 +96,7 @@ struct ContentView: View {
   var body: some View {
     Group {
       if auth.isSignedIn {
-        mainAppView
+        signedInRoot
       } else {
         AuthRouter()
       }
@@ -111,11 +112,13 @@ struct ContentView: View {
       // across launches via UserDefaults inside AppDelegate.
       if isSignedIn {
         AppDelegate.shared?.restoreAIChatIfNeeded()
+        Task { await orgs.bootstrap() }
       }
     }
     .task {
       if auth.isSignedIn {
         AppDelegate.shared?.restoreAIChatIfNeeded()
+        await orgs.bootstrap()
       }
     }
     .onReceive(
@@ -141,6 +144,27 @@ struct ContentView: View {
     return auth.currentUser?.providerData
       .compactMap(\.photoURL)
       .first
+  }
+
+  /// Branch between loading splash, onboarding, and the main app
+  /// shell once the user is signed in. The splash and onboarding
+  /// reuse the same accent backdrop + glass card aesthetic as the
+  /// auth views so the transition from registration → org creation
+  /// → app feels like one continuous flow.
+  @ViewBuilder
+  private var signedInRoot: some View {
+    switch orgs.state {
+    case .idle, .loading:
+      OrgLoadingView()
+    case .empty:
+      CreateOrgView()
+    case .ready:
+      mainAppView
+    case .error(let message):
+      OrgLoadErrorView(message: message) {
+        Task { await orgs.reload() }
+      }
+    }
   }
 
   private var mainAppView: some View {

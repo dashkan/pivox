@@ -935,6 +935,7 @@ class AuthService: NSObject {
       // signOut is @MainActor so this call is statically guaranteed
       // to be on the main actor — no runtime assertion needed.
       AIChatService.shared.reset()
+      OrgService.shared.reset()
     } catch {
       errorMessage = "Failed to sign out: \(error.localizedDescription)"
     }

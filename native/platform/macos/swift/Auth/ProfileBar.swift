@@ -58,7 +58,7 @@ struct ProfileBar: View {
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                         .truncationMode(.tail)
-                    Text(OrgDirectory.shared.current.name)
+                    Text(OrgService.shared.current?.displayName ?? "")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -89,30 +89,33 @@ struct ProfileBar: View {
             onSettings: onSettings,
             onSecurity: onSecurity,
             onSignOut: onSignOut,
-            onSwitchOrg: { id in OrgDirectory.shared.switchTo(id) })
+            onSwitchOrg: { id in OrgService.shared.switchTo(id) })
         menuActionTarget = target
 
         let menu = NSMenu()
 
-        // Organization submenu. Parent item has no direct action;
-        // children switch the current org.
-        let orgs = OrgDirectory.shared
-        let orgSubmenu = NSMenu()
-        for org in orgs.all {
-            let item = NSMenuItem(
-                title: org.name,
-                action: #selector(MenuActionTarget.switchOrganization(_:)),
-                keyEquivalent: "")
-            item.target = target
-            item.representedObject = org.id
-            if org.id == orgs.current.id { item.state = .on }
-            orgSubmenu.addItem(item)
-        }
-        let orgItem = NSMenuItem(title: "Organization", action: nil, keyEquivalent: "")
-        orgItem.submenu = orgSubmenu
-        menu.addItem(orgItem)
+        // Organization submenu — only shown when the user has more
+        // than one org to switch between. With a single membership
+        // the menu would be a no-op.
+        let orgs = OrgService.shared
+        if orgs.all.count > 1 {
+            let orgSubmenu = NSMenu()
+            for org in orgs.all {
+                let item = NSMenuItem(
+                    title: org.displayName,
+                    action: #selector(MenuActionTarget.switchOrganization(_:)),
+                    keyEquivalent: "")
+                item.target = target
+                item.representedObject = org.id
+                if org.id == orgs.current?.id { item.state = .on }
+                orgSubmenu.addItem(item)
+            }
+            let orgItem = NSMenuItem(title: "Organization", action: nil, keyEquivalent: "")
+            orgItem.submenu = orgSubmenu
+            menu.addItem(orgItem)
 
-        menu.addItem(.separator())
+            menu.addItem(.separator())
+        }
 
         // No ⌘, key equivalent on this item: it always opens
         // Account, but the global ⌘, opens whichever tab was used
