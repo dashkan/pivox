@@ -297,16 +297,6 @@ func (m *mockAuthService) CreateCustomToken(ctx context.Context, uid string) (st
 	return args.String(0), args.Error(1)
 }
 
-func (m *mockAuthService) CreateTenant(ctx context.Context, displayName string) (string, error) {
-	args := m.Called(ctx, displayName)
-	return args.String(0), args.Error(1)
-}
-
-func (m *mockAuthService) DeleteTenant(ctx context.Context, tenantID string) error {
-	args := m.Called(ctx, tenantID)
-	return args.Error(0)
-}
-
 // newCreateOrgServer builds an OrganizationsServer wired with the mock pool,
 // auth service, and querier needed by CreateOrganization. The querier is
 // where `GetAccountByFirebaseUID` (the pre-tx caller-resolution lookup)
@@ -371,27 +361,27 @@ func membershipRow(u db.User) *mockRow {
 // given values. The column order matches the sqlc-generated RETURNING clause.
 func orgRow(org db.Organization) *mockRow {
 	return &mockRow{scanFunc: func(dest ...interface{}) error {
-		// Column order: id, name, display_name, annotations, tenant_id,
-		// owner_id, state, etag, revision, created_by, updated_by,
-		// deleted_by, create_time, update_time, delete_time, purge_time
-		if len(dest) != 16 {
+		// Column order: id, name, display_name, annotations,
+		// created_by_account_id, state, etag, revision, created_by,
+		// updated_by, deleted_by, create_time, update_time, delete_time,
+		// purge_time
+		if len(dest) != 15 {
 			return errors.New("unexpected number of scan destinations")
 		}
 		*dest[0].(*uuid.UUID) = org.ID
 		*dest[1].(*string) = org.Name
 		*dest[2].(*string) = org.DisplayName
 		*dest[3].(*json.RawMessage) = org.Annotations
-		*dest[4].(*string) = org.TenantID
-		// dest[5] is *pgtype.UUID — leave as zero value
-		*dest[6].(*db.ResourceState) = org.State
-		*dest[7].(*string) = org.Etag
-		*dest[8].(*int32) = org.Revision
-		*dest[9].(*string) = org.CreatedBy
-		*dest[10].(*string) = org.UpdatedBy
-		*dest[11].(*string) = org.DeletedBy
-		*dest[12].(*time.Time) = org.CreateTime
-		*dest[13].(*time.Time) = org.UpdateTime
-		// dest[14], dest[15] are *pgtype.Timestamptz — leave as zero
+		// dest[4] is *pgtype.UUID — leave as zero value
+		*dest[5].(*db.ResourceState) = org.State
+		*dest[6].(*string) = org.Etag
+		*dest[7].(*int32) = org.Revision
+		*dest[8].(*string) = org.CreatedBy
+		*dest[9].(*string) = org.UpdatedBy
+		*dest[10].(*string) = org.DeletedBy
+		*dest[11].(*time.Time) = org.CreateTime
+		*dest[12].(*time.Time) = org.UpdateTime
+		// dest[13], dest[14] are *pgtype.Timestamptz — leave as zero
 		return nil
 	}}
 }
@@ -440,17 +430,10 @@ func TestUnit_CreateOrganization_Success(t *testing.T) {
 			UpdateTime: createdOrg.UpdateTime,
 		})).Once()
 
-	// 3. CreateTenant
-	auth.On("CreateTenant", mock.Anything, "neworg").Return("tenant-abc", nil)
-
-	// 4. SetOrganizationTenantID via qtx — calls Exec on the tx
-	tx.On("Exec", mock.Anything, mock.Anything, mock.Anything).
-		Return(pgconn.NewCommandTag("UPDATE 1"), nil)
-
-	// 5. Commit
+	// 3. Commit
 	tx.On("Commit", mock.Anything).Return(nil)
 
-	// 6. Deferred Rollback (no-op after commit, but still called)
+	// 4. Deferred Rollback (no-op after commit, but still called)
 	tx.On("Rollback", mock.Anything).Return(pgx.ErrTxClosed)
 
 	resp, err := srv.CreateOrganization(ctx, &apiv1.CreateOrganizationRequest{
@@ -531,9 +514,6 @@ func TestUnit_CreateOrganization_CreatesOwnerMembership(t *testing.T) {
 			UpdateTime: createdOrg.UpdateTime,
 		})).Once()
 
-	auth.On("CreateTenant", mock.Anything, "ownerorg").Return("tenant-owner", nil)
-	tx.On("Exec", mock.Anything, mock.Anything, mock.Anything).
-		Return(pgconn.NewCommandTag("UPDATE 1"), nil)
 	tx.On("Commit", mock.Anything).Return(nil)
 	tx.On("Rollback", mock.Anything).Return(pgx.ErrTxClosed)
 
@@ -579,71 +559,6 @@ func TestUnit_CreateOrganization_NoAuthContext(t *testing.T) {
 	assert.Equal(t, codes.Unauthenticated, st.Code())
 }
 
-func TestUnit_CreateOrganization_TenantCreateFailure(t *testing.T) {
-	ctx := context.Background()
-
-	pool := new(mockTxBeginner)
-	tx := new(mockTx)
-	auth := new(mockAuthService)
-	mockQ := new(mocks.MockQuerier)
-	expectGetAccount(mockQ)
-	srv := newCreateOrgServer(pool, auth, mockQ)
-
-	createdOrg := db.Organization{
-		ID:          uuid.MustParse("0192a000-0003-7000-8000-000000000003"),
-		Name:        "failorg",
-		DisplayName: "Fail Org",
-		Annotations: json.RawMessage(`{}`),
-		State:       db.ResourceStateACTIVE,
-		Etag:        "etag-fail",
-		Revision:    1,
-		CreateTime:  time.Date(2025, 7, 1, 12, 0, 0, 0, time.UTC),
-		UpdateTime:  time.Date(2025, 7, 1, 12, 0, 0, 0, time.UTC),
-	}
-
-	pool.On("Begin", mock.Anything).Return(tx, nil)
-
-	// CreateOrganization in DB succeeds.
-	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
-		Return(orgRow(createdOrg)).Once()
-	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
-		Return(membershipRow(db.User{
-			ID:         uuid.New(),
-			OrgID:      createdOrg.ID,
-			AccountID:  testCallerAccount.ID,
-			Role:       db.OrgRoleOwner,
-			Etag:       "etag-membership",
-			Revision:   1,
-			CreateTime: createdOrg.CreateTime,
-			UpdateTime: createdOrg.UpdateTime,
-		})).Once()
-
-	// CreateTenant fails.
-	auth.On("CreateTenant", mock.Anything, "failorg").
-		Return("", errors.New("firebase unavailable"))
-
-	// Deferred Rollback should be called (tx is not committed).
-	tx.On("Rollback", mock.Anything).Return(nil)
-
-	_, err := srv.CreateOrganization(ctx, &apiv1.CreateOrganizationRequest{
-		OrganizationId: "failorg",
-		Organization:   &apiv1.Organization{DisplayName: "Fail Org"},
-	})
-
-	require.Error(t, err)
-	st, ok := status.FromError(err)
-	require.True(t, ok)
-	assert.Equal(t, codes.Internal, st.Code())
-	assert.Contains(t, st.Message(), "create auth tenant")
-
-	// Commit must NOT have been called.
-	tx.AssertNotCalled(t, "Commit", mock.Anything)
-
-	pool.AssertExpectations(t)
-	tx.AssertExpectations(t)
-	auth.AssertExpectations(t)
-}
-
 func TestUnit_CreateOrganization_CommitFailure(t *testing.T) {
 	ctx := context.Background()
 
@@ -683,18 +598,8 @@ func TestUnit_CreateOrganization_CommitFailure(t *testing.T) {
 			UpdateTime: createdOrg.UpdateTime,
 		})).Once()
 
-	// CreateTenant succeeds.
-	auth.On("CreateTenant", mock.Anything, "commitfail").Return("tenant-xyz", nil)
-
-	// SetOrganizationTenantID succeeds.
-	tx.On("Exec", mock.Anything, mock.Anything, mock.Anything).
-		Return(pgconn.NewCommandTag("UPDATE 1"), nil)
-
 	// Commit fails.
 	tx.On("Commit", mock.Anything).Return(errors.New("connection lost"))
-
-	// Tenant must be cleaned up via DeleteTenant.
-	auth.On("DeleteTenant", mock.Anything, "tenant-xyz").Return(nil)
 
 	// Deferred Rollback after commit failure.
 	tx.On("Rollback", mock.Anything).Return(nil)
@@ -709,9 +614,6 @@ func TestUnit_CreateOrganization_CommitFailure(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, codes.Internal, st.Code())
 	assert.Contains(t, st.Message(), "commit transaction")
-
-	// Verify DeleteTenant was called to clean up the auth tenant.
-	auth.AssertCalled(t, "DeleteTenant", mock.Anything, "tenant-xyz")
 
 	pool.AssertExpectations(t)
 	tx.AssertExpectations(t)
@@ -731,42 +633,24 @@ func TestUnit_CreateOrganization_AutoGeneratedSlug(t *testing.T) {
 	// Begin tx succeeds.
 	pool.On("Begin", mock.Anything).Return(tx, nil)
 
-	// CreateOrganization in DB: the slug is auto-generated (8-char UUID prefix).
-	// We accept any name of length 8.
+	// CreateOrganization in DB: capture the auto-generated slug from
+	// the SQL args so we can assert its shape after the call. SQL arg
+	// order matches the CreateOrganization query: id, name, ...
 	var capturedSlug string
 	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
-		Return(&mockRow{scanFunc: func(dest ...interface{}) error {
-			// Capture the slug from the SQL args to build a realistic org.
-			// The row scanner populates all fields from the returned row.
-			generatedOrg := db.Organization{
-				ID:          uuid.MustParse("0192a000-0005-7000-8000-000000000005"),
-				Name:        capturedSlug, // will be set below
-				DisplayName: "Auto Slug Org",
-				Annotations: json.RawMessage(`{}`),
-				State:       db.ResourceStateACTIVE,
-				Etag:        "etag-auto",
-				Revision:    1,
-				CreateTime:  time.Date(2025, 8, 1, 10, 0, 0, 0, time.UTC),
-				UpdateTime:  time.Date(2025, 8, 1, 10, 0, 0, 0, time.UTC),
-			}
-			if len(dest) != 16 {
-				return errors.New("unexpected number of scan destinations")
-			}
-			*dest[0].(*uuid.UUID) = generatedOrg.ID
-			*dest[1].(*string) = generatedOrg.Name
-			*dest[2].(*string) = generatedOrg.DisplayName
-			*dest[3].(*json.RawMessage) = generatedOrg.Annotations
-			*dest[4].(*string) = generatedOrg.TenantID
-			*dest[6].(*db.ResourceState) = generatedOrg.State
-			*dest[7].(*string) = generatedOrg.Etag
-			*dest[8].(*int32) = generatedOrg.Revision
-			*dest[9].(*string) = generatedOrg.CreatedBy
-			*dest[10].(*string) = generatedOrg.UpdatedBy
-			*dest[11].(*string) = generatedOrg.DeletedBy
-			*dest[12].(*time.Time) = generatedOrg.CreateTime
-			*dest[13].(*time.Time) = generatedOrg.UpdateTime
-			return nil
-		}}).Once()
+		Run(func(args mock.Arguments) {
+			capturedSlug = args.Get(2).([]interface{})[1].(string)
+		}).
+		Return(orgRow(db.Organization{
+			ID:          uuid.MustParse("0192a000-0005-7000-8000-000000000005"),
+			DisplayName: "Auto Slug Org",
+			Annotations: json.RawMessage(`{}`),
+			State:       db.ResourceStateACTIVE,
+			Etag:        "etag-auto",
+			Revision:    1,
+			CreateTime:  time.Date(2025, 8, 1, 10, 0, 0, 0, time.UTC),
+			UpdateTime:  time.Date(2025, 8, 1, 10, 0, 0, 0, time.UTC),
+		})).Once()
 
 	// Owner membership row created in the same tx.
 	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
@@ -780,16 +664,6 @@ func TestUnit_CreateOrganization_AutoGeneratedSlug(t *testing.T) {
 			CreateTime: time.Date(2025, 8, 1, 10, 0, 0, 0, time.UTC),
 			UpdateTime: time.Date(2025, 8, 1, 10, 0, 0, 0, time.UTC),
 		})).Once()
-
-	// CreateTenant — called with whatever auto-slug was generated.
-	auth.On("CreateTenant", mock.Anything, mock.MatchedBy(func(s string) bool {
-		capturedSlug = s
-		return len(s) == 8
-	})).Return("tenant-auto", nil)
-
-	// SetOrganizationTenantID succeeds.
-	tx.On("Exec", mock.Anything, mock.Anything, mock.Anything).
-		Return(pgconn.NewCommandTag("UPDATE 1"), nil)
 
 	// Commit succeeds.
 	tx.On("Commit", mock.Anything).Return(nil)
@@ -806,6 +680,7 @@ func TestUnit_CreateOrganization_AutoGeneratedSlug(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	assert.True(t, resp.GetDone())
+	assert.Len(t, capturedSlug, 8, "auto-generated slug should be 8 chars")
 
 	pool.AssertExpectations(t)
 	tx.AssertExpectations(t)
@@ -836,81 +711,6 @@ func TestUnit_CreateOrganization_BeginTransactionError(t *testing.T) {
 	assert.Contains(t, st.Message(), "begin transaction")
 
 	pool.AssertExpectations(t)
-	// auth must not have been called at all.
-	auth.AssertNotCalled(t, "CreateTenant", mock.Anything, mock.Anything)
-}
-
-func TestUnit_CreateOrganization_SetTenantIDFailure(t *testing.T) {
-	ctx := context.Background()
-
-	pool := new(mockTxBeginner)
-	tx := new(mockTx)
-	auth := new(mockAuthService)
-	mockQ := new(mocks.MockQuerier)
-	expectGetAccount(mockQ)
-	srv := newCreateOrgServer(pool, auth, mockQ)
-
-	createdOrg := db.Organization{
-		ID:          uuid.MustParse("0192a000-0006-7000-8000-000000000006"),
-		Name:        "settenantfail",
-		DisplayName: "Set Tenant Fail Org",
-		Annotations: json.RawMessage(`{}`),
-		State:       db.ResourceStateACTIVE,
-		Etag:        "etag-stf",
-		Revision:    1,
-		CreateTime:  time.Date(2025, 8, 1, 10, 0, 0, 0, time.UTC),
-		UpdateTime:  time.Date(2025, 8, 1, 10, 0, 0, 0, time.UTC),
-	}
-
-	pool.On("Begin", mock.Anything).Return(tx, nil)
-
-	// CreateOrganization in DB succeeds.
-	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
-		Return(orgRow(createdOrg)).Once()
-	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
-		Return(membershipRow(db.User{
-			ID:         uuid.New(),
-			OrgID:      createdOrg.ID,
-			AccountID:  testCallerAccount.ID,
-			Role:       db.OrgRoleOwner,
-			Etag:       "etag-membership",
-			Revision:   1,
-			CreateTime: createdOrg.CreateTime,
-			UpdateTime: createdOrg.UpdateTime,
-		})).Once()
-
-	// CreateTenant succeeds.
-	auth.On("CreateTenant", mock.Anything, "settenantfail").Return("tenant-stf", nil)
-
-	// SetOrganizationTenantID fails — triggers tenant cleanup.
-	tx.On("Exec", mock.Anything, mock.Anything, mock.Anything).
-		Return(pgconn.CommandTag{}, errors.New("db constraint violation"))
-
-	// Cleanup: DeleteTenant must be called with the tenant we just created.
-	auth.On("DeleteTenant", mock.Anything, "tenant-stf").Return(nil)
-
-	// Deferred Rollback (tx was not committed).
-	tx.On("Rollback", mock.Anything).Return(nil)
-
-	_, err := srv.CreateOrganization(ctx, &apiv1.CreateOrganizationRequest{
-		OrganizationId: "settenantfail",
-		Organization:   &apiv1.Organization{DisplayName: "Set Tenant Fail Org"},
-	})
-
-	require.Error(t, err)
-	st, ok := status.FromError(err)
-	require.True(t, ok)
-	assert.Equal(t, codes.Internal, st.Code())
-	assert.Contains(t, st.Message(), "set tenant id")
-
-	// Verify the auth tenant was cleaned up.
-	auth.AssertCalled(t, "DeleteTenant", mock.Anything, "tenant-stf")
-	// Commit must NOT have been called.
-	tx.AssertNotCalled(t, "Commit", mock.Anything)
-
-	pool.AssertExpectations(t)
-	tx.AssertExpectations(t)
-	auth.AssertExpectations(t)
 }
 
 // ---------------------------------------------------------------------------
@@ -974,7 +774,7 @@ func TestUnit_ListOrganizations_AccountLookupError(t *testing.T) {
 }
 
 func TestUnit_ListOrganizations_OnlyReturnsCallerOrgs(t *testing.T) {
-	// Tenant-isolation: the handler MUST scope through
+	// Caller-scoping: the handler MUST scope through
 	// ListOrganizationsForAccount, which JOINs users → organizations
 	// on account_id. Caller never sees orgs they aren't a member of.
 	mockQ := new(mocks.MockQuerier)
@@ -1069,143 +869,8 @@ func TestUnit_CreateOrganization_DBCreateError(t *testing.T) {
 	require.True(t, ok)
 	assert.NotEqual(t, codes.OK, st.Code())
 
-	// auth must not have been called at all.
-	auth.AssertNotCalled(t, "CreateTenant", mock.Anything, mock.Anything)
-
 	pool.AssertExpectations(t)
 	tx.AssertExpectations(t)
-}
-
-func TestUnit_CreateOrganization_SetTenantIDFailureWithDeleteTenantError(t *testing.T) {
-	// When SetOrganizationTenantID fails AND the subsequent DeleteTenant also
-	// fails, we still return the set tenant id error (cleanup failure is only
-	// logged).
-	ctx := context.Background()
-
-	pool := new(mockTxBeginner)
-	tx := new(mockTx)
-	auth := new(mockAuthService)
-	mockQ := new(mocks.MockQuerier)
-	expectGetAccount(mockQ)
-	srv := newCreateOrgServer(pool, auth, mockQ)
-
-	createdOrg := db.Organization{
-		ID:          uuid.MustParse("0192a000-0007-7000-8000-000000000007"),
-		Name:        "dblefail",
-		DisplayName: "Double Fail Org",
-		Annotations: json.RawMessage(`{}`),
-		State:       db.ResourceStateACTIVE,
-		Etag:        "etag-df",
-		Revision:    1,
-		CreateTime:  time.Date(2025, 8, 2, 10, 0, 0, 0, time.UTC),
-		UpdateTime:  time.Date(2025, 8, 2, 10, 0, 0, 0, time.UTC),
-	}
-
-	pool.On("Begin", mock.Anything).Return(tx, nil)
-	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
-		Return(orgRow(createdOrg)).Once()
-	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
-		Return(membershipRow(db.User{
-			ID:         uuid.New(),
-			OrgID:      createdOrg.ID,
-			AccountID:  testCallerAccount.ID,
-			Role:       db.OrgRoleOwner,
-			Etag:       "etag-membership",
-			Revision:   1,
-			CreateTime: createdOrg.CreateTime,
-			UpdateTime: createdOrg.UpdateTime,
-		})).Once()
-	auth.On("CreateTenant", mock.Anything, "dblefail").Return("tenant-df", nil)
-
-	// SetOrganizationTenantID fails.
-	tx.On("Exec", mock.Anything, mock.Anything, mock.Anything).
-		Return(pgconn.CommandTag{}, errors.New("constraint error"))
-
-	// DeleteTenant also fails — should only be logged, not propagated.
-	auth.On("DeleteTenant", mock.Anything, "tenant-df").
-		Return(errors.New("firebase delete failed"))
-
-	tx.On("Rollback", mock.Anything).Return(nil)
-
-	_, err := srv.CreateOrganization(ctx, &apiv1.CreateOrganizationRequest{
-		OrganizationId: "dblefail",
-		Organization:   &apiv1.Organization{DisplayName: "Double Fail Org"},
-	})
-
-	require.Error(t, err)
-	st, ok := status.FromError(err)
-	require.True(t, ok)
-	assert.Equal(t, codes.Internal, st.Code())
-	assert.Contains(t, st.Message(), "set tenant id")
-
-	pool.AssertExpectations(t)
-	tx.AssertExpectations(t)
-	auth.AssertExpectations(t)
-}
-
-func TestUnit_CreateOrganization_CommitFailureWithDeleteTenantError(t *testing.T) {
-	// When Commit fails AND the subsequent DeleteTenant also fails, we still
-	// return the commit transaction error (cleanup failure is only logged).
-	ctx := context.Background()
-
-	pool := new(mockTxBeginner)
-	tx := new(mockTx)
-	auth := new(mockAuthService)
-	mockQ := new(mocks.MockQuerier)
-	expectGetAccount(mockQ)
-	srv := newCreateOrgServer(pool, auth, mockQ)
-
-	createdOrg := db.Organization{
-		ID:          uuid.MustParse("0192a000-0008-7000-8000-000000000008"),
-		Name:        "commitdelf",
-		DisplayName: "Commit Delete Fail Org",
-		Annotations: json.RawMessage(`{}`),
-		State:       db.ResourceStateACTIVE,
-		Etag:        "etag-cdf",
-		Revision:    1,
-		CreateTime:  time.Date(2025, 8, 3, 10, 0, 0, 0, time.UTC),
-		UpdateTime:  time.Date(2025, 8, 3, 10, 0, 0, 0, time.UTC),
-	}
-
-	pool.On("Begin", mock.Anything).Return(tx, nil)
-	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
-		Return(orgRow(createdOrg)).Once()
-	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
-		Return(membershipRow(db.User{
-			ID:         uuid.New(),
-			OrgID:      createdOrg.ID,
-			AccountID:  testCallerAccount.ID,
-			Role:       db.OrgRoleOwner,
-			Etag:       "etag-membership",
-			Revision:   1,
-			CreateTime: createdOrg.CreateTime,
-			UpdateTime: createdOrg.UpdateTime,
-		})).Once()
-	auth.On("CreateTenant", mock.Anything, "commitdelf").Return("tenant-cdf", nil)
-	tx.On("Exec", mock.Anything, mock.Anything, mock.Anything).
-		Return(pgconn.NewCommandTag("UPDATE 1"), nil)
-	tx.On("Commit", mock.Anything).Return(errors.New("network timeout"))
-
-	// DeleteTenant also fails — only logged.
-	auth.On("DeleteTenant", mock.Anything, "tenant-cdf").
-		Return(errors.New("firebase unreachable"))
-
-	tx.On("Rollback", mock.Anything).Return(nil)
-
-	_, err := srv.CreateOrganization(ctx, &apiv1.CreateOrganizationRequest{
-		OrganizationId: "commitdelf",
-		Organization:   &apiv1.Organization{DisplayName: "Commit Delete Fail Org"},
-	})
-
-	require.Error(t, err)
-	st, ok := status.FromError(err)
-	require.True(t, ok)
-	assert.Equal(t, codes.Internal, st.Code())
-	assert.Contains(t, st.Message(), "commit transaction")
-
-	pool.AssertExpectations(t)
-	tx.AssertExpectations(t)
-	auth.AssertExpectations(t)
 }
 
 // ---------------------------------------------------------------------------

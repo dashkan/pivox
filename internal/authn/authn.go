@@ -9,10 +9,9 @@ import "context"
 // Identity represents a verified user identity, independent of the
 // underlying identity provider (Firebase, Auth0, custom JWT, etc.).
 type Identity struct {
-	UID      string
-	Email    string
-	TenantID string
-	Claims   map[string]any
+	UID    string
+	Email  string
+	Claims map[string]any
 }
 
 // Service is the authentication interface that all identity provider
@@ -24,11 +23,4 @@ type Service interface {
 	// CreateCustomToken mints a provider-specific token for the given UID
 	// that a client can use to sign in.
 	CreateCustomToken(ctx context.Context, uid string) (string, error)
-
-	// CreateTenant provisions a new auth tenant (e.g., for multi-tenant
-	// isolation) and returns the provider-assigned tenant ID.
-	CreateTenant(ctx context.Context, displayName string) (string, error)
-
-	// DeleteTenant removes an auth tenant by its provider-assigned ID.
-	DeleteTenant(ctx context.Context, tenantID string) error
 }

@@ -161,7 +161,6 @@ func ScanOrganizations(rows pgx.Rows) ([]db.Organization, error) {
 			&o.Name,
 			&o.DisplayName,
 			&o.Annotations,
-			&o.TenantID,
 			&o.CreatedByAccountID,
 			&o.State,
 			&o.Etag,

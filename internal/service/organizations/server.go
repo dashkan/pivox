@@ -171,34 +171,11 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 		return nil, apierr.Internal("create owner membership")
 	}
 
-	tenantID, err := s.auth.CreateTenant(ctx, orgSlug)
-	if err != nil {
-		slog.ErrorContext(ctx, "failed to create Firebase tenant", "org", orgSlug, "error", err)
-		return nil, apierr.Internal("create auth tenant")
-	}
-
-	if err := qtx.SetOrganizationTenantID(ctx, db.SetOrganizationTenantIDParams{
-		ID:       org.ID,
-		TenantID: tenantID,
-	}); err != nil {
-		// Clean up the Firebase tenant we just created.
-		if delErr := s.auth.DeleteTenant(ctx, tenantID); delErr != nil {
-			slog.ErrorContext(ctx, "failed to clean up Firebase tenant", "tenantID", tenantID, "error", delErr)
-		}
-		slog.ErrorContext(ctx, "set tenant id failed", "org_id", org.ID, "error", err)
-		return nil, apierr.Internal("set tenant id")
-	}
-
 	if err := tx.Commit(ctx); err != nil {
-		// Clean up the Firebase tenant since the commit failed.
-		if delErr := s.auth.DeleteTenant(ctx, tenantID); delErr != nil {
-			slog.ErrorContext(ctx, "failed to clean up Firebase tenant after commit failure", "tenantID", tenantID, "error", delErr)
-		}
 		slog.ErrorContext(ctx, "commit transaction failed", "org_id", org.ID, "error", err)
 		return nil, apierr.Internal("commit transaction")
 	}
 
-	org.TenantID = tenantID
 	return lro.DoneOperation(convert.OrganizationToProto(org))
 }
 

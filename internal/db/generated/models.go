@@ -1184,7 +1184,6 @@ type Organization struct {
 	Name               string             `json:"name"`
 	DisplayName        string             `json:"display_name"`
 	Annotations        json.RawMessage    `json:"annotations"`
-	TenantID           string             `json:"tenant_id"`
 	CreatedByAccountID pgtype.UUID        `json:"created_by_account_id"`
 	State              ResourceState      `json:"state"`
 	Etag               string             `json:"etag"`

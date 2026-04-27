@@ -181,7 +181,6 @@ type Querier interface {
 	// Server-driven title write (the `:summarize` path). Does NOT flip
 	// `title_user_set` — that's the whole point of the flag.
 	SetAutoTitle(ctx context.Context, arg SetAutoTitleParams) (AiConversation, error)
-	SetOrganizationTenantID(ctx context.Context, arg SetOrganizationTenantIDParams) error
 	SoftDeleteApiKey(ctx context.Context, arg SoftDeleteApiKeyParams) (ApiKey, error)
 	SoftDeleteAsset(ctx context.Context, arg SoftDeleteAssetParams) error
 	SoftDeleteProject(ctx context.Context, arg SoftDeleteProjectParams) (Project, error)

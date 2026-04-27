@@ -72,7 +72,6 @@ CREATE TABLE organizations (
     -- domain
     display_name          TEXT NOT NULL DEFAULT '',
     annotations           JSONB NOT NULL DEFAULT '{}',
-    tenant_id             TEXT NOT NULL DEFAULT '',
     -- Immutable founder pointer. `created_by_account_id` references the
     -- account row of whoever created this org (FK added after the
     -- `accounts` table is declared further down). Survives membership
@@ -97,8 +96,6 @@ CREATE TABLE organizations (
     purge_time            TIMESTAMPTZ
 );
 CREATE INDEX idx_organizations_name ON organizations (name) WHERE delete_time IS NULL;
-CREATE UNIQUE INDEX idx_organizations_tenant_id
-  ON organizations (tenant_id) WHERE tenant_id != '' AND delete_time IS NULL;
 
 -- ============================================================================
 -- custom_domains (per-org, LRO-managed)

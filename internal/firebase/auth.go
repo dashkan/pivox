@@ -21,11 +21,10 @@ const firebaseScope = "https://www.googleapis.com/auth/cloud-platform"
 // Compile-time check: *AuthService implements authn.Service.
 var _ authn.Service = (*AuthService)(nil)
 
-// AuthService wraps Firebase Auth operations including tenant management,
-// ID token verification, and custom token creation.
+// AuthService wraps Firebase Auth operations: ID token verification and
+// custom token creation.
 type AuthService struct {
 	authClient *auth.Client
-	tenants    *auth.TenantManager
 }
 
 // NewAuthService initializes a Firebase app and returns an AuthService.
@@ -60,7 +59,6 @@ func NewAuthService(ctx context.Context) (*AuthService, error) {
 	}
 	return &AuthService{
 		authClient: authClient,
-		tenants:    authClient.TenantManager,
 	}, nil
 }
 
@@ -74,10 +72,9 @@ func (s *AuthService) VerifyToken(ctx context.Context, token string) (*authn.Ide
 	email, _ := fbToken.Claims["email"].(string)
 
 	return &authn.Identity{
-		UID:      fbToken.UID,
-		Email:    email,
-		TenantID: fbToken.Firebase.Tenant,
-		Claims:   fbToken.Claims,
+		UID:    fbToken.UID,
+		Email:  email,
+		Claims: fbToken.Claims,
 	}, nil
 }
 
@@ -85,32 +82,4 @@ func (s *AuthService) VerifyToken(ctx context.Context, token string) (*authn.Ide
 // by a client to sign in with signInWithCustomToken.
 func (s *AuthService) CreateCustomToken(ctx context.Context, uid string) (string, error) {
 	return s.authClient.CustomToken(ctx, uid)
-}
-
-// CreateTenant creates a new Firebase Auth tenant with the given display name
-// and returns the auto-generated tenant ID.
-func (s *AuthService) CreateTenant(ctx context.Context, displayName string) (string, error) {
-	tenant := (&auth.TenantToCreate{}).DisplayName(displayName)
-	t, err := s.tenants.CreateTenant(ctx, tenant)
-	if err != nil {
-		return "", fmt.Errorf("firebase: create tenant %q: %w", displayName, err)
-	}
-	return t.ID, nil
-}
-
-// UpdateTenantDisplayName updates the display name of an existing tenant.
-func (s *AuthService) UpdateTenantDisplayName(ctx context.Context, tenantID, displayName string) error {
-	tenant := (&auth.TenantToUpdate{}).DisplayName(displayName)
-	if _, err := s.tenants.UpdateTenant(ctx, tenantID, tenant); err != nil {
-		return fmt.Errorf("firebase: update tenant %q: %w", tenantID, err)
-	}
-	return nil
-}
-
-// DeleteTenant deletes a Firebase Auth tenant by ID.
-func (s *AuthService) DeleteTenant(ctx context.Context, tenantID string) error {
-	if err := s.tenants.DeleteTenant(ctx, tenantID); err != nil {
-		return fmt.Errorf("firebase: delete tenant %q: %w", tenantID, err)
-	}
-	return nil
 }

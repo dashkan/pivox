@@ -15,7 +15,7 @@ import (
 const createOrganization = `-- name: CreateOrganization :one
 INSERT INTO organizations (id, name, display_name, created_by_account_id, created_by, updated_by)
 VALUES ($1, $2, $3, $4, $5, $5)
-RETURNING id, name, display_name, annotations, tenant_id, created_by_account_id, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time
+RETURNING id, name, display_name, annotations, created_by_account_id, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time
 `
 
 type CreateOrganizationParams struct {
@@ -40,7 +40,6 @@ func (q *Queries) CreateOrganization(ctx context.Context, arg CreateOrganization
 		&i.Name,
 		&i.DisplayName,
 		&i.Annotations,
-		&i.TenantID,
 		&i.CreatedByAccountID,
 		&i.State,
 		&i.Etag,
@@ -57,7 +56,7 @@ func (q *Queries) CreateOrganization(ctx context.Context, arg CreateOrganization
 }
 
 const getOrganization = `-- name: GetOrganization :one
-SELECT id, name, display_name, annotations, tenant_id, created_by_account_id, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time FROM organizations WHERE id = $1 AND delete_time IS NULL
+SELECT id, name, display_name, annotations, created_by_account_id, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time FROM organizations WHERE id = $1 AND delete_time IS NULL
 `
 
 func (q *Queries) GetOrganization(ctx context.Context, id uuid.UUID) (Organization, error) {
@@ -68,7 +67,6 @@ func (q *Queries) GetOrganization(ctx context.Context, id uuid.UUID) (Organizati
 		&i.Name,
 		&i.DisplayName,
 		&i.Annotations,
-		&i.TenantID,
 		&i.CreatedByAccountID,
 		&i.State,
 		&i.Etag,
@@ -85,7 +83,7 @@ func (q *Queries) GetOrganization(ctx context.Context, id uuid.UUID) (Organizati
 }
 
 const getOrganizationByName = `-- name: GetOrganizationByName :one
-SELECT id, name, display_name, annotations, tenant_id, created_by_account_id, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time FROM organizations WHERE name = $1 AND delete_time IS NULL
+SELECT id, name, display_name, annotations, created_by_account_id, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time FROM organizations WHERE name = $1 AND delete_time IS NULL
 `
 
 func (q *Queries) GetOrganizationByName(ctx context.Context, name string) (Organization, error) {
@@ -96,7 +94,6 @@ func (q *Queries) GetOrganizationByName(ctx context.Context, name string) (Organ
 		&i.Name,
 		&i.DisplayName,
 		&i.Annotations,
-		&i.TenantID,
 		&i.CreatedByAccountID,
 		&i.State,
 		&i.Etag,
@@ -110,18 +107,4 @@ func (q *Queries) GetOrganizationByName(ctx context.Context, name string) (Organ
 		&i.PurgeTime,
 	)
 	return i, err
-}
-
-const setOrganizationTenantID = `-- name: SetOrganizationTenantID :exec
-UPDATE organizations SET tenant_id = $2, update_time = now() WHERE id = $1
-`
-
-type SetOrganizationTenantIDParams struct {
-	ID       uuid.UUID `json:"id"`
-	TenantID string    `json:"tenant_id"`
-}
-
-func (q *Queries) SetOrganizationTenantID(ctx context.Context, arg SetOrganizationTenantIDParams) error {
-	_, err := q.db.Exec(ctx, setOrganizationTenantID, arg.ID, arg.TenantID)
-	return err
 }

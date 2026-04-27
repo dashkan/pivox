@@ -136,11 +136,6 @@ func (m *MockQuerier) GetOrganizationByName(ctx context.Context, name string) (d
 	return args.Get(0).(db.Organization), args.Error(1)
 }
 
-func (m *MockQuerier) SetOrganizationTenantID(ctx context.Context, arg db.SetOrganizationTenantIDParams) error {
-	args := m.Called(ctx, arg)
-	return args.Error(0)
-}
-
 // --- Users (per-org membership) ---
 
 func (m *MockQuerier) CreateUserMembership(ctx context.Context, arg db.CreateUserMembershipParams) (db.User, error) {

@@ -101,7 +101,7 @@ func (q *Queries) GetUserMembership(ctx context.Context, arg GetUserMembershipPa
 }
 
 const listOrganizationsForAccount = `-- name: ListOrganizationsForAccount :many
-SELECT o.id, o.name, o.display_name, o.annotations, o.tenant_id, o.created_by_account_id, o.state, o.etag, o.revision, o.created_by, o.updated_by, o.deleted_by, o.create_time, o.update_time, o.delete_time, o.purge_time
+SELECT o.id, o.name, o.display_name, o.annotations, o.created_by_account_id, o.state, o.etag, o.revision, o.created_by, o.updated_by, o.deleted_by, o.create_time, o.update_time, o.delete_time, o.purge_time
   FROM organizations o
   JOIN users u ON u.org_id = o.id
  WHERE u.account_id = $1
@@ -130,7 +130,6 @@ func (q *Queries) ListOrganizationsForAccount(ctx context.Context, accountID uui
 			&i.Name,
 			&i.DisplayName,
 			&i.Annotations,
-			&i.TenantID,
 			&i.CreatedByAccountID,
 			&i.State,
 			&i.Etag,

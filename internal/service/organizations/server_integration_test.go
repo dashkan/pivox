@@ -4,7 +4,6 @@ package organizations_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
@@ -34,14 +33,6 @@ func (n noopAuthService) CreateCustomToken(_ context.Context, uid string) (strin
 	return "custom-token-" + uid, nil
 }
 
-func (n noopAuthService) CreateTenant(_ context.Context, displayName string) (string, error) {
-	return "tenant-" + displayName, nil
-}
-
-func (n noopAuthService) DeleteTenant(_ context.Context, _ string) error {
-	return nil
-}
-
 // testReadUID is the AuthContextReader used by integration tests. It
 // always returns the canonical test caller's UID, since these tests
 // build the gRPC server directly without the production AuthInterceptor
@@ -63,25 +54,6 @@ func seedTestCaller(t *testing.T, queries db.Querier) uuid.UUID {
 	})
 	require.NoError(t, err)
 	return acct.ID
-}
-
-// failingAuthService returns errors from CreateTenant for rollback testing.
-type failingAuthService struct{}
-
-func (f failingAuthService) VerifyToken(_ context.Context, _ string) (*authn.Identity, error) {
-	return &authn.Identity{UID: "test-user"}, nil
-}
-
-func (f failingAuthService) CreateCustomToken(_ context.Context, uid string) (string, error) {
-	return "custom-token-" + uid, nil
-}
-
-func (f failingAuthService) CreateTenant(_ context.Context, _ string) (string, error) {
-	return "", fmt.Errorf("tenant creation failed")
-}
-
-func (f failingAuthService) DeleteTenant(_ context.Context, _ string) error {
-	return nil
 }
 
 func TestIntegration_CreateOrganization_DuplicateName(t *testing.T) {
@@ -118,44 +90,6 @@ func TestIntegration_CreateOrganization_DuplicateName(t *testing.T) {
 	st, ok := status.FromError(err)
 	require.True(t, ok)
 	assert.Equal(t, codes.AlreadyExists, st.Code())
-}
-
-func TestIntegration_CreateOrganization_TenantFailure(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
-	}
-
-	pool, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
-
-	iamHelper := iam.NewHelper(queries)
-	seedTestCaller(t, queries)
-
-	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, iamHelper, failingAuthService{}, nil, testReadUID))
-	})
-
-	client := apiv1.NewOrganizationsClient(conn)
-	ctx := context.Background()
-
-	// CreateOrganization should fail because CreateTenant returns an error.
-	_, err := client.CreateOrganization(ctx, &apiv1.CreateOrganizationRequest{
-		OrganizationId: "tenantfail",
-		Organization:   &apiv1.Organization{DisplayName: "Tenant Fail Org"},
-	})
-	require.Error(t, err)
-	st, ok := status.FromError(err)
-	require.True(t, ok)
-	assert.Equal(t, codes.Internal, st.Code())
-
-	// Verify the org was NOT persisted (tx should have rolled back).
-	_, err = client.GetOrganization(ctx, &apiv1.GetOrganizationRequest{
-		Name: "organizations/tenantfail",
-	})
-	require.Error(t, err)
-	st2, ok := status.FromError(err)
-	require.True(t, ok)
-	assert.Equal(t, codes.NotFound, st2.Code())
 }
 
 func TestIntegration_Organizations(t *testing.T) {
