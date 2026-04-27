@@ -354,23 +354,6 @@ CREATE INDEX idx_api_keys_org ON api_keys (org_id) WHERE delete_time IS NULL;
 CREATE INDEX idx_api_keys_key_string ON api_keys (key_string) WHERE delete_time IS NULL;
 
 -- ============================================================================
--- iam_policies (shared IAM storage)
--- ============================================================================
-CREATE TABLE iam_policies (
-    resource_id   UUID PRIMARY KEY,
-    resource_type TEXT NOT NULL,
-    policy        JSONB NOT NULL DEFAULT '{}',
-    etag          TEXT NOT NULL DEFAULT md5(now()::text),
-    -- audit
-    created_by    TEXT NOT NULL DEFAULT '',
-    updated_by    TEXT NOT NULL DEFAULT '',
-    -- timestamps
-    create_time   TIMESTAMPTZ NOT NULL DEFAULT now(),
-    update_time   TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE INDEX idx_iam_policies_type ON iam_policies (resource_type);
-
--- ============================================================================
 -- firebase_identities (global Firebase Auth cache — internal, no proto)
 -- ============================================================================
 CREATE TABLE firebase_identities (
@@ -656,8 +639,6 @@ INSERT INTO permissions (permission_id, display_name, description) VALUES
   ('organizations.get', 'Get Organization', 'View organization details'),
   ('organizations.update', 'Update Organization', 'Modify organization settings'),
   ('organizations.delete', 'Delete Organization', 'Delete the organization'),
-  ('organizations.getIamPolicy', 'Get Org IAM Policy', 'View org access policies'),
-  ('organizations.setIamPolicy', 'Set Org IAM Policy', 'Modify org access policies'),
   -- Project creation (org-level; within-project access is project-role based)
   ('projects.create', 'Create Project', 'Create new projects in the organization'),
   -- User management

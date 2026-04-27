@@ -15,7 +15,6 @@ import (
 	"google.golang.org/grpc/status"
 
 	db "github.com/dashkan/pivox/internal/db/generated"
-	"github.com/dashkan/pivox/internal/iam"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	"github.com/dashkan/pivox/internal/service/tags"
 	"github.com/dashkan/pivox/internal/testutil"
@@ -41,11 +40,9 @@ func TestIntegration_Tags_FullLifecycle(t *testing.T) {
 	pool, queries, cleanup := testutil.SetupTestDB(t)
 	defer cleanup()
 
-	iamHelper := iam.NewHelper(queries)
-
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		apiv1.RegisterTagKeysServer(s, tags.NewTagKeysServer(pool, queries, iamHelper, nil))
-		apiv1.RegisterTagValuesServer(s, tags.NewTagValuesServer(pool, queries, iamHelper, nil))
+		apiv1.RegisterTagKeysServer(s, tags.NewTagKeysServer(pool, queries, nil))
+		apiv1.RegisterTagValuesServer(s, tags.NewTagValuesServer(pool, queries, nil))
 		apiv1.RegisterTagBindingsServer(s, tags.NewTagBindingsServer(pool, queries, nil))
 	})
 

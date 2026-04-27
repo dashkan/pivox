@@ -39,7 +39,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// A group of users within an organization.
+// A group of users within an organization. Managed via the `Iam` service.
 type Group struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The resource name of the group.
@@ -215,7 +215,7 @@ func (x *GroupMember) GetCreateTime() *timestamppb.Timestamp {
 	return nil
 }
 
-// Request message for `GetGroup`.
+// Request message for `Iam.GetGroup`.
 type GetGroupRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The resource name of the group.
@@ -262,7 +262,7 @@ func (x *GetGroupRequest) GetName() string {
 	return ""
 }
 
-// Request message for `ListGroups`.
+// Request message for `Iam.ListGroups`.
 type ListGroupsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The parent organization.
@@ -376,7 +376,7 @@ func (x *ListGroupsRequest) GetShowDeleted() bool {
 	return false
 }
 
-// Response message for `ListGroups`.
+// Response message for `Iam.ListGroups`.
 type ListGroupsResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The groups in the organization.
@@ -431,7 +431,7 @@ func (x *ListGroupsResponse) GetNextPageToken() string {
 	return ""
 }
 
-// Request message for `CreateGroup`.
+// Request message for `Iam.CreateGroup`.
 type CreateGroupRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The parent organization.
@@ -497,7 +497,7 @@ func (x *CreateGroupRequest) GetGroupId() string {
 	return ""
 }
 
-// Request message for `UpdateGroup`.
+// Request message for `Iam.UpdateGroup`.
 type UpdateGroupRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The group with updated fields.
@@ -552,7 +552,7 @@ func (x *UpdateGroupRequest) GetUpdateMask() *fieldmaskpb.FieldMask {
 	return nil
 }
 
-// Request message for `DeleteGroup`.
+// Request message for `Iam.DeleteGroup`.
 type DeleteGroupRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The resource name of the group to delete.
@@ -608,7 +608,7 @@ func (x *DeleteGroupRequest) GetEtag() string {
 	return ""
 }
 
-// Request message for `AddGroupMembers`.
+// Request message for `Iam.AddGroupMembers`.
 type AddGroupMembersRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The resource name of the group.
@@ -665,7 +665,7 @@ func (x *AddGroupMembersRequest) GetMembers() []string {
 	return nil
 }
 
-// Response message for `AddGroupMembers`.
+// Response message for `Iam.AddGroupMembers`.
 type AddGroupMembersResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -702,7 +702,7 @@ func (*AddGroupMembersResponse) Descriptor() ([]byte, []int) {
 	return file_pivox_iam_v1_groups_proto_rawDescGZIP(), []int{9}
 }
 
-// Request message for `RemoveGroupMembers`.
+// Request message for `Iam.RemoveGroupMembers`.
 type RemoveGroupMembersRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The resource name of the group.
@@ -759,7 +759,7 @@ func (x *RemoveGroupMembersRequest) GetMembers() []string {
 	return nil
 }
 
-// Response message for `RemoveGroupMembers`.
+// Response message for `Iam.RemoveGroupMembers`.
 type RemoveGroupMembersResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -796,7 +796,7 @@ func (*RemoveGroupMembersResponse) Descriptor() ([]byte, []int) {
 	return file_pivox_iam_v1_groups_proto_rawDescGZIP(), []int{11}
 }
 
-// Request message for `ListGroupMembers`.
+// Request message for `Iam.ListGroupMembers`.
 // (-- api-linter: core::0132::request-parent-required=disabled
 //
 //	aip.dev/not-precedent: ListGroupMembers uses `group` as the parent-like field. --)
@@ -872,7 +872,7 @@ func (x *ListGroupMembersRequest) GetPageToken() string {
 	return ""
 }
 
-// Response message for `ListGroupMembers`.
+// Response message for `Iam.ListGroupMembers`.
 // (-- api-linter: core::0132::response-unknown-fields=disabled
 //
 //	aip.dev/not-precedent: Response contains GroupMember, a custom sub-resource. --)
@@ -934,7 +934,7 @@ var File_pivox_iam_v1_groups_proto protoreflect.FileDescriptor
 
 const file_pivox_iam_v1_groups_proto_rawDesc = "" +
 	"\n" +
-	"\x19pivox/iam/v1/groups.proto\x12\fpivox.iam.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xfe\x04\n" +
+	"\x19pivox/iam/v1/groups.proto\x12\fpivox.iam.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xfe\x04\n" +
 	"\x05Group\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12/\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\f\xe0A\x02\xbaH\x06r\x04\x10\x01\x18?R\vdisplayName\x12-\n" +
@@ -1002,17 +1002,7 @@ const file_pivox_iam_v1_groups_proto_rawDesc = "" +
 	"page_token\x18\x03 \x01(\tB\x03\xe0A\x01R\tpageToken\"w\n" +
 	"\x18ListGroupMembersResponse\x123\n" +
 	"\amembers\x18\x01 \x03(\v2\x19.pivox.iam.v1.GroupMemberR\amembers\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken2\xc9\t\n" +
-	"\x06Groups\x12r\n" +
-	"\bGetGroup\x12\x1d.pivox.iam.v1.GetGroupRequest\x1a\x13.pivox.iam.v1.Group\"2\xdaA\x04name\x82\xd3\xe4\x93\x02%\x12#/v1/{name=organizations/*/groups/*}\x12\x85\x01\n" +
-	"\n" +
-	"ListGroups\x12\x1f.pivox.iam.v1.ListGroupsRequest\x1a .pivox.iam.v1.ListGroupsResponse\"4\xdaA\x06parent\x82\xd3\xe4\x93\x02%\x12#/v1/{parent=organizations/*}/groups\x12\x90\x01\n" +
-	"\vCreateGroup\x12 .pivox.iam.v1.CreateGroupRequest\x1a\x13.pivox.iam.v1.Group\"J\xdaA\x15parent,group,group_id\x82\xd3\xe4\x93\x02,:\x05group\"#/v1/{parent=organizations/*}/groups\x12\x92\x01\n" +
-	"\vUpdateGroup\x12 .pivox.iam.v1.UpdateGroupRequest\x1a\x13.pivox.iam.v1.Group\"L\xdaA\x11group,update_mask\x82\xd3\xe4\x93\x022:\x05group2)/v1/{group.name=organizations/*/groups/*}\x12x\n" +
-	"\vDeleteGroup\x12 .pivox.iam.v1.DeleteGroupRequest\x1a\x13.pivox.iam.v1.Group\"2\xdaA\x04name\x82\xd3\xe4\x93\x02%*#/v1/{name=organizations/*/groups/*}\x12\xaf\x01\n" +
-	"\x0fAddGroupMembers\x12$.pivox.iam.v1.AddGroupMembersRequest\x1a%.pivox.iam.v1.AddGroupMembersResponse\"O\xdaA\rgroup,members\x82\xd3\xe4\x93\x029:\x01*\"4/v1/{group=organizations/*/groups/*}:addGroupMembers\x12\xbb\x01\n" +
-	"\x12RemoveGroupMembers\x12'.pivox.iam.v1.RemoveGroupMembersRequest\x1a(.pivox.iam.v1.RemoveGroupMembersResponse\"R\xdaA\rgroup,members\x82\xd3\xe4\x93\x02<:\x01*\"7/v1/{group=organizations/*/groups/*}:removeGroupMembers\x12\x9f\x01\n" +
-	"\x10ListGroupMembers\x12%.pivox.iam.v1.ListGroupMembersRequest\x1a&.pivox.iam.v1.ListGroupMembersResponse\"<\xdaA\x05group\x82\xd3\xe4\x93\x02.\x12,/v1/{group=organizations/*/groups/*}/members\x1a\x0f\xcaA\fapi.pivox.ioB\xaf\x01\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageTokenB\xaf\x01\n" +
 	"\x10com.pivox.iam.v1B\vGroupsProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1;iamv1\xa2\x02\x03PIX\xaa\x02\fPivox.Iam.V1\xca\x02\fPivox\\Iam\\V1\xe2\x02\x18Pivox\\Iam\\V1\\GPBMetadata\xea\x02\x0ePivox::Iam::V1b\x06proto3"
 
 var (
@@ -1059,24 +1049,8 @@ var file_pivox_iam_v1_groups_proto_depIdxs = []int32{
 	0,  // 8: pivox.iam.v1.UpdateGroupRequest.group:type_name -> pivox.iam.v1.Group
 	16, // 9: pivox.iam.v1.UpdateGroupRequest.update_mask:type_name -> google.protobuf.FieldMask
 	1,  // 10: pivox.iam.v1.ListGroupMembersResponse.members:type_name -> pivox.iam.v1.GroupMember
-	2,  // 11: pivox.iam.v1.Groups.GetGroup:input_type -> pivox.iam.v1.GetGroupRequest
-	3,  // 12: pivox.iam.v1.Groups.ListGroups:input_type -> pivox.iam.v1.ListGroupsRequest
-	5,  // 13: pivox.iam.v1.Groups.CreateGroup:input_type -> pivox.iam.v1.CreateGroupRequest
-	6,  // 14: pivox.iam.v1.Groups.UpdateGroup:input_type -> pivox.iam.v1.UpdateGroupRequest
-	7,  // 15: pivox.iam.v1.Groups.DeleteGroup:input_type -> pivox.iam.v1.DeleteGroupRequest
-	8,  // 16: pivox.iam.v1.Groups.AddGroupMembers:input_type -> pivox.iam.v1.AddGroupMembersRequest
-	10, // 17: pivox.iam.v1.Groups.RemoveGroupMembers:input_type -> pivox.iam.v1.RemoveGroupMembersRequest
-	12, // 18: pivox.iam.v1.Groups.ListGroupMembers:input_type -> pivox.iam.v1.ListGroupMembersRequest
-	0,  // 19: pivox.iam.v1.Groups.GetGroup:output_type -> pivox.iam.v1.Group
-	4,  // 20: pivox.iam.v1.Groups.ListGroups:output_type -> pivox.iam.v1.ListGroupsResponse
-	0,  // 21: pivox.iam.v1.Groups.CreateGroup:output_type -> pivox.iam.v1.Group
-	0,  // 22: pivox.iam.v1.Groups.UpdateGroup:output_type -> pivox.iam.v1.Group
-	0,  // 23: pivox.iam.v1.Groups.DeleteGroup:output_type -> pivox.iam.v1.Group
-	9,  // 24: pivox.iam.v1.Groups.AddGroupMembers:output_type -> pivox.iam.v1.AddGroupMembersResponse
-	11, // 25: pivox.iam.v1.Groups.RemoveGroupMembers:output_type -> pivox.iam.v1.RemoveGroupMembersResponse
-	13, // 26: pivox.iam.v1.Groups.ListGroupMembers:output_type -> pivox.iam.v1.ListGroupMembersResponse
-	19, // [19:27] is the sub-list for method output_type
-	11, // [11:19] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for method output_type
+	11, // [11:11] is the sub-list for method input_type
 	11, // [11:11] is the sub-list for extension type_name
 	11, // [11:11] is the sub-list for extension extendee
 	0,  // [0:11] is the sub-list for field type_name
@@ -1095,7 +1069,7 @@ func file_pivox_iam_v1_groups_proto_init() {
 			NumEnums:      0,
 			NumMessages:   15,
 			NumExtensions: 0,
-			NumServices:   1,
+			NumServices:   0,
 		},
 		GoTypes:           file_pivox_iam_v1_groups_proto_goTypes,
 		DependencyIndexes: file_pivox_iam_v1_groups_proto_depIdxs,

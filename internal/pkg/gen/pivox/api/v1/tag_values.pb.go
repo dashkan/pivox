@@ -23,7 +23,6 @@ package apiv1
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
-	v1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -693,7 +692,7 @@ var File_pivox_api_v1_tag_values_proto protoreflect.FileDescriptor
 
 const file_pivox_api_v1_tag_values_proto_rawDesc = "" +
 	"\n" +
-	"\x1dpivox/api/v1/tag_values.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1dpivox/iam/v1/iam_policy.proto\x1a\x19pivox/iam/v1/policy.proto\"\xce\x04\n" +
+	"\x1dpivox/api/v1/tag_values.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xce\x04\n" +
 	"\bTagValue\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12-\n" +
 	"\vdescription\x18\x05 \x01(\tB\v\xe0A\x01\xbaH\x05r\x03\x18\x80\x02R\vdescription\x12@\n" +
@@ -740,7 +739,8 @@ const file_pivox_api_v1_tag_values_proto_rawDesc = "" +
 	"\x04etag\x18\x03 \x01(\tB\x03\xe0A\x01R\x04etag\"\x18\n" +
 	"\x16CreateTagValueMetadata\"\x18\n" +
 	"\x16UpdateTagValueMetadata\"\x18\n" +
-	"\x16DeleteTagValueMetadata2\xc2\x10\n" +
+	"\x16DeleteTagValueMetadata2\xa7\n" +
+	"\n" +
 	"\tTagValues\x12\xdb\x01\n" +
 	"\rListTagValues\x12\".pivox.api.v1.ListTagValuesRequest\x1a#.pivox.api.v1.ListTagValuesResponse\"\x80\x01\xdaA\x06parent\x82\xd3\xe4\x93\x02qZ=\x12;/v1/{parent=organizations/*/projects/*/tagKeys/*}/tagValues\x120/v1/{parent=organizations/*/tagKeys/*}/tagValues\x12\xc7\x01\n" +
 	"\vGetTagValue\x12 .pivox.api.v1.GetTagValueRequest\x1a\x16.pivox.api.v1.TagValue\"~\xdaA\x04name\x82\xd3\xe4\x93\x02qZ=\x12;/v1/{name=organizations/*/projects/*/tagKeys/*/tagValues/*}\x120/v1/{name=organizations/*/tagKeys/*/tagValues/*}\x12\xaa\x02\n" +
@@ -749,10 +749,7 @@ const file_pivox_api_v1_tag_values_proto_rawDesc = "" +
 	"\x0eUpdateTagValue\x12#.pivox.api.v1.UpdateTagValueRequest\x1a\x1d.google.longrunning.Operation\"\xdf\x01\xcaA\"\n" +
 	"\bTagValue\x12\x16UpdateTagValueMetadata\xdaA\x15tag_value,update_mask\x82\xd3\xe4\x93\x02\x9b\x01:\ttag_valueZR:\ttag_value2E/v1/{tag_value.name=organizations/*/projects/*/tagKeys/*/tagValues/*}2:/v1/{tag_value.name=organizations/*/tagKeys/*/tagValues/*}\x12\xfa\x01\n" +
 	"\x0eDeleteTagValue\x12#.pivox.api.v1.DeleteTagValueRequest\x1a\x1d.google.longrunning.Operation\"\xa3\x01\xcaA\"\n" +
-	"\bTagValue\x12\x16DeleteTagValueMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02qZ=*;/v1/{name=organizations/*/projects/*/tagKeys/*/tagValues/*}*0/v1/{name=organizations/*/tagKeys/*/tagValues/*}\x12\xe9\x01\n" +
-	"\fGetIamPolicy\x12!.pivox.iam.v1.GetIamPolicyRequest\x1a\x14.pivox.iam.v1.Policy\"\x9f\x01\xdaA\x04name\x82\xd3\xe4\x93\x02\x91\x01:\x01*ZM:\x01*\"H/v1/{name=organizations/*/projects/*/tagKeys/*/tagValues/*}:getIamPolicy\"=/v1/{name=organizations/*/tagKeys/*/tagValues/*}:getIamPolicy\x12\xfc\x01\n" +
-	"\fSetIamPolicy\x12!.pivox.iam.v1.SetIamPolicyRequest\x1a\x14.pivox.iam.v1.Policy\"\xb2\x01\xdaA\x0fresource,policy\x82\xd3\xe4\x93\x02\x99\x01:\x01*ZQ:\x01*\"L/v1/{resource=organizations/*/projects/*/tagKeys/*/tagValues/*}:setIamPolicy\"A/v1/{resource=organizations/*/tagKeys/*/tagValues/*}:setIamPolicy\x12\xad\x02\n" +
-	"\x12TestIamPermissions\x12'.pivox.iam.v1.TestIamPermissionsRequest\x1a(.pivox.iam.v1.TestIamPermissionsResponse\"\xc3\x01\xdaA\x14resource,permissions\x82\xd3\xe4\x93\x02\xa5\x01:\x01*ZW:\x01*\"R/v1/{resource=organizations/*/projects/*/tagKeys/*/tagValues/*}:testIamPermissions\"G/v1/{resource=organizations/*/tagKeys/*/tagValues/*}:testIamPermissions\x1a\x0f\xcaA\fapi.pivox.ioB\xb2\x01\n" +
+	"\bTagValue\x12\x16DeleteTagValueMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02qZ=*;/v1/{name=organizations/*/projects/*/tagKeys/*/tagValues/*}*0/v1/{name=organizations/*/tagKeys/*/tagValues/*}\x1a\x0f\xcaA\fapi.pivox.ioB\xb2\x01\n" +
 	"\x10com.pivox.api.v1B\x0eTagValuesProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
 
 var (
@@ -769,25 +766,20 @@ func file_pivox_api_v1_tag_values_proto_rawDescGZIP() []byte {
 
 var file_pivox_api_v1_tag_values_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_pivox_api_v1_tag_values_proto_goTypes = []any{
-	(*TagValue)(nil),                      // 0: pivox.api.v1.TagValue
-	(*ListTagValuesRequest)(nil),          // 1: pivox.api.v1.ListTagValuesRequest
-	(*ListTagValuesResponse)(nil),         // 2: pivox.api.v1.ListTagValuesResponse
-	(*GetTagValueRequest)(nil),            // 3: pivox.api.v1.GetTagValueRequest
-	(*CreateTagValueRequest)(nil),         // 4: pivox.api.v1.CreateTagValueRequest
-	(*UpdateTagValueRequest)(nil),         // 5: pivox.api.v1.UpdateTagValueRequest
-	(*DeleteTagValueRequest)(nil),         // 6: pivox.api.v1.DeleteTagValueRequest
-	(*CreateTagValueMetadata)(nil),        // 7: pivox.api.v1.CreateTagValueMetadata
-	(*UpdateTagValueMetadata)(nil),        // 8: pivox.api.v1.UpdateTagValueMetadata
-	(*DeleteTagValueMetadata)(nil),        // 9: pivox.api.v1.DeleteTagValueMetadata
-	nil,                                   // 10: pivox.api.v1.TagValue.AnnotationsEntry
-	(*timestamppb.Timestamp)(nil),         // 11: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),         // 12: google.protobuf.FieldMask
-	(*v1.GetIamPolicyRequest)(nil),        // 13: pivox.iam.v1.GetIamPolicyRequest
-	(*v1.SetIamPolicyRequest)(nil),        // 14: pivox.iam.v1.SetIamPolicyRequest
-	(*v1.TestIamPermissionsRequest)(nil),  // 15: pivox.iam.v1.TestIamPermissionsRequest
-	(*longrunningpb.Operation)(nil),       // 16: google.longrunning.Operation
-	(*v1.Policy)(nil),                     // 17: pivox.iam.v1.Policy
-	(*v1.TestIamPermissionsResponse)(nil), // 18: pivox.iam.v1.TestIamPermissionsResponse
+	(*TagValue)(nil),                // 0: pivox.api.v1.TagValue
+	(*ListTagValuesRequest)(nil),    // 1: pivox.api.v1.ListTagValuesRequest
+	(*ListTagValuesResponse)(nil),   // 2: pivox.api.v1.ListTagValuesResponse
+	(*GetTagValueRequest)(nil),      // 3: pivox.api.v1.GetTagValueRequest
+	(*CreateTagValueRequest)(nil),   // 4: pivox.api.v1.CreateTagValueRequest
+	(*UpdateTagValueRequest)(nil),   // 5: pivox.api.v1.UpdateTagValueRequest
+	(*DeleteTagValueRequest)(nil),   // 6: pivox.api.v1.DeleteTagValueRequest
+	(*CreateTagValueMetadata)(nil),  // 7: pivox.api.v1.CreateTagValueMetadata
+	(*UpdateTagValueMetadata)(nil),  // 8: pivox.api.v1.UpdateTagValueMetadata
+	(*DeleteTagValueMetadata)(nil),  // 9: pivox.api.v1.DeleteTagValueMetadata
+	nil,                             // 10: pivox.api.v1.TagValue.AnnotationsEntry
+	(*timestamppb.Timestamp)(nil),   // 11: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),   // 12: google.protobuf.FieldMask
+	(*longrunningpb.Operation)(nil), // 13: google.longrunning.Operation
 }
 var file_pivox_api_v1_tag_values_proto_depIdxs = []int32{
 	11, // 0: pivox.api.v1.TagValue.create_time:type_name -> google.protobuf.Timestamp
@@ -802,19 +794,13 @@ var file_pivox_api_v1_tag_values_proto_depIdxs = []int32{
 	4,  // 9: pivox.api.v1.TagValues.CreateTagValue:input_type -> pivox.api.v1.CreateTagValueRequest
 	5,  // 10: pivox.api.v1.TagValues.UpdateTagValue:input_type -> pivox.api.v1.UpdateTagValueRequest
 	6,  // 11: pivox.api.v1.TagValues.DeleteTagValue:input_type -> pivox.api.v1.DeleteTagValueRequest
-	13, // 12: pivox.api.v1.TagValues.GetIamPolicy:input_type -> pivox.iam.v1.GetIamPolicyRequest
-	14, // 13: pivox.api.v1.TagValues.SetIamPolicy:input_type -> pivox.iam.v1.SetIamPolicyRequest
-	15, // 14: pivox.api.v1.TagValues.TestIamPermissions:input_type -> pivox.iam.v1.TestIamPermissionsRequest
-	2,  // 15: pivox.api.v1.TagValues.ListTagValues:output_type -> pivox.api.v1.ListTagValuesResponse
-	0,  // 16: pivox.api.v1.TagValues.GetTagValue:output_type -> pivox.api.v1.TagValue
-	16, // 17: pivox.api.v1.TagValues.CreateTagValue:output_type -> google.longrunning.Operation
-	16, // 18: pivox.api.v1.TagValues.UpdateTagValue:output_type -> google.longrunning.Operation
-	16, // 19: pivox.api.v1.TagValues.DeleteTagValue:output_type -> google.longrunning.Operation
-	17, // 20: pivox.api.v1.TagValues.GetIamPolicy:output_type -> pivox.iam.v1.Policy
-	17, // 21: pivox.api.v1.TagValues.SetIamPolicy:output_type -> pivox.iam.v1.Policy
-	18, // 22: pivox.api.v1.TagValues.TestIamPermissions:output_type -> pivox.iam.v1.TestIamPermissionsResponse
-	15, // [15:23] is the sub-list for method output_type
-	7,  // [7:15] is the sub-list for method input_type
+	2,  // 12: pivox.api.v1.TagValues.ListTagValues:output_type -> pivox.api.v1.ListTagValuesResponse
+	0,  // 13: pivox.api.v1.TagValues.GetTagValue:output_type -> pivox.api.v1.TagValue
+	13, // 14: pivox.api.v1.TagValues.CreateTagValue:output_type -> google.longrunning.Operation
+	13, // 15: pivox.api.v1.TagValues.UpdateTagValue:output_type -> google.longrunning.Operation
+	13, // 16: pivox.api.v1.TagValues.DeleteTagValue:output_type -> google.longrunning.Operation
+	12, // [12:17] is the sub-list for method output_type
+	7,  // [7:12] is the sub-list for method input_type
 	7,  // [7:7] is the sub-list for extension type_name
 	7,  // [7:7] is the sub-list for extension extendee
 	0,  // [0:7] is the sub-list for field type_name

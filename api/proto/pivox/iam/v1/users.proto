@@ -17,33 +17,14 @@ syntax = "proto3";
 package pivox.iam.v1;
 
 import "buf/validate/validate.proto";
-import "google/api/annotations.proto";
-import "google/api/client.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
 import "google/protobuf/timestamp.proto";
 
 option go_package = "pivox/iam/v1;iampb";
 
-// Read-only service for users synced from Firebase Auth.
-service Users {
-  option (google.api.default_host) = "api.pivox.io";
-
-  // Gets a user by resource name.
-  rpc GetUser(GetUserRequest) returns (User) {
-    option (google.api.http) = {get: "/v1/{name=organizations/*/users/*}"};
-    option (google.api.method_signature) = "name";
-  }
-
-  // Lists users in an organization.
-  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse) {
-    option (google.api.http) = {get: "/v1/{parent=organizations/*}/users"};
-    option (google.api.method_signature) = "parent";
-  }
-}
-
 // A user within an organization. Users are synced from Firebase Auth and
-// are read-only through this API.
+// are read-only via `Iam.GetUser` / `Iam.ListUsers`.
 message User {
   option (google.api.resource) = {
     type: "pivox.iam/User"
@@ -85,7 +66,7 @@ message User {
   string etag = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
-// Request message for `GetUser`.
+// Request message for `Iam.GetUser`.
 message GetUserRequest {
   // Required. The resource name of the user to retrieve.
   // Format: `organizations/{organization}/users/{user}`
@@ -96,7 +77,7 @@ message GetUserRequest {
   ];
 }
 
-// Request message for `ListUsers`.
+// Request message for `Iam.ListUsers`.
 message ListUsersRequest {
   // Required. The parent organization.
   // Format: `organizations/{organization}`
@@ -146,7 +127,7 @@ message ListUsersRequest {
   string order_by = 5 [(google.api.field_behavior) = OPTIONAL];
 }
 
-// Response message for `ListUsers`.
+// Response message for `Iam.ListUsers`.
 message ListUsersResponse {
   // The users in the organization.
   repeated User users = 1;

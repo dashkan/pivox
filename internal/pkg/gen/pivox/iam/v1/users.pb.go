@@ -39,7 +39,7 @@ const (
 )
 
 // A user within an organization. Users are synced from Firebase Auth and
-// are read-only through this API.
+// are read-only via `Iam.GetUser` / `Iam.ListUsers`.
 type User struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The resource name of the user.
@@ -168,7 +168,7 @@ func (x *User) GetEtag() string {
 	return ""
 }
 
-// Request message for `GetUser`.
+// Request message for `Iam.GetUser`.
 type GetUserRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The resource name of the user to retrieve.
@@ -215,7 +215,7 @@ func (x *GetUserRequest) GetName() string {
 	return ""
 }
 
-// Request message for `ListUsers`.
+// Request message for `Iam.ListUsers`.
 type ListUsersRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The parent organization.
@@ -319,7 +319,7 @@ func (x *ListUsersRequest) GetOrderBy() string {
 	return ""
 }
 
-// Response message for `ListUsers`.
+// Response message for `Iam.ListUsers`.
 type ListUsersResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The users in the organization.
@@ -378,7 +378,7 @@ var File_pivox_iam_v1_users_proto protoreflect.FileDescriptor
 
 const file_pivox_iam_v1_users_proto_rawDesc = "" +
 	"\n" +
-	"\x18pivox/iam/v1/users.proto\x12\fpivox.iam.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x84\x04\n" +
+	"\x18pivox/iam/v1/users.proto\x12\fpivox.iam.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x84\x04\n" +
 	"\x04User\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12\x19\n" +
 	"\x05email\x18\x02 \x01(\tB\x03\xe0A\x03R\x05email\x12*\n" +
@@ -406,10 +406,7 @@ const file_pivox_iam_v1_users_proto_rawDesc = "" +
 	"\border_by\x18\x05 \x01(\tB\x03\xe0A\x01R\aorderBy\"e\n" +
 	"\x11ListUsersResponse\x12(\n" +
 	"\x05users\x18\x01 \x03(\v2\x12.pivox.iam.v1.UserR\x05users\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken2\x8c\x02\n" +
-	"\x05Users\x12n\n" +
-	"\aGetUser\x12\x1c.pivox.iam.v1.GetUserRequest\x1a\x12.pivox.iam.v1.User\"1\xdaA\x04name\x82\xd3\xe4\x93\x02$\x12\"/v1/{name=organizations/*/users/*}\x12\x81\x01\n" +
-	"\tListUsers\x12\x1e.pivox.iam.v1.ListUsersRequest\x1a\x1f.pivox.iam.v1.ListUsersResponse\"3\xdaA\x06parent\x82\xd3\xe4\x93\x02$\x12\"/v1/{parent=organizations/*}/users\x1a\x0f\xcaA\fapi.pivox.ioB\xae\x01\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageTokenB\xae\x01\n" +
 	"\x10com.pivox.iam.v1B\n" +
 	"UsersProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1;iamv1\xa2\x02\x03PIX\xaa\x02\fPivox.Iam.V1\xca\x02\fPivox\\Iam\\V1\xe2\x02\x18Pivox\\Iam\\V1\\GPBMetadata\xea\x02\x0ePivox::Iam::V1b\x06proto3"
 
@@ -438,12 +435,8 @@ var file_pivox_iam_v1_users_proto_depIdxs = []int32{
 	4, // 1: pivox.iam.v1.User.update_time:type_name -> google.protobuf.Timestamp
 	4, // 2: pivox.iam.v1.User.last_login_time:type_name -> google.protobuf.Timestamp
 	0, // 3: pivox.iam.v1.ListUsersResponse.users:type_name -> pivox.iam.v1.User
-	1, // 4: pivox.iam.v1.Users.GetUser:input_type -> pivox.iam.v1.GetUserRequest
-	2, // 5: pivox.iam.v1.Users.ListUsers:input_type -> pivox.iam.v1.ListUsersRequest
-	0, // 6: pivox.iam.v1.Users.GetUser:output_type -> pivox.iam.v1.User
-	3, // 7: pivox.iam.v1.Users.ListUsers:output_type -> pivox.iam.v1.ListUsersResponse
-	6, // [6:8] is the sub-list for method output_type
-	4, // [4:6] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for method output_type
+	4, // [4:4] is the sub-list for method input_type
 	4, // [4:4] is the sub-list for extension type_name
 	4, // [4:4] is the sub-list for extension extendee
 	0, // [0:4] is the sub-list for field type_name
@@ -462,7 +455,7 @@ func file_pivox_iam_v1_users_proto_init() {
 			NumEnums:      0,
 			NumMessages:   4,
 			NumExtensions: 0,
-			NumServices:   1,
+			NumServices:   0,
 		},
 		GoTypes:           file_pivox_iam_v1_users_proto_goTypes,
 		DependencyIndexes: file_pivox_iam_v1_users_proto_depIdxs,

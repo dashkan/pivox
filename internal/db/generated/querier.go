@@ -81,7 +81,6 @@ type Querier interface {
 	DeleteExpiredDelegatedAuthSessions(ctx context.Context) error
 	DeleteExpiredOperations(ctx context.Context) error
 	DeleteExpiredStorageAgentAudit(ctx context.Context) (int64, error)
-	DeleteIamPolicy(ctx context.Context, resourceID uuid.UUID) error
 	DeleteLineItem(ctx context.Context, id uuid.UUID) error
 	DeleteOperation(ctx context.Context, id uuid.UUID) error
 	DeleteRequest(ctx context.Context, id uuid.UUID) error
@@ -112,7 +111,6 @@ type Querier interface {
 	// distinguish "still pending" from "expired/unknown" after a failed consume.
 	GetDelegatedAuthSessionState(ctx context.Context, code uuid.UUID) (DelegatedAuthSessionState, error)
 	GetFirebaseIdentityByUID(ctx context.Context, firebaseUid string) (FirebaseIdentity, error)
-	GetIamPolicy(ctx context.Context, resourceID uuid.UUID) (IamPolicy, error)
 	GetLatestAssetVersion(ctx context.Context, assetID uuid.UUID) (AssetVersion, error)
 	GetLineItem(ctx context.Context, id uuid.UUID) (AssetRequestLineItem, error)
 	GetLineItemByName(ctx context.Context, arg GetLineItemByNameParams) (AssetRequestLineItem, error)
@@ -228,7 +226,6 @@ type Querier interface {
 	// Upserts a firebase_identity row synced from Firebase Auth.
 	// On conflict (same firebase_uid), updates all mutable fields.
 	UpsertFirebaseIdentity(ctx context.Context, arg UpsertFirebaseIdentityParams) (FirebaseIdentity, error)
-	UpsertIamPolicy(ctx context.Context, arg UpsertIamPolicyParams) (IamPolicy, error)
 }
 
 var _ Querier = (*Queries)(nil)

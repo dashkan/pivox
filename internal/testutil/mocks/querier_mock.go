@@ -759,23 +759,6 @@ func (m *MockQuerier) ListStorageEndpointsByGateway(ctx context.Context, gateway
 	return args.Get(0).([]db.StorageEndpoint), args.Error(1)
 }
 
-// --- IAM ---
-
-func (m *MockQuerier) GetIamPolicy(ctx context.Context, resourceID uuid.UUID) (db.IamPolicy, error) {
-	args := m.Called(ctx, resourceID)
-	return args.Get(0).(db.IamPolicy), args.Error(1)
-}
-
-func (m *MockQuerier) UpsertIamPolicy(ctx context.Context, arg db.UpsertIamPolicyParams) (db.IamPolicy, error) {
-	args := m.Called(ctx, arg)
-	return args.Get(0).(db.IamPolicy), args.Error(1)
-}
-
-func (m *MockQuerier) DeleteIamPolicy(ctx context.Context, resourceID uuid.UUID) error {
-	args := m.Called(ctx, resourceID)
-	return args.Error(0)
-}
-
 // --- Operation Metadata ---
 
 func (m *MockQuerier) UpdateOperationMetadata(ctx context.Context, arg db.UpdateOperationMetadataParams) error {

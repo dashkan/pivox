@@ -1,0 +1,1072 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "pivox/iam/v1/iam.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "Iam"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/organizations/{organization}/groups": {
+      "get": {
+        "summary": "Lists groups in an organization.",
+        "operationId": "Iam_ListGroups",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListGroupsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Optional. Maximum number of groups to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. Page token from a previous ListGroups call.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "filter",
+            "description": "Optional. An expression for filtering the results of the request.\nFilter rules are case insensitive. Filterable fields:\n\n+ `state`\n+ `displayName`\n+ `createTime` (supports comparison operators)\n\nExamples:\n\n+ `displayName = \"Engineering\"` — exact match on display name.\n+ `state = ACTIVE` — only active groups.\n+ `createTime \u003e \"2025-01-01T00:00:00Z\"` — created after date.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "description": "Optional. A comma-separated list of fields to order by. The default\norder is ascending. Use \"desc\" after a field name for descending.\nSupported fields:\n\n+ `displayName`\n+ `createTime`\n\nExample: `createTime desc, displayName`\n\nIf not specified, the results are ordered by `displayName` ascending.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "showDeleted",
+            "description": "Optional. Whether to include soft-deleted groups.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
+      },
+      "post": {
+        "summary": "Creates a new group.",
+        "operationId": "Iam_CreateGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Group"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "group",
+            "description": "Required. The group to create.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1Group"
+            }
+          },
+          {
+            "name": "groupId",
+            "description": "Optional. The server-generated group ID. If not provided, the server\nwill generate one.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/groups/{group}": {
+      "get": {
+        "summary": "Gets a group by resource name.",
+        "operationId": "Iam_GetGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Group"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "group",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
+      },
+      "delete": {
+        "summary": "Soft-deletes a group.",
+        "operationId": "Iam_DeleteGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Group"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "group",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "etag",
+            "description": "Optional. The etag for optimistic concurrency control.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
+      },
+      "patch": {
+        "summary": "Updates a group.",
+        "operationId": "Iam_UpdateGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Group"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "group",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "group",
+            "description": "Required. The group with updated fields.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "displayName": {
+                  "type": "string",
+                  "description": "Required. A human-readable name for the group."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Optional. A longer description of the group's purpose."
+                },
+                "createTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when the group was created.",
+                  "readOnly": true
+                },
+                "updateTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when the group was last modified.",
+                  "readOnly": true
+                },
+                "deleteTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when the group was soft-deleted.",
+                  "readOnly": true
+                },
+                "purgeTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when the group will be permanently purged.",
+                  "readOnly": true
+                },
+                "etag": {
+                  "type": "string",
+                  "description": "Output only. A checksum computed by the server based on the current value\nof the Group resource.",
+                  "readOnly": true
+                },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "Optional. Free-form annotations for the group."
+                }
+              },
+              "title": "Required. The group with updated fields.",
+              "required": [
+                "displayName"
+              ]
+            }
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/groups/{group}/members": {
+      "get": {
+        "summary": "Lists members of a group.",
+        "operationId": "Iam_ListGroupMembers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListGroupMembersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "group",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Optional. Maximum number of members to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. Page token from a previous ListGroupMembers call.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/groups/{group}:addGroupMembers": {
+      "post": {
+        "summary": "Adds members to a group.",
+        "operationId": "Iam_AddGroupMembers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1AddGroupMembersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "group",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/IamAddGroupMembersBody"
+            }
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/groups/{group}:removeGroupMembers": {
+      "post": {
+        "summary": "Removes members from a group.",
+        "operationId": "Iam_RemoveGroupMembers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1RemoveGroupMembersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "group",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/IamRemoveGroupMembersBody"
+            }
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/roles": {
+      "get": {
+        "summary": "Lists roles in an organization.",
+        "operationId": "Iam_ListRoles",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListRolesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Optional. Maximum number of roles to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. Page token from a previous ListRoles call.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "filter",
+            "description": "Optional. An expression for filtering the results of the request.\nFilter rules are case insensitive. Filterable fields:\n\n+ `state`\n+ `displayName`\n+ `isSystem`\n\nExamples:\n\n+ `displayName = \"Editor\"` — exact match on display name.\n+ `state = ACTIVE` — only active roles.\n+ `isSystem = true` — only system-defined roles.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "description": "Optional. A comma-separated list of fields to order by. The default\norder is ascending. Use \"desc\" after a field name for descending.\nSupported fields:\n\n+ `displayName`\n+ `createTime`\n\nExample: `createTime desc, displayName`\n\nIf not specified, the results are ordered by `displayName` ascending.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "showDeleted",
+            "description": "Optional. Whether to include soft-deleted roles.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/roles/{role}": {
+      "get": {
+        "summary": "Gets a role by resource name.",
+        "operationId": "Iam_GetRole",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Role"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "role",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/users": {
+      "get": {
+        "summary": "Lists users in an organization.",
+        "operationId": "Iam_ListUsers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListUsersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Optional. Maximum number of users to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. Page token from a previous ListUsers call.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "filter",
+            "description": "Optional. An expression for filtering the results of the request.\nFilter rules are case insensitive. Filterable fields:\n\n+ `email`\n+ `displayName`\n\nExamples:\n\n+ `email = \"alice@example.com\"` — exact match on email.\n+ `displayName = \"Alice\"` — exact match on display name.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "description": "Optional. A comma-separated list of fields to order by. The default\norder is ascending. Use \"desc\" after a field name for descending.\nSupported fields:\n\n+ `email`\n+ `displayName`\n+ `createTime`\n\nExample: `createTime desc, email`\n\nIf not specified, the results are ordered by `createTime` ascending.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/users/{user}": {
+      "get": {
+        "summary": "Gets a user by resource name.",
+        "operationId": "Iam_GetUser",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1User"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "user",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
+      }
+    },
+    "/v1/permissions": {
+      "get": {
+        "summary": "Lists all available system-defined permissions.",
+        "operationId": "Iam_ListPermissions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListPermissionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pageSize",
+            "description": "Optional. Maximum number of permissions to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. Page token from a previous ListPermissions call.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "IamAddGroupMembersBody": {
+      "type": "object",
+      "properties": {
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "title": "Required. The user resource names to add as members.\nFormat: `organizations/{organization}/users/{user}`"
+        }
+      },
+      "description": "Request message for `Iam.AddGroupMembers`.",
+      "required": [
+        "members"
+      ]
+    },
+    "IamRemoveGroupMembersBody": {
+      "type": "object",
+      "properties": {
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "title": "Required. The user resource names to remove from the group.\nFormat: `organizations/{organization}/users/{user}`"
+        }
+      },
+      "description": "Request message for `Iam.RemoveGroupMembers`.",
+      "required": [
+        "members"
+      ]
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    },
+    "v1AddGroupMembersResponse": {
+      "type": "object",
+      "description": "Response message for `Iam.AddGroupMembers`."
+    },
+    "v1Group": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "The resource name of the group.\nFormat: `organizations/{organization}/groups/{group}`"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Required. A human-readable name for the group."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional. A longer description of the group's purpose."
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the group was created.",
+          "readOnly": true
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the group was last modified.",
+          "readOnly": true
+        },
+        "deleteTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the group was soft-deleted.",
+          "readOnly": true
+        },
+        "purgeTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the group will be permanently purged.",
+          "readOnly": true
+        },
+        "etag": {
+          "type": "string",
+          "description": "Output only. A checksum computed by the server based on the current value\nof the Group resource.",
+          "readOnly": true
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Optional. Free-form annotations for the group."
+        }
+      },
+      "description": "A group of users within an organization. Managed via the `Iam` service.",
+      "required": [
+        "displayName"
+      ]
+    },
+    "v1GroupMember": {
+      "type": "object",
+      "properties": {
+        "member": {
+          "type": "string",
+          "title": "The resource name of the user member.\nFormat: `organizations/{organization}/users/{user}`"
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the membership was created.",
+          "readOnly": true
+        }
+      },
+      "description": "A membership of a user in a group.",
+      "required": [
+        "member"
+      ]
+    },
+    "v1ListGroupMembersResponse": {
+      "type": "object",
+      "properties": {
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1GroupMember"
+          },
+          "description": "The members of the group."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for the next page of results."
+        }
+      },
+      "description": "Response message for `Iam.ListGroupMembers`."
+    },
+    "v1ListGroupsResponse": {
+      "type": "object",
+      "properties": {
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Group"
+          },
+          "description": "The groups in the organization."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for the next page of results."
+        }
+      },
+      "description": "Response message for `Iam.ListGroups`."
+    },
+    "v1ListPermissionsResponse": {
+      "type": "object",
+      "properties": {
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Permission"
+          },
+          "description": "The available permissions."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for the next page of results."
+        }
+      },
+      "description": "Response message for `Iam.ListPermissions`."
+    },
+    "v1ListRolesResponse": {
+      "type": "object",
+      "properties": {
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Role"
+          },
+          "description": "The roles in the organization."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for the next page of results."
+        }
+      },
+      "description": "Response message for `Iam.ListRoles`."
+    },
+    "v1ListUsersResponse": {
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1User"
+          },
+          "description": "The users in the organization."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for the next page of results."
+        }
+      },
+      "description": "Response message for `Iam.ListUsers`."
+    },
+    "v1Permission": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "The resource name of the permission.\nFormat: `permissions/{permission}` (e.g. `permissions/projects.create`)"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "A human-readable name for the permission.",
+          "readOnly": true
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of what the permission allows.",
+          "readOnly": true
+        }
+      },
+      "description": "A system-defined permission that can be assigned to roles. Permissions\nare global (no parent resource) and code-defined; they are exposed\nread-only via `Iam.ListPermissions`."
+    },
+    "v1RemoveGroupMembersResponse": {
+      "type": "object",
+      "description": "Response message for `Iam.RemoveGroupMembers`."
+    },
+    "v1Role": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "The resource name of the role.\nFormat: `organizations/{organization}/roles/{role}`"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Required. A human-readable name for the role."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional. A longer description of the role's purpose."
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Output only. The permissions granted by this role, resolved from the\nrole_permissions join table.",
+          "readOnly": true
+        },
+        "system": {
+          "type": "boolean",
+          "description": "Output only. Whether this is a system-defined role (owner, admin, editor,\nviewer). System roles cannot be deleted or have their permissions changed.",
+          "readOnly": true
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the role was created.",
+          "readOnly": true
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the role was last modified.",
+          "readOnly": true
+        },
+        "deleteTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the role was soft-deleted.",
+          "readOnly": true
+        },
+        "purgeTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the role will be permanently purged.",
+          "readOnly": true
+        },
+        "etag": {
+          "type": "string",
+          "description": "Output only. A checksum computed by the server based on the current value\nof the Role resource.",
+          "readOnly": true
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Optional. Free-form annotations for the role."
+        }
+      },
+      "description": "A role within an organization. Roles can be system-defined (owner, admin,\neditor, viewer) or custom. System roles are seeded per-org at creation time.\n\nRead-only via `Iam.GetRole` / `Iam.ListRoles` in v1; custom-role CRUD is\ndeferred until a real customer use case materializes.",
+      "required": [
+        "displayName"
+      ]
+    },
+    "v1User": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "The resource name of the user.\nFormat: `organizations/{organization}/users/{user}`"
+        },
+        "email": {
+          "type": "string",
+          "description": "Output only. The user's email address.",
+          "readOnly": true
+        },
+        "emailVerified": {
+          "type": "boolean",
+          "description": "Output only. Whether the user's email address has been verified.",
+          "readOnly": true
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Output only. The user's display name.",
+          "readOnly": true
+        },
+        "photoUrl": {
+          "type": "string",
+          "description": "Output only. The URL of the user's profile photo.",
+          "readOnly": true
+        },
+        "disabled": {
+          "type": "boolean",
+          "description": "Output only. Whether the user account is disabled.",
+          "readOnly": true
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the user was created.",
+          "readOnly": true
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the user was last modified.",
+          "readOnly": true
+        },
+        "lastLoginTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp of the user's last login.",
+          "readOnly": true
+        },
+        "etag": {
+          "type": "string",
+          "description": "Output only. A checksum computed by the server based on the current value\nof the User resource.",
+          "readOnly": true
+        }
+      },
+      "description": "A user within an organization. Users are synced from Firebase Auth and\nare read-only via `Iam.GetUser` / `Iam.ListUsers`."
+    }
+  }
+}

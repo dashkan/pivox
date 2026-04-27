@@ -12,7 +12,6 @@ import (
 	"google.golang.org/grpc"
 
 	db "github.com/dashkan/pivox/internal/db/generated"
-	"github.com/dashkan/pivox/internal/iam"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	"github.com/dashkan/pivox/internal/service/projects"
 	"github.com/dashkan/pivox/internal/testutil"
@@ -38,10 +37,8 @@ func TestIntegration_Projects(t *testing.T) {
 	pool, queries, cleanup := testutil.SetupTestDB(t)
 	defer cleanup()
 
-	iamHelper := iam.NewHelper(queries)
-
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		apiv1.RegisterProjectsServer(s, projects.NewProjectsServer(pool, queries, iamHelper, nil))
+		apiv1.RegisterProjectsServer(s, projects.NewProjectsServer(pool, queries, nil))
 	})
 
 	client := apiv1.NewProjectsClient(conn)

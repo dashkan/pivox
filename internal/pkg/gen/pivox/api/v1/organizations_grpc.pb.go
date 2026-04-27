@@ -23,7 +23,6 @@ package apiv1
 import (
 	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
 	context "context"
-	v1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -39,9 +38,6 @@ const (
 	Organizations_ListOrganizations_FullMethodName      = "/pivox.api.v1.Organizations/ListOrganizations"
 	Organizations_CreateOrganization_FullMethodName     = "/pivox.api.v1.Organizations/CreateOrganization"
 	Organizations_UpdateOrganization_FullMethodName     = "/pivox.api.v1.Organizations/UpdateOrganization"
-	Organizations_GetIamPolicy_FullMethodName           = "/pivox.api.v1.Organizations/GetIamPolicy"
-	Organizations_SetIamPolicy_FullMethodName           = "/pivox.api.v1.Organizations/SetIamPolicy"
-	Organizations_TestIamPermissions_FullMethodName     = "/pivox.api.v1.Organizations/TestIamPermissions"
 	Organizations_CreateInvitation_FullMethodName       = "/pivox.api.v1.Organizations/CreateInvitation"
 	Organizations_ListInvitations_FullMethodName        = "/pivox.api.v1.Organizations/ListInvitations"
 	Organizations_GetInvitation_FullMethodName          = "/pivox.api.v1.Organizations/GetInvitation"
@@ -77,29 +73,6 @@ type OrganizationsClient interface {
 	// The caller must have `resourcemanager.organizations.update` permission
 	// on the specified organization.
 	UpdateOrganization(ctx context.Context, in *UpdateOrganizationRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
-	// Gets the access control policy for an organization resource. The policy may
-	// be empty if no such policy or resource exists. The `resource` field should
-	// be the organization's resource name, for example: "organizations/123".
-	//
-	// Authorization requires the IAM permission
-	// `resourcemanager.organizations.getIamPolicy` on the specified organization.
-	GetIamPolicy(ctx context.Context, in *v1.GetIamPolicyRequest, opts ...grpc.CallOption) (*v1.Policy, error)
-	// Sets the access control policy on an organization resource. Replaces any
-	// existing policy. The `resource` field should be the organization's resource
-	// name, for example: "organizations/123".
-	//
-	// Authorization requires the IAM permission
-	// `resourcemanager.organizations.setIamPolicy` on the specified organization.
-	// (-- api-linter: core::0136::response-message-name=disabled
-	//
-	//	aip.dev/not-precedent: SetIamPolicy returns Policy per IAM convention. --)
-	SetIamPolicy(ctx context.Context, in *v1.SetIamPolicyRequest, opts ...grpc.CallOption) (*v1.Policy, error)
-	// Returns the permissions that a caller has on the specified organization.
-	// The `resource` field should be the organization's resource name,
-	// for example: "organizations/123".
-	//
-	// There are no permissions required for making this API call.
-	TestIamPermissions(ctx context.Context, in *v1.TestIamPermissionsRequest, opts ...grpc.CallOption) (*v1.TestIamPermissionsResponse, error)
 	// Creates an invitation to join the organization.
 	//
 	// The server validates the email against the organization's invitation
@@ -170,36 +143,6 @@ func (c *organizationsClient) UpdateOrganization(ctx context.Context, in *Update
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(longrunningpb.Operation)
 	err := c.cc.Invoke(ctx, Organizations_UpdateOrganization_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *organizationsClient) GetIamPolicy(ctx context.Context, in *v1.GetIamPolicyRequest, opts ...grpc.CallOption) (*v1.Policy, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v1.Policy)
-	err := c.cc.Invoke(ctx, Organizations_GetIamPolicy_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *organizationsClient) SetIamPolicy(ctx context.Context, in *v1.SetIamPolicyRequest, opts ...grpc.CallOption) (*v1.Policy, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v1.Policy)
-	err := c.cc.Invoke(ctx, Organizations_SetIamPolicy_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *organizationsClient) TestIamPermissions(ctx context.Context, in *v1.TestIamPermissionsRequest, opts ...grpc.CallOption) (*v1.TestIamPermissionsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v1.TestIamPermissionsResponse)
-	err := c.cc.Invoke(ctx, Organizations_TestIamPermissions_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -311,29 +254,6 @@ type OrganizationsServer interface {
 	// The caller must have `resourcemanager.organizations.update` permission
 	// on the specified organization.
 	UpdateOrganization(context.Context, *UpdateOrganizationRequest) (*longrunningpb.Operation, error)
-	// Gets the access control policy for an organization resource. The policy may
-	// be empty if no such policy or resource exists. The `resource` field should
-	// be the organization's resource name, for example: "organizations/123".
-	//
-	// Authorization requires the IAM permission
-	// `resourcemanager.organizations.getIamPolicy` on the specified organization.
-	GetIamPolicy(context.Context, *v1.GetIamPolicyRequest) (*v1.Policy, error)
-	// Sets the access control policy on an organization resource. Replaces any
-	// existing policy. The `resource` field should be the organization's resource
-	// name, for example: "organizations/123".
-	//
-	// Authorization requires the IAM permission
-	// `resourcemanager.organizations.setIamPolicy` on the specified organization.
-	// (-- api-linter: core::0136::response-message-name=disabled
-	//
-	//	aip.dev/not-precedent: SetIamPolicy returns Policy per IAM convention. --)
-	SetIamPolicy(context.Context, *v1.SetIamPolicyRequest) (*v1.Policy, error)
-	// Returns the permissions that a caller has on the specified organization.
-	// The `resource` field should be the organization's resource name,
-	// for example: "organizations/123".
-	//
-	// There are no permissions required for making this API call.
-	TestIamPermissions(context.Context, *v1.TestIamPermissionsRequest) (*v1.TestIamPermissionsResponse, error)
 	// Creates an invitation to join the organization.
 	//
 	// The server validates the email against the organization's invitation
@@ -381,15 +301,6 @@ func (UnimplementedOrganizationsServer) CreateOrganization(context.Context, *Cre
 }
 func (UnimplementedOrganizationsServer) UpdateOrganization(context.Context, *UpdateOrganizationRequest) (*longrunningpb.Operation, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateOrganization not implemented")
-}
-func (UnimplementedOrganizationsServer) GetIamPolicy(context.Context, *v1.GetIamPolicyRequest) (*v1.Policy, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetIamPolicy not implemented")
-}
-func (UnimplementedOrganizationsServer) SetIamPolicy(context.Context, *v1.SetIamPolicyRequest) (*v1.Policy, error) {
-	return nil, status.Error(codes.Unimplemented, "method SetIamPolicy not implemented")
-}
-func (UnimplementedOrganizationsServer) TestIamPermissions(context.Context, *v1.TestIamPermissionsRequest) (*v1.TestIamPermissionsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method TestIamPermissions not implemented")
 }
 func (UnimplementedOrganizationsServer) CreateInvitation(context.Context, *CreateInvitationRequest) (*Invitation, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateInvitation not implemented")
@@ -504,60 +415,6 @@ func _Organizations_UpdateOrganization_Handler(srv interface{}, ctx context.Cont
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(OrganizationsServer).UpdateOrganization(ctx, req.(*UpdateOrganizationRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Organizations_GetIamPolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v1.GetIamPolicyRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(OrganizationsServer).GetIamPolicy(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Organizations_GetIamPolicy_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OrganizationsServer).GetIamPolicy(ctx, req.(*v1.GetIamPolicyRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Organizations_SetIamPolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v1.SetIamPolicyRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(OrganizationsServer).SetIamPolicy(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Organizations_SetIamPolicy_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OrganizationsServer).SetIamPolicy(ctx, req.(*v1.SetIamPolicyRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Organizations_TestIamPermissions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v1.TestIamPermissionsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(OrganizationsServer).TestIamPermissions(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Organizations_TestIamPermissions_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OrganizationsServer).TestIamPermissions(ctx, req.(*v1.TestIamPermissionsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -728,18 +585,6 @@ var Organizations_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateOrganization",
 			Handler:    _Organizations_UpdateOrganization_Handler,
-		},
-		{
-			MethodName: "GetIamPolicy",
-			Handler:    _Organizations_GetIamPolicy_Handler,
-		},
-		{
-			MethodName: "SetIamPolicy",
-			Handler:    _Organizations_SetIamPolicy_Handler,
-		},
-		{
-			MethodName: "TestIamPermissions",
-			Handler:    _Organizations_TestIamPermissions_Handler,
 		},
 		{
 			MethodName: "CreateInvitation",

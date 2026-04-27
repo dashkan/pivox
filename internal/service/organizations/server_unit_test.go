@@ -21,9 +21,7 @@ import (
 	"github.com/dashkan/pivox/internal/authn"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/filter"
-	"github.com/dashkan/pivox/internal/iam"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
-	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	"github.com/dashkan/pivox/internal/testutil/mocks"
 )
 
@@ -43,11 +41,9 @@ var (
 )
 
 func newTestServer(q *mocks.MockQuerier) *OrganizationsServer {
-	iamHelper := iam.NewHelper(q)
 	codec, _ := appkey.NewFromHex(strings.Repeat("ab", 32))
 	return &OrganizationsServer{
 		queries: q,
-		iam:     iamHelper,
 		filter:  filter.OrganizationFilter(),
 		codec:   codec,
 	}
@@ -58,14 +54,12 @@ func newTestServer(q *mocks.MockQuerier) *OrganizationsServer {
 // ---------------------------------------------------------------------------
 
 func TestUnit_NewOrganizationsServer(t *testing.T) {
-	mockQ := new(mocks.MockQuerier)
-	iamHelper := iam.NewHelper(mockQ)
 	// NewOrganizationsServer requires a *pgxpool.Pool, but we can test the
 	// basic constructor doesn't panic. Pass nil for pool and auth.
+	mockQ := new(mocks.MockQuerier)
 	srv := newTestServer(mockQ)
 	require.NotNil(t, srv)
-	assert.NotNil(t, srv.iam)
-	assert.Equal(t, iamHelper != nil, true) // iamHelper is valid
+	assert.NotNil(t, srv.queries)
 }
 
 // ---------------------------------------------------------------------------
@@ -122,77 +116,6 @@ func TestUnit_GetOrganization_InvalidName(t *testing.T) {
 	require.True(t, ok)
 	// ParseSegment fails, HandleResourceError returns Internal for non-pgx errors
 	assert.NotEqual(t, codes.OK, st.Code())
-}
-
-// ---------------------------------------------------------------------------
-// GetIamPolicy -- delegates to iam.Helper
-// ---------------------------------------------------------------------------
-
-func TestUnit_GetIamPolicy_Delegated(t *testing.T) {
-	mockQ := new(mocks.MockQuerier)
-	srv := newTestServer(mockQ)
-	ctx := context.Background()
-
-	// iam.Helper.resolveResourceID looks up the org by name.
-	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
-	// Then GetIamPolicy queries the IAM policy; return ErrNoRows -> empty policy.
-	mockQ.On("GetIamPolicy", mock.Anything, orgID).Return(db.IamPolicy{}, pgx.ErrNoRows)
-
-	resp, err := srv.GetIamPolicy(ctx, &iampb.GetIamPolicyRequest{
-		Name: "organizations/acme",
-	})
-
-	require.NoError(t, err)
-	assert.NotNil(t, resp)
-	// Empty policy has no bindings.
-	assert.Empty(t, resp.GetBindings())
-	mockQ.AssertExpectations(t)
-}
-
-// ---------------------------------------------------------------------------
-// SetIamPolicy -- delegates to iam.Helper
-// ---------------------------------------------------------------------------
-
-func TestUnit_SetIamPolicy(t *testing.T) {
-	mockQ := new(mocks.MockQuerier)
-	srv := newTestServer(mockQ)
-	ctx := context.Background()
-
-	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
-	mockQ.On("UpsertIamPolicy", mock.Anything, mock.MatchedBy(func(p db.UpsertIamPolicyParams) bool {
-		return p.ResourceID == orgID && p.ResourceType == "organizations"
-	})).Return(db.IamPolicy{
-		ResourceID: orgID,
-		Policy:     json.RawMessage(`{}`),
-		Etag:       "new-etag",
-	}, nil)
-
-	resp, err := srv.SetIamPolicy(ctx, &iampb.SetIamPolicyRequest{
-		Resource: "organizations/acme",
-		Policy:   &iampb.Policy{},
-	})
-
-	require.NoError(t, err)
-	assert.Equal(t, "new-etag", resp.GetEtag())
-	mockQ.AssertExpectations(t)
-}
-
-// ---------------------------------------------------------------------------
-// TestIamPermissions -- returns all requested permissions
-// ---------------------------------------------------------------------------
-
-func TestUnit_TestIamPermissions(t *testing.T) {
-	mockQ := new(mocks.MockQuerier)
-	srv := newTestServer(mockQ)
-	ctx := context.Background()
-
-	resp, err := srv.TestIamPermissions(ctx, &iampb.TestIamPermissionsRequest{
-		Resource:    "organizations/acme",
-		Permissions: []string{"pivox.organizations.get", "pivox.organizations.delete"},
-	})
-
-	require.NoError(t, err)
-	assert.Equal(t, []string{"pivox.organizations.get", "pivox.organizations.delete"}, resp.GetPermissions())
 }
 
 // ---------------------------------------------------------------------------
@@ -886,15 +809,13 @@ func TestUnit_NewOrganizationsServer_Constructor(t *testing.T) {
 	// instantiates the server struct without panicking. The filter field is
 	// the most important invariant to check.
 	mockQ := new(mocks.MockQuerier)
-	iamHelper := iam.NewHelper(mockQ)
 	auth := new(mockAuthService)
 
 	// NewOrganizationsServer with nil pool exercises the constructor code path.
-	srv := NewOrganizationsServer(nil, mockQ, iamHelper, auth, nil, nil)
+	srv := NewOrganizationsServer(nil, mockQ, auth, nil, nil)
 
 	require.NotNil(t, srv)
 	assert.NotNil(t, srv.filter)
-	assert.NotNil(t, srv.iam)
 	assert.Equal(t, auth, srv.auth)
 	assert.Equal(t, mockQ, srv.queries)
 }

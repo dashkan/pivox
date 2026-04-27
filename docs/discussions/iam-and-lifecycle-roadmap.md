@@ -125,23 +125,35 @@ Direct rename (no dual-route) per pre-prod / solo-dev constraints — brief depl
   - Identity Platform blocking triggers (`identitytoolkit.googleapis.com/admin/v2/projects/<id>/config`) point at the new function URIs — `beforeCreate` and `beforeSignIn` rewired to `syncFirebaseIdentity*` URLs, fresh updateTime.
 - [x] **New tooling**: `scripts/clean-fn-revisions.sh` + `make clean-fn-revisions` target. Auto-discovers Firebase-managed Cloud Run services from gcloud, deletes orphans (services not in `firebase functions:list`) and trims stale revisions (anything not actively serving). Dry-run by default; `FORCE=1` to delete.
 
-### IAM proto trim (set up phase 2 cleanly)
+### IAM proto trim + consolidation ✅
 
-- [ ] **Port `TestIamPermissions` request/response messages out of `iam_policy.proto`** into a location that survives (likely the new consolidated `iam.proto`, or stage as a temporary holding file).
-- [ ] Delete `pivox/iam/v1/iam_policy.proto` (after the port).
-- [ ] Delete `pivox/iam/v1/policy.proto` (`Policy`/`Binding`/conditional expressions).
-- [ ] Trim `pivox/iam/v1/roles.proto`: drop `CreateRole`/`UpdateRole`/`DeleteRole` and `AddRoleMembers`/`RemoveRoleMembers`/`ListRoleMembers`. Keep `Role` message + `GetRole`/`ListRoles`/`ListPermissions`+`Permission`. (Can fold into phase 2 file consolidation.)
-- [ ] Drop iam_policy + policy imports in `projects.proto` (and any other consumers).
-- [ ] Remove role-CRUD seed code if any exists.
+Scope grew during the phase: in addition to the planned trim, the IAM
+surface was consolidated into a single `Iam` service per the design
+discussion. `TestIamPermissions` was *not* preserved — phase 2 will
+re-introduce it as part of the new `Iam` service alongside `Member`.
 
-### Phase 1 exit criteria
+- [x] Deleted `pivox/iam/v1/iam_policy.proto` and `pivox/iam/v1/policy.proto` (Policy/Binding/conditional expressions, GetIamPolicy/SetIamPolicy/TestIamPermissions). No port of TestIamPermissions — phase 2 brings it back.
+- [x] Removed IAM RPCs from `organizations.proto`, `projects.proto`, `tag_keys.proto`, `tag_values.proto`. Dropped iam_policy + policy imports.
+- [x] **Consolidated three IAM services into one**: deleted `Roles`, `Users`, `Groups` services; created single `Iam` service in new `iam.proto`. All read paths (Get/ListUser, Get/ListRole, ListPermissions) and Group CRUD + GroupMember mgmt RPCs now live on `Iam`.
+- [x] **Per-resource message files**: `roles.proto`, `users.proto`, `groups.proto` now hold messages only; new `permissions.proto` extracted from `roles.proto` (Permission is global, not role-scoped).
+- [x] Deleted `internal/iam` package (Helper became empty after IAM RPCs removed).
+- [x] Stripped `iam.Helper` field/handler delegation from `OrganizationsServer`, `ProjectsServer`, `TagKeysServer`, `TagValuesServer`, and `cmd/pivox-cloud/main.go`.
+- [x] Dropped `iam_policies` table + `iam_policies.sql` query + generated `iam_policies.sql.go`. Removed seeded permission rows for `organizations.getIamPolicy` / `organizations.setIamPolicy`.
+- [x] Trimmed `mocks.MockQuerier` of `GetIamPolicy`/`UpsertIamPolicy`/`DeleteIamPolicy` stubs.
+- [x] Removed all IAM-Policy-shaped tests from unit + integration suites.
+- [x] Added api-linter ignore for `core::0121::resource-must-support-get` on the `Iam` service (Permission is a read-only catalog).
 
-- [ ] `make lint-proto && make api-lint && make proto-format && make proto-generate && make tidy` clean.
-- [ ] `make build` clean.
-- [ ] `xcodebuild test -scheme PivoxTests` clean (macOS Swift unit tests).
-- [ ] `go test ./...` clean.
-- [ ] Registration → org onboarding → AIChat manual smoke clean.
-- [ ] No `tenant`, `custom_domain`, `account` (in identity sense), `Policy`/`Binding`/`SetIamPolicy`/`AddRoleMembers` references remain in code (excluding generated files for tools we don't own).
+### Phase 1 exit criteria ✅
+
+- [x] `make lint-proto && make proto-format && make proto-generate && make tidy` clean.
+- [x] `make build` clean.
+- [x] `go test ./...` clean.
+- [x] `go test -tags dev ./...` clean for organizations, projects, tags, server (pre-existing aichat/storageagent failures tracked separately, see "Pre-existing test failures").
+- [x] `make lint` clean.
+- [x] No `tenant`, `custom_domain`, `account` (in identity sense), `Policy`/`Binding`/`SetIamPolicy`/`AddRoleMembers` references remain in non-generated code.
+- [x] Manual smoke: registration → org onboarding → AIChat verified (post phase 1.4 deploy via gcloud).
+- [x] **`make api-lint`**: Pivox-IAM files all clean (`groups.proto`, `iam.proto`, `permissions.proto`, `roles.proto`, `users.proto` all `problems: []`). Pre-existing failures in `assets/v1/asset.proto`, `storage/v1/storage_gateway.proto`, `storage/v1/endpoint.proto`, `ai/v1/messages.proto` predate this phase; tracked under "Pre-existing test failures".
+- [ ] `xcodebuild test -scheme PivoxTests` — macOS unit tests (run before phase 1 ships).
 
 ---
 

@@ -1,7 +1,7 @@
 {
   "swagger": "2.0",
   "info": {
-    "title": "pivox/iam/v1/policy.proto",
+    "title": "pivox/iam/v1/permissions.proto",
     "version": "version not set"
   },
   "consumes": [

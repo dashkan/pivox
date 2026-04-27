@@ -6,7 +6,6 @@ import (
 	"log/slog"
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
-	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -18,7 +17,6 @@ import (
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/filter"
-	"github.com/dashkan/pivox/internal/iam"
 	"github.com/dashkan/pivox/internal/lro"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	"github.com/dashkan/pivox/internal/resource"
@@ -41,19 +39,17 @@ type OrganizationsServer struct {
 	db      db.DBTX
 	pool    TxBeginner
 	queries db.Querier
-	iam     *iam.Helper
 	auth    authn.Service
 	filter  *filter.ResourceFilter
 	codec   *appkey.Codec
 	readUID AuthContextReader
 }
 
-func NewOrganizationsServer(pool *pgxpool.Pool, queries db.Querier, iam *iam.Helper, auth authn.Service, codec *appkey.Codec, readUID AuthContextReader) *OrganizationsServer {
+func NewOrganizationsServer(pool *pgxpool.Pool, queries db.Querier, auth authn.Service, codec *appkey.Codec, readUID AuthContextReader) *OrganizationsServer {
 	return &OrganizationsServer{
 		db:      pool,
 		pool:    pool,
 		queries: queries,
-		iam:     iam,
 		auth:    auth,
 		filter:  filter.OrganizationFilter(),
 		codec:   codec,
@@ -178,16 +174,4 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 	}
 
 	return lro.DoneOperation(convert.OrganizationToProto(org))
-}
-
-func (s *OrganizationsServer) GetIamPolicy(ctx context.Context, req *iampb.GetIamPolicyRequest) (*iampb.Policy, error) {
-	return s.iam.GetIamPolicy(ctx, req)
-}
-
-func (s *OrganizationsServer) SetIamPolicy(ctx context.Context, req *iampb.SetIamPolicyRequest) (*iampb.Policy, error) {
-	return s.iam.SetIamPolicy(ctx, req)
-}
-
-func (s *OrganizationsServer) TestIamPermissions(ctx context.Context, req *iampb.TestIamPermissionsRequest) (*iampb.TestIamPermissionsResponse, error) {
-	return s.iam.TestIamPermissions(ctx, req)
 }

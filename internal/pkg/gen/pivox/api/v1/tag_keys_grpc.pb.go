@@ -23,7 +23,6 @@ package apiv1
 import (
 	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
 	context "context"
-	v1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -35,14 +34,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	TagKeys_ListTagKeys_FullMethodName        = "/pivox.api.v1.TagKeys/ListTagKeys"
-	TagKeys_GetTagKey_FullMethodName          = "/pivox.api.v1.TagKeys/GetTagKey"
-	TagKeys_CreateTagKey_FullMethodName       = "/pivox.api.v1.TagKeys/CreateTagKey"
-	TagKeys_UpdateTagKey_FullMethodName       = "/pivox.api.v1.TagKeys/UpdateTagKey"
-	TagKeys_DeleteTagKey_FullMethodName       = "/pivox.api.v1.TagKeys/DeleteTagKey"
-	TagKeys_GetIamPolicy_FullMethodName       = "/pivox.api.v1.TagKeys/GetIamPolicy"
-	TagKeys_SetIamPolicy_FullMethodName       = "/pivox.api.v1.TagKeys/SetIamPolicy"
-	TagKeys_TestIamPermissions_FullMethodName = "/pivox.api.v1.TagKeys/TestIamPermissions"
+	TagKeys_ListTagKeys_FullMethodName  = "/pivox.api.v1.TagKeys/ListTagKeys"
+	TagKeys_GetTagKey_FullMethodName    = "/pivox.api.v1.TagKeys/GetTagKey"
+	TagKeys_CreateTagKey_FullMethodName = "/pivox.api.v1.TagKeys/CreateTagKey"
+	TagKeys_UpdateTagKey_FullMethodName = "/pivox.api.v1.TagKeys/UpdateTagKey"
+	TagKeys_DeleteTagKey_FullMethodName = "/pivox.api.v1.TagKeys/DeleteTagKey"
 )
 
 // TagKeysClient is the client API for TagKeys service.
@@ -66,26 +62,6 @@ type TagKeysClient interface {
 	// Deletes a TagKey. The TagKey cannot be deleted if it has any child
 	// TagValues.
 	DeleteTagKey(ctx context.Context, in *DeleteTagKeyRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
-	// Gets the access control policy for a TagKey. The returned policy may be
-	// empty if no such policy or resource exists. The `resource` field should
-	// be the TagKey's resource name.
-	// The caller must have
-	// `pivox.api/tagKeys.getIamPolicy` permission on
-	// the specified TagKey.
-	GetIamPolicy(ctx context.Context, in *v1.GetIamPolicyRequest, opts ...grpc.CallOption) (*v1.Policy, error)
-	// Sets the access control policy on a TagKey, replacing any existing
-	// policy. The `resource` field should be the TagKey's resource name.
-	// The caller must have `resourcemanager.tagKeys.setIamPolicy` permission
-	// on the identified tagValue.
-	// (-- api-linter: core::0136::response-message-name=disabled
-	//
-	//	aip.dev/not-precedent: SetIamPolicy returns Policy per IAM convention. --)
-	SetIamPolicy(ctx context.Context, in *v1.SetIamPolicyRequest, opts ...grpc.CallOption) (*v1.Policy, error)
-	// Returns permissions that a caller has on the specified TagKey.
-	// The `resource` field should be the TagKey's resource name.
-	//
-	// There are no permissions required for making this API call.
-	TestIamPermissions(ctx context.Context, in *v1.TestIamPermissionsRequest, opts ...grpc.CallOption) (*v1.TestIamPermissionsResponse, error)
 }
 
 type tagKeysClient struct {
@@ -146,36 +122,6 @@ func (c *tagKeysClient) DeleteTagKey(ctx context.Context, in *DeleteTagKeyReques
 	return out, nil
 }
 
-func (c *tagKeysClient) GetIamPolicy(ctx context.Context, in *v1.GetIamPolicyRequest, opts ...grpc.CallOption) (*v1.Policy, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v1.Policy)
-	err := c.cc.Invoke(ctx, TagKeys_GetIamPolicy_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *tagKeysClient) SetIamPolicy(ctx context.Context, in *v1.SetIamPolicyRequest, opts ...grpc.CallOption) (*v1.Policy, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v1.Policy)
-	err := c.cc.Invoke(ctx, TagKeys_SetIamPolicy_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *tagKeysClient) TestIamPermissions(ctx context.Context, in *v1.TestIamPermissionsRequest, opts ...grpc.CallOption) (*v1.TestIamPermissionsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v1.TestIamPermissionsResponse)
-	err := c.cc.Invoke(ctx, TagKeys_TestIamPermissions_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // TagKeysServer is the server API for TagKeys service.
 // All implementations must embed UnimplementedTagKeysServer
 // for forward compatibility.
@@ -197,26 +143,6 @@ type TagKeysServer interface {
 	// Deletes a TagKey. The TagKey cannot be deleted if it has any child
 	// TagValues.
 	DeleteTagKey(context.Context, *DeleteTagKeyRequest) (*longrunningpb.Operation, error)
-	// Gets the access control policy for a TagKey. The returned policy may be
-	// empty if no such policy or resource exists. The `resource` field should
-	// be the TagKey's resource name.
-	// The caller must have
-	// `pivox.api/tagKeys.getIamPolicy` permission on
-	// the specified TagKey.
-	GetIamPolicy(context.Context, *v1.GetIamPolicyRequest) (*v1.Policy, error)
-	// Sets the access control policy on a TagKey, replacing any existing
-	// policy. The `resource` field should be the TagKey's resource name.
-	// The caller must have `resourcemanager.tagKeys.setIamPolicy` permission
-	// on the identified tagValue.
-	// (-- api-linter: core::0136::response-message-name=disabled
-	//
-	//	aip.dev/not-precedent: SetIamPolicy returns Policy per IAM convention. --)
-	SetIamPolicy(context.Context, *v1.SetIamPolicyRequest) (*v1.Policy, error)
-	// Returns permissions that a caller has on the specified TagKey.
-	// The `resource` field should be the TagKey's resource name.
-	//
-	// There are no permissions required for making this API call.
-	TestIamPermissions(context.Context, *v1.TestIamPermissionsRequest) (*v1.TestIamPermissionsResponse, error)
 	mustEmbedUnimplementedTagKeysServer()
 }
 
@@ -241,15 +167,6 @@ func (UnimplementedTagKeysServer) UpdateTagKey(context.Context, *UpdateTagKeyReq
 }
 func (UnimplementedTagKeysServer) DeleteTagKey(context.Context, *DeleteTagKeyRequest) (*longrunningpb.Operation, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteTagKey not implemented")
-}
-func (UnimplementedTagKeysServer) GetIamPolicy(context.Context, *v1.GetIamPolicyRequest) (*v1.Policy, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetIamPolicy not implemented")
-}
-func (UnimplementedTagKeysServer) SetIamPolicy(context.Context, *v1.SetIamPolicyRequest) (*v1.Policy, error) {
-	return nil, status.Error(codes.Unimplemented, "method SetIamPolicy not implemented")
-}
-func (UnimplementedTagKeysServer) TestIamPermissions(context.Context, *v1.TestIamPermissionsRequest) (*v1.TestIamPermissionsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method TestIamPermissions not implemented")
 }
 func (UnimplementedTagKeysServer) mustEmbedUnimplementedTagKeysServer() {}
 func (UnimplementedTagKeysServer) testEmbeddedByValue()                 {}
@@ -362,60 +279,6 @@ func _TagKeys_DeleteTagKey_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
-func _TagKeys_GetIamPolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v1.GetIamPolicyRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(TagKeysServer).GetIamPolicy(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: TagKeys_GetIamPolicy_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TagKeysServer).GetIamPolicy(ctx, req.(*v1.GetIamPolicyRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _TagKeys_SetIamPolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v1.SetIamPolicyRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(TagKeysServer).SetIamPolicy(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: TagKeys_SetIamPolicy_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TagKeysServer).SetIamPolicy(ctx, req.(*v1.SetIamPolicyRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _TagKeys_TestIamPermissions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v1.TestIamPermissionsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(TagKeysServer).TestIamPermissions(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: TagKeys_TestIamPermissions_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TagKeysServer).TestIamPermissions(ctx, req.(*v1.TestIamPermissionsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // TagKeys_ServiceDesc is the grpc.ServiceDesc for TagKeys service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -442,18 +305,6 @@ var TagKeys_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteTagKey",
 			Handler:    _TagKeys_DeleteTagKey_Handler,
-		},
-		{
-			MethodName: "GetIamPolicy",
-			Handler:    _TagKeys_GetIamPolicy_Handler,
-		},
-		{
-			MethodName: "SetIamPolicy",
-			Handler:    _TagKeys_SetIamPolicy_Handler,
-		},
-		{
-			MethodName: "TestIamPermissions",
-			Handler:    _TagKeys_TestIamPermissions_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

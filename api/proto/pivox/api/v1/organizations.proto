@@ -24,8 +24,6 @@ import "google/api/resource.proto";
 import "google/longrunning/operations.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
-import "pivox/iam/v1/iam_policy.proto";
-import "pivox/iam/v1/policy.proto";
 
 option go_package = "pivox/api/v1;apiv1";
 
@@ -80,49 +78,6 @@ service Organizations {
       response_type: "Organization"
       metadata_type: "UpdateOrganizationMetadata"
     };
-  }
-
-  // Gets the access control policy for an organization resource. The policy may
-  // be empty if no such policy or resource exists. The `resource` field should
-  // be the organization's resource name, for example: "organizations/123".
-  //
-  // Authorization requires the IAM permission
-  // `resourcemanager.organizations.getIamPolicy` on the specified organization.
-  rpc GetIamPolicy(pivox.iam.v1.GetIamPolicyRequest) returns (pivox.iam.v1.Policy) {
-    option (google.api.http) = {
-      post: "/v1/{name=organizations/*}:getIamPolicy"
-      body: "*"
-    };
-    option (google.api.method_signature) = "name";
-  }
-
-  // Sets the access control policy on an organization resource. Replaces any
-  // existing policy. The `resource` field should be the organization's resource
-  // name, for example: "organizations/123".
-  //
-  // Authorization requires the IAM permission
-  // `resourcemanager.organizations.setIamPolicy` on the specified organization.
-  // (-- api-linter: core::0136::response-message-name=disabled
-  //     aip.dev/not-precedent: SetIamPolicy returns Policy per IAM convention. --)
-  rpc SetIamPolicy(pivox.iam.v1.SetIamPolicyRequest) returns (pivox.iam.v1.Policy) {
-    option (google.api.http) = {
-      post: "/v1/{resource=organizations/*}:setIamPolicy"
-      body: "*"
-    };
-    option (google.api.method_signature) = "resource,policy";
-  }
-
-  // Returns the permissions that a caller has on the specified organization.
-  // The `resource` field should be the organization's resource name,
-  // for example: "organizations/123".
-  //
-  // There are no permissions required for making this API call.
-  rpc TestIamPermissions(pivox.iam.v1.TestIamPermissionsRequest) returns (pivox.iam.v1.TestIamPermissionsResponse) {
-    option (google.api.http) = {
-      post: "/v1/{resource=organizations/*}:testIamPermissions"
-      body: "*"
-    };
-    option (google.api.method_signature) = "resource,permissions";
   }
 
   // Creates an invitation to join the organization.

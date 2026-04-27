@@ -27,7 +27,6 @@ import (
 	"github.com/dashkan/pivox/internal/crypto"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/firebase"
-	"github.com/dashkan/pivox/internal/iam"
 	"github.com/dashkan/pivox/internal/lro"
 	"github.com/dashkan/pivox/internal/server"
 	"github.com/dashkan/pivox/internal/service/apikeys"
@@ -180,7 +179,6 @@ func serve(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("initialize app key: %w", err)
 	}
 	lroManager := lro.NewManager(queries, logger)
-	iamHelper := iam.NewHelper(queries)
 
 	// Recover any pending operations from previous run
 	if err := lroManager.RecoverPending(ctx); err != nil {
@@ -251,10 +249,10 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	// Register all services
 	longrunningpb.RegisterOperationsServer(grpcServer, operations.NewOperationsServer(lroManager))
-	apiv1.RegisterProjectsServer(grpcServer, projects.NewProjectsServer(pool, queries, iamHelper, appCodec))
-	apiv1.RegisterOrganizationsServer(grpcServer, organizations.NewOrganizationsServer(pool, queries, iamHelper, authSvc, appCodec, server.AuthenticatedUID))
-	apiv1.RegisterTagKeysServer(grpcServer, tags.NewTagKeysServer(pool, queries, iamHelper, appCodec))
-	apiv1.RegisterTagValuesServer(grpcServer, tags.NewTagValuesServer(pool, queries, iamHelper, appCodec))
+	apiv1.RegisterProjectsServer(grpcServer, projects.NewProjectsServer(pool, queries, appCodec))
+	apiv1.RegisterOrganizationsServer(grpcServer, organizations.NewOrganizationsServer(pool, queries, authSvc, appCodec, server.AuthenticatedUID))
+	apiv1.RegisterTagKeysServer(grpcServer, tags.NewTagKeysServer(pool, queries, appCodec))
+	apiv1.RegisterTagValuesServer(grpcServer, tags.NewTagValuesServer(pool, queries, appCodec))
 	apiv1.RegisterTagBindingsServer(grpcServer, tags.NewTagBindingsServer(pool, queries, appCodec))
 	apiv1.RegisterApiKeysServer(grpcServer, apikeys.NewApiKeysServer(pool, queries, appCodec))
 

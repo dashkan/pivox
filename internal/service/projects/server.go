@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
-	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -16,7 +15,6 @@ import (
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/filter"
-	"github.com/dashkan/pivox/internal/iam"
 	"github.com/dashkan/pivox/internal/lro"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	"github.com/dashkan/pivox/internal/resource"
@@ -26,16 +24,14 @@ type ProjectsServer struct {
 	apiv1.UnimplementedProjectsServer
 	db      db.DBTX
 	queries db.Querier
-	iam     *iam.Helper
 	filter  *filter.ResourceFilter
 	codec   *appkey.Codec
 }
 
-func NewProjectsServer(pool db.DBTX, queries db.Querier, iam *iam.Helper, codec *appkey.Codec) *ProjectsServer {
+func NewProjectsServer(pool db.DBTX, queries db.Querier, codec *appkey.Codec) *ProjectsServer {
 	return &ProjectsServer{
 		db:      pool,
 		queries: queries,
-		iam:     iam,
 		filter:  filter.ProjectFilter(),
 		codec:   codec,
 	}
@@ -258,16 +254,4 @@ func (s *ProjectsServer) UndeleteProject(ctx context.Context, req *apiv1.Undelet
 		return nil, apierr.HandleResourceError(err, "Project", req.GetName())
 	}
 	return lro.DoneOperation(convert.ProjectToProto(result, orgName))
-}
-
-func (s *ProjectsServer) GetIamPolicy(ctx context.Context, req *iampb.GetIamPolicyRequest) (*iampb.Policy, error) {
-	return s.iam.GetIamPolicy(ctx, req)
-}
-
-func (s *ProjectsServer) SetIamPolicy(ctx context.Context, req *iampb.SetIamPolicyRequest) (*iampb.Policy, error) {
-	return s.iam.SetIamPolicy(ctx, req)
-}
-
-func (s *ProjectsServer) TestIamPermissions(ctx context.Context, req *iampb.TestIamPermissionsRequest) (*iampb.TestIamPermissionsResponse, error) {
-	return s.iam.TestIamPermissions(ctx, req)
 }

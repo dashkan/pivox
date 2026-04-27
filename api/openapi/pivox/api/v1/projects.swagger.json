@@ -330,142 +330,6 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/projects/{project}:getIamPolicy": {
-      "post": {
-        "summary": "Returns the IAM access control policy for the specified project.\nPermission is denied if the policy or the resource do not exist.",
-        "operationId": "Projects_GetIamPolicy",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/v1Policy"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "organization",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "project",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/v1ProjectsGetIamPolicyBody"
-            }
-          }
-        ],
-        "tags": [
-          "Projects"
-        ]
-      }
-    },
-    "/v1/organizations/{organization}/projects/{project}:setIamPolicy": {
-      "post": {
-        "summary": "Sets the IAM access control policy for the specified project.",
-        "description": "CAUTION: This method will replace the existing policy, and cannot be used\nto append additional IAM settings.\n\nNote: Removing service accounts from policies or changing their roles can\nrender services completely inoperable. It is important to understand how\nthe service account is being used before removing or updating its roles.\n\nThe following constraints apply when using `setIamPolicy()`:\n\n+ Project does not support `allUsers` and `allAuthenticatedUsers` as\n`members` in a `Binding` of a `Policy`.\n\n+ The owner role can be granted to a `user`, `serviceAccount`, or a group\nthat is part of an organization. For example,\ngroup@myownpersonaldomain.com could be added as an owner to a project in\nthe myownpersonaldomain.com organization, but not the examplepetstore.com\norganization.\n\n+ Service accounts can be made owners of a project directly\nwithout any restrictions. However, to be added as an owner, a user must be\ninvited using the Pivox Console and must accept the invitation.\n\n+ A user cannot be granted the owner role using `setIamPolicy()`. The user\nmust be granted the owner role using the Pivox Console and must\nexplicitly accept the invitation.\n\n+ Invitations to grant the owner role cannot be sent using\n`setIamPolicy()`;\nthey must be sent only using the Pivox Console.\n\n+ If the project is not part of an organization, there must be at least\none owner who has accepted the Terms of Service (ToS) agreement in the\npolicy. Calling `setIamPolicy()` to remove the last ToS-accepted owner\nfrom the policy will fail. This restriction also applies to legacy\nprojects that no longer have owners who have accepted the ToS. Edits to\nIAM policies will be rejected until the lack of a ToS-accepting owner is\nrectified. If the project is part of an organization, you can remove all\nowners, potentially making the organization inaccessible.",
-        "operationId": "Projects_SetIamPolicy",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/v1Policy"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "organization",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "project",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/v1ProjectsSetIamPolicyBody"
-            }
-          }
-        ],
-        "tags": [
-          "Projects"
-        ]
-      }
-    },
-    "/v1/organizations/{organization}/projects/{project}:testIamPermissions": {
-      "post": {
-        "summary": "Returns permissions that a caller has on the specified project.",
-        "operationId": "Projects_TestIamPermissions",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/v1TestIamPermissionsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "organization",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "project",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/v1ProjectsTestIamPermissionsBody"
-            }
-          }
-        ],
-        "tags": [
-          "Projects"
-        ]
-      }
-    },
     "/v1/organizations/{organization}/projects/{project}:undelete": {
       "post": {
         "summary": "Restores the project identified by the specified\n`name` (for example, `organizations/123/projects/my-project`).\nYou can only use this method for a project that has a lifecycle state of\n[DELETE_REQUESTED]\n[Projects.State.DELETE_REQUESTED].\nAfter deletion starts, the project cannot be restored.",
@@ -588,50 +452,6 @@
       },
       "description": "The `Status` type defines a logical error model that is suitable for\ndifferent programming environments, including REST APIs and RPC APIs. It is\nused by [gRPC](https://github.com/grpc). Each `Status` message contains\nthree pieces of data: error code, error message, and error details.\n\nYou can find out more about this error model and how to work with it in the\n[API Design Guide](https://cloud.google.com/apis/design/errors)."
     },
-    "typeExpr": {
-      "type": "object",
-      "properties": {
-        "expression": {
-          "type": "string",
-          "description": "Textual representation of an expression in Common Expression Language\nsyntax."
-        },
-        "title": {
-          "type": "string",
-          "description": "Optional. Title for the expression, i.e. a short string describing\nits purpose. This can be used e.g. in UIs which allow to enter the\nexpression."
-        },
-        "description": {
-          "type": "string",
-          "description": "Optional. Description of the expression. This is a longer text which\ndescribes the expression, e.g. when hovered over it in a UI."
-        },
-        "location": {
-          "type": "string",
-          "description": "Optional. String indicating the location of the expression for error\nreporting, e.g. a file name and a position in the file."
-        }
-      },
-      "description": "Represents a textual expression in the Common Expression Language (CEL)\nsyntax. CEL is a C-like expression language. The syntax and semantics of CEL\nare documented at https://github.com/google/cel-spec.\n\nExample (Comparison):\n\n    title: \"Summary size limit\"\n    description: \"Determines if a summary is less than 100 chars\"\n    expression: \"document.summary.size() \u003c 100\"\n\nExample (Equality):\n\n    title: \"Requestor is owner\"\n    description: \"Determines if requestor is the document owner\"\n    expression: \"document.owner == request.auth.claims.email\"\n\nExample (Logic):\n\n    title: \"Public documents\"\n    description: \"Determine whether the document should be publicly visible\"\n    expression: \"document.type != 'private' \u0026\u0026 document.type != 'internal'\"\n\nExample (Data Manipulation):\n\n    title: \"Notification string\"\n    description: \"Create a notification string with a timestamp.\"\n    expression: \"'New message received at ' + string(document.create_time)\"\n\nThe exact variables and functions that may be referenced within an expression\nare determined by the service that evaluates it. See the service\ndocumentation for additional information."
-    },
-    "v1Binding": {
-      "type": "object",
-      "properties": {
-        "role": {
-          "type": "string",
-          "description": "Role that is assigned to the list of `members`, or principals.\nFor example, `roles/viewer`, `roles/editor`, or `roles/owner`."
-        },
-        "members": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "* `allUsers`: A special identifier that represents anyone who is\n   on the internet; with or without an account.\n\n* `allAuthenticatedUsers`: A special identifier that represents anyone\n   who is authenticated with an account or a service account.\n\n* `user:{emailid}`: An email address that represents a specific\n   account. For example, `alice@example.com`.\n\n* `serviceAccount:{emailid}`: An email address that represents a service\n   account. For example, `my-other-app@appspot.gserviceaccount.com`.\n\n* `group:{emailid}`: An email address that represents a group.\n   For example, `admins@example.com`.\n\n* `domain:{domain}`: The domain (primary) that represents all the\n   users of that domain. For example, `example.com`.\n\nEvery binding must contain at least one principal — empty bindings\nare rejected at the validation interceptor.",
-          "title": "Specifies the principals requesting access for a Pivox resource.\n`members` can have the following values:"
-        },
-        "condition": {
-          "$ref": "#/definitions/typeExpr",
-          "description": "Optional. The condition that is associated with this binding.\n\nIf the condition evaluates to `true`, then this binding applies to the\ncurrent request.\n\nIf the condition evaluates to `false`, then this binding does not apply to\nthe current request. However, a different role binding might grant the same\nrole to one or more of the principals in this binding."
-        }
-      },
-      "description": "Associates `members`, or principals, with a `role`."
-    },
     "v1ListProjectsResponse": {
       "type": "object",
       "properties": {
@@ -649,24 +469,6 @@
         }
       },
       "description": "A page of the response received from the\n[ListProjects][pivox.api.v1.Projects.ListProjects]\nmethod.\n\nA paginated response where more pages are available has\n`next_page_token` set. This token can be used in a subsequent request to\nretrieve the next request page.\n\nNOTE: A response may contain fewer elements than the request `page_size` and\nstill have a `next_page_token`."
-    },
-    "v1Policy": {
-      "type": "object",
-      "properties": {
-        "bindings": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/v1Binding"
-          },
-          "description": "Associates a list of `members`, or principals, with a `role`. Optionally,\nmay specify a `condition` that determines how and when the `bindings` are\napplied. Each of the `bindings` must contain at least one principal."
-        },
-        "etag": {
-          "type": "string",
-          "description": "`etag` is used for optimistic concurrency control as a way to help\nprevent simultaneous updates of a policy from overwriting each other.\nIt is strongly suggested that systems make use of the `etag` in the\nread-modify-write cycle to perform policy updates in order to avoid race\nconditions: An `etag` is returned in the response to `getIamPolicy`, and\nsystems are expected to put that etag in the request to `setIamPolicy` to\nensure that their change will be applied to the same version of the policy."
-        }
-      },
-      "description": "An Identity and Access Management (IAM) policy, which specifies access\ncontrols for Pivox resources.\n\nA `Policy` is a collection of `bindings`. A `binding` binds one or more\n`members`, or principals, to a single `role`. Principals can be user\naccounts, service accounts, groups, and domains. A `role` is a named list\nof permissions; each `role` can be a predefined role or a user-created\ncustom role."
     },
     "v1Project": {
       "type": "object",
@@ -733,57 +535,6 @@
       ],
       "default": "STATE_UNSPECIFIED",
       "description": "Project lifecycle states.\n\n - STATE_UNSPECIFIED: Unspecified state.  This is only used/useful for distinguishing\nunset values.\n - ACTIVE: The normal and active state.\n - DELETE_REQUESTED: The project has been marked for deletion by the user\n(by invoking\n[DeleteProject][pivox.api.v1.Projects.DeleteProject])\nor by the system (Pivox).\nThis can generally be reversed by invoking [UndeleteProject]\n[pivox.api.v1.Projects.UndeleteProject]."
-    },
-    "v1ProjectsGetIamPolicyBody": {
-      "type": "object",
-      "description": "Request message for `GetIamPolicy` method."
-    },
-    "v1ProjectsSetIamPolicyBody": {
-      "type": "object",
-      "properties": {
-        "policy": {
-          "$ref": "#/definitions/v1Policy",
-          "description": "REQUIRED: The complete policy to be applied to the `resource`. The size of\nthe policy is limited to a few 10s of KB. An empty policy is a\nvalid policy but certain Pivox services (such as Projects)\nmight reject them."
-        },
-        "updateMask": {
-          "type": "string",
-          "description": "`paths: \"bindings, etag\"`",
-          "title": "OPTIONAL: A FieldMask specifying which fields of the policy to modify. Only\nthe fields in the mask will be modified. If no mask is provided, the\nfollowing default mask is used:"
-        }
-      },
-      "description": "Request message for `SetIamPolicy` method.",
-      "required": [
-        "policy"
-      ]
-    },
-    "v1ProjectsTestIamPermissionsBody": {
-      "type": "object",
-      "properties": {
-        "permissions": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "The set of permissions to check for the `resource`. Permissions with\nwildcards (such as '*' or 'storage.*') are not allowed. For more\ninformation see\n[IAM Overview](https://cloud.google.com/iam/docs/overview#permissions)."
-        }
-      },
-      "description": "Request message for `TestIamPermissions` method.",
-      "required": [
-        "permissions"
-      ]
-    },
-    "v1TestIamPermissionsResponse": {
-      "type": "object",
-      "properties": {
-        "permissions": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "A subset of `TestPermissionsRequest.permissions` that the caller is\nallowed."
-        }
-      },
-      "description": "Response message for `TestIamPermissions` method."
     }
   }
 }

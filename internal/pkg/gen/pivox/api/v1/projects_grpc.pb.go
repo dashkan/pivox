@@ -23,7 +23,6 @@ package apiv1
 import (
 	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
 	context "context"
-	v1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -35,15 +34,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Projects_GetProject_FullMethodName         = "/pivox.api.v1.Projects/GetProject"
-	Projects_ListProjects_FullMethodName       = "/pivox.api.v1.Projects/ListProjects"
-	Projects_CreateProject_FullMethodName      = "/pivox.api.v1.Projects/CreateProject"
-	Projects_UpdateProject_FullMethodName      = "/pivox.api.v1.Projects/UpdateProject"
-	Projects_DeleteProject_FullMethodName      = "/pivox.api.v1.Projects/DeleteProject"
-	Projects_UndeleteProject_FullMethodName    = "/pivox.api.v1.Projects/UndeleteProject"
-	Projects_GetIamPolicy_FullMethodName       = "/pivox.api.v1.Projects/GetIamPolicy"
-	Projects_SetIamPolicy_FullMethodName       = "/pivox.api.v1.Projects/SetIamPolicy"
-	Projects_TestIamPermissions_FullMethodName = "/pivox.api.v1.Projects/TestIamPermissions"
+	Projects_GetProject_FullMethodName      = "/pivox.api.v1.Projects/GetProject"
+	Projects_ListProjects_FullMethodName    = "/pivox.api.v1.Projects/ListProjects"
+	Projects_CreateProject_FullMethodName   = "/pivox.api.v1.Projects/CreateProject"
+	Projects_UpdateProject_FullMethodName   = "/pivox.api.v1.Projects/UpdateProject"
+	Projects_DeleteProject_FullMethodName   = "/pivox.api.v1.Projects/DeleteProject"
+	Projects_UndeleteProject_FullMethodName = "/pivox.api.v1.Projects/UndeleteProject"
 )
 
 // ProjectsClient is the client API for Projects service.
@@ -116,55 +112,6 @@ type ProjectsClient interface {
 	// The caller must have `resourcemanager.projects.undelete` permission for
 	// this project.
 	UndeleteProject(ctx context.Context, in *UndeleteProjectRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
-	// Returns the IAM access control policy for the specified project.
-	// Permission is denied if the policy or the resource do not exist.
-	GetIamPolicy(ctx context.Context, in *v1.GetIamPolicyRequest, opts ...grpc.CallOption) (*v1.Policy, error)
-	// Sets the IAM access control policy for the specified project.
-	//
-	// CAUTION: This method will replace the existing policy, and cannot be used
-	// to append additional IAM settings.
-	//
-	// Note: Removing service accounts from policies or changing their roles can
-	// render services completely inoperable. It is important to understand how
-	// the service account is being used before removing or updating its roles.
-	//
-	// The following constraints apply when using `setIamPolicy()`:
-	//
-	// + Project does not support `allUsers` and `allAuthenticatedUsers` as
-	// `members` in a `Binding` of a `Policy`.
-	//
-	// + The owner role can be granted to a `user`, `serviceAccount`, or a group
-	// that is part of an organization. For example,
-	// group@myownpersonaldomain.com could be added as an owner to a project in
-	// the myownpersonaldomain.com organization, but not the examplepetstore.com
-	// organization.
-	//
-	// + Service accounts can be made owners of a project directly
-	// without any restrictions. However, to be added as an owner, a user must be
-	// invited using the Pivox Console and must accept the invitation.
-	//
-	// + A user cannot be granted the owner role using `setIamPolicy()`. The user
-	// must be granted the owner role using the Pivox Console and must
-	// explicitly accept the invitation.
-	//
-	// + Invitations to grant the owner role cannot be sent using
-	// `setIamPolicy()`;
-	// they must be sent only using the Pivox Console.
-	//
-	// + If the project is not part of an organization, there must be at least
-	// one owner who has accepted the Terms of Service (ToS) agreement in the
-	// policy. Calling `setIamPolicy()` to remove the last ToS-accepted owner
-	// from the policy will fail. This restriction also applies to legacy
-	// projects that no longer have owners who have accepted the ToS. Edits to
-	// IAM policies will be rejected until the lack of a ToS-accepting owner is
-	// rectified. If the project is part of an organization, you can remove all
-	// owners, potentially making the organization inaccessible.
-	// (-- api-linter: core::0136::response-message-name=disabled
-	//
-	//	aip.dev/not-precedent: SetIamPolicy returns Policy per IAM convention. --)
-	SetIamPolicy(ctx context.Context, in *v1.SetIamPolicyRequest, opts ...grpc.CallOption) (*v1.Policy, error)
-	// Returns permissions that a caller has on the specified project.
-	TestIamPermissions(ctx context.Context, in *v1.TestIamPermissionsRequest, opts ...grpc.CallOption) (*v1.TestIamPermissionsResponse, error)
 }
 
 type projectsClient struct {
@@ -229,36 +176,6 @@ func (c *projectsClient) UndeleteProject(ctx context.Context, in *UndeleteProjec
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(longrunningpb.Operation)
 	err := c.cc.Invoke(ctx, Projects_UndeleteProject_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *projectsClient) GetIamPolicy(ctx context.Context, in *v1.GetIamPolicyRequest, opts ...grpc.CallOption) (*v1.Policy, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v1.Policy)
-	err := c.cc.Invoke(ctx, Projects_GetIamPolicy_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *projectsClient) SetIamPolicy(ctx context.Context, in *v1.SetIamPolicyRequest, opts ...grpc.CallOption) (*v1.Policy, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v1.Policy)
-	err := c.cc.Invoke(ctx, Projects_SetIamPolicy_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *projectsClient) TestIamPermissions(ctx context.Context, in *v1.TestIamPermissionsRequest, opts ...grpc.CallOption) (*v1.TestIamPermissionsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v1.TestIamPermissionsResponse)
-	err := c.cc.Invoke(ctx, Projects_TestIamPermissions_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -335,55 +252,6 @@ type ProjectsServer interface {
 	// The caller must have `resourcemanager.projects.undelete` permission for
 	// this project.
 	UndeleteProject(context.Context, *UndeleteProjectRequest) (*longrunningpb.Operation, error)
-	// Returns the IAM access control policy for the specified project.
-	// Permission is denied if the policy or the resource do not exist.
-	GetIamPolicy(context.Context, *v1.GetIamPolicyRequest) (*v1.Policy, error)
-	// Sets the IAM access control policy for the specified project.
-	//
-	// CAUTION: This method will replace the existing policy, and cannot be used
-	// to append additional IAM settings.
-	//
-	// Note: Removing service accounts from policies or changing their roles can
-	// render services completely inoperable. It is important to understand how
-	// the service account is being used before removing or updating its roles.
-	//
-	// The following constraints apply when using `setIamPolicy()`:
-	//
-	// + Project does not support `allUsers` and `allAuthenticatedUsers` as
-	// `members` in a `Binding` of a `Policy`.
-	//
-	// + The owner role can be granted to a `user`, `serviceAccount`, or a group
-	// that is part of an organization. For example,
-	// group@myownpersonaldomain.com could be added as an owner to a project in
-	// the myownpersonaldomain.com organization, but not the examplepetstore.com
-	// organization.
-	//
-	// + Service accounts can be made owners of a project directly
-	// without any restrictions. However, to be added as an owner, a user must be
-	// invited using the Pivox Console and must accept the invitation.
-	//
-	// + A user cannot be granted the owner role using `setIamPolicy()`. The user
-	// must be granted the owner role using the Pivox Console and must
-	// explicitly accept the invitation.
-	//
-	// + Invitations to grant the owner role cannot be sent using
-	// `setIamPolicy()`;
-	// they must be sent only using the Pivox Console.
-	//
-	// + If the project is not part of an organization, there must be at least
-	// one owner who has accepted the Terms of Service (ToS) agreement in the
-	// policy. Calling `setIamPolicy()` to remove the last ToS-accepted owner
-	// from the policy will fail. This restriction also applies to legacy
-	// projects that no longer have owners who have accepted the ToS. Edits to
-	// IAM policies will be rejected until the lack of a ToS-accepting owner is
-	// rectified. If the project is part of an organization, you can remove all
-	// owners, potentially making the organization inaccessible.
-	// (-- api-linter: core::0136::response-message-name=disabled
-	//
-	//	aip.dev/not-precedent: SetIamPolicy returns Policy per IAM convention. --)
-	SetIamPolicy(context.Context, *v1.SetIamPolicyRequest) (*v1.Policy, error)
-	// Returns permissions that a caller has on the specified project.
-	TestIamPermissions(context.Context, *v1.TestIamPermissionsRequest) (*v1.TestIamPermissionsResponse, error)
 	mustEmbedUnimplementedProjectsServer()
 }
 
@@ -411,15 +279,6 @@ func (UnimplementedProjectsServer) DeleteProject(context.Context, *DeleteProject
 }
 func (UnimplementedProjectsServer) UndeleteProject(context.Context, *UndeleteProjectRequest) (*longrunningpb.Operation, error) {
 	return nil, status.Error(codes.Unimplemented, "method UndeleteProject not implemented")
-}
-func (UnimplementedProjectsServer) GetIamPolicy(context.Context, *v1.GetIamPolicyRequest) (*v1.Policy, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetIamPolicy not implemented")
-}
-func (UnimplementedProjectsServer) SetIamPolicy(context.Context, *v1.SetIamPolicyRequest) (*v1.Policy, error) {
-	return nil, status.Error(codes.Unimplemented, "method SetIamPolicy not implemented")
-}
-func (UnimplementedProjectsServer) TestIamPermissions(context.Context, *v1.TestIamPermissionsRequest) (*v1.TestIamPermissionsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method TestIamPermissions not implemented")
 }
 func (UnimplementedProjectsServer) mustEmbedUnimplementedProjectsServer() {}
 func (UnimplementedProjectsServer) testEmbeddedByValue()                  {}
@@ -550,60 +409,6 @@ func _Projects_UndeleteProject_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Projects_GetIamPolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v1.GetIamPolicyRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ProjectsServer).GetIamPolicy(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Projects_GetIamPolicy_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ProjectsServer).GetIamPolicy(ctx, req.(*v1.GetIamPolicyRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Projects_SetIamPolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v1.SetIamPolicyRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ProjectsServer).SetIamPolicy(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Projects_SetIamPolicy_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ProjectsServer).SetIamPolicy(ctx, req.(*v1.SetIamPolicyRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Projects_TestIamPermissions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v1.TestIamPermissionsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ProjectsServer).TestIamPermissions(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Projects_TestIamPermissions_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ProjectsServer).TestIamPermissions(ctx, req.(*v1.TestIamPermissionsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // Projects_ServiceDesc is the grpc.ServiceDesc for Projects service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -634,18 +439,6 @@ var Projects_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UndeleteProject",
 			Handler:    _Projects_UndeleteProject_Handler,
-		},
-		{
-			MethodName: "GetIamPolicy",
-			Handler:    _Projects_GetIamPolicy_Handler,
-		},
-		{
-			MethodName: "SetIamPolicy",
-			Handler:    _Projects_SetIamPolicy_Handler,
-		},
-		{
-			MethodName: "TestIamPermissions",
-			Handler:    _Projects_TestIamPermissions_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

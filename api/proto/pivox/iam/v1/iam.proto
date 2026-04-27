@@ -1,0 +1,135 @@
+// Copyright 2025 Pivox
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package pivox.iam.v1;
+
+import "google/api/annotations.proto";
+import "google/api/client.proto";
+import "pivox/iam/v1/groups.proto";
+import "pivox/iam/v1/permissions.proto";
+import "pivox/iam/v1/roles.proto";
+import "pivox/iam/v1/users.proto";
+
+option go_package = "pivox/iam/v1;iampb";
+
+// Iam is the single entry point for all IAM-related RPCs. It hosts the
+// read paths for `User`, `Role`, and `Permission` resources alongside
+// the read+write paths for `Group` and group membership.
+//
+// Resource definitions live in their per-resource files
+// (`users.proto`, `roles.proto`, `groups.proto`, `permissions.proto`).
+// This file contains only the service contract.
+//
+// (-- api-linter: core::0121::resource-must-support-get=disabled
+//     aip.dev/not-precedent: Permission is a global, code-defined
+//     catalog consumed via ListPermissions only; per-permission Get
+//     carries no additional information beyond what the catalog
+//     already exposes. --)
+service Iam {
+  option (google.api.default_host) = "api.pivox.io";
+
+  // Gets a user by resource name. Users are synced from Firebase Auth
+  // and are read-only through this API.
+  rpc GetUser(GetUserRequest) returns (User) {
+    option (google.api.http) = {get: "/v1/{name=organizations/*/users/*}"};
+    option (google.api.method_signature) = "name";
+  }
+
+  // Lists users in an organization.
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse) {
+    option (google.api.http) = {get: "/v1/{parent=organizations/*}/users"};
+    option (google.api.method_signature) = "parent";
+  }
+
+  // Gets a role by resource name. v1 returns only system roles
+  // (owner, admin, editor, viewer); custom roles are deferred.
+  rpc GetRole(GetRoleRequest) returns (Role) {
+    option (google.api.http) = {get: "/v1/{name=organizations/*/roles/*}"};
+    option (google.api.method_signature) = "name";
+  }
+
+  // Lists roles in an organization.
+  rpc ListRoles(ListRolesRequest) returns (ListRolesResponse) {
+    option (google.api.http) = {get: "/v1/{parent=organizations/*}/roles"};
+    option (google.api.method_signature) = "parent";
+  }
+
+  // Lists all system-defined permissions. Permissions are global and
+  // code-defined; the catalog is identical for every caller.
+  rpc ListPermissions(ListPermissionsRequest) returns (ListPermissionsResponse) {
+    option (google.api.http) = {get: "/v1/permissions"};
+  }
+
+  // Gets a group by resource name.
+  rpc GetGroup(GetGroupRequest) returns (Group) {
+    option (google.api.http) = {get: "/v1/{name=organizations/*/groups/*}"};
+    option (google.api.method_signature) = "name";
+  }
+
+  // Lists groups in an organization.
+  rpc ListGroups(ListGroupsRequest) returns (ListGroupsResponse) {
+    option (google.api.http) = {get: "/v1/{parent=organizations/*}/groups"};
+    option (google.api.method_signature) = "parent";
+  }
+
+  // Creates a new group.
+  rpc CreateGroup(CreateGroupRequest) returns (Group) {
+    option (google.api.http) = {
+      post: "/v1/{parent=organizations/*}/groups"
+      body: "group"
+    };
+    option (google.api.method_signature) = "parent,group,group_id";
+  }
+
+  // Updates a group.
+  rpc UpdateGroup(UpdateGroupRequest) returns (Group) {
+    option (google.api.http) = {
+      patch: "/v1/{group.name=organizations/*/groups/*}"
+      body: "group"
+    };
+    option (google.api.method_signature) = "group,update_mask";
+  }
+
+  // Soft-deletes a group.
+  rpc DeleteGroup(DeleteGroupRequest) returns (Group) {
+    option (google.api.http) = {delete: "/v1/{name=organizations/*/groups/*}"};
+    option (google.api.method_signature) = "name";
+  }
+
+  // Adds members to a group.
+  rpc AddGroupMembers(AddGroupMembersRequest) returns (AddGroupMembersResponse) {
+    option (google.api.http) = {
+      post: "/v1/{group=organizations/*/groups/*}:addGroupMembers"
+      body: "*"
+    };
+    option (google.api.method_signature) = "group,members";
+  }
+
+  // Removes members from a group.
+  rpc RemoveGroupMembers(RemoveGroupMembersRequest) returns (RemoveGroupMembersResponse) {
+    option (google.api.http) = {
+      post: "/v1/{group=organizations/*/groups/*}:removeGroupMembers"
+      body: "*"
+    };
+    option (google.api.method_signature) = "group,members";
+  }
+
+  // Lists members of a group.
+  rpc ListGroupMembers(ListGroupMembersRequest) returns (ListGroupMembersResponse) {
+    option (google.api.http) = {get: "/v1/{group=organizations/*/groups/*}/members"};
+    option (google.api.method_signature) = "group";
+  }
+}

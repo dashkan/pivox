@@ -23,7 +23,6 @@ package apiv1
 import (
 	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
 	context "context"
-	v1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -35,14 +34,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	TagValues_ListTagValues_FullMethodName      = "/pivox.api.v1.TagValues/ListTagValues"
-	TagValues_GetTagValue_FullMethodName        = "/pivox.api.v1.TagValues/GetTagValue"
-	TagValues_CreateTagValue_FullMethodName     = "/pivox.api.v1.TagValues/CreateTagValue"
-	TagValues_UpdateTagValue_FullMethodName     = "/pivox.api.v1.TagValues/UpdateTagValue"
-	TagValues_DeleteTagValue_FullMethodName     = "/pivox.api.v1.TagValues/DeleteTagValue"
-	TagValues_GetIamPolicy_FullMethodName       = "/pivox.api.v1.TagValues/GetIamPolicy"
-	TagValues_SetIamPolicy_FullMethodName       = "/pivox.api.v1.TagValues/SetIamPolicy"
-	TagValues_TestIamPermissions_FullMethodName = "/pivox.api.v1.TagValues/TestIamPermissions"
+	TagValues_ListTagValues_FullMethodName  = "/pivox.api.v1.TagValues/ListTagValues"
+	TagValues_GetTagValue_FullMethodName    = "/pivox.api.v1.TagValues/GetTagValue"
+	TagValues_CreateTagValue_FullMethodName = "/pivox.api.v1.TagValues/CreateTagValue"
+	TagValues_UpdateTagValue_FullMethodName = "/pivox.api.v1.TagValues/UpdateTagValue"
+	TagValues_DeleteTagValue_FullMethodName = "/pivox.api.v1.TagValues/DeleteTagValue"
 )
 
 // TagValuesClient is the client API for TagValues service.
@@ -66,26 +62,6 @@ type TagValuesClient interface {
 	// Deletes a TagValue. The TagValue cannot have any bindings when it is
 	// deleted.
 	DeleteTagValue(ctx context.Context, in *DeleteTagValueRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
-	// Gets the access control policy for a TagValue. The returned policy may be
-	// empty if no such policy or resource exists. The `resource` field should
-	// be the TagValue's resource name.
-	// The caller must have the
-	// `pivox.api/tagValues.getIamPolicy` permission on
-	// the identified TagValue to get the access control policy.
-	GetIamPolicy(ctx context.Context, in *v1.GetIamPolicyRequest, opts ...grpc.CallOption) (*v1.Policy, error)
-	// Sets the access control policy on a TagValue, replacing any existing
-	// policy. The `resource` field should be the TagValue's resource name.
-	// The caller must have `resourcemanager.tagValues.setIamPolicy` permission
-	// on the identified tagValue.
-	// (-- api-linter: core::0136::response-message-name=disabled
-	//
-	//	aip.dev/not-precedent: SetIamPolicy returns Policy per IAM convention. --)
-	SetIamPolicy(ctx context.Context, in *v1.SetIamPolicyRequest, opts ...grpc.CallOption) (*v1.Policy, error)
-	// Returns permissions that a caller has on the specified TagValue.
-	// The `resource` field should be the TagValue's resource name.
-	//
-	// There are no permissions required for making this API call.
-	TestIamPermissions(ctx context.Context, in *v1.TestIamPermissionsRequest, opts ...grpc.CallOption) (*v1.TestIamPermissionsResponse, error)
 }
 
 type tagValuesClient struct {
@@ -146,36 +122,6 @@ func (c *tagValuesClient) DeleteTagValue(ctx context.Context, in *DeleteTagValue
 	return out, nil
 }
 
-func (c *tagValuesClient) GetIamPolicy(ctx context.Context, in *v1.GetIamPolicyRequest, opts ...grpc.CallOption) (*v1.Policy, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v1.Policy)
-	err := c.cc.Invoke(ctx, TagValues_GetIamPolicy_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *tagValuesClient) SetIamPolicy(ctx context.Context, in *v1.SetIamPolicyRequest, opts ...grpc.CallOption) (*v1.Policy, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v1.Policy)
-	err := c.cc.Invoke(ctx, TagValues_SetIamPolicy_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *tagValuesClient) TestIamPermissions(ctx context.Context, in *v1.TestIamPermissionsRequest, opts ...grpc.CallOption) (*v1.TestIamPermissionsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v1.TestIamPermissionsResponse)
-	err := c.cc.Invoke(ctx, TagValues_TestIamPermissions_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // TagValuesServer is the server API for TagValues service.
 // All implementations must embed UnimplementedTagValuesServer
 // for forward compatibility.
@@ -197,26 +143,6 @@ type TagValuesServer interface {
 	// Deletes a TagValue. The TagValue cannot have any bindings when it is
 	// deleted.
 	DeleteTagValue(context.Context, *DeleteTagValueRequest) (*longrunningpb.Operation, error)
-	// Gets the access control policy for a TagValue. The returned policy may be
-	// empty if no such policy or resource exists. The `resource` field should
-	// be the TagValue's resource name.
-	// The caller must have the
-	// `pivox.api/tagValues.getIamPolicy` permission on
-	// the identified TagValue to get the access control policy.
-	GetIamPolicy(context.Context, *v1.GetIamPolicyRequest) (*v1.Policy, error)
-	// Sets the access control policy on a TagValue, replacing any existing
-	// policy. The `resource` field should be the TagValue's resource name.
-	// The caller must have `resourcemanager.tagValues.setIamPolicy` permission
-	// on the identified tagValue.
-	// (-- api-linter: core::0136::response-message-name=disabled
-	//
-	//	aip.dev/not-precedent: SetIamPolicy returns Policy per IAM convention. --)
-	SetIamPolicy(context.Context, *v1.SetIamPolicyRequest) (*v1.Policy, error)
-	// Returns permissions that a caller has on the specified TagValue.
-	// The `resource` field should be the TagValue's resource name.
-	//
-	// There are no permissions required for making this API call.
-	TestIamPermissions(context.Context, *v1.TestIamPermissionsRequest) (*v1.TestIamPermissionsResponse, error)
 	mustEmbedUnimplementedTagValuesServer()
 }
 
@@ -241,15 +167,6 @@ func (UnimplementedTagValuesServer) UpdateTagValue(context.Context, *UpdateTagVa
 }
 func (UnimplementedTagValuesServer) DeleteTagValue(context.Context, *DeleteTagValueRequest) (*longrunningpb.Operation, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteTagValue not implemented")
-}
-func (UnimplementedTagValuesServer) GetIamPolicy(context.Context, *v1.GetIamPolicyRequest) (*v1.Policy, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetIamPolicy not implemented")
-}
-func (UnimplementedTagValuesServer) SetIamPolicy(context.Context, *v1.SetIamPolicyRequest) (*v1.Policy, error) {
-	return nil, status.Error(codes.Unimplemented, "method SetIamPolicy not implemented")
-}
-func (UnimplementedTagValuesServer) TestIamPermissions(context.Context, *v1.TestIamPermissionsRequest) (*v1.TestIamPermissionsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method TestIamPermissions not implemented")
 }
 func (UnimplementedTagValuesServer) mustEmbedUnimplementedTagValuesServer() {}
 func (UnimplementedTagValuesServer) testEmbeddedByValue()                   {}
@@ -362,60 +279,6 @@ func _TagValues_DeleteTagValue_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
-func _TagValues_GetIamPolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v1.GetIamPolicyRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(TagValuesServer).GetIamPolicy(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: TagValues_GetIamPolicy_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TagValuesServer).GetIamPolicy(ctx, req.(*v1.GetIamPolicyRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _TagValues_SetIamPolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v1.SetIamPolicyRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(TagValuesServer).SetIamPolicy(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: TagValues_SetIamPolicy_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TagValuesServer).SetIamPolicy(ctx, req.(*v1.SetIamPolicyRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _TagValues_TestIamPermissions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v1.TestIamPermissionsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(TagValuesServer).TestIamPermissions(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: TagValues_TestIamPermissions_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TagValuesServer).TestIamPermissions(ctx, req.(*v1.TestIamPermissionsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // TagValues_ServiceDesc is the grpc.ServiceDesc for TagValues service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -442,18 +305,6 @@ var TagValues_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteTagValue",
 			Handler:    _TagValues_DeleteTagValue_Handler,
-		},
-		{
-			MethodName: "GetIamPolicy",
-			Handler:    _TagValues_GetIamPolicy_Handler,
-		},
-		{
-			MethodName: "SetIamPolicy",
-			Handler:    _TagValues_SetIamPolicy_Handler,
-		},
-		{
-			MethodName: "TestIamPermissions",
-			Handler:    _TagValues_TestIamPermissions_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

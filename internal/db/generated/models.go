@@ -1074,17 +1074,6 @@ type GroupMember struct {
 	CreateTime time.Time `json:"create_time"`
 }
 
-type IamPolicy struct {
-	ResourceID   uuid.UUID       `json:"resource_id"`
-	ResourceType string          `json:"resource_type"`
-	Policy       json.RawMessage `json:"policy"`
-	Etag         string          `json:"etag"`
-	CreatedBy    string          `json:"created_by"`
-	UpdatedBy    string          `json:"updated_by"`
-	CreateTime   time.Time       `json:"create_time"`
-	UpdateTime   time.Time       `json:"update_time"`
-}
-
 type Invitation struct {
 	ID         uuid.UUID          `json:"id"`
 	OrgID      uuid.UUID          `json:"org_id"`

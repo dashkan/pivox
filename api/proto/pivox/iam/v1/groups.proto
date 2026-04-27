@@ -17,8 +17,6 @@ syntax = "proto3";
 package pivox.iam.v1;
 
 import "buf/validate/validate.proto";
-import "google/api/annotations.proto";
-import "google/api/client.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
 import "google/protobuf/field_mask.proto";
@@ -26,72 +24,7 @@ import "google/protobuf/timestamp.proto";
 
 option go_package = "pivox/iam/v1;iampb";
 
-// Manages groups within an organization.
-service Groups {
-  option (google.api.default_host) = "api.pivox.io";
-
-  // Gets a group by resource name.
-  rpc GetGroup(GetGroupRequest) returns (Group) {
-    option (google.api.http) = {get: "/v1/{name=organizations/*/groups/*}"};
-    option (google.api.method_signature) = "name";
-  }
-
-  // Lists groups in an organization.
-  rpc ListGroups(ListGroupsRequest) returns (ListGroupsResponse) {
-    option (google.api.http) = {get: "/v1/{parent=organizations/*}/groups"};
-    option (google.api.method_signature) = "parent";
-  }
-
-  // Creates a new group.
-  rpc CreateGroup(CreateGroupRequest) returns (Group) {
-    option (google.api.http) = {
-      post: "/v1/{parent=organizations/*}/groups"
-      body: "group"
-    };
-    option (google.api.method_signature) = "parent,group,group_id";
-  }
-
-  // Updates a group.
-  rpc UpdateGroup(UpdateGroupRequest) returns (Group) {
-    option (google.api.http) = {
-      patch: "/v1/{group.name=organizations/*/groups/*}"
-      body: "group"
-    };
-    option (google.api.method_signature) = "group,update_mask";
-  }
-
-  // Soft-deletes a group.
-  rpc DeleteGroup(DeleteGroupRequest) returns (Group) {
-    option (google.api.http) = {delete: "/v1/{name=organizations/*/groups/*}"};
-    option (google.api.method_signature) = "name";
-  }
-
-  // Adds members to a group.
-  rpc AddGroupMembers(AddGroupMembersRequest) returns (AddGroupMembersResponse) {
-    option (google.api.http) = {
-      post: "/v1/{group=organizations/*/groups/*}:addGroupMembers"
-      body: "*"
-    };
-    option (google.api.method_signature) = "group,members";
-  }
-
-  // Removes members from a group.
-  rpc RemoveGroupMembers(RemoveGroupMembersRequest) returns (RemoveGroupMembersResponse) {
-    option (google.api.http) = {
-      post: "/v1/{group=organizations/*/groups/*}:removeGroupMembers"
-      body: "*"
-    };
-    option (google.api.method_signature) = "group,members";
-  }
-
-  // Lists members of a group.
-  rpc ListGroupMembers(ListGroupMembersRequest) returns (ListGroupMembersResponse) {
-    option (google.api.http) = {get: "/v1/{group=organizations/*/groups/*}/members"};
-    option (google.api.method_signature) = "group";
-  }
-}
-
-// A group of users within an organization.
+// A group of users within an organization. Managed via the `Iam` service.
 message Group {
   option (google.api.resource) = {
     type: "pivox.iam/Group"
@@ -152,7 +85,7 @@ message GroupMember {
   google.protobuf.Timestamp create_time = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
-// Request message for `GetGroup`.
+// Request message for `Iam.GetGroup`.
 message GetGroupRequest {
   // Required. The resource name of the group.
   // Format: `organizations/{organization}/groups/{group}`
@@ -163,7 +96,7 @@ message GetGroupRequest {
   ];
 }
 
-// Request message for `ListGroups`.
+// Request message for `Iam.ListGroups`.
 message ListGroupsRequest {
   // Required. The parent organization.
   // Format: `organizations/{organization}`
@@ -217,7 +150,7 @@ message ListGroupsRequest {
   bool show_deleted = 6 [(google.api.field_behavior) = OPTIONAL];
 }
 
-// Response message for `ListGroups`.
+// Response message for `Iam.ListGroups`.
 message ListGroupsResponse {
   // The groups in the organization.
   repeated Group groups = 1;
@@ -226,7 +159,7 @@ message ListGroupsResponse {
   string next_page_token = 2;
 }
 
-// Request message for `CreateGroup`.
+// Request message for `Iam.CreateGroup`.
 message CreateGroupRequest {
   // Required. The parent organization.
   // Format: `organizations/{organization}`
@@ -247,7 +180,7 @@ message CreateGroupRequest {
   string group_id = 3 [(google.api.field_behavior) = OPTIONAL];
 }
 
-// Request message for `UpdateGroup`.
+// Request message for `Iam.UpdateGroup`.
 message UpdateGroupRequest {
   // Required. The group with updated fields.
   Group group = 1 [
@@ -259,7 +192,7 @@ message UpdateGroupRequest {
   google.protobuf.FieldMask update_mask = 2 [(google.api.field_behavior) = OPTIONAL];
 }
 
-// Request message for `DeleteGroup`.
+// Request message for `Iam.DeleteGroup`.
 message DeleteGroupRequest {
   // Required. The resource name of the group to delete.
   // Format: `organizations/{organization}/groups/{group}`
@@ -273,7 +206,7 @@ message DeleteGroupRequest {
   string etag = 2 [(google.api.field_behavior) = OPTIONAL];
 }
 
-// Request message for `AddGroupMembers`.
+// Request message for `Iam.AddGroupMembers`.
 message AddGroupMembersRequest {
   // Required. The resource name of the group.
   // Format: `organizations/{organization}/groups/{group}`
@@ -294,10 +227,10 @@ message AddGroupMembersRequest {
   ];
 }
 
-// Response message for `AddGroupMembers`.
+// Response message for `Iam.AddGroupMembers`.
 message AddGroupMembersResponse {}
 
-// Request message for `RemoveGroupMembers`.
+// Request message for `Iam.RemoveGroupMembers`.
 message RemoveGroupMembersRequest {
   // Required. The resource name of the group.
   // Format: `organizations/{organization}/groups/{group}`
@@ -318,10 +251,10 @@ message RemoveGroupMembersRequest {
   ];
 }
 
-// Response message for `RemoveGroupMembers`.
+// Response message for `Iam.RemoveGroupMembers`.
 message RemoveGroupMembersResponse {}
 
-// Request message for `ListGroupMembers`.
+// Request message for `Iam.ListGroupMembers`.
 // (-- api-linter: core::0132::request-parent-required=disabled
 //     aip.dev/not-precedent: ListGroupMembers uses `group` as the parent-like field. --)
 // (-- api-linter: core::0132::request-required-fields=disabled
@@ -350,7 +283,7 @@ message ListGroupMembersRequest {
   string page_token = 3 [(google.api.field_behavior) = OPTIONAL];
 }
 
-// Response message for `ListGroupMembers`.
+// Response message for `Iam.ListGroupMembers`.
 // (-- api-linter: core::0132::response-unknown-fields=disabled
 //     aip.dev/not-precedent: Response contains GroupMember, a custom sub-resource. --)
 message ListGroupMembersResponse {

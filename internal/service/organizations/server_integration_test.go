@@ -15,9 +15,7 @@ import (
 
 	"github.com/dashkan/pivox/internal/authn"
 	db "github.com/dashkan/pivox/internal/db/generated"
-	"github.com/dashkan/pivox/internal/iam"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
-	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	"github.com/dashkan/pivox/internal/service/organizations"
 	"github.com/dashkan/pivox/internal/testutil"
 )
@@ -64,11 +62,10 @@ func TestIntegration_CreateOrganization_DuplicateName(t *testing.T) {
 	pool, queries, cleanup := testutil.SetupTestDB(t)
 	defer cleanup()
 
-	iamHelper := iam.NewHelper(queries)
 	seedTestCaller(t, queries)
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, iamHelper, noopAuthService{}, nil, testReadUID))
+		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, noopAuthService{}, nil, testReadUID))
 	})
 
 	client := apiv1.NewOrganizationsClient(conn)
@@ -100,11 +97,10 @@ func TestIntegration_Organizations(t *testing.T) {
 	pool, queries, cleanup := testutil.SetupTestDB(t)
 	defer cleanup()
 
-	iamHelper := iam.NewHelper(queries)
 	seedTestCaller(t, queries)
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, iamHelper, noopAuthService{}, nil, testReadUID))
+		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, noopAuthService{}, nil, testReadUID))
 	})
 
 	client := apiv1.NewOrganizationsClient(conn)
@@ -152,40 +148,4 @@ func TestIntegration_Organizations(t *testing.T) {
 		assert.True(t, found, "created org should appear in list")
 	})
 
-	t.Run("GetIamPolicy_Empty", func(t *testing.T) {
-		resp, err := client.GetIamPolicy(ctx, &iampb.GetIamPolicyRequest{
-			Name: createdOrgName,
-		})
-		require.NoError(t, err)
-		// No bindings set yet.
-		assert.Empty(t, resp.GetBindings())
-	})
-
-	t.Run("SetIamPolicy", func(t *testing.T) {
-		resp, err := client.SetIamPolicy(ctx, &iampb.SetIamPolicyRequest{
-			Resource: createdOrgName,
-			Policy: &iampb.Policy{
-				Bindings: []*iampb.Binding{
-					{
-						Role:    "roles/admin",
-						Members: []string{"user:alice@example.com"},
-					},
-				},
-			},
-		})
-		require.NoError(t, err)
-		require.Len(t, resp.GetBindings(), 1)
-		assert.Equal(t, "roles/admin", resp.GetBindings()[0].GetRole())
-		assert.Contains(t, resp.GetBindings()[0].GetMembers(), "user:alice@example.com")
-		assert.NotEmpty(t, resp.GetEtag())
-	})
-
-	t.Run("GetIamPolicy_WithBindings", func(t *testing.T) {
-		resp, err := client.GetIamPolicy(ctx, &iampb.GetIamPolicyRequest{
-			Name: createdOrgName,
-		})
-		require.NoError(t, err)
-		require.Len(t, resp.GetBindings(), 1)
-		assert.Equal(t, "roles/admin", resp.GetBindings()[0].GetRole())
-	})
 }

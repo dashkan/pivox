@@ -23,7 +23,6 @@ package apiv1
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
-	v1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -950,7 +949,7 @@ var File_pivox_api_v1_projects_proto protoreflect.FileDescriptor
 
 const file_pivox_api_v1_projects_proto_rawDesc = "" +
 	"\n" +
-	"\x1bpivox/api/v1/projects.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1dpivox/iam/v1/iam_policy.proto\x1a\x19pivox/iam/v1/policy.proto\"\xc1\x05\n" +
+	"\x1bpivox/api/v1/projects.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xc1\x05\n" +
 	"\aProject\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x126\n" +
 	"\x05state\x18\x04 \x01(\x0e2\x1b.pivox.api.v1.Project.StateB\x03\xe0A\x03R\x05state\x12-\n" +
@@ -1015,7 +1014,7 @@ const file_pivox_api_v1_projects_proto_rawDesc = "" +
 	"\x15CreateProjectMetadata\"\x17\n" +
 	"\x15UpdateProjectMetadata\"\x17\n" +
 	"\x15DeleteProjectMetadata\"\x19\n" +
-	"\x17UndeleteProjectMetadata2\xa8\f\n" +
+	"\x17UndeleteProjectMetadata2\xaf\b\n" +
 	"\bProjects\x12z\n" +
 	"\n" +
 	"GetProject\x12\x1f.pivox.api.v1.GetProjectRequest\x1a\x15.pivox.api.v1.Project\"4\xdaA\x04name\x82\xd3\xe4\x93\x02'\x12%/v1/{name=organizations/*/projects/*}\x12\x8d\x01\n" +
@@ -1027,10 +1026,7 @@ const file_pivox_api_v1_projects_proto_rawDesc = "" +
 	"\rDeleteProject\x12\".pivox.api.v1.DeleteProjectRequest\x1a\x1d.google.longrunning.Operation\"W\xcaA \n" +
 	"\aProject\x12\x15DeleteProjectMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02'*%/v1/{name=organizations/*/projects/*}\x12\xbd\x01\n" +
 	"\x0fUndeleteProject\x12$.pivox.api.v1.UndeleteProjectRequest\x1a\x1d.google.longrunning.Operation\"e\xcaA\"\n" +
-	"\aProject\x12\x17UndeleteProjectMetadata\xdaA\x04name\x82\xd3\xe4\x93\x023:\x01*\"./v1/{name=organizations/*/projects/*}:undelete\x12\x8d\x01\n" +
-	"\fGetIamPolicy\x12!.pivox.iam.v1.GetIamPolicyRequest\x1a\x14.pivox.iam.v1.Policy\"D\xdaA\x04name\x82\xd3\xe4\x93\x027:\x01*\"2/v1/{name=organizations/*/projects/*}:getIamPolicy\x12\x9c\x01\n" +
-	"\fSetIamPolicy\x12!.pivox.iam.v1.SetIamPolicyRequest\x1a\x14.pivox.iam.v1.Policy\"S\xdaA\x0fresource,policy\x82\xd3\xe4\x93\x02;:\x01*\"6/v1/{resource=organizations/*/projects/*}:setIamPolicy\x12\xc7\x01\n" +
-	"\x12TestIamPermissions\x12'.pivox.iam.v1.TestIamPermissionsRequest\x1a(.pivox.iam.v1.TestIamPermissionsResponse\"^\xdaA\x14resource,permissions\x82\xd3\xe4\x93\x02A:\x01*\"</v1/{resource=organizations/*/projects/*}:testIamPermissions\x1a\x0f\xcaA\fapi.pivox.ioB\xb1\x01\n" +
+	"\aProject\x12\x17UndeleteProjectMetadata\xdaA\x04name\x82\xd3\xe4\x93\x023:\x01*\"./v1/{name=organizations/*/projects/*}:undelete\x1a\x0f\xcaA\fapi.pivox.ioB\xb1\x01\n" +
 	"\x10com.pivox.api.v1B\rProjectsProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
 
 var (
@@ -1048,28 +1044,23 @@ func file_pivox_api_v1_projects_proto_rawDescGZIP() []byte {
 var file_pivox_api_v1_projects_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_pivox_api_v1_projects_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_pivox_api_v1_projects_proto_goTypes = []any{
-	(Project_State)(0),                    // 0: pivox.api.v1.Project.State
-	(*Project)(nil),                       // 1: pivox.api.v1.Project
-	(*GetProjectRequest)(nil),             // 2: pivox.api.v1.GetProjectRequest
-	(*ListProjectsRequest)(nil),           // 3: pivox.api.v1.ListProjectsRequest
-	(*ListProjectsResponse)(nil),          // 4: pivox.api.v1.ListProjectsResponse
-	(*CreateProjectRequest)(nil),          // 5: pivox.api.v1.CreateProjectRequest
-	(*UpdateProjectRequest)(nil),          // 6: pivox.api.v1.UpdateProjectRequest
-	(*DeleteProjectRequest)(nil),          // 7: pivox.api.v1.DeleteProjectRequest
-	(*UndeleteProjectRequest)(nil),        // 8: pivox.api.v1.UndeleteProjectRequest
-	(*CreateProjectMetadata)(nil),         // 9: pivox.api.v1.CreateProjectMetadata
-	(*UpdateProjectMetadata)(nil),         // 10: pivox.api.v1.UpdateProjectMetadata
-	(*DeleteProjectMetadata)(nil),         // 11: pivox.api.v1.DeleteProjectMetadata
-	(*UndeleteProjectMetadata)(nil),       // 12: pivox.api.v1.UndeleteProjectMetadata
-	nil,                                   // 13: pivox.api.v1.Project.LabelsEntry
-	(*timestamppb.Timestamp)(nil),         // 14: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),         // 15: google.protobuf.FieldMask
-	(*v1.GetIamPolicyRequest)(nil),        // 16: pivox.iam.v1.GetIamPolicyRequest
-	(*v1.SetIamPolicyRequest)(nil),        // 17: pivox.iam.v1.SetIamPolicyRequest
-	(*v1.TestIamPermissionsRequest)(nil),  // 18: pivox.iam.v1.TestIamPermissionsRequest
-	(*longrunningpb.Operation)(nil),       // 19: google.longrunning.Operation
-	(*v1.Policy)(nil),                     // 20: pivox.iam.v1.Policy
-	(*v1.TestIamPermissionsResponse)(nil), // 21: pivox.iam.v1.TestIamPermissionsResponse
+	(Project_State)(0),              // 0: pivox.api.v1.Project.State
+	(*Project)(nil),                 // 1: pivox.api.v1.Project
+	(*GetProjectRequest)(nil),       // 2: pivox.api.v1.GetProjectRequest
+	(*ListProjectsRequest)(nil),     // 3: pivox.api.v1.ListProjectsRequest
+	(*ListProjectsResponse)(nil),    // 4: pivox.api.v1.ListProjectsResponse
+	(*CreateProjectRequest)(nil),    // 5: pivox.api.v1.CreateProjectRequest
+	(*UpdateProjectRequest)(nil),    // 6: pivox.api.v1.UpdateProjectRequest
+	(*DeleteProjectRequest)(nil),    // 7: pivox.api.v1.DeleteProjectRequest
+	(*UndeleteProjectRequest)(nil),  // 8: pivox.api.v1.UndeleteProjectRequest
+	(*CreateProjectMetadata)(nil),   // 9: pivox.api.v1.CreateProjectMetadata
+	(*UpdateProjectMetadata)(nil),   // 10: pivox.api.v1.UpdateProjectMetadata
+	(*DeleteProjectMetadata)(nil),   // 11: pivox.api.v1.DeleteProjectMetadata
+	(*UndeleteProjectMetadata)(nil), // 12: pivox.api.v1.UndeleteProjectMetadata
+	nil,                             // 13: pivox.api.v1.Project.LabelsEntry
+	(*timestamppb.Timestamp)(nil),   // 14: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),   // 15: google.protobuf.FieldMask
+	(*longrunningpb.Operation)(nil), // 16: google.longrunning.Operation
 }
 var file_pivox_api_v1_projects_proto_depIdxs = []int32{
 	0,  // 0: pivox.api.v1.Project.state:type_name -> pivox.api.v1.Project.State
@@ -1088,20 +1079,14 @@ var file_pivox_api_v1_projects_proto_depIdxs = []int32{
 	6,  // 13: pivox.api.v1.Projects.UpdateProject:input_type -> pivox.api.v1.UpdateProjectRequest
 	7,  // 14: pivox.api.v1.Projects.DeleteProject:input_type -> pivox.api.v1.DeleteProjectRequest
 	8,  // 15: pivox.api.v1.Projects.UndeleteProject:input_type -> pivox.api.v1.UndeleteProjectRequest
-	16, // 16: pivox.api.v1.Projects.GetIamPolicy:input_type -> pivox.iam.v1.GetIamPolicyRequest
-	17, // 17: pivox.api.v1.Projects.SetIamPolicy:input_type -> pivox.iam.v1.SetIamPolicyRequest
-	18, // 18: pivox.api.v1.Projects.TestIamPermissions:input_type -> pivox.iam.v1.TestIamPermissionsRequest
-	1,  // 19: pivox.api.v1.Projects.GetProject:output_type -> pivox.api.v1.Project
-	4,  // 20: pivox.api.v1.Projects.ListProjects:output_type -> pivox.api.v1.ListProjectsResponse
-	19, // 21: pivox.api.v1.Projects.CreateProject:output_type -> google.longrunning.Operation
-	19, // 22: pivox.api.v1.Projects.UpdateProject:output_type -> google.longrunning.Operation
-	19, // 23: pivox.api.v1.Projects.DeleteProject:output_type -> google.longrunning.Operation
-	19, // 24: pivox.api.v1.Projects.UndeleteProject:output_type -> google.longrunning.Operation
-	20, // 25: pivox.api.v1.Projects.GetIamPolicy:output_type -> pivox.iam.v1.Policy
-	20, // 26: pivox.api.v1.Projects.SetIamPolicy:output_type -> pivox.iam.v1.Policy
-	21, // 27: pivox.api.v1.Projects.TestIamPermissions:output_type -> pivox.iam.v1.TestIamPermissionsResponse
-	19, // [19:28] is the sub-list for method output_type
-	10, // [10:19] is the sub-list for method input_type
+	1,  // 16: pivox.api.v1.Projects.GetProject:output_type -> pivox.api.v1.Project
+	4,  // 17: pivox.api.v1.Projects.ListProjects:output_type -> pivox.api.v1.ListProjectsResponse
+	16, // 18: pivox.api.v1.Projects.CreateProject:output_type -> google.longrunning.Operation
+	16, // 19: pivox.api.v1.Projects.UpdateProject:output_type -> google.longrunning.Operation
+	16, // 20: pivox.api.v1.Projects.DeleteProject:output_type -> google.longrunning.Operation
+	16, // 21: pivox.api.v1.Projects.UndeleteProject:output_type -> google.longrunning.Operation
+	16, // [16:22] is the sub-list for method output_type
+	10, // [10:16] is the sub-list for method input_type
 	10, // [10:10] is the sub-list for extension type_name
 	10, // [10:10] is the sub-list for extension extendee
 	0,  // [0:10] is the sub-list for field type_name

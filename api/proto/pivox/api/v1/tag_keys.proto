@@ -24,8 +24,6 @@ import "google/api/resource.proto";
 import "google/longrunning/operations.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
-import "pivox/iam/v1/iam_policy.proto";
-import "pivox/iam/v1/policy.proto";
 
 option go_package = "pivox/api/v1;apiv1";
 
@@ -101,58 +99,6 @@ service TagKeys {
       response_type: "TagKey"
       metadata_type: "DeleteTagKeyMetadata"
     };
-  }
-
-  // Gets the access control policy for a TagKey. The returned policy may be
-  // empty if no such policy or resource exists. The `resource` field should
-  // be the TagKey's resource name.
-  // The caller must have
-  // `pivox.api/tagKeys.getIamPolicy` permission on
-  // the specified TagKey.
-  rpc GetIamPolicy(pivox.iam.v1.GetIamPolicyRequest) returns (pivox.iam.v1.Policy) {
-    option (google.api.http) = {
-      post: "/v1/{name=organizations/*/tagKeys/*}:getIamPolicy"
-      body: "*"
-      additional_bindings: {
-        post: "/v1/{name=organizations/*/projects/*/tagKeys/*}:getIamPolicy"
-        body: "*"
-      }
-    };
-    option (google.api.method_signature) = "name";
-  }
-
-  // Sets the access control policy on a TagKey, replacing any existing
-  // policy. The `resource` field should be the TagKey's resource name.
-  // The caller must have `resourcemanager.tagKeys.setIamPolicy` permission
-  // on the identified tagValue.
-  // (-- api-linter: core::0136::response-message-name=disabled
-  //     aip.dev/not-precedent: SetIamPolicy returns Policy per IAM convention. --)
-  rpc SetIamPolicy(pivox.iam.v1.SetIamPolicyRequest) returns (pivox.iam.v1.Policy) {
-    option (google.api.http) = {
-      post: "/v1/{resource=organizations/*/tagKeys/*}:setIamPolicy"
-      body: "*"
-      additional_bindings: {
-        post: "/v1/{resource=organizations/*/projects/*/tagKeys/*}:setIamPolicy"
-        body: "*"
-      }
-    };
-    option (google.api.method_signature) = "resource,policy";
-  }
-
-  // Returns permissions that a caller has on the specified TagKey.
-  // The `resource` field should be the TagKey's resource name.
-  //
-  // There are no permissions required for making this API call.
-  rpc TestIamPermissions(pivox.iam.v1.TestIamPermissionsRequest) returns (pivox.iam.v1.TestIamPermissionsResponse) {
-    option (google.api.http) = {
-      post: "/v1/{resource=organizations/*/tagKeys/*}:testIamPermissions"
-      body: "*"
-      additional_bindings: {
-        post: "/v1/{resource=organizations/*/projects/*/tagKeys/*}:testIamPermissions"
-        body: "*"
-      }
-    };
-    option (google.api.method_signature) = "resource,permissions";
   }
 }
 

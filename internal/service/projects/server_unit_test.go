@@ -17,9 +17,7 @@ import (
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	db "github.com/dashkan/pivox/internal/db/generated"
-	"github.com/dashkan/pivox/internal/iam"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
-	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	"github.com/dashkan/pivox/internal/testutil/mocks"
 )
 
@@ -50,7 +48,7 @@ var (
 
 func TestUnit_GetProject_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil, nil)
+	srv := NewProjectsServer(nil, mockQ, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
@@ -74,7 +72,7 @@ func TestUnit_GetProject_Success(t *testing.T) {
 
 func TestUnit_GetProject_InvalidName(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil, nil)
+	srv := NewProjectsServer(nil, mockQ, nil)
 	ctx := context.Background()
 
 	_, err := srv.GetProject(ctx, &apiv1.GetProjectRequest{
@@ -89,7 +87,7 @@ func TestUnit_GetProject_InvalidName(t *testing.T) {
 
 func TestUnit_GetProject_NotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil, nil)
+	srv := NewProjectsServer(nil, mockQ, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
@@ -110,7 +108,7 @@ func TestUnit_GetProject_NotFound(t *testing.T) {
 
 func TestUnit_CreateProject_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil, nil)
+	srv := NewProjectsServer(nil, mockQ, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
@@ -142,7 +140,7 @@ func TestUnit_CreateProject_Success(t *testing.T) {
 
 func TestUnit_CreateProject_InvalidParent(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil, nil)
+	srv := NewProjectsServer(nil, mockQ, nil)
 	ctx := context.Background()
 
 	_, err := srv.CreateProject(ctx, &apiv1.CreateProjectRequest{
@@ -158,7 +156,7 @@ func TestUnit_CreateProject_InvalidParent(t *testing.T) {
 
 func TestUnit_UpdateProject_WithFieldMask(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil, nil)
+	srv := NewProjectsServer(nil, mockQ, nil)
 	ctx := context.Background()
 
 	updatedProject := testDBProject
@@ -193,7 +191,7 @@ func TestUnit_UpdateProject_WithFieldMask(t *testing.T) {
 
 func TestUnit_DeleteProject_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil, nil)
+	srv := NewProjectsServer(nil, mockQ, nil)
 	ctx := context.Background()
 
 	deletedProject := testDBProject
@@ -221,7 +219,7 @@ func TestUnit_DeleteProject_Success(t *testing.T) {
 
 func TestUnit_UpdateProject_NoMask(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil, nil)
+	srv := NewProjectsServer(nil, mockQ, nil)
 	ctx := context.Background()
 
 	updatedProject := testDBProject
@@ -252,77 +250,9 @@ func TestUnit_UpdateProject_NoMask(t *testing.T) {
 	mockQ.AssertExpectations(t)
 }
 
-func TestUnit_GetIamPolicy(t *testing.T) {
-	mockQ := new(mocks.MockQuerier)
-	iamHelper := iam.NewHelper(mockQ)
-	srv := NewProjectsServer(nil, mockQ, iamHelper, nil)
-	ctx := context.Background()
-
-	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
-	mockQ.On("GetProjectByName", mock.Anything, db.GetProjectByNameParams{
-		OrgID: testOrgID,
-		Name:  "my-project",
-	}).Return(testDBProject, nil)
-	mockQ.On("GetIamPolicy", mock.Anything, testProjID).Return(db.IamPolicy{}, pgx.ErrNoRows)
-
-	resp, err := srv.GetIamPolicy(ctx, &iampb.GetIamPolicyRequest{
-		Name: "organizations/acme/projects/my-project",
-	})
-
-	require.NoError(t, err)
-	assert.NotNil(t, resp)
-	assert.Empty(t, resp.GetBindings())
-	mockQ.AssertExpectations(t)
-}
-
-func TestUnit_SetIamPolicy(t *testing.T) {
-	mockQ := new(mocks.MockQuerier)
-	iamHelper := iam.NewHelper(mockQ)
-	srv := NewProjectsServer(nil, mockQ, iamHelper, nil)
-	ctx := context.Background()
-
-	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
-	mockQ.On("GetProjectByName", mock.Anything, db.GetProjectByNameParams{
-		OrgID: testOrgID,
-		Name:  "my-project",
-	}).Return(testDBProject, nil)
-	mockQ.On("UpsertIamPolicy", mock.Anything, mock.MatchedBy(func(p db.UpsertIamPolicyParams) bool {
-		return p.ResourceID == testProjID && p.ResourceType == "organizations"
-	})).Return(db.IamPolicy{
-		ResourceID: testProjID,
-		Policy:     json.RawMessage(`{}`),
-		Etag:       "new-etag",
-	}, nil)
-
-	resp, err := srv.SetIamPolicy(ctx, &iampb.SetIamPolicyRequest{
-		Resource: "organizations/acme/projects/my-project",
-		Policy:   &iampb.Policy{},
-	})
-
-	require.NoError(t, err)
-	assert.Equal(t, "new-etag", resp.GetEtag())
-	mockQ.AssertExpectations(t)
-}
-
-func TestUnit_TestIamPermissions(t *testing.T) {
-	mockQ := new(mocks.MockQuerier)
-	iamHelper := iam.NewHelper(mockQ)
-	srv := NewProjectsServer(nil, mockQ, iamHelper, nil)
-	ctx := context.Background()
-
-	perms := []string{"pivox.projects.get", "pivox.projects.delete"}
-	resp, err := srv.TestIamPermissions(ctx, &iampb.TestIamPermissionsRequest{
-		Resource:    "organizations/acme/projects/my-project",
-		Permissions: perms,
-	})
-
-	require.NoError(t, err)
-	assert.Equal(t, perms, resp.GetPermissions())
-}
-
 func TestUnit_UndeleteProject_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil, nil)
+	srv := NewProjectsServer(nil, mockQ, nil)
 	ctx := context.Background()
 
 	undeletedProject := testDBProject
@@ -418,7 +348,7 @@ func TestUnit_UpdateProject_ErrorPaths(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
 			tc.setupMocks(mockQ)
-			srv := NewProjectsServer(nil, mockQ, nil, nil)
+			srv := NewProjectsServer(nil, mockQ, nil)
 
 			_, err := srv.UpdateProject(ctx, tc.req)
 
@@ -491,7 +421,7 @@ func TestUnit_DeleteProject_ErrorPaths(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
 			tc.setupMocks(mockQ)
-			srv := NewProjectsServer(nil, mockQ, nil, nil)
+			srv := NewProjectsServer(nil, mockQ, nil)
 
 			_, err := srv.DeleteProject(ctx, tc.req)
 
@@ -564,7 +494,7 @@ func TestUnit_UndeleteProject_ErrorPaths(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
 			tc.setupMocks(mockQ)
-			srv := NewProjectsServer(nil, mockQ, nil, nil)
+			srv := NewProjectsServer(nil, mockQ, nil)
 
 			_, err := srv.UndeleteProject(ctx, tc.req)
 
@@ -607,7 +537,7 @@ func TestUnit_ListProjects_InvalidParent(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
 			tc.setupMocks(mockQ)
-			srv := NewProjectsServer(nil, mockQ, nil, nil)
+			srv := NewProjectsServer(nil, mockQ, nil)
 
 			_, err := srv.ListProjects(ctx, tc.req)
 
@@ -622,7 +552,7 @@ func TestUnit_ListProjects_InvalidParent(t *testing.T) {
 
 func TestUnit_UpdateProject_LabelsMask(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil, nil)
+	srv := NewProjectsServer(nil, mockQ, nil)
 	ctx := context.Background()
 
 	updatedProject := testDBProject
@@ -654,7 +584,7 @@ func TestUnit_UpdateProject_LabelsMask(t *testing.T) {
 
 func TestUnit_UpdateProject_NoMaskWithLabels(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil, nil)
+	srv := NewProjectsServer(nil, mockQ, nil)
 	ctx := context.Background()
 
 	updatedProject := testDBProject
@@ -684,7 +614,7 @@ func TestUnit_UpdateProject_NoMaskWithLabels(t *testing.T) {
 
 func TestUnit_GetProject_OrgNotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil, nil)
+	srv := NewProjectsServer(nil, mockQ, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "unknown-org").
@@ -703,7 +633,7 @@ func TestUnit_GetProject_OrgNotFound(t *testing.T) {
 
 func TestUnit_CreateProject_AutoGeneratedID(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil, nil)
+	srv := NewProjectsServer(nil, mockQ, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
@@ -733,7 +663,7 @@ func TestUnit_CreateProject_AutoGeneratedID(t *testing.T) {
 
 func TestUnit_CreateProject_DBError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewProjectsServer(nil, mockQ, nil, nil)
+	srv := NewProjectsServer(nil, mockQ, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
