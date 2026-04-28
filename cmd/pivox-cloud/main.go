@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -14,12 +15,16 @@ import (
 
 	"buf.build/go/protovalidate"
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
+	"github.com/google/uuid"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
 
 	"github.com/dashkan/pivox/internal/agentstream"
 	"github.com/dashkan/pivox/internal/appkey"
@@ -30,6 +35,7 @@ import (
 	"github.com/dashkan/pivox/internal/lro"
 	"github.com/dashkan/pivox/internal/server"
 	"github.com/dashkan/pivox/internal/service/apikeys"
+	"github.com/dashkan/pivox/internal/service/iam"
 	"github.com/dashkan/pivox/internal/service/operations"
 	"github.com/dashkan/pivox/internal/service/organizations"
 	"github.com/dashkan/pivox/internal/service/spaces"
@@ -46,6 +52,7 @@ import (
 	aiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	assetsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1"
+	iamv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	storagev1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"
 )
 
@@ -255,6 +262,28 @@ func serve(cmd *cobra.Command, args []string) error {
 	apiv1.RegisterTagValuesServer(grpcServer, tags.NewTagValuesServer(pool, queries, appCodec))
 	apiv1.RegisterTagBindingsServer(grpcServer, tags.NewTagBindingsServer(pool, queries, appCodec))
 	apiv1.RegisterApiKeysServer(grpcServer, apikeys.NewApiKeysServer(pool, queries, appCodec))
+
+	// Iam service: members/roles/permissions/groups + TestIamPermissions.
+	// CallerResolver maps the auth-context Firebase UID to a Pivox
+	// firebase_identities row id. Returns Unauthenticated for missing
+	// auth context, NotFound for orphaned UIDs (registered in Firebase
+	// but not yet synced to our DB), and Internal for DB faults.
+	iamCallerResolver := func(ctx context.Context) (uuid.UUID, error) {
+		uid, ok := server.AuthenticatedUID(ctx)
+		if !ok {
+			return uuid.Nil, status.Error(codes.Unauthenticated, "missing authenticated caller")
+		}
+		identity, err := queries.GetFirebaseIdentityByUID(ctx, uid)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return uuid.Nil, status.Error(codes.Unauthenticated, "caller has no identity record")
+			}
+			logger.Error("iam: lookup caller identity failed", "uid", uid, "error", err)
+			return uuid.Nil, status.Error(codes.Internal, "lookup caller identity")
+		}
+		return identity.ID, nil
+	}
+	iamv1.RegisterIamServer(grpcServer, iam.NewIamServer(queries, nil /* resolver constructed by NewIamServer */, iamCallerResolver))
 
 	// Storage services
 	connMgr := agentstream.NewConnectionManager()

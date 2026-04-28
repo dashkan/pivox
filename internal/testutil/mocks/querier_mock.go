@@ -960,3 +960,18 @@ func (m *MockQuerier) CreateOrgMember(ctx context.Context, arg db.CreateOrgMembe
 	args := m.Called(ctx, arg)
 	return args.Error(0)
 }
+
+// --- Permissions catalog ---
+
+func (m *MockQuerier) ListPermissions(ctx context.Context) ([]db.Permission, error) {
+	args := m.Called(ctx)
+	if v := args.Get(0); v != nil {
+		return v.([]db.Permission), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockQuerier) GetPermission(ctx context.Context, permissionID string) (db.Permission, error) {
+	args := m.Called(ctx, permissionID)
+	return args.Get(0).(db.Permission), args.Error(1)
+}

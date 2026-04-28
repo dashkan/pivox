@@ -161,6 +161,10 @@ type Querier interface {
 	GetOperation(ctx context.Context, id uuid.UUID) (Operation, error)
 	GetOrganization(ctx context.Context, id uuid.UUID) (Organization, error)
 	GetOrganizationByName(ctx context.Context, name string) (Organization, error)
+	// Looks up a permission by its string id (e.g. 'organizations.delete').
+	// Used by Iam.GetPermission and as a validity check on caller-supplied
+	// permission strings in TestIamPermissions paths.
+	GetPermission(ctx context.Context, permissionID string) (Permission, error)
 	GetRequest(ctx context.Context, id uuid.UUID) (AssetRequest, error)
 	GetRequestByName(ctx context.Context, arg GetRequestByNameParams) (AssetRequest, error)
 	GetRoleByID(ctx context.Context, id uuid.UUID) (Role, error)
@@ -209,6 +213,13 @@ type Querier interface {
 	// orgs. The 1000-row LIMIT is a defensive backstop.
 	ListOrganizationsForFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) ([]Organization, error)
 	ListPendingOperations(ctx context.Context) ([]Operation, error)
+	// Returns the entire global permission catalog. Static / code-defined
+	// in v1 (seeded by the migration); the Iam.ListPermissions RPC just
+	// echoes this set so clients can render UI permission pickers without
+	// hardcoding the list. Ordered by permission_id for stable
+	// pagination — the catalog is small (~100 rows) so v1 returns the
+	// full set in one call without paging.
+	ListPermissions(ctx context.Context) ([]Permission, error)
 	ListRequestsBySpace(ctx context.Context, arg ListRequestsBySpaceParams) ([]AssetRequest, error)
 	ListRolesByOrg(ctx context.Context, orgID uuid.UUID) ([]Role, error)
 	ListStorageAgentAuditByAgent(ctx context.Context, arg ListStorageAgentAuditByAgentParams) ([]StorageAgentAudit, error)
