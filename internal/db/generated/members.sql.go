@@ -11,6 +11,36 @@ import (
 	"github.com/google/uuid"
 )
 
+const createOrgMember = `-- name: CreateOrgMember :exec
+INSERT INTO org_members (id, org_id, role_id, principal_kind, principal_id, created_by)
+VALUES ($1, $2, $3, $4, $5, $6)
+`
+
+type CreateOrgMemberParams struct {
+	ID            uuid.UUID     `json:"id"`
+	OrgID         uuid.UUID     `json:"org_id"`
+	RoleID        uuid.UUID     `json:"role_id"`
+	PrincipalKind PrincipalKind `json:"principal_kind"`
+	PrincipalID   uuid.UUID     `json:"principal_id"`
+	CreatedBy     string        `json:"created_by"`
+}
+
+// Inserts an org-level role binding. Caller assigns the id; the
+// schema's `uuidv7()` default applies only when omitted, but we
+// always pass an explicit id for symmetry with CreateOrganization
+// and CreateUserMembership.
+func (q *Queries) CreateOrgMember(ctx context.Context, arg CreateOrgMemberParams) error {
+	_, err := q.db.Exec(ctx, createOrgMember,
+		arg.ID,
+		arg.OrgID,
+		arg.RoleID,
+		arg.PrincipalKind,
+		arg.PrincipalID,
+		arg.CreatedBy,
+	)
+	return err
+}
+
 const getEffectiveOrgRoles = `-- name: GetEffectiveOrgRoles :many
 WITH caller AS (
   SELECT id FROM users
@@ -22,6 +52,11 @@ SELECT DISTINCT r.name
   FROM org_members om
   JOIN roles r ON r.id = om.role_id
  WHERE om.org_id = $1
+   -- v1 only resolves system roles against the in-memory matrix.
+   -- v2 (custom roles): drop this filter AND teach the resolver to
+   -- look up role_permissions rows for the non-system roles in the
+   -- result set; without that change, custom-role bindings would
+   -- silently never grant any permission.
    AND r.is_system = true
    AND (
      (om.principal_kind = 'user'
@@ -86,6 +121,11 @@ SELECT DISTINCT r.name
   FROM space_members sm
   JOIN roles r ON r.id = sm.role_id
  WHERE sm.space_id = $1
+   -- v1 only resolves system roles against the in-memory matrix.
+   -- v2 (custom roles): drop this filter AND teach the resolver to
+   -- look up role_permissions rows for the non-system roles in the
+   -- result set; without that change, custom-role bindings would
+   -- silently never grant any permission.
    AND r.is_system = true
    AND (
      (sm.principal_kind = 'user'

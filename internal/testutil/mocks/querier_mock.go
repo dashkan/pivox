@@ -928,3 +928,35 @@ func (m *MockQuerier) GetSpaceParentOrg(ctx context.Context, id uuid.UUID) (uuid
 	args := m.Called(ctx, id)
 	return args.Get(0).(uuid.UUID), args.Error(1)
 }
+
+// --- Roles ---
+
+func (m *MockQuerier) CreateRole(ctx context.Context, arg db.CreateRoleParams) error {
+	args := m.Called(ctx, arg)
+	return args.Error(0)
+}
+
+func (m *MockQuerier) GetSystemRole(ctx context.Context, arg db.GetSystemRoleParams) (db.Role, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.Role), args.Error(1)
+}
+
+func (m *MockQuerier) ListRolesByOrg(ctx context.Context, orgID uuid.UUID) ([]db.Role, error) {
+	args := m.Called(ctx, orgID)
+	if v := args.Get(0); v != nil {
+		return v.([]db.Role), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockQuerier) GetRoleByID(ctx context.Context, id uuid.UUID) (db.Role, error) {
+	args := m.Called(ctx, id)
+	return args.Get(0).(db.Role), args.Error(1)
+}
+
+// --- Org members ---
+
+func (m *MockQuerier) CreateOrgMember(ctx context.Context, arg db.CreateOrgMemberParams) error {
+	args := m.Called(ctx, arg)
+	return args.Error(0)
+}

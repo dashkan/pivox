@@ -61,8 +61,20 @@ type Querier interface {
 	CreateLineItem(ctx context.Context, arg CreateLineItemParams) (AssetRequestLineItem, error)
 	CreateMessage(ctx context.Context, arg CreateMessageParams) (AiMessage, error)
 	CreateOperation(ctx context.Context, arg CreateOperationParams) (Operation, error)
+	// Inserts an org-level role binding. Caller assigns the id; the
+	// schema's `uuidv7()` default applies only when omitted, but we
+	// always pass an explicit id for symmetry with CreateOrganization
+	// and CreateUserMembership.
+	CreateOrgMember(ctx context.Context, arg CreateOrgMemberParams) error
 	CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error)
 	CreateRequest(ctx context.Context, arg CreateRequestParams) (AssetRequest, error)
+	// Inserts a role row. Used by CreateOrganization to seed the 4 system
+	// roles per org at create time. Will also be used in v2 by the
+	// future Iam.CreateRole RPC for custom roles. Caller assigns the id;
+	// the schema's `uuidv7()` default applies only when omitted, but we
+	// always pass an explicit id so the caller can FK to it without a
+	// read-back round-trip.
+	CreateRole(ctx context.Context, arg CreateRoleParams) error
 	CreateSpace(ctx context.Context, arg CreateSpaceParams) (Space, error)
 	CreateStorageAgent(ctx context.Context, arg CreateStorageAgentParams) (StorageAgent, error)
 	CreateStorageAgentAudit(ctx context.Context, arg CreateStorageAgentAuditParams) error
@@ -151,6 +163,7 @@ type Querier interface {
 	GetOrganizationByName(ctx context.Context, name string) (Organization, error)
 	GetRequest(ctx context.Context, id uuid.UUID) (AssetRequest, error)
 	GetRequestByName(ctx context.Context, arg GetRequestByNameParams) (AssetRequest, error)
+	GetRoleByID(ctx context.Context, id uuid.UUID) (Role, error)
 	GetSpace(ctx context.Context, id uuid.UUID) (Space, error)
 	GetSpaceByName(ctx context.Context, arg GetSpaceByNameParams) (Space, error)
 	GetSpaceIncludingDeleted(ctx context.Context, id uuid.UUID) (Space, error)
@@ -165,6 +178,11 @@ type Querier interface {
 	GetStorageGateway(ctx context.Context, id uuid.UUID) (StorageGateway, error)
 	GetStorageGatewayByName(ctx context.Context, arg GetStorageGatewayByNameParams) (StorageGateway, error)
 	GetStorageGatewayByToken(ctx context.Context, registrationToken string) (StorageGateway, error)
+	// Looks up a system role by (org, name) — the canonical way to
+	// resolve the role id for a known system role like 'owner'. Returns
+	// only system roles; custom roles (when v2 ships) are excluded so a
+	// collision-named custom role can't shadow the system one.
+	GetSystemRole(ctx context.Context, arg GetSystemRoleParams) (Role, error)
 	GetTagBinding(ctx context.Context, id uuid.UUID) (TagBinding, error)
 	GetTagKey(ctx context.Context, id uuid.UUID) (TagKey, error)
 	GetTagKeyByNamespacedName(ctx context.Context, namespacedName string) (TagKey, error)
@@ -192,6 +210,7 @@ type Querier interface {
 	ListOrganizationsForFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) ([]Organization, error)
 	ListPendingOperations(ctx context.Context) ([]Operation, error)
 	ListRequestsBySpace(ctx context.Context, arg ListRequestsBySpaceParams) ([]AssetRequest, error)
+	ListRolesByOrg(ctx context.Context, orgID uuid.UUID) ([]Role, error)
 	ListStorageAgentAuditByAgent(ctx context.Context, arg ListStorageAgentAuditByAgentParams) ([]StorageAgentAudit, error)
 	ListStorageAgentAuditByGateway(ctx context.Context, arg ListStorageAgentAuditByGatewayParams) ([]StorageAgentAudit, error)
 	ListStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageAgent, error)

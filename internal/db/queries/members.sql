@@ -78,6 +78,14 @@ SELECT DISTINCT r.name
       ))
    );
 
+-- name: CreateOrgMember :exec
+-- Inserts an org-level role binding. Caller assigns the id; the
+-- schema's `uuidv7()` default applies only when omitted, but we
+-- always pass an explicit id for symmetry with CreateOrganization
+-- and CreateUserMembership.
+INSERT INTO org_members (id, org_id, role_id, principal_kind, principal_id, created_by)
+VALUES ($1, $2, $3, $4, $5, $6);
+
 -- name: GetSpaceParentOrg :one
 -- Resolves a space's parent org_id. Used by the permission resolver
 -- when a space-scoped permission check needs to fold in org-level
