@@ -400,20 +400,28 @@ plan is obsolete.)
 
 ### Step 6 — Workers (purge + verify-DNS), in-process
 
+> **DNS verification is mocked for v1.** The stub resolver returns
+> "TXT matches" unconditionally (sub-decision #10). `CreateDomain` LRO
+> transitions PENDING → VERIFIED on the next tick regardless of real DNS
+> state. Real `net.Resolver`-backed verification wires up before any
+> external admin uses SSO. Do not implement real DNS polling in this
+> phase — ship the stub, document the gap, move on.
+
 - [ ] New `internal/workers/` package. `type PurgeWorker struct{}`,
       `type VerifyDomainWorker struct{}`, both expose `Run(ctx) error`.
 - [ ] Dependencies (db queries, logger, config, dns resolver) injected; no
       reach into HTTP/gRPC server internals. Trivially transferable to a
       dedicated `cmd/pivox-purge-worker/` binary later (sub-decision #9).
 - [ ] Purge worker: scans orgs past `purge_time`, drives final cascade, frees slug.
-- [ ] Verify-DNS worker: drives `CreateDomain` LROs through DNS-TXT polling at
-      a backoff schedule (2 min × 1h → 30 min × 24h → 6h × 6d → EXPIRED).
+- [ ] Verify-DNS worker: ticks `CreateDomain` LROs to VERIFIED via the stub
+      resolver. Backoff schedule (2 min × 1h → 30 min × 24h → 6h × 6d → EXPIRED)
+      is wire-only — when real DNS lands, the same schedule applies.
 - [ ] Postgres advisory lock so multi-replica deploys safely have one active
       worker per type at a time.
-- [ ] DNS resolver as injectable interface. Real impl uses `net.Resolver`;
-      v1 ships with a stub fake that returns "TXT matches" unconditionally
-      (sub-decision #10) so end-to-end domain claiming works in dev without
-      real DNS. Real resolver wires up before any external admin uses SSO.
+- [ ] `DNSResolver` interface in `internal/workers/`. Stub impl
+      (`StubDNSResolver`) always returns the expected TXT record, logged at
+      INFO so it's obvious the verification is faked. Real impl deferred
+      until pre-prod SSO go-live.
 
 ### Step 7 — Domain RPC handlers
 
@@ -519,13 +527,26 @@ macOS-first; Windows shell mirrors after.
 - [ ] Re-import `google/iam/v1/iam_policy.proto` for full `GetIamPolicy`/`SetIamPolicy` projection over `members` table — when fine-grain sharing arrives.
 - [ ] `Group` cross-org? Today scoped to single org. Cross-org sharing is a future feature.
 - [ ] Audit log for IAM mutations.
-- [ ] **AI chat permissions model** (deferred). Org/space role matrix doesn't naturally fit AI conversations — they're personal artifacts (prompts, brainstorming, internal monologue), not org-shared content. The current placeholder `ai.conversations.{read,create,update,delete}` granted to editor/admin/owner is wrong: editor/viewer reading other people's chats is a privacy violation. Correct model is creator-owned with org-level escape hatches:
-  - Creator: full CRUD on own conversations
-  - Owner: read (audit) + delete (departed-employee cleanup)
-  - Admin: read (audit), no delete
-  - Editor/viewer: zero access to others' conversations
-  - `ai.chat.stream`: subscription/license gate (separate from conversation access)
-  Implementation requires resource-instance-level authorization (handler checks `created_by == caller`), not just role-based gating. New permissions needed: `ai.conversations.readAll` [owner, admin], `ai.conversations.deleteAll` [owner]. Address when wiring the AI chat interceptor.
+- [ ] **AI chat: re-parent to user + creator-owned permissions model** (deferred). Two coupled changes that ship together:
+
+  **Resource path change:** `organizations/*/conversations/*` → `organizations/*/users/*/conversations/*`. Conversations are personal, not org-shared. Path encodes ownership, the user segment is the parent. Same applies to nested `messages/*`, `artifacts/*`, `artifacts/*/versions/*`. Affects:
+  - `pivox/ai/v1/conversations.proto` — `option (google.api.resource).pattern`, all RPC URL bindings.
+  - `pivox/ai/v1/messages.proto`, `artifacts.proto` — same.
+  - DB: `ai_conversations` already has `created_by` (the user) — no schema change, just a uniqueness constraint check.
+  - Handlers: parse `(org, user, conversation)` from name; reject if path's user segment != caller.
+  - Native macOS client: regenerated stubs + every callsite that builds a conversation path.
+  - Migration: rewrite seeded permission IDs and the test fixtures referencing old path.
+
+  **Permissions model:** Org/space role matrix doesn't fit personal artifacts. Current placeholder `ai.conversations.{read,create,update,delete}` granted to editor/admin/owner is wrong — editor/viewer reading other people's chats is a privacy violation.
+  - Creator: full CRUD on own conversations.
+  - Owner: read (audit) + delete (departed-employee cleanup).
+  - Admin: read (audit), no delete.
+  - Editor/viewer: zero access to others' conversations.
+  - `ai.chat.stream`: subscription/license gate (separate from conversation access).
+  - Resource-instance-level authorization (handler checks `created_by == caller`), not just role-based gating.
+  - New permissions: `ai.conversations.readAll` [owner, admin], `ai.conversations.deleteAll` [owner].
+
+  Address when wiring the AI chat interceptor; both changes land in the same commit since the path change forces every callsite anyway.
 
 ---
 
