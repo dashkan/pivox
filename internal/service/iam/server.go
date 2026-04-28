@@ -154,6 +154,199 @@ func (s *IamServer) TestIamPermissions(ctx context.Context, req *iampb.TestIamPe
 	return &iampb.TestIamPermissionsResponse{Permissions: allowed}, nil
 }
 
+// memberPath captures the parsed pieces of a Member resource name
+// or its parent. `spaceSlug` is empty when the path is org-scoped;
+// `principal*` are zero-valued when parsing a list-parent (no
+// {member} segment).
+type memberPath struct {
+	orgSlug       string
+	spaceSlug     string
+	principalKind db.PrincipalKind
+	principalID   uuid.UUID
+}
+
+// isSpaceScoped reports whether the parsed path targets a space
+// rather than an org. `OrgScope` is the inverse.
+func (p memberPath) isSpaceScoped() bool { return p.spaceSlug != "" }
+
+// parseMemberName parses one of the two Member resource patterns:
+//
+//	organizations/{org}/members/{member}
+//	organizations/{org}/spaces/{space}/members/{member}
+//
+// where `{member}` is `user-{uuid}` or `group-{uuid}`. Reports
+// InvalidArgument on any structural mismatch.
+func parseMemberName(name string) (memberPath, error) {
+	parts := strings.Split(name, "/")
+	switch len(parts) {
+	case 4:
+		// organizations/{org}/members/{member}
+		if parts[0] != "organizations" || parts[2] != "members" || parts[1] == "" || parts[3] == "" {
+			return memberPath{}, invalidMemberName(name)
+		}
+		kind, id, err := parseMemberSegment(parts[3])
+		if err != nil {
+			return memberPath{}, err
+		}
+		return memberPath{orgSlug: parts[1], principalKind: kind, principalID: id}, nil
+	case 6:
+		// organizations/{org}/spaces/{space}/members/{member}
+		if parts[0] != "organizations" || parts[2] != "spaces" || parts[4] != "members" ||
+			parts[1] == "" || parts[3] == "" || parts[5] == "" {
+			return memberPath{}, invalidMemberName(name)
+		}
+		kind, id, err := parseMemberSegment(parts[5])
+		if err != nil {
+			return memberPath{}, err
+		}
+		return memberPath{orgSlug: parts[1], spaceSlug: parts[3], principalKind: kind, principalID: id}, nil
+	default:
+		return memberPath{}, invalidMemberName(name)
+	}
+}
+
+// parseMemberParent parses the parent of a Member listing:
+//
+//	organizations/{org}
+//	organizations/{org}/spaces/{space}
+func parseMemberParent(parent string) (memberPath, error) {
+	parts := strings.Split(parent, "/")
+	switch len(parts) {
+	case 2:
+		if parts[0] != "organizations" || parts[1] == "" {
+			return memberPath{}, invalidMemberParent(parent)
+		}
+		return memberPath{orgSlug: parts[1]}, nil
+	case 4:
+		if parts[0] != "organizations" || parts[2] != "spaces" || parts[1] == "" || parts[3] == "" {
+			return memberPath{}, invalidMemberParent(parent)
+		}
+		return memberPath{orgSlug: parts[1], spaceSlug: parts[3]}, nil
+	default:
+		return memberPath{}, invalidMemberParent(parent)
+	}
+}
+
+// parseMemberSegment splits the typed-prefix `{member}` segment into
+// (principal_kind, principal_id). Returns InvalidArgument if the
+// segment doesn't match `user-{uuid}` or `group-{uuid}`.
+func parseMemberSegment(seg string) (db.PrincipalKind, uuid.UUID, error) {
+	idx := strings.IndexByte(seg, '-')
+	if idx <= 0 || idx == len(seg)-1 {
+		return "", uuid.Nil, apierr.InvalidArgument(apierr.FieldViolation("name",
+			fmt.Sprintf("invalid member segment %q: expected user-{uuid} or group-{uuid}", seg)))
+	}
+	prefix, idStr := seg[:idx], seg[idx+1:]
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		return "", uuid.Nil, apierr.InvalidArgument(apierr.FieldViolation("name",
+			fmt.Sprintf("invalid member uuid %q in segment %q: %v", idStr, seg, err)))
+	}
+	switch prefix {
+	case "user":
+		return db.PrincipalKindUser, id, nil
+	case "group":
+		return db.PrincipalKindGroup, id, nil
+	default:
+		return "", uuid.Nil, apierr.InvalidArgument(apierr.FieldViolation("name",
+			fmt.Sprintf("invalid member prefix %q: expected user or group", prefix)))
+	}
+}
+
+func invalidMemberName(name string) error {
+	return apierr.InvalidArgument(apierr.FieldViolation("name",
+		fmt.Sprintf("invalid member name %q: expected organizations/{org}/members/{member} or organizations/{org}/spaces/{space}/members/{member}", name)))
+}
+
+func invalidMemberParent(parent string) error {
+	return apierr.InvalidArgument(apierr.FieldViolation("parent",
+		fmt.Sprintf("invalid parent %q: expected organizations/{org} or organizations/{org}/spaces/{space}", parent)))
+}
+
+// GetMember resolves a single member binding. Multi-parent: dispatches
+// on whether the parsed path is org-scoped or space-scoped and reads
+// from the appropriate table.
+func (s *IamServer) GetMember(ctx context.Context, req *iampb.GetMemberRequest) (*iampb.Member, error) {
+	path, err := parseMemberName(req.GetName())
+	if err != nil {
+		return nil, err
+	}
+	org, err := s.queries.GetOrganizationByName(ctx, path.orgSlug)
+	if err != nil {
+		return nil, apierr.HandleResourceError(err, "Member", req.GetName())
+	}
+	if path.isSpaceScoped() {
+		space, err := s.queries.GetSpaceByName(ctx, db.GetSpaceByNameParams{
+			OrgID: org.ID,
+			Name:  path.spaceSlug,
+		})
+		if err != nil {
+			return nil, apierr.HandleResourceError(err, "Member", req.GetName())
+		}
+		row, err := s.queries.GetSpaceMember(ctx, db.GetSpaceMemberParams{
+			SpaceID:       space.ID,
+			PrincipalKind: path.principalKind,
+			PrincipalID:   path.principalID,
+		})
+		if err != nil {
+			return nil, apierr.HandleResourceError(err, "Member", req.GetName())
+		}
+		return convert.SpaceMemberRowToProto(row, path.orgSlug, path.spaceSlug), nil
+	}
+	row, err := s.queries.GetOrgMember(ctx, db.GetOrgMemberParams{
+		OrgID:         org.ID,
+		PrincipalKind: path.principalKind,
+		PrincipalID:   path.principalID,
+	})
+	if err != nil {
+		return nil, apierr.HandleResourceError(err, "Member", req.GetName())
+	}
+	return convert.OrgMemberRowToProto(row, path.orgSlug), nil
+}
+
+// ListMembers returns all role bindings at the given scope. v1 returns
+// up to 1000 rows (the SQL LIMIT) without pagination — system-role
+// member counts in normal orgs are far below that ceiling.
+func (s *IamServer) ListMembers(ctx context.Context, req *iampb.ListMembersRequest) (*iampb.ListMembersResponse, error) {
+	path, err := parseMemberParent(req.GetParent())
+	if err != nil {
+		return nil, err
+	}
+	org, err := s.queries.GetOrganizationByName(ctx, path.orgSlug)
+	if err != nil {
+		return nil, apierr.HandleResourceError(err, "Organization", req.GetParent())
+	}
+	if path.isSpaceScoped() {
+		space, err := s.queries.GetSpaceByName(ctx, db.GetSpaceByNameParams{
+			OrgID: org.ID,
+			Name:  path.spaceSlug,
+		})
+		if err != nil {
+			return nil, apierr.HandleResourceError(err, "Space", req.GetParent())
+		}
+		rows, err := s.queries.ListSpaceMembers(ctx, space.ID)
+		if err != nil {
+			slog.ErrorContext(ctx, "iam: list space members failed", "space_id", space.ID, "error", err)
+			return nil, apierr.Internal("list members")
+		}
+		out := make([]*iampb.Member, len(rows))
+		for i, r := range rows {
+			out[i] = convert.SpaceMemberToProto(r, path.orgSlug, path.spaceSlug)
+		}
+		return &iampb.ListMembersResponse{Members: out}, nil
+	}
+	rows, err := s.queries.ListOrgMembers(ctx, org.ID)
+	if err != nil {
+		slog.ErrorContext(ctx, "iam: list org members failed", "org_id", org.ID, "error", err)
+		return nil, apierr.Internal("list members")
+	}
+	out := make([]*iampb.Member, len(rows))
+	for i, r := range rows {
+		out[i] = convert.OrgMemberToProto(r, path.orgSlug)
+	}
+	return &iampb.ListMembersResponse{Members: out}, nil
+}
+
 // parseRoleName splits `organizations/{org}/roles/{role}` into
 // (orgSlug, roleName). Reports InvalidArgument on shape mismatch.
 func parseRoleName(name string) (orgSlug, roleName string, err error) {

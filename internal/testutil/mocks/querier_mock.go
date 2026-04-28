@@ -975,3 +975,31 @@ func (m *MockQuerier) GetPermission(ctx context.Context, permissionID string) (d
 	args := m.Called(ctx, permissionID)
 	return args.Get(0).(db.Permission), args.Error(1)
 }
+
+// --- Member reads (org_members + space_members joined with roles) ---
+
+func (m *MockQuerier) GetOrgMember(ctx context.Context, arg db.GetOrgMemberParams) (db.GetOrgMemberRow, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.GetOrgMemberRow), args.Error(1)
+}
+
+func (m *MockQuerier) ListOrgMembers(ctx context.Context, orgID uuid.UUID) ([]db.ListOrgMembersRow, error) {
+	args := m.Called(ctx, orgID)
+	if v := args.Get(0); v != nil {
+		return v.([]db.ListOrgMembersRow), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockQuerier) GetSpaceMember(ctx context.Context, arg db.GetSpaceMemberParams) (db.GetSpaceMemberRow, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.GetSpaceMemberRow), args.Error(1)
+}
+
+func (m *MockQuerier) ListSpaceMembers(ctx context.Context, spaceID uuid.UUID) ([]db.ListSpaceMembersRow, error) {
+	args := m.Called(ctx, spaceID)
+	if v := args.Get(0); v != nil {
+		return v.([]db.ListSpaceMembersRow), args.Error(1)
+	}
+	return nil, args.Error(1)
+}

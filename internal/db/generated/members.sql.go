@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -173,6 +174,114 @@ func (q *Queries) GetEffectiveSpaceRoles(ctx context.Context, arg GetEffectiveSp
 	return items, nil
 }
 
+const getOrgMember = `-- name: GetOrgMember :one
+SELECT om.id, om.org_id, om.role_id, om.principal_kind, om.principal_id, om.etag, om.revision, om.created_by, om.updated_by, om.create_time, om.update_time, r.name AS role_name
+  FROM org_members om
+  JOIN roles r ON r.id = om.role_id
+ WHERE om.org_id = $1
+   AND om.principal_kind = $2
+   AND om.principal_id = $3
+`
+
+type GetOrgMemberParams struct {
+	OrgID         uuid.UUID     `json:"org_id"`
+	PrincipalKind PrincipalKind `json:"principal_kind"`
+	PrincipalID   uuid.UUID     `json:"principal_id"`
+}
+
+type GetOrgMemberRow struct {
+	ID            uuid.UUID     `json:"id"`
+	OrgID         uuid.UUID     `json:"org_id"`
+	RoleID        uuid.UUID     `json:"role_id"`
+	PrincipalKind PrincipalKind `json:"principal_kind"`
+	PrincipalID   uuid.UUID     `json:"principal_id"`
+	Etag          string        `json:"etag"`
+	Revision      int32         `json:"revision"`
+	CreatedBy     string        `json:"created_by"`
+	UpdatedBy     string        `json:"updated_by"`
+	CreateTime    time.Time     `json:"create_time"`
+	UpdateTime    time.Time     `json:"update_time"`
+	RoleName      string        `json:"role_name"`
+}
+
+// Looks up a single org-scope role binding by (org, principal). Joins
+// to roles so the caller has the role name without a second query;
+// handlers convert this row directly to the Member proto's
+// `name = organizations/{org}/members/{member}` shape.
+func (q *Queries) GetOrgMember(ctx context.Context, arg GetOrgMemberParams) (GetOrgMemberRow, error) {
+	row := q.db.QueryRow(ctx, getOrgMember, arg.OrgID, arg.PrincipalKind, arg.PrincipalID)
+	var i GetOrgMemberRow
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.RoleID,
+		&i.PrincipalKind,
+		&i.PrincipalID,
+		&i.Etag,
+		&i.Revision,
+		&i.CreatedBy,
+		&i.UpdatedBy,
+		&i.CreateTime,
+		&i.UpdateTime,
+		&i.RoleName,
+	)
+	return i, err
+}
+
+const getSpaceMember = `-- name: GetSpaceMember :one
+SELECT sm.id, sm.space_id, sm.role_id, sm.principal_kind, sm.principal_id, sm.etag, sm.revision, sm.created_by, sm.updated_by, sm.create_time, sm.update_time, r.name AS role_name
+  FROM space_members sm
+  JOIN roles r ON r.id = sm.role_id
+ WHERE sm.space_id = $1
+   AND sm.principal_kind = $2
+   AND sm.principal_id = $3
+`
+
+type GetSpaceMemberParams struct {
+	SpaceID       uuid.UUID     `json:"space_id"`
+	PrincipalKind PrincipalKind `json:"principal_kind"`
+	PrincipalID   uuid.UUID     `json:"principal_id"`
+}
+
+type GetSpaceMemberRow struct {
+	ID            uuid.UUID     `json:"id"`
+	SpaceID       uuid.UUID     `json:"space_id"`
+	RoleID        uuid.UUID     `json:"role_id"`
+	PrincipalKind PrincipalKind `json:"principal_kind"`
+	PrincipalID   uuid.UUID     `json:"principal_id"`
+	Etag          string        `json:"etag"`
+	Revision      int32         `json:"revision"`
+	CreatedBy     string        `json:"created_by"`
+	UpdatedBy     string        `json:"updated_by"`
+	CreateTime    time.Time     `json:"create_time"`
+	UpdateTime    time.Time     `json:"update_time"`
+	RoleName      string        `json:"role_name"`
+}
+
+// Companion to GetOrgMember at space scope. Note: this returns ONLY
+// direct space-level bindings; org-level inheritance (an org-admin
+// being implicitly a space-admin) is computed at the resolver layer,
+// not surfaced as a Member resource at the space scope.
+func (q *Queries) GetSpaceMember(ctx context.Context, arg GetSpaceMemberParams) (GetSpaceMemberRow, error) {
+	row := q.db.QueryRow(ctx, getSpaceMember, arg.SpaceID, arg.PrincipalKind, arg.PrincipalID)
+	var i GetSpaceMemberRow
+	err := row.Scan(
+		&i.ID,
+		&i.SpaceID,
+		&i.RoleID,
+		&i.PrincipalKind,
+		&i.PrincipalID,
+		&i.Etag,
+		&i.Revision,
+		&i.CreatedBy,
+		&i.UpdatedBy,
+		&i.CreateTime,
+		&i.UpdateTime,
+		&i.RoleName,
+	)
+	return i, err
+}
+
 const getSpaceParentOrg = `-- name: GetSpaceParentOrg :one
 SELECT org_id FROM spaces WHERE id = $1 AND delete_time IS NULL
 `
@@ -185,4 +294,124 @@ func (q *Queries) GetSpaceParentOrg(ctx context.Context, id uuid.UUID) (uuid.UUI
 	var org_id uuid.UUID
 	err := row.Scan(&org_id)
 	return org_id, err
+}
+
+const listOrgMembers = `-- name: ListOrgMembers :many
+SELECT om.id, om.org_id, om.role_id, om.principal_kind, om.principal_id, om.etag, om.revision, om.created_by, om.updated_by, om.create_time, om.update_time, r.name AS role_name
+  FROM org_members om
+  JOIN roles r ON r.id = om.role_id
+ WHERE om.org_id = $1
+ ORDER BY om.create_time, om.id
+ LIMIT 1000
+`
+
+type ListOrgMembersRow struct {
+	ID            uuid.UUID     `json:"id"`
+	OrgID         uuid.UUID     `json:"org_id"`
+	RoleID        uuid.UUID     `json:"role_id"`
+	PrincipalKind PrincipalKind `json:"principal_kind"`
+	PrincipalID   uuid.UUID     `json:"principal_id"`
+	Etag          string        `json:"etag"`
+	Revision      int32         `json:"revision"`
+	CreatedBy     string        `json:"created_by"`
+	UpdatedBy     string        `json:"updated_by"`
+	CreateTime    time.Time     `json:"create_time"`
+	UpdateTime    time.Time     `json:"update_time"`
+	RoleName      string        `json:"role_name"`
+}
+
+// Lists all org-scope role bindings for an org. Ordered by create_time
+// so paging by row position is stable. v1 caps the result at 1000 in
+// the handler since system-role member counts in normal orgs are far
+// below that; cursor-based paging is added when needed.
+func (q *Queries) ListOrgMembers(ctx context.Context, orgID uuid.UUID) ([]ListOrgMembersRow, error) {
+	rows, err := q.db.Query(ctx, listOrgMembers, orgID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListOrgMembersRow{}
+	for rows.Next() {
+		var i ListOrgMembersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.RoleID,
+			&i.PrincipalKind,
+			&i.PrincipalID,
+			&i.Etag,
+			&i.Revision,
+			&i.CreatedBy,
+			&i.UpdatedBy,
+			&i.CreateTime,
+			&i.UpdateTime,
+			&i.RoleName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSpaceMembers = `-- name: ListSpaceMembers :many
+SELECT sm.id, sm.space_id, sm.role_id, sm.principal_kind, sm.principal_id, sm.etag, sm.revision, sm.created_by, sm.updated_by, sm.create_time, sm.update_time, r.name AS role_name
+  FROM space_members sm
+  JOIN roles r ON r.id = sm.role_id
+ WHERE sm.space_id = $1
+ ORDER BY sm.create_time, sm.id
+ LIMIT 1000
+`
+
+type ListSpaceMembersRow struct {
+	ID            uuid.UUID     `json:"id"`
+	SpaceID       uuid.UUID     `json:"space_id"`
+	RoleID        uuid.UUID     `json:"role_id"`
+	PrincipalKind PrincipalKind `json:"principal_kind"`
+	PrincipalID   uuid.UUID     `json:"principal_id"`
+	Etag          string        `json:"etag"`
+	Revision      int32         `json:"revision"`
+	CreatedBy     string        `json:"created_by"`
+	UpdatedBy     string        `json:"updated_by"`
+	CreateTime    time.Time     `json:"create_time"`
+	UpdateTime    time.Time     `json:"update_time"`
+	RoleName      string        `json:"role_name"`
+}
+
+// Companion to ListOrgMembers at space scope. Same direct-only
+// semantic as GetSpaceMember.
+func (q *Queries) ListSpaceMembers(ctx context.Context, spaceID uuid.UUID) ([]ListSpaceMembersRow, error) {
+	rows, err := q.db.Query(ctx, listSpaceMembers, spaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSpaceMembersRow{}
+	for rows.Next() {
+		var i ListSpaceMembersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.SpaceID,
+			&i.RoleID,
+			&i.PrincipalKind,
+			&i.PrincipalID,
+			&i.Etag,
+			&i.Revision,
+			&i.CreatedBy,
+			&i.UpdatedBy,
+			&i.CreateTime,
+			&i.UpdateTime,
+			&i.RoleName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

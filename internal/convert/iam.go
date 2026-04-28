@@ -20,6 +20,71 @@ func PermissionToProto(p db.Permission) *iampb.Permission {
 	}
 }
 
+// OrgMemberToProto converts a joined org_members row (member columns
+// plus the joined role.name) to the unified Member proto. The proto's
+// resource name encodes the principal as `user-{uuid}` or
+// `group-{uuid}` — uniqueness-by-construction means at most one
+// Member per (scope, principal). Caller passes the org slug; the
+// converter does NOT re-resolve it.
+func OrgMemberToProto(m db.ListOrgMembersRow, orgSlug string) *iampb.Member {
+	pb := &iampb.Member{
+		Name:       fmt.Sprintf("organizations/%s/members/%s-%s", orgSlug, m.PrincipalKind, m.PrincipalID),
+		Role:       fmt.Sprintf("organizations/%s/roles/%s", orgSlug, m.RoleName),
+		Etag:       m.Etag,
+		CreateTime: timestamppb.New(m.CreateTime),
+		UpdateTime: timestamppb.New(m.UpdateTime),
+	}
+	switch m.PrincipalKind {
+	case db.PrincipalKindUser:
+		pb.Principal = &iampb.Member_User{
+			User: fmt.Sprintf("organizations/%s/users/%s", orgSlug, m.PrincipalID),
+		}
+	case db.PrincipalKindGroup:
+		pb.Principal = &iampb.Member_Group{
+			Group: fmt.Sprintf("organizations/%s/groups/%s", orgSlug, m.PrincipalID),
+		}
+	}
+	return pb
+}
+
+// OrgMemberRowToProto is the GetOrgMember equivalent of
+// OrgMemberToProto; sqlc generates separate row types for :one vs
+// :many even when the SELECT clauses match, so we provide both
+// converters as thin wrappers.
+func OrgMemberRowToProto(m db.GetOrgMemberRow, orgSlug string) *iampb.Member {
+	return OrgMemberToProto(db.ListOrgMembersRow(m), orgSlug)
+}
+
+// SpaceMemberToProto converts a joined space_members row to the
+// unified Member proto at space scope. The resource name nests under
+// the space: `organizations/{org}/spaces/{space}/members/{member}`.
+// Caller passes both org and space slugs.
+func SpaceMemberToProto(m db.ListSpaceMembersRow, orgSlug, spaceSlug string) *iampb.Member {
+	pb := &iampb.Member{
+		Name:       fmt.Sprintf("organizations/%s/spaces/%s/members/%s-%s", orgSlug, spaceSlug, m.PrincipalKind, m.PrincipalID),
+		Role:       fmt.Sprintf("organizations/%s/roles/%s", orgSlug, m.RoleName),
+		Etag:       m.Etag,
+		CreateTime: timestamppb.New(m.CreateTime),
+		UpdateTime: timestamppb.New(m.UpdateTime),
+	}
+	switch m.PrincipalKind {
+	case db.PrincipalKindUser:
+		pb.Principal = &iampb.Member_User{
+			User: fmt.Sprintf("organizations/%s/users/%s", orgSlug, m.PrincipalID),
+		}
+	case db.PrincipalKindGroup:
+		pb.Principal = &iampb.Member_Group{
+			Group: fmt.Sprintf("organizations/%s/groups/%s", orgSlug, m.PrincipalID),
+		}
+	}
+	return pb
+}
+
+// SpaceMemberRowToProto mirrors OrgMemberRowToProto for space scope.
+func SpaceMemberRowToProto(m db.GetSpaceMemberRow, orgSlug, spaceSlug string) *iampb.Member {
+	return SpaceMemberToProto(db.ListSpaceMembersRow(m), orgSlug, spaceSlug)
+}
+
 // RoleToProto converts a DB role row to its wire shape. `orgName` is
 // the organization slug — the proto's resource name format is
 // `organizations/{org}/roles/{role}` and we already have the slug at

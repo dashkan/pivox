@@ -159,6 +159,11 @@ type Querier interface {
 	GetMessageByName(ctx context.Context, arg GetMessageByNameParams) (AiMessage, error)
 	GetNextSequenceForConversation(ctx context.Context, conversationID uuid.UUID) (int32, error)
 	GetOperation(ctx context.Context, id uuid.UUID) (Operation, error)
+	// Looks up a single org-scope role binding by (org, principal). Joins
+	// to roles so the caller has the role name without a second query;
+	// handlers convert this row directly to the Member proto's
+	// `name = organizations/{org}/members/{member}` shape.
+	GetOrgMember(ctx context.Context, arg GetOrgMemberParams) (GetOrgMemberRow, error)
 	GetOrganization(ctx context.Context, id uuid.UUID) (Organization, error)
 	GetOrganizationByName(ctx context.Context, name string) (Organization, error)
 	// Looks up a permission by its string id (e.g. 'organizations.delete').
@@ -171,6 +176,11 @@ type Querier interface {
 	GetSpace(ctx context.Context, id uuid.UUID) (Space, error)
 	GetSpaceByName(ctx context.Context, arg GetSpaceByNameParams) (Space, error)
 	GetSpaceIncludingDeleted(ctx context.Context, id uuid.UUID) (Space, error)
+	// Companion to GetOrgMember at space scope. Note: this returns ONLY
+	// direct space-level bindings; org-level inheritance (an org-admin
+	// being implicitly a space-admin) is computed at the resolver layer,
+	// not surfaced as a Member resource at the space scope.
+	GetSpaceMember(ctx context.Context, arg GetSpaceMemberParams) (GetSpaceMemberRow, error)
 	// Resolves a space's parent org_id. Used by the permission resolver
 	// when a space-scoped permission check needs to fold in org-level
 	// inheritance.
@@ -206,6 +216,11 @@ type Querier interface {
 	// Caller walks rows accumulating token_count and stops when budget is exceeded.
 	ListMessagesNewestFirst(ctx context.Context, arg ListMessagesNewestFirstParams) ([]AiMessage, error)
 	ListOperations(ctx context.Context, arg ListOperationsParams) ([]Operation, error)
+	// Lists all org-scope role bindings for an org. Ordered by create_time
+	// so paging by row position is stable. v1 caps the result at 1000 in
+	// the handler since system-role member counts in normal orgs are far
+	// below that; cursor-based paging is added when needed.
+	ListOrgMembers(ctx context.Context, orgID uuid.UUID) ([]ListOrgMembersRow, error)
 	// Lists all organizations the given firebase_identity has membership in.
 	// Caller-scoped for `ListOrganizations`: every authenticated user is
 	// only ever shown orgs they belong to. Excludes soft-deleted orgs and
@@ -222,6 +237,9 @@ type Querier interface {
 	ListPermissions(ctx context.Context) ([]Permission, error)
 	ListRequestsBySpace(ctx context.Context, arg ListRequestsBySpaceParams) ([]AssetRequest, error)
 	ListRolesByOrg(ctx context.Context, orgID uuid.UUID) ([]Role, error)
+	// Companion to ListOrgMembers at space scope. Same direct-only
+	// semantic as GetSpaceMember.
+	ListSpaceMembers(ctx context.Context, spaceID uuid.UUID) ([]ListSpaceMembersRow, error)
 	ListStorageAgentAuditByAgent(ctx context.Context, arg ListStorageAgentAuditByAgentParams) ([]StorageAgentAudit, error)
 	ListStorageAgentAuditByGateway(ctx context.Context, arg ListStorageAgentAuditByGatewayParams) ([]StorageAgentAudit, error)
 	ListStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageAgent, error)

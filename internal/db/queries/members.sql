@@ -78,6 +78,52 @@ SELECT DISTINCT r.name
       ))
    );
 
+-- name: GetOrgMember :one
+-- Looks up a single org-scope role binding by (org, principal). Joins
+-- to roles so the caller has the role name without a second query;
+-- handlers convert this row directly to the Member proto's
+-- `name = organizations/{org}/members/{member}` shape.
+SELECT om.*, r.name AS role_name
+  FROM org_members om
+  JOIN roles r ON r.id = om.role_id
+ WHERE om.org_id = $1
+   AND om.principal_kind = $2
+   AND om.principal_id = $3;
+
+-- name: ListOrgMembers :many
+-- Lists all org-scope role bindings for an org. Ordered by create_time
+-- so paging by row position is stable. v1 caps the result at 1000 in
+-- the handler since system-role member counts in normal orgs are far
+-- below that; cursor-based paging is added when needed.
+SELECT om.*, r.name AS role_name
+  FROM org_members om
+  JOIN roles r ON r.id = om.role_id
+ WHERE om.org_id = $1
+ ORDER BY om.create_time, om.id
+ LIMIT 1000;
+
+-- name: GetSpaceMember :one
+-- Companion to GetOrgMember at space scope. Note: this returns ONLY
+-- direct space-level bindings; org-level inheritance (an org-admin
+-- being implicitly a space-admin) is computed at the resolver layer,
+-- not surfaced as a Member resource at the space scope.
+SELECT sm.*, r.name AS role_name
+  FROM space_members sm
+  JOIN roles r ON r.id = sm.role_id
+ WHERE sm.space_id = $1
+   AND sm.principal_kind = $2
+   AND sm.principal_id = $3;
+
+-- name: ListSpaceMembers :many
+-- Companion to ListOrgMembers at space scope. Same direct-only
+-- semantic as GetSpaceMember.
+SELECT sm.*, r.name AS role_name
+  FROM space_members sm
+  JOIN roles r ON r.id = sm.role_id
+ WHERE sm.space_id = $1
+ ORDER BY sm.create_time, sm.id
+ LIMIT 1000;
+
 -- name: CreateOrgMember :exec
 -- Inserts an org-level role binding. Caller assigns the id; the
 -- schema's `uuidv7()` default applies only when omitted, but we
