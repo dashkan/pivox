@@ -766,12 +766,14 @@ INSERT INTO permissions (permission_id, display_name, description) VALUES
   -- Group management
   ('groups.create', 'Create Group', 'Create new groups'),
   ('groups.get', 'Get Group', 'View group details'),
+  ('groups.list', 'List Groups', 'List groups in the organization'),
   ('groups.update', 'Update Group', 'Modify groups'),
   ('groups.delete', 'Delete Group', 'Delete groups'),
   ('groups.manageMembers', 'Manage Group Members', 'Add/remove group members'),
   -- Role management
   ('roles.create', 'Create Role', 'Create custom roles'),
   ('roles.get', 'Get Role', 'View role details'),
+  ('roles.list', 'List Roles', 'List roles in the organization'),
   ('roles.update', 'Update Role', 'Modify custom roles'),
   ('roles.delete', 'Delete Role', 'Delete custom roles'),
   ('roles.manageMembers', 'Manage Role Members', 'Add/remove role members'),

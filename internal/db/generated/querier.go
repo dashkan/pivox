@@ -118,6 +118,28 @@ type Querier interface {
 	// Returns the state of a session without mutating it. Used by pollers to
 	// distinguish "still pending" from "expired/unknown" after a failed consume.
 	GetDelegatedAuthSessionState(ctx context.Context, code uuid.UUID) (DelegatedAuthSessionState, error)
+	// Returns the system-role names a Firebase identity has at the given
+	// org, considering both direct user bindings and group-derived
+	// bindings (groups the user is a member of, which themselves have
+	// org_members rows). Custom roles are excluded — v1 only resolves
+	// against the system-role permission matrix.
+	//
+	// Used by the permission resolver as the org-scope half of effective-
+	// role resolution. Space-scope inheritance is handled at the resolver
+	// layer by unioning this with `GetEffectiveSpaceRoles`.
+	//
+	// Returns the empty set if the firebase_identity has no live user row
+	// in the org (caller is not a member, or membership was soft-deleted).
+	GetEffectiveOrgRoles(ctx context.Context, arg GetEffectiveOrgRolesParams) ([]string, error)
+	// Returns the system-role names a Firebase identity has at the given
+	// space — direct + group-derived space-level bindings only. Org-level
+	// inheritance (an org-admin is also a space-admin) is the resolver's
+	// responsibility to union in via GetEffectiveOrgRoles against the
+	// space's parent org.
+	//
+	// Returns the empty set if the firebase_identity has no live user row
+	// in the org that owns this space.
+	GetEffectiveSpaceRoles(ctx context.Context, arg GetEffectiveSpaceRolesParams) ([]string, error)
 	GetFirebaseIdentityByUID(ctx context.Context, firebaseUid string) (FirebaseIdentity, error)
 	GetLatestAssetVersion(ctx context.Context, assetID uuid.UUID) (AssetVersion, error)
 	GetLineItem(ctx context.Context, id uuid.UUID) (AssetRequestLineItem, error)
@@ -132,6 +154,10 @@ type Querier interface {
 	GetSpace(ctx context.Context, id uuid.UUID) (Space, error)
 	GetSpaceByName(ctx context.Context, arg GetSpaceByNameParams) (Space, error)
 	GetSpaceIncludingDeleted(ctx context.Context, id uuid.UUID) (Space, error)
+	// Resolves a space's parent org_id. Used by the permission resolver
+	// when a space-scoped permission check needs to fold in org-level
+	// inheritance.
+	GetSpaceParentOrg(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
 	GetStorageAgent(ctx context.Context, id uuid.UUID) (StorageAgent, error)
 	GetStorageAgentByGatewayAndIP(ctx context.Context, arg GetStorageAgentByGatewayAndIPParams) (StorageAgent, error)
 	GetStorageEndpoint(ctx context.Context, id uuid.UUID) (StorageEndpoint, error)

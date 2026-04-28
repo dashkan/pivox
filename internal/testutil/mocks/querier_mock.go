@@ -905,3 +905,26 @@ func (m *MockQuerier) IsOnlyArtifactVersion(ctx context.Context, artifactID uuid
 	args := m.Called(ctx, artifactID)
 	return args.Bool(0), args.Error(1)
 }
+
+// --- Members (org_members / space_members / group expansion) ---
+
+func (m *MockQuerier) GetEffectiveOrgRoles(ctx context.Context, arg db.GetEffectiveOrgRolesParams) ([]string, error) {
+	args := m.Called(ctx, arg)
+	if v := args.Get(0); v != nil {
+		return v.([]string), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockQuerier) GetEffectiveSpaceRoles(ctx context.Context, arg db.GetEffectiveSpaceRolesParams) ([]string, error) {
+	args := m.Called(ctx, arg)
+	if v := args.Get(0); v != nil {
+		return v.([]string), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockQuerier) GetSpaceParentOrg(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
+	args := m.Called(ctx, id)
+	return args.Get(0).(uuid.UUID), args.Error(1)
+}
