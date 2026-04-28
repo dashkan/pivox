@@ -48,7 +48,7 @@ var (
 
 func TestUnit_GetSpace_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewSpacesServer(nil, mockQ, nil)
+	srv := NewSpacesServer(nil, mockQ, nil, nil, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
@@ -72,7 +72,7 @@ func TestUnit_GetSpace_Success(t *testing.T) {
 
 func TestUnit_GetSpace_InvalidName(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewSpacesServer(nil, mockQ, nil)
+	srv := NewSpacesServer(nil, mockQ, nil, nil, nil)
 	ctx := context.Background()
 
 	_, err := srv.GetSpace(ctx, &apiv1.GetSpaceRequest{
@@ -87,7 +87,7 @@ func TestUnit_GetSpace_InvalidName(t *testing.T) {
 
 func TestUnit_GetSpace_NotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewSpacesServer(nil, mockQ, nil)
+	srv := NewSpacesServer(nil, mockQ, nil, nil, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
@@ -108,7 +108,7 @@ func TestUnit_GetSpace_NotFound(t *testing.T) {
 
 func TestUnit_CreateSpace_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewSpacesServer(nil, mockQ, nil)
+	srv := NewSpacesServer(nil, mockQ, nil, nil, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
@@ -140,7 +140,7 @@ func TestUnit_CreateSpace_Success(t *testing.T) {
 
 func TestUnit_CreateSpace_InvalidParent(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewSpacesServer(nil, mockQ, nil)
+	srv := NewSpacesServer(nil, mockQ, nil, nil, nil)
 	ctx := context.Background()
 
 	_, err := srv.CreateSpace(ctx, &apiv1.CreateSpaceRequest{
@@ -156,7 +156,7 @@ func TestUnit_CreateSpace_InvalidParent(t *testing.T) {
 
 func TestUnit_UpdateSpace_WithFieldMask(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewSpacesServer(nil, mockQ, nil)
+	srv := NewSpacesServer(nil, mockQ, nil, nil, nil)
 	ctx := context.Background()
 
 	updatedSpace := testDBSpace
@@ -191,7 +191,7 @@ func TestUnit_UpdateSpace_WithFieldMask(t *testing.T) {
 
 func TestUnit_DeleteSpace_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewSpacesServer(nil, mockQ, nil)
+	srv := NewSpacesServer(nil, mockQ, nil, nil, nil)
 	ctx := context.Background()
 
 	deletedSpace := testDBSpace
@@ -219,7 +219,7 @@ func TestUnit_DeleteSpace_Success(t *testing.T) {
 
 func TestUnit_UpdateSpace_NoMask(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewSpacesServer(nil, mockQ, nil)
+	srv := NewSpacesServer(nil, mockQ, nil, nil, nil)
 	ctx := context.Background()
 
 	updatedSpace := testDBSpace
@@ -252,7 +252,7 @@ func TestUnit_UpdateSpace_NoMask(t *testing.T) {
 
 func TestUnit_UndeleteSpace_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewSpacesServer(nil, mockQ, nil)
+	srv := NewSpacesServer(nil, mockQ, nil, nil, nil)
 	ctx := context.Background()
 
 	undeletedSpace := testDBSpace
@@ -348,7 +348,7 @@ func TestUnit_UpdateSpace_ErrorPaths(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
 			tc.setupMocks(mockQ)
-			srv := NewSpacesServer(nil, mockQ, nil)
+			srv := NewSpacesServer(nil, mockQ, nil, nil, nil)
 
 			_, err := srv.UpdateSpace(ctx, tc.req)
 
@@ -421,7 +421,7 @@ func TestUnit_DeleteSpace_ErrorPaths(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
 			tc.setupMocks(mockQ)
-			srv := NewSpacesServer(nil, mockQ, nil)
+			srv := NewSpacesServer(nil, mockQ, nil, nil, nil)
 
 			_, err := srv.DeleteSpace(ctx, tc.req)
 
@@ -494,7 +494,7 @@ func TestUnit_UndeleteSpace_ErrorPaths(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
 			tc.setupMocks(mockQ)
-			srv := NewSpacesServer(nil, mockQ, nil)
+			srv := NewSpacesServer(nil, mockQ, nil, nil, nil)
 
 			_, err := srv.UndeleteSpace(ctx, tc.req)
 
@@ -537,7 +537,7 @@ func TestUnit_ListSpaces_InvalidParent(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
 			tc.setupMocks(mockQ)
-			srv := NewSpacesServer(nil, mockQ, nil)
+			srv := NewSpacesServer(nil, mockQ, nil, nil, nil)
 
 			_, err := srv.ListSpaces(ctx, tc.req)
 
@@ -552,7 +552,7 @@ func TestUnit_ListSpaces_InvalidParent(t *testing.T) {
 
 func TestUnit_UpdateSpace_LabelsMask(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewSpacesServer(nil, mockQ, nil)
+	srv := NewSpacesServer(nil, mockQ, nil, nil, nil)
 	ctx := context.Background()
 
 	updatedSpace := testDBSpace
@@ -584,7 +584,7 @@ func TestUnit_UpdateSpace_LabelsMask(t *testing.T) {
 
 func TestUnit_UpdateSpace_NoMaskWithLabels(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewSpacesServer(nil, mockQ, nil)
+	srv := NewSpacesServer(nil, mockQ, nil, nil, nil)
 	ctx := context.Background()
 
 	updatedSpace := testDBSpace
@@ -614,7 +614,7 @@ func TestUnit_UpdateSpace_NoMaskWithLabels(t *testing.T) {
 
 func TestUnit_GetSpace_OrgNotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewSpacesServer(nil, mockQ, nil)
+	srv := NewSpacesServer(nil, mockQ, nil, nil, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "unknown-org").
@@ -633,7 +633,7 @@ func TestUnit_GetSpace_OrgNotFound(t *testing.T) {
 
 func TestUnit_CreateSpace_AutoGeneratedID(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewSpacesServer(nil, mockQ, nil)
+	srv := NewSpacesServer(nil, mockQ, nil, nil, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
@@ -663,7 +663,7 @@ func TestUnit_CreateSpace_AutoGeneratedID(t *testing.T) {
 
 func TestUnit_CreateSpace_DBError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewSpacesServer(nil, mockQ, nil)
+	srv := NewSpacesServer(nil, mockQ, nil, nil, nil)
 	ctx := context.Background()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)

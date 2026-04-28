@@ -842,6 +842,271 @@
         ]
       }
     },
+    "/v1/organizations/{organization}/members": {
+      "get": {
+        "summary": "Lists org-scope Members.",
+        "operationId": "Organizations_ListMembers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListMembersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Optional. Maximum number of members to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. Page token from a previous ListMembers call.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "filter",
+            "description": "Optional. An expression for filtering the results of the request.\nFilterable fields:\n\n+ `role` — exact match on a role resource name.\n+ `principal_kind` — `user` or `group`.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "description": "Optional. A comma-separated list of fields to order by. Supported\nfields: `createTime`, `role`. Default: `createTime` ascending.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      },
+      "post": {
+        "summary": "Creates an org-scope Member binding. The principal (user or group)\nmust already exist in the organization. The role must be one of\nthe system roles (`owner`, `admin`, `editor`, `viewer`).",
+        "operationId": "Organizations_CreateMember",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Member"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "member",
+            "description": "Required. The Member to create. The `principal` oneof must be set\nand `role` must reference an existing system role.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1Member"
+            }
+          },
+          {
+            "name": "memberId",
+            "description": "Optional. A client-specified member ID. If provided, must be\n`user-{user_id}` or `group-{group_id}` and must agree with the\n`principal` oneof. If omitted, the server derives it from\n`member.principal`.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/members/{member}": {
+      "get": {
+        "summary": "Gets an org-scope Member by resource name.",
+        "operationId": "Organizations_GetMember",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Member"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "member",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      },
+      "delete": {
+        "summary": "Deletes an org-scope Member binding. Refuses to delete the last\nowner — use TransferOwnership first or promote a co-owner.",
+        "operationId": "Organizations_DeleteMember",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "member",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "etag",
+            "description": "Optional. The etag known to the client for optimistic concurrency.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      },
+      "patch": {
+        "summary": "Updates an org-scope Member's role. Only `role` is mutable.\nRefuses to demote the last owner — use TransferOwnership instead.",
+        "operationId": "Organizations_UpdateMember",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Member"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "member",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "member",
+            "description": "A Member binds a principal (user or group) to a role at a scope\n(organization or space). The single source of truth for \"who has\nwhat role where.\"\n\nRequired. The Member with updated fields. The `name` field must\nidentify the existing member.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "user": {
+                  "type": "string",
+                  "description": "The user principal. Format: `organizations/{organization}/users/{user}`."
+                },
+                "group": {
+                  "type": "string",
+                  "description": "The group principal. Format: `organizations/{organization}/groups/{group}`."
+                },
+                "role": {
+                  "type": "string",
+                  "description": "Required. Reference to the role this principal holds at this scope.\nFormat: `organizations/{organization}/roles/{role}`. v1 accepts only\nsystem roles (`owner`, `admin`, `editor`, `viewer`)."
+                },
+                "createTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when this binding was created.",
+                  "readOnly": true
+                },
+                "updateTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when this binding was last modified.",
+                  "readOnly": true
+                },
+                "etag": {
+                  "type": "string",
+                  "description": "Output only. A checksum computed by the server based on the current\nvalue of the Member resource. Sent on update and delete requests for\noptimistic concurrency control.",
+                  "readOnly": true
+                }
+              },
+              "description": "Required. The Member with updated fields. The `name` field must\nidentify the existing member.",
+              "title": "A Member binds a principal (user or group) to a role at a scope\n(organization or space). The single source of truth for \"who has\nwhat role where.\"",
+              "required": [
+                "role"
+              ]
+            }
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
     "/v1/organizations/{organization}/ssoConfig": {
       "get": {
         "summary": "Gets the SSO configuration for an organization. Returns the\nSsoConfig singleton at `organizations/{org}/ssoConfig`. If no\nconfig has been set, returns NOT_FOUND.",
@@ -955,6 +1220,84 @@
         ]
       }
     },
+    "/v1/organizations/{organization}:testIamPermissions": {
+      "post": {
+        "summary": "Returns the subset of requested permissions the caller is allowed\non the organization. UI clients use this to gate buttons and\nmenus. Empty list (not an error) for callers with no role\nbindings on the org.",
+        "operationId": "Organizations_TestIamPermissions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1TestIamPermissionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1OrganizationsTestIamPermissionsBody"
+            }
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}:transferOwnership": {
+      "post": {
+        "summary": "Atomically promotes a user to `owner` and demotes the previous\nsole owner to `admin` of the organization. Both updates run in a\nsingle transaction so the org never has zero owners. Returns\nFAILED_PRECONDITION when the org already has multiple owners\n(use UpdateMember + CreateMember instead) or when the new owner\nis already an owner.",
+        "operationId": "Organizations_TransferOwnership",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1TransferOwnershipResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/OrganizationsTransferOwnershipBody"
+            }
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
     "/v1/organizations/{organization}:undelete": {
       "post": {
         "summary": "Restores a soft-deleted organization (`DELETE_REQUESTED` state)\nback to `ACTIVE`, clearing `delete_time` and `purge_time`. Only\ncallable during the 30-day grace window before purge. After\npurge there is no way back.",
@@ -1018,6 +1361,23 @@
     "OrganizationsDeclineInvitationBody": {
       "type": "object",
       "description": "Request message for `DeclineInvitation`."
+    },
+    "OrganizationsTransferOwnershipBody": {
+      "type": "object",
+      "properties": {
+        "newOwner": {
+          "type": "string",
+          "description": "Required. The user receiving owner role.\nFormat: `organizations/{organization}/users/{user}`. Must be an\nexisting member of the org and not already an owner."
+        },
+        "etag": {
+          "type": "string",
+          "description": "Optional. Etag of the organization for optimistic concurrency."
+        }
+      },
+      "description": "Request message for `Organizations.TransferOwnership`.",
+      "required": [
+        "newOwner"
+      ]
     },
     "OrganizationsUndeleteOrganizationBody": {
       "type": "object",
@@ -1310,6 +1670,24 @@
       },
       "description": "Response message for `ListInvitations`."
     },
+    "v1ListMembersResponse": {
+      "type": "object",
+      "properties": {
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Member"
+          },
+          "description": "The members of the scope."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for the next page of results."
+        }
+      },
+      "description": "Response message for `Iam.ListMembers`."
+    },
     "v1ListOrganizationsResponse": {
       "type": "object",
       "properties": {
@@ -1327,6 +1705,49 @@
         }
       },
       "description": "The response returned from the `ListOrganizations` method."
+    },
+    "v1Member": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The resource name of the member.\nFormat: `organizations/{organization}/members/{member}` or\n        `organizations/{organization}/spaces/{space}/members/{member}`\nwhere `{member}` is `user-{user_id}` or `group-{group_id}`."
+        },
+        "user": {
+          "type": "string",
+          "description": "The user principal. Format: `organizations/{organization}/users/{user}`."
+        },
+        "group": {
+          "type": "string",
+          "description": "The group principal. Format: `organizations/{organization}/groups/{group}`."
+        },
+        "role": {
+          "type": "string",
+          "description": "Required. Reference to the role this principal holds at this scope.\nFormat: `organizations/{organization}/roles/{role}`. v1 accepts only\nsystem roles (`owner`, `admin`, `editor`, `viewer`)."
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when this binding was created.",
+          "readOnly": true
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when this binding was last modified.",
+          "readOnly": true
+        },
+        "etag": {
+          "type": "string",
+          "description": "Output only. A checksum computed by the server based on the current\nvalue of the Member resource. Sent on update and delete requests for\noptimistic concurrency control.",
+          "readOnly": true
+        }
+      },
+      "description": "Multi-parent: a Member lives under either an organization or a space.\nThe URL segment `{member}` encodes the principal as `user-{user_id}`\nor `group-{group_id}` — uniqueness by construction means a given\nprincipal can hold at most one role per scope.\n\nPermission resolution unions org-level and space-level Member\nbindings: an org owner is implicitly a space owner. Server-side\nresolver is the source of truth; this proto defines only the wire\nshape.",
+      "title": "A Member binds a principal (user or group) to a role at a scope\n(organization or space). The single source of truth for \"who has\nwhat role where.\"",
+      "required": [
+        "role"
+      ]
     },
     "v1OidcConfig": {
       "type": "object",
@@ -1422,6 +1843,22 @@
       "default": "STATE_UNSPECIFIED",
       "description": "Organization lifecycle states.\n\n - STATE_UNSPECIFIED: Unspecified state.  This is only useful for distinguishing unset values.\n - ACTIVE: The normal and active state.\n - DELETE_REQUESTED: The organization has been marked for deletion by the user."
     },
+    "v1OrganizationsTestIamPermissionsBody": {
+      "type": "object",
+      "properties": {
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Required. The permissions to check. Each entry is a permission ID\n(e.g. `spaces.create`, `assets.assets.list`). Wildcards are not\nsupported."
+        }
+      },
+      "description": "Request message for `Iam.TestIamPermissions`.\n\nUsed by clients (notably UI layers) to ask the server: \"out of this\nlist of permissions, which ones does the caller actually have on\nthis resource?\" The server resolves the caller's effective role at\nthe resource and returns the subset of requested permissions that\nrole grants.",
+      "required": [
+        "permissions"
+      ]
+    },
     "v1SamlConfig": {
       "type": "object",
       "properties": {
@@ -1512,6 +1949,35 @@
       "required": [
         "displayName"
       ]
+    },
+    "v1TestIamPermissionsResponse": {
+      "type": "object",
+      "properties": {
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The subset of `TestIamPermissionsRequest.permissions` that the\ncaller is allowed on the resource. Permissions not in this list\nare denied (or unknown)."
+        }
+      },
+      "description": "Response message for `Iam.TestIamPermissions`."
+    },
+    "v1TransferOwnershipResponse": {
+      "type": "object",
+      "properties": {
+        "newOwner": {
+          "type": "string",
+          "description": "The user resource that now holds the `owner` role on the\norganization. Format: `organizations/{organization}/users/{user}`.",
+          "readOnly": true
+        },
+        "previousOwner": {
+          "type": "string",
+          "description": "The user resource that previously held the `owner` role and was\ndemoted to `admin` as part of the transfer. Same format as\n`new_owner`.",
+          "readOnly": true
+        }
+      },
+      "description": "Response message for `Organizations.TransferOwnership`. Returns the\nbefore/after owner refs so clients can confirm the swap and\noptimistically update their UI without a follow-up read of the\naffected Member rows."
     }
   }
 }

@@ -65,7 +65,7 @@ func TestIntegration_CreateOrganization_DuplicateName(t *testing.T) {
 	seedTestCaller(t, queries)
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, noopAuthService{}, nil, testReadUID))
+		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, noopAuthService{}, nil, testReadUID, nil, nil))
 	})
 
 	client := apiv1.NewOrganizationsClient(conn)
@@ -100,7 +100,7 @@ func TestIntegration_Organizations(t *testing.T) {
 	seedTestCaller(t, queries)
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, noopAuthService{}, nil, testReadUID))
+		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, noopAuthService{}, nil, testReadUID, nil, nil))
 	})
 
 	client := apiv1.NewOrganizationsClient(conn)

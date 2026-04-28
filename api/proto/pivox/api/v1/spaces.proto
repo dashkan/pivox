@@ -22,8 +22,11 @@ import "google/api/client.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
 import "google/longrunning/operations.proto";
+import "google/protobuf/empty.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
+import "pivox/iam/v1/members.proto";
+import "pivox/iam/v1/permissions.proto";
 
 option go_package = "pivox/api/v1;apiv1";
 
@@ -112,6 +115,10 @@ service Spaces {
   // This method behaves idempotently, such that deleting a `DELETE_REQUESTED`
   // space will not cause an error, but also won't do anything.
   //
+  // If `force=true`, the 30-day grace window is skipped: the LRO
+  // synchronously cascades all child data and frees the slug. The
+  // space is unrecoverable.
+  //
   // The caller must have `resourcemanager.spaces.delete` permissions for this
   // space.
   rpc DeleteSpace(DeleteSpaceRequest) returns (google.longrunning.Operation) {
@@ -142,6 +149,59 @@ service Spaces {
       response_type: "Space"
       metadata_type: "UndeleteSpaceMetadata"
     };
+  }
+
+  // Gets a space-scope Member by resource name. Members here are
+  // only direct space-level bindings; users with implicit access via
+  // their organization role do not appear as space Members.
+  rpc GetMember(pivox.iam.v1.GetMemberRequest) returns (pivox.iam.v1.Member) {
+    option (google.api.http) = {get: "/v1/{name=organizations/*/spaces/*/members/*}"};
+    option (google.api.method_signature) = "name";
+  }
+
+  // Lists space-scope Members. Direct bindings only — does not include
+  // members inherited from the parent org.
+  rpc ListMembers(pivox.iam.v1.ListMembersRequest) returns (pivox.iam.v1.ListMembersResponse) {
+    option (google.api.http) = {get: "/v1/{parent=organizations/*/spaces/*}/members"};
+    option (google.api.method_signature) = "parent";
+  }
+
+  // Creates a space-scope Member binding. The principal must already
+  // be a member of the parent organization. No ≥1-owner boundary at
+  // space scope.
+  rpc CreateMember(pivox.iam.v1.CreateMemberRequest) returns (pivox.iam.v1.Member) {
+    option (google.api.http) = {
+      post: "/v1/{parent=organizations/*/spaces/*}/members"
+      body: "member"
+    };
+    option (google.api.method_signature) = "parent,member,member_id";
+  }
+
+  // Updates a space-scope Member's role. Only `role` is mutable.
+  rpc UpdateMember(pivox.iam.v1.UpdateMemberRequest) returns (pivox.iam.v1.Member) {
+    option (google.api.http) = {
+      patch: "/v1/{member.name=organizations/*/spaces/*/members/*}"
+      body: "member"
+    };
+    option (google.api.method_signature) = "member,update_mask";
+  }
+
+  // Deletes a space-scope Member binding.
+  rpc DeleteMember(pivox.iam.v1.DeleteMemberRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/v1/{name=organizations/*/spaces/*/members/*}"};
+    option (google.api.method_signature) = "name";
+  }
+
+  // Returns the subset of requested permissions the caller is allowed
+  // on the space. Resolution unions direct space-level bindings with
+  // parent-org-level bindings — an org-admin is implicitly a
+  // space-admin without an explicit space-scope Member row.
+  rpc TestIamPermissions(pivox.iam.v1.TestIamPermissionsRequest) returns (pivox.iam.v1.TestIamPermissionsResponse) {
+    option (google.api.http) = {
+      post: "/v1/{resource=organizations/*/spaces/*}:testIamPermissions"
+      body: "*"
+    };
+    option (google.api.method_signature) = "resource,permissions";
   }
 }
 
@@ -412,6 +472,13 @@ message DeleteSpaceRequest {
   // Optional. If set to true, the request will only validate the request
   // without persisting it.
   bool validate_only = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. If true, bypasses the 30-day grace window: the LRO
+  // synchronously cascades all child data (assets, requests, line
+  // items, space-scope member bindings, …) and frees the space slug.
+  // The space is unrecoverable. Defaults to false (soft-delete with
+  // grace; recoverable via `UndeleteSpace` until purge_time).
+  bool force = 4 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // The request sent to the [UndeleteSpace]
@@ -443,9 +510,48 @@ message CreateSpaceMetadata {}
 // returned by UpdateSpace.
 message UpdateSpaceMetadata {}
 
-// A status object which is used as the `metadata` field for the Operation
-// returned by DeleteSpace.
-message DeleteSpaceMetadata {}
+// Metadata for the `DeleteSpace` LRO. Surfaces phase progression
+// so callers can render progress UI for long `force=true` cascades.
+//
+// With `force=false` the LRO completes once the space enters
+// `DELETE_REQUESTED`; the data purge runs out of band after
+// `purge_time`. With `force=true` the LRO drives the full cascade
+// and completes only after child data is purged.
+message DeleteSpaceMetadata {
+  // Phases of the delete LRO.
+  enum Phase {
+    // Default; not used.
+    PHASE_UNSPECIFIED = 0;
+
+    // Validating preconditions; the space must be ACTIVE.
+    VALIDATING = 1;
+
+    // Cancelling other LROs scoped to this space (asset imports,
+    // request workflows, etc.).
+    CANCELLING_OPERATIONS = 2;
+
+    // Marking the space soft-deleted: `delete_time` set,
+    // `purge_time = delete_time + 30d`, state → `DELETE_REQUESTED`.
+    // Soft-delete path only.
+    MARKING_DELETED = 3;
+
+    // Synchronously cascading child data (assets, requests, line
+    // items, space-scope member bindings, …) and freeing the slug.
+    // Force path only.
+    PURGING = 4;
+
+    // Done. For soft-delete, the space is recoverable via
+    // `UndeleteSpace` until `purge_time`. For force, the space and
+    // all child data are gone.
+    COMPLETED = 5;
+  }
+
+  // Output only. Current phase of the cascade.
+  Phase phase = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Resource name of the space being deleted.
+  string space = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
 
 // A status object which is used as the `metadata` field for the Operation
 // returned by UndeleteSpace.

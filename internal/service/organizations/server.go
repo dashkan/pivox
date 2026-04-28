@@ -18,8 +18,10 @@ import (
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/filter"
 	"github.com/dashkan/pivox/internal/lro"
+	"github.com/dashkan/pivox/internal/permission"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	"github.com/dashkan/pivox/internal/resource"
+	"github.com/dashkan/pivox/internal/server"
 )
 
 // AuthContextReader extracts the caller's Firebase UID from the
@@ -36,24 +38,28 @@ type TxBeginner interface {
 
 type OrganizationsServer struct {
 	apiv1.UnimplementedOrganizationsServer
-	db      db.DBTX
-	pool    TxBeginner
-	queries db.Querier
-	auth    authn.Service
-	filter  *filter.ResourceFilter
-	codec   *appkey.Codec
-	readUID AuthContextReader
+	db       db.DBTX
+	pool     TxBeginner
+	queries  db.Querier
+	auth     authn.Service
+	filter   *filter.ResourceFilter
+	codec    *appkey.Codec
+	readUID  AuthContextReader
+	resolver *permission.Resolver
+	caller   server.CallerIdentityResolver
 }
 
-func NewOrganizationsServer(pool *pgxpool.Pool, queries db.Querier, auth authn.Service, codec *appkey.Codec, readUID AuthContextReader) *OrganizationsServer {
+func NewOrganizationsServer(pool *pgxpool.Pool, queries db.Querier, auth authn.Service, codec *appkey.Codec, readUID AuthContextReader, resolver *permission.Resolver, caller server.CallerIdentityResolver) *OrganizationsServer {
 	return &OrganizationsServer{
-		db:      pool,
-		pool:    pool,
-		queries: queries,
-		auth:    auth,
-		filter:  filter.OrganizationFilter(),
-		codec:   codec,
-		readUID: readUID,
+		db:       pool,
+		pool:     pool,
+		queries:  queries,
+		auth:     auth,
+		filter:   filter.OrganizationFilter(),
+		codec:    codec,
+		readUID:  readUID,
+		resolver: resolver,
+		caller:   caller,
 	}
 }
 

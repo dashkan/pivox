@@ -201,27 +201,3 @@ message DeleteMemberRequest {
   // Optional. The etag known to the client for optimistic concurrency.
   string etag = 2 [(google.api.field_behavior) = OPTIONAL];
 }
-
-// Request message for `Iam.TransferOwnership`.
-//
-// Promotes the named Member to `owner` role and demotes the previous
-// sole owner to `admin`. Both updates happen in a single transaction.
-// If the scope already has multiple owners, the call returns
-// `FAILED_PRECONDITION` — explicit demotion via `UpdateMember` is the
-// right path in that case.
-//
-// (-- api-linter: core::0136::http-uri-suffix=disabled
-//     aip.dev/not-precedent: TransferOwnership operates on the target
-//     Member resource; the verb describes the broader transfer. --)
-message TransferOwnershipRequest {
-  // Required. The Member to promote to `owner`. Must be an existing
-  // member of the scope and not already an owner.
-  string name = 1 [
-    (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {type: "pivox.iam/Member"},
-    (buf.validate.field).required = true
-  ];
-
-  // Optional. Etag of the target Member for optimistic concurrency.
-  string etag = 2 [(google.api.field_behavior) = OPTIONAL];
-}

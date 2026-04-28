@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -15,16 +14,12 @@ import (
 
 	"buf.build/go/protovalidate"
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
-	"github.com/google/uuid"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
-	"google.golang.org/grpc/status"
 
 	"github.com/dashkan/pivox/internal/agentstream"
 	"github.com/dashkan/pivox/internal/appkey"
@@ -33,6 +28,7 @@ import (
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/firebase"
 	"github.com/dashkan/pivox/internal/lro"
+	"github.com/dashkan/pivox/internal/permission"
 	"github.com/dashkan/pivox/internal/server"
 	"github.com/dashkan/pivox/internal/service/apikeys"
 	"github.com/dashkan/pivox/internal/service/iam"
@@ -256,34 +252,26 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	// Register all services
 	longrunningpb.RegisterOperationsServer(grpcServer, operations.NewOperationsServer(lroManager))
-	apiv1.RegisterSpacesServer(grpcServer, spaces.NewSpacesServer(pool, queries, appCodec))
-	apiv1.RegisterOrganizationsServer(grpcServer, organizations.NewOrganizationsServer(pool, queries, authSvc, appCodec, server.AuthenticatedUID))
+	// Shared IAM dependencies for the org-scope and space-scope IAM
+	// handlers (Member CRUD, TestIamPermissions, TransferOwnership).
+	// Permission resolver wraps the in-memory matrix + sqlc queries
+	// for effective-role lookups; caller-identity resolver maps the
+	// auth-context Firebase UID to a firebase_identities row id.
+	permResolver := permission.NewResolver(queries)
+	callerIdentity := server.NewCallerIdentityResolver(queries)
+
+	apiv1.RegisterSpacesServer(grpcServer, spaces.NewSpacesServer(pool, queries, appCodec, permResolver, callerIdentity))
+	apiv1.RegisterOrganizationsServer(grpcServer, organizations.NewOrganizationsServer(pool, queries, authSvc, appCodec, server.AuthenticatedUID, permResolver, callerIdentity))
 	apiv1.RegisterTagKeysServer(grpcServer, tags.NewTagKeysServer(pool, queries, appCodec))
 	apiv1.RegisterTagValuesServer(grpcServer, tags.NewTagValuesServer(pool, queries, appCodec))
 	apiv1.RegisterTagBindingsServer(grpcServer, tags.NewTagBindingsServer(pool, queries, appCodec))
 	apiv1.RegisterApiKeysServer(grpcServer, apikeys.NewApiKeysServer(pool, queries, appCodec))
 
-	// Iam service: members/roles/permissions/groups + TestIamPermissions.
-	// CallerResolver maps the auth-context Firebase UID to a Pivox
-	// firebase_identities row id. Returns Unauthenticated for missing
-	// auth context, NotFound for orphaned UIDs (registered in Firebase
-	// but not yet synced to our DB), and Internal for DB faults.
-	iamCallerResolver := func(ctx context.Context) (uuid.UUID, error) {
-		uid, ok := server.AuthenticatedUID(ctx)
-		if !ok {
-			return uuid.Nil, status.Error(codes.Unauthenticated, "missing authenticated caller")
-		}
-		identity, err := queries.GetFirebaseIdentityByUID(ctx, uid)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return uuid.Nil, status.Error(codes.Unauthenticated, "caller has no identity record")
-			}
-			logger.Error("iam: lookup caller identity failed", "uid", uid, "error", err)
-			return uuid.Nil, status.Error(codes.Internal, "lookup caller identity")
-		}
-		return identity.ID, nil
-	}
-	iamv1.RegisterIamServer(grpcServer, iam.NewIamServer(queries, nil /* resolver constructed by NewIamServer */, iamCallerResolver))
+	// Iam service: cross-cutting IAM (role reads, permission catalog,
+	// user reads, group CRUD, DeleteUser LRO). Scope-divergent IAM
+	// ops (Member CRUD, TransferOwnership, TestIamPermissions) live
+	// on the scope-owning Organizations / Spaces services above.
+	iamv1.RegisterIamServer(grpcServer, iam.NewIamServer(queries))
 
 	// Storage services
 	connMgr := agentstream.NewConnectionManager()

@@ -174,7 +174,7 @@
       },
       "delete": {
         "summary": "Marks the space identified by the specified\n`name` (for example, `organizations/123/spaces/my-space`) for deletion.",
-        "description": "This method will only affect the space if it has a lifecycle state of\n[ACTIVE][pivox.api.v1.Space.State.ACTIVE].\n\nThis method changes the Space's lifecycle state from\n[ACTIVE][pivox.api.v1.Space.State.ACTIVE]\nto\n[DELETE_REQUESTED][pivox.api.v1.Space.State.DELETE_REQUESTED].\nThe deletion starts at an unspecified time,\nat which point the Space is no longer accessible.\n\nUntil the deletion completes, you can check the lifecycle state\nchecked by retrieving the space with [GetSpace]\n[pivox.api.v1.Spaces.GetSpace],\nand the space remains visible to [ListSpaces]\n[pivox.api.v1.Spaces.ListSpaces].\nHowever, you cannot update the space.\n\nAfter the deletion completes, the space is not retrievable by\nthe [GetSpace]\n[pivox.api.v1.Spaces.GetSpace] and\n[ListSpaces]\n[pivox.api.v1.Spaces.ListSpaces] method.\n\nThis method behaves idempotently, such that deleting a `DELETE_REQUESTED`\nspace will not cause an error, but also won't do anything.\n\nThe caller must have `resourcemanager.spaces.delete` permissions for this\nspace.",
+        "description": "This method will only affect the space if it has a lifecycle state of\n[ACTIVE][pivox.api.v1.Space.State.ACTIVE].\n\nThis method changes the Space's lifecycle state from\n[ACTIVE][pivox.api.v1.Space.State.ACTIVE]\nto\n[DELETE_REQUESTED][pivox.api.v1.Space.State.DELETE_REQUESTED].\nThe deletion starts at an unspecified time,\nat which point the Space is no longer accessible.\n\nUntil the deletion completes, you can check the lifecycle state\nchecked by retrieving the space with [GetSpace]\n[pivox.api.v1.Spaces.GetSpace],\nand the space remains visible to [ListSpaces]\n[pivox.api.v1.Spaces.ListSpaces].\nHowever, you cannot update the space.\n\nAfter the deletion completes, the space is not retrievable by\nthe [GetSpace]\n[pivox.api.v1.Spaces.GetSpace] and\n[ListSpaces]\n[pivox.api.v1.Spaces.ListSpaces] method.\n\nThis method behaves idempotently, such that deleting a `DELETE_REQUESTED`\nspace will not cause an error, but also won't do anything.\n\nIf `force=true`, the 30-day grace window is skipped: the LRO\nsynchronously cascades all child data and frees the slug. The\nspace is unrecoverable.\n\nThe caller must have `resourcemanager.spaces.delete` permissions for this\nspace.",
         "operationId": "Spaces_DeleteSpace",
         "responses": {
           "200": {
@@ -213,6 +213,13 @@
           {
             "name": "validateOnly",
             "description": "Optional. If set to true, the request will only validate the request\nwithout persisting it.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "force",
+            "description": "Optional. If true, bypasses the 30-day grace window: the LRO\nsynchronously cascades all child data (assets, requests, line\nitems, space-scope member bindings, …) and frees the space slug.\nThe space is unrecoverable. Defaults to false (soft-delete with\ngrace; recoverable via `UndeleteSpace` until purge_time).",
             "in": "query",
             "required": false,
             "type": "boolean"
@@ -323,6 +330,346 @@
             "in": "query",
             "required": false,
             "type": "boolean"
+          }
+        ],
+        "tags": [
+          "Spaces"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/spaces/{space}/members": {
+      "get": {
+        "summary": "Lists space-scope Members. Direct bindings only — does not include\nmembers inherited from the parent org.",
+        "operationId": "Spaces_ListMembers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListMembersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "space",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Optional. Maximum number of members to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. Page token from a previous ListMembers call.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "filter",
+            "description": "Optional. An expression for filtering the results of the request.\nFilterable fields:\n\n+ `role` — exact match on a role resource name.\n+ `principal_kind` — `user` or `group`.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "description": "Optional. A comma-separated list of fields to order by. Supported\nfields: `createTime`, `role`. Default: `createTime` ascending.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Spaces"
+        ]
+      },
+      "post": {
+        "summary": "Creates a space-scope Member binding. The principal must already\nbe a member of the parent organization. No ≥1-owner boundary at\nspace scope.",
+        "operationId": "Spaces_CreateMember",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Member"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "space",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "member",
+            "description": "Required. The Member to create. The `principal` oneof must be set\nand `role` must reference an existing system role.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1Member"
+            }
+          },
+          {
+            "name": "memberId",
+            "description": "Optional. A client-specified member ID. If provided, must be\n`user-{user_id}` or `group-{group_id}` and must agree with the\n`principal` oneof. If omitted, the server derives it from\n`member.principal`.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Spaces"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/spaces/{space}/members/{member}": {
+      "get": {
+        "summary": "Gets a space-scope Member by resource name. Members here are\nonly direct space-level bindings; users with implicit access via\ntheir organization role do not appear as space Members.",
+        "operationId": "Spaces_GetMember",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Member"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "space",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "member",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Spaces"
+        ]
+      },
+      "delete": {
+        "summary": "Deletes a space-scope Member binding.",
+        "operationId": "Spaces_DeleteMember",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "space",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "member",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "etag",
+            "description": "Optional. The etag known to the client for optimistic concurrency.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Spaces"
+        ]
+      },
+      "patch": {
+        "summary": "Updates a space-scope Member's role. Only `role` is mutable.",
+        "operationId": "Spaces_UpdateMember",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Member"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "space",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "member",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "member",
+            "description": "A Member binds a principal (user or group) to a role at a scope\n(organization or space). The single source of truth for \"who has\nwhat role where.\"\n\nRequired. The Member with updated fields. The `name` field must\nidentify the existing member.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "user": {
+                  "type": "string",
+                  "description": "The user principal. Format: `organizations/{organization}/users/{user}`."
+                },
+                "group": {
+                  "type": "string",
+                  "description": "The group principal. Format: `organizations/{organization}/groups/{group}`."
+                },
+                "role": {
+                  "type": "string",
+                  "description": "Required. Reference to the role this principal holds at this scope.\nFormat: `organizations/{organization}/roles/{role}`. v1 accepts only\nsystem roles (`owner`, `admin`, `editor`, `viewer`)."
+                },
+                "createTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when this binding was created.",
+                  "readOnly": true
+                },
+                "updateTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when this binding was last modified.",
+                  "readOnly": true
+                },
+                "etag": {
+                  "type": "string",
+                  "description": "Output only. A checksum computed by the server based on the current\nvalue of the Member resource. Sent on update and delete requests for\noptimistic concurrency control.",
+                  "readOnly": true
+                }
+              },
+              "description": "Required. The Member with updated fields. The `name` field must\nidentify the existing member.",
+              "title": "A Member binds a principal (user or group) to a role at a scope\n(organization or space). The single source of truth for \"who has\nwhat role where.\"",
+              "required": [
+                "role"
+              ]
+            }
+          }
+        ],
+        "tags": [
+          "Spaces"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/spaces/{space}:testIamPermissions": {
+      "post": {
+        "summary": "Returns the subset of requested permissions the caller is allowed\non the space. Resolution unions direct space-level bindings with\nparent-org-level bindings — an org-admin is implicitly a\nspace-admin without an explicit space-scope Member row.",
+        "operationId": "Spaces_TestIamPermissions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1TestIamPermissionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "space",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1SpacesTestIamPermissionsBody"
+            }
           }
         ],
         "tags": [
@@ -452,6 +799,24 @@
       },
       "description": "The `Status` type defines a logical error model that is suitable for\ndifferent programming environments, including REST APIs and RPC APIs. It is\nused by [gRPC](https://github.com/grpc). Each `Status` message contains\nthree pieces of data: error code, error message, and error details.\n\nYou can find out more about this error model and how to work with it in the\n[API Design Guide](https://cloud.google.com/apis/design/errors)."
     },
+    "v1ListMembersResponse": {
+      "type": "object",
+      "properties": {
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Member"
+          },
+          "description": "The members of the scope."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for the next page of results."
+        }
+      },
+      "description": "Response message for `Iam.ListMembers`."
+    },
     "v1ListSpacesResponse": {
       "type": "object",
       "properties": {
@@ -469,6 +834,49 @@
         }
       },
       "description": "A page of the response received from the\n[ListSpaces][pivox.api.v1.Spaces.ListSpaces]\nmethod.\n\nA paginated response where more pages are available has\n`next_page_token` set. This token can be used in a subsequent request to\nretrieve the next request page.\n\nNOTE: A response may contain fewer elements than the request `page_size` and\nstill have a `next_page_token`."
+    },
+    "v1Member": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The resource name of the member.\nFormat: `organizations/{organization}/members/{member}` or\n        `organizations/{organization}/spaces/{space}/members/{member}`\nwhere `{member}` is `user-{user_id}` or `group-{group_id}`."
+        },
+        "user": {
+          "type": "string",
+          "description": "The user principal. Format: `organizations/{organization}/users/{user}`."
+        },
+        "group": {
+          "type": "string",
+          "description": "The group principal. Format: `organizations/{organization}/groups/{group}`."
+        },
+        "role": {
+          "type": "string",
+          "description": "Required. Reference to the role this principal holds at this scope.\nFormat: `organizations/{organization}/roles/{role}`. v1 accepts only\nsystem roles (`owner`, `admin`, `editor`, `viewer`)."
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when this binding was created.",
+          "readOnly": true
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when this binding was last modified.",
+          "readOnly": true
+        },
+        "etag": {
+          "type": "string",
+          "description": "Output only. A checksum computed by the server based on the current\nvalue of the Member resource. Sent on update and delete requests for\noptimistic concurrency control.",
+          "readOnly": true
+        }
+      },
+      "description": "Multi-parent: a Member lives under either an organization or a space.\nThe URL segment `{member}` encodes the principal as `user-{user_id}`\nor `group-{group_id}` — uniqueness by construction means a given\nprincipal can hold at most one role per scope.\n\nPermission resolution unions org-level and space-level Member\nbindings: an org owner is implicitly a space owner. Server-side\nresolver is the source of truth; this proto defines only the wire\nshape.",
+      "title": "A Member binds a principal (user or group) to a role at a scope\n(organization or space). The single source of truth for \"who has\nwhat role where.\"",
+      "required": [
+        "role"
+      ]
     },
     "v1Space": {
       "type": "object",
@@ -535,6 +943,35 @@
       ],
       "default": "STATE_UNSPECIFIED",
       "description": "Space lifecycle states.\n\n - STATE_UNSPECIFIED: Unspecified state.  This is only used/useful for distinguishing\nunset values.\n - ACTIVE: The normal and active state.\n - DELETE_REQUESTED: The space has been marked for deletion by the user\n(by invoking\n[DeleteSpace][pivox.api.v1.Spaces.DeleteSpace])\nor by the system (Pivox).\nThis can generally be reversed by invoking [UndeleteSpace]\n[pivox.api.v1.Spaces.UndeleteSpace]."
+    },
+    "v1SpacesTestIamPermissionsBody": {
+      "type": "object",
+      "properties": {
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Required. The permissions to check. Each entry is a permission ID\n(e.g. `spaces.create`, `assets.assets.list`). Wildcards are not\nsupported."
+        }
+      },
+      "description": "Request message for `Iam.TestIamPermissions`.\n\nUsed by clients (notably UI layers) to ask the server: \"out of this\nlist of permissions, which ones does the caller actually have on\nthis resource?\" The server resolves the caller's effective role at\nthe resource and returns the subset of requested permissions that\nrole grants.",
+      "required": [
+        "permissions"
+      ]
+    },
+    "v1TestIamPermissionsResponse": {
+      "type": "object",
+      "properties": {
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The subset of `TestIamPermissionsRequest.permissions` that the\ncaller is allowed on the resource. Permissions not in this list\nare denied (or unknown)."
+        }
+      },
+      "description": "Response message for `Iam.TestIamPermissions`."
     }
   }
 }

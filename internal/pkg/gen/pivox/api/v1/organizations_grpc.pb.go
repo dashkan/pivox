@@ -23,9 +23,11 @@ package apiv1
 import (
 	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
 	context "context"
+	v1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -54,6 +56,13 @@ const (
 	Organizations_DeleteInvitation_FullMethodName       = "/pivox.api.v1.Organizations/DeleteInvitation"
 	Organizations_GetInvitationPolicy_FullMethodName    = "/pivox.api.v1.Organizations/GetInvitationPolicy"
 	Organizations_UpdateInvitationPolicy_FullMethodName = "/pivox.api.v1.Organizations/UpdateInvitationPolicy"
+	Organizations_GetMember_FullMethodName              = "/pivox.api.v1.Organizations/GetMember"
+	Organizations_ListMembers_FullMethodName            = "/pivox.api.v1.Organizations/ListMembers"
+	Organizations_CreateMember_FullMethodName           = "/pivox.api.v1.Organizations/CreateMember"
+	Organizations_UpdateMember_FullMethodName           = "/pivox.api.v1.Organizations/UpdateMember"
+	Organizations_DeleteMember_FullMethodName           = "/pivox.api.v1.Organizations/DeleteMember"
+	Organizations_TransferOwnership_FullMethodName      = "/pivox.api.v1.Organizations/TransferOwnership"
+	Organizations_TestIamPermissions_FullMethodName     = "/pivox.api.v1.Organizations/TestIamPermissions"
 )
 
 // OrganizationsClient is the client API for Organizations service.
@@ -176,6 +185,32 @@ type OrganizationsClient interface {
 	//
 	//	aip.dev/not-precedent: UpdateInvitationPolicy is a singleton sub-resource update. --)
 	UpdateInvitationPolicy(ctx context.Context, in *UpdateInvitationPolicyRequest, opts ...grpc.CallOption) (*InvitationPolicy, error)
+	// Gets an org-scope Member by resource name.
+	GetMember(ctx context.Context, in *v1.GetMemberRequest, opts ...grpc.CallOption) (*v1.Member, error)
+	// Lists org-scope Members.
+	ListMembers(ctx context.Context, in *v1.ListMembersRequest, opts ...grpc.CallOption) (*v1.ListMembersResponse, error)
+	// Creates an org-scope Member binding. The principal (user or group)
+	// must already exist in the organization. The role must be one of
+	// the system roles (`owner`, `admin`, `editor`, `viewer`).
+	CreateMember(ctx context.Context, in *v1.CreateMemberRequest, opts ...grpc.CallOption) (*v1.Member, error)
+	// Updates an org-scope Member's role. Only `role` is mutable.
+	// Refuses to demote the last owner — use TransferOwnership instead.
+	UpdateMember(ctx context.Context, in *v1.UpdateMemberRequest, opts ...grpc.CallOption) (*v1.Member, error)
+	// Deletes an org-scope Member binding. Refuses to delete the last
+	// owner — use TransferOwnership first or promote a co-owner.
+	DeleteMember(ctx context.Context, in *v1.DeleteMemberRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Atomically promotes a user to `owner` and demotes the previous
+	// sole owner to `admin` of the organization. Both updates run in a
+	// single transaction so the org never has zero owners. Returns
+	// FAILED_PRECONDITION when the org already has multiple owners
+	// (use UpdateMember + CreateMember instead) or when the new owner
+	// is already an owner.
+	TransferOwnership(ctx context.Context, in *TransferOwnershipRequest, opts ...grpc.CallOption) (*TransferOwnershipResponse, error)
+	// Returns the subset of requested permissions the caller is allowed
+	// on the organization. UI clients use this to gate buttons and
+	// menus. Empty list (not an error) for callers with no role
+	// bindings on the org.
+	TestIamPermissions(ctx context.Context, in *v1.TestIamPermissionsRequest, opts ...grpc.CallOption) (*v1.TestIamPermissionsResponse, error)
 }
 
 type organizationsClient struct {
@@ -386,6 +421,76 @@ func (c *organizationsClient) UpdateInvitationPolicy(ctx context.Context, in *Up
 	return out, nil
 }
 
+func (c *organizationsClient) GetMember(ctx context.Context, in *v1.GetMemberRequest, opts ...grpc.CallOption) (*v1.Member, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.Member)
+	err := c.cc.Invoke(ctx, Organizations_GetMember_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationsClient) ListMembers(ctx context.Context, in *v1.ListMembersRequest, opts ...grpc.CallOption) (*v1.ListMembersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.ListMembersResponse)
+	err := c.cc.Invoke(ctx, Organizations_ListMembers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationsClient) CreateMember(ctx context.Context, in *v1.CreateMemberRequest, opts ...grpc.CallOption) (*v1.Member, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.Member)
+	err := c.cc.Invoke(ctx, Organizations_CreateMember_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationsClient) UpdateMember(ctx context.Context, in *v1.UpdateMemberRequest, opts ...grpc.CallOption) (*v1.Member, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.Member)
+	err := c.cc.Invoke(ctx, Organizations_UpdateMember_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationsClient) DeleteMember(ctx context.Context, in *v1.DeleteMemberRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, Organizations_DeleteMember_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationsClient) TransferOwnership(ctx context.Context, in *TransferOwnershipRequest, opts ...grpc.CallOption) (*TransferOwnershipResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TransferOwnershipResponse)
+	err := c.cc.Invoke(ctx, Organizations_TransferOwnership_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationsClient) TestIamPermissions(ctx context.Context, in *v1.TestIamPermissionsRequest, opts ...grpc.CallOption) (*v1.TestIamPermissionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.TestIamPermissionsResponse)
+	err := c.cc.Invoke(ctx, Organizations_TestIamPermissions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // OrganizationsServer is the server API for Organizations service.
 // All implementations must embed UnimplementedOrganizationsServer
 // for forward compatibility.
@@ -506,6 +611,32 @@ type OrganizationsServer interface {
 	//
 	//	aip.dev/not-precedent: UpdateInvitationPolicy is a singleton sub-resource update. --)
 	UpdateInvitationPolicy(context.Context, *UpdateInvitationPolicyRequest) (*InvitationPolicy, error)
+	// Gets an org-scope Member by resource name.
+	GetMember(context.Context, *v1.GetMemberRequest) (*v1.Member, error)
+	// Lists org-scope Members.
+	ListMembers(context.Context, *v1.ListMembersRequest) (*v1.ListMembersResponse, error)
+	// Creates an org-scope Member binding. The principal (user or group)
+	// must already exist in the organization. The role must be one of
+	// the system roles (`owner`, `admin`, `editor`, `viewer`).
+	CreateMember(context.Context, *v1.CreateMemberRequest) (*v1.Member, error)
+	// Updates an org-scope Member's role. Only `role` is mutable.
+	// Refuses to demote the last owner — use TransferOwnership instead.
+	UpdateMember(context.Context, *v1.UpdateMemberRequest) (*v1.Member, error)
+	// Deletes an org-scope Member binding. Refuses to delete the last
+	// owner — use TransferOwnership first or promote a co-owner.
+	DeleteMember(context.Context, *v1.DeleteMemberRequest) (*emptypb.Empty, error)
+	// Atomically promotes a user to `owner` and demotes the previous
+	// sole owner to `admin` of the organization. Both updates run in a
+	// single transaction so the org never has zero owners. Returns
+	// FAILED_PRECONDITION when the org already has multiple owners
+	// (use UpdateMember + CreateMember instead) or when the new owner
+	// is already an owner.
+	TransferOwnership(context.Context, *TransferOwnershipRequest) (*TransferOwnershipResponse, error)
+	// Returns the subset of requested permissions the caller is allowed
+	// on the organization. UI clients use this to gate buttons and
+	// menus. Empty list (not an error) for callers with no role
+	// bindings on the org.
+	TestIamPermissions(context.Context, *v1.TestIamPermissionsRequest) (*v1.TestIamPermissionsResponse, error)
 	mustEmbedUnimplementedOrganizationsServer()
 }
 
@@ -575,6 +706,27 @@ func (UnimplementedOrganizationsServer) GetInvitationPolicy(context.Context, *Ge
 }
 func (UnimplementedOrganizationsServer) UpdateInvitationPolicy(context.Context, *UpdateInvitationPolicyRequest) (*InvitationPolicy, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateInvitationPolicy not implemented")
+}
+func (UnimplementedOrganizationsServer) GetMember(context.Context, *v1.GetMemberRequest) (*v1.Member, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetMember not implemented")
+}
+func (UnimplementedOrganizationsServer) ListMembers(context.Context, *v1.ListMembersRequest) (*v1.ListMembersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListMembers not implemented")
+}
+func (UnimplementedOrganizationsServer) CreateMember(context.Context, *v1.CreateMemberRequest) (*v1.Member, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateMember not implemented")
+}
+func (UnimplementedOrganizationsServer) UpdateMember(context.Context, *v1.UpdateMemberRequest) (*v1.Member, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateMember not implemented")
+}
+func (UnimplementedOrganizationsServer) DeleteMember(context.Context, *v1.DeleteMemberRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteMember not implemented")
+}
+func (UnimplementedOrganizationsServer) TransferOwnership(context.Context, *TransferOwnershipRequest) (*TransferOwnershipResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method TransferOwnership not implemented")
+}
+func (UnimplementedOrganizationsServer) TestIamPermissions(context.Context, *v1.TestIamPermissionsRequest) (*v1.TestIamPermissionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method TestIamPermissions not implemented")
 }
 func (UnimplementedOrganizationsServer) mustEmbedUnimplementedOrganizationsServer() {}
 func (UnimplementedOrganizationsServer) testEmbeddedByValue()                       {}
@@ -957,6 +1109,132 @@ func _Organizations_UpdateInvitationPolicy_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Organizations_GetMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.GetMemberRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).GetMember(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_GetMember_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).GetMember(ctx, req.(*v1.GetMemberRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Organizations_ListMembers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.ListMembersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).ListMembers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_ListMembers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).ListMembers(ctx, req.(*v1.ListMembersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Organizations_CreateMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.CreateMemberRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).CreateMember(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_CreateMember_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).CreateMember(ctx, req.(*v1.CreateMemberRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Organizations_UpdateMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.UpdateMemberRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).UpdateMember(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_UpdateMember_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).UpdateMember(ctx, req.(*v1.UpdateMemberRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Organizations_DeleteMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.DeleteMemberRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).DeleteMember(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_DeleteMember_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).DeleteMember(ctx, req.(*v1.DeleteMemberRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Organizations_TransferOwnership_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TransferOwnershipRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).TransferOwnership(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_TransferOwnership_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).TransferOwnership(ctx, req.(*TransferOwnershipRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Organizations_TestIamPermissions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.TestIamPermissionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).TestIamPermissions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_TestIamPermissions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).TestIamPermissions(ctx, req.(*v1.TestIamPermissionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Organizations_ServiceDesc is the grpc.ServiceDesc for Organizations service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1043,6 +1321,34 @@ var Organizations_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateInvitationPolicy",
 			Handler:    _Organizations_UpdateInvitationPolicy_Handler,
+		},
+		{
+			MethodName: "GetMember",
+			Handler:    _Organizations_GetMember_Handler,
+		},
+		{
+			MethodName: "ListMembers",
+			Handler:    _Organizations_ListMembers_Handler,
+		},
+		{
+			MethodName: "CreateMember",
+			Handler:    _Organizations_CreateMember_Handler,
+		},
+		{
+			MethodName: "UpdateMember",
+			Handler:    _Organizations_UpdateMember_Handler,
+		},
+		{
+			MethodName: "DeleteMember",
+			Handler:    _Organizations_DeleteMember_Handler,
+		},
+		{
+			MethodName: "TransferOwnership",
+			Handler:    _Organizations_TransferOwnership_Handler,
+		},
+		{
+			MethodName: "TestIamPermissions",
+			Handler:    _Organizations_TestIamPermissions_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -16,24 +16,34 @@ import (
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/filter"
 	"github.com/dashkan/pivox/internal/lro"
+	"github.com/dashkan/pivox/internal/permission"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	"github.com/dashkan/pivox/internal/resource"
+	"github.com/dashkan/pivox/internal/server"
 )
 
 type SpacesServer struct {
 	apiv1.UnimplementedSpacesServer
-	db      db.DBTX
-	queries db.Querier
-	filter  *filter.ResourceFilter
-	codec   *appkey.Codec
+	db       db.DBTX
+	queries  db.Querier
+	filter   *filter.ResourceFilter
+	codec    *appkey.Codec
+	resolver *permission.Resolver
+	caller   server.CallerIdentityResolver
 }
 
-func NewSpacesServer(pool db.DBTX, queries db.Querier, codec *appkey.Codec) *SpacesServer {
+// NewSpacesServer constructs the server. `resolver` and `caller` are
+// only consumed by the IAM-shaped handlers (TestIamPermissions today;
+// space-scope Member CRUD when writes land). Tests that only exercise
+// non-IAM RPCs may pass nil for those two.
+func NewSpacesServer(pool db.DBTX, queries db.Querier, codec *appkey.Codec, resolver *permission.Resolver, caller server.CallerIdentityResolver) *SpacesServer {
 	return &SpacesServer{
-		db:      pool,
-		queries: queries,
-		filter:  filter.SpaceFilter(),
-		codec:   codec,
+		db:       pool,
+		queries:  queries,
+		filter:   filter.SpaceFilter(),
+		codec:    codec,
+		resolver: resolver,
+		caller:   caller,
 	}
 }
 
@@ -112,7 +122,7 @@ func (s *SpacesServer) ListSpaces(ctx context.Context, req *apiv1.ListSpacesRequ
 	}
 
 	return &apiv1.ListSpacesResponse{
-		Spaces:      spaces,
+		Spaces:        spaces,
 		NextPageToken: nextPageToken,
 	}, nil
 }

@@ -23,9 +23,11 @@ package apiv1
 import (
 	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
 	context "context"
+	v1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -34,12 +36,18 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Spaces_GetSpace_FullMethodName      = "/pivox.api.v1.Spaces/GetSpace"
-	Spaces_ListSpaces_FullMethodName    = "/pivox.api.v1.Spaces/ListSpaces"
-	Spaces_CreateSpace_FullMethodName   = "/pivox.api.v1.Spaces/CreateSpace"
-	Spaces_UpdateSpace_FullMethodName   = "/pivox.api.v1.Spaces/UpdateSpace"
-	Spaces_DeleteSpace_FullMethodName   = "/pivox.api.v1.Spaces/DeleteSpace"
-	Spaces_UndeleteSpace_FullMethodName = "/pivox.api.v1.Spaces/UndeleteSpace"
+	Spaces_GetSpace_FullMethodName           = "/pivox.api.v1.Spaces/GetSpace"
+	Spaces_ListSpaces_FullMethodName         = "/pivox.api.v1.Spaces/ListSpaces"
+	Spaces_CreateSpace_FullMethodName        = "/pivox.api.v1.Spaces/CreateSpace"
+	Spaces_UpdateSpace_FullMethodName        = "/pivox.api.v1.Spaces/UpdateSpace"
+	Spaces_DeleteSpace_FullMethodName        = "/pivox.api.v1.Spaces/DeleteSpace"
+	Spaces_UndeleteSpace_FullMethodName      = "/pivox.api.v1.Spaces/UndeleteSpace"
+	Spaces_GetMember_FullMethodName          = "/pivox.api.v1.Spaces/GetMember"
+	Spaces_ListMembers_FullMethodName        = "/pivox.api.v1.Spaces/ListMembers"
+	Spaces_CreateMember_FullMethodName       = "/pivox.api.v1.Spaces/CreateMember"
+	Spaces_UpdateMember_FullMethodName       = "/pivox.api.v1.Spaces/UpdateMember"
+	Spaces_DeleteMember_FullMethodName       = "/pivox.api.v1.Spaces/DeleteMember"
+	Spaces_TestIamPermissions_FullMethodName = "/pivox.api.v1.Spaces/TestIamPermissions"
 )
 
 // SpacesClient is the client API for Spaces service.
@@ -99,6 +107,10 @@ type SpacesClient interface {
 	// This method behaves idempotently, such that deleting a `DELETE_REQUESTED`
 	// space will not cause an error, but also won't do anything.
 	//
+	// If `force=true`, the 30-day grace window is skipped: the LRO
+	// synchronously cascades all child data and frees the slug. The
+	// space is unrecoverable.
+	//
 	// The caller must have `resourcemanager.spaces.delete` permissions for this
 	// space.
 	DeleteSpace(ctx context.Context, in *DeleteSpaceRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
@@ -112,6 +124,26 @@ type SpacesClient interface {
 	// The caller must have `resourcemanager.spaces.undelete` permission for
 	// this space.
 	UndeleteSpace(ctx context.Context, in *UndeleteSpaceRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
+	// Gets a space-scope Member by resource name. Members here are
+	// only direct space-level bindings; users with implicit access via
+	// their organization role do not appear as space Members.
+	GetMember(ctx context.Context, in *v1.GetMemberRequest, opts ...grpc.CallOption) (*v1.Member, error)
+	// Lists space-scope Members. Direct bindings only — does not include
+	// members inherited from the parent org.
+	ListMembers(ctx context.Context, in *v1.ListMembersRequest, opts ...grpc.CallOption) (*v1.ListMembersResponse, error)
+	// Creates a space-scope Member binding. The principal must already
+	// be a member of the parent organization. No ≥1-owner boundary at
+	// space scope.
+	CreateMember(ctx context.Context, in *v1.CreateMemberRequest, opts ...grpc.CallOption) (*v1.Member, error)
+	// Updates a space-scope Member's role. Only `role` is mutable.
+	UpdateMember(ctx context.Context, in *v1.UpdateMemberRequest, opts ...grpc.CallOption) (*v1.Member, error)
+	// Deletes a space-scope Member binding.
+	DeleteMember(ctx context.Context, in *v1.DeleteMemberRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Returns the subset of requested permissions the caller is allowed
+	// on the space. Resolution unions direct space-level bindings with
+	// parent-org-level bindings — an org-admin is implicitly a
+	// space-admin without an explicit space-scope Member row.
+	TestIamPermissions(ctx context.Context, in *v1.TestIamPermissionsRequest, opts ...grpc.CallOption) (*v1.TestIamPermissionsResponse, error)
 }
 
 type spacesClient struct {
@@ -182,6 +214,66 @@ func (c *spacesClient) UndeleteSpace(ctx context.Context, in *UndeleteSpaceReque
 	return out, nil
 }
 
+func (c *spacesClient) GetMember(ctx context.Context, in *v1.GetMemberRequest, opts ...grpc.CallOption) (*v1.Member, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.Member)
+	err := c.cc.Invoke(ctx, Spaces_GetMember_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *spacesClient) ListMembers(ctx context.Context, in *v1.ListMembersRequest, opts ...grpc.CallOption) (*v1.ListMembersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.ListMembersResponse)
+	err := c.cc.Invoke(ctx, Spaces_ListMembers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *spacesClient) CreateMember(ctx context.Context, in *v1.CreateMemberRequest, opts ...grpc.CallOption) (*v1.Member, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.Member)
+	err := c.cc.Invoke(ctx, Spaces_CreateMember_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *spacesClient) UpdateMember(ctx context.Context, in *v1.UpdateMemberRequest, opts ...grpc.CallOption) (*v1.Member, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.Member)
+	err := c.cc.Invoke(ctx, Spaces_UpdateMember_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *spacesClient) DeleteMember(ctx context.Context, in *v1.DeleteMemberRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, Spaces_DeleteMember_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *spacesClient) TestIamPermissions(ctx context.Context, in *v1.TestIamPermissionsRequest, opts ...grpc.CallOption) (*v1.TestIamPermissionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.TestIamPermissionsResponse)
+	err := c.cc.Invoke(ctx, Spaces_TestIamPermissions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SpacesServer is the server API for Spaces service.
 // All implementations must embed UnimplementedSpacesServer
 // for forward compatibility.
@@ -239,6 +331,10 @@ type SpacesServer interface {
 	// This method behaves idempotently, such that deleting a `DELETE_REQUESTED`
 	// space will not cause an error, but also won't do anything.
 	//
+	// If `force=true`, the 30-day grace window is skipped: the LRO
+	// synchronously cascades all child data and frees the slug. The
+	// space is unrecoverable.
+	//
 	// The caller must have `resourcemanager.spaces.delete` permissions for this
 	// space.
 	DeleteSpace(context.Context, *DeleteSpaceRequest) (*longrunningpb.Operation, error)
@@ -252,6 +348,26 @@ type SpacesServer interface {
 	// The caller must have `resourcemanager.spaces.undelete` permission for
 	// this space.
 	UndeleteSpace(context.Context, *UndeleteSpaceRequest) (*longrunningpb.Operation, error)
+	// Gets a space-scope Member by resource name. Members here are
+	// only direct space-level bindings; users with implicit access via
+	// their organization role do not appear as space Members.
+	GetMember(context.Context, *v1.GetMemberRequest) (*v1.Member, error)
+	// Lists space-scope Members. Direct bindings only — does not include
+	// members inherited from the parent org.
+	ListMembers(context.Context, *v1.ListMembersRequest) (*v1.ListMembersResponse, error)
+	// Creates a space-scope Member binding. The principal must already
+	// be a member of the parent organization. No ≥1-owner boundary at
+	// space scope.
+	CreateMember(context.Context, *v1.CreateMemberRequest) (*v1.Member, error)
+	// Updates a space-scope Member's role. Only `role` is mutable.
+	UpdateMember(context.Context, *v1.UpdateMemberRequest) (*v1.Member, error)
+	// Deletes a space-scope Member binding.
+	DeleteMember(context.Context, *v1.DeleteMemberRequest) (*emptypb.Empty, error)
+	// Returns the subset of requested permissions the caller is allowed
+	// on the space. Resolution unions direct space-level bindings with
+	// parent-org-level bindings — an org-admin is implicitly a
+	// space-admin without an explicit space-scope Member row.
+	TestIamPermissions(context.Context, *v1.TestIamPermissionsRequest) (*v1.TestIamPermissionsResponse, error)
 	mustEmbedUnimplementedSpacesServer()
 }
 
@@ -279,6 +395,24 @@ func (UnimplementedSpacesServer) DeleteSpace(context.Context, *DeleteSpaceReques
 }
 func (UnimplementedSpacesServer) UndeleteSpace(context.Context, *UndeleteSpaceRequest) (*longrunningpb.Operation, error) {
 	return nil, status.Error(codes.Unimplemented, "method UndeleteSpace not implemented")
+}
+func (UnimplementedSpacesServer) GetMember(context.Context, *v1.GetMemberRequest) (*v1.Member, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetMember not implemented")
+}
+func (UnimplementedSpacesServer) ListMembers(context.Context, *v1.ListMembersRequest) (*v1.ListMembersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListMembers not implemented")
+}
+func (UnimplementedSpacesServer) CreateMember(context.Context, *v1.CreateMemberRequest) (*v1.Member, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateMember not implemented")
+}
+func (UnimplementedSpacesServer) UpdateMember(context.Context, *v1.UpdateMemberRequest) (*v1.Member, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateMember not implemented")
+}
+func (UnimplementedSpacesServer) DeleteMember(context.Context, *v1.DeleteMemberRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteMember not implemented")
+}
+func (UnimplementedSpacesServer) TestIamPermissions(context.Context, *v1.TestIamPermissionsRequest) (*v1.TestIamPermissionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method TestIamPermissions not implemented")
 }
 func (UnimplementedSpacesServer) mustEmbedUnimplementedSpacesServer() {}
 func (UnimplementedSpacesServer) testEmbeddedByValue()                {}
@@ -409,6 +543,114 @@ func _Spaces_UndeleteSpace_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Spaces_GetMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.GetMemberRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SpacesServer).GetMember(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Spaces_GetMember_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SpacesServer).GetMember(ctx, req.(*v1.GetMemberRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Spaces_ListMembers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.ListMembersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SpacesServer).ListMembers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Spaces_ListMembers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SpacesServer).ListMembers(ctx, req.(*v1.ListMembersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Spaces_CreateMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.CreateMemberRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SpacesServer).CreateMember(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Spaces_CreateMember_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SpacesServer).CreateMember(ctx, req.(*v1.CreateMemberRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Spaces_UpdateMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.UpdateMemberRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SpacesServer).UpdateMember(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Spaces_UpdateMember_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SpacesServer).UpdateMember(ctx, req.(*v1.UpdateMemberRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Spaces_DeleteMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.DeleteMemberRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SpacesServer).DeleteMember(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Spaces_DeleteMember_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SpacesServer).DeleteMember(ctx, req.(*v1.DeleteMemberRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Spaces_TestIamPermissions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.TestIamPermissionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SpacesServer).TestIamPermissions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Spaces_TestIamPermissions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SpacesServer).TestIamPermissions(ctx, req.(*v1.TestIamPermissionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Spaces_ServiceDesc is the grpc.ServiceDesc for Spaces service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -439,6 +681,30 @@ var Spaces_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UndeleteSpace",
 			Handler:    _Spaces_UndeleteSpace_Handler,
+		},
+		{
+			MethodName: "GetMember",
+			Handler:    _Spaces_GetMember_Handler,
+		},
+		{
+			MethodName: "ListMembers",
+			Handler:    _Spaces_ListMembers_Handler,
+		},
+		{
+			MethodName: "CreateMember",
+			Handler:    _Spaces_CreateMember_Handler,
+		},
+		{
+			MethodName: "UpdateMember",
+			Handler:    _Spaces_UpdateMember_Handler,
+		},
+		{
+			MethodName: "DeleteMember",
+			Handler:    _Spaces_DeleteMember_Handler,
+		},
+		{
+			MethodName: "TestIamPermissions",
+			Handler:    _Spaces_TestIamPermissions_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

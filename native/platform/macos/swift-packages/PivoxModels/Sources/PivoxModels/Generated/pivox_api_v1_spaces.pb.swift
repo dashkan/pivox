@@ -408,6 +408,13 @@ public struct Pivox_Api_V1_DeleteSpaceRequest: Sendable {
   /// without persisting it.
   public var validateOnly: Bool = false
 
+  /// Optional. If true, bypasses the 30-day grace window: the LRO
+  /// synchronously cascades all child data (assets, requests, line
+  /// items, space-scope member bindings, …) and frees the space slug.
+  /// The space is unrecoverable. Defaults to false (soft-delete with
+  /// grace; recoverable via `UndeleteSpace` until purge_time).
+  public var force: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -462,14 +469,95 @@ public struct Pivox_Api_V1_UpdateSpaceMetadata: Sendable {
   public init() {}
 }
 
-/// A status object which is used as the `metadata` field for the Operation
-/// returned by DeleteSpace.
+/// Metadata for the `DeleteSpace` LRO. Surfaces phase progression
+/// so callers can render progress UI for long `force=true` cascades.
+///
+/// With `force=false` the LRO completes once the space enters
+/// `DELETE_REQUESTED`; the data purge runs out of band after
+/// `purge_time`. With `force=true` the LRO drives the full cascade
+/// and completes only after child data is purged.
 public struct Pivox_Api_V1_DeleteSpaceMetadata: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
+  /// Output only. Current phase of the cascade.
+  public var phase: Pivox_Api_V1_DeleteSpaceMetadata.Phase = .unspecified
+
+  /// Output only. Resource name of the space being deleted.
+  public var space: String = String()
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  /// Phases of the delete LRO.
+  public enum Phase: SwiftProtobuf.Enum, Swift.CaseIterable {
+    public typealias RawValue = Int
+
+    /// Default; not used.
+    case unspecified // = 0
+
+    /// Validating preconditions; the space must be ACTIVE.
+    case validating // = 1
+
+    /// Cancelling other LROs scoped to this space (asset imports,
+    /// request workflows, etc.).
+    case cancellingOperations // = 2
+
+    /// Marking the space soft-deleted: `delete_time` set,
+    /// `purge_time = delete_time + 30d`, state → `DELETE_REQUESTED`.
+    /// Soft-delete path only.
+    case markingDeleted // = 3
+
+    /// Synchronously cascading child data (assets, requests, line
+    /// items, space-scope member bindings, …) and freeing the slug.
+    /// Force path only.
+    case purging // = 4
+
+    /// Done. For soft-delete, the space is recoverable via
+    /// `UndeleteSpace` until `purge_time`. For force, the space and
+    /// all child data are gone.
+    case completed // = 5
+    case UNRECOGNIZED(Int)
+
+    public init() {
+      self = .unspecified
+    }
+
+    public init?(rawValue: Int) {
+      switch rawValue {
+      case 0: self = .unspecified
+      case 1: self = .validating
+      case 2: self = .cancellingOperations
+      case 3: self = .markingDeleted
+      case 4: self = .purging
+      case 5: self = .completed
+      default: self = .UNRECOGNIZED(rawValue)
+      }
+    }
+
+    public var rawValue: Int {
+      switch self {
+      case .unspecified: return 0
+      case .validating: return 1
+      case .cancellingOperations: return 2
+      case .markingDeleted: return 3
+      case .purging: return 4
+      case .completed: return 5
+      case .UNRECOGNIZED(let i): return i
+      }
+    }
+
+    // The compiler won't synthesize support with the UNRECOGNIZED case.
+    public static let allCases: [Pivox_Api_V1_DeleteSpaceMetadata.Phase] = [
+      .unspecified,
+      .validating,
+      .cancellingOperations,
+      .markingDeleted,
+      .purging,
+      .completed,
+    ]
+
+  }
 
   public init() {}
 }
@@ -788,7 +876,7 @@ extension Pivox_Api_V1_UpdateSpaceRequest: SwiftProtobuf.Message, SwiftProtobuf.
 
 extension Pivox_Api_V1_DeleteSpaceRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DeleteSpaceRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}etag\0\u{3}validate_only\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}etag\0\u{3}validate_only\0\u{1}force\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -799,6 +887,7 @@ extension Pivox_Api_V1_DeleteSpaceRequest: SwiftProtobuf.Message, SwiftProtobuf.
       case 1: try { try decoder.decodeSingularStringField(value: &self.name) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.etag) }()
       case 3: try { try decoder.decodeSingularBoolField(value: &self.validateOnly) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.force) }()
       default: break
       }
     }
@@ -814,6 +903,9 @@ extension Pivox_Api_V1_DeleteSpaceRequest: SwiftProtobuf.Message, SwiftProtobuf.
     if self.validateOnly != false {
       try visitor.visitSingularBoolField(value: self.validateOnly, fieldNumber: 3)
     }
+    if self.force != false {
+      try visitor.visitSingularBoolField(value: self.force, fieldNumber: 4)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -821,6 +913,7 @@ extension Pivox_Api_V1_DeleteSpaceRequest: SwiftProtobuf.Message, SwiftProtobuf.
     if lhs.name != rhs.name {return false}
     if lhs.etag != rhs.etag {return false}
     if lhs.validateOnly != rhs.validateOnly {return false}
+    if lhs.force != rhs.force {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -906,21 +999,41 @@ extension Pivox_Api_V1_UpdateSpaceMetadata: SwiftProtobuf.Message, SwiftProtobuf
 
 extension Pivox_Api_V1_DeleteSpaceMetadata: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DeleteSpaceMetadata"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}phase\0\u{1}space\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    // Load everything into unknown fields
-    while try decoder.nextFieldNumber() != nil {}
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.phase) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.space) }()
+      default: break
+      }
+    }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.phase != .unspecified {
+      try visitor.visitSingularEnumField(value: self.phase, fieldNumber: 1)
+    }
+    if !self.space.isEmpty {
+      try visitor.visitSingularStringField(value: self.space, fieldNumber: 2)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Pivox_Api_V1_DeleteSpaceMetadata, rhs: Pivox_Api_V1_DeleteSpaceMetadata) -> Bool {
+    if lhs.phase != rhs.phase {return false}
+    if lhs.space != rhs.space {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
+}
+
+extension Pivox_Api_V1_DeleteSpaceMetadata.Phase: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0PHASE_UNSPECIFIED\0\u{1}VALIDATING\0\u{1}CANCELLING_OPERATIONS\0\u{1}MARKING_DELETED\0\u{1}PURGING\0\u{1}COMPLETED\0")
 }
 
 extension Pivox_Api_V1_UndeleteSpaceMetadata: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {

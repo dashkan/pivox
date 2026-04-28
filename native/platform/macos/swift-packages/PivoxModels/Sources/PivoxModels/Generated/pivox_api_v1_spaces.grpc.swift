@@ -24,6 +24,7 @@
 
 import GRPCCore
 import GRPCProtobuf
+import SwiftProtobuf
 
 // MARK: - pivox.api.v1.Spaces
 
@@ -112,6 +113,84 @@ public enum Pivox_Api_V1_Spaces: Sendable {
                 type: .unary
             )
         }
+        /// Namespace for "GetMember" metadata.
+        public enum GetMember: Sendable {
+            /// Request type for "GetMember".
+            public typealias Input = Pivox_Iam_V1_GetMemberRequest
+            /// Response type for "GetMember".
+            public typealias Output = Pivox_Iam_V1_Member
+            /// Descriptor for "GetMember".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "pivox.api.v1.Spaces"),
+                method: "GetMember",
+                type: .unary
+            )
+        }
+        /// Namespace for "ListMembers" metadata.
+        public enum ListMembers: Sendable {
+            /// Request type for "ListMembers".
+            public typealias Input = Pivox_Iam_V1_ListMembersRequest
+            /// Response type for "ListMembers".
+            public typealias Output = Pivox_Iam_V1_ListMembersResponse
+            /// Descriptor for "ListMembers".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "pivox.api.v1.Spaces"),
+                method: "ListMembers",
+                type: .unary
+            )
+        }
+        /// Namespace for "CreateMember" metadata.
+        public enum CreateMember: Sendable {
+            /// Request type for "CreateMember".
+            public typealias Input = Pivox_Iam_V1_CreateMemberRequest
+            /// Response type for "CreateMember".
+            public typealias Output = Pivox_Iam_V1_Member
+            /// Descriptor for "CreateMember".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "pivox.api.v1.Spaces"),
+                method: "CreateMember",
+                type: .unary
+            )
+        }
+        /// Namespace for "UpdateMember" metadata.
+        public enum UpdateMember: Sendable {
+            /// Request type for "UpdateMember".
+            public typealias Input = Pivox_Iam_V1_UpdateMemberRequest
+            /// Response type for "UpdateMember".
+            public typealias Output = Pivox_Iam_V1_Member
+            /// Descriptor for "UpdateMember".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "pivox.api.v1.Spaces"),
+                method: "UpdateMember",
+                type: .unary
+            )
+        }
+        /// Namespace for "DeleteMember" metadata.
+        public enum DeleteMember: Sendable {
+            /// Request type for "DeleteMember".
+            public typealias Input = Pivox_Iam_V1_DeleteMemberRequest
+            /// Response type for "DeleteMember".
+            public typealias Output = SwiftProtobuf.Google_Protobuf_Empty
+            /// Descriptor for "DeleteMember".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "pivox.api.v1.Spaces"),
+                method: "DeleteMember",
+                type: .unary
+            )
+        }
+        /// Namespace for "TestIamPermissions" metadata.
+        public enum TestIamPermissions: Sendable {
+            /// Request type for "TestIamPermissions".
+            public typealias Input = Pivox_Iam_V1_TestIamPermissionsRequest
+            /// Response type for "TestIamPermissions".
+            public typealias Output = Pivox_Iam_V1_TestIamPermissionsResponse
+            /// Descriptor for "TestIamPermissions".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "pivox.api.v1.Spaces"),
+                method: "TestIamPermissions",
+                type: .unary
+            )
+        }
         /// Descriptors for all methods in the "pivox.api.v1.Spaces" service.
         public static let descriptors: [GRPCCore.MethodDescriptor] = [
             GetSpace.descriptor,
@@ -119,7 +198,13 @@ public enum Pivox_Api_V1_Spaces: Sendable {
             CreateSpace.descriptor,
             UpdateSpace.descriptor,
             DeleteSpace.descriptor,
-            UndeleteSpace.descriptor
+            UndeleteSpace.descriptor,
+            GetMember.descriptor,
+            ListMembers.descriptor,
+            CreateMember.descriptor,
+            UpdateMember.descriptor,
+            DeleteMember.descriptor,
+            TestIamPermissions.descriptor
         ]
     }
 }
@@ -282,6 +367,10 @@ extension Pivox_Api_V1_Spaces {
         /// > This method behaves idempotently, such that deleting a `DELETE_REQUESTED`
         /// > space will not cause an error, but also won't do anything.
         /// > 
+        /// > If `force=true`, the 30-day grace window is skipped: the LRO
+        /// > synchronously cascades all child data and frees the slug. The
+        /// > space is unrecoverable.
+        /// > 
         /// > The caller must have `resourcemanager.spaces.delete` permissions for this
         /// > space.
         ///
@@ -331,6 +420,152 @@ extension Pivox_Api_V1_Spaces {
             deserializer: some GRPCCore.MessageDeserializer<Google_Longrunning_Operation>,
             options: GRPCCore.CallOptions,
             onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "GetMember" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Gets a space-scope Member by resource name. Members here are
+        /// > only direct space-level bindings; users with implicit access via
+        /// > their organization role do not appear as space Members.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Pivox_Iam_V1_GetMemberRequest` message.
+        ///   - serializer: A serializer for `Pivox_Iam_V1_GetMemberRequest` messages.
+        ///   - deserializer: A deserializer for `Pivox_Iam_V1_Member` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func getMember<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Iam_V1_GetMemberRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Iam_V1_GetMemberRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Pivox_Iam_V1_Member>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_Member>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "ListMembers" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Lists space-scope Members. Direct bindings only — does not include
+        /// > members inherited from the parent org.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Pivox_Iam_V1_ListMembersRequest` message.
+        ///   - serializer: A serializer for `Pivox_Iam_V1_ListMembersRequest` messages.
+        ///   - deserializer: A deserializer for `Pivox_Iam_V1_ListMembersResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func listMembers<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Iam_V1_ListMembersRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Iam_V1_ListMembersRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Pivox_Iam_V1_ListMembersResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_ListMembersResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "CreateMember" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Creates a space-scope Member binding. The principal must already
+        /// > be a member of the parent organization. No ≥1-owner boundary at
+        /// > space scope.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Pivox_Iam_V1_CreateMemberRequest` message.
+        ///   - serializer: A serializer for `Pivox_Iam_V1_CreateMemberRequest` messages.
+        ///   - deserializer: A deserializer for `Pivox_Iam_V1_Member` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func createMember<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Iam_V1_CreateMemberRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Iam_V1_CreateMemberRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Pivox_Iam_V1_Member>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_Member>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "UpdateMember" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Updates a space-scope Member's role. Only `role` is mutable.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Pivox_Iam_V1_UpdateMemberRequest` message.
+        ///   - serializer: A serializer for `Pivox_Iam_V1_UpdateMemberRequest` messages.
+        ///   - deserializer: A deserializer for `Pivox_Iam_V1_Member` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func updateMember<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Iam_V1_UpdateMemberRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Iam_V1_UpdateMemberRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Pivox_Iam_V1_Member>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_Member>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "DeleteMember" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Deletes a space-scope Member binding.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Pivox_Iam_V1_DeleteMemberRequest` message.
+        ///   - serializer: A serializer for `Pivox_Iam_V1_DeleteMemberRequest` messages.
+        ///   - deserializer: A deserializer for `SwiftProtobuf.Google_Protobuf_Empty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func deleteMember<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Iam_V1_DeleteMemberRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Iam_V1_DeleteMemberRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<SwiftProtobuf.Google_Protobuf_Empty>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<SwiftProtobuf.Google_Protobuf_Empty>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "TestIamPermissions" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Returns the subset of requested permissions the caller is allowed
+        /// > on the space. Resolution unions direct space-level bindings with
+        /// > parent-org-level bindings — an org-admin is implicitly a
+        /// > space-admin without an explicit space-scope Member row.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Pivox_Iam_V1_TestIamPermissionsRequest` message.
+        ///   - serializer: A serializer for `Pivox_Iam_V1_TestIamPermissionsRequest` messages.
+        ///   - deserializer: A deserializer for `Pivox_Iam_V1_TestIamPermissionsResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func testIamPermissions<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Iam_V1_TestIamPermissionsRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Iam_V1_TestIamPermissionsRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Pivox_Iam_V1_TestIamPermissionsResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_TestIamPermissionsResponse>) async throws -> Result
         ) async throws -> Result where Result: Sendable
     }
 
@@ -537,6 +772,10 @@ extension Pivox_Api_V1_Spaces {
         /// > This method behaves idempotently, such that deleting a `DELETE_REQUESTED`
         /// > space will not cause an error, but also won't do anything.
         /// > 
+        /// > If `force=true`, the 30-day grace window is skipped: the LRO
+        /// > synchronously cascades all child data and frees the slug. The
+        /// > space is unrecoverable.
+        /// > 
         /// > The caller must have `resourcemanager.spaces.delete` permissions for this
         /// > space.
         ///
@@ -603,6 +842,218 @@ extension Pivox_Api_V1_Spaces {
             try await self.client.unary(
                 request: request,
                 descriptor: Pivox_Api_V1_Spaces.Method.UndeleteSpace.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "GetMember" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Gets a space-scope Member by resource name. Members here are
+        /// > only direct space-level bindings; users with implicit access via
+        /// > their organization role do not appear as space Members.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Pivox_Iam_V1_GetMemberRequest` message.
+        ///   - serializer: A serializer for `Pivox_Iam_V1_GetMemberRequest` messages.
+        ///   - deserializer: A deserializer for `Pivox_Iam_V1_Member` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func getMember<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Iam_V1_GetMemberRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Iam_V1_GetMemberRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Pivox_Iam_V1_Member>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_Member>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Pivox_Api_V1_Spaces.Method.GetMember.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "ListMembers" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Lists space-scope Members. Direct bindings only — does not include
+        /// > members inherited from the parent org.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Pivox_Iam_V1_ListMembersRequest` message.
+        ///   - serializer: A serializer for `Pivox_Iam_V1_ListMembersRequest` messages.
+        ///   - deserializer: A deserializer for `Pivox_Iam_V1_ListMembersResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func listMembers<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Iam_V1_ListMembersRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Iam_V1_ListMembersRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Pivox_Iam_V1_ListMembersResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_ListMembersResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Pivox_Api_V1_Spaces.Method.ListMembers.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "CreateMember" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Creates a space-scope Member binding. The principal must already
+        /// > be a member of the parent organization. No ≥1-owner boundary at
+        /// > space scope.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Pivox_Iam_V1_CreateMemberRequest` message.
+        ///   - serializer: A serializer for `Pivox_Iam_V1_CreateMemberRequest` messages.
+        ///   - deserializer: A deserializer for `Pivox_Iam_V1_Member` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func createMember<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Iam_V1_CreateMemberRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Iam_V1_CreateMemberRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Pivox_Iam_V1_Member>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_Member>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Pivox_Api_V1_Spaces.Method.CreateMember.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "UpdateMember" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Updates a space-scope Member's role. Only `role` is mutable.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Pivox_Iam_V1_UpdateMemberRequest` message.
+        ///   - serializer: A serializer for `Pivox_Iam_V1_UpdateMemberRequest` messages.
+        ///   - deserializer: A deserializer for `Pivox_Iam_V1_Member` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func updateMember<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Iam_V1_UpdateMemberRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Iam_V1_UpdateMemberRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Pivox_Iam_V1_Member>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_Member>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Pivox_Api_V1_Spaces.Method.UpdateMember.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "DeleteMember" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Deletes a space-scope Member binding.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Pivox_Iam_V1_DeleteMemberRequest` message.
+        ///   - serializer: A serializer for `Pivox_Iam_V1_DeleteMemberRequest` messages.
+        ///   - deserializer: A deserializer for `SwiftProtobuf.Google_Protobuf_Empty` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func deleteMember<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Iam_V1_DeleteMemberRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Iam_V1_DeleteMemberRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<SwiftProtobuf.Google_Protobuf_Empty>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<SwiftProtobuf.Google_Protobuf_Empty>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Pivox_Api_V1_Spaces.Method.DeleteMember.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "TestIamPermissions" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Returns the subset of requested permissions the caller is allowed
+        /// > on the space. Resolution unions direct space-level bindings with
+        /// > parent-org-level bindings — an org-admin is implicitly a
+        /// > space-admin without an explicit space-scope Member row.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Pivox_Iam_V1_TestIamPermissionsRequest` message.
+        ///   - serializer: A serializer for `Pivox_Iam_V1_TestIamPermissionsRequest` messages.
+        ///   - deserializer: A deserializer for `Pivox_Iam_V1_TestIamPermissionsResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func testIamPermissions<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Iam_V1_TestIamPermissionsRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Iam_V1_TestIamPermissionsRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Pivox_Iam_V1_TestIamPermissionsResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_TestIamPermissionsResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Pivox_Api_V1_Spaces.Method.TestIamPermissions.descriptor,
                 serializer: serializer,
                 deserializer: deserializer,
                 options: options,
@@ -778,6 +1229,10 @@ extension Pivox_Api_V1_Spaces.ClientProtocol {
     /// > This method behaves idempotently, such that deleting a `DELETE_REQUESTED`
     /// > space will not cause an error, but also won't do anything.
     /// > 
+    /// > If `force=true`, the 30-day grace window is skipped: the LRO
+    /// > synchronously cascades all child data and frees the slug. The
+    /// > space is unrecoverable.
+    /// > 
     /// > The caller must have `resourcemanager.spaces.delete` permissions for this
     /// > space.
     ///
@@ -836,6 +1291,188 @@ extension Pivox_Api_V1_Spaces.ClientProtocol {
             request: request,
             serializer: GRPCProtobuf.ProtobufSerializer<Pivox_Api_V1_UndeleteSpaceRequest>(),
             deserializer: GRPCProtobuf.ProtobufDeserializer<Google_Longrunning_Operation>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "GetMember" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Gets a space-scope Member by resource name. Members here are
+    /// > only direct space-level bindings; users with implicit access via
+    /// > their organization role do not appear as space Members.
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Pivox_Iam_V1_GetMemberRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func getMember<Result>(
+        request: GRPCCore.ClientRequest<Pivox_Iam_V1_GetMemberRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_Member>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.getMember(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Pivox_Iam_V1_GetMemberRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Pivox_Iam_V1_Member>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListMembers" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Lists space-scope Members. Direct bindings only — does not include
+    /// > members inherited from the parent org.
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Pivox_Iam_V1_ListMembersRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func listMembers<Result>(
+        request: GRPCCore.ClientRequest<Pivox_Iam_V1_ListMembersRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_ListMembersResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.listMembers(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Pivox_Iam_V1_ListMembersRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Pivox_Iam_V1_ListMembersResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "CreateMember" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Creates a space-scope Member binding. The principal must already
+    /// > be a member of the parent organization. No ≥1-owner boundary at
+    /// > space scope.
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Pivox_Iam_V1_CreateMemberRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func createMember<Result>(
+        request: GRPCCore.ClientRequest<Pivox_Iam_V1_CreateMemberRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_Member>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.createMember(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Pivox_Iam_V1_CreateMemberRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Pivox_Iam_V1_Member>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "UpdateMember" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Updates a space-scope Member's role. Only `role` is mutable.
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Pivox_Iam_V1_UpdateMemberRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func updateMember<Result>(
+        request: GRPCCore.ClientRequest<Pivox_Iam_V1_UpdateMemberRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_Member>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.updateMember(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Pivox_Iam_V1_UpdateMemberRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Pivox_Iam_V1_Member>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "DeleteMember" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Deletes a space-scope Member binding.
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Pivox_Iam_V1_DeleteMemberRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func deleteMember<Result>(
+        request: GRPCCore.ClientRequest<Pivox_Iam_V1_DeleteMemberRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<SwiftProtobuf.Google_Protobuf_Empty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.deleteMember(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Pivox_Iam_V1_DeleteMemberRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<SwiftProtobuf.Google_Protobuf_Empty>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "TestIamPermissions" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Returns the subset of requested permissions the caller is allowed
+    /// > on the space. Resolution unions direct space-level bindings with
+    /// > parent-org-level bindings — an org-admin is implicitly a
+    /// > space-admin without an explicit space-scope Member row.
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Pivox_Iam_V1_TestIamPermissionsRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func testIamPermissions<Result>(
+        request: GRPCCore.ClientRequest<Pivox_Iam_V1_TestIamPermissionsRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_TestIamPermissionsResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.testIamPermissions(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Pivox_Iam_V1_TestIamPermissionsRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Pivox_Iam_V1_TestIamPermissionsResponse>(),
             options: options,
             onResponse: handleResponse
         )
@@ -1024,6 +1661,10 @@ extension Pivox_Api_V1_Spaces.ClientProtocol {
     /// > This method behaves idempotently, such that deleting a `DELETE_REQUESTED`
     /// > space will not cause an error, but also won't do anything.
     /// > 
+    /// > If `force=true`, the 30-day grace window is skipped: the LRO
+    /// > synchronously cascades all child data and frees the slug. The
+    /// > space is unrecoverable.
+    /// > 
     /// > The caller must have `resourcemanager.spaces.delete` permissions for this
     /// > space.
     ///
@@ -1089,6 +1730,212 @@ extension Pivox_Api_V1_Spaces.ClientProtocol {
             metadata: metadata
         )
         return try await self.undeleteSpace(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "GetMember" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Gets a space-scope Member by resource name. Members here are
+    /// > only direct space-level bindings; users with implicit access via
+    /// > their organization role do not appear as space Members.
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func getMember<Result>(
+        _ message: Pivox_Iam_V1_GetMemberRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_Member>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Pivox_Iam_V1_GetMemberRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.getMember(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListMembers" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Lists space-scope Members. Direct bindings only — does not include
+    /// > members inherited from the parent org.
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func listMembers<Result>(
+        _ message: Pivox_Iam_V1_ListMembersRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_ListMembersResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Pivox_Iam_V1_ListMembersRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.listMembers(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "CreateMember" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Creates a space-scope Member binding. The principal must already
+    /// > be a member of the parent organization. No ≥1-owner boundary at
+    /// > space scope.
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func createMember<Result>(
+        _ message: Pivox_Iam_V1_CreateMemberRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_Member>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Pivox_Iam_V1_CreateMemberRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.createMember(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "UpdateMember" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Updates a space-scope Member's role. Only `role` is mutable.
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func updateMember<Result>(
+        _ message: Pivox_Iam_V1_UpdateMemberRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_Member>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Pivox_Iam_V1_UpdateMemberRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.updateMember(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "DeleteMember" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Deletes a space-scope Member binding.
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func deleteMember<Result>(
+        _ message: Pivox_Iam_V1_DeleteMemberRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<SwiftProtobuf.Google_Protobuf_Empty>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Pivox_Iam_V1_DeleteMemberRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.deleteMember(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "TestIamPermissions" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Returns the subset of requested permissions the caller is allowed
+    /// > on the space. Resolution unions direct space-level bindings with
+    /// > parent-org-level bindings — an org-admin is implicitly a
+    /// > space-admin without an explicit space-scope Member row.
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func testIamPermissions<Result>(
+        _ message: Pivox_Iam_V1_TestIamPermissionsRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_TestIamPermissionsResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Pivox_Iam_V1_TestIamPermissionsRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.testIamPermissions(
             request: request,
             options: options,
             onResponse: handleResponse

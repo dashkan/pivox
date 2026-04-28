@@ -23,9 +23,11 @@ package apiv1
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
+	v1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
@@ -97,6 +99,78 @@ func (x Space_State) Number() protoreflect.EnumNumber {
 // Deprecated: Use Space_State.Descriptor instead.
 func (Space_State) EnumDescriptor() ([]byte, []int) {
 	return file_pivox_api_v1_spaces_proto_rawDescGZIP(), []int{0, 0}
+}
+
+// Phases of the delete LRO.
+type DeleteSpaceMetadata_Phase int32
+
+const (
+	// Default; not used.
+	DeleteSpaceMetadata_PHASE_UNSPECIFIED DeleteSpaceMetadata_Phase = 0
+	// Validating preconditions; the space must be ACTIVE.
+	DeleteSpaceMetadata_VALIDATING DeleteSpaceMetadata_Phase = 1
+	// Cancelling other LROs scoped to this space (asset imports,
+	// request workflows, etc.).
+	DeleteSpaceMetadata_CANCELLING_OPERATIONS DeleteSpaceMetadata_Phase = 2
+	// Marking the space soft-deleted: `delete_time` set,
+	// `purge_time = delete_time + 30d`, state → `DELETE_REQUESTED`.
+	// Soft-delete path only.
+	DeleteSpaceMetadata_MARKING_DELETED DeleteSpaceMetadata_Phase = 3
+	// Synchronously cascading child data (assets, requests, line
+	// items, space-scope member bindings, …) and freeing the slug.
+	// Force path only.
+	DeleteSpaceMetadata_PURGING DeleteSpaceMetadata_Phase = 4
+	// Done. For soft-delete, the space is recoverable via
+	// `UndeleteSpace` until `purge_time`. For force, the space and
+	// all child data are gone.
+	DeleteSpaceMetadata_COMPLETED DeleteSpaceMetadata_Phase = 5
+)
+
+// Enum value maps for DeleteSpaceMetadata_Phase.
+var (
+	DeleteSpaceMetadata_Phase_name = map[int32]string{
+		0: "PHASE_UNSPECIFIED",
+		1: "VALIDATING",
+		2: "CANCELLING_OPERATIONS",
+		3: "MARKING_DELETED",
+		4: "PURGING",
+		5: "COMPLETED",
+	}
+	DeleteSpaceMetadata_Phase_value = map[string]int32{
+		"PHASE_UNSPECIFIED":     0,
+		"VALIDATING":            1,
+		"CANCELLING_OPERATIONS": 2,
+		"MARKING_DELETED":       3,
+		"PURGING":               4,
+		"COMPLETED":             5,
+	}
+)
+
+func (x DeleteSpaceMetadata_Phase) Enum() *DeleteSpaceMetadata_Phase {
+	p := new(DeleteSpaceMetadata_Phase)
+	*p = x
+	return p
+}
+
+func (x DeleteSpaceMetadata_Phase) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (DeleteSpaceMetadata_Phase) Descriptor() protoreflect.EnumDescriptor {
+	return file_pivox_api_v1_spaces_proto_enumTypes[1].Descriptor()
+}
+
+func (DeleteSpaceMetadata_Phase) Type() protoreflect.EnumType {
+	return &file_pivox_api_v1_spaces_proto_enumTypes[1]
+}
+
+func (x DeleteSpaceMetadata_Phase) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use DeleteSpaceMetadata_Phase.Descriptor instead.
+func (DeleteSpaceMetadata_Phase) EnumDescriptor() ([]byte, []int) {
+	return file_pivox_api_v1_spaces_proto_rawDescGZIP(), []int{10, 0}
 }
 
 // A space is a high-level Pivox entity. It is a
@@ -668,7 +742,13 @@ type DeleteSpaceRequest struct {
 	Etag string `protobuf:"bytes,2,opt,name=etag,proto3" json:"etag,omitempty"`
 	// Optional. If set to true, the request will only validate the request
 	// without persisting it.
-	ValidateOnly  bool `protobuf:"varint,3,opt,name=validate_only,json=validateOnly,proto3" json:"validate_only,omitempty"`
+	ValidateOnly bool `protobuf:"varint,3,opt,name=validate_only,json=validateOnly,proto3" json:"validate_only,omitempty"`
+	// Optional. If true, bypasses the 30-day grace window: the LRO
+	// synchronously cascades all child data (assets, requests, line
+	// items, space-scope member bindings, …) and frees the space slug.
+	// The space is unrecoverable. Defaults to false (soft-delete with
+	// grace; recoverable via `UndeleteSpace` until purge_time).
+	Force         bool `protobuf:"varint,4,opt,name=force,proto3" json:"force,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -720,6 +800,13 @@ func (x *DeleteSpaceRequest) GetEtag() string {
 func (x *DeleteSpaceRequest) GetValidateOnly() bool {
 	if x != nil {
 		return x.ValidateOnly
+	}
+	return false
+}
+
+func (x *DeleteSpaceRequest) GetForce() bool {
+	if x != nil {
+		return x.Force
 	}
 	return false
 }
@@ -869,10 +956,19 @@ func (*UpdateSpaceMetadata) Descriptor() ([]byte, []int) {
 	return file_pivox_api_v1_spaces_proto_rawDescGZIP(), []int{9}
 }
 
-// A status object which is used as the `metadata` field for the Operation
-// returned by DeleteSpace.
+// Metadata for the `DeleteSpace` LRO. Surfaces phase progression
+// so callers can render progress UI for long `force=true` cascades.
+//
+// With `force=false` the LRO completes once the space enters
+// `DELETE_REQUESTED`; the data purge runs out of band after
+// `purge_time`. With `force=true` the LRO drives the full cascade
+// and completes only after child data is purged.
 type DeleteSpaceMetadata struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Output only. Current phase of the cascade.
+	Phase DeleteSpaceMetadata_Phase `protobuf:"varint,1,opt,name=phase,proto3,enum=pivox.api.v1.DeleteSpaceMetadata_Phase" json:"phase,omitempty"`
+	// Output only. Resource name of the space being deleted.
+	Space         string `protobuf:"bytes,2,opt,name=space,proto3" json:"space,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -905,6 +1001,20 @@ func (x *DeleteSpaceMetadata) ProtoReflect() protoreflect.Message {
 // Deprecated: Use DeleteSpaceMetadata.ProtoReflect.Descriptor instead.
 func (*DeleteSpaceMetadata) Descriptor() ([]byte, []int) {
 	return file_pivox_api_v1_spaces_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *DeleteSpaceMetadata) GetPhase() DeleteSpaceMetadata_Phase {
+	if x != nil {
+		return x.Phase
+	}
+	return DeleteSpaceMetadata_PHASE_UNSPECIFIED
+}
+
+func (x *DeleteSpaceMetadata) GetSpace() string {
+	if x != nil {
+		return x.Space
+	}
+	return ""
 }
 
 // A status object which is used as the `metadata` field for the Operation
@@ -949,7 +1059,7 @@ var File_pivox_api_v1_spaces_proto protoreflect.FileDescriptor
 
 const file_pivox_api_v1_spaces_proto_rawDesc = "" +
 	"\n" +
-	"\x19pivox/api/v1/spaces.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb1\x05\n" +
+	"\x19pivox/api/v1/spaces.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1apivox/iam/v1/members.proto\x1a\x1epivox/iam/v1/permissions.proto\"\xb1\x05\n" +
 	"\x05Space\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x124\n" +
 	"\x05state\x18\x04 \x01(\x0e2\x19.pivox.api.v1.Space.StateB\x03\xe0A\x03R\x05state\x12-\n" +
@@ -999,21 +1109,32 @@ const file_pivox_api_v1_spaces_proto_rawDesc = "" +
 	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskB\x03\xe0A\x01R\n" +
 	"updateMask\x12(\n" +
 	"\rallow_missing\x18\x03 \x01(\bB\x03\xe0A\x01R\fallowMissing\x12(\n" +
-	"\rvalidate_only\x18\x04 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\x8a\x01\n" +
+	"\rvalidate_only\x18\x04 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\xa5\x01\n" +
 	"\x12DeleteSpaceRequest\x121\n" +
 	"\x04name\x18\x01 \x01(\tB\x1d\xe0A\x02\xfaA\x11\n" +
 	"\x0fpivox.api/Space\xbaH\x03\xc8\x01\x01R\x04name\x12\x17\n" +
 	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x01R\x04etag\x12(\n" +
-	"\rvalidate_only\x18\x03 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\x8c\x01\n" +
+	"\rvalidate_only\x18\x03 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\x12\x19\n" +
+	"\x05force\x18\x04 \x01(\bB\x03\xe0A\x01R\x05force\"\x8c\x01\n" +
 	"\x14UndeleteSpaceRequest\x121\n" +
 	"\x04name\x18\x01 \x01(\tB\x1d\xe0A\x02\xfaA\x11\n" +
 	"\x0fpivox.api/Space\xbaH\x03\xc8\x01\x01R\x04name\x12\x17\n" +
 	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x01R\x04etag\x12(\n" +
 	"\rvalidate_only\x18\x03 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\x15\n" +
 	"\x13CreateSpaceMetadata\"\x15\n" +
-	"\x13UpdateSpaceMetadata\"\x15\n" +
-	"\x13DeleteSpaceMetadata\"\x17\n" +
-	"\x15UndeleteSpaceMetadata2\xe9\a\n" +
+	"\x13UpdateSpaceMetadata\"\xf0\x01\n" +
+	"\x13DeleteSpaceMetadata\x12B\n" +
+	"\x05phase\x18\x01 \x01(\x0e2'.pivox.api.v1.DeleteSpaceMetadata.PhaseB\x03\xe0A\x03R\x05phase\x12\x19\n" +
+	"\x05space\x18\x02 \x01(\tB\x03\xe0A\x03R\x05space\"z\n" +
+	"\x05Phase\x12\x15\n" +
+	"\x11PHASE_UNSPECIFIED\x10\x00\x12\x0e\n" +
+	"\n" +
+	"VALIDATING\x10\x01\x12\x19\n" +
+	"\x15CANCELLING_OPERATIONS\x10\x02\x12\x13\n" +
+	"\x0fMARKING_DELETED\x10\x03\x12\v\n" +
+	"\aPURGING\x10\x04\x12\r\n" +
+	"\tCOMPLETED\x10\x05\"\x17\n" +
+	"\x15UndeleteSpaceMetadata2\x99\x0f\n" +
 	"\x06Spaces\x12r\n" +
 	"\bGetSpace\x12\x1d.pivox.api.v1.GetSpaceRequest\x1a\x13.pivox.api.v1.Space\"2\xdaA\x04name\x82\xd3\xe4\x93\x02%\x12#/v1/{name=organizations/*/spaces/*}\x12\x85\x01\n" +
 	"\n" +
@@ -1025,7 +1146,13 @@ const file_pivox_api_v1_spaces_proto_rawDesc = "" +
 	"\vDeleteSpace\x12 .pivox.api.v1.DeleteSpaceRequest\x1a\x1d.google.longrunning.Operation\"Q\xcaA\x1c\n" +
 	"\x05Space\x12\x13DeleteSpaceMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02%*#/v1/{name=organizations/*/spaces/*}\x12\xb3\x01\n" +
 	"\rUndeleteSpace\x12\".pivox.api.v1.UndeleteSpaceRequest\x1a\x1d.google.longrunning.Operation\"_\xcaA\x1e\n" +
-	"\x05Space\x12\x15UndeleteSpaceMetadata\xdaA\x04name\x82\xd3\xe4\x93\x021:\x01*\",/v1/{name=organizations/*/spaces/*}:undelete\x1a\x0f\xcaA\fapi.pivox.ioB\xaf\x01\n" +
+	"\x05Space\x12\x15UndeleteSpaceMetadata\xdaA\x04name\x82\xd3\xe4\x93\x021:\x01*\",/v1/{name=organizations/*/spaces/*}:undelete\x12\x7f\n" +
+	"\tGetMember\x12\x1e.pivox.iam.v1.GetMemberRequest\x1a\x14.pivox.iam.v1.Member\"<\xdaA\x04name\x82\xd3\xe4\x93\x02/\x12-/v1/{name=organizations/*/spaces/*/members/*}\x12\x92\x01\n" +
+	"\vListMembers\x12 .pivox.iam.v1.ListMembersRequest\x1a!.pivox.iam.v1.ListMembersResponse\">\xdaA\x06parent\x82\xd3\xe4\x93\x02/\x12-/v1/{parent=organizations/*/spaces/*}/members\x12\xa0\x01\n" +
+	"\fCreateMember\x12!.pivox.iam.v1.CreateMemberRequest\x1a\x14.pivox.iam.v1.Member\"W\xdaA\x17parent,member,member_id\x82\xd3\xe4\x93\x027:\x06member\"-/v1/{parent=organizations/*/spaces/*}/members\x12\xa2\x01\n" +
+	"\fUpdateMember\x12!.pivox.iam.v1.UpdateMemberRequest\x1a\x14.pivox.iam.v1.Member\"Y\xdaA\x12member,update_mask\x82\xd3\xe4\x93\x02>:\x06member24/v1/{member.name=organizations/*/spaces/*/members/*}\x12\x87\x01\n" +
+	"\fDeleteMember\x12!.pivox.iam.v1.DeleteMemberRequest\x1a\x16.google.protobuf.Empty\"<\xdaA\x04name\x82\xd3\xe4\x93\x02/*-/v1/{name=organizations/*/spaces/*/members/*}\x12\xc5\x01\n" +
+	"\x12TestIamPermissions\x12'.pivox.iam.v1.TestIamPermissionsRequest\x1a(.pivox.iam.v1.TestIamPermissionsResponse\"\\\xdaA\x14resource,permissions\x82\xd3\xe4\x93\x02?:\x01*\":/v1/{resource=organizations/*/spaces/*}:testIamPermissions\x1a\x0f\xcaA\fapi.pivox.ioB\xaf\x01\n" +
 	"\x10com.pivox.api.v1B\vSpacesProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
 
 var (
@@ -1040,55 +1167,79 @@ func file_pivox_api_v1_spaces_proto_rawDescGZIP() []byte {
 	return file_pivox_api_v1_spaces_proto_rawDescData
 }
 
-var file_pivox_api_v1_spaces_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_pivox_api_v1_spaces_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
 var file_pivox_api_v1_spaces_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_pivox_api_v1_spaces_proto_goTypes = []any{
-	(Space_State)(0),                // 0: pivox.api.v1.Space.State
-	(*Space)(nil),                   // 1: pivox.api.v1.Space
-	(*GetSpaceRequest)(nil),         // 2: pivox.api.v1.GetSpaceRequest
-	(*ListSpacesRequest)(nil),       // 3: pivox.api.v1.ListSpacesRequest
-	(*ListSpacesResponse)(nil),      // 4: pivox.api.v1.ListSpacesResponse
-	(*CreateSpaceRequest)(nil),      // 5: pivox.api.v1.CreateSpaceRequest
-	(*UpdateSpaceRequest)(nil),      // 6: pivox.api.v1.UpdateSpaceRequest
-	(*DeleteSpaceRequest)(nil),      // 7: pivox.api.v1.DeleteSpaceRequest
-	(*UndeleteSpaceRequest)(nil),    // 8: pivox.api.v1.UndeleteSpaceRequest
-	(*CreateSpaceMetadata)(nil),     // 9: pivox.api.v1.CreateSpaceMetadata
-	(*UpdateSpaceMetadata)(nil),     // 10: pivox.api.v1.UpdateSpaceMetadata
-	(*DeleteSpaceMetadata)(nil),     // 11: pivox.api.v1.DeleteSpaceMetadata
-	(*UndeleteSpaceMetadata)(nil),   // 12: pivox.api.v1.UndeleteSpaceMetadata
-	nil,                             // 13: pivox.api.v1.Space.LabelsEntry
-	(*timestamppb.Timestamp)(nil),   // 14: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),   // 15: google.protobuf.FieldMask
-	(*longrunningpb.Operation)(nil), // 16: google.longrunning.Operation
+	(Space_State)(0),                      // 0: pivox.api.v1.Space.State
+	(DeleteSpaceMetadata_Phase)(0),        // 1: pivox.api.v1.DeleteSpaceMetadata.Phase
+	(*Space)(nil),                         // 2: pivox.api.v1.Space
+	(*GetSpaceRequest)(nil),               // 3: pivox.api.v1.GetSpaceRequest
+	(*ListSpacesRequest)(nil),             // 4: pivox.api.v1.ListSpacesRequest
+	(*ListSpacesResponse)(nil),            // 5: pivox.api.v1.ListSpacesResponse
+	(*CreateSpaceRequest)(nil),            // 6: pivox.api.v1.CreateSpaceRequest
+	(*UpdateSpaceRequest)(nil),            // 7: pivox.api.v1.UpdateSpaceRequest
+	(*DeleteSpaceRequest)(nil),            // 8: pivox.api.v1.DeleteSpaceRequest
+	(*UndeleteSpaceRequest)(nil),          // 9: pivox.api.v1.UndeleteSpaceRequest
+	(*CreateSpaceMetadata)(nil),           // 10: pivox.api.v1.CreateSpaceMetadata
+	(*UpdateSpaceMetadata)(nil),           // 11: pivox.api.v1.UpdateSpaceMetadata
+	(*DeleteSpaceMetadata)(nil),           // 12: pivox.api.v1.DeleteSpaceMetadata
+	(*UndeleteSpaceMetadata)(nil),         // 13: pivox.api.v1.UndeleteSpaceMetadata
+	nil,                                   // 14: pivox.api.v1.Space.LabelsEntry
+	(*timestamppb.Timestamp)(nil),         // 15: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),         // 16: google.protobuf.FieldMask
+	(*v1.GetMemberRequest)(nil),           // 17: pivox.iam.v1.GetMemberRequest
+	(*v1.ListMembersRequest)(nil),         // 18: pivox.iam.v1.ListMembersRequest
+	(*v1.CreateMemberRequest)(nil),        // 19: pivox.iam.v1.CreateMemberRequest
+	(*v1.UpdateMemberRequest)(nil),        // 20: pivox.iam.v1.UpdateMemberRequest
+	(*v1.DeleteMemberRequest)(nil),        // 21: pivox.iam.v1.DeleteMemberRequest
+	(*v1.TestIamPermissionsRequest)(nil),  // 22: pivox.iam.v1.TestIamPermissionsRequest
+	(*longrunningpb.Operation)(nil),       // 23: google.longrunning.Operation
+	(*v1.Member)(nil),                     // 24: pivox.iam.v1.Member
+	(*v1.ListMembersResponse)(nil),        // 25: pivox.iam.v1.ListMembersResponse
+	(*emptypb.Empty)(nil),                 // 26: google.protobuf.Empty
+	(*v1.TestIamPermissionsResponse)(nil), // 27: pivox.iam.v1.TestIamPermissionsResponse
 }
 var file_pivox_api_v1_spaces_proto_depIdxs = []int32{
 	0,  // 0: pivox.api.v1.Space.state:type_name -> pivox.api.v1.Space.State
-	14, // 1: pivox.api.v1.Space.create_time:type_name -> google.protobuf.Timestamp
-	14, // 2: pivox.api.v1.Space.update_time:type_name -> google.protobuf.Timestamp
-	14, // 3: pivox.api.v1.Space.delete_time:type_name -> google.protobuf.Timestamp
-	14, // 4: pivox.api.v1.Space.purge_time:type_name -> google.protobuf.Timestamp
-	13, // 5: pivox.api.v1.Space.labels:type_name -> pivox.api.v1.Space.LabelsEntry
-	1,  // 6: pivox.api.v1.ListSpacesResponse.spaces:type_name -> pivox.api.v1.Space
-	1,  // 7: pivox.api.v1.CreateSpaceRequest.space:type_name -> pivox.api.v1.Space
-	1,  // 8: pivox.api.v1.UpdateSpaceRequest.space:type_name -> pivox.api.v1.Space
-	15, // 9: pivox.api.v1.UpdateSpaceRequest.update_mask:type_name -> google.protobuf.FieldMask
-	2,  // 10: pivox.api.v1.Spaces.GetSpace:input_type -> pivox.api.v1.GetSpaceRequest
-	3,  // 11: pivox.api.v1.Spaces.ListSpaces:input_type -> pivox.api.v1.ListSpacesRequest
-	5,  // 12: pivox.api.v1.Spaces.CreateSpace:input_type -> pivox.api.v1.CreateSpaceRequest
-	6,  // 13: pivox.api.v1.Spaces.UpdateSpace:input_type -> pivox.api.v1.UpdateSpaceRequest
-	7,  // 14: pivox.api.v1.Spaces.DeleteSpace:input_type -> pivox.api.v1.DeleteSpaceRequest
-	8,  // 15: pivox.api.v1.Spaces.UndeleteSpace:input_type -> pivox.api.v1.UndeleteSpaceRequest
-	1,  // 16: pivox.api.v1.Spaces.GetSpace:output_type -> pivox.api.v1.Space
-	4,  // 17: pivox.api.v1.Spaces.ListSpaces:output_type -> pivox.api.v1.ListSpacesResponse
-	16, // 18: pivox.api.v1.Spaces.CreateSpace:output_type -> google.longrunning.Operation
-	16, // 19: pivox.api.v1.Spaces.UpdateSpace:output_type -> google.longrunning.Operation
-	16, // 20: pivox.api.v1.Spaces.DeleteSpace:output_type -> google.longrunning.Operation
-	16, // 21: pivox.api.v1.Spaces.UndeleteSpace:output_type -> google.longrunning.Operation
-	16, // [16:22] is the sub-list for method output_type
-	10, // [10:16] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	15, // 1: pivox.api.v1.Space.create_time:type_name -> google.protobuf.Timestamp
+	15, // 2: pivox.api.v1.Space.update_time:type_name -> google.protobuf.Timestamp
+	15, // 3: pivox.api.v1.Space.delete_time:type_name -> google.protobuf.Timestamp
+	15, // 4: pivox.api.v1.Space.purge_time:type_name -> google.protobuf.Timestamp
+	14, // 5: pivox.api.v1.Space.labels:type_name -> pivox.api.v1.Space.LabelsEntry
+	2,  // 6: pivox.api.v1.ListSpacesResponse.spaces:type_name -> pivox.api.v1.Space
+	2,  // 7: pivox.api.v1.CreateSpaceRequest.space:type_name -> pivox.api.v1.Space
+	2,  // 8: pivox.api.v1.UpdateSpaceRequest.space:type_name -> pivox.api.v1.Space
+	16, // 9: pivox.api.v1.UpdateSpaceRequest.update_mask:type_name -> google.protobuf.FieldMask
+	1,  // 10: pivox.api.v1.DeleteSpaceMetadata.phase:type_name -> pivox.api.v1.DeleteSpaceMetadata.Phase
+	3,  // 11: pivox.api.v1.Spaces.GetSpace:input_type -> pivox.api.v1.GetSpaceRequest
+	4,  // 12: pivox.api.v1.Spaces.ListSpaces:input_type -> pivox.api.v1.ListSpacesRequest
+	6,  // 13: pivox.api.v1.Spaces.CreateSpace:input_type -> pivox.api.v1.CreateSpaceRequest
+	7,  // 14: pivox.api.v1.Spaces.UpdateSpace:input_type -> pivox.api.v1.UpdateSpaceRequest
+	8,  // 15: pivox.api.v1.Spaces.DeleteSpace:input_type -> pivox.api.v1.DeleteSpaceRequest
+	9,  // 16: pivox.api.v1.Spaces.UndeleteSpace:input_type -> pivox.api.v1.UndeleteSpaceRequest
+	17, // 17: pivox.api.v1.Spaces.GetMember:input_type -> pivox.iam.v1.GetMemberRequest
+	18, // 18: pivox.api.v1.Spaces.ListMembers:input_type -> pivox.iam.v1.ListMembersRequest
+	19, // 19: pivox.api.v1.Spaces.CreateMember:input_type -> pivox.iam.v1.CreateMemberRequest
+	20, // 20: pivox.api.v1.Spaces.UpdateMember:input_type -> pivox.iam.v1.UpdateMemberRequest
+	21, // 21: pivox.api.v1.Spaces.DeleteMember:input_type -> pivox.iam.v1.DeleteMemberRequest
+	22, // 22: pivox.api.v1.Spaces.TestIamPermissions:input_type -> pivox.iam.v1.TestIamPermissionsRequest
+	2,  // 23: pivox.api.v1.Spaces.GetSpace:output_type -> pivox.api.v1.Space
+	5,  // 24: pivox.api.v1.Spaces.ListSpaces:output_type -> pivox.api.v1.ListSpacesResponse
+	23, // 25: pivox.api.v1.Spaces.CreateSpace:output_type -> google.longrunning.Operation
+	23, // 26: pivox.api.v1.Spaces.UpdateSpace:output_type -> google.longrunning.Operation
+	23, // 27: pivox.api.v1.Spaces.DeleteSpace:output_type -> google.longrunning.Operation
+	23, // 28: pivox.api.v1.Spaces.UndeleteSpace:output_type -> google.longrunning.Operation
+	24, // 29: pivox.api.v1.Spaces.GetMember:output_type -> pivox.iam.v1.Member
+	25, // 30: pivox.api.v1.Spaces.ListMembers:output_type -> pivox.iam.v1.ListMembersResponse
+	24, // 31: pivox.api.v1.Spaces.CreateMember:output_type -> pivox.iam.v1.Member
+	24, // 32: pivox.api.v1.Spaces.UpdateMember:output_type -> pivox.iam.v1.Member
+	26, // 33: pivox.api.v1.Spaces.DeleteMember:output_type -> google.protobuf.Empty
+	27, // 34: pivox.api.v1.Spaces.TestIamPermissions:output_type -> pivox.iam.v1.TestIamPermissionsResponse
+	23, // [23:35] is the sub-list for method output_type
+	11, // [11:23] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_pivox_api_v1_spaces_proto_init() }
@@ -1101,7 +1252,7 @@ func file_pivox_api_v1_spaces_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pivox_api_v1_spaces_proto_rawDesc), len(file_pivox_api_v1_spaces_proto_rawDesc)),
-			NumEnums:      1,
+			NumEnums:      2,
 			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,

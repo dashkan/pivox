@@ -578,73 +578,6 @@ func (x *DeleteMemberRequest) GetEtag() string {
 	return ""
 }
 
-// Request message for `Iam.TransferOwnership`.
-//
-// Promotes the named Member to `owner` role and demotes the previous
-// sole owner to `admin`. Both updates happen in a single transaction.
-// If the scope already has multiple owners, the call returns
-// `FAILED_PRECONDITION` — explicit demotion via `UpdateMember` is the
-// right path in that case.
-//
-// (-- api-linter: core::0136::http-uri-suffix=disabled
-//
-//	aip.dev/not-precedent: TransferOwnership operates on the target
-//	Member resource; the verb describes the broader transfer. --)
-type TransferOwnershipRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Required. The Member to promote to `owner`. Must be an existing
-	// member of the scope and not already an owner.
-	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	// Optional. Etag of the target Member for optimistic concurrency.
-	Etag          string `protobuf:"bytes,2,opt,name=etag,proto3" json:"etag,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *TransferOwnershipRequest) Reset() {
-	*x = TransferOwnershipRequest{}
-	mi := &file_pivox_iam_v1_members_proto_msgTypes[7]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *TransferOwnershipRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*TransferOwnershipRequest) ProtoMessage() {}
-
-func (x *TransferOwnershipRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_iam_v1_members_proto_msgTypes[7]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use TransferOwnershipRequest.ProtoReflect.Descriptor instead.
-func (*TransferOwnershipRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_iam_v1_members_proto_rawDescGZIP(), []int{7}
-}
-
-func (x *TransferOwnershipRequest) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *TransferOwnershipRequest) GetEtag() string {
-	if x != nil {
-		return x.Etag
-	}
-	return ""
-}
-
 var File_pivox_iam_v1_members_proto protoreflect.FileDescriptor
 
 const file_pivox_iam_v1_members_proto_rawDesc = "" +
@@ -689,10 +622,6 @@ const file_pivox_iam_v1_members_proto_rawDesc = "" +
 	"\x13DeleteMemberRequest\x122\n" +
 	"\x04name\x18\x01 \x01(\tB\x1e\xe0A\x02\xfaA\x12\n" +
 	"\x10pivox.iam/Member\xbaH\x03\xc8\x01\x01R\x04name\x12\x17\n" +
-	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x01R\x04etag\"g\n" +
-	"\x18TransferOwnershipRequest\x122\n" +
-	"\x04name\x18\x01 \x01(\tB\x1e\xe0A\x02\xfaA\x12\n" +
-	"\x10pivox.iam/Member\xbaH\x03\xc8\x01\x01R\x04name\x12\x17\n" +
 	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x01R\x04etagB\xb0\x01\n" +
 	"\x10com.pivox.iam.v1B\fMembersProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1;iamv1\xa2\x02\x03PIX\xaa\x02\fPivox.Iam.V1\xca\x02\fPivox\\Iam\\V1\xe2\x02\x18Pivox\\Iam\\V1\\GPBMetadata\xea\x02\x0ePivox::Iam::V1b\x06proto3"
 
@@ -708,26 +637,25 @@ func file_pivox_iam_v1_members_proto_rawDescGZIP() []byte {
 	return file_pivox_iam_v1_members_proto_rawDescData
 }
 
-var file_pivox_iam_v1_members_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_pivox_iam_v1_members_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_pivox_iam_v1_members_proto_goTypes = []any{
-	(*Member)(nil),                   // 0: pivox.iam.v1.Member
-	(*GetMemberRequest)(nil),         // 1: pivox.iam.v1.GetMemberRequest
-	(*ListMembersRequest)(nil),       // 2: pivox.iam.v1.ListMembersRequest
-	(*ListMembersResponse)(nil),      // 3: pivox.iam.v1.ListMembersResponse
-	(*CreateMemberRequest)(nil),      // 4: pivox.iam.v1.CreateMemberRequest
-	(*UpdateMemberRequest)(nil),      // 5: pivox.iam.v1.UpdateMemberRequest
-	(*DeleteMemberRequest)(nil),      // 6: pivox.iam.v1.DeleteMemberRequest
-	(*TransferOwnershipRequest)(nil), // 7: pivox.iam.v1.TransferOwnershipRequest
-	(*timestamppb.Timestamp)(nil),    // 8: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),    // 9: google.protobuf.FieldMask
+	(*Member)(nil),                // 0: pivox.iam.v1.Member
+	(*GetMemberRequest)(nil),      // 1: pivox.iam.v1.GetMemberRequest
+	(*ListMembersRequest)(nil),    // 2: pivox.iam.v1.ListMembersRequest
+	(*ListMembersResponse)(nil),   // 3: pivox.iam.v1.ListMembersResponse
+	(*CreateMemberRequest)(nil),   // 4: pivox.iam.v1.CreateMemberRequest
+	(*UpdateMemberRequest)(nil),   // 5: pivox.iam.v1.UpdateMemberRequest
+	(*DeleteMemberRequest)(nil),   // 6: pivox.iam.v1.DeleteMemberRequest
+	(*timestamppb.Timestamp)(nil), // 7: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil), // 8: google.protobuf.FieldMask
 }
 var file_pivox_iam_v1_members_proto_depIdxs = []int32{
-	8, // 0: pivox.iam.v1.Member.create_time:type_name -> google.protobuf.Timestamp
-	8, // 1: pivox.iam.v1.Member.update_time:type_name -> google.protobuf.Timestamp
+	7, // 0: pivox.iam.v1.Member.create_time:type_name -> google.protobuf.Timestamp
+	7, // 1: pivox.iam.v1.Member.update_time:type_name -> google.protobuf.Timestamp
 	0, // 2: pivox.iam.v1.ListMembersResponse.members:type_name -> pivox.iam.v1.Member
 	0, // 3: pivox.iam.v1.CreateMemberRequest.member:type_name -> pivox.iam.v1.Member
 	0, // 4: pivox.iam.v1.UpdateMemberRequest.member:type_name -> pivox.iam.v1.Member
-	9, // 5: pivox.iam.v1.UpdateMemberRequest.update_mask:type_name -> google.protobuf.FieldMask
+	8, // 5: pivox.iam.v1.UpdateMemberRequest.update_mask:type_name -> google.protobuf.FieldMask
 	6, // [6:6] is the sub-list for method output_type
 	6, // [6:6] is the sub-list for method input_type
 	6, // [6:6] is the sub-list for extension type_name
@@ -750,7 +678,7 @@ func file_pivox_iam_v1_members_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pivox_iam_v1_members_proto_rawDesc), len(file_pivox_iam_v1_members_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

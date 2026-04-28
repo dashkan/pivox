@@ -34,6 +34,52 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
   typealias Version = _2
 }
 
+/// Request message for `Organizations.TransferOwnership`.
+public struct Pivox_Api_V1_TransferOwnershipRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Required. The organization changing hands.
+  /// Format: `organizations/{organization}`.
+  public var name: String = String()
+
+  /// Required. The user receiving owner role.
+  /// Format: `organizations/{organization}/users/{user}`. Must be an
+  /// existing member of the org and not already an owner.
+  public var newOwner: String = String()
+
+  /// Optional. Etag of the organization for optimistic concurrency.
+  public var etag: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+/// Response message for `Organizations.TransferOwnership`. Returns the
+/// before/after owner refs so clients can confirm the swap and
+/// optimistically update their UI without a follow-up read of the
+/// affected Member rows.
+public struct Pivox_Api_V1_TransferOwnershipResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// The user resource that now holds the `owner` role on the
+  /// organization. Format: `organizations/{organization}/users/{user}`.
+  public var newOwner: String = String()
+
+  /// The user resource that previously held the `owner` role and was
+  /// demoted to `admin` as part of the transfer. Same format as
+  /// `new_owner`.
+  public var previousOwner: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
 /// The root node in the resource hierarchy to which a particular entity's
 /// (a company, for example) resources belong.
 public struct Pivox_Api_V1_Organization: Sendable {
@@ -949,6 +995,81 @@ public struct Pivox_Api_V1_UpdateInvitationPolicyRequest: Sendable {
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate let _protobuf_package = "pivox.api.v1"
+
+extension Pivox_Api_V1_TransferOwnershipRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".TransferOwnershipRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}new_owner\0\u{1}etag\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.newOwner) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.etag) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 1)
+    }
+    if !self.newOwner.isEmpty {
+      try visitor.visitSingularStringField(value: self.newOwner, fieldNumber: 2)
+    }
+    if !self.etag.isEmpty {
+      try visitor.visitSingularStringField(value: self.etag, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Pivox_Api_V1_TransferOwnershipRequest, rhs: Pivox_Api_V1_TransferOwnershipRequest) -> Bool {
+    if lhs.name != rhs.name {return false}
+    if lhs.newOwner != rhs.newOwner {return false}
+    if lhs.etag != rhs.etag {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Pivox_Api_V1_TransferOwnershipResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".TransferOwnershipResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}new_owner\0\u{3}previous_owner\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.newOwner) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.previousOwner) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.newOwner.isEmpty {
+      try visitor.visitSingularStringField(value: self.newOwner, fieldNumber: 1)
+    }
+    if !self.previousOwner.isEmpty {
+      try visitor.visitSingularStringField(value: self.previousOwner, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Pivox_Api_V1_TransferOwnershipResponse, rhs: Pivox_Api_V1_TransferOwnershipResponse) -> Bool {
+    if lhs.newOwner != rhs.newOwner {return false}
+    if lhs.previousOwner != rhs.previousOwner {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
 
 extension Pivox_Api_V1_Organization: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".Organization"

@@ -38,7 +38,7 @@ func TestIntegration_Spaces(t *testing.T) {
 	defer cleanup()
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		apiv1.RegisterSpacesServer(s, spaces.NewSpacesServer(pool, queries, nil))
+		apiv1.RegisterSpacesServer(s, spaces.NewSpacesServer(pool, queries, nil, nil, nil))
 	})
 
 	client := apiv1.NewSpacesClient(conn)

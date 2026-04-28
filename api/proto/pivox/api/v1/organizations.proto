@@ -22,10 +22,13 @@ import "google/api/client.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
 import "google/longrunning/operations.proto";
+import "google/protobuf/empty.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "pivox/api/v1/domains.proto";
 import "pivox/api/v1/sso.proto";
+import "pivox/iam/v1/members.proto";
+import "pivox/iam/v1/permissions.proto";
 
 option go_package = "pivox/api/v1;apiv1";
 
@@ -270,6 +273,116 @@ service Organizations {
     };
     option (google.api.method_signature) = "invitation_policy,update_mask";
   }
+
+  // Gets an org-scope Member by resource name.
+  rpc GetMember(pivox.iam.v1.GetMemberRequest) returns (pivox.iam.v1.Member) {
+    option (google.api.http) = {get: "/v1/{name=organizations/*/members/*}"};
+    option (google.api.method_signature) = "name";
+  }
+
+  // Lists org-scope Members.
+  rpc ListMembers(pivox.iam.v1.ListMembersRequest) returns (pivox.iam.v1.ListMembersResponse) {
+    option (google.api.http) = {get: "/v1/{parent=organizations/*}/members"};
+    option (google.api.method_signature) = "parent";
+  }
+
+  // Creates an org-scope Member binding. The principal (user or group)
+  // must already exist in the organization. The role must be one of
+  // the system roles (`owner`, `admin`, `editor`, `viewer`).
+  rpc CreateMember(pivox.iam.v1.CreateMemberRequest) returns (pivox.iam.v1.Member) {
+    option (google.api.http) = {
+      post: "/v1/{parent=organizations/*}/members"
+      body: "member"
+    };
+    option (google.api.method_signature) = "parent,member,member_id";
+  }
+
+  // Updates an org-scope Member's role. Only `role` is mutable.
+  // Refuses to demote the last owner — use TransferOwnership instead.
+  rpc UpdateMember(pivox.iam.v1.UpdateMemberRequest) returns (pivox.iam.v1.Member) {
+    option (google.api.http) = {
+      patch: "/v1/{member.name=organizations/*/members/*}"
+      body: "member"
+    };
+    option (google.api.method_signature) = "member,update_mask";
+  }
+
+  // Deletes an org-scope Member binding. Refuses to delete the last
+  // owner — use TransferOwnership first or promote a co-owner.
+  rpc DeleteMember(pivox.iam.v1.DeleteMemberRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/v1/{name=organizations/*/members/*}"};
+    option (google.api.method_signature) = "name";
+  }
+
+  // Atomically promotes a user to `owner` and demotes the previous
+  // sole owner to `admin` of the organization. Both updates run in a
+  // single transaction so the org never has zero owners. Returns
+  // FAILED_PRECONDITION when the org already has multiple owners
+  // (use UpdateMember + CreateMember instead) or when the new owner
+  // is already an owner.
+  rpc TransferOwnership(TransferOwnershipRequest) returns (TransferOwnershipResponse) {
+    option (google.api.http) = {
+      post: "/v1/{name=organizations/*}:transferOwnership"
+      body: "*"
+    };
+    option (google.api.method_signature) = "name,new_owner";
+  }
+
+  // Returns the subset of requested permissions the caller is allowed
+  // on the organization. UI clients use this to gate buttons and
+  // menus. Empty list (not an error) for callers with no role
+  // bindings on the org.
+  rpc TestIamPermissions(pivox.iam.v1.TestIamPermissionsRequest) returns (pivox.iam.v1.TestIamPermissionsResponse) {
+    option (google.api.http) = {
+      post: "/v1/{resource=organizations/*}:testIamPermissions"
+      body: "*"
+    };
+    option (google.api.method_signature) = "resource,permissions";
+  }
+}
+
+// Request message for `Organizations.TransferOwnership`.
+message TransferOwnershipRequest {
+  // Required. The organization changing hands.
+  // Format: `organizations/{organization}`.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.api/Organization"},
+    (buf.validate.field).required = true
+  ];
+
+  // Required. The user receiving owner role.
+  // Format: `organizations/{organization}/users/{user}`. Must be an
+  // existing member of the org and not already an owner.
+  string new_owner = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.iam/User"},
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. Etag of the organization for optimistic concurrency.
+  string etag = 3 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// Response message for `Organizations.TransferOwnership`. Returns the
+// before/after owner refs so clients can confirm the swap and
+// optimistically update their UI without a follow-up read of the
+// affected Member rows.
+message TransferOwnershipResponse {
+  // The user resource that now holds the `owner` role on the
+  // organization. Format: `organizations/{organization}/users/{user}`.
+  string new_owner = 1 [
+    (google.api.field_behavior) = OUTPUT_ONLY,
+    (google.api.resource_reference) = {type: "pivox.iam/User"}
+  ];
+
+  // The user resource that previously held the `owner` role and was
+  // demoted to `admin` as part of the transfer. Same format as
+  // `new_owner`.
+  string previous_owner = 2 [
+    (google.api.field_behavior) = OUTPUT_ONLY,
+    (google.api.resource_reference) = {type: "pivox.iam/User"}
+  ];
 }
 
 // The root node in the resource hierarchy to which a particular entity's

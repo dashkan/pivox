@@ -30,21 +30,37 @@ Non-goals: custom roles, conditional bindings, fine-grain `Get/SetIamPolicy`, an
 - **`firebase_identities` table** mirrors Firebase users; populated by Firebase Auth blocking trigger calling `/internal/v1/syncFirebaseIdentity`.
 - **`User` resource** at `organizations/{org}/users/{user}` is the per-org identity record. Independent of role assignments.
 
-### IAM model (single `Iam` service)
+### IAM model — distributed across scope-owning services
+
+**Locked principle (sub-decision #12):** *operations with scope-divergent
+behavior live on the scope-owning service. Operations that are scope-uniform
+stay on a cross-cutting service.* The earlier "single `Iam` service hosts
+everything" framing is dropped — the multi-parent dispatch baked extra
+runtime gates into a service that didn't own the resources it was gating.
 
 | Resource | Pattern | Notes |
 |---|---|---|
 | `User` | `organizations/{org}/users/{user}` | Per-org identity. |
-| `Group` | `organizations/{org}/groups/{group}` | Named user collection. |
+| `Group` | `organizations/{org}/groups/{group}` | Named user collection. Org-scoped only (no space variant in v1). |
 | `Role` | `organizations/{org}/roles/{role}` | v1 read-only. 4 system roles: `owner`, `admin`, `editor`, `viewer`. Custom roles deferred. |
 | `Permission` | `permissions/{permission}` | Global, read-only catalog. Code-defined. |
-| `Member` | `organizations/{org}/members/{member}` *and* `organizations/{org}/spaces/{space}/members/{member}` | One resource, multi-parent. `principal` = `users/*` or `groups/*`; `role` = ref to a `Role`. The single source of truth for "who has what role where." |
+| `Member` | `organizations/{org}/members/{member}` *and* `organizations/{org}/spaces/{space}/members/{member}` | Shared message type in `iam/v1`. RPCs hosted on `Organizations` (org pattern) and `Spaces` (space pattern), each with its own URL-pattern-narrowed scope. |
 
-The `Iam` service exposes:
-- Get/List/Create/Update/Delete on Members + Groups.
-- Get/List on Roles + Permissions (read-only in v1).
-- Get/List on Users; `DeleteUser` LRO.
-- `TestIamPermissions` for UI gating.
+**Service distribution:**
+
+- **`Organizations` service** (org-scope IAM):
+  - `Get/List/Create/Update/DeleteMember` — operates on `org_members` table, enforces ≥1-owner boundary
+  - `TransferOwnership` — atomic two-row swap, org-only by URL pattern
+  - `TestIamPermissions` — resolves against direct + group-derived org bindings
+- **`Spaces` service** (space-scope IAM):
+  - `Get/List/Create/Update/DeleteMember` — operates on `space_members` table, no boundary check
+  - `TestIamPermissions` — resolves against direct space bindings *unioned with* parent-org inheritance (different operation than the org-scope variant)
+- **`Iam` service** (scope-uniform residual):
+  - `Get/List` on `User`, `Role`; `DeleteUser` LRO
+  - `Get/List/Create/Update/Delete` on `Group`, plus group membership ops (groups are uniformly org-scoped)
+  - `ListPermissions` (global catalog)
+
+Cross-package shared types: `iam/v1/members.proto` defines the `Member` message + Get/List/Create/Update/Delete request types; `Organizations` and `Spaces` import and reuse them. `iam/v1/permissions.proto` similarly hosts the shared `TestIamPermissionsRequest/Response`.
 
 **Permission resolution** at runtime (interceptor): union of direct Member + Group-derived bindings. Space scope inherits from org (decision to lock — see open decisions).
 
@@ -330,15 +346,32 @@ tests, lint) and an audit-eligible commit boundary.
       (locked: open decision #1 — union with org-level).
 - [ ] Static `(role, permission) → allow` map in code.
 - [ ] Wire into gRPC server interceptor chain.
-- [ ] `Iam.TestIamPermissions` handler reuses the same resolver.
+- [ ] `Organizations.TestIamPermissions` and `Spaces.TestIamPermissions`
+      handlers reuse the same resolver (each builds its own scope-shaped
+      `Target` — `OrgTarget` or `SpaceTarget`). Per locked sub-decision #14.
 
 ### Step 3 — Member / Group / Role handlers
 
-- [ ] `Iam.{Get,List,Create,Update,Delete}Member` — multi-parent (org/space),
-      dispatches to `org_members` or `space_members` table by parent shape.
-- [ ] `Iam.{Create,List,Get,Update,Delete}Group` + `AddGroupMembers` / `RemoveGroupMembers`.
-- [ ] `Iam.{Get,List}Role`, `Iam.ListPermissions` — read-only in v1.
-- [ ] `Iam.TransferOwnership` — atomic two-row swap inside one transaction.
+(Restructured per locked sub-decisions #12–#15: scope-divergent IAM ops
+moved to scope-owning services. Original "single Iam mega-service"
+plan is obsolete.)
+
+- [ ] **`Organizations` service gains:**
+      - `Get/List/Create/Update/DeleteMember` — single-scope dispatch
+        on `org_members` table; tx-wrapped ≥1-owner boundary on Update
+        and Delete.
+      - `TransferOwnership` — atomic two-row swap inside one transaction;
+        returns `TransferOwnershipResponse {new_owner, previous_owner}`.
+      - `TestIamPermissions` — resolves direct + group-derived org bindings.
+- [ ] **`Spaces` service gains:**
+      - `Get/List/Create/Update/DeleteMember` — single-scope dispatch
+        on `space_members` table; no boundary check.
+      - `TestIamPermissions` — resolves direct + group-derived space
+        bindings unioned with parent-org inheritance.
+- [ ] **`Iam` service keeps:**
+      - `Get/List` on `User`, `Role`; `DeleteUser` LRO.
+      - `Get/List/Create/Update/Delete` on `Group` + `Add/Remove/ListGroupMembers`.
+      - `ListPermissions`.
 - [ ] `CreateOrganization` handler grows: seed 4 system roles for the new org,
       then insert `org_members` row binding the founder to the system 'owner' role.
       Restore the deferred owner-binding test assertion (tracked in step 1).
@@ -583,6 +616,58 @@ New (locked during phase 3 / phase 4 step 0):
     `UpdateOrganization`-as-LRO; the latter is the one that should be downgraded
     to sync, not this one upgraded — out of scope for phase 4.)
 
+12. **IAM service redistribution: scope-divergent ops live on the scope-owning service.** ✅ **Locked.**
+    Triggered by surfacing the placement of `TransferOwnership`, then
+    generalized: the original "single `Iam` service hosts everything"
+    framing forced multi-parent dispatch into a service that didn't own
+    the resources it was gating, with extra runtime checks on every
+    handler ("if path is space-scoped, do X; otherwise do Y"). The split:
+    `Member` CRUD, `TransferOwnership`, and `TestIamPermissions` move to
+    `Organizations` and `Spaces` services per scope; `User` reads,
+    `DeleteUser`, `Role` reads, `Group` CRUD, and `ListPermissions` stay
+    on `Iam` (uniformly org-scoped or global, no scope divergence).
+    URL patterns at the new homes constrain scope by construction —
+    invalid states (e.g., space-scoped TransferOwnership) become
+    unrepresentable rather than runtime-rejected.
+
+13. **`TransferOwnership` lives on `Organizations` with a typed response.** ✅ **Locked.**
+    Path: `POST /v1/{name=organizations/*}:transferOwnership`. Request
+    is `{name=organizations/{org}, new_owner=organizations/{org}/users/{user}}`;
+    response is a custom `TransferOwnershipResponse {new_owner, previous_owner}`
+    (option C from the response-type fork — `Empty` flagged by api-linter,
+    `Member` and `Organization` returns less informative for the
+    caller's UI update path).
+
+14. **`TestIamPermissions` is two operations sharing a wire shape, not one.** ✅ **Locked.**
+    Org-scope variant runs one query (`GetEffectiveOrgRoles`); space-scope
+    variant unions direct space bindings with parent-org inheritance
+    (three queries). Hosted on both `Organizations.TestIamPermissions`
+    and `Spaces.TestIamPermissions` — splitting surfaces the divergent
+    semantics in the API rather than hiding them behind a runtime
+    dispatch on the `resource` field shape.
+
+15. **`Member` request/response messages stay shared in `iam/v1`.** ✅ **Locked.**
+    `Organizations.GetMember` and `Spaces.GetMember` both reference
+    `pivox.iam.v1.GetMemberRequest`/`Member`. api-linter accepts
+    cross-package message reuse without complaint — confirmed by running
+    `make api-lint` after the split. No need for a separate
+    `pivox/types/v1` package.
+
+16. **`apierr.HandleResourceError` keys on `pgconn.PgError.Code` + named SQLSTATE constants, not string-matching driver messages.** ✅ **Locked.**
+    The previous `strings.Contains(err.Error(), "duplicate key")` pattern
+    is fragile across pgx versions and locales. New constants in
+    `internal/apierr/pgstate.go` cover the common SQL standard codes
+    (`PgUniqueViolation` 23505, `PgForeignKeyViolation` 23503,
+    `PgNotNullViolation` 23502, `PgCheckViolation` 23514,
+    `PgSerializationFailure` 40001). Today only `PgUniqueViolation`
+    is consumed; the others document the namespace for future handlers.
+
+17. **`DeleteSpace` gains `force` field for parity with `DeleteOrganization`.** ✅ **Locked.**
+    `DeleteSpaceRequest.force` (bool, optional) — when true, bypasses
+    the 30-day grace and synchronously cascades child data + frees
+    the slug. Same semantics + same Phase-enum extension pattern that
+    DeleteOrganization uses.
+
 ## Tracked risks (resurface when relevant)
 
 - **Founder owner-binding test downgraded in step 1.** `TestUnit_CreateOrganization_CreatesOwnerMembership`
@@ -592,3 +677,23 @@ New (locked during phase 3 / phase 4 step 0):
   **Surface again at phase 4 step 3:** restore the owner-binding tx assertion
   (org_members row with role_id pointing to the system 'owner' role) before
   shipping that handler change.
+
+- **"Race acceptable for v1" is not my call to make on IAM-layer code.**
+  During step 3b3 I drafted UpdateMember/DeleteMember with sequential
+  check-then-mutate on the ≥1-owner boundary, justified as "Pivox is
+  solo-dev pre-prod, race probability ≈ 0." The user pushed back: that's
+  a security/correctness decision, not a momentum tradeoff. Locked
+  decision afterward: tx-wrapped boundary checks for ≥1-owner gates,
+  consistent with the existing organizations-service pattern. **General
+  rule going forward:** semantic risks (correctness, security, atomicity)
+  must be surfaced before code lands; "v1 acceptable" reasoning should
+  flag user-decision territory, not silently ship.
+
+- **Apply "make invalid states unrepresentable" uniformly when forking.**
+  The TransferOwnership move (sub-decision #13) was prompted by the user
+  pointing out wire-level scope enforcement beats runtime guards. I
+  initially under-applied that logic and only the user's follow-up on
+  TestIamPermissions (sub-decision #14) generalized it. **General rule
+  going forward:** when a fork lets URL patterns / type narrowing
+  enforce a constraint, prefer that over runtime validation, even when
+  the runtime validation looks "fine."
