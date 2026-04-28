@@ -19,6 +19,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
+	"github.com/dashkan/pivox/internal/apierr"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	"github.com/dashkan/pivox/internal/testutil/mocks"
@@ -612,7 +613,7 @@ func TestUnit_CreateTagKey_DBError(t *testing.T) {
 	}{
 		{
 			name:     "duplicate key",
-			dbErr:    fmt.Errorf("ERROR: duplicate key value violates unique constraint"),
+			dbErr:    &pgconn.PgError{Code: apierr.PgUniqueViolation, Message: "duplicate key"},
 			wantCode: codes.AlreadyExists,
 		},
 		{
@@ -902,7 +903,7 @@ func TestUnit_CreateTagValue_ErrorPaths(t *testing.T) {
 			parent: "tagKeys/" + testTagKeyID.String(),
 			setup: func(mockQ *mocks.MockQuerier) {
 				mockQ.On("GetTagKey", mock.Anything, testTagKeyID).Return(testTagKey, nil)
-				mockQ.On("CreateTagValue", mock.Anything, mock.Anything).Return(db.TagValue{}, fmt.Errorf("duplicate key value violates unique constraint"))
+				mockQ.On("CreateTagValue", mock.Anything, mock.Anything).Return(db.TagValue{}, &pgconn.PgError{Code: apierr.PgUniqueViolation, Message: "duplicate key"})
 			},
 			wantCode: codes.AlreadyExists,
 		},
@@ -1228,7 +1229,7 @@ func TestUnit_CreateTagBinding_ErrorPaths(t *testing.T) {
 			tagValue: tvName,
 			setup: func(mockQ *mocks.MockQuerier) {
 				mockQ.On("GetTagValue", mock.Anything, testTagValID).Return(testTagValue, nil)
-				mockQ.On("CreateTagBinding", mock.Anything, mock.Anything).Return(db.TagBinding{}, fmt.Errorf("duplicate key value violates unique constraint"))
+				mockQ.On("CreateTagBinding", mock.Anything, mock.Anything).Return(db.TagBinding{}, &pgconn.PgError{Code: apierr.PgUniqueViolation, Message: "duplicate key"})
 			},
 			wantCode: codes.AlreadyExists,
 		},

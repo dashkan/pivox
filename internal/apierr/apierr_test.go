@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
@@ -187,6 +188,9 @@ func TestAborted(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestHandleResourceError(t *testing.T) {
+	uniqueViolation := &pgconn.PgError{Code: PgUniqueViolation, Message: "duplicate key"}
+	fkViolation := &pgconn.PgError{Code: PgForeignKeyViolation, Message: "foreign key"}
+
 	tests := []struct {
 		name     string
 		err      error
@@ -198,14 +202,24 @@ func TestHandleResourceError(t *testing.T) {
 			wantCode: codes.NotFound,
 		},
 		{
-			name:     "duplicate key maps to AlreadyExists",
-			err:      fmt.Errorf("ERROR: duplicate key value violates unique constraint"),
+			name:     "pgconn unique-violation (23505) maps to AlreadyExists",
+			err:      uniqueViolation,
 			wantCode: codes.AlreadyExists,
 		},
 		{
-			name:     "unique constraint maps to AlreadyExists",
-			err:      fmt.Errorf("pq: unique constraint violation on table foo"),
+			name:     "wrapped pgconn unique-violation maps to AlreadyExists",
+			err:      fmt.Errorf("insert failed: %w", uniqueViolation),
 			wantCode: codes.AlreadyExists,
+		},
+		{
+			name:     "pgconn FK violation (23503) does NOT map to AlreadyExists, falls through to Internal",
+			err:      fkViolation,
+			wantCode: codes.Internal,
+		},
+		{
+			name:     "string-shaped 'duplicate key' error does NOT match — must be a real PgError",
+			err:      fmt.Errorf("ERROR: duplicate key value violates unique constraint"),
+			wantCode: codes.Internal,
 		},
 		{
 			name:     "generic error maps to Internal",

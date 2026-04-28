@@ -3,10 +3,10 @@ package apierr
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -137,12 +137,22 @@ func QuotaExceeded(subject, description string, retryDelay time.Duration) error 
 	return st.Err()
 }
 
-// HandleResourceError translates common database errors into gRPC status errors.
+// HandleResourceError translates common database errors into gRPC
+// status errors. Recognizes:
+//   - `pgx.ErrNoRows` → NotFound
+//   - Postgres unique-violation (SQLSTATE 23505) → AlreadyExists
+//   - everything else → Internal
+//
+// The unique-violation check uses `errors.As` against `pgconn.PgError`
+// + the SQLSTATE constant, NOT a substring match on the error message.
+// String-matching driver messages is fragile (driver upgrades, locale
+// differences); structured codes are stable across pgx versions.
 func HandleResourceError(err error, resourceType, resourceName string) error {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return NotFound(resourceType, resourceName)
 	}
-	if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == PgUniqueViolation {
 		return AlreadyExists(resourceType, resourceName)
 	}
 	return Internal("database error")
