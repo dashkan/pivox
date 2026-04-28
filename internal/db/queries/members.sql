@@ -124,13 +124,91 @@ SELECT sm.*, r.name AS role_name
  ORDER BY sm.create_time, sm.id
  LIMIT 1000;
 
--- name: CreateOrgMember :exec
--- Inserts an org-level role binding. Caller assigns the id; the
--- schema's `uuidv7()` default applies only when omitted, but we
--- always pass an explicit id for symmetry with CreateOrganization
--- and CreateUserMembership.
+-- name: CreateOrgMember :one
+-- Inserts an org-level role binding and returns the server-generated
+-- etag + timestamps so the handler can build the Member proto
+-- response without a follow-up GetOrgMember round-trip.
 INSERT INTO org_members (id, org_id, role_id, principal_kind, principal_id, created_by)
-VALUES ($1, $2, $3, $4, $5, $6);
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, etag, create_time, update_time;
+
+-- name: CreateSpaceMember :one
+-- Companion to CreateOrgMember at space scope.
+INSERT INTO space_members (id, space_id, role_id, principal_kind, principal_id, created_by)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, etag, create_time, update_time;
+
+-- name: UpdateOrgMemberRole :one
+-- Mutates only the role; principal and scope are immutable. Bumps
+-- revision + etag. Returns the new etag + timestamps so the handler
+-- can build the Member proto response without a follow-up
+-- GetOrgMember round-trip — the caller already knows the org slug
+-- and new role name from validation.
+UPDATE org_members
+   SET role_id = $4,
+       update_time = now(),
+       revision = revision + 1,
+       etag = md5(now()::text)
+ WHERE org_id = $1
+   AND principal_kind = $2
+   AND principal_id = $3
+RETURNING id, etag, create_time, update_time;
+
+-- name: UpdateSpaceMemberRole :one
+-- Companion to UpdateOrgMemberRole at space scope.
+UPDATE space_members
+   SET role_id = $4,
+       update_time = now(),
+       revision = revision + 1,
+       etag = md5(now()::text)
+ WHERE space_id = $1
+   AND principal_kind = $2
+   AND principal_id = $3
+RETURNING id, etag, create_time, update_time;
+
+-- name: DeleteOrgMember :execrows
+-- Returns the affected-row count so the handler can map "not found"
+-- (0 rows) to gRPC NotFound rather than treating it as success.
+DELETE FROM org_members
+ WHERE org_id = $1
+   AND principal_kind = $2
+   AND principal_id = $3;
+
+-- name: DeleteSpaceMember :execrows
+DELETE FROM space_members
+ WHERE space_id = $1
+   AND principal_kind = $2
+   AND principal_id = $3;
+
+-- name: GetUserByID :one
+-- Verifies a user.id belongs to the given org and is not soft-deleted.
+-- Used by Member create handlers to confirm the principal exists in
+-- this org before inserting a binding — org_members.principal_id has
+-- no FK (it's polymorphic), so the check is application-level.
+SELECT * FROM users
+ WHERE id = $1
+   AND org_id = $2
+   AND delete_time IS NULL;
+
+-- name: GetGroupByID :one
+-- Companion to GetUserByID for groups.
+SELECT * FROM groups
+ WHERE id = $1
+   AND org_id = $2;
+
+-- name: ListOrgOwnerMembers :many
+-- Returns all org_members rows currently bound to the system 'owner'
+-- role for the given org. Used by TransferOwnership to find the
+-- current owner(s) to demote; in normal operation returns ≥1 row.
+SELECT om.id, om.org_id, om.role_id, om.principal_kind, om.principal_id,
+       om.etag, om.revision, om.created_by, om.updated_by,
+       om.create_time, om.update_time
+  FROM org_members om
+  JOIN roles r ON r.id = om.role_id
+ WHERE om.org_id = $1
+   AND r.is_system = true
+   AND r.name = 'owner'
+ ORDER BY om.create_time, om.id;
 
 -- name: GetSpaceParentOrg :one
 -- Resolves a space's parent org_id. Used by the permission resolver

@@ -260,7 +260,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	permResolver := permission.NewResolver(queries)
 	callerIdentity := server.NewCallerIdentityResolver(queries)
 
-	apiv1.RegisterSpacesServer(grpcServer, spaces.NewSpacesServer(pool, queries, appCodec, permResolver, callerIdentity))
+	apiv1.RegisterSpacesServer(grpcServer, spaces.NewSpacesServer(pool, pool, queries, appCodec, permResolver, callerIdentity))
 	apiv1.RegisterOrganizationsServer(grpcServer, organizations.NewOrganizationsServer(pool, queries, authSvc, appCodec, server.AuthenticatedUID, permResolver, callerIdentity))
 	apiv1.RegisterTagKeysServer(grpcServer, tags.NewTagKeysServer(pool, queries, appCodec))
 	apiv1.RegisterTagValuesServer(grpcServer, tags.NewTagValuesServer(pool, queries, appCodec))

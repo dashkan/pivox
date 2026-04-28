@@ -54,8 +54,8 @@ func bootstrapOrgRoles(ctx context.Context, qtx db.Querier, orgID, founderUserID
 
 	// Bind the founder to the just-created owner role. Using
 	// PrincipalKind=user (not group) because group bindings are
-	// reserved for Iam.AddGroupMembers in v1.
-	if err := qtx.CreateOrgMember(ctx, db.CreateOrgMemberParams{
+	// added later via group-membership ops.
+	if _, err := qtx.CreateOrgMember(ctx, db.CreateOrgMemberParams{
 		ID:            uuid.New(),
 		OrgID:         orgID,
 		RoleID:        ownerRoleID,

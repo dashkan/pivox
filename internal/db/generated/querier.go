@@ -61,11 +61,10 @@ type Querier interface {
 	CreateLineItem(ctx context.Context, arg CreateLineItemParams) (AssetRequestLineItem, error)
 	CreateMessage(ctx context.Context, arg CreateMessageParams) (AiMessage, error)
 	CreateOperation(ctx context.Context, arg CreateOperationParams) (Operation, error)
-	// Inserts an org-level role binding. Caller assigns the id; the
-	// schema's `uuidv7()` default applies only when omitted, but we
-	// always pass an explicit id for symmetry with CreateOrganization
-	// and CreateUserMembership.
-	CreateOrgMember(ctx context.Context, arg CreateOrgMemberParams) error
+	// Inserts an org-level role binding and returns the server-generated
+	// etag + timestamps so the handler can build the Member proto
+	// response without a follow-up GetOrgMember round-trip.
+	CreateOrgMember(ctx context.Context, arg CreateOrgMemberParams) (CreateOrgMemberRow, error)
 	CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error)
 	CreateRequest(ctx context.Context, arg CreateRequestParams) (AssetRequest, error)
 	// Inserts a role row. Used by CreateOrganization to seed the 4 system
@@ -76,6 +75,8 @@ type Querier interface {
 	// read-back round-trip.
 	CreateRole(ctx context.Context, arg CreateRoleParams) error
 	CreateSpace(ctx context.Context, arg CreateSpaceParams) (Space, error)
+	// Companion to CreateOrgMember at space scope.
+	CreateSpaceMember(ctx context.Context, arg CreateSpaceMemberParams) (CreateSpaceMemberRow, error)
 	CreateStorageAgent(ctx context.Context, arg CreateStorageAgentParams) (StorageAgent, error)
 	CreateStorageAgentAudit(ctx context.Context, arg CreateStorageAgentAuditParams) error
 	CreateStorageEndpoint(ctx context.Context, arg CreateStorageEndpointParams) (StorageEndpoint, error)
@@ -101,7 +102,11 @@ type Querier interface {
 	DeleteExpiredStorageAgentAudit(ctx context.Context) (int64, error)
 	DeleteLineItem(ctx context.Context, id uuid.UUID) error
 	DeleteOperation(ctx context.Context, id uuid.UUID) error
+	// Returns the affected-row count so the handler can map "not found"
+	// (0 rows) to gRPC NotFound rather than treating it as success.
+	DeleteOrgMember(ctx context.Context, arg DeleteOrgMemberParams) (int64, error)
 	DeleteRequest(ctx context.Context, id uuid.UUID) error
+	DeleteSpaceMember(ctx context.Context, arg DeleteSpaceMemberParams) (int64, error)
 	DeleteStorageAgent(ctx context.Context, id uuid.UUID) error
 	DeleteStorageEndpoint(ctx context.Context, id uuid.UUID) error
 	DeleteStorageGateway(ctx context.Context, id uuid.UUID) error
@@ -153,6 +158,8 @@ type Querier interface {
 	// in the org that owns this space.
 	GetEffectiveSpaceRoles(ctx context.Context, arg GetEffectiveSpaceRolesParams) ([]string, error)
 	GetFirebaseIdentityByUID(ctx context.Context, firebaseUid string) (FirebaseIdentity, error)
+	// Companion to GetUserByID for groups.
+	GetGroupByID(ctx context.Context, arg GetGroupByIDParams) (Group, error)
 	GetLatestAssetVersion(ctx context.Context, assetID uuid.UUID) (AssetVersion, error)
 	GetLineItem(ctx context.Context, id uuid.UUID) (AssetRequestLineItem, error)
 	GetLineItemByName(ctx context.Context, arg GetLineItemByNameParams) (AssetRequestLineItem, error)
@@ -202,6 +209,11 @@ type Querier interface {
 	GetTagKeyByNamespacedName(ctx context.Context, namespacedName string) (TagKey, error)
 	GetTagValue(ctx context.Context, id uuid.UUID) (TagValue, error)
 	GetTagValueByNamespacedName(ctx context.Context, namespacedName string) (TagValue, error)
+	// Verifies a user.id belongs to the given org and is not soft-deleted.
+	// Used by Member create handlers to confirm the principal exists in
+	// this org before inserting a binding — org_members.principal_id has
+	// no FK (it's polymorphic), so the check is application-level.
+	GetUserByID(ctx context.Context, arg GetUserByIDParams) (User, error)
 	GetUserMembership(ctx context.Context, arg GetUserMembershipParams) (User, error)
 	IncrementConversationMessageCount(ctx context.Context, id uuid.UUID) error
 	IsOnlyArtifactVersion(ctx context.Context, artifactID uuid.UUID) (bool, error)
@@ -221,6 +233,10 @@ type Querier interface {
 	// the handler since system-role member counts in normal orgs are far
 	// below that; cursor-based paging is added when needed.
 	ListOrgMembers(ctx context.Context, orgID uuid.UUID) ([]ListOrgMembersRow, error)
+	// Returns all org_members rows currently bound to the system 'owner'
+	// role for the given org. Used by TransferOwnership to find the
+	// current owner(s) to demote; in normal operation returns ≥1 row.
+	ListOrgOwnerMembers(ctx context.Context, orgID uuid.UUID) ([]OrgMember, error)
 	// Lists all organizations the given firebase_identity has membership in.
 	// Caller-scoped for `ListOrganizations`: every authenticated user is
 	// only ever shown orgs they belong to. Excludes soft-deleted orgs and
@@ -282,12 +298,20 @@ type Querier interface {
 	UpdateLineItem(ctx context.Context, arg UpdateLineItemParams) (AssetRequestLineItem, error)
 	UpdateLineItemState(ctx context.Context, arg UpdateLineItemStateParams) error
 	UpdateOperationMetadata(ctx context.Context, arg UpdateOperationMetadataParams) error
+	// Mutates only the role; principal and scope are immutable. Bumps
+	// revision + etag. Returns the new etag + timestamps so the handler
+	// can build the Member proto response without a follow-up
+	// GetOrgMember round-trip — the caller already knows the org slug
+	// and new role name from validation.
+	UpdateOrgMemberRole(ctx context.Context, arg UpdateOrgMemberRoleParams) (UpdateOrgMemberRoleRow, error)
 	UpdateRequest(ctx context.Context, arg UpdateRequestParams) (AssetRequest, error)
 	UpdateRequestApproved(ctx context.Context, arg UpdateRequestApprovedParams) (AssetRequest, error)
 	UpdateRequestAssignee(ctx context.Context, arg UpdateRequestAssigneeParams) (AssetRequest, error)
 	UpdateRequestDelivered(ctx context.Context, arg UpdateRequestDeliveredParams) (AssetRequest, error)
 	UpdateRequestState(ctx context.Context, arg UpdateRequestStateParams) (AssetRequest, error)
 	UpdateSpace(ctx context.Context, arg UpdateSpaceParams) (Space, error)
+	// Companion to UpdateOrgMemberRole at space scope.
+	UpdateSpaceMemberRole(ctx context.Context, arg UpdateSpaceMemberRoleParams) (UpdateSpaceMemberRoleRow, error)
 	UpdateStorageAgentCacheUsed(ctx context.Context, arg UpdateStorageAgentCacheUsedParams) error
 	UpdateStorageAgentCert(ctx context.Context, arg UpdateStorageAgentCertParams) error
 	UpdateStorageAgentHeartbeat(ctx context.Context, id uuid.UUID) error

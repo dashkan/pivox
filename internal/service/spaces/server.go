@@ -8,6 +8,7 @@ import (
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/dashkan/pivox/internal/apierr"
@@ -22,9 +23,17 @@ import (
 	"github.com/dashkan/pivox/internal/server"
 )
 
+// TxBeginner abstracts transaction creation for testability.
+// *pgxpool.Pool satisfies this interface. Same shape as the
+// organizations service's local TxBeginner.
+type TxBeginner interface {
+	Begin(ctx context.Context) (pgx.Tx, error)
+}
+
 type SpacesServer struct {
 	apiv1.UnimplementedSpacesServer
 	db       db.DBTX
+	pool     TxBeginner
 	queries  db.Querier
 	filter   *filter.ResourceFilter
 	codec    *appkey.Codec
@@ -33,12 +42,14 @@ type SpacesServer struct {
 }
 
 // NewSpacesServer constructs the server. `resolver` and `caller` are
-// only consumed by the IAM-shaped handlers (TestIamPermissions today;
-// space-scope Member CRUD when writes land). Tests that only exercise
-// non-IAM RPCs may pass nil for those two.
-func NewSpacesServer(pool db.DBTX, queries db.Querier, codec *appkey.Codec, resolver *permission.Resolver, caller server.CallerIdentityResolver) *SpacesServer {
+// only consumed by the IAM-shaped handlers (TestIamPermissions and
+// space-scope Member CRUD). `pool` is used for tx-wrapped writes
+// (CreateMember principal validation + insert atomicity); tests that
+// only exercise reads may pass nil.
+func NewSpacesServer(pool db.DBTX, txPool TxBeginner, queries db.Querier, codec *appkey.Codec, resolver *permission.Resolver, caller server.CallerIdentityResolver) *SpacesServer {
 	return &SpacesServer{
 		db:       pool,
+		pool:     txPool,
 		queries:  queries,
 		filter:   filter.SpaceFilter(),
 		codec:    codec,

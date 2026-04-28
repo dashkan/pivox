@@ -956,9 +956,9 @@ func (m *MockQuerier) GetRoleByID(ctx context.Context, id uuid.UUID) (db.Role, e
 
 // --- Org members ---
 
-func (m *MockQuerier) CreateOrgMember(ctx context.Context, arg db.CreateOrgMemberParams) error {
+func (m *MockQuerier) CreateOrgMember(ctx context.Context, arg db.CreateOrgMemberParams) (db.CreateOrgMemberRow, error) {
 	args := m.Called(ctx, arg)
-	return args.Error(0)
+	return args.Get(0).(db.CreateOrgMemberRow), args.Error(1)
 }
 
 // --- Permissions catalog ---
@@ -1000,6 +1000,51 @@ func (m *MockQuerier) ListSpaceMembers(ctx context.Context, spaceID uuid.UUID) (
 	args := m.Called(ctx, spaceID)
 	if v := args.Get(0); v != nil {
 		return v.([]db.ListSpaceMembersRow), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+// --- Member writes ---
+
+func (m *MockQuerier) CreateSpaceMember(ctx context.Context, arg db.CreateSpaceMemberParams) (db.CreateSpaceMemberRow, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.CreateSpaceMemberRow), args.Error(1)
+}
+
+func (m *MockQuerier) UpdateOrgMemberRole(ctx context.Context, arg db.UpdateOrgMemberRoleParams) (db.UpdateOrgMemberRoleRow, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.UpdateOrgMemberRoleRow), args.Error(1)
+}
+
+func (m *MockQuerier) UpdateSpaceMemberRole(ctx context.Context, arg db.UpdateSpaceMemberRoleParams) (db.UpdateSpaceMemberRoleRow, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.UpdateSpaceMemberRoleRow), args.Error(1)
+}
+
+func (m *MockQuerier) DeleteOrgMember(ctx context.Context, arg db.DeleteOrgMemberParams) (int64, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+func (m *MockQuerier) DeleteSpaceMember(ctx context.Context, arg db.DeleteSpaceMemberParams) (int64, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+func (m *MockQuerier) GetUserByID(ctx context.Context, arg db.GetUserByIDParams) (db.User, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.User), args.Error(1)
+}
+
+func (m *MockQuerier) GetGroupByID(ctx context.Context, arg db.GetGroupByIDParams) (db.Group, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.Group), args.Error(1)
+}
+
+func (m *MockQuerier) ListOrgOwnerMembers(ctx context.Context, orgID uuid.UUID) ([]db.OrgMember, error) {
+	args := m.Called(ctx, orgID)
+	if v := args.Get(0); v != nil {
+		return v.([]db.OrgMember), args.Error(1)
 	}
 	return nil, args.Error(1)
 }

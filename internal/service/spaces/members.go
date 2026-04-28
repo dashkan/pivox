@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/convert"
@@ -127,4 +128,275 @@ func (s *SpacesServer) ListMembers(ctx context.Context, req *iampb.ListMembersRe
 		out[i] = convert.SpaceMemberToProto(r, orgSlug, spaceSlug)
 	}
 	return &iampb.ListMembersResponse{Members: out}, nil
+}
+
+// CreateMember binds a principal (user or group) to a role at space
+// scope. The principal must already exist in the org that owns this
+// space; the role must be a system role (v1).
+//
+// Tx-wrapped: principal-existence check + insert run in one
+// transaction so a concurrent principal soft-delete cannot race
+// between them and produce a dead binding.
+//
+// No ≥1-owner boundary at space scope — spaces don't have a sole-
+// owner invariant; the inherited org-admin path means a space is
+// never operationally ownerless even if no direct space-owner
+// binding exists.
+func (s *SpacesServer) CreateMember(ctx context.Context, req *iampb.CreateMemberRequest) (*iampb.Member, error) {
+	orgSlug, spaceSlug, err := parseSpaceMemberParent(req.GetParent())
+	if err != nil {
+		return nil, err
+	}
+	mem := req.GetMember()
+	if mem == nil {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("member", "member is required"))
+	}
+	principalKind, principalID, err := principalFromMember(mem, orgSlug)
+	if err != nil {
+		return nil, err
+	}
+	if req.GetMemberId() != "" {
+		expected := fmt.Sprintf("%s-%s", principalKind, principalID)
+		if req.GetMemberId() != expected {
+			return nil, apierr.InvalidArgument(apierr.FieldViolation("member_id",
+				fmt.Sprintf("member_id %q does not match principal (expected %q)", req.GetMemberId(), expected)))
+		}
+	}
+	roleSlug, err := parseRoleRef(mem.GetRole(), orgSlug)
+	if err != nil {
+		return nil, err
+	}
+	org, err := s.queries.GetOrganizationByName(ctx, orgSlug)
+	if err != nil {
+		return nil, apierr.HandleResourceError(err, "Organization", req.GetParent())
+	}
+	space, err := s.queries.GetSpaceByName(ctx, db.GetSpaceByNameParams{
+		OrgID: org.ID,
+		Name:  spaceSlug,
+	})
+	if err != nil {
+		return nil, apierr.HandleResourceError(err, "Space", req.GetParent())
+	}
+	role, err := s.queries.GetSystemRole(ctx, db.GetSystemRoleParams{
+		OrgID: org.ID,
+		Name:  roleSlug,
+	})
+	if err != nil {
+		return nil, apierr.HandleResourceError(err, "Role", mem.GetRole())
+	}
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, apierr.Internal("begin transaction")
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := db.New(tx)
+
+	if err := verifyPrincipalInOrg(ctx, qtx, org.ID, principalKind, principalID); err != nil {
+		return nil, err
+	}
+
+	row, err := qtx.CreateSpaceMember(ctx, db.CreateSpaceMemberParams{
+		ID:            uuid.New(),
+		SpaceID:       space.ID,
+		RoleID:        role.ID,
+		PrincipalKind: principalKind,
+		PrincipalID:   principalID,
+	})
+	if err != nil {
+		return nil, apierr.HandleResourceError(err, "Member", req.GetParent())
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, apierr.Internal("commit transaction")
+	}
+
+	return convert.SpaceMemberRowToProto(db.GetSpaceMemberRow{
+		ID:            row.ID,
+		SpaceID:       space.ID,
+		RoleID:        role.ID,
+		PrincipalKind: principalKind,
+		PrincipalID:   principalID,
+		RoleName:      role.Name,
+		Etag:          row.Etag,
+		CreateTime:    row.CreateTime,
+		UpdateTime:    row.UpdateTime,
+	}, orgSlug, spaceSlug), nil
+}
+
+// UpdateMember mutates the role of an existing space-scope Member.
+// Only `role` is mutable. No boundary check — spaces have no
+// ≥1-owner invariant.
+func (s *SpacesServer) UpdateMember(ctx context.Context, req *iampb.UpdateMemberRequest) (*iampb.Member, error) {
+	mem := req.GetMember()
+	if mem == nil || mem.GetName() == "" {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("member.name", "member.name is required"))
+	}
+	if err := validateRoleOnlyMask(req.GetUpdateMask().GetPaths()); err != nil {
+		return nil, err
+	}
+	path, err := parseSpaceMemberName(mem.GetName())
+	if err != nil {
+		return nil, err
+	}
+	roleSlug, err := parseRoleRef(mem.GetRole(), path.orgSlug)
+	if err != nil {
+		return nil, err
+	}
+	org, err := s.queries.GetOrganizationByName(ctx, path.orgSlug)
+	if err != nil {
+		return nil, apierr.HandleResourceError(err, "Member", mem.GetName())
+	}
+	space, err := s.queries.GetSpaceByName(ctx, db.GetSpaceByNameParams{
+		OrgID: org.ID,
+		Name:  path.spaceSlug,
+	})
+	if err != nil {
+		return nil, apierr.HandleResourceError(err, "Member", mem.GetName())
+	}
+	newRole, err := s.queries.GetSystemRole(ctx, db.GetSystemRoleParams{
+		OrgID: org.ID,
+		Name:  roleSlug,
+	})
+	if err != nil {
+		return nil, apierr.HandleResourceError(err, "Role", mem.GetRole())
+	}
+	row, err := s.queries.UpdateSpaceMemberRole(ctx, db.UpdateSpaceMemberRoleParams{
+		SpaceID:       space.ID,
+		PrincipalKind: path.principalKind,
+		PrincipalID:   path.principalID,
+		RoleID:        newRole.ID,
+	})
+	if err != nil {
+		return nil, apierr.HandleResourceError(err, "Member", mem.GetName())
+	}
+	return convert.SpaceMemberRowToProto(db.GetSpaceMemberRow{
+		ID:            row.ID,
+		SpaceID:       space.ID,
+		RoleID:        newRole.ID,
+		PrincipalKind: path.principalKind,
+		PrincipalID:   path.principalID,
+		RoleName:      newRole.Name,
+		Etag:          row.Etag,
+		CreateTime:    row.CreateTime,
+		UpdateTime:    row.UpdateTime,
+	}, path.orgSlug, path.spaceSlug), nil
+}
+
+// principalFromMember pulls (kind, id) out of the Member proto's
+// `principal` oneof. The principal resource ref must address the
+// same org as the parent.
+func principalFromMember(mem *iampb.Member, parentOrgSlug string) (db.PrincipalKind, uuid.UUID, error) {
+	switch p := mem.GetPrincipal().(type) {
+	case *iampb.Member_User:
+		id, err := parsePrincipalRef(p.User, parentOrgSlug, "users")
+		if err != nil {
+			return "", uuid.Nil, err
+		}
+		return db.PrincipalKindUser, id, nil
+	case *iampb.Member_Group:
+		id, err := parsePrincipalRef(p.Group, parentOrgSlug, "groups")
+		if err != nil {
+			return "", uuid.Nil, err
+		}
+		return db.PrincipalKindGroup, id, nil
+	default:
+		return "", uuid.Nil, apierr.InvalidArgument(apierr.FieldViolation("member.principal",
+			"exactly one of `user` or `group` must be set"))
+	}
+}
+
+// parsePrincipalRef validates a principal resource string of the form
+// `organizations/{org}/{collection}/{uuid}` and confirms the org
+// matches the parent.
+func parsePrincipalRef(ref, parentOrgSlug, collection string) (uuid.UUID, error) {
+	parts := strings.Split(ref, "/")
+	if len(parts) != 4 || parts[0] != "organizations" || parts[2] != collection || parts[1] == "" || parts[3] == "" {
+		return uuid.Nil, apierr.InvalidArgument(apierr.FieldViolation("member.principal",
+			fmt.Sprintf("invalid principal ref %q: expected organizations/{org}/%s/{uuid}", ref, collection)))
+	}
+	if parts[1] != parentOrgSlug {
+		return uuid.Nil, apierr.InvalidArgument(apierr.FieldViolation("member.principal",
+			fmt.Sprintf("principal org %q does not match parent org %q", parts[1], parentOrgSlug)))
+	}
+	id, err := uuid.Parse(parts[3])
+	if err != nil {
+		return uuid.Nil, apierr.InvalidArgument(apierr.FieldViolation("member.principal",
+			fmt.Sprintf("invalid uuid in principal ref %q: %v", ref, err)))
+	}
+	return id, nil
+}
+
+// parseRoleRef extracts the role's stable name slug from
+// `organizations/{org}/roles/{role}` and verifies the org matches.
+func parseRoleRef(ref, parentOrgSlug string) (string, error) {
+	parts := strings.Split(ref, "/")
+	if len(parts) != 4 || parts[0] != "organizations" || parts[2] != "roles" || parts[1] == "" || parts[3] == "" {
+		return "", apierr.InvalidArgument(apierr.FieldViolation("member.role",
+			fmt.Sprintf("invalid role ref %q: expected organizations/{org}/roles/{role}", ref)))
+	}
+	if parts[1] != parentOrgSlug {
+		return "", apierr.InvalidArgument(apierr.FieldViolation("member.role",
+			fmt.Sprintf("role org %q does not match parent org %q", parts[1], parentOrgSlug)))
+	}
+	return parts[3], nil
+}
+
+// verifyPrincipalInOrg confirms the principal exists in this org so
+// we don't insert dead bindings (space_members.principal_id is NOT a
+// DB FK — it's polymorphic).
+func verifyPrincipalInOrg(ctx context.Context, qtx db.Querier, orgID uuid.UUID, kind db.PrincipalKind, id uuid.UUID) error {
+	switch kind {
+	case db.PrincipalKindUser:
+		if _, err := qtx.GetUserByID(ctx, db.GetUserByIDParams{ID: id, OrgID: orgID}); err != nil {
+			return apierr.HandleResourceError(err, "User", id.String())
+		}
+	case db.PrincipalKindGroup:
+		if _, err := qtx.GetGroupByID(ctx, db.GetGroupByIDParams{ID: id, OrgID: orgID}); err != nil {
+			return apierr.HandleResourceError(err, "Group", id.String())
+		}
+	}
+	return nil
+}
+
+// validateRoleOnlyMask rejects update_mask paths other than "role".
+func validateRoleOnlyMask(paths []string) error {
+	for _, p := range paths {
+		if p != "role" {
+			return apierr.InvalidArgument(apierr.FieldViolation("update_mask",
+				fmt.Sprintf("only `role` is mutable; got %q", p)))
+		}
+	}
+	return nil
+}
+
+// DeleteMember removes a space-scope Member binding. No boundary
+// check.
+func (s *SpacesServer) DeleteMember(ctx context.Context, req *iampb.DeleteMemberRequest) (*emptypb.Empty, error) {
+	path, err := parseSpaceMemberName(req.GetName())
+	if err != nil {
+		return nil, err
+	}
+	org, err := s.queries.GetOrganizationByName(ctx, path.orgSlug)
+	if err != nil {
+		return nil, apierr.HandleResourceError(err, "Member", req.GetName())
+	}
+	space, err := s.queries.GetSpaceByName(ctx, db.GetSpaceByNameParams{
+		OrgID: org.ID,
+		Name:  path.spaceSlug,
+	})
+	if err != nil {
+		return nil, apierr.HandleResourceError(err, "Member", req.GetName())
+	}
+	n, err := s.queries.DeleteSpaceMember(ctx, db.DeleteSpaceMemberParams{
+		SpaceID:       space.ID,
+		PrincipalKind: path.principalKind,
+		PrincipalID:   path.principalID,
+	})
+	if err != nil {
+		return nil, apierr.Internal("delete space member")
+	}
+	if n == 0 {
+		return nil, apierr.NotFound("Member", req.GetName())
+	}
+	return &emptypb.Empty{}, nil
 }

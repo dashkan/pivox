@@ -259,14 +259,21 @@ func expectGetIdentity(q *mocks.MockQuerier) {
 }
 
 // expectBootstrapExecs absorbs the role-seeding + org_member insert
-// Exec calls produced by the founder bootstrap (5 calls per
-// successful CreateOrganization: 4 role inserts + 1 org_member
-// insert). Tests at this layer don't pin SQL params for those —
+// produced by the founder bootstrap: 4 Exec calls (role :exec
+// inserts) + 1 QueryRow (CreateOrgMember :one INSERT…RETURNING).
+// Tests at this layer don't pin SQL params for those —
 // `bootstrap_test.go` covers the bootstrap shape directly. This
-// helper just keeps mockTx from panicking on unexpected Exec.
+// helper just keeps mockTx from panicking on unexpected calls.
 func expectBootstrapExecs(tx *mockTx) {
 	tx.On("Exec", mock.Anything, mock.Anything, mock.Anything).
 		Return(pgconn.NewCommandTag("INSERT 0 1"), nil)
+	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
+		Return(&mockRow{scanFunc: func(dest ...interface{}) error {
+			// CreateOrgMember RETURNING id, etag, create_time,
+			// update_time. Default-value scans are sufficient since
+			// the bootstrap code path discards the returned row.
+			return nil
+		}})
 }
 
 // membershipRow returns a mockRow whose Scan populates a db.User
@@ -485,9 +492,11 @@ func TestUnit_CreateOrganization_CreatesOwnerMembership(t *testing.T) {
 	// `bootstrap_test.go` (TestBootstrapOrgRoles_SeedsFourSystemRoles)
 	// against a MockQuerier directly — no need to re-parse SQL here.
 	// What this test verifies is *integration*: that CreateOrganization
-	// actually invokes the bootstrap, observable as exactly 5 Exec
-	// calls on the tx (4 role seeds + 1 org_member insert).
-	tx.AssertNumberOfCalls(t, "Exec", 5)
+	// actually invokes the bootstrap, observable as exactly 4 Exec
+	// calls on the tx (the 4 system role :exec inserts). The
+	// CreateOrgMember insert is a :one RETURNING and goes through
+	// QueryRow, accounted for separately.
+	tx.AssertNumberOfCalls(t, "Exec", 4)
 }
 
 // TestUnit_CreateOrganization_NoAuthContext asserts that the handler

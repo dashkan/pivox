@@ -40,7 +40,7 @@ func TestBootstrapOrgRoles_SeedsFourSystemRoles(t *testing.T) {
 	q.On("CreateOrgMember", mock.Anything, mock.MatchedBy(func(p db.CreateOrgMemberParams) bool {
 		memberArg = p
 		return true
-	})).Return(nil).Once()
+	})).Return(db.CreateOrgMemberRow{}, nil).Once()
 
 	err := bootstrapOrgRoles(context.Background(), q, orgID, founderUserID, createdBy)
 	require.NoError(t, err)
@@ -91,7 +91,7 @@ func TestBootstrapOrgRoles_OwnerBindingFailureBubblesUp(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	q.On("CreateRole", mock.Anything, mock.Anything).Return(nil).Times(4)
 	q.On("CreateOrgMember", mock.Anything, mock.Anything).
-		Return(errors.New("fk violation")).Once()
+		Return(db.CreateOrgMemberRow{}, errors.New("fk violation")).Once()
 
 	err := bootstrapOrgRoles(context.Background(), q,
 		uuid.New(), uuid.New(), "")

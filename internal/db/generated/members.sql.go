@@ -12,9 +12,10 @@ import (
 	"github.com/google/uuid"
 )
 
-const createOrgMember = `-- name: CreateOrgMember :exec
+const createOrgMember = `-- name: CreateOrgMember :one
 INSERT INTO org_members (id, org_id, role_id, principal_kind, principal_id, created_by)
 VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, etag, create_time, update_time
 `
 
 type CreateOrgMemberParams struct {
@@ -26,12 +27,18 @@ type CreateOrgMemberParams struct {
 	CreatedBy     string        `json:"created_by"`
 }
 
-// Inserts an org-level role binding. Caller assigns the id; the
-// schema's `uuidv7()` default applies only when omitted, but we
-// always pass an explicit id for symmetry with CreateOrganization
-// and CreateUserMembership.
-func (q *Queries) CreateOrgMember(ctx context.Context, arg CreateOrgMemberParams) error {
-	_, err := q.db.Exec(ctx, createOrgMember,
+type CreateOrgMemberRow struct {
+	ID         uuid.UUID `json:"id"`
+	Etag       string    `json:"etag"`
+	CreateTime time.Time `json:"create_time"`
+	UpdateTime time.Time `json:"update_time"`
+}
+
+// Inserts an org-level role binding and returns the server-generated
+// etag + timestamps so the handler can build the Member proto
+// response without a follow-up GetOrgMember round-trip.
+func (q *Queries) CreateOrgMember(ctx context.Context, arg CreateOrgMemberParams) (CreateOrgMemberRow, error) {
+	row := q.db.QueryRow(ctx, createOrgMember,
 		arg.ID,
 		arg.OrgID,
 		arg.RoleID,
@@ -39,7 +46,100 @@ func (q *Queries) CreateOrgMember(ctx context.Context, arg CreateOrgMemberParams
 		arg.PrincipalID,
 		arg.CreatedBy,
 	)
-	return err
+	var i CreateOrgMemberRow
+	err := row.Scan(
+		&i.ID,
+		&i.Etag,
+		&i.CreateTime,
+		&i.UpdateTime,
+	)
+	return i, err
+}
+
+const createSpaceMember = `-- name: CreateSpaceMember :one
+INSERT INTO space_members (id, space_id, role_id, principal_kind, principal_id, created_by)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, etag, create_time, update_time
+`
+
+type CreateSpaceMemberParams struct {
+	ID            uuid.UUID     `json:"id"`
+	SpaceID       uuid.UUID     `json:"space_id"`
+	RoleID        uuid.UUID     `json:"role_id"`
+	PrincipalKind PrincipalKind `json:"principal_kind"`
+	PrincipalID   uuid.UUID     `json:"principal_id"`
+	CreatedBy     string        `json:"created_by"`
+}
+
+type CreateSpaceMemberRow struct {
+	ID         uuid.UUID `json:"id"`
+	Etag       string    `json:"etag"`
+	CreateTime time.Time `json:"create_time"`
+	UpdateTime time.Time `json:"update_time"`
+}
+
+// Companion to CreateOrgMember at space scope.
+func (q *Queries) CreateSpaceMember(ctx context.Context, arg CreateSpaceMemberParams) (CreateSpaceMemberRow, error) {
+	row := q.db.QueryRow(ctx, createSpaceMember,
+		arg.ID,
+		arg.SpaceID,
+		arg.RoleID,
+		arg.PrincipalKind,
+		arg.PrincipalID,
+		arg.CreatedBy,
+	)
+	var i CreateSpaceMemberRow
+	err := row.Scan(
+		&i.ID,
+		&i.Etag,
+		&i.CreateTime,
+		&i.UpdateTime,
+	)
+	return i, err
+}
+
+const deleteOrgMember = `-- name: DeleteOrgMember :execrows
+DELETE FROM org_members
+ WHERE org_id = $1
+   AND principal_kind = $2
+   AND principal_id = $3
+`
+
+type DeleteOrgMemberParams struct {
+	OrgID         uuid.UUID     `json:"org_id"`
+	PrincipalKind PrincipalKind `json:"principal_kind"`
+	PrincipalID   uuid.UUID     `json:"principal_id"`
+}
+
+// Returns the affected-row count so the handler can map "not found"
+// (0 rows) to gRPC NotFound rather than treating it as success.
+func (q *Queries) DeleteOrgMember(ctx context.Context, arg DeleteOrgMemberParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteOrgMember, arg.OrgID, arg.PrincipalKind, arg.PrincipalID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteSpaceMember = `-- name: DeleteSpaceMember :execrows
+DELETE FROM space_members
+ WHERE space_id = $1
+   AND principal_kind = $2
+   AND principal_id = $3
+`
+
+type DeleteSpaceMemberParams struct {
+	SpaceID       uuid.UUID     `json:"space_id"`
+	PrincipalKind PrincipalKind `json:"principal_kind"`
+	PrincipalID   uuid.UUID     `json:"principal_id"`
+}
+
+func (q *Queries) DeleteSpaceMember(ctx context.Context, arg DeleteSpaceMemberParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteSpaceMember, arg.SpaceID, arg.PrincipalKind, arg.PrincipalID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const getEffectiveOrgRoles = `-- name: GetEffectiveOrgRoles :many
@@ -174,6 +274,38 @@ func (q *Queries) GetEffectiveSpaceRoles(ctx context.Context, arg GetEffectiveSp
 	return items, nil
 }
 
+const getGroupByID = `-- name: GetGroupByID :one
+SELECT id, org_id, display_name, description, annotations, state, etag, revision, created_by, updated_by, create_time, update_time FROM groups
+ WHERE id = $1
+   AND org_id = $2
+`
+
+type GetGroupByIDParams struct {
+	ID    uuid.UUID `json:"id"`
+	OrgID uuid.UUID `json:"org_id"`
+}
+
+// Companion to GetUserByID for groups.
+func (q *Queries) GetGroupByID(ctx context.Context, arg GetGroupByIDParams) (Group, error) {
+	row := q.db.QueryRow(ctx, getGroupByID, arg.ID, arg.OrgID)
+	var i Group
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.DisplayName,
+		&i.Description,
+		&i.Annotations,
+		&i.State,
+		&i.Etag,
+		&i.Revision,
+		&i.CreatedBy,
+		&i.UpdatedBy,
+		&i.CreateTime,
+		&i.UpdateTime,
+	)
+	return i, err
+}
+
 const getOrgMember = `-- name: GetOrgMember :one
 SELECT om.id, om.org_id, om.role_id, om.principal_kind, om.principal_id, om.etag, om.revision, om.created_by, om.updated_by, om.create_time, om.update_time, r.name AS role_name
   FROM org_members om
@@ -296,6 +428,40 @@ func (q *Queries) GetSpaceParentOrg(ctx context.Context, id uuid.UUID) (uuid.UUI
 	return org_id, err
 }
 
+const getUserByID = `-- name: GetUserByID :one
+SELECT id, org_id, firebase_identity_id, etag, revision, deleted_by, create_time, update_time, delete_time, purge_time FROM users
+ WHERE id = $1
+   AND org_id = $2
+   AND delete_time IS NULL
+`
+
+type GetUserByIDParams struct {
+	ID    uuid.UUID `json:"id"`
+	OrgID uuid.UUID `json:"org_id"`
+}
+
+// Verifies a user.id belongs to the given org and is not soft-deleted.
+// Used by Member create handlers to confirm the principal exists in
+// this org before inserting a binding — org_members.principal_id has
+// no FK (it's polymorphic), so the check is application-level.
+func (q *Queries) GetUserByID(ctx context.Context, arg GetUserByIDParams) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByID, arg.ID, arg.OrgID)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.FirebaseIdentityID,
+		&i.Etag,
+		&i.Revision,
+		&i.DeletedBy,
+		&i.CreateTime,
+		&i.UpdateTime,
+		&i.DeleteTime,
+		&i.PurgeTime,
+	)
+	return i, err
+}
+
 const listOrgMembers = `-- name: ListOrgMembers :many
 SELECT om.id, om.org_id, om.role_id, om.principal_kind, om.principal_id, om.etag, om.revision, om.created_by, om.updated_by, om.create_time, om.update_time, r.name AS role_name
   FROM org_members om
@@ -346,6 +512,53 @@ func (q *Queries) ListOrgMembers(ctx context.Context, orgID uuid.UUID) ([]ListOr
 			&i.CreateTime,
 			&i.UpdateTime,
 			&i.RoleName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOrgOwnerMembers = `-- name: ListOrgOwnerMembers :many
+SELECT om.id, om.org_id, om.role_id, om.principal_kind, om.principal_id,
+       om.etag, om.revision, om.created_by, om.updated_by,
+       om.create_time, om.update_time
+  FROM org_members om
+  JOIN roles r ON r.id = om.role_id
+ WHERE om.org_id = $1
+   AND r.is_system = true
+   AND r.name = 'owner'
+ ORDER BY om.create_time, om.id
+`
+
+// Returns all org_members rows currently bound to the system 'owner'
+// role for the given org. Used by TransferOwnership to find the
+// current owner(s) to demote; in normal operation returns ≥1 row.
+func (q *Queries) ListOrgOwnerMembers(ctx context.Context, orgID uuid.UUID) ([]OrgMember, error) {
+	rows, err := q.db.Query(ctx, listOrgOwnerMembers, orgID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []OrgMember{}
+	for rows.Next() {
+		var i OrgMember
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.RoleID,
+			&i.PrincipalKind,
+			&i.PrincipalID,
+			&i.Etag,
+			&i.Revision,
+			&i.CreatedBy,
+			&i.UpdatedBy,
+			&i.CreateTime,
+			&i.UpdateTime,
 		); err != nil {
 			return nil, err
 		}
@@ -414,4 +627,96 @@ func (q *Queries) ListSpaceMembers(ctx context.Context, spaceID uuid.UUID) ([]Li
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateOrgMemberRole = `-- name: UpdateOrgMemberRole :one
+UPDATE org_members
+   SET role_id = $4,
+       update_time = now(),
+       revision = revision + 1,
+       etag = md5(now()::text)
+ WHERE org_id = $1
+   AND principal_kind = $2
+   AND principal_id = $3
+RETURNING id, etag, create_time, update_time
+`
+
+type UpdateOrgMemberRoleParams struct {
+	OrgID         uuid.UUID     `json:"org_id"`
+	PrincipalKind PrincipalKind `json:"principal_kind"`
+	PrincipalID   uuid.UUID     `json:"principal_id"`
+	RoleID        uuid.UUID     `json:"role_id"`
+}
+
+type UpdateOrgMemberRoleRow struct {
+	ID         uuid.UUID `json:"id"`
+	Etag       string    `json:"etag"`
+	CreateTime time.Time `json:"create_time"`
+	UpdateTime time.Time `json:"update_time"`
+}
+
+// Mutates only the role; principal and scope are immutable. Bumps
+// revision + etag. Returns the new etag + timestamps so the handler
+// can build the Member proto response without a follow-up
+// GetOrgMember round-trip — the caller already knows the org slug
+// and new role name from validation.
+func (q *Queries) UpdateOrgMemberRole(ctx context.Context, arg UpdateOrgMemberRoleParams) (UpdateOrgMemberRoleRow, error) {
+	row := q.db.QueryRow(ctx, updateOrgMemberRole,
+		arg.OrgID,
+		arg.PrincipalKind,
+		arg.PrincipalID,
+		arg.RoleID,
+	)
+	var i UpdateOrgMemberRoleRow
+	err := row.Scan(
+		&i.ID,
+		&i.Etag,
+		&i.CreateTime,
+		&i.UpdateTime,
+	)
+	return i, err
+}
+
+const updateSpaceMemberRole = `-- name: UpdateSpaceMemberRole :one
+UPDATE space_members
+   SET role_id = $4,
+       update_time = now(),
+       revision = revision + 1,
+       etag = md5(now()::text)
+ WHERE space_id = $1
+   AND principal_kind = $2
+   AND principal_id = $3
+RETURNING id, etag, create_time, update_time
+`
+
+type UpdateSpaceMemberRoleParams struct {
+	SpaceID       uuid.UUID     `json:"space_id"`
+	PrincipalKind PrincipalKind `json:"principal_kind"`
+	PrincipalID   uuid.UUID     `json:"principal_id"`
+	RoleID        uuid.UUID     `json:"role_id"`
+}
+
+type UpdateSpaceMemberRoleRow struct {
+	ID         uuid.UUID `json:"id"`
+	Etag       string    `json:"etag"`
+	CreateTime time.Time `json:"create_time"`
+	UpdateTime time.Time `json:"update_time"`
+}
+
+// Companion to UpdateOrgMemberRole at space scope.
+func (q *Queries) UpdateSpaceMemberRole(ctx context.Context, arg UpdateSpaceMemberRoleParams) (UpdateSpaceMemberRoleRow, error) {
+	row := q.db.QueryRow(ctx, updateSpaceMemberRole,
+		arg.SpaceID,
+		arg.PrincipalKind,
+		arg.PrincipalID,
+		arg.RoleID,
+	)
+	var i UpdateSpaceMemberRoleRow
+	err := row.Scan(
+		&i.ID,
+		&i.Etag,
+		&i.CreateTime,
+		&i.UpdateTime,
+	)
+	return i, err
 }
