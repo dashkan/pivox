@@ -1,0 +1,304 @@
+# Source of truth for the v1 permission catalog.
+# Edit this file, then run `make generate` to regenerate Go constants
+# + matrix.
+#
+# Conventions:
+#   - CRUD verbs (create / read / update / delete) cover standard
+#     resource ops. `read` covers both single Get and List — we don't
+#     split listing from viewing.
+#   - Workflow / lifecycle actions get their own verb (transferOwnership,
+#     import, deliver, approve, drain, etc.). These have different blast
+#     radius from CRUD and need to be grantable independently.
+permissions:
+  - id: organizations.read
+    display_name: Read Organization
+    description: View organization details
+    roles: [owner, admin, editor, viewer]
+  - id: organizations.update
+    display_name: Update Organization
+    description: Modify organization settings
+    roles: [owner, admin]
+  - id: organizations.delete
+    display_name: Delete Organization
+    description: Delete the organization
+    roles: [owner]
+  - id: organizations.transferOwnership
+    display_name: Transfer Ownership
+    description: Atomically transfer the owner role to another member
+    roles: [owner]
+  - id: organizations.ssoConfig.read
+    display_name: Read SSO Config
+    description: View SSO configuration
+    roles: [owner, admin]
+  - id: organizations.ssoConfig.update
+    display_name: Update SSO Config
+    description: Modify SSO configuration
+    roles: [owner]
+  - id: spaces.create
+    display_name: Create Space
+    description: Create new spaces in the organization
+    roles: [owner, admin]
+  - id: users.read
+    display_name: Read Users
+    description: View and list users
+    roles: [owner, admin, editor, viewer]
+  - id: users.delete
+    display_name: Delete User
+    description: Delete a user globally (LRO; cascades memberships)
+    roles: [owner]
+  - id: groups.create
+    display_name: Create Group
+    description: Create new groups
+    roles: [owner, admin]
+  - id: groups.read
+    display_name: Read Groups
+    description: View and list groups
+    roles: [owner, admin, editor, viewer]
+  - id: groups.update
+    display_name: Update Group
+    description: Modify groups
+    roles: [owner, admin]
+  - id: groups.delete
+    display_name: Delete Group
+    description: Delete groups
+    roles: [owner, admin]
+  - id: groups.manageMembers
+    display_name: Manage Group Members
+    description: Add/remove group members
+    roles: [owner, admin]
+  - id: roles.create
+    display_name: Create Role
+    description: Create custom roles
+    roles: [owner, admin]
+  - id: roles.read
+    display_name: Read Roles
+    description: View and list roles
+    roles: [owner, admin, editor, viewer]
+  - id: roles.update
+    display_name: Update Role
+    description: Modify custom roles
+    roles: [owner, admin]
+  - id: roles.delete
+    display_name: Delete Role
+    description: Delete custom roles
+    roles: [owner, admin]
+  - id: roles.manageMembers
+    display_name: Manage Role Members
+    description: Add/remove role members
+    roles: [owner, admin]
+  - id: invitations.create
+    display_name: Create Invitation
+    description: Invite users to the organization
+    roles: [owner, admin]
+  - id: invitations.read
+    display_name: Read Invitations
+    description: View and list invitations
+    roles: [owner, admin]
+  - id: invitations.delete
+    display_name: Delete Invitation
+    description: Revoke invitations
+    roles: [owner, admin]
+  - id: invitations.updatePolicy
+    display_name: Update Invitation Policy
+    description: Modify invitation policy
+    roles: [owner, admin]
+  - id: apiKeys.create
+    display_name: Create API Key
+    description: Create API keys
+    roles: [owner, admin]
+  - id: apiKeys.read
+    display_name: Read API Keys
+    description: View and list API keys
+    roles: [owner, admin]
+  - id: apiKeys.update
+    display_name: Update API Key
+    description: Modify API keys
+    roles: [owner, admin]
+  - id: apiKeys.delete
+    display_name: Delete API Key
+    description: Delete API keys
+    roles: [owner, admin]
+  - id: domains.create
+    display_name: Create Domain
+    description: Claim a DNS domain for the organization
+    roles: [owner, admin]
+  - id: domains.read
+    display_name: Read Domains
+    description: View and list domains
+    roles: [owner, admin]
+  - id: domains.delete
+    display_name: Delete Domain
+    description: Release a domain claim
+    roles: [owner, admin]
+  - id: members.create
+    display_name: Create Member
+    description: Bind a principal to a role
+    roles: [owner, admin]
+  - id: members.read
+    display_name: Read Members
+    description: View and list role bindings at a scope
+    roles: [owner, admin]
+  - id: members.update
+    display_name: Update Member
+    description: "Change a member's role"
+    roles: [owner, admin]
+  - id: members.delete
+    display_name: Delete Member
+    description: Remove a role binding
+    roles: [owner, admin]
+  - id: storage.gateways.create
+    display_name: Create Storage Gateway
+    description: Create storage gateways
+    roles: [owner, admin]
+  - id: storage.gateways.read
+    display_name: Read Storage Gateways
+    description: View and list storage gateways
+    roles: [owner, admin, editor]
+  - id: storage.gateways.update
+    display_name: Update Storage Gateway
+    description: Modify storage gateways
+    roles: [owner, admin]
+  - id: storage.gateways.delete
+    display_name: Delete Storage Gateway
+    description: Delete storage gateways
+    roles: [owner, admin]
+  - id: storage.gateways.upgrade
+    display_name: Upgrade Storage Gateway
+    description: Trigger gateway upgrades
+    roles: [owner, admin]
+  - id: storage.endpoints.create
+    display_name: Create Storage Endpoint
+    description: Create storage endpoints
+    roles: [owner, admin]
+  - id: storage.endpoints.read
+    display_name: Read Storage Endpoints
+    description: View and list storage endpoints
+    roles: [owner, admin, editor, viewer]
+  - id: storage.endpoints.update
+    display_name: Update Storage Endpoint
+    description: Modify storage endpoints
+    roles: [owner, admin]
+  - id: storage.endpoints.delete
+    display_name: Delete Storage Endpoint
+    description: Delete storage endpoints
+    roles: [owner, admin]
+  - id: storage.agents.read
+    display_name: Read Agents
+    description: View and list agents
+    roles: [owner, admin, editor, viewer]
+  - id: storage.agents.drain
+    display_name: Drain Agent
+    description: Drain agents for maintenance
+    roles: [owner, admin]
+  - id: storage.agents.remove
+    display_name: Remove Agent
+    description: Remove agents from gateway pool
+    roles: [owner, admin]
+  - id: assets.assets.read
+    display_name: Read Assets
+    description: View and list assets
+    roles: [owner, admin, editor, viewer]
+  - id: assets.assets.create
+    display_name: Create Asset
+    description: Create assets
+    roles: [owner, admin, editor]
+  - id: assets.assets.update
+    display_name: Update Asset
+    description: Modify asset metadata
+    roles: [owner, admin, editor]
+  - id: assets.assets.delete
+    display_name: Delete Asset
+    description: Soft-delete assets
+    roles: [owner, admin, editor]
+  - id: assets.assets.undelete
+    display_name: Undelete Asset
+    description: Restore soft-deleted assets
+    roles: [owner, admin, editor]
+  - id: assets.assets.import
+    display_name: Import Assets
+    description: Import assets from storage endpoint
+    roles: [owner, admin, editor]
+  - id: assets.requests.read
+    display_name: Read Requests
+    description: View and list requests
+    roles: [owner, admin, editor, viewer]
+  - id: assets.requests.create
+    display_name: Create Request
+    description: Create asset requests
+    roles: [owner, admin, editor]
+  - id: assets.requests.update
+    display_name: Update Request
+    description: Modify request details
+    roles: [owner, admin, editor]
+  - id: assets.requests.delete
+    display_name: Delete Request
+    description: Soft-delete requests
+    roles: [owner, admin, editor]
+  - id: assets.requests.assign
+    display_name: Assign Request
+    description: Assign artists to requests
+    roles: [owner, admin]
+  - id: assets.requests.claim
+    display_name: Claim Request
+    description: Self-assign to open requests
+    roles: [owner, admin, editor]
+  - id: assets.requests.submit
+    display_name: Submit Request
+    description: Submit draft requests
+    roles: [owner, admin, editor]
+  - id: assets.requests.deliver
+    display_name: Deliver Request
+    description: Mark requests as delivered
+    roles: [owner, admin, editor]
+  - id: assets.requests.approve
+    display_name: Approve Request
+    description: Approve delivered requests
+    roles: [owner, admin]
+  - id: assets.requests.reject
+    display_name: Reject Request
+    description: Reject delivered requests
+    roles: [owner, admin]
+  - id: assets.requests.cancel
+    display_name: Cancel Request
+    description: Cancel requests
+    roles: [owner, admin]
+  - id: assets.lineItems.read
+    display_name: Read Line Items
+    description: View and list line items
+    roles: [owner, admin, editor, viewer]
+  - id: assets.lineItems.create
+    display_name: Create Line Item
+    description: Add line items to requests
+    roles: [owner, admin, editor]
+  - id: assets.lineItems.update
+    display_name: Update Line Item
+    description: Modify line item details
+    roles: [owner, admin, editor]
+  - id: assets.lineItems.delete
+    display_name: Delete Line Item
+    description: Remove line items from requests
+    roles: [owner, admin, editor]
+  - id: assets.lineItems.fulfill
+    display_name: Fulfill Line Item
+    description: Upload deliverable for line item
+    roles: [owner, admin, editor]
+  - id: ai.conversations.read
+    display_name: Read Conversations
+    description: View and list conversations, messages, artifacts, and artifact versions
+    roles: [owner, admin, editor, viewer]
+  - id: ai.conversations.create
+    display_name: Create Conversation
+    description: Create conversations
+    roles: [owner, admin, editor]
+  - id: ai.conversations.update
+    display_name: Update Conversation
+    description: Modify conversations and their artifacts
+    roles: [owner, admin, editor]
+  - id: ai.conversations.delete
+    display_name: Delete Conversation
+    description: Delete conversations and their artifacts
+    roles: [owner, admin, editor]
+  - id: ai.chat.stream
+    display_name: Stream Chat
+    description: Use AI chat streaming
+    roles: [owner, admin, editor]

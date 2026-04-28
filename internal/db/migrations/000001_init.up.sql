@@ -754,66 +754,60 @@ INSERT INTO public_email_domains (domain) VALUES
 -- ============================================================================
 INSERT INTO permissions (permission_id, display_name, description) VALUES
   -- Organization management
-  ('organizations.get', 'Get Organization', 'View organization details'),
+  ('organizations.read', 'Read Organization', 'View organization details'),
   ('organizations.update', 'Update Organization', 'Modify organization settings'),
   ('organizations.delete', 'Delete Organization', 'Delete the organization'),
+  ('organizations.transferOwnership', 'Transfer Ownership', 'Atomically transfer the owner role to another member'),
+  -- SSO config (singleton sub-resource; tighter role list than the parent org)
+  ('organizations.ssoConfig.read', 'Read SSO Config', 'View SSO configuration'),
+  ('organizations.ssoConfig.update', 'Update SSO Config', 'Modify SSO configuration'),
   -- Space creation (org-level; within-space access is space-role based)
   ('spaces.create', 'Create Space', 'Create new spaces in the organization'),
   -- User management
-  ('users.get', 'Get User', 'View user details'),
-  ('users.list', 'List Users', 'List users in the organization'),
+  ('users.read', 'Read Users', 'View and list users'),
   ('users.delete', 'Delete User', 'Delete a user globally (LRO; cascades memberships)'),
   -- Group management
   ('groups.create', 'Create Group', 'Create new groups'),
-  ('groups.get', 'Get Group', 'View group details'),
-  ('groups.list', 'List Groups', 'List groups in the organization'),
+  ('groups.read', 'Read Groups', 'View and list groups'),
   ('groups.update', 'Update Group', 'Modify groups'),
   ('groups.delete', 'Delete Group', 'Delete groups'),
   ('groups.manageMembers', 'Manage Group Members', 'Add/remove group members'),
   -- Role management
   ('roles.create', 'Create Role', 'Create custom roles'),
-  ('roles.get', 'Get Role', 'View role details'),
-  ('roles.list', 'List Roles', 'List roles in the organization'),
+  ('roles.read', 'Read Roles', 'View and list roles'),
   ('roles.update', 'Update Role', 'Modify custom roles'),
   ('roles.delete', 'Delete Role', 'Delete custom roles'),
   ('roles.manageMembers', 'Manage Role Members', 'Add/remove role members'),
   -- Invitation management
   ('invitations.create', 'Create Invitation', 'Invite users to the organization'),
-  ('invitations.get', 'Get Invitation', 'View invitation details'),
-  ('invitations.list', 'List Invitations', 'List invitations in the organization'),
+  ('invitations.read', 'Read Invitations', 'View and list invitations'),
   ('invitations.delete', 'Delete Invitation', 'Revoke invitations'),
   ('invitations.updatePolicy', 'Update Invitation Policy', 'Modify invitation policy'),
   -- API key management
-  ('apikeys.create', 'Create API Key', 'Create API keys'),
-  ('apikeys.get', 'Get API Key', 'View API key details'),
-  ('apikeys.update', 'Update API Key', 'Modify API keys'),
-  ('apikeys.delete', 'Delete API Key', 'Delete API keys'),
+  ('apiKeys.create', 'Create API Key', 'Create API keys'),
+  ('apiKeys.read', 'Read API Keys', 'View and list API keys'),
+  ('apiKeys.update', 'Update API Key', 'Modify API keys'),
+  ('apiKeys.delete', 'Delete API Key', 'Delete API keys'),
   -- Domain management
   ('domains.create', 'Create Domain', 'Claim a DNS domain for the organization'),
-  ('domains.get', 'Get Domain', 'View domain details'),
-  ('domains.list', 'List Domains', 'List domains in the organization'),
+  ('domains.read', 'Read Domains', 'View and list domains'),
   ('domains.delete', 'Delete Domain', 'Release a domain claim'),
-  -- SSO config (singleton sub-resource)
-  ('organizations.ssoConfig.get', 'Get SSO Config', 'View SSO configuration'),
-  ('organizations.ssoConfig.update', 'Update SSO Config', 'Modify SSO configuration'),
   -- Member (role bindings at org and space scope)
   ('members.create', 'Create Member', 'Bind a principal to a role'),
-  ('members.get', 'Get Member', 'View member details'),
-  ('members.list', 'List Members', 'List role bindings at a scope'),
+  ('members.read', 'Read Members', 'View and list role bindings at a scope'),
   ('members.update', 'Update Member', 'Change a member''s role'),
   ('members.delete', 'Delete Member', 'Remove a role binding'),
-  ('members.transferOwnership', 'Transfer Ownership', 'Atomically transfer the owner role'),
   -- Storage gateway management
   ('storage.gateways.create', 'Create Storage Gateway', 'Create storage gateways'),
-  ('storage.gateways.get', 'Get Storage Gateway', 'View storage gateway details'),
+  ('storage.gateways.read', 'Read Storage Gateways', 'View and list storage gateways'),
   ('storage.gateways.update', 'Update Storage Gateway', 'Modify storage gateways'),
   ('storage.gateways.delete', 'Delete Storage Gateway', 'Delete storage gateways'),
   ('storage.gateways.upgrade', 'Upgrade Storage Gateway', 'Trigger gateway upgrades'),
   ('storage.endpoints.create', 'Create Storage Endpoint', 'Create storage endpoints'),
-  ('storage.endpoints.get', 'Get Storage Endpoint', 'View storage endpoint details'),
+  ('storage.endpoints.read', 'Read Storage Endpoints', 'View and list storage endpoints'),
   ('storage.endpoints.update', 'Update Storage Endpoint', 'Modify storage endpoints'),
   ('storage.endpoints.delete', 'Delete Storage Endpoint', 'Delete storage endpoints'),
-  ('storage.agents.get', 'Get Agent', 'View agent details'),
+  ('storage.agents.read', 'Read Agents', 'View and list agents'),
   ('storage.agents.drain', 'Drain Agent', 'Drain agents for maintenance'),
   ('storage.agents.remove', 'Remove Agent', 'Remove agents from gateway pool');
 
@@ -1048,15 +1042,13 @@ CREATE INDEX idx_asset_request_line_items_asset ON asset_request_line_items (ass
 -- Asset permissions
 -- ============================================================================
 INSERT INTO permissions (permission_id, display_name, description) VALUES
-  ('assets.assets.get', 'Get Asset', 'View asset details'),
-  ('assets.assets.list', 'List Assets', 'List assets in a space'),
+  ('assets.assets.read', 'Read Assets', 'View and list assets'),
   ('assets.assets.create', 'Create Asset', 'Create assets'),
   ('assets.assets.update', 'Update Asset', 'Modify asset metadata'),
   ('assets.assets.delete', 'Delete Asset', 'Soft-delete assets'),
   ('assets.assets.undelete', 'Undelete Asset', 'Restore soft-deleted assets'),
   ('assets.assets.import', 'Import Assets', 'Import assets from storage endpoint'),
-  ('assets.requests.get', 'Get Request', 'View request details'),
-  ('assets.requests.list', 'List Requests', 'List requests in a space'),
+  ('assets.requests.read', 'Read Requests', 'View and list requests'),
   ('assets.requests.create', 'Create Request', 'Create asset requests'),
   ('assets.requests.update', 'Update Request', 'Modify request details'),
   ('assets.requests.delete', 'Delete Request', 'Soft-delete requests'),
@@ -1067,8 +1059,7 @@ INSERT INTO permissions (permission_id, display_name, description) VALUES
   ('assets.requests.approve', 'Approve Request', 'Approve delivered requests'),
   ('assets.requests.reject', 'Reject Request', 'Reject delivered requests'),
   ('assets.requests.cancel', 'Cancel Request', 'Cancel requests'),
-  ('assets.lineItems.get', 'Get Line Item', 'View line item details'),
-  ('assets.lineItems.list', 'List Line Items', 'List line items in a request'),
+  ('assets.lineItems.read', 'Read Line Items', 'View and list line items'),
   ('assets.lineItems.create', 'Create Line Item', 'Add line items to requests'),
   ('assets.lineItems.update', 'Update Line Item', 'Modify line item details'),
   ('assets.lineItems.delete', 'Delete Line Item', 'Remove line items from requests'),
@@ -1206,19 +1197,12 @@ ALTER TABLE ai_artifact_versions ADD CONSTRAINT fk_ai_artifact_versions_artifact
 CREATE INDEX idx_ai_artifact_versions_artifact ON ai_artifact_versions (artifact_id, id DESC);
 CREATE INDEX idx_ai_artifact_versions_asset ON ai_artifact_versions (asset_version_name) WHERE asset_version_name IS NOT NULL;
 
--- AI chat permissions
+-- AI chat permissions. Messages, artifacts, and artifact versions are
+-- facets of a conversation — their reads roll up to ai.conversations.read,
+-- and artifact/version mutations roll up to ai.conversations.update/delete.
 INSERT INTO permissions (permission_id, display_name, description) VALUES
-  ('ai.conversations.get', 'Get Conversation', 'View conversation details'),
-  ('ai.conversations.list', 'List Conversations', 'List conversations in an organization'),
+  ('ai.conversations.read', 'Read Conversations', 'View and list conversations, messages, artifacts, and artifact versions'),
   ('ai.conversations.create', 'Create Conversation', 'Create conversations'),
-  ('ai.conversations.update', 'Update Conversation', 'Modify conversation details'),
-  ('ai.conversations.delete', 'Delete Conversation', 'Delete conversations'),
-  ('ai.messages.get', 'Get Message', 'View message details'),
-  ('ai.messages.list', 'List Messages', 'List messages in a conversation'),
-  ('ai.artifacts.get', 'Get Artifact', 'View artifact details'),
-  ('ai.artifacts.list', 'List Artifacts', 'List artifacts in a conversation'),
-  ('ai.artifacts.delete', 'Delete Artifact', 'Delete artifacts'),
-  ('ai.artifactVersions.get', 'Get Artifact Version', 'View artifact version details'),
-  ('ai.artifactVersions.list', 'List Artifact Versions', 'List artifact versions'),
-  ('ai.artifactVersions.delete', 'Delete Artifact Version', 'Delete artifact versions'),
+  ('ai.conversations.update', 'Update Conversation', 'Modify conversations and their artifacts'),
+  ('ai.conversations.delete', 'Delete Conversation', 'Delete conversations and their artifacts'),
   ('ai.chat.stream', 'Stream Chat', 'Use AI chat streaming');

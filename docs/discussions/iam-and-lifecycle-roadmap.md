@@ -519,6 +519,13 @@ macOS-first; Windows shell mirrors after.
 - [ ] Re-import `google/iam/v1/iam_policy.proto` for full `GetIamPolicy`/`SetIamPolicy` projection over `members` table — when fine-grain sharing arrives.
 - [ ] `Group` cross-org? Today scoped to single org. Cross-org sharing is a future feature.
 - [ ] Audit log for IAM mutations.
+- [ ] **AI chat permissions model** (deferred). Org/space role matrix doesn't naturally fit AI conversations — they're personal artifacts (prompts, brainstorming, internal monologue), not org-shared content. The current placeholder `ai.conversations.{read,create,update,delete}` granted to editor/admin/owner is wrong: editor/viewer reading other people's chats is a privacy violation. Correct model is creator-owned with org-level escape hatches:
+  - Creator: full CRUD on own conversations
+  - Owner: read (audit) + delete (departed-employee cleanup)
+  - Admin: read (audit), no delete
+  - Editor/viewer: zero access to others' conversations
+  - `ai.chat.stream`: subscription/license gate (separate from conversation access)
+  Implementation requires resource-instance-level authorization (handler checks `created_by == caller`), not just role-based gating. New permissions needed: `ai.conversations.readAll` [owner, admin], `ai.conversations.deleteAll` [owner]. Address when wiring the AI chat interceptor.
 
 ---
 

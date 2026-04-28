@@ -20,7 +20,7 @@ func TestMatrix_OwnerHasDestructionClassPermissions(t *testing.T) {
 	// not admin: org delete, transfer ownership, SSO update, user delete.
 	cases := []string{
 		OrganizationsDelete,
-		MembersTransferOwnership,
+		OrganizationsTransferOwnership,
 		OrganizationsSsoConfigUpdate,
 		UsersDelete,
 	}
@@ -37,14 +37,16 @@ func TestMatrix_OwnerHasDestructionClassPermissions(t *testing.T) {
 }
 
 func TestMatrix_AdminHasDayToDayManagement(t *testing.T) {
-	// Admin can do most management ops short of destruction-class.
+	// Admin can do most management ops short of destruction-class,
+	// including approval/assignment workflow verbs that editors must
+	// not have (admin-only request gating is a real RBAC invariant).
 	cases := []string{
 		OrganizationsUpdate,
 		SpacesCreate,
 		DomainsCreate,
-		DomainsList,
+		DomainsRead,
 		DomainsDelete,
-		OrganizationsSsoConfigGet,
+		OrganizationsSsoConfigRead,
 		MembersCreate,
 		MembersUpdate,
 		MembersDelete,
@@ -54,7 +56,14 @@ func TestMatrix_AdminHasDayToDayManagement(t *testing.T) {
 		ApiKeysCreate,
 		InvitationsCreate,
 		StorageGatewaysCreate,
+		StorageGatewaysUpgrade,
+		StorageAgentsDrain,
+		StorageAgentsRemove,
 		StorageEndpointsCreate,
+		AssetsRequestsAssign,
+		AssetsRequestsApprove,
+		AssetsRequestsReject,
+		AssetsRequestsCancel,
 	}
 	for _, p := range cases {
 		t.Run(p, func(t *testing.T) {
@@ -88,7 +97,13 @@ func TestMatrix_EditorCanMutateContentNotIam(t *testing.T) {
 		ApiKeysCreate,
 		InvitationsCreate,
 		StorageGatewaysCreate,
-		OrganizationsSsoConfigGet,
+		OrganizationsSsoConfigRead,
+		// Workflow gating: editors create/update content but admins
+		// own assignment + approval lifecycle.
+		AssetsRequestsAssign,
+		AssetsRequestsApprove,
+		AssetsRequestsReject,
+		AssetsRequestsCancel,
 	}
 	for _, p := range canDo {
 		t.Run("can/"+p, func(t *testing.T) {
@@ -108,16 +123,12 @@ func TestMatrix_EditorCanMutateContentNotIam(t *testing.T) {
 
 func TestMatrix_ViewerIsReadOnly(t *testing.T) {
 	canDo := []string{
-		OrganizationsGet,
-		UsersGet,
-		UsersList,
-		GroupsGet,
-		GroupsList,
-		RolesGet,
-		AssetsAssetsGet,
-		AssetsAssetsList,
-		AiConversationsGet,
-		AiConversationsList,
+		OrganizationsRead,
+		UsersRead,
+		GroupsRead,
+		RolesRead,
+		AssetsAssetsRead,
+		AiConversationsRead,
 	}
 	cantDo := []string{
 		OrganizationsUpdate,
@@ -147,10 +158,10 @@ func TestMatrix_ViewerIsReadOnly(t *testing.T) {
 }
 
 func TestMatrix_UnknownRoleDeniesEverything(t *testing.T) {
-	if Has("rando", OrganizationsGet) {
+	if Has("rando", OrganizationsRead) {
 		t.Error("unknown role must not grant any permission")
 	}
-	if Has("", OrganizationsGet) {
+	if Has("", OrganizationsRead) {
 		t.Error("empty role must not grant any permission")
 	}
 }
@@ -220,6 +231,11 @@ func TestPermissions_MigrationMatchesConstants(t *testing.T) {
 			continue
 		}
 		if !inBlock {
+			continue
+		}
+		// Skip SQL comment lines so a commented-out row like
+		// `-- ('foo.bar', ...)` doesn't get picked up as seeded.
+		if strings.HasPrefix(strings.TrimSpace(line), "--") {
 			continue
 		}
 		if m := rowRe.FindStringSubmatch(line); m != nil {

@@ -1,4 +1,4 @@
-.PHONY: build run test tidy lint lint-fix fmt \
+.PHONY: build run test tidy lint lint-fix fmt generate \
        lint-proto proto-format proto-breaking proto-generate \
        proto-generate-go proto-generate-native build-grpc-swift-2-plugin api-lint \
        db-up db-down db-migrate db-force db-seed db-clear db-drop db-create \
@@ -52,6 +52,9 @@ proto-format:
 
 proto-breaking:
 	$(TOOL) buf breaking --against '.git\#branch=main'
+
+generate:
+	go generate ./...
 
 proto-generate: proto-generate-go proto-generate-native
 
