@@ -238,6 +238,49 @@ func (ns NullDelegatedAuthSessionState) Value() (driver.Value, error) {
 	return string(ns.DelegatedAuthSessionState), nil
 }
 
+type DomainState string
+
+const (
+	DomainStatePENDING  DomainState = "PENDING"
+	DomainStateVERIFIED DomainState = "VERIFIED"
+	DomainStateFAILED   DomainState = "FAILED"
+)
+
+func (e *DomainState) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = DomainState(s)
+	case string:
+		*e = DomainState(s)
+	default:
+		return fmt.Errorf("unsupported scan type for DomainState: %T", src)
+	}
+	return nil
+}
+
+type NullDomainState struct {
+	DomainState DomainState `json:"domain_state"`
+	Valid       bool        `json:"valid"` // Valid is true if DomainState is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullDomainState) Scan(value interface{}) error {
+	if value == nil {
+		ns.DomainState, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.DomainState.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullDomainState) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.DomainState), nil
+}
+
 type EndpointState string
 
 const (
@@ -413,46 +456,46 @@ func (ns NullLineItemState) Value() (driver.Value, error) {
 	return string(ns.LineItemState), nil
 }
 
-type OrgRole string
+type PrincipalKind string
 
 const (
-	OrgRoleOwner  OrgRole = "owner"
-	OrgRoleMember OrgRole = "member"
+	PrincipalKindUser  PrincipalKind = "user"
+	PrincipalKindGroup PrincipalKind = "group"
 )
 
-func (e *OrgRole) Scan(src interface{}) error {
+func (e *PrincipalKind) Scan(src interface{}) error {
 	switch s := src.(type) {
 	case []byte:
-		*e = OrgRole(s)
+		*e = PrincipalKind(s)
 	case string:
-		*e = OrgRole(s)
+		*e = PrincipalKind(s)
 	default:
-		return fmt.Errorf("unsupported scan type for OrgRole: %T", src)
+		return fmt.Errorf("unsupported scan type for PrincipalKind: %T", src)
 	}
 	return nil
 }
 
-type NullOrgRole struct {
-	OrgRole OrgRole `json:"org_role"`
-	Valid   bool    `json:"valid"` // Valid is true if OrgRole is not NULL
+type NullPrincipalKind struct {
+	PrincipalKind PrincipalKind `json:"principal_kind"`
+	Valid         bool          `json:"valid"` // Valid is true if PrincipalKind is not NULL
 }
 
 // Scan implements the Scanner interface.
-func (ns *NullOrgRole) Scan(value interface{}) error {
+func (ns *NullPrincipalKind) Scan(value interface{}) error {
 	if value == nil {
-		ns.OrgRole, ns.Valid = "", false
+		ns.PrincipalKind, ns.Valid = "", false
 		return nil
 	}
 	ns.Valid = true
-	return ns.OrgRole.Scan(value)
+	return ns.PrincipalKind.Scan(value)
 }
 
 // Value implements the driver Valuer interface.
-func (ns NullOrgRole) Value() (driver.Value, error) {
+func (ns NullPrincipalKind) Value() (driver.Value, error) {
 	if !ns.Valid {
 		return nil, nil
 	}
-	return string(ns.OrgRole), nil
+	return string(ns.PrincipalKind), nil
 }
 
 type RenditionType string
@@ -634,133 +677,6 @@ func (ns NullResourceState) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.ResourceState), nil
-}
-
-type RoleMemberType string
-
-const (
-	RoleMemberTypeUser  RoleMemberType = "user"
-	RoleMemberTypeGroup RoleMemberType = "group"
-)
-
-func (e *RoleMemberType) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = RoleMemberType(s)
-	case string:
-		*e = RoleMemberType(s)
-	default:
-		return fmt.Errorf("unsupported scan type for RoleMemberType: %T", src)
-	}
-	return nil
-}
-
-type NullRoleMemberType struct {
-	RoleMemberType RoleMemberType `json:"role_member_type"`
-	Valid          bool           `json:"valid"` // Valid is true if RoleMemberType is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullRoleMemberType) Scan(value interface{}) error {
-	if value == nil {
-		ns.RoleMemberType, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.RoleMemberType.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullRoleMemberType) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.RoleMemberType), nil
-}
-
-type SpaceMemberType string
-
-const (
-	SpaceMemberTypeUser  SpaceMemberType = "user"
-	SpaceMemberTypeGroup SpaceMemberType = "group"
-)
-
-func (e *SpaceMemberType) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = SpaceMemberType(s)
-	case string:
-		*e = SpaceMemberType(s)
-	default:
-		return fmt.Errorf("unsupported scan type for SpaceMemberType: %T", src)
-	}
-	return nil
-}
-
-type NullSpaceMemberType struct {
-	SpaceMemberType SpaceMemberType `json:"space_member_type"`
-	Valid           bool            `json:"valid"` // Valid is true if SpaceMemberType is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullSpaceMemberType) Scan(value interface{}) error {
-	if value == nil {
-		ns.SpaceMemberType, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.SpaceMemberType.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullSpaceMemberType) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.SpaceMemberType), nil
-}
-
-type SpaceRole string
-
-const (
-	SpaceRoleADMIN  SpaceRole = "ADMIN"
-	SpaceRoleEDITOR SpaceRole = "EDITOR"
-	SpaceRoleVIEWER SpaceRole = "VIEWER"
-)
-
-func (e *SpaceRole) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = SpaceRole(s)
-	case string:
-		*e = SpaceRole(s)
-	default:
-		return fmt.Errorf("unsupported scan type for SpaceRole: %T", src)
-	}
-	return nil
-}
-
-type NullSpaceRole struct {
-	SpaceRole SpaceRole `json:"space_role"`
-	Valid     bool      `json:"valid"` // Valid is true if SpaceRole is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullSpaceRole) Scan(value interface{}) error {
-	if value == nil {
-		ns.SpaceRole, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.SpaceRole.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullSpaceRole) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.SpaceRole), nil
 }
 
 type StorageGatewayState string
@@ -1038,6 +954,21 @@ type DelegatedAuthSession struct {
 	ExpireTime  time.Time                 `json:"expire_time"`
 }
 
+type Domain struct {
+	ID                uuid.UUID          `json:"id"`
+	OrgID             uuid.UUID          `json:"org_id"`
+	Domain            string             `json:"domain"`
+	VerificationToken string             `json:"verification_token"`
+	State             DomainState        `json:"state"`
+	Etag              string             `json:"etag"`
+	Revision          int32              `json:"revision"`
+	CreatedBy         string             `json:"created_by"`
+	UpdatedBy         string             `json:"updated_by"`
+	CreateTime        time.Time          `json:"create_time"`
+	UpdateTime        time.Time          `json:"update_time"`
+	VerifiedTime      pgtype.Timestamptz `json:"verified_time"`
+}
+
 type FirebaseIdentity struct {
 	ID            uuid.UUID          `json:"id"`
 	FirebaseUid   string             `json:"firebase_uid"`
@@ -1111,6 +1042,20 @@ type Operation struct {
 	ExpireTime   time.Time   `json:"expire_time"`
 }
 
+type OrgMember struct {
+	ID            uuid.UUID     `json:"id"`
+	OrgID         uuid.UUID     `json:"org_id"`
+	RoleID        uuid.UUID     `json:"role_id"`
+	PrincipalKind PrincipalKind `json:"principal_kind"`
+	PrincipalID   uuid.UUID     `json:"principal_id"`
+	Etag          string        `json:"etag"`
+	Revision      int32         `json:"revision"`
+	CreatedBy     string        `json:"created_by"`
+	UpdatedBy     string        `json:"updated_by"`
+	CreateTime    time.Time     `json:"create_time"`
+	UpdateTime    time.Time     `json:"update_time"`
+}
+
 type Organization struct {
 	ID                          uuid.UUID          `json:"id"`
 	Name                        string             `json:"name"`
@@ -1145,6 +1090,7 @@ type PublicEmailDomain struct {
 type Role struct {
 	ID          uuid.UUID       `json:"id"`
 	OrgID       uuid.UUID       `json:"org_id"`
+	Name        string          `json:"name"`
 	DisplayName string          `json:"display_name"`
 	Description string          `json:"description"`
 	IsSystem    bool            `json:"is_system"`
@@ -1156,15 +1102,6 @@ type Role struct {
 	UpdatedBy   string          `json:"updated_by"`
 	CreateTime  time.Time       `json:"create_time"`
 	UpdateTime  time.Time       `json:"update_time"`
-}
-
-type RoleMember struct {
-	ID         uuid.UUID      `json:"id"`
-	RoleID     uuid.UUID      `json:"role_id"`
-	MemberID   uuid.UUID      `json:"member_id"`
-	MemberType RoleMemberType `json:"member_type"`
-	CreatedBy  string         `json:"created_by"`
-	CreateTime time.Time      `json:"create_time"`
 }
 
 type RolePermission struct {
@@ -1191,12 +1128,34 @@ type Space struct {
 }
 
 type SpaceMember struct {
-	SpaceID    uuid.UUID       `json:"space_id"`
-	MemberID   uuid.UUID       `json:"member_id"`
-	MemberType SpaceMemberType `json:"member_type"`
-	Role       SpaceRole       `json:"role"`
-	CreatedBy  string          `json:"created_by"`
-	CreateTime time.Time       `json:"create_time"`
+	ID            uuid.UUID     `json:"id"`
+	SpaceID       uuid.UUID     `json:"space_id"`
+	RoleID        uuid.UUID     `json:"role_id"`
+	PrincipalKind PrincipalKind `json:"principal_kind"`
+	PrincipalID   uuid.UUID     `json:"principal_id"`
+	Etag          string        `json:"etag"`
+	Revision      int32         `json:"revision"`
+	CreatedBy     string        `json:"created_by"`
+	UpdatedBy     string        `json:"updated_by"`
+	CreateTime    time.Time     `json:"create_time"`
+	UpdateTime    time.Time     `json:"update_time"`
+}
+
+type SsoConfig struct {
+	ID                     uuid.UUID `json:"id"`
+	OrgID                  uuid.UUID `json:"org_id"`
+	FirebaseProviderID     string    `json:"firebase_provider_id"`
+	DisplayName            string    `json:"display_name"`
+	Enabled                bool      `json:"enabled"`
+	OidcConfig             []byte    `json:"oidc_config"`
+	SamlConfig             []byte    `json:"saml_config"`
+	ClientSecretCiphertext []byte    `json:"client_secret_ciphertext"`
+	Etag                   string    `json:"etag"`
+	Revision               int32     `json:"revision"`
+	CreatedBy              string    `json:"created_by"`
+	UpdatedBy              string    `json:"updated_by"`
+	CreateTime             time.Time `json:"create_time"`
+	UpdateTime             time.Time `json:"update_time"`
 }
 
 type StorageAgent struct {
@@ -1307,12 +1266,14 @@ type TagValue struct {
 }
 
 type User struct {
-	ID                 uuid.UUID `json:"id"`
-	OrgID              uuid.UUID `json:"org_id"`
-	FirebaseIdentityID uuid.UUID `json:"firebase_identity_id"`
-	Role               OrgRole   `json:"role"`
-	Etag               string    `json:"etag"`
-	Revision           int32     `json:"revision"`
-	CreateTime         time.Time `json:"create_time"`
-	UpdateTime         time.Time `json:"update_time"`
+	ID                 uuid.UUID          `json:"id"`
+	OrgID              uuid.UUID          `json:"org_id"`
+	FirebaseIdentityID uuid.UUID          `json:"firebase_identity_id"`
+	Etag               string             `json:"etag"`
+	Revision           int32              `json:"revision"`
+	DeletedBy          string             `json:"deleted_by"`
+	CreateTime         time.Time          `json:"create_time"`
+	UpdateTime         time.Time          `json:"update_time"`
+	DeleteTime         pgtype.Timestamptz `json:"delete_time"`
+	PurgeTime          pgtype.Timestamptz `json:"purge_time"`
 }

@@ -21,9 +21,12 @@
 -- Enum types
 -- ============================================================================
 CREATE TYPE resource_state AS ENUM ('ACTIVE', 'DELETE_REQUESTED');
-CREATE TYPE role_member_type AS ENUM ('user', 'group');
-CREATE TYPE space_role AS ENUM ('ADMIN', 'EDITOR', 'VIEWER');
-CREATE TYPE space_member_type AS ENUM ('user', 'group');
+-- Principal kind for both org_members and space_members. Two tables
+-- give structural integrity by design (an org_members row physically
+-- cannot be misinterpreted as a space membership), but the principal
+-- shape is uniform across them.
+CREATE TYPE principal_kind AS ENUM ('user', 'group');
+CREATE TYPE domain_state AS ENUM ('PENDING', 'VERIFIED', 'FAILED');
 CREATE TYPE invitation_state AS ENUM (
     'PENDING', 'ACCEPTED', 'DECLINED', 'REVOKED', 'EXPIRED'
 );
@@ -73,9 +76,10 @@ CREATE TABLE organizations (
     -- references the firebase_identities row of whoever created this
     -- org (FK added after the `firebase_identities` table is declared
     -- further down). Survives membership changes (the user can leave
-    -- the org without breaking this FK). Owners are tracked separately
-    -- via `users.role = 'owner'`; an org can have N owners and "≥1
-    -- owner" is enforced at the service mutation boundary, not here.
+    -- the org without breaking this FK). Ownership is tracked via
+    -- `org_members` rows where `role_id` references the system 'owner'
+    -- role for this org; an org can have N owners and "≥1 owner" is
+    -- enforced at the service mutation boundary, not here.
     created_by_firebase_identity_id UUID,
     -- state
     state                 resource_state NOT NULL DEFAULT 'ACTIVE',
@@ -374,68 +378,48 @@ CREATE TABLE firebase_identities (
 CREATE INDEX idx_firebase_identities_email ON firebase_identities (email);
 
 -- ============================================================================
--- users (per-org membership)
+-- users (per-org identity record)
 --
--- One row per (org, firebase_identity) pairing — the join that says
--- "this identity has access to this org". Created in two ways:
---   1. By `CreateOrganization` for the founder, with role='owner'.
---   2. By `AcceptInvitation` (future) for invitees, role from the invite.
+-- One row per (org, firebase_identity) pairing — the per-org identity
+-- record that says "this identity exists in this org". Created in two
+-- ways:
+--   1. By `CreateOrganization` for the founder.
+--   2. By `AcceptInvitation` (future) for invitees.
 --
--- "≥1 owner per org" is invariant; enforced at the service mutation
--- boundary (role-change / membership-delete handlers reject ops that
--- would zero out owners). Not enforced by DB triggers — triggers
--- surprise readers and complicate test setup.
+-- Role bindings live in `org_members` (and `space_members` for space
+-- scope), not on this table. "≥1 owner per org" is invariant; enforced
+-- at the service mutation boundary by counting `org_members` rows
+-- where `role_id` references the owner system role.
 -- ============================================================================
-CREATE TYPE org_role AS ENUM ('owner', 'member');
-
 CREATE TABLE users (
     id                   UUID PRIMARY KEY DEFAULT uuidv7(),
     -- relationships
     org_id               UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     firebase_identity_id UUID NOT NULL REFERENCES firebase_identities(id) ON DELETE CASCADE,
-    -- domain
-    role                 org_role NOT NULL DEFAULT 'member',
     -- versioning
     etag                 TEXT NOT NULL DEFAULT md5(now()::text),
     revision             INTEGER NOT NULL DEFAULT 1,
+    -- audit
+    deleted_by           TEXT NOT NULL DEFAULT '',
     -- timestamps
     create_time          TIMESTAMPTZ NOT NULL DEFAULT now(),
     update_time          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    delete_time          TIMESTAMPTZ,
+    purge_time           TIMESTAMPTZ,
     -- constraints
     UNIQUE(org_id, firebase_identity_id)
 );
-CREATE INDEX idx_users_org ON users (org_id);
-CREATE INDEX idx_users_firebase_identity ON users (firebase_identity_id);
--- Lets us cheaply enforce "≥1 owner per org" by counting owner rows.
-CREATE INDEX idx_users_org_owner ON users (org_id) WHERE role = 'owner';
+CREATE INDEX idx_users_org ON users (org_id) WHERE delete_time IS NULL;
+CREATE INDEX idx_users_firebase_identity ON users (firebase_identity_id) WHERE delete_time IS NULL;
 
 -- FK from organizations.created_by_firebase_identity_id → firebase_identities.id,
 -- added here because `firebase_identities` was declared after `organizations` in
 -- this migration. ON DELETE SET NULL: deleting a firebase_identity preserves the
 -- org but nulls out the founder pointer (the org survives, ownership is tracked
--- via `users.role` anyway).
+-- via `org_members` rows bound to the system 'owner' role anyway).
 ALTER TABLE organizations
   ADD CONSTRAINT fk_organizations_created_by_firebase_identity
   FOREIGN KEY (created_by_firebase_identity_id) REFERENCES firebase_identities(id) ON DELETE SET NULL;
-
--- ============================================================================
--- space_members (user or group <-> space, fixed roles)
--- ============================================================================
-CREATE TABLE space_members (
-    -- relationships
-    space_id    UUID NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
-    member_id   UUID NOT NULL,
-    member_type space_member_type NOT NULL,
-    -- domain
-    role        space_role NOT NULL,
-    -- audit
-    created_by  TEXT NOT NULL DEFAULT '',
-    -- timestamps
-    create_time TIMESTAMPTZ NOT NULL DEFAULT now(),
-    -- constraints
-    PRIMARY KEY (space_id, member_id, member_type)
-);
-CREATE INDEX idx_space_members_member ON space_members (member_id, member_type);
 
 -- ============================================================================
 -- groups
@@ -501,6 +485,13 @@ CREATE TABLE roles (
     id           UUID PRIMARY KEY DEFAULT uuidv7(),
     -- relationships
     org_id       UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    -- identity. `name` is the stable slug — both the trailing segment
+    -- of the AIP resource name (`organizations/{org}/roles/{name}`)
+    -- AND the machine identifier for system roles. The 4 system roles
+    -- per org are seeded with `name` ∈ {'owner','admin','editor','viewer'}
+    -- and `is_system = true`. Custom roles get caller-chosen slugs.
+    -- Pin queries that need the system owner role on (org_id, name='owner', is_system=true).
+    name         TEXT NOT NULL,
     -- domain
     display_name TEXT NOT NULL DEFAULT '',
     description  TEXT NOT NULL DEFAULT '',
@@ -516,9 +507,13 @@ CREATE TABLE roles (
     updated_by   TEXT NOT NULL DEFAULT '',
     -- timestamps
     create_time  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    update_time  TIMESTAMPTZ NOT NULL DEFAULT now()
+    update_time  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- constraints
+    UNIQUE(org_id, name)
 );
 CREATE INDEX idx_roles_org ON roles (org_id);
+-- Cheap (org_id, system-owner) lookup for "≥1 owner per org" enforcement.
+CREATE INDEX idx_roles_org_system_name ON roles (org_id, name) WHERE is_system = true;
 
 -- ============================================================================
 -- role_permissions (role <-> permission)
@@ -531,23 +526,70 @@ CREATE TABLE role_permissions (
 CREATE INDEX idx_role_permissions_permission ON role_permissions (permission_id);
 
 -- ============================================================================
--- role_members (user or group <-> org role)
+-- org_members (role binding at org scope)
+--
+-- One row per (org, principal, role) tuple. The single source of
+-- truth for "who has what role in this org." Each row binds a
+-- principal (a user-row or group-row in this org) to a role-row
+-- in this org.
+--
+-- See companion `space_members` below for the same shape at space
+-- scope. Two physical tables, not one with a `scope_kind` column —
+-- structural integrity by design (an org_members row physically
+-- cannot be misinterpreted as a space membership).
 -- ============================================================================
-CREATE TABLE role_members (
-    id          UUID PRIMARY KEY DEFAULT uuidv7(),
+CREATE TABLE org_members (
+    id             UUID PRIMARY KEY DEFAULT uuidv7(),
     -- relationships
-    role_id     UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-    member_id   UUID NOT NULL,
-    member_type role_member_type NOT NULL,
+    org_id         UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    role_id        UUID NOT NULL REFERENCES roles(id) ON DELETE RESTRICT,
+    principal_kind principal_kind NOT NULL,
+    principal_id   UUID NOT NULL,
+    -- versioning
+    etag           TEXT NOT NULL DEFAULT md5(now()::text),
+    revision       INTEGER NOT NULL DEFAULT 1,
     -- audit
-    created_by  TEXT NOT NULL DEFAULT '',
+    created_by     TEXT NOT NULL DEFAULT '',
+    updated_by     TEXT NOT NULL DEFAULT '',
     -- timestamps
-    create_time TIMESTAMPTZ NOT NULL DEFAULT now(),
+    create_time    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    update_time    TIMESTAMPTZ NOT NULL DEFAULT now(),
     -- constraints
-    UNIQUE(role_id, member_id, member_type)
+    UNIQUE(org_id, principal_kind, principal_id)
 );
-CREATE INDEX idx_role_members_role ON role_members (role_id);
-CREATE INDEX idx_role_members_member ON role_members (member_id, member_type);
+CREATE INDEX idx_org_members_org ON org_members (org_id);
+CREATE INDEX idx_org_members_principal ON org_members (principal_kind, principal_id);
+CREATE INDEX idx_org_members_role ON org_members (role_id);
+
+-- ============================================================================
+-- space_members (role binding at space scope)
+--
+-- Companion to `org_members`. Rows here represent space-level role
+-- bindings only; org-level inheritance (org owners are space owners
+-- by transitivity) is resolved at query time, not denormalized.
+-- ============================================================================
+CREATE TABLE space_members (
+    id             UUID PRIMARY KEY DEFAULT uuidv7(),
+    -- relationships
+    space_id       UUID NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
+    role_id        UUID NOT NULL REFERENCES roles(id) ON DELETE RESTRICT,
+    principal_kind principal_kind NOT NULL,
+    principal_id   UUID NOT NULL,
+    -- versioning
+    etag           TEXT NOT NULL DEFAULT md5(now()::text),
+    revision       INTEGER NOT NULL DEFAULT 1,
+    -- audit
+    created_by     TEXT NOT NULL DEFAULT '',
+    updated_by     TEXT NOT NULL DEFAULT '',
+    -- timestamps
+    create_time    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    update_time    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- constraints
+    UNIQUE(space_id, principal_kind, principal_id)
+);
+CREATE INDEX idx_space_members_space ON space_members (space_id);
+CREATE INDEX idx_space_members_principal ON space_members (principal_kind, principal_id);
+CREATE INDEX idx_space_members_role ON space_members (role_id);
 
 -- ============================================================================
 -- invitations
@@ -591,6 +633,82 @@ CREATE TABLE invitation_policies (
     etag                          TEXT NOT NULL DEFAULT md5(now()::text),
     -- timestamps
     update_time                   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ============================================================================
+-- domains (org-claimed DNS domains, verified via TXT)
+--
+-- One row per claimed domain. Created in PENDING via CreateDomain,
+-- driven to VERIFIED (or FAILED on grace-window expiry) by a
+-- background worker that polls DNS for the TXT record at
+-- `_pivox-verify.<domain>` matching `verification_token`. The
+-- corresponding `operations` row carries the live LRO state.
+--
+-- `domain` is globally UNIQUE: a domain can be claimed by at most
+-- one org. Concurrent claims surface as ALREADY_EXISTS without
+-- disclosing which org holds the existing claim.
+-- ============================================================================
+CREATE TABLE domains (
+    id                 UUID PRIMARY KEY DEFAULT uuidv7(),
+    -- relationships
+    org_id             UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    -- identity. `domain` is canonicalized to lowercase by the
+    -- application before insert; the CHECK enforces that on the
+    -- database side as well so a buggy caller can't sneak in
+    -- "Acme.com" as a parallel claim of "acme.com". UNIQUE then
+    -- enforces global single-claim.
+    domain             TEXT NOT NULL UNIQUE CHECK (domain = lower(domain)),
+    -- domain
+    verification_token TEXT NOT NULL,
+    -- state
+    state              domain_state NOT NULL DEFAULT 'PENDING',
+    -- versioning
+    etag               TEXT NOT NULL DEFAULT md5(now()::text),
+    revision           INTEGER NOT NULL DEFAULT 1,
+    -- audit
+    created_by         TEXT NOT NULL DEFAULT '',
+    updated_by         TEXT NOT NULL DEFAULT '',
+    -- timestamps
+    create_time        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    update_time        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    verified_time      TIMESTAMPTZ
+);
+CREATE INDEX idx_domains_org ON domains (org_id);
+CREATE INDEX idx_domains_state ON domains (org_id, state);
+
+-- ============================================================================
+-- sso_configs (per-org SSO/IDP configuration; AIP-156 singleton)
+--
+-- One row per organization (UNIQUE on org_id). `oidc_config` and
+-- `saml_config` are mutually exclusive — exactly one is non-null,
+-- enforced by CHECK. `client_secret_ciphertext` is the KMS-encrypted
+-- OIDC client_secret (separate from oidc_config so it can be rotated
+-- and access-controlled independently); decrypted only at use sites.
+-- Linkage to verified domains is implicit via `domains.org_id`.
+-- ============================================================================
+CREATE TABLE sso_configs (
+    id                         UUID PRIMARY KEY DEFAULT uuidv7(),
+    -- relationships
+    org_id                     UUID NOT NULL UNIQUE REFERENCES organizations(id) ON DELETE CASCADE,
+    -- identity
+    firebase_provider_id       TEXT NOT NULL DEFAULT '',
+    -- domain
+    display_name               TEXT NOT NULL DEFAULT '',
+    enabled                    BOOLEAN NOT NULL DEFAULT false,
+    oidc_config                JSONB,
+    saml_config                JSONB,
+    client_secret_ciphertext   BYTEA,
+    -- versioning
+    etag                       TEXT NOT NULL DEFAULT md5(now()::text),
+    revision                   INTEGER NOT NULL DEFAULT 1,
+    -- audit
+    created_by                 TEXT NOT NULL DEFAULT '',
+    updated_by                 TEXT NOT NULL DEFAULT '',
+    -- timestamps
+    create_time                TIMESTAMPTZ NOT NULL DEFAULT now(),
+    update_time                TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- constraints: exactly one of oidc_config / saml_config is set.
+    CHECK ((oidc_config IS NOT NULL) <> (saml_config IS NOT NULL))
 );
 
 -- ============================================================================
@@ -644,6 +762,7 @@ INSERT INTO permissions (permission_id, display_name, description) VALUES
   -- User management
   ('users.get', 'Get User', 'View user details'),
   ('users.list', 'List Users', 'List users in the organization'),
+  ('users.delete', 'Delete User', 'Delete a user globally (LRO; cascades memberships)'),
   -- Group management
   ('groups.create', 'Create Group', 'Create new groups'),
   ('groups.get', 'Get Group', 'View group details'),
@@ -667,6 +786,21 @@ INSERT INTO permissions (permission_id, display_name, description) VALUES
   ('apikeys.get', 'Get API Key', 'View API key details'),
   ('apikeys.update', 'Update API Key', 'Modify API keys'),
   ('apikeys.delete', 'Delete API Key', 'Delete API keys'),
+  -- Domain management
+  ('domains.create', 'Create Domain', 'Claim a DNS domain for the organization'),
+  ('domains.get', 'Get Domain', 'View domain details'),
+  ('domains.list', 'List Domains', 'List domains in the organization'),
+  ('domains.delete', 'Delete Domain', 'Release a domain claim'),
+  -- SSO config (singleton sub-resource)
+  ('organizations.ssoConfig.get', 'Get SSO Config', 'View SSO configuration'),
+  ('organizations.ssoConfig.update', 'Update SSO Config', 'Modify SSO configuration'),
+  -- Member (role bindings at org and space scope)
+  ('members.create', 'Create Member', 'Bind a principal to a role'),
+  ('members.get', 'Get Member', 'View member details'),
+  ('members.list', 'List Members', 'List role bindings at a scope'),
+  ('members.update', 'Update Member', 'Change a member''s role'),
+  ('members.delete', 'Delete Member', 'Remove a role binding'),
+  ('members.transferOwnership', 'Transfer Ownership', 'Atomically transfer the owner role'),
   -- Storage gateway management
   ('storage.gateways.create', 'Create Storage Gateway', 'Create storage gateways'),
   ('storage.gateways.get', 'Get Storage Gateway', 'View storage gateway details'),

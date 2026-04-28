@@ -12,11 +12,23 @@ import (
 )
 
 const countOwnersByOrg = `-- name: CountOwnersByOrg :one
-SELECT COUNT(*) FROM users WHERE org_id = $1 AND role = 'owner'
+SELECT COUNT(*)
+  FROM org_members om
+  JOIN roles r ON r.id = om.role_id
+  JOIN users u ON u.id = om.principal_id
+ WHERE om.org_id = $1
+   AND om.principal_kind = 'user'
+   AND r.is_system = true
+   AND r.name = 'owner'
+   AND u.delete_time IS NULL
 `
 
 // Used by membership-mutation handlers to enforce "≥1 owner" — call
 // before any role-change or delete that would reduce the owner count.
+// Counts org_members rows whose role is the system 'owner' role for
+// this org and whose principal is a (non-deleted) user. Keys on the
+// stable `roles.name` slug, not display_name — display_name is mutable
+// and i18n-eligible, name is the machine identifier.
 func (q *Queries) CountOwnersByOrg(ctx context.Context, orgID uuid.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, countOwnersByOrg, orgID)
 	var count int64
@@ -25,38 +37,36 @@ func (q *Queries) CountOwnersByOrg(ctx context.Context, orgID uuid.UUID) (int64,
 }
 
 const createUserMembership = `-- name: CreateUserMembership :one
-INSERT INTO users (id, org_id, firebase_identity_id, role)
-VALUES ($1, $2, $3, $4)
-RETURNING id, org_id, firebase_identity_id, role, etag, revision, create_time, update_time
+INSERT INTO users (id, org_id, firebase_identity_id)
+VALUES ($1, $2, $3)
+RETURNING id, org_id, firebase_identity_id, etag, revision, deleted_by, create_time, update_time, delete_time, purge_time
 `
 
 type CreateUserMembershipParams struct {
 	ID                 uuid.UUID `json:"id"`
 	OrgID              uuid.UUID `json:"org_id"`
 	FirebaseIdentityID uuid.UUID `json:"firebase_identity_id"`
-	Role               OrgRole   `json:"role"`
 }
 
-// Creates a per-org membership row joining a firebase_identity to an
-// org with a role. Used by `CreateOrganization` (founder, role='owner')
-// and the future `AcceptInvitation` flow (invitee, role from invite).
+// Creates a per-org identity row joining a firebase_identity to an
+// org. Role bindings live in `org_members`, not on this table; the
+// caller follows up with InsertOrgMember to bind the new user to a
+// role. Used by `CreateOrganization` (founder) and the future
+// `AcceptInvitation` flow (invitee).
 func (q *Queries) CreateUserMembership(ctx context.Context, arg CreateUserMembershipParams) (User, error) {
-	row := q.db.QueryRow(ctx, createUserMembership,
-		arg.ID,
-		arg.OrgID,
-		arg.FirebaseIdentityID,
-		arg.Role,
-	)
+	row := q.db.QueryRow(ctx, createUserMembership, arg.ID, arg.OrgID, arg.FirebaseIdentityID)
 	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.OrgID,
 		&i.FirebaseIdentityID,
-		&i.Role,
 		&i.Etag,
 		&i.Revision,
+		&i.DeletedBy,
 		&i.CreateTime,
 		&i.UpdateTime,
+		&i.DeleteTime,
+		&i.PurgeTime,
 	)
 	return i, err
 }
@@ -70,13 +80,18 @@ type DeleteUserMembershipParams struct {
 	FirebaseIdentityID uuid.UUID `json:"firebase_identity_id"`
 }
 
+// Hard-delete used by tests + the DeleteUser LRO post-soft-delete
+// purge. For ordinary user removal, prefer SoftDeleteUserMembership.
 func (q *Queries) DeleteUserMembership(ctx context.Context, arg DeleteUserMembershipParams) error {
 	_, err := q.db.Exec(ctx, deleteUserMembership, arg.OrgID, arg.FirebaseIdentityID)
 	return err
 }
 
 const getUserMembership = `-- name: GetUserMembership :one
-SELECT id, org_id, firebase_identity_id, role, etag, revision, create_time, update_time FROM users WHERE org_id = $1 AND firebase_identity_id = $2
+SELECT id, org_id, firebase_identity_id, etag, revision, deleted_by, create_time, update_time, delete_time, purge_time FROM users
+ WHERE org_id = $1
+   AND firebase_identity_id = $2
+   AND delete_time IS NULL
 `
 
 type GetUserMembershipParams struct {
@@ -91,11 +106,13 @@ func (q *Queries) GetUserMembership(ctx context.Context, arg GetUserMembershipPa
 		&i.ID,
 		&i.OrgID,
 		&i.FirebaseIdentityID,
-		&i.Role,
 		&i.Etag,
 		&i.Revision,
+		&i.DeletedBy,
 		&i.CreateTime,
 		&i.UpdateTime,
+		&i.DeleteTime,
+		&i.PurgeTime,
 	)
 	return i, err
 }
@@ -105,6 +122,7 @@ SELECT o.id, o.name, o.display_name, o.annotations, o.created_by_firebase_identi
   FROM organizations o
   JOIN users u ON u.org_id = o.id
  WHERE u.firebase_identity_id = $1
+   AND u.delete_time IS NULL
    AND o.delete_time IS NULL
  ORDER BY o.id ASC
  LIMIT 1000
@@ -112,10 +130,9 @@ SELECT o.id, o.name, o.display_name, o.annotations, o.created_by_firebase_identi
 
 // Lists all organizations the given firebase_identity has membership in.
 // Caller-scoped for `ListOrganizations`: every authenticated user is
-// only ever shown orgs they belong to. Excludes soft-deleted orgs.
-// No pagination — typical users are in 1-3 orgs. The 1000-row LIMIT
-// is a defensive backstop, not a paging mechanism; if anyone ever
-// needs more we'll know because something is very wrong.
+// only ever shown orgs they belong to. Excludes soft-deleted orgs and
+// soft-deleted user rows. No pagination — typical users are in 1-3
+// orgs. The 1000-row LIMIT is a defensive backstop.
 func (q *Queries) ListOrganizationsForFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) ([]Organization, error) {
 	rows, err := q.db.Query(ctx, listOrganizationsForFirebaseIdentity, firebaseIdentityID)
 	if err != nil {
@@ -153,21 +170,19 @@ func (q *Queries) ListOrganizationsForFirebaseIdentity(ctx context.Context, fire
 }
 
 const listUsersByFirebaseIdentity = `-- name: ListUsersByFirebaseIdentity :many
-SELECT u.id, u.org_id, u.firebase_identity_id, u.role, u.etag, u.revision, u.create_time, u.update_time
+SELECT u.id, u.org_id, u.firebase_identity_id, u.etag, u.revision, u.deleted_by, u.create_time, u.update_time, u.delete_time, u.purge_time
   FROM users u
   JOIN organizations o ON o.id = u.org_id
  WHERE u.firebase_identity_id = $1
+   AND u.delete_time IS NULL
    AND o.delete_time IS NULL
  ORDER BY u.create_time
 `
 
 // Lists all live org memberships for a firebase_identity, excluding
-// memberships in soft-deleted orgs. Used by the membership interceptor's
-// gate and by any consumer that needs the "is this caller in any active
-// org?" signal. Joining out the deleted orgs here keeps that signal in
-// sync with `ListOrganizationsForFirebaseIdentity` — without it, a
-// caller whose only memberships are in deleted orgs would pass the
-// membership check but see an empty org list, soft-bricking onboarding.
+// memberships in soft-deleted orgs and soft-deleted user rows. Used
+// by the membership interceptor's gate and by any consumer that
+// needs the "is this caller in any active org?" signal.
 func (q *Queries) ListUsersByFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) ([]User, error) {
 	rows, err := q.db.Query(ctx, listUsersByFirebaseIdentity, firebaseIdentityID)
 	if err != nil {
@@ -181,11 +196,13 @@ func (q *Queries) ListUsersByFirebaseIdentity(ctx context.Context, firebaseIdent
 			&i.ID,
 			&i.OrgID,
 			&i.FirebaseIdentityID,
-			&i.Role,
 			&i.Etag,
 			&i.Revision,
+			&i.DeletedBy,
 			&i.CreateTime,
 			&i.UpdateTime,
+			&i.DeleteTime,
+			&i.PurgeTime,
 		); err != nil {
 			return nil, err
 		}
@@ -198,7 +215,10 @@ func (q *Queries) ListUsersByFirebaseIdentity(ctx context.Context, firebaseIdent
 }
 
 const listUsersByOrg = `-- name: ListUsersByOrg :many
-SELECT id, org_id, firebase_identity_id, role, etag, revision, create_time, update_time FROM users WHERE org_id = $1 ORDER BY create_time
+SELECT id, org_id, firebase_identity_id, etag, revision, deleted_by, create_time, update_time, delete_time, purge_time FROM users
+ WHERE org_id = $1
+   AND delete_time IS NULL
+ ORDER BY create_time
 `
 
 func (q *Queries) ListUsersByOrg(ctx context.Context, orgID uuid.UUID) ([]User, error) {
@@ -214,11 +234,13 @@ func (q *Queries) ListUsersByOrg(ctx context.Context, orgID uuid.UUID) ([]User, 
 			&i.ID,
 			&i.OrgID,
 			&i.FirebaseIdentityID,
-			&i.Role,
 			&i.Etag,
 			&i.Revision,
+			&i.DeletedBy,
 			&i.CreateTime,
 			&i.UpdateTime,
+			&i.DeleteTime,
+			&i.PurgeTime,
 		); err != nil {
 			return nil, err
 		}
@@ -230,31 +252,21 @@ func (q *Queries) ListUsersByOrg(ctx context.Context, orgID uuid.UUID) ([]User, 
 	return items, nil
 }
 
-const updateUserRole = `-- name: UpdateUserRole :one
+const softDeleteUserMembership = `-- name: SoftDeleteUserMembership :exec
 UPDATE users
-   SET role = $3, update_time = now(), revision = revision + 1
+   SET delete_time = now(),
+       purge_time = now() + INTERVAL '30 days',
+       update_time = now(),
+       revision = revision + 1
  WHERE org_id = $1 AND firebase_identity_id = $2
- RETURNING id, org_id, firebase_identity_id, role, etag, revision, create_time, update_time
 `
 
-type UpdateUserRoleParams struct {
+type SoftDeleteUserMembershipParams struct {
 	OrgID              uuid.UUID `json:"org_id"`
 	FirebaseIdentityID uuid.UUID `json:"firebase_identity_id"`
-	Role               OrgRole   `json:"role"`
 }
 
-func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) (User, error) {
-	row := q.db.QueryRow(ctx, updateUserRole, arg.OrgID, arg.FirebaseIdentityID, arg.Role)
-	var i User
-	err := row.Scan(
-		&i.ID,
-		&i.OrgID,
-		&i.FirebaseIdentityID,
-		&i.Role,
-		&i.Etag,
-		&i.Revision,
-		&i.CreateTime,
-		&i.UpdateTime,
-	)
-	return i, err
+func (q *Queries) SoftDeleteUserMembership(ctx context.Context, arg SoftDeleteUserMembershipParams) error {
+	_, err := q.db.Exec(ctx, softDeleteUserMembership, arg.OrgID, arg.FirebaseIdentityID)
+	return err
 }

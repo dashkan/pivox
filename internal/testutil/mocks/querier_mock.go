@@ -177,12 +177,12 @@ func (m *MockQuerier) CountOwnersByOrg(ctx context.Context, orgID uuid.UUID) (in
 	return args.Get(0).(int64), args.Error(1)
 }
 
-func (m *MockQuerier) UpdateUserRole(ctx context.Context, arg db.UpdateUserRoleParams) (db.User, error) {
+func (m *MockQuerier) DeleteUserMembership(ctx context.Context, arg db.DeleteUserMembershipParams) error {
 	args := m.Called(ctx, arg)
-	return args.Get(0).(db.User), args.Error(1)
+	return args.Error(0)
 }
 
-func (m *MockQuerier) DeleteUserMembership(ctx context.Context, arg db.DeleteUserMembershipParams) error {
+func (m *MockQuerier) SoftDeleteUserMembership(ctx context.Context, arg db.SoftDeleteUserMembershipParams) error {
 	args := m.Called(ctx, arg)
 	return args.Error(0)
 }

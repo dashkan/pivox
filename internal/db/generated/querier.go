@@ -36,6 +36,10 @@ type Querier interface {
 	CountMessagesByConversation(ctx context.Context, conversationID uuid.UUID) (int64, error)
 	// Used by membership-mutation handlers to enforce "≥1 owner" — call
 	// before any role-change or delete that would reduce the owner count.
+	// Counts org_members rows whose role is the system 'owner' role for
+	// this org and whose principal is a (non-deleted) user. Keys on the
+	// stable `roles.name` slug, not display_name — display_name is mutable
+	// and i18n-eligible, name is the machine identifier.
 	CountOwnersByOrg(ctx context.Context, orgID uuid.UUID) (int64, error)
 	CountRequestsBySpace(ctx context.Context, spaceID uuid.UUID) (int64, error)
 	CountStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) (int64, error)
@@ -67,9 +71,11 @@ type Querier interface {
 	CreateTagBinding(ctx context.Context, arg CreateTagBindingParams) (TagBinding, error)
 	CreateTagKey(ctx context.Context, arg CreateTagKeyParams) (TagKey, error)
 	CreateTagValue(ctx context.Context, arg CreateTagValueParams) (TagValue, error)
-	// Creates a per-org membership row joining a firebase_identity to an
-	// org with a role. Used by `CreateOrganization` (founder, role='owner')
-	// and the future `AcceptInvitation` flow (invitee, role from invite).
+	// Creates a per-org identity row joining a firebase_identity to an
+	// org. Role bindings live in `org_members`, not on this table; the
+	// caller follows up with InsertOrgMember to bind the new user to a
+	// role. Used by `CreateOrganization` (founder) and the future
+	// `AcceptInvitation` flow (invitee).
 	CreateUserMembership(ctx context.Context, arg CreateUserMembershipParams) (User, error)
 	DeleteArtifact(ctx context.Context, id uuid.UUID) error
 	DeleteArtifactVersion(ctx context.Context, id uuid.UUID) error
@@ -90,6 +96,8 @@ type Querier interface {
 	DeleteTagBinding(ctx context.Context, id uuid.UUID) error
 	DeleteTagKey(ctx context.Context, id uuid.UUID) error
 	DeleteTagValue(ctx context.Context, id uuid.UUID) error
+	// Hard-delete used by tests + the DeleteUser LRO post-soft-delete
+	// purge. For ordinary user removal, prefer SoftDeleteUserMembership.
 	DeleteUserMembership(ctx context.Context, arg DeleteUserMembershipParams) error
 	FailOperation(ctx context.Context, arg FailOperationParams) (Operation, error)
 	GetApiKey(ctx context.Context, id uuid.UUID) (ApiKey, error)
@@ -152,10 +160,9 @@ type Querier interface {
 	ListOperations(ctx context.Context, arg ListOperationsParams) ([]Operation, error)
 	// Lists all organizations the given firebase_identity has membership in.
 	// Caller-scoped for `ListOrganizations`: every authenticated user is
-	// only ever shown orgs they belong to. Excludes soft-deleted orgs.
-	// No pagination — typical users are in 1-3 orgs. The 1000-row LIMIT
-	// is a defensive backstop, not a paging mechanism; if anyone ever
-	// needs more we'll know because something is very wrong.
+	// only ever shown orgs they belong to. Excludes soft-deleted orgs and
+	// soft-deleted user rows. No pagination — typical users are in 1-3
+	// orgs. The 1000-row LIMIT is a defensive backstop.
 	ListOrganizationsForFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) ([]Organization, error)
 	ListPendingOperations(ctx context.Context) ([]Operation, error)
 	ListRequestsBySpace(ctx context.Context, arg ListRequestsBySpaceParams) ([]AssetRequest, error)
@@ -164,12 +171,9 @@ type Querier interface {
 	ListStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageAgent, error)
 	ListStorageEndpointsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageEndpoint, error)
 	// Lists all live org memberships for a firebase_identity, excluding
-	// memberships in soft-deleted orgs. Used by the membership interceptor's
-	// gate and by any consumer that needs the "is this caller in any active
-	// org?" signal. Joining out the deleted orgs here keeps that signal in
-	// sync with `ListOrganizationsForFirebaseIdentity` — without it, a
-	// caller whose only memberships are in deleted orgs would pass the
-	// membership check but see an empty org list, soft-bricking onboarding.
+	// memberships in soft-deleted orgs and soft-deleted user rows. Used
+	// by the membership interceptor's gate and by any consumer that
+	// needs the "is this caller in any active org?" signal.
 	ListUsersByFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) ([]User, error)
 	ListUsersByOrg(ctx context.Context, orgID uuid.UUID) ([]User, error)
 	LookupApiKeyByKeyString(ctx context.Context, keyString string) (ApiKey, error)
@@ -182,6 +186,7 @@ type Querier interface {
 	SoftDeleteApiKey(ctx context.Context, arg SoftDeleteApiKeyParams) (ApiKey, error)
 	SoftDeleteAsset(ctx context.Context, arg SoftDeleteAssetParams) error
 	SoftDeleteSpace(ctx context.Context, arg SoftDeleteSpaceParams) (Space, error)
+	SoftDeleteUserMembership(ctx context.Context, arg SoftDeleteUserMembershipParams) error
 	SumTokensByConversation(ctx context.Context, conversationID uuid.UUID) (int64, error)
 	UndeleteApiKey(ctx context.Context, arg UndeleteApiKeyParams) (ApiKey, error)
 	UndeleteAsset(ctx context.Context, id uuid.UUID) error
@@ -222,7 +227,6 @@ type Querier interface {
 	UpdateStorageGatewayVersion(ctx context.Context, arg UpdateStorageGatewayVersionParams) error
 	UpdateTagKey(ctx context.Context, arg UpdateTagKeyParams) (TagKey, error)
 	UpdateTagValue(ctx context.Context, arg UpdateTagValueParams) (TagValue, error)
-	UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) (User, error)
 	// Upserts a firebase_identity row synced from Firebase Auth.
 	// On conflict (same firebase_uid), updates all mutable fields.
 	UpsertFirebaseIdentity(ctx context.Context, arg UpsertFirebaseIdentityParams) (FirebaseIdentity, error)

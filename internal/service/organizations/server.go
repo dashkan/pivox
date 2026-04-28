@@ -155,17 +155,19 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 		return nil, apierr.HandleResourceError(err, "Organization", orgSlug)
 	}
 
-	// Founder gets an `owner` membership row in the same transaction.
-	// "≥1 owner per org" is preserved by definition for new orgs;
-	// future role-mutation code enforces it at the boundary.
+	// Founder gets a per-org user row in the same transaction. The
+	// owner role binding is wired up in phase 4 step 3+ (Iam handlers
+	// will seed the org's 4 system roles and insert an org_members row
+	// binding the founder to the owner role). Until then "≥1 owner per
+	// org" is *unenforced* — acceptable in pre-prod where this code
+	// path is mid-rebuild.
 	if _, err := qtx.CreateUserMembership(ctx, db.CreateUserMembershipParams{
 		ID:                 uuid.New(),
 		OrgID:              org.ID,
 		FirebaseIdentityID: caller.ID,
-		Role:               db.OrgRoleOwner,
 	}); err != nil {
-		slog.ErrorContext(ctx, "create owner membership failed", "org_id", org.ID, "firebase_identity_id", caller.ID, "error", err)
-		return nil, apierr.Internal("create owner membership")
+		slog.ErrorContext(ctx, "create founder user row failed", "org_id", org.ID, "firebase_identity_id", caller.ID, "error", err)
+		return nil, apierr.Internal("create founder user row")
 	}
 
 	if err := tx.Commit(ctx); err != nil {

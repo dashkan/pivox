@@ -105,7 +105,6 @@ func TestMembershipInterceptor_MemberCaller(t *testing.T) {
 			ID:                 uuid.New(),
 			OrgID:              uuid.New(),
 			FirebaseIdentityID: testMemberIdentity.ID,
-			Role:               db.OrgRoleOwner,
 		}}, nil).Once()
 
 	interceptor := MembershipRequiredInterceptor(q)

@@ -235,91 +235,188 @@ Decisions locked before sweeping:
 
 ---
 
-## Phase 3 — Lifecycle + SSO proto
+## Phase 3 — Lifecycle + SSO proto ✅
+
+Shipped at commit `b49828d` and refined in `584790d` (phase 4 step 0,
+which extracted `Domain` as its own org-level resource and removed the
+short-lived `Sso` gRPC service).
 
 ### Org lifecycle
 
-- [ ] `DeleteOrganization` returns `google.longrunning.Operation` (was synchronous if applicable).
-- [ ] `UndeleteOrganization` RPC.
-- [ ] `Organization.delete_time` / `purge_time` fields.
-- [ ] `Organization.state` enum if useful (`ACTIVE`, `DELETE_REQUESTED`).
+- [x] `DeleteOrganization` returns `google.longrunning.Operation` (sync version replaced).
+- [x] `UndeleteOrganization` LRO.
+- [x] `Organization.delete_time` / `purge_time` fields.
+- [x] `Organization.state` enum (`STATE_UNSPECIFIED`, `ACTIVE`, `DELETE_REQUESTED`).
+- [x] `DeleteOrganization` request: `{name, etag, force}`. Standard AIP-135 DELETE
+      verb after the typed-confirm pattern was moved to client-side UX gate
+      (sub-decision below). `force=true` skips the 30-day grace window and
+      synchronously cascades.
+- [x] `DeleteOrganizationMetadata` Phase enum: VALIDATING, CANCELLING_OPERATIONS,
+      MARKING_DELETED, PURGING (force-only), COMPLETED.
 
-### User lifecycle
+### User lifecycle (proto only — handlers in phase 4)
 
-- [ ] `DeleteUser` LRO (already added in phase 2 — cross-link the spec here).
-- [ ] Sole-owner-blocking error code documented (`FAILED_PRECONDITION` with structured detail listing affected orgs).
-- [ ] `TransferOwnership` design: dedicated RPC on `Member` (atomic two-row swap) **vs** two `UpdateMember` calls (race window). Recommend dedicated.
+- [x] `DeleteUser` LRO + `DeleteUserMetadata.Phase` enum landed in phase 2.
+- [ ] Sole-owner-blocking error code documented in proto comments
+      (FAILED_PRECONDITION + structured detail listing affected orgs) —
+      handler work, lands in phase 4 step 5.
+- [x] `TransferOwnership` — dedicated atomic RPC on `Iam` service (locked: open decision #5).
 
 ### SSO
 
-- [ ] `SsoConfig` singleton message at `organizations/{org}/ssoConfig` per AIP-156.
-- [ ] Fields: `firebase_provider_id`, `kind` (OIDC|SAML), `oidc_config` (issuer, client_id, encrypted client_secret, redirect URIs), `saml_config` (metadata XML, attribute mappings), `verified_domains[]`, `verification_state`, `enabled`.
-- [ ] `Get`, `Update` only.
-- [ ] `Domains.Verify` flow if needed (DNS TXT). Decide whether to add now or defer.
-- [ ] `Sso.Resolve` RPC: `{email}` → `{provider_id}`. Rate-limited.
-- [ ] Decide secret-storage strategy: KMS column-encryption vs `Secret` table with wrapped DEKs.
+- [x] `SsoConfig` singleton message at `organizations/{org}/ssoConfig` per AIP-156.
+- [x] Fields: `firebase_provider_id`, `display_name`, `enabled`,
+      oneof `oidc | saml`, etag, timestamps. `verified_domains[]` was
+      removed in phase 4 step 0 in favor of the org-level `Domain` resource.
+- [x] `OidcConfig` and `SamlConfig` shapes match Firebase Admin SDK
+      `OIDCProviderConfig` / `SAMLProviderConfig`.
+- [x] `Get`, `Update` only (sync; not LROs — see sub-decision #11 below).
+- [x] DNS-TXT verification flow lives in the `Domain` resource (extracted in
+      step 0). `CreateDomain` returns an LRO that drives DNS polling end-to-end.
+- [x] No `Sso.Resolve` gRPC RPC. Replaced by `POST /internal/v1/auth:resolveProvider`
+      stdlib HTTP route on the existing `:8080` listener (sub-decision #7 below).
+- [x] Secret-storage: **KMS column-encryption** for `client_secret` (locked: open decision #4).
 
 ### Phase 3 exit criteria
 
-- [ ] Proto pipeline clean.
-- [ ] Spec doc added (this doc) updated with finalized message shapes.
+- [x] Proto pipeline clean (`make proto-format && make lint-proto && make api-lint && make proto-generate && make tidy`).
+- [x] Build clean (`make build && go test ./...`).
+- [x] Spec doc updated: this section + sub-decisions #6–#11 below.
 
 ---
 
-## Phase 4 — Server impl for phases 2–3
+## Phase 4 — Server impl + final proto cleanup
 
-The big build. Strict TDD: write the unit/integration test first, watch it fail, then implement.
+The big build. Strict TDD: write the unit/integration test first,
+watch it fail, then implement.
 
-### Schema
+Executed as 8 ordered steps. Each step ends in a clean gate (build,
+tests, lint) and an audit-eligible commit boundary.
 
-- [ ] `members` table: scope (org or space), principal_kind (user|group), principal_id, role_id. Unique on (scope, principal). FK cascades on parent delete.
-- [ ] `groups` table + `group_members` table.
-- [ ] `roles` table seeded with 4 system roles per org at create time.
-- [ ] `permissions` static — code-defined, exposed via `ListPermissions`.
-- [ ] `sso_configs` table (1 per org, optional). Columns include encrypted secret material.
-- [ ] Soft-delete: `organizations.delete_time` / `purge_time`. (Same on `spaces` and `users` — for consistency.)
-- [ ] Drop+recreate dev DB.
+### Step 0 — Proto cleanup ✅ (commit `584790d`)
 
-### Permission interceptor
+- [x] Drop `service Sso { ... }` from `sso.proto`. SSO config CRUD lives on Organizations.
+- [x] Drop `VerifiedDomain` message + `repeated VerifiedDomain verified_domains` field from SsoConfig.
+- [x] Add new `domains.proto` with org-level `Domain` resource (decoupled from SSO; future consumers may include email allowlist, branding).
+- [x] Add 4 RPCs to `Organizations` service: `CreateDomain` (LRO), `ListDomains`, `GetDomain`, `DeleteDomain`.
+- [x] `CreateDomainMetadata` Phase enum: AWAITING_DNS, VERIFIED, FAILED, EXPIRED.
+
+### Step 1 — Schema sweep + sqlc + dev-DB recreate
+
+- [ ] Init migration edit: new tables `org_members`, `space_members` (new shape),
+      `domains`, `sso_configs`. New enums `principal_kind`, `domain_state`.
+- [ ] Drop old tables `role_members` and old `space_members`. Drop old enums
+      `space_role`, `space_member_type`, `role_member_type`, `org_role`.
+- [ ] `users` loses `role` column; gains soft-delete (`delete_time`, `purge_time`, `deleted_by`).
+- [ ] `roles` gains stable `name` slug column (system-role machine identifier;
+      `name='owner'/'admin'/'editor'/'viewer'` for the 4 system roles per org).
+      `UNIQUE(org_id, name)`.
+- [ ] `domains.domain` `UNIQUE` globally + `CHECK (domain = lower(domain))` for
+      case-insensitive single-claim enforcement.
+- [ ] `sso_configs.client_secret_ciphertext BYTEA` separate from `oidc_config`
+      JSONB; KMS-encrypt on write. CHECK ensures exactly one of OIDC/SAML.
+- [ ] Permission catalog adds `domains.*`, `organizations.ssoConfig.*`, `members.*`, `users.delete`.
+- [ ] `users.sql` queries: `CreateUserMembership` no longer takes role,
+      `CountOwnersByOrg` joins `org_members + roles + users` keyed on `roles.name='owner'`,
+      `SoftDeleteUserMembership` added, `UpdateUserRole` removed.
+- [ ] sqlc regen + Go code fixes (CreateOrganization handler, mock querier, two test files).
+- [ ] Drop+recreate dev DB; `make db-seed` clean; storage agent registration tokens present.
+- [ ] Code-reviewer audit before commit.
+
+### Step 2 — Permission interceptor
 
 - [ ] Test fixtures: orgs with various member/group/role bindings.
-- [ ] Resolver: caller → effective role at target scope, considering inheritance.
-- [ ] Static `(role, permission) → allow` map.
+- [ ] Resolver: caller → effective role at target scope, with org→space inheritance
+      (locked: open decision #1 — union with org-level).
+- [ ] Static `(role, permission) → allow` map in code.
 - [ ] Wire into gRPC server interceptor chain.
-- [ ] `TestIamPermissions` reuses resolver.
+- [ ] `Iam.TestIamPermissions` handler reuses the same resolver.
 
-### Org lifecycle
+### Step 3 — Member / Group / Role handlers
 
-- [ ] `DeleteOrganization` LRO orchestrator. State machine. Cancellation of in-flight LROs.
-- [ ] Soft-delete gate at RPC boundary: org-scoped reads succeed with metadata; mutations return `FAILED_PRECONDITION`.
-- [ ] `UndeleteOrganization` clears `delete_time`.
-- [ ] Purge worker: scheduled job hard-deletes orgs past `purge_time`. FK cascade does the rest.
+- [ ] `Iam.{Get,List,Create,Update,Delete}Member` — multi-parent (org/space),
+      dispatches to `org_members` or `space_members` table by parent shape.
+- [ ] `Iam.{Create,List,Get,Update,Delete}Group` + `AddGroupMembers` / `RemoveGroupMembers`.
+- [ ] `Iam.{Get,List}Role`, `Iam.ListPermissions` — read-only in v1.
+- [ ] `Iam.TransferOwnership` — atomic two-row swap inside one transaction.
+- [ ] `CreateOrganization` handler grows: seed 4 system roles for the new org,
+      then insert `org_members` row binding the founder to the system 'owner' role.
+      Restore the deferred owner-binding test assertion (tracked in step 1).
+
+### Step 4 — Org lifecycle
+
+- [ ] `Organizations.DeleteOrganization` LRO orchestrator. State machine matching
+      `DeleteOrganizationMetadata.Phase`: VALIDATING → CANCELLING_OPERATIONS →
+      MARKING_DELETED|PURGING → COMPLETED. `force=true` takes the PURGING branch.
+- [ ] Cancellation of in-flight org-scoped LROs.
+- [ ] Soft-delete gate at RPC boundary: org-scoped reads succeed with metadata;
+      mutations return `FAILED_PRECONDITION`.
+- [ ] `Organizations.UndeleteOrganization` LRO clears `delete_time`/`purge_time`,
+      restores `state=ACTIVE`. Grace-window check.
 - [ ] Slug freed at purge time, not at soft-delete.
 
-### User lifecycle
+### Step 5 — User lifecycle
 
-- [ ] `DeleteUser` LRO orchestrator.
-- [ ] Sole-owner check: scan members for `role = owner`, group by org, count. If any org has only this user as owner, return `FAILED_PRECONDITION` with structured detail.
-- [ ] Cascade memberships → owned data → `firebase.Auth.DeleteUser(uid)`.
-- [ ] `onUserDeleted` webhook handler: idempotent — if user already gone in our DB, no-op.
-- [ ] `TransferOwnership` atomic implementation.
+- [ ] `Iam.DeleteUser` LRO orchestrator (`DeleteUserMetadata.Phase`: VALIDATING,
+      REVOKING_MEMBERSHIPS, DELETING_PIVOX_RECORDS, DELETING_FIREBASE_IDENTITY,
+      COMPLETED).
+- [ ] Sole-owner check: `org_members WHERE role_id=<system owner>` group-by-org;
+      blocks with FAILED_PRECONDITION + structured detail listing affected orgs.
+- [ ] Cascade order: memberships → owned data → `firebase.Auth.DeleteUser(uid)` last.
+- [ ] `onUserDeleted` Firebase webhook handler: idempotent — no-op if user already gone.
 
-### SSO
+### Step 6 — Workers (purge + verify-DNS), in-process
 
-- [ ] `SsoConfig` Get/Update handlers.
-- [ ] On Update: write DB, then call Firebase Admin SDK `CreateOIDCProviderConfig` / `CreateSAMLProviderConfig` / `Update*ProviderConfig`.
-- [ ] Reconciliation job (or test hook) detects drift.
-- [ ] Encrypted-secret storage wired via chosen strategy (KMS column or Secret table).
-- [ ] `Sso.Resolve` handler with rate limiting.
-- [ ] Domain verification flow (DNS TXT) if scoped in.
+- [ ] New `internal/workers/` package. `type PurgeWorker struct{}`,
+      `type VerifyDomainWorker struct{}`, both expose `Run(ctx) error`.
+- [ ] Dependencies (db queries, logger, config, dns resolver) injected; no
+      reach into HTTP/gRPC server internals. Trivially transferable to a
+      dedicated `cmd/pivox-purge-worker/` binary later (sub-decision #9).
+- [ ] Purge worker: scans orgs past `purge_time`, drives final cascade, frees slug.
+- [ ] Verify-DNS worker: drives `CreateDomain` LROs through DNS-TXT polling at
+      a backoff schedule (2 min × 1h → 30 min × 24h → 6h × 6d → EXPIRED).
+- [ ] Postgres advisory lock so multi-replica deploys safely have one active
+      worker per type at a time.
+- [ ] DNS resolver as injectable interface. Real impl uses `net.Resolver`;
+      v1 ships with a stub fake that returns "TXT matches" unconditionally
+      (sub-decision #10) so end-to-end domain claiming works in dev without
+      real DNS. Real resolver wires up before any external admin uses SSO.
+
+### Step 7 — Domain RPC handlers
+
+- [ ] `Organizations.CreateDomain` — generate token, write row with `state=PENDING`,
+      create LRO with `verification_token` in metadata. Returns
+      `ALREADY_EXISTS` for globally-claimed domains *without* disclosing the
+      holder org.
+- [ ] `Organizations.ListDomains`, `GetDomain`, `DeleteDomain` — sync.
+- [ ] `DeleteDomain` cancels in-flight `CreateDomain` LRO if still running.
+      Returns FAILED_PRECONDITION when removing the last `state=VERIFIED`
+      domain on an `enabled=true` SsoConfig.
+
+### Step 8 — SSO config + `auth:resolveProvider`
+
+- [ ] `Organizations.GetSsoConfig` / `UpdateSsoConfig` handlers (sync, not LRO).
+- [ ] On Update: validate → KMS-encrypt new `client_secret` if provided →
+      DB write → Firebase Admin SDK `Create*ProviderConfig` /
+      `Update*ProviderConfig`. Best-effort sync; failure returns error to caller.
+- [ ] KMS column-encryption via existing `internal/crypto/encryptor_gcp.go` path
+      (locked: open decision #4). Drift reconciliation job lands later, not phase 4.
+- [ ] `POST /internal/v1/auth:resolveProvider { email }` → `{ provider_id }`.
+      Hand-written handler in `InternalHooks`, sibling of `auth:exchangeToken`.
+      New `resolveProviderLimiter *ipRateLimiter` (sub-decision #7).
+- [ ] Lookup chain: `email → domain → domains WHERE org_id AND state=VERIFIED →
+      sso_configs WHERE enabled=true → firebase_provider_id`.
 
 ### Phase 4 exit criteria
 
-- [ ] All RPCs land with full integration test coverage.
+- [ ] All new/changed RPCs covered by integration tests.
 - [ ] Permission interceptor tests cover org+space, user+group, inheritance, deny paths.
-- [ ] Soft-delete + revive end-to-end test.
-- [ ] User-delete blocking + unblock-via-transfer + unblock-via-org-delete tests.
-- [ ] SSO Update → Firebase Admin SDK side-effect test (with mock).
+- [ ] Soft-delete → revive end-to-end test.
+- [ ] `DeleteUser` blocking → unblock-via-transfer / unblock-via-org-delete tests.
+- [ ] `UpdateSsoConfig` → Firebase Admin SDK side-effect test (with mock).
+- [ ] `CreateDomain` LRO drives PENDING → VERIFIED → EXPIRED through stubbed DNS resolver.
+- [ ] Native macOS app rebuilds against regenerated stubs.
+- [ ] `make build && go test ./... && make api-lint && make lint` clean.
 
 ---
 
@@ -428,19 +525,70 @@ The handshake completes early (or silently fails), so the post-handshake `ListSt
 
 ---
 
-## Open decisions (lock before phase 2)
+## Locked decisions
 
-1. **Space role inheritance.** Does space-level `effective_role(user)` union with org-level `effective_role(user)` (GCP-style), or is space membership fully explicit?
-   - Recommend: union (org owner is automatically space owner). Simpler reasoning, matches GCP norm.
+Original (locked before phase 2):
 
-2. **`Member` resource ID shape.** `members/{principal_id}` (one binding per principal per scope, deduplication-by-construction) vs `members/{generated_id}` with `principal` as a separate field (more flexible but allows weird states).
-   - Recommend: `members/{principal_id}`. Forbids duplicates by construction. Lookup-by-principal is the dominant query.
+1. **Space role inheritance.** ✅ **Locked: union with org-level.**
+   Org owner is automatically space owner. Simpler reasoning, matches GCP norm.
+2. **`Member` resource ID shape.** ✅ **Locked: `members/{user-id}` or `members/{group-id}` (singular typed prefix).**
+   `Member.principal` is a oneof. One binding per (principal, scope) by construction.
+3. **`Group` ↔ `Team` naming.** ✅ **Locked: `Group`.** Industry-standard, no collision with Space-as-team metaphor.
+4. **SSO secret storage.** ✅ **Locked: KMS column-encryption for v1.** Migrate to envelope-DEK later if rotation requirements grow.
+5. **`TransferOwnership`.** ✅ **Locked: dedicated atomic RPC.** Single transaction; no window of zero or two owners.
 
-3. **`Group` ↔ `Team` naming.** Keep `Group`? User has called them "groups/teams" — pick one.
-   - Recommend: `Group`. Industry-standard, no collision with Space-as-team metaphor.
+New (locked during phase 3 / phase 4 step 0):
 
-4. **SSO secret storage.** KMS column-encryption (simpler) vs `Secret` table with KMS-wrapped DEKs (envelope, more flexible).
-   - Recommend: KMS column-encryption for v1. Migrate to envelope later if rotation requirements grow.
+6. **Domain verification is an LRO, not a sync RPC.** ✅ **Locked.**
+   `CreateDomain` returns `google.longrunning.Operation`. `CreateDomainMetadata.Phase`
+   surfaces AWAITING_DNS / VERIFIED / FAILED / EXPIRED; the verification token lives
+   in the operation metadata so admins can read it immediately. Re-verification gets
+   a separate `VerifyDomain` RPC if/when admins need it (deferred — YAGNI). Reasoning:
+   server takes responsibility for repeated DNS checks at a backoff schedule until
+   propagation succeeds or the grace window elapses; that's textbook LRO work.
 
-5. **`TransferOwnership`** — dedicated RPC vs two `UpdateMember` calls.
-   - Recommend: dedicated. Atomicity matters (no window of zero or two owners).
+7. **`auth:resolveProvider` is stdlib HTTP, not gRPC.** ✅ **Locked.**
+   `POST /internal/v1/auth:resolveProvider {email} → {provider_id}` mounts on the
+   existing `:8080` listener under `/internal/v1/`, sibling of `auth:exchangeToken`
+   et al. No new gRPC listener (50053 idea is dead). Rate-limited per-IP by
+   `ipRateLimiter` in Go (matches established pattern). Reasoning: single-purpose,
+   public, unauthenticated, idempotent, GET-shaped lookup; gRPC's strengths
+   (typed clients, streaming, bidi) don't apply.
+
+8. **`Domain` is org-level, not SSO-config-scoped.** ✅ **Locked.**
+   Path `organizations/{org}/domains/{domain}`. SSO is the first consumer; future
+   features (email allowlist, custom invitation domains, branding) consume the
+   same resource without renaming. Linkage to SsoConfig is implicit (any of the
+   org's `state=VERIFIED` domains route to its `enabled=true` SsoConfig — AIP-156
+   enforces one SsoConfig per org so the mapping is unambiguous).
+
+9. **Purge worker host: in-process goroutine in `pivox-cloud`.** ✅ **Locked for v1; transferable design.**
+   Workers live in `internal/workers/` with dependencies injected and no reach into
+   HTTP/gRPC server internals. Postgres advisory lock for multi-replica safety.
+   `cmd/pivox-purge-worker/` binary becomes a one-line `main` calling the same
+   package when rolling-deploy correctness becomes load-bearing.
+
+10. **DNS reconciler is the LRO, not a separate worker.** ✅ **Locked.**
+    The `CreateDomain` LRO drives DNS polling end-to-end; there's no separate
+    "reconciler" service. Phase 5/6 originally had a reconciler line — folded
+    into the LRO. v1 ships with a stub DNS resolver that returns "TXT matches"
+    unconditionally so end-to-end domain claiming works in dev without real DNS;
+    real resolver wires up before any external admin uses SSO.
+
+11. **`UpdateSsoConfig` is sync, not LRO.** ✅ **Locked.**
+    Validate → KMS-encrypt → DB write → Firebase Admin SDK `*ProviderConfig`
+    call. Sub-second median; no Phase enum to surface. If the Firebase call
+    fails, return error to caller; drift reconciliation is a separate concern,
+    not an Operation tied to this Update call. (Inconsistent with
+    `UpdateOrganization`-as-LRO; the latter is the one that should be downgraded
+    to sync, not this one upgraded — out of scope for phase 4.)
+
+## Tracked risks (resurface when relevant)
+
+- **Founder owner-binding test downgraded in step 1.** `TestUnit_CreateOrganization_CreatesOwnerMembership`
+  in `internal/service/organizations/server_unit_test.go` was downgraded to
+  assert only the user-row creation (3 args), not the owner-role binding,
+  because step 1 dropped `users.role` and step 3+ adds the org_members row.
+  **Surface again at phase 4 step 3:** restore the owner-binding tx assertion
+  (org_members row with role_id pointing to the system 'owner' role) before
+  shipping that handler change.
