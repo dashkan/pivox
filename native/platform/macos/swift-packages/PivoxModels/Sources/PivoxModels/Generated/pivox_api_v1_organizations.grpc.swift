@@ -86,42 +86,55 @@ public enum Pivox_Api_V1_Organizations: Sendable {
                 type: .unary
             )
         }
-        /// Namespace for "GetIamPolicy" metadata.
-        public enum GetIamPolicy: Sendable {
-            /// Request type for "GetIamPolicy".
-            public typealias Input = Pivox_Iam_V1_GetIamPolicyRequest
-            /// Response type for "GetIamPolicy".
-            public typealias Output = Pivox_Iam_V1_Policy
-            /// Descriptor for "GetIamPolicy".
+        /// Namespace for "DeleteOrganization" metadata.
+        public enum DeleteOrganization: Sendable {
+            /// Request type for "DeleteOrganization".
+            public typealias Input = Pivox_Api_V1_DeleteOrganizationRequest
+            /// Response type for "DeleteOrganization".
+            public typealias Output = Google_Longrunning_Operation
+            /// Descriptor for "DeleteOrganization".
             public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "pivox.api.v1.Organizations"),
-                method: "GetIamPolicy",
+                method: "DeleteOrganization",
                 type: .unary
             )
         }
-        /// Namespace for "SetIamPolicy" metadata.
-        public enum SetIamPolicy: Sendable {
-            /// Request type for "SetIamPolicy".
-            public typealias Input = Pivox_Iam_V1_SetIamPolicyRequest
-            /// Response type for "SetIamPolicy".
-            public typealias Output = Pivox_Iam_V1_Policy
-            /// Descriptor for "SetIamPolicy".
+        /// Namespace for "UndeleteOrganization" metadata.
+        public enum UndeleteOrganization: Sendable {
+            /// Request type for "UndeleteOrganization".
+            public typealias Input = Pivox_Api_V1_UndeleteOrganizationRequest
+            /// Response type for "UndeleteOrganization".
+            public typealias Output = Google_Longrunning_Operation
+            /// Descriptor for "UndeleteOrganization".
             public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "pivox.api.v1.Organizations"),
-                method: "SetIamPolicy",
+                method: "UndeleteOrganization",
                 type: .unary
             )
         }
-        /// Namespace for "TestIamPermissions" metadata.
-        public enum TestIamPermissions: Sendable {
-            /// Request type for "TestIamPermissions".
-            public typealias Input = Pivox_Iam_V1_TestIamPermissionsRequest
-            /// Response type for "TestIamPermissions".
-            public typealias Output = Pivox_Iam_V1_TestIamPermissionsResponse
-            /// Descriptor for "TestIamPermissions".
+        /// Namespace for "GetSsoConfig" metadata.
+        public enum GetSsoConfig: Sendable {
+            /// Request type for "GetSsoConfig".
+            public typealias Input = Pivox_Api_V1_GetSsoConfigRequest
+            /// Response type for "GetSsoConfig".
+            public typealias Output = Pivox_Api_V1_SsoConfig
+            /// Descriptor for "GetSsoConfig".
             public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "pivox.api.v1.Organizations"),
-                method: "TestIamPermissions",
+                method: "GetSsoConfig",
+                type: .unary
+            )
+        }
+        /// Namespace for "UpdateSsoConfig" metadata.
+        public enum UpdateSsoConfig: Sendable {
+            /// Request type for "UpdateSsoConfig".
+            public typealias Input = Pivox_Api_V1_UpdateSsoConfigRequest
+            /// Response type for "UpdateSsoConfig".
+            public typealias Output = Pivox_Api_V1_SsoConfig
+            /// Descriptor for "UpdateSsoConfig".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "pivox.api.v1.Organizations"),
+                method: "UpdateSsoConfig",
                 type: .unary
             )
         }
@@ -229,67 +242,16 @@ public enum Pivox_Api_V1_Organizations: Sendable {
                 type: .unary
             )
         }
-        /// Namespace for "GetCustomDomain" metadata.
-        public enum GetCustomDomain: Sendable {
-            /// Request type for "GetCustomDomain".
-            public typealias Input = Pivox_Api_V1_GetCustomDomainRequest
-            /// Response type for "GetCustomDomain".
-            public typealias Output = Pivox_Api_V1_CustomDomain
-            /// Descriptor for "GetCustomDomain".
-            public static let descriptor = GRPCCore.MethodDescriptor(
-                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "pivox.api.v1.Organizations"),
-                method: "GetCustomDomain",
-                type: .unary
-            )
-        }
-        /// Namespace for "ListCustomDomains" metadata.
-        public enum ListCustomDomains: Sendable {
-            /// Request type for "ListCustomDomains".
-            public typealias Input = Pivox_Api_V1_ListCustomDomainsRequest
-            /// Response type for "ListCustomDomains".
-            public typealias Output = Pivox_Api_V1_ListCustomDomainsResponse
-            /// Descriptor for "ListCustomDomains".
-            public static let descriptor = GRPCCore.MethodDescriptor(
-                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "pivox.api.v1.Organizations"),
-                method: "ListCustomDomains",
-                type: .unary
-            )
-        }
-        /// Namespace for "CreateCustomDomain" metadata.
-        public enum CreateCustomDomain: Sendable {
-            /// Request type for "CreateCustomDomain".
-            public typealias Input = Pivox_Api_V1_CreateCustomDomainRequest
-            /// Response type for "CreateCustomDomain".
-            public typealias Output = Google_Longrunning_Operation
-            /// Descriptor for "CreateCustomDomain".
-            public static let descriptor = GRPCCore.MethodDescriptor(
-                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "pivox.api.v1.Organizations"),
-                method: "CreateCustomDomain",
-                type: .unary
-            )
-        }
-        /// Namespace for "DeleteCustomDomain" metadata.
-        public enum DeleteCustomDomain: Sendable {
-            /// Request type for "DeleteCustomDomain".
-            public typealias Input = Pivox_Api_V1_DeleteCustomDomainRequest
-            /// Response type for "DeleteCustomDomain".
-            public typealias Output = Google_Longrunning_Operation
-            /// Descriptor for "DeleteCustomDomain".
-            public static let descriptor = GRPCCore.MethodDescriptor(
-                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "pivox.api.v1.Organizations"),
-                method: "DeleteCustomDomain",
-                type: .unary
-            )
-        }
         /// Descriptors for all methods in the "pivox.api.v1.Organizations" service.
         public static let descriptors: [GRPCCore.MethodDescriptor] = [
             GetOrganization.descriptor,
             ListOrganizations.descriptor,
             CreateOrganization.descriptor,
             UpdateOrganization.descriptor,
-            GetIamPolicy.descriptor,
-            SetIamPolicy.descriptor,
-            TestIamPermissions.descriptor,
+            DeleteOrganization.descriptor,
+            UndeleteOrganization.descriptor,
+            GetSsoConfig.descriptor,
+            UpdateSsoConfig.descriptor,
             CreateInvitation.descriptor,
             ListInvitations.descriptor,
             GetInvitation.descriptor,
@@ -297,11 +259,7 @@ public enum Pivox_Api_V1_Organizations: Sendable {
             DeclineInvitation.descriptor,
             DeleteInvitation.descriptor,
             GetInvitationPolicy.descriptor,
-            UpdateInvitationPolicy.descriptor,
-            GetCustomDomain.descriptor,
-            ListCustomDomains.descriptor,
-            CreateCustomDomain.descriptor,
-            DeleteCustomDomain.descriptor
+            UpdateInvitationPolicy.descriptor
         ]
     }
 }
@@ -428,89 +386,128 @@ extension Pivox_Api_V1_Organizations {
             onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result
         ) async throws -> Result where Result: Sendable
 
-        /// Call the "GetIamPolicy" method.
+        /// Call the "DeleteOrganization" method.
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Gets the access control policy for an organization resource. The policy may
-        /// > be empty if no such policy or resource exists. The `resource` field should
-        /// > be the organization's resource name, for example: "organizations/123".
+        /// > Soft-deletes an organization. The org transitions to
+        /// > `DELETE_REQUESTED` state with `delete_time` set; `purge_time` is
+        /// > populated to `delete_time + 30 days`. Until purge, the org is
+        /// > recoverable via `UndeleteOrganization` and remains visible to
+        /// > `ListOrganizations` callers who pass `show_deleted=true`. After
+        /// > purge, all data cascades and the slug is freed.
         /// > 
-        /// > Authorization requires the IAM permission
-        /// > `resourcemanager.organizations.getIamPolicy` on the specified organization.
+        /// > If `force=true`, the 30-day grace window is skipped: the LRO
+        /// > synchronously cascades all child data and frees the slug.
+        /// > The org is unrecoverable.
+        /// > 
+        /// > The caller must hold the `owner` role on the organization;
+        /// > otherwise the LRO completes with PERMISSION_DENIED. The LRO
+        /// > surfaces cascade progress via `DeleteOrganizationMetadata.Phase`.
         ///
         /// - Parameters:
-        ///   - request: A request containing a single `Pivox_Iam_V1_GetIamPolicyRequest` message.
-        ///   - serializer: A serializer for `Pivox_Iam_V1_GetIamPolicyRequest` messages.
-        ///   - deserializer: A deserializer for `Pivox_Iam_V1_Policy` messages.
+        ///   - request: A request containing a single `Pivox_Api_V1_DeleteOrganizationRequest` message.
+        ///   - serializer: A serializer for `Pivox_Api_V1_DeleteOrganizationRequest` messages.
+        ///   - deserializer: A deserializer for `Google_Longrunning_Operation` messages.
         ///   - options: Options to apply to this RPC.
         ///   - handleResponse: A closure which handles the response, the result of which is
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        func getIamPolicy<Result>(
-            request: GRPCCore.ClientRequest<Pivox_Iam_V1_GetIamPolicyRequest>,
-            serializer: some GRPCCore.MessageSerializer<Pivox_Iam_V1_GetIamPolicyRequest>,
-            deserializer: some GRPCCore.MessageDeserializer<Pivox_Iam_V1_Policy>,
+        func deleteOrganization<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Api_V1_DeleteOrganizationRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Api_V1_DeleteOrganizationRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Google_Longrunning_Operation>,
             options: GRPCCore.CallOptions,
-            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_Policy>) async throws -> Result
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result
         ) async throws -> Result where Result: Sendable
 
-        /// Call the "SetIamPolicy" method.
+        /// Call the "UndeleteOrganization" method.
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Sets the access control policy on an organization resource. Replaces any
-        /// > existing policy. The `resource` field should be the organization's resource
-        /// > name, for example: "organizations/123".
+        /// > Restores a soft-deleted organization (`DELETE_REQUESTED` state)
+        /// > back to `ACTIVE`, clearing `delete_time` and `purge_time`. Only
+        /// > callable during the 30-day grace window before purge. After
+        /// > purge there is no way back.
         /// > 
-        /// > Authorization requires the IAM permission
-        /// > `resourcemanager.organizations.setIamPolicy` on the specified organization.
-        /// > (-- api-linter: core::0136::response-message-name=disabled
-        /// >     aip.dev/not-precedent: SetIamPolicy returns Policy per IAM convention. --)
+        /// > The caller must hold the `owner` role on the organization.
         ///
         /// - Parameters:
-        ///   - request: A request containing a single `Pivox_Iam_V1_SetIamPolicyRequest` message.
-        ///   - serializer: A serializer for `Pivox_Iam_V1_SetIamPolicyRequest` messages.
-        ///   - deserializer: A deserializer for `Pivox_Iam_V1_Policy` messages.
+        ///   - request: A request containing a single `Pivox_Api_V1_UndeleteOrganizationRequest` message.
+        ///   - serializer: A serializer for `Pivox_Api_V1_UndeleteOrganizationRequest` messages.
+        ///   - deserializer: A deserializer for `Google_Longrunning_Operation` messages.
         ///   - options: Options to apply to this RPC.
         ///   - handleResponse: A closure which handles the response, the result of which is
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        func setIamPolicy<Result>(
-            request: GRPCCore.ClientRequest<Pivox_Iam_V1_SetIamPolicyRequest>,
-            serializer: some GRPCCore.MessageSerializer<Pivox_Iam_V1_SetIamPolicyRequest>,
-            deserializer: some GRPCCore.MessageDeserializer<Pivox_Iam_V1_Policy>,
+        func undeleteOrganization<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Api_V1_UndeleteOrganizationRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Api_V1_UndeleteOrganizationRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Google_Longrunning_Operation>,
             options: GRPCCore.CallOptions,
-            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_Policy>) async throws -> Result
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result
         ) async throws -> Result where Result: Sendable
 
-        /// Call the "TestIamPermissions" method.
+        /// Call the "GetSsoConfig" method.
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Returns the permissions that a caller has on the specified organization.
-        /// > The `resource` field should be the organization's resource name,
-        /// > for example: "organizations/123".
+        /// > Gets the SSO configuration for an organization. Returns the
+        /// > SsoConfig singleton at `organizations/{org}/ssoConfig`. If no
+        /// > config has been set, returns NOT_FOUND.
         /// > 
-        /// > There are no permissions required for making this API call.
+        /// > (-- api-linter: core::0131::request-name-required=disabled
+        /// >     aip.dev/not-precedent: GetSsoConfig is an AIP-156 singleton
+        /// >     sub-resource read; the parent org disambiguates the singleton. --)
         ///
         /// - Parameters:
-        ///   - request: A request containing a single `Pivox_Iam_V1_TestIamPermissionsRequest` message.
-        ///   - serializer: A serializer for `Pivox_Iam_V1_TestIamPermissionsRequest` messages.
-        ///   - deserializer: A deserializer for `Pivox_Iam_V1_TestIamPermissionsResponse` messages.
+        ///   - request: A request containing a single `Pivox_Api_V1_GetSsoConfigRequest` message.
+        ///   - serializer: A serializer for `Pivox_Api_V1_GetSsoConfigRequest` messages.
+        ///   - deserializer: A deserializer for `Pivox_Api_V1_SsoConfig` messages.
         ///   - options: Options to apply to this RPC.
         ///   - handleResponse: A closure which handles the response, the result of which is
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        func testIamPermissions<Result>(
-            request: GRPCCore.ClientRequest<Pivox_Iam_V1_TestIamPermissionsRequest>,
-            serializer: some GRPCCore.MessageSerializer<Pivox_Iam_V1_TestIamPermissionsRequest>,
-            deserializer: some GRPCCore.MessageDeserializer<Pivox_Iam_V1_TestIamPermissionsResponse>,
+        func getSsoConfig<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Api_V1_GetSsoConfigRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Api_V1_GetSsoConfigRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Pivox_Api_V1_SsoConfig>,
             options: GRPCCore.CallOptions,
-            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_TestIamPermissionsResponse>) async throws -> Result
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_SsoConfig>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "UpdateSsoConfig" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Updates the SSO configuration for an organization (AIP-156
+        /// > singleton sub-resource). The server applies changes by calling
+        /// > Firebase Admin SDK to update the underlying provider config,
+        /// > then persists the local SsoConfig row. `client_secret` (when
+        /// > provided) is encrypted at rest via Cloud KMS before storage.
+        /// > 
+        /// > (-- api-linter: core::0134::response-message-name=disabled
+        /// >     aip.dev/not-precedent: UpdateSsoConfig is an AIP-156 singleton
+        /// >     sub-resource update; returning the singleton is correct. --)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Pivox_Api_V1_UpdateSsoConfigRequest` message.
+        ///   - serializer: A serializer for `Pivox_Api_V1_UpdateSsoConfigRequest` messages.
+        ///   - deserializer: A deserializer for `Pivox_Api_V1_SsoConfig` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func updateSsoConfig<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Api_V1_UpdateSsoConfigRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Api_V1_UpdateSsoConfigRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Pivox_Api_V1_SsoConfig>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_SsoConfig>) async throws -> Result
         ) async throws -> Result where Result: Sendable
 
         /// Call the "CreateInvitation" method.
@@ -705,109 +702,6 @@ extension Pivox_Api_V1_Organizations {
             options: GRPCCore.CallOptions,
             onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_InvitationPolicy>) async throws -> Result
         ) async throws -> Result where Result: Sendable
-
-        /// Call the "GetCustomDomain" method.
-        ///
-        /// > Source IDL Documentation:
-        /// >
-        /// > Retrieves a custom domain associated with an organization.
-        ///
-        /// - Parameters:
-        ///   - request: A request containing a single `Pivox_Api_V1_GetCustomDomainRequest` message.
-        ///   - serializer: A serializer for `Pivox_Api_V1_GetCustomDomainRequest` messages.
-        ///   - deserializer: A deserializer for `Pivox_Api_V1_CustomDomain` messages.
-        ///   - options: Options to apply to this RPC.
-        ///   - handleResponse: A closure which handles the response, the result of which is
-        ///       returned to the caller. Returning from the closure will cancel the RPC if it
-        ///       hasn't already finished.
-        /// - Returns: The result of `handleResponse`.
-        func getCustomDomain<Result>(
-            request: GRPCCore.ClientRequest<Pivox_Api_V1_GetCustomDomainRequest>,
-            serializer: some GRPCCore.MessageSerializer<Pivox_Api_V1_GetCustomDomainRequest>,
-            deserializer: some GRPCCore.MessageDeserializer<Pivox_Api_V1_CustomDomain>,
-            options: GRPCCore.CallOptions,
-            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_CustomDomain>) async throws -> Result
-        ) async throws -> Result where Result: Sendable
-
-        /// Call the "ListCustomDomains" method.
-        ///
-        /// > Source IDL Documentation:
-        /// >
-        /// > Lists custom domains associated with an organization.
-        ///
-        /// - Parameters:
-        ///   - request: A request containing a single `Pivox_Api_V1_ListCustomDomainsRequest` message.
-        ///   - serializer: A serializer for `Pivox_Api_V1_ListCustomDomainsRequest` messages.
-        ///   - deserializer: A deserializer for `Pivox_Api_V1_ListCustomDomainsResponse` messages.
-        ///   - options: Options to apply to this RPC.
-        ///   - handleResponse: A closure which handles the response, the result of which is
-        ///       returned to the caller. Returning from the closure will cancel the RPC if it
-        ///       hasn't already finished.
-        /// - Returns: The result of `handleResponse`.
-        func listCustomDomains<Result>(
-            request: GRPCCore.ClientRequest<Pivox_Api_V1_ListCustomDomainsRequest>,
-            serializer: some GRPCCore.MessageSerializer<Pivox_Api_V1_ListCustomDomainsRequest>,
-            deserializer: some GRPCCore.MessageDeserializer<Pivox_Api_V1_ListCustomDomainsResponse>,
-            options: GRPCCore.CallOptions,
-            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_ListCustomDomainsResponse>) async throws -> Result
-        ) async throws -> Result where Result: Sendable
-
-        /// Call the "CreateCustomDomain" method.
-        ///
-        /// > Source IDL Documentation:
-        /// >
-        /// > Creates a custom domain for an organization. Once created, the domain
-        /// > enters the `PENDING` state and the response includes the DNS records
-        /// > that the domain owner must configure. After DNS verification succeeds,
-        /// > the server automatically provisions a TLS certificate and transitions
-        /// > the domain to `ACTIVE`.
-        /// > 
-        /// > The caller must have `resourcemanager.customDomains.create` permission
-        /// > on the parent organization.
-        ///
-        /// - Parameters:
-        ///   - request: A request containing a single `Pivox_Api_V1_CreateCustomDomainRequest` message.
-        ///   - serializer: A serializer for `Pivox_Api_V1_CreateCustomDomainRequest` messages.
-        ///   - deserializer: A deserializer for `Google_Longrunning_Operation` messages.
-        ///   - options: Options to apply to this RPC.
-        ///   - handleResponse: A closure which handles the response, the result of which is
-        ///       returned to the caller. Returning from the closure will cancel the RPC if it
-        ///       hasn't already finished.
-        /// - Returns: The result of `handleResponse`.
-        func createCustomDomain<Result>(
-            request: GRPCCore.ClientRequest<Pivox_Api_V1_CreateCustomDomainRequest>,
-            serializer: some GRPCCore.MessageSerializer<Pivox_Api_V1_CreateCustomDomainRequest>,
-            deserializer: some GRPCCore.MessageDeserializer<Google_Longrunning_Operation>,
-            options: GRPCCore.CallOptions,
-            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result
-        ) async throws -> Result where Result: Sendable
-
-        /// Call the "DeleteCustomDomain" method.
-        ///
-        /// > Source IDL Documentation:
-        /// >
-        /// > Deletes a custom domain from an organization, including TLS certificate
-        /// > revocation and routing removal.
-        /// > 
-        /// > The caller must have `resourcemanager.customDomains.delete` permission
-        /// > on the parent organization.
-        ///
-        /// - Parameters:
-        ///   - request: A request containing a single `Pivox_Api_V1_DeleteCustomDomainRequest` message.
-        ///   - serializer: A serializer for `Pivox_Api_V1_DeleteCustomDomainRequest` messages.
-        ///   - deserializer: A deserializer for `Google_Longrunning_Operation` messages.
-        ///   - options: Options to apply to this RPC.
-        ///   - handleResponse: A closure which handles the response, the result of which is
-        ///       returned to the caller. Returning from the closure will cancel the RPC if it
-        ///       hasn't already finished.
-        /// - Returns: The result of `handleResponse`.
-        func deleteCustomDomain<Result>(
-            request: GRPCCore.ClientRequest<Pivox_Api_V1_DeleteCustomDomainRequest>,
-            serializer: some GRPCCore.MessageSerializer<Pivox_Api_V1_DeleteCustomDomainRequest>,
-            deserializer: some GRPCCore.MessageDeserializer<Google_Longrunning_Operation>,
-            options: GRPCCore.CallOptions,
-            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result
-        ) async throws -> Result where Result: Sendable
     }
 
     /// Generated client for the "pivox.api.v1.Organizations" service.
@@ -977,38 +871,46 @@ extension Pivox_Api_V1_Organizations {
             )
         }
 
-        /// Call the "GetIamPolicy" method.
+        /// Call the "DeleteOrganization" method.
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Gets the access control policy for an organization resource. The policy may
-        /// > be empty if no such policy or resource exists. The `resource` field should
-        /// > be the organization's resource name, for example: "organizations/123".
+        /// > Soft-deletes an organization. The org transitions to
+        /// > `DELETE_REQUESTED` state with `delete_time` set; `purge_time` is
+        /// > populated to `delete_time + 30 days`. Until purge, the org is
+        /// > recoverable via `UndeleteOrganization` and remains visible to
+        /// > `ListOrganizations` callers who pass `show_deleted=true`. After
+        /// > purge, all data cascades and the slug is freed.
         /// > 
-        /// > Authorization requires the IAM permission
-        /// > `resourcemanager.organizations.getIamPolicy` on the specified organization.
+        /// > If `force=true`, the 30-day grace window is skipped: the LRO
+        /// > synchronously cascades all child data and frees the slug.
+        /// > The org is unrecoverable.
+        /// > 
+        /// > The caller must hold the `owner` role on the organization;
+        /// > otherwise the LRO completes with PERMISSION_DENIED. The LRO
+        /// > surfaces cascade progress via `DeleteOrganizationMetadata.Phase`.
         ///
         /// - Parameters:
-        ///   - request: A request containing a single `Pivox_Iam_V1_GetIamPolicyRequest` message.
-        ///   - serializer: A serializer for `Pivox_Iam_V1_GetIamPolicyRequest` messages.
-        ///   - deserializer: A deserializer for `Pivox_Iam_V1_Policy` messages.
+        ///   - request: A request containing a single `Pivox_Api_V1_DeleteOrganizationRequest` message.
+        ///   - serializer: A serializer for `Pivox_Api_V1_DeleteOrganizationRequest` messages.
+        ///   - deserializer: A deserializer for `Google_Longrunning_Operation` messages.
         ///   - options: Options to apply to this RPC.
         ///   - handleResponse: A closure which handles the response, the result of which is
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        public func getIamPolicy<Result>(
-            request: GRPCCore.ClientRequest<Pivox_Iam_V1_GetIamPolicyRequest>,
-            serializer: some GRPCCore.MessageSerializer<Pivox_Iam_V1_GetIamPolicyRequest>,
-            deserializer: some GRPCCore.MessageDeserializer<Pivox_Iam_V1_Policy>,
+        public func deleteOrganization<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Api_V1_DeleteOrganizationRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Api_V1_DeleteOrganizationRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Google_Longrunning_Operation>,
             options: GRPCCore.CallOptions = .defaults,
-            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_Policy>) async throws -> Result = { response in
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result = { response in
                 try response.message
             }
         ) async throws -> Result where Result: Sendable {
             try await self.client.unary(
                 request: request,
-                descriptor: Pivox_Api_V1_Organizations.Method.GetIamPolicy.descriptor,
+                descriptor: Pivox_Api_V1_Organizations.Method.DeleteOrganization.descriptor,
                 serializer: serializer,
                 deserializer: deserializer,
                 options: options,
@@ -1016,40 +918,38 @@ extension Pivox_Api_V1_Organizations {
             )
         }
 
-        /// Call the "SetIamPolicy" method.
+        /// Call the "UndeleteOrganization" method.
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Sets the access control policy on an organization resource. Replaces any
-        /// > existing policy. The `resource` field should be the organization's resource
-        /// > name, for example: "organizations/123".
+        /// > Restores a soft-deleted organization (`DELETE_REQUESTED` state)
+        /// > back to `ACTIVE`, clearing `delete_time` and `purge_time`. Only
+        /// > callable during the 30-day grace window before purge. After
+        /// > purge there is no way back.
         /// > 
-        /// > Authorization requires the IAM permission
-        /// > `resourcemanager.organizations.setIamPolicy` on the specified organization.
-        /// > (-- api-linter: core::0136::response-message-name=disabled
-        /// >     aip.dev/not-precedent: SetIamPolicy returns Policy per IAM convention. --)
+        /// > The caller must hold the `owner` role on the organization.
         ///
         /// - Parameters:
-        ///   - request: A request containing a single `Pivox_Iam_V1_SetIamPolicyRequest` message.
-        ///   - serializer: A serializer for `Pivox_Iam_V1_SetIamPolicyRequest` messages.
-        ///   - deserializer: A deserializer for `Pivox_Iam_V1_Policy` messages.
+        ///   - request: A request containing a single `Pivox_Api_V1_UndeleteOrganizationRequest` message.
+        ///   - serializer: A serializer for `Pivox_Api_V1_UndeleteOrganizationRequest` messages.
+        ///   - deserializer: A deserializer for `Google_Longrunning_Operation` messages.
         ///   - options: Options to apply to this RPC.
         ///   - handleResponse: A closure which handles the response, the result of which is
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        public func setIamPolicy<Result>(
-            request: GRPCCore.ClientRequest<Pivox_Iam_V1_SetIamPolicyRequest>,
-            serializer: some GRPCCore.MessageSerializer<Pivox_Iam_V1_SetIamPolicyRequest>,
-            deserializer: some GRPCCore.MessageDeserializer<Pivox_Iam_V1_Policy>,
+        public func undeleteOrganization<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Api_V1_UndeleteOrganizationRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Api_V1_UndeleteOrganizationRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Google_Longrunning_Operation>,
             options: GRPCCore.CallOptions = .defaults,
-            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_Policy>) async throws -> Result = { response in
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result = { response in
                 try response.message
             }
         ) async throws -> Result where Result: Sendable {
             try await self.client.unary(
                 request: request,
-                descriptor: Pivox_Api_V1_Organizations.Method.SetIamPolicy.descriptor,
+                descriptor: Pivox_Api_V1_Organizations.Method.UndeleteOrganization.descriptor,
                 serializer: serializer,
                 deserializer: deserializer,
                 options: options,
@@ -1057,37 +957,81 @@ extension Pivox_Api_V1_Organizations {
             )
         }
 
-        /// Call the "TestIamPermissions" method.
+        /// Call the "GetSsoConfig" method.
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Returns the permissions that a caller has on the specified organization.
-        /// > The `resource` field should be the organization's resource name,
-        /// > for example: "organizations/123".
+        /// > Gets the SSO configuration for an organization. Returns the
+        /// > SsoConfig singleton at `organizations/{org}/ssoConfig`. If no
+        /// > config has been set, returns NOT_FOUND.
         /// > 
-        /// > There are no permissions required for making this API call.
+        /// > (-- api-linter: core::0131::request-name-required=disabled
+        /// >     aip.dev/not-precedent: GetSsoConfig is an AIP-156 singleton
+        /// >     sub-resource read; the parent org disambiguates the singleton. --)
         ///
         /// - Parameters:
-        ///   - request: A request containing a single `Pivox_Iam_V1_TestIamPermissionsRequest` message.
-        ///   - serializer: A serializer for `Pivox_Iam_V1_TestIamPermissionsRequest` messages.
-        ///   - deserializer: A deserializer for `Pivox_Iam_V1_TestIamPermissionsResponse` messages.
+        ///   - request: A request containing a single `Pivox_Api_V1_GetSsoConfigRequest` message.
+        ///   - serializer: A serializer for `Pivox_Api_V1_GetSsoConfigRequest` messages.
+        ///   - deserializer: A deserializer for `Pivox_Api_V1_SsoConfig` messages.
         ///   - options: Options to apply to this RPC.
         ///   - handleResponse: A closure which handles the response, the result of which is
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
         ///       hasn't already finished.
         /// - Returns: The result of `handleResponse`.
-        public func testIamPermissions<Result>(
-            request: GRPCCore.ClientRequest<Pivox_Iam_V1_TestIamPermissionsRequest>,
-            serializer: some GRPCCore.MessageSerializer<Pivox_Iam_V1_TestIamPermissionsRequest>,
-            deserializer: some GRPCCore.MessageDeserializer<Pivox_Iam_V1_TestIamPermissionsResponse>,
+        public func getSsoConfig<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Api_V1_GetSsoConfigRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Api_V1_GetSsoConfigRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Pivox_Api_V1_SsoConfig>,
             options: GRPCCore.CallOptions = .defaults,
-            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_TestIamPermissionsResponse>) async throws -> Result = { response in
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_SsoConfig>) async throws -> Result = { response in
                 try response.message
             }
         ) async throws -> Result where Result: Sendable {
             try await self.client.unary(
                 request: request,
-                descriptor: Pivox_Api_V1_Organizations.Method.TestIamPermissions.descriptor,
+                descriptor: Pivox_Api_V1_Organizations.Method.GetSsoConfig.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "UpdateSsoConfig" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Updates the SSO configuration for an organization (AIP-156
+        /// > singleton sub-resource). The server applies changes by calling
+        /// > Firebase Admin SDK to update the underlying provider config,
+        /// > then persists the local SsoConfig row. `client_secret` (when
+        /// > provided) is encrypted at rest via Cloud KMS before storage.
+        /// > 
+        /// > (-- api-linter: core::0134::response-message-name=disabled
+        /// >     aip.dev/not-precedent: UpdateSsoConfig is an AIP-156 singleton
+        /// >     sub-resource update; returning the singleton is correct. --)
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Pivox_Api_V1_UpdateSsoConfigRequest` message.
+        ///   - serializer: A serializer for `Pivox_Api_V1_UpdateSsoConfigRequest` messages.
+        ///   - deserializer: A deserializer for `Pivox_Api_V1_SsoConfig` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func updateSsoConfig<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Api_V1_UpdateSsoConfigRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Api_V1_UpdateSsoConfigRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Pivox_Api_V1_SsoConfig>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_SsoConfig>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Pivox_Api_V1_Organizations.Method.UpdateSsoConfig.descriptor,
                 serializer: serializer,
                 deserializer: deserializer,
                 options: options,
@@ -1375,153 +1319,6 @@ extension Pivox_Api_V1_Organizations {
                 onResponse: handleResponse
             )
         }
-
-        /// Call the "GetCustomDomain" method.
-        ///
-        /// > Source IDL Documentation:
-        /// >
-        /// > Retrieves a custom domain associated with an organization.
-        ///
-        /// - Parameters:
-        ///   - request: A request containing a single `Pivox_Api_V1_GetCustomDomainRequest` message.
-        ///   - serializer: A serializer for `Pivox_Api_V1_GetCustomDomainRequest` messages.
-        ///   - deserializer: A deserializer for `Pivox_Api_V1_CustomDomain` messages.
-        ///   - options: Options to apply to this RPC.
-        ///   - handleResponse: A closure which handles the response, the result of which is
-        ///       returned to the caller. Returning from the closure will cancel the RPC if it
-        ///       hasn't already finished.
-        /// - Returns: The result of `handleResponse`.
-        public func getCustomDomain<Result>(
-            request: GRPCCore.ClientRequest<Pivox_Api_V1_GetCustomDomainRequest>,
-            serializer: some GRPCCore.MessageSerializer<Pivox_Api_V1_GetCustomDomainRequest>,
-            deserializer: some GRPCCore.MessageDeserializer<Pivox_Api_V1_CustomDomain>,
-            options: GRPCCore.CallOptions = .defaults,
-            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_CustomDomain>) async throws -> Result = { response in
-                try response.message
-            }
-        ) async throws -> Result where Result: Sendable {
-            try await self.client.unary(
-                request: request,
-                descriptor: Pivox_Api_V1_Organizations.Method.GetCustomDomain.descriptor,
-                serializer: serializer,
-                deserializer: deserializer,
-                options: options,
-                onResponse: handleResponse
-            )
-        }
-
-        /// Call the "ListCustomDomains" method.
-        ///
-        /// > Source IDL Documentation:
-        /// >
-        /// > Lists custom domains associated with an organization.
-        ///
-        /// - Parameters:
-        ///   - request: A request containing a single `Pivox_Api_V1_ListCustomDomainsRequest` message.
-        ///   - serializer: A serializer for `Pivox_Api_V1_ListCustomDomainsRequest` messages.
-        ///   - deserializer: A deserializer for `Pivox_Api_V1_ListCustomDomainsResponse` messages.
-        ///   - options: Options to apply to this RPC.
-        ///   - handleResponse: A closure which handles the response, the result of which is
-        ///       returned to the caller. Returning from the closure will cancel the RPC if it
-        ///       hasn't already finished.
-        /// - Returns: The result of `handleResponse`.
-        public func listCustomDomains<Result>(
-            request: GRPCCore.ClientRequest<Pivox_Api_V1_ListCustomDomainsRequest>,
-            serializer: some GRPCCore.MessageSerializer<Pivox_Api_V1_ListCustomDomainsRequest>,
-            deserializer: some GRPCCore.MessageDeserializer<Pivox_Api_V1_ListCustomDomainsResponse>,
-            options: GRPCCore.CallOptions = .defaults,
-            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_ListCustomDomainsResponse>) async throws -> Result = { response in
-                try response.message
-            }
-        ) async throws -> Result where Result: Sendable {
-            try await self.client.unary(
-                request: request,
-                descriptor: Pivox_Api_V1_Organizations.Method.ListCustomDomains.descriptor,
-                serializer: serializer,
-                deserializer: deserializer,
-                options: options,
-                onResponse: handleResponse
-            )
-        }
-
-        /// Call the "CreateCustomDomain" method.
-        ///
-        /// > Source IDL Documentation:
-        /// >
-        /// > Creates a custom domain for an organization. Once created, the domain
-        /// > enters the `PENDING` state and the response includes the DNS records
-        /// > that the domain owner must configure. After DNS verification succeeds,
-        /// > the server automatically provisions a TLS certificate and transitions
-        /// > the domain to `ACTIVE`.
-        /// > 
-        /// > The caller must have `resourcemanager.customDomains.create` permission
-        /// > on the parent organization.
-        ///
-        /// - Parameters:
-        ///   - request: A request containing a single `Pivox_Api_V1_CreateCustomDomainRequest` message.
-        ///   - serializer: A serializer for `Pivox_Api_V1_CreateCustomDomainRequest` messages.
-        ///   - deserializer: A deserializer for `Google_Longrunning_Operation` messages.
-        ///   - options: Options to apply to this RPC.
-        ///   - handleResponse: A closure which handles the response, the result of which is
-        ///       returned to the caller. Returning from the closure will cancel the RPC if it
-        ///       hasn't already finished.
-        /// - Returns: The result of `handleResponse`.
-        public func createCustomDomain<Result>(
-            request: GRPCCore.ClientRequest<Pivox_Api_V1_CreateCustomDomainRequest>,
-            serializer: some GRPCCore.MessageSerializer<Pivox_Api_V1_CreateCustomDomainRequest>,
-            deserializer: some GRPCCore.MessageDeserializer<Google_Longrunning_Operation>,
-            options: GRPCCore.CallOptions = .defaults,
-            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result = { response in
-                try response.message
-            }
-        ) async throws -> Result where Result: Sendable {
-            try await self.client.unary(
-                request: request,
-                descriptor: Pivox_Api_V1_Organizations.Method.CreateCustomDomain.descriptor,
-                serializer: serializer,
-                deserializer: deserializer,
-                options: options,
-                onResponse: handleResponse
-            )
-        }
-
-        /// Call the "DeleteCustomDomain" method.
-        ///
-        /// > Source IDL Documentation:
-        /// >
-        /// > Deletes a custom domain from an organization, including TLS certificate
-        /// > revocation and routing removal.
-        /// > 
-        /// > The caller must have `resourcemanager.customDomains.delete` permission
-        /// > on the parent organization.
-        ///
-        /// - Parameters:
-        ///   - request: A request containing a single `Pivox_Api_V1_DeleteCustomDomainRequest` message.
-        ///   - serializer: A serializer for `Pivox_Api_V1_DeleteCustomDomainRequest` messages.
-        ///   - deserializer: A deserializer for `Google_Longrunning_Operation` messages.
-        ///   - options: Options to apply to this RPC.
-        ///   - handleResponse: A closure which handles the response, the result of which is
-        ///       returned to the caller. Returning from the closure will cancel the RPC if it
-        ///       hasn't already finished.
-        /// - Returns: The result of `handleResponse`.
-        public func deleteCustomDomain<Result>(
-            request: GRPCCore.ClientRequest<Pivox_Api_V1_DeleteCustomDomainRequest>,
-            serializer: some GRPCCore.MessageSerializer<Pivox_Api_V1_DeleteCustomDomainRequest>,
-            deserializer: some GRPCCore.MessageDeserializer<Google_Longrunning_Operation>,
-            options: GRPCCore.CallOptions = .defaults,
-            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result = { response in
-                try response.message
-            }
-        ) async throws -> Result where Result: Sendable {
-            try await self.client.unary(
-                request: request,
-                descriptor: Pivox_Api_V1_Organizations.Method.DeleteCustomDomain.descriptor,
-                serializer: serializer,
-                deserializer: deserializer,
-                options: options,
-                onResponse: handleResponse
-            )
-        }
     }
 }
 
@@ -1655,104 +1452,149 @@ extension Pivox_Api_V1_Organizations.ClientProtocol {
         )
     }
 
-    /// Call the "GetIamPolicy" method.
+    /// Call the "DeleteOrganization" method.
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Gets the access control policy for an organization resource. The policy may
-    /// > be empty if no such policy or resource exists. The `resource` field should
-    /// > be the organization's resource name, for example: "organizations/123".
+    /// > Soft-deletes an organization. The org transitions to
+    /// > `DELETE_REQUESTED` state with `delete_time` set; `purge_time` is
+    /// > populated to `delete_time + 30 days`. Until purge, the org is
+    /// > recoverable via `UndeleteOrganization` and remains visible to
+    /// > `ListOrganizations` callers who pass `show_deleted=true`. After
+    /// > purge, all data cascades and the slug is freed.
     /// > 
-    /// > Authorization requires the IAM permission
-    /// > `resourcemanager.organizations.getIamPolicy` on the specified organization.
+    /// > If `force=true`, the 30-day grace window is skipped: the LRO
+    /// > synchronously cascades all child data and frees the slug.
+    /// > The org is unrecoverable.
+    /// > 
+    /// > The caller must hold the `owner` role on the organization;
+    /// > otherwise the LRO completes with PERMISSION_DENIED. The LRO
+    /// > surfaces cascade progress via `DeleteOrganizationMetadata.Phase`.
     ///
     /// - Parameters:
-    ///   - request: A request containing a single `Pivox_Iam_V1_GetIamPolicyRequest` message.
+    ///   - request: A request containing a single `Pivox_Api_V1_DeleteOrganizationRequest` message.
     ///   - options: Options to apply to this RPC.
     ///   - handleResponse: A closure which handles the response, the result of which is
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    public func getIamPolicy<Result>(
-        request: GRPCCore.ClientRequest<Pivox_Iam_V1_GetIamPolicyRequest>,
+    public func deleteOrganization<Result>(
+        request: GRPCCore.ClientRequest<Pivox_Api_V1_DeleteOrganizationRequest>,
         options: GRPCCore.CallOptions = .defaults,
-        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_Policy>) async throws -> Result = { response in
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result = { response in
             try response.message
         }
     ) async throws -> Result where Result: Sendable {
-        try await self.getIamPolicy(
+        try await self.deleteOrganization(
             request: request,
-            serializer: GRPCProtobuf.ProtobufSerializer<Pivox_Iam_V1_GetIamPolicyRequest>(),
-            deserializer: GRPCProtobuf.ProtobufDeserializer<Pivox_Iam_V1_Policy>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Pivox_Api_V1_DeleteOrganizationRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Google_Longrunning_Operation>(),
             options: options,
             onResponse: handleResponse
         )
     }
 
-    /// Call the "SetIamPolicy" method.
+    /// Call the "UndeleteOrganization" method.
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Sets the access control policy on an organization resource. Replaces any
-    /// > existing policy. The `resource` field should be the organization's resource
-    /// > name, for example: "organizations/123".
+    /// > Restores a soft-deleted organization (`DELETE_REQUESTED` state)
+    /// > back to `ACTIVE`, clearing `delete_time` and `purge_time`. Only
+    /// > callable during the 30-day grace window before purge. After
+    /// > purge there is no way back.
     /// > 
-    /// > Authorization requires the IAM permission
-    /// > `resourcemanager.organizations.setIamPolicy` on the specified organization.
-    /// > (-- api-linter: core::0136::response-message-name=disabled
-    /// >     aip.dev/not-precedent: SetIamPolicy returns Policy per IAM convention. --)
+    /// > The caller must hold the `owner` role on the organization.
     ///
     /// - Parameters:
-    ///   - request: A request containing a single `Pivox_Iam_V1_SetIamPolicyRequest` message.
+    ///   - request: A request containing a single `Pivox_Api_V1_UndeleteOrganizationRequest` message.
     ///   - options: Options to apply to this RPC.
     ///   - handleResponse: A closure which handles the response, the result of which is
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    public func setIamPolicy<Result>(
-        request: GRPCCore.ClientRequest<Pivox_Iam_V1_SetIamPolicyRequest>,
+    public func undeleteOrganization<Result>(
+        request: GRPCCore.ClientRequest<Pivox_Api_V1_UndeleteOrganizationRequest>,
         options: GRPCCore.CallOptions = .defaults,
-        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_Policy>) async throws -> Result = { response in
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result = { response in
             try response.message
         }
     ) async throws -> Result where Result: Sendable {
-        try await self.setIamPolicy(
+        try await self.undeleteOrganization(
             request: request,
-            serializer: GRPCProtobuf.ProtobufSerializer<Pivox_Iam_V1_SetIamPolicyRequest>(),
-            deserializer: GRPCProtobuf.ProtobufDeserializer<Pivox_Iam_V1_Policy>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Pivox_Api_V1_UndeleteOrganizationRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Google_Longrunning_Operation>(),
             options: options,
             onResponse: handleResponse
         )
     }
 
-    /// Call the "TestIamPermissions" method.
+    /// Call the "GetSsoConfig" method.
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Returns the permissions that a caller has on the specified organization.
-    /// > The `resource` field should be the organization's resource name,
-    /// > for example: "organizations/123".
+    /// > Gets the SSO configuration for an organization. Returns the
+    /// > SsoConfig singleton at `organizations/{org}/ssoConfig`. If no
+    /// > config has been set, returns NOT_FOUND.
     /// > 
-    /// > There are no permissions required for making this API call.
+    /// > (-- api-linter: core::0131::request-name-required=disabled
+    /// >     aip.dev/not-precedent: GetSsoConfig is an AIP-156 singleton
+    /// >     sub-resource read; the parent org disambiguates the singleton. --)
     ///
     /// - Parameters:
-    ///   - request: A request containing a single `Pivox_Iam_V1_TestIamPermissionsRequest` message.
+    ///   - request: A request containing a single `Pivox_Api_V1_GetSsoConfigRequest` message.
     ///   - options: Options to apply to this RPC.
     ///   - handleResponse: A closure which handles the response, the result of which is
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    public func testIamPermissions<Result>(
-        request: GRPCCore.ClientRequest<Pivox_Iam_V1_TestIamPermissionsRequest>,
+    public func getSsoConfig<Result>(
+        request: GRPCCore.ClientRequest<Pivox_Api_V1_GetSsoConfigRequest>,
         options: GRPCCore.CallOptions = .defaults,
-        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_TestIamPermissionsResponse>) async throws -> Result = { response in
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_SsoConfig>) async throws -> Result = { response in
             try response.message
         }
     ) async throws -> Result where Result: Sendable {
-        try await self.testIamPermissions(
+        try await self.getSsoConfig(
             request: request,
-            serializer: GRPCProtobuf.ProtobufSerializer<Pivox_Iam_V1_TestIamPermissionsRequest>(),
-            deserializer: GRPCProtobuf.ProtobufDeserializer<Pivox_Iam_V1_TestIamPermissionsResponse>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Pivox_Api_V1_GetSsoConfigRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Pivox_Api_V1_SsoConfig>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "UpdateSsoConfig" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Updates the SSO configuration for an organization (AIP-156
+    /// > singleton sub-resource). The server applies changes by calling
+    /// > Firebase Admin SDK to update the underlying provider config,
+    /// > then persists the local SsoConfig row. `client_secret` (when
+    /// > provided) is encrypted at rest via Cloud KMS before storage.
+    /// > 
+    /// > (-- api-linter: core::0134::response-message-name=disabled
+    /// >     aip.dev/not-precedent: UpdateSsoConfig is an AIP-156 singleton
+    /// >     sub-resource update; returning the singleton is correct. --)
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Pivox_Api_V1_UpdateSsoConfigRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func updateSsoConfig<Result>(
+        request: GRPCCore.ClientRequest<Pivox_Api_V1_UpdateSsoConfigRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_SsoConfig>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.updateSsoConfig(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Pivox_Api_V1_UpdateSsoConfigRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Pivox_Api_V1_SsoConfig>(),
             options: options,
             onResponse: handleResponse
         )
@@ -1998,133 +1840,6 @@ extension Pivox_Api_V1_Organizations.ClientProtocol {
             onResponse: handleResponse
         )
     }
-
-    /// Call the "GetCustomDomain" method.
-    ///
-    /// > Source IDL Documentation:
-    /// >
-    /// > Retrieves a custom domain associated with an organization.
-    ///
-    /// - Parameters:
-    ///   - request: A request containing a single `Pivox_Api_V1_GetCustomDomainRequest` message.
-    ///   - options: Options to apply to this RPC.
-    ///   - handleResponse: A closure which handles the response, the result of which is
-    ///       returned to the caller. Returning from the closure will cancel the RPC if it
-    ///       hasn't already finished.
-    /// - Returns: The result of `handleResponse`.
-    public func getCustomDomain<Result>(
-        request: GRPCCore.ClientRequest<Pivox_Api_V1_GetCustomDomainRequest>,
-        options: GRPCCore.CallOptions = .defaults,
-        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_CustomDomain>) async throws -> Result = { response in
-            try response.message
-        }
-    ) async throws -> Result where Result: Sendable {
-        try await self.getCustomDomain(
-            request: request,
-            serializer: GRPCProtobuf.ProtobufSerializer<Pivox_Api_V1_GetCustomDomainRequest>(),
-            deserializer: GRPCProtobuf.ProtobufDeserializer<Pivox_Api_V1_CustomDomain>(),
-            options: options,
-            onResponse: handleResponse
-        )
-    }
-
-    /// Call the "ListCustomDomains" method.
-    ///
-    /// > Source IDL Documentation:
-    /// >
-    /// > Lists custom domains associated with an organization.
-    ///
-    /// - Parameters:
-    ///   - request: A request containing a single `Pivox_Api_V1_ListCustomDomainsRequest` message.
-    ///   - options: Options to apply to this RPC.
-    ///   - handleResponse: A closure which handles the response, the result of which is
-    ///       returned to the caller. Returning from the closure will cancel the RPC if it
-    ///       hasn't already finished.
-    /// - Returns: The result of `handleResponse`.
-    public func listCustomDomains<Result>(
-        request: GRPCCore.ClientRequest<Pivox_Api_V1_ListCustomDomainsRequest>,
-        options: GRPCCore.CallOptions = .defaults,
-        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_ListCustomDomainsResponse>) async throws -> Result = { response in
-            try response.message
-        }
-    ) async throws -> Result where Result: Sendable {
-        try await self.listCustomDomains(
-            request: request,
-            serializer: GRPCProtobuf.ProtobufSerializer<Pivox_Api_V1_ListCustomDomainsRequest>(),
-            deserializer: GRPCProtobuf.ProtobufDeserializer<Pivox_Api_V1_ListCustomDomainsResponse>(),
-            options: options,
-            onResponse: handleResponse
-        )
-    }
-
-    /// Call the "CreateCustomDomain" method.
-    ///
-    /// > Source IDL Documentation:
-    /// >
-    /// > Creates a custom domain for an organization. Once created, the domain
-    /// > enters the `PENDING` state and the response includes the DNS records
-    /// > that the domain owner must configure. After DNS verification succeeds,
-    /// > the server automatically provisions a TLS certificate and transitions
-    /// > the domain to `ACTIVE`.
-    /// > 
-    /// > The caller must have `resourcemanager.customDomains.create` permission
-    /// > on the parent organization.
-    ///
-    /// - Parameters:
-    ///   - request: A request containing a single `Pivox_Api_V1_CreateCustomDomainRequest` message.
-    ///   - options: Options to apply to this RPC.
-    ///   - handleResponse: A closure which handles the response, the result of which is
-    ///       returned to the caller. Returning from the closure will cancel the RPC if it
-    ///       hasn't already finished.
-    /// - Returns: The result of `handleResponse`.
-    public func createCustomDomain<Result>(
-        request: GRPCCore.ClientRequest<Pivox_Api_V1_CreateCustomDomainRequest>,
-        options: GRPCCore.CallOptions = .defaults,
-        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result = { response in
-            try response.message
-        }
-    ) async throws -> Result where Result: Sendable {
-        try await self.createCustomDomain(
-            request: request,
-            serializer: GRPCProtobuf.ProtobufSerializer<Pivox_Api_V1_CreateCustomDomainRequest>(),
-            deserializer: GRPCProtobuf.ProtobufDeserializer<Google_Longrunning_Operation>(),
-            options: options,
-            onResponse: handleResponse
-        )
-    }
-
-    /// Call the "DeleteCustomDomain" method.
-    ///
-    /// > Source IDL Documentation:
-    /// >
-    /// > Deletes a custom domain from an organization, including TLS certificate
-    /// > revocation and routing removal.
-    /// > 
-    /// > The caller must have `resourcemanager.customDomains.delete` permission
-    /// > on the parent organization.
-    ///
-    /// - Parameters:
-    ///   - request: A request containing a single `Pivox_Api_V1_DeleteCustomDomainRequest` message.
-    ///   - options: Options to apply to this RPC.
-    ///   - handleResponse: A closure which handles the response, the result of which is
-    ///       returned to the caller. Returning from the closure will cancel the RPC if it
-    ///       hasn't already finished.
-    /// - Returns: The result of `handleResponse`.
-    public func deleteCustomDomain<Result>(
-        request: GRPCCore.ClientRequest<Pivox_Api_V1_DeleteCustomDomainRequest>,
-        options: GRPCCore.CallOptions = .defaults,
-        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result = { response in
-            try response.message
-        }
-    ) async throws -> Result where Result: Sendable {
-        try await self.deleteCustomDomain(
-            request: request,
-            serializer: GRPCProtobuf.ProtobufSerializer<Pivox_Api_V1_DeleteCustomDomainRequest>(),
-            deserializer: GRPCProtobuf.ProtobufDeserializer<Google_Longrunning_Operation>(),
-            options: options,
-            onResponse: handleResponse
-        )
-    }
 }
 
 // Helpers providing sugared APIs for 'ClientProtocol' methods.
@@ -2273,16 +1988,24 @@ extension Pivox_Api_V1_Organizations.ClientProtocol {
         )
     }
 
-    /// Call the "GetIamPolicy" method.
+    /// Call the "DeleteOrganization" method.
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Gets the access control policy for an organization resource. The policy may
-    /// > be empty if no such policy or resource exists. The `resource` field should
-    /// > be the organization's resource name, for example: "organizations/123".
+    /// > Soft-deletes an organization. The org transitions to
+    /// > `DELETE_REQUESTED` state with `delete_time` set; `purge_time` is
+    /// > populated to `delete_time + 30 days`. Until purge, the org is
+    /// > recoverable via `UndeleteOrganization` and remains visible to
+    /// > `ListOrganizations` callers who pass `show_deleted=true`. After
+    /// > purge, all data cascades and the slug is freed.
     /// > 
-    /// > Authorization requires the IAM permission
-    /// > `resourcemanager.organizations.getIamPolicy` on the specified organization.
+    /// > If `force=true`, the 30-day grace window is skipped: the LRO
+    /// > synchronously cascades all child data and frees the slug.
+    /// > The org is unrecoverable.
+    /// > 
+    /// > The caller must hold the `owner` role on the organization;
+    /// > otherwise the LRO completes with PERMISSION_DENIED. The LRO
+    /// > surfaces cascade progress via `DeleteOrganizationMetadata.Phase`.
     ///
     /// - Parameters:
     ///   - message: request message to send.
@@ -2292,37 +2015,35 @@ extension Pivox_Api_V1_Organizations.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    public func getIamPolicy<Result>(
-        _ message: Pivox_Iam_V1_GetIamPolicyRequest,
+    public func deleteOrganization<Result>(
+        _ message: Pivox_Api_V1_DeleteOrganizationRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
-        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_Policy>) async throws -> Result = { response in
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result = { response in
             try response.message
         }
     ) async throws -> Result where Result: Sendable {
-        let request = GRPCCore.ClientRequest<Pivox_Iam_V1_GetIamPolicyRequest>(
+        let request = GRPCCore.ClientRequest<Pivox_Api_V1_DeleteOrganizationRequest>(
             message: message,
             metadata: metadata
         )
-        return try await self.getIamPolicy(
+        return try await self.deleteOrganization(
             request: request,
             options: options,
             onResponse: handleResponse
         )
     }
 
-    /// Call the "SetIamPolicy" method.
+    /// Call the "UndeleteOrganization" method.
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Sets the access control policy on an organization resource. Replaces any
-    /// > existing policy. The `resource` field should be the organization's resource
-    /// > name, for example: "organizations/123".
+    /// > Restores a soft-deleted organization (`DELETE_REQUESTED` state)
+    /// > back to `ACTIVE`, clearing `delete_time` and `purge_time`. Only
+    /// > callable during the 30-day grace window before purge. After
+    /// > purge there is no way back.
     /// > 
-    /// > Authorization requires the IAM permission
-    /// > `resourcemanager.organizations.setIamPolicy` on the specified organization.
-    /// > (-- api-linter: core::0136::response-message-name=disabled
-    /// >     aip.dev/not-precedent: SetIamPolicy returns Policy per IAM convention. --)
+    /// > The caller must hold the `owner` role on the organization.
     ///
     /// - Parameters:
     ///   - message: request message to send.
@@ -2332,34 +2053,36 @@ extension Pivox_Api_V1_Organizations.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    public func setIamPolicy<Result>(
-        _ message: Pivox_Iam_V1_SetIamPolicyRequest,
+    public func undeleteOrganization<Result>(
+        _ message: Pivox_Api_V1_UndeleteOrganizationRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
-        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_Policy>) async throws -> Result = { response in
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result = { response in
             try response.message
         }
     ) async throws -> Result where Result: Sendable {
-        let request = GRPCCore.ClientRequest<Pivox_Iam_V1_SetIamPolicyRequest>(
+        let request = GRPCCore.ClientRequest<Pivox_Api_V1_UndeleteOrganizationRequest>(
             message: message,
             metadata: metadata
         )
-        return try await self.setIamPolicy(
+        return try await self.undeleteOrganization(
             request: request,
             options: options,
             onResponse: handleResponse
         )
     }
 
-    /// Call the "TestIamPermissions" method.
+    /// Call the "GetSsoConfig" method.
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Returns the permissions that a caller has on the specified organization.
-    /// > The `resource` field should be the organization's resource name,
-    /// > for example: "organizations/123".
+    /// > Gets the SSO configuration for an organization. Returns the
+    /// > SsoConfig singleton at `organizations/{org}/ssoConfig`. If no
+    /// > config has been set, returns NOT_FOUND.
     /// > 
-    /// > There are no permissions required for making this API call.
+    /// > (-- api-linter: core::0131::request-name-required=disabled
+    /// >     aip.dev/not-precedent: GetSsoConfig is an AIP-156 singleton
+    /// >     sub-resource read; the parent org disambiguates the singleton. --)
     ///
     /// - Parameters:
     ///   - message: request message to send.
@@ -2369,19 +2092,60 @@ extension Pivox_Api_V1_Organizations.ClientProtocol {
     ///       returned to the caller. Returning from the closure will cancel the RPC if it
     ///       hasn't already finished.
     /// - Returns: The result of `handleResponse`.
-    public func testIamPermissions<Result>(
-        _ message: Pivox_Iam_V1_TestIamPermissionsRequest,
+    public func getSsoConfig<Result>(
+        _ message: Pivox_Api_V1_GetSsoConfigRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
-        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Iam_V1_TestIamPermissionsResponse>) async throws -> Result = { response in
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_SsoConfig>) async throws -> Result = { response in
             try response.message
         }
     ) async throws -> Result where Result: Sendable {
-        let request = GRPCCore.ClientRequest<Pivox_Iam_V1_TestIamPermissionsRequest>(
+        let request = GRPCCore.ClientRequest<Pivox_Api_V1_GetSsoConfigRequest>(
             message: message,
             metadata: metadata
         )
-        return try await self.testIamPermissions(
+        return try await self.getSsoConfig(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "UpdateSsoConfig" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Updates the SSO configuration for an organization (AIP-156
+    /// > singleton sub-resource). The server applies changes by calling
+    /// > Firebase Admin SDK to update the underlying provider config,
+    /// > then persists the local SsoConfig row. `client_secret` (when
+    /// > provided) is encrypted at rest via Cloud KMS before storage.
+    /// > 
+    /// > (-- api-linter: core::0134::response-message-name=disabled
+    /// >     aip.dev/not-precedent: UpdateSsoConfig is an AIP-156 singleton
+    /// >     sub-resource update; returning the singleton is correct. --)
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func updateSsoConfig<Result>(
+        _ message: Pivox_Api_V1_UpdateSsoConfigRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_SsoConfig>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Pivox_Api_V1_UpdateSsoConfigRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.updateSsoConfig(
             request: request,
             options: options,
             onResponse: handleResponse
@@ -2655,149 +2419,6 @@ extension Pivox_Api_V1_Organizations.ClientProtocol {
             metadata: metadata
         )
         return try await self.updateInvitationPolicy(
-            request: request,
-            options: options,
-            onResponse: handleResponse
-        )
-    }
-
-    /// Call the "GetCustomDomain" method.
-    ///
-    /// > Source IDL Documentation:
-    /// >
-    /// > Retrieves a custom domain associated with an organization.
-    ///
-    /// - Parameters:
-    ///   - message: request message to send.
-    ///   - metadata: Additional metadata to send, defaults to empty.
-    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
-    ///   - handleResponse: A closure which handles the response, the result of which is
-    ///       returned to the caller. Returning from the closure will cancel the RPC if it
-    ///       hasn't already finished.
-    /// - Returns: The result of `handleResponse`.
-    public func getCustomDomain<Result>(
-        _ message: Pivox_Api_V1_GetCustomDomainRequest,
-        metadata: GRPCCore.Metadata = [:],
-        options: GRPCCore.CallOptions = .defaults,
-        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_CustomDomain>) async throws -> Result = { response in
-            try response.message
-        }
-    ) async throws -> Result where Result: Sendable {
-        let request = GRPCCore.ClientRequest<Pivox_Api_V1_GetCustomDomainRequest>(
-            message: message,
-            metadata: metadata
-        )
-        return try await self.getCustomDomain(
-            request: request,
-            options: options,
-            onResponse: handleResponse
-        )
-    }
-
-    /// Call the "ListCustomDomains" method.
-    ///
-    /// > Source IDL Documentation:
-    /// >
-    /// > Lists custom domains associated with an organization.
-    ///
-    /// - Parameters:
-    ///   - message: request message to send.
-    ///   - metadata: Additional metadata to send, defaults to empty.
-    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
-    ///   - handleResponse: A closure which handles the response, the result of which is
-    ///       returned to the caller. Returning from the closure will cancel the RPC if it
-    ///       hasn't already finished.
-    /// - Returns: The result of `handleResponse`.
-    public func listCustomDomains<Result>(
-        _ message: Pivox_Api_V1_ListCustomDomainsRequest,
-        metadata: GRPCCore.Metadata = [:],
-        options: GRPCCore.CallOptions = .defaults,
-        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_ListCustomDomainsResponse>) async throws -> Result = { response in
-            try response.message
-        }
-    ) async throws -> Result where Result: Sendable {
-        let request = GRPCCore.ClientRequest<Pivox_Api_V1_ListCustomDomainsRequest>(
-            message: message,
-            metadata: metadata
-        )
-        return try await self.listCustomDomains(
-            request: request,
-            options: options,
-            onResponse: handleResponse
-        )
-    }
-
-    /// Call the "CreateCustomDomain" method.
-    ///
-    /// > Source IDL Documentation:
-    /// >
-    /// > Creates a custom domain for an organization. Once created, the domain
-    /// > enters the `PENDING` state and the response includes the DNS records
-    /// > that the domain owner must configure. After DNS verification succeeds,
-    /// > the server automatically provisions a TLS certificate and transitions
-    /// > the domain to `ACTIVE`.
-    /// > 
-    /// > The caller must have `resourcemanager.customDomains.create` permission
-    /// > on the parent organization.
-    ///
-    /// - Parameters:
-    ///   - message: request message to send.
-    ///   - metadata: Additional metadata to send, defaults to empty.
-    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
-    ///   - handleResponse: A closure which handles the response, the result of which is
-    ///       returned to the caller. Returning from the closure will cancel the RPC if it
-    ///       hasn't already finished.
-    /// - Returns: The result of `handleResponse`.
-    public func createCustomDomain<Result>(
-        _ message: Pivox_Api_V1_CreateCustomDomainRequest,
-        metadata: GRPCCore.Metadata = [:],
-        options: GRPCCore.CallOptions = .defaults,
-        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result = { response in
-            try response.message
-        }
-    ) async throws -> Result where Result: Sendable {
-        let request = GRPCCore.ClientRequest<Pivox_Api_V1_CreateCustomDomainRequest>(
-            message: message,
-            metadata: metadata
-        )
-        return try await self.createCustomDomain(
-            request: request,
-            options: options,
-            onResponse: handleResponse
-        )
-    }
-
-    /// Call the "DeleteCustomDomain" method.
-    ///
-    /// > Source IDL Documentation:
-    /// >
-    /// > Deletes a custom domain from an organization, including TLS certificate
-    /// > revocation and routing removal.
-    /// > 
-    /// > The caller must have `resourcemanager.customDomains.delete` permission
-    /// > on the parent organization.
-    ///
-    /// - Parameters:
-    ///   - message: request message to send.
-    ///   - metadata: Additional metadata to send, defaults to empty.
-    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
-    ///   - handleResponse: A closure which handles the response, the result of which is
-    ///       returned to the caller. Returning from the closure will cancel the RPC if it
-    ///       hasn't already finished.
-    /// - Returns: The result of `handleResponse`.
-    public func deleteCustomDomain<Result>(
-        _ message: Pivox_Api_V1_DeleteCustomDomainRequest,
-        metadata: GRPCCore.Metadata = [:],
-        options: GRPCCore.CallOptions = .defaults,
-        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result = { response in
-            try response.message
-        }
-    ) async throws -> Result where Result: Sendable {
-        let request = GRPCCore.ClientRequest<Pivox_Api_V1_DeleteCustomDomainRequest>(
-            message: message,
-            metadata: metadata
-        )
-        return try await self.deleteCustomDomain(
             request: request,
             options: options,
             onResponse: handleResponse

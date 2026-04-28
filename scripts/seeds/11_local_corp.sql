@@ -1,12 +1,12 @@
 -- Local Corp: simple org for local dev testing
--- One org, two projects, a few tags, one gateway, one agent, one endpoint
+-- One org, two spaces, a few tags, one gateway, one agent, one endpoint
 
 -- Organization
 INSERT INTO organizations (id, name, display_name, create_time, update_time) VALUES
     ('0192a000-0001-7000-8000-00000000000b', 'local-corp', 'Local Corp', '2026-01-01 08:00:00+00', '2026-01-01 08:00:00+00');
 
--- Projects
-INSERT INTO projects (id, org_id, name, display_name, labels, create_time, update_time) VALUES
+-- Spaces
+INSERT INTO spaces (id, org_id, name, display_name, labels, create_time, update_time) VALUES
     ('0192a000-0003-7000-8000-0000003b0001', '0192a000-0001-7000-8000-00000000000b', 'news',   'News Production',   '{"env":"dev"}', '2026-01-02 08:00:00+00', '2026-01-02 08:00:00+00'),
     ('0192a000-0003-7000-8000-0000003b0002', '0192a000-0001-7000-8000-00000000000b', 'sports', 'Sports Production', '{"env":"dev"}', '2026-01-02 09:00:00+00', '2026-01-02 09:00:00+00');
 

@@ -24,6 +24,7 @@ import "google/api/resource.proto";
 import "google/longrunning/operations.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
+import "pivox/api/v1/sso.proto";
 
 option go_package = "pivox/api/v1;apiv1";
 
@@ -78,6 +79,76 @@ service Organizations {
       response_type: "Organization"
       metadata_type: "UpdateOrganizationMetadata"
     };
+  }
+
+  // Soft-deletes an organization. The org transitions to
+  // `DELETE_REQUESTED` state with `delete_time` set; `purge_time` is
+  // populated to `delete_time + 30 days`. Until purge, the org is
+  // recoverable via `UndeleteOrganization` and remains visible to
+  // `ListOrganizations` callers who pass `show_deleted=true`. After
+  // purge, all data cascades and the slug is freed.
+  //
+  // If `force=true`, the 30-day grace window is skipped: the LRO
+  // synchronously cascades all child data and frees the slug.
+  // The org is unrecoverable.
+  //
+  // The caller must hold the `owner` role on the organization;
+  // otherwise the LRO completes with PERMISSION_DENIED. The LRO
+  // surfaces cascade progress via `DeleteOrganizationMetadata.Phase`.
+  rpc DeleteOrganization(DeleteOrganizationRequest) returns (google.longrunning.Operation) {
+    option (google.api.http) = {delete: "/v1/{name=organizations/*}"};
+    option (google.api.method_signature) = "name";
+    option (google.longrunning.operation_info) = {
+      response_type: "Organization"
+      metadata_type: "DeleteOrganizationMetadata"
+    };
+  }
+
+  // Restores a soft-deleted organization (`DELETE_REQUESTED` state)
+  // back to `ACTIVE`, clearing `delete_time` and `purge_time`. Only
+  // callable during the 30-day grace window before purge. After
+  // purge there is no way back.
+  //
+  // The caller must hold the `owner` role on the organization.
+  rpc UndeleteOrganization(UndeleteOrganizationRequest) returns (google.longrunning.Operation) {
+    option (google.api.http) = {
+      post: "/v1/{name=organizations/*}:undelete"
+      body: "*"
+    };
+    option (google.api.method_signature) = "name";
+    option (google.longrunning.operation_info) = {
+      response_type: "Organization"
+      metadata_type: "UndeleteOrganizationMetadata"
+    };
+  }
+
+  // Gets the SSO configuration for an organization. Returns the
+  // SsoConfig singleton at `organizations/{org}/ssoConfig`. If no
+  // config has been set, returns NOT_FOUND.
+  //
+  // (-- api-linter: core::0131::request-name-required=disabled
+  //     aip.dev/not-precedent: GetSsoConfig is an AIP-156 singleton
+  //     sub-resource read; the parent org disambiguates the singleton. --)
+  rpc GetSsoConfig(GetSsoConfigRequest) returns (SsoConfig) {
+    option (google.api.http) = {get: "/v1/{name=organizations/*/ssoConfig}"};
+    option (google.api.method_signature) = "name";
+  }
+
+  // Updates the SSO configuration for an organization (AIP-156
+  // singleton sub-resource). The server applies changes by calling
+  // Firebase Admin SDK to update the underlying provider config,
+  // then persists the local SsoConfig row. `client_secret` (when
+  // provided) is encrypted at rest via Cloud KMS before storage.
+  //
+  // (-- api-linter: core::0134::response-message-name=disabled
+  //     aip.dev/not-precedent: UpdateSsoConfig is an AIP-156 singleton
+  //     sub-resource update; returning the singleton is correct. --)
+  rpc UpdateSsoConfig(UpdateSsoConfigRequest) returns (SsoConfig) {
+    option (google.api.http) = {
+      patch: "/v1/{sso_config.name=organizations/*/ssoConfig}"
+      body: "sso_config"
+    };
+    option (google.api.method_signature) = "sso_config,update_mask";
   }
 
   // Creates an invitation to join the organization.
@@ -342,6 +413,99 @@ message CreateOrganizationMetadata {}
 // A status object which is used as the `metadata` field for the Operation
 // returned by UpdateOrganization.
 message UpdateOrganizationMetadata {}
+
+// Request message for `Organizations.DeleteOrganization`.
+message DeleteOrganizationRequest {
+  // Required. The resource name of the organization to delete.
+  // Format: `organizations/{organization}`.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.api/Organization"},
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. The etag known to the client for the expected state of
+  // the organization. Used for optimistic concurrency control.
+  string etag = 2 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. If true, bypasses the 30-day grace window: the LRO
+  // synchronously cascades all child data (spaces, members, assets,
+  // SSO config, invitations, …) and frees the slug. The org is
+  // unrecoverable. Defaults to false (soft-delete with grace).
+  bool force = 3 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// A status object used as the `metadata` field for the Operation
+// returned by `DeleteOrganization`. Surfaces incremental progress
+// through the soft-delete + cascade-cancellation phases.
+//
+// For `force=false` (default), this LRO completes when the org
+// enters `DELETE_REQUESTED`; the actual data purge happens
+// out-of-band via the scheduled purge worker after `purge_time`.
+// Clients polling this LRO should not expect to see the org's
+// downstream resources gone — those linger until purge.
+//
+// For `force=true`, the LRO drives the full cascade synchronously
+// and only completes once child data has been purged.
+message DeleteOrganizationMetadata {
+  // Phases of the delete LRO.
+  enum Phase {
+    // Default; not used.
+    PHASE_UNSPECIFIED = 0;
+
+    // Validating preconditions (caller is owner; org is currently
+    // ACTIVE).
+    VALIDATING = 1;
+
+    // Cancelling LROs scoped to this org (in-flight asset imports,
+    // organization updates, etc.).
+    CANCELLING_OPERATIONS = 2;
+
+    // Marking the org row as soft-deleted: setting `delete_time`,
+    // `purge_time = delete_time + 30d`, and transitioning state to
+    // `DELETE_REQUESTED`. Soft-delete path only (`force=false`).
+    MARKING_DELETED = 3;
+
+    // Synchronously cascading child data (spaces, members, assets,
+    // SSO config, invitations, …) and freeing the slug. Force path
+    // only (`force=true`).
+    PURGING = 5;
+
+    // Done. For soft-delete, the org is in `DELETE_REQUESTED` state
+    // and recoverable via `UndeleteOrganization` until `purge_time`.
+    // For force, the org row and all child data are gone.
+    COMPLETED = 4;
+  }
+
+  // Output only. Current phase of the cascade.
+  Phase phase = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Resource name of the organization being deleted.
+  string organization = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Request message for `Organizations.UndeleteOrganization`.
+message UndeleteOrganizationRequest {
+  // Required. The resource name of the organization to restore.
+  // Format: `organizations/{organization}`. Must currently be in
+  // `DELETE_REQUESTED` state and within the 30-day grace window.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.api/Organization"},
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. The etag known to the client for the expected state of
+  // the organization.
+  string etag = 2 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// A status object used as the `metadata` field for the Operation
+// returned by `UndeleteOrganization`.
+message UndeleteOrganizationMetadata {
+  // Output only. Resource name of the organization being restored.
+  string organization = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
 
 // An invitation to join an organization. Invitations are created by org
 // admins and sent to users by email. The recipient can accept or decline.

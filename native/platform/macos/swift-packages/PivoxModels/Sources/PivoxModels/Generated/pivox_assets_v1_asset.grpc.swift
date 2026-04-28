@@ -211,7 +211,7 @@ extension Pivox_Assets_V1_Assets {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Manages media assets within a project. Assets represent media files
+    /// > Manages media assets within a space. Assets represent media files
     /// > (images, video, audio, graphics) with rich metadata, versioning,
     /// > and AI-generated descriptions. Creation is an LRO that runs the
     /// > full ingestion pipeline: validation, metadata extraction, thumbnail
@@ -222,7 +222,7 @@ extension Pivox_Assets_V1_Assets {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Creates a new asset in the specified project. The asset undergoes
+        /// > Creates a new asset in the specified space. The asset undergoes
         /// > a full ingestion pipeline as a long-running operation including
         /// > format validation, metadata extraction, thumbnail generation,
         /// > and AI processing.
@@ -231,7 +231,7 @@ extension Pivox_Assets_V1_Assets {
         /// > created for the Request workflow.
         /// > 
         /// > The caller must have `assets.assets.create` permission on the parent
-        /// > project.
+        /// > space.
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Pivox_Assets_V1_CreateAssetRequest` message.
@@ -277,7 +277,7 @@ extension Pivox_Assets_V1_Assets {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Lists assets in a project.
+        /// > Lists assets in a space.
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Pivox_Assets_V1_ListAssetsRequest` message.
@@ -449,7 +449,7 @@ extension Pivox_Assets_V1_Assets {
         /// > import progress.
         /// > 
         /// > The caller must have `assets.assets.create` permission on the
-        /// > parent project and `storage.endpoints.get` on the source endpoint.
+        /// > parent space and `storage.endpoints.get` on the source endpoint.
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Pivox_Assets_V1_ImportAssetsRequest` message.
@@ -502,7 +502,7 @@ extension Pivox_Assets_V1_Assets {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Manages media assets within a project. Assets represent media files
+    /// > Manages media assets within a space. Assets represent media files
     /// > (images, video, audio, graphics) with rich metadata, versioning,
     /// > and AI-generated descriptions. Creation is an LRO that runs the
     /// > full ingestion pipeline: validation, metadata extraction, thumbnail
@@ -523,7 +523,7 @@ extension Pivox_Assets_V1_Assets {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Creates a new asset in the specified project. The asset undergoes
+        /// > Creates a new asset in the specified space. The asset undergoes
         /// > a full ingestion pipeline as a long-running operation including
         /// > format validation, metadata extraction, thumbnail generation,
         /// > and AI processing.
@@ -532,7 +532,7 @@ extension Pivox_Assets_V1_Assets {
         /// > created for the Request workflow.
         /// > 
         /// > The caller must have `assets.assets.create` permission on the parent
-        /// > project.
+        /// > space.
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Pivox_Assets_V1_CreateAssetRequest` message.
@@ -600,7 +600,7 @@ extension Pivox_Assets_V1_Assets {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Lists assets in a project.
+        /// > Lists assets in a space.
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Pivox_Assets_V1_ListAssetsRequest` message.
@@ -849,7 +849,7 @@ extension Pivox_Assets_V1_Assets {
         /// > import progress.
         /// > 
         /// > The caller must have `assets.assets.create` permission on the
-        /// > parent project and `storage.endpoints.get` on the source endpoint.
+        /// > parent space and `storage.endpoints.get` on the source endpoint.
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Pivox_Assets_V1_ImportAssetsRequest` message.
@@ -924,7 +924,7 @@ extension Pivox_Assets_V1_Assets.ClientProtocol {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Creates a new asset in the specified project. The asset undergoes
+    /// > Creates a new asset in the specified space. The asset undergoes
     /// > a full ingestion pipeline as a long-running operation including
     /// > format validation, metadata extraction, thumbnail generation,
     /// > and AI processing.
@@ -933,7 +933,7 @@ extension Pivox_Assets_V1_Assets.ClientProtocol {
     /// > created for the Request workflow.
     /// > 
     /// > The caller must have `assets.assets.create` permission on the parent
-    /// > project.
+    /// > space.
     ///
     /// - Parameters:
     ///   - request: A request containing a single `Pivox_Assets_V1_CreateAssetRequest` message.
@@ -991,7 +991,7 @@ extension Pivox_Assets_V1_Assets.ClientProtocol {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Lists assets in a project.
+    /// > Lists assets in a space.
     ///
     /// - Parameters:
     ///   - request: A request containing a single `Pivox_Assets_V1_ListAssetsRequest` message.
@@ -1205,7 +1205,7 @@ extension Pivox_Assets_V1_Assets.ClientProtocol {
     /// > import progress.
     /// > 
     /// > The caller must have `assets.assets.create` permission on the
-    /// > parent project and `storage.endpoints.get` on the source endpoint.
+    /// > parent space and `storage.endpoints.get` on the source endpoint.
     ///
     /// - Parameters:
     ///   - request: A request containing a single `Pivox_Assets_V1_ImportAssetsRequest` message.
@@ -1269,7 +1269,7 @@ extension Pivox_Assets_V1_Assets.ClientProtocol {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Creates a new asset in the specified project. The asset undergoes
+    /// > Creates a new asset in the specified space. The asset undergoes
     /// > a full ingestion pipeline as a long-running operation including
     /// > format validation, metadata extraction, thumbnail generation,
     /// > and AI processing.
@@ -1278,7 +1278,7 @@ extension Pivox_Assets_V1_Assets.ClientProtocol {
     /// > created for the Request workflow.
     /// > 
     /// > The caller must have `assets.assets.create` permission on the parent
-    /// > project.
+    /// > space.
     ///
     /// - Parameters:
     ///   - message: request message to send.
@@ -1344,7 +1344,7 @@ extension Pivox_Assets_V1_Assets.ClientProtocol {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Lists assets in a project.
+    /// > Lists assets in a space.
     ///
     /// - Parameters:
     ///   - message: request message to send.
@@ -1586,7 +1586,7 @@ extension Pivox_Assets_V1_Assets.ClientProtocol {
     /// > import progress.
     /// > 
     /// > The caller must have `assets.assets.create` permission on the
-    /// > parent project and `storage.endpoints.get` on the source endpoint.
+    /// > parent space and `storage.endpoints.get` on the source endpoint.
     ///
     /// - Parameters:
     ///   - message: request message to send.

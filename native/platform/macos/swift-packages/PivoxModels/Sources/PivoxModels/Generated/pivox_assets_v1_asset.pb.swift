@@ -44,7 +44,7 @@ public struct Pivox_Assets_V1_Asset: @unchecked Sendable {
   // methods supported on all messages.
 
   /// Output only. The resource name of the asset. Format:
-  /// `organizations/{organization}/projects/{project}/assets/{asset}`
+  /// `organizations/{organization}/spaces/{space}/assets/{asset}`
   public var name: String {
     get {_storage._name}
     set {_uniqueStorage()._name = newValue}
@@ -103,7 +103,7 @@ public struct Pivox_Assets_V1_Asset: @unchecked Sendable {
 
   /// Output only. SHA-256 checksum of the original file. Used for
   /// deduplication — if a file with the same checksum already exists
-  /// in the project, the existing asset is returned instead of creating
+  /// in the space, the existing asset is returned instead of creating
   /// a duplicate.
   public var checksumSha256: String {
     get {_storage._checksumSha256}
@@ -388,7 +388,7 @@ public struct Pivox_Assets_V1_AssetVersion: @unchecked Sendable {
   // methods supported on all messages.
 
   /// Output only. The resource name of the version. Format:
-  /// `organizations/{organization}/projects/{project}/assets/{asset}/versions/{version}`
+  /// `organizations/{organization}/spaces/{space}/assets/{asset}/versions/{version}`
   public var name: String {
     get {_storage._name}
     set {_uniqueStorage()._name = newValue}
@@ -760,8 +760,8 @@ public struct Pivox_Assets_V1_CreateAssetRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Required. The parent project. Format:
-  /// `organizations/{organization}/projects/{project}`
+  /// Required. The parent space. Format:
+  /// `organizations/{organization}/spaces/{space}`
   public var parent: String = String()
 
   /// Required. The asset to create. Must include display_name. If no
@@ -945,8 +945,8 @@ public struct Pivox_Assets_V1_ListAssetsRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Required. The parent project whose assets are being listed.
-  /// Format: `organizations/{organization}/projects/{project}`
+  /// Required. The parent space whose assets are being listed.
+  /// Format: `organizations/{organization}/spaces/{space}`
   public var parent: String = String()
 
   /// Optional. The maximum number of assets to return.
@@ -1002,7 +1002,7 @@ public struct Pivox_Assets_V1_ListAssetsResponse: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// The assets belonging to the specified project.
+  /// The assets belonging to the specified space.
   public var assets: [Pivox_Assets_V1_Asset] = []
 
   /// A pagination token for the next page.
@@ -1137,7 +1137,7 @@ public struct Pivox_Assets_V1_CreateAssetVersionRequest: Sendable {
   // methods supported on all messages.
 
   /// Required. The parent asset. Format:
-  /// `organizations/{organization}/projects/{project}/assets/{asset}`
+  /// `organizations/{organization}/spaces/{space}/assets/{asset}`
   public var parent: String = String()
 
   /// Required. The version to create. Only change_note is user-settable.
@@ -1271,8 +1271,8 @@ public struct Pivox_Assets_V1_ImportAssetsRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Required. The parent project to import assets into. Format:
-  /// `organizations/{organization}/projects/{project}`
+  /// Required. The parent space to import assets into. Format:
+  /// `organizations/{organization}/spaces/{space}`
   public var parent: String = String()
 
   /// Required. The storage endpoint to scan. Format:
@@ -1403,7 +1403,7 @@ public struct Pivox_Assets_V1_GetAssetMetadataRequest: Sendable {
   // methods supported on all messages.
 
   /// Required. The resource name of the asset metadata. Format:
-  /// `organizations/{organization}/projects/{project}/assets/{asset}/metadata`
+  /// `organizations/{organization}/spaces/{space}/assets/{asset}/metadata`
   public var name: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -1421,7 +1421,7 @@ public struct Pivox_Assets_V1_AssetMetadata: Sendable {
   // methods supported on all messages.
 
   /// Output only. The resource name. Format:
-  /// `organizations/{organization}/projects/{project}/assets/{asset}/metadata`
+  /// `organizations/{organization}/spaces/{space}/assets/{asset}/metadata`
   public var name: String = String()
 
   /// Output only. The extracted metadata as a structured JSON object.

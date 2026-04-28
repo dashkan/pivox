@@ -281,7 +281,7 @@ public struct Pivox_Storage_V1_S3AccessKeyCredentials: Sendable {
 /// a marker file during endpoint creation.
 ///
 /// Assets are stored as immutable versioned files:
-///   {path}/{org_id}/{project_id}/assets/{asset_id}/v1.ext
+///   {path}/{org_id}/{space_id}/assets/{asset_id}/v1.ext
 ///
 /// No credentials are needed — the agent accesses files using the
 /// pivox system user's permissions on the mounted filesystem.

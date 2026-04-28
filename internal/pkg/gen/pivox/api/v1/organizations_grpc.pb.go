@@ -38,6 +38,10 @@ const (
 	Organizations_ListOrganizations_FullMethodName      = "/pivox.api.v1.Organizations/ListOrganizations"
 	Organizations_CreateOrganization_FullMethodName     = "/pivox.api.v1.Organizations/CreateOrganization"
 	Organizations_UpdateOrganization_FullMethodName     = "/pivox.api.v1.Organizations/UpdateOrganization"
+	Organizations_DeleteOrganization_FullMethodName     = "/pivox.api.v1.Organizations/DeleteOrganization"
+	Organizations_UndeleteOrganization_FullMethodName   = "/pivox.api.v1.Organizations/UndeleteOrganization"
+	Organizations_GetSsoConfig_FullMethodName           = "/pivox.api.v1.Organizations/GetSsoConfig"
+	Organizations_UpdateSsoConfig_FullMethodName        = "/pivox.api.v1.Organizations/UpdateSsoConfig"
 	Organizations_CreateInvitation_FullMethodName       = "/pivox.api.v1.Organizations/CreateInvitation"
 	Organizations_ListInvitations_FullMethodName        = "/pivox.api.v1.Organizations/ListInvitations"
 	Organizations_GetInvitation_FullMethodName          = "/pivox.api.v1.Organizations/GetInvitation"
@@ -73,6 +77,48 @@ type OrganizationsClient interface {
 	// The caller must have `resourcemanager.organizations.update` permission
 	// on the specified organization.
 	UpdateOrganization(ctx context.Context, in *UpdateOrganizationRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
+	// Soft-deletes an organization. The org transitions to
+	// `DELETE_REQUESTED` state with `delete_time` set; `purge_time` is
+	// populated to `delete_time + 30 days`. Until purge, the org is
+	// recoverable via `UndeleteOrganization` and remains visible to
+	// `ListOrganizations` callers who pass `show_deleted=true`. After
+	// purge, all data cascades and the slug is freed.
+	//
+	// If `force=true`, the 30-day grace window is skipped: the LRO
+	// synchronously cascades all child data and frees the slug.
+	// The org is unrecoverable.
+	//
+	// The caller must hold the `owner` role on the organization;
+	// otherwise the LRO completes with PERMISSION_DENIED. The LRO
+	// surfaces cascade progress via `DeleteOrganizationMetadata.Phase`.
+	DeleteOrganization(ctx context.Context, in *DeleteOrganizationRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
+	// Restores a soft-deleted organization (`DELETE_REQUESTED` state)
+	// back to `ACTIVE`, clearing `delete_time` and `purge_time`. Only
+	// callable during the 30-day grace window before purge. After
+	// purge there is no way back.
+	//
+	// The caller must hold the `owner` role on the organization.
+	UndeleteOrganization(ctx context.Context, in *UndeleteOrganizationRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
+	// Gets the SSO configuration for an organization. Returns the
+	// SsoConfig singleton at `organizations/{org}/ssoConfig`. If no
+	// config has been set, returns NOT_FOUND.
+	//
+	// (-- api-linter: core::0131::request-name-required=disabled
+	//
+	//	aip.dev/not-precedent: GetSsoConfig is an AIP-156 singleton
+	//	sub-resource read; the parent org disambiguates the singleton. --)
+	GetSsoConfig(ctx context.Context, in *GetSsoConfigRequest, opts ...grpc.CallOption) (*SsoConfig, error)
+	// Updates the SSO configuration for an organization (AIP-156
+	// singleton sub-resource). The server applies changes by calling
+	// Firebase Admin SDK to update the underlying provider config,
+	// then persists the local SsoConfig row. `client_secret` (when
+	// provided) is encrypted at rest via Cloud KMS before storage.
+	//
+	// (-- api-linter: core::0134::response-message-name=disabled
+	//
+	//	aip.dev/not-precedent: UpdateSsoConfig is an AIP-156 singleton
+	//	sub-resource update; returning the singleton is correct. --)
+	UpdateSsoConfig(ctx context.Context, in *UpdateSsoConfigRequest, opts ...grpc.CallOption) (*SsoConfig, error)
 	// Creates an invitation to join the organization.
 	//
 	// The server validates the email against the organization's invitation
@@ -143,6 +189,46 @@ func (c *organizationsClient) UpdateOrganization(ctx context.Context, in *Update
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(longrunningpb.Operation)
 	err := c.cc.Invoke(ctx, Organizations_UpdateOrganization_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationsClient) DeleteOrganization(ctx context.Context, in *DeleteOrganizationRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(longrunningpb.Operation)
+	err := c.cc.Invoke(ctx, Organizations_DeleteOrganization_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationsClient) UndeleteOrganization(ctx context.Context, in *UndeleteOrganizationRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(longrunningpb.Operation)
+	err := c.cc.Invoke(ctx, Organizations_UndeleteOrganization_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationsClient) GetSsoConfig(ctx context.Context, in *GetSsoConfigRequest, opts ...grpc.CallOption) (*SsoConfig, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SsoConfig)
+	err := c.cc.Invoke(ctx, Organizations_GetSsoConfig_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationsClient) UpdateSsoConfig(ctx context.Context, in *UpdateSsoConfigRequest, opts ...grpc.CallOption) (*SsoConfig, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SsoConfig)
+	err := c.cc.Invoke(ctx, Organizations_UpdateSsoConfig_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -254,6 +340,48 @@ type OrganizationsServer interface {
 	// The caller must have `resourcemanager.organizations.update` permission
 	// on the specified organization.
 	UpdateOrganization(context.Context, *UpdateOrganizationRequest) (*longrunningpb.Operation, error)
+	// Soft-deletes an organization. The org transitions to
+	// `DELETE_REQUESTED` state with `delete_time` set; `purge_time` is
+	// populated to `delete_time + 30 days`. Until purge, the org is
+	// recoverable via `UndeleteOrganization` and remains visible to
+	// `ListOrganizations` callers who pass `show_deleted=true`. After
+	// purge, all data cascades and the slug is freed.
+	//
+	// If `force=true`, the 30-day grace window is skipped: the LRO
+	// synchronously cascades all child data and frees the slug.
+	// The org is unrecoverable.
+	//
+	// The caller must hold the `owner` role on the organization;
+	// otherwise the LRO completes with PERMISSION_DENIED. The LRO
+	// surfaces cascade progress via `DeleteOrganizationMetadata.Phase`.
+	DeleteOrganization(context.Context, *DeleteOrganizationRequest) (*longrunningpb.Operation, error)
+	// Restores a soft-deleted organization (`DELETE_REQUESTED` state)
+	// back to `ACTIVE`, clearing `delete_time` and `purge_time`. Only
+	// callable during the 30-day grace window before purge. After
+	// purge there is no way back.
+	//
+	// The caller must hold the `owner` role on the organization.
+	UndeleteOrganization(context.Context, *UndeleteOrganizationRequest) (*longrunningpb.Operation, error)
+	// Gets the SSO configuration for an organization. Returns the
+	// SsoConfig singleton at `organizations/{org}/ssoConfig`. If no
+	// config has been set, returns NOT_FOUND.
+	//
+	// (-- api-linter: core::0131::request-name-required=disabled
+	//
+	//	aip.dev/not-precedent: GetSsoConfig is an AIP-156 singleton
+	//	sub-resource read; the parent org disambiguates the singleton. --)
+	GetSsoConfig(context.Context, *GetSsoConfigRequest) (*SsoConfig, error)
+	// Updates the SSO configuration for an organization (AIP-156
+	// singleton sub-resource). The server applies changes by calling
+	// Firebase Admin SDK to update the underlying provider config,
+	// then persists the local SsoConfig row. `client_secret` (when
+	// provided) is encrypted at rest via Cloud KMS before storage.
+	//
+	// (-- api-linter: core::0134::response-message-name=disabled
+	//
+	//	aip.dev/not-precedent: UpdateSsoConfig is an AIP-156 singleton
+	//	sub-resource update; returning the singleton is correct. --)
+	UpdateSsoConfig(context.Context, *UpdateSsoConfigRequest) (*SsoConfig, error)
 	// Creates an invitation to join the organization.
 	//
 	// The server validates the email against the organization's invitation
@@ -301,6 +429,18 @@ func (UnimplementedOrganizationsServer) CreateOrganization(context.Context, *Cre
 }
 func (UnimplementedOrganizationsServer) UpdateOrganization(context.Context, *UpdateOrganizationRequest) (*longrunningpb.Operation, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateOrganization not implemented")
+}
+func (UnimplementedOrganizationsServer) DeleteOrganization(context.Context, *DeleteOrganizationRequest) (*longrunningpb.Operation, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteOrganization not implemented")
+}
+func (UnimplementedOrganizationsServer) UndeleteOrganization(context.Context, *UndeleteOrganizationRequest) (*longrunningpb.Operation, error) {
+	return nil, status.Error(codes.Unimplemented, "method UndeleteOrganization not implemented")
+}
+func (UnimplementedOrganizationsServer) GetSsoConfig(context.Context, *GetSsoConfigRequest) (*SsoConfig, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetSsoConfig not implemented")
+}
+func (UnimplementedOrganizationsServer) UpdateSsoConfig(context.Context, *UpdateSsoConfigRequest) (*SsoConfig, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateSsoConfig not implemented")
 }
 func (UnimplementedOrganizationsServer) CreateInvitation(context.Context, *CreateInvitationRequest) (*Invitation, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateInvitation not implemented")
@@ -415,6 +555,78 @@ func _Organizations_UpdateOrganization_Handler(srv interface{}, ctx context.Cont
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(OrganizationsServer).UpdateOrganization(ctx, req.(*UpdateOrganizationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Organizations_DeleteOrganization_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteOrganizationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).DeleteOrganization(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_DeleteOrganization_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).DeleteOrganization(ctx, req.(*DeleteOrganizationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Organizations_UndeleteOrganization_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UndeleteOrganizationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).UndeleteOrganization(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_UndeleteOrganization_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).UndeleteOrganization(ctx, req.(*UndeleteOrganizationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Organizations_GetSsoConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSsoConfigRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).GetSsoConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_GetSsoConfig_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).GetSsoConfig(ctx, req.(*GetSsoConfigRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Organizations_UpdateSsoConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateSsoConfigRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).UpdateSsoConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_UpdateSsoConfig_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).UpdateSsoConfig(ctx, req.(*UpdateSsoConfigRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -585,6 +797,22 @@ var Organizations_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateOrganization",
 			Handler:    _Organizations_UpdateOrganization_Handler,
+		},
+		{
+			MethodName: "DeleteOrganization",
+			Handler:    _Organizations_DeleteOrganization_Handler,
+		},
+		{
+			MethodName: "UndeleteOrganization",
+			Handler:    _Organizations_UndeleteOrganization_Handler,
+		},
+		{
+			MethodName: "GetSsoConfig",
+			Handler:    _Organizations_GetSsoConfig_Handler,
+		},
+		{
+			MethodName: "UpdateSsoConfig",
+			Handler:    _Organizations_UpdateSsoConfig_Handler,
 		},
 		{
 			MethodName: "CreateInvitation",

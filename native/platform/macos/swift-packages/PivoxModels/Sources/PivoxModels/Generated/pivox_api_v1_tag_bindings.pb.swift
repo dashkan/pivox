@@ -44,7 +44,7 @@ public struct Pivox_Api_V1_TagBinding: Sendable {
 
   /// Output only. The name of the TagBinding. Format:
   /// `organizations/{organization}/tagBindings/{tag_binding}` or
-  /// `organizations/{organization}/projects/{project}/tagBindings/{tag_binding}`.
+  /// `organizations/{organization}/spaces/{space}/tagBindings/{tag_binding}`.
   public var name: String = String()
 
   /// Immutable. The TagValue of the TagBinding.
@@ -150,7 +150,7 @@ public struct Pivox_Api_V1_GetTagBindingRequest: Sendable {
 
   /// Required. The name of the TagBinding to retrieve. Format:
   /// `organizations/{organization}/tagBindings/{tag_binding}` or
-  /// `organizations/{organization}/projects/{project}/tagBindings/{tag_binding}`.
+  /// `organizations/{organization}/spaces/{space}/tagBindings/{tag_binding}`.
   public var name: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -166,7 +166,7 @@ public struct Pivox_Api_V1_CreateTagBindingRequest: Sendable {
 
   /// Required. The parent resource to create the TagBinding under. Format:
   /// `organizations/{organization}` or
-  /// `organizations/{organization}/projects/{project}`.
+  /// `organizations/{organization}/spaces/{space}`.
   public var parent: String = String()
 
   /// Required. The TagBinding to be created.
@@ -202,7 +202,7 @@ public struct Pivox_Api_V1_DeleteTagBindingRequest: Sendable {
 
   /// Required. The name of the TagBinding to delete. Format:
   /// `organizations/{organization}/tagBindings/{tag_binding}` or
-  /// `organizations/{organization}/projects/{project}/tagBindings/{tag_binding}`.
+  /// `organizations/{organization}/spaces/{space}/tagBindings/{tag_binding}`.
   public var name: String = String()
 
   /// Optional. The etag known to the client for the expected state of the tag binding.
@@ -226,7 +226,7 @@ public struct Pivox_Api_V1_ListTagBindingsRequest: Sendable {
 
   /// Required. The parent resource for which you want to list existing
   /// TagBindings. Format: `organizations/{organization}` or
-  /// `organizations/{organization}/projects/{project}`.
+  /// `organizations/{organization}/spaces/{space}`.
   public var parent: String = String()
 
   /// Optional. The maximum number of TagBindings to return in the response. The
@@ -245,7 +245,7 @@ public struct Pivox_Api_V1_ListTagBindingsRequest: Sendable {
   ///
   /// Examples:
   ///
-  /// + `parentResource = "organizations/123/projects/my-project"` —
+  /// + `parentResource = "organizations/123/spaces/my-space"` —
   ///   bindings for a specific resource.
   ///
   /// For more information, see [AIP-160](https://aip.dev/160).
@@ -302,7 +302,7 @@ public struct Pivox_Api_V1_ListEffectiveTagsRequest: Sendable {
 
   /// Required. The parent resource for which you want to list the effective
   /// tags. Format: `organizations/{organization}` or
-  /// `organizations/{organization}/projects/{project}`.
+  /// `organizations/{organization}/spaces/{space}`.
   public var parent: String = String()
 
   /// Optional. The maximum number of effective tags to return in the response.

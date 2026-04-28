@@ -96,7 +96,7 @@ public struct Pivox_Api_V1_ListTagValuesRequest: Sendable {
 
   /// Required. The resource name of the parent TagKey.
   /// Must be of the form `organizations/{org_id}/tagKeys/{tag_key}` or
-  /// `organizations/{org_id}/projects/{project}/tagKeys/{tag_key}`.
+  /// `organizations/{org_id}/spaces/{space}/tagKeys/{tag_key}`.
   public var parent: String = String()
 
   /// Optional. The maximum number of TagValues to return in the response. The
@@ -182,7 +182,7 @@ public struct Pivox_Api_V1_CreateTagValueRequest: Sendable {
 
   /// Required. The resource name of the parent TagKey.
   /// Must be of the form `organizations/{org_id}/tagKeys/{tag_key}` or
-  /// `organizations/{org_id}/projects/{project}/tagKeys/{tag_key}`.
+  /// `organizations/{org_id}/spaces/{space}/tagKeys/{tag_key}`.
   public var parent: String = String()
 
   /// Required. The TagValue to be created. Only fields `description`

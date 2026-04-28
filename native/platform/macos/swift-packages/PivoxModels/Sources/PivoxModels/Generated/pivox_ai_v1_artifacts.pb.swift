@@ -117,7 +117,7 @@ public struct Pivox_Ai_V1_ArtifactVersion: Sendable {
   }
 
   /// Resource name of the asset version for binary artifacts.
-  /// Format: `organizations/{organization}/projects/{project}/assets/{asset}/versions/{version}`
+  /// Format: `organizations/{organization}/spaces/{space}/assets/{asset}/versions/{version}`
   public var assetVersion: String {
     get {
       if case .assetVersion(let v)? = content {return v}
@@ -143,7 +143,7 @@ public struct Pivox_Ai_V1_ArtifactVersion: Sendable {
     /// Inline content for small text artifacts (code, markdown, svg).
     case inline(Pivox_Ai_V1_InlineContent)
     /// Resource name of the asset version for binary artifacts.
-    /// Format: `organizations/{organization}/projects/{project}/assets/{asset}/versions/{version}`
+    /// Format: `organizations/{organization}/spaces/{space}/assets/{asset}/versions/{version}`
     case assetVersion(String)
 
   }

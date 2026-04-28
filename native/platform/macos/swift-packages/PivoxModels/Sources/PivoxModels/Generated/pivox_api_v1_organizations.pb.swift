@@ -251,7 +251,6 @@ public struct Pivox_Api_V1_CreateOrganizationRequest: Sendable {
   /// Optional. A unique identifier for the organization. If not provided, the
   /// server will generate one. Must start with a letter, contain only lowercase
   /// letters, digits, and hyphens, and be between 4 and 20 characters long.
-  /// This value is also used as the Firebase Auth tenant display name.
   public var organizationID: String = String()
 
   /// Optional. If set to true, the request will only validate the request
@@ -334,315 +333,6 @@ public struct Pivox_Api_V1_ListOrganizationsResponse: Sendable {
   public init() {}
 }
 
-/// A custom domain associated with an organization. Custom domains allow
-/// organizations to serve Pivox services under their own domain name
-/// (for example, `pivox.acme.com`). The server handles DNS verification
-/// and TLS certificate provisioning automatically.
-public struct Pivox_Api_V1_CustomDomain: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  /// Output only. The resource name of the custom domain. Format:
-  /// `organizations/{organization}/customDomains/{custom_domain}`
-  public var name: String = String()
-
-  /// Immutable. The fully qualified domain name, for example
-  /// `pivox.acme.com`. Cannot be changed after creation — delete and
-  /// recreate the resource to use a different domain.
-  public var domain: String = String()
-
-  /// Output only. The current lifecycle state of the custom domain.
-  public var state: Pivox_Api_V1_CustomDomain.State = .unspecified
-
-  /// Output only. The DNS records that the domain owner must create to verify
-  /// ownership and route traffic. Typically includes a `TXT` record for
-  /// verification and a `CNAME` record for routing.
-  public var requiredDnsRecords: [Pivox_Api_V1_DnsRecord] = []
-
-  /// Output only. Timestamp when the custom domain was created.
-  public var createTime: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {_createTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
-    set {_createTime = newValue}
-  }
-  /// Returns true if `createTime` has been explicitly set.
-  public var hasCreateTime: Bool {self._createTime != nil}
-  /// Clears the value of `createTime`. Subsequent reads from it will return its default value.
-  public mutating func clearCreateTime() {self._createTime = nil}
-
-  /// Output only. Timestamp when the custom domain was last modified.
-  public var updateTime: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {_updateTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
-    set {_updateTime = newValue}
-  }
-  /// Returns true if `updateTime` has been explicitly set.
-  public var hasUpdateTime: Bool {self._updateTime != nil}
-  /// Clears the value of `updateTime`. Subsequent reads from it will return its default value.
-  public mutating func clearUpdateTime() {self._updateTime = nil}
-
-  /// Output only. Timestamp when the custom domain was requested for deletion.
-  public var deleteTime: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {_deleteTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
-    set {_deleteTime = newValue}
-  }
-  /// Returns true if `deleteTime` has been explicitly set.
-  public var hasDeleteTime: Bool {self._deleteTime != nil}
-  /// Clears the value of `deleteTime`. Subsequent reads from it will return its default value.
-  public mutating func clearDeleteTime() {self._deleteTime = nil}
-
-  /// Output only. Timestamp when DNS verification was last confirmed.
-  public var verifyTime: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {_verifyTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
-    set {_verifyTime = newValue}
-  }
-  /// Returns true if `verifyTime` has been explicitly set.
-  public var hasVerifyTime: Bool {self._verifyTime != nil}
-  /// Clears the value of `verifyTime`. Subsequent reads from it will return its default value.
-  public mutating func clearVerifyTime() {self._verifyTime = nil}
-
-  /// Output only. A checksum computed by the server based on the current value
-  /// of the CustomDomain resource. This may be sent on delete requests to
-  /// ensure the client has an up-to-date value before proceeding.
-  public var etag: String = String()
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  /// The lifecycle state of a custom domain.
-  public enum State: SwiftProtobuf.Enum, Swift.CaseIterable {
-    public typealias RawValue = Int
-
-    /// Unspecified state. This is only useful for distinguishing unset values.
-    case unspecified // = 0
-
-    /// The domain has been created and is waiting for the owner to configure
-    /// the required DNS records.
-    case pending // = 1
-
-    /// The DNS records have been verified. The server is provisioning a TLS
-    /// certificate via the ACME protocol.
-    case provisioning // = 2
-
-    /// The domain is fully verified, the TLS certificate has been issued, and
-    /// traffic is being served.
-    case active // = 3
-
-    /// DNS verification or TLS certificate provisioning failed. Inspect the
-    /// `required_dns_records` to ensure records are configured correctly.
-    case failed // = 4
-
-    /// The domain was previously active but has been deactivated because DNS
-    /// records were removed or the TLS certificate could not be renewed.
-    case deactivated // = 5
-    case UNRECOGNIZED(Int)
-
-    public init() {
-      self = .unspecified
-    }
-
-    public init?(rawValue: Int) {
-      switch rawValue {
-      case 0: self = .unspecified
-      case 1: self = .pending
-      case 2: self = .provisioning
-      case 3: self = .active
-      case 4: self = .failed
-      case 5: self = .deactivated
-      default: self = .UNRECOGNIZED(rawValue)
-      }
-    }
-
-    public var rawValue: Int {
-      switch self {
-      case .unspecified: return 0
-      case .pending: return 1
-      case .provisioning: return 2
-      case .active: return 3
-      case .failed: return 4
-      case .deactivated: return 5
-      case .UNRECOGNIZED(let i): return i
-      }
-    }
-
-    // The compiler won't synthesize support with the UNRECOGNIZED case.
-    public static let allCases: [Pivox_Api_V1_CustomDomain.State] = [
-      .unspecified,
-      .pending,
-      .provisioning,
-      .active,
-      .failed,
-      .deactivated,
-    ]
-
-  }
-
-  public init() {}
-
-  fileprivate var _createTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
-  fileprivate var _updateTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
-  fileprivate var _deleteTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
-  fileprivate var _verifyTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
-}
-
-/// A DNS record that a domain owner must configure in their DNS provider
-/// to verify ownership or route traffic.
-public struct Pivox_Api_V1_DnsRecord: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  /// The DNS record type, for example `CNAME`, `TXT`, or `A`.
-  public var type: String = String()
-
-  /// The hostname to create the record on, for example
-  /// `_pivox.acme.com` or `pivox.acme.com`.
-  public var host: String = String()
-
-  /// The value for the DNS record, for example
-  /// `pivox-verify=abc123` or `custom.pivox.io`.
-  public var value: String = String()
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-/// The request sent to the
-/// [GetCustomDomain][pivox.api.v1.Organizations.GetCustomDomain]
-/// method.
-public struct Pivox_Api_V1_GetCustomDomainRequest: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  /// Required. The resource name of the custom domain to retrieve. Format:
-  /// `organizations/{organization}/customDomains/{custom_domain}`
-  public var name: String = String()
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-/// The request sent to the
-/// [ListCustomDomains][pivox.api.v1.Organizations.ListCustomDomains]
-/// method.
-public struct Pivox_Api_V1_ListCustomDomainsRequest: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  /// Required. The parent organization whose custom domains are being listed.
-  /// Format: `organizations/{organization}`
-  public var parent: String = String()
-
-  /// Optional. The maximum number of custom domains to return in the response.
-  /// The server can return fewer custom domains than requested. If unspecified,
-  /// the server picks an appropriate default.
-  public var pageSize: Int32 = 0
-
-  /// Optional. A pagination token returned from a previous call to
-  /// `ListCustomDomains` that indicates from where listing should continue.
-  public var pageToken: String = String()
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-/// The response returned from the
-/// [ListCustomDomains][pivox.api.v1.Organizations.ListCustomDomains]
-/// method.
-public struct Pivox_Api_V1_ListCustomDomainsResponse: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  /// The list of custom domains for the specified organization.
-  public var customDomains: [Pivox_Api_V1_CustomDomain] = []
-
-  /// A pagination token to be used to retrieve the next page of results.
-  /// If empty, this response contains the last page of results.
-  public var nextPageToken: String = String()
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-/// The request sent to the
-/// [CreateCustomDomain][pivox.api.v1.Organizations.CreateCustomDomain]
-/// method.
-public struct Pivox_Api_V1_CreateCustomDomainRequest: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  /// Required. The parent organization where the custom domain will be created.
-  /// Format: `organizations/{organization}`
-  public var parent: String = String()
-
-  /// Required. The custom domain to create. The `domain` field must be set.
-  public var customDomain: Pivox_Api_V1_CustomDomain {
-    get {_customDomain ?? Pivox_Api_V1_CustomDomain()}
-    set {_customDomain = newValue}
-  }
-  /// Returns true if `customDomain` has been explicitly set.
-  public var hasCustomDomain: Bool {self._customDomain != nil}
-  /// Clears the value of `customDomain`. Subsequent reads from it will return its default value.
-  public mutating func clearCustomDomain() {self._customDomain = nil}
-
-  /// Optional. A unique identifier for the custom domain. If not provided,
-  /// the server will generate one.
-  public var customDomainID: String = String()
-
-  /// Optional. If set to true, the request will only validate the request
-  /// without persisting it.
-  public var validateOnly: Bool = false
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _customDomain: Pivox_Api_V1_CustomDomain? = nil
-}
-
-/// A status object which is used as the `metadata` field for the Operation
-/// returned by CreateCustomDomain.
-public struct Pivox_Api_V1_CreateCustomDomainMetadata: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-/// The request sent to the
-/// [DeleteCustomDomain][pivox.api.v1.Organizations.DeleteCustomDomain]
-/// method.
-public struct Pivox_Api_V1_DeleteCustomDomainRequest: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  /// Required. The resource name of the custom domain to delete. Format:
-  /// `organizations/{organization}/customDomains/{custom_domain}`
-  public var name: String = String()
-
-  /// Optional. The etag known to the client for the expected state of the
-  /// custom domain. This is to be used for optimistic concurrency.
-  public var etag: String = String()
-
-  /// Optional. If set to true, the request will only validate the request
-  /// without persisting it.
-  public var validateOnly: Bool = false
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
 /// A status object which is used as the `metadata` field for the Operation
 /// returned by CreateOrganization.
 public struct Pivox_Api_V1_CreateOrganizationMetadata: Sendable {
@@ -667,12 +357,159 @@ public struct Pivox_Api_V1_UpdateOrganizationMetadata: Sendable {
   public init() {}
 }
 
-/// A status object which is used as the `metadata` field for the Operation
-/// returned by DeleteCustomDomain.
-public struct Pivox_Api_V1_DeleteCustomDomainMetadata: Sendable {
+/// Request message for `Organizations.DeleteOrganization`.
+public struct Pivox_Api_V1_DeleteOrganizationRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
+
+  /// Required. The resource name of the organization to delete.
+  /// Format: `organizations/{organization}`.
+  public var name: String = String()
+
+  /// Optional. The etag known to the client for the expected state of
+  /// the organization. Used for optimistic concurrency control.
+  public var etag: String = String()
+
+  /// Optional. If true, bypasses the 30-day grace window: the LRO
+  /// synchronously cascades all child data (spaces, members, assets,
+  /// SSO config, invitations, …) and frees the slug. The org is
+  /// unrecoverable. Defaults to false (soft-delete with grace).
+  public var force: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+/// A status object used as the `metadata` field for the Operation
+/// returned by `DeleteOrganization`. Surfaces incremental progress
+/// through the soft-delete + cascade-cancellation phases.
+///
+/// For `force=false` (default), this LRO completes when the org
+/// enters `DELETE_REQUESTED`; the actual data purge happens
+/// out-of-band via the scheduled purge worker after `purge_time`.
+/// Clients polling this LRO should not expect to see the org's
+/// downstream resources gone — those linger until purge.
+///
+/// For `force=true`, the LRO drives the full cascade synchronously
+/// and only completes once child data has been purged.
+public struct Pivox_Api_V1_DeleteOrganizationMetadata: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Output only. Current phase of the cascade.
+  public var phase: Pivox_Api_V1_DeleteOrganizationMetadata.Phase = .unspecified
+
+  /// Output only. Resource name of the organization being deleted.
+  public var organization: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  /// Phases of the delete LRO.
+  public enum Phase: SwiftProtobuf.Enum, Swift.CaseIterable {
+    public typealias RawValue = Int
+
+    /// Default; not used.
+    case unspecified // = 0
+
+    /// Validating preconditions (caller is owner; org is currently
+    /// ACTIVE).
+    case validating // = 1
+
+    /// Cancelling LROs scoped to this org (in-flight asset imports,
+    /// organization updates, etc.).
+    case cancellingOperations // = 2
+
+    /// Marking the org row as soft-deleted: setting `delete_time`,
+    /// `purge_time = delete_time + 30d`, and transitioning state to
+    /// `DELETE_REQUESTED`. Soft-delete path only (`force=false`).
+    case markingDeleted // = 3
+
+    /// Synchronously cascading child data (spaces, members, assets,
+    /// SSO config, invitations, …) and freeing the slug. Force path
+    /// only (`force=true`).
+    case purging // = 5
+
+    /// Done. For soft-delete, the org is in `DELETE_REQUESTED` state
+    /// and recoverable via `UndeleteOrganization` until `purge_time`.
+    /// For force, the org row and all child data are gone.
+    case completed // = 4
+    case UNRECOGNIZED(Int)
+
+    public init() {
+      self = .unspecified
+    }
+
+    public init?(rawValue: Int) {
+      switch rawValue {
+      case 0: self = .unspecified
+      case 1: self = .validating
+      case 2: self = .cancellingOperations
+      case 3: self = .markingDeleted
+      case 4: self = .completed
+      case 5: self = .purging
+      default: self = .UNRECOGNIZED(rawValue)
+      }
+    }
+
+    public var rawValue: Int {
+      switch self {
+      case .unspecified: return 0
+      case .validating: return 1
+      case .cancellingOperations: return 2
+      case .markingDeleted: return 3
+      case .completed: return 4
+      case .purging: return 5
+      case .UNRECOGNIZED(let i): return i
+      }
+    }
+
+    // The compiler won't synthesize support with the UNRECOGNIZED case.
+    public static let allCases: [Pivox_Api_V1_DeleteOrganizationMetadata.Phase] = [
+      .unspecified,
+      .validating,
+      .cancellingOperations,
+      .markingDeleted,
+      .purging,
+      .completed,
+    ]
+
+  }
+
+  public init() {}
+}
+
+/// Request message for `Organizations.UndeleteOrganization`.
+public struct Pivox_Api_V1_UndeleteOrganizationRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Required. The resource name of the organization to restore.
+  /// Format: `organizations/{organization}`. Must currently be in
+  /// `DELETE_REQUESTED` state and within the 30-day grace window.
+  public var name: String = String()
+
+  /// Optional. The etag known to the client for the expected state of
+  /// the organization.
+  public var etag: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+/// A status object used as the `metadata` field for the Operation
+/// returned by `UndeleteOrganization`.
+public struct Pivox_Api_V1_UndeleteOrganizationMetadata: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Output only. Resource name of the organization being restored.
+  public var organization: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1394,337 +1231,6 @@ extension Pivox_Api_V1_ListOrganizationsResponse: SwiftProtobuf.Message, SwiftPr
   }
 }
 
-extension Pivox_Api_V1_CustomDomain: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".CustomDomain"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{2}\u{2}domain\0\u{1}state\0\u{3}required_dns_records\0\u{3}create_time\0\u{3}update_time\0\u{3}delete_time\0\u{3}verify_time\0\u{1}etag\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.name) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.domain) }()
-      case 4: try { try decoder.decodeSingularEnumField(value: &self.state) }()
-      case 5: try { try decoder.decodeRepeatedMessageField(value: &self.requiredDnsRecords) }()
-      case 6: try { try decoder.decodeSingularMessageField(value: &self._createTime) }()
-      case 7: try { try decoder.decodeSingularMessageField(value: &self._updateTime) }()
-      case 8: try { try decoder.decodeSingularMessageField(value: &self._deleteTime) }()
-      case 9: try { try decoder.decodeSingularMessageField(value: &self._verifyTime) }()
-      case 10: try { try decoder.decodeSingularStringField(value: &self.etag) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.name.isEmpty {
-      try visitor.visitSingularStringField(value: self.name, fieldNumber: 1)
-    }
-    if !self.domain.isEmpty {
-      try visitor.visitSingularStringField(value: self.domain, fieldNumber: 3)
-    }
-    if self.state != .unspecified {
-      try visitor.visitSingularEnumField(value: self.state, fieldNumber: 4)
-    }
-    if !self.requiredDnsRecords.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.requiredDnsRecords, fieldNumber: 5)
-    }
-    try { if let v = self._createTime {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
-    } }()
-    try { if let v = self._updateTime {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
-    } }()
-    try { if let v = self._deleteTime {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
-    } }()
-    try { if let v = self._verifyTime {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
-    } }()
-    if !self.etag.isEmpty {
-      try visitor.visitSingularStringField(value: self.etag, fieldNumber: 10)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Pivox_Api_V1_CustomDomain, rhs: Pivox_Api_V1_CustomDomain) -> Bool {
-    if lhs.name != rhs.name {return false}
-    if lhs.domain != rhs.domain {return false}
-    if lhs.state != rhs.state {return false}
-    if lhs.requiredDnsRecords != rhs.requiredDnsRecords {return false}
-    if lhs._createTime != rhs._createTime {return false}
-    if lhs._updateTime != rhs._updateTime {return false}
-    if lhs._deleteTime != rhs._deleteTime {return false}
-    if lhs._verifyTime != rhs._verifyTime {return false}
-    if lhs.etag != rhs.etag {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension Pivox_Api_V1_CustomDomain.State: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0STATE_UNSPECIFIED\0\u{1}PENDING\0\u{1}PROVISIONING\0\u{1}ACTIVE\0\u{1}FAILED\0\u{1}DEACTIVATED\0")
-}
-
-extension Pivox_Api_V1_DnsRecord: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".DnsRecord"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{1}host\0\u{1}value\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.type) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.host) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.value) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.type.isEmpty {
-      try visitor.visitSingularStringField(value: self.type, fieldNumber: 1)
-    }
-    if !self.host.isEmpty {
-      try visitor.visitSingularStringField(value: self.host, fieldNumber: 2)
-    }
-    if !self.value.isEmpty {
-      try visitor.visitSingularStringField(value: self.value, fieldNumber: 3)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Pivox_Api_V1_DnsRecord, rhs: Pivox_Api_V1_DnsRecord) -> Bool {
-    if lhs.type != rhs.type {return false}
-    if lhs.host != rhs.host {return false}
-    if lhs.value != rhs.value {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension Pivox_Api_V1_GetCustomDomainRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".GetCustomDomainRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.name) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.name.isEmpty {
-      try visitor.visitSingularStringField(value: self.name, fieldNumber: 1)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Pivox_Api_V1_GetCustomDomainRequest, rhs: Pivox_Api_V1_GetCustomDomainRequest) -> Bool {
-    if lhs.name != rhs.name {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension Pivox_Api_V1_ListCustomDomainsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ListCustomDomainsRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}parent\0\u{3}page_size\0\u{3}page_token\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.parent) }()
-      case 2: try { try decoder.decodeSingularInt32Field(value: &self.pageSize) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.pageToken) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.parent.isEmpty {
-      try visitor.visitSingularStringField(value: self.parent, fieldNumber: 1)
-    }
-    if self.pageSize != 0 {
-      try visitor.visitSingularInt32Field(value: self.pageSize, fieldNumber: 2)
-    }
-    if !self.pageToken.isEmpty {
-      try visitor.visitSingularStringField(value: self.pageToken, fieldNumber: 3)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Pivox_Api_V1_ListCustomDomainsRequest, rhs: Pivox_Api_V1_ListCustomDomainsRequest) -> Bool {
-    if lhs.parent != rhs.parent {return false}
-    if lhs.pageSize != rhs.pageSize {return false}
-    if lhs.pageToken != rhs.pageToken {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension Pivox_Api_V1_ListCustomDomainsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ListCustomDomainsResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}custom_domains\0\u{3}next_page_token\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.customDomains) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.nextPageToken) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.customDomains.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.customDomains, fieldNumber: 1)
-    }
-    if !self.nextPageToken.isEmpty {
-      try visitor.visitSingularStringField(value: self.nextPageToken, fieldNumber: 2)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Pivox_Api_V1_ListCustomDomainsResponse, rhs: Pivox_Api_V1_ListCustomDomainsResponse) -> Bool {
-    if lhs.customDomains != rhs.customDomains {return false}
-    if lhs.nextPageToken != rhs.nextPageToken {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension Pivox_Api_V1_CreateCustomDomainRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".CreateCustomDomainRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}parent\0\u{3}custom_domain\0\u{3}custom_domain_id\0\u{3}validate_only\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.parent) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._customDomain) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.customDomainID) }()
-      case 4: try { try decoder.decodeSingularBoolField(value: &self.validateOnly) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.parent.isEmpty {
-      try visitor.visitSingularStringField(value: self.parent, fieldNumber: 1)
-    }
-    try { if let v = self._customDomain {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
-    if !self.customDomainID.isEmpty {
-      try visitor.visitSingularStringField(value: self.customDomainID, fieldNumber: 3)
-    }
-    if self.validateOnly != false {
-      try visitor.visitSingularBoolField(value: self.validateOnly, fieldNumber: 4)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Pivox_Api_V1_CreateCustomDomainRequest, rhs: Pivox_Api_V1_CreateCustomDomainRequest) -> Bool {
-    if lhs.parent != rhs.parent {return false}
-    if lhs._customDomain != rhs._customDomain {return false}
-    if lhs.customDomainID != rhs.customDomainID {return false}
-    if lhs.validateOnly != rhs.validateOnly {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension Pivox_Api_V1_CreateCustomDomainMetadata: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".CreateCustomDomainMetadata"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    // Load everything into unknown fields
-    while try decoder.nextFieldNumber() != nil {}
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Pivox_Api_V1_CreateCustomDomainMetadata, rhs: Pivox_Api_V1_CreateCustomDomainMetadata) -> Bool {
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension Pivox_Api_V1_DeleteCustomDomainRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".DeleteCustomDomainRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}etag\0\u{3}validate_only\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.name) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.etag) }()
-      case 3: try { try decoder.decodeSingularBoolField(value: &self.validateOnly) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.name.isEmpty {
-      try visitor.visitSingularStringField(value: self.name, fieldNumber: 1)
-    }
-    if !self.etag.isEmpty {
-      try visitor.visitSingularStringField(value: self.etag, fieldNumber: 2)
-    }
-    if self.validateOnly != false {
-      try visitor.visitSingularBoolField(value: self.validateOnly, fieldNumber: 3)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Pivox_Api_V1_DeleteCustomDomainRequest, rhs: Pivox_Api_V1_DeleteCustomDomainRequest) -> Bool {
-    if lhs.name != rhs.name {return false}
-    if lhs.etag != rhs.etag {return false}
-    if lhs.validateOnly != rhs.validateOnly {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
 extension Pivox_Api_V1_CreateOrganizationMetadata: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CreateOrganizationMetadata"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
@@ -1763,20 +1269,145 @@ extension Pivox_Api_V1_UpdateOrganizationMetadata: SwiftProtobuf.Message, SwiftP
   }
 }
 
-extension Pivox_Api_V1_DeleteCustomDomainMetadata: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".DeleteCustomDomainMetadata"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+extension Pivox_Api_V1_DeleteOrganizationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DeleteOrganizationRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}etag\0\u{1}force\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    // Load everything into unknown fields
-    while try decoder.nextFieldNumber() != nil {}
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.etag) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.force) }()
+      default: break
+      }
+    }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 1)
+    }
+    if !self.etag.isEmpty {
+      try visitor.visitSingularStringField(value: self.etag, fieldNumber: 2)
+    }
+    if self.force != false {
+      try visitor.visitSingularBoolField(value: self.force, fieldNumber: 3)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Pivox_Api_V1_DeleteCustomDomainMetadata, rhs: Pivox_Api_V1_DeleteCustomDomainMetadata) -> Bool {
+  public static func ==(lhs: Pivox_Api_V1_DeleteOrganizationRequest, rhs: Pivox_Api_V1_DeleteOrganizationRequest) -> Bool {
+    if lhs.name != rhs.name {return false}
+    if lhs.etag != rhs.etag {return false}
+    if lhs.force != rhs.force {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Pivox_Api_V1_DeleteOrganizationMetadata: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DeleteOrganizationMetadata"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}phase\0\u{1}organization\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.phase) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.organization) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.phase != .unspecified {
+      try visitor.visitSingularEnumField(value: self.phase, fieldNumber: 1)
+    }
+    if !self.organization.isEmpty {
+      try visitor.visitSingularStringField(value: self.organization, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Pivox_Api_V1_DeleteOrganizationMetadata, rhs: Pivox_Api_V1_DeleteOrganizationMetadata) -> Bool {
+    if lhs.phase != rhs.phase {return false}
+    if lhs.organization != rhs.organization {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Pivox_Api_V1_DeleteOrganizationMetadata.Phase: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0PHASE_UNSPECIFIED\0\u{1}VALIDATING\0\u{1}CANCELLING_OPERATIONS\0\u{1}MARKING_DELETED\0\u{1}COMPLETED\0\u{1}PURGING\0")
+}
+
+extension Pivox_Api_V1_UndeleteOrganizationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".UndeleteOrganizationRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}etag\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.etag) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 1)
+    }
+    if !self.etag.isEmpty {
+      try visitor.visitSingularStringField(value: self.etag, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Pivox_Api_V1_UndeleteOrganizationRequest, rhs: Pivox_Api_V1_UndeleteOrganizationRequest) -> Bool {
+    if lhs.name != rhs.name {return false}
+    if lhs.etag != rhs.etag {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Pivox_Api_V1_UndeleteOrganizationMetadata: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".UndeleteOrganizationMetadata"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}organization\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.organization) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.organization.isEmpty {
+      try visitor.visitSingularStringField(value: self.organization, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Pivox_Api_V1_UndeleteOrganizationMetadata, rhs: Pivox_Api_V1_UndeleteOrganizationMetadata) -> Bool {
+    if lhs.organization != rhs.organization {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

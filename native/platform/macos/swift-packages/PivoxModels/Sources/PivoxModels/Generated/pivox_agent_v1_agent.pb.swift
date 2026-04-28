@@ -715,8 +715,8 @@ public struct Pivox_Agent_V1_HandshakeAck: Sendable {
 
   /// Full set of denied access patterns. Requests matching any pattern
   /// are rejected with 404. Patterns use glob syntax (e.g.
-  /// "projects/proj1/*" denies all assets in a deleted project,
-  /// "projects/proj1/assets/abc123/*" denies a single deleted asset).
+  /// "spaces/space1/*" denies all assets in a deleted space,
+  /// "spaces/space1/assets/abc123/*" denies a single deleted asset).
   /// The agent persists these in local SQLite for crash resilience.
   public var deniedPatterns: [String] = []
 

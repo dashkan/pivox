@@ -1,5 +1,5 @@
--- Projects (1-2 per org, all org-parented)
-INSERT INTO projects (id, org_id, name, display_name, labels, create_time, update_time) VALUES
+-- Spaces (1-2 per org, all org-parented)
+INSERT INTO spaces (id, org_id, name, display_name, labels, create_time, update_time) VALUES
     -- Meridian Broadcasting
     ('0192a000-0003-7000-8000-000000310001', '0192a000-0001-7000-8000-000000000001', 'corp-site',     'Corporate Website',    '{"env":"production","team":"web"}',    '2025-03-15 08:00:00+00', '2025-07-01 10:00:00+00'),
     ('0192a000-0003-7000-8000-000000310002', '0192a000-0001-7000-8000-000000000001', 'internal-tools', 'Internal Tools',       '{"env":"production","team":"ops"}',    '2025-03-18 10:00:00+00', '2025-08-15 12:00:00+00'),
@@ -23,4 +23,4 @@ INSERT INTO projects (id, org_id, name, display_name, labels, create_time, updat
     ('0192a000-0003-7000-8000-0000003a0001', '0192a000-0001-7000-8000-00000000000a', 'showcase',      'Starlight Showcase',   '{"env":"production"}',                 '2025-10-05 08:00:00+00', '2026-02-20 10:00:00+00');
 
 -- Soft-delete one project for filter testing
-UPDATE projects SET state = 'DELETE_REQUESTED', delete_time = '2026-02-01 15:00:00+00', deleted_by = 'admin@meridian.example' WHERE id = '0192a000-0003-7000-8000-000000310002';
+UPDATE spaces SET state = 'DELETE_REQUESTED', delete_time = '2026-02-01 15:00:00+00', deleted_by = 'admin@meridian.example' WHERE id = '0192a000-0003-7000-8000-000000310002';

@@ -435,7 +435,7 @@ extension Pivox_Storage_V1_StorageGateways {
         /// > Source IDL Documentation:
         /// >
         /// > Creates a storage session for the authenticated user. Computes
-        /// > access patterns based on the user's org and project memberships,
+        /// > access patterns based on the user's org and space memberships,
         /// > pushes session grants to connected gateways, and returns a JWT
         /// > cookie for browser-based storage access.
         /// > 
@@ -815,7 +815,7 @@ extension Pivox_Storage_V1_StorageGateways {
         /// > Source IDL Documentation:
         /// >
         /// > Creates a storage session for the authenticated user. Computes
-        /// > access patterns based on the user's org and project memberships,
+        /// > access patterns based on the user's org and space memberships,
         /// > pushes session grants to connected gateways, and returns a JWT
         /// > cookie for browser-based storage access.
         /// > 
@@ -1145,7 +1145,7 @@ extension Pivox_Storage_V1_StorageGateways.ClientProtocol {
     /// > Source IDL Documentation:
     /// >
     /// > Creates a storage session for the authenticated user. Computes
-    /// > access patterns based on the user's org and project memberships,
+    /// > access patterns based on the user's org and space memberships,
     /// > pushes session grants to connected gateways, and returns a JWT
     /// > cookie for browser-based storage access.
     /// > 
@@ -1505,7 +1505,7 @@ extension Pivox_Storage_V1_StorageGateways.ClientProtocol {
     /// > Source IDL Documentation:
     /// >
     /// > Creates a storage session for the authenticated user. Computes
-    /// > access patterns based on the user's org and project memberships,
+    /// > access patterns based on the user's org and space memberships,
     /// > pushes session grants to connected gateways, and returns a JWT
     /// > cookie for browser-based storage access.
     /// > 

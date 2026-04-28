@@ -42,7 +42,7 @@ public struct Pivox_Api_V1_TagKey: Sendable {
 
   /// Immutable. The resource name for a TagKey. Must be in the format
   /// `organizations/{organization}/tagKeys/{tag_key}` or
-  /// `organizations/{organization}/projects/{project}/tagKeys/{tag_key}`.
+  /// `organizations/{organization}/spaces/{space}/tagKeys/{tag_key}`.
   public var name: String = String()
 
   /// Optional. User-assigned description of the TagKey. Must not exceed 256
@@ -96,7 +96,7 @@ public struct Pivox_Api_V1_ListTagKeysRequest: Sendable {
 
   /// Required. The resource name of the TagKey's parent.
   /// Must be of the form `organizations/{org_id}` or
-  /// `organizations/{org_id}/projects/{project_id}`.
+  /// `organizations/{org_id}/spaces/{space_id}`.
   public var parent: String = String()
 
   /// Optional. The maximum number of TagKeys to return in the response. The
@@ -180,7 +180,7 @@ public struct Pivox_Api_V1_CreateTagKeyRequest: Sendable {
 
   /// Required. The resource name of the parent. Must be of the form
   /// `organizations/{org_id}` or
-  /// `organizations/{org_id}/projects/{project_id}`.
+  /// `organizations/{org_id}/spaces/{space_id}`.
   public var parent: String = String()
 
   /// Required. The TagKey to be created. Only fields `description`

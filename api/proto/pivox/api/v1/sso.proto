@@ -1,0 +1,349 @@
+// Copyright 2025 Pivox
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package pivox.api.v1;
+
+import "buf/validate/validate.proto";
+import "google/api/annotations.proto";
+import "google/api/client.proto";
+import "google/api/field_behavior.proto";
+import "google/api/resource.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "pivox/api/v1;apiv1";
+
+// Sso is a small, pre-authentication service that hosts the lookup
+// front-channel (`Resolve`) used by the sign-in screen before any
+// user identity exists. Authenticated SSO config CRUD lives on the
+// Organizations service (Get/UpdateSsoConfig) — that's an AIP-156
+// singleton sub-resource of Organization.
+//
+// Security profile (uniform across this service):
+//   - No Firebase auth required (callers don't have an identity yet).
+//   - Per-IP rate-limited at the middleware layer; surfaces as
+//     RESOURCE_EXHAUSTED.
+//   - Information-disclosure aware: returns NOT_FOUND for unknown
+//     domains rather than echoing details back.
+service Sso {
+  option (google.api.default_host) = "api.pivox.io";
+
+  // Maps an email address to its SSO provider id, if any. Used by the
+  // sign-in screen to decide whether to redirect the user to an
+  // identity provider before attempting password sign-in.
+  //
+  // Returns NOT_FOUND if no SSO is configured for the email's domain
+  // (or if the SsoConfig is `enabled=false`). Returns RESOURCE_EXHAUSTED
+  // if the caller is over the per-IP rate limit.
+  //
+  // (-- api-linter: core::0136::http-uri-suffix=disabled
+  //     aip.dev/not-precedent: ResolveProvider is a service-level
+  //     (collection-less) custom method; the URL pattern intentionally
+  //     has no parent. --)
+  rpc ResolveProvider(ResolveProviderRequest) returns (ResolveProviderResponse) {
+    option (google.api.http) = {
+      post: "/v1/sso:resolveProvider"
+      body: "*"
+    };
+  }
+}
+
+// SsoConfig is the per-organization SSO/IDP configuration. AIP-156
+// singleton sub-resource of Organization — there is at most one
+// SsoConfig per org, addressable at `organizations/{org}/ssoConfig`.
+//
+// Get/Update RPCs live on the Organizations service (this is the
+// resource definition and request shapes only). Phase 4 wires server-
+// side encryption: client_secret travels cleartext over TLS, the
+// server envelope-encrypts it via Cloud KMS before persisting.
+message SsoConfig {
+  option (google.api.resource) = {
+    type: "pivox.api/SsoConfig"
+    pattern: "organizations/{organization}/ssoConfig"
+    plural: "ssoConfigs"
+    singular: "ssoConfig"
+  };
+
+  // The resource name of the SsoConfig. Format:
+  // `organizations/{organization}/ssoConfig`.
+  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Output only. The Firebase Auth provider id. Server-managed; the
+  // server creates / updates the underlying Firebase provider config
+  // when this SsoConfig is updated. Format: `oidc.<slug>` for OIDC,
+  // `saml.<slug>` for SAML.
+  string firebase_provider_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Required. Human-readable display name shown on the sign-in
+  // screen and in the Firebase console.
+  string display_name = 3 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).string = {
+      min_len: 1
+      max_len: 63
+    }
+  ];
+
+  // Optional. Whether SSO is currently active. When `false`, the
+  // SsoConfig remains stored but `Sso.ResolveProvider` returns
+  // NOT_FOUND for the org's domains and no Firebase provider is
+  // exposed.
+  bool enabled = 4 [(google.api.field_behavior) = OPTIONAL];
+
+  // Required. The provider type and its configuration. Exactly one
+  // of `oidc` or `saml` is set; enforced by the protobuf wire format.
+  oneof config {
+    // OIDC provider configuration. Set when the IDP supports OAuth
+    // 2.0 / OpenID Connect.
+    OidcConfig oidc = 5;
+
+    // SAML 2.0 provider configuration. Set when the IDP only speaks
+    // SAML.
+    SamlConfig saml = 6;
+  }
+
+  // Optional. Domains owned by this organization that route to this
+  // SsoConfig. Each domain carries its own verification state (DNS TXT
+  // challenge); only `VERIFIED` domains participate in
+  // `Sso.ResolveProvider` lookups.
+  repeated VerifiedDomain verified_domains = 7 [(google.api.field_behavior) = OPTIONAL];
+
+  // Output only. Timestamp when the SsoConfig was created.
+  google.protobuf.Timestamp create_time = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Timestamp when the SsoConfig was last modified.
+  google.protobuf.Timestamp update_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. A checksum computed by the server based on the
+  // current value of the SsoConfig resource.
+  string etag = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// OIDC provider configuration. Maps onto Firebase Admin SDK's
+// `OIDCProviderConfig` shape — server reads these fields and calls
+// `CreateOIDCProviderConfig` / `UpdateOIDCProviderConfig` against
+// Firebase Auth on Update.
+message OidcConfig {
+  // Required. The IDP issuer URL. Must support OIDC discovery at
+  // `<issuer>/.well-known/openid-configuration`. Example:
+  // `https://accounts.google.com` or
+  // `https://example.okta.com/oauth2/default`.
+  string issuer = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).cel = {
+      id: "valid_issuer_url"
+      message: "issuer must be a valid HTTPS URL"
+      expression: "this.matches('^https://')"
+    }
+  ];
+
+  // Required. The OAuth 2.0 client ID registered with the IDP for
+  // this Pivox organization.
+  string client_id = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).string.min_len = 1
+  ];
+
+  // Optional on read; the server returns this field empty (the actual
+  // value is encrypted at rest and never returned to clients). Set on
+  // Update via the `update_mask`. Only required when using the
+  // authorization-code flow (response_type.code = true).
+  //
+  // Travels cleartext over TLS to the server, which envelope-encrypts
+  // it via Cloud KMS before persisting.
+  string client_secret = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Required. The OIDC response type the IDP returns to Firebase
+  // Auth's callback. Most production setups use `code` (authorization-
+  // code flow with `client_secret`). `id_token` is the implicit flow
+  // and does not require a secret.
+  ResponseType response_type = 4 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true
+  ];
+
+  // OIDC response_type bitfield. Maps directly onto Firebase Admin
+  // SDK's `OIDCProviderConfig.ResponseType` struct.
+  message ResponseType {
+    // Optional. Authorization-code flow. Requires `client_secret`.
+    bool code = 1 [(google.api.field_behavior) = OPTIONAL];
+
+    // Optional. Implicit flow with id_token only. No `client_secret`
+    // needed.
+    bool id_token = 2 [(google.api.field_behavior) = OPTIONAL];
+  }
+}
+
+// SAML provider configuration. Maps onto Firebase Admin SDK's
+// `SAMLProviderConfig` shape — server reads these fields and calls
+// `CreateSAMLProviderConfig` / `UpdateSAMLProviderConfig` against
+// Firebase Auth on Update.
+//
+// `rp_entity_id` and `callback_url` are output-only — the server
+// derives them from the org's resource name and Firebase Auth's
+// hosted callback endpoint, respectively.
+message SamlConfig {
+  // Required. The IDP entity ID. Found in the IDP's SAML metadata
+  // under the root `EntityDescriptor[entityID]` attribute.
+  string idp_entity_id = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).string.min_len = 1
+  ];
+
+  // Required. The IDP's single-sign-on URL. Found in the IDP's SAML
+  // metadata under `SingleSignOnService[Binding=HTTP-POST].Location`.
+  string sso_url = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).string.min_len = 1
+  ];
+
+  // Required. PEM-encoded X.509 certificates the IDP uses to sign
+  // SAML responses. At least one is required; multiple may be
+  // provided during cert rotation.
+  repeated string x509_certificates = 3 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).repeated = {
+      min_items: 1
+      max_items: 5
+      items: {
+        string: {min_len: 1}
+      }
+    }
+  ];
+
+  // Optional. Whether the IDP requires the SP (Pivox/Firebase) to
+  // sign AuthnRequests. Set this to match the IDP's
+  // `WantAuthnRequestsSigned` metadata flag.
+  bool request_signing_enabled = 4 [(google.api.field_behavior) = OPTIONAL];
+
+  // Output only. The relying-party entity ID Pivox uses with this
+  // IDP. Server-derived from the org's resource name; configure your
+  // IDP to expect this value.
+  string rp_entity_id = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The Pivox/Firebase callback URL (ACS endpoint) the
+  // IDP should redirect to after authentication. Server-derived from
+  // the Firebase Auth project's hosted handler.
+  string callback_url = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// VerifiedDomain ties a domain (e.g. `acme.com`) to an SsoConfig and
+// tracks its DNS-TXT-record verification state. Only `VERIFIED`
+// domains participate in `Sso.Resolve` lookups.
+message VerifiedDomain {
+  // Required on Create. The fully qualified domain. Must be a valid
+  // DNS name; case-insensitive on read.
+  string domain = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).cel = {
+      id: "valid_domain"
+      message: "must be a valid domain name"
+      expression: "this.matches('^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\\\.)+[a-zA-Z]{2,}$')"
+    }
+  ];
+
+  // The lifecycle state of this domain's verification.
+  enum State {
+    // Default. Not used.
+    STATE_UNSPECIFIED = 0;
+
+    // Domain added; awaiting DNS TXT record. Server polls
+    // periodically until the record is observed (or the request
+    // expires).
+    PENDING = 1;
+
+    // DNS TXT record observed and matches `verification_token`.
+    // Domain participates in `Sso.Resolve`.
+    VERIFIED = 2;
+
+    // Verification failed (token mismatch or expired window). Caller
+    // can retry by reissuing the domain via Update.
+    FAILED = 3;
+  }
+
+  // Output only. Current verification state.
+  State state = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The DNS TXT record value the domain owner must
+  // publish at `_pivox-sso.<domain>` to prove ownership. Generated
+  // when the domain enters `PENDING`.
+  string verification_token = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Timestamp when the domain transitioned to `VERIFIED`,
+  // or unset if it has never verified successfully.
+  google.protobuf.Timestamp verified_time = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Request message for `Organizations.GetSsoConfig`.
+message GetSsoConfigRequest {
+  // Required. The resource name of the SsoConfig.
+  // Format: `organizations/{organization}/ssoConfig`.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.api/SsoConfig"},
+    (buf.validate.field).required = true
+  ];
+}
+
+// Request message for `Organizations.UpdateSsoConfig`.
+//
+// Updates the per-organization SSO/IDP configuration. The server
+// applies changes by calling Firebase Auth Admin SDK to update the
+// underlying provider config, then persists the local SsoConfig row.
+// `client_secret` is encrypted at rest via Cloud KMS before storage.
+//
+// (-- api-linter: core::0134::response-message-name=disabled
+//     aip.dev/not-precedent: UpdateSsoConfig is an AIP-156 singleton
+//     sub-resource update; returning the singleton is correct. --)
+message UpdateSsoConfigRequest {
+  // Required. The new definition of the SsoConfig. The `name` field
+  // must be set to identify the SsoConfig to update.
+  SsoConfig sso_config = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. The fields to update. If omitted, all mutable fields
+  // are updated.
+  google.protobuf.FieldMask update_mask = 2 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// Request message for `Sso.ResolveProvider`.
+message ResolveProviderRequest {
+  // Required. The email address being signed in with. The server
+  // extracts the domain (right of `@`) and looks up the verified
+  // domain → SsoConfig mapping.
+  string email = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).string = {
+      email: true
+      max_len: 254
+    }
+  ];
+}
+
+// Response message for `Sso.ResolveProvider`.
+message ResolveProviderResponse {
+  // The Firebase Auth provider id to redirect the user to. Format:
+  // `oidc.<slug>` or `saml.<slug>`. Empty if no provider is
+  // configured (the server returns NOT_FOUND in that case rather
+  // than an empty string).
+  string firebase_provider_id = 1;
+
+  // Human-readable label for the IDP, suitable for showing on the
+  // sign-in screen (e.g. "Sign in with Acme").
+  string display_name = 2;
+}

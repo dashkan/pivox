@@ -35,7 +35,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 }
 
 /// A user within an organization. Users are synced from Firebase Auth and
-/// are read-only through this API.
+/// are read-only via `Iam.GetUser` / `Iam.ListUsers`.
 public struct Pivox_Iam_V1_User: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -103,7 +103,7 @@ public struct Pivox_Iam_V1_User: Sendable {
   fileprivate var _lastLoginTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
 
-/// Request message for `GetUser`.
+/// Request message for `Iam.GetUser`.
 public struct Pivox_Iam_V1_GetUserRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -118,7 +118,7 @@ public struct Pivox_Iam_V1_GetUserRequest: Sendable {
   public init() {}
 }
 
-/// Request message for `ListUsers`.
+/// Request message for `Iam.ListUsers`.
 public struct Pivox_Iam_V1_ListUsersRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -166,7 +166,7 @@ public struct Pivox_Iam_V1_ListUsersRequest: Sendable {
   public init() {}
 }
 
-/// Response message for `ListUsers`.
+/// Response message for `Iam.ListUsers`.
 public struct Pivox_Iam_V1_ListUsersResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -179,6 +179,127 @@ public struct Pivox_Iam_V1_ListUsersResponse: Sendable {
   public var nextPageToken: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+/// Request message for `Iam.DeleteUser`.
+///
+/// Self-delete: address `organizations/{organization}/users/me`. The
+/// server resolves `me` to the authenticated caller.
+///
+/// Sole-owner blocking: if the caller is the sole `owner` of any
+/// active organization, the LRO completes with `FAILED_PRECONDITION`
+/// and a structured detail listing the blocking org names. Resolve by
+/// `TransferOwnership` (promote another member) or by deleting those
+/// orgs first.
+///
+/// Cascade order inside the LRO:
+///   1. Cancel in-flight LROs scoped to the user.
+///   2. Delete org-level Member bindings (org_members where principal = this user).
+///   3. Delete space-level Member bindings (space_members where principal = this user).
+///   4. Delete group memberships.
+///   5. Delete the User row.
+///   6. Delete the firebase_identity row.
+///   7. firebase.Auth.DeleteUser(uid) — last, so a partial failure
+///      leaves us in a recoverable state with the Firebase identity
+///      still alive.
+public struct Pivox_Iam_V1_DeleteUserRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Required. The user to delete. Format:
+  /// `organizations/{organization}/users/{user}` or
+  /// `organizations/{organization}/users/me` for self-delete.
+  public var name: String = String()
+
+  /// Optional. Etag of the user for optimistic concurrency.
+  public var etag: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+/// A status object used as the `metadata` field for the Operation
+/// returned by `Iam.DeleteUser`. Surfaces incremental progress through
+/// the cascade phases.
+public struct Pivox_Iam_V1_DeleteUserMetadata: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Output only. Current phase of the cascade.
+  public var phase: Pivox_Iam_V1_DeleteUserMetadata.Phase = .unspecified
+
+  /// Output only. Resource name of the user being deleted.
+  public var user: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  /// Output only. The phase of the cascade currently executing.
+  public enum Phase: SwiftProtobuf.Enum, Swift.CaseIterable {
+    public typealias RawValue = Int
+
+    /// Default; not used.
+    case unspecified // = 0
+
+    /// Validating preconditions (sole-owner check).
+    case validating // = 1
+
+    /// Removing role / group memberships.
+    case revokingMemberships // = 2
+
+    /// Deleting Pivox-side records.
+    case deletingPivoxRecords // = 3
+
+    /// Deleting the Firebase Auth identity (last step).
+    case deletingFirebaseIdentity // = 4
+
+    /// Done.
+    case completed // = 5
+    case UNRECOGNIZED(Int)
+
+    public init() {
+      self = .unspecified
+    }
+
+    public init?(rawValue: Int) {
+      switch rawValue {
+      case 0: self = .unspecified
+      case 1: self = .validating
+      case 2: self = .revokingMemberships
+      case 3: self = .deletingPivoxRecords
+      case 4: self = .deletingFirebaseIdentity
+      case 5: self = .completed
+      default: self = .UNRECOGNIZED(rawValue)
+      }
+    }
+
+    public var rawValue: Int {
+      switch self {
+      case .unspecified: return 0
+      case .validating: return 1
+      case .revokingMemberships: return 2
+      case .deletingPivoxRecords: return 3
+      case .deletingFirebaseIdentity: return 4
+      case .completed: return 5
+      case .UNRECOGNIZED(let i): return i
+      }
+    }
+
+    // The compiler won't synthesize support with the UNRECOGNIZED case.
+    public static let allCases: [Pivox_Iam_V1_DeleteUserMetadata.Phase] = [
+      .unspecified,
+      .validating,
+      .revokingMemberships,
+      .deletingPivoxRecords,
+      .deletingFirebaseIdentity,
+      .completed,
+    ]
+
+  }
 
   public init() {}
 }
@@ -379,4 +500,78 @@ extension Pivox_Iam_V1_ListUsersResponse: SwiftProtobuf.Message, SwiftProtobuf._
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
+}
+
+extension Pivox_Iam_V1_DeleteUserRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DeleteUserRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}etag\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.etag) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 1)
+    }
+    if !self.etag.isEmpty {
+      try visitor.visitSingularStringField(value: self.etag, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Pivox_Iam_V1_DeleteUserRequest, rhs: Pivox_Iam_V1_DeleteUserRequest) -> Bool {
+    if lhs.name != rhs.name {return false}
+    if lhs.etag != rhs.etag {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Pivox_Iam_V1_DeleteUserMetadata: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DeleteUserMetadata"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}phase\0\u{1}user\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.phase) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.user) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.phase != .unspecified {
+      try visitor.visitSingularEnumField(value: self.phase, fieldNumber: 1)
+    }
+    if !self.user.isEmpty {
+      try visitor.visitSingularStringField(value: self.user, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Pivox_Iam_V1_DeleteUserMetadata, rhs: Pivox_Iam_V1_DeleteUserMetadata) -> Bool {
+    if lhs.phase != rhs.phase {return false}
+    if lhs.user != rhs.user {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Pivox_Iam_V1_DeleteUserMetadata.Phase: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0PHASE_UNSPECIFIED\0\u{1}VALIDATING\0\u{1}REVOKING_MEMBERSHIPS\0\u{1}DELETING_PIVOX_RECORDS\0\u{1}DELETING_FIREBASE_IDENTITY\0\u{1}COMPLETED\0")
 }

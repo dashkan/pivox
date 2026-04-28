@@ -44,7 +44,7 @@ public struct Pivox_Assets_V1_Request: @unchecked Sendable {
   // methods supported on all messages.
 
   /// Output only. The resource name of the request. Format:
-  /// `organizations/{organization}/projects/{project}/requests/{request}`
+  /// `organizations/{organization}/spaces/{space}/requests/{request}`
   public var name: String {
     get {_storage._name}
     set {_uniqueStorage()._name = newValue}
@@ -350,7 +350,7 @@ public struct Pivox_Assets_V1_LineItem: Sendable {
   // methods supported on all messages.
 
   /// Output only. The resource name of the line item. Format:
-  /// `organizations/{organization}/projects/{project}/requests/{request}/lineItems/{line_item}`
+  /// `organizations/{organization}/spaces/{space}/requests/{request}/lineItems/{line_item}`
   public var name: String = String()
 
   /// Required. A human-readable name for the deliverable.
@@ -473,8 +473,8 @@ public struct Pivox_Assets_V1_CreateRequestRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Required. The parent project. Format:
-  /// `organizations/{organization}/projects/{project}`
+  /// Required. The parent space. Format:
+  /// `organizations/{organization}/spaces/{space}`
   public var parent: String = String()
 
   /// Required. The request to create. May include line items in the
@@ -529,7 +529,7 @@ public struct Pivox_Assets_V1_ListRequestsRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Required. The parent project whose requests are being listed.
+  /// Required. The parent space whose requests are being listed.
   public var parent: String = String()
 
   /// Optional. The maximum number of requests to return.
@@ -586,7 +586,7 @@ public struct Pivox_Assets_V1_ListRequestsResponse: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// The requests belonging to the specified project.
+  /// The requests belonging to the specified space.
   public var requests: [Pivox_Assets_V1_Request] = []
 
   /// A pagination token for the next page.
@@ -807,7 +807,7 @@ public struct Pivox_Assets_V1_CreateLineItemRequest: Sendable {
   // methods supported on all messages.
 
   /// Required. The parent request. Format:
-  /// `organizations/{organization}/projects/{project}/requests/{request}`
+  /// `organizations/{organization}/spaces/{space}/requests/{request}`
   public var parent: String = String()
 
   /// Required. The line item to create.

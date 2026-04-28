@@ -34,14 +34,14 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
   typealias Version = _2
 }
 
-/// A custom dashboard belonging to a project.
+/// A custom dashboard belonging to a space.
 public struct Pivox_Api_V1_Dashboard: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Immutable. The resource name of the dashboard.
-  /// Format: `organizations/{organization}/projects/{project}/dashboards/{dashboard}`
+  /// Format: `organizations/{organization}/spaces/{space}/dashboards/{dashboard}`
   public var name: String = String()
 
   /// Required. A human-readable name for the dashboard.
@@ -137,8 +137,8 @@ public struct Pivox_Api_V1_ListDashboardsRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Required. The parent project.
-  /// Format: `organizations/{organization}/projects/{project}`
+  /// Required. The parent space.
+  /// Format: `organizations/{organization}/spaces/{space}`
   public var parent: String = String()
 
   /// Optional. Maximum number of dashboards to return.
@@ -184,7 +184,7 @@ public struct Pivox_Api_V1_ListDashboardsResponse: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// The dashboards in the project.
+  /// The dashboards in the space.
   public var dashboards: [Pivox_Api_V1_Dashboard] = []
 
   /// Token for the next page of results.
@@ -215,8 +215,8 @@ public struct Pivox_Api_V1_CreateDashboardRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Required. The parent project.
-  /// Format: `organizations/{organization}/projects/{project}`
+  /// Required. The parent space.
+  /// Format: `organizations/{organization}/spaces/{space}`
   public var parent: String = String()
 
   /// Required. The dashboard to create.

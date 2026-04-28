@@ -323,7 +323,7 @@ extension Pivox_Assets_V1_Requests {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Manages asset requests within a project. Requests represent the
+    /// > Manages asset requests within a space. Requests represent the
     /// > order workflow: a producer creates a request describing needed
     /// > assets, optionally assigns an artist, the artist delivers assets
     /// > for each line item, and the producer approves or requests revisions.
@@ -336,12 +336,12 @@ extension Pivox_Assets_V1_Requests {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Creates a new request in the specified project. Line items can be
+        /// > Creates a new request in the specified space. Line items can be
         /// > included in the request body — each line item creates a
-        /// > PLACEHOLDER asset in the project.
+        /// > PLACEHOLDER asset in the space.
         /// > 
         /// > The caller must have `assets.requests.create` permission on the
-        /// > parent project.
+        /// > parent space.
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Pivox_Assets_V1_CreateRequestRequest` message.
@@ -387,7 +387,7 @@ extension Pivox_Assets_V1_Requests {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Lists requests in a project.
+        /// > Lists requests in a space.
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Pivox_Assets_V1_ListRequestsRequest` message.
@@ -686,7 +686,7 @@ extension Pivox_Assets_V1_Requests {
         /// > Source IDL Documentation:
         /// >
         /// > Creates a new line item on a request. A PLACEHOLDER asset is
-        /// > created in the project and linked to the line item.
+        /// > created in the space and linked to the line item.
         /// > 
         /// > The caller must have `assets.lineItems.create` permission.
         ///
@@ -836,7 +836,7 @@ extension Pivox_Assets_V1_Requests {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Manages asset requests within a project. Requests represent the
+    /// > Manages asset requests within a space. Requests represent the
     /// > order workflow: a producer creates a request describing needed
     /// > assets, optionally assigns an artist, the artist delivers assets
     /// > for each line item, and the producer approves or requests revisions.
@@ -859,12 +859,12 @@ extension Pivox_Assets_V1_Requests {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Creates a new request in the specified project. Line items can be
+        /// > Creates a new request in the specified space. Line items can be
         /// > included in the request body — each line item creates a
-        /// > PLACEHOLDER asset in the project.
+        /// > PLACEHOLDER asset in the space.
         /// > 
         /// > The caller must have `assets.requests.create` permission on the
-        /// > parent project.
+        /// > parent space.
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Pivox_Assets_V1_CreateRequestRequest` message.
@@ -932,7 +932,7 @@ extension Pivox_Assets_V1_Requests {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Lists requests in a project.
+        /// > Lists requests in a space.
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Pivox_Assets_V1_ListRequestsRequest` message.
@@ -1352,7 +1352,7 @@ extension Pivox_Assets_V1_Requests {
         /// > Source IDL Documentation:
         /// >
         /// > Creates a new line item on a request. A PLACEHOLDER asset is
-        /// > created in the project and linked to the line item.
+        /// > created in the space and linked to the line item.
         /// > 
         /// > The caller must have `assets.lineItems.create` permission.
         ///
@@ -1568,12 +1568,12 @@ extension Pivox_Assets_V1_Requests.ClientProtocol {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Creates a new request in the specified project. Line items can be
+    /// > Creates a new request in the specified space. Line items can be
     /// > included in the request body — each line item creates a
-    /// > PLACEHOLDER asset in the project.
+    /// > PLACEHOLDER asset in the space.
     /// > 
     /// > The caller must have `assets.requests.create` permission on the
-    /// > parent project.
+    /// > parent space.
     ///
     /// - Parameters:
     ///   - request: A request containing a single `Pivox_Assets_V1_CreateRequestRequest` message.
@@ -1631,7 +1631,7 @@ extension Pivox_Assets_V1_Requests.ClientProtocol {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Lists requests in a project.
+    /// > Lists requests in a space.
     ///
     /// - Parameters:
     ///   - request: A request containing a single `Pivox_Assets_V1_ListRequestsRequest` message.
@@ -1996,7 +1996,7 @@ extension Pivox_Assets_V1_Requests.ClientProtocol {
     /// > Source IDL Documentation:
     /// >
     /// > Creates a new line item on a request. A PLACEHOLDER asset is
-    /// > created in the project and linked to the line item.
+    /// > created in the space and linked to the line item.
     /// > 
     /// > The caller must have `assets.lineItems.create` permission.
     ///
@@ -2181,12 +2181,12 @@ extension Pivox_Assets_V1_Requests.ClientProtocol {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Creates a new request in the specified project. Line items can be
+    /// > Creates a new request in the specified space. Line items can be
     /// > included in the request body — each line item creates a
-    /// > PLACEHOLDER asset in the project.
+    /// > PLACEHOLDER asset in the space.
     /// > 
     /// > The caller must have `assets.requests.create` permission on the
-    /// > parent project.
+    /// > parent space.
     ///
     /// - Parameters:
     ///   - message: request message to send.
@@ -2252,7 +2252,7 @@ extension Pivox_Assets_V1_Requests.ClientProtocol {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Lists requests in a project.
+    /// > Lists requests in a space.
     ///
     /// - Parameters:
     ///   - message: request message to send.
@@ -2661,7 +2661,7 @@ extension Pivox_Assets_V1_Requests.ClientProtocol {
     /// > Source IDL Documentation:
     /// >
     /// > Creates a new line item on a request. A PLACEHOLDER asset is
-    /// > created in the project and linked to the line item.
+    /// > created in the space and linked to the line item.
     /// > 
     /// > The caller must have `assets.lineItems.create` permission.
     ///

@@ -58,7 +58,7 @@ Resource paths: `organizations/{org}/spaces/{space}/...`. Service: `Spaces`.
 
 ### Lifecycle
 
-**`DeleteOrganization` LRO** — soft delete (`delete_time` set, `purge_time = delete_time + 30d`), then purge. Triggered by any owner with slug-typed confirmation. RPC boundary gates org-scoped calls; child resources untouched (no cascade soft-delete). FAILED_PRECONDITION on active playout / pending LROs / outstanding billing.
+**`DeleteOrganization` LRO** — soft delete (`delete_time` set, `purge_time = delete_time + 30d`), then purge. Caller must hold the `owner` role; `force=true` skips the grace window and synchronously cascades. Slug-typed confirmation is a client-side UX gate (the macOS / web app forces the user to retype the slug before calling) — not a wire field, since a malicious client can craft any payload it likes. RPC boundary gates org-scoped calls; child resources untouched on soft-delete (no cascade until purge). FAILED_PRECONDITION on active playout / pending LROs / outstanding billing.
 
 **`UndeleteOrganization`** — clears `delete_time` during grace window. Revival is a feature.
 

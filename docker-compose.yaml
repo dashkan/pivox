@@ -22,6 +22,28 @@ services:
       - "9001:9001"
     volumes:
       - ./.docker/rustfs:/data
+
+  # Local Keycloak — used as a development IDP to validate Pivox SSO
+  # configuration against a real OIDC/SAML provider before we wire up
+  # Firebase Auth provider configs. Reachable via nginx at
+  # http(s)://<host>:8081/keycloak/ (admin UI at /keycloak/admin).
+  #
+  # Bootstrap admin: admin / admin (DEV ONLY — change before exposing
+  # this beyond localhost / private ngrok tunnel).
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    command: start-dev
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HTTP_RELATIVE_PATH: /keycloak
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+    ports:
+      - "8082:8080"
+    volumes:
+      - ./.docker/keycloak:/opt/keycloak/data
   # # Mac users: `brew install ollama` instead (uses Metal GPU).
   # # Linux/WSL2 users: requires nvidia-container-toolkit.
   # #   Install: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html

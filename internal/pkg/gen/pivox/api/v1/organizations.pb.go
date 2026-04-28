@@ -93,6 +93,79 @@ func (Organization_State) EnumDescriptor() ([]byte, []int) {
 	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{0, 0}
 }
 
+// Phases of the delete LRO.
+type DeleteOrganizationMetadata_Phase int32
+
+const (
+	// Default; not used.
+	DeleteOrganizationMetadata_PHASE_UNSPECIFIED DeleteOrganizationMetadata_Phase = 0
+	// Validating preconditions (caller is owner; org is currently
+	// ACTIVE).
+	DeleteOrganizationMetadata_VALIDATING DeleteOrganizationMetadata_Phase = 1
+	// Cancelling LROs scoped to this org (in-flight asset imports,
+	// organization updates, etc.).
+	DeleteOrganizationMetadata_CANCELLING_OPERATIONS DeleteOrganizationMetadata_Phase = 2
+	// Marking the org row as soft-deleted: setting `delete_time`,
+	// `purge_time = delete_time + 30d`, and transitioning state to
+	// `DELETE_REQUESTED`. Soft-delete path only (`force=false`).
+	DeleteOrganizationMetadata_MARKING_DELETED DeleteOrganizationMetadata_Phase = 3
+	// Synchronously cascading child data (spaces, members, assets,
+	// SSO config, invitations, …) and freeing the slug. Force path
+	// only (`force=true`).
+	DeleteOrganizationMetadata_PURGING DeleteOrganizationMetadata_Phase = 5
+	// Done. For soft-delete, the org is in `DELETE_REQUESTED` state
+	// and recoverable via `UndeleteOrganization` until `purge_time`.
+	// For force, the org row and all child data are gone.
+	DeleteOrganizationMetadata_COMPLETED DeleteOrganizationMetadata_Phase = 4
+)
+
+// Enum value maps for DeleteOrganizationMetadata_Phase.
+var (
+	DeleteOrganizationMetadata_Phase_name = map[int32]string{
+		0: "PHASE_UNSPECIFIED",
+		1: "VALIDATING",
+		2: "CANCELLING_OPERATIONS",
+		3: "MARKING_DELETED",
+		5: "PURGING",
+		4: "COMPLETED",
+	}
+	DeleteOrganizationMetadata_Phase_value = map[string]int32{
+		"PHASE_UNSPECIFIED":     0,
+		"VALIDATING":            1,
+		"CANCELLING_OPERATIONS": 2,
+		"MARKING_DELETED":       3,
+		"PURGING":               5,
+		"COMPLETED":             4,
+	}
+)
+
+func (x DeleteOrganizationMetadata_Phase) Enum() *DeleteOrganizationMetadata_Phase {
+	p := new(DeleteOrganizationMetadata_Phase)
+	*p = x
+	return p
+}
+
+func (x DeleteOrganizationMetadata_Phase) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (DeleteOrganizationMetadata_Phase) Descriptor() protoreflect.EnumDescriptor {
+	return file_pivox_api_v1_organizations_proto_enumTypes[1].Descriptor()
+}
+
+func (DeleteOrganizationMetadata_Phase) Type() protoreflect.EnumType {
+	return &file_pivox_api_v1_organizations_proto_enumTypes[1]
+}
+
+func (x DeleteOrganizationMetadata_Phase) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use DeleteOrganizationMetadata_Phase.Descriptor instead.
+func (DeleteOrganizationMetadata_Phase) EnumDescriptor() ([]byte, []int) {
+	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{9, 0}
+}
+
 // Invitation lifecycle states.
 type Invitation_State int32
 
@@ -142,11 +215,11 @@ func (x Invitation_State) String() string {
 }
 
 func (Invitation_State) Descriptor() protoreflect.EnumDescriptor {
-	return file_pivox_api_v1_organizations_proto_enumTypes[1].Descriptor()
+	return file_pivox_api_v1_organizations_proto_enumTypes[2].Descriptor()
 }
 
 func (Invitation_State) Type() protoreflect.EnumType {
-	return &file_pivox_api_v1_organizations_proto_enumTypes[1]
+	return &file_pivox_api_v1_organizations_proto_enumTypes[2]
 }
 
 func (x Invitation_State) Number() protoreflect.EnumNumber {
@@ -155,7 +228,7 @@ func (x Invitation_State) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Invitation_State.Descriptor instead.
 func (Invitation_State) EnumDescriptor() ([]byte, []int) {
-	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{8, 0}
+	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{12, 0}
 }
 
 // The root node in the resource hierarchy to which a particular entity's
@@ -723,6 +796,246 @@ func (*UpdateOrganizationMetadata) Descriptor() ([]byte, []int) {
 	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{7}
 }
 
+// Request message for `Organizations.DeleteOrganization`.
+type DeleteOrganizationRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Required. The resource name of the organization to delete.
+	// Format: `organizations/{organization}`.
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// Optional. The etag known to the client for the expected state of
+	// the organization. Used for optimistic concurrency control.
+	Etag string `protobuf:"bytes,2,opt,name=etag,proto3" json:"etag,omitempty"`
+	// Optional. If true, bypasses the 30-day grace window: the LRO
+	// synchronously cascades all child data (spaces, members, assets,
+	// SSO config, invitations, …) and frees the slug. The org is
+	// unrecoverable. Defaults to false (soft-delete with grace).
+	Force         bool `protobuf:"varint,3,opt,name=force,proto3" json:"force,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteOrganizationRequest) Reset() {
+	*x = DeleteOrganizationRequest{}
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteOrganizationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteOrganizationRequest) ProtoMessage() {}
+
+func (x *DeleteOrganizationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteOrganizationRequest.ProtoReflect.Descriptor instead.
+func (*DeleteOrganizationRequest) Descriptor() ([]byte, []int) {
+	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *DeleteOrganizationRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *DeleteOrganizationRequest) GetEtag() string {
+	if x != nil {
+		return x.Etag
+	}
+	return ""
+}
+
+func (x *DeleteOrganizationRequest) GetForce() bool {
+	if x != nil {
+		return x.Force
+	}
+	return false
+}
+
+// A status object used as the `metadata` field for the Operation
+// returned by `DeleteOrganization`. Surfaces incremental progress
+// through the soft-delete + cascade-cancellation phases.
+//
+// For `force=false` (default), this LRO completes when the org
+// enters `DELETE_REQUESTED`; the actual data purge happens
+// out-of-band via the scheduled purge worker after `purge_time`.
+// Clients polling this LRO should not expect to see the org's
+// downstream resources gone — those linger until purge.
+//
+// For `force=true`, the LRO drives the full cascade synchronously
+// and only completes once child data has been purged.
+type DeleteOrganizationMetadata struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Output only. Current phase of the cascade.
+	Phase DeleteOrganizationMetadata_Phase `protobuf:"varint,1,opt,name=phase,proto3,enum=pivox.api.v1.DeleteOrganizationMetadata_Phase" json:"phase,omitempty"`
+	// Output only. Resource name of the organization being deleted.
+	Organization  string `protobuf:"bytes,2,opt,name=organization,proto3" json:"organization,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteOrganizationMetadata) Reset() {
+	*x = DeleteOrganizationMetadata{}
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteOrganizationMetadata) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteOrganizationMetadata) ProtoMessage() {}
+
+func (x *DeleteOrganizationMetadata) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteOrganizationMetadata.ProtoReflect.Descriptor instead.
+func (*DeleteOrganizationMetadata) Descriptor() ([]byte, []int) {
+	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *DeleteOrganizationMetadata) GetPhase() DeleteOrganizationMetadata_Phase {
+	if x != nil {
+		return x.Phase
+	}
+	return DeleteOrganizationMetadata_PHASE_UNSPECIFIED
+}
+
+func (x *DeleteOrganizationMetadata) GetOrganization() string {
+	if x != nil {
+		return x.Organization
+	}
+	return ""
+}
+
+// Request message for `Organizations.UndeleteOrganization`.
+type UndeleteOrganizationRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Required. The resource name of the organization to restore.
+	// Format: `organizations/{organization}`. Must currently be in
+	// `DELETE_REQUESTED` state and within the 30-day grace window.
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// Optional. The etag known to the client for the expected state of
+	// the organization.
+	Etag          string `protobuf:"bytes,2,opt,name=etag,proto3" json:"etag,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UndeleteOrganizationRequest) Reset() {
+	*x = UndeleteOrganizationRequest{}
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UndeleteOrganizationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UndeleteOrganizationRequest) ProtoMessage() {}
+
+func (x *UndeleteOrganizationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UndeleteOrganizationRequest.ProtoReflect.Descriptor instead.
+func (*UndeleteOrganizationRequest) Descriptor() ([]byte, []int) {
+	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *UndeleteOrganizationRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *UndeleteOrganizationRequest) GetEtag() string {
+	if x != nil {
+		return x.Etag
+	}
+	return ""
+}
+
+// A status object used as the `metadata` field for the Operation
+// returned by `UndeleteOrganization`.
+type UndeleteOrganizationMetadata struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Output only. Resource name of the organization being restored.
+	Organization  string `protobuf:"bytes,1,opt,name=organization,proto3" json:"organization,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UndeleteOrganizationMetadata) Reset() {
+	*x = UndeleteOrganizationMetadata{}
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UndeleteOrganizationMetadata) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UndeleteOrganizationMetadata) ProtoMessage() {}
+
+func (x *UndeleteOrganizationMetadata) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UndeleteOrganizationMetadata.ProtoReflect.Descriptor instead.
+func (*UndeleteOrganizationMetadata) Descriptor() ([]byte, []int) {
+	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *UndeleteOrganizationMetadata) GetOrganization() string {
+	if x != nil {
+		return x.Organization
+	}
+	return ""
+}
+
 // An invitation to join an organization. Invitations are created by org
 // admins and sent to users by email. The recipient can accept or decline.
 type Invitation struct {
@@ -754,7 +1067,7 @@ type Invitation struct {
 
 func (x *Invitation) Reset() {
 	*x = Invitation{}
-	mi := &file_pivox_api_v1_organizations_proto_msgTypes[8]
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -766,7 +1079,7 @@ func (x *Invitation) String() string {
 func (*Invitation) ProtoMessage() {}
 
 func (x *Invitation) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_api_v1_organizations_proto_msgTypes[8]
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -779,7 +1092,7 @@ func (x *Invitation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Invitation.ProtoReflect.Descriptor instead.
 func (*Invitation) Descriptor() ([]byte, []int) {
-	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{8}
+	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *Invitation) GetName() string {
@@ -873,7 +1186,7 @@ type InvitationPolicy struct {
 
 func (x *InvitationPolicy) Reset() {
 	*x = InvitationPolicy{}
-	mi := &file_pivox_api_v1_organizations_proto_msgTypes[9]
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -885,7 +1198,7 @@ func (x *InvitationPolicy) String() string {
 func (*InvitationPolicy) ProtoMessage() {}
 
 func (x *InvitationPolicy) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_api_v1_organizations_proto_msgTypes[9]
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -898,7 +1211,7 @@ func (x *InvitationPolicy) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InvitationPolicy.ProtoReflect.Descriptor instead.
 func (*InvitationPolicy) Descriptor() ([]byte, []int) {
-	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{9}
+	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *InvitationPolicy) GetName() string {
@@ -960,7 +1273,7 @@ type CreateInvitationRequest struct {
 
 func (x *CreateInvitationRequest) Reset() {
 	*x = CreateInvitationRequest{}
-	mi := &file_pivox_api_v1_organizations_proto_msgTypes[10]
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -972,7 +1285,7 @@ func (x *CreateInvitationRequest) String() string {
 func (*CreateInvitationRequest) ProtoMessage() {}
 
 func (x *CreateInvitationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_api_v1_organizations_proto_msgTypes[10]
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -985,7 +1298,7 @@ func (x *CreateInvitationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateInvitationRequest.ProtoReflect.Descriptor instead.
 func (*CreateInvitationRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{10}
+	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *CreateInvitationRequest) GetParent() string {
@@ -1051,7 +1364,7 @@ type ListInvitationsRequest struct {
 
 func (x *ListInvitationsRequest) Reset() {
 	*x = ListInvitationsRequest{}
-	mi := &file_pivox_api_v1_organizations_proto_msgTypes[11]
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1063,7 +1376,7 @@ func (x *ListInvitationsRequest) String() string {
 func (*ListInvitationsRequest) ProtoMessage() {}
 
 func (x *ListInvitationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_api_v1_organizations_proto_msgTypes[11]
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1076,7 +1389,7 @@ func (x *ListInvitationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListInvitationsRequest.ProtoReflect.Descriptor instead.
 func (*ListInvitationsRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{11}
+	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ListInvitationsRequest) GetParent() string {
@@ -1127,7 +1440,7 @@ type ListInvitationsResponse struct {
 
 func (x *ListInvitationsResponse) Reset() {
 	*x = ListInvitationsResponse{}
-	mi := &file_pivox_api_v1_organizations_proto_msgTypes[12]
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1139,7 +1452,7 @@ func (x *ListInvitationsResponse) String() string {
 func (*ListInvitationsResponse) ProtoMessage() {}
 
 func (x *ListInvitationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_api_v1_organizations_proto_msgTypes[12]
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1152,7 +1465,7 @@ func (x *ListInvitationsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListInvitationsResponse.ProtoReflect.Descriptor instead.
 func (*ListInvitationsResponse) Descriptor() ([]byte, []int) {
-	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{12}
+	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ListInvitationsResponse) GetInvitations() []*Invitation {
@@ -1181,7 +1494,7 @@ type GetInvitationRequest struct {
 
 func (x *GetInvitationRequest) Reset() {
 	*x = GetInvitationRequest{}
-	mi := &file_pivox_api_v1_organizations_proto_msgTypes[13]
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1193,7 +1506,7 @@ func (x *GetInvitationRequest) String() string {
 func (*GetInvitationRequest) ProtoMessage() {}
 
 func (x *GetInvitationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_api_v1_organizations_proto_msgTypes[13]
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1206,7 +1519,7 @@ func (x *GetInvitationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetInvitationRequest.ProtoReflect.Descriptor instead.
 func (*GetInvitationRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{13}
+	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *GetInvitationRequest) GetName() string {
@@ -1228,7 +1541,7 @@ type AcceptInvitationRequest struct {
 
 func (x *AcceptInvitationRequest) Reset() {
 	*x = AcceptInvitationRequest{}
-	mi := &file_pivox_api_v1_organizations_proto_msgTypes[14]
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1240,7 +1553,7 @@ func (x *AcceptInvitationRequest) String() string {
 func (*AcceptInvitationRequest) ProtoMessage() {}
 
 func (x *AcceptInvitationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_api_v1_organizations_proto_msgTypes[14]
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1253,7 +1566,7 @@ func (x *AcceptInvitationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AcceptInvitationRequest.ProtoReflect.Descriptor instead.
 func (*AcceptInvitationRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{14}
+	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *AcceptInvitationRequest) GetName() string {
@@ -1274,7 +1587,7 @@ type AcceptInvitationResponse struct {
 
 func (x *AcceptInvitationResponse) Reset() {
 	*x = AcceptInvitationResponse{}
-	mi := &file_pivox_api_v1_organizations_proto_msgTypes[15]
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1286,7 +1599,7 @@ func (x *AcceptInvitationResponse) String() string {
 func (*AcceptInvitationResponse) ProtoMessage() {}
 
 func (x *AcceptInvitationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_api_v1_organizations_proto_msgTypes[15]
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1299,7 +1612,7 @@ func (x *AcceptInvitationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AcceptInvitationResponse.ProtoReflect.Descriptor instead.
 func (*AcceptInvitationResponse) Descriptor() ([]byte, []int) {
-	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{15}
+	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *AcceptInvitationResponse) GetInvitation() *Invitation {
@@ -1321,7 +1634,7 @@ type DeclineInvitationRequest struct {
 
 func (x *DeclineInvitationRequest) Reset() {
 	*x = DeclineInvitationRequest{}
-	mi := &file_pivox_api_v1_organizations_proto_msgTypes[16]
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1333,7 +1646,7 @@ func (x *DeclineInvitationRequest) String() string {
 func (*DeclineInvitationRequest) ProtoMessage() {}
 
 func (x *DeclineInvitationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_api_v1_organizations_proto_msgTypes[16]
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1346,7 +1659,7 @@ func (x *DeclineInvitationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeclineInvitationRequest.ProtoReflect.Descriptor instead.
 func (*DeclineInvitationRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{16}
+	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *DeclineInvitationRequest) GetName() string {
@@ -1367,7 +1680,7 @@ type DeclineInvitationResponse struct {
 
 func (x *DeclineInvitationResponse) Reset() {
 	*x = DeclineInvitationResponse{}
-	mi := &file_pivox_api_v1_organizations_proto_msgTypes[17]
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1379,7 +1692,7 @@ func (x *DeclineInvitationResponse) String() string {
 func (*DeclineInvitationResponse) ProtoMessage() {}
 
 func (x *DeclineInvitationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_api_v1_organizations_proto_msgTypes[17]
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1392,7 +1705,7 @@ func (x *DeclineInvitationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeclineInvitationResponse.ProtoReflect.Descriptor instead.
 func (*DeclineInvitationResponse) Descriptor() ([]byte, []int) {
-	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{17}
+	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *DeclineInvitationResponse) GetInvitation() *Invitation {
@@ -1416,7 +1729,7 @@ type DeleteInvitationRequest struct {
 
 func (x *DeleteInvitationRequest) Reset() {
 	*x = DeleteInvitationRequest{}
-	mi := &file_pivox_api_v1_organizations_proto_msgTypes[18]
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1428,7 +1741,7 @@ func (x *DeleteInvitationRequest) String() string {
 func (*DeleteInvitationRequest) ProtoMessage() {}
 
 func (x *DeleteInvitationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_api_v1_organizations_proto_msgTypes[18]
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1441,7 +1754,7 @@ func (x *DeleteInvitationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteInvitationRequest.ProtoReflect.Descriptor instead.
 func (*DeleteInvitationRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{18}
+	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *DeleteInvitationRequest) GetName() string {
@@ -1470,7 +1783,7 @@ type GetInvitationPolicyRequest struct {
 
 func (x *GetInvitationPolicyRequest) Reset() {
 	*x = GetInvitationPolicyRequest{}
-	mi := &file_pivox_api_v1_organizations_proto_msgTypes[19]
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1482,7 +1795,7 @@ func (x *GetInvitationPolicyRequest) String() string {
 func (*GetInvitationPolicyRequest) ProtoMessage() {}
 
 func (x *GetInvitationPolicyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_api_v1_organizations_proto_msgTypes[19]
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1495,7 +1808,7 @@ func (x *GetInvitationPolicyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetInvitationPolicyRequest.ProtoReflect.Descriptor instead.
 func (*GetInvitationPolicyRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{19}
+	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *GetInvitationPolicyRequest) GetName() string {
@@ -1518,7 +1831,7 @@ type UpdateInvitationPolicyRequest struct {
 
 func (x *UpdateInvitationPolicyRequest) Reset() {
 	*x = UpdateInvitationPolicyRequest{}
-	mi := &file_pivox_api_v1_organizations_proto_msgTypes[20]
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1530,7 +1843,7 @@ func (x *UpdateInvitationPolicyRequest) String() string {
 func (*UpdateInvitationPolicyRequest) ProtoMessage() {}
 
 func (x *UpdateInvitationPolicyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_api_v1_organizations_proto_msgTypes[20]
+	mi := &file_pivox_api_v1_organizations_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1543,7 +1856,7 @@ func (x *UpdateInvitationPolicyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateInvitationPolicyRequest.ProtoReflect.Descriptor instead.
 func (*UpdateInvitationPolicyRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{20}
+	return file_pivox_api_v1_organizations_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *UpdateInvitationPolicyRequest) GetInvitationPolicy() *InvitationPolicy {
@@ -1564,7 +1877,7 @@ var File_pivox_api_v1_organizations_proto protoreflect.FileDescriptor
 
 const file_pivox_api_v1_organizations_proto_rawDesc = "" +
 	"\n" +
-	" pivox/api/v1/organizations.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xd9\x05\n" +
+	" pivox/api/v1/organizations.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16pivox/api/v1/sso.proto\"\xd9\x05\n" +
 	"\fOrganization\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12&\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\x03\xe0A\x03R\vdisplayName\x12;\n" +
@@ -1612,7 +1925,29 @@ const file_pivox_api_v1_organizations_proto_rawDesc = "" +
 	"\rorganizations\x18\x01 \x03(\v2\x1a.pivox.api.v1.OrganizationR\rorganizations\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\x1c\n" +
 	"\x1aCreateOrganizationMetadata\"\x1c\n" +
-	"\x1aUpdateOrganizationMetadata\"\xbf\x05\n" +
+	"\x1aUpdateOrganizationMetadata\"\x89\x01\n" +
+	"\x19DeleteOrganizationRequest\x128\n" +
+	"\x04name\x18\x01 \x01(\tB$\xe0A\x02\xfaA\x18\n" +
+	"\x16pivox.api/Organization\xbaH\x03\xc8\x01\x01R\x04name\x12\x17\n" +
+	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x01R\x04etag\x12\x19\n" +
+	"\x05force\x18\x03 \x01(\bB\x03\xe0A\x01R\x05force\"\x8c\x02\n" +
+	"\x1aDeleteOrganizationMetadata\x12I\n" +
+	"\x05phase\x18\x01 \x01(\x0e2..pivox.api.v1.DeleteOrganizationMetadata.PhaseB\x03\xe0A\x03R\x05phase\x12'\n" +
+	"\forganization\x18\x02 \x01(\tB\x03\xe0A\x03R\forganization\"z\n" +
+	"\x05Phase\x12\x15\n" +
+	"\x11PHASE_UNSPECIFIED\x10\x00\x12\x0e\n" +
+	"\n" +
+	"VALIDATING\x10\x01\x12\x19\n" +
+	"\x15CANCELLING_OPERATIONS\x10\x02\x12\x13\n" +
+	"\x0fMARKING_DELETED\x10\x03\x12\v\n" +
+	"\aPURGING\x10\x05\x12\r\n" +
+	"\tCOMPLETED\x10\x04\"p\n" +
+	"\x1bUndeleteOrganizationRequest\x128\n" +
+	"\x04name\x18\x01 \x01(\tB$\xe0A\x02\xfaA\x18\n" +
+	"\x16pivox.api/Organization\xbaH\x03\xc8\x01\x01R\x04name\x12\x17\n" +
+	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x01R\x04etag\"G\n" +
+	"\x1cUndeleteOrganizationMetadata\x12'\n" +
+	"\forganization\x18\x01 \x01(\tB\x03\xe0A\x03R\forganization\"\xbf\x05\n" +
 	"\n" +
 	"Invitation\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12u\n" +
@@ -1689,14 +2024,21 @@ const file_pivox_api_v1_organizations_proto_rawDesc = "" +
 	"\x1dUpdateInvitationPolicyRequest\x12V\n" +
 	"\x11invitation_policy\x18\x01 \x01(\v2\x1e.pivox.api.v1.InvitationPolicyB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\x10invitationPolicy\x12@\n" +
 	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskB\x03\xe0A\x01R\n" +
-	"updateMask2\xa7\x10\n" +
+	"updateMask2\xd9\x15\n" +
 	"\rOrganizations\x12~\n" +
 	"\x0fGetOrganization\x12$.pivox.api.v1.GetOrganizationRequest\x1a\x1a.pivox.api.v1.Organization\")\xdaA\x04name\x82\xd3\xe4\x93\x02\x1c\x12\x1a/v1/{name=organizations/*}\x12\x7f\n" +
 	"\x11ListOrganizations\x12&.pivox.api.v1.ListOrganizationsRequest\x1a'.pivox.api.v1.ListOrganizationsResponse\"\x19\x82\xd3\xe4\x93\x02\x13\x12\x11/v1/organizations\x12\xd1\x01\n" +
 	"\x12CreateOrganization\x12'.pivox.api.v1.CreateOrganizationRequest\x1a\x1d.google.longrunning.Operation\"s\xcaA*\n" +
 	"\fOrganization\x12\x1aCreateOrganizationMetadata\xdaA\x1corganization,organization_id\x82\xd3\xe4\x93\x02!:\forganization\"\x11/v1/organizations\x12\xf3\x01\n" +
 	"\x12UpdateOrganization\x12'.pivox.api.v1.UpdateOrganizationRequest\x1a\x1d.google.longrunning.Operation\"\x94\x01\xcaA*\n" +
-	"\fOrganization\x12\x1aUpdateOrganizationMetadata\xdaA\x18organization,update_mask\xdaA\forganization\x82\xd3\xe4\x93\x027:\forganization2'/v1/{organization.name=organizations/*}\x12\xb3\x01\n" +
+	"\fOrganization\x12\x1aUpdateOrganizationMetadata\xdaA\x18organization,update_mask\xdaA\forganization\x82\xd3\xe4\x93\x027:\forganization2'/v1/{organization.name=organizations/*}\x12\xb4\x01\n" +
+	"\x12DeleteOrganization\x12'.pivox.api.v1.DeleteOrganizationRequest\x1a\x1d.google.longrunning.Operation\"V\xcaA*\n" +
+	"\fOrganization\x12\x1aDeleteOrganizationMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02\x1c*\x1a/v1/{name=organizations/*}\x12\xc6\x01\n" +
+	"\x14UndeleteOrganization\x12).pivox.api.v1.UndeleteOrganizationRequest\x1a\x1d.google.longrunning.Operation\"d\xcaA,\n" +
+	"\fOrganization\x12\x1cUndeleteOrganizationMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02(:\x01*\"#/v1/{name=organizations/*}:undelete\x12\x7f\n" +
+	"\fGetSsoConfig\x12!.pivox.api.v1.GetSsoConfigRequest\x1a\x17.pivox.api.v1.SsoConfig\"3\xdaA\x04name\x82\xd3\xe4\x93\x02&\x12$/v1/{name=organizations/*/ssoConfig}\x12\xae\x01\n" +
+	"\x0fUpdateSsoConfig\x12$.pivox.api.v1.UpdateSsoConfigRequest\x1a\x17.pivox.api.v1.SsoConfig\"\\\xdaA\x16sso_config,update_mask\x82\xd3\xe4\x93\x02=:\n" +
+	"sso_config2//v1/{sso_config.name=organizations/*/ssoConfig}\x12\xb3\x01\n" +
 	"\x10CreateInvitation\x12%.pivox.api.v1.CreateInvitationRequest\x1a\x18.pivox.api.v1.Invitation\"^\xdaA\x1fparent,invitation,invitation_id\x82\xd3\xe4\x93\x026:\n" +
 	"invitation\"(/v1/{parent=organizations/*}/invitations\x12\x99\x01\n" +
 	"\x0fListInvitations\x12$.pivox.api.v1.ListInvitationsRequest\x1a%.pivox.api.v1.ListInvitationsResponse\"9\xdaA\x06parent\x82\xd3\xe4\x93\x02*\x12(/v1/{parent=organizations/*}/invitations\x12\x86\x01\n" +
@@ -1720,88 +2062,105 @@ func file_pivox_api_v1_organizations_proto_rawDescGZIP() []byte {
 	return file_pivox_api_v1_organizations_proto_rawDescData
 }
 
-var file_pivox_api_v1_organizations_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_pivox_api_v1_organizations_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_pivox_api_v1_organizations_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_pivox_api_v1_organizations_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
 var file_pivox_api_v1_organizations_proto_goTypes = []any{
 	(Organization_State)(0),               // 0: pivox.api.v1.Organization.State
-	(Invitation_State)(0),                 // 1: pivox.api.v1.Invitation.State
-	(*Organization)(nil),                  // 2: pivox.api.v1.Organization
-	(*GetOrganizationRequest)(nil),        // 3: pivox.api.v1.GetOrganizationRequest
-	(*ListOrganizationsRequest)(nil),      // 4: pivox.api.v1.ListOrganizationsRequest
-	(*CreateOrganizationRequest)(nil),     // 5: pivox.api.v1.CreateOrganizationRequest
-	(*UpdateOrganizationRequest)(nil),     // 6: pivox.api.v1.UpdateOrganizationRequest
-	(*ListOrganizationsResponse)(nil),     // 7: pivox.api.v1.ListOrganizationsResponse
-	(*CreateOrganizationMetadata)(nil),    // 8: pivox.api.v1.CreateOrganizationMetadata
-	(*UpdateOrganizationMetadata)(nil),    // 9: pivox.api.v1.UpdateOrganizationMetadata
-	(*Invitation)(nil),                    // 10: pivox.api.v1.Invitation
-	(*InvitationPolicy)(nil),              // 11: pivox.api.v1.InvitationPolicy
-	(*CreateInvitationRequest)(nil),       // 12: pivox.api.v1.CreateInvitationRequest
-	(*ListInvitationsRequest)(nil),        // 13: pivox.api.v1.ListInvitationsRequest
-	(*ListInvitationsResponse)(nil),       // 14: pivox.api.v1.ListInvitationsResponse
-	(*GetInvitationRequest)(nil),          // 15: pivox.api.v1.GetInvitationRequest
-	(*AcceptInvitationRequest)(nil),       // 16: pivox.api.v1.AcceptInvitationRequest
-	(*AcceptInvitationResponse)(nil),      // 17: pivox.api.v1.AcceptInvitationResponse
-	(*DeclineInvitationRequest)(nil),      // 18: pivox.api.v1.DeclineInvitationRequest
-	(*DeclineInvitationResponse)(nil),     // 19: pivox.api.v1.DeclineInvitationResponse
-	(*DeleteInvitationRequest)(nil),       // 20: pivox.api.v1.DeleteInvitationRequest
-	(*GetInvitationPolicyRequest)(nil),    // 21: pivox.api.v1.GetInvitationPolicyRequest
-	(*UpdateInvitationPolicyRequest)(nil), // 22: pivox.api.v1.UpdateInvitationPolicyRequest
-	nil,                                   // 23: pivox.api.v1.Organization.AnnotationsEntry
-	(*timestamppb.Timestamp)(nil),         // 24: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),         // 25: google.protobuf.FieldMask
-	(*longrunningpb.Operation)(nil),       // 26: google.longrunning.Operation
+	(DeleteOrganizationMetadata_Phase)(0), // 1: pivox.api.v1.DeleteOrganizationMetadata.Phase
+	(Invitation_State)(0),                 // 2: pivox.api.v1.Invitation.State
+	(*Organization)(nil),                  // 3: pivox.api.v1.Organization
+	(*GetOrganizationRequest)(nil),        // 4: pivox.api.v1.GetOrganizationRequest
+	(*ListOrganizationsRequest)(nil),      // 5: pivox.api.v1.ListOrganizationsRequest
+	(*CreateOrganizationRequest)(nil),     // 6: pivox.api.v1.CreateOrganizationRequest
+	(*UpdateOrganizationRequest)(nil),     // 7: pivox.api.v1.UpdateOrganizationRequest
+	(*ListOrganizationsResponse)(nil),     // 8: pivox.api.v1.ListOrganizationsResponse
+	(*CreateOrganizationMetadata)(nil),    // 9: pivox.api.v1.CreateOrganizationMetadata
+	(*UpdateOrganizationMetadata)(nil),    // 10: pivox.api.v1.UpdateOrganizationMetadata
+	(*DeleteOrganizationRequest)(nil),     // 11: pivox.api.v1.DeleteOrganizationRequest
+	(*DeleteOrganizationMetadata)(nil),    // 12: pivox.api.v1.DeleteOrganizationMetadata
+	(*UndeleteOrganizationRequest)(nil),   // 13: pivox.api.v1.UndeleteOrganizationRequest
+	(*UndeleteOrganizationMetadata)(nil),  // 14: pivox.api.v1.UndeleteOrganizationMetadata
+	(*Invitation)(nil),                    // 15: pivox.api.v1.Invitation
+	(*InvitationPolicy)(nil),              // 16: pivox.api.v1.InvitationPolicy
+	(*CreateInvitationRequest)(nil),       // 17: pivox.api.v1.CreateInvitationRequest
+	(*ListInvitationsRequest)(nil),        // 18: pivox.api.v1.ListInvitationsRequest
+	(*ListInvitationsResponse)(nil),       // 19: pivox.api.v1.ListInvitationsResponse
+	(*GetInvitationRequest)(nil),          // 20: pivox.api.v1.GetInvitationRequest
+	(*AcceptInvitationRequest)(nil),       // 21: pivox.api.v1.AcceptInvitationRequest
+	(*AcceptInvitationResponse)(nil),      // 22: pivox.api.v1.AcceptInvitationResponse
+	(*DeclineInvitationRequest)(nil),      // 23: pivox.api.v1.DeclineInvitationRequest
+	(*DeclineInvitationResponse)(nil),     // 24: pivox.api.v1.DeclineInvitationResponse
+	(*DeleteInvitationRequest)(nil),       // 25: pivox.api.v1.DeleteInvitationRequest
+	(*GetInvitationPolicyRequest)(nil),    // 26: pivox.api.v1.GetInvitationPolicyRequest
+	(*UpdateInvitationPolicyRequest)(nil), // 27: pivox.api.v1.UpdateInvitationPolicyRequest
+	nil,                                   // 28: pivox.api.v1.Organization.AnnotationsEntry
+	(*timestamppb.Timestamp)(nil),         // 29: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),         // 30: google.protobuf.FieldMask
+	(*GetSsoConfigRequest)(nil),           // 31: pivox.api.v1.GetSsoConfigRequest
+	(*UpdateSsoConfigRequest)(nil),        // 32: pivox.api.v1.UpdateSsoConfigRequest
+	(*longrunningpb.Operation)(nil),       // 33: google.longrunning.Operation
+	(*SsoConfig)(nil),                     // 34: pivox.api.v1.SsoConfig
 }
 var file_pivox_api_v1_organizations_proto_depIdxs = []int32{
 	0,  // 0: pivox.api.v1.Organization.state:type_name -> pivox.api.v1.Organization.State
-	24, // 1: pivox.api.v1.Organization.create_time:type_name -> google.protobuf.Timestamp
-	24, // 2: pivox.api.v1.Organization.update_time:type_name -> google.protobuf.Timestamp
-	24, // 3: pivox.api.v1.Organization.delete_time:type_name -> google.protobuf.Timestamp
-	24, // 4: pivox.api.v1.Organization.purge_time:type_name -> google.protobuf.Timestamp
-	23, // 5: pivox.api.v1.Organization.annotations:type_name -> pivox.api.v1.Organization.AnnotationsEntry
-	2,  // 6: pivox.api.v1.CreateOrganizationRequest.organization:type_name -> pivox.api.v1.Organization
-	2,  // 7: pivox.api.v1.UpdateOrganizationRequest.organization:type_name -> pivox.api.v1.Organization
-	25, // 8: pivox.api.v1.UpdateOrganizationRequest.update_mask:type_name -> google.protobuf.FieldMask
-	2,  // 9: pivox.api.v1.ListOrganizationsResponse.organizations:type_name -> pivox.api.v1.Organization
-	1,  // 10: pivox.api.v1.Invitation.state:type_name -> pivox.api.v1.Invitation.State
-	24, // 11: pivox.api.v1.Invitation.create_time:type_name -> google.protobuf.Timestamp
-	24, // 12: pivox.api.v1.Invitation.expire_time:type_name -> google.protobuf.Timestamp
-	24, // 13: pivox.api.v1.Invitation.accept_time:type_name -> google.protobuf.Timestamp
-	24, // 14: pivox.api.v1.InvitationPolicy.update_time:type_name -> google.protobuf.Timestamp
-	10, // 15: pivox.api.v1.CreateInvitationRequest.invitation:type_name -> pivox.api.v1.Invitation
-	10, // 16: pivox.api.v1.ListInvitationsResponse.invitations:type_name -> pivox.api.v1.Invitation
-	10, // 17: pivox.api.v1.AcceptInvitationResponse.invitation:type_name -> pivox.api.v1.Invitation
-	10, // 18: pivox.api.v1.DeclineInvitationResponse.invitation:type_name -> pivox.api.v1.Invitation
-	11, // 19: pivox.api.v1.UpdateInvitationPolicyRequest.invitation_policy:type_name -> pivox.api.v1.InvitationPolicy
-	25, // 20: pivox.api.v1.UpdateInvitationPolicyRequest.update_mask:type_name -> google.protobuf.FieldMask
-	3,  // 21: pivox.api.v1.Organizations.GetOrganization:input_type -> pivox.api.v1.GetOrganizationRequest
-	4,  // 22: pivox.api.v1.Organizations.ListOrganizations:input_type -> pivox.api.v1.ListOrganizationsRequest
-	5,  // 23: pivox.api.v1.Organizations.CreateOrganization:input_type -> pivox.api.v1.CreateOrganizationRequest
-	6,  // 24: pivox.api.v1.Organizations.UpdateOrganization:input_type -> pivox.api.v1.UpdateOrganizationRequest
-	12, // 25: pivox.api.v1.Organizations.CreateInvitation:input_type -> pivox.api.v1.CreateInvitationRequest
-	13, // 26: pivox.api.v1.Organizations.ListInvitations:input_type -> pivox.api.v1.ListInvitationsRequest
-	15, // 27: pivox.api.v1.Organizations.GetInvitation:input_type -> pivox.api.v1.GetInvitationRequest
-	16, // 28: pivox.api.v1.Organizations.AcceptInvitation:input_type -> pivox.api.v1.AcceptInvitationRequest
-	18, // 29: pivox.api.v1.Organizations.DeclineInvitation:input_type -> pivox.api.v1.DeclineInvitationRequest
-	20, // 30: pivox.api.v1.Organizations.DeleteInvitation:input_type -> pivox.api.v1.DeleteInvitationRequest
-	21, // 31: pivox.api.v1.Organizations.GetInvitationPolicy:input_type -> pivox.api.v1.GetInvitationPolicyRequest
-	22, // 32: pivox.api.v1.Organizations.UpdateInvitationPolicy:input_type -> pivox.api.v1.UpdateInvitationPolicyRequest
-	2,  // 33: pivox.api.v1.Organizations.GetOrganization:output_type -> pivox.api.v1.Organization
-	7,  // 34: pivox.api.v1.Organizations.ListOrganizations:output_type -> pivox.api.v1.ListOrganizationsResponse
-	26, // 35: pivox.api.v1.Organizations.CreateOrganization:output_type -> google.longrunning.Operation
-	26, // 36: pivox.api.v1.Organizations.UpdateOrganization:output_type -> google.longrunning.Operation
-	10, // 37: pivox.api.v1.Organizations.CreateInvitation:output_type -> pivox.api.v1.Invitation
-	14, // 38: pivox.api.v1.Organizations.ListInvitations:output_type -> pivox.api.v1.ListInvitationsResponse
-	10, // 39: pivox.api.v1.Organizations.GetInvitation:output_type -> pivox.api.v1.Invitation
-	17, // 40: pivox.api.v1.Organizations.AcceptInvitation:output_type -> pivox.api.v1.AcceptInvitationResponse
-	19, // 41: pivox.api.v1.Organizations.DeclineInvitation:output_type -> pivox.api.v1.DeclineInvitationResponse
-	10, // 42: pivox.api.v1.Organizations.DeleteInvitation:output_type -> pivox.api.v1.Invitation
-	11, // 43: pivox.api.v1.Organizations.GetInvitationPolicy:output_type -> pivox.api.v1.InvitationPolicy
-	11, // 44: pivox.api.v1.Organizations.UpdateInvitationPolicy:output_type -> pivox.api.v1.InvitationPolicy
-	33, // [33:45] is the sub-list for method output_type
-	21, // [21:33] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	29, // 1: pivox.api.v1.Organization.create_time:type_name -> google.protobuf.Timestamp
+	29, // 2: pivox.api.v1.Organization.update_time:type_name -> google.protobuf.Timestamp
+	29, // 3: pivox.api.v1.Organization.delete_time:type_name -> google.protobuf.Timestamp
+	29, // 4: pivox.api.v1.Organization.purge_time:type_name -> google.protobuf.Timestamp
+	28, // 5: pivox.api.v1.Organization.annotations:type_name -> pivox.api.v1.Organization.AnnotationsEntry
+	3,  // 6: pivox.api.v1.CreateOrganizationRequest.organization:type_name -> pivox.api.v1.Organization
+	3,  // 7: pivox.api.v1.UpdateOrganizationRequest.organization:type_name -> pivox.api.v1.Organization
+	30, // 8: pivox.api.v1.UpdateOrganizationRequest.update_mask:type_name -> google.protobuf.FieldMask
+	3,  // 9: pivox.api.v1.ListOrganizationsResponse.organizations:type_name -> pivox.api.v1.Organization
+	1,  // 10: pivox.api.v1.DeleteOrganizationMetadata.phase:type_name -> pivox.api.v1.DeleteOrganizationMetadata.Phase
+	2,  // 11: pivox.api.v1.Invitation.state:type_name -> pivox.api.v1.Invitation.State
+	29, // 12: pivox.api.v1.Invitation.create_time:type_name -> google.protobuf.Timestamp
+	29, // 13: pivox.api.v1.Invitation.expire_time:type_name -> google.protobuf.Timestamp
+	29, // 14: pivox.api.v1.Invitation.accept_time:type_name -> google.protobuf.Timestamp
+	29, // 15: pivox.api.v1.InvitationPolicy.update_time:type_name -> google.protobuf.Timestamp
+	15, // 16: pivox.api.v1.CreateInvitationRequest.invitation:type_name -> pivox.api.v1.Invitation
+	15, // 17: pivox.api.v1.ListInvitationsResponse.invitations:type_name -> pivox.api.v1.Invitation
+	15, // 18: pivox.api.v1.AcceptInvitationResponse.invitation:type_name -> pivox.api.v1.Invitation
+	15, // 19: pivox.api.v1.DeclineInvitationResponse.invitation:type_name -> pivox.api.v1.Invitation
+	16, // 20: pivox.api.v1.UpdateInvitationPolicyRequest.invitation_policy:type_name -> pivox.api.v1.InvitationPolicy
+	30, // 21: pivox.api.v1.UpdateInvitationPolicyRequest.update_mask:type_name -> google.protobuf.FieldMask
+	4,  // 22: pivox.api.v1.Organizations.GetOrganization:input_type -> pivox.api.v1.GetOrganizationRequest
+	5,  // 23: pivox.api.v1.Organizations.ListOrganizations:input_type -> pivox.api.v1.ListOrganizationsRequest
+	6,  // 24: pivox.api.v1.Organizations.CreateOrganization:input_type -> pivox.api.v1.CreateOrganizationRequest
+	7,  // 25: pivox.api.v1.Organizations.UpdateOrganization:input_type -> pivox.api.v1.UpdateOrganizationRequest
+	11, // 26: pivox.api.v1.Organizations.DeleteOrganization:input_type -> pivox.api.v1.DeleteOrganizationRequest
+	13, // 27: pivox.api.v1.Organizations.UndeleteOrganization:input_type -> pivox.api.v1.UndeleteOrganizationRequest
+	31, // 28: pivox.api.v1.Organizations.GetSsoConfig:input_type -> pivox.api.v1.GetSsoConfigRequest
+	32, // 29: pivox.api.v1.Organizations.UpdateSsoConfig:input_type -> pivox.api.v1.UpdateSsoConfigRequest
+	17, // 30: pivox.api.v1.Organizations.CreateInvitation:input_type -> pivox.api.v1.CreateInvitationRequest
+	18, // 31: pivox.api.v1.Organizations.ListInvitations:input_type -> pivox.api.v1.ListInvitationsRequest
+	20, // 32: pivox.api.v1.Organizations.GetInvitation:input_type -> pivox.api.v1.GetInvitationRequest
+	21, // 33: pivox.api.v1.Organizations.AcceptInvitation:input_type -> pivox.api.v1.AcceptInvitationRequest
+	23, // 34: pivox.api.v1.Organizations.DeclineInvitation:input_type -> pivox.api.v1.DeclineInvitationRequest
+	25, // 35: pivox.api.v1.Organizations.DeleteInvitation:input_type -> pivox.api.v1.DeleteInvitationRequest
+	26, // 36: pivox.api.v1.Organizations.GetInvitationPolicy:input_type -> pivox.api.v1.GetInvitationPolicyRequest
+	27, // 37: pivox.api.v1.Organizations.UpdateInvitationPolicy:input_type -> pivox.api.v1.UpdateInvitationPolicyRequest
+	3,  // 38: pivox.api.v1.Organizations.GetOrganization:output_type -> pivox.api.v1.Organization
+	8,  // 39: pivox.api.v1.Organizations.ListOrganizations:output_type -> pivox.api.v1.ListOrganizationsResponse
+	33, // 40: pivox.api.v1.Organizations.CreateOrganization:output_type -> google.longrunning.Operation
+	33, // 41: pivox.api.v1.Organizations.UpdateOrganization:output_type -> google.longrunning.Operation
+	33, // 42: pivox.api.v1.Organizations.DeleteOrganization:output_type -> google.longrunning.Operation
+	33, // 43: pivox.api.v1.Organizations.UndeleteOrganization:output_type -> google.longrunning.Operation
+	34, // 44: pivox.api.v1.Organizations.GetSsoConfig:output_type -> pivox.api.v1.SsoConfig
+	34, // 45: pivox.api.v1.Organizations.UpdateSsoConfig:output_type -> pivox.api.v1.SsoConfig
+	15, // 46: pivox.api.v1.Organizations.CreateInvitation:output_type -> pivox.api.v1.Invitation
+	19, // 47: pivox.api.v1.Organizations.ListInvitations:output_type -> pivox.api.v1.ListInvitationsResponse
+	15, // 48: pivox.api.v1.Organizations.GetInvitation:output_type -> pivox.api.v1.Invitation
+	22, // 49: pivox.api.v1.Organizations.AcceptInvitation:output_type -> pivox.api.v1.AcceptInvitationResponse
+	24, // 50: pivox.api.v1.Organizations.DeclineInvitation:output_type -> pivox.api.v1.DeclineInvitationResponse
+	15, // 51: pivox.api.v1.Organizations.DeleteInvitation:output_type -> pivox.api.v1.Invitation
+	16, // 52: pivox.api.v1.Organizations.GetInvitationPolicy:output_type -> pivox.api.v1.InvitationPolicy
+	16, // 53: pivox.api.v1.Organizations.UpdateInvitationPolicy:output_type -> pivox.api.v1.InvitationPolicy
+	38, // [38:54] is the sub-list for method output_type
+	22, // [22:38] is the sub-list for method input_type
+	22, // [22:22] is the sub-list for extension type_name
+	22, // [22:22] is the sub-list for extension extendee
+	0,  // [0:22] is the sub-list for field type_name
 }
 
 func init() { file_pivox_api_v1_organizations_proto_init() }
@@ -1809,13 +2168,14 @@ func file_pivox_api_v1_organizations_proto_init() {
 	if File_pivox_api_v1_organizations_proto != nil {
 		return
 	}
+	file_pivox_api_v1_sso_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pivox_api_v1_organizations_proto_rawDesc), len(file_pivox_api_v1_organizations_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   22,
+			NumEnums:      3,
+			NumMessages:   26,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

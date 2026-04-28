@@ -127,13 +127,13 @@ extension Pivox_Api_V1_Dashboards {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Manages custom dashboards within a project.
+    /// > Manages custom dashboards within a space.
     public protocol ClientProtocol: Sendable {
         /// Call the "ListDashboards" method.
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Lists dashboards in a project.
+        /// > Lists dashboards in a space.
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Pivox_Api_V1_ListDashboardsRequest` message.
@@ -179,7 +179,7 @@ extension Pivox_Api_V1_Dashboards {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Creates a new dashboard in a project.
+        /// > Creates a new dashboard in a space.
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Pivox_Api_V1_CreateDashboardRequest` message.
@@ -253,7 +253,7 @@ extension Pivox_Api_V1_Dashboards {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Manages custom dashboards within a project.
+    /// > Manages custom dashboards within a space.
     public struct Client<Transport>: ClientProtocol where Transport: GRPCCore.ClientTransport {
         private let client: GRPCCore.GRPCClient<Transport>
 
@@ -269,7 +269,7 @@ extension Pivox_Api_V1_Dashboards {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Lists dashboards in a project.
+        /// > Lists dashboards in a space.
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Pivox_Api_V1_ListDashboardsRequest` message.
@@ -337,7 +337,7 @@ extension Pivox_Api_V1_Dashboards {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Creates a new dashboard in a project.
+        /// > Creates a new dashboard in a space.
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Pivox_Api_V1_CreateDashboardRequest` message.
@@ -444,7 +444,7 @@ extension Pivox_Api_V1_Dashboards.ClientProtocol {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Lists dashboards in a project.
+    /// > Lists dashboards in a space.
     ///
     /// - Parameters:
     ///   - request: A request containing a single `Pivox_Api_V1_ListDashboardsRequest` message.
@@ -502,7 +502,7 @@ extension Pivox_Api_V1_Dashboards.ClientProtocol {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Creates a new dashboard in a project.
+    /// > Creates a new dashboard in a space.
     ///
     /// - Parameters:
     ///   - request: A request containing a single `Pivox_Api_V1_CreateDashboardRequest` message.
@@ -593,7 +593,7 @@ extension Pivox_Api_V1_Dashboards.ClientProtocol {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Lists dashboards in a project.
+    /// > Lists dashboards in a space.
     ///
     /// - Parameters:
     ///   - message: request message to send.
@@ -659,7 +659,7 @@ extension Pivox_Api_V1_Dashboards.ClientProtocol {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Creates a new dashboard in a project.
+    /// > Creates a new dashboard in a space.
     ///
     /// - Parameters:
     ///   - message: request message to send.

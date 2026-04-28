@@ -34,7 +34,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
   typealias Version = _2
 }
 
-/// A group of users within an organization.
+/// A group of users within an organization. Managed via the `Iam` service.
 public struct Pivox_Iam_V1_Group: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -134,7 +134,7 @@ public struct Pivox_Iam_V1_GroupMember: Sendable {
   fileprivate var _createTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
 
-/// Request message for `GetGroup`.
+/// Request message for `Iam.GetGroup`.
 public struct Pivox_Iam_V1_GetGroupRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -149,7 +149,7 @@ public struct Pivox_Iam_V1_GetGroupRequest: Sendable {
   public init() {}
 }
 
-/// Request message for `ListGroups`.
+/// Request message for `Iam.ListGroups`.
 public struct Pivox_Iam_V1_ListGroupsRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -201,7 +201,7 @@ public struct Pivox_Iam_V1_ListGroupsRequest: Sendable {
   public init() {}
 }
 
-/// Response message for `ListGroups`.
+/// Response message for `Iam.ListGroups`.
 public struct Pivox_Iam_V1_ListGroupsResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -218,7 +218,7 @@ public struct Pivox_Iam_V1_ListGroupsResponse: Sendable {
   public init() {}
 }
 
-/// Request message for `CreateGroup`.
+/// Request message for `Iam.CreateGroup`.
 public struct Pivox_Iam_V1_CreateGroupRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -249,7 +249,7 @@ public struct Pivox_Iam_V1_CreateGroupRequest: Sendable {
   fileprivate var _group: Pivox_Iam_V1_Group? = nil
 }
 
-/// Request message for `UpdateGroup`.
+/// Request message for `Iam.UpdateGroup`.
 public struct Pivox_Iam_V1_UpdateGroupRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -283,7 +283,7 @@ public struct Pivox_Iam_V1_UpdateGroupRequest: Sendable {
   fileprivate var _updateMask: SwiftProtobuf.Google_Protobuf_FieldMask? = nil
 }
 
-/// Request message for `DeleteGroup`.
+/// Request message for `Iam.DeleteGroup`.
 public struct Pivox_Iam_V1_DeleteGroupRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -301,7 +301,7 @@ public struct Pivox_Iam_V1_DeleteGroupRequest: Sendable {
   public init() {}
 }
 
-/// Request message for `AddGroupMembers`.
+/// Request message for `Iam.AddGroupMembers`.
 public struct Pivox_Iam_V1_AddGroupMembersRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -320,7 +320,7 @@ public struct Pivox_Iam_V1_AddGroupMembersRequest: Sendable {
   public init() {}
 }
 
-/// Response message for `AddGroupMembers`.
+/// Response message for `Iam.AddGroupMembers`.
 public struct Pivox_Iam_V1_AddGroupMembersResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -331,7 +331,7 @@ public struct Pivox_Iam_V1_AddGroupMembersResponse: Sendable {
   public init() {}
 }
 
-/// Request message for `RemoveGroupMembers`.
+/// Request message for `Iam.RemoveGroupMembers`.
 public struct Pivox_Iam_V1_RemoveGroupMembersRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -350,7 +350,7 @@ public struct Pivox_Iam_V1_RemoveGroupMembersRequest: Sendable {
   public init() {}
 }
 
-/// Response message for `RemoveGroupMembers`.
+/// Response message for `Iam.RemoveGroupMembers`.
 public struct Pivox_Iam_V1_RemoveGroupMembersResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -361,7 +361,7 @@ public struct Pivox_Iam_V1_RemoveGroupMembersResponse: Sendable {
   public init() {}
 }
 
-/// Request message for `ListGroupMembers`.
+/// Request message for `Iam.ListGroupMembers`.
 /// (-- api-linter: core::0132::request-parent-required=disabled
 ///     aip.dev/not-precedent: ListGroupMembers uses `group` as the parent-like field. --)
 /// (-- api-linter: core::0132::request-required-fields=disabled
@@ -388,7 +388,7 @@ public struct Pivox_Iam_V1_ListGroupMembersRequest: Sendable {
   public init() {}
 }
 
-/// Response message for `ListGroupMembers`.
+/// Response message for `Iam.ListGroupMembers`.
 /// (-- api-linter: core::0132::response-unknown-fields=disabled
 ///     aip.dev/not-precedent: Response contains GroupMember, a custom sub-resource. --)
 public struct Pivox_Iam_V1_ListGroupMembersResponse: Sendable {

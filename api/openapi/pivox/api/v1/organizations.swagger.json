@@ -155,6 +155,50 @@
           "Organizations"
         ]
       },
+      "delete": {
+        "summary": "Soft-deletes an organization. The org transitions to\n`DELETE_REQUESTED` state with `delete_time` set; `purge_time` is\npopulated to `delete_time + 30 days`. Until purge, the org is\nrecoverable via `UndeleteOrganization` and remains visible to\n`ListOrganizations` callers who pass `show_deleted=true`. After\npurge, all data cascades and the slug is freed.",
+        "description": "If `force=true`, the 30-day grace window is skipped: the LRO\nsynchronously cascades all child data and frees the slug.\nThe org is unrecoverable.\n\nThe caller must hold the `owner` role on the organization;\notherwise the LRO completes with PERMISSION_DENIED. The LRO\nsurfaces cascade progress via `DeleteOrganizationMetadata.Phase`.",
+        "operationId": "Organizations_DeleteOrganization",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/longrunningOperation"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "etag",
+            "description": "Optional. The etag known to the client for the expected state of\nthe organization. Used for optimistic concurrency control.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "force",
+            "description": "Optional. If true, bypasses the 30-day grace window: the LRO\nsynchronously cascades all child data (spaces, members, assets,\nSSO config, invitations, …) and frees the slug. The org is\nunrecoverable. Defaults to false (soft-delete with grace).",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      },
       "patch": {
         "summary": "Updates an organization resource. Only the `display_name` and\n`annotations` fields can be updated. Use the field mask to specify which\nfields to update. Omitting the field mask updates all mutable fields.",
         "description": "The caller must have `resourcemanager.organizations.update` permission\non the specified organization.",
@@ -626,9 +670,184 @@
           "Organizations"
         ]
       }
+    },
+    "/v1/organizations/{organization}/ssoConfig": {
+      "get": {
+        "summary": "Gets the SSO configuration for an organization. Returns the\nSsoConfig singleton at `organizations/{org}/ssoConfig`. If no\nconfig has been set, returns NOT_FOUND.",
+        "operationId": "Organizations_GetSsoConfig",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1SsoConfig"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      },
+      "patch": {
+        "summary": "Updates the SSO configuration for an organization (AIP-156\nsingleton sub-resource). The server applies changes by calling\nFirebase Admin SDK to update the underlying provider config,\nthen persists the local SsoConfig row. `client_secret` (when\nprovided) is encrypted at rest via Cloud KMS before storage.",
+        "operationId": "Organizations_UpdateSsoConfig",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1SsoConfig"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "ssoConfig",
+            "description": "Required. The new definition of the SsoConfig. The `name` field\nmust be set to identify the SsoConfig to update.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "firebaseProviderId": {
+                  "type": "string",
+                  "description": "Output only. The Firebase Auth provider id. Server-managed; the\nserver creates / updates the underlying Firebase provider config\nwhen this SsoConfig is updated. Format: `oidc.\u003cslug\u003e` for OIDC,\n`saml.\u003cslug\u003e` for SAML.",
+                  "readOnly": true
+                },
+                "displayName": {
+                  "type": "string",
+                  "description": "Required. Human-readable display name shown on the sign-in\nscreen and in the Firebase console."
+                },
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Optional. Whether SSO is currently active. When `false`, the\nSsoConfig remains stored but `Sso.ResolveProvider` returns\nNOT_FOUND for the org's domains and no Firebase provider is\nexposed."
+                },
+                "oidc": {
+                  "$ref": "#/definitions/v1OidcConfig",
+                  "description": "OIDC provider configuration. Set when the IDP supports OAuth\n2.0 / OpenID Connect."
+                },
+                "saml": {
+                  "$ref": "#/definitions/v1SamlConfig",
+                  "description": "SAML 2.0 provider configuration. Set when the IDP only speaks\nSAML."
+                },
+                "verifiedDomains": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "$ref": "#/definitions/v1VerifiedDomain"
+                  },
+                  "description": "Optional. Domains owned by this organization that route to this\nSsoConfig. Each domain carries its own verification state (DNS TXT\nchallenge); only `VERIFIED` domains participate in\n`Sso.ResolveProvider` lookups."
+                },
+                "createTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when the SsoConfig was created.",
+                  "readOnly": true
+                },
+                "updateTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Output only. Timestamp when the SsoConfig was last modified.",
+                  "readOnly": true
+                },
+                "etag": {
+                  "type": "string",
+                  "description": "Output only. A checksum computed by the server based on the\ncurrent value of the SsoConfig resource.",
+                  "readOnly": true
+                }
+              },
+              "description": "Required. The new definition of the SsoConfig. The `name` field\nmust be set to identify the SsoConfig to update.",
+              "required": [
+                "displayName"
+              ]
+            }
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}:undelete": {
+      "post": {
+        "summary": "Restores a soft-deleted organization (`DELETE_REQUESTED` state)\nback to `ACTIVE`, clearing `delete_time` and `purge_time`. Only\ncallable during the 30-day grace window before purge. After\npurge there is no way back.",
+        "description": "The caller must hold the `owner` role on the organization.",
+        "operationId": "Organizations_UndeleteOrganization",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/longrunningOperation"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/OrganizationsUndeleteOrganizationBody"
+            }
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      }
     }
   },
   "definitions": {
+    "OidcConfigResponseType": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "boolean",
+          "description": "Optional. Authorization-code flow. Requires `client_secret`."
+        },
+        "idToken": {
+          "type": "boolean",
+          "description": "Optional. Implicit flow with id_token only. No `client_secret`\nneeded."
+        }
+      },
+      "description": "OIDC response_type bitfield. Maps directly onto Firebase Admin\nSDK's `OIDCProviderConfig.ResponseType` struct."
+    },
     "OrganizationsAcceptInvitationBody": {
       "type": "object",
       "description": "Request message for `AcceptInvitation`."
@@ -636,6 +855,16 @@
     "OrganizationsDeclineInvitationBody": {
       "type": "object",
       "description": "Request message for `DeclineInvitation`."
+    },
+    "OrganizationsUndeleteOrganizationBody": {
+      "type": "object",
+      "properties": {
+        "etag": {
+          "type": "string",
+          "description": "Optional. The etag known to the client for the expected state of\nthe organization."
+        }
+      },
+      "description": "Request message for `Organizations.UndeleteOrganization`."
     },
     "longrunningOperation": {
       "type": "object",
@@ -861,6 +1090,33 @@
       },
       "description": "The response returned from the `ListOrganizations` method."
     },
+    "v1OidcConfig": {
+      "type": "object",
+      "properties": {
+        "issuer": {
+          "type": "string",
+          "description": "Required. The IDP issuer URL. Must support OIDC discovery at\n`\u003cissuer\u003e/.well-known/openid-configuration`. Example:\n`https://accounts.google.com` or\n`https://example.okta.com/oauth2/default`."
+        },
+        "clientId": {
+          "type": "string",
+          "description": "Required. The OAuth 2.0 client ID registered with the IDP for\nthis Pivox organization."
+        },
+        "clientSecret": {
+          "type": "string",
+          "description": "Optional on read; the server returns this field empty (the actual\nvalue is encrypted at rest and never returned to clients). Set on\nUpdate via the `update_mask`. Only required when using the\nauthorization-code flow (response_type.code = true).\n\nTravels cleartext over TLS to the server, which envelope-encrypts\nit via Cloud KMS before persisting."
+        },
+        "responseType": {
+          "$ref": "#/definitions/OidcConfigResponseType",
+          "description": "Required. The OIDC response type the IDP returns to Firebase\nAuth's callback. Most production setups use `code` (authorization-\ncode flow with `client_secret`). `id_token` is the implicit flow\nand does not require a secret."
+        }
+      },
+      "description": "OIDC provider configuration. Maps onto Firebase Admin SDK's\n`OIDCProviderConfig` shape — server reads these fields and calls\n`CreateOIDCProviderConfig` / `UpdateOIDCProviderConfig` against\nFirebase Auth on Update.",
+      "required": [
+        "issuer",
+        "clientId",
+        "responseType"
+      ]
+    },
     "v1Organization": {
       "type": "object",
       "properties": {
@@ -927,6 +1183,145 @@
       ],
       "default": "STATE_UNSPECIFIED",
       "description": "Organization lifecycle states.\n\n - STATE_UNSPECIFIED: Unspecified state.  This is only useful for distinguishing unset values.\n - ACTIVE: The normal and active state.\n - DELETE_REQUESTED: The organization has been marked for deletion by the user."
+    },
+    "v1SamlConfig": {
+      "type": "object",
+      "properties": {
+        "idpEntityId": {
+          "type": "string",
+          "description": "Required. The IDP entity ID. Found in the IDP's SAML metadata\nunder the root `EntityDescriptor[entityID]` attribute."
+        },
+        "ssoUrl": {
+          "type": "string",
+          "description": "Required. The IDP's single-sign-on URL. Found in the IDP's SAML\nmetadata under `SingleSignOnService[Binding=HTTP-POST].Location`."
+        },
+        "x509Certificates": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Required. PEM-encoded X.509 certificates the IDP uses to sign\nSAML responses. At least one is required; multiple may be\nprovided during cert rotation."
+        },
+        "requestSigningEnabled": {
+          "type": "boolean",
+          "description": "Optional. Whether the IDP requires the SP (Pivox/Firebase) to\nsign AuthnRequests. Set this to match the IDP's\n`WantAuthnRequestsSigned` metadata flag."
+        },
+        "rpEntityId": {
+          "type": "string",
+          "description": "Output only. The relying-party entity ID Pivox uses with this\nIDP. Server-derived from the org's resource name; configure your\nIDP to expect this value.",
+          "readOnly": true
+        },
+        "callbackUrl": {
+          "type": "string",
+          "description": "Output only. The Pivox/Firebase callback URL (ACS endpoint) the\nIDP should redirect to after authentication. Server-derived from\nthe Firebase Auth project's hosted handler.",
+          "readOnly": true
+        }
+      },
+      "description": "SAML provider configuration. Maps onto Firebase Admin SDK's\n`SAMLProviderConfig` shape — server reads these fields and calls\n`CreateSAMLProviderConfig` / `UpdateSAMLProviderConfig` against\nFirebase Auth on Update.\n\n`rp_entity_id` and `callback_url` are output-only — the server\nderives them from the org's resource name and Firebase Auth's\nhosted callback endpoint, respectively.",
+      "required": [
+        "idpEntityId",
+        "ssoUrl",
+        "x509Certificates"
+      ]
+    },
+    "v1SsoConfig": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The resource name of the SsoConfig. Format:\n`organizations/{organization}/ssoConfig`."
+        },
+        "firebaseProviderId": {
+          "type": "string",
+          "description": "Output only. The Firebase Auth provider id. Server-managed; the\nserver creates / updates the underlying Firebase provider config\nwhen this SsoConfig is updated. Format: `oidc.\u003cslug\u003e` for OIDC,\n`saml.\u003cslug\u003e` for SAML.",
+          "readOnly": true
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Required. Human-readable display name shown on the sign-in\nscreen and in the Firebase console."
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Optional. Whether SSO is currently active. When `false`, the\nSsoConfig remains stored but `Sso.ResolveProvider` returns\nNOT_FOUND for the org's domains and no Firebase provider is\nexposed."
+        },
+        "oidc": {
+          "$ref": "#/definitions/v1OidcConfig",
+          "description": "OIDC provider configuration. Set when the IDP supports OAuth\n2.0 / OpenID Connect."
+        },
+        "saml": {
+          "$ref": "#/definitions/v1SamlConfig",
+          "description": "SAML 2.0 provider configuration. Set when the IDP only speaks\nSAML."
+        },
+        "verifiedDomains": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1VerifiedDomain"
+          },
+          "description": "Optional. Domains owned by this organization that route to this\nSsoConfig. Each domain carries its own verification state (DNS TXT\nchallenge); only `VERIFIED` domains participate in\n`Sso.ResolveProvider` lookups."
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the SsoConfig was created.",
+          "readOnly": true
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the SsoConfig was last modified.",
+          "readOnly": true
+        },
+        "etag": {
+          "type": "string",
+          "description": "Output only. A checksum computed by the server based on the\ncurrent value of the SsoConfig resource.",
+          "readOnly": true
+        }
+      },
+      "description": "SsoConfig is the per-organization SSO/IDP configuration. AIP-156\nsingleton sub-resource of Organization — there is at most one\nSsoConfig per org, addressable at `organizations/{org}/ssoConfig`.\n\nGet/Update RPCs live on the Organizations service (this is the\nresource definition and request shapes only). Phase 4 wires server-\nside encryption: client_secret travels cleartext over TLS, the\nserver envelope-encrypts it via Cloud KMS before persisting.",
+      "required": [
+        "displayName"
+      ]
+    },
+    "v1VerifiedDomain": {
+      "type": "object",
+      "properties": {
+        "domain": {
+          "type": "string",
+          "description": "Required on Create. The fully qualified domain. Must be a valid\nDNS name; case-insensitive on read."
+        },
+        "state": {
+          "$ref": "#/definitions/v1VerifiedDomainState",
+          "description": "Output only. Current verification state.",
+          "readOnly": true
+        },
+        "verificationToken": {
+          "type": "string",
+          "description": "Output only. The DNS TXT record value the domain owner must\npublish at `_pivox-sso.\u003cdomain\u003e` to prove ownership. Generated\nwhen the domain enters `PENDING`.",
+          "readOnly": true
+        },
+        "verifiedTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the domain transitioned to `VERIFIED`,\nor unset if it has never verified successfully.",
+          "readOnly": true
+        }
+      },
+      "description": "VerifiedDomain ties a domain (e.g. `acme.com`) to an SsoConfig and\ntracks its DNS-TXT-record verification state. Only `VERIFIED`\ndomains participate in `Sso.Resolve` lookups.",
+      "required": [
+        "domain"
+      ]
+    },
+    "v1VerifiedDomainState": {
+      "type": "string",
+      "enum": [
+        "STATE_UNSPECIFIED",
+        "PENDING",
+        "VERIFIED",
+        "FAILED"
+      ],
+      "default": "STATE_UNSPECIFIED",
+      "description": "The lifecycle state of this domain's verification.\n\n - STATE_UNSPECIFIED: Default. Not used.\n - PENDING: Domain added; awaiting DNS TXT record. Server polls\nperiodically until the record is observed (or the request\nexpires).\n - VERIFIED: DNS TXT record observed and matches `verification_token`.\nDomain participates in `Sso.Resolve`.\n - FAILED: Verification failed (token mismatch or expired window). Caller\ncan retry by reissuing the domain via Update."
     }
   }
 }
