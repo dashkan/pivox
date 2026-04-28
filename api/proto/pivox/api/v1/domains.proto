@@ -1,0 +1,239 @@
+// Copyright 2025 Pivox
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package pivox.api.v1;
+
+import "buf/validate/validate.proto";
+import "google/api/field_behavior.proto";
+import "google/api/resource.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "pivox/api/v1;apiv1";
+
+// Domain is an organization-scoped resource representing a DNS domain
+// the organization claims to own. Ownership is proved by publishing a
+// TXT record matching the server-issued `verification_token`; the
+// `CreateDomain` LRO drives that proof end-to-end.
+//
+// Domain is decoupled from any single consumer — SSO is the first
+// caller (a verified domain routes to the org's enabled SsoConfig),
+// but future features (email allowlist, custom invitation domains,
+// branding) consume the same resource.
+message Domain {
+  option (google.api.resource) = {
+    type: "pivox.api/Domain"
+    pattern: "organizations/{organization}/domains/{domain}"
+    plural: "domains"
+    singular: "domain"
+  };
+
+  // Verification lifecycle states. A Domain reflects the *last known*
+  // verification result; the active LRO progress lives in
+  // `CreateDomainMetadata.Phase` until it completes.
+  enum State {
+    // Default; not used.
+    STATE_UNSPECIFIED = 0;
+
+    // Domain row exists; verification has not yet succeeded. The
+    // associated `CreateDomain` LRO is either in flight or expired.
+    PENDING = 1;
+
+    // The DNS TXT record was observed and matches the issued
+    // `verification_token`. The domain participates in
+    // `auth:resolveProvider` lookups (and any other consumers).
+    VERIFIED = 2;
+
+    // Verification failed unrecoverably (e.g. token mismatch
+    // detected after a previous VERIFIED state, or the LRO expired
+    // without a successful check). Caller can retry via a fresh
+    // `CreateDomain` cycle (delete + recreate).
+    FAILED = 3;
+  }
+
+  // Output only. The resource name of the Domain. Format:
+  // `organizations/{organization}/domains/{domain}`. The trailing
+  // segment is the domain name itself (lowercase canonical form).
+  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // Required on Create. The fully qualified domain name. Stored
+  // lowercase; case-insensitive on read.
+  string domain = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_behavior) = IMMUTABLE,
+    (buf.validate.field).cel = {
+      id: "valid_domain"
+      message: "must be a valid domain name"
+      expression: "this.matches('^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\\\.)+[a-zA-Z]{2,}$')"
+    }
+  ];
+
+  // Output only. Last known verification state.
+  State state = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Timestamp when the domain transitioned to
+  // `VERIFIED`, or unset if it has never verified successfully.
+  google.protobuf.Timestamp verified_time = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Timestamp when the Domain row was created.
+  google.protobuf.Timestamp create_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Timestamp when the Domain was last modified.
+  google.protobuf.Timestamp update_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. A checksum computed by the server based on the
+  // current value of the Domain resource.
+  string etag = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Request message for `Organizations.CreateDomain`.
+message CreateDomainRequest {
+  // Required. The parent organization.
+  // Format: `organizations/{organization}`.
+  string parent = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {child_type: "pivox.api/Domain"},
+    (buf.validate.field).required = true
+  ];
+
+  // Required. The Domain to create. The `domain` field must be set;
+  // all other fields are output-only.
+  Domain domain = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. The id portion of the resource name. If unset, the
+  // server uses the lowercase form of `domain.domain`. If set, must
+  // equal that value (provided for AIP-133 compliance and idempotent
+  // retries).
+  string domain_id = 3 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// Metadata for the LRO returned by `CreateDomain`. Surfaces the
+// verification cycle as the server polls DNS at a backoff schedule.
+//
+// `verification_token` is set immediately when the operation is
+// created — clients read it from the operation metadata to display
+// DNS-record instructions to the admin without waiting for the LRO
+// to complete.
+message CreateDomainMetadata {
+  // Phases of the domain-verification LRO.
+  enum Phase {
+    // Default; not used.
+    PHASE_UNSPECIFIED = 0;
+
+    // Operation is actively polling DNS for the TXT record. The
+    // server retries on a backoff schedule until the record is
+    // observed or the grace window elapses.
+    AWAITING_DNS = 1;
+
+    // The TXT record was observed and matches `verification_token`.
+    // `Domain.state` has been set to `VERIFIED` and the operation
+    // has completed with the verified Domain as its response.
+    VERIFIED = 2;
+
+    // Verification failed unrecoverably.
+    FAILED = 3;
+
+    // The grace window (default 7 days) elapsed without a
+    // successful check. `Domain.state` has been set to `FAILED`
+    // and the operation has completed with FAILED_PRECONDITION.
+    EXPIRED = 4;
+  }
+
+  // Output only. Current phase of the LRO.
+  Phase phase = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The DNS TXT record value the admin must publish at
+  // `_pivox-verify.<domain>` to prove ownership. Set when the
+  // operation is created; stable for the operation's lifetime.
+  string verification_token = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Timestamp of the most recent DNS-lookup attempt.
+  // Unset until the worker has performed at least one check.
+  google.protobuf.Timestamp last_check_time = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Number of DNS-lookup attempts the worker has made
+  // for this operation.
+  int32 attempt_count = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The domain being verified, for caller convenience.
+  string domain = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Request message for `Organizations.ListDomains`.
+message ListDomainsRequest {
+  // Required. The parent organization.
+  // Format: `organizations/{organization}`.
+  string parent = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {child_type: "pivox.api/Domain"},
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. Maximum number of domains to return.
+  int32 page_size = 2 [
+    (google.api.field_behavior) = OPTIONAL,
+    (buf.validate.field).int32 = {
+      gte: 0
+      lte: 1000
+    }
+  ];
+
+  // Optional. Page token from a previous ListDomains call.
+  string page_token = 3 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// Response message for `Organizations.ListDomains`.
+message ListDomainsResponse {
+  // The domains in the organization.
+  repeated Domain domains = 1;
+
+  // Token for the next page of results.
+  string next_page_token = 2;
+}
+
+// Request message for `Organizations.GetDomain`.
+message GetDomainRequest {
+  // Required. The resource name of the domain.
+  // Format: `organizations/{organization}/domains/{domain}`.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.api/Domain"},
+    (buf.validate.field).required = true
+  ];
+}
+
+// Request message for `Organizations.DeleteDomain`.
+//
+// Deleting a domain that has an in-flight `CreateDomain` LRO cancels
+// that operation as part of the delete. Deleting the last
+// `state=VERIFIED` domain on an `enabled=true` SsoConfig returns
+// `FAILED_PRECONDITION` — admins must disable SSO or add another
+// verified domain first.
+message DeleteDomainRequest {
+  // Required. The resource name of the domain to delete.
+  // Format: `organizations/{organization}/domains/{domain}`.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.api/Domain"},
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. The etag known to the client. Used for optimistic
+  // concurrency control.
+  string etag = 2 [(google.api.field_behavior) = OPTIONAL];
+}

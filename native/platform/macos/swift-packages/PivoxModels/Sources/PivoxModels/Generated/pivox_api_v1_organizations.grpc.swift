@@ -138,6 +138,58 @@ public enum Pivox_Api_V1_Organizations: Sendable {
                 type: .unary
             )
         }
+        /// Namespace for "CreateDomain" metadata.
+        public enum CreateDomain: Sendable {
+            /// Request type for "CreateDomain".
+            public typealias Input = Pivox_Api_V1_CreateDomainRequest
+            /// Response type for "CreateDomain".
+            public typealias Output = Google_Longrunning_Operation
+            /// Descriptor for "CreateDomain".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "pivox.api.v1.Organizations"),
+                method: "CreateDomain",
+                type: .unary
+            )
+        }
+        /// Namespace for "ListDomains" metadata.
+        public enum ListDomains: Sendable {
+            /// Request type for "ListDomains".
+            public typealias Input = Pivox_Api_V1_ListDomainsRequest
+            /// Response type for "ListDomains".
+            public typealias Output = Pivox_Api_V1_ListDomainsResponse
+            /// Descriptor for "ListDomains".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "pivox.api.v1.Organizations"),
+                method: "ListDomains",
+                type: .unary
+            )
+        }
+        /// Namespace for "GetDomain" metadata.
+        public enum GetDomain: Sendable {
+            /// Request type for "GetDomain".
+            public typealias Input = Pivox_Api_V1_GetDomainRequest
+            /// Response type for "GetDomain".
+            public typealias Output = Pivox_Api_V1_Domain
+            /// Descriptor for "GetDomain".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "pivox.api.v1.Organizations"),
+                method: "GetDomain",
+                type: .unary
+            )
+        }
+        /// Namespace for "DeleteDomain" metadata.
+        public enum DeleteDomain: Sendable {
+            /// Request type for "DeleteDomain".
+            public typealias Input = Pivox_Api_V1_DeleteDomainRequest
+            /// Response type for "DeleteDomain".
+            public typealias Output = Pivox_Api_V1_Domain
+            /// Descriptor for "DeleteDomain".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "pivox.api.v1.Organizations"),
+                method: "DeleteDomain",
+                type: .unary
+            )
+        }
         /// Namespace for "CreateInvitation" metadata.
         public enum CreateInvitation: Sendable {
             /// Request type for "CreateInvitation".
@@ -252,6 +304,10 @@ public enum Pivox_Api_V1_Organizations: Sendable {
             UndeleteOrganization.descriptor,
             GetSsoConfig.descriptor,
             UpdateSsoConfig.descriptor,
+            CreateDomain.descriptor,
+            ListDomains.descriptor,
+            GetDomain.descriptor,
+            DeleteDomain.descriptor,
             CreateInvitation.descriptor,
             ListInvitations.descriptor,
             GetInvitation.descriptor,
@@ -508,6 +564,117 @@ extension Pivox_Api_V1_Organizations {
             deserializer: some GRPCCore.MessageDeserializer<Pivox_Api_V1_SsoConfig>,
             options: GRPCCore.CallOptions,
             onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_SsoConfig>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "CreateDomain" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Claims a DNS domain on behalf of the organization. The server
+        /// > generates a verification token (returned in the LRO metadata),
+        /// > creates a `Domain` row with `state=PENDING`, and starts polling
+        /// > DNS for the TXT record at `_pivox-verify.<domain>`. The LRO
+        /// > completes when the record is observed (state → VERIFIED) or
+        /// > when the grace window elapses (state → FAILED, phase=EXPIRED).
+        /// > 
+        /// > The verification token lives in the LRO metadata and is
+        /// > available immediately on operation creation — clients display
+        /// > DNS-record instructions without waiting for the LRO to finish.
+        /// > 
+        /// > The caller must hold a role on the organization that grants
+        /// > `resourcemanager.domains.create`. Returns ALREADY_EXISTS if the
+        /// > domain is already claimed by any organization (the response
+        /// > does not disclose which org).
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Pivox_Api_V1_CreateDomainRequest` message.
+        ///   - serializer: A serializer for `Pivox_Api_V1_CreateDomainRequest` messages.
+        ///   - deserializer: A deserializer for `Google_Longrunning_Operation` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func createDomain<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Api_V1_CreateDomainRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Api_V1_CreateDomainRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Google_Longrunning_Operation>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "ListDomains" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Lists the domains claimed by an organization, including those
+        /// > still pending verification.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Pivox_Api_V1_ListDomainsRequest` message.
+        ///   - serializer: A serializer for `Pivox_Api_V1_ListDomainsRequest` messages.
+        ///   - deserializer: A deserializer for `Pivox_Api_V1_ListDomainsResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func listDomains<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Api_V1_ListDomainsRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Api_V1_ListDomainsRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Pivox_Api_V1_ListDomainsResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_ListDomainsResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "GetDomain" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Fetches a single domain by resource name.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Pivox_Api_V1_GetDomainRequest` message.
+        ///   - serializer: A serializer for `Pivox_Api_V1_GetDomainRequest` messages.
+        ///   - deserializer: A deserializer for `Pivox_Api_V1_Domain` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func getDomain<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Api_V1_GetDomainRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Api_V1_GetDomainRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Pivox_Api_V1_Domain>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_Domain>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "DeleteDomain" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Releases a domain claim. Cancels the in-flight `CreateDomain`
+        /// > LRO if still running. Returns FAILED_PRECONDITION if the
+        /// > domain is the last `VERIFIED` domain on an `enabled=true`
+        /// > SsoConfig (admins must disable SSO or add another verified
+        /// > domain first).
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Pivox_Api_V1_DeleteDomainRequest` message.
+        ///   - serializer: A serializer for `Pivox_Api_V1_DeleteDomainRequest` messages.
+        ///   - deserializer: A deserializer for `Pivox_Api_V1_Domain` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func deleteDomain<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Api_V1_DeleteDomainRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Api_V1_DeleteDomainRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Pivox_Api_V1_Domain>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_Domain>) async throws -> Result
         ) async throws -> Result where Result: Sendable
 
         /// Call the "CreateInvitation" method.
@@ -1032,6 +1199,161 @@ extension Pivox_Api_V1_Organizations {
             try await self.client.unary(
                 request: request,
                 descriptor: Pivox_Api_V1_Organizations.Method.UpdateSsoConfig.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "CreateDomain" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Claims a DNS domain on behalf of the organization. The server
+        /// > generates a verification token (returned in the LRO metadata),
+        /// > creates a `Domain` row with `state=PENDING`, and starts polling
+        /// > DNS for the TXT record at `_pivox-verify.<domain>`. The LRO
+        /// > completes when the record is observed (state → VERIFIED) or
+        /// > when the grace window elapses (state → FAILED, phase=EXPIRED).
+        /// > 
+        /// > The verification token lives in the LRO metadata and is
+        /// > available immediately on operation creation — clients display
+        /// > DNS-record instructions without waiting for the LRO to finish.
+        /// > 
+        /// > The caller must hold a role on the organization that grants
+        /// > `resourcemanager.domains.create`. Returns ALREADY_EXISTS if the
+        /// > domain is already claimed by any organization (the response
+        /// > does not disclose which org).
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Pivox_Api_V1_CreateDomainRequest` message.
+        ///   - serializer: A serializer for `Pivox_Api_V1_CreateDomainRequest` messages.
+        ///   - deserializer: A deserializer for `Google_Longrunning_Operation` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func createDomain<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Api_V1_CreateDomainRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Api_V1_CreateDomainRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Google_Longrunning_Operation>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Pivox_Api_V1_Organizations.Method.CreateDomain.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "ListDomains" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Lists the domains claimed by an organization, including those
+        /// > still pending verification.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Pivox_Api_V1_ListDomainsRequest` message.
+        ///   - serializer: A serializer for `Pivox_Api_V1_ListDomainsRequest` messages.
+        ///   - deserializer: A deserializer for `Pivox_Api_V1_ListDomainsResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func listDomains<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Api_V1_ListDomainsRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Api_V1_ListDomainsRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Pivox_Api_V1_ListDomainsResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_ListDomainsResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Pivox_Api_V1_Organizations.Method.ListDomains.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "GetDomain" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Fetches a single domain by resource name.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Pivox_Api_V1_GetDomainRequest` message.
+        ///   - serializer: A serializer for `Pivox_Api_V1_GetDomainRequest` messages.
+        ///   - deserializer: A deserializer for `Pivox_Api_V1_Domain` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func getDomain<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Api_V1_GetDomainRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Api_V1_GetDomainRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Pivox_Api_V1_Domain>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_Domain>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Pivox_Api_V1_Organizations.Method.GetDomain.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "DeleteDomain" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Releases a domain claim. Cancels the in-flight `CreateDomain`
+        /// > LRO if still running. Returns FAILED_PRECONDITION if the
+        /// > domain is the last `VERIFIED` domain on an `enabled=true`
+        /// > SsoConfig (admins must disable SSO or add another verified
+        /// > domain first).
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Pivox_Api_V1_DeleteDomainRequest` message.
+        ///   - serializer: A serializer for `Pivox_Api_V1_DeleteDomainRequest` messages.
+        ///   - deserializer: A deserializer for `Pivox_Api_V1_Domain` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func deleteDomain<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Api_V1_DeleteDomainRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Api_V1_DeleteDomainRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Pivox_Api_V1_Domain>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_Domain>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Pivox_Api_V1_Organizations.Method.DeleteDomain.descriptor,
                 serializer: serializer,
                 deserializer: deserializer,
                 options: options,
@@ -1600,6 +1922,141 @@ extension Pivox_Api_V1_Organizations.ClientProtocol {
         )
     }
 
+    /// Call the "CreateDomain" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Claims a DNS domain on behalf of the organization. The server
+    /// > generates a verification token (returned in the LRO metadata),
+    /// > creates a `Domain` row with `state=PENDING`, and starts polling
+    /// > DNS for the TXT record at `_pivox-verify.<domain>`. The LRO
+    /// > completes when the record is observed (state → VERIFIED) or
+    /// > when the grace window elapses (state → FAILED, phase=EXPIRED).
+    /// > 
+    /// > The verification token lives in the LRO metadata and is
+    /// > available immediately on operation creation — clients display
+    /// > DNS-record instructions without waiting for the LRO to finish.
+    /// > 
+    /// > The caller must hold a role on the organization that grants
+    /// > `resourcemanager.domains.create`. Returns ALREADY_EXISTS if the
+    /// > domain is already claimed by any organization (the response
+    /// > does not disclose which org).
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Pivox_Api_V1_CreateDomainRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func createDomain<Result>(
+        request: GRPCCore.ClientRequest<Pivox_Api_V1_CreateDomainRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.createDomain(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Pivox_Api_V1_CreateDomainRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Google_Longrunning_Operation>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListDomains" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Lists the domains claimed by an organization, including those
+    /// > still pending verification.
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Pivox_Api_V1_ListDomainsRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func listDomains<Result>(
+        request: GRPCCore.ClientRequest<Pivox_Api_V1_ListDomainsRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_ListDomainsResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.listDomains(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Pivox_Api_V1_ListDomainsRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Pivox_Api_V1_ListDomainsResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "GetDomain" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Fetches a single domain by resource name.
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Pivox_Api_V1_GetDomainRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func getDomain<Result>(
+        request: GRPCCore.ClientRequest<Pivox_Api_V1_GetDomainRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_Domain>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.getDomain(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Pivox_Api_V1_GetDomainRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Pivox_Api_V1_Domain>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "DeleteDomain" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Releases a domain claim. Cancels the in-flight `CreateDomain`
+    /// > LRO if still running. Returns FAILED_PRECONDITION if the
+    /// > domain is the last `VERIFIED` domain on an `enabled=true`
+    /// > SsoConfig (admins must disable SSO or add another verified
+    /// > domain first).
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Pivox_Api_V1_DeleteDomainRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func deleteDomain<Result>(
+        request: GRPCCore.ClientRequest<Pivox_Api_V1_DeleteDomainRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_Domain>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.deleteDomain(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Pivox_Api_V1_DeleteDomainRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Pivox_Api_V1_Domain>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
     /// Call the "CreateInvitation" method.
     ///
     /// > Source IDL Documentation:
@@ -2146,6 +2603,157 @@ extension Pivox_Api_V1_Organizations.ClientProtocol {
             metadata: metadata
         )
         return try await self.updateSsoConfig(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "CreateDomain" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Claims a DNS domain on behalf of the organization. The server
+    /// > generates a verification token (returned in the LRO metadata),
+    /// > creates a `Domain` row with `state=PENDING`, and starts polling
+    /// > DNS for the TXT record at `_pivox-verify.<domain>`. The LRO
+    /// > completes when the record is observed (state → VERIFIED) or
+    /// > when the grace window elapses (state → FAILED, phase=EXPIRED).
+    /// > 
+    /// > The verification token lives in the LRO metadata and is
+    /// > available immediately on operation creation — clients display
+    /// > DNS-record instructions without waiting for the LRO to finish.
+    /// > 
+    /// > The caller must hold a role on the organization that grants
+    /// > `resourcemanager.domains.create`. Returns ALREADY_EXISTS if the
+    /// > domain is already claimed by any organization (the response
+    /// > does not disclose which org).
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func createDomain<Result>(
+        _ message: Pivox_Api_V1_CreateDomainRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Pivox_Api_V1_CreateDomainRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.createDomain(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ListDomains" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Lists the domains claimed by an organization, including those
+    /// > still pending verification.
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func listDomains<Result>(
+        _ message: Pivox_Api_V1_ListDomainsRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_ListDomainsResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Pivox_Api_V1_ListDomainsRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.listDomains(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "GetDomain" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Fetches a single domain by resource name.
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func getDomain<Result>(
+        _ message: Pivox_Api_V1_GetDomainRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_Domain>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Pivox_Api_V1_GetDomainRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.getDomain(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "DeleteDomain" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Releases a domain claim. Cancels the in-flight `CreateDomain`
+    /// > LRO if still running. Returns FAILED_PRECONDITION if the
+    /// > domain is the last `VERIFIED` domain on an `enabled=true`
+    /// > SsoConfig (admins must disable SSO or add another verified
+    /// > domain first).
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func deleteDomain<Result>(
+        _ message: Pivox_Api_V1_DeleteDomainRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_Domain>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Pivox_Api_V1_DeleteDomainRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.deleteDomain(
             request: request,
             options: options,
             onResponse: handleResponse

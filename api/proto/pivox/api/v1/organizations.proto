@@ -24,6 +24,7 @@ import "google/api/resource.proto";
 import "google/longrunning/operations.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
+import "pivox/api/v1/domains.proto";
 import "pivox/api/v1/sso.proto";
 
 option go_package = "pivox/api/v1;apiv1";
@@ -149,6 +150,56 @@ service Organizations {
       body: "sso_config"
     };
     option (google.api.method_signature) = "sso_config,update_mask";
+  }
+
+  // Claims a DNS domain on behalf of the organization. The server
+  // generates a verification token (returned in the LRO metadata),
+  // creates a `Domain` row with `state=PENDING`, and starts polling
+  // DNS for the TXT record at `_pivox-verify.<domain>`. The LRO
+  // completes when the record is observed (state → VERIFIED) or
+  // when the grace window elapses (state → FAILED, phase=EXPIRED).
+  //
+  // The verification token lives in the LRO metadata and is
+  // available immediately on operation creation — clients display
+  // DNS-record instructions without waiting for the LRO to finish.
+  //
+  // The caller must hold a role on the organization that grants
+  // `resourcemanager.domains.create`. Returns ALREADY_EXISTS if the
+  // domain is already claimed by any organization (the response
+  // does not disclose which org).
+  rpc CreateDomain(CreateDomainRequest) returns (google.longrunning.Operation) {
+    option (google.api.http) = {
+      post: "/v1/{parent=organizations/*}/domains"
+      body: "domain"
+    };
+    option (google.api.method_signature) = "parent,domain,domain_id";
+    option (google.longrunning.operation_info) = {
+      response_type: "Domain"
+      metadata_type: "CreateDomainMetadata"
+    };
+  }
+
+  // Lists the domains claimed by an organization, including those
+  // still pending verification.
+  rpc ListDomains(ListDomainsRequest) returns (ListDomainsResponse) {
+    option (google.api.http) = {get: "/v1/{parent=organizations/*}/domains"};
+    option (google.api.method_signature) = "parent";
+  }
+
+  // Fetches a single domain by resource name.
+  rpc GetDomain(GetDomainRequest) returns (Domain) {
+    option (google.api.http) = {get: "/v1/{name=organizations/*/domains/*}"};
+    option (google.api.method_signature) = "name";
+  }
+
+  // Releases a domain claim. Cancels the in-flight `CreateDomain`
+  // LRO if still running. Returns FAILED_PRECONDITION if the
+  // domain is the last `VERIFIED` domain on an `enabled=true`
+  // SsoConfig (admins must disable SSO or add another verified
+  // domain first).
+  rpc DeleteDomain(DeleteDomainRequest) returns (Domain) {
+    option (google.api.http) = {delete: "/v1/{name=organizations/*/domains/*}"};
+    option (google.api.method_signature) = "name";
   }
 
   // Creates an invitation to join the organization.

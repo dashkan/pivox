@@ -42,6 +42,10 @@ const (
 	Organizations_UndeleteOrganization_FullMethodName   = "/pivox.api.v1.Organizations/UndeleteOrganization"
 	Organizations_GetSsoConfig_FullMethodName           = "/pivox.api.v1.Organizations/GetSsoConfig"
 	Organizations_UpdateSsoConfig_FullMethodName        = "/pivox.api.v1.Organizations/UpdateSsoConfig"
+	Organizations_CreateDomain_FullMethodName           = "/pivox.api.v1.Organizations/CreateDomain"
+	Organizations_ListDomains_FullMethodName            = "/pivox.api.v1.Organizations/ListDomains"
+	Organizations_GetDomain_FullMethodName              = "/pivox.api.v1.Organizations/GetDomain"
+	Organizations_DeleteDomain_FullMethodName           = "/pivox.api.v1.Organizations/DeleteDomain"
 	Organizations_CreateInvitation_FullMethodName       = "/pivox.api.v1.Organizations/CreateInvitation"
 	Organizations_ListInvitations_FullMethodName        = "/pivox.api.v1.Organizations/ListInvitations"
 	Organizations_GetInvitation_FullMethodName          = "/pivox.api.v1.Organizations/GetInvitation"
@@ -119,6 +123,33 @@ type OrganizationsClient interface {
 	//	aip.dev/not-precedent: UpdateSsoConfig is an AIP-156 singleton
 	//	sub-resource update; returning the singleton is correct. --)
 	UpdateSsoConfig(ctx context.Context, in *UpdateSsoConfigRequest, opts ...grpc.CallOption) (*SsoConfig, error)
+	// Claims a DNS domain on behalf of the organization. The server
+	// generates a verification token (returned in the LRO metadata),
+	// creates a `Domain` row with `state=PENDING`, and starts polling
+	// DNS for the TXT record at `_pivox-verify.<domain>`. The LRO
+	// completes when the record is observed (state → VERIFIED) or
+	// when the grace window elapses (state → FAILED, phase=EXPIRED).
+	//
+	// The verification token lives in the LRO metadata and is
+	// available immediately on operation creation — clients display
+	// DNS-record instructions without waiting for the LRO to finish.
+	//
+	// The caller must hold a role on the organization that grants
+	// `resourcemanager.domains.create`. Returns ALREADY_EXISTS if the
+	// domain is already claimed by any organization (the response
+	// does not disclose which org).
+	CreateDomain(ctx context.Context, in *CreateDomainRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
+	// Lists the domains claimed by an organization, including those
+	// still pending verification.
+	ListDomains(ctx context.Context, in *ListDomainsRequest, opts ...grpc.CallOption) (*ListDomainsResponse, error)
+	// Fetches a single domain by resource name.
+	GetDomain(ctx context.Context, in *GetDomainRequest, opts ...grpc.CallOption) (*Domain, error)
+	// Releases a domain claim. Cancels the in-flight `CreateDomain`
+	// LRO if still running. Returns FAILED_PRECONDITION if the
+	// domain is the last `VERIFIED` domain on an `enabled=true`
+	// SsoConfig (admins must disable SSO or add another verified
+	// domain first).
+	DeleteDomain(ctx context.Context, in *DeleteDomainRequest, opts ...grpc.CallOption) (*Domain, error)
 	// Creates an invitation to join the organization.
 	//
 	// The server validates the email against the organization's invitation
@@ -229,6 +260,46 @@ func (c *organizationsClient) UpdateSsoConfig(ctx context.Context, in *UpdateSso
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SsoConfig)
 	err := c.cc.Invoke(ctx, Organizations_UpdateSsoConfig_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationsClient) CreateDomain(ctx context.Context, in *CreateDomainRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(longrunningpb.Operation)
+	err := c.cc.Invoke(ctx, Organizations_CreateDomain_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationsClient) ListDomains(ctx context.Context, in *ListDomainsRequest, opts ...grpc.CallOption) (*ListDomainsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListDomainsResponse)
+	err := c.cc.Invoke(ctx, Organizations_ListDomains_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationsClient) GetDomain(ctx context.Context, in *GetDomainRequest, opts ...grpc.CallOption) (*Domain, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Domain)
+	err := c.cc.Invoke(ctx, Organizations_GetDomain_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationsClient) DeleteDomain(ctx context.Context, in *DeleteDomainRequest, opts ...grpc.CallOption) (*Domain, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Domain)
+	err := c.cc.Invoke(ctx, Organizations_DeleteDomain_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -382,6 +453,33 @@ type OrganizationsServer interface {
 	//	aip.dev/not-precedent: UpdateSsoConfig is an AIP-156 singleton
 	//	sub-resource update; returning the singleton is correct. --)
 	UpdateSsoConfig(context.Context, *UpdateSsoConfigRequest) (*SsoConfig, error)
+	// Claims a DNS domain on behalf of the organization. The server
+	// generates a verification token (returned in the LRO metadata),
+	// creates a `Domain` row with `state=PENDING`, and starts polling
+	// DNS for the TXT record at `_pivox-verify.<domain>`. The LRO
+	// completes when the record is observed (state → VERIFIED) or
+	// when the grace window elapses (state → FAILED, phase=EXPIRED).
+	//
+	// The verification token lives in the LRO metadata and is
+	// available immediately on operation creation — clients display
+	// DNS-record instructions without waiting for the LRO to finish.
+	//
+	// The caller must hold a role on the organization that grants
+	// `resourcemanager.domains.create`. Returns ALREADY_EXISTS if the
+	// domain is already claimed by any organization (the response
+	// does not disclose which org).
+	CreateDomain(context.Context, *CreateDomainRequest) (*longrunningpb.Operation, error)
+	// Lists the domains claimed by an organization, including those
+	// still pending verification.
+	ListDomains(context.Context, *ListDomainsRequest) (*ListDomainsResponse, error)
+	// Fetches a single domain by resource name.
+	GetDomain(context.Context, *GetDomainRequest) (*Domain, error)
+	// Releases a domain claim. Cancels the in-flight `CreateDomain`
+	// LRO if still running. Returns FAILED_PRECONDITION if the
+	// domain is the last `VERIFIED` domain on an `enabled=true`
+	// SsoConfig (admins must disable SSO or add another verified
+	// domain first).
+	DeleteDomain(context.Context, *DeleteDomainRequest) (*Domain, error)
 	// Creates an invitation to join the organization.
 	//
 	// The server validates the email against the organization's invitation
@@ -441,6 +539,18 @@ func (UnimplementedOrganizationsServer) GetSsoConfig(context.Context, *GetSsoCon
 }
 func (UnimplementedOrganizationsServer) UpdateSsoConfig(context.Context, *UpdateSsoConfigRequest) (*SsoConfig, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateSsoConfig not implemented")
+}
+func (UnimplementedOrganizationsServer) CreateDomain(context.Context, *CreateDomainRequest) (*longrunningpb.Operation, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateDomain not implemented")
+}
+func (UnimplementedOrganizationsServer) ListDomains(context.Context, *ListDomainsRequest) (*ListDomainsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListDomains not implemented")
+}
+func (UnimplementedOrganizationsServer) GetDomain(context.Context, *GetDomainRequest) (*Domain, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetDomain not implemented")
+}
+func (UnimplementedOrganizationsServer) DeleteDomain(context.Context, *DeleteDomainRequest) (*Domain, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteDomain not implemented")
 }
 func (UnimplementedOrganizationsServer) CreateInvitation(context.Context, *CreateInvitationRequest) (*Invitation, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateInvitation not implemented")
@@ -631,6 +741,78 @@ func _Organizations_UpdateSsoConfig_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Organizations_CreateDomain_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateDomainRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).CreateDomain(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_CreateDomain_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).CreateDomain(ctx, req.(*CreateDomainRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Organizations_ListDomains_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListDomainsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).ListDomains(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_ListDomains_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).ListDomains(ctx, req.(*ListDomainsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Organizations_GetDomain_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetDomainRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).GetDomain(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_GetDomain_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).GetDomain(ctx, req.(*GetDomainRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Organizations_DeleteDomain_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteDomainRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).DeleteDomain(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_DeleteDomain_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).DeleteDomain(ctx, req.(*DeleteDomainRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Organizations_CreateInvitation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateInvitationRequest)
 	if err := dec(in); err != nil {
@@ -813,6 +995,22 @@ var Organizations_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateSsoConfig",
 			Handler:    _Organizations_UpdateSsoConfig_Handler,
+		},
+		{
+			MethodName: "CreateDomain",
+			Handler:    _Organizations_CreateDomain_Handler,
+		},
+		{
+			MethodName: "ListDomains",
+			Handler:    _Organizations_ListDomains_Handler,
+		},
+		{
+			MethodName: "GetDomain",
+			Handler:    _Organizations_GetDomain_Handler,
+		},
+		{
+			MethodName: "DeleteDomain",
+			Handler:    _Organizations_DeleteDomain_Handler,
 		},
 		{
 			MethodName: "CreateInvitation",

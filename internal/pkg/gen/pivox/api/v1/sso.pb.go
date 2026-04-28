@@ -39,67 +39,6 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// The lifecycle state of this domain's verification.
-type VerifiedDomain_State int32
-
-const (
-	// Default. Not used.
-	VerifiedDomain_STATE_UNSPECIFIED VerifiedDomain_State = 0
-	// Domain added; awaiting DNS TXT record. Server polls
-	// periodically until the record is observed (or the request
-	// expires).
-	VerifiedDomain_PENDING VerifiedDomain_State = 1
-	// DNS TXT record observed and matches `verification_token`.
-	// Domain participates in `Sso.Resolve`.
-	VerifiedDomain_VERIFIED VerifiedDomain_State = 2
-	// Verification failed (token mismatch or expired window). Caller
-	// can retry by reissuing the domain via Update.
-	VerifiedDomain_FAILED VerifiedDomain_State = 3
-)
-
-// Enum value maps for VerifiedDomain_State.
-var (
-	VerifiedDomain_State_name = map[int32]string{
-		0: "STATE_UNSPECIFIED",
-		1: "PENDING",
-		2: "VERIFIED",
-		3: "FAILED",
-	}
-	VerifiedDomain_State_value = map[string]int32{
-		"STATE_UNSPECIFIED": 0,
-		"PENDING":           1,
-		"VERIFIED":          2,
-		"FAILED":            3,
-	}
-)
-
-func (x VerifiedDomain_State) Enum() *VerifiedDomain_State {
-	p := new(VerifiedDomain_State)
-	*p = x
-	return p
-}
-
-func (x VerifiedDomain_State) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (VerifiedDomain_State) Descriptor() protoreflect.EnumDescriptor {
-	return file_pivox_api_v1_sso_proto_enumTypes[0].Descriptor()
-}
-
-func (VerifiedDomain_State) Type() protoreflect.EnumType {
-	return &file_pivox_api_v1_sso_proto_enumTypes[0]
-}
-
-func (x VerifiedDomain_State) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use VerifiedDomain_State.Descriptor instead.
-func (VerifiedDomain_State) EnumDescriptor() ([]byte, []int) {
-	return file_pivox_api_v1_sso_proto_rawDescGZIP(), []int{3, 0}
-}
-
 // SsoConfig is the per-organization SSO/IDP configuration. AIP-156
 // singleton sub-resource of Organization — there is at most one
 // SsoConfig per org, addressable at `organizations/{org}/ssoConfig`.
@@ -108,6 +47,11 @@ func (VerifiedDomain_State) EnumDescriptor() ([]byte, []int) {
 // resource definition and request shapes only). Phase 4 wires server-
 // side encryption: client_secret travels cleartext over TLS, the
 // server envelope-encrypts it via Cloud KMS before persisting.
+//
+// Domain ↔ SsoConfig linkage is implicit: any of the org's `Domain`
+// resources in `state=VERIFIED` route to this SsoConfig when
+// `enabled=true`. There is at most one SsoConfig per org so the
+// mapping is unambiguous.
 type SsoConfig struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The resource name of the SsoConfig. Format:
@@ -122,7 +66,7 @@ type SsoConfig struct {
 	// screen and in the Firebase console.
 	DisplayName string `protobuf:"bytes,3,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
 	// Optional. Whether SSO is currently active. When `false`, the
-	// SsoConfig remains stored but `Sso.ResolveProvider` returns
+	// SsoConfig remains stored but `auth:resolveProvider` returns
 	// NOT_FOUND for the org's domains and no Firebase provider is
 	// exposed.
 	Enabled bool `protobuf:"varint,4,opt,name=enabled,proto3" json:"enabled,omitempty"`
@@ -134,18 +78,13 @@ type SsoConfig struct {
 	//	*SsoConfig_Oidc
 	//	*SsoConfig_Saml
 	Config isSsoConfig_Config `protobuf_oneof:"config"`
-	// Optional. Domains owned by this organization that route to this
-	// SsoConfig. Each domain carries its own verification state (DNS TXT
-	// challenge); only `VERIFIED` domains participate in
-	// `Sso.ResolveProvider` lookups.
-	VerifiedDomains []*VerifiedDomain `protobuf:"bytes,7,rep,name=verified_domains,json=verifiedDomains,proto3" json:"verified_domains,omitempty"`
 	// Output only. Timestamp when the SsoConfig was created.
-	CreateTime *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	CreateTime *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
 	// Output only. Timestamp when the SsoConfig was last modified.
-	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
 	// Output only. A checksum computed by the server based on the
 	// current value of the SsoConfig resource.
-	Etag          string `protobuf:"bytes,10,opt,name=etag,proto3" json:"etag,omitempty"`
+	Etag          string `protobuf:"bytes,9,opt,name=etag,proto3" json:"etag,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -229,13 +168,6 @@ func (x *SsoConfig) GetSaml() *SamlConfig {
 		if x, ok := x.Config.(*SsoConfig_Saml); ok {
 			return x.Saml
 		}
-	}
-	return nil
-}
-
-func (x *SsoConfig) GetVerifiedDomains() []*VerifiedDomain {
-	if x != nil {
-		return x.VerifiedDomains
 	}
 	return nil
 }
@@ -478,85 +410,6 @@ func (x *SamlConfig) GetCallbackUrl() string {
 	return ""
 }
 
-// VerifiedDomain ties a domain (e.g. `acme.com`) to an SsoConfig and
-// tracks its DNS-TXT-record verification state. Only `VERIFIED`
-// domains participate in `Sso.Resolve` lookups.
-type VerifiedDomain struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Required on Create. The fully qualified domain. Must be a valid
-	// DNS name; case-insensitive on read.
-	Domain string `protobuf:"bytes,1,opt,name=domain,proto3" json:"domain,omitempty"`
-	// Output only. Current verification state.
-	State VerifiedDomain_State `protobuf:"varint,2,opt,name=state,proto3,enum=pivox.api.v1.VerifiedDomain_State" json:"state,omitempty"`
-	// Output only. The DNS TXT record value the domain owner must
-	// publish at `_pivox-sso.<domain>` to prove ownership. Generated
-	// when the domain enters `PENDING`.
-	VerificationToken string `protobuf:"bytes,3,opt,name=verification_token,json=verificationToken,proto3" json:"verification_token,omitempty"`
-	// Output only. Timestamp when the domain transitioned to `VERIFIED`,
-	// or unset if it has never verified successfully.
-	VerifiedTime  *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=verified_time,json=verifiedTime,proto3" json:"verified_time,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *VerifiedDomain) Reset() {
-	*x = VerifiedDomain{}
-	mi := &file_pivox_api_v1_sso_proto_msgTypes[3]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *VerifiedDomain) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*VerifiedDomain) ProtoMessage() {}
-
-func (x *VerifiedDomain) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_api_v1_sso_proto_msgTypes[3]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use VerifiedDomain.ProtoReflect.Descriptor instead.
-func (*VerifiedDomain) Descriptor() ([]byte, []int) {
-	return file_pivox_api_v1_sso_proto_rawDescGZIP(), []int{3}
-}
-
-func (x *VerifiedDomain) GetDomain() string {
-	if x != nil {
-		return x.Domain
-	}
-	return ""
-}
-
-func (x *VerifiedDomain) GetState() VerifiedDomain_State {
-	if x != nil {
-		return x.State
-	}
-	return VerifiedDomain_STATE_UNSPECIFIED
-}
-
-func (x *VerifiedDomain) GetVerificationToken() string {
-	if x != nil {
-		return x.VerificationToken
-	}
-	return ""
-}
-
-func (x *VerifiedDomain) GetVerifiedTime() *timestamppb.Timestamp {
-	if x != nil {
-		return x.VerifiedTime
-	}
-	return nil
-}
-
 // Request message for `Organizations.GetSsoConfig`.
 type GetSsoConfigRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -569,7 +422,7 @@ type GetSsoConfigRequest struct {
 
 func (x *GetSsoConfigRequest) Reset() {
 	*x = GetSsoConfigRequest{}
-	mi := &file_pivox_api_v1_sso_proto_msgTypes[4]
+	mi := &file_pivox_api_v1_sso_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -581,7 +434,7 @@ func (x *GetSsoConfigRequest) String() string {
 func (*GetSsoConfigRequest) ProtoMessage() {}
 
 func (x *GetSsoConfigRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_api_v1_sso_proto_msgTypes[4]
+	mi := &file_pivox_api_v1_sso_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -594,7 +447,7 @@ func (x *GetSsoConfigRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSsoConfigRequest.ProtoReflect.Descriptor instead.
 func (*GetSsoConfigRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_api_v1_sso_proto_rawDescGZIP(), []int{4}
+	return file_pivox_api_v1_sso_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GetSsoConfigRequest) GetName() string {
@@ -629,7 +482,7 @@ type UpdateSsoConfigRequest struct {
 
 func (x *UpdateSsoConfigRequest) Reset() {
 	*x = UpdateSsoConfigRequest{}
-	mi := &file_pivox_api_v1_sso_proto_msgTypes[5]
+	mi := &file_pivox_api_v1_sso_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -641,7 +494,7 @@ func (x *UpdateSsoConfigRequest) String() string {
 func (*UpdateSsoConfigRequest) ProtoMessage() {}
 
 func (x *UpdateSsoConfigRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_api_v1_sso_proto_msgTypes[5]
+	mi := &file_pivox_api_v1_sso_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -654,7 +507,7 @@ func (x *UpdateSsoConfigRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateSsoConfigRequest.ProtoReflect.Descriptor instead.
 func (*UpdateSsoConfigRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_api_v1_sso_proto_rawDescGZIP(), []int{5}
+	return file_pivox_api_v1_sso_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *UpdateSsoConfigRequest) GetSsoConfig() *SsoConfig {
@@ -669,113 +522,6 @@ func (x *UpdateSsoConfigRequest) GetUpdateMask() *fieldmaskpb.FieldMask {
 		return x.UpdateMask
 	}
 	return nil
-}
-
-// Request message for `Sso.ResolveProvider`.
-type ResolveProviderRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Required. The email address being signed in with. The server
-	// extracts the domain (right of `@`) and looks up the verified
-	// domain → SsoConfig mapping.
-	Email         string `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ResolveProviderRequest) Reset() {
-	*x = ResolveProviderRequest{}
-	mi := &file_pivox_api_v1_sso_proto_msgTypes[6]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ResolveProviderRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ResolveProviderRequest) ProtoMessage() {}
-
-func (x *ResolveProviderRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_api_v1_sso_proto_msgTypes[6]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ResolveProviderRequest.ProtoReflect.Descriptor instead.
-func (*ResolveProviderRequest) Descriptor() ([]byte, []int) {
-	return file_pivox_api_v1_sso_proto_rawDescGZIP(), []int{6}
-}
-
-func (x *ResolveProviderRequest) GetEmail() string {
-	if x != nil {
-		return x.Email
-	}
-	return ""
-}
-
-// Response message for `Sso.ResolveProvider`.
-type ResolveProviderResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// The Firebase Auth provider id to redirect the user to. Format:
-	// `oidc.<slug>` or `saml.<slug>`. Empty if no provider is
-	// configured (the server returns NOT_FOUND in that case rather
-	// than an empty string).
-	FirebaseProviderId string `protobuf:"bytes,1,opt,name=firebase_provider_id,json=firebaseProviderId,proto3" json:"firebase_provider_id,omitempty"`
-	// Human-readable label for the IDP, suitable for showing on the
-	// sign-in screen (e.g. "Sign in with Acme").
-	DisplayName   string `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ResolveProviderResponse) Reset() {
-	*x = ResolveProviderResponse{}
-	mi := &file_pivox_api_v1_sso_proto_msgTypes[7]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ResolveProviderResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ResolveProviderResponse) ProtoMessage() {}
-
-func (x *ResolveProviderResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_api_v1_sso_proto_msgTypes[7]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ResolveProviderResponse.ProtoReflect.Descriptor instead.
-func (*ResolveProviderResponse) Descriptor() ([]byte, []int) {
-	return file_pivox_api_v1_sso_proto_rawDescGZIP(), []int{7}
-}
-
-func (x *ResolveProviderResponse) GetFirebaseProviderId() string {
-	if x != nil {
-		return x.FirebaseProviderId
-	}
-	return ""
-}
-
-func (x *ResolveProviderResponse) GetDisplayName() string {
-	if x != nil {
-		return x.DisplayName
-	}
-	return ""
 }
 
 // OIDC response_type bitfield. Maps directly onto Firebase Admin
@@ -793,7 +539,7 @@ type OidcConfig_ResponseType struct {
 
 func (x *OidcConfig_ResponseType) Reset() {
 	*x = OidcConfig_ResponseType{}
-	mi := &file_pivox_api_v1_sso_proto_msgTypes[8]
+	mi := &file_pivox_api_v1_sso_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -805,7 +551,7 @@ func (x *OidcConfig_ResponseType) String() string {
 func (*OidcConfig_ResponseType) ProtoMessage() {}
 
 func (x *OidcConfig_ResponseType) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_api_v1_sso_proto_msgTypes[8]
+	mi := &file_pivox_api_v1_sso_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -839,21 +585,19 @@ var File_pivox_api_v1_sso_proto protoreflect.FileDescriptor
 
 const file_pivox_api_v1_sso_proto_rawDesc = "" +
 	"\n" +
-	"\x16pivox/api/v1/sso.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xd9\x04\n" +
+	"\x16pivox/api/v1/sso.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x8b\x04\n" +
 	"\tSsoConfig\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x125\n" +
 	"\x14firebase_provider_id\x18\x02 \x01(\tB\x03\xe0A\x03R\x12firebaseProviderId\x12/\n" +
 	"\fdisplay_name\x18\x03 \x01(\tB\f\xe0A\x02\xbaH\x06r\x04\x10\x01\x18?R\vdisplayName\x12\x1d\n" +
 	"\aenabled\x18\x04 \x01(\bB\x03\xe0A\x01R\aenabled\x12.\n" +
 	"\x04oidc\x18\x05 \x01(\v2\x18.pivox.api.v1.OidcConfigH\x00R\x04oidc\x12.\n" +
-	"\x04saml\x18\x06 \x01(\v2\x18.pivox.api.v1.SamlConfigH\x00R\x04saml\x12L\n" +
-	"\x10verified_domains\x18\a \x03(\v2\x1c.pivox.api.v1.VerifiedDomainB\x03\xe0A\x01R\x0fverifiedDomains\x12@\n" +
-	"\vcreate_time\x18\b \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"\x04saml\x18\x06 \x01(\v2\x18.pivox.api.v1.SamlConfigH\x00R\x04saml\x12@\n" +
+	"\vcreate_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"createTime\x12@\n" +
-	"\vupdate_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"\vupdate_time\x18\b \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"updateTime\x12\x17\n" +
-	"\x04etag\x18\n" +
-	" \x01(\tB\x03\xe0A\x03R\x04etag:W\xeaAT\n" +
+	"\x04etag\x18\t \x01(\tB\x03\xe0A\x03R\x04etag:W\xeaAT\n" +
 	"\x13pivox.api/SsoConfig\x12&organizations/{organization}/ssoConfig*\n" +
 	"ssoConfigs2\tssoConfigB\b\n" +
 	"\x06config\"\xf1\x02\n" +
@@ -879,19 +623,7 @@ const file_pivox_api_v1_sso_proto_rawDesc = "" +
 	"\x17request_signing_enabled\x18\x04 \x01(\bB\x03\xe0A\x01R\x15requestSigningEnabled\x12%\n" +
 	"\frp_entity_id\x18\x05 \x01(\tB\x03\xe0A\x03R\n" +
 	"rpEntityId\x12&\n" +
-	"\fcallback_url\x18\x06 \x01(\tB\x03\xe0A\x03R\vcallbackUrl\"\xb1\x03\n" +
-	"\x0eVerifiedDomain\x12\x9e\x01\n" +
-	"\x06domain\x18\x01 \x01(\tB\x85\x01\xe0A\x02\xbaH\x7f\xba\x01|\n" +
-	"\fvalid_domain\x12\x1bmust be a valid domain name\x1aOthis.matches('^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\\\.)+[a-zA-Z]{2,}$')R\x06domain\x12=\n" +
-	"\x05state\x18\x02 \x01(\x0e2\".pivox.api.v1.VerifiedDomain.StateB\x03\xe0A\x03R\x05state\x122\n" +
-	"\x12verification_token\x18\x03 \x01(\tB\x03\xe0A\x03R\x11verificationToken\x12D\n" +
-	"\rverified_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\fverifiedTime\"E\n" +
-	"\x05State\x12\x15\n" +
-	"\x11STATE_UNSPECIFIED\x10\x00\x12\v\n" +
-	"\aPENDING\x10\x01\x12\f\n" +
-	"\bVERIFIED\x10\x02\x12\n" +
-	"\n" +
-	"\x06FAILED\x10\x03\"L\n" +
+	"\fcallback_url\x18\x06 \x01(\tB\x03\xe0A\x03R\vcallbackUrl\"L\n" +
 	"\x13GetSsoConfigRequest\x125\n" +
 	"\x04name\x18\x01 \x01(\tB!\xe0A\x02\xfaA\x15\n" +
 	"\x13pivox.api/SsoConfig\xbaH\x03\xc8\x01\x01R\x04name\"\x9d\x01\n" +
@@ -899,14 +631,7 @@ const file_pivox_api_v1_sso_proto_rawDesc = "" +
 	"\n" +
 	"sso_config\x18\x01 \x01(\v2\x17.pivox.api.v1.SsoConfigB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\tssoConfig\x12@\n" +
 	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskB\x03\xe0A\x01R\n" +
-	"updateMask\"=\n" +
-	"\x16ResolveProviderRequest\x12#\n" +
-	"\x05email\x18\x01 \x01(\tB\r\xe0A\x02\xbaH\ar\x05\x18\xfe\x01`\x01R\x05email\"n\n" +
-	"\x17ResolveProviderResponse\x120\n" +
-	"\x14firebase_provider_id\x18\x01 \x01(\tR\x12firebaseProviderId\x12!\n" +
-	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName2\x9b\x01\n" +
-	"\x03Sso\x12\x82\x01\n" +
-	"\x0fResolveProvider\x12$.pivox.api.v1.ResolveProviderRequest\x1a%.pivox.api.v1.ResolveProviderResponse\"\"\x82\xd3\xe4\x93\x02\x1c:\x01*\"\x17/v1/sso:resolveProvider\x1a\x0f\xcaA\fapi.pivox.ioB\xac\x01\n" +
+	"updateMaskB\xac\x01\n" +
 	"\x10com.pivox.api.v1B\bSsoProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
 
 var (
@@ -921,40 +646,30 @@ func file_pivox_api_v1_sso_proto_rawDescGZIP() []byte {
 	return file_pivox_api_v1_sso_proto_rawDescData
 }
 
-var file_pivox_api_v1_sso_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_pivox_api_v1_sso_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_pivox_api_v1_sso_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_pivox_api_v1_sso_proto_goTypes = []any{
-	(VerifiedDomain_State)(0),       // 0: pivox.api.v1.VerifiedDomain.State
-	(*SsoConfig)(nil),               // 1: pivox.api.v1.SsoConfig
-	(*OidcConfig)(nil),              // 2: pivox.api.v1.OidcConfig
-	(*SamlConfig)(nil),              // 3: pivox.api.v1.SamlConfig
-	(*VerifiedDomain)(nil),          // 4: pivox.api.v1.VerifiedDomain
-	(*GetSsoConfigRequest)(nil),     // 5: pivox.api.v1.GetSsoConfigRequest
-	(*UpdateSsoConfigRequest)(nil),  // 6: pivox.api.v1.UpdateSsoConfigRequest
-	(*ResolveProviderRequest)(nil),  // 7: pivox.api.v1.ResolveProviderRequest
-	(*ResolveProviderResponse)(nil), // 8: pivox.api.v1.ResolveProviderResponse
-	(*OidcConfig_ResponseType)(nil), // 9: pivox.api.v1.OidcConfig.ResponseType
-	(*timestamppb.Timestamp)(nil),   // 10: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),   // 11: google.protobuf.FieldMask
+	(*SsoConfig)(nil),               // 0: pivox.api.v1.SsoConfig
+	(*OidcConfig)(nil),              // 1: pivox.api.v1.OidcConfig
+	(*SamlConfig)(nil),              // 2: pivox.api.v1.SamlConfig
+	(*GetSsoConfigRequest)(nil),     // 3: pivox.api.v1.GetSsoConfigRequest
+	(*UpdateSsoConfigRequest)(nil),  // 4: pivox.api.v1.UpdateSsoConfigRequest
+	(*OidcConfig_ResponseType)(nil), // 5: pivox.api.v1.OidcConfig.ResponseType
+	(*timestamppb.Timestamp)(nil),   // 6: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),   // 7: google.protobuf.FieldMask
 }
 var file_pivox_api_v1_sso_proto_depIdxs = []int32{
-	2,  // 0: pivox.api.v1.SsoConfig.oidc:type_name -> pivox.api.v1.OidcConfig
-	3,  // 1: pivox.api.v1.SsoConfig.saml:type_name -> pivox.api.v1.SamlConfig
-	4,  // 2: pivox.api.v1.SsoConfig.verified_domains:type_name -> pivox.api.v1.VerifiedDomain
-	10, // 3: pivox.api.v1.SsoConfig.create_time:type_name -> google.protobuf.Timestamp
-	10, // 4: pivox.api.v1.SsoConfig.update_time:type_name -> google.protobuf.Timestamp
-	9,  // 5: pivox.api.v1.OidcConfig.response_type:type_name -> pivox.api.v1.OidcConfig.ResponseType
-	0,  // 6: pivox.api.v1.VerifiedDomain.state:type_name -> pivox.api.v1.VerifiedDomain.State
-	10, // 7: pivox.api.v1.VerifiedDomain.verified_time:type_name -> google.protobuf.Timestamp
-	1,  // 8: pivox.api.v1.UpdateSsoConfigRequest.sso_config:type_name -> pivox.api.v1.SsoConfig
-	11, // 9: pivox.api.v1.UpdateSsoConfigRequest.update_mask:type_name -> google.protobuf.FieldMask
-	7,  // 10: pivox.api.v1.Sso.ResolveProvider:input_type -> pivox.api.v1.ResolveProviderRequest
-	8,  // 11: pivox.api.v1.Sso.ResolveProvider:output_type -> pivox.api.v1.ResolveProviderResponse
-	11, // [11:12] is the sub-list for method output_type
-	10, // [10:11] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	1, // 0: pivox.api.v1.SsoConfig.oidc:type_name -> pivox.api.v1.OidcConfig
+	2, // 1: pivox.api.v1.SsoConfig.saml:type_name -> pivox.api.v1.SamlConfig
+	6, // 2: pivox.api.v1.SsoConfig.create_time:type_name -> google.protobuf.Timestamp
+	6, // 3: pivox.api.v1.SsoConfig.update_time:type_name -> google.protobuf.Timestamp
+	5, // 4: pivox.api.v1.OidcConfig.response_type:type_name -> pivox.api.v1.OidcConfig.ResponseType
+	0, // 5: pivox.api.v1.UpdateSsoConfigRequest.sso_config:type_name -> pivox.api.v1.SsoConfig
+	7, // 6: pivox.api.v1.UpdateSsoConfigRequest.update_mask:type_name -> google.protobuf.FieldMask
+	7, // [7:7] is the sub-list for method output_type
+	7, // [7:7] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_pivox_api_v1_sso_proto_init() }
@@ -971,14 +686,13 @@ func file_pivox_api_v1_sso_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pivox_api_v1_sso_proto_rawDesc), len(file_pivox_api_v1_sso_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   9,
+			NumEnums:      0,
+			NumMessages:   6,
 			NumExtensions: 0,
-			NumServices:   1,
+			NumServices:   0,
 		},
 		GoTypes:           file_pivox_api_v1_sso_proto_goTypes,
 		DependencyIndexes: file_pivox_api_v1_sso_proto_depIdxs,
-		EnumInfos:         file_pivox_api_v1_sso_proto_enumTypes,
 		MessageInfos:      file_pivox_api_v1_sso_proto_msgTypes,
 	}.Build()
 	File_pivox_api_v1_sso_proto = out.File

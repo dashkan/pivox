@@ -295,6 +295,177 @@
         ]
       }
     },
+    "/v1/organizations/{organization}/domains": {
+      "get": {
+        "summary": "Lists the domains claimed by an organization, including those\nstill pending verification.",
+        "operationId": "Organizations_ListDomains",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListDomainsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Optional. Maximum number of domains to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. Page token from a previous ListDomains call.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      },
+      "post": {
+        "summary": "Claims a DNS domain on behalf of the organization. The server\ngenerates a verification token (returned in the LRO metadata),\ncreates a `Domain` row with `state=PENDING`, and starts polling\nDNS for the TXT record at `_pivox-verify.\u003cdomain\u003e`. The LRO\ncompletes when the record is observed (state → VERIFIED) or\nwhen the grace window elapses (state → FAILED, phase=EXPIRED).",
+        "description": "The verification token lives in the LRO metadata and is\navailable immediately on operation creation — clients display\nDNS-record instructions without waiting for the LRO to finish.\n\nThe caller must hold a role on the organization that grants\n`resourcemanager.domains.create`. Returns ALREADY_EXISTS if the\ndomain is already claimed by any organization (the response\ndoes not disclose which org).",
+        "operationId": "Organizations_CreateDomain",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/longrunningOperation"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "domain",
+            "description": "Required. The Domain to create. The `domain` field must be set;\nall other fields are output-only.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1Domain"
+            }
+          },
+          {
+            "name": "domainId",
+            "description": "Optional. The id portion of the resource name. If unset, the\nserver uses the lowercase form of `domain.domain`. If set, must\nequal that value (provided for AIP-133 compliance and idempotent\nretries).",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/domains/{domain}": {
+      "get": {
+        "summary": "Fetches a single domain by resource name.",
+        "operationId": "Organizations_GetDomain",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Domain"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      },
+      "delete": {
+        "summary": "Releases a domain claim. Cancels the in-flight `CreateDomain`\nLRO if still running. Returns FAILED_PRECONDITION if the\ndomain is the last `VERIFIED` domain on an `enabled=true`\nSsoConfig (admins must disable SSO or add another verified\ndomain first).",
+        "operationId": "Organizations_DeleteDomain",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Domain"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "etag",
+            "description": "Optional. The etag known to the client. Used for optimistic\nconcurrency control.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
     "/v1/organizations/{organization}/invitationPolicy": {
       "get": {
         "summary": "Gets the invitation policy for an organization.",
@@ -744,7 +915,7 @@
                 },
                 "enabled": {
                   "type": "boolean",
-                  "description": "Optional. Whether SSO is currently active. When `false`, the\nSsoConfig remains stored but `Sso.ResolveProvider` returns\nNOT_FOUND for the org's domains and no Firebase provider is\nexposed."
+                  "description": "Optional. Whether SSO is currently active. When `false`, the\nSsoConfig remains stored but `auth:resolveProvider` returns\nNOT_FOUND for the org's domains and no Firebase provider is\nexposed."
                 },
                 "oidc": {
                   "$ref": "#/definitions/v1OidcConfig",
@@ -753,14 +924,6 @@
                 "saml": {
                   "$ref": "#/definitions/v1SamlConfig",
                   "description": "SAML 2.0 provider configuration. Set when the IDP only speaks\nSAML."
-                },
-                "verifiedDomains": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "$ref": "#/definitions/v1VerifiedDomain"
-                  },
-                  "description": "Optional. Domains owned by this organization that route to this\nSsoConfig. Each domain carries its own verification state (DNS TXT\nchallenge); only `VERIFIED` domains participate in\n`Sso.ResolveProvider` lookups."
                 },
                 "createTime": {
                   "type": "string",
@@ -946,6 +1109,63 @@
       },
       "description": "Response message for `DeclineInvitation`."
     },
+    "v1Domain": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Output only. The resource name of the Domain. Format:\n`organizations/{organization}/domains/{domain}`. The trailing\nsegment is the domain name itself (lowercase canonical form).",
+          "readOnly": true
+        },
+        "domain": {
+          "type": "string",
+          "description": "Required on Create. The fully qualified domain name. Stored\nlowercase; case-insensitive on read."
+        },
+        "state": {
+          "$ref": "#/definitions/v1DomainState",
+          "description": "Output only. Last known verification state.",
+          "readOnly": true
+        },
+        "verifiedTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the domain transitioned to\n`VERIFIED`, or unset if it has never verified successfully.",
+          "readOnly": true
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the Domain row was created.",
+          "readOnly": true
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Output only. Timestamp when the Domain was last modified.",
+          "readOnly": true
+        },
+        "etag": {
+          "type": "string",
+          "description": "Output only. A checksum computed by the server based on the\ncurrent value of the Domain resource.",
+          "readOnly": true
+        }
+      },
+      "description": "Domain is an organization-scoped resource representing a DNS domain\nthe organization claims to own. Ownership is proved by publishing a\nTXT record matching the server-issued `verification_token`; the\n`CreateDomain` LRO drives that proof end-to-end.\n\nDomain is decoupled from any single consumer — SSO is the first\ncaller (a verified domain routes to the org's enabled SsoConfig),\nbut future features (email allowlist, custom invitation domains,\nbranding) consume the same resource.",
+      "required": [
+        "domain"
+      ]
+    },
+    "v1DomainState": {
+      "type": "string",
+      "enum": [
+        "STATE_UNSPECIFIED",
+        "PENDING",
+        "VERIFIED",
+        "FAILED"
+      ],
+      "default": "STATE_UNSPECIFIED",
+      "description": "Verification lifecycle states. A Domain reflects the *last known*\nverification result; the active LRO progress lives in\n`CreateDomainMetadata.Phase` until it completes.\n\n - STATE_UNSPECIFIED: Default; not used.\n - PENDING: Domain row exists; verification has not yet succeeded. The\nassociated `CreateDomain` LRO is either in flight or expired.\n - VERIFIED: The DNS TXT record was observed and matches the issued\n`verification_token`. The domain participates in\n`auth:resolveProvider` lookups (and any other consumers).\n - FAILED: Verification failed unrecoverably (e.g. token mismatch\ndetected after a previous VERIFIED state, or the LRO expired\nwithout a successful check). Caller can retry via a fresh\n`CreateDomain` cycle (delete + recreate)."
+    },
     "v1Invitation": {
       "type": "object",
       "properties": {
@@ -1053,6 +1273,24 @@
       ],
       "default": "STATE_UNSPECIFIED",
       "description": "Invitation lifecycle states.\n\n - STATE_UNSPECIFIED: Unspecified state.\n - PENDING: The invitation is pending acceptance.\n - ACCEPTED: The invitation has been accepted and a user membership was created.\n - DECLINED: The invitation was declined by the recipient.\n - REVOKED: The invitation was revoked by an org admin.\n - EXPIRED: The invitation expired before being accepted or declined."
+    },
+    "v1ListDomainsResponse": {
+      "type": "object",
+      "properties": {
+        "domains": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Domain"
+          },
+          "description": "The domains in the organization."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for the next page of results."
+        }
+      },
+      "description": "Response message for `Organizations.ListDomains`."
     },
     "v1ListInvitationsResponse": {
       "type": "object",
@@ -1242,7 +1480,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Optional. Whether SSO is currently active. When `false`, the\nSsoConfig remains stored but `Sso.ResolveProvider` returns\nNOT_FOUND for the org's domains and no Firebase provider is\nexposed."
+          "description": "Optional. Whether SSO is currently active. When `false`, the\nSsoConfig remains stored but `auth:resolveProvider` returns\nNOT_FOUND for the org's domains and no Firebase provider is\nexposed."
         },
         "oidc": {
           "$ref": "#/definitions/v1OidcConfig",
@@ -1251,14 +1489,6 @@
         "saml": {
           "$ref": "#/definitions/v1SamlConfig",
           "description": "SAML 2.0 provider configuration. Set when the IDP only speaks\nSAML."
-        },
-        "verifiedDomains": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/v1VerifiedDomain"
-          },
-          "description": "Optional. Domains owned by this organization that route to this\nSsoConfig. Each domain carries its own verification state (DNS TXT\nchallenge); only `VERIFIED` domains participate in\n`Sso.ResolveProvider` lookups."
         },
         "createTime": {
           "type": "string",
@@ -1278,50 +1508,10 @@
           "readOnly": true
         }
       },
-      "description": "SsoConfig is the per-organization SSO/IDP configuration. AIP-156\nsingleton sub-resource of Organization — there is at most one\nSsoConfig per org, addressable at `organizations/{org}/ssoConfig`.\n\nGet/Update RPCs live on the Organizations service (this is the\nresource definition and request shapes only). Phase 4 wires server-\nside encryption: client_secret travels cleartext over TLS, the\nserver envelope-encrypts it via Cloud KMS before persisting.",
+      "description": "SsoConfig is the per-organization SSO/IDP configuration. AIP-156\nsingleton sub-resource of Organization — there is at most one\nSsoConfig per org, addressable at `organizations/{org}/ssoConfig`.\n\nGet/Update RPCs live on the Organizations service (this is the\nresource definition and request shapes only). Phase 4 wires server-\nside encryption: client_secret travels cleartext over TLS, the\nserver envelope-encrypts it via Cloud KMS before persisting.\n\nDomain ↔ SsoConfig linkage is implicit: any of the org's `Domain`\nresources in `state=VERIFIED` route to this SsoConfig when\n`enabled=true`. There is at most one SsoConfig per org so the\nmapping is unambiguous.",
       "required": [
         "displayName"
       ]
-    },
-    "v1VerifiedDomain": {
-      "type": "object",
-      "properties": {
-        "domain": {
-          "type": "string",
-          "description": "Required on Create. The fully qualified domain. Must be a valid\nDNS name; case-insensitive on read."
-        },
-        "state": {
-          "$ref": "#/definitions/v1VerifiedDomainState",
-          "description": "Output only. Current verification state.",
-          "readOnly": true
-        },
-        "verificationToken": {
-          "type": "string",
-          "description": "Output only. The DNS TXT record value the domain owner must\npublish at `_pivox-sso.\u003cdomain\u003e` to prove ownership. Generated\nwhen the domain enters `PENDING`.",
-          "readOnly": true
-        },
-        "verifiedTime": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Output only. Timestamp when the domain transitioned to `VERIFIED`,\nor unset if it has never verified successfully.",
-          "readOnly": true
-        }
-      },
-      "description": "VerifiedDomain ties a domain (e.g. `acme.com`) to an SsoConfig and\ntracks its DNS-TXT-record verification state. Only `VERIFIED`\ndomains participate in `Sso.Resolve` lookups.",
-      "required": [
-        "domain"
-      ]
-    },
-    "v1VerifiedDomainState": {
-      "type": "string",
-      "enum": [
-        "STATE_UNSPECIFIED",
-        "PENDING",
-        "VERIFIED",
-        "FAILED"
-      ],
-      "default": "STATE_UNSPECIFIED",
-      "description": "The lifecycle state of this domain's verification.\n\n - STATE_UNSPECIFIED: Default. Not used.\n - PENDING: Domain added; awaiting DNS TXT record. Server polls\nperiodically until the record is observed (or the request\nexpires).\n - VERIFIED: DNS TXT record observed and matches `verification_token`.\nDomain participates in `Sso.Resolve`.\n - FAILED: Verification failed (token mismatch or expired window). Caller\ncan retry by reissuing the domain via Update."
     }
   }
 }

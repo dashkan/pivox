@@ -1877,7 +1877,7 @@ var File_pivox_api_v1_organizations_proto protoreflect.FileDescriptor
 
 const file_pivox_api_v1_organizations_proto_rawDesc = "" +
 	"\n" +
-	" pivox/api/v1/organizations.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16pivox/api/v1/sso.proto\"\xd9\x05\n" +
+	" pivox/api/v1/organizations.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1apivox/api/v1/domains.proto\x1a\x16pivox/api/v1/sso.proto\"\xd9\x05\n" +
 	"\fOrganization\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12&\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\x03\xe0A\x03R\vdisplayName\x12;\n" +
@@ -2024,7 +2024,7 @@ const file_pivox_api_v1_organizations_proto_rawDesc = "" +
 	"\x1dUpdateInvitationPolicyRequest\x12V\n" +
 	"\x11invitation_policy\x18\x01 \x01(\v2\x1e.pivox.api.v1.InvitationPolicyB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\x10invitationPolicy\x12@\n" +
 	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskB\x03\xe0A\x01R\n" +
-	"updateMask2\xd9\x15\n" +
+	"updateMask2\x9f\x1a\n" +
 	"\rOrganizations\x12~\n" +
 	"\x0fGetOrganization\x12$.pivox.api.v1.GetOrganizationRequest\x1a\x1a.pivox.api.v1.Organization\")\xdaA\x04name\x82\xd3\xe4\x93\x02\x1c\x12\x1a/v1/{name=organizations/*}\x12\x7f\n" +
 	"\x11ListOrganizations\x12&.pivox.api.v1.ListOrganizationsRequest\x1a'.pivox.api.v1.ListOrganizationsResponse\"\x19\x82\xd3\xe4\x93\x02\x13\x12\x11/v1/organizations\x12\xd1\x01\n" +
@@ -2038,7 +2038,12 @@ const file_pivox_api_v1_organizations_proto_rawDesc = "" +
 	"\fOrganization\x12\x1cUndeleteOrganizationMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02(:\x01*\"#/v1/{name=organizations/*}:undelete\x12\x7f\n" +
 	"\fGetSsoConfig\x12!.pivox.api.v1.GetSsoConfigRequest\x1a\x17.pivox.api.v1.SsoConfig\"3\xdaA\x04name\x82\xd3\xe4\x93\x02&\x12$/v1/{name=organizations/*/ssoConfig}\x12\xae\x01\n" +
 	"\x0fUpdateSsoConfig\x12$.pivox.api.v1.UpdateSsoConfigRequest\x1a\x17.pivox.api.v1.SsoConfig\"\\\xdaA\x16sso_config,update_mask\x82\xd3\xe4\x93\x02=:\n" +
-	"sso_config2//v1/{sso_config.name=organizations/*/ssoConfig}\x12\xb3\x01\n" +
+	"sso_config2//v1/{sso_config.name=organizations/*/ssoConfig}\x12\xc1\x01\n" +
+	"\fCreateDomain\x12!.pivox.api.v1.CreateDomainRequest\x1a\x1d.google.longrunning.Operation\"o\xcaA\x1e\n" +
+	"\x06Domain\x12\x14CreateDomainMetadata\xdaA\x17parent,domain,domain_id\x82\xd3\xe4\x93\x02.:\x06domain\"$/v1/{parent=organizations/*}/domains\x12\x89\x01\n" +
+	"\vListDomains\x12 .pivox.api.v1.ListDomainsRequest\x1a!.pivox.api.v1.ListDomainsResponse\"5\xdaA\x06parent\x82\xd3\xe4\x93\x02&\x12$/v1/{parent=organizations/*}/domains\x12v\n" +
+	"\tGetDomain\x12\x1e.pivox.api.v1.GetDomainRequest\x1a\x14.pivox.api.v1.Domain\"3\xdaA\x04name\x82\xd3\xe4\x93\x02&\x12$/v1/{name=organizations/*/domains/*}\x12|\n" +
+	"\fDeleteDomain\x12!.pivox.api.v1.DeleteDomainRequest\x1a\x14.pivox.api.v1.Domain\"3\xdaA\x04name\x82\xd3\xe4\x93\x02&*$/v1/{name=organizations/*/domains/*}\x12\xb3\x01\n" +
 	"\x10CreateInvitation\x12%.pivox.api.v1.CreateInvitationRequest\x1a\x18.pivox.api.v1.Invitation\"^\xdaA\x1fparent,invitation,invitation_id\x82\xd3\xe4\x93\x026:\n" +
 	"invitation\"(/v1/{parent=organizations/*}/invitations\x12\x99\x01\n" +
 	"\x0fListInvitations\x12$.pivox.api.v1.ListInvitationsRequest\x1a%.pivox.api.v1.ListInvitationsResponse\"9\xdaA\x06parent\x82\xd3\xe4\x93\x02*\x12(/v1/{parent=organizations/*}/invitations\x12\x86\x01\n" +
@@ -2098,8 +2103,14 @@ var file_pivox_api_v1_organizations_proto_goTypes = []any{
 	(*fieldmaskpb.FieldMask)(nil),         // 30: google.protobuf.FieldMask
 	(*GetSsoConfigRequest)(nil),           // 31: pivox.api.v1.GetSsoConfigRequest
 	(*UpdateSsoConfigRequest)(nil),        // 32: pivox.api.v1.UpdateSsoConfigRequest
-	(*longrunningpb.Operation)(nil),       // 33: google.longrunning.Operation
-	(*SsoConfig)(nil),                     // 34: pivox.api.v1.SsoConfig
+	(*CreateDomainRequest)(nil),           // 33: pivox.api.v1.CreateDomainRequest
+	(*ListDomainsRequest)(nil),            // 34: pivox.api.v1.ListDomainsRequest
+	(*GetDomainRequest)(nil),              // 35: pivox.api.v1.GetDomainRequest
+	(*DeleteDomainRequest)(nil),           // 36: pivox.api.v1.DeleteDomainRequest
+	(*longrunningpb.Operation)(nil),       // 37: google.longrunning.Operation
+	(*SsoConfig)(nil),                     // 38: pivox.api.v1.SsoConfig
+	(*ListDomainsResponse)(nil),           // 39: pivox.api.v1.ListDomainsResponse
+	(*Domain)(nil),                        // 40: pivox.api.v1.Domain
 }
 var file_pivox_api_v1_organizations_proto_depIdxs = []int32{
 	0,  // 0: pivox.api.v1.Organization.state:type_name -> pivox.api.v1.Organization.State
@@ -2132,32 +2143,40 @@ var file_pivox_api_v1_organizations_proto_depIdxs = []int32{
 	13, // 27: pivox.api.v1.Organizations.UndeleteOrganization:input_type -> pivox.api.v1.UndeleteOrganizationRequest
 	31, // 28: pivox.api.v1.Organizations.GetSsoConfig:input_type -> pivox.api.v1.GetSsoConfigRequest
 	32, // 29: pivox.api.v1.Organizations.UpdateSsoConfig:input_type -> pivox.api.v1.UpdateSsoConfigRequest
-	17, // 30: pivox.api.v1.Organizations.CreateInvitation:input_type -> pivox.api.v1.CreateInvitationRequest
-	18, // 31: pivox.api.v1.Organizations.ListInvitations:input_type -> pivox.api.v1.ListInvitationsRequest
-	20, // 32: pivox.api.v1.Organizations.GetInvitation:input_type -> pivox.api.v1.GetInvitationRequest
-	21, // 33: pivox.api.v1.Organizations.AcceptInvitation:input_type -> pivox.api.v1.AcceptInvitationRequest
-	23, // 34: pivox.api.v1.Organizations.DeclineInvitation:input_type -> pivox.api.v1.DeclineInvitationRequest
-	25, // 35: pivox.api.v1.Organizations.DeleteInvitation:input_type -> pivox.api.v1.DeleteInvitationRequest
-	26, // 36: pivox.api.v1.Organizations.GetInvitationPolicy:input_type -> pivox.api.v1.GetInvitationPolicyRequest
-	27, // 37: pivox.api.v1.Organizations.UpdateInvitationPolicy:input_type -> pivox.api.v1.UpdateInvitationPolicyRequest
-	3,  // 38: pivox.api.v1.Organizations.GetOrganization:output_type -> pivox.api.v1.Organization
-	8,  // 39: pivox.api.v1.Organizations.ListOrganizations:output_type -> pivox.api.v1.ListOrganizationsResponse
-	33, // 40: pivox.api.v1.Organizations.CreateOrganization:output_type -> google.longrunning.Operation
-	33, // 41: pivox.api.v1.Organizations.UpdateOrganization:output_type -> google.longrunning.Operation
-	33, // 42: pivox.api.v1.Organizations.DeleteOrganization:output_type -> google.longrunning.Operation
-	33, // 43: pivox.api.v1.Organizations.UndeleteOrganization:output_type -> google.longrunning.Operation
-	34, // 44: pivox.api.v1.Organizations.GetSsoConfig:output_type -> pivox.api.v1.SsoConfig
-	34, // 45: pivox.api.v1.Organizations.UpdateSsoConfig:output_type -> pivox.api.v1.SsoConfig
-	15, // 46: pivox.api.v1.Organizations.CreateInvitation:output_type -> pivox.api.v1.Invitation
-	19, // 47: pivox.api.v1.Organizations.ListInvitations:output_type -> pivox.api.v1.ListInvitationsResponse
-	15, // 48: pivox.api.v1.Organizations.GetInvitation:output_type -> pivox.api.v1.Invitation
-	22, // 49: pivox.api.v1.Organizations.AcceptInvitation:output_type -> pivox.api.v1.AcceptInvitationResponse
-	24, // 50: pivox.api.v1.Organizations.DeclineInvitation:output_type -> pivox.api.v1.DeclineInvitationResponse
-	15, // 51: pivox.api.v1.Organizations.DeleteInvitation:output_type -> pivox.api.v1.Invitation
-	16, // 52: pivox.api.v1.Organizations.GetInvitationPolicy:output_type -> pivox.api.v1.InvitationPolicy
-	16, // 53: pivox.api.v1.Organizations.UpdateInvitationPolicy:output_type -> pivox.api.v1.InvitationPolicy
-	38, // [38:54] is the sub-list for method output_type
-	22, // [22:38] is the sub-list for method input_type
+	33, // 30: pivox.api.v1.Organizations.CreateDomain:input_type -> pivox.api.v1.CreateDomainRequest
+	34, // 31: pivox.api.v1.Organizations.ListDomains:input_type -> pivox.api.v1.ListDomainsRequest
+	35, // 32: pivox.api.v1.Organizations.GetDomain:input_type -> pivox.api.v1.GetDomainRequest
+	36, // 33: pivox.api.v1.Organizations.DeleteDomain:input_type -> pivox.api.v1.DeleteDomainRequest
+	17, // 34: pivox.api.v1.Organizations.CreateInvitation:input_type -> pivox.api.v1.CreateInvitationRequest
+	18, // 35: pivox.api.v1.Organizations.ListInvitations:input_type -> pivox.api.v1.ListInvitationsRequest
+	20, // 36: pivox.api.v1.Organizations.GetInvitation:input_type -> pivox.api.v1.GetInvitationRequest
+	21, // 37: pivox.api.v1.Organizations.AcceptInvitation:input_type -> pivox.api.v1.AcceptInvitationRequest
+	23, // 38: pivox.api.v1.Organizations.DeclineInvitation:input_type -> pivox.api.v1.DeclineInvitationRequest
+	25, // 39: pivox.api.v1.Organizations.DeleteInvitation:input_type -> pivox.api.v1.DeleteInvitationRequest
+	26, // 40: pivox.api.v1.Organizations.GetInvitationPolicy:input_type -> pivox.api.v1.GetInvitationPolicyRequest
+	27, // 41: pivox.api.v1.Organizations.UpdateInvitationPolicy:input_type -> pivox.api.v1.UpdateInvitationPolicyRequest
+	3,  // 42: pivox.api.v1.Organizations.GetOrganization:output_type -> pivox.api.v1.Organization
+	8,  // 43: pivox.api.v1.Organizations.ListOrganizations:output_type -> pivox.api.v1.ListOrganizationsResponse
+	37, // 44: pivox.api.v1.Organizations.CreateOrganization:output_type -> google.longrunning.Operation
+	37, // 45: pivox.api.v1.Organizations.UpdateOrganization:output_type -> google.longrunning.Operation
+	37, // 46: pivox.api.v1.Organizations.DeleteOrganization:output_type -> google.longrunning.Operation
+	37, // 47: pivox.api.v1.Organizations.UndeleteOrganization:output_type -> google.longrunning.Operation
+	38, // 48: pivox.api.v1.Organizations.GetSsoConfig:output_type -> pivox.api.v1.SsoConfig
+	38, // 49: pivox.api.v1.Organizations.UpdateSsoConfig:output_type -> pivox.api.v1.SsoConfig
+	37, // 50: pivox.api.v1.Organizations.CreateDomain:output_type -> google.longrunning.Operation
+	39, // 51: pivox.api.v1.Organizations.ListDomains:output_type -> pivox.api.v1.ListDomainsResponse
+	40, // 52: pivox.api.v1.Organizations.GetDomain:output_type -> pivox.api.v1.Domain
+	40, // 53: pivox.api.v1.Organizations.DeleteDomain:output_type -> pivox.api.v1.Domain
+	15, // 54: pivox.api.v1.Organizations.CreateInvitation:output_type -> pivox.api.v1.Invitation
+	19, // 55: pivox.api.v1.Organizations.ListInvitations:output_type -> pivox.api.v1.ListInvitationsResponse
+	15, // 56: pivox.api.v1.Organizations.GetInvitation:output_type -> pivox.api.v1.Invitation
+	22, // 57: pivox.api.v1.Organizations.AcceptInvitation:output_type -> pivox.api.v1.AcceptInvitationResponse
+	24, // 58: pivox.api.v1.Organizations.DeclineInvitation:output_type -> pivox.api.v1.DeclineInvitationResponse
+	15, // 59: pivox.api.v1.Organizations.DeleteInvitation:output_type -> pivox.api.v1.Invitation
+	16, // 60: pivox.api.v1.Organizations.GetInvitationPolicy:output_type -> pivox.api.v1.InvitationPolicy
+	16, // 61: pivox.api.v1.Organizations.UpdateInvitationPolicy:output_type -> pivox.api.v1.InvitationPolicy
+	42, // [42:62] is the sub-list for method output_type
+	22, // [22:42] is the sub-list for method input_type
 	22, // [22:22] is the sub-list for extension type_name
 	22, // [22:22] is the sub-list for extension extendee
 	0,  // [0:22] is the sub-list for field type_name
@@ -2168,6 +2187,7 @@ func file_pivox_api_v1_organizations_proto_init() {
 	if File_pivox_api_v1_organizations_proto != nil {
 		return
 	}
+	file_pivox_api_v1_domains_proto_init()
 	file_pivox_api_v1_sso_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{

@@ -42,6 +42,11 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 /// resource definition and request shapes only). Phase 4 wires server-
 /// side encryption: client_secret travels cleartext over TLS, the
 /// server envelope-encrypts it via Cloud KMS before persisting.
+///
+/// Domain ↔ SsoConfig linkage is implicit: any of the org's `Domain`
+/// resources in `state=VERIFIED` route to this SsoConfig when
+/// `enabled=true`. There is at most one SsoConfig per org so the
+/// mapping is unambiguous.
 public struct Pivox_Api_V1_SsoConfig: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -62,7 +67,7 @@ public struct Pivox_Api_V1_SsoConfig: Sendable {
   public var displayName: String = String()
 
   /// Optional. Whether SSO is currently active. When `false`, the
-  /// SsoConfig remains stored but `Sso.ResolveProvider` returns
+  /// SsoConfig remains stored but `auth:resolveProvider` returns
   /// NOT_FOUND for the org's domains and no Firebase provider is
   /// exposed.
   public var enabled: Bool = false
@@ -90,12 +95,6 @@ public struct Pivox_Api_V1_SsoConfig: Sendable {
     }
     set {config = .saml(newValue)}
   }
-
-  /// Optional. Domains owned by this organization that route to this
-  /// SsoConfig. Each domain carries its own verification state (DNS TXT
-  /// challenge); only `VERIFIED` domains participate in
-  /// `Sso.ResolveProvider` lookups.
-  public var verifiedDomains: [Pivox_Api_V1_VerifiedDomain] = []
 
   /// Output only. Timestamp when the SsoConfig was created.
   public var createTime: SwiftProtobuf.Google_Protobuf_Timestamp {
@@ -254,99 +253,6 @@ public struct Pivox_Api_V1_SamlConfig: Sendable {
   public init() {}
 }
 
-/// VerifiedDomain ties a domain (e.g. `acme.com`) to an SsoConfig and
-/// tracks its DNS-TXT-record verification state. Only `VERIFIED`
-/// domains participate in `Sso.Resolve` lookups.
-public struct Pivox_Api_V1_VerifiedDomain: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  /// Required on Create. The fully qualified domain. Must be a valid
-  /// DNS name; case-insensitive on read.
-  public var domain: String = String()
-
-  /// Output only. Current verification state.
-  public var state: Pivox_Api_V1_VerifiedDomain.State = .unspecified
-
-  /// Output only. The DNS TXT record value the domain owner must
-  /// publish at `_pivox-sso.<domain>` to prove ownership. Generated
-  /// when the domain enters `PENDING`.
-  public var verificationToken: String = String()
-
-  /// Output only. Timestamp when the domain transitioned to `VERIFIED`,
-  /// or unset if it has never verified successfully.
-  public var verifiedTime: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {_verifiedTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
-    set {_verifiedTime = newValue}
-  }
-  /// Returns true if `verifiedTime` has been explicitly set.
-  public var hasVerifiedTime: Bool {self._verifiedTime != nil}
-  /// Clears the value of `verifiedTime`. Subsequent reads from it will return its default value.
-  public mutating func clearVerifiedTime() {self._verifiedTime = nil}
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  /// The lifecycle state of this domain's verification.
-  public enum State: SwiftProtobuf.Enum, Swift.CaseIterable {
-    public typealias RawValue = Int
-
-    /// Default. Not used.
-    case unspecified // = 0
-
-    /// Domain added; awaiting DNS TXT record. Server polls
-    /// periodically until the record is observed (or the request
-    /// expires).
-    case pending // = 1
-
-    /// DNS TXT record observed and matches `verification_token`.
-    /// Domain participates in `Sso.Resolve`.
-    case verified // = 2
-
-    /// Verification failed (token mismatch or expired window). Caller
-    /// can retry by reissuing the domain via Update.
-    case failed // = 3
-    case UNRECOGNIZED(Int)
-
-    public init() {
-      self = .unspecified
-    }
-
-    public init?(rawValue: Int) {
-      switch rawValue {
-      case 0: self = .unspecified
-      case 1: self = .pending
-      case 2: self = .verified
-      case 3: self = .failed
-      default: self = .UNRECOGNIZED(rawValue)
-      }
-    }
-
-    public var rawValue: Int {
-      switch self {
-      case .unspecified: return 0
-      case .pending: return 1
-      case .verified: return 2
-      case .failed: return 3
-      case .UNRECOGNIZED(let i): return i
-      }
-    }
-
-    // The compiler won't synthesize support with the UNRECOGNIZED case.
-    public static let allCases: [Pivox_Api_V1_VerifiedDomain.State] = [
-      .unspecified,
-      .pending,
-      .verified,
-      .failed,
-    ]
-
-  }
-
-  public init() {}
-
-  fileprivate var _verifiedTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
-}
-
 /// Request message for `Organizations.GetSsoConfig`.
 public struct Pivox_Api_V1_GetSsoConfigRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
@@ -372,7 +278,7 @@ public struct Pivox_Api_V1_GetSsoConfigRequest: Sendable {
 /// (-- api-linter: core::0134::response-message-name=disabled
 ///     aip.dev/not-precedent: UpdateSsoConfig is an AIP-156 singleton
 ///     sub-resource update; returning the singleton is correct. --)
-public struct Pivox_Api_V1_UpdateSsoConfigRequest: @unchecked Sendable {
+public struct Pivox_Api_V1_UpdateSsoConfigRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -380,67 +286,31 @@ public struct Pivox_Api_V1_UpdateSsoConfigRequest: @unchecked Sendable {
   /// Required. The new definition of the SsoConfig. The `name` field
   /// must be set to identify the SsoConfig to update.
   public var ssoConfig: Pivox_Api_V1_SsoConfig {
-    get {_storage._ssoConfig ?? Pivox_Api_V1_SsoConfig()}
-    set {_uniqueStorage()._ssoConfig = newValue}
+    get {_ssoConfig ?? Pivox_Api_V1_SsoConfig()}
+    set {_ssoConfig = newValue}
   }
   /// Returns true if `ssoConfig` has been explicitly set.
-  public var hasSsoConfig: Bool {_storage._ssoConfig != nil}
+  public var hasSsoConfig: Bool {self._ssoConfig != nil}
   /// Clears the value of `ssoConfig`. Subsequent reads from it will return its default value.
-  public mutating func clearSsoConfig() {_uniqueStorage()._ssoConfig = nil}
+  public mutating func clearSsoConfig() {self._ssoConfig = nil}
 
   /// Optional. The fields to update. If omitted, all mutable fields
   /// are updated.
   public var updateMask: SwiftProtobuf.Google_Protobuf_FieldMask {
-    get {_storage._updateMask ?? SwiftProtobuf.Google_Protobuf_FieldMask()}
-    set {_uniqueStorage()._updateMask = newValue}
+    get {_updateMask ?? SwiftProtobuf.Google_Protobuf_FieldMask()}
+    set {_updateMask = newValue}
   }
   /// Returns true if `updateMask` has been explicitly set.
-  public var hasUpdateMask: Bool {_storage._updateMask != nil}
+  public var hasUpdateMask: Bool {self._updateMask != nil}
   /// Clears the value of `updateMask`. Subsequent reads from it will return its default value.
-  public mutating func clearUpdateMask() {_uniqueStorage()._updateMask = nil}
+  public mutating func clearUpdateMask() {self._updateMask = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
-}
-
-/// Request message for `Sso.ResolveProvider`.
-public struct Pivox_Api_V1_ResolveProviderRequest: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  /// Required. The email address being signed in with. The server
-  /// extracts the domain (right of `@`) and looks up the verified
-  /// domain → SsoConfig mapping.
-  public var email: String = String()
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-/// Response message for `Sso.ResolveProvider`.
-public struct Pivox_Api_V1_ResolveProviderResponse: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  /// The Firebase Auth provider id to redirect the user to. Format:
-  /// `oidc.<slug>` or `saml.<slug>`. Empty if no provider is
-  /// configured (the server returns NOT_FOUND in that case rather
-  /// than an empty string).
-  public var firebaseProviderID: String = String()
-
-  /// Human-readable label for the IDP, suitable for showing on the
-  /// sign-in screen (e.g. "Sign in with Acme").
-  public var displayName: String = String()
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
+  fileprivate var _ssoConfig: Pivox_Api_V1_SsoConfig? = nil
+  fileprivate var _updateMask: SwiftProtobuf.Google_Protobuf_FieldMask? = nil
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -449,7 +319,7 @@ fileprivate let _protobuf_package = "pivox.api.v1"
 
 extension Pivox_Api_V1_SsoConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SsoConfig"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}firebase_provider_id\0\u{3}display_name\0\u{1}enabled\0\u{1}oidc\0\u{1}saml\0\u{3}verified_domains\0\u{3}create_time\0\u{3}update_time\0\u{1}etag\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}firebase_provider_id\0\u{3}display_name\0\u{1}enabled\0\u{1}oidc\0\u{1}saml\0\u{3}create_time\0\u{3}update_time\0\u{1}etag\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -487,10 +357,9 @@ extension Pivox_Api_V1_SsoConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageI
           self.config = .saml(v)
         }
       }()
-      case 7: try { try decoder.decodeRepeatedMessageField(value: &self.verifiedDomains) }()
-      case 8: try { try decoder.decodeSingularMessageField(value: &self._createTime) }()
-      case 9: try { try decoder.decodeSingularMessageField(value: &self._updateTime) }()
-      case 10: try { try decoder.decodeSingularStringField(value: &self.etag) }()
+      case 7: try { try decoder.decodeSingularMessageField(value: &self._createTime) }()
+      case 8: try { try decoder.decodeSingularMessageField(value: &self._updateTime) }()
+      case 9: try { try decoder.decodeSingularStringField(value: &self.etag) }()
       default: break
       }
     }
@@ -524,17 +393,14 @@ extension Pivox_Api_V1_SsoConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     }()
     case nil: break
     }
-    if !self.verifiedDomains.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.verifiedDomains, fieldNumber: 7)
-    }
     try { if let v = self._createTime {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
     } }()
     try { if let v = self._updateTime {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
     } }()
     if !self.etag.isEmpty {
-      try visitor.visitSingularStringField(value: self.etag, fieldNumber: 10)
+      try visitor.visitSingularStringField(value: self.etag, fieldNumber: 9)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -545,7 +411,6 @@ extension Pivox_Api_V1_SsoConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if lhs.displayName != rhs.displayName {return false}
     if lhs.enabled != rhs.enabled {return false}
     if lhs.config != rhs.config {return false}
-    if lhs.verifiedDomains != rhs.verifiedDomains {return false}
     if lhs._createTime != rhs._createTime {return false}
     if lhs._updateTime != rhs._updateTime {return false}
     if lhs.etag != rhs.etag {return false}
@@ -693,59 +558,6 @@ extension Pivox_Api_V1_SamlConfig: SwiftProtobuf.Message, SwiftProtobuf._Message
   }
 }
 
-extension Pivox_Api_V1_VerifiedDomain: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".VerifiedDomain"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}domain\0\u{1}state\0\u{3}verification_token\0\u{3}verified_time\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.domain) }()
-      case 2: try { try decoder.decodeSingularEnumField(value: &self.state) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.verificationToken) }()
-      case 4: try { try decoder.decodeSingularMessageField(value: &self._verifiedTime) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.domain.isEmpty {
-      try visitor.visitSingularStringField(value: self.domain, fieldNumber: 1)
-    }
-    if self.state != .unspecified {
-      try visitor.visitSingularEnumField(value: self.state, fieldNumber: 2)
-    }
-    if !self.verificationToken.isEmpty {
-      try visitor.visitSingularStringField(value: self.verificationToken, fieldNumber: 3)
-    }
-    try { if let v = self._verifiedTime {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Pivox_Api_V1_VerifiedDomain, rhs: Pivox_Api_V1_VerifiedDomain) -> Bool {
-    if lhs.domain != rhs.domain {return false}
-    if lhs.state != rhs.state {return false}
-    if lhs.verificationToken != rhs.verificationToken {return false}
-    if lhs._verifiedTime != rhs._verifiedTime {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension Pivox_Api_V1_VerifiedDomain.State: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0STATE_UNSPECIFIED\0\u{1}PENDING\0\u{1}VERIFIED\0\u{1}FAILED\0")
-}
-
 extension Pivox_Api_V1_GetSsoConfigRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GetSsoConfigRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0")
@@ -780,139 +592,36 @@ extension Pivox_Api_V1_UpdateSsoConfigRequest: SwiftProtobuf.Message, SwiftProto
   public static let protoMessageName: String = _protobuf_package + ".UpdateSsoConfigRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}sso_config\0\u{3}update_mask\0")
 
-  fileprivate class _StorageClass {
-    var _ssoConfig: Pivox_Api_V1_SsoConfig? = nil
-    var _updateMask: SwiftProtobuf.Google_Protobuf_FieldMask? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _ssoConfig = source._ssoConfig
-      _updateMask = source._updateMask
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._ssoConfig) }()
-        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._updateMask) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._ssoConfig) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._updateMask) }()
+      default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      try { if let v = _storage._ssoConfig {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-      } }()
-      try { if let v = _storage._updateMask {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-      } }()
-    }
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._ssoConfig {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try { if let v = self._updateMask {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Pivox_Api_V1_UpdateSsoConfigRequest, rhs: Pivox_Api_V1_UpdateSsoConfigRequest) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._ssoConfig != rhs_storage._ssoConfig {return false}
-        if _storage._updateMask != rhs_storage._updateMask {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension Pivox_Api_V1_ResolveProviderRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ResolveProviderRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}email\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.email) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.email.isEmpty {
-      try visitor.visitSingularStringField(value: self.email, fieldNumber: 1)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Pivox_Api_V1_ResolveProviderRequest, rhs: Pivox_Api_V1_ResolveProviderRequest) -> Bool {
-    if lhs.email != rhs.email {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension Pivox_Api_V1_ResolveProviderResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ResolveProviderResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}firebase_provider_id\0\u{3}display_name\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.firebaseProviderID) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.displayName) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.firebaseProviderID.isEmpty {
-      try visitor.visitSingularStringField(value: self.firebaseProviderID, fieldNumber: 1)
-    }
-    if !self.displayName.isEmpty {
-      try visitor.visitSingularStringField(value: self.displayName, fieldNumber: 2)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Pivox_Api_V1_ResolveProviderResponse, rhs: Pivox_Api_V1_ResolveProviderResponse) -> Bool {
-    if lhs.firebaseProviderID != rhs.firebaseProviderID {return false}
-    if lhs.displayName != rhs.displayName {return false}
+    if lhs._ssoConfig != rhs._ssoConfig {return false}
+    if lhs._updateMask != rhs._updateMask {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

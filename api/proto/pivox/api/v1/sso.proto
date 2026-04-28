@@ -17,49 +17,12 @@ syntax = "proto3";
 package pivox.api.v1;
 
 import "buf/validate/validate.proto";
-import "google/api/annotations.proto";
-import "google/api/client.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 
 option go_package = "pivox/api/v1;apiv1";
-
-// Sso is a small, pre-authentication service that hosts the lookup
-// front-channel (`Resolve`) used by the sign-in screen before any
-// user identity exists. Authenticated SSO config CRUD lives on the
-// Organizations service (Get/UpdateSsoConfig) — that's an AIP-156
-// singleton sub-resource of Organization.
-//
-// Security profile (uniform across this service):
-//   - No Firebase auth required (callers don't have an identity yet).
-//   - Per-IP rate-limited at the middleware layer; surfaces as
-//     RESOURCE_EXHAUSTED.
-//   - Information-disclosure aware: returns NOT_FOUND for unknown
-//     domains rather than echoing details back.
-service Sso {
-  option (google.api.default_host) = "api.pivox.io";
-
-  // Maps an email address to its SSO provider id, if any. Used by the
-  // sign-in screen to decide whether to redirect the user to an
-  // identity provider before attempting password sign-in.
-  //
-  // Returns NOT_FOUND if no SSO is configured for the email's domain
-  // (or if the SsoConfig is `enabled=false`). Returns RESOURCE_EXHAUSTED
-  // if the caller is over the per-IP rate limit.
-  //
-  // (-- api-linter: core::0136::http-uri-suffix=disabled
-  //     aip.dev/not-precedent: ResolveProvider is a service-level
-  //     (collection-less) custom method; the URL pattern intentionally
-  //     has no parent. --)
-  rpc ResolveProvider(ResolveProviderRequest) returns (ResolveProviderResponse) {
-    option (google.api.http) = {
-      post: "/v1/sso:resolveProvider"
-      body: "*"
-    };
-  }
-}
 
 // SsoConfig is the per-organization SSO/IDP configuration. AIP-156
 // singleton sub-resource of Organization — there is at most one
@@ -69,6 +32,11 @@ service Sso {
 // resource definition and request shapes only). Phase 4 wires server-
 // side encryption: client_secret travels cleartext over TLS, the
 // server envelope-encrypts it via Cloud KMS before persisting.
+//
+// Domain ↔ SsoConfig linkage is implicit: any of the org's `Domain`
+// resources in `state=VERIFIED` route to this SsoConfig when
+// `enabled=true`. There is at most one SsoConfig per org so the
+// mapping is unambiguous.
 message SsoConfig {
   option (google.api.resource) = {
     type: "pivox.api/SsoConfig"
@@ -98,7 +66,7 @@ message SsoConfig {
   ];
 
   // Optional. Whether SSO is currently active. When `false`, the
-  // SsoConfig remains stored but `Sso.ResolveProvider` returns
+  // SsoConfig remains stored but `auth:resolveProvider` returns
   // NOT_FOUND for the org's domains and no Firebase provider is
   // exposed.
   bool enabled = 4 [(google.api.field_behavior) = OPTIONAL];
@@ -115,21 +83,15 @@ message SsoConfig {
     SamlConfig saml = 6;
   }
 
-  // Optional. Domains owned by this organization that route to this
-  // SsoConfig. Each domain carries its own verification state (DNS TXT
-  // challenge); only `VERIFIED` domains participate in
-  // `Sso.ResolveProvider` lookups.
-  repeated VerifiedDomain verified_domains = 7 [(google.api.field_behavior) = OPTIONAL];
-
   // Output only. Timestamp when the SsoConfig was created.
-  google.protobuf.Timestamp create_time = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when the SsoConfig was last modified.
-  google.protobuf.Timestamp update_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. A checksum computed by the server based on the
   // current value of the SsoConfig resource.
-  string etag = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string etag = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // OIDC provider configuration. Maps onto Firebase Admin SDK's
@@ -240,53 +202,6 @@ message SamlConfig {
   string callback_url = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
-// VerifiedDomain ties a domain (e.g. `acme.com`) to an SsoConfig and
-// tracks its DNS-TXT-record verification state. Only `VERIFIED`
-// domains participate in `Sso.Resolve` lookups.
-message VerifiedDomain {
-  // Required on Create. The fully qualified domain. Must be a valid
-  // DNS name; case-insensitive on read.
-  string domain = 1 [
-    (google.api.field_behavior) = REQUIRED,
-    (buf.validate.field).cel = {
-      id: "valid_domain"
-      message: "must be a valid domain name"
-      expression: "this.matches('^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\\\.)+[a-zA-Z]{2,}$')"
-    }
-  ];
-
-  // The lifecycle state of this domain's verification.
-  enum State {
-    // Default. Not used.
-    STATE_UNSPECIFIED = 0;
-
-    // Domain added; awaiting DNS TXT record. Server polls
-    // periodically until the record is observed (or the request
-    // expires).
-    PENDING = 1;
-
-    // DNS TXT record observed and matches `verification_token`.
-    // Domain participates in `Sso.Resolve`.
-    VERIFIED = 2;
-
-    // Verification failed (token mismatch or expired window). Caller
-    // can retry by reissuing the domain via Update.
-    FAILED = 3;
-  }
-
-  // Output only. Current verification state.
-  State state = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // Output only. The DNS TXT record value the domain owner must
-  // publish at `_pivox-sso.<domain>` to prove ownership. Generated
-  // when the domain enters `PENDING`.
-  string verification_token = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // Output only. Timestamp when the domain transitioned to `VERIFIED`,
-  // or unset if it has never verified successfully.
-  google.protobuf.Timestamp verified_time = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
-}
-
 // Request message for `Organizations.GetSsoConfig`.
 message GetSsoConfigRequest {
   // Required. The resource name of the SsoConfig.
@@ -319,31 +234,4 @@ message UpdateSsoConfigRequest {
   // Optional. The fields to update. If omitted, all mutable fields
   // are updated.
   google.protobuf.FieldMask update_mask = 2 [(google.api.field_behavior) = OPTIONAL];
-}
-
-// Request message for `Sso.ResolveProvider`.
-message ResolveProviderRequest {
-  // Required. The email address being signed in with. The server
-  // extracts the domain (right of `@`) and looks up the verified
-  // domain → SsoConfig mapping.
-  string email = 1 [
-    (google.api.field_behavior) = REQUIRED,
-    (buf.validate.field).string = {
-      email: true
-      max_len: 254
-    }
-  ];
-}
-
-// Response message for `Sso.ResolveProvider`.
-message ResolveProviderResponse {
-  // The Firebase Auth provider id to redirect the user to. Format:
-  // `oidc.<slug>` or `saml.<slug>`. Empty if no provider is
-  // configured (the server returns NOT_FOUND in that case rather
-  // than an empty string).
-  string firebase_provider_id = 1;
-
-  // Human-readable label for the IDP, suitable for showing on the
-  // sign-in screen (e.g. "Sign in with Acme").
-  string display_name = 2;
 }
