@@ -20,7 +20,7 @@ permissions:
     roles: [owner, admin]
   - id: organizations.delete
     display_name: Delete Organization
-    description: Delete the organization
+    description: Delete or restore the organization (covers UndeleteOrganization too — same destruction-class tier)
     roles: [owner]
   - id: organizations.transferOwnership
     display_name: Transfer Ownership

@@ -24,6 +24,14 @@ import (
 // service unions inherited org bindings with direct space bindings;
 // the two are different operations sharing a wire shape.
 //
+// SECURITY: This RPC is in PermissionInterceptor's exempt set —
+// answering "which permissions do I have" can't itself require a
+// permission (would be circular). That means the gate that protects
+// every other RPC does NOT run for this one. This handler MUST do
+// its own caller-identity resolution (s.caller below) and MUST NOT
+// trust any field on the request to identify the caller. Do not
+// remove the s.caller call without auditing the entire control flow.
+//
 // Returns Unauthenticated if the caller has no auth context. Returns
 // the empty set (and OK) if the caller has no role bindings — UI
 // treats that as "no permissions granted" and greys out everything.

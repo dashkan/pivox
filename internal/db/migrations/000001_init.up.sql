@@ -756,7 +756,7 @@ INSERT INTO permissions (permission_id, display_name, description) VALUES
   -- Organization management
   ('organizations.read', 'Read Organization', 'View organization details'),
   ('organizations.update', 'Update Organization', 'Modify organization settings'),
-  ('organizations.delete', 'Delete Organization', 'Delete the organization'),
+  ('organizations.delete', 'Delete Organization', 'Delete or restore the organization (covers UndeleteOrganization too — same destruction-class tier)'),
   ('organizations.transferOwnership', 'Transfer Ownership', 'Atomically transfer the owner role to another member'),
   -- SSO config (singleton sub-resource; tighter role list than the parent org)
   ('organizations.ssoConfig.read', 'Read SSO Config', 'View SSO configuration'),
