@@ -283,29 +283,169 @@ func TestPermissionInterceptor_CallerIdentityErrorPropagates(t *testing.T) {
 	q.AssertExpectations(t)
 }
 
-// --- Space scope is reserved for a follow-up commit ---
+// --- Space scope ---
 
-func TestPermissionInterceptor_SpaceScopeReturnsUnimplemented(t *testing.T) {
-	q := new(mocks.MockQuerier) // must not reach the DB
-	resolver := permission.NewResolver(q)
-	registry := Registry{
-		"/svc/UpdateSpace": {
-			Permission: permission.SpacesCreate,
-			Extract:    func(any) (ScopeRef, error) { return ScopeRef{Kind: ScopeSpace, Slug: "x"}, nil },
-		},
+var (
+	testPermSpaceID   = uuid.MustParse("0192a000-cccc-7000-8000-000000000003")
+	testPermSpaceSlug = "design"
+	testPermSpaceRow  = db.Space{ID: testPermSpaceID, OrgID: testPermOrgID, Name: testPermSpaceSlug}
+)
+
+func spaceScopeFromRequest(req any) (ScopeRef, error) {
+	// Test extractor: req is a [2]string array {orgSlug, spaceSlug}.
+	s, ok := req.([2]string)
+	if !ok {
+		return ScopeRef{}, status.Error(codes.InvalidArgument, "test extractor requires [2]string request")
 	}
+	return SpaceScope(s[0], s[1]), nil
+}
+
+func TestPermissionInterceptor_SpaceScope_AllowsWhenPermissionGranted(t *testing.T) {
+	q := new(mocks.MockQuerier)
+	q.On("GetOrganizationByName", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
+	q.On("GetSpaceByName", mock.Anything, db.GetSpaceByNameParams{
+		OrgID: testPermOrgID, Name: testPermSpaceSlug,
+	}).Return(testPermSpaceRow, nil)
+	// Resolver path for SpaceTarget: GetSpaceParentOrg + GetEffectiveSpaceRoles + GetEffectiveOrgRoles.
+	q.On("GetSpaceParentOrg", mock.Anything, testPermSpaceID).Return(testPermOrgID, nil)
+	q.On("GetEffectiveSpaceRoles", mock.Anything, db.GetEffectiveSpaceRolesParams{
+		SpaceID: testPermSpaceID, FirebaseIdentityID: testPermCallerID,
+	}).Return([]string{permission.RoleEditor}, nil)
+	q.On("GetEffectiveOrgRoles", mock.Anything, db.GetEffectiveOrgRolesParams{
+		OrgID: testPermOrgID, FirebaseIdentityID: testPermCallerID,
+	}).Return([]string(nil), nil)
+
+	registry := Registry{
+		"/svc/GetSpace": {Permission: permission.SpacesRead, Extract: spaceScopeFromRequest},
+	}
+	resolver := permission.NewResolver(q)
 	interceptor := PermissionInterceptor(registry, nil, q, resolver, stubIdentity(testPermCallerID, nil))
 
 	called := false
 	var captured context.Context
 	_, err := interceptor(
 		context.Background(),
-		nil,
+		[2]string{testPermOrgSlug, testPermSpaceSlug},
+		&grpc.UnaryServerInfo{FullMethod: "/svc/GetSpace"},
+		recordingHandler(&called, &captured),
+	)
+	require.NoError(t, err)
+	assert.True(t, called)
+
+	gotOrg, ok := ResolvedOrgFromContext(captured)
+	require.True(t, ok, "interceptor must attach resolved parent org for space-scoped RPCs")
+	assert.Equal(t, testPermOrgID, gotOrg.ID)
+	gotSpace, ok := ResolvedSpaceFromContext(captured)
+	require.True(t, ok, "interceptor must attach resolved space")
+	assert.Equal(t, testPermSpaceID, gotSpace.ID)
+	assert.Equal(t, testPermSpaceSlug, gotSpace.Slug)
+	q.AssertExpectations(t)
+}
+
+func TestPermissionInterceptor_SpaceScope_DeniesWhenPermissionMissing(t *testing.T) {
+	q := new(mocks.MockQuerier)
+	q.On("GetOrganizationByName", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
+	q.On("GetSpaceByName", mock.Anything, mock.Anything).Return(testPermSpaceRow, nil)
+	q.On("GetSpaceParentOrg", mock.Anything, testPermSpaceID).Return(testPermOrgID, nil)
+	q.On("GetEffectiveSpaceRoles", mock.Anything, mock.Anything).Return([]string{permission.RoleViewer}, nil)
+	q.On("GetEffectiveOrgRoles", mock.Anything, mock.Anything).Return([]string(nil), nil)
+
+	registry := Registry{
+		"/svc/UpdateSpace": {Permission: permission.SpacesUpdate, Extract: spaceScopeFromRequest},
+	}
+	resolver := permission.NewResolver(q)
+	interceptor := PermissionInterceptor(registry, nil, q, resolver, stubIdentity(testPermCallerID, nil))
+
+	called := false
+	var captured context.Context
+	_, err := interceptor(
+		context.Background(),
+		[2]string{testPermOrgSlug, testPermSpaceSlug},
 		&grpc.UnaryServerInfo{FullMethod: "/svc/UpdateSpace"},
 		recordingHandler(&called, &captured),
 	)
 	require.Error(t, err)
-	assert.Equal(t, codes.Unimplemented, status.Code(err))
+	assert.Equal(t, codes.PermissionDenied, status.Code(err))
+	assert.False(t, called)
+	q.AssertExpectations(t)
+}
+
+func TestPermissionInterceptor_SpaceScope_OrgInheritanceGrants(t *testing.T) {
+	// Space-level role list is empty; org-level admin role inherits
+	// down and grants SpacesUpdate via the resolver's union.
+	q := new(mocks.MockQuerier)
+	q.On("GetOrganizationByName", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
+	q.On("GetSpaceByName", mock.Anything, mock.Anything).Return(testPermSpaceRow, nil)
+	q.On("GetSpaceParentOrg", mock.Anything, testPermSpaceID).Return(testPermOrgID, nil)
+	q.On("GetEffectiveSpaceRoles", mock.Anything, mock.Anything).Return([]string(nil), nil)
+	q.On("GetEffectiveOrgRoles", mock.Anything, mock.Anything).Return([]string{permission.RoleAdmin}, nil)
+
+	registry := Registry{
+		"/svc/UpdateSpace": {Permission: permission.SpacesUpdate, Extract: spaceScopeFromRequest},
+	}
+	resolver := permission.NewResolver(q)
+	interceptor := PermissionInterceptor(registry, nil, q, resolver, stubIdentity(testPermCallerID, nil))
+
+	called := false
+	var captured context.Context
+	_, err := interceptor(
+		context.Background(),
+		[2]string{testPermOrgSlug, testPermSpaceSlug},
+		&grpc.UnaryServerInfo{FullMethod: "/svc/UpdateSpace"},
+		recordingHandler(&called, &captured),
+	)
+	require.NoError(t, err)
+	assert.True(t, called)
+}
+
+func TestPermissionInterceptor_SpaceScope_OrgNotFoundReturns404(t *testing.T) {
+	// Parent org missing on a space-scope RPC must short-circuit at
+	// the org lookup with NotFound — same code path as the org-scope
+	// 404, just on the first of two slug resolutions.
+	q := new(mocks.MockQuerier)
+	q.On("GetOrganizationByName", mock.Anything, "ghost-org").Return(db.Organization{}, pgx.ErrNoRows)
+
+	registry := Registry{
+		"/svc/GetSpace": {Permission: permission.SpacesRead, Extract: spaceScopeFromRequest},
+	}
+	resolver := permission.NewResolver(q)
+	interceptor := PermissionInterceptor(registry, nil, q, resolver, stubIdentity(testPermCallerID, nil))
+
+	called := false
+	var captured context.Context
+	_, err := interceptor(
+		context.Background(),
+		[2]string{"ghost-org", testPermSpaceSlug},
+		&grpc.UnaryServerInfo{FullMethod: "/svc/GetSpace"},
+		recordingHandler(&called, &captured),
+	)
+	require.Error(t, err)
+	assert.Equal(t, codes.NotFound, status.Code(err))
+	assert.False(t, called)
+	q.AssertExpectations(t)
+}
+
+func TestPermissionInterceptor_SpaceScope_SpaceNotFoundReturns404(t *testing.T) {
+	q := new(mocks.MockQuerier)
+	q.On("GetOrganizationByName", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
+	q.On("GetSpaceByName", mock.Anything, mock.Anything).Return(db.Space{}, pgx.ErrNoRows)
+
+	registry := Registry{
+		"/svc/GetSpace": {Permission: permission.SpacesRead, Extract: spaceScopeFromRequest},
+	}
+	resolver := permission.NewResolver(q)
+	interceptor := PermissionInterceptor(registry, nil, q, resolver, stubIdentity(testPermCallerID, nil))
+
+	called := false
+	var captured context.Context
+	_, err := interceptor(
+		context.Background(),
+		[2]string{testPermOrgSlug, "ghost"},
+		&grpc.UnaryServerInfo{FullMethod: "/svc/GetSpace"},
+		recordingHandler(&called, &captured),
+	)
+	require.Error(t, err)
+	assert.Equal(t, codes.NotFound, status.Code(err))
 	assert.False(t, called)
 	q.AssertExpectations(t)
 }

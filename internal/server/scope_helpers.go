@@ -34,6 +34,28 @@ func OrgScopeFromPath(field, path string) (ScopeRef, error) {
 	return OrgScope(parts[1]), nil
 }
 
+// SpaceScopeFromPath extracts a space-scoped ScopeRef from a resource
+// path of the form `organizations/{org}/spaces/{space}` or
+// `organizations/{org}/spaces/{space}/...`. Both the parent org slug
+// and the space slug are pulled out — the interceptor needs both to
+// resolve through the slug-immutable lookup chain.
+//
+// Returns InvalidArgument for empty paths, wrong collection prefix
+// at either level, or missing slug at either level.
+func SpaceScopeFromPath(field, path string) (ScopeRef, error) {
+	if path == "" {
+		return ScopeRef{}, apierr.InvalidArgument(apierr.FieldViolation(field, "must not be empty"))
+	}
+	parts := strings.Split(path, "/")
+	if len(parts) < 4 ||
+		parts[0] != "organizations" || parts[1] == "" ||
+		parts[2] != "spaces" || parts[3] == "" {
+		return ScopeRef{}, apierr.InvalidArgument(apierr.FieldViolation(field,
+			fmt.Sprintf("expected organizations/{org}/spaces/{space}[/...] in %q", path)))
+	}
+	return SpaceScope(parts[1], parts[3]), nil
+}
+
 // AssertRegistryCoversService verifies that every RPC declared on
 // `desc` is accounted for by `registry` ∪ `exempt`. Intended for use
 // in service-level unit tests so a newly-added proto RPC fails its

@@ -12,6 +12,9 @@ const (
 	OrganizationsSsoConfigRead     = "organizations.ssoConfig.read"
 	OrganizationsSsoConfigUpdate   = "organizations.ssoConfig.update"
 	SpacesCreate                   = "spaces.create"
+	SpacesRead                     = "spaces.read"
+	SpacesUpdate                   = "spaces.update"
+	SpacesDelete                   = "spaces.delete"
 	UsersRead                      = "users.read"
 	UsersDelete                    = "users.delete"
 	GroupsCreate                   = "groups.create"
@@ -91,6 +94,9 @@ var All = []string{
 	OrganizationsSsoConfigRead,
 	OrganizationsSsoConfigUpdate,
 	SpacesCreate,
+	SpacesRead,
+	SpacesUpdate,
+	SpacesDelete,
 	UsersRead,
 	UsersDelete,
 	GroupsCreate,
@@ -223,6 +229,9 @@ var matrix = map[string]map[string]bool{
 		RolesRead:                      true,
 		RolesUpdate:                    true,
 		SpacesCreate:                   true,
+		SpacesDelete:                   true,
+		SpacesRead:                     true,
+		SpacesUpdate:                   true,
 		StorageAgentsDrain:             true,
 		StorageAgentsRead:              true,
 		StorageAgentsRemove:            true,
@@ -295,6 +304,9 @@ var matrix = map[string]map[string]bool{
 		RolesRead:                  true,
 		RolesUpdate:                true,
 		SpacesCreate:               true,
+		SpacesDelete:               true,
+		SpacesRead:                 true,
+		SpacesUpdate:               true,
 		StorageAgentsDrain:         true,
 		StorageAgentsRead:          true,
 		StorageAgentsRemove:        true,
@@ -336,6 +348,7 @@ var matrix = map[string]map[string]bool{
 		GroupsRead:             true,
 		OrganizationsRead:      true,
 		RolesRead:              true,
+		SpacesRead:             true,
 		StorageAgentsRead:      true,
 		StorageEndpointsRead:   true,
 		StorageGatewaysRead:    true,
@@ -349,6 +362,7 @@ var matrix = map[string]map[string]bool{
 		GroupsRead:           true,
 		OrganizationsRead:    true,
 		RolesRead:            true,
+		SpacesRead:           true,
 		StorageAgentsRead:    true,
 		StorageEndpointsRead: true,
 		UsersRead:            true,

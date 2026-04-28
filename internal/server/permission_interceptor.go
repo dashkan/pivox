@@ -10,8 +10,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/dashkan/pivox/internal/apierr"
 	db "github.com/dashkan/pivox/internal/db/generated"
@@ -28,9 +26,9 @@ const (
 	// field of ScopeRef is the org's URL slug.
 	ScopeOrg ScopeKind = iota + 1
 
-	// ScopeSpace means the RPC operates on a space. Resolution path
-	// (slug → space row → parent org → permission check with space
-	// inheritance) lands in a follow-up commit.
+	// ScopeSpace means the RPC operates on a space. Resolution path:
+	// org slug → org row → space slug → space row → permission check
+	// against SpaceTarget, which inherits org-level role bindings.
 	ScopeSpace
 )
 
@@ -49,14 +47,27 @@ func (k ScopeKind) String() string {
 // ScopeRef is the unresolved scope an RPC operates on, as pulled from
 // the request body by a ScopeExtractor. The interceptor resolves
 // slug → uuid via the database before calling the permission resolver.
+//
+// For ScopeOrg: only Slug is set (the org slug).
+// For ScopeSpace: both OrgSlug (parent org) and Slug (space) are set —
+// resolving a space requires looking up the parent org first because
+// the schema scopes space slugs per-org (UNIQUE on (org_id, name)).
 type ScopeRef struct {
-	Kind ScopeKind
-	Slug string
+	Kind    ScopeKind
+	Slug    string
+	OrgSlug string // populated for ScopeSpace; empty for ScopeOrg
 }
 
 // OrgScope is a convenience constructor for an org-scoped ScopeRef.
 func OrgScope(slug string) ScopeRef {
 	return ScopeRef{Kind: ScopeOrg, Slug: slug}
+}
+
+// SpaceScope is a convenience constructor for a space-scoped
+// ScopeRef. Both org slug and space slug are required because spaces
+// are scoped per-org (the same space slug can exist in two orgs).
+func SpaceScope(orgSlug, spaceSlug string) ScopeRef {
+	return ScopeRef{Kind: ScopeSpace, Slug: spaceSlug, OrgSlug: orgSlug}
 }
 
 // ScopeExtractor pulls the ScopeRef from a request. Each gated RPC
@@ -100,7 +111,8 @@ type resolvedOrgKey struct{}
 // ResolvedOrgFromContext returns the org resolved by
 // PermissionInterceptor for the current RPC, or (nil, false) if the
 // interceptor didn't run (e.g. the method was exempt) or didn't
-// resolve an org scope.
+// resolve an org scope. For space-scoped RPCs, the parent org row
+// is also attached and is retrievable via this function.
 func ResolvedOrgFromContext(ctx context.Context) (*ResolvedOrg, bool) {
 	v, ok := ctx.Value(resolvedOrgKey{}).(*ResolvedOrg)
 	return v, ok
@@ -116,6 +128,40 @@ func MustResolvedOrgFromContext(ctx context.Context) *ResolvedOrg {
 	v, ok := ResolvedOrgFromContext(ctx)
 	if !ok {
 		panic("server: org-scoped handler invoked without a resolved org on the context (missing or misconfigured permission interceptor)")
+	}
+	return v
+}
+
+// ResolvedSpace is what the interceptor attaches to the request
+// context after a successful space-scope check. Like ResolvedOrg, it
+// saves the handler from re-issuing the slug-resolution lookup.
+//
+// The space's parent org is resolved as part of the gate and attached
+// separately via resolvedOrgKey, so handlers that need both can call
+// MustResolvedOrgFromContext + MustResolvedSpaceFromContext without
+// extra DB calls.
+type ResolvedSpace struct {
+	ID   uuid.UUID
+	Slug string
+	Row  db.Space
+}
+
+type resolvedSpaceKey struct{}
+
+// ResolvedSpaceFromContext returns the space resolved by
+// PermissionInterceptor for the current RPC, or (nil, false) if the
+// method wasn't space-scoped or the interceptor didn't run.
+func ResolvedSpaceFromContext(ctx context.Context) (*ResolvedSpace, bool) {
+	v, ok := ctx.Value(resolvedSpaceKey{}).(*ResolvedSpace)
+	return v, ok
+}
+
+// MustResolvedSpaceFromContext is the handler-side assertion variant
+// for space-scoped RPCs. Mirrors MustResolvedOrgFromContext.
+func MustResolvedSpaceFromContext(ctx context.Context) *ResolvedSpace {
+	v, ok := ResolvedSpaceFromContext(ctx)
+	if !ok {
+		panic("server: space-scoped handler invoked without a resolved space on the context (missing or misconfigured permission interceptor)")
 	}
 	return v
 }
@@ -186,7 +232,7 @@ func (g *permissionGate) check(ctx context.Context, fullMethod string, req any) 
 	case ScopeOrg:
 		return g.checkOrgScope(ctx, fullMethod, entry, scope, callerID)
 	case ScopeSpace:
-		return nil, status.Error(codes.Unimplemented, "space-scoped permission gating not yet wired")
+		return g.checkSpaceScope(ctx, fullMethod, entry, scope, callerID)
 	default:
 		slog.ErrorContext(ctx, "permission interceptor: unknown scope kind", "method", fullMethod, "kind", scope.Kind)
 		return nil, apierr.Internal("permission gate misconfigured for this method")
@@ -218,6 +264,49 @@ func (g *permissionGate) checkOrgScope(
 	}
 	resolved := &ResolvedOrg{ID: org.ID, Slug: scope.Slug, Row: org}
 	return context.WithValue(ctx, resolvedOrgKey{}, resolved), nil
+}
+
+// checkSpaceScope handles space-scope: resolve org slug → org row,
+// then space slug → space row within that org, then check permission
+// against SpaceTarget (which inherits org-level role bindings).
+// Both rows are attached to ctx so handlers don't repeat either
+// lookup.
+func (g *permissionGate) checkSpaceScope(
+	ctx context.Context,
+	fullMethod string,
+	entry RegistryEntry,
+	scope ScopeRef,
+	callerID uuid.UUID,
+) (context.Context, error) {
+	org, err := g.queries.GetOrganizationByName(ctx, scope.OrgSlug)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apierr.NotFound("organization", scope.OrgSlug)
+		}
+		slog.ErrorContext(ctx, "permission interceptor: org lookup failed", "method", fullMethod, "slug", scope.OrgSlug, "error", err)
+		return nil, apierr.Internal("lookup organization")
+	}
+	space, err := g.queries.GetSpaceByName(ctx, db.GetSpaceByNameParams{OrgID: org.ID, Name: scope.Slug})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apierr.NotFound("space", scope.OrgSlug+"/"+scope.Slug)
+		}
+		slog.ErrorContext(ctx, "permission interceptor: space lookup failed", "method", fullMethod, "org", scope.OrgSlug, "space", scope.Slug, "error", err)
+		return nil, apierr.Internal("lookup space")
+	}
+	allowed, err := g.resolver.HasPermission(ctx, callerID, permission.SpaceTarget(space.ID), entry.Permission)
+	if err != nil {
+		slog.ErrorContext(ctx, "permission interceptor: resolve failed", "method", fullMethod, "permission", entry.Permission, "error", err)
+		return nil, apierr.Internal("resolve permission")
+	}
+	if !allowed {
+		return nil, apierr.PermissionDenied(fmt.Sprintf("caller lacks %q on space %q/%q", entry.Permission, scope.OrgSlug, scope.Slug))
+	}
+	resolvedOrg := &ResolvedOrg{ID: org.ID, Slug: scope.OrgSlug, Row: org}
+	resolvedSpace := &ResolvedSpace{ID: space.ID, Slug: scope.Slug, Row: space}
+	ctx = context.WithValue(ctx, resolvedOrgKey{}, resolvedOrg)
+	ctx = context.WithValue(ctx, resolvedSpaceKey{}, resolvedSpace)
+	return ctx, nil
 }
 
 // PermissionInterceptor returns a gRPC unary server interceptor that

@@ -59,3 +59,46 @@ func TestOrgScopeFromPath_WrongPrefixIsInvalidArgument(t *testing.T) {
 		})
 	}
 }
+
+func TestSpaceScopeFromPath_BareSpace(t *testing.T) {
+	got, err := SpaceScopeFromPath("name", "organizations/acme/spaces/design")
+	require.NoError(t, err)
+	assert.Equal(t, ScopeSpace, got.Kind)
+	assert.Equal(t, "acme", got.OrgSlug)
+	assert.Equal(t, "design", got.Slug)
+}
+
+func TestSpaceScopeFromPath_NestedSpaceChild(t *testing.T) {
+	cases := []string{
+		"organizations/acme/spaces/design/members/usr-1",
+		"organizations/acme/spaces/design/assets/asset-42",
+	}
+	for _, path := range cases {
+		t.Run(path, func(t *testing.T) {
+			got, err := SpaceScopeFromPath("name", path)
+			require.NoError(t, err)
+			assert.Equal(t, "acme", got.OrgSlug)
+			assert.Equal(t, "design", got.Slug)
+		})
+	}
+}
+
+func TestSpaceScopeFromPath_InvalidIsInvalidArgument(t *testing.T) {
+	cases := []string{
+		"",                                  // empty
+		"organizations/acme",                // missing space segment entirely
+		"organizations/acme/spaces",         // missing space slug
+		"organizations/acme/spaces/",        // empty space slug
+		"organizations//spaces/design",      // empty org slug
+		"organizations/acme/space/design",   // wrong collection (singular)
+		"orgs/acme/spaces/design",           // wrong root
+		"/organizations/acme/spaces/design", // leading slash
+	}
+	for _, path := range cases {
+		t.Run(path, func(t *testing.T) {
+			_, err := SpaceScopeFromPath("name", path)
+			require.Error(t, err)
+			assert.Equal(t, codes.InvalidArgument, status.Code(err))
+		})
+	}
+}

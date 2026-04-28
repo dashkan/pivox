@@ -20,6 +20,14 @@ import (
 // space-scope Member row. This is the meaningful divergence from
 // `Organizations.TestIamPermissions`, which resolves only against
 // org bindings.
+//
+// SECURITY: This RPC is in PermissionInterceptor's exempt set —
+// answering "which permissions do I have" can't itself require a
+// permission (would be circular). That means the gate that protects
+// every other RPC does NOT run for this one. This handler MUST do
+// its own caller-identity resolution (s.caller below) and MUST NOT
+// trust any field on the request to identify the caller. Do not
+// remove the s.caller call without auditing the entire control flow.
 func (s *SpacesServer) TestIamPermissions(ctx context.Context, req *iampb.TestIamPermissionsRequest) (*iampb.TestIamPermissionsResponse, error) {
 	identity, err := s.caller(ctx)
 	if err != nil {

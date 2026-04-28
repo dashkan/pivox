@@ -38,6 +38,18 @@ permissions:
     display_name: Create Space
     description: Create new spaces in the organization
     roles: [owner, admin]
+  - id: spaces.read
+    display_name: Read Space
+    description: View and list spaces
+    roles: [owner, admin, editor, viewer]
+  - id: spaces.update
+    display_name: Update Space
+    description: Modify space metadata
+    roles: [owner, admin]
+  - id: spaces.delete
+    display_name: Delete Space
+    description: Delete or restore a space (covers UndeleteSpace too — same destruction-class tier). Admin-allowed because spaces have narrower blast radius than orgs (workgroup vs whole tenant); compare organizations.delete which is owner-only.
+    roles: [owner, admin]
   - id: users.read
     display_name: Read Users
     description: View and list users

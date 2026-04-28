@@ -763,6 +763,9 @@ INSERT INTO permissions (permission_id, display_name, description) VALUES
   ('organizations.ssoConfig.update', 'Update SSO Config', 'Modify SSO configuration'),
   -- Space creation (org-level; within-space access is space-role based)
   ('spaces.create', 'Create Space', 'Create new spaces in the organization'),
+  ('spaces.read', 'Read Space', 'View and list spaces'),
+  ('spaces.update', 'Update Space', 'Modify space metadata'),
+  ('spaces.delete', 'Delete Space', 'Delete or restore a space (covers UndeleteSpace too — same destruction-class tier). Admin-allowed because spaces have narrower blast radius than orgs (workgroup vs whole tenant); compare organizations.delete which is owner-only.'),
   -- User management
   ('users.read', 'Read Users', 'View and list users'),
   ('users.delete', 'Delete User', 'Delete a user globally (LRO; cascades memberships)'),
