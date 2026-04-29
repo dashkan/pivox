@@ -361,10 +361,11 @@ func TestE2E_SpacePurgeWorker_CascadesPastGrace(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	// Run a single processBatch tick directly (avoiding the
-	// advisory-lock dance the full Run loop adds).
+	// Run a single processBatch tick directly (bypassing the
+	// advisory-lock dance the full Run loop adds — the lock is a
+	// multi-replica coordination token, not needed in-process).
 	worker := workers.NewSpacePurgeWorker(h.Pool, h.Queries, slog.New(slog.NewTextHandler(io.Discard, nil)), time.Minute)
-	require.NoError(t, runSpacePurgeBatch(t, worker, ctx))
+	require.NoError(t, worker.ProcessBatchForTest(ctx))
 
 	// Slug is now free; recreating the space with the same id must
 	// succeed (proves the row is genuinely gone, not just hidden).
@@ -397,34 +398,6 @@ func waitSpaceOp(t *testing.T, h *grpcharness.Harness, op *longrunningpb.Operati
 	var space apiv1.Space
 	require.NoError(t, final.GetResponse().UnmarshalTo(&space))
 	return &space
-}
-
-// runSpacePurgeBatch invokes the worker's batch processor. Defined
-// here (not on the worker package) because processBatch is
-// unexported; this test exercises it via a same-package wrapper
-// would be cleaner, but for now we go through Run with a one-tick
-// context.
-func runSpacePurgeBatch(t *testing.T, w *workers.SpacePurgeWorker, ctx context.Context) error {
-	t.Helper()
-	// Worker.Run blocks; we want exactly one tick. Easiest path:
-	// run with a context cancelled immediately after first tick
-	// fires, since loop() always fires once before the ticker
-	// channel.
-	tickCtx, cancel := context.WithCancel(ctx)
-	done := make(chan error, 1)
-	go func() { done <- w.Run(tickCtx) }()
-	// Give the first tick a moment to land.
-	time.Sleep(150 * time.Millisecond)
-	cancel()
-	select {
-	case err := <-done:
-		if err != nil && err != context.Canceled {
-			return err
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("worker didn't return after cancel")
-	}
-	return nil
 }
 
 func newSpacesHarness(t *testing.T) *grpcharness.Harness {

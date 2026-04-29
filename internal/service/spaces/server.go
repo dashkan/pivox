@@ -399,9 +399,9 @@ func (s *SpacesServer) DeleteSpace(ctx context.Context, req *apiv1.DeleteSpaceRe
 
 // runDeleteSpace orchestrates the DeleteSpace LRO. force=false drives
 // MARKING_DELETED → COMPLETED; force=true drives PURGING → COMPLETED.
-// CANCELLING_OPERATIONS is a no-op today (no space-scoped LROs
-// exist) but the phase is reported so callers can observe a stable
-// progression.
+// The proto enum reserves CANCELLING_OPERATIONS for a future
+// space-scoped-LRO cancellation phase, but no such LROs exist today
+// so this orchestrator does not emit it.
 func (s *SpacesServer) runDeleteSpace(
 	ctx context.Context,
 	progress lro.Progress,
@@ -495,10 +495,7 @@ func (s *SpacesServer) UndeleteSpace(ctx context.Context, req *apiv1.UndeleteSpa
 	orgSlug := resolvedOrg.Slug
 	updatedBy := caller.String()
 	spaceRsrc := "organizations/" + orgSlug + "/spaces/" + resolvedSpace.Slug
-	// UndeleteSpaceMetadata is intentionally empty — the LRO has only
-	// one phase and the space resource is encoded in the operation
-	// name, so there's nothing to surface mid-flight.
-	initialMeta := &apiv1.UndeleteSpaceMetadata{}
+	initialMeta := &apiv1.UndeleteSpaceMetadata{Space: spaceRsrc}
 
 	return s.lroManager.CreateAndRun(ctx, spaceLifecyclePrefix, initialMeta,
 		func(workCtx context.Context, _ lro.Progress) (proto.Message, error) {

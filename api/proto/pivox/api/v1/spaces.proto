@@ -570,4 +570,7 @@ message DeleteSpaceMetadata {
 
 // A status object which is used as the `metadata` field for the Operation
 // returned by UndeleteSpace.
-message UndeleteSpaceMetadata {}
+message UndeleteSpaceMetadata {
+  // Output only. Resource name of the space being restored.
+  string space = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+}

@@ -1054,7 +1054,15 @@ CREATE TABLE asset_request_line_items (
     id                UUID PRIMARY KEY DEFAULT uuidv7(),
     -- relationships
     request_id        UUID NOT NULL REFERENCES asset_requests(id) ON DELETE CASCADE,
-    asset_id          UUID REFERENCES assets(id),
+    -- ON DELETE SET NULL so a cross-space asset purge (space B's
+    -- asset is referenced from a line_item in space A's request)
+    -- doesn't block the cascade. The line_item survives with a null
+    -- asset_id; the request still holds it as a pending pointer
+    -- the user can re-link or remove. Without SET NULL, force-
+    -- deleting a space (or the post-grace SpacePurgeWorker) would
+    -- abort with an FK violation any time a line_item in another
+    -- space pointed at one of the doomed assets.
+    asset_id          UUID REFERENCES assets(id) ON DELETE SET NULL,
     -- identity
     name              TEXT NOT NULL,
     -- domain

@@ -65,6 +65,15 @@ func (w *SpacePurgeWorker) tick(ctx context.Context) {
 	}
 }
 
+// ProcessBatchForTest exposes the unexported tick body for
+// cross-package E2E tests, bypassing the advisory-lock dance (the
+// lock is a multi-replica coordination token; in-process tests run
+// a single replica and don't need it). Same naming convention as
+// `EnforceSoftDeleteGateForTest` in internal/server.
+func (w *SpacePurgeWorker) ProcessBatchForTest(ctx context.Context) error {
+	return w.processBatch(ctx)
+}
+
 // processBatch lists spaces past their purge window and cascades
 // each one. Split out so tests can exercise the inner logic without
 // needing a real *pgxpool.Pool for the advisory lock.

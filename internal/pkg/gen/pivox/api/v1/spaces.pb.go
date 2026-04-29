@@ -1021,7 +1021,9 @@ func (x *DeleteSpaceMetadata) GetSpace() string {
 // A status object which is used as the `metadata` field for the Operation
 // returned by UndeleteSpace.
 type UndeleteSpaceMetadata struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Output only. Resource name of the space being restored.
+	Space         string `protobuf:"bytes,1,opt,name=space,proto3" json:"space,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1054,6 +1056,13 @@ func (x *UndeleteSpaceMetadata) ProtoReflect() protoreflect.Message {
 // Deprecated: Use UndeleteSpaceMetadata.ProtoReflect.Descriptor instead.
 func (*UndeleteSpaceMetadata) Descriptor() ([]byte, []int) {
 	return file_pivox_api_v1_spaces_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *UndeleteSpaceMetadata) GetSpace() string {
+	if x != nil {
+		return x.Space
+	}
+	return ""
 }
 
 var File_pivox_api_v1_spaces_proto protoreflect.FileDescriptor
@@ -1134,8 +1143,9 @@ const file_pivox_api_v1_spaces_proto_rawDesc = "" +
 	"\x15CANCELLING_OPERATIONS\x10\x02\x12\x13\n" +
 	"\x0fMARKING_DELETED\x10\x03\x12\v\n" +
 	"\aPURGING\x10\x04\x12\r\n" +
-	"\tCOMPLETED\x10\x05\"\x17\n" +
-	"\x15UndeleteSpaceMetadata2\xf5\x10\n" +
+	"\tCOMPLETED\x10\x05\"2\n" +
+	"\x15UndeleteSpaceMetadata\x12\x19\n" +
+	"\x05space\x18\x01 \x01(\tB\x03\xe0A\x03R\x05space2\xf5\x10\n" +
 	"\x06Spaces\x12\x81\x01\n" +
 	"\bGetSpace\x12\x1d.pivox.api.v1.GetSpaceRequest\x1a\x13.pivox.api.v1.Space\"A\xdaA\x04name\x8a\xb5\x18\vspaces.read\x82\xd3\xe4\x93\x02%\x12#/v1/{name=organizations/*/spaces/*}\x12\x94\x01\n" +
 	"\n" +
