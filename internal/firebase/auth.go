@@ -83,3 +83,22 @@ func (s *AuthService) VerifyToken(ctx context.Context, token string) (*authn.Ide
 func (s *AuthService) CreateCustomToken(ctx context.Context, uid string) (string, error) {
 	return s.authClient.CustomToken(ctx, uid)
 }
+
+// DeleteUser removes the user from Firebase Auth. Idempotent: a UID
+// that no longer exists in Firebase returns nil so the DeleteUser
+// LRO can retry the final phase without spuriously failing.
+//
+// Called as the last step of the DeleteUser cascade (after Pivox-side
+// records are gone). A failure here leaves the Firebase identity
+// alive while the Pivox state has been cleaned up — the LRO surfaces
+// the error and the caller can retry; on retry, idempotency on
+// already-deleted UIDs lets the second attempt complete.
+func (s *AuthService) DeleteUser(ctx context.Context, uid string) error {
+	if err := s.authClient.DeleteUser(ctx, uid); err != nil {
+		if auth.IsUserNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	return nil
+}

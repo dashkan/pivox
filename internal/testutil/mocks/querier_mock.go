@@ -161,6 +161,31 @@ func (m *MockQuerier) CancelRunningOpsForOrg(ctx context.Context, orgID pgtype.U
 	return args.Error(0)
 }
 
+func (m *MockQuerier) ListSoleOwnerOrgsForFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) ([]db.Organization, error) {
+	args := m.Called(ctx, firebaseIdentityID)
+	return args.Get(0).([]db.Organization), args.Error(1)
+}
+
+func (m *MockQuerier) DeleteOrgMembersForFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) error {
+	args := m.Called(ctx, firebaseIdentityID)
+	return args.Error(0)
+}
+
+func (m *MockQuerier) DeleteSpaceMembersForFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) error {
+	args := m.Called(ctx, firebaseIdentityID)
+	return args.Error(0)
+}
+
+func (m *MockQuerier) HardDeleteFirebaseIdentity(ctx context.Context, id uuid.UUID) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
+func (m *MockQuerier) GetFirebaseIdentityByID(ctx context.Context, id uuid.UUID) (db.FirebaseIdentity, error) {
+	args := m.Called(ctx, id)
+	return args.Get(0).(db.FirebaseIdentity), args.Error(1)
+}
+
 // --- Users (per-org membership) ---
 
 func (m *MockQuerier) CreateUserMembership(ctx context.Context, arg db.CreateUserMembershipParams) (db.User, error) {

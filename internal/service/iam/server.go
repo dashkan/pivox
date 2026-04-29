@@ -16,10 +16,13 @@ import (
 	"strings"
 
 	"github.com/dashkan/pivox/internal/apierr"
+	"github.com/dashkan/pivox/internal/authn"
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
+	"github.com/dashkan/pivox/internal/lro"
 	"github.com/dashkan/pivox/internal/permission"
 	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
+	"github.com/dashkan/pivox/internal/server"
 )
 
 // IamServer implements the wire-level Iam service. Reads (role,
@@ -28,15 +31,24 @@ import (
 // `Unimplemented`.
 type IamServer struct {
 	iampb.UnimplementedIamServer
-	queries db.Querier
+	queries    db.Querier
+	auth       authn.Service
+	caller     server.CallerIdentityResolver
+	lroManager *lro.Manager
 }
 
-// NewIamServer constructs the server. No resolver/caller deps —
-// permission gating is handled at the interceptor layer; nothing in
-// the IamServer's surface needs caller-identity resolution at
-// handler granularity.
-func NewIamServer(queries db.Querier) *IamServer {
-	return &IamServer{queries: queries}
+// NewIamServer constructs the server. The auth/caller/lroManager
+// deps are required by DeleteUser (a global LRO that ends with a
+// Firebase Auth deletion); read-only handlers (ListPermissions,
+// GetRole, ListRoles) ignore them. Tests that exercise only reads
+// pass nils for the unused deps.
+func NewIamServer(queries db.Querier, auth authn.Service, caller server.CallerIdentityResolver, lroManager *lro.Manager) *IamServer {
+	return &IamServer{
+		queries:    queries,
+		auth:       auth,
+		caller:     caller,
+		lroManager: lroManager,
+	}
 }
 
 // ListPermissions returns the global permission catalog. Permissions

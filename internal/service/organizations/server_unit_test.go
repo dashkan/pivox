@@ -220,6 +220,11 @@ func (m *mockAuthService) CreateCustomToken(ctx context.Context, uid string) (st
 	return args.String(0), args.Error(1)
 }
 
+func (m *mockAuthService) DeleteUser(ctx context.Context, uid string) error {
+	args := m.Called(ctx, uid)
+	return args.Error(0)
+}
+
 // newCreateOrgServer builds an OrganizationsServer wired with the mock pool,
 // auth service, and querier needed by CreateOrganization. The querier is
 // where `GetFirebaseIdentityByUID` (the pre-tx caller-resolution lookup)

@@ -45,6 +45,11 @@ func (m *mockAuthService) DeleteTenant(ctx context.Context, tenantID string) err
 	return args.Error(0)
 }
 
+func (m *mockAuthService) DeleteUser(ctx context.Context, uid string) error {
+	args := m.Called(ctx, uid)
+	return args.Error(0)
+}
+
 // --- Mock grpc.ServerStream ---
 
 type mockServerStream struct {

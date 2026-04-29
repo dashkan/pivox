@@ -127,8 +127,15 @@ type Querier interface {
 	// Returns the affected-row count so the handler can map "not found"
 	// (0 rows) to gRPC NotFound rather than treating it as success.
 	DeleteOrgMember(ctx context.Context, arg DeleteOrgMemberParams) (int64, error)
+	// DeleteOrgMembersForFirebaseIdentity removes all org-scope role
+	// bindings for users owned by this firebase_identity. The DELETE is
+	// explicit because org_members.principal_id has no FK on users
+	// (principal_kind discriminates user vs group).
+	DeleteOrgMembersForFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) error
 	DeleteRequest(ctx context.Context, id uuid.UUID) error
 	DeleteSpaceMember(ctx context.Context, arg DeleteSpaceMemberParams) (int64, error)
+	// DeleteSpaceMembersForFirebaseIdentity is the space-scope analogue.
+	DeleteSpaceMembersForFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) error
 	DeleteStorageAgent(ctx context.Context, id uuid.UUID) error
 	DeleteStorageEndpoint(ctx context.Context, id uuid.UUID) error
 	DeleteStorageGateway(ctx context.Context, id uuid.UUID) error
@@ -179,6 +186,11 @@ type Querier interface {
 	// Returns the empty set if the firebase_identity has no live user row
 	// in the org that owns this space.
 	GetEffectiveSpaceRoles(ctx context.Context, arg GetEffectiveSpaceRolesParams) ([]string, error)
+	// GetFirebaseIdentityByID looks up by primary key. Used by
+	// DeleteUser's DELETING_PIVOX_RECORDS phase to capture the
+	// firebase_uid before the row is hard-deleted, so the subsequent
+	// DELETING_FIREBASE_IDENTITY phase can call auth.DeleteUser(uid).
+	GetFirebaseIdentityByID(ctx context.Context, id uuid.UUID) (FirebaseIdentity, error)
 	GetFirebaseIdentityByUID(ctx context.Context, firebaseUid string) (FirebaseIdentity, error)
 	// Companion to GetUserByID for groups.
 	GetGroupByID(ctx context.Context, arg GetGroupByIDParams) (Group, error)
@@ -243,6 +255,16 @@ type Querier interface {
 	// no FK (it's polymorphic), so the check is application-level.
 	GetUserByID(ctx context.Context, arg GetUserByIDParams) (User, error)
 	GetUserMembership(ctx context.Context, arg GetUserMembershipParams) (User, error)
+	// HardDeleteFirebaseIdentity removes the firebase_identity row.
+	// Cascade chain (via FK ON DELETE CASCADE):
+	//   firebase_identities → users → group_members
+	// Explicit revocation queries above handle org_members and
+	// space_members because their `principal_id` is unFK'd (the
+	// principal_kind discriminator means we can't add a FK directly).
+	// Called as the second-to-last step of DeleteUser; the Firebase
+	// Auth identity itself is deleted last so a partial failure leaves
+	// a recoverable Firebase identity rather than orphaned Pivox state.
+	HardDeleteFirebaseIdentity(ctx context.Context, id uuid.UUID) error
 	IncrementConversationMessageCount(ctx context.Context, id uuid.UUID) error
 	IsOnlyArtifactVersion(ctx context.Context, artifactID uuid.UUID) (bool, error)
 	ListAssetRenditions(ctx context.Context, versionID uuid.UUID) ([]AssetRendition, error)
@@ -281,6 +303,17 @@ type Querier interface {
 	ListPermissions(ctx context.Context) ([]Permission, error)
 	ListRequestsBySpace(ctx context.Context, arg ListRequestsBySpaceParams) ([]AssetRequest, error)
 	ListRolesByOrg(ctx context.Context, orgID uuid.UUID) ([]Role, error)
+	// ListSoleOwnerOrgsForFirebaseIdentity returns the set of active orgs
+	// where this firebase_identity is the ONLY owner. Used by DeleteUser's
+	// VALIDATING phase to refuse deletion when the caller would leave any
+	// org without an owner. Empty result means deletion is safe.
+	//
+	// The `having count(*) = 1` clause runs over org_members keyed on the
+	// system 'owner' role for that org; `bool_or` then asserts the single
+	// owner is THIS firebase_identity (true for exactly one row in the
+	// group, false otherwise). Soft-deleted orgs and soft-deleted users
+	// are excluded.
+	ListSoleOwnerOrgsForFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) ([]Organization, error)
 	// Companion to ListOrgMembers at space scope. Same direct-only
 	// semantic as GetSpaceMember.
 	ListSpaceMembers(ctx context.Context, spaceID uuid.UUID) ([]ListSpaceMembersRow, error)

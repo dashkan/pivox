@@ -428,15 +428,26 @@ plan is obsolete.)
 - [x] `force=true` requires a non-empty etag pinning the row revision —
       destructive op safety.
 
-### Step 5 — User lifecycle
+### Step 5 — User lifecycle ✅
 
-- [ ] `Iam.DeleteUser` LRO orchestrator (`DeleteUserMetadata.Phase`: VALIDATING,
+- [x] `Iam.DeleteUser` LRO orchestrator (`DeleteUserMetadata.Phase`: VALIDATING,
       REVOKING_MEMBERSHIPS, DELETING_PIVOX_RECORDS, DELETING_FIREBASE_IDENTITY,
-      COMPLETED).
-- [ ] Sole-owner check: `org_members WHERE role_id=<system owner>` group-by-org;
-      blocks with FAILED_PRECONDITION + structured detail listing affected orgs.
-- [ ] Cascade order: memberships → owned data → `firebase.Auth.DeleteUser(uid)` last.
-- [ ] `onUserDeleted` Firebase webhook handler: idempotent — no-op if user already gone.
+      COMPLETED). Self-delete via `users/me`. Path: `organizations/{org}/users/{user}`
+      where `{user}` is the per-org users.id UUID or `me`.
+- [x] Sole-owner check: `org_members WHERE role_id=<system owner>` group-by-org,
+      keyed on caller's firebase_identity_id. Blocks with FAILED_PRECONDITION
+      and lists affected orgs in the message so the caller can route to
+      `Organizations.TransferOwnership` or `DeleteOrganization`.
+- [x] Cascade order: org_members + space_members revoked explicitly; users +
+      group_members removed via FK ON DELETE CASCADE when the firebase_identity
+      row is hard-deleted; `auth.DeleteUser(uid)` last so a partial failure
+      leaves a recoverable Firebase identity. Idempotent on already-gone rows
+      so retry-from-mid-cascade is safe.
+- [x] `authn.Service.DeleteUser` interface + Firebase impl that swallows
+      `auth.IsUserNotFound` errors for retry idempotency.
+- [ ] `onUserDeleted` Firebase webhook handler: idempotent — no-op if user
+      already gone. Out-of-process, lives in `deployments/firebase/functions/`;
+      separate commit.
 
 ### Step 6 — Workers (purge + verify-DNS), in-process
 

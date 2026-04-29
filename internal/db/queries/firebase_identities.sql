@@ -22,3 +22,10 @@ RETURNING *;
 
 -- name: GetFirebaseIdentityByUID :one
 SELECT * FROM firebase_identities WHERE firebase_uid = $1;
+
+-- GetFirebaseIdentityByID looks up by primary key. Used by
+-- DeleteUser's DELETING_PIVOX_RECORDS phase to capture the
+-- firebase_uid before the row is hard-deleted, so the subsequent
+-- DELETING_FIREBASE_IDENTITY phase can call auth.DeleteUser(uid).
+-- name: GetFirebaseIdentityByID :one
+SELECT * FROM firebase_identities WHERE id = $1;

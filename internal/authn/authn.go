@@ -23,4 +23,12 @@ type Service interface {
 	// CreateCustomToken mints a provider-specific token for the given UID
 	// that a client can use to sign in.
 	CreateCustomToken(ctx context.Context, uid string) (string, error)
+
+	// DeleteUser removes the user from the underlying identity provider.
+	// Called as the LAST step of the DeleteUser LRO so a partial failure
+	// leaves the Firebase identity alive (and Pivox state already
+	// cleaned up — but recoverable). Implementations should be idempotent
+	// (no error for already-deleted UIDs) so the LRO is safe to retry
+	// after a transient failure.
+	DeleteUser(ctx context.Context, uid string) error
 }

@@ -8,8 +8,35 @@ package db
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const getFirebaseIdentityByID = `-- name: GetFirebaseIdentityByID :one
+SELECT id, firebase_uid, email, email_verified, display_name, photo_url, disabled, create_time, update_time, last_login_time FROM firebase_identities WHERE id = $1
+`
+
+// GetFirebaseIdentityByID looks up by primary key. Used by
+// DeleteUser's DELETING_PIVOX_RECORDS phase to capture the
+// firebase_uid before the row is hard-deleted, so the subsequent
+// DELETING_FIREBASE_IDENTITY phase can call auth.DeleteUser(uid).
+func (q *Queries) GetFirebaseIdentityByID(ctx context.Context, id uuid.UUID) (FirebaseIdentity, error) {
+	row := q.db.QueryRow(ctx, getFirebaseIdentityByID, id)
+	var i FirebaseIdentity
+	err := row.Scan(
+		&i.ID,
+		&i.FirebaseUid,
+		&i.Email,
+		&i.EmailVerified,
+		&i.DisplayName,
+		&i.PhotoUrl,
+		&i.Disabled,
+		&i.CreateTime,
+		&i.UpdateTime,
+		&i.LastLoginTime,
+	)
+	return i, err
+}
 
 const getFirebaseIdentityByUID = `-- name: GetFirebaseIdentityByUID :one
 SELECT id, firebase_uid, email, email_verified, display_name, photo_url, disabled, create_time, update_time, last_login_time FROM firebase_identities WHERE firebase_uid = $1
