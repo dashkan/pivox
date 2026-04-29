@@ -73,6 +73,19 @@ public enum Pivox_Iam_V1_Iam: Sendable {
                 type: .unary
             )
         }
+        /// Namespace for "DeleteAccount" metadata.
+        public enum DeleteAccount: Sendable {
+            /// Request type for "DeleteAccount".
+            public typealias Input = Pivox_Iam_V1_DeleteAccountRequest
+            /// Response type for "DeleteAccount".
+            public typealias Output = Google_Longrunning_Operation
+            /// Descriptor for "DeleteAccount".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "pivox.iam.v1.Iam"),
+                method: "DeleteAccount",
+                type: .unary
+            )
+        }
         /// Namespace for "GetRole" metadata.
         public enum GetRole: Sendable {
             /// Request type for "GetRole".
@@ -221,6 +234,7 @@ public enum Pivox_Iam_V1_Iam: Sendable {
             GetUser.descriptor,
             ListUsers.descriptor,
             DeleteUser.descriptor,
+            DeleteAccount.descriptor,
             GetRole.descriptor,
             ListRoles.descriptor,
             ListPermissions.descriptor,
@@ -330,14 +344,19 @@ extension Pivox_Iam_V1_Iam {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Deletes a user (LRO). Cascades through Pivox-side state and
-        /// > finishes by deleting the underlying Firebase Auth identity.
-        /// > Self-delete: address `organizations/{org}/users/me`.
+        /// > Removes a user from an organization (LRO). Org-scoped: deletes
+        /// > the user's per-org bindings and their per-org users row in this
+        /// > org only. Their Pivox account, Firebase Auth identity, and
+        /// > memberships in other orgs are untouched. Use `DeleteAccount`
+        /// > for full account deletion.
         /// > 
-        /// > Sole-owner blocking: if the caller owns any active org with no
-        /// > other owners, the LRO completes with FAILED_PRECONDITION listing
-        /// > affected orgs. Resolve via `Organizations.TransferOwnership` or
-        /// > `Organizations.DeleteOrganization` first.
+        /// > Sole-owner blocking: if removing this user from this org would
+        /// > leave the org with zero owners, the LRO completes with
+        /// > FAILED_PRECONDITION. Resolve via `Organizations.TransferOwnership`
+        /// > first.
+        /// > 
+        /// > The literal `me` is not a valid {user} segment for this RPC; v1
+        /// > has no self-leave-org capability.
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Pivox_Iam_V1_DeleteUserRequest` message.
@@ -351,6 +370,47 @@ extension Pivox_Iam_V1_Iam {
         func deleteUser<Result>(
             request: GRPCCore.ClientRequest<Pivox_Iam_V1_DeleteUserRequest>,
             serializer: some GRPCCore.MessageSerializer<Pivox_Iam_V1_DeleteUserRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Google_Longrunning_Operation>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "DeleteAccount" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Deletes the authenticated caller's Pivox account (LRO). Cascades
+        /// > through Pivox-side state across every org the caller is in, then
+        /// > deletes the underlying Firebase Auth identity. Cross-org by
+        /// > design — this is the only Pivox RPC that legitimately reaches
+        /// > across orgs.
+        /// > 
+        /// > Why Pivox-owned: Firebase Auth has no blocking pre-delete
+        /// > trigger, so server-side validation (sole-owner check) requires
+        /// > Pivox to be the entry point. The webhook for direct-Console
+        /// > bypass is a separate fallback path.
+        /// > 
+        /// > Sole-owner blocking: if the caller is the sole owner of any
+        /// > active org, the LRO completes with FAILED_PRECONDITION listing
+        /// > them. Resolve via `Organizations.TransferOwnership` or
+        /// > `Organizations.DeleteOrganization` on each.
+        /// > 
+        /// > No permission annotation: on the membership-exempt list, like
+        /// > CreateOrganization, so memberless callers (stuck in a
+        /// > half-bootstrapped state) can still delete their account.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Pivox_Iam_V1_DeleteAccountRequest` message.
+        ///   - serializer: A serializer for `Pivox_Iam_V1_DeleteAccountRequest` messages.
+        ///   - deserializer: A deserializer for `Google_Longrunning_Operation` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func deleteAccount<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Iam_V1_DeleteAccountRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Iam_V1_DeleteAccountRequest>,
             deserializer: some GRPCCore.MessageDeserializer<Google_Longrunning_Operation>,
             options: GRPCCore.CallOptions,
             onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result
@@ -729,14 +789,19 @@ extension Pivox_Iam_V1_Iam {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Deletes a user (LRO). Cascades through Pivox-side state and
-        /// > finishes by deleting the underlying Firebase Auth identity.
-        /// > Self-delete: address `organizations/{org}/users/me`.
+        /// > Removes a user from an organization (LRO). Org-scoped: deletes
+        /// > the user's per-org bindings and their per-org users row in this
+        /// > org only. Their Pivox account, Firebase Auth identity, and
+        /// > memberships in other orgs are untouched. Use `DeleteAccount`
+        /// > for full account deletion.
         /// > 
-        /// > Sole-owner blocking: if the caller owns any active org with no
-        /// > other owners, the LRO completes with FAILED_PRECONDITION listing
-        /// > affected orgs. Resolve via `Organizations.TransferOwnership` or
-        /// > `Organizations.DeleteOrganization` first.
+        /// > Sole-owner blocking: if removing this user from this org would
+        /// > leave the org with zero owners, the LRO completes with
+        /// > FAILED_PRECONDITION. Resolve via `Organizations.TransferOwnership`
+        /// > first.
+        /// > 
+        /// > The literal `me` is not a valid {user} segment for this RPC; v1
+        /// > has no self-leave-org capability.
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Pivox_Iam_V1_DeleteUserRequest` message.
@@ -759,6 +824,58 @@ extension Pivox_Iam_V1_Iam {
             try await self.client.unary(
                 request: request,
                 descriptor: Pivox_Iam_V1_Iam.Method.DeleteUser.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "DeleteAccount" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Deletes the authenticated caller's Pivox account (LRO). Cascades
+        /// > through Pivox-side state across every org the caller is in, then
+        /// > deletes the underlying Firebase Auth identity. Cross-org by
+        /// > design — this is the only Pivox RPC that legitimately reaches
+        /// > across orgs.
+        /// > 
+        /// > Why Pivox-owned: Firebase Auth has no blocking pre-delete
+        /// > trigger, so server-side validation (sole-owner check) requires
+        /// > Pivox to be the entry point. The webhook for direct-Console
+        /// > bypass is a separate fallback path.
+        /// > 
+        /// > Sole-owner blocking: if the caller is the sole owner of any
+        /// > active org, the LRO completes with FAILED_PRECONDITION listing
+        /// > them. Resolve via `Organizations.TransferOwnership` or
+        /// > `Organizations.DeleteOrganization` on each.
+        /// > 
+        /// > No permission annotation: on the membership-exempt list, like
+        /// > CreateOrganization, so memberless callers (stuck in a
+        /// > half-bootstrapped state) can still delete their account.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Pivox_Iam_V1_DeleteAccountRequest` message.
+        ///   - serializer: A serializer for `Pivox_Iam_V1_DeleteAccountRequest` messages.
+        ///   - deserializer: A deserializer for `Google_Longrunning_Operation` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func deleteAccount<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Iam_V1_DeleteAccountRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Iam_V1_DeleteAccountRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Google_Longrunning_Operation>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Pivox_Iam_V1_Iam.Method.DeleteAccount.descriptor,
                 serializer: serializer,
                 deserializer: deserializer,
                 options: options,
@@ -1210,14 +1327,19 @@ extension Pivox_Iam_V1_Iam.ClientProtocol {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Deletes a user (LRO). Cascades through Pivox-side state and
-    /// > finishes by deleting the underlying Firebase Auth identity.
-    /// > Self-delete: address `organizations/{org}/users/me`.
+    /// > Removes a user from an organization (LRO). Org-scoped: deletes
+    /// > the user's per-org bindings and their per-org users row in this
+    /// > org only. Their Pivox account, Firebase Auth identity, and
+    /// > memberships in other orgs are untouched. Use `DeleteAccount`
+    /// > for full account deletion.
     /// > 
-    /// > Sole-owner blocking: if the caller owns any active org with no
-    /// > other owners, the LRO completes with FAILED_PRECONDITION listing
-    /// > affected orgs. Resolve via `Organizations.TransferOwnership` or
-    /// > `Organizations.DeleteOrganization` first.
+    /// > Sole-owner blocking: if removing this user from this org would
+    /// > leave the org with zero owners, the LRO completes with
+    /// > FAILED_PRECONDITION. Resolve via `Organizations.TransferOwnership`
+    /// > first.
+    /// > 
+    /// > The literal `me` is not a valid {user} segment for this RPC; v1
+    /// > has no self-leave-org capability.
     ///
     /// - Parameters:
     ///   - request: A request containing a single `Pivox_Iam_V1_DeleteUserRequest` message.
@@ -1236,6 +1358,53 @@ extension Pivox_Iam_V1_Iam.ClientProtocol {
         try await self.deleteUser(
             request: request,
             serializer: GRPCProtobuf.ProtobufSerializer<Pivox_Iam_V1_DeleteUserRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Google_Longrunning_Operation>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "DeleteAccount" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Deletes the authenticated caller's Pivox account (LRO). Cascades
+    /// > through Pivox-side state across every org the caller is in, then
+    /// > deletes the underlying Firebase Auth identity. Cross-org by
+    /// > design — this is the only Pivox RPC that legitimately reaches
+    /// > across orgs.
+    /// > 
+    /// > Why Pivox-owned: Firebase Auth has no blocking pre-delete
+    /// > trigger, so server-side validation (sole-owner check) requires
+    /// > Pivox to be the entry point. The webhook for direct-Console
+    /// > bypass is a separate fallback path.
+    /// > 
+    /// > Sole-owner blocking: if the caller is the sole owner of any
+    /// > active org, the LRO completes with FAILED_PRECONDITION listing
+    /// > them. Resolve via `Organizations.TransferOwnership` or
+    /// > `Organizations.DeleteOrganization` on each.
+    /// > 
+    /// > No permission annotation: on the membership-exempt list, like
+    /// > CreateOrganization, so memberless callers (stuck in a
+    /// > half-bootstrapped state) can still delete their account.
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Pivox_Iam_V1_DeleteAccountRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func deleteAccount<Result>(
+        request: GRPCCore.ClientRequest<Pivox_Iam_V1_DeleteAccountRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.deleteAccount(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Pivox_Iam_V1_DeleteAccountRequest>(),
             deserializer: GRPCProtobuf.ProtobufDeserializer<Google_Longrunning_Operation>(),
             options: options,
             onResponse: handleResponse
@@ -1638,14 +1807,19 @@ extension Pivox_Iam_V1_Iam.ClientProtocol {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Deletes a user (LRO). Cascades through Pivox-side state and
-    /// > finishes by deleting the underlying Firebase Auth identity.
-    /// > Self-delete: address `organizations/{org}/users/me`.
+    /// > Removes a user from an organization (LRO). Org-scoped: deletes
+    /// > the user's per-org bindings and their per-org users row in this
+    /// > org only. Their Pivox account, Firebase Auth identity, and
+    /// > memberships in other orgs are untouched. Use `DeleteAccount`
+    /// > for full account deletion.
     /// > 
-    /// > Sole-owner blocking: if the caller owns any active org with no
-    /// > other owners, the LRO completes with FAILED_PRECONDITION listing
-    /// > affected orgs. Resolve via `Organizations.TransferOwnership` or
-    /// > `Organizations.DeleteOrganization` first.
+    /// > Sole-owner blocking: if removing this user from this org would
+    /// > leave the org with zero owners, the LRO completes with
+    /// > FAILED_PRECONDITION. Resolve via `Organizations.TransferOwnership`
+    /// > first.
+    /// > 
+    /// > The literal `me` is not a valid {user} segment for this RPC; v1
+    /// > has no self-leave-org capability.
     ///
     /// - Parameters:
     ///   - message: request message to send.
@@ -1668,6 +1842,57 @@ extension Pivox_Iam_V1_Iam.ClientProtocol {
             metadata: metadata
         )
         return try await self.deleteUser(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "DeleteAccount" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Deletes the authenticated caller's Pivox account (LRO). Cascades
+    /// > through Pivox-side state across every org the caller is in, then
+    /// > deletes the underlying Firebase Auth identity. Cross-org by
+    /// > design — this is the only Pivox RPC that legitimately reaches
+    /// > across orgs.
+    /// > 
+    /// > Why Pivox-owned: Firebase Auth has no blocking pre-delete
+    /// > trigger, so server-side validation (sole-owner check) requires
+    /// > Pivox to be the entry point. The webhook for direct-Console
+    /// > bypass is a separate fallback path.
+    /// > 
+    /// > Sole-owner blocking: if the caller is the sole owner of any
+    /// > active org, the LRO completes with FAILED_PRECONDITION listing
+    /// > them. Resolve via `Organizations.TransferOwnership` or
+    /// > `Organizations.DeleteOrganization` on each.
+    /// > 
+    /// > No permission annotation: on the membership-exempt list, like
+    /// > CreateOrganization, so memberless callers (stuck in a
+    /// > half-bootstrapped state) can still delete their account.
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func deleteAccount<Result>(
+        _ message: Pivox_Iam_V1_DeleteAccountRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Pivox_Iam_V1_DeleteAccountRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.deleteAccount(
             request: request,
             options: options,
             onResponse: handleResponse

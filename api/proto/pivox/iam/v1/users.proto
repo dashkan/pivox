@@ -138,29 +138,32 @@ message ListUsersResponse {
 
 // Request message for `Iam.DeleteUser`.
 //
-// Self-delete: address `organizations/{organization}/users/me`. The
-// server resolves `me` to the authenticated caller.
+// Org-scoped removal: removes a user FROM a single org. The user's
+// Pivox account itself is unaffected; their memberships in OTHER
+// orgs are unaffected; their Firebase Auth identity is unaffected.
+// Use `Iam.DeleteAccount` for global account deletion.
 //
-// Sole-owner blocking: if the caller is the sole `owner` of any
-// active organization, the LRO completes with `FAILED_PRECONDITION`
-// and a structured detail listing the blocking org names. Resolve by
-// `TransferOwnership` (promote another member) or by deleting those
-// orgs first.
+// Sole-owner blocking: if removing this user from this org would
+// leave the org with zero owners, the LRO completes with
+// `FAILED_PRECONDITION`. Resolve via `TransferOwnership` first
+// (promote another member to owner) before retrying.
 //
-// Cascade order inside the LRO:
-//   1. Cancel in-flight LROs scoped to the user.
-//   2. Delete org-level Member bindings (org_members where principal = this user).
-//   3. Delete space-level Member bindings (space_members where principal = this user).
-//   4. Delete group memberships.
-//   5. Delete the User row.
-//   6. Delete the firebase_identity row.
-//   7. firebase.Auth.DeleteUser(uid) — last, so a partial failure
-//      leaves us in a recoverable state with the Firebase identity
-//      still alive.
+// Self-target rejection: paths of the form
+// `organizations/{org}/users/me` are NOT supported on this RPC.
+// `me` does not parse as a UUID and surfaces InvalidArgument. v1
+// has no self-leave-org capability — see roadmap for the open
+// product question (SSO vs non-SSO orgs need different policies).
+//
+// Cascade order inside the LRO (all bounded to the path's org):
+//   1. Validate org-local sole-owner constraint.
+//   2. Delete this user's org-level Member bindings in this org.
+//   3. Delete this user's space-level Member bindings in spaces of this org.
+//   4. Delete this user's group memberships in groups of this org.
+//   5. Soft-delete the per-org users row (30-day grace + purge_time).
 message DeleteUserRequest {
   // Required. The user to delete. Format:
-  // `organizations/{organization}/users/{user}` or
-  // `organizations/{organization}/users/me` for self-delete.
+  // `organizations/{organization}/users/{user}` where {user} is a
+  // UUID. The literal `me` is rejected.
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.iam/User"},
@@ -173,27 +176,24 @@ message DeleteUserRequest {
 
 // A status object used as the `metadata` field for the Operation
 // returned by `Iam.DeleteUser`. Surfaces incremental progress through
-// the cascade phases.
+// the org-scoped cascade phases.
 message DeleteUserMetadata {
   // Output only. The phase of the cascade currently executing.
   enum Phase {
     // Default; not used.
     PHASE_UNSPECIFIED = 0;
 
-    // Validating preconditions (sole-owner check).
+    // Validating preconditions (org-local sole-owner check).
     VALIDATING = 1;
 
-    // Removing role / group memberships.
+    // Removing role / group memberships in this org.
     REVOKING_MEMBERSHIPS = 2;
 
-    // Deleting Pivox-side records.
-    DELETING_PIVOX_RECORDS = 3;
-
-    // Deleting the Firebase Auth identity (last step).
-    DELETING_FIREBASE_IDENTITY = 4;
+    // Soft-deleting the per-org users row.
+    SOFT_DELETING_USER = 3;
 
     // Done.
-    COMPLETED = 5;
+    COMPLETED = 4;
   }
 
   // Output only. Current phase of the cascade.

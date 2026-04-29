@@ -53,6 +53,12 @@ var membershipExemptMethods = map[string]bool{
 	"/pivox.api.v1.Organizations/ListOrganizations":  true,
 	"/pivox.api.v1.Organizations/AcceptInvitation":   true,
 	"/pivox.api.v1.Organizations/GetInvitation":      true,
+	// DeleteAccount targets the singleton accounts/me — no org
+	// scope. A user stuck in a half-bootstrapped state (firebase
+	// identity exists, no org memberships) must still be able to
+	// delete their account; gating this on membership would lock
+	// them out of recovery.
+	"/pivox.iam.v1.Iam/DeleteAccount": true,
 }
 
 // requireMembership is the shared body for both unary and stream

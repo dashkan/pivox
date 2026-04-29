@@ -20,6 +20,7 @@ import "google/api/annotations.proto";
 import "google/api/client.proto";
 import "google/longrunning/operations.proto";
 import "google/protobuf/empty.proto";
+import "pivox/iam/v1/accounts.proto";
 import "pivox/iam/v1/groups.proto";
 import "pivox/iam/v1/members.proto";
 import "pivox/iam/v1/permissions.proto";
@@ -72,14 +73,19 @@ service Iam {
     option (pivox.permission.v1.required_permission) = "users.read";
   }
 
-  // Deletes a user (LRO). Cascades through Pivox-side state and
-  // finishes by deleting the underlying Firebase Auth identity.
-  // Self-delete: address `organizations/{org}/users/me`.
+  // Removes a user from an organization (LRO). Org-scoped: deletes
+  // the user's per-org bindings and their per-org users row in this
+  // org only. Their Pivox account, Firebase Auth identity, and
+  // memberships in other orgs are untouched. Use `DeleteAccount`
+  // for full account deletion.
   //
-  // Sole-owner blocking: if the caller owns any active org with no
-  // other owners, the LRO completes with FAILED_PRECONDITION listing
-  // affected orgs. Resolve via `Organizations.TransferOwnership` or
-  // `Organizations.DeleteOrganization` first.
+  // Sole-owner blocking: if removing this user from this org would
+  // leave the org with zero owners, the LRO completes with
+  // FAILED_PRECONDITION. Resolve via `Organizations.TransferOwnership`
+  // first.
+  //
+  // The literal `me` is not a valid {user} segment for this RPC; v1
+  // has no self-leave-org capability.
   rpc DeleteUser(DeleteUserRequest) returns (google.longrunning.Operation) {
     option (google.api.http) = {delete: "/v1/{name=organizations/*/users/*}"};
     option (google.api.method_signature) = "name";
@@ -88,6 +94,38 @@ service Iam {
       metadata_type: "DeleteUserMetadata"
     };
     option (pivox.permission.v1.required_permission) = "users.delete";
+  }
+
+  // Deletes the authenticated caller's Pivox account (LRO). Cascades
+  // through Pivox-side state across every org the caller is in, then
+  // deletes the underlying Firebase Auth identity. Cross-org by
+  // design — this is the only Pivox RPC that legitimately reaches
+  // across orgs.
+  //
+  // Why Pivox-owned: Firebase Auth has no blocking pre-delete
+  // trigger, so server-side validation (sole-owner check) requires
+  // Pivox to be the entry point. The webhook for direct-Console
+  // bypass is a separate fallback path.
+  //
+  // Sole-owner blocking: if the caller is the sole owner of any
+  // active org, the LRO completes with FAILED_PRECONDITION listing
+  // them. Resolve via `Organizations.TransferOwnership` or
+  // `Organizations.DeleteOrganization` on each.
+  //
+  // No permission annotation: on the membership-exempt list, like
+  // CreateOrganization, so memberless callers (stuck in a
+  // half-bootstrapped state) can still delete their account.
+  rpc DeleteAccount(DeleteAccountRequest) returns (google.longrunning.Operation) {
+    option (google.api.http) = {
+      post: "/v1/{name=accounts/me}:delete"
+      body: "*"
+    };
+    option (google.api.method_signature) = "name";
+    option (google.longrunning.operation_info) = {
+      response_type: "google.protobuf.Empty"
+      metadata_type: "DeleteAccountMetadata"
+    };
+    option (pivox.permission.v1.exempt) = true;
   }
 
   // Gets a role by resource name. v1 returns only system roles

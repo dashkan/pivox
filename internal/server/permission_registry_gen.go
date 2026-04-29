@@ -819,6 +819,7 @@ var GeneratedExempt = map[string]bool{
 	"/pivox.api.v1.Organizations/ListOrganizations":          true,
 	"/pivox.api.v1.Organizations/TestIamPermissions":         true,
 	"/pivox.api.v1.Spaces/TestIamPermissions":                true,
+	"/pivox.iam.v1.Iam/DeleteAccount":                        true,
 	"/pivox.iam.v1.Iam/ListPermissions":                      true,
 	"/pivox.storage.v1.StorageGateways/CreateStorageSession": true,
 }

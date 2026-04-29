@@ -44,16 +44,14 @@ type DeleteUserMetadata_Phase int32
 const (
 	// Default; not used.
 	DeleteUserMetadata_PHASE_UNSPECIFIED DeleteUserMetadata_Phase = 0
-	// Validating preconditions (sole-owner check).
+	// Validating preconditions (org-local sole-owner check).
 	DeleteUserMetadata_VALIDATING DeleteUserMetadata_Phase = 1
-	// Removing role / group memberships.
+	// Removing role / group memberships in this org.
 	DeleteUserMetadata_REVOKING_MEMBERSHIPS DeleteUserMetadata_Phase = 2
-	// Deleting Pivox-side records.
-	DeleteUserMetadata_DELETING_PIVOX_RECORDS DeleteUserMetadata_Phase = 3
-	// Deleting the Firebase Auth identity (last step).
-	DeleteUserMetadata_DELETING_FIREBASE_IDENTITY DeleteUserMetadata_Phase = 4
+	// Soft-deleting the per-org users row.
+	DeleteUserMetadata_SOFT_DELETING_USER DeleteUserMetadata_Phase = 3
 	// Done.
-	DeleteUserMetadata_COMPLETED DeleteUserMetadata_Phase = 5
+	DeleteUserMetadata_COMPLETED DeleteUserMetadata_Phase = 4
 )
 
 // Enum value maps for DeleteUserMetadata_Phase.
@@ -62,17 +60,15 @@ var (
 		0: "PHASE_UNSPECIFIED",
 		1: "VALIDATING",
 		2: "REVOKING_MEMBERSHIPS",
-		3: "DELETING_PIVOX_RECORDS",
-		4: "DELETING_FIREBASE_IDENTITY",
-		5: "COMPLETED",
+		3: "SOFT_DELETING_USER",
+		4: "COMPLETED",
 	}
 	DeleteUserMetadata_Phase_value = map[string]int32{
-		"PHASE_UNSPECIFIED":          0,
-		"VALIDATING":                 1,
-		"REVOKING_MEMBERSHIPS":       2,
-		"DELETING_PIVOX_RECORDS":     3,
-		"DELETING_FIREBASE_IDENTITY": 4,
-		"COMPLETED":                  5,
+		"PHASE_UNSPECIFIED":    0,
+		"VALIDATING":           1,
+		"REVOKING_MEMBERSHIPS": 2,
+		"SOFT_DELETING_USER":   3,
+		"COMPLETED":            4,
 	}
 )
 
@@ -441,30 +437,33 @@ func (x *ListUsersResponse) GetNextPageToken() string {
 
 // Request message for `Iam.DeleteUser`.
 //
-// Self-delete: address `organizations/{organization}/users/me`. The
-// server resolves `me` to the authenticated caller.
+// Org-scoped removal: removes a user FROM a single org. The user's
+// Pivox account itself is unaffected; their memberships in OTHER
+// orgs are unaffected; their Firebase Auth identity is unaffected.
+// Use `Iam.DeleteAccount` for global account deletion.
 //
-// Sole-owner blocking: if the caller is the sole `owner` of any
-// active organization, the LRO completes with `FAILED_PRECONDITION`
-// and a structured detail listing the blocking org names. Resolve by
-// `TransferOwnership` (promote another member) or by deleting those
-// orgs first.
+// Sole-owner blocking: if removing this user from this org would
+// leave the org with zero owners, the LRO completes with
+// `FAILED_PRECONDITION`. Resolve via `TransferOwnership` first
+// (promote another member to owner) before retrying.
 //
-// Cascade order inside the LRO:
-//  1. Cancel in-flight LROs scoped to the user.
-//  2. Delete org-level Member bindings (org_members where principal = this user).
-//  3. Delete space-level Member bindings (space_members where principal = this user).
-//  4. Delete group memberships.
-//  5. Delete the User row.
-//  6. Delete the firebase_identity row.
-//  7. firebase.Auth.DeleteUser(uid) — last, so a partial failure
-//     leaves us in a recoverable state with the Firebase identity
-//     still alive.
+// Self-target rejection: paths of the form
+// `organizations/{org}/users/me` are NOT supported on this RPC.
+// `me` does not parse as a UUID and surfaces InvalidArgument. v1
+// has no self-leave-org capability — see roadmap for the open
+// product question (SSO vs non-SSO orgs need different policies).
+//
+// Cascade order inside the LRO (all bounded to the path's org):
+//  1. Validate org-local sole-owner constraint.
+//  2. Delete this user's org-level Member bindings in this org.
+//  3. Delete this user's space-level Member bindings in spaces of this org.
+//  4. Delete this user's group memberships in groups of this org.
+//  5. Soft-delete the per-org users row (30-day grace + purge_time).
 type DeleteUserRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The user to delete. Format:
-	// `organizations/{organization}/users/{user}` or
-	// `organizations/{organization}/users/me` for self-delete.
+	// `organizations/{organization}/users/{user}` where {user} is a
+	// UUID. The literal `me` is rejected.
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Optional. Etag of the user for optimistic concurrency.
 	Etag          string `protobuf:"bytes,2,opt,name=etag,proto3" json:"etag,omitempty"`
@@ -518,7 +517,7 @@ func (x *DeleteUserRequest) GetEtag() string {
 
 // A status object used as the `metadata` field for the Operation
 // returned by `Iam.DeleteUser`. Surfaces incremental progress through
-// the cascade phases.
+// the org-scoped cascade phases.
 type DeleteUserMetadata struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Output only. Current phase of the cascade.
@@ -609,18 +608,17 @@ const file_pivox_iam_v1_users_proto_rawDesc = "" +
 	"\x11DeleteUserRequest\x120\n" +
 	"\x04name\x18\x01 \x01(\tB\x1c\xe0A\x02\xfaA\x10\n" +
 	"\x0epivox.iam/User\xbaH\x03\xc8\x01\x01R\x04name\x12\x17\n" +
-	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x01R\x04etag\"\x86\x02\n" +
+	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x01R\x04etag\"\xe1\x01\n" +
 	"\x12DeleteUserMetadata\x12A\n" +
 	"\x05phase\x18\x01 \x01(\x0e2&.pivox.iam.v1.DeleteUserMetadata.PhaseB\x03\xe0A\x03R\x05phase\x12\x17\n" +
-	"\x04user\x18\x02 \x01(\tB\x03\xe0A\x03R\x04user\"\x93\x01\n" +
+	"\x04user\x18\x02 \x01(\tB\x03\xe0A\x03R\x04user\"o\n" +
 	"\x05Phase\x12\x15\n" +
 	"\x11PHASE_UNSPECIFIED\x10\x00\x12\x0e\n" +
 	"\n" +
 	"VALIDATING\x10\x01\x12\x18\n" +
-	"\x14REVOKING_MEMBERSHIPS\x10\x02\x12\x1a\n" +
-	"\x16DELETING_PIVOX_RECORDS\x10\x03\x12\x1e\n" +
-	"\x1aDELETING_FIREBASE_IDENTITY\x10\x04\x12\r\n" +
-	"\tCOMPLETED\x10\x05B\xae\x01\n" +
+	"\x14REVOKING_MEMBERSHIPS\x10\x02\x12\x16\n" +
+	"\x12SOFT_DELETING_USER\x10\x03\x12\r\n" +
+	"\tCOMPLETED\x10\x04B\xae\x01\n" +
 	"\x10com.pivox.iam.v1B\n" +
 	"UsersProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1;iamv1\xa2\x02\x03PIX\xaa\x02\fPivox.Iam.V1\xca\x02\fPivox\\Iam\\V1\xe2\x02\x18Pivox\\Iam\\V1\\GPBMetadata\xea\x02\x0ePivox::Iam::V1b\x06proto3"
 

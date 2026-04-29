@@ -16,6 +16,47 @@
     "application/json"
   ],
   "paths": {
+    "/v1/accounts/me:delete": {
+      "post": {
+        "summary": "Deletes the authenticated caller's Pivox account (LRO). Cascades\nthrough Pivox-side state across every org the caller is in, then\ndeletes the underlying Firebase Auth identity. Cross-org by\ndesign — this is the only Pivox RPC that legitimately reaches\nacross orgs.",
+        "description": "Why Pivox-owned: Firebase Auth has no blocking pre-delete\ntrigger, so server-side validation (sole-owner check) requires\nPivox to be the entry point. The webhook for direct-Console\nbypass is a separate fallback path.\n\nSole-owner blocking: if the caller is the sole owner of any\nactive org, the LRO completes with FAILED_PRECONDITION listing\nthem. Resolve via `Organizations.TransferOwnership` or\n`Organizations.DeleteOrganization` on each.\n\nNo permission annotation: on the membership-exempt list, like\nCreateOrganization, so memberless callers (stuck in a\nhalf-bootstrapped state) can still delete their account.",
+        "operationId": "Iam_DeleteAccount",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/longrunningOperation"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "description": "Required. Must be `accounts/me`. The caller is implicit from\nthe authentication context.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/IamDeleteAccountBody"
+            }
+          }
+        ],
+        "tags": [
+          "Iam"
+        ]
+      }
+    },
     "/v1/organizations/{organization}/groups": {
       "get": {
         "summary": "Lists groups in an organization.",
@@ -644,8 +685,8 @@
         ]
       },
       "delete": {
-        "summary": "Deletes a user (LRO). Cascades through Pivox-side state and\nfinishes by deleting the underlying Firebase Auth identity.\nSelf-delete: address `organizations/{org}/users/me`.",
-        "description": "Sole-owner blocking: if the caller owns any active org with no\nother owners, the LRO completes with FAILED_PRECONDITION listing\naffected orgs. Resolve via `Organizations.TransferOwnership` or\n`Organizations.DeleteOrganization` first.",
+        "summary": "Removes a user from an organization (LRO). Org-scoped: deletes\nthe user's per-org bindings and their per-org users row in this\norg only. Their Pivox account, Firebase Auth identity, and\nmemberships in other orgs are untouched. Use `DeleteAccount`\nfor full account deletion.",
+        "description": "Sole-owner blocking: if removing this user from this org would\nleave the org with zero owners, the LRO completes with\nFAILED_PRECONDITION. Resolve via `Organizations.TransferOwnership`\nfirst.\n\nThe literal `me` is not a valid {user} segment for this RPC; v1\nhas no self-leave-org capability.",
         "operationId": "Iam_DeleteUser",
         "responses": {
           "200": {
@@ -744,6 +785,10 @@
       "required": [
         "members"
       ]
+    },
+    "IamDeleteAccountBody": {
+      "type": "object",
+      "description": "Request message for `Iam.DeleteAccount`. The account being deleted\nis always the authenticated caller's account; the only valid value\nfor `name` is `accounts/me`. The handler validates this literal\nto defend against a misconfigured client constructing a path\npointing at someone else."
     },
     "IamRemoveGroupMembersBody": {
       "type": "object",

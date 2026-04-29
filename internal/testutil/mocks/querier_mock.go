@@ -299,6 +299,31 @@ func (m *MockQuerier) ListOrganizationsForFirebaseIdentity(ctx context.Context, 
 	return nil, args.Error(1)
 }
 
+func (m *MockQuerier) CountOrgOwnersExcludingUser(ctx context.Context, arg db.CountOrgOwnersExcludingUserParams) (int64, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+func (m *MockQuerier) DeleteOrgMembersForUserInOrg(ctx context.Context, arg db.DeleteOrgMembersForUserInOrgParams) error {
+	args := m.Called(ctx, arg)
+	return args.Error(0)
+}
+
+func (m *MockQuerier) DeleteSpaceMembersForUserInOrg(ctx context.Context, arg db.DeleteSpaceMembersForUserInOrgParams) error {
+	args := m.Called(ctx, arg)
+	return args.Error(0)
+}
+
+func (m *MockQuerier) DeleteGroupMembersForUserInOrg(ctx context.Context, arg db.DeleteGroupMembersForUserInOrgParams) error {
+	args := m.Called(ctx, arg)
+	return args.Error(0)
+}
+
+func (m *MockQuerier) SoftDeleteUserInOrg(ctx context.Context, id uuid.UUID) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
 func (m *MockQuerier) CountOwnersByOrg(ctx context.Context, orgID uuid.UUID) (int64, error) {
 	args := m.Called(ctx, orgID)
 	return args.Get(0).(int64), args.Error(1)

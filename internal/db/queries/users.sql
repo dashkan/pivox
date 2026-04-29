@@ -174,8 +174,95 @@ DELETE FROM space_members
 -- Explicit revocation queries above handle org_members and
 -- space_members because their `principal_id` is unFK'd (the
 -- principal_kind discriminator means we can't add a FK directly).
--- Called as the second-to-last step of DeleteUser; the Firebase
+-- Called as the second-to-last step of DeleteAccount; the Firebase
 -- Auth identity itself is deleted last so a partial failure leaves
 -- a recoverable Firebase identity rather than orphaned Pivox state.
 -- name: HardDeleteFirebaseIdentity :exec
 DELETE FROM firebase_identities WHERE id = $1;
+
+-- ===========================================================================
+-- Org-scoped cascade queries used by Iam.DeleteUser (org-scoped).
+-- These are the per-org analogues of the Delete*ForFirebaseIdentity
+-- queries above: they remove a single user's bindings within ONE org,
+-- leaving every other org untouched. Used exclusively by DeleteUser;
+-- DeleteAccount uses the cross-org variants since account deletion
+-- spans every org the firebase_identity is in.
+-- ===========================================================================
+
+-- DeleteOrgMembersForUserInOrg removes the user's org-scope role
+-- bindings in a single org. Bounded by (org_id, principal_id) so
+-- bindings in other orgs are unaffected.
+-- name: DeleteOrgMembersForUserInOrg :exec
+DELETE FROM org_members
+ WHERE org_id = $1
+   AND principal_kind = 'user'
+   AND principal_id = $2;
+
+-- DeleteSpaceMembersForUserInOrg removes the user's space-scope
+-- bindings for spaces in this org. Joins to spaces to bound by
+-- org_id, since space_members rows themselves only carry space_id.
+-- name: DeleteSpaceMembersForUserInOrg :exec
+DELETE FROM space_members
+ WHERE principal_kind = 'user'
+   AND principal_id = $2
+   AND space_id IN (SELECT id FROM spaces WHERE org_id = $1);
+
+-- DeleteGroupMembersForUserInOrg removes the user's membership in
+-- groups belonging to this org. group_members.user_id is the per-org
+-- users.id (NOT a firebase_identity_id), matching the column name in
+-- the schema. Sibling queries in this cascade family
+-- (DeleteOrgMembersForUserInOrg, DeleteSpaceMembersForUserInOrg) use
+-- `principal_id` because their tables discriminate user-vs-group
+-- principals; group_members has no such discriminator, so the column
+-- is just `user_id`. The generated sqlc struct field name therefore
+-- diverges (UserID vs PrincipalID) — that's intentional and reflects
+-- the schema, not a refactor leftover.
+--
+-- groups themselves are scoped by org_id, so the join bounds the
+-- delete by org without an explicit principal-kind filter.
+-- name: DeleteGroupMembersForUserInOrg :exec
+DELETE FROM group_members
+ WHERE user_id = $2
+   AND group_id IN (SELECT id FROM groups WHERE org_id = $1);
+
+-- SoftDeleteUserInOrg marks the per-org users row as soft-deleted
+-- with the standard 30-day grace + purge_time. Mirrors the org's
+-- own soft-delete pattern: the row remains queryable for grace,
+-- the purge worker hard-deletes after grace expiry. Race-safe via
+-- WHERE delete_time IS NULL — a second soft-delete is absorbed.
+-- name: SoftDeleteUserInOrg :exec
+UPDATE users
+   SET delete_time = now(),
+       purge_time  = now() + INTERVAL '30 days',
+       update_time = now(),
+       revision    = revision + 1,
+       etag        = md5(now()::text || revision::text)
+ WHERE id = $1
+   AND delete_time IS NULL;
+
+-- CountOrgOwnersExcludingUser is the org-local sole-owner guard for
+-- Iam.DeleteUser: it counts owner bindings in this org EXCLUDING the
+-- user being removed, so the handler can refuse if removing them
+-- would leave the org with zero owners. Counts both user and group
+-- principals (matches CountOwnersByOrg's group-owner support).
+-- name: CountOrgOwnersExcludingUser :one
+SELECT COUNT(*)
+  FROM org_members om
+  JOIN roles r ON r.id = om.role_id
+ WHERE om.org_id = $1
+   AND r.is_system = true
+   AND r.name = 'owner'
+   AND NOT (om.principal_kind = 'user' AND om.principal_id = $2)
+   AND (
+     (om.principal_kind = 'user'
+      AND EXISTS (
+        SELECT 1 FROM users u
+         WHERE u.id = om.principal_id
+           AND u.delete_time IS NULL))
+     OR
+     (om.principal_kind = 'group'
+      AND EXISTS (
+        SELECT 1 FROM groups g
+         WHERE g.id = om.principal_id
+           AND g.state = 'ACTIVE'))
+   );

@@ -68,6 +68,12 @@ type Querier interface {
 	CountFulfilledLineItems(ctx context.Context, requestID uuid.UUID) (int64, error)
 	CountLineItemsByRequest(ctx context.Context, requestID uuid.UUID) (int64, error)
 	CountMessagesByConversation(ctx context.Context, conversationID uuid.UUID) (int64, error)
+	// CountOrgOwnersExcludingUser is the org-local sole-owner guard for
+	// Iam.DeleteUser: it counts owner bindings in this org EXCLUDING the
+	// user being removed, so the handler can refuse if removing them
+	// would leave the org with zero owners. Counts both user and group
+	// principals (matches CountOwnersByOrg's group-owner support).
+	CountOrgOwnersExcludingUser(ctx context.Context, arg CountOrgOwnersExcludingUserParams) (int64, error)
 	// Used by membership-mutation handlers to enforce "≥1 owner" — call
 	// before any role-change or delete that would reduce the owner count.
 	// Counts org_members rows whose role is the system 'owner' role for
@@ -154,6 +160,20 @@ type Querier interface {
 	DeleteExpiredDelegatedAuthSessions(ctx context.Context) error
 	DeleteExpiredOperations(ctx context.Context) error
 	DeleteExpiredStorageAgentAudit(ctx context.Context) (int64, error)
+	// DeleteGroupMembersForUserInOrg removes the user's membership in
+	// groups belonging to this org. group_members.user_id is the per-org
+	// users.id (NOT a firebase_identity_id), matching the column name in
+	// the schema. Sibling queries in this cascade family
+	// (DeleteOrgMembersForUserInOrg, DeleteSpaceMembersForUserInOrg) use
+	// `principal_id` because their tables discriminate user-vs-group
+	// principals; group_members has no such discriminator, so the column
+	// is just `user_id`. The generated sqlc struct field name therefore
+	// diverges (UserID vs PrincipalID) — that's intentional and reflects
+	// the schema, not a refactor leftover.
+	//
+	// groups themselves are scoped by org_id, so the join bounds the
+	// delete by org without an explicit principal-kind filter.
+	DeleteGroupMembersForUserInOrg(ctx context.Context, arg DeleteGroupMembersForUserInOrgParams) error
 	DeleteLineItem(ctx context.Context, id uuid.UUID) error
 	DeleteOperation(ctx context.Context, id uuid.UUID) error
 	// Returns the affected-row count so the handler can map "not found"
@@ -164,10 +184,26 @@ type Querier interface {
 	// explicit because org_members.principal_id has no FK on users
 	// (principal_kind discriminates user vs group).
 	DeleteOrgMembersForFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) error
+	// ===========================================================================
+	// Org-scoped cascade queries used by Iam.DeleteUser (org-scoped).
+	// These are the per-org analogues of the Delete*ForFirebaseIdentity
+	// queries above: they remove a single user's bindings within ONE org,
+	// leaving every other org untouched. Used exclusively by DeleteUser;
+	// DeleteAccount uses the cross-org variants since account deletion
+	// spans every org the firebase_identity is in.
+	// ===========================================================================
+	// DeleteOrgMembersForUserInOrg removes the user's org-scope role
+	// bindings in a single org. Bounded by (org_id, principal_id) so
+	// bindings in other orgs are unaffected.
+	DeleteOrgMembersForUserInOrg(ctx context.Context, arg DeleteOrgMembersForUserInOrgParams) error
 	DeleteRequest(ctx context.Context, id uuid.UUID) error
 	DeleteSpaceMember(ctx context.Context, arg DeleteSpaceMemberParams) (int64, error)
 	// DeleteSpaceMembersForFirebaseIdentity is the space-scope analogue.
 	DeleteSpaceMembersForFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) error
+	// DeleteSpaceMembersForUserInOrg removes the user's space-scope
+	// bindings for spaces in this org. Joins to spaces to bound by
+	// org_id, since space_members rows themselves only carry space_id.
+	DeleteSpaceMembersForUserInOrg(ctx context.Context, arg DeleteSpaceMembersForUserInOrgParams) error
 	DeleteStorageAgent(ctx context.Context, id uuid.UUID) error
 	DeleteStorageEndpoint(ctx context.Context, id uuid.UUID) error
 	DeleteStorageGateway(ctx context.Context, id uuid.UUID) error
@@ -307,7 +343,7 @@ type Querier interface {
 	// Explicit revocation queries above handle org_members and
 	// space_members because their `principal_id` is unFK'd (the
 	// principal_kind discriminator means we can't add a FK directly).
-	// Called as the second-to-last step of DeleteUser; the Firebase
+	// Called as the second-to-last step of DeleteAccount; the Firebase
 	// Auth identity itself is deleted last so a partial failure leaves
 	// a recoverable Firebase identity rather than orphaned Pivox state.
 	HardDeleteFirebaseIdentity(ctx context.Context, id uuid.UUID) error
@@ -459,6 +495,12 @@ type Querier interface {
 	// Returns the updated row.
 	SoftDeleteOrganization(ctx context.Context, arg SoftDeleteOrganizationParams) (Organization, error)
 	SoftDeleteSpace(ctx context.Context, arg SoftDeleteSpaceParams) (Space, error)
+	// SoftDeleteUserInOrg marks the per-org users row as soft-deleted
+	// with the standard 30-day grace + purge_time. Mirrors the org's
+	// own soft-delete pattern: the row remains queryable for grace,
+	// the purge worker hard-deletes after grace expiry. Race-safe via
+	// WHERE delete_time IS NULL — a second soft-delete is absorbed.
+	SoftDeleteUserInOrg(ctx context.Context, id uuid.UUID) error
 	SoftDeleteUserMembership(ctx context.Context, arg SoftDeleteUserMembershipParams) error
 	SumTokensByConversation(ctx context.Context, conversationID uuid.UUID) (int64, error)
 	UndeleteApiKey(ctx context.Context, arg UndeleteApiKeyParams) (ApiKey, error)

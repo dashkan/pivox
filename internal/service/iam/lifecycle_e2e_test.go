@@ -13,6 +13,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
+	"google.golang.org/grpc/status"
+
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	"github.com/dashkan/pivox/internal/server"
@@ -21,17 +23,14 @@ import (
 	"github.com/dashkan/pivox/internal/testutil/grpcharness"
 )
 
-// TestE2E_DeleteUser_SoleOwnerBlocked pins the sole-owner-blocking
-// guard end-to-end. Founder1 is the only owner of Org1. DeleteUser
-// is an LRO whose VALIDATING phase runs the sole-owner check and
-// completes the operation with FAILED_PRECONDITION naming Org1 —
-// without this, deletion would leave Org1 ownerless.
-//
-// The RPC itself returns nil (the operation is created); the
-// failure surfaces as the operation's error_code/error_message
-// after the goroutine runs the sole-owner check. We wait on the
-// operation and assert its terminal state.
-func TestE2E_DeleteUser_SoleOwnerBlocked(t *testing.T) {
+// ===========================================================================
+// DeleteAccount — global Pivox + Firebase cascade.
+// ===========================================================================
+
+// TestE2E_DeleteAccount_SoleOwnerBlocked pins cross-org sole-owner
+// blocking. Founder is the only owner of an active org; DeleteAccount
+// completes the LRO with FAILED_PRECONDITION naming the blocking org.
+func TestE2E_DeleteAccount_SoleOwnerBlocked(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
@@ -42,31 +41,22 @@ func TestE2E_DeleteUser_SoleOwnerBlocked(t *testing.T) {
 
 	founder := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "founder"})
 	h.SetCaller(founder)
-
 	createOrg(t, orgClient, "blocked-org", "Blocked Org")
 
-	op, err := iamClient.DeleteUser(context.Background(), &iampb.DeleteUserRequest{
-		Name: "organizations/blocked-org/users/me",
+	op, err := iamClient.DeleteAccount(context.Background(), &iampb.DeleteAccountRequest{
+		Name: "accounts/me",
 	})
-	require.NoError(t, err, "DeleteUser RPC creates the LRO; the failure is on the LRO state")
-	final := waitOpExpectFailure(t, h, op, "DeleteUser")
-	assert.Equal(t, int32(codes.FailedPrecondition), final.GetError().GetCode(),
-		"sole-owner DeleteUser must fail with FailedPrecondition")
-	assert.Contains(t, final.GetError().GetMessage(), "blocked-org",
-		"error must name the blocking org so the caller knows what to fix")
+	require.NoError(t, err, "DeleteAccount RPC creates the LRO; failure surfaces on the LRO state")
+	final := waitOpExpectFailure(t, h, op, "DeleteAccount")
+	assert.Equal(t, int32(codes.FailedPrecondition), final.GetError().GetCode())
+	assert.Contains(t, final.GetError().GetMessage(), "blocked-org")
 }
 
-// TestE2E_DeleteUser_UnblockViaTransferOwnership covers recovery
-// path 1: founder promotes successor to owner via TransferOwnership,
-// then the new owner (NOT the demoted founder) executes DeleteUser
-// against the founder's user. After demotion the founder is admin,
-// and admin doesn't carry `users.delete` — the destructive verb is
-// owner-only by design. So self-delete-via-transfer is structurally
-// "transfer THEN have the new owner remove you", not "transfer then
-// self-delete". This test pins that path; if the permission matrix
-// ever grants users.delete to admin, the assertion shape needs to
-// be revisited.
-func TestE2E_DeleteUser_UnblockViaTransferOwnership(t *testing.T) {
+// TestE2E_DeleteAccount_UnblockViaTransferOwnership pins recovery
+// path 1: founder transfers ownership, then deletes their account.
+// After transfer the founder is no longer sole owner of any org, so
+// the cross-org sole-owner check passes and the account cascade runs.
+func TestE2E_DeleteAccount_UnblockViaTransferOwnership(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
@@ -76,54 +66,39 @@ func TestE2E_DeleteUser_UnblockViaTransferOwnership(t *testing.T) {
 	iamClient := iampb.NewIamClient(h.Conn())
 	ctx := context.Background()
 
-	// Step 1: founder creates the org, becomes sole owner.
 	founder := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "founder"})
 	h.SetCaller(founder)
 	createOrg(t, orgClient, "transfer-org", "Transfer Org")
 	orgID := h.LookupOrgID(t, "transfer-org")
 
-	// Step 2: seed a successor member as Admin (via direct DB; the
-	// invitation flow isn't required for this test scope). Capture
-	// the founder's per-org user uuid by listing org_members — the
-	// founder's user row was created by CreateOrganization but its
-	// id wasn't returned in the proto response.
 	successor := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "successor"})
 	successorUserID := h.SeedMembership(t, orgID, successor, grpcharness.RoleAdmin)
-	founderUserID := h.LookupOrgUserID(t, orgID, founder.FirebaseIdentityID)
 
-	// Step 3: confirm DeleteUser still blocks before the transfer.
-	op, err := iamClient.DeleteUser(ctx, &iampb.DeleteUserRequest{
-		Name: "organizations/transfer-org/users/me",
-	})
+	// Pre-transfer DeleteAccount must still block.
+	op, err := iamClient.DeleteAccount(ctx, &iampb.DeleteAccountRequest{Name: "accounts/me"})
 	require.NoError(t, err)
-	final := waitOpExpectFailure(t, h, op, "pre-transfer DeleteUser")
-	assert.Equal(t, int32(codes.FailedPrecondition), final.GetError().GetCode(),
-		"pre-transfer DeleteUser must still block")
+	final := waitOpExpectFailure(t, h, op, "pre-transfer DeleteAccount")
+	assert.Equal(t, int32(codes.FailedPrecondition), final.GetError().GetCode())
 
-	// Step 4: founder transfers ownership to successor.
+	// Transfer ownership to successor.
 	_, err = orgClient.TransferOwnership(ctx, &apiv1.TransferOwnershipRequest{
 		Name:     "organizations/transfer-org",
 		NewOwner: "organizations/transfer-org/users/" + successorUserID.String(),
 	})
 	require.NoError(t, err)
 
-	// Step 5: switch to the new owner; they delete the demoted
-	// founder's user (the founder is now admin, no longer sole
-	// owner of any org, so the sole-owner check passes).
-	h.SetCaller(successor)
-	op2, err := iamClient.DeleteUser(ctx, &iampb.DeleteUserRequest{
-		Name: "organizations/transfer-org/users/" + founderUserID.String(),
-	})
-	require.NoError(t, err, "post-transfer DeleteUser by new owner must succeed")
-	waitOp(t, h, op2, "post-transfer DeleteUser")
+	// Founder (now admin) deletes their account. Cross-org cascade
+	// runs; sole-owner check passes since successor owns the org.
+	op2, err := iamClient.DeleteAccount(ctx, &iampb.DeleteAccountRequest{Name: "accounts/me"})
+	require.NoError(t, err)
+	waitOp(t, h, op2, "post-transfer DeleteAccount")
 }
 
-// TestE2E_DeleteUser_UnblockViaDeleteOrg covers recovery path 2:
-// Founder soft-deletes their only org first; sole-owner check
-// excludes soft-deleted orgs (see ListSoleOwnerOrgsForFirebaseIdentity
-// query — `o.delete_time IS NULL` filter), so DeleteUser then
-// succeeds.
-func TestE2E_DeleteUser_UnblockViaDeleteOrg(t *testing.T) {
+// TestE2E_DeleteAccount_UnblockViaDeleteOrg pins recovery path 2:
+// soft-delete the only blocking org first; sole-owner check excludes
+// soft-deleted orgs (ListSoleOwnerOrgsForFirebaseIdentity has
+// `o.delete_time IS NULL`), so DeleteAccount then succeeds.
+func TestE2E_DeleteAccount_UnblockViaDeleteOrg(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
@@ -137,25 +112,154 @@ func TestE2E_DeleteUser_UnblockViaDeleteOrg(t *testing.T) {
 	h.SetCaller(founder)
 	createOrg(t, orgClient, "doomed-org", "Doomed Org")
 
-	// Soft-delete the org first.
 	deleteOp, err := orgClient.DeleteOrganization(ctx, &apiv1.DeleteOrganizationRequest{
 		Name: "organizations/doomed-org",
 	})
 	require.NoError(t, err)
 	waitOp(t, h, deleteOp, "DeleteOrganization")
 
-	// Now DeleteUser should succeed — soft-deleted orgs don't
-	// count as sole-owner blockers.
-	op, err := iamClient.DeleteUser(ctx, &iampb.DeleteUserRequest{
-		Name: "organizations/doomed-org/users/me",
-	})
-	require.NoError(t, err, "DeleteUser must succeed after the only blocking org is soft-deleted")
-	waitOp(t, h, op, "DeleteUser")
+	op, err := iamClient.DeleteAccount(ctx, &iampb.DeleteAccountRequest{Name: "accounts/me"})
+	require.NoError(t, err)
+	waitOp(t, h, op, "DeleteAccount")
 }
 
-// newIamHarness wires up the harness with both Organizations and
-// Iam services — DeleteUser flows touch both (TransferOwnership +
-// DeleteOrganization on Organizations; DeleteUser itself on Iam).
+// TestE2E_DeleteAccount_RejectsNonMeName confirms the singleton
+// shape: only `accounts/me` is valid; a different account name
+// returns InvalidArgument.
+func TestE2E_DeleteAccount_RejectsNonMeName(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	h := newIamHarness(t)
+	iamClient := iampb.NewIamClient(h.Conn())
+	founder := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "founder"})
+	h.SetCaller(founder)
+
+	_, err := iamClient.DeleteAccount(context.Background(), &iampb.DeleteAccountRequest{
+		Name: "accounts/someone-else",
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+}
+
+// ===========================================================================
+// DeleteUser — org-scoped removal of a user from one org.
+// ===========================================================================
+
+// TestE2E_DeleteUser_AdminRemovesUserFromOrg pins the happy path:
+// an org admin removes another user from their org. The user's
+// per-org bindings + users row in this org are gone, but their
+// firebase_identity is untouched and they remain a member of OTHER
+// orgs (proving the cascade is org-scoped).
+func TestE2E_DeleteUser_AdminRemovesUserFromOrg(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	h := newIamHarness(t)
+	orgClient := apiv1.NewOrganizationsClient(h.Conn())
+	iamClient := iampb.NewIamClient(h.Conn())
+	ctx := context.Background()
+
+	// Owner creates two orgs.
+	owner := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "owner"})
+	h.SetCaller(owner)
+	createOrg(t, orgClient, "org-a", "Org A")
+	createOrg(t, orgClient, "org-b", "Org B")
+	orgAID := h.LookupOrgID(t, "org-a")
+	orgBID := h.LookupOrgID(t, "org-b")
+
+	// Target is a member of BOTH orgs.
+	target := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "target"})
+	targetUserAID := h.SeedMembership(t, orgAID, target, grpcharness.RoleEditor)
+	_ = h.SeedMembership(t, orgBID, target, grpcharness.RoleEditor)
+
+	// Owner removes target from Org A.
+	op, err := iamClient.DeleteUser(ctx, &iampb.DeleteUserRequest{
+		Name: "organizations/org-a/users/" + targetUserAID.String(),
+	})
+	require.NoError(t, err)
+	waitOp(t, h, op, "DeleteUser org-a")
+
+	// Org A: target's user row is soft-deleted (purge_time set).
+	users, err := h.Queries.ListUsersByFirebaseIdentity(ctx, target.FirebaseIdentityID)
+	require.NoError(t, err)
+	// ListUsersByFirebaseIdentity excludes soft-deleted users
+	// (u.delete_time IS NULL), so target should now appear in
+	// Org B only.
+	gotOrgs := map[string]bool{}
+	for _, u := range users {
+		gotOrgs[u.OrgID.String()] = true
+	}
+	assert.False(t, gotOrgs[orgAID.String()],
+		"target's per-org users row in Org A should be soft-deleted (excluded from query)")
+	assert.True(t, gotOrgs[orgBID.String()],
+		"target's per-org users row in Org B should be untouched")
+}
+
+// TestE2E_DeleteUser_LastOwnerBlocked: removing the only owner of an
+// org leaves it ownerless — the org-local sole-owner check refuses
+// with FAILED_PRECONDITION.
+func TestE2E_DeleteUser_LastOwnerBlocked(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	h := newIamHarness(t)
+	orgClient := apiv1.NewOrganizationsClient(h.Conn())
+	iamClient := iampb.NewIamClient(h.Conn())
+	ctx := context.Background()
+
+	// Owner creates an org. They're the sole owner.
+	owner := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "owner"})
+	h.SetCaller(owner)
+	createOrg(t, orgClient, "single-owner-org", "Single Owner Org")
+	orgID := h.LookupOrgID(t, "single-owner-org")
+	ownerUserID := h.LookupOrgUserID(t, orgID, owner.FirebaseIdentityID)
+
+	// Add a successor as Admin (does NOT count as an owner).
+	other := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "other"})
+	h.SeedMembership(t, orgID, other, grpcharness.RoleAdmin)
+
+	// Owner attempts to remove themselves — would leave 0 owners.
+	op, err := iamClient.DeleteUser(ctx, &iampb.DeleteUserRequest{
+		Name: "organizations/single-owner-org/users/" + ownerUserID.String(),
+	})
+	require.NoError(t, err)
+	final := waitOpExpectFailure(t, h, op, "DeleteUser last-owner")
+	assert.Equal(t, int32(codes.FailedPrecondition), final.GetError().GetCode())
+	assert.Contains(t, final.GetError().GetMessage(), "no owners")
+}
+
+// TestE2E_DeleteUser_RejectsMeTarget: the literal `me` is not
+// supported on this RPC. Falls through to uuid.Parse failure with
+// generic InvalidArgument.
+func TestE2E_DeleteUser_RejectsMeTarget(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	h := newIamHarness(t)
+	orgClient := apiv1.NewOrganizationsClient(h.Conn())
+	iamClient := iampb.NewIamClient(h.Conn())
+	ctx := context.Background()
+
+	owner := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "owner"})
+	h.SetCaller(owner)
+	createOrg(t, orgClient, "any-org", "Any Org")
+
+	_, err := iamClient.DeleteUser(ctx, &iampb.DeleteUserRequest{
+		Name: "organizations/any-org/users/me",
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+}
+
+// ===========================================================================
+// helpers
+// ===========================================================================
+
 func newIamHarness(t *testing.T) *grpcharness.Harness {
 	return grpcharness.New(t, grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
 		callerIdentity := server.NewCallerIdentityResolver(h.Queries)
@@ -169,9 +273,6 @@ func newIamHarness(t *testing.T) *grpcharness.Harness {
 	}))
 }
 
-// createOrg is a thin helper for the test setup phase; tests that
-// only need the founder/owner shape don't have to assert the LRO
-// shape every time.
 func createOrg(t *testing.T, c apiv1.OrganizationsClient, slug, displayName string) {
 	t.Helper()
 	op, err := c.CreateOrganization(context.Background(), &apiv1.CreateOrganizationRequest{
@@ -195,9 +296,6 @@ func waitOp(t *testing.T, h *grpcharness.Harness, op interface{ GetName() string
 	}
 }
 
-// waitOpExpectFailure is the inverse of waitOp: assert the LRO
-// completed with a populated error rather than a result. Returns
-// the final Operation so the caller can inspect the error code.
 func waitOpExpectFailure(t *testing.T, h *grpcharness.Harness, op interface{ GetName() string }, label string) *longrunningpb.Operation {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

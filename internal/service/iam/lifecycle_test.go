@@ -24,20 +24,31 @@ import (
 	"github.com/dashkan/pivox/internal/testutil/mocks"
 )
 
-// fakeProgress captures DeleteUser phase updates for assertion.
-type fakeProgress struct {
+// fakeUserProgress captures DeleteUser phase updates.
+type fakeUserProgress struct {
 	phases []iampb.DeleteUserMetadata_Phase
 }
 
-func (f *fakeProgress) Update(_ context.Context, m proto.Message) {
+func (f *fakeUserProgress) Update(_ context.Context, m proto.Message) {
 	if md, ok := m.(*iampb.DeleteUserMetadata); ok {
 		f.phases = append(f.phases, md.GetPhase())
 	}
 }
 
-// mockAuthService is a minimal authn.Service for DeleteUser tests.
-// Only DeleteUser is exercised; VerifyToken / CreateCustomToken
-// are stubbed to satisfy the interface and never called.
+// fakeAccountProgress captures DeleteAccount phase updates.
+type fakeAccountProgress struct {
+	phases []iampb.DeleteAccountMetadata_Phase
+}
+
+func (f *fakeAccountProgress) Update(_ context.Context, m proto.Message) {
+	if md, ok := m.(*iampb.DeleteAccountMetadata); ok {
+		f.phases = append(f.phases, md.GetPhase())
+	}
+}
+
+// mockAuthService is a minimal authn.Service for DeleteAccount tests.
+// VerifyToken / CreateCustomToken are stubbed to satisfy the
+// interface and never called.
 type mockAuthService struct{ mock.Mock }
 
 func (m *mockAuthService) VerifyToken(context.Context, string) (*authn.Identity, error) {
@@ -83,13 +94,21 @@ func silentLogger() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discar
 
 // --- DeleteUser handler validation ---
 
+var (
+	testHandlerOrgID = uuid.MustParse("0192a000-aaaa-7000-8000-000000000001")
+	testTargetUserID = uuid.MustParse("0192a000-cccc-7000-8000-000000000001")
+)
+
+func resolvedOrgCtx() context.Context {
+	return server.WithResolvedOrgForTest(context.Background(), &server.ResolvedOrg{
+		ID: testHandlerOrgID, Slug: "acme",
+	})
+}
+
 func TestDeleteUser_RejectsMalformedPath(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	srv := &IamServer{queries: q, lroManager: lro.NewManager(q, silentLogger())}
-	ctx := server.WithResolvedOrgForTest(context.Background(), &server.ResolvedOrg{
-		ID: uuid.MustParse("0192a000-aaaa-7000-8000-000000000001"), Slug: "acme",
-	})
-	_, err := srv.DeleteUser(ctx, &iampb.DeleteUserRequest{Name: "users/foo"})
+	_, err := srv.DeleteUser(resolvedOrgCtx(), &iampb.DeleteUserRequest{Name: "users/foo"})
 	require.Error(t, err)
 	assert.Equal(t, codes.InvalidArgument, status.Code(err))
 }
@@ -98,11 +117,22 @@ func TestDeleteUser_RejectsOrgSlugMismatch(t *testing.T) {
 	// Defense against gate-vs-handler name drift.
 	q := new(mocks.MockQuerier)
 	srv := &IamServer{queries: q, lroManager: lro.NewManager(q, silentLogger())}
-	ctx := server.WithResolvedOrgForTest(context.Background(), &server.ResolvedOrg{
-		ID: uuid.MustParse("0192a000-aaaa-7000-8000-000000000001"), Slug: "acme",
+	_, err := srv.DeleteUser(resolvedOrgCtx(), &iampb.DeleteUserRequest{
+		Name: "organizations/different/users/" + testTargetUserID.String(),
 	})
-	_, err := srv.DeleteUser(ctx, &iampb.DeleteUserRequest{
-		Name: "organizations/different/users/me",
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+}
+
+// TestDeleteUser_RejectsMeTarget pins the v1 design: there's no
+// self-leave-org capability. The literal `me` fails uuid.Parse and
+// surfaces InvalidArgument with a generic "not a valid UUID"
+// message — no special-casing or cross-RPC redirect.
+func TestDeleteUser_RejectsMeTarget(t *testing.T) {
+	q := new(mocks.MockQuerier)
+	srv := &IamServer{queries: q, lroManager: lro.NewManager(q, silentLogger())}
+	_, err := srv.DeleteUser(resolvedOrgCtx(), &iampb.DeleteUserRequest{
+		Name: "organizations/acme/users/me",
 	})
 	require.Error(t, err)
 	assert.Equal(t, codes.InvalidArgument, status.Code(err))
@@ -111,36 +141,119 @@ func TestDeleteUser_RejectsOrgSlugMismatch(t *testing.T) {
 func TestDeleteUser_RejectsBadUserSegment(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	srv := &IamServer{queries: q, lroManager: lro.NewManager(q, silentLogger())}
-	ctx := server.WithResolvedOrgForTest(context.Background(), &server.ResolvedOrg{
-		ID: uuid.MustParse("0192a000-aaaa-7000-8000-000000000001"), Slug: "acme",
-	})
-	_, err := srv.DeleteUser(ctx, &iampb.DeleteUserRequest{
+	_, err := srv.DeleteUser(resolvedOrgCtx(), &iampb.DeleteUserRequest{
 		Name: "organizations/acme/users/not-uuid",
 	})
 	require.Error(t, err)
 	assert.Equal(t, codes.InvalidArgument, status.Code(err))
 }
 
-// --- runDeleteUser orchestrator ---
+// --- runDeleteUser org-scoped orchestrator ---
 
-func TestRunDeleteUser_BlocksSoleOwner(t *testing.T) {
+func TestRunDeleteUser_BlocksWhenLastOwner(t *testing.T) {
+	// Removing this user would leave 0 owners in the org —
+	// CountOrgOwnersExcludingUser returns 0, handler refuses.
+	q := new(mocks.MockQuerier)
+	q.On("CountOrgOwnersExcludingUser", mock.Anything, db.CountOrgOwnersExcludingUserParams{
+		OrgID: testHandlerOrgID, PrincipalID: testTargetUserID,
+	}).Return(int64(0), nil)
+
+	srv := &IamServer{queries: q}
+	_, err := srv.runDeleteUser(context.Background(), &fakeUserProgress{},
+		testHandlerOrgID, testTargetUserID, "organizations/acme/users/x")
+	require.Error(t, err)
+	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+	assert.Contains(t, err.Error(), "no owners")
+}
+
+func TestRunDeleteUser_FullCascade(t *testing.T) {
+	q := new(mocks.MockQuerier)
+	q.On("CountOrgOwnersExcludingUser", mock.Anything, mock.Anything).Return(int64(2), nil)
+	q.On("DeleteOrgMembersForUserInOrg", mock.Anything, db.DeleteOrgMembersForUserInOrgParams{
+		OrgID: testHandlerOrgID, PrincipalID: testTargetUserID,
+	}).Return(nil)
+	q.On("DeleteSpaceMembersForUserInOrg", mock.Anything, db.DeleteSpaceMembersForUserInOrgParams{
+		OrgID: testHandlerOrgID, PrincipalID: testTargetUserID,
+	}).Return(nil)
+	q.On("DeleteGroupMembersForUserInOrg", mock.Anything, db.DeleteGroupMembersForUserInOrgParams{
+		OrgID: testHandlerOrgID, UserID: testTargetUserID,
+	}).Return(nil)
+	q.On("SoftDeleteUserInOrg", mock.Anything, testTargetUserID).Return(nil)
+
+	srv := &IamServer{queries: q}
+	progress := &fakeUserProgress{}
+	_, err := srv.runDeleteUser(context.Background(), progress,
+		testHandlerOrgID, testTargetUserID, "organizations/acme/users/x")
+	require.NoError(t, err)
+	assert.Equal(t, []iampb.DeleteUserMetadata_Phase{
+		iampb.DeleteUserMetadata_VALIDATING,
+		iampb.DeleteUserMetadata_REVOKING_MEMBERSHIPS,
+		iampb.DeleteUserMetadata_SOFT_DELETING_USER,
+		iampb.DeleteUserMetadata_COMPLETED,
+	}, progress.phases)
+	q.AssertExpectations(t)
+}
+
+// --- DeleteAccount handler validation ---
+
+func TestDeleteAccount_RejectsNonMeName(t *testing.T) {
+	srv := &IamServer{}
+	_, err := srv.DeleteAccount(context.Background(), &iampb.DeleteAccountRequest{
+		Name: "accounts/someone-else",
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+}
+
+func TestDeleteAccount_FailsLoudOnNilDeps(t *testing.T) {
+	srv := &IamServer{} // no lroManager / auth / caller
+	_, err := srv.DeleteAccount(context.Background(), &iampb.DeleteAccountRequest{
+		Name: "accounts/me",
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.Internal, status.Code(err))
+}
+
+// TestDeleteAccount_PropagatesCallerResolutionFailure pins that
+// DeleteAccount surfaces caller-resolution errors directly rather
+// than masking them. A common failure mode: Firebase token is valid
+// (auth interceptor passed) but the firebase_identities row hasn't
+// synced yet (race with the syncFirebaseIdentity webhook). The
+// caller resolver returns NotFound; the handler must surface that.
+func TestDeleteAccount_PropagatesCallerResolutionFailure(t *testing.T) {
+	srv := &IamServer{
+		queries:    new(mocks.MockQuerier),
+		auth:       new(mockAuthService),
+		lroManager: lro.NewManager(new(mocks.MockQuerier), silentLogger()),
+		caller: func(context.Context) (uuid.UUID, error) {
+			return uuid.Nil, status.Error(codes.NotFound, "firebase identity not yet synced")
+		},
+	}
+	_, err := srv.DeleteAccount(context.Background(), &iampb.DeleteAccountRequest{
+		Name: "accounts/me",
+	})
+	require.Error(t, err)
+	// Whatever code the resolver returned should surface unchanged.
+	assert.Equal(t, codes.NotFound, status.Code(err))
+}
+
+// --- runDeleteAccount cross-org orchestrator ---
+
+func TestRunDeleteAccount_BlocksSoleOwner(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	identityID := uuid.MustParse("0192a000-bbbb-7000-8000-000000000002")
 	q.On("ListSoleOwnerOrgsForFirebaseIdentity", mock.Anything, identityID).
-		Return([]db.Organization{
-			{Name: "acme"},
-			{Name: "beta"},
-		}, nil)
+		Return([]db.Organization{{Name: "acme"}, {Name: "beta"}}, nil)
 
 	srv := &IamServer{queries: q}
-	_, err := srv.runDeleteUser(context.Background(), &fakeProgress{}, identityID, "organizations/acme/users/me")
+	_, err := srv.runDeleteAccount(context.Background(), &fakeAccountProgress{}, identityID)
 	require.Error(t, err)
 	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
 	assert.Contains(t, err.Error(), "organizations/acme")
 	assert.Contains(t, err.Error(), "organizations/beta")
 }
 
-func TestRunDeleteUser_FullCascade(t *testing.T) {
+func TestRunDeleteAccount_FullCascade(t *testing.T) {
 	identityID := uuid.MustParse("0192a000-bbbb-7000-8000-000000000002")
 	q := new(mocks.MockQuerier)
 	q.On("ListSoleOwnerOrgsForFirebaseIdentity", mock.Anything, identityID).
@@ -155,27 +268,27 @@ func TestRunDeleteUser_FullCascade(t *testing.T) {
 	auth.On("DeleteUser", mock.Anything, "fb-abc").Return(nil)
 
 	srv := &IamServer{queries: q, auth: auth}
-	progress := &fakeProgress{}
-	_, err := srv.runDeleteUser(context.Background(), progress, identityID, "organizations/acme/users/me")
+	progress := &fakeAccountProgress{}
+	_, err := srv.runDeleteAccount(context.Background(), progress, identityID)
 	require.NoError(t, err)
-	assert.Equal(t, []iampb.DeleteUserMetadata_Phase{
-		iampb.DeleteUserMetadata_VALIDATING,
-		iampb.DeleteUserMetadata_REVOKING_MEMBERSHIPS,
-		iampb.DeleteUserMetadata_DELETING_PIVOX_RECORDS,
-		iampb.DeleteUserMetadata_DELETING_FIREBASE_IDENTITY,
-		iampb.DeleteUserMetadata_COMPLETED,
+	assert.Equal(t, []iampb.DeleteAccountMetadata_Phase{
+		iampb.DeleteAccountMetadata_VALIDATING,
+		iampb.DeleteAccountMetadata_REVOKING_MEMBERSHIPS,
+		iampb.DeleteAccountMetadata_DELETING_PIVOX_RECORDS,
+		iampb.DeleteAccountMetadata_DELETING_FIREBASE_IDENTITY,
+		iampb.DeleteAccountMetadata_COMPLETED,
 	}, progress.phases)
 	q.AssertExpectations(t)
 	auth.AssertExpectations(t)
 }
 
-func TestRunDeleteUser_AlreadyGoneSurfacesInternal(t *testing.T) {
+func TestRunDeleteAccount_AlreadyGoneSurfacesInternal(t *testing.T) {
 	// Pivox-side row already gone from a prior partial run, but
 	// auth.DeleteUser hasn't run yet — the firebase_uid is lost.
-	// The orchestrator MUST NOT silently complete: that would
-	// leave a fully-functional Firebase Auth account orphaned with
-	// no matching Pivox row. Expect Internal so the operator sees
-	// the failure and reconciles manually.
+	// The orchestrator MUST NOT silently complete: that would leave
+	// a fully-functional Firebase Auth account orphaned with no
+	// matching Pivox row. Expect Internal so the operator sees the
+	// failure and reconciles manually.
 	identityID := uuid.MustParse("0192a000-bbbb-7000-8000-000000000002")
 	q := new(mocks.MockQuerier)
 	q.On("ListSoleOwnerOrgsForFirebaseIdentity", mock.Anything, mock.Anything).Return([]db.Organization{}, nil)
@@ -185,16 +298,13 @@ func TestRunDeleteUser_AlreadyGoneSurfacesInternal(t *testing.T) {
 		Return(db.FirebaseIdentity{}, pgx.ErrNoRows)
 
 	srv := &IamServer{queries: q}
-	_, err := srv.runDeleteUser(context.Background(), &fakeProgress{}, identityID, "organizations/acme/users/me")
+	_, err := srv.runDeleteAccount(context.Background(), &fakeAccountProgress{}, identityID)
 	require.Error(t, err)
 	assert.Equal(t, codes.Internal, status.Code(err))
 	q.AssertNotCalled(t, "HardDeleteFirebaseIdentity", mock.Anything, mock.Anything)
 }
 
-func TestRunDeleteUser_AuthFailureSurfaces(t *testing.T) {
-	// Pivox state is already gone when this fires; the LRO surfaces
-	// the Firebase Auth error so the caller can retry. Idempotency
-	// of authn.Service.DeleteUser makes the retry safe.
+func TestRunDeleteAccount_AuthFailureSurfaces(t *testing.T) {
 	identityID := uuid.MustParse("0192a000-bbbb-7000-8000-000000000002")
 	q := new(mocks.MockQuerier)
 	q.On("ListSoleOwnerOrgsForFirebaseIdentity", mock.Anything, mock.Anything).Return([]db.Organization{}, nil)
@@ -208,7 +318,7 @@ func TestRunDeleteUser_AuthFailureSurfaces(t *testing.T) {
 	auth.On("DeleteUser", mock.Anything, "fb-abc").Return(errors.New("firebase down"))
 
 	srv := &IamServer{queries: q, auth: auth}
-	_, err := srv.runDeleteUser(context.Background(), &fakeProgress{}, identityID, "organizations/acme/users/me")
+	_, err := srv.runDeleteAccount(context.Background(), &fakeAccountProgress{}, identityID)
 	require.Error(t, err)
 	assert.Equal(t, codes.Internal, status.Code(err))
 }

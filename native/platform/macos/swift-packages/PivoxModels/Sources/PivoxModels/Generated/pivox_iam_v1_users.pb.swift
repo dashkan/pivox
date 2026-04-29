@@ -185,33 +185,36 @@ public struct Pivox_Iam_V1_ListUsersResponse: Sendable {
 
 /// Request message for `Iam.DeleteUser`.
 ///
-/// Self-delete: address `organizations/{organization}/users/me`. The
-/// server resolves `me` to the authenticated caller.
+/// Org-scoped removal: removes a user FROM a single org. The user's
+/// Pivox account itself is unaffected; their memberships in OTHER
+/// orgs are unaffected; their Firebase Auth identity is unaffected.
+/// Use `Iam.DeleteAccount` for global account deletion.
 ///
-/// Sole-owner blocking: if the caller is the sole `owner` of any
-/// active organization, the LRO completes with `FAILED_PRECONDITION`
-/// and a structured detail listing the blocking org names. Resolve by
-/// `TransferOwnership` (promote another member) or by deleting those
-/// orgs first.
+/// Sole-owner blocking: if removing this user from this org would
+/// leave the org with zero owners, the LRO completes with
+/// `FAILED_PRECONDITION`. Resolve via `TransferOwnership` first
+/// (promote another member to owner) before retrying.
 ///
-/// Cascade order inside the LRO:
-///   1. Cancel in-flight LROs scoped to the user.
-///   2. Delete org-level Member bindings (org_members where principal = this user).
-///   3. Delete space-level Member bindings (space_members where principal = this user).
-///   4. Delete group memberships.
-///   5. Delete the User row.
-///   6. Delete the firebase_identity row.
-///   7. firebase.Auth.DeleteUser(uid) — last, so a partial failure
-///      leaves us in a recoverable state with the Firebase identity
-///      still alive.
+/// Self-target rejection: paths of the form
+/// `organizations/{org}/users/me` are NOT supported on this RPC.
+/// `me` does not parse as a UUID and surfaces InvalidArgument. v1
+/// has no self-leave-org capability — see roadmap for the open
+/// product question (SSO vs non-SSO orgs need different policies).
+///
+/// Cascade order inside the LRO (all bounded to the path's org):
+///   1. Validate org-local sole-owner constraint.
+///   2. Delete this user's org-level Member bindings in this org.
+///   3. Delete this user's space-level Member bindings in spaces of this org.
+///   4. Delete this user's group memberships in groups of this org.
+///   5. Soft-delete the per-org users row (30-day grace + purge_time).
 public struct Pivox_Iam_V1_DeleteUserRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Required. The user to delete. Format:
-  /// `organizations/{organization}/users/{user}` or
-  /// `organizations/{organization}/users/me` for self-delete.
+  /// `organizations/{organization}/users/{user}` where {user} is a
+  /// UUID. The literal `me` is rejected.
   public var name: String = String()
 
   /// Optional. Etag of the user for optimistic concurrency.
@@ -224,7 +227,7 @@ public struct Pivox_Iam_V1_DeleteUserRequest: Sendable {
 
 /// A status object used as the `metadata` field for the Operation
 /// returned by `Iam.DeleteUser`. Surfaces incremental progress through
-/// the cascade phases.
+/// the org-scoped cascade phases.
 public struct Pivox_Iam_V1_DeleteUserMetadata: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -245,20 +248,17 @@ public struct Pivox_Iam_V1_DeleteUserMetadata: Sendable {
     /// Default; not used.
     case unspecified // = 0
 
-    /// Validating preconditions (sole-owner check).
+    /// Validating preconditions (org-local sole-owner check).
     case validating // = 1
 
-    /// Removing role / group memberships.
+    /// Removing role / group memberships in this org.
     case revokingMemberships // = 2
 
-    /// Deleting Pivox-side records.
-    case deletingPivoxRecords // = 3
-
-    /// Deleting the Firebase Auth identity (last step).
-    case deletingFirebaseIdentity // = 4
+    /// Soft-deleting the per-org users row.
+    case softDeletingUser // = 3
 
     /// Done.
-    case completed // = 5
+    case completed // = 4
     case UNRECOGNIZED(Int)
 
     public init() {
@@ -270,9 +270,8 @@ public struct Pivox_Iam_V1_DeleteUserMetadata: Sendable {
       case 0: self = .unspecified
       case 1: self = .validating
       case 2: self = .revokingMemberships
-      case 3: self = .deletingPivoxRecords
-      case 4: self = .deletingFirebaseIdentity
-      case 5: self = .completed
+      case 3: self = .softDeletingUser
+      case 4: self = .completed
       default: self = .UNRECOGNIZED(rawValue)
       }
     }
@@ -282,9 +281,8 @@ public struct Pivox_Iam_V1_DeleteUserMetadata: Sendable {
       case .unspecified: return 0
       case .validating: return 1
       case .revokingMemberships: return 2
-      case .deletingPivoxRecords: return 3
-      case .deletingFirebaseIdentity: return 4
-      case .completed: return 5
+      case .softDeletingUser: return 3
+      case .completed: return 4
       case .UNRECOGNIZED(let i): return i
       }
     }
@@ -294,8 +292,7 @@ public struct Pivox_Iam_V1_DeleteUserMetadata: Sendable {
       .unspecified,
       .validating,
       .revokingMemberships,
-      .deletingPivoxRecords,
-      .deletingFirebaseIdentity,
+      .softDeletingUser,
       .completed,
     ]
 
@@ -573,5 +570,5 @@ extension Pivox_Iam_V1_DeleteUserMetadata: SwiftProtobuf.Message, SwiftProtobuf.
 }
 
 extension Pivox_Iam_V1_DeleteUserMetadata.Phase: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0PHASE_UNSPECIFIED\0\u{1}VALIDATING\0\u{1}REVOKING_MEMBERSHIPS\0\u{1}DELETING_PIVOX_RECORDS\0\u{1}DELETING_FIREBASE_IDENTITY\0\u{1}COMPLETED\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0PHASE_UNSPECIFIED\0\u{1}VALIDATING\0\u{1}REVOKING_MEMBERSHIPS\0\u{1}SOFT_DELETING_USER\0\u{1}COMPLETED\0")
 }

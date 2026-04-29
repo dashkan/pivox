@@ -37,6 +37,7 @@ const (
 	Iam_GetUser_FullMethodName            = "/pivox.iam.v1.Iam/GetUser"
 	Iam_ListUsers_FullMethodName          = "/pivox.iam.v1.Iam/ListUsers"
 	Iam_DeleteUser_FullMethodName         = "/pivox.iam.v1.Iam/DeleteUser"
+	Iam_DeleteAccount_FullMethodName      = "/pivox.iam.v1.Iam/DeleteAccount"
 	Iam_GetRole_FullMethodName            = "/pivox.iam.v1.Iam/GetRole"
 	Iam_ListRoles_FullMethodName          = "/pivox.iam.v1.Iam/ListRoles"
 	Iam_ListPermissions_FullMethodName    = "/pivox.iam.v1.Iam/ListPermissions"
@@ -86,15 +87,40 @@ type IamClient interface {
 	GetUser(ctx context.Context, in *GetUserRequest, opts ...grpc.CallOption) (*User, error)
 	// Lists users in an organization.
 	ListUsers(ctx context.Context, in *ListUsersRequest, opts ...grpc.CallOption) (*ListUsersResponse, error)
-	// Deletes a user (LRO). Cascades through Pivox-side state and
-	// finishes by deleting the underlying Firebase Auth identity.
-	// Self-delete: address `organizations/{org}/users/me`.
+	// Removes a user from an organization (LRO). Org-scoped: deletes
+	// the user's per-org bindings and their per-org users row in this
+	// org only. Their Pivox account, Firebase Auth identity, and
+	// memberships in other orgs are untouched. Use `DeleteAccount`
+	// for full account deletion.
 	//
-	// Sole-owner blocking: if the caller owns any active org with no
-	// other owners, the LRO completes with FAILED_PRECONDITION listing
-	// affected orgs. Resolve via `Organizations.TransferOwnership` or
-	// `Organizations.DeleteOrganization` first.
+	// Sole-owner blocking: if removing this user from this org would
+	// leave the org with zero owners, the LRO completes with
+	// FAILED_PRECONDITION. Resolve via `Organizations.TransferOwnership`
+	// first.
+	//
+	// The literal `me` is not a valid {user} segment for this RPC; v1
+	// has no self-leave-org capability.
 	DeleteUser(ctx context.Context, in *DeleteUserRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
+	// Deletes the authenticated caller's Pivox account (LRO). Cascades
+	// through Pivox-side state across every org the caller is in, then
+	// deletes the underlying Firebase Auth identity. Cross-org by
+	// design — this is the only Pivox RPC that legitimately reaches
+	// across orgs.
+	//
+	// Why Pivox-owned: Firebase Auth has no blocking pre-delete
+	// trigger, so server-side validation (sole-owner check) requires
+	// Pivox to be the entry point. The webhook for direct-Console
+	// bypass is a separate fallback path.
+	//
+	// Sole-owner blocking: if the caller is the sole owner of any
+	// active org, the LRO completes with FAILED_PRECONDITION listing
+	// them. Resolve via `Organizations.TransferOwnership` or
+	// `Organizations.DeleteOrganization` on each.
+	//
+	// No permission annotation: on the membership-exempt list, like
+	// CreateOrganization, so memberless callers (stuck in a
+	// half-bootstrapped state) can still delete their account.
+	DeleteAccount(ctx context.Context, in *DeleteAccountRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
 	// Gets a role by resource name. v1 returns only system roles
 	// (owner, admin, editor, viewer); custom roles are deferred.
 	GetRole(ctx context.Context, in *GetRoleRequest, opts ...grpc.CallOption) (*Role, error)
@@ -153,6 +179,16 @@ func (c *iamClient) DeleteUser(ctx context.Context, in *DeleteUserRequest, opts 
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(longrunningpb.Operation)
 	err := c.cc.Invoke(ctx, Iam_DeleteUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *iamClient) DeleteAccount(ctx context.Context, in *DeleteAccountRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(longrunningpb.Operation)
+	err := c.cc.Invoke(ctx, Iam_DeleteAccount_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -305,15 +341,40 @@ type IamServer interface {
 	GetUser(context.Context, *GetUserRequest) (*User, error)
 	// Lists users in an organization.
 	ListUsers(context.Context, *ListUsersRequest) (*ListUsersResponse, error)
-	// Deletes a user (LRO). Cascades through Pivox-side state and
-	// finishes by deleting the underlying Firebase Auth identity.
-	// Self-delete: address `organizations/{org}/users/me`.
+	// Removes a user from an organization (LRO). Org-scoped: deletes
+	// the user's per-org bindings and their per-org users row in this
+	// org only. Their Pivox account, Firebase Auth identity, and
+	// memberships in other orgs are untouched. Use `DeleteAccount`
+	// for full account deletion.
 	//
-	// Sole-owner blocking: if the caller owns any active org with no
-	// other owners, the LRO completes with FAILED_PRECONDITION listing
-	// affected orgs. Resolve via `Organizations.TransferOwnership` or
-	// `Organizations.DeleteOrganization` first.
+	// Sole-owner blocking: if removing this user from this org would
+	// leave the org with zero owners, the LRO completes with
+	// FAILED_PRECONDITION. Resolve via `Organizations.TransferOwnership`
+	// first.
+	//
+	// The literal `me` is not a valid {user} segment for this RPC; v1
+	// has no self-leave-org capability.
 	DeleteUser(context.Context, *DeleteUserRequest) (*longrunningpb.Operation, error)
+	// Deletes the authenticated caller's Pivox account (LRO). Cascades
+	// through Pivox-side state across every org the caller is in, then
+	// deletes the underlying Firebase Auth identity. Cross-org by
+	// design — this is the only Pivox RPC that legitimately reaches
+	// across orgs.
+	//
+	// Why Pivox-owned: Firebase Auth has no blocking pre-delete
+	// trigger, so server-side validation (sole-owner check) requires
+	// Pivox to be the entry point. The webhook for direct-Console
+	// bypass is a separate fallback path.
+	//
+	// Sole-owner blocking: if the caller is the sole owner of any
+	// active org, the LRO completes with FAILED_PRECONDITION listing
+	// them. Resolve via `Organizations.TransferOwnership` or
+	// `Organizations.DeleteOrganization` on each.
+	//
+	// No permission annotation: on the membership-exempt list, like
+	// CreateOrganization, so memberless callers (stuck in a
+	// half-bootstrapped state) can still delete their account.
+	DeleteAccount(context.Context, *DeleteAccountRequest) (*longrunningpb.Operation, error)
 	// Gets a role by resource name. v1 returns only system roles
 	// (owner, admin, editor, viewer); custom roles are deferred.
 	GetRole(context.Context, *GetRoleRequest) (*Role, error)
@@ -356,6 +417,9 @@ func (UnimplementedIamServer) ListUsers(context.Context, *ListUsersRequest) (*Li
 }
 func (UnimplementedIamServer) DeleteUser(context.Context, *DeleteUserRequest) (*longrunningpb.Operation, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteUser not implemented")
+}
+func (UnimplementedIamServer) DeleteAccount(context.Context, *DeleteAccountRequest) (*longrunningpb.Operation, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteAccount not implemented")
 }
 func (UnimplementedIamServer) GetRole(context.Context, *GetRoleRequest) (*Role, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetRole not implemented")
@@ -461,6 +525,24 @@ func _Iam_DeleteUser_Handler(srv interface{}, ctx context.Context, dec func(inte
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(IamServer).DeleteUser(ctx, req.(*DeleteUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Iam_DeleteAccount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteAccountRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IamServer).DeleteAccount(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Iam_DeleteAccount_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IamServer).DeleteAccount(ctx, req.(*DeleteAccountRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -681,6 +763,10 @@ var Iam_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteUser",
 			Handler:    _Iam_DeleteUser_Handler,
+		},
+		{
+			MethodName: "DeleteAccount",
+			Handler:    _Iam_DeleteAccount_Handler,
 		},
 		{
 			MethodName: "GetRole",

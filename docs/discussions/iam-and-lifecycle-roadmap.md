@@ -680,6 +680,14 @@ macOS-first; Windows shell mirrors after.
 
 ## Future / on-demand
 
+- [ ] **`Organizations.LeaveOrganization`** — member self-leave-org RPC.
+      Open product question: SSO orgs need IdP-controlled offboarding (a
+      user shouldn't be able to leave unilaterally because the IdP would
+      re-add them on next sign-in), email/social orgs may allow self-leave.
+      Implementation requires either per-org policy config or per-IdP
+      semantics. Defer until product clarity. Today's gap: a member who
+      wants out has to ask an owner/admin to remove them via
+      `Iam.DeleteUser` (org-scoped).
 - [ ] Custom roles: lift `UNIMPLEMENTED` on `CreateRole`/`UpdateRole`/`DeleteRole` when there's a real customer use case.
 - [ ] Conditional bindings: re-import `google/type/expr.proto`, attach to `Member.condition`.
 - [ ] Re-import `google/iam/v1/iam_policy.proto` for full `GetIamPolicy`/`SetIamPolicy` projection over `members` table — when fine-grain sharing arrives.
