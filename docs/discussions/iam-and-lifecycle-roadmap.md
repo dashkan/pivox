@@ -175,46 +175,23 @@ re-introduce it as part of the new `Iam` service alongside `Member`.
 
 ---
 
-## Phase 1.5 — Rename `Project` → `Space`
+## Phase 1.5 — Rename `Project` → `Space` ✅
 
-Mechanical sweep across **9 protos, 1 migration, ~10+ Go service/convert/test dirs, and all generated code**. Pre-prod, drop+recreate the dev DB.
+Absorbed into the Phase 4 step 1 schema sweep + the proto/Go renames
+that landed alongside it. Verified post-Phase-4 that no items remain:
 
-### Protos
-
-- [ ] `pivox/api/v1/projects.proto` → `pivox/api/v1/spaces.proto`. Service `Projects` → `Spaces`. All messages.
-- [ ] `pivox/api/v1/dashboards.proto` — patterns + URL paths.
-- [ ] `pivox/api/v1/tag_keys.proto` — patterns + URL paths (multi-parent stays).
-- [ ] `pivox/api/v1/tag_values.proto` — patterns + URL paths.
-- [ ] `pivox/api/v1/tag_bindings.proto` — patterns + URL paths.
-- [ ] `pivox/assets/v1/asset.proto` — patterns + URL paths (Asset, AssetVersion).
-- [ ] `pivox/assets/v1/request.proto` — patterns + URL paths (AssetRequest, LineItem).
-- [ ] `pivox/ai/v1/artifacts.proto` — comment-only references update.
-- [ ] `pivox/agent/v1/agent.proto` — comment-only references in denied-pattern docs.
-- [ ] `make lint-proto && make api-lint && make proto-format && make proto-generate && make tidy`.
-
-### DB
-
-- [ ] Rename `projects` → `spaces`. `project_role` → `space_role`. `project_member_type` → (likely deleted in phase 4 in favor of unified `members` table — leave intact for phase 1.5).
-- [ ] Rename `assets.project_id` → `space_id`.
-- [ ] Rename `asset_requests.project_id` → `space_id`.
-- [ ] Rename indexes: `idx_projects_org`, `idx_project_members_member`, `idx_assets_project*`, `idx_asset_requests_project*`.
-- [ ] Update seeded permissions: `projects.create` → `spaces.create`, etc.
-- [ ] Drop+recreate dev DB.
-
-### sqlc + Go
-
-- [ ] Rename queries in `internal/db/queries/asset_requests.sql`, `internal/db/queries/assets.sql`. Regenerate via `make sqlc`.
-- [ ] Rename `internal/service/projects/` → `internal/service/spaces/`.
-- [ ] Update all imports + references in `internal/iam`, `internal/convert`, `internal/resource`, `internal/filter`, `internal/lro`, `internal/apierr`, `internal/server`.
-- [ ] Update test fixtures and pattern strings.
-- [ ] **Verify `internal/crypto/encryptor_gcp.go`'s `projects/...` is GCP-KMS (Google Cloud project), not Pivox project. Leave alone.**
-
-### Phase 1.5 exit criteria
-
-- [ ] `make build` clean.
-- [ ] `go test ./...` clean.
-- [ ] Native macOS app rebuilds with regenerated PivoxModels (`xcodebuild -scheme Pivox`).
-- [ ] No `Project` / `projects` references in pivox-owned code (except GCP-KMS path).
+- [x] All protos renamed (`projects.proto` → `spaces.proto`; URL
+      paths use `organizations/*/spaces/*` everywhere).
+- [x] DB schema uses `spaces`, `space_id`, `space_members`,
+      `idx_spaces_*` etc. No `project_*` artifacts.
+- [x] Seeded permissions use `spaces.create`, `space.delete`, etc.
+- [x] `internal/service/spaces/` exists; no `internal/service/projects/`.
+- [x] sqlc queries + generated code use `space_id`.
+- [x] `internal/crypto/encryptor_gcp.go`'s `projects/...` references
+      are GCP-KMS resource names (intentional, not Pivox projects).
+- [x] No `Project` / `projects` references in pivox-owned code
+      (verified by grep — remaining hits are vendored Google protos
+      under `api/proto/google/`).
 
 ---
 
@@ -273,9 +250,9 @@ short-lived `Sso` gRPC service).
 ### User lifecycle (proto only — handlers in phase 4)
 
 - [x] `DeleteUser` LRO + `DeleteUserMetadata.Phase` enum landed in phase 2.
-- [ ] Sole-owner-blocking error code documented in proto comments
+- [x] Sole-owner-blocking error code documented in proto comments
       (FAILED_PRECONDITION + structured detail listing affected orgs) —
-      handler work, lands in phase 4 step 5.
+      see `DeleteUserRequest` doc comment in `pivox/iam/v1/users.proto`.
 - [x] `TransferOwnership` — dedicated atomic RPC on `Iam` service (locked: open decision #5).
 
 ### SSO
@@ -448,6 +425,17 @@ plan is obsolete.)
 - [ ] `onUserDeleted` Firebase webhook handler: idempotent — no-op if user
       already gone. Out-of-process, lives in `deployments/firebase/functions/`;
       separate commit.
+      **Open semantic question (block before implementing): when a Firebase
+      user is deleted out-of-band (Console / gcloud) and they're the sole
+      owner of one or more orgs, what should the webhook do?** DeleteUser
+      LRO uses refuse-with-FailedPrecondition; the webhook has no caller
+      to show an error to. Options:
+        (a) refuse — Pivox state diverges from Firebase, no recovery path.
+        (b) proceed, leave the org ownerless, loud alert. Admin reconciles.
+        (c) auto-promote next-admin — implicit policy.
+        (d) auto-soft-delete affected orgs — 30-day grace gives ops time.
+      Two new files when picked: Go internal endpoint + TS Cloud Function.
+      Realistic scope: ~2-3 hours including the integration test.
 
 ### Step 6 — Workers (purge + verify-DNS), in-process ✅
 
