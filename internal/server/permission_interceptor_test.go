@@ -306,7 +306,7 @@ func spaceScopeFromRequest(req any) (ScopeRef, error) {
 func TestPermissionInterceptor_SpaceScope_AllowsWhenPermissionGranted(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	q.On("GetOrganizationByNameForGate", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
-	q.On("GetSpaceByName", mock.Anything, db.GetSpaceByNameParams{
+	q.On("GetSpaceByNameForGate", mock.Anything, db.GetSpaceByNameForGateParams{
 		OrgID: testPermOrgID, Name: testPermSpaceSlug,
 	}).Return(testPermSpaceRow, nil)
 	// Resolver path for SpaceTarget: GetSpaceParentOrg + GetEffectiveSpaceRoles + GetEffectiveOrgRoles.
@@ -348,7 +348,7 @@ func TestPermissionInterceptor_SpaceScope_AllowsWhenPermissionGranted(t *testing
 func TestPermissionInterceptor_SpaceScope_DeniesWhenPermissionMissing(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	q.On("GetOrganizationByNameForGate", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
-	q.On("GetSpaceByName", mock.Anything, mock.Anything).Return(testPermSpaceRow, nil)
+	q.On("GetSpaceByNameForGate", mock.Anything, mock.Anything).Return(testPermSpaceRow, nil)
 	q.On("GetSpaceParentOrg", mock.Anything, testPermSpaceID).Return(testPermOrgID, nil)
 	q.On("GetEffectiveSpaceRoles", mock.Anything, mock.Anything).Return([]string{permission.RoleViewer}, nil)
 	q.On("GetEffectiveOrgRoles", mock.Anything, mock.Anything).Return([]string(nil), nil)
@@ -378,7 +378,7 @@ func TestPermissionInterceptor_SpaceScope_OrgInheritanceGrants(t *testing.T) {
 	// down and grants SpacesUpdate via the resolver's union.
 	q := new(mocks.MockQuerier)
 	q.On("GetOrganizationByNameForGate", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
-	q.On("GetSpaceByName", mock.Anything, mock.Anything).Return(testPermSpaceRow, nil)
+	q.On("GetSpaceByNameForGate", mock.Anything, mock.Anything).Return(testPermSpaceRow, nil)
 	q.On("GetSpaceParentOrg", mock.Anything, testPermSpaceID).Return(testPermOrgID, nil)
 	q.On("GetEffectiveSpaceRoles", mock.Anything, mock.Anything).Return([]string(nil), nil)
 	q.On("GetEffectiveOrgRoles", mock.Anything, mock.Anything).Return([]string{permission.RoleAdmin}, nil)
@@ -431,7 +431,7 @@ func TestPermissionInterceptor_SpaceScope_OrgNotFoundReturns404(t *testing.T) {
 func TestPermissionInterceptor_SpaceScope_SpaceNotFoundReturns404(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	q.On("GetOrganizationByNameForGate", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
-	q.On("GetSpaceByName", mock.Anything, mock.Anything).Return(db.Space{}, pgx.ErrNoRows)
+	q.On("GetSpaceByNameForGate", mock.Anything, mock.Anything).Return(db.Space{}, pgx.ErrNoRows)
 
 	registry := Registry{
 		"/svc/GetSpace": {Permission: permission.SpacesRead, Extract: spaceScopeFromRequest},
@@ -603,6 +603,106 @@ func TestPermissionInterceptor_SoftDeletedOrg_BlocksMutations(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
 	assert.False(t, called, "soft-delete gate must run before the handler")
+}
+
+// --- Space-scope soft-delete gate ---
+
+// TestPermissionInterceptor_SoftDeletedSpace_AllowsReads pins the
+// space-scope analogue of SoftDeletedOrg_AllowsReads. Reads against
+// a DELETE_REQUESTED space pass through so operators can inspect
+// metadata during the grace window before deciding to undelete.
+func TestPermissionInterceptor_SoftDeletedSpace_AllowsReads(t *testing.T) {
+	q := new(mocks.MockQuerier)
+	deletedSpace := testPermSpaceRow
+	deletedSpace.State = db.ResourceStateDELETEREQUESTED
+	q.On("GetOrganizationByNameForGate", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
+	q.On("GetSpaceByNameForGate", mock.Anything, mock.Anything).Return(deletedSpace, nil)
+	q.On("GetSpaceParentOrg", mock.Anything, testPermSpaceID).Return(testPermOrgID, nil)
+	q.On("GetEffectiveSpaceRoles", mock.Anything, mock.Anything).Return([]string{permission.RoleViewer}, nil)
+	q.On("GetEffectiveOrgRoles", mock.Anything, mock.Anything).Return([]string(nil), nil)
+
+	registry := Registry{
+		"/svc/GetSpace": {Permission: permission.SpacesRead, Extract: spaceScopeFromRequest},
+	}
+	resolver := permission.NewResolver(q)
+	interceptor := PermissionInterceptor(registry, nil, q, resolver, stubIdentity(testPermCallerID, nil))
+
+	called := false
+	var captured context.Context
+	_, err := interceptor(
+		context.Background(),
+		[2]string{testPermOrgSlug, testPermSpaceSlug},
+		&grpc.UnaryServerInfo{FullMethod: "/svc/GetSpace"},
+		recordingHandler(&called, &captured),
+	)
+	require.NoError(t, err)
+	assert.True(t, called)
+}
+
+// TestPermissionInterceptor_SoftDeletedSpace_AllowsSpacesDeletePerm pins
+// that `spaces.delete` passes the gate even on a DELETE_REQUESTED
+// space — the perm gates both DeleteSpace (re-delete →
+// FAILED_PRECONDITION at the handler) and UndeleteSpace (recovery
+// path). Without this exemption UndeleteSpace would be unreachable.
+func TestPermissionInterceptor_SoftDeletedSpace_AllowsSpacesDeletePerm(t *testing.T) {
+	q := new(mocks.MockQuerier)
+	deletedSpace := testPermSpaceRow
+	deletedSpace.State = db.ResourceStateDELETEREQUESTED
+	q.On("GetOrganizationByNameForGate", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
+	q.On("GetSpaceByNameForGate", mock.Anything, mock.Anything).Return(deletedSpace, nil)
+	q.On("GetSpaceParentOrg", mock.Anything, testPermSpaceID).Return(testPermOrgID, nil)
+	q.On("GetEffectiveSpaceRoles", mock.Anything, mock.Anything).Return([]string{permission.RoleOwner}, nil)
+	q.On("GetEffectiveOrgRoles", mock.Anything, mock.Anything).Return([]string(nil), nil)
+
+	registry := Registry{
+		"/svc/UndeleteSpace": {Permission: permission.SpacesDelete, Extract: spaceScopeFromRequest},
+	}
+	resolver := permission.NewResolver(q)
+	interceptor := PermissionInterceptor(registry, nil, q, resolver, stubIdentity(testPermCallerID, nil))
+
+	called := false
+	var captured context.Context
+	_, err := interceptor(
+		context.Background(),
+		[2]string{testPermOrgSlug, testPermSpaceSlug},
+		&grpc.UnaryServerInfo{FullMethod: "/svc/UndeleteSpace"},
+		recordingHandler(&called, &captured),
+	)
+	require.NoError(t, err)
+	assert.True(t, called)
+}
+
+// TestPermissionInterceptor_SoftDeletedSpace_BlocksMutations pins
+// the gate's positive denial: a non-{read,spaces.delete} mutation on
+// a DELETE_REQUESTED space surfaces FAILED_PRECONDITION at the
+// interceptor before the handler runs.
+func TestPermissionInterceptor_SoftDeletedSpace_BlocksMutations(t *testing.T) {
+	q := new(mocks.MockQuerier)
+	deletedSpace := testPermSpaceRow
+	deletedSpace.State = db.ResourceStateDELETEREQUESTED
+	q.On("GetOrganizationByNameForGate", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
+	q.On("GetSpaceByNameForGate", mock.Anything, mock.Anything).Return(deletedSpace, nil)
+	q.On("GetSpaceParentOrg", mock.Anything, testPermSpaceID).Return(testPermOrgID, nil)
+	q.On("GetEffectiveSpaceRoles", mock.Anything, mock.Anything).Return([]string{permission.RoleAdmin}, nil)
+	q.On("GetEffectiveOrgRoles", mock.Anything, mock.Anything).Return([]string(nil), nil)
+
+	registry := Registry{
+		"/svc/UpdateSpace": {Permission: permission.SpacesUpdate, Extract: spaceScopeFromRequest},
+	}
+	resolver := permission.NewResolver(q)
+	interceptor := PermissionInterceptor(registry, nil, q, resolver, stubIdentity(testPermCallerID, nil))
+
+	called := false
+	var captured context.Context
+	_, err := interceptor(
+		context.Background(),
+		[2]string{testPermOrgSlug, testPermSpaceSlug},
+		&grpc.UnaryServerInfo{FullMethod: "/svc/UpdateSpace"},
+		recordingHandler(&called, &captured),
+	)
+	require.Error(t, err)
+	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+	assert.False(t, called, "space soft-delete gate must run before the handler")
 }
 
 // --- Stream interceptor: default-deny for unregistered streaming methods ---

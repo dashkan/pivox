@@ -203,20 +203,30 @@ func (s *OrganizationsServer) CreateMember(ctx context.Context, req *iampb.Creat
 	if err != nil {
 		return nil, err
 	}
-	role, err := s.queries.GetSystemRole(ctx, db.GetSystemRoleParams{
-		OrgID: resolved.ID,
-		Name:  roleSlug,
-	})
+
+	caller, err := s.caller(ctx)
 	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Role", mem.GetRole())
+		return nil, err
 	}
 
+	// Tx-wrapped: role lookup + principal-existence check + insert run
+	// atomically. The role lookup inside the tx prevents a concurrent
+	// role rename (or v2 custom-role delete) from racing the binding
+	// insert and producing a row that points at a stale role id.
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return nil, apierr.Internal("begin transaction")
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := db.New(tx)
+
+	role, err := qtx.GetSystemRole(ctx, db.GetSystemRoleParams{
+		OrgID: resolved.ID,
+		Name:  roleSlug,
+	})
+	if err != nil {
+		return nil, apierr.HandleResourceError(err, "Role", mem.GetRole())
+	}
 
 	if err := verifyPrincipalInOrg(ctx, qtx, resolved.ID, principalKind, principalID); err != nil {
 		return nil, err
@@ -228,6 +238,7 @@ func (s *OrganizationsServer) CreateMember(ctx context.Context, req *iampb.Creat
 		RoleID:        role.ID,
 		PrincipalKind: principalKind,
 		PrincipalID:   principalID,
+		CreatedBy:     caller.String(),
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Member", req.GetParent())
@@ -268,20 +279,26 @@ func (s *OrganizationsServer) UpdateMember(ctx context.Context, req *iampb.Updat
 	if err != nil {
 		return nil, err
 	}
-	newRole, err := s.queries.GetSystemRole(ctx, db.GetSystemRoleParams{
-		OrgID: resolved.ID,
-		Name:  roleSlug,
-	})
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Role", mem.GetRole())
-	}
 
+	// Tx-wrapped: role lookup + boundary check + role mutation run
+	// atomically. Without the role lookup inside the tx, a concurrent
+	// role rename (or v2 custom-role delete) could land between the
+	// lookup and the update and produce a binding that points at a
+	// stale role id.
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return nil, apierr.Internal("begin transaction")
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := db.New(tx)
+
+	newRole, err := qtx.GetSystemRole(ctx, db.GetSystemRoleParams{
+		OrgID: resolved.ID,
+		Name:  roleSlug,
+	})
+	if err != nil {
+		return nil, apierr.HandleResourceError(err, "Role", mem.GetRole())
+	}
 
 	current, err := qtx.GetOrgMember(ctx, db.GetOrgMemberParams{
 		OrgID:         resolved.ID,

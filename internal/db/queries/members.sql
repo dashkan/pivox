@@ -219,4 +219,10 @@ SELECT om.id, om.org_id, om.role_id, om.principal_kind, om.principal_id,
 -- Resolves a space's parent org_id. Used by the permission resolver
 -- when a space-scoped permission check needs to fold in org-level
 -- inheritance.
-SELECT org_id FROM spaces WHERE id = $1 AND delete_time IS NULL;
+--
+-- Returns the parent org regardless of the space's soft-delete state:
+-- the parent relationship is immutable, and the resolver runs for
+-- soft-deleted spaces too (UndeleteSpace, reads during the grace
+-- window). Filtering on delete_time would break those flows by
+-- returning ErrNoRows after the gate has already admitted the row.
+SELECT org_id FROM spaces WHERE id = $1;

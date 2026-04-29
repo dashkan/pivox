@@ -311,6 +311,23 @@ func enforceSoftDeleteGate(state db.ResourceState, perm, orgSlug string) error {
 		fmt.Sprintf("organization %q is in DELETE_REQUESTED state; restore it via UndeleteOrganization or wait for purge before mutating", orgSlug))
 }
 
+// enforceSpaceSoftDeleteGate is the space-scope analogue of
+// enforceSoftDeleteGate. Mutations on a DELETE_REQUESTED space fail at
+// the gate so every space-scoped mutating RPC inherits protection
+// without per-handler checks. Reads pass through (so the operator can
+// inspect a soft-deleted space during the grace window) and
+// `spaces.delete` passes through so UndeleteSpace can land.
+func enforceSpaceSoftDeleteGate(state db.ResourceState, perm, orgSlug, spaceSlug string) error {
+	if state != db.ResourceStateDELETEREQUESTED {
+		return nil
+	}
+	if isReadPermission(perm) || perm == permission.SpacesDelete {
+		return nil
+	}
+	return apierr.FailedPrecondition(
+		fmt.Sprintf("space %q/%q is in DELETE_REQUESTED state; restore it via UndeleteSpace or wait for purge before mutating", orgSlug, spaceSlug))
+}
+
 // isReadPermission reports whether the permission ID is a read-only
 // operation. Convention: every read perm in the catalog ends with
 // `.read`. Workflow verbs (transferOwnership, fulfill, deliver, etc.)
@@ -374,7 +391,15 @@ func (g *permissionGate) checkSpaceScope(
 		slog.ErrorContext(ctx, "permission interceptor: org lookup failed", "method", fullMethod, "slug", scope.OrgSlug, "error", err)
 		return nil, apierr.Internal("lookup organization")
 	}
-	space, err := g.queries.GetSpaceByName(ctx, db.GetSpaceByNameParams{OrgID: org.ID, Name: scope.Slug})
+	// Soft-delete-aware lookup so a space-scoped RPC against a
+	// soft-deleted space can still reach the handler (reads during
+	// the grace window, UndeleteSpace). Mirrors checkOrgScope's use
+	// of GetOrganizationByNameForGate. Mutating ops on a
+	// DELETE_REQUESTED parent org or a DELETE_REQUESTED space are
+	// both blocked further below by enforceSoftDeleteGate /
+	// enforceSpaceSoftDeleteGate respectively — single source of
+	// truth at the gate, not handler-side.
+	space, err := g.queries.GetSpaceByNameForGate(ctx, db.GetSpaceByNameForGateParams{OrgID: org.ID, Name: scope.Slug})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apierr.NotFound("space", scope.OrgSlug+"/"+scope.Slug)
@@ -391,6 +416,9 @@ func (g *permissionGate) checkSpaceScope(
 		return nil, apierr.PermissionDenied(fmt.Sprintf("caller lacks %q on space %q/%q", entry.Permission, scope.OrgSlug, scope.Slug))
 	}
 	if err := enforceSoftDeleteGate(org.State, entry.Permission, scope.OrgSlug); err != nil {
+		return nil, err
+	}
+	if err := enforceSpaceSoftDeleteGate(space.State, entry.Permission, scope.OrgSlug, scope.Slug); err != nil {
 		return nil, err
 	}
 	resolvedOrg := &ResolvedOrg{ID: org.ID, Slug: scope.OrgSlug, Row: org}

@@ -211,20 +211,28 @@ func (s *SpacesServer) CreateMember(ctx context.Context, req *iampb.CreateMember
 	if err != nil {
 		return nil, err
 	}
-	role, err := s.queries.GetSystemRole(ctx, db.GetSystemRoleParams{
-		OrgID: resolvedOrg.ID,
-		Name:  roleSlug,
-	})
+
+	caller, err := s.caller(ctx)
 	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Role", mem.GetRole())
+		return nil, err
 	}
 
+	// Tx-wrapped: role lookup + principal-existence check + insert run
+	// atomically. Mirrors the org-scope CreateMember pattern.
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return nil, apierr.Internal("begin transaction")
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := db.New(tx)
+
+	role, err := qtx.GetSystemRole(ctx, db.GetSystemRoleParams{
+		OrgID: resolvedOrg.ID,
+		Name:  roleSlug,
+	})
+	if err != nil {
+		return nil, apierr.HandleResourceError(err, "Role", mem.GetRole())
+	}
 
 	if err := verifyPrincipalInOrg(ctx, qtx, resolvedOrg.ID, principalKind, principalID); err != nil {
 		return nil, err
@@ -236,6 +244,7 @@ func (s *SpacesServer) CreateMember(ctx context.Context, req *iampb.CreateMember
 		RoleID:        role.ID,
 		PrincipalKind: principalKind,
 		PrincipalID:   principalID,
+		CreatedBy:     caller.String(),
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Member", req.GetParent())
@@ -282,14 +291,29 @@ func (s *SpacesServer) UpdateMember(ctx context.Context, req *iampb.UpdateMember
 	if err != nil {
 		return nil, err
 	}
-	newRole, err := s.queries.GetSystemRole(ctx, db.GetSystemRoleParams{
+
+	// Tx-wrapped: role lookup + binding mutation run atomically so a
+	// concurrent role rename (or v2 custom-role delete) cannot race in
+	// between and produce a binding that points at a different role
+	// than the caller asked for. Mirrors the org-scope UpdateMember,
+	// minus the ≥1-owner boundary check (spaces have no sole-owner
+	// invariant — inherited org-admin keeps a space reachable even
+	// without a direct space-owner binding).
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, apierr.Internal("begin transaction")
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := db.New(tx)
+
+	newRole, err := qtx.GetSystemRole(ctx, db.GetSystemRoleParams{
 		OrgID: resolvedOrg.ID,
 		Name:  roleSlug,
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Role", mem.GetRole())
 	}
-	row, err := s.queries.UpdateSpaceMemberRole(ctx, db.UpdateSpaceMemberRoleParams{
+	row, err := qtx.UpdateSpaceMemberRole(ctx, db.UpdateSpaceMemberRoleParams{
 		SpaceID:       resolvedSpace.ID,
 		PrincipalKind: path.principalKind,
 		PrincipalID:   path.principalID,
@@ -298,6 +322,10 @@ func (s *SpacesServer) UpdateMember(ctx context.Context, req *iampb.UpdateMember
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Member", mem.GetName())
 	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, apierr.Internal("commit transaction")
+	}
+
 	return convert.SpaceMemberRowToProto(db.GetSpaceMemberRow{
 		ID:            row.ID,
 		SpaceID:       resolvedSpace.ID,

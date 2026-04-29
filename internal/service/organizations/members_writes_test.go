@@ -1,6 +1,7 @@
 package organizations
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -79,6 +80,33 @@ func scanGetOrgMemberRow(row db.GetOrgMemberRow) *mockRow {
 	}}
 }
 
+// scanRole stages a Role shape (GetSystemRole result): 14 columns —
+// id, org_id, name, display_name, description, is_system, annotations,
+// state, etag, revision, created_by, updated_by, create_time,
+// update_time.
+func scanRole(r db.Role) *mockRow {
+	return &mockRow{scanFunc: func(dest ...interface{}) error {
+		if len(dest) != 14 {
+			return errors.New("unexpected Role column count")
+		}
+		*dest[0].(*uuid.UUID) = r.ID
+		*dest[1].(*uuid.UUID) = r.OrgID
+		*dest[2].(*string) = r.Name
+		*dest[3].(*string) = r.DisplayName
+		*dest[4].(*string) = r.Description
+		*dest[5].(*bool) = r.IsSystem
+		*dest[6].(*json.RawMessage) = r.Annotations
+		*dest[7].(*db.ResourceState) = r.State
+		*dest[8].(*string) = r.Etag
+		*dest[9].(*int32) = r.Revision
+		*dest[10].(*string) = r.CreatedBy
+		*dest[11].(*string) = r.UpdatedBy
+		*dest[12].(*time.Time) = r.CreateTime
+		*dest[13].(*time.Time) = r.UpdateTime
+		return nil
+	}}
+}
+
 // scanInt64 stages a single int64 Scan (CountOwnersByOrg shape).
 func scanInt64(v int64) *mockRow {
 	return &mockRow{scanFunc: func(dest ...interface{}) error {
@@ -123,11 +151,11 @@ func TestUpdateMember_BoundaryRejectsLastOwnerDemotion(t *testing.T) {
 	adminRoleID := uuid.MustParse("0192a000-1000-7000-8000-000000000004")
 
 	q.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
-	q.On("GetSystemRole", mock.Anything, db.GetSystemRoleParams{
-		OrgID: testOrg.ID, Name: "admin",
-	}).Return(db.Role{ID: adminRoleID, Name: "admin", IsSystem: true}, nil)
 
 	pool.On("Begin", mock.Anything).Return(tx, nil)
+	// Inside-tx: GetSystemRole resolves the target role first.
+	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
+		Return(scanRole(db.Role{ID: adminRoleID, OrgID: testOrg.ID, Name: "admin", IsSystem: true})).Once()
 	// Inside-tx: GetOrgMember returns current binding (owner role).
 	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
 		Return(scanGetOrgMemberRow(db.GetOrgMemberRow{
@@ -161,9 +189,9 @@ func TestUpdateMember_BoundaryRejectsLastOwnerDemotion(t *testing.T) {
 		"demoting the last owner must return FailedPrecondition")
 	assert.Contains(t, st.Message(), "last owner")
 
-	// No UPDATE happened — only 2 QueryRow calls (the GetOrgMember
-	// + CountOwnersByOrg lookups). The role mutation never fires.
-	tx.AssertNumberOfCalls(t, "QueryRow", 2)
+	// No UPDATE happened — only 3 QueryRow calls (GetSystemRole +
+	// GetOrgMember + CountOwnersByOrg). The role mutation never fires.
+	tx.AssertNumberOfCalls(t, "QueryRow", 3)
 	tx.AssertNotCalled(t, "Commit", mock.Anything)
 }
 
@@ -179,10 +207,11 @@ func TestUpdateMember_AllowsDemotionWhenMultipleOwners(t *testing.T) {
 	adminRoleID := uuid.MustParse("0192a000-1100-7000-8000-000000000004")
 
 	q.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
-	q.On("GetSystemRole", mock.Anything, mock.Anything).
-		Return(db.Role{ID: adminRoleID, Name: "admin", IsSystem: true}, nil)
 
 	pool.On("Begin", mock.Anything).Return(tx, nil)
+	// Inside-tx: GetSystemRole resolves the target role first.
+	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
+		Return(scanRole(db.Role{ID: adminRoleID, OrgID: testOrg.ID, Name: "admin", IsSystem: true})).Once()
 	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
 		Return(scanGetOrgMemberRow(db.GetOrgMemberRow{
 			ID:            memberID,

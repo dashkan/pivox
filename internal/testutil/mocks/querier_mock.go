@@ -356,6 +356,11 @@ func (m *MockQuerier) GetSpaceByName(ctx context.Context, arg db.GetSpaceByNameP
 	return args.Get(0).(db.Space), args.Error(1)
 }
 
+func (m *MockQuerier) GetSpaceByNameForGate(ctx context.Context, arg db.GetSpaceByNameForGateParams) (db.Space, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.Space), args.Error(1)
+}
+
 func (m *MockQuerier) GetSpaceIncludingDeleted(ctx context.Context, id uuid.UUID) (db.Space, error) {
 	args := m.Called(ctx, id)
 	return args.Get(0).(db.Space), args.Error(1)

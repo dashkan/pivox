@@ -644,11 +644,15 @@ reusable by Phase 5+ space-scoped tests without modification.
 
 Wire existing (post-rename) `Spaces` RPCs to schema. `Spaces` proto largely already defined.
 
-- [ ] Update tests for existing `Projects`-now-`Spaces` server unit + integration tests.
-- [ ] `CreateSpace`: seed default space-level Member binding (creator → owner).
-- [ ] `DeleteSpace`: same soft-delete + purge pattern as orgs.
-- [ ] Inheritance from org level for permission resolution (decision-locked above).
-- [ ] Asset / AssetRequest / Tag* / Dashboard handlers updated for `space_id` column.
+- [x] Update tests for existing `Projects`-now-`Spaces` server unit + integration tests. *(P5.1: slimmed unit tests to validation-surface only; obsolete `server_integration_test.go` removed; coverage migrated to grpcharness E2E.)*
+- [x] `CreateSpace`: seed default space-level Member binding (creator → owner). *(P5.1: founder owner seed atomic with space create; pinned by `TestE2E_CreateSpace_SeedsFounderOwnerBinding`.)*
+- [x] Audit-class fixes for Get/Update/Delete/Undelete/List handlers — use resolved-context (`MustResolvedOrgFromContext` / `MustResolvedSpaceFromContext`), populate `created_by`/`updated_by`/`deleted_by` from caller identity, FailedPrecondition on non-ACTIVE state, slug-mismatch defensive checks. *(P5.1.)*
+- [x] Soft-delete-aware gate for spaces: added `GetSpaceByNameForGate` mirror of the org variant; permission interceptor now resolves soft-deleted spaces so reads-during-grace and `UndeleteSpace` reach the handler. Also dropped the `delete_time IS NULL` filter from `GetSpaceParentOrg` so the resolver can fold in org-level inheritance for soft-deleted spaces. *(P5.1.)*
+- [x] Space-scope soft-delete gate enforcement: added `enforceSpaceSoftDeleteGate` mirror of `enforceSoftDeleteGate`. Mutating RPCs against a DELETE_REQUESTED space surface FAILED_PRECONDITION at the interceptor (single source of truth, matches org-scope semantics); `spaces.delete` passes through so UndeleteSpace works. Per-handler state guards in UpdateSpace removed (gate is authoritative). Pinned by `TestE2E_SoftDeletedSpace_BlocksMutationsAtGate`. *(P5.1.)*
+- [x] Member-write atomicity + audit fields: org-scope and space-scope `CreateMember`/`UpdateMember` now wrap `GetSystemRole` inside the same tx as the principal-existence check + insert/update — closes the role-rename race. `created_by` is now populated on `org_members` and `space_members` inserts (was silently dropped). *(P5.1, audit-class.)*
+- [ ] `DeleteSpace`: same soft-delete + purge pattern as orgs. *(P5.1 ships soft-delete; P5.2 adds the LRO purge worker.)*
+- [x] Inheritance from org level for permission resolution (decision-locked above). *(Phase 4; verified end-to-end in P5.1 by `TestE2E_UndeleteSpace_RestoresSoftDeletedSpace` exercising the org-inheritance path.)*
+- [x] Asset / AssetRequest / Tag* / Dashboard handlers updated for `space_id` column. *(Phase 1.5.)*
 
 ### Phase 5 exit criteria
 

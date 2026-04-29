@@ -117,6 +117,42 @@ func (q *Queries) GetSpaceByName(ctx context.Context, arg GetSpaceByNameParams) 
 	return i, err
 }
 
+const getSpaceByNameForGate = `-- name: GetSpaceByNameForGate :one
+SELECT id, org_id, name, display_name, labels, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time FROM spaces WHERE org_id = $1 AND name = $2
+`
+
+type GetSpaceByNameForGateParams struct {
+	OrgID uuid.UUID `json:"org_id"`
+	Name  string    `json:"name"`
+}
+
+// GetSpaceByNameForGate looks up a space by (org, slug) regardless of
+// soft-delete state. Mirrors GetOrganizationByNameForGate: lets the
+// permission interceptor resolve a soft-deleted space so reads still
+// work during the grace window and UndeleteSpace can target the row.
+func (q *Queries) GetSpaceByNameForGate(ctx context.Context, arg GetSpaceByNameForGateParams) (Space, error) {
+	row := q.db.QueryRow(ctx, getSpaceByNameForGate, arg.OrgID, arg.Name)
+	var i Space
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.Name,
+		&i.DisplayName,
+		&i.Labels,
+		&i.State,
+		&i.Etag,
+		&i.Revision,
+		&i.CreatedBy,
+		&i.UpdatedBy,
+		&i.DeletedBy,
+		&i.CreateTime,
+		&i.UpdateTime,
+		&i.DeleteTime,
+		&i.PurgeTime,
+	)
+	return i, err
+}
+
 const getSpaceIncludingDeleted = `-- name: GetSpaceIncludingDeleted :one
 SELECT id, org_id, name, display_name, labels, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time FROM spaces WHERE id = $1
 `

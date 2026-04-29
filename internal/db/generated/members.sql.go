@@ -415,12 +415,18 @@ func (q *Queries) GetSpaceMember(ctx context.Context, arg GetSpaceMemberParams) 
 }
 
 const getSpaceParentOrg = `-- name: GetSpaceParentOrg :one
-SELECT org_id FROM spaces WHERE id = $1 AND delete_time IS NULL
+SELECT org_id FROM spaces WHERE id = $1
 `
 
 // Resolves a space's parent org_id. Used by the permission resolver
 // when a space-scoped permission check needs to fold in org-level
 // inheritance.
+//
+// Returns the parent org regardless of the space's soft-delete state:
+// the parent relationship is immutable, and the resolver runs for
+// soft-deleted spaces too (UndeleteSpace, reads during the grace
+// window). Filtering on delete_time would break those flows by
+// returning ErrNoRows after the gate has already admitted the row.
 func (q *Queries) GetSpaceParentOrg(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, getSpaceParentOrg, id)
 	var org_id uuid.UUID

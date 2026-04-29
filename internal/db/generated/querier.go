@@ -298,6 +298,11 @@ type Querier interface {
 	GetRoleByID(ctx context.Context, id uuid.UUID) (Role, error)
 	GetSpace(ctx context.Context, id uuid.UUID) (Space, error)
 	GetSpaceByName(ctx context.Context, arg GetSpaceByNameParams) (Space, error)
+	// GetSpaceByNameForGate looks up a space by (org, slug) regardless of
+	// soft-delete state. Mirrors GetOrganizationByNameForGate: lets the
+	// permission interceptor resolve a soft-deleted space so reads still
+	// work during the grace window and UndeleteSpace can target the row.
+	GetSpaceByNameForGate(ctx context.Context, arg GetSpaceByNameForGateParams) (Space, error)
 	GetSpaceIncludingDeleted(ctx context.Context, id uuid.UUID) (Space, error)
 	// Companion to GetOrgMember at space scope. Note: this returns ONLY
 	// direct space-level bindings; org-level inheritance (an org-admin
@@ -307,6 +312,12 @@ type Querier interface {
 	// Resolves a space's parent org_id. Used by the permission resolver
 	// when a space-scoped permission check needs to fold in org-level
 	// inheritance.
+	//
+	// Returns the parent org regardless of the space's soft-delete state:
+	// the parent relationship is immutable, and the resolver runs for
+	// soft-deleted spaces too (UndeleteSpace, reads during the grace
+	// window). Filtering on delete_time would break those flows by
+	// returning ErrNoRows after the gate has already admitted the row.
 	GetSpaceParentOrg(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
 	// GetSsoConfigByOrgID looks up the SSO config row for an org, if
 	// one exists. UNIQUE(org_id) ensures at most one row. Used by
