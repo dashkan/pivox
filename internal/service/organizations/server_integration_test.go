@@ -6,97 +6,25 @@ import (
 	"context"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/dashkan/pivox/internal/authn"
-	db "github.com/dashkan/pivox/internal/db/generated"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
-	"github.com/dashkan/pivox/internal/service/organizations"
-	"github.com/dashkan/pivox/internal/testutil"
+	"github.com/dashkan/pivox/internal/testutil/grpcharness"
 )
-
-// noopAuthService stubs out the authn.Service interface for tests.
-type noopAuthService struct{}
-
-func (n noopAuthService) VerifyToken(_ context.Context, _ string) (*authn.Identity, error) {
-	return &authn.Identity{UID: "test-user"}, nil
-}
-
-func (n noopAuthService) CreateCustomToken(_ context.Context, uid string) (string, error) {
-	return "custom-token-" + uid, nil
-}
-
-func (n noopAuthService) CreateOidcProvider(_ context.Context, _ authn.OidcProviderConfig) error {
-	return nil
-}
-
-func (n noopAuthService) UpdateOidcProvider(_ context.Context, _ authn.OidcProviderConfig) error {
-	return nil
-}
-
-func (n noopAuthService) DeleteOidcProvider(_ context.Context, _ string) error {
-	return nil
-}
-
-func (n noopAuthService) CreateSamlProvider(_ context.Context, _ authn.SamlProviderConfig) error {
-	return nil
-}
-
-func (n noopAuthService) UpdateSamlProvider(_ context.Context, _ authn.SamlProviderConfig) error {
-	return nil
-}
-
-func (n noopAuthService) DeleteSamlProvider(_ context.Context, _ string) error {
-	return nil
-}
-
-func (n noopAuthService) DeleteUser(_ context.Context, _ string) error {
-	return nil
-}
-
-// testReadUID is the AuthContextReader used by integration tests. It
-// always returns the canonical test caller's UID, since these tests
-// build the gRPC server directly without the production AuthInterceptor
-// in the chain. The matching `accounts` row is seeded by `seedTestCaller`.
-const testCallerUID = "test-user"
-
-func testReadUID(_ context.Context) (string, bool) { return testCallerUID, true }
-
-// seedTestCaller upserts a `firebase_identities` row for testCallerUID
-// so `CreateOrganization`'s `GetFirebaseIdentityByUID` lookup
-// succeeds. Returns the seeded identity's id.
-func seedTestCaller(t *testing.T, queries db.Querier) uuid.UUID {
-	t.Helper()
-	identity, err := queries.UpsertFirebaseIdentity(context.Background(), db.UpsertFirebaseIdentityParams{
-		FirebaseUid:   testCallerUID,
-		Email:         "test@example.com",
-		EmailVerified: true,
-		DisplayName:   "Test Caller",
-	})
-	require.NoError(t, err)
-	return identity.ID
-}
 
 func TestIntegration_CreateOrganization_DuplicateName(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
+	h := newLifecycleHarness(t)
+	owner := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "founder"})
+	h.SetCaller(owner)
 
-	seedTestCaller(t, queries)
-
-	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, noopAuthService{}, nil, testReadUID, nil, nil, nil, nil))
-	})
-
-	client := apiv1.NewOrganizationsClient(conn)
+	client := apiv1.NewOrganizationsClient(h.Conn())
 	ctx := context.Background()
 
 	// Create the first org.
@@ -122,16 +50,11 @@ func TestIntegration_Organizations(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
+	h := newLifecycleHarness(t)
+	owner := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "founder"})
+	h.SetCaller(owner)
 
-	seedTestCaller(t, queries)
-
-	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, noopAuthService{}, nil, testReadUID, nil, nil, nil, nil))
-	})
-
-	client := apiv1.NewOrganizationsClient(conn)
+	client := apiv1.NewOrganizationsClient(h.Conn())
 	ctx := context.Background()
 
 	var createdOrgName string
@@ -175,5 +98,4 @@ func TestIntegration_Organizations(t *testing.T) {
 		}
 		assert.True(t, found, "created org should appear in list")
 	})
-
 }

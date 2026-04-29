@@ -395,10 +395,20 @@ type Querier interface {
 	ListStorageAgentAuditByGateway(ctx context.Context, arg ListStorageAgentAuditByGatewayParams) ([]StorageAgentAudit, error)
 	ListStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageAgent, error)
 	ListStorageEndpointsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageEndpoint, error)
-	// Lists all live org memberships for a firebase_identity, excluding
-	// memberships in soft-deleted orgs and soft-deleted user rows. Used
-	// by the membership interceptor's gate and by any consumer that
-	// needs the "is this caller in any active org?" signal.
+	// Lists all org memberships for a firebase_identity, including those
+	// in soft-deleted orgs so the owner can reach UndeleteOrganization
+	// during the 30-day grace window. Excludes:
+	//   - soft-deleted user rows (the per-org membership itself was
+	//     soft-deleted, distinct from the org being soft-deleted), and
+	//   - purged orgs (the org row is hard-deleted; the JOIN naturally
+	//     drops those).
+	//
+	// Used by the membership interceptor's gate, which decides whether a
+	// caller is "memberful enough" to reach the permission interceptor.
+	// Membership in a DELETE_REQUESTED org counts: the permission
+	// interceptor's soft-delete gate then narrows allowed permissions to
+	// reads + organizations.delete (which gates UndeleteOrganization),
+	// so the bootstrap path stays intact without granting mutate access.
 	ListUsersByFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) ([]User, error)
 	ListUsersByOrg(ctx context.Context, orgID uuid.UUID) ([]User, error)
 	LookupApiKeyByKeyString(ctx context.Context, keyString string) (ApiKey, error)

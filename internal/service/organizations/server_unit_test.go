@@ -82,9 +82,11 @@ func TestUnit_NewOrganizationsServer(t *testing.T) {
 func TestUnit_GetOrganization_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newTestServer(mockQ)
-	ctx := context.Background()
-
-	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
+	// GetOrganization now reads the org from the interceptor-resolved
+	// context (audit MED #4 / soft-delete-revive flow); the unit test
+	// has to seed the same ResolvedOrg the production interceptor
+	// would attach.
+	ctx := memberTestCtx()
 
 	resp, err := srv.GetOrganization(ctx, &apiv1.GetOrganizationRequest{
 		Name: "organizations/acme",
@@ -94,25 +96,25 @@ func TestUnit_GetOrganization_Success(t *testing.T) {
 	assert.Equal(t, "organizations/acme", resp.GetName())
 	assert.Equal(t, "Acme Corp", resp.GetDisplayName())
 	assert.Equal(t, "etag-org-1", resp.GetEtag())
-	mockQ.AssertExpectations(t)
 }
 
-func TestUnit_GetOrganization_NotFound(t *testing.T) {
+// TestUnit_GetOrganization_SlugMismatch covers the
+// path-vs-resolved-scope drift assertion. In production this never
+// fires (the interceptor 404s on an unknown slug before the handler
+// runs); the assertion is paranoia against gate-vs-handler skew.
+func TestUnit_GetOrganization_SlugMismatch(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newTestServer(mockQ)
-	ctx := context.Background()
-
-	mockQ.On("GetOrganizationByName", mock.Anything, "nonexistent").Return(db.Organization{}, pgx.ErrNoRows)
+	ctx := memberTestCtx() // resolved org slug = "acme"
 
 	_, err := srv.GetOrganization(ctx, &apiv1.GetOrganizationRequest{
-		Name: "organizations/nonexistent",
+		Name: "organizations/different-slug",
 	})
 
 	require.Error(t, err)
 	st, ok := status.FromError(err)
 	require.True(t, ok)
-	assert.Equal(t, codes.NotFound, st.Code())
-	mockQ.AssertExpectations(t)
+	assert.Equal(t, codes.InvalidArgument, st.Code())
 }
 
 func TestUnit_GetOrganization_InvalidName(t *testing.T) {

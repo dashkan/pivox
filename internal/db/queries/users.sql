@@ -22,16 +22,25 @@ SELECT * FROM users
  ORDER BY create_time;
 
 -- name: ListUsersByFirebaseIdentity :many
--- Lists all live org memberships for a firebase_identity, excluding
--- memberships in soft-deleted orgs and soft-deleted user rows. Used
--- by the membership interceptor's gate and by any consumer that
--- needs the "is this caller in any active org?" signal.
+-- Lists all org memberships for a firebase_identity, including those
+-- in soft-deleted orgs so the owner can reach UndeleteOrganization
+-- during the 30-day grace window. Excludes:
+--   - soft-deleted user rows (the per-org membership itself was
+--     soft-deleted, distinct from the org being soft-deleted), and
+--   - purged orgs (the org row is hard-deleted; the JOIN naturally
+--     drops those).
+--
+-- Used by the membership interceptor's gate, which decides whether a
+-- caller is "memberful enough" to reach the permission interceptor.
+-- Membership in a DELETE_REQUESTED org counts: the permission
+-- interceptor's soft-delete gate then narrows allowed permissions to
+-- reads + organizations.delete (which gates UndeleteOrganization),
+-- so the bootstrap path stays intact without granting mutate access.
 SELECT u.*
   FROM users u
   JOIN organizations o ON o.id = u.org_id
  WHERE u.firebase_identity_id = $1
    AND u.delete_time IS NULL
-   AND o.delete_time IS NULL
  ORDER BY u.create_time;
 
 -- name: CountOwnersByOrg :one

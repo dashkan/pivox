@@ -80,12 +80,19 @@ func (s *OrganizationsServer) GetOrganization(ctx context.Context, req *apiv1.Ge
 		return nil, apierr.HandleResourceError(err, "Organization", req.GetName())
 	}
 
-	org, err := s.queries.GetOrganizationByName(ctx, segment)
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Organization", req.GetName())
+	// Use the org row resolved by the permission interceptor — its
+	// gate is soft-delete-aware (uses GetOrganizationByNameForGate)
+	// so the caller reaches us with a row that may be DELETE_REQUESTED.
+	// Re-fetching via GetOrganizationByName would filter that row
+	// out and surface NotFound, breaking the grace-window read path
+	// the soft-delete-gate explicitly allows. Defensive slug check
+	// mirrors the audit MED #4 fix for member handlers.
+	resolved := server.MustResolvedOrgFromContext(ctx)
+	if segment != resolved.Slug {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("name",
+			"org slug in path does not match resolved scope"))
 	}
-
-	return convert.OrganizationToProto(org), nil
+	return convert.OrganizationToProto(resolved.Row), nil
 }
 
 // ListOrganizations is the post-signin "which orgs am I in?" query.
