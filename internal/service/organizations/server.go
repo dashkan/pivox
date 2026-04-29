@@ -47,19 +47,24 @@ type OrganizationsServer struct {
 	readUID  AuthContextReader
 	resolver *permission.Resolver
 	caller   server.CallerIdentityResolver
+	// lroManager drives the asynchronous orchestrators for
+	// DeleteOrganization and UndeleteOrganization. Optional in
+	// tests that don't exercise lifecycle paths.
+	lroManager *lro.Manager
 }
 
-func NewOrganizationsServer(pool *pgxpool.Pool, queries db.Querier, auth authn.Service, codec *appkey.Codec, readUID AuthContextReader, resolver *permission.Resolver, caller server.CallerIdentityResolver) *OrganizationsServer {
+func NewOrganizationsServer(pool *pgxpool.Pool, queries db.Querier, auth authn.Service, codec *appkey.Codec, readUID AuthContextReader, resolver *permission.Resolver, caller server.CallerIdentityResolver, lroManager *lro.Manager) *OrganizationsServer {
 	return &OrganizationsServer{
-		db:       pool,
-		pool:     pool,
-		queries:  queries,
-		auth:     auth,
-		filter:   filter.OrganizationFilter(),
-		codec:    codec,
-		readUID:  readUID,
-		resolver: resolver,
-		caller:   caller,
+		db:         pool,
+		pool:       pool,
+		queries:    queries,
+		auth:       auth,
+		filter:     filter.OrganizationFilter(),
+		codec:      codec,
+		readUID:    readUID,
+		resolver:   resolver,
+		caller:     caller,
+		lroManager: lroManager,
 	}
 }
 

@@ -405,17 +405,28 @@ plan is obsolete.)
 > 38ec1f7 (scaffolding) → 8ea5368/cd23ee9/2be9c29 (per-service
 > registries) → 9d28a4a (proto-annotation rewrite + interceptor live).
 
-### Step 4 — Org lifecycle
+### Step 4 — Org lifecycle ✅
 
-- [ ] `Organizations.DeleteOrganization` LRO orchestrator. State machine matching
+- [x] `Organizations.DeleteOrganization` LRO orchestrator. State machine matching
       `DeleteOrganizationMetadata.Phase`: VALIDATING → CANCELLING_OPERATIONS →
       MARKING_DELETED|PURGING → COMPLETED. `force=true` takes the PURGING branch.
-- [ ] Cancellation of in-flight org-scoped LROs.
-- [ ] Soft-delete gate at RPC boundary: org-scoped reads succeed with metadata;
-      mutations return `FAILED_PRECONDITION`.
-- [ ] `Organizations.UndeleteOrganization` LRO clears `delete_time`/`purge_time`,
-      restores `state=ACTIVE`. Grace-window check.
-- [ ] Slug freed at purge time, not at soft-delete.
+- [x] Cancellation of in-flight org-scoped LROs via the `operations.org_id`
+      reverse pointer (added in this commit). LROs opt in by calling
+      `lro.Manager.CreateAndRunForOrg`. Today only DeleteOrganization itself
+      uses the LRO machinery (passes NULL to avoid self-cancel); future LROs
+      (asset imports, domain verifications, gateway upgrades) populate the
+      column when implemented.
+- [x] Soft-delete gate at RPC boundary: org-scoped reads succeed with metadata;
+      mutations return `FAILED_PRECONDITION`. `organizations.delete` is
+      explicitly allowed against a DELETE_REQUESTED org so the handler can
+      dispatch UndeleteOrganization or surface re-delete errors itself.
+- [x] `Organizations.UndeleteOrganization` LRO clears `delete_time`/`purge_time`,
+      restores `state=ACTIVE`. Grace-window check (purge_time > now) enforced
+      in the SQL.
+- [x] Slug freed at purge time, not at soft-delete (enforced by the global
+      UNIQUE constraint on `organizations.name`).
+- [x] `force=true` requires a non-empty etag pinning the row revision —
+      destructive op safety.
 
 ### Step 5 — User lifecycle
 

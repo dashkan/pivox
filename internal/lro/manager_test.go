@@ -366,7 +366,7 @@ func TestCreateAndRun(t *testing.T) {
 	s, err := structpb.NewStruct(map[string]interface{}{"key": "value"})
 	require.NoError(t, err)
 
-	op, err := m.CreateAndRun(ctx, "assets", nil, func(ctx context.Context) (proto.Message, error) {
+	op, err := m.CreateAndRun(ctx, "assets", nil, func(ctx context.Context, _ Progress) (proto.Message, error) {
 		return s, nil
 	})
 	require.NoError(t, err)
@@ -394,7 +394,7 @@ func TestRunWork_Failure(t *testing.T) {
 		failCalled <- args.Get(1).(db.FailOperationParams)
 	})
 
-	_, err := m.CreateAndRun(ctx, "assets", nil, func(ctx context.Context) (proto.Message, error) {
+	_, err := m.CreateAndRun(ctx, "assets", nil, func(ctx context.Context, _ Progress) (proto.Message, error) {
 		return nil, fmt.Errorf("work failed")
 	})
 	require.NoError(t, err) // CreateAndRun itself should succeed
@@ -420,7 +420,7 @@ func TestRunWork_GRPCStatusError(t *testing.T) {
 		failCalled <- args.Get(1).(db.FailOperationParams)
 	})
 
-	_, err := m.CreateAndRun(ctx, "assets", nil, func(ctx context.Context) (proto.Message, error) {
+	_, err := m.CreateAndRun(ctx, "assets", nil, func(ctx context.Context, _ Progress) (proto.Message, error) {
 		return nil, status.Error(codes.PermissionDenied, "access denied")
 	})
 	require.NoError(t, err)
@@ -447,7 +447,7 @@ func TestRunWork_SuccessWithNilResult(t *testing.T) {
 	})
 
 	// Return nil result -- the success path with no result to marshal
-	_, err := m.CreateAndRun(ctx, "assets", nil, func(ctx context.Context) (proto.Message, error) {
+	_, err := m.CreateAndRun(ctx, "assets", nil, func(ctx context.Context, _ Progress) (proto.Message, error) {
 		return nil, nil
 	})
 	require.NoError(t, err)
@@ -716,7 +716,7 @@ func TestCreateAndRun_WithMetadata(t *testing.T) {
 		close(done)
 	})
 
-	op, err := m.CreateAndRun(ctx, "assets", metadata, func(ctx context.Context) (proto.Message, error) {
+	op, err := m.CreateAndRun(ctx, "assets", metadata, func(ctx context.Context, _ Progress) (proto.Message, error) {
 		return nil, nil
 	})
 	require.NoError(t, err)
@@ -736,7 +736,7 @@ func TestCreateAndRun_CreateOperationError(t *testing.T) {
 
 	mockQ.On("CreateOperation", ctx, mock.Anything).Return(db.Operation{}, fmt.Errorf("db down"))
 
-	op, err := m.CreateAndRun(ctx, "assets", nil, func(ctx context.Context) (proto.Message, error) {
+	op, err := m.CreateAndRun(ctx, "assets", nil, func(ctx context.Context, _ Progress) (proto.Message, error) {
 		return nil, nil
 	})
 	require.Error(t, err)
@@ -765,7 +765,7 @@ func TestRunWork_MarshalResultError(t *testing.T) {
 	// anypb.New() will fail when the message type is not resolvable.
 	badMsg := &anypb.Any{TypeUrl: "type.googleapis.com/nonexistent.Type", Value: []byte("bad")}
 
-	go m.runWork(opID, func(ctx context.Context) (proto.Message, error) {
+	go m.runWork(opID, func(ctx context.Context, _ Progress) (proto.Message, error) {
 		return badMsg, nil
 	})
 
@@ -1008,7 +1008,7 @@ func TestRunWork_FailOperationDBError(t *testing.T) {
 		close(done)
 	})
 
-	_, err := m.CreateAndRun(ctx, "assets", nil, func(ctx context.Context) (proto.Message, error) {
+	_, err := m.CreateAndRun(ctx, "assets", nil, func(ctx context.Context, _ Progress) (proto.Message, error) {
 		return nil, fmt.Errorf("work failed")
 	})
 	require.NoError(t, err)
@@ -1038,7 +1038,7 @@ func TestRunWork_CompleteOperationDBError(t *testing.T) {
 		close(done)
 	})
 
-	_, err := m.CreateAndRun(ctx, "assets", nil, func(ctx context.Context) (proto.Message, error) {
+	_, err := m.CreateAndRun(ctx, "assets", nil, func(ctx context.Context, _ Progress) (proto.Message, error) {
 		s, _ := structpb.NewStruct(map[string]interface{}{"k": "v"})
 		return s, nil
 	})
@@ -1068,7 +1068,7 @@ func TestRunWork_MarshalResultError_FailOperationAlsoFails(t *testing.T) {
 
 	badMsg := &anypb.Any{TypeUrl: "type.googleapis.com/nonexistent.Type", Value: []byte("bad")}
 
-	go m.runWork(opID, func(ctx context.Context) (proto.Message, error) {
+	go m.runWork(opID, func(ctx context.Context, _ Progress) (proto.Message, error) {
 		return badMsg, nil
 	})
 

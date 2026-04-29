@@ -21,8 +21,28 @@ import (
 	db "github.com/dashkan/pivox/internal/db/generated"
 )
 
-// WorkFunc performs the actual work for an operation.
-type WorkFunc func(ctx context.Context) (proto.Message, error)
+// WorkFunc performs the actual work for an operation. The supplied
+// `progress` reports phase transitions back to the operation
+// metadata so polling clients can observe state. Progress reporting
+// is best-effort; the Update method swallows DB errors and never
+// returns one (a metadata write failure must not abort the work).
+type WorkFunc func(ctx context.Context, progress Progress) (proto.Message, error)
+
+// Progress is the phase-reporting handle passed to a WorkFunc. It
+// captures the operation ID so callers don't have to thread it
+// manually. Implementations are safe to call from any goroutine.
+type Progress interface {
+	Update(ctx context.Context, metadata proto.Message)
+}
+
+type managerProgress struct {
+	m    *Manager
+	opID uuid.UUID
+}
+
+func (p *managerProgress) Update(ctx context.Context, metadata proto.Message) {
+	p.m.UpdateMetadata(ctx, p.opID, metadata)
+}
 
 // Manager manages long-running operations.
 type Manager struct {
@@ -42,8 +62,49 @@ func NewManager(queries db.Querier, logger *slog.Logger) *Manager {
 	}
 }
 
-// CreateAndRun creates a new operation and runs the work function asynchronously.
+// UpdateMetadata replaces the metadata blob on an in-flight
+// operation. Used by multi-phase work functions to surface progress
+// (e.g. DeleteOrganization transitioning VALIDATING →
+// CANCELLING_OPERATIONS → MARKING_DELETED) so polling clients see
+// the current phase. Marshal errors are logged but not returned —
+// progress reporting is best-effort and must not abort the work.
+func (m *Manager) UpdateMetadata(ctx context.Context, opID uuid.UUID, metadata proto.Message) {
+	metaJSON, err := marshalAny(metadata)
+	if err != nil {
+		m.logger.Error("lro: marshal metadata for update", "op", opID, "error", err)
+		return
+	}
+	if err := m.queries.UpdateOperationMetadata(ctx, db.UpdateOperationMetadataParams{
+		ID:       opID,
+		Metadata: metaJSON,
+	}); err != nil {
+		m.logger.Error("lro: update operation metadata", "op", opID, "error", err)
+	}
+}
+
+// CreateAndRun creates a new operation and runs the work function
+// asynchronously. The operation is unscoped — operations.org_id is
+// NULL — so it isn't cancellable via DeleteOrganization's
+// CANCELLING_OPERATIONS phase. Use CreateAndRunForOrg when the LRO
+// targets an organization and should be cancelled if the org is
+// soft-deleted.
 func (m *Manager) CreateAndRun(ctx context.Context, prefix string, metadata proto.Message, work WorkFunc) (*longrunningpb.Operation, error) {
+	return m.createAndRun(ctx, prefix, pgtype.UUID{}, metadata, work)
+}
+
+// CreateAndRunForOrg is the org-scoped variant: the operation row's
+// org_id is set to `orgID`, so DeleteOrganization's
+// CancelRunningOpsForOrg will mark this LRO done with codes.Cancelled
+// when the org enters DELETE_REQUESTED. Use this for any LRO whose
+// progress would mutate org-scoped state (asset imports, domain
+// verifications, gateway upgrades). DO NOT use it for the
+// DeleteOrganization LRO itself — a self-pointing org_id would
+// cause the cancellation phase to cancel its own work.
+func (m *Manager) CreateAndRunForOrg(ctx context.Context, prefix string, orgID uuid.UUID, metadata proto.Message, work WorkFunc) (*longrunningpb.Operation, error) {
+	return m.createAndRun(ctx, prefix, pgtype.UUID{Bytes: orgID, Valid: true}, metadata, work)
+}
+
+func (m *Manager) createAndRun(ctx context.Context, prefix string, orgID pgtype.UUID, metadata proto.Message, work WorkFunc) (*longrunningpb.Operation, error) {
 	opID := uuid.New()
 
 	var metaJSON json.RawMessage
@@ -59,6 +120,7 @@ func (m *Manager) CreateAndRun(ctx context.Context, prefix string, metadata prot
 		ID:       opID,
 		Prefix:   prefix,
 		Metadata: metaJSON,
+		OrgID:    orgID,
 	})
 	if err != nil {
 		return nil, apierr.Internal("failed to create operation")
@@ -72,7 +134,8 @@ func (m *Manager) CreateAndRun(ctx context.Context, prefix string, metadata prot
 func (m *Manager) runWork(opID uuid.UUID, work WorkFunc) {
 	ctx := context.Background()
 
-	result, err := work(ctx)
+	progress := &managerProgress{m: m, opID: opID}
+	result, err := work(ctx, progress)
 	if err != nil {
 		errCode := int32(codes.Internal)
 		errMsg := err.Error()

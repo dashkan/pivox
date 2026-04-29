@@ -1,6 +1,11 @@
+-- CreateOperation creates a new operation row. `org_id` is the
+-- optional reverse pointer that links the LRO to its target org
+-- (NULL for ops that aren't org-scoped or where the org isn't
+-- known at create time, including DeleteOrganization which must
+-- not self-cancel).
 -- name: CreateOperation :one
-INSERT INTO operations (id, prefix, metadata, created_by)
-VALUES ($1, $2, $3, $4)
+INSERT INTO operations (id, prefix, metadata, created_by, org_id)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 
 -- name: GetOperation :one

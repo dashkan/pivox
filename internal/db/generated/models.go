@@ -1036,6 +1036,7 @@ type Operation struct {
 	Result       []byte      `json:"result"`
 	ErrorCode    pgtype.Int4 `json:"error_code"`
 	ErrorMessage pgtype.Text `json:"error_message"`
+	OrgID        pgtype.UUID `json:"org_id"`
 	CreatedBy    string      `json:"created_by"`
 	CreateTime   time.Time   `json:"create_time"`
 	UpdateTime   time.Time   `json:"update_time"`

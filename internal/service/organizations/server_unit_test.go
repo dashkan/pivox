@@ -852,7 +852,7 @@ func TestUnit_NewOrganizationsServer_Constructor(t *testing.T) {
 	auth := new(mockAuthService)
 
 	// NewOrganizationsServer with nil pool exercises the constructor code path.
-	srv := NewOrganizationsServer(nil, mockQ, auth, nil, nil, nil, nil)
+	srv := NewOrganizationsServer(nil, mockQ, auth, nil, nil, nil, nil, nil)
 
 	require.NotNil(t, srv)
 	assert.NotNil(t, srv.filter)

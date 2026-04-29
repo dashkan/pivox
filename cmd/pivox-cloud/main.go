@@ -277,7 +277,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	longrunningpb.RegisterOperationsServer(grpcServer, operations.NewOperationsServer(lroManager))
 
 	apiv1.RegisterSpacesServer(grpcServer, spaces.NewSpacesServer(pool, pool, queries, appCodec, permResolver, callerIdentity))
-	apiv1.RegisterOrganizationsServer(grpcServer, organizations.NewOrganizationsServer(pool, queries, authSvc, appCodec, server.AuthenticatedUID, permResolver, callerIdentity))
+	apiv1.RegisterOrganizationsServer(grpcServer, organizations.NewOrganizationsServer(pool, queries, authSvc, appCodec, server.AuthenticatedUID, permResolver, callerIdentity, lroManager))
 	apiv1.RegisterTagKeysServer(grpcServer, tags.NewTagKeysServer(pool, queries, appCodec))
 	apiv1.RegisterTagValuesServer(grpcServer, tags.NewTagValuesServer(pool, queries, appCodec))
 	apiv1.RegisterTagBindingsServer(grpcServer, tags.NewTagBindingsServer(pool, queries, appCodec))

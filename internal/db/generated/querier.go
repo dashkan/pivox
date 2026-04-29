@@ -13,6 +13,23 @@ import (
 
 type Querier interface {
 	CancelOperation(ctx context.Context, id uuid.UUID) (Operation, error)
+	// CancelRunningOpsForOrg marks all running operations linked to the
+	// given org (via the operations.org_id reverse pointer) as
+	// cancelled. Used by DeleteOrganization's CANCELLING_OPERATIONS
+	// phase to interrupt in-flight org-scoped LROs before the cascade
+	// deletes their target rows.
+	//
+	// Scope: this matches operations whose creator passed `org_id` to
+	// Manager.CreateAndRun. Today the only org-targeting LROs in code
+	// are DeleteOrganization itself (which intentionally passes NULL
+	// to avoid self-cancellation) and UndeleteOrganization (also NULL
+	// so concurrent undeletes don't kill each other mid-flight). Future
+	// LROs (asset imports, domain verifications, gateway upgrades,
+	// etc.) populate org_id when implemented and will be cancellable
+	// through this query without further changes.
+	//
+	// error_code = 1 is gRPC codes.Cancelled.
+	CancelRunningOpsForOrg(ctx context.Context, orgID pgtype.UUID) error
 	// Transitions a pending session to approved and stores the minted custom token.
 	// Only unexpired pending sessions match — a no-row result means the session
 	// was never created, already completed, or has expired.
@@ -60,6 +77,11 @@ type Querier interface {
 	CreateInlineArtifactVersion(ctx context.Context, arg CreateInlineArtifactVersionParams) (AiArtifactVersion, error)
 	CreateLineItem(ctx context.Context, arg CreateLineItemParams) (AssetRequestLineItem, error)
 	CreateMessage(ctx context.Context, arg CreateMessageParams) (AiMessage, error)
+	// CreateOperation creates a new operation row. `org_id` is the
+	// optional reverse pointer that links the LRO to its target org
+	// (NULL for ops that aren't org-scoped or where the org isn't
+	// known at create time, including DeleteOrganization which must
+	// not self-cancel).
 	CreateOperation(ctx context.Context, arg CreateOperationParams) (Operation, error)
 	// Inserts an org-level role binding and returns the server-generated
 	// etag + timestamps so the handler can build the Member proto
@@ -173,6 +195,12 @@ type Querier interface {
 	GetOrgMember(ctx context.Context, arg GetOrgMemberParams) (GetOrgMemberRow, error)
 	GetOrganization(ctx context.Context, id uuid.UUID) (Organization, error)
 	GetOrganizationByName(ctx context.Context, name string) (Organization, error)
+	// GetOrganizationByNameForGate looks up an org by slug regardless of
+	// soft-delete state. Used by the permission interceptor so callers
+	// can still target a soft-deleted org for reads and Undelete; the
+	// gate enforces FAILED_PRECONDITION on mutating ops against a
+	// DELETE_REQUESTED org.
+	GetOrganizationByNameForGate(ctx context.Context, name string) (Organization, error)
 	// Looks up a permission by its string id (e.g. 'organizations.delete').
 	// Used by Iam.GetPermission and as a validity check on caller-supplied
 	// permission strings in TestIamPermissions paths.
@@ -268,6 +296,11 @@ type Querier interface {
 	ListUsersByOrg(ctx context.Context, orgID uuid.UUID) ([]User, error)
 	LookupApiKeyByKeyString(ctx context.Context, keyString string) (ApiKey, error)
 	NextVersionNumber(ctx context.Context, assetID uuid.UUID) (int32, error)
+	// PurgeOrganization hard-deletes an org row. FK ON DELETE CASCADE
+	// removes spaces, members, domains, sso_configs, assets, requests,
+	// tags, api keys, and ai conversations transitively. Used by force=true
+	// DeleteOrganization and by the purge worker after grace expiry.
+	PurgeOrganization(ctx context.Context, id uuid.UUID) error
 	RotateRegistrationToken(ctx context.Context, arg RotateRegistrationTokenParams) (StorageGateway, error)
 	SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]Asset, error)
 	// Server-driven title write (the `:summarize` path). Does NOT flip
@@ -275,11 +308,20 @@ type Querier interface {
 	SetAutoTitle(ctx context.Context, arg SetAutoTitleParams) (AiConversation, error)
 	SoftDeleteApiKey(ctx context.Context, arg SoftDeleteApiKeyParams) (ApiKey, error)
 	SoftDeleteAsset(ctx context.Context, arg SoftDeleteAssetParams) error
+	// SoftDeleteOrganization transitions an ACTIVE org to DELETE_REQUESTED.
+	// Sets delete_time=now, purge_time=now+30 days, deleted_by=$2. Refuses
+	// to soft-delete an already-soft-deleted org (matches no rows).
+	// Returns the updated row.
+	SoftDeleteOrganization(ctx context.Context, arg SoftDeleteOrganizationParams) (Organization, error)
 	SoftDeleteSpace(ctx context.Context, arg SoftDeleteSpaceParams) (Space, error)
 	SoftDeleteUserMembership(ctx context.Context, arg SoftDeleteUserMembershipParams) error
 	SumTokensByConversation(ctx context.Context, conversationID uuid.UUID) (int64, error)
 	UndeleteApiKey(ctx context.Context, arg UndeleteApiKeyParams) (ApiKey, error)
 	UndeleteAsset(ctx context.Context, id uuid.UUID) error
+	// UndeleteOrganization restores a DELETE_REQUESTED org to ACTIVE,
+	// clearing the soft-delete fields. Refuses to undelete past the
+	// purge window (purge_time must still be in the future).
+	UndeleteOrganization(ctx context.Context, id uuid.UUID) (Organization, error)
 	UndeleteSpace(ctx context.Context, arg UndeleteSpaceParams) (Space, error)
 	UpdateApiKey(ctx context.Context, arg UpdateApiKeyParams) (ApiKey, error)
 	UpdateArtifactLatestVersion(ctx context.Context, arg UpdateArtifactLatestVersionParams) error

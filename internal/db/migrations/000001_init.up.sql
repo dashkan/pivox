@@ -53,6 +53,23 @@ CREATE TABLE operations (
     result      JSONB,
     error_code  INTEGER,
     error_message TEXT,
+    -- Optional reverse pointer to the org this LRO operates against,
+    -- set at CreateAndRun time when known. Used by
+    -- CancelRunningOpsForOrg in DeleteOrganization's
+    -- CANCELLING_OPERATIONS phase to interrupt in-flight org-scoped
+    -- LROs (asset imports, domain verifications, gateway upgrades,
+    -- etc.) before the cascade deletes their target rows.
+    --
+    -- ON DELETE SET NULL (not CASCADE) so the operations row survives
+    -- a force-path PurgeOrganization — losing its org reference but
+    -- keeping its result/error so the LRO that drove the purge can
+    -- still update its own row at completion.
+    --
+    -- NULL for ops that aren't org-scoped or where the org isn't
+    -- known at create time (e.g. CreateOrganization). NULL also for
+    -- DeleteOrganization itself: a self-pointing org_id would cause
+    -- the LRO to cancel itself in the CANCELLING_OPERATIONS phase.
+    org_id      UUID REFERENCES organizations(id) ON DELETE SET NULL,
     created_by  TEXT NOT NULL DEFAULT '',
     create_time TIMESTAMPTZ NOT NULL DEFAULT now(),
     update_time TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -61,6 +78,9 @@ CREATE TABLE operations (
 CREATE INDEX idx_operations_pending ON operations (create_time) WHERE done = false;
 CREATE INDEX idx_operations_expire ON operations (expire_time) WHERE done = true;
 CREATE INDEX idx_operations_prefix ON operations (prefix, create_time DESC);
+-- Partial index supports CancelRunningOpsForOrg: only the running
+-- subset is queried, and only for ops with a populated org_id.
+CREATE INDEX idx_operations_org_pending ON operations (org_id) WHERE done = false AND org_id IS NOT NULL;
 
 -- ============================================================================
 -- organizations

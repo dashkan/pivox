@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -248,7 +249,12 @@ func (g *permissionGate) checkOrgScope(
 	scope ScopeRef,
 	callerID uuid.UUID,
 ) (context.Context, error) {
-	org, err := g.queries.GetOrganizationByName(ctx, scope.Slug)
+	// Use the gate-aware lookup so soft-deleted orgs are visible:
+	// reads still work during the grace window, and Undelete needs
+	// to find the row. The state check below enforces the
+	// FAILED_PRECONDITION semantics for mutations on a
+	// DELETE_REQUESTED org.
+	org, err := g.queries.GetOrganizationByNameForGate(ctx, scope.Slug)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apierr.NotFound("organization", scope.Slug)
@@ -264,8 +270,69 @@ func (g *permissionGate) checkOrgScope(
 	if !allowed {
 		return nil, apierr.PermissionDenied(fmt.Sprintf("caller lacks %q on organization %q", entry.Permission, scope.Slug))
 	}
+	if err := enforceSoftDeleteGate(org.State, entry.Permission, scope.Slug); err != nil {
+		return nil, err
+	}
 	resolved := &ResolvedOrg{ID: org.ID, Slug: scope.Slug, Row: org}
 	return context.WithValue(ctx, resolvedOrgKey{}, resolved), nil
+}
+
+// enforceSoftDeleteGate returns FAILED_PRECONDITION when the caller
+// is mutating a soft-deleted org. Reads pass through (org metadata
+// remains visible during the grace window) and `organizations.delete`
+// passes through too — that permission gates UndeleteOrganization,
+// which is the only mutating op valid against a DELETE_REQUESTED
+// row. Other writes are blocked until the org is restored.
+//
+// This is the RPC-boundary "soft-delete gate" called for in the
+// IAM/lifecycle roadmap: the gate lives in the interceptor so every
+// gated handler inherits the protection without per-handler checks.
+func enforceSoftDeleteGate(state db.ResourceState, perm, orgSlug string) error {
+	if state != db.ResourceStateDELETEREQUESTED {
+		return nil
+	}
+	if isReadPermission(perm) || perm == permission.OrganizationsDelete {
+		return nil
+	}
+	return apierr.FailedPrecondition(
+		fmt.Sprintf("organization %q is in DELETE_REQUESTED state; restore it via UndeleteOrganization or wait for purge before mutating", orgSlug))
+}
+
+// isReadPermission reports whether the permission ID is a read-only
+// operation. Convention: every read perm in the catalog ends with
+// `.read`. Workflow verbs (transferOwnership, fulfill, deliver, etc.)
+// and CRUD writes use other suffixes.
+func isReadPermission(perm string) bool {
+	return strings.HasSuffix(perm, ".read")
+}
+
+// --- Test-only exports ---
+//
+// These helpers expose internals for tests in OTHER packages
+// (e.g. service/organizations lifecycle tests that simulate a
+// post-gate context). Same-package tests don't need them; they
+// access checkOrgScope/enforceSoftDeleteGate/resolvedOrgKey
+// directly. We can't put these in a _test.go file because Go's
+// test compilation makes _test.go symbols invisible across
+// packages. The cost is three exported functions in the
+// production binary, all with `ForTest` suffixes — visible but
+// uncallable in the wild without obvious intent.
+
+// EnforceSoftDeleteGateForTest is the test-only export of the
+// soft-delete gate logic.
+func EnforceSoftDeleteGateForTest(state db.ResourceState, perm, orgSlug string) error {
+	return enforceSoftDeleteGate(state, perm, orgSlug)
+}
+
+// WithResolvedOrgForTest injects a ResolvedOrg into ctx for
+// service-level tests that bypass the interceptor.
+func WithResolvedOrgForTest(ctx context.Context, org *ResolvedOrg) context.Context {
+	return context.WithValue(ctx, resolvedOrgKey{}, org)
+}
+
+// WithResolvedSpaceForTest is the space-scoped analogue.
+func WithResolvedSpaceForTest(ctx context.Context, space *ResolvedSpace) context.Context {
+	return context.WithValue(ctx, resolvedSpaceKey{}, space)
 }
 
 // checkSpaceScope handles space-scope: resolve org slug → org row,
@@ -280,7 +347,13 @@ func (g *permissionGate) checkSpaceScope(
 	scope ScopeRef,
 	callerID uuid.UUID,
 ) (context.Context, error) {
-	org, err := g.queries.GetOrganizationByName(ctx, scope.OrgSlug)
+	// Same soft-delete-aware lookup as the org-scope path so a
+	// space-scoped RPC against a soft-deleted parent org surfaces
+	// FAILED_PRECONDITION (mutating) or proceeds (reading), not
+	// NotFound. The soft-delete gate fires after HasPermission for
+	// symmetry with checkOrgScope — non-permitted callers get
+	// PermissionDenied and don't learn the org's state.
+	org, err := g.queries.GetOrganizationByNameForGate(ctx, scope.OrgSlug)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apierr.NotFound("organization", scope.OrgSlug)
@@ -303,6 +376,9 @@ func (g *permissionGate) checkSpaceScope(
 	}
 	if !allowed {
 		return nil, apierr.PermissionDenied(fmt.Sprintf("caller lacks %q on space %q/%q", entry.Permission, scope.OrgSlug, scope.Slug))
+	}
+	if err := enforceSoftDeleteGate(org.State, entry.Permission, scope.OrgSlug); err != nil {
+		return nil, err
 	}
 	resolvedOrg := &ResolvedOrg{ID: org.ID, Slug: scope.OrgSlug, Row: org}
 	resolvedSpace := &ResolvedSpace{ID: space.ID, Slug: scope.Slug, Row: space}

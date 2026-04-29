@@ -62,7 +62,7 @@ func recordingHandler(called *bool, captured *context.Context) grpc.UnaryHandler
 
 func TestPermissionInterceptor_AllowsWhenPermissionGranted(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	q.On("GetOrganizationByName", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
+	q.On("GetOrganizationByNameForGate", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
 	q.On("GetEffectiveOrgRoles", mock.Anything, db.GetEffectiveOrgRolesParams{
 		OrgID: testPermOrgID, FirebaseIdentityID: testPermCallerID,
 	}).Return([]string{permission.RoleAdmin}, nil)
@@ -119,7 +119,7 @@ func TestPermissionInterceptor_UnregisteredMethodIsInternal(t *testing.T) {
 
 func TestPermissionInterceptor_DeniesWhenPermissionMissing(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	q.On("GetOrganizationByName", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
+	q.On("GetOrganizationByNameForGate", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
 	q.On("GetEffectiveOrgRoles", mock.Anything, mock.Anything).Return([]string{permission.RoleViewer}, nil)
 
 	registry := Registry{
@@ -192,7 +192,7 @@ func TestPermissionInterceptor_ExtractorErrorPropagates(t *testing.T) {
 
 func TestPermissionInterceptor_OrgNotFoundReturns404(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	q.On("GetOrganizationByName", mock.Anything, "missing").Return(db.Organization{}, pgx.ErrNoRows)
+	q.On("GetOrganizationByNameForGate", mock.Anything, "missing").Return(db.Organization{}, pgx.ErrNoRows)
 
 	registry := Registry{
 		"/svc/UpdateOrg": {Permission: permission.OrganizationsUpdate, Extract: orgScopeFromRequest},
@@ -216,7 +216,7 @@ func TestPermissionInterceptor_OrgNotFoundReturns404(t *testing.T) {
 
 func TestPermissionInterceptor_OrgLookupDBErrorIsInternal(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	q.On("GetOrganizationByName", mock.Anything, testPermOrgSlug).Return(db.Organization{}, errors.New("db down"))
+	q.On("GetOrganizationByNameForGate", mock.Anything, testPermOrgSlug).Return(db.Organization{}, errors.New("db down"))
 
 	registry := Registry{
 		"/svc/UpdateOrg": {Permission: permission.OrganizationsUpdate, Extract: orgScopeFromRequest},
@@ -240,7 +240,7 @@ func TestPermissionInterceptor_OrgLookupDBErrorIsInternal(t *testing.T) {
 
 func TestPermissionInterceptor_ResolverErrorIsInternal(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	q.On("GetOrganizationByName", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
+	q.On("GetOrganizationByNameForGate", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
 	q.On("GetEffectiveOrgRoles", mock.Anything, mock.Anything).Return([]string(nil), errors.New("db transient"))
 
 	registry := Registry{
@@ -305,7 +305,7 @@ func spaceScopeFromRequest(req any) (ScopeRef, error) {
 
 func TestPermissionInterceptor_SpaceScope_AllowsWhenPermissionGranted(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	q.On("GetOrganizationByName", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
+	q.On("GetOrganizationByNameForGate", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
 	q.On("GetSpaceByName", mock.Anything, db.GetSpaceByNameParams{
 		OrgID: testPermOrgID, Name: testPermSpaceSlug,
 	}).Return(testPermSpaceRow, nil)
@@ -347,7 +347,7 @@ func TestPermissionInterceptor_SpaceScope_AllowsWhenPermissionGranted(t *testing
 
 func TestPermissionInterceptor_SpaceScope_DeniesWhenPermissionMissing(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	q.On("GetOrganizationByName", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
+	q.On("GetOrganizationByNameForGate", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
 	q.On("GetSpaceByName", mock.Anything, mock.Anything).Return(testPermSpaceRow, nil)
 	q.On("GetSpaceParentOrg", mock.Anything, testPermSpaceID).Return(testPermOrgID, nil)
 	q.On("GetEffectiveSpaceRoles", mock.Anything, mock.Anything).Return([]string{permission.RoleViewer}, nil)
@@ -377,7 +377,7 @@ func TestPermissionInterceptor_SpaceScope_OrgInheritanceGrants(t *testing.T) {
 	// Space-level role list is empty; org-level admin role inherits
 	// down and grants SpacesUpdate via the resolver's union.
 	q := new(mocks.MockQuerier)
-	q.On("GetOrganizationByName", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
+	q.On("GetOrganizationByNameForGate", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
 	q.On("GetSpaceByName", mock.Anything, mock.Anything).Return(testPermSpaceRow, nil)
 	q.On("GetSpaceParentOrg", mock.Anything, testPermSpaceID).Return(testPermOrgID, nil)
 	q.On("GetEffectiveSpaceRoles", mock.Anything, mock.Anything).Return([]string(nil), nil)
@@ -406,7 +406,7 @@ func TestPermissionInterceptor_SpaceScope_OrgNotFoundReturns404(t *testing.T) {
 	// the org lookup with NotFound — same code path as the org-scope
 	// 404, just on the first of two slug resolutions.
 	q := new(mocks.MockQuerier)
-	q.On("GetOrganizationByName", mock.Anything, "ghost-org").Return(db.Organization{}, pgx.ErrNoRows)
+	q.On("GetOrganizationByNameForGate", mock.Anything, "ghost-org").Return(db.Organization{}, pgx.ErrNoRows)
 
 	registry := Registry{
 		"/svc/GetSpace": {Permission: permission.SpacesRead, Extract: spaceScopeFromRequest},
@@ -430,7 +430,7 @@ func TestPermissionInterceptor_SpaceScope_OrgNotFoundReturns404(t *testing.T) {
 
 func TestPermissionInterceptor_SpaceScope_SpaceNotFoundReturns404(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	q.On("GetOrganizationByName", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
+	q.On("GetOrganizationByNameForGate", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
 	q.On("GetSpaceByName", mock.Anything, mock.Anything).Return(db.Space{}, pgx.ErrNoRows)
 
 	registry := Registry{
@@ -461,7 +461,7 @@ func TestPermissionInterceptor_EmptySlugFromExtractorReturns404(t *testing.T) {
 	// org lookup. Per-extractor validation is the right layer for
 	// shape checks; this test pins the fallback behavior.
 	q := new(mocks.MockQuerier)
-	q.On("GetOrganizationByName", mock.Anything, "").Return(db.Organization{}, pgx.ErrNoRows)
+	q.On("GetOrganizationByNameForGate", mock.Anything, "").Return(db.Organization{}, pgx.ErrNoRows)
 
 	registry := Registry{
 		"/svc/UpdateOrg": {
@@ -496,7 +496,7 @@ func TestPermissionInterceptor_ResolvedOrgSlugMatchesRequest(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	rowWithDifferentName := testPermOrgRow
 	rowWithDifferentName.Name = "renamed-by-some-future-migration"
-	q.On("GetOrganizationByName", mock.Anything, testPermOrgSlug).Return(rowWithDifferentName, nil)
+	q.On("GetOrganizationByNameForGate", mock.Anything, testPermOrgSlug).Return(rowWithDifferentName, nil)
 	q.On("GetEffectiveOrgRoles", mock.Anything, mock.Anything).Return([]string{permission.RoleAdmin}, nil)
 
 	registry := Registry{
@@ -518,6 +518,91 @@ func TestPermissionInterceptor_ResolvedOrgSlugMatchesRequest(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, testPermOrgSlug, got.Slug,
 		"ResolvedOrg.Slug must echo the slug used for the permission check, not whatever happens to be in org.Name")
+}
+
+// --- Soft-delete gate at the interceptor boundary ---
+
+func TestPermissionInterceptor_SoftDeletedOrg_AllowsReads(t *testing.T) {
+	// A read against a soft-deleted org passes through the gate so
+	// the caller can still inspect metadata during the grace window.
+	q := new(mocks.MockQuerier)
+	deleted := testPermOrgRow
+	deleted.State = db.ResourceStateDELETEREQUESTED
+	q.On("GetOrganizationByNameForGate", mock.Anything, testPermOrgSlug).Return(deleted, nil)
+	q.On("GetEffectiveOrgRoles", mock.Anything, mock.Anything).Return([]string{permission.RoleViewer}, nil)
+
+	registry := Registry{
+		"/svc/GetOrg": {Permission: permission.OrganizationsRead, Extract: orgScopeFromRequest},
+	}
+	resolver := permission.NewResolver(q)
+	interceptor := PermissionInterceptor(registry, nil, q, resolver, stubIdentity(testPermCallerID, nil))
+
+	called := false
+	var captured context.Context
+	_, err := interceptor(
+		context.Background(), testPermOrgSlug,
+		&grpc.UnaryServerInfo{FullMethod: "/svc/GetOrg"},
+		recordingHandler(&called, &captured),
+	)
+	require.NoError(t, err)
+	assert.True(t, called)
+	q.AssertExpectations(t)
+}
+
+func TestPermissionInterceptor_SoftDeletedOrg_AllowsOrgDeletePerm(t *testing.T) {
+	// `organizations.delete` gates BOTH DeleteOrganization (which
+	// will FAILED_PRECONDITION on a re-delete) and
+	// UndeleteOrganization (the recovery path). Both must reach
+	// the handler so it can dispatch correctly.
+	q := new(mocks.MockQuerier)
+	deleted := testPermOrgRow
+	deleted.State = db.ResourceStateDELETEREQUESTED
+	q.On("GetOrganizationByNameForGate", mock.Anything, testPermOrgSlug).Return(deleted, nil)
+	q.On("GetEffectiveOrgRoles", mock.Anything, mock.Anything).Return([]string{permission.RoleOwner}, nil)
+
+	registry := Registry{
+		"/svc/UndeleteOrg": {Permission: permission.OrganizationsDelete, Extract: orgScopeFromRequest},
+	}
+	resolver := permission.NewResolver(q)
+	interceptor := PermissionInterceptor(registry, nil, q, resolver, stubIdentity(testPermCallerID, nil))
+
+	called := false
+	var captured context.Context
+	_, err := interceptor(
+		context.Background(), testPermOrgSlug,
+		&grpc.UnaryServerInfo{FullMethod: "/svc/UndeleteOrg"},
+		recordingHandler(&called, &captured),
+	)
+	require.NoError(t, err)
+	assert.True(t, called)
+}
+
+func TestPermissionInterceptor_SoftDeletedOrg_BlocksMutations(t *testing.T) {
+	// Mutating ops on a DELETE_REQUESTED org return
+	// FAILED_PRECONDITION at the interceptor boundary, before the
+	// handler runs. This is the soft-delete gate.
+	q := new(mocks.MockQuerier)
+	deleted := testPermOrgRow
+	deleted.State = db.ResourceStateDELETEREQUESTED
+	q.On("GetOrganizationByNameForGate", mock.Anything, testPermOrgSlug).Return(deleted, nil)
+	q.On("GetEffectiveOrgRoles", mock.Anything, mock.Anything).Return([]string{permission.RoleAdmin}, nil)
+
+	registry := Registry{
+		"/svc/UpdateOrg": {Permission: permission.OrganizationsUpdate, Extract: orgScopeFromRequest},
+	}
+	resolver := permission.NewResolver(q)
+	interceptor := PermissionInterceptor(registry, nil, q, resolver, stubIdentity(testPermCallerID, nil))
+
+	called := false
+	var captured context.Context
+	_, err := interceptor(
+		context.Background(), testPermOrgSlug,
+		&grpc.UnaryServerInfo{FullMethod: "/svc/UpdateOrg"},
+		recordingHandler(&called, &captured),
+	)
+	require.Error(t, err)
+	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+	assert.False(t, called, "soft-delete gate must run before the handler")
 }
 
 // --- Stream interceptor: default-deny for unregistered streaming methods ---
@@ -596,7 +681,7 @@ func (s *permTestStream) RecvMsg(m any) error {
 
 func TestPermissionStreamInterceptor_FirstMsgGateAllows(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	q.On("GetOrganizationByName", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
+	q.On("GetOrganizationByNameForGate", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
 	q.On("GetEffectiveOrgRoles", mock.Anything, mock.Anything).Return([]string{permission.RoleEditor}, nil)
 
 	registry := Registry{
@@ -637,7 +722,7 @@ func TestPermissionStreamInterceptor_FirstMsgGateDenies(t *testing.T) {
 	// Viewer role lacks ai.chat.stream → first RecvMsg surfaces
 	// PermissionDenied; handler propagates it to the client.
 	q := new(mocks.MockQuerier)
-	q.On("GetOrganizationByName", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
+	q.On("GetOrganizationByNameForGate", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
 	q.On("GetEffectiveOrgRoles", mock.Anything, mock.Anything).Return([]string{permission.RoleViewer}, nil)
 
 	registry := Registry{
@@ -699,7 +784,7 @@ func TestPermissionStreamInterceptor_RealProtoExtractor(t *testing.T) {
 	require.Truef(t, ok, "registry must contain %s", method)
 
 	q := new(mocks.MockQuerier)
-	q.On("GetOrganizationByName", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
+	q.On("GetOrganizationByNameForGate", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
 	q.On("GetEffectiveOrgRoles", mock.Anything, mock.Anything).Return([]string{permission.RoleEditor}, nil)
 
 	resolver := permission.NewResolver(q)
@@ -736,7 +821,7 @@ func TestPermissionStreamInterceptor_GateRunsOnceForMultipleRecvMsg(t *testing.T
 	// extractor and the resolver. Pin this so subsequent messages
 	// stay in the same scope without paying for re-resolution.
 	q := new(mocks.MockQuerier)
-	q.On("GetOrganizationByName", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil).Once()
+	q.On("GetOrganizationByNameForGate", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil).Once()
 	q.On("GetEffectiveOrgRoles", mock.Anything, mock.Anything).Return([]string{permission.RoleAdmin}, nil).Once()
 
 	extractCalls := 0

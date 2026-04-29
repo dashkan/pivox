@@ -136,6 +136,31 @@ func (m *MockQuerier) GetOrganizationByName(ctx context.Context, name string) (d
 	return args.Get(0).(db.Organization), args.Error(1)
 }
 
+func (m *MockQuerier) GetOrganizationByNameForGate(ctx context.Context, name string) (db.Organization, error) {
+	args := m.Called(ctx, name)
+	return args.Get(0).(db.Organization), args.Error(1)
+}
+
+func (m *MockQuerier) SoftDeleteOrganization(ctx context.Context, arg db.SoftDeleteOrganizationParams) (db.Organization, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.Organization), args.Error(1)
+}
+
+func (m *MockQuerier) UndeleteOrganization(ctx context.Context, id uuid.UUID) (db.Organization, error) {
+	args := m.Called(ctx, id)
+	return args.Get(0).(db.Organization), args.Error(1)
+}
+
+func (m *MockQuerier) PurgeOrganization(ctx context.Context, id uuid.UUID) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
+func (m *MockQuerier) CancelRunningOpsForOrg(ctx context.Context, orgID pgtype.UUID) error {
+	args := m.Called(ctx, orgID)
+	return args.Error(0)
+}
+
 // --- Users (per-org membership) ---
 
 func (m *MockQuerier) CreateUserMembership(ctx context.Context, arg db.CreateUserMembershipParams) (db.User, error) {
