@@ -12,7 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
+	"github.com/dashkan/pivox/internal/permission"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	"github.com/dashkan/pivox/internal/server"
@@ -57,15 +59,11 @@ func TestE2E_DeleteUser_SoleOwnerBlocked(t *testing.T) {
 }
 
 // TestE2E_DeleteUser_UnblockViaTransferOwnership covers recovery
-// path 1: founder promotes successor to owner via TransferOwnership,
-// then the new owner (NOT the demoted founder) executes DeleteUser
-// against the founder's user. After demotion the founder is admin,
-// and admin doesn't carry `users.delete` — the destructive verb is
-// owner-only by design. So self-delete-via-transfer is structurally
-// "transfer THEN have the new owner remove you", not "transfer then
-// self-delete". This test pins that path; if the permission matrix
-// ever grants users.delete to admin, the assertion shape needs to
-// be revisited.
+// path 1: founder transfers ownership to successor, becoming admin.
+// Founder then self-deletes — which works because users.deleteSelf
+// is granted to all roles, not just owner. (Pre-users.deleteSelf
+// this required the new owner to delete the founder; the
+// universally-granted self-delete makes the recovery flow direct.)
 func TestE2E_DeleteUser_UnblockViaTransferOwnership(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
@@ -83,13 +81,9 @@ func TestE2E_DeleteUser_UnblockViaTransferOwnership(t *testing.T) {
 	orgID := h.LookupOrgID(t, "transfer-org")
 
 	// Step 2: seed a successor member as Admin (via direct DB; the
-	// invitation flow isn't required for this test scope). Capture
-	// the founder's per-org user uuid by listing org_members — the
-	// founder's user row was created by CreateOrganization but its
-	// id wasn't returned in the proto response.
+	// invitation flow isn't required for this test scope).
 	successor := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "successor"})
 	successorUserID := h.SeedMembership(t, orgID, successor, grpcharness.RoleAdmin)
-	founderUserID := h.LookupOrgUserID(t, orgID, founder.FirebaseIdentityID)
 
 	// Step 3: confirm DeleteUser still blocks before the transfer.
 	op, err := iamClient.DeleteUser(ctx, &iampb.DeleteUserRequest{
@@ -107,15 +101,53 @@ func TestE2E_DeleteUser_UnblockViaTransferOwnership(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Step 5: switch to the new owner; they delete the demoted
-	// founder's user (the founder is now admin, no longer sole
-	// owner of any org, so the sole-owner check passes).
-	h.SetCaller(successor)
+	// Step 5: founder (now admin) self-deletes — users.deleteSelf
+	// is universal so admin can take this destructive-against-self
+	// action without an owner intermediary.
 	op2, err := iamClient.DeleteUser(ctx, &iampb.DeleteUserRequest{
-		Name: "organizations/transfer-org/users/" + founderUserID.String(),
+		Name: "organizations/transfer-org/users/me",
 	})
-	require.NoError(t, err, "post-transfer DeleteUser by new owner must succeed")
-	waitOp(t, h, op2, "post-transfer DeleteUser")
+	require.NoError(t, err, "post-transfer self-delete by demoted founder must succeed")
+	waitOp(t, h, op2, "post-transfer self-delete")
+}
+
+// TestE2E_DeleteUser_AdminCannotDeleteOthers pins the in-handler
+// users.delete bump: even with users.deleteSelf granted, the handler
+// rejects DeleteUser when the target is a different user and the
+// caller doesn't have users.delete (owner-only). Without this,
+// self-delete granted to all roles would also expose deleting
+// arbitrary other users to admins.
+func TestE2E_DeleteUser_AdminCannotDeleteOthers(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	h := newIamHarness(t)
+	orgClient := apiv1.NewOrganizationsClient(h.Conn())
+	iamClient := iampb.NewIamClient(h.Conn())
+	ctx := context.Background()
+
+	// Owner creates the org.
+	owner := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "owner"})
+	h.SetCaller(owner)
+	createOrg(t, orgClient, "two-user-org", "Two User Org")
+	orgID := h.LookupOrgID(t, "two-user-org")
+
+	// Add an admin and a target user. Try to have the admin delete
+	// the target — must fail with PermissionDenied.
+	admin := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "admin"})
+	h.SeedMembership(t, orgID, admin, grpcharness.RoleAdmin)
+	target := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "target"})
+	targetUserID := h.SeedMembership(t, orgID, target, grpcharness.RoleViewer)
+
+	h.SetCaller(admin)
+	_, err := iamClient.DeleteUser(ctx, &iampb.DeleteUserRequest{
+		Name: "organizations/two-user-org/users/" + targetUserID.String(),
+	})
+	require.Error(t, err)
+	st, _ := status.FromError(err)
+	assert.Equal(t, codes.PermissionDenied, st.Code(),
+		"admin without users.delete must not delete other users")
 }
 
 // TestE2E_DeleteUser_UnblockViaDeleteOrg covers recovery path 2:
@@ -165,6 +197,7 @@ func newIamHarness(t *testing.T) *grpcharness.Harness {
 		))
 		iampb.RegisterIamServer(s, iam.NewIamServer(
 			h.Queries, h.Auth, callerIdentity, h.LROManager,
+			permission.NewResolver(h.Queries),
 		))
 	}))
 }

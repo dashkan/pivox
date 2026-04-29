@@ -285,13 +285,15 @@ func (g *permissionGate) checkOrgScope(
 //   - organizations.delete gates UndeleteOrganization, the recovery
 //     path. Without this the only way out of DELETE_REQUESTED is
 //     waiting for purge.
-//   - users.delete gates DeleteUser. A user whose only org is
-//     soft-deleted needs a path to delete their own account; without
-//     this they're locked out of the cleanup verb until purge.
-//     The cascade is going to wipe everything anyway when purge
-//     fires; allowing self-delete just lets users opt into faster
-//     cleanup without contributing any new mutating effect to the
-//     org's state.
+//   - users.deleteSelf gates the self-delete entry path of
+//     DeleteUser. A user whose only org is soft-deleted needs a
+//     way to leave; without this they're locked out of cleanup
+//     until purge fires. The cascade wipes everything on purge
+//     anyway, so opt-in earlier cleanup of one's own account adds
+//     no new mutating effect against the org. (DeleteUser against
+//     a different user — the destructive-against-others path —
+//     escalates to users.delete via an in-handler bump and remains
+//     blocked here.)
 //
 // Other writes are blocked until the org is restored.
 //
@@ -304,7 +306,7 @@ func enforceSoftDeleteGate(state db.ResourceState, perm, orgSlug string) error {
 	}
 	if isReadPermission(perm) ||
 		perm == permission.OrganizationsDelete ||
-		perm == permission.UsersDelete {
+		perm == permission.UsersDeleteSelf {
 		return nil
 	}
 	return apierr.FailedPrecondition(

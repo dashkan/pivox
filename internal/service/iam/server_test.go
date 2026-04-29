@@ -30,7 +30,7 @@ var (
 )
 
 func newServer(q *mocks.MockQuerier) *IamServer {
-	return NewIamServer(q, nil, nil, nil)
+	return NewIamServer(q, nil, nil, nil, nil)
 }
 
 // ---------------------------------------------------------------------------

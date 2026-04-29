@@ -87,7 +87,13 @@ service Iam {
       response_type: "google.protobuf.Empty"
       metadata_type: "DeleteUserMetadata"
     };
-    option (pivox.permission.v1.required_permission) = "users.delete";
+    // users.deleteSelf is the entry-level perm so any role can delete
+    // themselves (target = "me"). The handler bumps to users.delete
+    // when the target is a different user — that's the owner-only
+    // destructive verb against arbitrary users. Two-tier because the
+    // proto annotation system is one-perm-per-method; the looser
+    // permission goes here, the stricter check is in-handler.
+    option (pivox.permission.v1.required_permission) = "users.deleteSelf";
   }
 
   // Gets a role by resource name. v1 returns only system roles

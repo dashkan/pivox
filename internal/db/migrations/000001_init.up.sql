@@ -803,7 +803,8 @@ INSERT INTO permissions (permission_id, display_name, description) VALUES
   ('tags.delete', 'Delete Tag', 'Delete tag keys, values, or bindings'),
   -- User management
   ('users.read', 'Read Users', 'View and list users'),
-  ('users.delete', 'Delete User', 'Delete a user globally (LRO; cascades memberships)'),
+  ('users.delete', 'Delete User', 'Delete another user globally (LRO; cascades memberships). Owner-only.'),
+  ('users.deleteSelf', 'Delete Self', 'Delete one''s own user account (LRO; cascades across all orgs). Granted to all roles.'),
   -- Group management
   ('groups.create', 'Create Group', 'Create new groups'),
   ('groups.read', 'Read Groups', 'View and list groups'),
