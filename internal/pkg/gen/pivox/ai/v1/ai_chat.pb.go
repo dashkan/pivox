@@ -22,6 +22,7 @@ package aiv1
 
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
+	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/permission/v1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	status "google.golang.org/genproto/googleapis/rpc/status"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -1937,7 +1938,7 @@ var File_pivox_ai_v1_ai_chat_proto protoreflect.FileDescriptor
 
 const file_pivox_ai_v1_ai_chat_proto_rawDesc = "" +
 	"\n" +
-	"\x19pivox/ai/v1/ai_chat.proto\x12\vpivox.ai.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x17google/rpc/status.proto\x1a\x1bpivox/ai/v1/artifacts.proto\x1a\x1fpivox/ai/v1/conversations.proto\x1a\x1apivox/ai/v1/messages.proto\"\xbb\x03\n" +
+	"\x19pivox/ai/v1/ai_chat.proto\x12\vpivox.ai.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x17google/rpc/status.proto\x1a\x1bpivox/ai/v1/artifacts.proto\x1a\x1fpivox/ai/v1/conversations.proto\x1a\x1apivox/ai/v1/messages.proto\x1a!pivox/permission/v1/options.proto\"\xbb\x03\n" +
 	"\x16GenerateContentRequest\x12V\n" +
 	"\x06parent\x18\x01 \x01(\tB>\xe0A\x02\xfaA2\n" +
 	"0cloudresourcemanager.googleapis.com/Organization\xbaH\x03\xc8\x01\x01R\x06parent\x12A\n" +
@@ -2069,25 +2070,25 @@ const file_pivox_ai_v1_ai_chat_proto_rawDesc = "" +
 	"\x06status\x18\x01 \x01(\v2\x12.google.rpc.StatusR\x06status\";\n" +
 	"\bDataPart\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x1b\n" +
-	"\tdata_json\x18\x02 \x01(\tR\bdataJson2\xbc\x14\n" +
-	"\x06AiChat\x12\x8c\x01\n" +
-	"\x0fGetConversation\x12#.pivox.ai.v1.GetConversationRequest\x1a\x19.pivox.ai.v1.Conversation\"9\xdaA\x04name\x82\xd3\xe4\x93\x02,\x12*/v1/{name=organizations/*/conversations/*}\x12\x9f\x01\n" +
-	"\x11ListConversations\x12%.pivox.ai.v1.ListConversationsRequest\x1a&.pivox.ai.v1.ListConversationsResponse\";\xdaA\x06parent\x82\xd3\xe4\x93\x02,\x12*/v1/{parent=organizations/*}/conversations\x12\xaf\x01\n" +
-	"\x12CreateConversation\x12&.pivox.ai.v1.CreateConversationRequest\x1a\x19.pivox.ai.v1.Conversation\"V\xdaA\x13parent,conversation\x82\xd3\xe4\x93\x02::\fconversation\"*/v1/{parent=organizations/*}/conversations\x12\xc1\x01\n" +
-	"\x12UpdateConversation\x12&.pivox.ai.v1.UpdateConversationRequest\x1a\x19.pivox.ai.v1.Conversation\"h\xdaA\x18conversation,update_mask\x82\xd3\xe4\x93\x02G:\fconversation27/v1/{conversation.name=organizations/*/conversations/*}\x12\x8f\x01\n" +
-	"\x12DeleteConversation\x12&.pivox.ai.v1.DeleteConversationRequest\x1a\x16.google.protobuf.Empty\"9\xdaA\x04name\x82\xd3\xe4\x93\x02,**/v1/{name=organizations/*/conversations/*}\x12\x88\x01\n" +
+	"\tdata_json\x18\x02 \x01(\tR\bdataJson2\xf4\x17\n" +
+	"\x06AiChat\x12\xa5\x01\n" +
+	"\x0fGetConversation\x12#.pivox.ai.v1.GetConversationRequest\x1a\x19.pivox.ai.v1.Conversation\"R\xdaA\x04name\x8a\xb5\x18\x15ai.conversations.read\x82\xd3\xe4\x93\x02,\x12*/v1/{name=organizations/*/conversations/*}\x12\xb8\x01\n" +
+	"\x11ListConversations\x12%.pivox.ai.v1.ListConversationsRequest\x1a&.pivox.ai.v1.ListConversationsResponse\"T\xdaA\x06parent\x8a\xb5\x18\x15ai.conversations.read\x82\xd3\xe4\x93\x02,\x12*/v1/{parent=organizations/*}/conversations\x12\xca\x01\n" +
+	"\x12CreateConversation\x12&.pivox.ai.v1.CreateConversationRequest\x1a\x19.pivox.ai.v1.Conversation\"q\xdaA\x13parent,conversation\x8a\xb5\x18\x17ai.conversations.create\x82\xd3\xe4\x93\x02::\fconversation\"*/v1/{parent=organizations/*}/conversations\x12\xf2\x01\n" +
+	"\x12UpdateConversation\x12&.pivox.ai.v1.UpdateConversationRequest\x1a\x19.pivox.ai.v1.Conversation\"\x98\x01\xdaA\x18conversation,update_mask\x8a\xb5\x18\x17ai.conversations.update\x9a\xb5\x18\x11conversation.name\x82\xd3\xe4\x93\x02G:\fconversation27/v1/{conversation.name=organizations/*/conversations/*}\x12\xaa\x01\n" +
+	"\x12DeleteConversation\x12&.pivox.ai.v1.DeleteConversationRequest\x1a\x16.google.protobuf.Empty\"T\xdaA\x04name\x8a\xb5\x18\x17ai.conversations.delete\x82\xd3\xe4\x93\x02,**/v1/{name=organizations/*/conversations/*}\x12\xa1\x01\n" +
 	"\n" +
-	"GetMessage\x12\x1e.pivox.ai.v1.GetMessageRequest\x1a\x14.pivox.ai.v1.Message\"D\xdaA\x04name\x82\xd3\xe4\x93\x027\x125/v1/{name=organizations/*/conversations/*/messages/*}\x12\x9b\x01\n" +
-	"\fListMessages\x12 .pivox.ai.v1.ListMessagesRequest\x1a!.pivox.ai.v1.ListMessagesResponse\"F\xdaA\x06parent\x82\xd3\xe4\x93\x027\x125/v1/{parent=organizations/*/conversations/*}/messages\x12\x8c\x01\n" +
-	"\vGetArtifact\x12\x1f.pivox.ai.v1.GetArtifactRequest\x1a\x15.pivox.ai.v1.Artifact\"E\xdaA\x04name\x82\xd3\xe4\x93\x028\x126/v1/{name=organizations/*/conversations/*/artifacts/*}\x12\x9f\x01\n" +
-	"\rListArtifacts\x12!.pivox.ai.v1.ListArtifactsRequest\x1a\".pivox.ai.v1.ListArtifactsResponse\"G\xdaA\x06parent\x82\xd3\xe4\x93\x028\x126/v1/{parent=organizations/*/conversations/*}/artifacts\x12\x93\x01\n" +
-	"\x0eDeleteArtifact\x12\".pivox.ai.v1.DeleteArtifactRequest\x1a\x16.google.protobuf.Empty\"E\xdaA\x04name\x82\xd3\xe4\x93\x028*6/v1/{name=organizations/*/conversations/*/artifacts/*}\x12\xac\x01\n" +
-	"\x12GetArtifactVersion\x12&.pivox.ai.v1.GetArtifactVersionRequest\x1a\x1c.pivox.ai.v1.ArtifactVersion\"P\xdaA\x04name\x82\xd3\xe4\x93\x02C\x12A/v1/{name=organizations/*/conversations/*/artifacts/*/versions/*}\x12\xbf\x01\n" +
-	"\x14ListArtifactVersions\x12(.pivox.ai.v1.ListArtifactVersionsRequest\x1a).pivox.ai.v1.ListArtifactVersionsResponse\"R\xdaA\x06parent\x82\xd3\xe4\x93\x02C\x12A/v1/{parent=organizations/*/conversations/*/artifacts/*}/versions\x12\xac\x01\n" +
-	"\x15DeleteArtifactVersion\x12).pivox.ai.v1.DeleteArtifactVersionRequest\x1a\x16.google.protobuf.Empty\"P\xdaA\x04name\x82\xd3\xe4\x93\x02C*A/v1/{name=organizations/*/conversations/*/artifacts/*/versions/*}\x12\x95\x01\n" +
-	"\x0fGenerateContent\x12#.pivox.ai.v1.GenerateContentRequest\x1a$.pivox.ai.v1.GenerateContentResponse\"7\x82\xd3\xe4\x93\x021:\x01*\",/v1/{parent=organizations/*}:generateContent\x12\x97\x01\n" +
-	"\x15StreamGenerateContent\x12#.pivox.ai.v1.GenerateContentRequest\x1a\x18.pivox.ai.v1.ServerEvent\"=\x82\xd3\xe4\x93\x027:\x01*\"2/v1/{parent=organizations/*}:streamGenerateContent0\x01\x12\xa5\x01\n" +
-	"\x15SummarizeConversation\x12).pivox.ai.v1.SummarizeConversationRequest\x1a\x19.pivox.ai.v1.Conversation\"F\xdaA\x04name\x82\xd3\xe4\x93\x029:\x01*\"4/v1/{name=organizations/*/conversations/*}:summarize\x1a\x0f\xcaA\fapi.pivox.ioB\xa8\x01\n" +
+	"GetMessage\x12\x1e.pivox.ai.v1.GetMessageRequest\x1a\x14.pivox.ai.v1.Message\"]\xdaA\x04name\x8a\xb5\x18\x15ai.conversations.read\x82\xd3\xe4\x93\x027\x125/v1/{name=organizations/*/conversations/*/messages/*}\x12\xb4\x01\n" +
+	"\fListMessages\x12 .pivox.ai.v1.ListMessagesRequest\x1a!.pivox.ai.v1.ListMessagesResponse\"_\xdaA\x06parent\x8a\xb5\x18\x15ai.conversations.read\x82\xd3\xe4\x93\x027\x125/v1/{parent=organizations/*/conversations/*}/messages\x12\xa5\x01\n" +
+	"\vGetArtifact\x12\x1f.pivox.ai.v1.GetArtifactRequest\x1a\x15.pivox.ai.v1.Artifact\"^\xdaA\x04name\x8a\xb5\x18\x15ai.conversations.read\x82\xd3\xe4\x93\x028\x126/v1/{name=organizations/*/conversations/*/artifacts/*}\x12\xb8\x01\n" +
+	"\rListArtifacts\x12!.pivox.ai.v1.ListArtifactsRequest\x1a\".pivox.ai.v1.ListArtifactsResponse\"`\xdaA\x06parent\x8a\xb5\x18\x15ai.conversations.read\x82\xd3\xe4\x93\x028\x126/v1/{parent=organizations/*/conversations/*}/artifacts\x12\xae\x01\n" +
+	"\x0eDeleteArtifact\x12\".pivox.ai.v1.DeleteArtifactRequest\x1a\x16.google.protobuf.Empty\"`\xdaA\x04name\x8a\xb5\x18\x17ai.conversations.update\x82\xd3\xe4\x93\x028*6/v1/{name=organizations/*/conversations/*/artifacts/*}\x12\xc5\x01\n" +
+	"\x12GetArtifactVersion\x12&.pivox.ai.v1.GetArtifactVersionRequest\x1a\x1c.pivox.ai.v1.ArtifactVersion\"i\xdaA\x04name\x8a\xb5\x18\x15ai.conversations.read\x82\xd3\xe4\x93\x02C\x12A/v1/{name=organizations/*/conversations/*/artifacts/*/versions/*}\x12\xd8\x01\n" +
+	"\x14ListArtifactVersions\x12(.pivox.ai.v1.ListArtifactVersionsRequest\x1a).pivox.ai.v1.ListArtifactVersionsResponse\"k\xdaA\x06parent\x8a\xb5\x18\x15ai.conversations.read\x82\xd3\xe4\x93\x02C\x12A/v1/{parent=organizations/*/conversations/*/artifacts/*}/versions\x12\xc7\x01\n" +
+	"\x15DeleteArtifactVersion\x12).pivox.ai.v1.DeleteArtifactVersionRequest\x1a\x16.google.protobuf.Empty\"k\xdaA\x04name\x8a\xb5\x18\x17ai.conversations.update\x82\xd3\xe4\x93\x02C*A/v1/{name=organizations/*/conversations/*/artifacts/*/versions/*}\x12\xb1\x01\n" +
+	"\x0fGenerateContent\x12#.pivox.ai.v1.GenerateContentRequest\x1a$.pivox.ai.v1.GenerateContentResponse\"S\x8a\xb5\x18\x0eai.chat.stream\x9a\xb5\x18\x06parent\x82\xd3\xe4\x93\x021:\x01*\",/v1/{parent=organizations/*}:generateContent\x12\xb3\x01\n" +
+	"\x15StreamGenerateContent\x12#.pivox.ai.v1.GenerateContentRequest\x1a\x18.pivox.ai.v1.ServerEvent\"Y\x8a\xb5\x18\x0eai.chat.stream\x9a\xb5\x18\x06parent\x82\xd3\xe4\x93\x027:\x01*\"2/v1/{parent=organizations/*}:streamGenerateContent0\x01\x12\xc0\x01\n" +
+	"\x15SummarizeConversation\x12).pivox.ai.v1.SummarizeConversationRequest\x1a\x19.pivox.ai.v1.Conversation\"a\xdaA\x04name\x8a\xb5\x18\x17ai.conversations.update\x82\xd3\xe4\x93\x029:\x01*\"4/v1/{name=organizations/*/conversations/*}:summarize\x1a\x0f\xcaA\fapi.pivox.ioB\xa8\x01\n" +
 	"\x0fcom.pivox.ai.v1B\vAiChatProtoP\x01Z:github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1;aiv1\xa2\x02\x03PAX\xaa\x02\vPivox.Ai.V1\xca\x02\vPivox\\Ai\\V1\xe2\x02\x17Pivox\\Ai\\V1\\GPBMetadata\xea\x02\rPivox::Ai::V1b\x06proto3"
 
 var (

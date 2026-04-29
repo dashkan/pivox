@@ -24,6 +24,7 @@ import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
 	v1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
+	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/permission/v1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -1059,7 +1060,7 @@ var File_pivox_api_v1_spaces_proto protoreflect.FileDescriptor
 
 const file_pivox_api_v1_spaces_proto_rawDesc = "" +
 	"\n" +
-	"\x19pivox/api/v1/spaces.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1apivox/iam/v1/members.proto\x1a\x1epivox/iam/v1/permissions.proto\"\xb1\x05\n" +
+	"\x19pivox/api/v1/spaces.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1apivox/iam/v1/members.proto\x1a\x1epivox/iam/v1/permissions.proto\x1a!pivox/permission/v1/options.proto\"\xb1\x05\n" +
 	"\x05Space\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x124\n" +
 	"\x05state\x18\x04 \x01(\x0e2\x19.pivox.api.v1.Space.StateB\x03\xe0A\x03R\x05state\x12-\n" +
@@ -1134,25 +1135,26 @@ const file_pivox_api_v1_spaces_proto_rawDesc = "" +
 	"\x0fMARKING_DELETED\x10\x03\x12\v\n" +
 	"\aPURGING\x10\x04\x12\r\n" +
 	"\tCOMPLETED\x10\x05\"\x17\n" +
-	"\x15UndeleteSpaceMetadata2\x99\x0f\n" +
-	"\x06Spaces\x12r\n" +
-	"\bGetSpace\x12\x1d.pivox.api.v1.GetSpaceRequest\x1a\x13.pivox.api.v1.Space\"2\xdaA\x04name\x82\xd3\xe4\x93\x02%\x12#/v1/{name=organizations/*/spaces/*}\x12\x85\x01\n" +
+	"\x15UndeleteSpaceMetadata2\xf5\x10\n" +
+	"\x06Spaces\x12\x81\x01\n" +
+	"\bGetSpace\x12\x1d.pivox.api.v1.GetSpaceRequest\x1a\x13.pivox.api.v1.Space\"A\xdaA\x04name\x8a\xb5\x18\vspaces.read\x82\xd3\xe4\x93\x02%\x12#/v1/{name=organizations/*/spaces/*}\x12\x94\x01\n" +
 	"\n" +
-	"ListSpaces\x12\x1f.pivox.api.v1.ListSpacesRequest\x1a .pivox.api.v1.ListSpacesResponse\"4\xdaA\x06parent\x82\xd3\xe4\x93\x02%\x12#/v1/{parent=organizations/*}/spaces\x12\xb9\x01\n" +
-	"\vCreateSpace\x12 .pivox.api.v1.CreateSpaceRequest\x1a\x1d.google.longrunning.Operation\"i\xcaA\x1c\n" +
-	"\x05Space\x12\x13CreateSpaceMetadata\xdaA\x15parent,space,space_id\x82\xd3\xe4\x93\x02,:\x05space\"#/v1/{parent=organizations/*}/spaces\x12\xbb\x01\n" +
-	"\vUpdateSpace\x12 .pivox.api.v1.UpdateSpaceRequest\x1a\x1d.google.longrunning.Operation\"k\xcaA\x1c\n" +
-	"\x05Space\x12\x13UpdateSpaceMetadata\xdaA\x11space,update_mask\x82\xd3\xe4\x93\x022:\x05space2)/v1/{space.name=organizations/*/spaces/*}\x12\xa1\x01\n" +
-	"\vDeleteSpace\x12 .pivox.api.v1.DeleteSpaceRequest\x1a\x1d.google.longrunning.Operation\"Q\xcaA\x1c\n" +
-	"\x05Space\x12\x13DeleteSpaceMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02%*#/v1/{name=organizations/*/spaces/*}\x12\xb3\x01\n" +
-	"\rUndeleteSpace\x12\".pivox.api.v1.UndeleteSpaceRequest\x1a\x1d.google.longrunning.Operation\"_\xcaA\x1e\n" +
-	"\x05Space\x12\x15UndeleteSpaceMetadata\xdaA\x04name\x82\xd3\xe4\x93\x021:\x01*\",/v1/{name=organizations/*/spaces/*}:undelete\x12\x7f\n" +
-	"\tGetMember\x12\x1e.pivox.iam.v1.GetMemberRequest\x1a\x14.pivox.iam.v1.Member\"<\xdaA\x04name\x82\xd3\xe4\x93\x02/\x12-/v1/{name=organizations/*/spaces/*/members/*}\x12\x92\x01\n" +
-	"\vListMembers\x12 .pivox.iam.v1.ListMembersRequest\x1a!.pivox.iam.v1.ListMembersResponse\">\xdaA\x06parent\x82\xd3\xe4\x93\x02/\x12-/v1/{parent=organizations/*/spaces/*}/members\x12\xa0\x01\n" +
-	"\fCreateMember\x12!.pivox.iam.v1.CreateMemberRequest\x1a\x14.pivox.iam.v1.Member\"W\xdaA\x17parent,member,member_id\x82\xd3\xe4\x93\x027:\x06member\"-/v1/{parent=organizations/*/spaces/*}/members\x12\xa2\x01\n" +
-	"\fUpdateMember\x12!.pivox.iam.v1.UpdateMemberRequest\x1a\x14.pivox.iam.v1.Member\"Y\xdaA\x12member,update_mask\x82\xd3\xe4\x93\x02>:\x06member24/v1/{member.name=organizations/*/spaces/*/members/*}\x12\x87\x01\n" +
-	"\fDeleteMember\x12!.pivox.iam.v1.DeleteMemberRequest\x1a\x16.google.protobuf.Empty\"<\xdaA\x04name\x82\xd3\xe4\x93\x02/*-/v1/{name=organizations/*/spaces/*/members/*}\x12\xc5\x01\n" +
-	"\x12TestIamPermissions\x12'.pivox.iam.v1.TestIamPermissionsRequest\x1a(.pivox.iam.v1.TestIamPermissionsResponse\"\\\xdaA\x14resource,permissions\x82\xd3\xe4\x93\x02?:\x01*\":/v1/{resource=organizations/*/spaces/*}:testIamPermissions\x1a\x0f\xcaA\fapi.pivox.ioB\xaf\x01\n" +
+	"ListSpaces\x12\x1f.pivox.api.v1.ListSpacesRequest\x1a .pivox.api.v1.ListSpacesResponse\"C\xdaA\x06parent\x8a\xb5\x18\vspaces.read\x82\xd3\xe4\x93\x02%\x12#/v1/{parent=organizations/*}/spaces\x12\xca\x01\n" +
+	"\vCreateSpace\x12 .pivox.api.v1.CreateSpaceRequest\x1a\x1d.google.longrunning.Operation\"z\xcaA\x1c\n" +
+	"\x05Space\x12\x13CreateSpaceMetadata\xdaA\x15parent,space,space_id\x8a\xb5\x18\rspaces.create\x82\xd3\xe4\x93\x02,:\x05space\"#/v1/{parent=organizations/*}/spaces\x12\xdb\x01\n" +
+	"\vUpdateSpace\x12 .pivox.api.v1.UpdateSpaceRequest\x1a\x1d.google.longrunning.Operation\"\x8a\x01\xcaA\x1c\n" +
+	"\x05Space\x12\x13UpdateSpaceMetadata\xdaA\x11space,update_mask\x8a\xb5\x18\rspaces.update\x9a\xb5\x18\n" +
+	"space.name\x82\xd3\xe4\x93\x022:\x05space2)/v1/{space.name=organizations/*/spaces/*}\x12\xb2\x01\n" +
+	"\vDeleteSpace\x12 .pivox.api.v1.DeleteSpaceRequest\x1a\x1d.google.longrunning.Operation\"b\xcaA\x1c\n" +
+	"\x05Space\x12\x13DeleteSpaceMetadata\xdaA\x04name\x8a\xb5\x18\rspaces.delete\x82\xd3\xe4\x93\x02%*#/v1/{name=organizations/*/spaces/*}\x12\xc4\x01\n" +
+	"\rUndeleteSpace\x12\".pivox.api.v1.UndeleteSpaceRequest\x1a\x1d.google.longrunning.Operation\"p\xcaA\x1e\n" +
+	"\x05Space\x12\x15UndeleteSpaceMetadata\xdaA\x04name\x8a\xb5\x18\rspaces.delete\x82\xd3\xe4\x93\x021:\x01*\",/v1/{name=organizations/*/spaces/*}:undelete\x12\x8f\x01\n" +
+	"\tGetMember\x12\x1e.pivox.iam.v1.GetMemberRequest\x1a\x14.pivox.iam.v1.Member\"L\xdaA\x04name\x8a\xb5\x18\fmembers.read\x82\xd3\xe4\x93\x02/\x12-/v1/{name=organizations/*/spaces/*/members/*}\x12\xa2\x01\n" +
+	"\vListMembers\x12 .pivox.iam.v1.ListMembersRequest\x1a!.pivox.iam.v1.ListMembersResponse\"N\xdaA\x06parent\x8a\xb5\x18\fmembers.read\x82\xd3\xe4\x93\x02/\x12-/v1/{parent=organizations/*/spaces/*}/members\x12\xb2\x01\n" +
+	"\fCreateMember\x12!.pivox.iam.v1.CreateMemberRequest\x1a\x14.pivox.iam.v1.Member\"i\xdaA\x17parent,member,member_id\x8a\xb5\x18\x0emembers.create\x82\xd3\xe4\x93\x027:\x06member\"-/v1/{parent=organizations/*/spaces/*}/members\x12\xc3\x01\n" +
+	"\fUpdateMember\x12!.pivox.iam.v1.UpdateMemberRequest\x1a\x14.pivox.iam.v1.Member\"z\xdaA\x12member,update_mask\x8a\xb5\x18\x0emembers.update\x9a\xb5\x18\vmember.name\x82\xd3\xe4\x93\x02>:\x06member24/v1/{member.name=organizations/*/spaces/*/members/*}\x12\x99\x01\n" +
+	"\fDeleteMember\x12!.pivox.iam.v1.DeleteMemberRequest\x1a\x16.google.protobuf.Empty\"N\xdaA\x04name\x8a\xb5\x18\x0emembers.delete\x82\xd3\xe4\x93\x02/*-/v1/{name=organizations/*/spaces/*/members/*}\x12\xc9\x01\n" +
+	"\x12TestIamPermissions\x12'.pivox.iam.v1.TestIamPermissionsRequest\x1a(.pivox.iam.v1.TestIamPermissionsResponse\"`\xdaA\x14resource,permissions\x90\xb5\x18\x01\x82\xd3\xe4\x93\x02?:\x01*\":/v1/{resource=organizations/*/spaces/*}:testIamPermissions\x1a\x0f\xcaA\fapi.pivox.ioB\xaf\x01\n" +
 	"\x10com.pivox.api.v1B\vSpacesProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
 
 var (

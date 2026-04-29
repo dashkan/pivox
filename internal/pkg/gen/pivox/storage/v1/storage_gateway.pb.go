@@ -23,6 +23,7 @@ package storagev1
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
+	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/permission/v1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -1552,7 +1553,7 @@ var File_pivox_storage_v1_storage_gateway_proto protoreflect.FileDescriptor
 
 const file_pivox_storage_v1_storage_gateway_proto_rawDesc = "" +
 	"\n" +
-	"&pivox/storage/v1/storage_gateway.proto\x12\x10pivox.storage.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xd0\t\n" +
+	"&pivox/storage/v1/storage_gateway.proto\x12\x10pivox.storage.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!pivox/permission/v1/options.proto\"\xd0\t\n" +
 	"\x0eStorageGateway\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12-\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\n" +
@@ -1670,22 +1671,22 @@ const file_pivox_storage_v1_storage_gateway_proto_rawDesc = "" +
 	"\x1bCreateStorageSessionRequest\x120\n" +
 	"\x03ttl\x18\x01 \x01(\v2\x19.google.protobuf.DurationB\x03\xe0A\x01R\x03ttl\"R\n" +
 	"\x1cCreateStorageSessionResponse\x122\n" +
-	"\x06expiry\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\x06expiry2\x99\x10\n" +
-	"\x0fStorageGateways\x12\x89\x02\n" +
-	"\x14CreateStorageGateway\x12-.pivox.storage.v1.CreateStorageGatewayRequest\x1a\x1d.google.longrunning.Operation\"\xa2\x01\xcaA.\n" +
-	"\x0eStorageGateway\x12\x1cCreateStorageGatewayMetadata\xdaA)parent,storage_gateway,storage_gateway_id\x82\xd3\xe4\x93\x02?:\x0fstorage_gateway\",/v1/{parent=organizations/*}/storageGateways\x12\x9e\x01\n" +
-	"\x11GetStorageGateway\x12*.pivox.storage.v1.GetStorageGatewayRequest\x1a .pivox.storage.v1.StorageGateway\";\xdaA\x04name\x82\xd3\xe4\x93\x02.\x12,/v1/{name=organizations/*/storageGateways/*}\x12\xb1\x01\n" +
-	"\x13ListStorageGateways\x12,.pivox.storage.v1.ListStorageGatewaysRequest\x1a-.pivox.storage.v1.ListStorageGatewaysResponse\"=\xdaA\x06parent\x82\xd3\xe4\x93\x02.\x12,/v1/{parent=organizations/*}/storageGateways\x12\x8b\x02\n" +
-	"\x14UpdateStorageGateway\x12-.pivox.storage.v1.UpdateStorageGatewayRequest\x1a\x1d.google.longrunning.Operation\"\xa4\x01\xcaA.\n" +
-	"\x0eStorageGateway\x12\x1cUpdateStorageGatewayMetadata\xdaA\x1bstorage_gateway,update_mask\x82\xd3\xe4\x93\x02O:\x0fstorage_gateway2</v1/{storage_gateway.name=organizations/*/storageGateways/*}\x12\xd2\x01\n" +
-	"\x14DeleteStorageGateway\x12-.pivox.storage.v1.DeleteStorageGatewayRequest\x1a\x1d.google.longrunning.Operation\"l\xcaA.\n" +
-	"\x0eStorageGateway\x12\x1cDeleteStorageGatewayMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02.*,/v1/{name=organizations/*/storageGateways/*}\x12\xc5\x01\n" +
-	"\x17RotateRegistrationToken\x120.pivox.storage.v1.RotateRegistrationTokenRequest\x1a .pivox.storage.v1.StorageGateway\"V\xdaA\x04name\x82\xd3\xe4\x93\x02I:\x01*\"D/v1/{name=organizations/*/storageGateways/*}:rotateRegistrationToken\x12\xb4\x01\n" +
-	"\x10GetInstallScript\x12).pivox.storage.v1.GetInstallScriptRequest\x1a*.pivox.storage.v1.GetInstallScriptResponse\"I\xdaA\x04name\x82\xd3\xe4\x93\x02<\x12:/v1/{name=organizations/*/storageGateways/*}:installScript\x12\xbc\x01\n" +
-	"\x12GetUninstallScript\x12+.pivox.storage.v1.GetUninstallScriptRequest\x1a,.pivox.storage.v1.GetUninstallScriptResponse\"K\xdaA\x04name\x82\xd3\xe4\x93\x02>\x12</v1/{name=organizations/*/storageGateways/*}:uninstallScript\x12\xdb\x01\n" +
-	"\x0eUpgradeGateway\x12'.pivox.storage.v1.UpgradeGatewayRequest\x1a\x1d.google.longrunning.Operation\"\x80\x01\xcaA(\n" +
-	"\x0eStorageGateway\x12\x16UpgradeGatewayMetadata\xdaA\x13name,target_version\x82\xd3\xe4\x93\x029:\x01*\"4/v1/{name=organizations/*/storageGateways/*}:upgrade\x12\x94\x01\n" +
-	"\x14CreateStorageSession\x12-.pivox.storage.v1.CreateStorageSessionRequest\x1a..pivox.storage.v1.CreateStorageSessionResponse\"\x1d\x82\xd3\xe4\x93\x02\x17:\x01*\"\x12/v1/storageSession\x1a\x0f\xcaA\fapi.pivox.ioB\xd3\x01\n" +
+	"\x06expiry\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\x06expiry2\xa2\x12\n" +
+	"\x0fStorageGateways\x12\xa4\x02\n" +
+	"\x14CreateStorageGateway\x12-.pivox.storage.v1.CreateStorageGatewayRequest\x1a\x1d.google.longrunning.Operation\"\xbd\x01\xcaA.\n" +
+	"\x0eStorageGateway\x12\x1cCreateStorageGatewayMetadata\xdaA)parent,storage_gateway,storage_gateway_id\x8a\xb5\x18\x17storage.gateways.create\x82\xd3\xe4\x93\x02?:\x0fstorage_gateway\",/v1/{parent=organizations/*}/storageGateways\x12\xb7\x01\n" +
+	"\x11GetStorageGateway\x12*.pivox.storage.v1.GetStorageGatewayRequest\x1a .pivox.storage.v1.StorageGateway\"T\xdaA\x04name\x8a\xb5\x18\x15storage.gateways.read\x82\xd3\xe4\x93\x02.\x12,/v1/{name=organizations/*/storageGateways/*}\x12\xca\x01\n" +
+	"\x13ListStorageGateways\x12,.pivox.storage.v1.ListStorageGatewaysRequest\x1a-.pivox.storage.v1.ListStorageGatewaysResponse\"V\xdaA\x06parent\x8a\xb5\x18\x15storage.gateways.read\x82\xd3\xe4\x93\x02.\x12,/v1/{parent=organizations/*}/storageGateways\x12\xbe\x02\n" +
+	"\x14UpdateStorageGateway\x12-.pivox.storage.v1.UpdateStorageGatewayRequest\x1a\x1d.google.longrunning.Operation\"\xd7\x01\xcaA.\n" +
+	"\x0eStorageGateway\x12\x1cUpdateStorageGatewayMetadata\xdaA\x1bstorage_gateway,update_mask\x8a\xb5\x18\x17storage.gateways.update\x9a\xb5\x18\x14storage_gateway.name\x82\xd3\xe4\x93\x02O:\x0fstorage_gateway2</v1/{storage_gateway.name=organizations/*/storageGateways/*}\x12\xee\x01\n" +
+	"\x14DeleteStorageGateway\x12-.pivox.storage.v1.DeleteStorageGatewayRequest\x1a\x1d.google.longrunning.Operation\"\x87\x01\xcaA.\n" +
+	"\x0eStorageGateway\x12\x1cDeleteStorageGatewayMetadata\xdaA\x04name\x8a\xb5\x18\x17storage.gateways.delete\x82\xd3\xe4\x93\x02.*,/v1/{name=organizations/*/storageGateways/*}\x12\xe0\x01\n" +
+	"\x17RotateRegistrationToken\x120.pivox.storage.v1.RotateRegistrationTokenRequest\x1a .pivox.storage.v1.StorageGateway\"q\xdaA\x04name\x8a\xb5\x18\x17storage.gateways.update\x82\xd3\xe4\x93\x02I:\x01*\"D/v1/{name=organizations/*/storageGateways/*}:rotateRegistrationToken\x12\xcd\x01\n" +
+	"\x10GetInstallScript\x12).pivox.storage.v1.GetInstallScriptRequest\x1a*.pivox.storage.v1.GetInstallScriptResponse\"b\xdaA\x04name\x8a\xb5\x18\x15storage.gateways.read\x82\xd3\xe4\x93\x02<\x12:/v1/{name=organizations/*/storageGateways/*}:installScript\x12\xd5\x01\n" +
+	"\x12GetUninstallScript\x12+.pivox.storage.v1.GetUninstallScriptRequest\x1a,.pivox.storage.v1.GetUninstallScriptResponse\"d\xdaA\x04name\x8a\xb5\x18\x15storage.gateways.read\x82\xd3\xe4\x93\x02>\x12</v1/{name=organizations/*/storageGateways/*}:uninstallScript\x12\xf7\x01\n" +
+	"\x0eUpgradeGateway\x12'.pivox.storage.v1.UpgradeGatewayRequest\x1a\x1d.google.longrunning.Operation\"\x9c\x01\xcaA(\n" +
+	"\x0eStorageGateway\x12\x16UpgradeGatewayMetadata\xdaA\x13name,target_version\x8a\xb5\x18\x18storage.gateways.upgrade\x82\xd3\xe4\x93\x029:\x01*\"4/v1/{name=organizations/*/storageGateways/*}:upgrade\x12\x98\x01\n" +
+	"\x14CreateStorageSession\x12-.pivox.storage.v1.CreateStorageSessionRequest\x1a..pivox.storage.v1.CreateStorageSessionResponse\"!\x90\xb5\x18\x01\x82\xd3\xe4\x93\x02\x17:\x01*\"\x12/v1/storageSession\x1a\x0f\xcaA\fapi.pivox.ioB\xd3\x01\n" +
 	"\x14com.pivox.storage.v1B\x13StorageGatewayProtoP\x01ZDgithub.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1;storagev1\xa2\x02\x03PSX\xaa\x02\x10Pivox.Storage.V1\xca\x02\x10Pivox\\Storage\\V1\xe2\x02\x1cPivox\\Storage\\V1\\GPBMetadata\xea\x02\x12Pivox::Storage::V1b\x06proto3"
 
 var (

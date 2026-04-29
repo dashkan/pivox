@@ -23,6 +23,7 @@ package storagev1
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
+	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/permission/v1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -1167,7 +1168,7 @@ var File_pivox_storage_v1_endpoint_proto protoreflect.FileDescriptor
 
 const file_pivox_storage_v1_endpoint_proto_rawDesc = "" +
 	"\n" +
-	"\x1fpivox/storage/v1/endpoint.proto\x12\x10pivox.storage.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xac\a\n" +
+	"\x1fpivox/storage/v1/endpoint.proto\x12\x10pivox.storage.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!pivox/permission/v1/options.proto\"\xac\a\n" +
 	"\bEndpoint\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12-\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\n" +
@@ -1252,16 +1253,16 @@ const file_pivox_storage_v1_endpoint_proto_rawDesc = "" +
 	"\x16pivox.storage/Endpoint\xbaH\x03\xc8\x01\x01R\x04name\x12\x17\n" +
 	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x01R\x04etag\x12(\n" +
 	"\rvalidate_only\x18\x03 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\"\x18\n" +
-	"\x16DeleteEndpointMetadata2\x86\b\n" +
-	"\tEndpoints\x12\xe8\x01\n" +
-	"\x0eCreateEndpoint\x12'.pivox.storage.v1.CreateEndpointRequest\x1a\x1d.google.longrunning.Operation\"\x8d\x01\xcaA\"\n" +
-	"\bEndpoint\x12\x16CreateEndpointMetadata\xdaA\x1bparent,endpoint,endpoint_id\x82\xd3\xe4\x93\x02D:\bendpoint\"8/v1/{parent=organizations/*/storageGateways/*}/endpoints\x12\x98\x01\n" +
-	"\vGetEndpoint\x12$.pivox.storage.v1.GetEndpointRequest\x1a\x1a.pivox.storage.v1.Endpoint\"G\xdaA\x04name\x82\xd3\xe4\x93\x02:\x128/v1/{name=organizations/*/storageGateways/*/endpoints/*}\x12\xab\x01\n" +
-	"\rListEndpoints\x12&.pivox.storage.v1.ListEndpointsRequest\x1a'.pivox.storage.v1.ListEndpointsResponse\"I\xdaA\x06parent\x82\xd3\xe4\x93\x02:\x128/v1/{parent=organizations/*/storageGateways/*}/endpoints\x12\xea\x01\n" +
-	"\x0eUpdateEndpoint\x12'.pivox.storage.v1.UpdateEndpointRequest\x1a\x1d.google.longrunning.Operation\"\x8f\x01\xcaA\"\n" +
-	"\bEndpoint\x12\x16UpdateEndpointMetadata\xdaA\x14endpoint,update_mask\x82\xd3\xe4\x93\x02M:\bendpoint2A/v1/{endpoint.name=organizations/*/storageGateways/*/endpoints/*}\x12\xc6\x01\n" +
-	"\x0eDeleteEndpoint\x12'.pivox.storage.v1.DeleteEndpointRequest\x1a\x1d.google.longrunning.Operation\"l\xcaA\"\n" +
-	"\bEndpoint\x12\x16DeleteEndpointMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02:*8/v1/{name=organizations/*/storageGateways/*/endpoints/*}\x1a\x0f\xcaA\fapi.pivox.ioB\xcd\x01\n" +
+	"\x16DeleteEndpointMetadata2\xa0\t\n" +
+	"\tEndpoints\x12\x84\x02\n" +
+	"\x0eCreateEndpoint\x12'.pivox.storage.v1.CreateEndpointRequest\x1a\x1d.google.longrunning.Operation\"\xa9\x01\xcaA\"\n" +
+	"\bEndpoint\x12\x16CreateEndpointMetadata\xdaA\x1bparent,endpoint,endpoint_id\x8a\xb5\x18\x18storage.endpoints.create\x82\xd3\xe4\x93\x02D:\bendpoint\"8/v1/{parent=organizations/*/storageGateways/*}/endpoints\x12\xb2\x01\n" +
+	"\vGetEndpoint\x12$.pivox.storage.v1.GetEndpointRequest\x1a\x1a.pivox.storage.v1.Endpoint\"a\xdaA\x04name\x8a\xb5\x18\x16storage.endpoints.read\x82\xd3\xe4\x93\x02:\x128/v1/{name=organizations/*/storageGateways/*/endpoints/*}\x12\xc5\x01\n" +
+	"\rListEndpoints\x12&.pivox.storage.v1.ListEndpointsRequest\x1a'.pivox.storage.v1.ListEndpointsResponse\"c\xdaA\x06parent\x8a\xb5\x18\x16storage.endpoints.read\x82\xd3\xe4\x93\x02:\x128/v1/{parent=organizations/*/storageGateways/*}/endpoints\x12\x97\x02\n" +
+	"\x0eUpdateEndpoint\x12'.pivox.storage.v1.UpdateEndpointRequest\x1a\x1d.google.longrunning.Operation\"\xbc\x01\xcaA\"\n" +
+	"\bEndpoint\x12\x16UpdateEndpointMetadata\xdaA\x14endpoint,update_mask\x8a\xb5\x18\x18storage.endpoints.update\x9a\xb5\x18\rendpoint.name\x82\xd3\xe4\x93\x02M:\bendpoint2A/v1/{endpoint.name=organizations/*/storageGateways/*/endpoints/*}\x12\xe3\x01\n" +
+	"\x0eDeleteEndpoint\x12'.pivox.storage.v1.DeleteEndpointRequest\x1a\x1d.google.longrunning.Operation\"\x88\x01\xcaA\"\n" +
+	"\bEndpoint\x12\x16DeleteEndpointMetadata\xdaA\x04name\x8a\xb5\x18\x18storage.endpoints.delete\x82\xd3\xe4\x93\x02:*8/v1/{name=organizations/*/storageGateways/*/endpoints/*}\x1a\x0f\xcaA\fapi.pivox.ioB\xcd\x01\n" +
 	"\x14com.pivox.storage.v1B\rEndpointProtoP\x01ZDgithub.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1;storagev1\xa2\x02\x03PSX\xaa\x02\x10Pivox.Storage.V1\xca\x02\x10Pivox\\Storage\\V1\xe2\x02\x1cPivox\\Storage\\V1\\GPBMetadata\xea\x02\x12Pivox::Storage::V1b\x06proto3"
 
 var (

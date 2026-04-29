@@ -25,6 +25,7 @@ import "pivox/iam/v1/members.proto";
 import "pivox/iam/v1/permissions.proto";
 import "pivox/iam/v1/roles.proto";
 import "pivox/iam/v1/users.proto";
+import "pivox/permission/v1/options.proto";
 
 option go_package = "pivox/iam/v1;iampb";
 
@@ -61,12 +62,14 @@ service Iam {
   rpc GetUser(GetUserRequest) returns (User) {
     option (google.api.http) = {get: "/v1/{name=organizations/*/users/*}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "users.read";
   }
 
   // Lists users in an organization.
   rpc ListUsers(ListUsersRequest) returns (ListUsersResponse) {
     option (google.api.http) = {get: "/v1/{parent=organizations/*}/users"};
     option (google.api.method_signature) = "parent";
+    option (pivox.permission.v1.required_permission) = "users.read";
   }
 
   // Deletes a user (LRO). Cascades through Pivox-side state and
@@ -84,6 +87,7 @@ service Iam {
       response_type: "google.protobuf.Empty"
       metadata_type: "DeleteUserMetadata"
     };
+    option (pivox.permission.v1.required_permission) = "users.delete";
   }
 
   // Gets a role by resource name. v1 returns only system roles
@@ -91,30 +95,35 @@ service Iam {
   rpc GetRole(GetRoleRequest) returns (Role) {
     option (google.api.http) = {get: "/v1/{name=organizations/*/roles/*}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "roles.read";
   }
 
   // Lists roles in an organization.
   rpc ListRoles(ListRolesRequest) returns (ListRolesResponse) {
     option (google.api.http) = {get: "/v1/{parent=organizations/*}/roles"};
     option (google.api.method_signature) = "parent";
+    option (pivox.permission.v1.required_permission) = "roles.read";
   }
 
   // Lists all system-defined permissions. Permissions are global and
   // code-defined; the catalog is identical for every caller.
   rpc ListPermissions(ListPermissionsRequest) returns (ListPermissionsResponse) {
     option (google.api.http) = {get: "/v1/permissions"};
+    option (pivox.permission.v1.exempt) = true;
   }
 
   // Gets a group by resource name.
   rpc GetGroup(GetGroupRequest) returns (Group) {
     option (google.api.http) = {get: "/v1/{name=organizations/*/groups/*}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "groups.read";
   }
 
   // Lists groups in an organization.
   rpc ListGroups(ListGroupsRequest) returns (ListGroupsResponse) {
     option (google.api.http) = {get: "/v1/{parent=organizations/*}/groups"};
     option (google.api.method_signature) = "parent";
+    option (pivox.permission.v1.required_permission) = "groups.read";
   }
 
   // Creates a new group.
@@ -124,6 +133,7 @@ service Iam {
       body: "group"
     };
     option (google.api.method_signature) = "parent,group,group_id";
+    option (pivox.permission.v1.required_permission) = "groups.create";
   }
 
   // Updates a group.
@@ -133,12 +143,15 @@ service Iam {
       body: "group"
     };
     option (google.api.method_signature) = "group,update_mask";
+    option (pivox.permission.v1.required_permission) = "groups.update";
+    option (pivox.permission.v1.scope_field) = "group.name";
   }
 
   // Soft-deletes a group.
   rpc DeleteGroup(DeleteGroupRequest) returns (Group) {
     option (google.api.http) = {delete: "/v1/{name=organizations/*/groups/*}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "groups.delete";
   }
 
   // Adds members to a group.
@@ -148,6 +161,8 @@ service Iam {
       body: "*"
     };
     option (google.api.method_signature) = "group,members";
+    option (pivox.permission.v1.required_permission) = "groups.manageMembers";
+    option (pivox.permission.v1.scope_field) = "group";
   }
 
   // Removes members from a group.
@@ -157,11 +172,15 @@ service Iam {
       body: "*"
     };
     option (google.api.method_signature) = "group,members";
+    option (pivox.permission.v1.required_permission) = "groups.manageMembers";
+    option (pivox.permission.v1.scope_field) = "group";
   }
 
   // Lists members of a group.
   rpc ListGroupMembers(ListGroupMembersRequest) returns (ListGroupMembersResponse) {
     option (google.api.http) = {get: "/v1/{group=organizations/*/groups/*}/members"};
     option (google.api.method_signature) = "group";
+    option (pivox.permission.v1.required_permission) = "groups.read";
+    option (pivox.permission.v1.scope_field) = "group";
   }
 }

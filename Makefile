@@ -56,7 +56,13 @@ proto-breaking:
 generate:
 	go generate ./...
 
-proto-generate: proto-generate-go proto-generate-native
+# proto-generate chains into `generate` so editing a proto file
+# (e.g. adding a `pivox.permission.v1.required_permission` option)
+# also regenerates Go-side codegen artifacts that depend on the
+# new descriptors — currently the permission registry, but the
+# pattern extends to anything else built via `//go:generate` that
+# walks proto descriptors.
+proto-generate: proto-generate-go proto-generate-native generate
 
 # Go codegen (BE + internal gRPC types).
 proto-generate-go:

@@ -23,6 +23,7 @@ package apiv1
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
+	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/permission/v1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -692,7 +693,7 @@ var File_pivox_api_v1_tag_values_proto protoreflect.FileDescriptor
 
 const file_pivox_api_v1_tag_values_proto_rawDesc = "" +
 	"\n" +
-	"\x1dpivox/api/v1/tag_values.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xca\x04\n" +
+	"\x1dpivox/api/v1/tag_values.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!pivox/permission/v1/options.proto\"\xca\x04\n" +
 	"\bTagValue\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12-\n" +
 	"\vdescription\x18\x05 \x01(\tB\v\xe0A\x01\xbaH\x05r\x03\x18\x80\x02R\vdescription\x12@\n" +
@@ -739,17 +740,17 @@ const file_pivox_api_v1_tag_values_proto_rawDesc = "" +
 	"\x04etag\x18\x03 \x01(\tB\x03\xe0A\x01R\x04etag\"\x18\n" +
 	"\x16CreateTagValueMetadata\"\x18\n" +
 	"\x16UpdateTagValueMetadata\"\x18\n" +
-	"\x16DeleteTagValueMetadata2\x9c\n" +
+	"\x16DeleteTagValueMetadata2\xf7\n" +
 	"\n" +
-	"\tTagValues\x12\xd8\x01\n" +
-	"\rListTagValues\x12\".pivox.api.v1.ListTagValuesRequest\x1a#.pivox.api.v1.ListTagValuesResponse\"~\xdaA\x06parent\x82\xd3\xe4\x93\x02oZ;\x129/v1/{parent=organizations/*/spaces/*/tagKeys/*}/tagValues\x120/v1/{parent=organizations/*/tagKeys/*}/tagValues\x12\xc5\x01\n" +
-	"\vGetTagValue\x12 .pivox.api.v1.GetTagValueRequest\x1a\x16.pivox.api.v1.TagValue\"|\xdaA\x04name\x82\xd3\xe4\x93\x02oZ;\x129/v1/{name=organizations/*/spaces/*/tagKeys/*/tagValues/*}\x120/v1/{name=organizations/*/tagKeys/*/tagValues/*}\x12\xa8\x02\n" +
-	"\x0eCreateTagValue\x12#.pivox.api.v1.CreateTagValueRequest\x1a\x1d.google.longrunning.Operation\"\xd1\x01\xcaA\"\n" +
-	"\bTagValue\x12\x16CreateTagValueMetadata\xdaA\x1dparent,tag_value,tag_value_id\x82\xd3\xe4\x93\x02\x85\x01:\ttag_valueZF:\ttag_value\"9/v1/{parent=organizations/*/spaces/*/tagKeys/*}/tagValues\"0/v1/{parent=organizations/*/tagKeys/*}/tagValues\x12\xb4\x02\n" +
-	"\x0eUpdateTagValue\x12#.pivox.api.v1.UpdateTagValueRequest\x1a\x1d.google.longrunning.Operation\"\xdd\x01\xcaA\"\n" +
-	"\bTagValue\x12\x16UpdateTagValueMetadata\xdaA\x15tag_value,update_mask\x82\xd3\xe4\x93\x02\x99\x01:\ttag_valueZP:\ttag_value2C/v1/{tag_value.name=organizations/*/spaces/*/tagKeys/*/tagValues/*}2:/v1/{tag_value.name=organizations/*/tagKeys/*/tagValues/*}\x12\xf8\x01\n" +
-	"\x0eDeleteTagValue\x12#.pivox.api.v1.DeleteTagValueRequest\x1a\x1d.google.longrunning.Operation\"\xa1\x01\xcaA\"\n" +
-	"\bTagValue\x12\x16DeleteTagValueMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02oZ;*9/v1/{name=organizations/*/spaces/*/tagKeys/*/tagValues/*}*0/v1/{name=organizations/*/tagKeys/*/tagValues/*}\x1a\x0f\xcaA\fapi.pivox.ioB\xb2\x01\n" +
+	"\tTagValues\x12\xe6\x01\n" +
+	"\rListTagValues\x12\".pivox.api.v1.ListTagValuesRequest\x1a#.pivox.api.v1.ListTagValuesResponse\"\x8b\x01\xdaA\x06parent\x8a\xb5\x18\ttags.read\x82\xd3\xe4\x93\x02oZ;\x129/v1/{parent=organizations/*/spaces/*/tagKeys/*}/tagValues\x120/v1/{parent=organizations/*/tagKeys/*}/tagValues\x12\xd3\x01\n" +
+	"\vGetTagValue\x12 .pivox.api.v1.GetTagValueRequest\x1a\x16.pivox.api.v1.TagValue\"\x89\x01\xdaA\x04name\x8a\xb5\x18\ttags.read\x82\xd3\xe4\x93\x02oZ;\x129/v1/{name=organizations/*/spaces/*/tagKeys/*/tagValues/*}\x120/v1/{name=organizations/*/tagKeys/*/tagValues/*}\x12\xb7\x02\n" +
+	"\x0eCreateTagValue\x12#.pivox.api.v1.CreateTagValueRequest\x1a\x1d.google.longrunning.Operation\"\xe0\x01\xcaA\"\n" +
+	"\bTagValue\x12\x16CreateTagValueMetadata\xdaA\x1dparent,tag_value,tag_value_id\x8a\xb5\x18\vtags.create\x82\xd3\xe4\x93\x02\x85\x01:\ttag_valueZF:\ttag_value\"9/v1/{parent=organizations/*/spaces/*/tagKeys/*}/tagValues\"0/v1/{parent=organizations/*/tagKeys/*}/tagValues\x12\xd5\x02\n" +
+	"\x0eUpdateTagValue\x12#.pivox.api.v1.UpdateTagValueRequest\x1a\x1d.google.longrunning.Operation\"\xfe\x01\xcaA\"\n" +
+	"\bTagValue\x12\x16UpdateTagValueMetadata\xdaA\x15tag_value,update_mask\x8a\xb5\x18\vtags.update\x9a\xb5\x18\x0etag_value.name\x82\xd3\xe4\x93\x02\x99\x01:\ttag_valueZP:\ttag_value2C/v1/{tag_value.name=organizations/*/spaces/*/tagKeys/*/tagValues/*}2:/v1/{tag_value.name=organizations/*/tagKeys/*/tagValues/*}\x12\x87\x02\n" +
+	"\x0eDeleteTagValue\x12#.pivox.api.v1.DeleteTagValueRequest\x1a\x1d.google.longrunning.Operation\"\xb0\x01\xcaA\"\n" +
+	"\bTagValue\x12\x16DeleteTagValueMetadata\xdaA\x04name\x8a\xb5\x18\vtags.delete\x82\xd3\xe4\x93\x02oZ;*9/v1/{name=organizations/*/spaces/*/tagKeys/*/tagValues/*}*0/v1/{name=organizations/*/tagKeys/*/tagValues/*}\x1a\x0f\xcaA\fapi.pivox.ioB\xb2\x01\n" +
 	"\x10com.pivox.api.v1B\x0eTagValuesProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
 
 var (

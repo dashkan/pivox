@@ -24,6 +24,7 @@ import "google/api/resource.proto";
 import "google/longrunning/operations.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
+import "pivox/permission/v1/options.proto";
 
 option go_package = "pivox/api/v1;apiv1";
 
@@ -38,6 +39,7 @@ service TagValues {
       additional_bindings: {get: "/v1/{parent=organizations/*/spaces/*/tagKeys/*}/tagValues"}
     };
     option (google.api.method_signature) = "parent";
+    option (pivox.permission.v1.required_permission) = "tags.read";
   }
 
   // Retrieves a TagValue. This method will return `PERMISSION_DENIED` if the
@@ -48,6 +50,7 @@ service TagValues {
       additional_bindings: {get: "/v1/{name=organizations/*/spaces/*/tagKeys/*/tagValues/*}"}
     };
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "tags.read";
   }
 
   // Creates a TagValue as a child of the specified TagKey. If a another
@@ -68,6 +71,7 @@ service TagValues {
       response_type: "TagValue"
       metadata_type: "CreateTagValueMetadata"
     };
+    option (pivox.permission.v1.required_permission) = "tags.create";
   }
 
   // Updates the attributes of the TagValue resource.
@@ -85,6 +89,8 @@ service TagValues {
       response_type: "TagValue"
       metadata_type: "UpdateTagValueMetadata"
     };
+    option (pivox.permission.v1.required_permission) = "tags.update";
+    option (pivox.permission.v1.scope_field) = "tag_value.name";
   }
 
   // Deletes a TagValue. The TagValue cannot have any bindings when it is
@@ -99,6 +105,7 @@ service TagValues {
       response_type: "TagValue"
       metadata_type: "DeleteTagValueMetadata"
     };
+    option (pivox.permission.v1.required_permission) = "tags.delete";
   }
 }
 

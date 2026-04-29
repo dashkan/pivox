@@ -29,6 +29,7 @@ import "pivox/api/v1/domains.proto";
 import "pivox/api/v1/sso.proto";
 import "pivox/iam/v1/members.proto";
 import "pivox/iam/v1/permissions.proto";
+import "pivox/permission/v1/options.proto";
 
 option go_package = "pivox/api/v1;apiv1";
 
@@ -40,6 +41,7 @@ service Organizations {
   rpc GetOrganization(GetOrganizationRequest) returns (Organization) {
     option (google.api.http) = {get: "/v1/{name=organizations/*}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "organizations.read";
   }
 
   // Lists organization resources that are visible to the user and satisfy
@@ -49,6 +51,7 @@ service Organizations {
   // `resourcemanager.organizations.get`
   rpc ListOrganizations(ListOrganizationsRequest) returns (ListOrganizationsResponse) {
     option (google.api.http) = {get: "/v1/organizations"};
+    option (pivox.permission.v1.exempt) = true;
   }
 
   // Creates a new organization resource.
@@ -64,6 +67,7 @@ service Organizations {
       response_type: "Organization"
       metadata_type: "CreateOrganizationMetadata"
     };
+    option (pivox.permission.v1.exempt) = true;
   }
 
   // Updates an organization resource. Only the `display_name` and
@@ -83,6 +87,8 @@ service Organizations {
       response_type: "Organization"
       metadata_type: "UpdateOrganizationMetadata"
     };
+    option (pivox.permission.v1.required_permission) = "organizations.update";
+    option (pivox.permission.v1.scope_field) = "organization.name";
   }
 
   // Soft-deletes an organization. The org transitions to
@@ -106,6 +112,7 @@ service Organizations {
       response_type: "Organization"
       metadata_type: "DeleteOrganizationMetadata"
     };
+    option (pivox.permission.v1.required_permission) = "organizations.delete";
   }
 
   // Restores a soft-deleted organization (`DELETE_REQUESTED` state)
@@ -124,6 +131,7 @@ service Organizations {
       response_type: "Organization"
       metadata_type: "UndeleteOrganizationMetadata"
     };
+    option (pivox.permission.v1.required_permission) = "organizations.delete";
   }
 
   // Gets the SSO configuration for an organization. Returns the
@@ -136,6 +144,7 @@ service Organizations {
   rpc GetSsoConfig(GetSsoConfigRequest) returns (SsoConfig) {
     option (google.api.http) = {get: "/v1/{name=organizations/*/ssoConfig}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "organizations.ssoConfig.read";
   }
 
   // Updates the SSO configuration for an organization (AIP-156
@@ -153,6 +162,8 @@ service Organizations {
       body: "sso_config"
     };
     option (google.api.method_signature) = "sso_config,update_mask";
+    option (pivox.permission.v1.required_permission) = "organizations.ssoConfig.update";
+    option (pivox.permission.v1.scope_field) = "sso_config.name";
   }
 
   // Claims a DNS domain on behalf of the organization. The server
@@ -180,6 +191,7 @@ service Organizations {
       response_type: "Domain"
       metadata_type: "CreateDomainMetadata"
     };
+    option (pivox.permission.v1.required_permission) = "domains.create";
   }
 
   // Lists the domains claimed by an organization, including those
@@ -187,12 +199,14 @@ service Organizations {
   rpc ListDomains(ListDomainsRequest) returns (ListDomainsResponse) {
     option (google.api.http) = {get: "/v1/{parent=organizations/*}/domains"};
     option (google.api.method_signature) = "parent";
+    option (pivox.permission.v1.required_permission) = "domains.read";
   }
 
   // Fetches a single domain by resource name.
   rpc GetDomain(GetDomainRequest) returns (Domain) {
     option (google.api.http) = {get: "/v1/{name=organizations/*/domains/*}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "domains.read";
   }
 
   // Releases a domain claim. Cancels the in-flight `CreateDomain`
@@ -203,6 +217,7 @@ service Organizations {
   rpc DeleteDomain(DeleteDomainRequest) returns (Domain) {
     option (google.api.http) = {delete: "/v1/{name=organizations/*/domains/*}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "domains.delete";
   }
 
   // Creates an invitation to join the organization.
@@ -215,18 +230,21 @@ service Organizations {
       body: "invitation"
     };
     option (google.api.method_signature) = "parent,invitation,invitation_id";
+    option (pivox.permission.v1.required_permission) = "invitations.create";
   }
 
   // Lists invitations for the organization.
   rpc ListInvitations(ListInvitationsRequest) returns (ListInvitationsResponse) {
     option (google.api.http) = {get: "/v1/{parent=organizations/*}/invitations"};
     option (google.api.method_signature) = "parent";
+    option (pivox.permission.v1.required_permission) = "invitations.read";
   }
 
   // Gets an invitation by resource name.
   rpc GetInvitation(GetInvitationRequest) returns (Invitation) {
     option (google.api.http) = {get: "/v1/{name=organizations/*/invitations/*}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.exempt) = true;
   }
 
   // Accepts a pending invitation. The caller must be authenticated and
@@ -239,6 +257,7 @@ service Organizations {
       body: "*"
     };
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.exempt) = true;
   }
 
   // Declines a pending invitation. The caller must be authenticated and
@@ -249,18 +268,21 @@ service Organizations {
       body: "*"
     };
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.exempt) = true;
   }
 
   // Revokes a pending invitation. Only org admins can revoke invitations.
   rpc DeleteInvitation(DeleteInvitationRequest) returns (Invitation) {
     option (google.api.http) = {delete: "/v1/{name=organizations/*/invitations/*}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "invitations.delete";
   }
 
   // Gets the invitation policy for an organization.
   rpc GetInvitationPolicy(GetInvitationPolicyRequest) returns (InvitationPolicy) {
     option (google.api.http) = {get: "/v1/{name=organizations/*/invitationPolicy}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "invitations.read";
   }
 
   // Updates the invitation policy for an organization.
@@ -272,18 +294,22 @@ service Organizations {
       body: "invitation_policy"
     };
     option (google.api.method_signature) = "invitation_policy,update_mask";
+    option (pivox.permission.v1.required_permission) = "invitations.updatePolicy";
+    option (pivox.permission.v1.scope_field) = "invitation_policy.name";
   }
 
   // Gets an org-scope Member by resource name.
   rpc GetMember(pivox.iam.v1.GetMemberRequest) returns (pivox.iam.v1.Member) {
     option (google.api.http) = {get: "/v1/{name=organizations/*/members/*}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "members.read";
   }
 
   // Lists org-scope Members.
   rpc ListMembers(pivox.iam.v1.ListMembersRequest) returns (pivox.iam.v1.ListMembersResponse) {
     option (google.api.http) = {get: "/v1/{parent=organizations/*}/members"};
     option (google.api.method_signature) = "parent";
+    option (pivox.permission.v1.required_permission) = "members.read";
   }
 
   // Creates an org-scope Member binding. The principal (user or group)
@@ -295,6 +321,7 @@ service Organizations {
       body: "member"
     };
     option (google.api.method_signature) = "parent,member,member_id";
+    option (pivox.permission.v1.required_permission) = "members.create";
   }
 
   // Updates an org-scope Member's role. Only `role` is mutable.
@@ -305,6 +332,8 @@ service Organizations {
       body: "member"
     };
     option (google.api.method_signature) = "member,update_mask";
+    option (pivox.permission.v1.required_permission) = "members.update";
+    option (pivox.permission.v1.scope_field) = "member.name";
   }
 
   // Deletes an org-scope Member binding. Refuses to delete the last
@@ -312,6 +341,7 @@ service Organizations {
   rpc DeleteMember(pivox.iam.v1.DeleteMemberRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {delete: "/v1/{name=organizations/*/members/*}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "members.delete";
   }
 
   // Atomically promotes a user to `owner` and demotes the previous
@@ -326,6 +356,7 @@ service Organizations {
       body: "*"
     };
     option (google.api.method_signature) = "name,new_owner";
+    option (pivox.permission.v1.required_permission) = "organizations.transferOwnership";
   }
 
   // Returns the subset of requested permissions the caller is allowed
@@ -338,6 +369,7 @@ service Organizations {
       body: "*"
     };
     option (google.api.method_signature) = "resource,permissions";
+    option (pivox.permission.v1.exempt) = true;
   }
 }
 

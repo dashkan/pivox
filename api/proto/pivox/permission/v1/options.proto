@@ -1,0 +1,44 @@
+// Pivox custom proto extensions for the permission interceptor.
+//
+// Each gRPC RPC declares either `required_permission` (gated, with
+// the permission ID from the v1 catalog) or `exempt = true`
+// (bootstrap / circular-by-nature RPCs that the interceptor must
+// pass through). cmd/gen-permission-registry walks every method
+// descriptor at code-gen time and emits the registry consumed by
+// server.PermissionInterceptor.
+//
+// The interceptor derives scope kind (org vs. space) from the
+// resource name pattern declared via google.api.resource on the
+// response (or `parent` field) of the method, so RPCs only need
+// the permission ID here in most cases.
+//
+// `scope_field` overrides the default field-name discovery for
+// RPCs whose resource path lives on a nested message (e.g.
+// `organization.name` on UpdateOrganization). Empty defaults to
+// "name" for singular ops and "parent" for collection ops.
+syntax = "proto3";
+
+package pivox.permission.v1;
+
+import "google/protobuf/descriptor.proto";
+
+option go_package = "github.com/dashkan/pivox/internal/pkg/gen/pivox/permission/v1;permissionv1";
+
+extend google.protobuf.MethodOptions {
+  // Permission ID required to invoke this RPC. Must match an entry
+  // in internal/permission/permissions.yaml. Mutually exclusive with
+  // `exempt`; setting both is a build-time error.
+  string required_permission = 50001;
+
+  // True if this RPC is permission-gate exempt. Used for bootstrap
+  // RPCs (no membership yet) and TestIamPermissions (gating it would
+  // be circular). Mutually exclusive with `required_permission`.
+  bool exempt = 50002;
+
+  // Optional override for the request field that holds the resource
+  // path. Defaults to "name" for Get/Update/Delete-shaped RPCs and
+  // "parent" for List/Create-shaped RPCs. Use a dotted path to
+  // descend into nested messages, e.g. "organization.name" or
+  // "member.name".
+  string scope_field = 50003;
+}

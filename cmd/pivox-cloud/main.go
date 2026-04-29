@@ -228,6 +228,24 @@ func serve(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("create validator: %w", err)
 	}
+	// Permission interceptor wiring: a single union registry +
+	// exempt set is generated from pivox.permission.v1 method
+	// options across every annotated proto. Run order matters —
+	// Auth populates the caller UID, Membership cheap-denies
+	// memberless callers, Permission resolves slug → uuid + role
+	// → permission, Validate runs last so handlers see only
+	// permission-checked, well-formed requests.
+	permResolver := permission.NewResolver(queries)
+	callerIdentity := server.NewCallerIdentityResolver(queries)
+	permissionInterceptor := server.PermissionInterceptor(
+		server.GeneratedRegistry, server.GeneratedExempt,
+		queries, permResolver, callerIdentity,
+	)
+	permissionStreamInterceptor := server.PermissionStreamInterceptor(
+		server.GeneratedRegistry, server.GeneratedExempt,
+		queries, permResolver, callerIdentity,
+	)
+
 	grpcServer := grpc.NewServer(
 		// Logging is FIRST so it sees every RPC including the ones
 		// auth/validate reject — those would otherwise fail silently
@@ -236,29 +254,27 @@ func serve(cmd *cobra.Command, args []string) error {
 			server.LoggingUnaryInterceptor(logger),
 			server.AuthInterceptor(authSvc),
 			// Membership check runs after Auth so the caller's UID is
-			// in context, and before Validate so we don't leak field
-			// shape errors to memberless callers. Allowlisted methods
-			// (CreateOrganization, ListOrganizations, AcceptInvitation,
-			// GetInvitation) bypass — see server/membership_interceptor.go.
+			// in context, and before Permission/Validate so we don't
+			// leak field shape errors to memberless callers.
+			// Allowlisted methods (CreateOrganization,
+			// ListOrganizations, AcceptInvitation, GetInvitation)
+			// bypass — see server/membership_interceptor.go.
 			server.MembershipRequiredInterceptor(queries),
+			permissionInterceptor,
 			server.FieldMaskAwareValidationInterceptor(validator),
 		),
 		grpc.ChainStreamInterceptor(
 			server.LoggingStreamInterceptor(logger),
 			server.AuthStreamInterceptor(authSvc),
 			server.MembershipRequiredStreamInterceptor(queries),
+			permissionStreamInterceptor,
 		),
 	)
 
-	// Register all services
+	// Register all services. permResolver and callerIdentity were
+	// constructed above for the permission interceptor and are
+	// reused here by service handlers (TestIamPermissions, etc.).
 	longrunningpb.RegisterOperationsServer(grpcServer, operations.NewOperationsServer(lroManager))
-	// Shared IAM dependencies for the org-scope and space-scope IAM
-	// handlers (Member CRUD, TestIamPermissions, TransferOwnership).
-	// Permission resolver wraps the in-memory matrix + sqlc queries
-	// for effective-role lookups; caller-identity resolver maps the
-	// auth-context Firebase UID to a firebase_identities row id.
-	permResolver := permission.NewResolver(queries)
-	callerIdentity := server.NewCallerIdentityResolver(queries)
 
 	apiv1.RegisterSpacesServer(grpcServer, spaces.NewSpacesServer(pool, pool, queries, appCodec, permResolver, callerIdentity))
 	apiv1.RegisterOrganizationsServer(grpcServer, organizations.NewOrganizationsServer(pool, queries, authSvc, appCodec, server.AuthenticatedUID, permResolver, callerIdentity))

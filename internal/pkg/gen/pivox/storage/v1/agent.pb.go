@@ -22,6 +22,7 @@ package storagev1
 
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
+	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/permission/v1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -550,7 +551,7 @@ var File_pivox_storage_v1_agent_proto protoreflect.FileDescriptor
 
 const file_pivox_storage_v1_agent_proto_rawDesc = "" +
 	"\n" +
-	"\x1cpivox/storage/v1/agent.proto\x12\x10pivox.storage.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x19google/api/resource.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa5\x05\n" +
+	"\x1cpivox/storage/v1/agent.proto\x12\x10pivox.storage.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x19google/api/resource.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!pivox/permission/v1/options.proto\"\xa5\x05\n" +
 	"\x05Agent\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12*\n" +
 	"\n" +
@@ -590,14 +591,14 @@ const file_pivox_storage_v1_agent_proto_rawDesc = "" +
 	"\x06reason\x18\x02 \x01(\tB\x03\xe0A\x01R\x06reason\"K\n" +
 	"\x12RemoveAgentRequest\x125\n" +
 	"\x04name\x18\x01 \x01(\tB!\xe0A\x02\xfaA\x15\n" +
-	"\x13pivox.storage/Agent\xbaH\x03\xc8\x01\x01R\x04name2\x85\x05\n" +
-	"\x06Agents\x12\x8c\x01\n" +
-	"\bGetAgent\x12!.pivox.storage.v1.GetAgentRequest\x1a\x17.pivox.storage.v1.Agent\"D\xdaA\x04name\x82\xd3\xe4\x93\x027\x125/v1/{name=organizations/*/storageGateways/*/agents/*}\x12\x9f\x01\n" +
+	"\x13pivox.storage/Agent\xbaH\x03\xc8\x01\x01R\x04name2\xe4\x05\n" +
+	"\x06Agents\x12\xa3\x01\n" +
+	"\bGetAgent\x12!.pivox.storage.v1.GetAgentRequest\x1a\x17.pivox.storage.v1.Agent\"[\xdaA\x04name\x8a\xb5\x18\x13storage.agents.read\x82\xd3\xe4\x93\x027\x125/v1/{name=organizations/*/storageGateways/*/agents/*}\x12\xb6\x01\n" +
 	"\n" +
-	"ListAgents\x12#.pivox.storage.v1.ListAgentsRequest\x1a$.pivox.storage.v1.ListAgentsResponse\"F\xdaA\x06parent\x82\xd3\xe4\x93\x027\x125/v1/{parent=organizations/*/storageGateways/*}/agents\x12\x99\x01\n" +
+	"ListAgents\x12#.pivox.storage.v1.ListAgentsRequest\x1a$.pivox.storage.v1.ListAgentsResponse\"]\xdaA\x06parent\x8a\xb5\x18\x13storage.agents.read\x82\xd3\xe4\x93\x027\x125/v1/{parent=organizations/*/storageGateways/*}/agents\x12\xb1\x01\n" +
 	"\n" +
-	"DrainAgent\x12#.pivox.storage.v1.DrainAgentRequest\x1a\x17.pivox.storage.v1.Agent\"M\xdaA\x04name\x82\xd3\xe4\x93\x02@:\x01*\";/v1/{name=organizations/*/storageGateways/*/agents/*}:drain\x12\x9c\x01\n" +
-	"\vRemoveAgent\x12$.pivox.storage.v1.RemoveAgentRequest\x1a\x17.pivox.storage.v1.Agent\"N\xdaA\x04name\x82\xd3\xe4\x93\x02A:\x01*\"</v1/{name=organizations/*/storageGateways/*/agents/*}:remove\x1a\x0f\xcaA\fapi.pivox.ioB\xca\x01\n" +
+	"DrainAgent\x12#.pivox.storage.v1.DrainAgentRequest\x1a\x17.pivox.storage.v1.Agent\"e\xdaA\x04name\x8a\xb5\x18\x14storage.agents.drain\x82\xd3\xe4\x93\x02@:\x01*\";/v1/{name=organizations/*/storageGateways/*/agents/*}:drain\x12\xb5\x01\n" +
+	"\vRemoveAgent\x12$.pivox.storage.v1.RemoveAgentRequest\x1a\x17.pivox.storage.v1.Agent\"g\xdaA\x04name\x8a\xb5\x18\x15storage.agents.remove\x82\xd3\xe4\x93\x02A:\x01*\"</v1/{name=organizations/*/storageGateways/*/agents/*}:remove\x1a\x0f\xcaA\fapi.pivox.ioB\xca\x01\n" +
 	"\x14com.pivox.storage.v1B\n" +
 	"AgentProtoP\x01ZDgithub.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1;storagev1\xa2\x02\x03PSX\xaa\x02\x10Pivox.Storage.V1\xca\x02\x10Pivox\\Storage\\V1\xe2\x02\x1cPivox\\Storage\\V1\\GPBMetadata\xea\x02\x12Pivox::Storage::V1b\x06proto3"
 

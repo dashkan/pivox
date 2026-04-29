@@ -23,6 +23,7 @@ package apiv1
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
+	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/permission/v1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -855,7 +856,7 @@ var File_pivox_api_v1_tag_bindings_proto protoreflect.FileDescriptor
 
 const file_pivox_api_v1_tag_bindings_proto_rawDesc = "" +
 	"\n" +
-	"\x1fpivox/api/v1/tag_bindings.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9c\x06\n" +
+	"\x1fpivox/api/v1/tag_bindings.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!pivox/permission/v1/options.proto\"\x9c\x06\n" +
 	"\n" +
 	"TagBinding\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12=\n" +
@@ -919,17 +920,17 @@ const file_pivox_api_v1_tag_bindings_proto_rawDesc = "" +
 	"\x10pivox.api/TagKeyR\x06tagKey\x12\x1c\n" +
 	"\tinherited\x18\x05 \x01(\bR\tinherited\"\x1a\n" +
 	"\x18CreateTagBindingMetadata\"\x1a\n" +
-	"\x18DeleteTagBindingMetadata2\xf2\v\n" +
-	"\vTagBindings\x12\x8e\x02\n" +
-	"\x0fListTagBindings\x12$.pivox.api.v1.ListTagBindingsRequest\x1a%.pivox.api.v1.ListTagBindingsResponse\"\xad\x01\xdaA\x06parent\x82\xd3\xe4\x93\x02\x9d\x01Z3\x121/v1/{parent=organizations/*/spaces/*}/tagBindingsZ<\x12:/v1/{parent=organizations/*/spaces/*/assets/*}/tagBindings\x12(/v1/{parent=organizations/*}/tagBindings\x12\xfb\x01\n" +
-	"\rGetTagBinding\x12\".pivox.api.v1.GetTagBindingRequest\x1a\x18.pivox.api.v1.TagBinding\"\xab\x01\xdaA\x04name\x82\xd3\xe4\x93\x02\x9d\x01Z3\x121/v1/{name=organizations/*/spaces/*/tagBindings/*}Z<\x12:/v1/{name=organizations/*/spaces/*/assets/*/tagBindings/*}\x12(/v1/{name=organizations/*/tagBindings/*}\x12\xf3\x02\n" +
-	"\x10CreateTagBinding\x12%.pivox.api.v1.CreateTagBindingRequest\x1a\x1d.google.longrunning.Operation\"\x98\x02\xcaA&\n" +
+	"\x18DeleteTagBindingMetadata2\xb7\f\n" +
+	"\vTagBindings\x12\x9b\x02\n" +
+	"\x0fListTagBindings\x12$.pivox.api.v1.ListTagBindingsRequest\x1a%.pivox.api.v1.ListTagBindingsResponse\"\xba\x01\xdaA\x06parent\x8a\xb5\x18\ttags.read\x82\xd3\xe4\x93\x02\x9d\x01Z3\x121/v1/{parent=organizations/*/spaces/*}/tagBindingsZ<\x12:/v1/{parent=organizations/*/spaces/*/assets/*}/tagBindings\x12(/v1/{parent=organizations/*}/tagBindings\x12\x88\x02\n" +
+	"\rGetTagBinding\x12\".pivox.api.v1.GetTagBindingRequest\x1a\x18.pivox.api.v1.TagBinding\"\xb8\x01\xdaA\x04name\x8a\xb5\x18\ttags.read\x82\xd3\xe4\x93\x02\x9d\x01Z3\x121/v1/{name=organizations/*/spaces/*/tagBindings/*}Z<\x12:/v1/{name=organizations/*/spaces/*/assets/*/tagBindings/*}\x12(/v1/{name=organizations/*/tagBindings/*}\x12\x82\x03\n" +
+	"\x10CreateTagBinding\x12%.pivox.api.v1.CreateTagBindingRequest\x1a\x1d.google.longrunning.Operation\"\xa7\x02\xcaA&\n" +
 	"\n" +
-	"TagBinding\x12\x18CreateTagBindingMetadata\xdaA!parent,tag_binding,tag_binding_id\x82\xd3\xe4\x93\x02\xc4\x01:\vtag_bindingZ@:\vtag_binding\"1/v1/{parent=organizations/*/spaces/*}/tagBindingsZI:\vtag_binding\":/v1/{parent=organizations/*/spaces/*/assets/*}/tagBindings\"(/v1/{parent=organizations/*}/tagBindings\x12\xaf\x02\n" +
-	"\x10DeleteTagBinding\x12%.pivox.api.v1.DeleteTagBindingRequest\x1a\x1d.google.longrunning.Operation\"\xd4\x01\xcaA&\n" +
+	"TagBinding\x12\x18CreateTagBindingMetadata\xdaA!parent,tag_binding,tag_binding_id\x8a\xb5\x18\vtags.create\x82\xd3\xe4\x93\x02\xc4\x01:\vtag_bindingZ@:\vtag_binding\"1/v1/{parent=organizations/*/spaces/*}/tagBindingsZI:\vtag_binding\":/v1/{parent=organizations/*/spaces/*/assets/*}/tagBindings\"(/v1/{parent=organizations/*}/tagBindings\x12\xbe\x02\n" +
+	"\x10DeleteTagBinding\x12%.pivox.api.v1.DeleteTagBindingRequest\x1a\x1d.google.longrunning.Operation\"\xe3\x01\xcaA&\n" +
 	"\n" +
-	"TagBinding\x12\x18DeleteTagBindingMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02\x9d\x01Z3*1/v1/{name=organizations/*/spaces/*/tagBindings/*}Z<*:/v1/{name=organizations/*/spaces/*/assets/*/tagBindings/*}*(/v1/{name=organizations/*/tagBindings/*}\x12\x9a\x02\n" +
-	"\x11ListEffectiveTags\x12&.pivox.api.v1.ListEffectiveTagsRequest\x1a'.pivox.api.v1.ListEffectiveTagsResponse\"\xb3\x01\xdaA\x06parent\x82\xd3\xe4\x93\x02\xa3\x01Z5\x123/v1/{parent=organizations/*/spaces/*}/effectiveTagsZ>\x12</v1/{parent=organizations/*/spaces/*/assets/*}/effectiveTags\x12*/v1/{parent=organizations/*}/effectiveTags\x1a\x0f\xcaA\fapi.pivox.ioB\xb4\x01\n" +
+	"TagBinding\x12\x18DeleteTagBindingMetadata\xdaA\x04name\x8a\xb5\x18\vtags.delete\x82\xd3\xe4\x93\x02\x9d\x01Z3*1/v1/{name=organizations/*/spaces/*/tagBindings/*}Z<*:/v1/{name=organizations/*/spaces/*/assets/*/tagBindings/*}*(/v1/{name=organizations/*/tagBindings/*}\x12\xa7\x02\n" +
+	"\x11ListEffectiveTags\x12&.pivox.api.v1.ListEffectiveTagsRequest\x1a'.pivox.api.v1.ListEffectiveTagsResponse\"\xc0\x01\xdaA\x06parent\x8a\xb5\x18\ttags.read\x82\xd3\xe4\x93\x02\xa3\x01Z5\x123/v1/{parent=organizations/*/spaces/*}/effectiveTagsZ>\x12</v1/{parent=organizations/*/spaces/*/assets/*}/effectiveTags\x12*/v1/{parent=organizations/*}/effectiveTags\x1a\x0f\xcaA\fapi.pivox.ioB\xb4\x01\n" +
 	"\x10com.pivox.api.v1B\x10TagBindingsProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
 
 var (

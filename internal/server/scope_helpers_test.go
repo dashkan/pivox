@@ -83,6 +83,44 @@ func TestSpaceScopeFromPath_NestedSpaceChild(t *testing.T) {
 	}
 }
 
+func TestScopeFromPath_DispatchesByPathShape(t *testing.T) {
+	cases := []struct {
+		path string
+		want ScopeKind
+	}{
+		{"organizations/acme", ScopeOrg},
+		{"organizations/acme/domains/example.com", ScopeOrg},
+		{"organizations/acme/spaces/design", ScopeSpace},
+		{"organizations/acme/spaces/design/members/u-1", ScopeSpace},
+		{"organizations/acme/spaces/design/assets/asset-1", ScopeSpace},
+	}
+	for _, tc := range cases {
+		t.Run(tc.path, func(t *testing.T) {
+			got, err := ScopeFromPath("name", tc.path)
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got.Kind)
+		})
+	}
+}
+
+func TestScopeFromPath_InvalidIsInvalidArgument(t *testing.T) {
+	cases := []string{
+		"",
+		"users/me",
+		"organizations",
+		"organizations/",
+		"organizations/acme/spaces",
+		"organizations/acme/spaces/",
+	}
+	for _, p := range cases {
+		t.Run(p, func(t *testing.T) {
+			_, err := ScopeFromPath("name", p)
+			require.Error(t, err)
+			assert.Equal(t, codes.InvalidArgument, status.Code(err))
+		})
+	}
+}
+
 func TestSpaceScopeFromPath_InvalidIsInvalidArgument(t *testing.T) {
 	cases := []string{
 		"",                                  // empty

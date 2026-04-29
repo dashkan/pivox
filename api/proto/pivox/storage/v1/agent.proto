@@ -23,6 +23,7 @@ import "google/api/field_behavior.proto";
 import "google/api/field_info.proto";
 import "google/api/resource.proto";
 import "google/protobuf/timestamp.proto";
+import "pivox/permission/v1/options.proto";
 
 option go_package = "pivox/storage/v1;storagev1";
 
@@ -36,6 +37,7 @@ service Agents {
   rpc GetAgent(GetAgentRequest) returns (Agent) {
     option (google.api.http) = {get: "/v1/{name=organizations/*/storageGateways/*/agents/*}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "storage.agents.read";
   }
 
   // Lists agents belonging to a storage gateway that satisfy the specified
@@ -43,6 +45,7 @@ service Agents {
   rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse) {
     option (google.api.http) = {get: "/v1/{parent=organizations/*/storageGateways/*}/agents"};
     option (google.api.method_signature) = "parent";
+    option (pivox.permission.v1.required_permission) = "storage.agents.read";
   }
 
   // Initiates a graceful drain of the specified agent. The agent stops
@@ -54,6 +57,7 @@ service Agents {
       body: "*"
     };
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "storage.agents.drain";
   }
 
   // Removes an agent from the storage gateway. The agent is immediately
@@ -64,6 +68,7 @@ service Agents {
       body: "*"
     };
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "storage.agents.remove";
   }
 }
 

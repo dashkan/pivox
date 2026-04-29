@@ -27,6 +27,7 @@ import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "pivox/iam/v1/members.proto";
 import "pivox/iam/v1/permissions.proto";
+import "pivox/permission/v1/options.proto";
 
 option go_package = "pivox/api/v1;apiv1";
 
@@ -42,6 +43,7 @@ service Spaces {
   rpc GetSpace(GetSpaceRequest) returns (Space) {
     option (google.api.http) = {get: "/v1/{name=organizations/*/spaces/*}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "spaces.read";
   }
 
   // Lists spaces that are direct children of the specified organization
@@ -53,6 +55,7 @@ service Spaces {
   rpc ListSpaces(ListSpacesRequest) returns (ListSpacesResponse) {
     option (google.api.http) = {get: "/v1/{parent=organizations/*}/spaces"};
     option (google.api.method_signature) = "parent";
+    option (pivox.permission.v1.required_permission) = "spaces.read";
   }
 
   // Creates a new space under the specified organization.
@@ -66,6 +69,7 @@ service Spaces {
       response_type: "Space"
       metadata_type: "CreateSpaceMetadata"
     };
+    option (pivox.permission.v1.required_permission) = "spaces.create";
   }
 
   // Updates the `display_name` and labels of the space identified by the
@@ -84,6 +88,8 @@ service Spaces {
       response_type: "Space"
       metadata_type: "UpdateSpaceMetadata"
     };
+    option (pivox.permission.v1.required_permission) = "spaces.update";
+    option (pivox.permission.v1.scope_field) = "space.name";
   }
 
   // Marks the space identified by the specified
@@ -128,6 +134,7 @@ service Spaces {
       response_type: "Space"
       metadata_type: "DeleteSpaceMetadata"
     };
+    option (pivox.permission.v1.required_permission) = "spaces.delete";
   }
 
   // Restores the space identified by the specified
@@ -149,6 +156,7 @@ service Spaces {
       response_type: "Space"
       metadata_type: "UndeleteSpaceMetadata"
     };
+    option (pivox.permission.v1.required_permission) = "spaces.delete";
   }
 
   // Gets a space-scope Member by resource name. Members here are
@@ -157,6 +165,7 @@ service Spaces {
   rpc GetMember(pivox.iam.v1.GetMemberRequest) returns (pivox.iam.v1.Member) {
     option (google.api.http) = {get: "/v1/{name=organizations/*/spaces/*/members/*}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "members.read";
   }
 
   // Lists space-scope Members. Direct bindings only — does not include
@@ -164,6 +173,7 @@ service Spaces {
   rpc ListMembers(pivox.iam.v1.ListMembersRequest) returns (pivox.iam.v1.ListMembersResponse) {
     option (google.api.http) = {get: "/v1/{parent=organizations/*/spaces/*}/members"};
     option (google.api.method_signature) = "parent";
+    option (pivox.permission.v1.required_permission) = "members.read";
   }
 
   // Creates a space-scope Member binding. The principal must already
@@ -175,6 +185,7 @@ service Spaces {
       body: "member"
     };
     option (google.api.method_signature) = "parent,member,member_id";
+    option (pivox.permission.v1.required_permission) = "members.create";
   }
 
   // Updates a space-scope Member's role. Only `role` is mutable.
@@ -184,12 +195,15 @@ service Spaces {
       body: "member"
     };
     option (google.api.method_signature) = "member,update_mask";
+    option (pivox.permission.v1.required_permission) = "members.update";
+    option (pivox.permission.v1.scope_field) = "member.name";
   }
 
   // Deletes a space-scope Member binding.
   rpc DeleteMember(pivox.iam.v1.DeleteMemberRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {delete: "/v1/{name=organizations/*/spaces/*/members/*}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "members.delete";
   }
 
   // Returns the subset of requested permissions the caller is allowed
@@ -202,6 +216,7 @@ service Spaces {
       body: "*"
     };
     option (google.api.method_signature) = "resource,permissions";
+    option (pivox.permission.v1.exempt) = true;
   }
 }
 

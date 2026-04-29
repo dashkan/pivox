@@ -1,5 +1,7 @@
 package server
 
+//go:generate go run ../../cmd/gen-permission-registry
+
 import (
 	"context"
 	"errors"
@@ -356,19 +358,26 @@ func PermissionInterceptor(
 	}
 }
 
-// PermissionStreamInterceptor is the streaming variant. Same registry,
-// same exempt set, same gate semantics. Streaming RPCs that pass the
-// gate get a wrapped ServerStream whose Context() carries the
-// resolved-scope value, so streaming handlers read scope the same way
-// unary handlers do.
+// PermissionStreamInterceptor is the streaming variant. Same
+// registry, same exempt set, same gate semantics — but the
+// extraction point is shifted to first-RecvMsg because gRPC's
+// streaming-server interceptor signature doesn't carry the request
+// body. The flow:
 //
-// Note: unlike unary, the gate runs on the initial request metadata
-// (no request body to extract from yet for client-streaming RPCs).
-// Today's streaming surface is server-side-only (AI chat) and is
-// deferred from gating; the interceptor still default-denies any
-// streaming method not registered or exempted, which prevents a
-// future client-streaming RPC from reaching its handler before its
-// gating is wired.
+//  1. Exempt methods bypass everything (no wrap).
+//  2. Methods absent from the registry default-deny BEFORE the
+//     handler runs (Internal — server misconfiguration).
+//  3. Caller identity is resolved up-front so unauth callers fail
+//     fast without waiting for a message that may never arrive.
+//  4. The stream is wrapped with a `permissionStream` that runs
+//     the registered extractor on the first message read by the
+//     handler. If the gate denies, the deny error surfaces from
+//     RecvMsg and the handler propagates it to the client.
+//
+// Subsequent messages on the same stream are NOT re-gated — the
+// scope is fixed for the lifetime of the stream (matches the
+// AI-chat conversation-per-stream usage and avoids re-resolving
+// on every chunk).
 func PermissionStreamInterceptor(
 	registry Registry,
 	exempt map[string]bool,
@@ -383,14 +392,88 @@ func PermissionStreamInterceptor(
 		info *grpc.StreamServerInfo,
 		handler grpc.StreamHandler,
 	) error {
-		// Streaming has no request body at gate time; passing nil here
-		// means streaming extractors must be no-arg / parent-only.
-		// Until streaming RPCs are explicitly registered, every
-		// streaming method falls into the default-deny path.
-		newCtx, err := gate.check(ss.Context(), info.FullMethod, nil)
+		if gate.exempt[info.FullMethod] {
+			return handler(srv, ss)
+		}
+		entry, ok := gate.registry[info.FullMethod]
+		if !ok {
+			slog.ErrorContext(ss.Context(), "permission interceptor: streaming method has no gate registered", "method", info.FullMethod)
+			return apierr.Internal("permission gate not configured for this method")
+		}
+		// Pre-resolve caller identity so unauth callers fail fast
+		// without waiting for the first message.
+		callerID, err := gate.identity(ss.Context())
 		if err != nil {
 			return err
 		}
-		return handler(srv, &serverStreamWithContext{ServerStream: ss, ctx: newCtx})
+		wrapped := &permissionStream{
+			ServerStream: ss,
+			gate:         gate,
+			method:       info.FullMethod,
+			entry:        entry,
+			callerID:     callerID,
+			ctx:          ss.Context(),
+		}
+		return handler(srv, wrapped)
 	}
+}
+
+// permissionStream wraps grpc.ServerStream so the gate fires on
+// the first RecvMsg call. Subsequent messages skip the gate check.
+// Context() returns the gate-augmented context after the first
+// successful resolution so the handler observes the resolved
+// scope via {Resolved Org,Space} FromContext.
+//
+// Concurrency: this wrapper is safe for server-streaming RPCs
+// only. gRPC-Go serializes RecvMsg per stream (the transport
+// pulls one message at a time from the wire), so `checked` and
+// `ctx` are mutated from a single goroutine in the server-stream
+// case. A future bidi or client-streaming RPC that fans RecvMsg
+// out across goroutines would need a sync.Mutex around the
+// checked/ctx fields — flag this when wrapping such a method.
+type permissionStream struct {
+	grpc.ServerStream
+	gate     *permissionGate
+	method   string
+	entry    RegistryEntry
+	callerID uuid.UUID
+	ctx      context.Context
+	// checked is set to true on the first call to RecvMsg
+	// regardless of gate outcome (allow, deny, extractor error,
+	// resolver fault). A handler that swallows a deny error and
+	// retries RecvMsg will not re-run the gate; the next
+	// underlying RecvMsg either returns io.EOF or the next message
+	// (which is fine — the original deny already surfaced).
+	checked bool
+}
+
+func (s *permissionStream) Context() context.Context { return s.ctx }
+
+func (s *permissionStream) RecvMsg(m any) error {
+	if err := s.ServerStream.RecvMsg(m); err != nil {
+		return err
+	}
+	if s.checked {
+		return nil
+	}
+	s.checked = true
+	scope, err := s.entry.Extract(m)
+	if err != nil {
+		return err
+	}
+	var newCtx context.Context
+	switch scope.Kind {
+	case ScopeOrg:
+		newCtx, err = s.gate.checkOrgScope(s.ctx, s.method, s.entry, scope, s.callerID)
+	case ScopeSpace:
+		newCtx, err = s.gate.checkSpaceScope(s.ctx, s.method, s.entry, scope, s.callerID)
+	default:
+		slog.ErrorContext(s.ctx, "permission interceptor: unknown scope kind on stream", "method", s.method, "kind", scope.Kind)
+		return apierr.Internal("permission gate misconfigured for this method")
+	}
+	if err != nil {
+		return err
+	}
+	s.ctx = newCtx
+	return nil
 }

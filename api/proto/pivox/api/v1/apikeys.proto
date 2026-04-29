@@ -24,6 +24,7 @@ import "google/api/resource.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
+import "pivox/permission/v1/options.proto";
 
 option go_package = "pivox/api/v1;apiv1";
 
@@ -38,6 +39,7 @@ service ApiKeys {
       body: "key"
     };
     option (google.api.method_signature) = "parent,key,key_id";
+    option (pivox.permission.v1.required_permission) = "apiKeys.create";
   }
 
   // Lists the API keys owned by an organization. The key string of the API
@@ -45,6 +47,7 @@ service ApiKeys {
   rpc ListKeys(ListKeysRequest) returns (ListKeysResponse) {
     option (google.api.http) = {get: "/v1/{parent=organizations/*}/keys"};
     option (google.api.method_signature) = "parent";
+    option (pivox.permission.v1.required_permission) = "apiKeys.read";
   }
 
   // Gets the metadata for an API key. The key string of the API key
@@ -52,6 +55,7 @@ service ApiKeys {
   rpc GetKey(GetKeyRequest) returns (Key) {
     option (google.api.http) = {get: "/v1/{name=organizations/*/keys/*}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "apiKeys.read";
   }
 
   // Get the key string for an API key.
@@ -60,6 +64,7 @@ service ApiKeys {
   rpc GetKeyString(GetKeyStringRequest) returns (GetKeyStringResponse) {
     option (google.api.http) = {get: "/v1/{name=organizations/*/keys/*}/keyString"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "apiKeys.read";
   }
 
   // Patches the modifiable fields of an API key.
@@ -70,6 +75,8 @@ service ApiKeys {
       body: "key"
     };
     option (google.api.method_signature) = "key,update_mask";
+    option (pivox.permission.v1.required_permission) = "apiKeys.update";
+    option (pivox.permission.v1.scope_field) = "key.name";
   }
 
   // Deletes an API key. Deleted key can be retrieved within 30 days of
@@ -77,6 +84,7 @@ service ApiKeys {
   rpc DeleteKey(DeleteKeyRequest) returns (Key) {
     option (google.api.http) = {delete: "/v1/{name=organizations/*/keys/*}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "apiKeys.delete";
   }
 
   // Undeletes an API key which was deleted within 30 days.
@@ -86,6 +94,7 @@ service ApiKeys {
       body: "*"
     };
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "apiKeys.delete";
   }
 
   // Find the parent organization and resource name of the API
@@ -97,6 +106,10 @@ service ApiKeys {
   //     aip.dev/not-precedent: LookupKey searches by key string, not by resource name. --)
   rpc LookupKey(LookupKeyRequest) returns (LookupKeyResponse) {
     option (google.api.http) = {get: "/v1/keys:lookupKey"};
+    // Cross-org reverse lookup by key_string — caller doesn't yet
+    // know which org owns the key, so per-org gating doesn't apply.
+    // Membership interceptor still requires authentication.
+    option (pivox.permission.v1.exempt) = true;
   }
 }
 

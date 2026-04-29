@@ -26,6 +26,7 @@ import "google/rpc/status.proto";
 import "pivox/ai/v1/artifacts.proto";
 import "pivox/ai/v1/conversations.proto";
 import "pivox/ai/v1/messages.proto";
+import "pivox/permission/v1/options.proto";
 
 option go_package = "pivox/ai/v1;aiv1";
 
@@ -45,12 +46,14 @@ service AiChat {
   rpc GetConversation(GetConversationRequest) returns (Conversation) {
     option (google.api.http) = {get: "/v1/{name=organizations/*/conversations/*}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "ai.conversations.read";
   }
 
   // Lists conversations in an organization.
   rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse) {
     option (google.api.http) = {get: "/v1/{parent=organizations/*}/conversations"};
     option (google.api.method_signature) = "parent";
+    option (pivox.permission.v1.required_permission) = "ai.conversations.read";
   }
 
   // Creates a new conversation.
@@ -60,6 +63,7 @@ service AiChat {
       body: "conversation"
     };
     option (google.api.method_signature) = "parent,conversation";
+    option (pivox.permission.v1.required_permission) = "ai.conversations.create";
   }
 
   // Updates a conversation's mutable fields.
@@ -69,54 +73,65 @@ service AiChat {
       body: "conversation"
     };
     option (google.api.method_signature) = "conversation,update_mask";
+    option (pivox.permission.v1.required_permission) = "ai.conversations.update";
+    option (pivox.permission.v1.scope_field) = "conversation.name";
   }
 
   // Soft-deletes a conversation.
   rpc DeleteConversation(DeleteConversationRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {delete: "/v1/{name=organizations/*/conversations/*}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "ai.conversations.delete";
   }
 
   // Gets a message by resource name.
   rpc GetMessage(GetMessageRequest) returns (Message) {
     option (google.api.http) = {get: "/v1/{name=organizations/*/conversations/*/messages/*}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "ai.conversations.read";
   }
 
   // Lists messages in a conversation.
   rpc ListMessages(ListMessagesRequest) returns (ListMessagesResponse) {
     option (google.api.http) = {get: "/v1/{parent=organizations/*/conversations/*}/messages"};
     option (google.api.method_signature) = "parent";
+    option (pivox.permission.v1.required_permission) = "ai.conversations.read";
   }
 
   // Gets an artifact by resource name.
   rpc GetArtifact(GetArtifactRequest) returns (Artifact) {
     option (google.api.http) = {get: "/v1/{name=organizations/*/conversations/*/artifacts/*}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "ai.conversations.read";
   }
 
   // Lists artifacts in a conversation.
   rpc ListArtifacts(ListArtifactsRequest) returns (ListArtifactsResponse) {
     option (google.api.http) = {get: "/v1/{parent=organizations/*/conversations/*}/artifacts"};
     option (google.api.method_signature) = "parent";
+    option (pivox.permission.v1.required_permission) = "ai.conversations.read";
   }
 
   // Deletes an artifact and all its versions.
   rpc DeleteArtifact(DeleteArtifactRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {delete: "/v1/{name=organizations/*/conversations/*/artifacts/*}"};
     option (google.api.method_signature) = "name";
+    // Per YAML rollup: ai.conversations.update covers artifact mutations.
+    option (pivox.permission.v1.required_permission) = "ai.conversations.update";
   }
 
   // Gets an artifact version by resource name.
   rpc GetArtifactVersion(GetArtifactVersionRequest) returns (ArtifactVersion) {
     option (google.api.http) = {get: "/v1/{name=organizations/*/conversations/*/artifacts/*/versions/*}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "ai.conversations.read";
   }
 
   // Lists versions of an artifact.
   rpc ListArtifactVersions(ListArtifactVersionsRequest) returns (ListArtifactVersionsResponse) {
     option (google.api.http) = {get: "/v1/{parent=organizations/*/conversations/*/artifacts/*}/versions"};
     option (google.api.method_signature) = "parent";
+    option (pivox.permission.v1.required_permission) = "ai.conversations.read";
   }
 
   // Deletes an artifact version. If the last version is deleted, the parent
@@ -124,6 +139,7 @@ service AiChat {
   rpc DeleteArtifactVersion(DeleteArtifactVersionRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {delete: "/v1/{name=organizations/*/conversations/*/artifacts/*/versions/*}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "ai.conversations.update";
   }
 
   // Generates assistant content for the given input. Unary: collects
@@ -137,6 +153,8 @@ service AiChat {
       post: "/v1/{parent=organizations/*}:generateContent"
       body: "*"
     };
+    option (pivox.permission.v1.required_permission) = "ai.chat.stream";
+    option (pivox.permission.v1.scope_field) = "parent";
   }
 
   // Server-streaming counterpart to `GenerateContent`. Same request
@@ -162,6 +180,8 @@ service AiChat {
       post: "/v1/{parent=organizations/*}:streamGenerateContent"
       body: "*"
     };
+    option (pivox.permission.v1.required_permission) = "ai.chat.stream";
+    option (pivox.permission.v1.scope_field) = "parent";
   }
 
   // Generates a short title for the conversation by summarizing its
@@ -181,6 +201,7 @@ service AiChat {
       body: "*"
     };
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "ai.conversations.update";
   }
 }
 

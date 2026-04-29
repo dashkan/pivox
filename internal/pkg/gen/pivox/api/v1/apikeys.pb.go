@@ -22,6 +22,7 @@ package apiv1
 
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
+	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/permission/v1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -1269,7 +1270,7 @@ var File_pivox_api_v1_apikeys_proto protoreflect.FileDescriptor
 
 const file_pivox_api_v1_apikeys_proto_rawDesc = "" +
 	"\n" +
-	"\x1apivox/api/v1/apikeys.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa1\x05\n" +
+	"\x1apivox/api/v1/apikeys.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!pivox/permission/v1/options.proto\"\xa1\x05\n" +
 	"\x03Key\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12&\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\x03\xe0A\x01R\vdisplayName\x12\"\n" +
@@ -1354,16 +1355,16 @@ const file_pivox_api_v1_apikeys_proto_rawDesc = "" +
 	"key_string\x18\x01 \x01(\tB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\tkeyString\"?\n" +
 	"\x11LookupKeyResponse\x12\x16\n" +
 	"\x06parent\x18\x01 \x01(\tR\x06parent\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name2\x84\b\n" +
-	"\aApiKeys\x12\x82\x01\n" +
-	"\tCreateKey\x12\x1e.pivox.api.v1.CreateKeyRequest\x1a\x11.pivox.api.v1.Key\"B\xdaA\x11parent,key,key_id\x82\xd3\xe4\x93\x02(:\x03key\"!/v1/{parent=organizations/*}/keys\x12}\n" +
-	"\bListKeys\x12\x1d.pivox.api.v1.ListKeysRequest\x1a\x1e.pivox.api.v1.ListKeysResponse\"2\xdaA\x06parent\x82\xd3\xe4\x93\x02#\x12!/v1/{parent=organizations/*}/keys\x12j\n" +
-	"\x06GetKey\x12\x1b.pivox.api.v1.GetKeyRequest\x1a\x11.pivox.api.v1.Key\"0\xdaA\x04name\x82\xd3\xe4\x93\x02#\x12!/v1/{name=organizations/*/keys/*}\x12\x91\x01\n" +
-	"\fGetKeyString\x12!.pivox.api.v1.GetKeyStringRequest\x1a\".pivox.api.v1.GetKeyStringResponse\":\xdaA\x04name\x82\xd3\xe4\x93\x02-\x12+/v1/{name=organizations/*/keys/*}/keyString\x12\x84\x01\n" +
-	"\tUpdateKey\x12\x1e.pivox.api.v1.UpdateKeyRequest\x1a\x11.pivox.api.v1.Key\"D\xdaA\x0fkey,update_mask\x82\xd3\xe4\x93\x02,:\x03key2%/v1/{key.name=organizations/*/keys/*}\x12p\n" +
-	"\tDeleteKey\x12\x1e.pivox.api.v1.DeleteKeyRequest\x1a\x11.pivox.api.v1.Key\"0\xdaA\x04name\x82\xd3\xe4\x93\x02#*!/v1/{name=organizations/*/keys/*}\x12\x80\x01\n" +
-	"\vUndeleteKey\x12 .pivox.api.v1.UndeleteKeyRequest\x1a\x11.pivox.api.v1.Key\"<\xdaA\x04name\x82\xd3\xe4\x93\x02/:\x01*\"*/v1/{name=organizations/*/keys/*}:undelete\x12h\n" +
-	"\tLookupKey\x12\x1e.pivox.api.v1.LookupKeyRequest\x1a\x1f.pivox.api.v1.LookupKeyResponse\"\x1a\x82\xd3\xe4\x93\x02\x14\x12\x12/v1/keys:lookupKey\x1a\x0f\xcaA\fapi.pivox.ioB\xb0\x01\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name2\x8e\t\n" +
+	"\aApiKeys\x12\x94\x01\n" +
+	"\tCreateKey\x12\x1e.pivox.api.v1.CreateKeyRequest\x1a\x11.pivox.api.v1.Key\"T\xdaA\x11parent,key,key_id\x8a\xb5\x18\x0eapiKeys.create\x82\xd3\xe4\x93\x02(:\x03key\"!/v1/{parent=organizations/*}/keys\x12\x8d\x01\n" +
+	"\bListKeys\x12\x1d.pivox.api.v1.ListKeysRequest\x1a\x1e.pivox.api.v1.ListKeysResponse\"B\xdaA\x06parent\x8a\xb5\x18\fapiKeys.read\x82\xd3\xe4\x93\x02#\x12!/v1/{parent=organizations/*}/keys\x12z\n" +
+	"\x06GetKey\x12\x1b.pivox.api.v1.GetKeyRequest\x1a\x11.pivox.api.v1.Key\"@\xdaA\x04name\x8a\xb5\x18\fapiKeys.read\x82\xd3\xe4\x93\x02#\x12!/v1/{name=organizations/*/keys/*}\x12\xa1\x01\n" +
+	"\fGetKeyString\x12!.pivox.api.v1.GetKeyStringRequest\x1a\".pivox.api.v1.GetKeyStringResponse\"J\xdaA\x04name\x8a\xb5\x18\fapiKeys.read\x82\xd3\xe4\x93\x02-\x12+/v1/{name=organizations/*/keys/*}/keyString\x12\xa2\x01\n" +
+	"\tUpdateKey\x12\x1e.pivox.api.v1.UpdateKeyRequest\x1a\x11.pivox.api.v1.Key\"b\xdaA\x0fkey,update_mask\x8a\xb5\x18\x0eapiKeys.update\x9a\xb5\x18\bkey.name\x82\xd3\xe4\x93\x02,:\x03key2%/v1/{key.name=organizations/*/keys/*}\x12\x82\x01\n" +
+	"\tDeleteKey\x12\x1e.pivox.api.v1.DeleteKeyRequest\x1a\x11.pivox.api.v1.Key\"B\xdaA\x04name\x8a\xb5\x18\x0eapiKeys.delete\x82\xd3\xe4\x93\x02#*!/v1/{name=organizations/*/keys/*}\x12\x92\x01\n" +
+	"\vUndeleteKey\x12 .pivox.api.v1.UndeleteKeyRequest\x1a\x11.pivox.api.v1.Key\"N\xdaA\x04name\x8a\xb5\x18\x0eapiKeys.delete\x82\xd3\xe4\x93\x02/:\x01*\"*/v1/{name=organizations/*/keys/*}:undelete\x12l\n" +
+	"\tLookupKey\x12\x1e.pivox.api.v1.LookupKeyRequest\x1a\x1f.pivox.api.v1.LookupKeyResponse\"\x1e\x90\xb5\x18\x01\x82\xd3\xe4\x93\x02\x14\x12\x12/v1/keys:lookupKey\x1a\x0f\xcaA\fapi.pivox.ioB\xb0\x01\n" +
 	"\x10com.pivox.api.v1B\fApikeysProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
 
 var (

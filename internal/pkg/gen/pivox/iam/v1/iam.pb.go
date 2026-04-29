@@ -22,6 +22,7 @@ package iamv1
 
 import (
 	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
+	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/permission/v1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -41,25 +42,30 @@ var File_pivox_iam_v1_iam_proto protoreflect.FileDescriptor
 
 const file_pivox_iam_v1_iam_proto_rawDesc = "" +
 	"\n" +
-	"\x16pivox/iam/v1/iam.proto\x12\fpivox.iam.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a#google/longrunning/operations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x19pivox/iam/v1/groups.proto\x1a\x1apivox/iam/v1/members.proto\x1a\x1epivox/iam/v1/permissions.proto\x1a\x18pivox/iam/v1/roles.proto\x1a\x18pivox/iam/v1/users.proto2\xd7\x0f\n" +
-	"\x03Iam\x12n\n" +
-	"\aGetUser\x12\x1c.pivox.iam.v1.GetUserRequest\x1a\x12.pivox.iam.v1.User\"1\xdaA\x04name\x82\xd3\xe4\x93\x02$\x12\"/v1/{name=organizations/*/users/*}\x12\x81\x01\n" +
-	"\tListUsers\x12\x1e.pivox.iam.v1.ListUsersRequest\x1a\x1f.pivox.iam.v1.ListUsersResponse\"3\xdaA\x06parent\x82\xd3\xe4\x93\x02$\x12\"/v1/{parent=organizations/*}/users\x12\xad\x01\n" +
+	"\x16pivox/iam/v1/iam.proto\x12\fpivox.iam.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a#google/longrunning/operations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x19pivox/iam/v1/groups.proto\x1a\x1apivox/iam/v1/members.proto\x1a\x1epivox/iam/v1/permissions.proto\x1a\x18pivox/iam/v1/roles.proto\x1a\x18pivox/iam/v1/users.proto\x1a!pivox/permission/v1/options.proto2\xde\x11\n" +
+	"\x03Iam\x12|\n" +
+	"\aGetUser\x12\x1c.pivox.iam.v1.GetUserRequest\x1a\x12.pivox.iam.v1.User\"?\xdaA\x04name\x8a\xb5\x18\n" +
+	"users.read\x82\xd3\xe4\x93\x02$\x12\"/v1/{name=organizations/*/users/*}\x12\x8f\x01\n" +
+	"\tListUsers\x12\x1e.pivox.iam.v1.ListUsersRequest\x1a\x1f.pivox.iam.v1.ListUsersResponse\"A\xdaA\x06parent\x8a\xb5\x18\n" +
+	"users.read\x82\xd3\xe4\x93\x02$\x12\"/v1/{parent=organizations/*}/users\x12\xbd\x01\n" +
 	"\n" +
-	"DeleteUser\x12\x1f.pivox.iam.v1.DeleteUserRequest\x1a\x1d.google.longrunning.Operation\"_\xcaA+\n" +
-	"\x15google.protobuf.Empty\x12\x12DeleteUserMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02$*\"/v1/{name=organizations/*/users/*}\x12n\n" +
-	"\aGetRole\x12\x1c.pivox.iam.v1.GetRoleRequest\x1a\x12.pivox.iam.v1.Role\"1\xdaA\x04name\x82\xd3\xe4\x93\x02$\x12\"/v1/{name=organizations/*/roles/*}\x12\x81\x01\n" +
-	"\tListRoles\x12\x1e.pivox.iam.v1.ListRolesRequest\x1a\x1f.pivox.iam.v1.ListRolesResponse\"3\xdaA\x06parent\x82\xd3\xe4\x93\x02$\x12\"/v1/{parent=organizations/*}/roles\x12w\n" +
-	"\x0fListPermissions\x12$.pivox.iam.v1.ListPermissionsRequest\x1a%.pivox.iam.v1.ListPermissionsResponse\"\x17\x82\xd3\xe4\x93\x02\x11\x12\x0f/v1/permissions\x12r\n" +
-	"\bGetGroup\x12\x1d.pivox.iam.v1.GetGroupRequest\x1a\x13.pivox.iam.v1.Group\"2\xdaA\x04name\x82\xd3\xe4\x93\x02%\x12#/v1/{name=organizations/*/groups/*}\x12\x85\x01\n" +
+	"DeleteUser\x12\x1f.pivox.iam.v1.DeleteUserRequest\x1a\x1d.google.longrunning.Operation\"o\xcaA+\n" +
+	"\x15google.protobuf.Empty\x12\x12DeleteUserMetadata\xdaA\x04name\x8a\xb5\x18\fusers.delete\x82\xd3\xe4\x93\x02$*\"/v1/{name=organizations/*/users/*}\x12|\n" +
+	"\aGetRole\x12\x1c.pivox.iam.v1.GetRoleRequest\x1a\x12.pivox.iam.v1.Role\"?\xdaA\x04name\x8a\xb5\x18\n" +
+	"roles.read\x82\xd3\xe4\x93\x02$\x12\"/v1/{name=organizations/*/roles/*}\x12\x8f\x01\n" +
+	"\tListRoles\x12\x1e.pivox.iam.v1.ListRolesRequest\x1a\x1f.pivox.iam.v1.ListRolesResponse\"A\xdaA\x06parent\x8a\xb5\x18\n" +
+	"roles.read\x82\xd3\xe4\x93\x02$\x12\"/v1/{parent=organizations/*}/roles\x12{\n" +
+	"\x0fListPermissions\x12$.pivox.iam.v1.ListPermissionsRequest\x1a%.pivox.iam.v1.ListPermissionsResponse\"\x1b\x90\xb5\x18\x01\x82\xd3\xe4\x93\x02\x11\x12\x0f/v1/permissions\x12\x81\x01\n" +
+	"\bGetGroup\x12\x1d.pivox.iam.v1.GetGroupRequest\x1a\x13.pivox.iam.v1.Group\"A\xdaA\x04name\x8a\xb5\x18\vgroups.read\x82\xd3\xe4\x93\x02%\x12#/v1/{name=organizations/*/groups/*}\x12\x94\x01\n" +
 	"\n" +
-	"ListGroups\x12\x1f.pivox.iam.v1.ListGroupsRequest\x1a .pivox.iam.v1.ListGroupsResponse\"4\xdaA\x06parent\x82\xd3\xe4\x93\x02%\x12#/v1/{parent=organizations/*}/groups\x12\x90\x01\n" +
-	"\vCreateGroup\x12 .pivox.iam.v1.CreateGroupRequest\x1a\x13.pivox.iam.v1.Group\"J\xdaA\x15parent,group,group_id\x82\xd3\xe4\x93\x02,:\x05group\"#/v1/{parent=organizations/*}/groups\x12\x92\x01\n" +
-	"\vUpdateGroup\x12 .pivox.iam.v1.UpdateGroupRequest\x1a\x13.pivox.iam.v1.Group\"L\xdaA\x11group,update_mask\x82\xd3\xe4\x93\x022:\x05group2)/v1/{group.name=organizations/*/groups/*}\x12x\n" +
-	"\vDeleteGroup\x12 .pivox.iam.v1.DeleteGroupRequest\x1a\x13.pivox.iam.v1.Group\"2\xdaA\x04name\x82\xd3\xe4\x93\x02%*#/v1/{name=organizations/*/groups/*}\x12\xaf\x01\n" +
-	"\x0fAddGroupMembers\x12$.pivox.iam.v1.AddGroupMembersRequest\x1a%.pivox.iam.v1.AddGroupMembersResponse\"O\xdaA\rgroup,members\x82\xd3\xe4\x93\x029:\x01*\"4/v1/{group=organizations/*/groups/*}:addGroupMembers\x12\xbb\x01\n" +
-	"\x12RemoveGroupMembers\x12'.pivox.iam.v1.RemoveGroupMembersRequest\x1a(.pivox.iam.v1.RemoveGroupMembersResponse\"R\xdaA\rgroup,members\x82\xd3\xe4\x93\x02<:\x01*\"7/v1/{group=organizations/*/groups/*}:removeGroupMembers\x12\x9f\x01\n" +
-	"\x10ListGroupMembers\x12%.pivox.iam.v1.ListGroupMembersRequest\x1a&.pivox.iam.v1.ListGroupMembersResponse\"<\xdaA\x05group\x82\xd3\xe4\x93\x02.\x12,/v1/{group=organizations/*/groups/*}/members\x1a\x0f\xcaA\fapi.pivox.ioB\xac\x01\n" +
+	"ListGroups\x12\x1f.pivox.iam.v1.ListGroupsRequest\x1a .pivox.iam.v1.ListGroupsResponse\"C\xdaA\x06parent\x8a\xb5\x18\vgroups.read\x82\xd3\xe4\x93\x02%\x12#/v1/{parent=organizations/*}/groups\x12\xa1\x01\n" +
+	"\vCreateGroup\x12 .pivox.iam.v1.CreateGroupRequest\x1a\x13.pivox.iam.v1.Group\"[\xdaA\x15parent,group,group_id\x8a\xb5\x18\rgroups.create\x82\xd3\xe4\x93\x02,:\x05group\"#/v1/{parent=organizations/*}/groups\x12\xb1\x01\n" +
+	"\vUpdateGroup\x12 .pivox.iam.v1.UpdateGroupRequest\x1a\x13.pivox.iam.v1.Group\"k\xdaA\x11group,update_mask\x8a\xb5\x18\rgroups.update\x9a\xb5\x18\n" +
+	"group.name\x82\xd3\xe4\x93\x022:\x05group2)/v1/{group.name=organizations/*/groups/*}\x12\x89\x01\n" +
+	"\vDeleteGroup\x12 .pivox.iam.v1.DeleteGroupRequest\x1a\x13.pivox.iam.v1.Group\"C\xdaA\x04name\x8a\xb5\x18\rgroups.delete\x82\xd3\xe4\x93\x02%*#/v1/{name=organizations/*/groups/*}\x12\xd0\x01\n" +
+	"\x0fAddGroupMembers\x12$.pivox.iam.v1.AddGroupMembersRequest\x1a%.pivox.iam.v1.AddGroupMembersResponse\"p\xdaA\rgroup,members\x8a\xb5\x18\x14groups.manageMembers\x9a\xb5\x18\x05group\x82\xd3\xe4\x93\x029:\x01*\"4/v1/{group=organizations/*/groups/*}:addGroupMembers\x12\xdc\x01\n" +
+	"\x12RemoveGroupMembers\x12'.pivox.iam.v1.RemoveGroupMembersRequest\x1a(.pivox.iam.v1.RemoveGroupMembersResponse\"s\xdaA\rgroup,members\x8a\xb5\x18\x14groups.manageMembers\x9a\xb5\x18\x05group\x82\xd3\xe4\x93\x02<:\x01*\"7/v1/{group=organizations/*/groups/*}:removeGroupMembers\x12\xb7\x01\n" +
+	"\x10ListGroupMembers\x12%.pivox.iam.v1.ListGroupMembersRequest\x1a&.pivox.iam.v1.ListGroupMembersResponse\"T\xdaA\x05group\x8a\xb5\x18\vgroups.read\x9a\xb5\x18\x05group\x82\xd3\xe4\x93\x02.\x12,/v1/{group=organizations/*/groups/*}/members\x1a\x0f\xcaA\fapi.pivox.ioB\xac\x01\n" +
 	"\x10com.pivox.iam.v1B\bIamProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1;iamv1\xa2\x02\x03PIX\xaa\x02\fPivox.Iam.V1\xca\x02\fPivox\\Iam\\V1\xe2\x02\x18Pivox\\Iam\\V1\\GPBMetadata\xea\x02\x0ePivox::Iam::V1b\x06proto3"
 
 var file_pivox_iam_v1_iam_proto_goTypes = []any{

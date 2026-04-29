@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"io"
 	"testing"
 
 	"github.com/google/uuid"
@@ -13,9 +14,11 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/permission"
+	aiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1"
 	"github.com/dashkan/pivox/internal/testutil/mocks"
 )
 
@@ -559,14 +562,213 @@ func TestPermissionStreamInterceptor_ExemptStreamPassesThrough(t *testing.T) {
 	assert.True(t, called)
 }
 
-// permTestStream is a minimal grpc.ServerStream stub used only to
-// drive the streaming interceptor in unit tests.
+// permTestStream is a minimal grpc.ServerStream stub for streaming
+// interceptor tests. RecvMsg returns nil on first call (no real
+// message decoded — tests rely on extractor closures that ignore
+// `m`) and io.EOF afterward. If `firstMsg` is set, RecvMsg copies
+// it into the destination via proto.Merge — used by the
+// regression test that exercises the real generated extractor.
 type permTestStream struct {
 	grpc.ServerStream
-	ctx context.Context
+	ctx       context.Context
+	firstMsg  proto.Message
+	recvCalls int
 }
 
 func (s *permTestStream) Context() context.Context { return s.ctx }
+
+func (s *permTestStream) RecvMsg(m any) error {
+	s.recvCalls++
+	if s.recvCalls > 1 {
+		return io.EOF
+	}
+	if s.firstMsg != nil {
+		dst, ok := m.(proto.Message)
+		if !ok {
+			return errors.New("permTestStream: m is not proto.Message")
+		}
+		proto.Merge(dst, s.firstMsg)
+	}
+	return nil
+}
+
+// --- Streaming gate fires on first RecvMsg ---
+
+func TestPermissionStreamInterceptor_FirstMsgGateAllows(t *testing.T) {
+	q := new(mocks.MockQuerier)
+	q.On("GetOrganizationByName", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
+	q.On("GetEffectiveOrgRoles", mock.Anything, mock.Anything).Return([]string{permission.RoleEditor}, nil)
+
+	registry := Registry{
+		"/svc/Stream": {
+			Permission: permission.AiChatStream,
+			// Stream tests use a closure-fixed extractor (no real
+			// proto unmarshaling in permTestStream).
+			Extract: func(any) (ScopeRef, error) { return OrgScope(testPermOrgSlug), nil },
+		},
+	}
+	resolver := permission.NewResolver(q)
+	interceptor := PermissionStreamInterceptor(registry, nil, q, resolver, stubIdentity(testPermCallerID, nil))
+
+	stream := &permTestStream{ctx: context.Background()}
+	called := false
+	var capturedCtx context.Context
+	err := interceptor(nil, stream, &grpc.StreamServerInfo{FullMethod: "/svc/Stream"},
+		func(_ any, ss grpc.ServerStream) error {
+			called = true
+			// Drive the gate: handler reads the first message,
+			// which triggers extractor + permission check inside
+			// permissionStream.RecvMsg.
+			if err := ss.RecvMsg(nil); err != nil {
+				return err
+			}
+			capturedCtx = ss.Context()
+			return nil
+		})
+	require.NoError(t, err)
+	assert.True(t, called)
+	got, ok := ResolvedOrgFromContext(capturedCtx)
+	require.True(t, ok, "stream gate must attach resolved org after first RecvMsg")
+	assert.Equal(t, testPermOrgID, got.ID)
+	q.AssertExpectations(t)
+}
+
+func TestPermissionStreamInterceptor_FirstMsgGateDenies(t *testing.T) {
+	// Viewer role lacks ai.chat.stream → first RecvMsg surfaces
+	// PermissionDenied; handler propagates it to the client.
+	q := new(mocks.MockQuerier)
+	q.On("GetOrganizationByName", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
+	q.On("GetEffectiveOrgRoles", mock.Anything, mock.Anything).Return([]string{permission.RoleViewer}, nil)
+
+	registry := Registry{
+		"/svc/Stream": {
+			Permission: permission.AiChatStream,
+			Extract:    func(any) (ScopeRef, error) { return OrgScope(testPermOrgSlug), nil },
+		},
+	}
+	resolver := permission.NewResolver(q)
+	interceptor := PermissionStreamInterceptor(registry, nil, q, resolver, stubIdentity(testPermCallerID, nil))
+
+	stream := &permTestStream{ctx: context.Background()}
+	err := interceptor(nil, stream, &grpc.StreamServerInfo{FullMethod: "/svc/Stream"},
+		func(_ any, ss grpc.ServerStream) error {
+			// Surface RecvMsg error to caller — same pattern real
+			// streaming handlers use.
+			return ss.RecvMsg(nil)
+		})
+	require.Error(t, err)
+	assert.Equal(t, codes.PermissionDenied, status.Code(err))
+	q.AssertExpectations(t)
+}
+
+func TestPermissionStreamInterceptor_CallerIdentityFailsBeforeFirstMsg(t *testing.T) {
+	// Identity resolution runs up-front in the stream interceptor
+	// (before the handler is invoked), so unauth callers fail fast
+	// without waiting for a message that may never arrive.
+	q := new(mocks.MockQuerier)
+	resolver := permission.NewResolver(q)
+	wantErr := status.Error(codes.Unauthenticated, "no caller")
+	registry := Registry{
+		"/svc/Stream": {
+			Permission: permission.AiChatStream,
+			Extract:    func(any) (ScopeRef, error) { return OrgScope(testPermOrgSlug), nil },
+		},
+	}
+	interceptor := PermissionStreamInterceptor(registry, nil, q, resolver, stubIdentity(uuid.Nil, wantErr))
+
+	called := false
+	err := interceptor(nil, &permTestStream{ctx: context.Background()},
+		&grpc.StreamServerInfo{FullMethod: "/svc/Stream"},
+		func(any, grpc.ServerStream) error { called = true; return nil })
+	require.Error(t, err)
+	assert.Equal(t, codes.Unauthenticated, status.Code(err))
+	assert.False(t, called, "handler must not run when identity resolution fails")
+}
+
+// TestPermissionStreamInterceptor_RealProtoExtractor is the
+// regression guard for the original streaming-panic bug. The
+// previous interceptor passed nil to the extractor, which did
+// `req.(*aiv1.GenerateContentRequest)` and panicked. This test
+// drives a real *aiv1.GenerateContentRequest through the stream
+// wrapper using the actual generated extractor — exercising the
+// type assertion + GetParent() path that broke last time. If
+// the registry generator regresses, this fails.
+func TestPermissionStreamInterceptor_RealProtoExtractor(t *testing.T) {
+	const method = "/pivox.ai.v1.AiChat/StreamGenerateContent"
+	entry, ok := GeneratedRegistry[method]
+	require.Truef(t, ok, "registry must contain %s", method)
+
+	q := new(mocks.MockQuerier)
+	q.On("GetOrganizationByName", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
+	q.On("GetEffectiveOrgRoles", mock.Anything, mock.Anything).Return([]string{permission.RoleEditor}, nil)
+
+	resolver := permission.NewResolver(q)
+	interceptor := PermissionStreamInterceptor(
+		Registry{method: entry}, nil, q, resolver,
+		stubIdentity(testPermCallerID, nil),
+	)
+
+	stream := &permTestStream{
+		ctx: context.Background(),
+		firstMsg: &aiv1.GenerateContentRequest{
+			Parent: "organizations/" + testPermOrgSlug,
+		},
+	}
+	called := false
+	err := interceptor(nil, stream, &grpc.StreamServerInfo{FullMethod: method},
+		func(_ any, ss grpc.ServerStream) error {
+			called = true
+			// Production handler reads into a typed proto pointer;
+			// permTestStream.RecvMsg copies firstMsg into it via
+			// proto.Merge, then the wrapper runs the generated
+			// extractor (which type-asserts and calls GetParent).
+			var req aiv1.GenerateContentRequest
+			return ss.RecvMsg(&req)
+		})
+	require.NoError(t, err)
+	assert.True(t, called)
+	q.AssertExpectations(t)
+}
+
+func TestPermissionStreamInterceptor_GateRunsOnceForMultipleRecvMsg(t *testing.T) {
+	// The gate must fire exactly once per stream — even if the
+	// handler reads many messages, only the first runs the
+	// extractor and the resolver. Pin this so subsequent messages
+	// stay in the same scope without paying for re-resolution.
+	q := new(mocks.MockQuerier)
+	q.On("GetOrganizationByName", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil).Once()
+	q.On("GetEffectiveOrgRoles", mock.Anything, mock.Anything).Return([]string{permission.RoleAdmin}, nil).Once()
+
+	extractCalls := 0
+	registry := Registry{
+		"/svc/Stream": {
+			Permission: permission.AiChatStream,
+			Extract: func(any) (ScopeRef, error) {
+				extractCalls++
+				return OrgScope(testPermOrgSlug), nil
+			},
+		},
+	}
+	resolver := permission.NewResolver(q)
+	interceptor := PermissionStreamInterceptor(registry, nil, q, resolver, stubIdentity(testPermCallerID, nil))
+
+	err := interceptor(nil, &permTestStream{ctx: context.Background()},
+		&grpc.StreamServerInfo{FullMethod: "/svc/Stream"},
+		func(_ any, ss grpc.ServerStream) error {
+			// Read first message — gate fires.
+			if err := ss.RecvMsg(nil); err != nil {
+				return err
+			}
+			// Subsequent reads (io.EOF in the fake stream) must NOT
+			// retrigger extractor or DB queries.
+			_ = ss.RecvMsg(nil)
+			_ = ss.RecvMsg(nil)
+			return nil
+		})
+	require.NoError(t, err)
+	assert.Equal(t, 1, extractCalls, "extractor must fire exactly once per stream")
+	q.AssertExpectations(t)
+}
 
 // --- Registry / Exempt overlap is a misconfiguration ---
 

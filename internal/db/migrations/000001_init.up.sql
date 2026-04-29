@@ -766,6 +766,10 @@ INSERT INTO permissions (permission_id, display_name, description) VALUES
   ('spaces.read', 'Read Space', 'View and list spaces'),
   ('spaces.update', 'Update Space', 'Modify space metadata'),
   ('spaces.delete', 'Delete Space', 'Delete or restore a space (covers UndeleteSpace too — same destruction-class tier). Admin-allowed because spaces have narrower blast radius than orgs (workgroup vs whole tenant); compare organizations.delete which is owner-only.'),
+  ('tags.create', 'Create Tag', 'Create new tag keys, values, or bindings'),
+  ('tags.read', 'Read Tags', 'View and list tag keys, values, and bindings'),
+  ('tags.update', 'Update Tag', 'Modify tag keys or values'),
+  ('tags.delete', 'Delete Tag', 'Delete tag keys, values, or bindings'),
   -- User management
   ('users.read', 'Read Users', 'View and list users'),
   ('users.delete', 'Delete User', 'Delete a user globally (LRO; cascades memberships)'),

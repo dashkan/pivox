@@ -15,6 +15,10 @@ const (
 	SpacesRead                     = "spaces.read"
 	SpacesUpdate                   = "spaces.update"
 	SpacesDelete                   = "spaces.delete"
+	TagsCreate                     = "tags.create"
+	TagsRead                       = "tags.read"
+	TagsUpdate                     = "tags.update"
+	TagsDelete                     = "tags.delete"
 	UsersRead                      = "users.read"
 	UsersDelete                    = "users.delete"
 	GroupsCreate                   = "groups.create"
@@ -97,6 +101,10 @@ var All = []string{
 	SpacesRead,
 	SpacesUpdate,
 	SpacesDelete,
+	TagsCreate,
+	TagsRead,
+	TagsUpdate,
+	TagsDelete,
 	UsersRead,
 	UsersDelete,
 	GroupsCreate,
@@ -244,6 +252,10 @@ var matrix = map[string]map[string]bool{
 		StorageGatewaysRead:            true,
 		StorageGatewaysUpdate:          true,
 		StorageGatewaysUpgrade:         true,
+		TagsCreate:                     true,
+		TagsDelete:                     true,
+		TagsRead:                       true,
+		TagsUpdate:                     true,
 		UsersDelete:                    true,
 		UsersRead:                      true,
 	},
@@ -319,6 +331,10 @@ var matrix = map[string]map[string]bool{
 		StorageGatewaysRead:        true,
 		StorageGatewaysUpdate:      true,
 		StorageGatewaysUpgrade:     true,
+		TagsCreate:                 true,
+		TagsDelete:                 true,
+		TagsRead:                   true,
+		TagsUpdate:                 true,
 		UsersRead:                  true,
 	},
 	RoleEditor: {
@@ -352,6 +368,7 @@ var matrix = map[string]map[string]bool{
 		StorageAgentsRead:      true,
 		StorageEndpointsRead:   true,
 		StorageGatewaysRead:    true,
+		TagsRead:               true,
 		UsersRead:              true,
 	},
 	RoleViewer: {
@@ -365,6 +382,7 @@ var matrix = map[string]map[string]bool{
 		SpacesRead:           true,
 		StorageAgentsRead:    true,
 		StorageEndpointsRead: true,
+		TagsRead:             true,
 		UsersRead:            true,
 	},
 }

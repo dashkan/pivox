@@ -23,6 +23,7 @@ package assetsv1
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
+	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/permission/v1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -2126,7 +2127,7 @@ var File_pivox_assets_v1_request_proto protoreflect.FileDescriptor
 
 const file_pivox_assets_v1_request_proto_rawDesc = "" +
 	"\n" +
-	"\x1dpivox/assets/v1/request.proto\x12\x0fpivox.assets.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bpivox/assets/v1/asset.proto\"\xcc\v\n" +
+	"\x1dpivox/assets/v1/request.proto\x12\x0fpivox.assets.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bpivox/assets/v1/asset.proto\x1a!pivox/permission/v1/options.proto\"\xcc\v\n" +
 	"\aRequest\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12.\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\v\xe0A\x02\xbaH\x05r\x03\x18\xff\x01R\vdisplayName\x12-\n" +
@@ -2301,35 +2302,35 @@ const file_pivox_assets_v1_request_proto_rawDesc = "" +
 	"\x04step\x18\x01 \x01(\x0e2).pivox.assets.v1.CreateAssetMetadata.StepR\x04step\x12<\n" +
 	"\vupload_info\x18\x02 \x01(\v2\x1b.pivox.assets.v1.UploadInfoR\n" +
 	"uploadInfo\x12)\n" +
-	"\x10progress_percent\x18\x03 \x01(\x05R\x0fprogressPercent2\xdf\x1a\n" +
-	"\bRequests\x12\xca\x01\n" +
-	"\rCreateRequest\x12%.pivox.assets.v1.CreateRequestRequest\x1a\x1d.google.longrunning.Operation\"s\xcaA \n" +
-	"\aRequest\x12\x15CreateRequestMetadata\xdaA\x0eparent,request\x82\xd3\xe4\x93\x029:\arequest\"./v1/{parent=organizations/*/spaces/*}/requests\x12\x89\x01\n" +
+	"\x10progress_percent\x18\x03 \x01(\x05R\x0fprogressPercent2\xf3\x1e\n" +
+	"\bRequests\x12\xe5\x01\n" +
+	"\rCreateRequest\x12%.pivox.assets.v1.CreateRequestRequest\x1a\x1d.google.longrunning.Operation\"\x8d\x01\xcaA \n" +
+	"\aRequest\x12\x15CreateRequestMetadata\xdaA\x0eparent,request\x8a\xb5\x18\x16assets.requests.create\x82\xd3\xe4\x93\x029:\arequest\"./v1/{parent=organizations/*/spaces/*}/requests\x12\xa1\x01\n" +
 	"\n" +
-	"GetRequest\x12\".pivox.assets.v1.GetRequestRequest\x1a\x18.pivox.assets.v1.Request\"=\xdaA\x04name\x82\xd3\xe4\x93\x020\x12./v1/{name=organizations/*/spaces/*/requests/*}\x12\x9c\x01\n" +
-	"\fListRequests\x12$.pivox.assets.v1.ListRequestsRequest\x1a%.pivox.assets.v1.ListRequestsResponse\"?\xdaA\x06parent\x82\xd3\xe4\x93\x020\x12./v1/{parent=organizations/*/spaces/*}/requests\x12\xd8\x01\n" +
-	"\rUpdateRequest\x12%.pivox.assets.v1.UpdateRequestRequest\x1a\x1d.google.longrunning.Operation\"\x80\x01\xcaA \n" +
-	"\aRequest\x12\x15UpdateRequestMetadata\xdaA\x13request,update_mask\x82\xd3\xe4\x93\x02A:\arequest26/v1/{request.name=organizations/*/spaces/*/requests/*}\x12\xb7\x01\n" +
-	"\rDeleteRequest\x12%.pivox.assets.v1.DeleteRequestRequest\x1a\x1d.google.longrunning.Operation\"`\xcaA \n" +
-	"\aRequest\x12\x15DeleteRequestMetadata\xdaA\x04name\x82\xd3\xe4\x93\x020*./v1/{name=organizations/*/spaces/*/requests/*}\x12\x99\x01\n" +
-	"\rSubmitRequest\x12%.pivox.assets.v1.SubmitRequestRequest\x1a\x18.pivox.assets.v1.Request\"G\xdaA\x04name\x82\xd3\xe4\x93\x02::\x01*\"5/v1/{name=organizations/*/spaces/*/requests/*}:submit\x12\xa2\x01\n" +
-	"\rAssignRequest\x12%.pivox.assets.v1.AssignRequestRequest\x1a\x18.pivox.assets.v1.Request\"P\xdaA\rname,assignee\x82\xd3\xe4\x93\x02::\x01*\"5/v1/{name=organizations/*/spaces/*/requests/*}:assign\x12\x96\x01\n" +
-	"\fClaimRequest\x12$.pivox.assets.v1.ClaimRequestRequest\x1a\x18.pivox.assets.v1.Request\"F\xdaA\x04name\x82\xd3\xe4\x93\x029:\x01*\"4/v1/{name=organizations/*/spaces/*/requests/*}:claim\x12\x9c\x01\n" +
-	"\x0eDeliverRequest\x12&.pivox.assets.v1.DeliverRequestRequest\x1a\x18.pivox.assets.v1.Request\"H\xdaA\x04name\x82\xd3\xe4\x93\x02;:\x01*\"6/v1/{name=organizations/*/spaces/*/requests/*}:deliver\x12\x9c\x01\n" +
-	"\x0eApproveRequest\x12&.pivox.assets.v1.ApproveRequestRequest\x1a\x18.pivox.assets.v1.Request\"H\xdaA\x04name\x82\xd3\xe4\x93\x02;:\x01*\"6/v1/{name=organizations/*/spaces/*/requests/*}:approve\x12\xa6\x01\n" +
-	"\x0fRequestRevision\x12'.pivox.assets.v1.RequestRevisionRequest\x1a\x18.pivox.assets.v1.Request\"P\xdaA\x04name\x82\xd3\xe4\x93\x02C:\x01*\">/v1/{name=organizations/*/spaces/*/requests/*}:requestRevision\x12\x99\x01\n" +
-	"\rRejectRequest\x12%.pivox.assets.v1.RejectRequestRequest\x1a\x18.pivox.assets.v1.Request\"G\xdaA\x04name\x82\xd3\xe4\x93\x02::\x01*\"5/v1/{name=organizations/*/spaces/*/requests/*}:reject\x12\x99\x01\n" +
-	"\rCancelRequest\x12%.pivox.assets.v1.CancelRequestRequest\x1a\x18.pivox.assets.v1.Request\"G\xdaA\x04name\x82\xd3\xe4\x93\x02::\x01*\"5/v1/{name=organizations/*/spaces/*/requests/*}:cancel\x12\xdf\x01\n" +
-	"\x0eCreateLineItem\x12&.pivox.assets.v1.CreateLineItemRequest\x1a\x1d.google.longrunning.Operation\"\x85\x01\xcaA\"\n" +
-	"\bLineItem\x12\x16CreateLineItemMetadata\xdaA\x10parent,line_item\x82\xd3\xe4\x93\x02G:\tline_item\":/v1/{parent=organizations/*/spaces/*/requests/*}/lineItems\x12\x98\x01\n" +
-	"\vGetLineItem\x12#.pivox.assets.v1.GetLineItemRequest\x1a\x19.pivox.assets.v1.LineItem\"I\xdaA\x04name\x82\xd3\xe4\x93\x02<\x12:/v1/{name=organizations/*/spaces/*/requests/*/lineItems/*}\x12\xab\x01\n" +
-	"\rListLineItems\x12%.pivox.assets.v1.ListLineItemsRequest\x1a&.pivox.assets.v1.ListLineItemsResponse\"K\xdaA\x06parent\x82\xd3\xe4\x93\x02<\x12:/v1/{parent=organizations/*/spaces/*/requests/*}/lineItems\x12\xee\x01\n" +
-	"\x0eUpdateLineItem\x12&.pivox.assets.v1.UpdateLineItemRequest\x1a\x1d.google.longrunning.Operation\"\x94\x01\xcaA\"\n" +
-	"\bLineItem\x12\x16UpdateLineItemMetadata\xdaA\x15line_item,update_mask\x82\xd3\xe4\x93\x02Q:\tline_item2D/v1/{line_item.name=organizations/*/spaces/*/requests/*/lineItems/*}\x12\xc7\x01\n" +
-	"\x0eDeleteLineItem\x12&.pivox.assets.v1.DeleteLineItemRequest\x1a\x1d.google.longrunning.Operation\"n\xcaA\"\n" +
-	"\bLineItem\x12\x16DeleteLineItemMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02<*:/v1/{name=organizations/*/spaces/*/requests/*/lineItems/*}\x12\xd5\x01\n" +
-	"\x0fFulfillLineItem\x12'.pivox.assets.v1.FulfillLineItemRequest\x1a\x1d.google.longrunning.Operation\"z\xcaA#\n" +
-	"\bLineItem\x12\x17FulfillLineItemMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02G:\x01*\"B/v1/{name=organizations/*/spaces/*/requests/*/lineItems/*}:fulfill\x1a\x0f\xcaA\fapi.pivox.ioB\xc5\x01\n" +
+	"GetRequest\x12\".pivox.assets.v1.GetRequestRequest\x1a\x18.pivox.assets.v1.Request\"U\xdaA\x04name\x8a\xb5\x18\x14assets.requests.read\x82\xd3\xe4\x93\x020\x12./v1/{name=organizations/*/spaces/*/requests/*}\x12\xb4\x01\n" +
+	"\fListRequests\x12$.pivox.assets.v1.ListRequestsRequest\x1a%.pivox.assets.v1.ListRequestsResponse\"W\xdaA\x06parent\x8a\xb5\x18\x14assets.requests.read\x82\xd3\xe4\x93\x020\x12./v1/{parent=organizations/*/spaces/*}/requests\x12\x82\x02\n" +
+	"\rUpdateRequest\x12%.pivox.assets.v1.UpdateRequestRequest\x1a\x1d.google.longrunning.Operation\"\xaa\x01\xcaA \n" +
+	"\aRequest\x12\x15UpdateRequestMetadata\xdaA\x13request,update_mask\x8a\xb5\x18\x16assets.requests.update\x9a\xb5\x18\frequest.name\x82\xd3\xe4\x93\x02A:\arequest26/v1/{request.name=organizations/*/spaces/*/requests/*}\x12\xd1\x01\n" +
+	"\rDeleteRequest\x12%.pivox.assets.v1.DeleteRequestRequest\x1a\x1d.google.longrunning.Operation\"z\xcaA \n" +
+	"\aRequest\x12\x15DeleteRequestMetadata\xdaA\x04name\x8a\xb5\x18\x16assets.requests.delete\x82\xd3\xe4\x93\x020*./v1/{name=organizations/*/spaces/*/requests/*}\x12\xb3\x01\n" +
+	"\rSubmitRequest\x12%.pivox.assets.v1.SubmitRequestRequest\x1a\x18.pivox.assets.v1.Request\"a\xdaA\x04name\x8a\xb5\x18\x16assets.requests.submit\x82\xd3\xe4\x93\x02::\x01*\"5/v1/{name=organizations/*/spaces/*/requests/*}:submit\x12\xbc\x01\n" +
+	"\rAssignRequest\x12%.pivox.assets.v1.AssignRequestRequest\x1a\x18.pivox.assets.v1.Request\"j\xdaA\rname,assignee\x8a\xb5\x18\x16assets.requests.assign\x82\xd3\xe4\x93\x02::\x01*\"5/v1/{name=organizations/*/spaces/*/requests/*}:assign\x12\xaf\x01\n" +
+	"\fClaimRequest\x12$.pivox.assets.v1.ClaimRequestRequest\x1a\x18.pivox.assets.v1.Request\"_\xdaA\x04name\x8a\xb5\x18\x15assets.requests.claim\x82\xd3\xe4\x93\x029:\x01*\"4/v1/{name=organizations/*/spaces/*/requests/*}:claim\x12\xb7\x01\n" +
+	"\x0eDeliverRequest\x12&.pivox.assets.v1.DeliverRequestRequest\x1a\x18.pivox.assets.v1.Request\"c\xdaA\x04name\x8a\xb5\x18\x17assets.requests.deliver\x82\xd3\xe4\x93\x02;:\x01*\"6/v1/{name=organizations/*/spaces/*/requests/*}:deliver\x12\xb7\x01\n" +
+	"\x0eApproveRequest\x12&.pivox.assets.v1.ApproveRequestRequest\x1a\x18.pivox.assets.v1.Request\"c\xdaA\x04name\x8a\xb5\x18\x17assets.requests.approve\x82\xd3\xe4\x93\x02;:\x01*\"6/v1/{name=organizations/*/spaces/*/requests/*}:approve\x12\xc1\x01\n" +
+	"\x0fRequestRevision\x12'.pivox.assets.v1.RequestRevisionRequest\x1a\x18.pivox.assets.v1.Request\"k\xdaA\x04name\x8a\xb5\x18\x17assets.requests.approve\x82\xd3\xe4\x93\x02C:\x01*\">/v1/{name=organizations/*/spaces/*/requests/*}:requestRevision\x12\xb3\x01\n" +
+	"\rRejectRequest\x12%.pivox.assets.v1.RejectRequestRequest\x1a\x18.pivox.assets.v1.Request\"a\xdaA\x04name\x8a\xb5\x18\x16assets.requests.reject\x82\xd3\xe4\x93\x02::\x01*\"5/v1/{name=organizations/*/spaces/*/requests/*}:reject\x12\xb3\x01\n" +
+	"\rCancelRequest\x12%.pivox.assets.v1.CancelRequestRequest\x1a\x18.pivox.assets.v1.Request\"a\xdaA\x04name\x8a\xb5\x18\x16assets.requests.cancel\x82\xd3\xe4\x93\x02::\x01*\"5/v1/{name=organizations/*/spaces/*/requests/*}:cancel\x12\xfa\x01\n" +
+	"\x0eCreateLineItem\x12&.pivox.assets.v1.CreateLineItemRequest\x1a\x1d.google.longrunning.Operation\"\xa0\x01\xcaA\"\n" +
+	"\bLineItem\x12\x16CreateLineItemMetadata\xdaA\x10parent,line_item\x8a\xb5\x18\x17assets.lineItems.create\x82\xd3\xe4\x93\x02G:\tline_item\":/v1/{parent=organizations/*/spaces/*/requests/*}/lineItems\x12\xb1\x01\n" +
+	"\vGetLineItem\x12#.pivox.assets.v1.GetLineItemRequest\x1a\x19.pivox.assets.v1.LineItem\"b\xdaA\x04name\x8a\xb5\x18\x15assets.lineItems.read\x82\xd3\xe4\x93\x02<\x12:/v1/{name=organizations/*/spaces/*/requests/*/lineItems/*}\x12\xc4\x01\n" +
+	"\rListLineItems\x12%.pivox.assets.v1.ListLineItemsRequest\x1a&.pivox.assets.v1.ListLineItemsResponse\"d\xdaA\x06parent\x8a\xb5\x18\x15assets.lineItems.read\x82\xd3\xe4\x93\x02<\x12:/v1/{parent=organizations/*/spaces/*/requests/*}/lineItems\x12\x9b\x02\n" +
+	"\x0eUpdateLineItem\x12&.pivox.assets.v1.UpdateLineItemRequest\x1a\x1d.google.longrunning.Operation\"\xc1\x01\xcaA\"\n" +
+	"\bLineItem\x12\x16UpdateLineItemMetadata\xdaA\x15line_item,update_mask\x8a\xb5\x18\x17assets.lineItems.update\x9a\xb5\x18\x0eline_item.name\x82\xd3\xe4\x93\x02Q:\tline_item2D/v1/{line_item.name=organizations/*/spaces/*/requests/*/lineItems/*}\x12\xe3\x01\n" +
+	"\x0eDeleteLineItem\x12&.pivox.assets.v1.DeleteLineItemRequest\x1a\x1d.google.longrunning.Operation\"\x89\x01\xcaA\"\n" +
+	"\bLineItem\x12\x16DeleteLineItemMetadata\xdaA\x04name\x8a\xb5\x18\x17assets.lineItems.delete\x82\xd3\xe4\x93\x02<*:/v1/{name=organizations/*/spaces/*/requests/*/lineItems/*}\x12\xf2\x01\n" +
+	"\x0fFulfillLineItem\x12'.pivox.assets.v1.FulfillLineItemRequest\x1a\x1d.google.longrunning.Operation\"\x96\x01\xcaA#\n" +
+	"\bLineItem\x12\x17FulfillLineItemMetadata\xdaA\x04name\x8a\xb5\x18\x18assets.lineItems.fulfill\x82\xd3\xe4\x93\x02G:\x01*\"B/v1/{name=organizations/*/spaces/*/requests/*/lineItems/*}:fulfill\x1a\x0f\xcaA\fapi.pivox.ioB\xc5\x01\n" +
 	"\x13com.pivox.assets.v1B\fRequestProtoP\x01ZBgithub.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1;assetsv1\xa2\x02\x03PAX\xaa\x02\x0fPivox.Assets.V1\xca\x02\x0fPivox\\Assets\\V1\xe2\x02\x1bPivox\\Assets\\V1\\GPBMetadata\xea\x02\x11Pivox::Assets::V1b\x06proto3"
 
 var (

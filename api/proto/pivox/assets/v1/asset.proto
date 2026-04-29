@@ -26,6 +26,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
+import "pivox/permission/v1/options.proto";
 
 option go_package = "pivox/assets/v1;assetsv1";
 
@@ -58,18 +59,21 @@ service Assets {
       response_type: "Asset"
       metadata_type: "CreateAssetMetadata"
     };
+    option (pivox.permission.v1.required_permission) = "assets.assets.create";
   }
 
   // Retrieves an asset by resource name.
   rpc GetAsset(GetAssetRequest) returns (Asset) {
     option (google.api.http) = {get: "/v1/{name=organizations/*/spaces/*/assets/*}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "assets.assets.read";
   }
 
   // Lists assets in a space.
   rpc ListAssets(ListAssetsRequest) returns (ListAssetsResponse) {
     option (google.api.http) = {get: "/v1/{parent=organizations/*/spaces/*}/assets"};
     option (google.api.method_signature) = "parent";
+    option (pivox.permission.v1.required_permission) = "assets.assets.read";
   }
 
   // Updates an asset's mutable fields (display_name, path, annotations).
@@ -84,6 +88,8 @@ service Assets {
       response_type: "Asset"
       metadata_type: "UpdateAssetMetadata"
     };
+    option (pivox.permission.v1.required_permission) = "assets.assets.update";
+    option (pivox.permission.v1.scope_field) = "asset.name";
   }
 
   // Soft-deletes an asset. The asset enters DELETE_REQUESTED state and
@@ -96,6 +102,7 @@ service Assets {
       response_type: "Asset"
       metadata_type: "DeleteAssetMetadata"
     };
+    option (pivox.permission.v1.required_permission) = "assets.assets.delete";
   }
 
   // Restores a soft-deleted asset.
@@ -109,6 +116,7 @@ service Assets {
       response_type: "Asset"
       metadata_type: "UndeleteAssetMetadata"
     };
+    option (pivox.permission.v1.required_permission) = "assets.assets.undelete";
   }
 
   // Creates a new version of an existing asset. Runs the same ingestion
@@ -124,18 +132,21 @@ service Assets {
       response_type: "AssetVersion"
       metadata_type: "CreateAssetVersionMetadata"
     };
+    option (pivox.permission.v1.required_permission) = "assets.assets.update";
   }
 
   // Retrieves a specific version of an asset.
   rpc GetAssetVersion(GetAssetVersionRequest) returns (AssetVersion) {
     option (google.api.http) = {get: "/v1/{name=organizations/*/spaces/*/assets/*/versions/*}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "assets.assets.read";
   }
 
   // Lists all versions of an asset.
   rpc ListAssetVersions(ListAssetVersionsRequest) returns (ListAssetVersionsResponse) {
     option (google.api.http) = {get: "/v1/{parent=organizations/*/spaces/*/assets/*}/versions"};
     option (google.api.method_signature) = "parent";
+    option (pivox.permission.v1.required_permission) = "assets.assets.read";
   }
 
   // Imports assets from a storage endpoint path. Recursively scans
@@ -157,6 +168,7 @@ service Assets {
       response_type: "ImportAssetsResponse"
       metadata_type: "ImportAssetsMetadata"
     };
+    option (pivox.permission.v1.required_permission) = "assets.assets.import";
   }
 
   // Retrieves the extracted metadata for an asset (EXIF, XMP, etc.).
@@ -165,6 +177,7 @@ service Assets {
   rpc GetAssetMetadata(GetAssetMetadataRequest) returns (AssetMetadata) {
     option (google.api.http) = {get: "/v1/{name=organizations/*/spaces/*/assets/*/metadata}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "assets.assets.read";
   }
 }
 

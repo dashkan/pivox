@@ -24,6 +24,7 @@ import "google/api/resource.proto";
 import "google/longrunning/operations.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
+import "pivox/permission/v1/options.proto";
 
 option go_package = "pivox/api/v1;apiv1";
 
@@ -38,6 +39,7 @@ service TagKeys {
       additional_bindings: {get: "/v1/{parent=organizations/*/spaces/*}/tagKeys"}
     };
     option (google.api.method_signature) = "parent";
+    option (pivox.permission.v1.required_permission) = "tags.read";
   }
 
   // Retrieves a TagKey. This method will return `PERMISSION_DENIED` if the
@@ -48,6 +50,7 @@ service TagKeys {
       additional_bindings: {get: "/v1/{name=organizations/*/spaces/*/tagKeys/*}"}
     };
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "tags.read";
   }
 
   // Creates a new TagKey. If another request with the same parameters is
@@ -68,6 +71,7 @@ service TagKeys {
       response_type: "TagKey"
       metadata_type: "CreateTagKeyMetadata"
     };
+    option (pivox.permission.v1.required_permission) = "tags.create";
   }
 
   // Updates the attributes of the TagKey resource.
@@ -85,6 +89,8 @@ service TagKeys {
       response_type: "TagKey"
       metadata_type: "UpdateTagKeyMetadata"
     };
+    option (pivox.permission.v1.required_permission) = "tags.update";
+    option (pivox.permission.v1.scope_field) = "tag_key.name";
   }
 
   // Deletes a TagKey. The TagKey cannot be deleted if it has any child
@@ -99,6 +105,7 @@ service TagKeys {
       response_type: "TagKey"
       metadata_type: "DeleteTagKeyMetadata"
     };
+    option (pivox.permission.v1.required_permission) = "tags.delete";
   }
 }
 

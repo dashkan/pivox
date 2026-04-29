@@ -23,6 +23,7 @@ package assetsv1
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
+	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/permission/v1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -2681,7 +2682,7 @@ var File_pivox_assets_v1_asset_proto protoreflect.FileDescriptor
 
 const file_pivox_assets_v1_asset_proto_rawDesc = "" +
 	"\n" +
-	"\x1bpivox/assets/v1/asset.proto\x12\x0fpivox.assets.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xc4\f\n" +
+	"\x1bpivox/assets/v1/asset.proto\x12\x0fpivox.assets.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!pivox/permission/v1/options.proto\"\xc4\f\n" +
 	"\x05Asset\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12.\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\v\xe0A\x02\xbaH\x05r\x03\x18\xff\x01R\vdisplayName\x127\n" +
@@ -2933,26 +2934,27 @@ const file_pivox_assets_v1_asset_proto_rawDesc = "" +
 	"\rAssetMetadata\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x128\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x17.google.protobuf.StructB\x03\xe0A\x03R\bmetadata:x\xeaAu\n" +
-	"\x1apivox.assets/AssetMetadata\x12Corganizations/{organization}/spaces/{space}/assets/{asset}/metadata*\bmetadata2\bmetadata2\xf4\x0f\n" +
-	"\x06Assets\x12\xbc\x01\n" +
-	"\vCreateAsset\x12#.pivox.assets.v1.CreateAssetRequest\x1a\x1d.google.longrunning.Operation\"i\xcaA\x1c\n" +
-	"\x05Asset\x12\x13CreateAssetMetadata\xdaA\fparent,asset\x82\xd3\xe4\x93\x025:\x05asset\",/v1/{parent=organizations/*/spaces/*}/assets\x12\x81\x01\n" +
-	"\bGetAsset\x12 .pivox.assets.v1.GetAssetRequest\x1a\x16.pivox.assets.v1.Asset\";\xdaA\x04name\x82\xd3\xe4\x93\x02.\x12,/v1/{name=organizations/*/spaces/*/assets/*}\x12\x94\x01\n" +
+	"\x1apivox.assets/AssetMetadata\x12Corganizations/{organization}/spaces/{space}/assets/{asset}/metadata*\bmetadata2\bmetadata2\x86\x12\n" +
+	"\x06Assets\x12\xd5\x01\n" +
+	"\vCreateAsset\x12#.pivox.assets.v1.CreateAssetRequest\x1a\x1d.google.longrunning.Operation\"\x81\x01\xcaA\x1c\n" +
+	"\x05Asset\x12\x13CreateAssetMetadata\xdaA\fparent,asset\x8a\xb5\x18\x14assets.assets.create\x82\xd3\xe4\x93\x025:\x05asset\",/v1/{parent=organizations/*/spaces/*}/assets\x12\x97\x01\n" +
+	"\bGetAsset\x12 .pivox.assets.v1.GetAssetRequest\x1a\x16.pivox.assets.v1.Asset\"Q\xdaA\x04name\x8a\xb5\x18\x12assets.assets.read\x82\xd3\xe4\x93\x02.\x12,/v1/{name=organizations/*/spaces/*/assets/*}\x12\xaa\x01\n" +
 	"\n" +
-	"ListAssets\x12\".pivox.assets.v1.ListAssetsRequest\x1a#.pivox.assets.v1.ListAssetsResponse\"=\xdaA\x06parent\x82\xd3\xe4\x93\x02.\x12,/v1/{parent=organizations/*/spaces/*}/assets\x12\xc7\x01\n" +
-	"\vUpdateAsset\x12#.pivox.assets.v1.UpdateAssetRequest\x1a\x1d.google.longrunning.Operation\"t\xcaA\x1c\n" +
-	"\x05Asset\x12\x13UpdateAssetMetadata\xdaA\x11asset,update_mask\x82\xd3\xe4\x93\x02;:\x05asset22/v1/{asset.name=organizations/*/spaces/*/assets/*}\x12\xad\x01\n" +
-	"\vDeleteAsset\x12#.pivox.assets.v1.DeleteAssetRequest\x1a\x1d.google.longrunning.Operation\"Z\xcaA\x1c\n" +
-	"\x05Asset\x12\x13DeleteAssetMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02.*,/v1/{name=organizations/*/spaces/*/assets/*}\x12\xbf\x01\n" +
-	"\rUndeleteAsset\x12%.pivox.assets.v1.UndeleteAssetRequest\x1a\x1d.google.longrunning.Operation\"h\xcaA\x1e\n" +
-	"\x05Asset\x12\x15UndeleteAssetMetadata\xdaA\x04name\x82\xd3\xe4\x93\x02::\x01*\"5/v1/{name=organizations/*/spaces/*/assets/*}:undelete\x12\xf4\x01\n" +
-	"\x12CreateAssetVersion\x12*.pivox.assets.v1.CreateAssetVersionRequest\x1a\x1d.google.longrunning.Operation\"\x92\x01\xcaA*\n" +
-	"\fAssetVersion\x12\x1aCreateAssetVersionMetadata\xdaA\x14parent,asset_version\x82\xd3\xe4\x93\x02H:\rasset_version\"7/v1/{parent=organizations/*/spaces/*/assets/*}/versions\x12\xa1\x01\n" +
-	"\x0fGetAssetVersion\x12'.pivox.assets.v1.GetAssetVersionRequest\x1a\x1d.pivox.assets.v1.AssetVersion\"F\xdaA\x04name\x82\xd3\xe4\x93\x029\x127/v1/{name=organizations/*/spaces/*/assets/*/versions/*}\x12\xb4\x01\n" +
-	"\x11ListAssetVersions\x12).pivox.assets.v1.ListAssetVersionsRequest\x1a*.pivox.assets.v1.ListAssetVersionsResponse\"H\xdaA\x06parent\x82\xd3\xe4\x93\x029\x127/v1/{parent=organizations/*/spaces/*/assets/*}/versions\x12\xcb\x01\n" +
-	"\fImportAssets\x12$.pivox.assets.v1.ImportAssetsRequest\x1a\x1d.google.longrunning.Operation\"v\xcaA,\n" +
-	"\x14ImportAssetsResponse\x12\x14ImportAssetsMetadata\xdaA\x06parent\x82\xd3\xe4\x93\x028:\x01*\"3/v1/{parent=organizations/*/spaces/*}/assets:import\x12\xa2\x01\n" +
-	"\x10GetAssetMetadata\x12(.pivox.assets.v1.GetAssetMetadataRequest\x1a\x1e.pivox.assets.v1.AssetMetadata\"D\xdaA\x04name\x82\xd3\xe4\x93\x027\x125/v1/{name=organizations/*/spaces/*/assets/*/metadata}\x1a\x0f\xcaA\fapi.pivox.ioB\xc3\x01\n" +
+	"ListAssets\x12\".pivox.assets.v1.ListAssetsRequest\x1a#.pivox.assets.v1.ListAssetsResponse\"S\xdaA\x06parent\x8a\xb5\x18\x12assets.assets.read\x82\xd3\xe4\x93\x02.\x12,/v1/{parent=organizations/*/spaces/*}/assets\x12\xee\x01\n" +
+	"\vUpdateAsset\x12#.pivox.assets.v1.UpdateAssetRequest\x1a\x1d.google.longrunning.Operation\"\x9a\x01\xcaA\x1c\n" +
+	"\x05Asset\x12\x13UpdateAssetMetadata\xdaA\x11asset,update_mask\x8a\xb5\x18\x14assets.assets.update\x9a\xb5\x18\n" +
+	"asset.name\x82\xd3\xe4\x93\x02;:\x05asset22/v1/{asset.name=organizations/*/spaces/*/assets/*}\x12\xc5\x01\n" +
+	"\vDeleteAsset\x12#.pivox.assets.v1.DeleteAssetRequest\x1a\x1d.google.longrunning.Operation\"r\xcaA\x1c\n" +
+	"\x05Asset\x12\x13DeleteAssetMetadata\xdaA\x04name\x8a\xb5\x18\x14assets.assets.delete\x82\xd3\xe4\x93\x02.*,/v1/{name=organizations/*/spaces/*/assets/*}\x12\xda\x01\n" +
+	"\rUndeleteAsset\x12%.pivox.assets.v1.UndeleteAssetRequest\x1a\x1d.google.longrunning.Operation\"\x82\x01\xcaA\x1e\n" +
+	"\x05Asset\x12\x15UndeleteAssetMetadata\xdaA\x04name\x8a\xb5\x18\x16assets.assets.undelete\x82\xd3\xe4\x93\x02::\x01*\"5/v1/{name=organizations/*/spaces/*/assets/*}:undelete\x12\x8c\x02\n" +
+	"\x12CreateAssetVersion\x12*.pivox.assets.v1.CreateAssetVersionRequest\x1a\x1d.google.longrunning.Operation\"\xaa\x01\xcaA*\n" +
+	"\fAssetVersion\x12\x1aCreateAssetVersionMetadata\xdaA\x14parent,asset_version\x8a\xb5\x18\x14assets.assets.update\x82\xd3\xe4\x93\x02H:\rasset_version\"7/v1/{parent=organizations/*/spaces/*/assets/*}/versions\x12\xb7\x01\n" +
+	"\x0fGetAssetVersion\x12'.pivox.assets.v1.GetAssetVersionRequest\x1a\x1d.pivox.assets.v1.AssetVersion\"\\\xdaA\x04name\x8a\xb5\x18\x12assets.assets.read\x82\xd3\xe4\x93\x029\x127/v1/{name=organizations/*/spaces/*/assets/*/versions/*}\x12\xca\x01\n" +
+	"\x11ListAssetVersions\x12).pivox.assets.v1.ListAssetVersionsRequest\x1a*.pivox.assets.v1.ListAssetVersionsResponse\"^\xdaA\x06parent\x8a\xb5\x18\x12assets.assets.read\x82\xd3\xe4\x93\x029\x127/v1/{parent=organizations/*/spaces/*/assets/*}/versions\x12\xe4\x01\n" +
+	"\fImportAssets\x12$.pivox.assets.v1.ImportAssetsRequest\x1a\x1d.google.longrunning.Operation\"\x8e\x01\xcaA,\n" +
+	"\x14ImportAssetsResponse\x12\x14ImportAssetsMetadata\xdaA\x06parent\x8a\xb5\x18\x14assets.assets.import\x82\xd3\xe4\x93\x028:\x01*\"3/v1/{parent=organizations/*/spaces/*}/assets:import\x12\xb8\x01\n" +
+	"\x10GetAssetMetadata\x12(.pivox.assets.v1.GetAssetMetadataRequest\x1a\x1e.pivox.assets.v1.AssetMetadata\"Z\xdaA\x04name\x8a\xb5\x18\x12assets.assets.read\x82\xd3\xe4\x93\x027\x125/v1/{name=organizations/*/spaces/*/assets/*/metadata}\x1a\x0f\xcaA\fapi.pivox.ioB\xc3\x01\n" +
 	"\x13com.pivox.assets.v1B\n" +
 	"AssetProtoP\x01ZBgithub.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1;assetsv1\xa2\x02\x03PAX\xaa\x02\x0fPivox.Assets.V1\xca\x02\x0fPivox\\Assets\\V1\xe2\x02\x1bPivox\\Assets\\V1\\GPBMetadata\xea\x02\x11Pivox::Assets::V1b\x06proto3"
 

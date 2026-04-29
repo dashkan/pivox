@@ -25,6 +25,7 @@ import "google/longrunning/operations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
+import "pivox/permission/v1/options.proto";
 
 option go_package = "pivox/storage/v1;storagev1";
 
@@ -46,6 +47,7 @@ service StorageGateways {
       response_type: "StorageGateway"
       metadata_type: "CreateStorageGatewayMetadata"
     };
+    option (pivox.permission.v1.required_permission) = "storage.gateways.create";
   }
 
   // Fetches a storage gateway resource identified by the specified resource
@@ -53,12 +55,14 @@ service StorageGateways {
   rpc GetStorageGateway(GetStorageGatewayRequest) returns (StorageGateway) {
     option (google.api.http) = {get: "/v1/{name=organizations/*/storageGateways/*}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "storage.gateways.read";
   }
 
   // Lists storage gateways in the specified organization.
   rpc ListStorageGateways(ListStorageGatewaysRequest) returns (ListStorageGatewaysResponse) {
     option (google.api.http) = {get: "/v1/{parent=organizations/*}/storageGateways"};
     option (google.api.method_signature) = "parent";
+    option (pivox.permission.v1.required_permission) = "storage.gateways.read";
   }
 
   // Updates a storage gateway resource. Use the field mask to specify which
@@ -76,6 +80,8 @@ service StorageGateways {
       response_type: "StorageGateway"
       metadata_type: "UpdateStorageGatewayMetadata"
     };
+    option (pivox.permission.v1.required_permission) = "storage.gateways.update";
+    option (pivox.permission.v1.scope_field) = "storage_gateway.name";
   }
 
   // Deletes a storage gateway resource.
@@ -89,6 +95,7 @@ service StorageGateways {
       response_type: "StorageGateway"
       metadata_type: "DeleteStorageGatewayMetadata"
     };
+    option (pivox.permission.v1.required_permission) = "storage.gateways.delete";
   }
 
   // Rotates the registration token for a storage gateway. The previous token
@@ -99,6 +106,7 @@ service StorageGateways {
       body: "*"
     };
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "storage.gateways.update";
   }
 
   // Returns an install script for the specified storage gateway. The script
@@ -111,6 +119,7 @@ service StorageGateways {
   rpc GetInstallScript(GetInstallScriptRequest) returns (GetInstallScriptResponse) {
     option (google.api.http) = {get: "/v1/{name=organizations/*/storageGateways/*}:installScript"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "storage.gateways.read";
   }
 
   // Returns an uninstall script for the specified storage gateway.
@@ -122,6 +131,7 @@ service StorageGateways {
   rpc GetUninstallScript(GetUninstallScriptRequest) returns (GetUninstallScriptResponse) {
     option (google.api.http) = {get: "/v1/{name=organizations/*/storageGateways/*}:uninstallScript"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "storage.gateways.read";
   }
 
   // Initiates an upgrade of the storage gateway to the specified target
@@ -136,6 +146,7 @@ service StorageGateways {
       response_type: "StorageGateway"
       metadata_type: "UpgradeGatewayMetadata"
     };
+    option (pivox.permission.v1.required_permission) = "storage.gateways.upgrade";
   }
 
   // Creates a storage session for the authenticated user. Computes
@@ -150,6 +161,10 @@ service StorageGateways {
       post: "/v1/storageSession"
       body: "*"
     };
+    // No org parent — session is for the authenticated caller and
+    // computes their access patterns across all org memberships.
+    // Membership interceptor still requires authentication.
+    option (pivox.permission.v1.exempt) = true;
   }
 }
 

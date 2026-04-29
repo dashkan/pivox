@@ -24,6 +24,7 @@ import "google/api/resource.proto";
 import "google/longrunning/operations.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
+import "pivox/permission/v1/options.proto";
 
 option go_package = "pivox/storage/v1;storagev1";
 
@@ -49,18 +50,21 @@ service Endpoints {
       response_type: "Endpoint"
       metadata_type: "CreateEndpointMetadata"
     };
+    option (pivox.permission.v1.required_permission) = "storage.endpoints.create";
   }
 
   // Fetches an endpoint resource identified by the specified resource name.
   rpc GetEndpoint(GetEndpointRequest) returns (Endpoint) {
     option (google.api.http) = {get: "/v1/{name=organizations/*/storageGateways/*/endpoints/*}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "storage.endpoints.read";
   }
 
   // Lists endpoints belonging to a storage gateway.
   rpc ListEndpoints(ListEndpointsRequest) returns (ListEndpointsResponse) {
     option (google.api.http) = {get: "/v1/{parent=organizations/*/storageGateways/*}/endpoints"};
     option (google.api.method_signature) = "parent";
+    option (pivox.permission.v1.required_permission) = "storage.endpoints.read";
   }
 
   // Updates an endpoint resource. Use the field mask to specify which
@@ -79,6 +83,8 @@ service Endpoints {
       response_type: "Endpoint"
       metadata_type: "UpdateEndpointMetadata"
     };
+    option (pivox.permission.v1.required_permission) = "storage.endpoints.update";
+    option (pivox.permission.v1.scope_field) = "endpoint.name";
   }
 
   // Deletes an endpoint resource. The endpoint is removed from the
@@ -93,6 +99,7 @@ service Endpoints {
       response_type: "Endpoint"
       metadata_type: "DeleteEndpointMetadata"
     };
+    option (pivox.permission.v1.required_permission) = "storage.endpoints.delete";
   }
 }
 

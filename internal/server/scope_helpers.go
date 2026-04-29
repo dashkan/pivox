@@ -34,6 +34,35 @@ func OrgScopeFromPath(field, path string) (ScopeRef, error) {
 	return OrgScope(parts[1]), nil
 }
 
+// ScopeFromPath auto-discriminates between org-scope and space-scope
+// from the path's shape. Generated extractors call this single
+// helper so the generator doesn't have to know per-RPC which scope
+// kind applies — the runtime path tells us:
+//
+//   - `organizations/{org}/spaces/{space}[/...]` → ScopeSpace
+//   - `organizations/{org}[/...]` (without /spaces/) → ScopeOrg
+//
+// Anything else surfaces as InvalidArgument with the same field-
+// violation shape the per-kind helpers use.
+func ScopeFromPath(field, path string) (ScopeRef, error) {
+	if path == "" {
+		return ScopeRef{}, apierr.InvalidArgument(apierr.FieldViolation(field, "must not be empty"))
+	}
+	parts := strings.Split(path, "/")
+	if len(parts) < 2 || parts[0] != "organizations" || parts[1] == "" {
+		return ScopeRef{}, apierr.InvalidArgument(apierr.FieldViolation(field,
+			fmt.Sprintf("expected organizations/{org}[/...] or organizations/{org}/spaces/{space}[/...] in %q", path)))
+	}
+	if len(parts) >= 3 && parts[2] == "spaces" {
+		if len(parts) < 4 || parts[3] == "" {
+			return ScopeRef{}, apierr.InvalidArgument(apierr.FieldViolation(field,
+				fmt.Sprintf("missing space slug in %q", path)))
+		}
+		return SpaceScope(parts[1], parts[3]), nil
+	}
+	return OrgScope(parts[1]), nil
+}
+
 // SpaceScopeFromPath extracts a space-scoped ScopeRef from a resource
 // path of the form `organizations/{org}/spaces/{space}` or
 // `organizations/{org}/spaces/{space}/...`. Both the parent org slug

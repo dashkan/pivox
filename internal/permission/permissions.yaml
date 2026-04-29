@@ -50,6 +50,22 @@ permissions:
     display_name: Delete Space
     description: Delete or restore a space (covers UndeleteSpace too — same destruction-class tier). Admin-allowed because spaces have narrower blast radius than orgs (workgroup vs whole tenant); compare organizations.delete which is owner-only.
     roles: [owner, admin]
+  - id: tags.create
+    display_name: Create Tag
+    description: Create new tag keys, values, or bindings
+    roles: [owner, admin]
+  - id: tags.read
+    display_name: Read Tags
+    description: View and list tag keys, values, and bindings
+    roles: [owner, admin, editor, viewer]
+  - id: tags.update
+    display_name: Update Tag
+    description: Modify tag keys or values
+    roles: [owner, admin]
+  - id: tags.delete
+    display_name: Delete Tag
+    description: Delete tag keys, values, or bindings
+    roles: [owner, admin]
   - id: users.read
     display_name: Read Users
     description: View and list users
