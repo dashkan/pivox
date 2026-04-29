@@ -489,16 +489,35 @@ plan is obsolete.)
       server via `workers.RunAll`; ctx cancellation stops both, WaitGroup
       blocks the binary until they exit.
 
-### Step 7 — Domain RPC handlers
+### Step 7 — Domain RPC handlers ✅
 
-- [ ] `Organizations.CreateDomain` — generate token, write row with `state=PENDING`,
-      create LRO with `verification_token` in metadata. Returns
-      `ALREADY_EXISTS` for globally-claimed domains *without* disclosing the
-      holder org.
-- [ ] `Organizations.ListDomains`, `GetDomain`, `DeleteDomain` — sync.
-- [ ] `DeleteDomain` cancels in-flight `CreateDomain` LRO if still running.
-      Returns FAILED_PRECONDITION when removing the last `state=VERIFIED`
-      domain on an `enabled=true` SsoConfig.
+- [x] `Organizations.CreateDomain` — generates a 32-byte CSPRNG token
+      (43-char unpadded base64url), writes the domains row with
+      `state=PENDING`, dispatches an LRO whose work fn long-polls the row
+      (30s interval, 7-day grace) until the verify-domain worker flips
+      state to VERIFIED or FAILED. Initial metadata carries the
+      `verification_token` so clients display DNS instructions immediately
+      without waiting for the LRO. Returns `ALREADY_EXISTS` for
+      globally-claimed domains via the pgconn unique-violation, *without*
+      disclosing the holding org (security: error message names only the
+      domain string, never the holder).
+- [x] `Organizations.GetDomain`, `ListDomains` — sync. Reads from
+      `ResolvedOrg` in ctx; no extra DB calls beyond the row fetch.
+- [x] `Organizations.DeleteDomain` — sync. Three preconditions in order:
+        1. etag check (when client supplied);
+        2. last-VERIFIED-domain-on-enabled-SSO guard (FAILED_PRECONDITION
+           when removing this row would leave an enabled SsoConfig with
+           zero verified domains);
+        3. cancel any in-flight CreateDomain LRO via
+           `CancelDomainOpsForDomain` (matches by `metadata->>'domain'`
+           since LROs created here populate that field). DB error in
+           cancel surfaces as Internal — we don't delete the row while a
+           verifying goroutine still runs.
+- [x] `convert.DomainToProto` — wraps the row with the per-org slug to
+      construct the resource name. State enum mapping covers PENDING /
+      VERIFIED / FAILED / unspecified.
+- [x] Permission gating: `domains.{create,read,delete}` already in catalog
+      from Step 2; interceptor enforces.
 
 ### Step 8 — SSO config + `auth:resolveProvider`
 

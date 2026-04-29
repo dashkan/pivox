@@ -12,6 +12,17 @@ import (
 )
 
 type Querier interface {
+	// CancelDomainOpsForDomain marks running CreateDomain LROs for the
+	// given (org, domain) pair as cancelled. The match is on
+	// metadata->>'domain' (set by runVerifyDomain) AND on the
+	// operations.org_id reverse pointer (populated by
+	// CreateAndRunForOrg). The org_id filter is defense-in-depth: it
+	// prevents a cross-org cancel even in the hypothetical case where
+	// the same domain string ever appeared in two orgs (impossible
+	// today thanks to UNIQUE(domain), but cheap insurance).
+	//
+	// error_code = 1 is gRPC codes.Cancelled.
+	CancelDomainOpsForDomain(ctx context.Context, arg CancelDomainOpsForDomainParams) error
 	CancelOperation(ctx context.Context, id uuid.UUID) (Operation, error)
 	// CancelRunningOpsForOrg marks all running operations linked to the
 	// given org (via the operations.org_id reverse pointer) as
@@ -62,6 +73,10 @@ type Querier interface {
 	CountStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) (int64, error)
 	CountTagBindingsByTagValue(ctx context.Context, tagValueID uuid.UUID) (int64, error)
 	CountTagValuesByTagKey(ctx context.Context, tagKeyID uuid.UUID) (int64, error)
+	// CountVerifiedDomainsByOrg counts state=VERIFIED domains for an
+	// org. Used by DeleteDomain's "last VERIFIED domain on enabled SSO"
+	// precondition.
+	CountVerifiedDomainsByOrg(ctx context.Context, orgID uuid.UUID) (int64, error)
 	CreateApiKey(ctx context.Context, arg CreateApiKeyParams) (ApiKey, error)
 	CreateArtifact(ctx context.Context, arg CreateArtifactParams) (AiArtifact, error)
 	CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset, error)
@@ -74,6 +89,11 @@ type Querier interface {
 	// Creates a new delegated auth session. The code and expiry are chosen by the
 	// server so we can control both TTL and the entropy source (crypto/rand).
 	CreateDelegatedAuthSession(ctx context.Context, arg CreateDelegatedAuthSessionParams) (DelegatedAuthSession, error)
+	// CreateDomain inserts a new PENDING domain. UNIQUE(domain) is a
+	// global single-claim constraint — a duplicate insert returns
+	// pgconn unique-violation, which the handler maps to ALREADY_EXISTS
+	// WITHOUT disclosing the holding org.
+	CreateDomain(ctx context.Context, arg CreateDomainParams) (Domain, error)
 	CreateInlineArtifactVersion(ctx context.Context, arg CreateInlineArtifactVersionParams) (AiArtifactVersion, error)
 	CreateLineItem(ctx context.Context, arg CreateLineItemParams) (AssetRequestLineItem, error)
 	CreateMessage(ctx context.Context, arg CreateMessageParams) (AiMessage, error)
@@ -116,6 +136,10 @@ type Querier interface {
 	DeleteArtifactVersion(ctx context.Context, id uuid.UUID) error
 	DeleteAssetRenditionsByVersion(ctx context.Context, versionID uuid.UUID) error
 	DeleteConversation(ctx context.Context, id uuid.UUID) error
+	// DeleteDomain removes a domain row. The handler runs preconditions
+	// (cancel in-flight LROs, last-VERIFIED-domain-on-enabled-SSO check)
+	// before this fires.
+	DeleteDomain(ctx context.Context, arg DeleteDomainParams) error
 	// Cleanup: remove codes older than 10 minutes (all should be expired by then).
 	DeleteExpiredAuthTokenCodes(ctx context.Context) error
 	// Cleanup: remove sessions past their expiry. Run periodically.
@@ -164,6 +188,14 @@ type Querier interface {
 	// Returns the state of a session without mutating it. Used by pollers to
 	// distinguish "still pending" from "expired/unknown" after a failed consume.
 	GetDelegatedAuthSessionState(ctx context.Context, code uuid.UUID) (DelegatedAuthSessionState, error)
+	// GetDomainByID looks up a domain row by primary key, scoped to an
+	// org. Used by the CreateDomain LRO's polling work fn and by
+	// GetDomain handler.
+	GetDomainByID(ctx context.Context, arg GetDomainByIDParams) (Domain, error)
+	// GetDomainByName resolves a Domain resource path's trailing
+	// segment (the domain string) to a row, scoped to org. Used by
+	// GetDomain handler.
+	GetDomainByName(ctx context.Context, arg GetDomainByNameParams) (Domain, error)
 	// Returns the system-role names a Firebase identity has at the given
 	// org, considering both direct user bindings and group-derived
 	// bindings (groups the user is a member of, which themselves have
@@ -232,6 +264,13 @@ type Querier interface {
 	// when a space-scoped permission check needs to fold in org-level
 	// inheritance.
 	GetSpaceParentOrg(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
+	// GetSsoConfigByOrgID looks up the SSO config row for an org, if
+	// one exists. UNIQUE(org_id) ensures at most one row. Used by
+	// DeleteDomain to enforce the "last verified domain on an enabled
+	// SSO config" precondition: the handler refuses to delete a
+	// VERIFIED domain when removing it would leave an enabled SSO
+	// config without any verified domain.
+	GetSsoConfigByOrgID(ctx context.Context, orgID uuid.UUID) (SsoConfig, error)
 	GetStorageAgent(ctx context.Context, id uuid.UUID) (StorageAgent, error)
 	GetStorageAgentByGatewayAndIP(ctx context.Context, arg GetStorageAgentByGatewayAndIPParams) (StorageAgent, error)
 	GetStorageEndpoint(ctx context.Context, id uuid.UUID) (StorageEndpoint, error)
@@ -271,6 +310,10 @@ type Querier interface {
 	ListAssetVersions(ctx context.Context, arg ListAssetVersionsParams) ([]AssetVersion, error)
 	ListAssetsBySpace(ctx context.Context, arg ListAssetsBySpaceParams) ([]Asset, error)
 	ListAssetsBySpaceWithDeleted(ctx context.Context, arg ListAssetsBySpaceWithDeletedParams) ([]Asset, error)
+	// ListDomainsByOrg returns all domains for an org, oldest-first.
+	// 100-row LIMIT is a defensive backstop; the typical org has a
+	// handful of claimed domains.
+	ListDomainsByOrg(ctx context.Context, orgID uuid.UUID) ([]Domain, error)
 	ListEffectiveTags(ctx context.Context, parentResource string) ([]ListEffectiveTagsRow, error)
 	ListExpiredAssets(ctx context.Context, limit int32) ([]Asset, error)
 	ListLineItemsByRequest(ctx context.Context, arg ListLineItemsByRequestParams) ([]AssetRequestLineItem, error)

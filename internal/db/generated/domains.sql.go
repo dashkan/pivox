@@ -9,7 +9,217 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const cancelDomainOpsForDomain = `-- name: CancelDomainOpsForDomain :exec
+UPDATE operations
+SET done          = true,
+    error_code    = 1,
+    error_message = 'cancelled by DeleteDomain',
+    update_time   = now()
+WHERE done = false
+  AND prefix = 'domains'
+  AND org_id = $1
+  AND metadata->>'domain' = $2::text
+`
+
+type CancelDomainOpsForDomainParams struct {
+	OrgID      pgtype.UUID `json:"org_id"`
+	DomainName string      `json:"domain_name"`
+}
+
+// CancelDomainOpsForDomain marks running CreateDomain LROs for the
+// given (org, domain) pair as cancelled. The match is on
+// metadata->>'domain' (set by runVerifyDomain) AND on the
+// operations.org_id reverse pointer (populated by
+// CreateAndRunForOrg). The org_id filter is defense-in-depth: it
+// prevents a cross-org cancel even in the hypothetical case where
+// the same domain string ever appeared in two orgs (impossible
+// today thanks to UNIQUE(domain), but cheap insurance).
+//
+// error_code = 1 is gRPC codes.Cancelled.
+func (q *Queries) CancelDomainOpsForDomain(ctx context.Context, arg CancelDomainOpsForDomainParams) error {
+	_, err := q.db.Exec(ctx, cancelDomainOpsForDomain, arg.OrgID, arg.DomainName)
+	return err
+}
+
+const countVerifiedDomainsByOrg = `-- name: CountVerifiedDomainsByOrg :one
+SELECT count(*) FROM domains WHERE org_id = $1 AND state = 'VERIFIED'
+`
+
+// CountVerifiedDomainsByOrg counts state=VERIFIED domains for an
+// org. Used by DeleteDomain's "last VERIFIED domain on enabled SSO"
+// precondition.
+func (q *Queries) CountVerifiedDomainsByOrg(ctx context.Context, orgID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countVerifiedDomainsByOrg, orgID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const createDomain = `-- name: CreateDomain :one
+INSERT INTO domains (org_id, domain, verification_token, created_by)
+VALUES ($1, $2, $3, $4)
+RETURNING id, org_id, domain, verification_token, state, etag, revision, created_by, updated_by, create_time, update_time, verified_time
+`
+
+type CreateDomainParams struct {
+	OrgID             uuid.UUID `json:"org_id"`
+	Domain            string    `json:"domain"`
+	VerificationToken string    `json:"verification_token"`
+	CreatedBy         string    `json:"created_by"`
+}
+
+// CreateDomain inserts a new PENDING domain. UNIQUE(domain) is a
+// global single-claim constraint — a duplicate insert returns
+// pgconn unique-violation, which the handler maps to ALREADY_EXISTS
+// WITHOUT disclosing the holding org.
+func (q *Queries) CreateDomain(ctx context.Context, arg CreateDomainParams) (Domain, error) {
+	row := q.db.QueryRow(ctx, createDomain,
+		arg.OrgID,
+		arg.Domain,
+		arg.VerificationToken,
+		arg.CreatedBy,
+	)
+	var i Domain
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.Domain,
+		&i.VerificationToken,
+		&i.State,
+		&i.Etag,
+		&i.Revision,
+		&i.CreatedBy,
+		&i.UpdatedBy,
+		&i.CreateTime,
+		&i.UpdateTime,
+		&i.VerifiedTime,
+	)
+	return i, err
+}
+
+const deleteDomain = `-- name: DeleteDomain :exec
+DELETE FROM domains WHERE id = $1 AND org_id = $2
+`
+
+type DeleteDomainParams struct {
+	ID    uuid.UUID `json:"id"`
+	OrgID uuid.UUID `json:"org_id"`
+}
+
+// DeleteDomain removes a domain row. The handler runs preconditions
+// (cancel in-flight LROs, last-VERIFIED-domain-on-enabled-SSO check)
+// before this fires.
+func (q *Queries) DeleteDomain(ctx context.Context, arg DeleteDomainParams) error {
+	_, err := q.db.Exec(ctx, deleteDomain, arg.ID, arg.OrgID)
+	return err
+}
+
+const getDomainByID = `-- name: GetDomainByID :one
+SELECT id, org_id, domain, verification_token, state, etag, revision, created_by, updated_by, create_time, update_time, verified_time FROM domains WHERE id = $1 AND org_id = $2
+`
+
+type GetDomainByIDParams struct {
+	ID    uuid.UUID `json:"id"`
+	OrgID uuid.UUID `json:"org_id"`
+}
+
+// GetDomainByID looks up a domain row by primary key, scoped to an
+// org. Used by the CreateDomain LRO's polling work fn and by
+// GetDomain handler.
+func (q *Queries) GetDomainByID(ctx context.Context, arg GetDomainByIDParams) (Domain, error) {
+	row := q.db.QueryRow(ctx, getDomainByID, arg.ID, arg.OrgID)
+	var i Domain
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.Domain,
+		&i.VerificationToken,
+		&i.State,
+		&i.Etag,
+		&i.Revision,
+		&i.CreatedBy,
+		&i.UpdatedBy,
+		&i.CreateTime,
+		&i.UpdateTime,
+		&i.VerifiedTime,
+	)
+	return i, err
+}
+
+const getDomainByName = `-- name: GetDomainByName :one
+SELECT id, org_id, domain, verification_token, state, etag, revision, created_by, updated_by, create_time, update_time, verified_time FROM domains WHERE domain = $1 AND org_id = $2
+`
+
+type GetDomainByNameParams struct {
+	Domain string    `json:"domain"`
+	OrgID  uuid.UUID `json:"org_id"`
+}
+
+// GetDomainByName resolves a Domain resource path's trailing
+// segment (the domain string) to a row, scoped to org. Used by
+// GetDomain handler.
+func (q *Queries) GetDomainByName(ctx context.Context, arg GetDomainByNameParams) (Domain, error) {
+	row := q.db.QueryRow(ctx, getDomainByName, arg.Domain, arg.OrgID)
+	var i Domain
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.Domain,
+		&i.VerificationToken,
+		&i.State,
+		&i.Etag,
+		&i.Revision,
+		&i.CreatedBy,
+		&i.UpdatedBy,
+		&i.CreateTime,
+		&i.UpdateTime,
+		&i.VerifiedTime,
+	)
+	return i, err
+}
+
+const listDomainsByOrg = `-- name: ListDomainsByOrg :many
+SELECT id, org_id, domain, verification_token, state, etag, revision, created_by, updated_by, create_time, update_time, verified_time FROM domains WHERE org_id = $1 ORDER BY create_time ASC LIMIT 100
+`
+
+// ListDomainsByOrg returns all domains for an org, oldest-first.
+// 100-row LIMIT is a defensive backstop; the typical org has a
+// handful of claimed domains.
+func (q *Queries) ListDomainsByOrg(ctx context.Context, orgID uuid.UUID) ([]Domain, error) {
+	rows, err := q.db.Query(ctx, listDomainsByOrg, orgID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Domain{}
+	for rows.Next() {
+		var i Domain
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.Domain,
+			&i.VerificationToken,
+			&i.State,
+			&i.Etag,
+			&i.Revision,
+			&i.CreatedBy,
+			&i.UpdatedBy,
+			&i.CreateTime,
+			&i.UpdateTime,
+			&i.VerifiedTime,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
 
 const listPendingDomains = `-- name: ListPendingDomains :many
 SELECT id, org_id, domain, verification_token, state, etag, revision, created_by, updated_by, create_time, update_time, verified_time FROM domains WHERE state = 'PENDING' ORDER BY create_time ASC LIMIT 1000

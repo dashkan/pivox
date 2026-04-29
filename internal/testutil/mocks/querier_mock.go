@@ -211,6 +211,46 @@ func (m *MockQuerier) MarkDomainFailed(ctx context.Context, id uuid.UUID) (db.Do
 	return args.Get(0).(db.Domain), args.Error(1)
 }
 
+func (m *MockQuerier) CreateDomain(ctx context.Context, arg db.CreateDomainParams) (db.Domain, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.Domain), args.Error(1)
+}
+
+func (m *MockQuerier) GetDomainByID(ctx context.Context, arg db.GetDomainByIDParams) (db.Domain, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.Domain), args.Error(1)
+}
+
+func (m *MockQuerier) GetDomainByName(ctx context.Context, arg db.GetDomainByNameParams) (db.Domain, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.Domain), args.Error(1)
+}
+
+func (m *MockQuerier) ListDomainsByOrg(ctx context.Context, orgID uuid.UUID) ([]db.Domain, error) {
+	args := m.Called(ctx, orgID)
+	return args.Get(0).([]db.Domain), args.Error(1)
+}
+
+func (m *MockQuerier) DeleteDomain(ctx context.Context, arg db.DeleteDomainParams) error {
+	args := m.Called(ctx, arg)
+	return args.Error(0)
+}
+
+func (m *MockQuerier) CountVerifiedDomainsByOrg(ctx context.Context, orgID uuid.UUID) (int64, error) {
+	args := m.Called(ctx, orgID)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+func (m *MockQuerier) CancelDomainOpsForDomain(ctx context.Context, arg db.CancelDomainOpsForDomainParams) error {
+	args := m.Called(ctx, arg)
+	return args.Error(0)
+}
+
+func (m *MockQuerier) GetSsoConfigByOrgID(ctx context.Context, orgID uuid.UUID) (db.SsoConfig, error) {
+	args := m.Called(ctx, orgID)
+	return args.Get(0).(db.SsoConfig), args.Error(1)
+}
+
 // --- Users (per-org membership) ---
 
 func (m *MockQuerier) CreateUserMembership(ctx context.Context, arg db.CreateUserMembershipParams) (db.User, error) {
