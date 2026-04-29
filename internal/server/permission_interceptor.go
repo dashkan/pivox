@@ -279,10 +279,21 @@ func (g *permissionGate) checkOrgScope(
 
 // enforceSoftDeleteGate returns FAILED_PRECONDITION when the caller
 // is mutating a soft-deleted org. Reads pass through (org metadata
-// remains visible during the grace window) and `organizations.delete`
-// passes through too — that permission gates UndeleteOrganization,
-// which is the only mutating op valid against a DELETE_REQUESTED
-// row. Other writes are blocked until the org is restored.
+// remains visible during the grace window). Two specific mutating
+// perms also pass through:
+//
+//   - organizations.delete gates UndeleteOrganization, the recovery
+//     path. Without this the only way out of DELETE_REQUESTED is
+//     waiting for purge.
+//   - users.delete gates DeleteUser. A user whose only org is
+//     soft-deleted needs a path to delete their own account; without
+//     this they're locked out of the cleanup verb until purge.
+//     The cascade is going to wipe everything anyway when purge
+//     fires; allowing self-delete just lets users opt into faster
+//     cleanup without contributing any new mutating effect to the
+//     org's state.
+//
+// Other writes are blocked until the org is restored.
 //
 // This is the RPC-boundary "soft-delete gate" called for in the
 // IAM/lifecycle roadmap: the gate lives in the interceptor so every
@@ -291,7 +302,9 @@ func enforceSoftDeleteGate(state db.ResourceState, perm, orgSlug string) error {
 	if state != db.ResourceStateDELETEREQUESTED {
 		return nil
 	}
-	if isReadPermission(perm) || perm == permission.OrganizationsDelete {
+	if isReadPermission(perm) ||
+		perm == permission.OrganizationsDelete ||
+		perm == permission.UsersDelete {
 		return nil
 	}
 	return apierr.FailedPrecondition(
