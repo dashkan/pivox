@@ -317,64 +317,93 @@ tests, lint) and an audit-eligible commit boundary.
 - [x] Add 4 RPCs to `Organizations` service: `CreateDomain` (LRO), `ListDomains`, `GetDomain`, `DeleteDomain`.
 - [x] `CreateDomainMetadata` Phase enum: AWAITING_DNS, VERIFIED, FAILED, EXPIRED.
 
-### Step 1 — Schema sweep + sqlc + dev-DB recreate
+### Step 1 — Schema sweep + sqlc + dev-DB recreate ✅
 
-- [ ] Init migration edit: new tables `org_members`, `space_members` (new shape),
+- [x] Init migration edit: new tables `org_members`, `space_members` (new shape),
       `domains`, `sso_configs`. New enums `principal_kind`, `domain_state`.
-- [ ] Drop old tables `role_members` and old `space_members`. Drop old enums
+- [x] Drop old tables `role_members` and old `space_members`. Drop old enums
       `space_role`, `space_member_type`, `role_member_type`, `org_role`.
-- [ ] `users` loses `role` column; gains soft-delete (`delete_time`, `purge_time`, `deleted_by`).
-- [ ] `roles` gains stable `name` slug column (system-role machine identifier;
+- [x] `users` loses `role` column; gains soft-delete (`delete_time`, `purge_time`, `deleted_by`).
+- [x] `roles` gains stable `name` slug column (system-role machine identifier;
       `name='owner'/'admin'/'editor'/'viewer'` for the 4 system roles per org).
       `UNIQUE(org_id, name)`.
-- [ ] `domains.domain` `UNIQUE` globally + `CHECK (domain = lower(domain))` for
+- [x] `domains.domain` `UNIQUE` globally + `CHECK (domain = lower(domain))` for
       case-insensitive single-claim enforcement.
-- [ ] `sso_configs.client_secret_ciphertext BYTEA` separate from `oidc_config`
+- [x] `sso_configs.client_secret_ciphertext BYTEA` separate from `oidc_config`
       JSONB; KMS-encrypt on write. CHECK ensures exactly one of OIDC/SAML.
-- [ ] Permission catalog adds `domains.*`, `organizations.ssoConfig.*`, `members.*`, `users.delete`.
-- [ ] `users.sql` queries: `CreateUserMembership` no longer takes role,
+- [x] Permission catalog adds `domains.*`, `organizations.ssoConfig.*`, `members.*`, `users.delete`.
+      Plus: catalog refactored to YAML-driven CRUD model with codegen, additional
+      perms for `tags.*`, `spaces.{read,update,delete}`, `apiKeys.*` rename.
+- [x] `users.sql` queries: `CreateUserMembership` no longer takes role,
       `CountOwnersByOrg` joins `org_members + roles + users` keyed on `roles.name='owner'`,
       `SoftDeleteUserMembership` added, `UpdateUserRole` removed.
-- [ ] sqlc regen + Go code fixes (CreateOrganization handler, mock querier, two test files).
-- [ ] Drop+recreate dev DB; `make db-seed` clean; storage agent registration tokens present.
-- [ ] Code-reviewer audit before commit.
+- [x] sqlc regen + Go code fixes (CreateOrganization handler, mock querier, two test files).
+- [x] Drop+recreate dev DB; `make db-seed` clean; storage agent registration tokens present.
+- [x] Code-reviewer audit before commit.
 
-### Step 2 — Permission interceptor
+### Step 2 — Permission interceptor ✅
 
-- [ ] Test fixtures: orgs with various member/group/role bindings.
-- [ ] Resolver: caller → effective role at target scope, with org→space inheritance
+- [x] Test fixtures: orgs with various member/group/role bindings.
+- [x] Resolver: caller → effective role at target scope, with org→space inheritance
       (locked: open decision #1 — union with org-level).
-- [ ] Static `(role, permission) → allow` map in code.
-- [ ] Wire into gRPC server interceptor chain.
-- [ ] `Organizations.TestIamPermissions` and `Spaces.TestIamPermissions`
+- [x] Static `(role, permission) → allow` map in code.
+- [x] **YAML-driven permission catalog** (`internal/permission/permissions.yaml`)
+      with `cmd/gen-permissions` emitting typed constants + matrix. CRUD model
+      (collapsed `*.list` + `*.get` → `*.read`); AI sub-resources rolled into
+      `ai.conversations.*`. 73 permissions total.
+- [x] **Proto-annotation permission gating**: `pivox.permission.v1.{required_permission,
+      exempt, scope_field}` extends MethodOptions on every gated RPC across
+      Organizations, Spaces, Iam, ApiKeys, Tags, Storage, Assets, Requests, AiChat
+      (~110 RPCs).
+- [x] `cmd/gen-permission-registry` walks `protoregistry.GlobalFiles`, emits
+      `internal/server/permission_registry_gen.go` with the union Registry +
+      Exempt set. Drift-guard tests assert (a) every RPC on every gated service
+      is wired, (b) every emitted permission ID is in `permission.All`.
+- [x] `make proto-generate` chains into `make generate` so proto annotation
+      edits regenerate the registry automatically.
+- [x] Wire into gRPC server interceptor chain — both unary
+      (`PermissionInterceptor`) and streaming (`PermissionStreamInterceptor`,
+      gates on first RecvMsg). Wired in `cmd/pivox-cloud/main.go` after Auth +
+      Membership, before Validate.
+- [x] `ResolvedOrg` / `ResolvedSpace` attached to ctx so handlers don't repeat
+      slug → row lookups. `MustResolvedOrgFromContext` /
+      `MustResolvedSpaceFromContext` for handler-side assertion.
+- [x] `Organizations.TestIamPermissions` and `Spaces.TestIamPermissions`
       handlers reuse the same resolver (each builds its own scope-shaped
       `Target` — `OrgTarget` or `SpaceTarget`). Per locked sub-decision #14.
+      SECURITY-commented — both are exempt from the interceptor (gating
+      would be circular) and resolve caller identity themselves.
 
-### Step 3 — Member / Group / Role handlers
+### Step 3 — Member / Group / Role handlers ✅
 
 (Restructured per locked sub-decisions #12–#15: scope-divergent IAM ops
 moved to scope-owning services. Original "single Iam mega-service"
 plan is obsolete.)
 
-- [ ] **`Organizations` service gains:**
+- [x] **`Organizations` service gains:**
       - `Get/List/Create/Update/DeleteMember` — single-scope dispatch
         on `org_members` table; tx-wrapped ≥1-owner boundary on Update
         and Delete.
       - `TransferOwnership` — atomic two-row swap inside one transaction;
         returns `TransferOwnershipResponse {new_owner, previous_owner}`.
       - `TestIamPermissions` — resolves direct + group-derived org bindings.
-- [ ] **`Spaces` service gains:**
+- [x] **`Spaces` service gains:**
       - `Get/List/Create/Update/DeleteMember` — single-scope dispatch
         on `space_members` table; no boundary check.
       - `TestIamPermissions` — resolves direct + group-derived space
         bindings unioned with parent-org inheritance.
-- [ ] **`Iam` service keeps:**
-      - `Get/List` on `User`, `Role`; `DeleteUser` LRO.
+- [x] **`Iam` service keeps:**
+      - `Get/List` on `User`, `Role`; `DeleteUser` proto contract (LRO impl in Step 5).
       - `Get/List/Create/Update/Delete` on `Group` + `Add/Remove/ListGroupMembers`.
       - `ListPermissions`.
-- [ ] `CreateOrganization` handler grows: seed 4 system roles for the new org,
+- [x] `CreateOrganization` handler grows: seed 4 system roles for the new org,
       then insert `org_members` row binding the founder to the system 'owner' role.
       Restore the deferred owner-binding test assertion (tracked in step 1).
+
+> Step 2 (Permission interceptor) was the natural follow-on to Step 3
+> handlers; both shipped together across commits 4a91cf2 (catalog) →
+> 38ec1f7 (scaffolding) → 8ea5368/cd23ee9/2be9c29 (per-service
+> registries) → 9d28a4a (proto-annotation rewrite + interceptor live).
 
 ### Step 4 — Org lifecycle
 
