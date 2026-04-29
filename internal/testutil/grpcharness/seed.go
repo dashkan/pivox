@@ -56,6 +56,26 @@ func (h *Harness) SeedMembership(t *testing.T, orgID uuid.UUID, identity *Caller
 	return user.ID
 }
 
+// SeedUserMembershipOnly creates a per-org users row joining a
+// firebase_identity to an org WITHOUT any role binding. Returns the
+// per-org users.id. Useful for tests that want to verify a caller
+// reaches a specific RPC via group-mediated permissions without a
+// direct org_members row clouding the assertion.
+//
+// In production, the only path to a per-org users row is
+// CreateOrganization (founder) or AcceptInvitation (invitee). This
+// helper bypasses both for test setup convenience.
+func (h *Harness) SeedUserMembershipOnly(t *testing.T, orgID uuid.UUID, identity *Caller) uuid.UUID {
+	t.Helper()
+	user, err := h.Queries.CreateUserMembership(context.Background(), db.CreateUserMembershipParams{
+		ID:                 uuid.New(),
+		OrgID:              orgID,
+		FirebaseIdentityID: identity.FirebaseIdentityID,
+	})
+	require.NoError(t, err)
+	return user.ID
+}
+
 // LookupOrgID resolves a slug to its uuid. Convenience for tests
 // that create an org via CreateOrganization (which returns the proto
 // Organization without exposing the uuid) and then need the uuid for
