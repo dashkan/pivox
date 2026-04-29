@@ -19,28 +19,6 @@ import (
 
 func silentLogger() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
 
-// purgeTickFn calls the worker's tick logic without going through
-// withAdvisoryLock — tests run against a mock Querier where the
-// real *pgxpool.Pool isn't available. We exercise the inner work
-// fn directly. The lock-acquisition path is covered by an
-// integration test layer (not in this commit) since it requires
-// real Postgres.
-func purgeTickFn(w *PurgeWorker) func(context.Context) error {
-	return func(ctx context.Context) error {
-		orgs, err := w.queries.ListOrgsPastPurgeTime(ctx)
-		if err != nil {
-			return err
-		}
-		for _, o := range orgs {
-			if err := w.queries.PurgeExpiredOrganization(ctx, o.ID); err != nil {
-				w.logger.Error("purge: PurgeExpiredOrganization failed", "org", o.Name, "error", err)
-				continue
-			}
-		}
-		return nil
-	}
-}
-
 func TestPurgeWorker_PurgesEachOrgPastPurgeTime(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	orgA := db.Organization{ID: uuid.MustParse("0192a000-aaaa-7000-8000-000000000001"), Name: "acme"}
@@ -50,7 +28,7 @@ func TestPurgeWorker_PurgesEachOrgPastPurgeTime(t *testing.T) {
 	q.On("PurgeExpiredOrganization", mock.Anything, orgB.ID).Return(nil)
 
 	w := &PurgeWorker{queries: q, logger: silentLogger(), interval: time.Minute}
-	require.NoError(t, purgeTickFn(w)(context.Background()))
+	require.NoError(t, w.processBatch(context.Background()))
 	q.AssertExpectations(t)
 }
 
@@ -58,7 +36,7 @@ func TestPurgeWorker_NoopWhenNoOrgsPending(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	q.On("ListOrgsPastPurgeTime", mock.Anything).Return([]db.Organization{}, nil)
 	w := &PurgeWorker{queries: q, logger: silentLogger(), interval: time.Minute}
-	require.NoError(t, purgeTickFn(w)(context.Background()))
+	require.NoError(t, w.processBatch(context.Background()))
 	q.AssertNotCalled(t, "PurgeExpiredOrganization", mock.Anything, mock.Anything)
 }
 
@@ -74,7 +52,7 @@ func TestPurgeWorker_OnePurgeFailureDoesNotBlockOthers(t *testing.T) {
 	q.On("PurgeExpiredOrganization", mock.Anything, orgB.ID).Return(nil)
 
 	w := &PurgeWorker{queries: q, logger: silentLogger(), interval: time.Minute}
-	require.NoError(t, purgeTickFn(w)(context.Background()))
+	require.NoError(t, w.processBatch(context.Background()))
 	q.AssertExpectations(t)
 }
 
@@ -85,7 +63,7 @@ func TestPurgeWorker_ListErrorReturned(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	q.On("ListOrgsPastPurgeTime", mock.Anything).Return([]db.Organization{}, errors.New("db down"))
 	w := &PurgeWorker{queries: q, logger: silentLogger(), interval: time.Minute}
-	err := purgeTickFn(w)(context.Background())
+	err := w.processBatch(context.Background())
 	require.Error(t, err)
 	assert.Equal(t, "db down", err.Error())
 }

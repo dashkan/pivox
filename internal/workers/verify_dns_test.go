@@ -26,27 +26,6 @@ func (f *fakeResolver) LookupTXT(ctx context.Context, host string) ([]string, er
 	return args.Get(0).([]string), args.Error(1)
 }
 
-// verifyTickFn mirrors purgeTickFn — exercises the worker's inner
-// work fn without the advisory lock so tests can use a mock pool.
-func verifyTickFn(w *VerifyDomainWorker) func(context.Context) error {
-	return func(ctx context.Context) error {
-		domains, err := w.queries.ListPendingDomains(ctx)
-		if err != nil {
-			return err
-		}
-		for _, d := range domains {
-			records, lookupErr := w.resolver.LookupTXT(ctx, "_pivox-verify."+d.Domain)
-			if lookupErr != nil || len(records) == 0 {
-				continue
-			}
-			if _, err := w.queries.MarkDomainVerified(ctx, d.ID); err != nil {
-				continue
-			}
-		}
-		return nil
-	}
-}
-
 func TestVerifyDomainWorker_TicksPendingToVerified(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	resolver := &fakeResolver{}
@@ -59,7 +38,7 @@ func TestVerifyDomainWorker_TicksPendingToVerified(t *testing.T) {
 	q.On("MarkDomainVerified", mock.Anything, d2.ID).Return(d2, nil)
 
 	w := &VerifyDomainWorker{queries: q, resolver: resolver, logger: silentLogger(), interval: time.Minute}
-	require.NoError(t, verifyTickFn(w)(context.Background()))
+	require.NoError(t, w.processBatch(context.Background()))
 	q.AssertExpectations(t)
 	resolver.AssertExpectations(t)
 }
@@ -75,7 +54,7 @@ func TestVerifyDomainWorker_LookupFailureKeepsDomainPending(t *testing.T) {
 		Return([]string{}, errors.New("dns timeout"))
 
 	w := &VerifyDomainWorker{queries: q, resolver: resolver, logger: silentLogger(), interval: time.Minute}
-	require.NoError(t, verifyTickFn(w)(context.Background()))
+	require.NoError(t, w.processBatch(context.Background()))
 	q.AssertNotCalled(t, "MarkDomainVerified", mock.Anything, mock.Anything)
 }
 
@@ -89,7 +68,7 @@ func TestVerifyDomainWorker_EmptyTXTRecordsKeepsPending(t *testing.T) {
 	resolver.On("LookupTXT", mock.Anything, "_pivox-verify.no-record.com").Return([]string{}, nil)
 
 	w := &VerifyDomainWorker{queries: q, resolver: resolver, logger: silentLogger(), interval: time.Minute}
-	require.NoError(t, verifyTickFn(w)(context.Background()))
+	require.NoError(t, w.processBatch(context.Background()))
 	q.AssertNotCalled(t, "MarkDomainVerified", mock.Anything, mock.Anything)
 }
 

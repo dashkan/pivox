@@ -289,7 +289,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	longrunningpb.RegisterOperationsServer(grpcServer, operations.NewOperationsServer(lroManager))
 
 	apiv1.RegisterSpacesServer(grpcServer, spaces.NewSpacesServer(pool, pool, queries, appCodec, permResolver, callerIdentity))
-	apiv1.RegisterOrganizationsServer(grpcServer, organizations.NewOrganizationsServer(pool, queries, authSvc, appCodec, server.AuthenticatedUID, permResolver, callerIdentity, lroManager))
+	apiv1.RegisterOrganizationsServer(grpcServer, organizations.NewOrganizationsServer(pool, queries, authSvc, appCodec, server.AuthenticatedUID, permResolver, callerIdentity, lroManager, enc))
 	apiv1.RegisterTagKeysServer(grpcServer, tags.NewTagKeysServer(pool, queries, appCodec))
 	apiv1.RegisterTagValuesServer(grpcServer, tags.NewTagValuesServer(pool, queries, appCodec))
 	apiv1.RegisterTagBindingsServer(grpcServer, tags.NewTagBindingsServer(pool, queries, appCodec))
@@ -423,7 +423,7 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	// HTTP mux: internal hooks + gRPC gateway (fallback)
 	httpMux := http.NewServeMux()
-	hooks, err := server.NewInternalHooks(queries, cfg.SyncAuth, cfg.DelegatedAuth, cfg.RateLimitEnabled, logger, authSvc)
+	hooks, err := server.NewInternalHooks(queries, cfg.SyncAuth, cfg.DelegatedAuth, cfg.RateLimitEnabled, cfg.TrustedProxies, logger, authSvc)
 	if err != nil {
 		return fmt.Errorf("initialize internal hooks: %w", err)
 	}

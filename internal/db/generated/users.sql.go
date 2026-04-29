@@ -15,20 +15,32 @@ const countOwnersByOrg = `-- name: CountOwnersByOrg :one
 SELECT COUNT(*)
   FROM org_members om
   JOIN roles r ON r.id = om.role_id
-  JOIN users u ON u.id = om.principal_id
  WHERE om.org_id = $1
-   AND om.principal_kind = 'user'
    AND r.is_system = true
    AND r.name = 'owner'
-   AND u.delete_time IS NULL
+   AND (
+     (om.principal_kind = 'user'
+      AND EXISTS (
+        SELECT 1 FROM users u
+         WHERE u.id = om.principal_id
+           AND u.delete_time IS NULL))
+     OR
+     (om.principal_kind = 'group'
+      AND EXISTS (
+        SELECT 1 FROM groups g
+         WHERE g.id = om.principal_id
+           AND g.state = 'ACTIVE'))
+   )
 `
 
 // Used by membership-mutation handlers to enforce "≥1 owner" — call
 // before any role-change or delete that would reduce the owner count.
 // Counts org_members rows whose role is the system 'owner' role for
-// this org and whose principal is a (non-deleted) user. Keys on the
-// stable `roles.name` slug, not display_name — display_name is mutable
-// and i18n-eligible, name is the machine identifier.
+// this org, regardless of principal kind. A binding is only counted
+// when its principal is still live: users.delete_time IS NULL for
+// user principals, groups.state = 'ACTIVE' for group principals.
+// Keys on the stable `roles.name` slug, not display_name —
+// display_name is mutable and i18n-eligible.
 func (q *Queries) CountOwnersByOrg(ctx context.Context, orgID uuid.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, countOwnersByOrg, orgID)
 	var count int64
@@ -225,6 +237,7 @@ SELECT o.id, o.name, o.display_name, o.annotations, o.created_by_firebase_identi
   FROM organizations o
  WHERE o.delete_time IS NULL
    AND o.id IN (
+     -- exactly one user-owner, and it's this firebase_identity
      SELECT om.org_id
        FROM org_members om
        JOIN roles r ON r.id = om.role_id
@@ -237,6 +250,18 @@ SELECT o.id, o.name, o.display_name, o.annotations, o.created_by_firebase_identi
      HAVING count(*) = 1
         AND bool_or(u.firebase_identity_id = $1) = true
    )
+   -- no live group-owners
+   AND NOT EXISTS (
+     SELECT 1
+       FROM org_members om2
+       JOIN roles r2 ON r2.id = om2.role_id
+       JOIN groups g2 ON g2.id = om2.principal_id
+      WHERE om2.org_id = o.id
+        AND om2.principal_kind = 'group'
+        AND r2.is_system = true
+        AND r2.name = 'owner'
+        AND g2.state = 'ACTIVE'
+   )
 `
 
 // ListSoleOwnerOrgsForFirebaseIdentity returns the set of active orgs
@@ -244,11 +269,20 @@ SELECT o.id, o.name, o.display_name, o.annotations, o.created_by_firebase_identi
 // VALIDATING phase to refuse deletion when the caller would leave any
 // org without an owner. Empty result means deletion is safe.
 //
-// The `having count(*) = 1` clause runs over org_members keyed on the
-// system 'owner' role for that org; `bool_or` then asserts the single
-// owner is THIS firebase_identity (true for exactly one row in the
-// group, false otherwise). Soft-deleted orgs and soft-deleted users
-// are excluded.
+// An org is "ONLY owned by this firebase_identity" iff:
+//   - exactly one live user-owner binding exists, and it points to a
+//     user belonging to this firebase_identity, AND
+//   - zero live group-owner bindings exist.
+//
+// Live = users.delete_time IS NULL for user principals,
+//
+//	groups.state = 'ACTIVE' for group principals.
+//
+// A group-owner binding (even on a group with zero members) keeps the
+// org out of this result set: the role is held by the group, so the
+// org is not "only" owned by the user. This mirrors the
+// CountOwnersByOrg invariant — both queries must count both
+// principal kinds or the ≥1-owner gate has a hole.
 func (q *Queries) ListSoleOwnerOrgsForFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) ([]Organization, error) {
 	rows, err := q.db.Query(ctx, listSoleOwnerOrgsForFirebaseIdentity, firebaseIdentityID)
 	if err != nil {

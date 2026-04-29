@@ -210,7 +210,7 @@ func TestDeleteDomain_VerifiedWithExtraVerifiedAllowed(t *testing.T) {
 	q.On("CancelDomainOpsForDomain", mock.Anything, db.CancelDomainOpsForDomainParams{
 		OrgID:      pgtype.UUID{Bytes: orgID, Valid: true},
 		DomainName: "organizations/acme/domains/x.com",
-	}).Return(nil)
+	}).Return([]uuid.UUID{}, nil)
 	q.On("DeleteDomain", mock.Anything, db.DeleteDomainParams{ID: domainID, OrgID: orgID}).Return(nil)
 
 	srv := &OrganizationsServer{queries: q}
@@ -232,7 +232,7 @@ func TestDeleteDomain_NoSsoConfigSkipsGuard(t *testing.T) {
 		ID: domainID, Domain: "x.com", State: db.DomainStateVERIFIED,
 	}, nil)
 	q.On("GetSsoConfigByOrgID", mock.Anything, orgID).Return(db.SsoConfig{}, pgx.ErrNoRows)
-	q.On("CancelDomainOpsForDomain", mock.Anything, mock.Anything).Return(nil)
+	q.On("CancelDomainOpsForDomain", mock.Anything, mock.Anything).Return([]uuid.UUID{}, nil)
 	q.On("DeleteDomain", mock.Anything, db.DeleteDomainParams{ID: domainID, OrgID: orgID}).Return(nil)
 
 	srv := &OrganizationsServer{queries: q}
@@ -254,7 +254,7 @@ func TestDeleteDomain_PendingRowSkipsSSO(t *testing.T) {
 	q.On("GetDomainByName", mock.Anything, mock.Anything).Return(db.Domain{
 		ID: domainID, Domain: "x.com", State: db.DomainStatePENDING,
 	}, nil)
-	q.On("CancelDomainOpsForDomain", mock.Anything, mock.Anything).Return(nil)
+	q.On("CancelDomainOpsForDomain", mock.Anything, mock.Anything).Return([]uuid.UUID{}, nil)
 	q.On("DeleteDomain", mock.Anything, db.DeleteDomainParams{ID: domainID, OrgID: orgID}).Return(nil)
 
 	srv := &OrganizationsServer{queries: q}
@@ -275,7 +275,7 @@ func TestDeleteDomain_CancelOpsFailureSurfacesInternal(t *testing.T) {
 	q.On("GetDomainByName", mock.Anything, mock.Anything).Return(db.Domain{
 		Domain: "x.com", State: db.DomainStatePENDING,
 	}, nil)
-	q.On("CancelDomainOpsForDomain", mock.Anything, mock.Anything).Return(errors.New("db down"))
+	q.On("CancelDomainOpsForDomain", mock.Anything, mock.Anything).Return([]uuid.UUID{}, errors.New("db down"))
 
 	srv := &OrganizationsServer{queries: q}
 	ctx := server.WithResolvedOrgForTest(context.Background(), &server.ResolvedOrg{

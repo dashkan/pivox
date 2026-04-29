@@ -12,13 +12,14 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const cancelRunningOpsForOrg = `-- name: CancelRunningOpsForOrg :exec
+const cancelRunningOpsForOrg = `-- name: CancelRunningOpsForOrg :many
 UPDATE operations
 SET done          = true,
     error_code    = 1,
     error_message = 'cancelled by DeleteOrganization',
     update_time   = now()
 WHERE done = false AND org_id = $1
+RETURNING id
 `
 
 // CancelRunningOpsForOrg marks all running operations linked to the
@@ -36,10 +37,27 @@ WHERE done = false AND org_id = $1
 // etc.) populate org_id when implemented and will be cancellable
 // through this query without further changes.
 //
-// error_code = 1 is gRPC codes.Cancelled.
-func (q *Queries) CancelRunningOpsForOrg(ctx context.Context, orgID pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, cancelRunningOpsForOrg, orgID)
-	return err
+// error_code = 1 is gRPC codes.Cancelled. Returns the id of every
+// transitioned row so the caller can fire local LRO Manager
+// cancels for goroutines running on this replica.
+func (q *Queries) CancelRunningOpsForOrg(ctx context.Context, orgID pgtype.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, cancelRunningOpsForOrg, orgID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const createOrganization = `-- name: CreateOrganization :one
@@ -241,19 +259,30 @@ func (q *Queries) PurgeExpiredOrganization(ctx context.Context, id uuid.UUID) er
 	return err
 }
 
-const purgeOrganization = `-- name: PurgeOrganization :exec
-DELETE FROM organizations WHERE id = $1
+const purgeOrganization = `-- name: PurgeOrganization :one
+DELETE FROM organizations WHERE id = $1 AND etag = $2 RETURNING id
 `
 
-// PurgeOrganization hard-deletes an org row unconditionally. FK ON
-// DELETE CASCADE removes spaces, members, domains, sso_configs,
-// assets, requests, tags, api keys, and ai conversations
-// transitively. Used by force=true DeleteOrganization where the
-// caller has already validated state and intends to skip the
-// 30-day grace window.
-func (q *Queries) PurgeOrganization(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.Exec(ctx, purgeOrganization, id)
-	return err
+type PurgeOrganizationParams struct {
+	ID   uuid.UUID `json:"id"`
+	Etag string    `json:"etag"`
+}
+
+// PurgeOrganization hard-deletes an org row, race-guarded by etag.
+// FK ON DELETE CASCADE removes spaces, members, domains,
+// sso_configs, assets, requests, tags, api keys, and ai
+// conversations transitively. Used by force=true DeleteOrganization
+// where the caller has already validated state and pinned the
+// row's revision; the etag check refuses to fire if the row has
+// been mutated since the handler read it (e.g., a concurrent
+// soft-delete + undelete cycle bumped revision). Returns the
+// deleted id on success; pgx.ErrNoRows on etag drift, which the
+// LRO surfaces as FailedPrecondition.
+func (q *Queries) PurgeOrganization(ctx context.Context, arg PurgeOrganizationParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, purgeOrganization, arg.ID, arg.Etag)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
 }
 
 const softDeleteOrganization = `-- name: SoftDeleteOrganization :one

@@ -24,6 +24,7 @@ func NewInternalHooks(
 	cfg config.SyncAuthConfig,
 	dcfg config.DelegatedAuthConfig,
 	rateLimitEnabled bool,
+	trustedProxies []string,
 	logger *slog.Logger,
 	auth authn.Service,
 ) (*InternalHooks, error) {
@@ -37,12 +38,18 @@ func NewInternalHooks(
 		allowed[sa] = struct{}{}
 	}
 
+	prefixes, err := parseTrustedProxies(trustedProxies)
+	if err != nil {
+		return nil, err
+	}
+
 	h := &InternalHooks{
 		queries:          queries,
 		logger:           logger,
 		auth:             auth,
 		delegatedAuth:    dcfg,
 		rateLimitEnabled: rateLimitEnabled,
+		trustedProxies:   prefixes,
 		exchangeLimiter:  newIPRateLimiter(rate.Every(6*time.Second), 10),
 		// Aggressive for create — user-initiated, one per flow, cheap to reject.
 		delegatedCreateLimiter: newIPRateLimiter(rate.Every(10*time.Second), 3),
@@ -51,6 +58,10 @@ func NewInternalHooks(
 		// Must sustain the configured poll cadence — refill faster than pollInterval
 		// so a well-behaved client never 429s on normal use.
 		delegatedPollLimiter: newIPRateLimiter(rate.Every(3*time.Second), 5),
+		// resolveProvider is called once per sign-in attempt per user.
+		// Per-IP cap protects against credential-stuffing-style enumeration
+		// while leaving normal sign-in traffic unaffected.
+		resolveProviderLimiter: newIPRateLimiter(rate.Every(2*time.Second), 10),
 	}
 	h.syncAuth = h.requireGoogleIdentity(validator, allowed, cfg.Audience)
 	return h, nil

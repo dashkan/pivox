@@ -1,7 +1,6 @@
 package organizations
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -149,7 +148,7 @@ func TestUpdateMember_BoundaryRejectsLastOwnerDemotion(t *testing.T) {
 	tx.On("Rollback", mock.Anything).Return(nil)
 
 	srv := newMemberWritesServer(pool, q)
-	_, err := srv.UpdateMember(context.Background(), &iampb.UpdateMemberRequest{
+	_, err := srv.UpdateMember(memberTestCtx(), &iampb.UpdateMemberRequest{
 		Member: &iampb.Member{
 			Name: "organizations/acme/members/user-" + userID.String(),
 			Role: "organizations/acme/roles/admin",
@@ -206,7 +205,7 @@ func TestUpdateMember_AllowsDemotionWhenMultipleOwners(t *testing.T) {
 	tx.On("Rollback", mock.Anything).Return(pgx.ErrTxClosed)
 
 	srv := newMemberWritesServer(pool, q)
-	resp, err := srv.UpdateMember(context.Background(), &iampb.UpdateMemberRequest{
+	resp, err := srv.UpdateMember(memberTestCtx(), &iampb.UpdateMemberRequest{
 		Member: &iampb.Member{
 			Name: "organizations/acme/members/user-" + userID.String(),
 			Role: "organizations/acme/roles/admin",
@@ -251,7 +250,7 @@ func TestDeleteMember_BoundaryRejectsLastOwner(t *testing.T) {
 	tx.On("Rollback", mock.Anything).Return(nil)
 
 	srv := newMemberWritesServer(pool, q)
-	_, err := srv.DeleteMember(context.Background(), &iampb.DeleteMemberRequest{
+	_, err := srv.DeleteMember(memberTestCtx(), &iampb.DeleteMemberRequest{
 		Name: "organizations/acme/members/user-" + userID.String(),
 	})
 	require.Error(t, err)
@@ -294,7 +293,7 @@ func TestDeleteMember_AllowsDeleteWhenMultipleOwners(t *testing.T) {
 	tx.On("Rollback", mock.Anything).Return(pgx.ErrTxClosed)
 
 	srv := newMemberWritesServer(pool, q)
-	_, err := srv.DeleteMember(context.Background(), &iampb.DeleteMemberRequest{
+	_, err := srv.DeleteMember(memberTestCtx(), &iampb.DeleteMemberRequest{
 		Name: "organizations/acme/members/user-" + userID.String(),
 	})
 	require.NoError(t, err)

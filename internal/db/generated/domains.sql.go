@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const cancelDomainOpsForDomain = `-- name: CancelDomainOpsForDomain :exec
+const cancelDomainOpsForDomain = `-- name: CancelDomainOpsForDomain :many
 UPDATE operations
 SET done          = true,
     error_code    = 1,
@@ -22,6 +22,7 @@ WHERE done = false
   AND prefix = 'domains'
   AND org_id = $1
   AND metadata->>'domain' = $2::text
+RETURNING id
 `
 
 type CancelDomainOpsForDomainParams struct {
@@ -38,10 +39,29 @@ type CancelDomainOpsForDomainParams struct {
 // the same domain string ever appeared in two orgs (impossible
 // today thanks to UNIQUE(domain), but cheap insurance).
 //
-// error_code = 1 is gRPC codes.Cancelled.
-func (q *Queries) CancelDomainOpsForDomain(ctx context.Context, arg CancelDomainOpsForDomainParams) error {
-	_, err := q.db.Exec(ctx, cancelDomainOpsForDomain, arg.OrgID, arg.DomainName)
-	return err
+// error_code = 1 is gRPC codes.Cancelled. Returns the id of every
+// row it just transitioned to done so the caller can fire the
+// local LRO Manager's cancel-fn for any goroutine running on this
+// replica — without that, the SQL update only marks intent and the
+// goroutine runs to completion before observing the change.
+func (q *Queries) CancelDomainOpsForDomain(ctx context.Context, arg CancelDomainOpsForDomainParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, cancelDomainOpsForDomain, arg.OrgID, arg.DomainName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const countVerifiedDomainsByOrg = `-- name: CountVerifiedDomainsByOrg :one

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -42,7 +43,7 @@ func TestNewInternalHooks_Dev(t *testing.T) {
 	auth := new(mockAuthService)
 	logger := slog.Default()
 
-	h, err := NewInternalHooks(mockQ, config.SyncAuthConfig{SharedSecret: "test-secret"}, testDelegatedAuthConfig(), true, logger, auth)
+	h, err := NewInternalHooks(mockQ, config.SyncAuthConfig{SharedSecret: "test-secret"}, testDelegatedAuthConfig(), true, nil, logger, auth)
 	require.NoError(t, err)
 	require.NotNil(t, h)
 	assert.NotNil(t, h.syncAuth)
@@ -66,8 +67,10 @@ func TestRegister_AllRoutes(t *testing.T) {
 		Return(pgtype.Text{}, errors.New("no rows")).Maybe()
 	mockQ.On("GetDelegatedAuthSessionState", mock.Anything, mock.Anything).
 		Return(db.DelegatedAuthSessionState(""), errors.New("no rows")).Maybe()
+	mockQ.On("ResolveProviderByDomain", mock.Anything, mock.Anything).
+		Return(db.ResolveProviderByDomainRow{}, pgx.ErrNoRows).Maybe()
 
-	h, err := NewInternalHooks(mockQ, config.SyncAuthConfig{SharedSecret: "s"}, testDelegatedAuthConfig(), true, logger, auth)
+	h, err := NewInternalHooks(mockQ, config.SyncAuthConfig{SharedSecret: "s"}, testDelegatedAuthConfig(), true, nil, logger, auth)
 	require.NoError(t, err)
 
 	mux := http.NewServeMux()
@@ -85,6 +88,7 @@ func TestRegister_AllRoutes(t *testing.T) {
 		{"POST", "/internal/v1/auth:createDelegatedAuthSession"},
 		{"POST", "/internal/v1/auth:completeDelegatedAuthSession"},
 		{"POST", "/internal/v1/auth:pollDelegatedAuthSession"},
+		{"POST", "/internal/v1/auth:resolveProvider"},
 	}
 
 	for _, rt := range routes {
@@ -154,9 +158,141 @@ func newTestHooks(t *testing.T, mockQ *mocks.MockQuerier, auth *mockAuthService)
 
 func newTestHooksWithConfig(t *testing.T, mockQ *mocks.MockQuerier, auth *mockAuthService, dcfg config.DelegatedAuthConfig) *InternalHooks {
 	t.Helper()
-	h, err := NewInternalHooks(mockQ, config.SyncAuthConfig{SharedSecret: "s"}, dcfg, true, slog.Default(), auth)
+	h, err := NewInternalHooks(mockQ, config.SyncAuthConfig{SharedSecret: "s"}, dcfg, true, nil, slog.Default(), auth)
 	require.NoError(t, err)
 	return h
+}
+
+// --- resolveProvider ---
+
+func TestResolveProvider_Success(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	auth := new(mockAuthService)
+	h := newTestHooks(t, mockQ, auth)
+
+	mockQ.On("ResolveProviderByDomain", mock.Anything, "acme.com").
+		Return(db.ResolveProviderByDomainRow{FirebaseProviderID: "oidc.acme"}, nil)
+
+	body := `{"email":"alice@acme.com"}`
+	req := httptest.NewRequest("POST", "/internal/v1/auth:resolveProvider", strings.NewReader(body))
+	rr := httptest.NewRecorder()
+	h.resolveProvider(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+	var resp resolveProviderResponse
+	require.NoError(t, json.NewDecoder(rr.Body).Decode(&resp))
+	assert.Equal(t, "oidc.acme", resp.ProviderID)
+}
+
+func TestResolveProvider_DomainCaseInsensitive(t *testing.T) {
+	// Email-domain matching is case-insensitive on the request side.
+	// Domains are stored lowercase (DB CHECK enforces it), so the
+	// handler lowercases before lookup.
+	mockQ := new(mocks.MockQuerier)
+	auth := new(mockAuthService)
+	h := newTestHooks(t, mockQ, auth)
+
+	mockQ.On("ResolveProviderByDomain", mock.Anything, "acme.com").
+		Return(db.ResolveProviderByDomainRow{FirebaseProviderID: "oidc.acme"}, nil)
+
+	req := httptest.NewRequest("POST", "/internal/v1/auth:resolveProvider",
+		strings.NewReader(`{"email":"Alice@ACME.com"}`))
+	rr := httptest.NewRecorder()
+	h.resolveProvider(rr, req)
+	assert.Equal(t, http.StatusOK, rr.Code)
+}
+
+func TestResolveProvider_NotFoundReturns404(t *testing.T) {
+	// Three failure modes collapse to 404 (avoid enumeration):
+	// domain not claimed, domain not VERIFIED, SsoConfig disabled.
+	// All surface as pgx.ErrNoRows from the join.
+	mockQ := new(mocks.MockQuerier)
+	auth := new(mockAuthService)
+	h := newTestHooks(t, mockQ, auth)
+
+	mockQ.On("ResolveProviderByDomain", mock.Anything, "unknown.com").
+		Return(db.ResolveProviderByDomainRow{}, pgx.ErrNoRows)
+
+	req := httptest.NewRequest("POST", "/internal/v1/auth:resolveProvider",
+		strings.NewReader(`{"email":"alice@unknown.com"}`))
+	rr := httptest.NewRecorder()
+	h.resolveProvider(rr, req)
+	assert.Equal(t, http.StatusNotFound, rr.Code)
+}
+
+func TestResolveProvider_MissingEmail400(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	auth := new(mockAuthService)
+	h := newTestHooks(t, mockQ, auth)
+
+	cases := []string{
+		`{}`,                  // missing field
+		`{"email":""}`,        // empty
+		`{"email":"no-at"}`,   // no @
+		`{"email":"@nohost"}`, // empty local part
+		`{"email":"local@"}`,  // empty domain part
+	}
+	for _, body := range cases {
+		t.Run(body, func(t *testing.T) {
+			req := httptest.NewRequest("POST", "/internal/v1/auth:resolveProvider",
+				strings.NewReader(body))
+			rr := httptest.NewRecorder()
+			h.resolveProvider(rr, req)
+			assert.Equal(t, http.StatusBadRequest, rr.Code)
+		})
+	}
+}
+
+func TestResolveProvider_MalformedJSON400(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	auth := new(mockAuthService)
+	h := newTestHooks(t, mockQ, auth)
+
+	req := httptest.NewRequest("POST", "/internal/v1/auth:resolveProvider",
+		strings.NewReader("not-json"))
+	rr := httptest.NewRecorder()
+	h.resolveProvider(rr, req)
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func TestResolveProvider_DBErrorReturns500(t *testing.T) {
+	// Real DB errors are 500, not 404 — operators see the failure
+	// and clients can retry. The 404 path is reserved for "no
+	// provider applies."
+	mockQ := new(mocks.MockQuerier)
+	auth := new(mockAuthService)
+	h := newTestHooks(t, mockQ, auth)
+
+	mockQ.On("ResolveProviderByDomain", mock.Anything, mock.Anything).
+		Return(db.ResolveProviderByDomainRow{}, errors.New("connection refused"))
+
+	req := httptest.NewRequest("POST", "/internal/v1/auth:resolveProvider",
+		strings.NewReader(`{"email":"alice@acme.com"}`))
+	rr := httptest.NewRecorder()
+	h.resolveProvider(rr, req)
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+}
+
+// --- emailDomain helper ---
+
+func TestEmailDomain(t *testing.T) {
+	cases := []struct {
+		in, want string
+	}{
+		{"alice@example.com", "example.com"},
+		{"Alice@EXAMPLE.com", "example.com"},
+		{"a+tag@sub.example.com", "sub.example.com"},
+		{"weird@@double.com", "double.com"}, // last @ wins
+		{"", ""},
+		{"no-at", ""},
+		{"@only-at", ""},
+		{"only-at@", ""},
+	}
+	for _, c := range cases {
+		t.Run(c.in, func(t *testing.T) {
+			assert.Equal(t, c.want, emailDomain(c.in))
+		})
+	}
 }
 
 func TestSyncFirebaseIdentity_Success(t *testing.T) {
@@ -527,9 +663,13 @@ func TestRateLimit_OverLimit(t *testing.T) {
 }
 
 func TestRateLimit_XForwardedFor(t *testing.T) {
+	// XFF is honored when RemoteAddr falls inside trustedProxies.
+	prefixes, err := parseTrustedProxies([]string{"10.0.0.0/8"})
+	require.NoError(t, err)
 	h := &InternalHooks{
 		logger:           slog.Default(),
 		rateLimitEnabled: true,
+		trustedProxies:   prefixes,
 		exchangeLimiter:  newIPRateLimiter(rate.Every(time.Hour), 1),
 	}
 
@@ -539,17 +679,51 @@ func TestRateLimit_XForwardedFor(t *testing.T) {
 
 	limited := h.rateLimit(inner)
 
-	// Use X-Forwarded-For to identify the client.
+	// RemoteAddr is the proxy hop (trusted); XFF contains the real
+	// client. Two requests with the same XFF should burn the bucket.
 	req := httptest.NewRequest("POST", "/test", nil)
+	req.RemoteAddr = "10.0.0.5:34521"
 	req.Header.Set("X-Forwarded-For", "203.0.113.42")
 	rr1 := httptest.NewRecorder()
 	limited(rr1, req)
 	assert.Equal(t, http.StatusOK, rr1.Code)
 
-	// Second request from same XFF IP.
 	rr2 := httptest.NewRecorder()
 	limited(rr2, req)
 	assert.Equal(t, http.StatusTooManyRequests, rr2.Code)
+}
+
+// TestRateLimit_XFFIgnoredWithoutTrustedProxies confirms the
+// fail-closed default: an unauthenticated client cannot evade the
+// rate limit by setting a fresh XFF on each call.
+func TestRateLimit_XFFIgnoredWithoutTrustedProxies(t *testing.T) {
+	h := &InternalHooks{
+		logger:           slog.Default(),
+		rateLimitEnabled: true,
+		exchangeLimiter:  newIPRateLimiter(rate.Every(time.Hour), 1),
+	}
+
+	inner := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}
+	limited := h.rateLimit(inner)
+
+	mkReq := func(xff string) *http.Request {
+		req := httptest.NewRequest("POST", "/test", nil)
+		req.RemoteAddr = "203.0.113.42:34521"
+		req.Header.Set("X-Forwarded-For", xff)
+		return req
+	}
+
+	rr1 := httptest.NewRecorder()
+	limited(rr1, mkReq("1.1.1.1"))
+	assert.Equal(t, http.StatusOK, rr1.Code)
+
+	// Different XFF, same RemoteAddr — same bucket, rejected.
+	rr2 := httptest.NewRecorder()
+	limited(rr2, mkReq("2.2.2.2"))
+	assert.Equal(t, http.StatusTooManyRequests, rr2.Code,
+		"XFF rotation must NOT defeat rate limiting when proxies aren't trusted")
 }
 
 // TestRateLimit_DisabledPassthrough verifies that flipping rateLimitEnabled
@@ -580,6 +754,111 @@ func TestRateLimit_DisabledPassthrough(t *testing.T) {
 		assert.Equal(t, http.StatusOK, rr.Code)
 	}
 	assert.Equal(t, 5, callCount)
+}
+
+// ---------------------------------------------------------------------------
+// clientIP / parseTrustedProxies
+// ---------------------------------------------------------------------------
+
+func TestParseTrustedProxies(t *testing.T) {
+	prefixes, err := parseTrustedProxies([]string{"10.0.0.0/8", "fd00::/8", "  192.168.1.0/24  "})
+	require.NoError(t, err)
+	require.Len(t, prefixes, 3)
+
+	prefixes, err = parseTrustedProxies(nil)
+	require.NoError(t, err)
+	assert.Nil(t, prefixes)
+
+	_, err = parseTrustedProxies([]string{"not-a-cidr"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not-a-cidr")
+}
+
+func TestClientIP_NoTrustedProxies_IgnoresXFF(t *testing.T) {
+	// trustedProxies empty → fail closed → header is ignored
+	// regardless of who sent it.
+	h := &InternalHooks{}
+
+	req := httptest.NewRequest("POST", "/test", nil)
+	req.RemoteAddr = "203.0.113.42:34521"
+	req.Header.Set("X-Forwarded-For", "1.2.3.4, 5.6.7.8")
+
+	assert.Equal(t, "203.0.113.42", h.clientIP(req))
+}
+
+func TestClientIP_TrustedProxy_HonorsXFF(t *testing.T) {
+	// RemoteAddr in trusted CIDR, XFF set → return leftmost
+	// untrusted entry.
+	prefixes, err := parseTrustedProxies([]string{"10.0.0.0/8"})
+	require.NoError(t, err)
+	h := &InternalHooks{trustedProxies: prefixes}
+
+	req := httptest.NewRequest("POST", "/test", nil)
+	req.RemoteAddr = "10.0.0.5:34521"
+	req.Header.Set("X-Forwarded-For", "203.0.113.42, 10.0.0.99")
+
+	assert.Equal(t, "203.0.113.42", h.clientIP(req))
+}
+
+func TestClientIP_UntrustedRemoteAddr_IgnoresXFF(t *testing.T) {
+	// Even when XFF is set, an untrusted RemoteAddr means we ignore
+	// it — anyone could have set the header.
+	prefixes, err := parseTrustedProxies([]string{"10.0.0.0/8"})
+	require.NoError(t, err)
+	h := &InternalHooks{trustedProxies: prefixes}
+
+	req := httptest.NewRequest("POST", "/test", nil)
+	req.RemoteAddr = "203.0.113.42:34521"
+	req.Header.Set("X-Forwarded-For", "1.2.3.4")
+
+	assert.Equal(t, "203.0.113.42", h.clientIP(req))
+}
+
+func TestClientIP_TrustedProxy_NoXFF_FallsBackToRemoteAddr(t *testing.T) {
+	prefixes, err := parseTrustedProxies([]string{"10.0.0.0/8"})
+	require.NoError(t, err)
+	h := &InternalHooks{trustedProxies: prefixes}
+
+	req := httptest.NewRequest("POST", "/test", nil)
+	req.RemoteAddr = "10.0.0.5:34521"
+
+	assert.Equal(t, "10.0.0.5", h.clientIP(req))
+}
+
+func TestClientIP_AllXFFEntriesAreTrusted_FallsBackToRemoteAddr(t *testing.T) {
+	// Pathological: every XFF entry is itself a trusted proxy hop.
+	// No untrusted client found → return RemoteAddr (the closest
+	// hop we know).
+	prefixes, err := parseTrustedProxies([]string{"10.0.0.0/8"})
+	require.NoError(t, err)
+	h := &InternalHooks{trustedProxies: prefixes}
+
+	req := httptest.NewRequest("POST", "/test", nil)
+	req.RemoteAddr = "10.0.0.5:34521"
+	req.Header.Set("X-Forwarded-For", "10.0.0.10, 10.0.0.20")
+
+	assert.Equal(t, "10.0.0.5", h.clientIP(req))
+}
+
+func TestClientIP_IPv6RemoteAddr(t *testing.T) {
+	// Format check: net.SplitHostPort handles bracketed IPv6.
+	h := &InternalHooks{}
+
+	req := httptest.NewRequest("POST", "/test", nil)
+	req.RemoteAddr = "[2001:db8::1]:34521"
+
+	assert.Equal(t, "2001:db8::1", h.clientIP(req))
+}
+
+func TestClientIP_MalformedRemoteAddr_ReturnsRaw(t *testing.T) {
+	// Defensive: don't panic on weird transports/test setups that
+	// produce non-host:port RemoteAddr.
+	h := &InternalHooks{}
+
+	req := httptest.NewRequest("POST", "/test", nil)
+	req.RemoteAddr = "not-an-addr"
+
+	assert.Equal(t, "not-an-addr", h.clientIP(req))
 }
 
 // ---------------------------------------------------------------------------

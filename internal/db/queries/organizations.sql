@@ -48,14 +48,18 @@ SET state       = 'ACTIVE',
 WHERE id = $1 AND state = 'DELETE_REQUESTED' AND purge_time > now()
 RETURNING *;
 
--- PurgeOrganization hard-deletes an org row unconditionally. FK ON
--- DELETE CASCADE removes spaces, members, domains, sso_configs,
--- assets, requests, tags, api keys, and ai conversations
--- transitively. Used by force=true DeleteOrganization where the
--- caller has already validated state and intends to skip the
--- 30-day grace window.
--- name: PurgeOrganization :exec
-DELETE FROM organizations WHERE id = $1;
+-- PurgeOrganization hard-deletes an org row, race-guarded by etag.
+-- FK ON DELETE CASCADE removes spaces, members, domains,
+-- sso_configs, assets, requests, tags, api keys, and ai
+-- conversations transitively. Used by force=true DeleteOrganization
+-- where the caller has already validated state and pinned the
+-- row's revision; the etag check refuses to fire if the row has
+-- been mutated since the handler read it (e.g., a concurrent
+-- soft-delete + undelete cycle bumped revision). Returns the
+-- deleted id on success; pgx.ErrNoRows on etag drift, which the
+-- LRO surfaces as FailedPrecondition.
+-- name: PurgeOrganization :one
+DELETE FROM organizations WHERE id = $1 AND etag = $2 RETURNING id;
 
 -- PurgeExpiredOrganization is the purge-worker variant: deletes
 -- only soft-deleted orgs whose grace window has elapsed. The WHERE
@@ -99,11 +103,14 @@ SELECT * FROM organizations
 -- etc.) populate org_id when implemented and will be cancellable
 -- through this query without further changes.
 --
--- error_code = 1 is gRPC codes.Cancelled.
--- name: CancelRunningOpsForOrg :exec
+-- error_code = 1 is gRPC codes.Cancelled. Returns the id of every
+-- transitioned row so the caller can fire local LRO Manager
+-- cancels for goroutines running on this replica.
+-- name: CancelRunningOpsForOrg :many
 UPDATE operations
 SET done          = true,
     error_code    = 1,
     error_message = 'cancelled by DeleteOrganization',
     update_time   = now()
-WHERE done = false AND org_id = $1;
+WHERE done = false AND org_id = $1
+RETURNING id;

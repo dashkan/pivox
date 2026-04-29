@@ -95,9 +95,18 @@ func (s *OrganizationsServer) DeleteOrganization(ctx context.Context, req *apiv1
 		Organization: orgName,
 	}
 
+	// Pin the etag at handler time so the LRO's PURGING phase refuses
+	// to fire if the row has been mutated since (e.g., a concurrent
+	// soft-delete + undelete cycle bumped revision). The handler
+	// already requires force=true to supply a non-empty etag; here we
+	// pass through the row's actual etag, since either the request
+	// etag or the live etag works (they're equal once the etag-match
+	// check above passes).
+	expectedEtag := org.Etag
+
 	return s.lroManager.CreateAndRun(ctx, orgLifecyclePrefix, initialMeta,
 		func(workCtx context.Context, progress lro.Progress) (proto.Message, error) {
-			return s.runDeleteOrganization(workCtx, progress, org.ID, orgName, deletedBy, force)
+			return s.runDeleteOrganization(workCtx, progress, org.ID, orgName, deletedBy, force, expectedEtag)
 		})
 }
 
@@ -111,6 +120,7 @@ func (s *OrganizationsServer) runDeleteOrganization(
 	orgID uuid.UUID,
 	orgName, deletedBy string,
 	force bool,
+	expectedEtag string,
 ) (proto.Message, error) {
 	updatePhase := func(phase apiv1.DeleteOrganizationMetadata_Phase) {
 		progress.Update(ctx, &apiv1.DeleteOrganizationMetadata{
@@ -129,16 +139,34 @@ func (s *OrganizationsServer) runDeleteOrganization(
 	// force path the FK cascade still cleans them up. Future LROs
 	// populate org_id when they're implemented.
 	updatePhase(apiv1.DeleteOrganizationMetadata_CANCELLING_OPERATIONS)
-	if err := s.queries.CancelRunningOpsForOrg(ctx, pgtype.UUID{Bytes: orgID, Valid: true}); err != nil {
+	cancelledIDs, err := s.queries.CancelRunningOpsForOrg(ctx, pgtype.UUID{Bytes: orgID, Valid: true})
+	if err != nil {
 		slog.ErrorContext(ctx, "delete org: cancel in-flight ops failed", "org", orgName, "error", err)
 		return nil, apierr.Internal("cancel in-flight operations")
+	}
+	// Fire local cancel funcs for any of the cancelled ops that are
+	// running on this replica. The SQL update marks them done for
+	// cross-replica observers; this stops the in-replica goroutines
+	// from running to completion before noticing.
+	if s.lroManager != nil && len(cancelledIDs) > 0 {
+		s.lroManager.CancelLocal(cancelledIDs...)
 	}
 
 	if force {
 		// PURGING: hard-delete the org. FK cascades handle children.
-		// The slug is freed once the row is gone.
+		// The slug is freed once the row is gone. Etag-guarded so a
+		// concurrent state mutation between handler validation and
+		// LRO worker execution refuses to purge a row the caller
+		// didn't actually approve.
 		updatePhase(apiv1.DeleteOrganizationMetadata_PURGING)
-		if err := s.queries.PurgeOrganization(ctx, orgID); err != nil {
+		if _, err := s.queries.PurgeOrganization(ctx, db.PurgeOrganizationParams{
+			ID:   orgID,
+			Etag: expectedEtag,
+		}); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, apierr.FailedPrecondition(
+					"organization revision changed since delete was requested; refresh and retry")
+			}
 			slog.ErrorContext(ctx, "delete org: purge failed", "org", orgName, "error", err)
 			return nil, apierr.Internal("purge organization")
 		}

@@ -313,12 +313,21 @@ func (s *OrganizationsServer) DeleteDomain(ctx context.Context, req *apiv1.Delet
 	// LRO is running, this is a no-op (UPDATE 0 rows). DB errors
 	// here surface as Internal — we don't want to delete the row
 	// while a verification goroutine still runs.
-	if err := s.queries.CancelDomainOpsForDomain(ctx, db.CancelDomainOpsForDomainParams{
+	cancelledIDs, err := s.queries.CancelDomainOpsForDomain(ctx, db.CancelDomainOpsForDomainParams{
 		OrgID:      pgtype.UUID{Bytes: resolvedOrg.ID, Valid: true},
 		DomainName: "organizations/" + resolvedOrg.Slug + "/domains/" + domainStr,
-	}); err != nil {
+	})
+	if err != nil {
 		slog.ErrorContext(ctx, "delete domain: cancel in-flight LROs failed", "domain", domainStr, "error", err)
 		return nil, apierr.Internal("cancel in-flight verification operations")
+	}
+	// Fire local cancel funcs so the verify goroutine on this replica
+	// observes ctx.Done() instead of running until its next poll
+	// returns ErrNoRows. Without this the goroutine could land a
+	// MarkDomainVerified write between this point and the DELETE
+	// below, briefly flipping the row to VERIFIED before it's gone.
+	if s.lroManager != nil && len(cancelledIDs) > 0 {
+		s.lroManager.CancelLocal(cancelledIDs...)
 	}
 
 	if err := s.queries.DeleteDomain(ctx, db.DeleteDomainParams{ID: row.ID, OrgID: resolvedOrg.ID}); err != nil {

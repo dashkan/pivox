@@ -21,8 +21,12 @@ type Querier interface {
 	// the same domain string ever appeared in two orgs (impossible
 	// today thanks to UNIQUE(domain), but cheap insurance).
 	//
-	// error_code = 1 is gRPC codes.Cancelled.
-	CancelDomainOpsForDomain(ctx context.Context, arg CancelDomainOpsForDomainParams) error
+	// error_code = 1 is gRPC codes.Cancelled. Returns the id of every
+	// row it just transitioned to done so the caller can fire the
+	// local LRO Manager's cancel-fn for any goroutine running on this
+	// replica — without that, the SQL update only marks intent and the
+	// goroutine runs to completion before observing the change.
+	CancelDomainOpsForDomain(ctx context.Context, arg CancelDomainOpsForDomainParams) ([]uuid.UUID, error)
 	CancelOperation(ctx context.Context, id uuid.UUID) (Operation, error)
 	// CancelRunningOpsForOrg marks all running operations linked to the
 	// given org (via the operations.org_id reverse pointer) as
@@ -39,8 +43,10 @@ type Querier interface {
 	// etc.) populate org_id when implemented and will be cancellable
 	// through this query without further changes.
 	//
-	// error_code = 1 is gRPC codes.Cancelled.
-	CancelRunningOpsForOrg(ctx context.Context, orgID pgtype.UUID) error
+	// error_code = 1 is gRPC codes.Cancelled. Returns the id of every
+	// transitioned row so the caller can fire local LRO Manager
+	// cancels for goroutines running on this replica.
+	CancelRunningOpsForOrg(ctx context.Context, orgID pgtype.UUID) ([]uuid.UUID, error)
 	// Transitions a pending session to approved and stores the minted custom token.
 	// Only unexpired pending sessions match — a no-row result means the session
 	// was never created, already completed, or has expired.
@@ -65,9 +71,11 @@ type Querier interface {
 	// Used by membership-mutation handlers to enforce "≥1 owner" — call
 	// before any role-change or delete that would reduce the owner count.
 	// Counts org_members rows whose role is the system 'owner' role for
-	// this org and whose principal is a (non-deleted) user. Keys on the
-	// stable `roles.name` slug, not display_name — display_name is mutable
-	// and i18n-eligible, name is the machine identifier.
+	// this org, regardless of principal kind. A binding is only counted
+	// when its principal is still live: users.delete_time IS NULL for
+	// user principals, groups.state = 'ACTIVE' for group principals.
+	// Keys on the stable `roles.name` slug, not display_name —
+	// display_name is mutable and i18n-eligible.
 	CountOwnersByOrg(ctx context.Context, orgID uuid.UUID) (int64, error)
 	CountRequestsBySpace(ctx context.Context, spaceID uuid.UUID) (int64, error)
 	CountStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) (int64, error)
@@ -267,9 +275,8 @@ type Querier interface {
 	// GetSsoConfigByOrgID looks up the SSO config row for an org, if
 	// one exists. UNIQUE(org_id) ensures at most one row. Used by
 	// DeleteDomain to enforce the "last verified domain on an enabled
-	// SSO config" precondition: the handler refuses to delete a
-	// VERIFIED domain when removing it would leave an enabled SSO
-	// config without any verified domain.
+	// SSO config" precondition, and by GetSsoConfig to surface the
+	// current config to the caller.
 	GetSsoConfigByOrgID(ctx context.Context, orgID uuid.UUID) (SsoConfig, error)
 	GetStorageAgent(ctx context.Context, id uuid.UUID) (StorageAgent, error)
 	GetStorageAgentByGatewayAndIP(ctx context.Context, arg GetStorageAgentByGatewayAndIPParams) (StorageAgent, error)
@@ -321,11 +328,13 @@ type Querier interface {
 	// Caller walks rows accumulating token_count and stops when budget is exceeded.
 	ListMessagesNewestFirst(ctx context.Context, arg ListMessagesNewestFirstParams) ([]AiMessage, error)
 	ListOperations(ctx context.Context, arg ListOperationsParams) ([]Operation, error)
-	// Lists all org-scope role bindings for an org. Ordered by create_time
-	// so paging by row position is stable. v1 caps the result at 1000 in
-	// the handler since system-role member counts in normal orgs are far
-	// below that; cursor-based paging is added when needed.
-	ListOrgMembers(ctx context.Context, orgID uuid.UUID) ([]ListOrgMembersRow, error)
+	// Lists org-scope role bindings for an org with offset-based
+	// pagination. Ordered by (create_time, id) so paging is stable under
+	// concurrent inserts. The handler converts AIP-132 page_token /
+	// page_size into the offset / limit args here. Caller asks for
+	// limit+1 rows to detect "more pages exist" without a separate count
+	// query; the handler trims the extra row before responding.
+	ListOrgMembers(ctx context.Context, arg ListOrgMembersParams) ([]ListOrgMembersRow, error)
 	// Returns all org_members rows currently bound to the system 'owner'
 	// role for the given org. Used by TransferOwnership to find the
 	// current owner(s) to demote; in normal operation returns ≥1 row.
@@ -364,15 +373,24 @@ type Querier interface {
 	// VALIDATING phase to refuse deletion when the caller would leave any
 	// org without an owner. Empty result means deletion is safe.
 	//
-	// The `having count(*) = 1` clause runs over org_members keyed on the
-	// system 'owner' role for that org; `bool_or` then asserts the single
-	// owner is THIS firebase_identity (true for exactly one row in the
-	// group, false otherwise). Soft-deleted orgs and soft-deleted users
-	// are excluded.
+	// An org is "ONLY owned by this firebase_identity" iff:
+	//   - exactly one live user-owner binding exists, and it points to a
+	//     user belonging to this firebase_identity, AND
+	//   - zero live group-owner bindings exist.
+	//
+	// Live = users.delete_time IS NULL for user principals,
+	//        groups.state = 'ACTIVE' for group principals.
+	//
+	// A group-owner binding (even on a group with zero members) keeps the
+	// org out of this result set: the role is held by the group, so the
+	// org is not "only" owned by the user. This mirrors the
+	// CountOwnersByOrg invariant — both queries must count both
+	// principal kinds or the ≥1-owner gate has a hole.
 	ListSoleOwnerOrgsForFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) ([]Organization, error)
 	// Companion to ListOrgMembers at space scope. Same direct-only
-	// semantic as GetSpaceMember.
-	ListSpaceMembers(ctx context.Context, spaceID uuid.UUID) ([]ListSpaceMembersRow, error)
+	// semantic as GetSpaceMember and the same offset+limit pagination
+	// contract.
+	ListSpaceMembers(ctx context.Context, arg ListSpaceMembersParams) ([]ListSpaceMembersRow, error)
 	ListStorageAgentAuditByAgent(ctx context.Context, arg ListStorageAgentAuditByAgentParams) ([]StorageAgentAudit, error)
 	ListStorageAgentAuditByGateway(ctx context.Context, arg ListStorageAgentAuditByGatewayParams) ([]StorageAgentAudit, error)
 	ListStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageAgent, error)
@@ -400,13 +418,24 @@ type Querier interface {
 	// a restored-to-ACTIVE org is left alone, matching the user's
 	// intent (they undeleted just before purge).
 	PurgeExpiredOrganization(ctx context.Context, id uuid.UUID) error
-	// PurgeOrganization hard-deletes an org row unconditionally. FK ON
-	// DELETE CASCADE removes spaces, members, domains, sso_configs,
-	// assets, requests, tags, api keys, and ai conversations
-	// transitively. Used by force=true DeleteOrganization where the
-	// caller has already validated state and intends to skip the
-	// 30-day grace window.
-	PurgeOrganization(ctx context.Context, id uuid.UUID) error
+	// PurgeOrganization hard-deletes an org row, race-guarded by etag.
+	// FK ON DELETE CASCADE removes spaces, members, domains,
+	// sso_configs, assets, requests, tags, api keys, and ai
+	// conversations transitively. Used by force=true DeleteOrganization
+	// where the caller has already validated state and pinned the
+	// row's revision; the etag check refuses to fire if the row has
+	// been mutated since the handler read it (e.g., a concurrent
+	// soft-delete + undelete cycle bumped revision). Returns the
+	// deleted id on success; pgx.ErrNoRows on etag drift, which the
+	// LRO surfaces as FailedPrecondition.
+	PurgeOrganization(ctx context.Context, arg PurgeOrganizationParams) (uuid.UUID, error)
+	// ResolveProviderByDomain is the query backing the
+	// POST /internal/v1/auth:resolveProvider endpoint. Joins the
+	// email's domain to the SsoConfig via the verified Domain row and
+	// returns the firebase_provider_id when SSO is enabled. Returns no
+	// rows for any of: domain not claimed, domain not VERIFIED, no
+	// SsoConfig row, SsoConfig.enabled=false.
+	ResolveProviderByDomain(ctx context.Context, domain string) (ResolveProviderByDomainRow, error)
 	RotateRegistrationToken(ctx context.Context, arg RotateRegistrationTokenParams) (StorageGateway, error)
 	SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]Asset, error)
 	// Server-driven title write (the `:summarize` path). Does NOT flip
@@ -476,6 +505,21 @@ type Querier interface {
 	// Upserts a firebase_identity row synced from Firebase Auth.
 	// On conflict (same firebase_uid), updates all mutable fields.
 	UpsertFirebaseIdentity(ctx context.Context, arg UpsertFirebaseIdentityParams) (FirebaseIdentity, error)
+	// UpsertSsoConfig is the create-or-update for the per-org SsoConfig
+	// singleton. ON CONFLICT (org_id) DO UPDATE — UNIQUE(org_id)
+	// ensures at most one row per org, so the upsert is unambiguous.
+	// The handler decides whether to call CreateOidcProvider vs
+	// UpdateOidcProvider on Firebase based on whether a row already
+	// existed; this query is the local-state half of the operation.
+	//
+	// client_secret_ciphertext is the KMS-envelope-encrypted secret.
+	// The COALESCE+NULLIF on UPDATE collapses both Go nil (binds SQL
+	// NULL) and Go empty []byte (binds SQL ''::bytea) to "preserve the
+	// existing ciphertext"; only a non-empty new value overwrites. There
+	// is intentionally no way to clear the secret via this query — a
+	// cleared secret would render an enabled SsoConfig non-functional, so
+	// callers that want to disable SSO flip `enabled=false` instead.
+	UpsertSsoConfig(ctx context.Context, arg UpsertSsoConfigParams) (SsoConfig, error)
 }
 
 var _ Querier = (*Queries)(nil)

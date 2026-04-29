@@ -46,8 +46,12 @@ SELECT count(*) FROM domains WHERE org_id = $1 AND state = 'VERIFIED';
 -- the same domain string ever appeared in two orgs (impossible
 -- today thanks to UNIQUE(domain), but cheap insurance).
 --
--- error_code = 1 is gRPC codes.Cancelled.
--- name: CancelDomainOpsForDomain :exec
+-- error_code = 1 is gRPC codes.Cancelled. Returns the id of every
+-- row it just transitioned to done so the caller can fire the
+-- local LRO Manager's cancel-fn for any goroutine running on this
+-- replica — without that, the SQL update only marks intent and the
+-- goroutine runs to completion before observing the change.
+-- name: CancelDomainOpsForDomain :many
 UPDATE operations
 SET done          = true,
     error_code    = 1,
@@ -56,7 +60,8 @@ SET done          = true,
 WHERE done = false
   AND prefix = 'domains'
   AND org_id = @org_id
-  AND metadata->>'domain' = @domain_name::text;
+  AND metadata->>'domain' = @domain_name::text
+RETURNING id;
 
 -- ListPendingDomains returns all domains in PENDING state, ordered
 -- by oldest-first. Used by VerifyDomainWorker to drive PENDING →

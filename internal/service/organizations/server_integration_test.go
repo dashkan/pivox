@@ -31,6 +31,34 @@ func (n noopAuthService) CreateCustomToken(_ context.Context, uid string) (strin
 	return "custom-token-" + uid, nil
 }
 
+func (n noopAuthService) CreateOidcProvider(_ context.Context, _ authn.OidcProviderConfig) error {
+	return nil
+}
+
+func (n noopAuthService) UpdateOidcProvider(_ context.Context, _ authn.OidcProviderConfig) error {
+	return nil
+}
+
+func (n noopAuthService) DeleteOidcProvider(_ context.Context, _ string) error {
+	return nil
+}
+
+func (n noopAuthService) CreateSamlProvider(_ context.Context, _ authn.SamlProviderConfig) error {
+	return nil
+}
+
+func (n noopAuthService) UpdateSamlProvider(_ context.Context, _ authn.SamlProviderConfig) error {
+	return nil
+}
+
+func (n noopAuthService) DeleteSamlProvider(_ context.Context, _ string) error {
+	return nil
+}
+
+func (n noopAuthService) DeleteUser(_ context.Context, _ string) error {
+	return nil
+}
+
 // testReadUID is the AuthContextReader used by integration tests. It
 // always returns the canonical test caller's UID, since these tests
 // build the gRPC server directly without the production AuthInterceptor
@@ -65,7 +93,7 @@ func TestIntegration_CreateOrganization_DuplicateName(t *testing.T) {
 	seedTestCaller(t, queries)
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, noopAuthService{}, nil, testReadUID, nil, nil))
+		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, noopAuthService{}, nil, testReadUID, nil, nil, nil, nil))
 	})
 
 	client := apiv1.NewOrganizationsClient(conn)
@@ -100,7 +128,7 @@ func TestIntegration_Organizations(t *testing.T) {
 	seedTestCaller(t, queries)
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, noopAuthService{}, nil, testReadUID, nil, nil))
+		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(pool, queries, noopAuthService{}, nil, testReadUID, nil, nil, nil, nil))
 	})
 
 	client := apiv1.NewOrganizationsClient(conn)

@@ -1,12 +1,10 @@
 package spaces
 
 import (
-	"context"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -31,11 +29,6 @@ func TestSpaces_GetMember_GroupPrincipal(t *testing.T) {
 	spaceID := uuid.MustParse("0192a000-0020-7000-8000-000000000020")
 	groupID := uuid.MustParse("0192a000-0030-7000-8000-000000000030")
 	q := new(mocks.MockQuerier)
-	q.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
-	q.On("GetSpaceByName", mock.Anything, db.GetSpaceByNameParams{
-		OrgID: testOrg.ID,
-		Name:  "news",
-	}).Return(db.Space{ID: spaceID, OrgID: testOrg.ID, Name: "news"}, nil)
 	q.On("GetSpaceMember", mock.Anything, db.GetSpaceMemberParams{
 		SpaceID:       spaceID,
 		PrincipalKind: db.PrincipalKindGroup,
@@ -53,7 +46,7 @@ func TestSpaces_GetMember_GroupPrincipal(t *testing.T) {
 	}, nil)
 
 	srv := newServerForMembers(q)
-	resp, err := srv.GetMember(context.Background(), &iampb.GetMemberRequest{
+	resp, err := srv.GetMember(memberTestCtx(spaceID), &iampb.GetMemberRequest{
 		Name: "organizations/acme/spaces/news/members/group-" + groupID.String(),
 	})
 	require.NoError(t, err)
@@ -76,7 +69,7 @@ func TestSpaces_GetMember_InvalidNameShape(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			q := new(mocks.MockQuerier)
 			srv := newServerForMembers(q)
-			_, err := srv.GetMember(context.Background(), &iampb.GetMemberRequest{Name: name})
+			_, err := srv.GetMember(memberTestCtx(uuid.New()), &iampb.GetMemberRequest{Name: name})
 			require.Error(t, err)
 			st, _ := status.FromError(err)
 			assert.Equal(t, codes.InvalidArgument, st.Code())
@@ -84,27 +77,29 @@ func TestSpaces_GetMember_InvalidNameShape(t *testing.T) {
 	}
 }
 
-func TestSpaces_GetMember_OrgNotFound(t *testing.T) {
+// TestSpaces_GetMember_SlugMismatch defends against a path/scope
+// drift — the resource path's org or space slug not matching the
+// resolved scope. In production the interceptor 404s on an unknown
+// org/space before this fires; the assertion is paranoia against
+// gate-vs-handler skew.
+func TestSpaces_GetMember_SlugMismatch(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	q.On("GetOrganizationByName", mock.Anything, "ghost").
-		Return(db.Organization{}, pgx.ErrNoRows)
-
 	srv := newServerForMembers(q)
-	_, err := srv.GetMember(context.Background(), &iampb.GetMemberRequest{
+	_, err := srv.GetMember(memberTestCtx(uuid.New()), &iampb.GetMemberRequest{
 		Name: "organizations/ghost/spaces/news/members/user-" + uuid.New().String(),
 	})
 	require.Error(t, err)
 	st, _ := status.FromError(err)
-	assert.Equal(t, codes.NotFound, st.Code())
+	assert.Equal(t, codes.InvalidArgument, st.Code())
 }
 
 func TestSpaces_ListMembers_DirectBindingsOnly(t *testing.T) {
 	spaceID := uuid.MustParse("0192a000-0050-7000-8000-000000000050")
 	userA := uuid.MustParse("0192a000-0051-7000-8000-000000000051")
 	q := new(mocks.MockQuerier)
-	q.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
-	q.On("GetSpaceByName", mock.Anything, mock.Anything).Return(db.Space{ID: spaceID}, nil)
-	q.On("ListSpaceMembers", mock.Anything, spaceID).Return([]db.ListSpaceMembersRow{
+	q.On("ListSpaceMembers", mock.Anything, mock.MatchedBy(func(p db.ListSpaceMembersParams) bool {
+		return p.SpaceID == spaceID
+	})).Return([]db.ListSpaceMembersRow{
 		{
 			ID: uuid.New(), SpaceID: spaceID, RoleID: uuid.New(),
 			PrincipalKind: db.PrincipalKindUser, PrincipalID: userA,
@@ -113,7 +108,7 @@ func TestSpaces_ListMembers_DirectBindingsOnly(t *testing.T) {
 	}, nil)
 
 	srv := newServerForMembers(q)
-	resp, err := srv.ListMembers(context.Background(), &iampb.ListMembersRequest{
+	resp, err := srv.ListMembers(memberTestCtx(spaceID), &iampb.ListMembersRequest{
 		Parent: "organizations/acme/spaces/news",
 	})
 	require.NoError(t, err)
@@ -134,7 +129,7 @@ func TestSpaces_ListMembers_InvalidParentShape(t *testing.T) {
 		t.Run(p, func(t *testing.T) {
 			q := new(mocks.MockQuerier)
 			srv := newServerForMembers(q)
-			_, err := srv.ListMembers(context.Background(), &iampb.ListMembersRequest{Parent: p})
+			_, err := srv.ListMembers(memberTestCtx(uuid.New()), &iampb.ListMembersRequest{Parent: p})
 			require.Error(t, err)
 			st, _ := status.FromError(err)
 			assert.Equal(t, codes.InvalidArgument, st.Code())

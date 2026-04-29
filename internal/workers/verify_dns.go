@@ -47,45 +47,11 @@ func (w *VerifyDomainWorker) Run(ctx context.Context) error {
 	return loop(ctx, w.logger, w.Name(), w.interval, w.tick)
 }
 
-// tick scans for PENDING domains, runs DNS lookups, and updates
-// rows. The advisory lock guarantees at most one replica runs the
-// scan at a time. The MarkDomainVerified query is race-safe: it
-// only flips PENDING→VERIFIED, so a concurrent FAILED transition
-// would absorb the no-op.
+// tick takes the advisory lock and delegates to processBatch.
+// Split so tests can exercise processBatch without spinning up a
+// real *pgxpool.Pool for the lock.
 func (w *VerifyDomainWorker) tick(ctx context.Context) {
-	acquired, err := withAdvisoryLock(ctx, w.pool, verifyDomainWorkerLockID, func(workCtx context.Context) error {
-		domains, err := w.queries.ListPendingDomains(workCtx)
-		if err != nil {
-			return err
-		}
-		if len(domains) == 0 {
-			return nil
-		}
-		w.logger.Info("verify-domain: ticking pending domains", "count", len(domains))
-		for _, d := range domains {
-			records, lookupErr := w.resolver.LookupTXT(workCtx, "_pivox-verify."+d.Domain)
-			if lookupErr != nil || len(records) == 0 {
-				// Lookup failure isn't a verification failure —
-				// real DNS frequently returns transient errors that
-				// don't mean the record is wrong. The row stays
-				// PENDING; the next tick retries. The dedicated
-				// FAILED transition fires only after the full
-				// backoff schedule elapses, which the v1 stub never
-				// triggers.
-				w.logger.Warn("verify-domain: lookup failed; will retry next tick",
-					"domain", d.Domain, "error", lookupErr)
-				continue
-			}
-			updated, err := w.queries.MarkDomainVerified(workCtx, d.ID)
-			if err != nil {
-				w.logger.Error("verify-domain: MarkDomainVerified failed",
-					"domain", d.Domain, "error", err)
-				continue
-			}
-			w.logger.Info("verify-domain: verified", "domain", updated.Domain)
-		}
-		return nil
-	})
+	acquired, err := withAdvisoryLock(ctx, w.pool, verifyDomainWorkerLockID, w.processBatch)
 	if err != nil {
 		w.logger.Error("verify-domain: tick failed", "error", err)
 		return
@@ -93,4 +59,42 @@ func (w *VerifyDomainWorker) tick(ctx context.Context) {
 	if !acquired {
 		w.logger.Debug("verify-domain: skipped (advisory lock held by peer)")
 	}
+}
+
+// processBatch scans for PENDING domains, runs DNS lookups, and
+// updates rows. The MarkDomainVerified query is race-safe: it only
+// flips PENDING→VERIFIED, so a concurrent FAILED transition is
+// absorbed as a no-op.
+func (w *VerifyDomainWorker) processBatch(ctx context.Context) error {
+	domains, err := w.queries.ListPendingDomains(ctx)
+	if err != nil {
+		return err
+	}
+	if len(domains) == 0 {
+		return nil
+	}
+	w.logger.Info("verify-domain: ticking pending domains", "count", len(domains))
+	for _, d := range domains {
+		records, lookupErr := w.resolver.LookupTXT(ctx, "_pivox-verify."+d.Domain)
+		if lookupErr != nil || len(records) == 0 {
+			// Lookup failure isn't a verification failure —
+			// real DNS frequently returns transient errors that
+			// don't mean the record is wrong. The row stays
+			// PENDING; the next tick retries. The dedicated
+			// FAILED transition fires only after the full
+			// backoff schedule elapses, which the v1 stub never
+			// triggers.
+			w.logger.Warn("verify-domain: lookup failed; will retry next tick",
+				"domain", d.Domain, "error", lookupErr)
+			continue
+		}
+		updated, err := w.queries.MarkDomainVerified(ctx, d.ID)
+		if err != nil {
+			w.logger.Error("verify-domain: MarkDomainVerified failed",
+				"domain", d.Domain, "error", err)
+			continue
+		}
+		w.logger.Info("verify-domain: verified", "domain", updated.Domain)
+	}
+	return nil
 }

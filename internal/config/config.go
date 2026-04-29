@@ -18,8 +18,20 @@ type Config struct {
 	DebugPort        string
 	LogLevel         string
 	RateLimitEnabled bool
-	SyncAuth         SyncAuthConfig
-	DelegatedAuth    DelegatedAuthConfig
+	// TrustedProxies is the set of CIDR blocks whose connections are
+	// trusted to set X-Forwarded-For. When the connection's
+	// RemoteAddr falls in this set, the leftmost X-Forwarded-For
+	// entry that is NOT itself a trusted-proxy IP is used as the
+	// rate-limit identity. When RemoteAddr is NOT in this set, the
+	// header is ignored and RemoteAddr alone is used.
+	//
+	// Default empty list = "fail closed" — never trust the header,
+	// always key on RemoteAddr. Dev configs typically set this to
+	// ["0.0.0.0/0", "::/0"] (trust everyone — same machine, no
+	// adversaries). Prod configs set it to the load balancer's CIDR.
+	TrustedProxies []string
+	SyncAuth       SyncAuthConfig
+	DelegatedAuth  DelegatedAuthConfig
 }
 
 // DelegatedAuthConfig controls the delegated auth session flow used by

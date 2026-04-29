@@ -151,14 +151,15 @@ func (m *MockQuerier) UndeleteOrganization(ctx context.Context, id uuid.UUID) (d
 	return args.Get(0).(db.Organization), args.Error(1)
 }
 
-func (m *MockQuerier) PurgeOrganization(ctx context.Context, id uuid.UUID) error {
-	args := m.Called(ctx, id)
-	return args.Error(0)
+func (m *MockQuerier) PurgeOrganization(ctx context.Context, arg db.PurgeOrganizationParams) (uuid.UUID, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(uuid.UUID), args.Error(1)
 }
 
-func (m *MockQuerier) CancelRunningOpsForOrg(ctx context.Context, orgID pgtype.UUID) error {
+func (m *MockQuerier) CancelRunningOpsForOrg(ctx context.Context, orgID pgtype.UUID) ([]uuid.UUID, error) {
 	args := m.Called(ctx, orgID)
-	return args.Error(0)
+	out, _ := args.Get(0).([]uuid.UUID)
+	return out, args.Error(1)
 }
 
 func (m *MockQuerier) ListSoleOwnerOrgsForFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) ([]db.Organization, error) {
@@ -241,14 +242,25 @@ func (m *MockQuerier) CountVerifiedDomainsByOrg(ctx context.Context, orgID uuid.
 	return args.Get(0).(int64), args.Error(1)
 }
 
-func (m *MockQuerier) CancelDomainOpsForDomain(ctx context.Context, arg db.CancelDomainOpsForDomainParams) error {
+func (m *MockQuerier) CancelDomainOpsForDomain(ctx context.Context, arg db.CancelDomainOpsForDomainParams) ([]uuid.UUID, error) {
 	args := m.Called(ctx, arg)
-	return args.Error(0)
+	out, _ := args.Get(0).([]uuid.UUID)
+	return out, args.Error(1)
 }
 
 func (m *MockQuerier) GetSsoConfigByOrgID(ctx context.Context, orgID uuid.UUID) (db.SsoConfig, error) {
 	args := m.Called(ctx, orgID)
 	return args.Get(0).(db.SsoConfig), args.Error(1)
+}
+
+func (m *MockQuerier) UpsertSsoConfig(ctx context.Context, arg db.UpsertSsoConfigParams) (db.SsoConfig, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.SsoConfig), args.Error(1)
+}
+
+func (m *MockQuerier) ResolveProviderByDomain(ctx context.Context, domain string) (db.ResolveProviderByDomainRow, error) {
+	args := m.Called(ctx, domain)
+	return args.Get(0).(db.ResolveProviderByDomainRow), args.Error(1)
 }
 
 // --- Users (per-org membership) ---
@@ -1098,8 +1110,8 @@ func (m *MockQuerier) GetOrgMember(ctx context.Context, arg db.GetOrgMemberParam
 	return args.Get(0).(db.GetOrgMemberRow), args.Error(1)
 }
 
-func (m *MockQuerier) ListOrgMembers(ctx context.Context, orgID uuid.UUID) ([]db.ListOrgMembersRow, error) {
-	args := m.Called(ctx, orgID)
+func (m *MockQuerier) ListOrgMembers(ctx context.Context, arg db.ListOrgMembersParams) ([]db.ListOrgMembersRow, error) {
+	args := m.Called(ctx, arg)
 	if v := args.Get(0); v != nil {
 		return v.([]db.ListOrgMembersRow), args.Error(1)
 	}
@@ -1111,8 +1123,8 @@ func (m *MockQuerier) GetSpaceMember(ctx context.Context, arg db.GetSpaceMemberP
 	return args.Get(0).(db.GetSpaceMemberRow), args.Error(1)
 }
 
-func (m *MockQuerier) ListSpaceMembers(ctx context.Context, spaceID uuid.UUID) ([]db.ListSpaceMembersRow, error) {
-	args := m.Called(ctx, spaceID)
+func (m *MockQuerier) ListSpaceMembers(ctx context.Context, arg db.ListSpaceMembersParams) ([]db.ListSpaceMembersRow, error) {
+	args := m.Called(ctx, arg)
 	if v := args.Get(0); v != nil {
 		return v.([]db.ListSpaceMembersRow), args.Error(1)
 	}

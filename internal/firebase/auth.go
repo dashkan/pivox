@@ -7,6 +7,7 @@ import (
 	"cloud.google.com/go/auth/credentials"
 	fb "firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/auth"
+	"firebase.google.com/go/v4/errorutils"
 	"google.golang.org/api/option"
 
 	"github.com/dashkan/pivox/internal/authn"
@@ -96,6 +97,121 @@ func (s *AuthService) CreateCustomToken(ctx context.Context, uid string) (string
 func (s *AuthService) DeleteUser(ctx context.Context, uid string) error {
 	if err := s.authClient.DeleteUser(ctx, uid); err != nil {
 		if auth.IsUserNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+// CreateOidcProvider creates a Firebase Auth OIDC provider config
+// from the provider-agnostic shape on the authn.Service interface.
+// Translates the boolean code/id_token flags into Firebase's
+// ResponseType struct.
+func (s *AuthService) CreateOidcProvider(ctx context.Context, cfg authn.OidcProviderConfig) error {
+	toCreate := (&auth.OIDCProviderConfigToCreate{}).
+		ID(cfg.ProviderID).
+		DisplayName(cfg.DisplayName).
+		Enabled(cfg.Enabled).
+		Issuer(cfg.Issuer).
+		ClientID(cfg.ClientID).
+		CodeResponseType(cfg.CodeFlow).
+		IDTokenResponseType(cfg.IDTokenFlow)
+	if cfg.ClientSecret != "" {
+		toCreate = toCreate.ClientSecret(cfg.ClientSecret)
+	}
+	_, err := s.authClient.CreateOIDCProviderConfig(ctx, toCreate)
+	if err != nil && errorutils.IsAlreadyExists(err) {
+		// Wrap with the package-level sentinel so UpdateSsoConfig's
+		// fallback can detect-and-flip without taking a hard
+		// dependency on the firebase package.
+		return fmt.Errorf("%w: %v", authn.ErrAlreadyExists, err)
+	}
+	return err
+}
+
+// UpdateOidcProvider modifies an existing OIDC provider config. An
+// empty ClientSecret means "don't touch the existing secret"; the
+// builder skips the field rather than clearing it.
+func (s *AuthService) UpdateOidcProvider(ctx context.Context, cfg authn.OidcProviderConfig) error {
+	toUpdate := (&auth.OIDCProviderConfigToUpdate{}).
+		DisplayName(cfg.DisplayName).
+		Enabled(cfg.Enabled).
+		Issuer(cfg.Issuer).
+		ClientID(cfg.ClientID).
+		CodeResponseType(cfg.CodeFlow).
+		IDTokenResponseType(cfg.IDTokenFlow)
+	if cfg.ClientSecret != "" {
+		toUpdate = toUpdate.ClientSecret(cfg.ClientSecret)
+	}
+	_, err := s.authClient.UpdateOIDCProviderConfig(ctx, cfg.ProviderID, toUpdate)
+	if err != nil && auth.IsConfigurationNotFound(err) {
+		return fmt.Errorf("%w: %v", authn.ErrNotFound, err)
+	}
+	return err
+}
+
+// DeleteOidcProvider removes an OIDC provider config. Idempotent on
+// already-deleted ids — the underlying not-found surfaces as a
+// gRPC NotFound error from the SDK; we swallow it so cleanup paths
+// can call this safely after partial failures.
+func (s *AuthService) DeleteOidcProvider(ctx context.Context, providerID string) error {
+	if err := s.authClient.DeleteOIDCProviderConfig(ctx, providerID); err != nil {
+		if auth.IsConfigurationNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+// CreateSamlProvider creates a SAML provider config from the
+// provider-agnostic shape on the authn.Service interface.
+func (s *AuthService) CreateSamlProvider(ctx context.Context, cfg authn.SamlProviderConfig) error {
+	toCreate := (&auth.SAMLProviderConfigToCreate{}).
+		ID(cfg.ProviderID).
+		DisplayName(cfg.DisplayName).
+		Enabled(cfg.Enabled).
+		IDPEntityID(cfg.IDPEntityID).
+		SSOURL(cfg.SSOURL).
+		X509Certificates(cfg.X509Certificates).
+		RequestSigningEnabled(cfg.RequestSigningEnabled).
+		RPEntityID(cfg.RPEntityID).
+		CallbackURL(cfg.CallbackURL)
+	_, err := s.authClient.CreateSAMLProviderConfig(ctx, toCreate)
+	if err != nil && errorutils.IsAlreadyExists(err) {
+		return fmt.Errorf("%w: %v", authn.ErrAlreadyExists, err)
+	}
+	return err
+}
+
+// UpdateSamlProvider modifies an existing SAML provider config.
+// Empty X509Certificates means "don't touch the existing certs"
+// (the builder skips the field when the slice is nil/empty).
+func (s *AuthService) UpdateSamlProvider(ctx context.Context, cfg authn.SamlProviderConfig) error {
+	toUpdate := (&auth.SAMLProviderConfigToUpdate{}).
+		DisplayName(cfg.DisplayName).
+		Enabled(cfg.Enabled).
+		IDPEntityID(cfg.IDPEntityID).
+		SSOURL(cfg.SSOURL).
+		RequestSigningEnabled(cfg.RequestSigningEnabled).
+		RPEntityID(cfg.RPEntityID).
+		CallbackURL(cfg.CallbackURL)
+	if len(cfg.X509Certificates) > 0 {
+		toUpdate = toUpdate.X509Certificates(cfg.X509Certificates)
+	}
+	_, err := s.authClient.UpdateSAMLProviderConfig(ctx, cfg.ProviderID, toUpdate)
+	if err != nil && auth.IsConfigurationNotFound(err) {
+		return fmt.Errorf("%w: %v", authn.ErrNotFound, err)
+	}
+	return err
+}
+
+// DeleteSamlProvider removes a SAML provider config. Idempotent on
+// already-deleted ids.
+func (s *AuthService) DeleteSamlProvider(ctx context.Context, providerID string) error {
+	if err := s.authClient.DeleteSAMLProviderConfig(ctx, providerID); err != nil {
+		if auth.IsConfigurationNotFound(err) {
 			return nil
 		}
 		return err

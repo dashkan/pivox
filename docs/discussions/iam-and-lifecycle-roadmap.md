@@ -521,25 +521,110 @@ plan is obsolete.)
 
 ### Step 8 — SSO config + `auth:resolveProvider`
 
-- [ ] `Organizations.GetSsoConfig` / `UpdateSsoConfig` handlers (sync, not LRO).
-- [ ] On Update: validate → KMS-encrypt new `client_secret` if provided →
-      DB write → Firebase Admin SDK `Create*ProviderConfig` /
-      `Update*ProviderConfig`. Best-effort sync; failure returns error to caller.
-- [ ] KMS column-encryption via existing `internal/crypto/encryptor_gcp.go` path
+- [x] `Organizations.GetSsoConfig` / `UpdateSsoConfig` handlers (sync, not LRO).
+- [x] On Update: validate → KMS-encrypt new `client_secret` if provided →
+      Firebase Admin SDK `CreateOidcProvider` / `UpdateOidcProvider` →
+      DB upsert. Failure on Firebase aborts before local write so state
+      stays consistent.
+- [x] KMS column-encryption via existing `internal/crypto/encryptor_gcp.go` path
       (locked: open decision #4). Drift reconciliation job lands later, not phase 4.
-- [ ] `POST /internal/v1/auth:resolveProvider { email }` → `{ provider_id }`.
+- [x] `POST /internal/v1/auth:resolveProvider { email }` → `{ provider_id }`.
       Hand-written handler in `InternalHooks`, sibling of `auth:exchangeToken`.
-      New `resolveProviderLimiter *ipRateLimiter` (sub-decision #7).
-- [ ] Lookup chain: `email → domain → domains WHERE org_id AND state=VERIFIED →
+      Reuses existing `rateLimit` middleware.
+- [x] Lookup chain: `email → domain → domains WHERE org_id AND state=VERIFIED →
       sso_configs WHERE enabled=true → firebase_provider_id`.
+- [x] SAML wired through Firebase Admin SDK — `CreateSamlProvider` /
+      `UpdateSamlProvider` / `DeleteSamlProvider` mirror the OIDC
+      methods; UpdateSsoConfig handler dispatches based on the
+      `oneof config` selection.
 
-### Phase 4 exit criteria
+### Step 8b — Audit-driven hardening (post-Step 8 reviewer pass)
+
+A full audit of Phase 4 surfaced 13 findings (3 HIGH, 7 MED, 3 LOW).
+All resolved in this step before moving on to integration tests.
+
+- [x] **HIGH #1.** `CountOwnersByOrg` only counted `principal_kind='user'`
+      bindings, silently excluding group-owners. Mixed user+group owner
+      configs gave false positives on the ≥1-owner guard. Fixed via
+      EXISTS subqueries that count both principal kinds.
+- [x] **HIGH #2.** `lro.Manager.runWork` used `context.Background()` so
+      `CancelOperation` only marked the DB row done — running goroutines
+      ran to completion and overwrote the cancel state. Fixed by adding
+      a per-op `context.CancelFunc` registry; `CancelOperation` now
+      invokes the registered cancel so the goroutine observes
+      `ctx.Done()` and aborts cleanly.
+- [x] **MED #4.** Member handlers (org + space) re-issued
+      `GetOrganizationByName` / `GetSpaceByName` instead of using the
+      `ResolvedOrg` / `ResolvedSpace` already attached by the
+      interceptor. Refactored to read from context with defensive
+      slug-match assertions.
+- [x] **MED #5.** `ListMembers` (org + space) silently truncated at
+      1000 rows with no `next_page_token`. Implemented offset-based
+      AIP-132 pagination with `page_size` (default 50, max 500) and
+      opaque base-10 `page_token` cursors.
+- [x] **MED #6.** Concurrent `UpdateSsoConfig` on a fresh org both saw
+      `ErrNoRows` and both called `CreateOidcProvider`. Resolved via
+      idempotent Firebase-side fallback: try Create then fall through
+      to Update on `ErrAlreadyExists`; try Update then fall through to
+      Create on `ErrNotFound`. Adds `authn.ErrAlreadyExists` /
+      `authn.ErrNotFound` sentinels so the org service doesn't import
+      firebase directly.
+- [x] **MED #7.** Force-path `PurgeOrganization` had no race-guard, so
+      a concurrent soft-delete + undelete cycle could leave the LRO
+      operating on a row whose state had drifted since handler-time
+      validation. Added etag pinning to the SQL (`WHERE id=$1 AND
+      etag=$2`); LRO surfaces `FailedPrecondition` on drift.
+- [x] **MED #8.** `CancelDomainOpsForDomain` and
+      `CancelRunningOpsForOrg` were bulk SQL UPDATEs that marked
+      operations done but didn't notify in-replica goroutines, leaving
+      windows where verify/orchestrator goroutines could write to rows
+      about to be deleted. Both queries now `RETURNING id`; the
+      handler invokes `lro.Manager.CancelLocal(ids...)` to fire local
+      cancel funcs immediately.
+- [x] **MED #9.** `lro.Manager.runWork` notified listeners
+      unconditionally even when `CompleteOperation` /
+      `FailOperation` DB write failed, leaving callers waking up to a
+      stuck `done=false` row. Notification now only fires on
+      successful DB write; failures are logged and recovered on next
+      restart via `RecoverPending`.
+- [x] **MED #10.** SAML promoted from "Unimplemented" stub to full
+      Firebase Admin SDK integration. See Step 8 entry above.
+- [x] **LOW #11.** `verifyTickFn` / `purgeTickFn` test helpers were
+      hand-copied subsets of the real `tick` body. Refactored
+      `tick` → `tick` + `processBatch`; tests now exercise
+      `processBatch` directly without the advisory lock.
+- [x] **LOW #12.** `X-Forwarded-For` was honored unconditionally for
+      rate-limit identity, defeatable by any client that could reach
+      the server directly. Added `Config.TrustedProxies` (CIDR list);
+      empty default = fail closed (header ignored, key on
+      `RemoteAddr`); when `RemoteAddr` is in a trusted CIDR, picks the
+      leftmost untrusted XFF entry.
+- [x] **LOW #13.** `UpsertSsoConfig` SQL had a misleading comment
+      conflating "empty bytes" with "NULL via sqlc.narg". Rewrote the
+      comment to describe both bindings accurately and document that
+      "clear secret" is intentionally not a query option.
+
+#### Audit findings deferred to Step 9 (integration tests)
+
+- The roadmap-locked Phase 4 exit criteria (below) require real-DB
+  integration tests for soft-delete→revive, DeleteUser blocking flows,
+  CreateDomain LRO state machine, and end-to-end permission
+  interceptor coverage. These need a test-mode interceptor pipeline
+  (the existing scaffolding doesn't wire one up) and represent
+  ~1500 LOC of net-new test code. Tracked as Step 9 to keep the
+  audit-fix diff focused and reviewable.
+
+### Phase 4 exit criteria — Step 9 (integration tests, deferred)
 
 - [ ] All new/changed RPCs covered by integration tests.
 - [ ] Permission interceptor tests cover org+space, user+group, inheritance, deny paths.
 - [ ] Soft-delete → revive end-to-end test.
 - [ ] `DeleteUser` blocking → unblock-via-transfer / unblock-via-org-delete tests.
-- [ ] `UpdateSsoConfig` → Firebase Admin SDK side-effect test (with mock).
+- [x] `UpdateSsoConfig` → Firebase Admin SDK side-effect test (with mock).
+      (Covered by the existing unit tests in
+      `internal/service/organizations/sso_test.go`, which exercise the
+      full handler against a mock implementing `authn.Service` —
+      including the create-or-update fallback for both OIDC and SAML.)
 - [ ] `CreateDomain` LRO drives PENDING → VERIFIED → EXPIRED through stubbed DNS resolver.
 - [ ] Native macOS app rebuilds against regenerated stubs.
 - [ ] `make build && go test ./... && make api-lint && make lint` clean.

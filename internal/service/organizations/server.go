@@ -15,6 +15,7 @@ import (
 	"github.com/dashkan/pivox/internal/appkey"
 	"github.com/dashkan/pivox/internal/authn"
 	"github.com/dashkan/pivox/internal/convert"
+	"github.com/dashkan/pivox/internal/crypto"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/filter"
 	"github.com/dashkan/pivox/internal/lro"
@@ -51,9 +52,13 @@ type OrganizationsServer struct {
 	// DeleteOrganization and UndeleteOrganization. Optional in
 	// tests that don't exercise lifecycle paths.
 	lroManager *lro.Manager
+	// encryptor wraps Cloud KMS for column-level encryption of
+	// SsoConfig.client_secret. Optional in tests that don't
+	// exercise the SSO path.
+	encryptor crypto.Encryptor
 }
 
-func NewOrganizationsServer(pool *pgxpool.Pool, queries db.Querier, auth authn.Service, codec *appkey.Codec, readUID AuthContextReader, resolver *permission.Resolver, caller server.CallerIdentityResolver, lroManager *lro.Manager) *OrganizationsServer {
+func NewOrganizationsServer(pool *pgxpool.Pool, queries db.Querier, auth authn.Service, codec *appkey.Codec, readUID AuthContextReader, resolver *permission.Resolver, caller server.CallerIdentityResolver, lroManager *lro.Manager, encryptor crypto.Encryptor) *OrganizationsServer {
 	return &OrganizationsServer{
 		db:         pool,
 		pool:       pool,
@@ -65,6 +70,7 @@ func NewOrganizationsServer(pool *pgxpool.Pool, queries db.Querier, auth authn.S
 		resolver:   resolver,
 		caller:     caller,
 		lroManager: lroManager,
+		encryptor:  encryptor,
 	}
 }
 

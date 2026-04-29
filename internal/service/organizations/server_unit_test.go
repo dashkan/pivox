@@ -22,6 +22,7 @@ import (
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/filter"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
+	"github.com/dashkan/pivox/internal/server"
 	"github.com/dashkan/pivox/internal/testutil/mocks"
 )
 
@@ -39,6 +40,18 @@ var (
 		UpdateTime:  time.Date(2025, 6, 15, 10, 0, 0, 0, time.UTC),
 	}
 )
+
+// memberTestCtx returns a context pre-populated with the same
+// ResolvedOrg the permission interceptor would attach in production.
+// Member handlers now read from context instead of issuing a fresh
+// GetOrganizationByName lookup, so unit tests must seed this.
+func memberTestCtx() context.Context {
+	return server.WithResolvedOrgForTest(context.Background(), &server.ResolvedOrg{
+		ID:   testOrg.ID,
+		Slug: testOrg.Name,
+		Row:  testOrg,
+	})
+}
 
 func newTestServer(q *mocks.MockQuerier) *OrganizationsServer {
 	codec, _ := appkey.NewFromHex(strings.Repeat("ab", 32))
@@ -222,6 +235,36 @@ func (m *mockAuthService) CreateCustomToken(ctx context.Context, uid string) (st
 
 func (m *mockAuthService) DeleteUser(ctx context.Context, uid string) error {
 	args := m.Called(ctx, uid)
+	return args.Error(0)
+}
+
+func (m *mockAuthService) CreateOidcProvider(ctx context.Context, cfg authn.OidcProviderConfig) error {
+	args := m.Called(ctx, cfg)
+	return args.Error(0)
+}
+
+func (m *mockAuthService) UpdateOidcProvider(ctx context.Context, cfg authn.OidcProviderConfig) error {
+	args := m.Called(ctx, cfg)
+	return args.Error(0)
+}
+
+func (m *mockAuthService) DeleteOidcProvider(ctx context.Context, providerID string) error {
+	args := m.Called(ctx, providerID)
+	return args.Error(0)
+}
+
+func (m *mockAuthService) CreateSamlProvider(ctx context.Context, cfg authn.SamlProviderConfig) error {
+	args := m.Called(ctx, cfg)
+	return args.Error(0)
+}
+
+func (m *mockAuthService) UpdateSamlProvider(ctx context.Context, cfg authn.SamlProviderConfig) error {
+	args := m.Called(ctx, cfg)
+	return args.Error(0)
+}
+
+func (m *mockAuthService) DeleteSamlProvider(ctx context.Context, providerID string) error {
+	args := m.Called(ctx, providerID)
 	return args.Error(0)
 }
 
@@ -857,7 +900,7 @@ func TestUnit_NewOrganizationsServer_Constructor(t *testing.T) {
 	auth := new(mockAuthService)
 
 	// NewOrganizationsServer with nil pool exercises the constructor code path.
-	srv := NewOrganizationsServer(nil, mockQ, auth, nil, nil, nil, nil, nil)
+	srv := NewOrganizationsServer(nil, mockQ, auth, nil, nil, nil, nil, nil, nil)
 
 	require.NotNil(t, srv)
 	assert.NotNil(t, srv.filter)

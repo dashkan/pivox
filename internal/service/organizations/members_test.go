@@ -1,12 +1,10 @@
 package organizations
 
 import (
-	"context"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -51,7 +49,7 @@ func TestGetMember_OrgScope_UserPrincipal(t *testing.T) {
 	}, nil)
 
 	srv := newServerForMembers(q)
-	resp, err := srv.GetMember(context.Background(), &iampb.GetMemberRequest{
+	resp, err := srv.GetMember(memberTestCtx(), &iampb.GetMemberRequest{
 		Name: "organizations/acme/members/user-" + userID.String(),
 	})
 	require.NoError(t, err)
@@ -77,7 +75,7 @@ func TestGetMember_InvalidNameShape(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			q := new(mocks.MockQuerier)
 			srv := newServerForMembers(q)
-			_, err := srv.GetMember(context.Background(), &iampb.GetMemberRequest{Name: name})
+			_, err := srv.GetMember(memberTestCtx(), &iampb.GetMemberRequest{Name: name})
 			require.Error(t, err)
 			st, _ := status.FromError(err)
 			assert.Equal(t, codes.InvalidArgument, st.Code())
@@ -85,18 +83,21 @@ func TestGetMember_InvalidNameShape(t *testing.T) {
 	}
 }
 
-func TestGetMember_OrgNotFound(t *testing.T) {
+// TestGetMember_OrgSlugMismatch defends against a path/scope drift —
+// if the resource name's slug doesn't match the resolved scope (which
+// the interceptor already gated), the handler refuses rather than
+// silently operating on the wrong org. In production this never fires
+// because the interceptor 404s on an unknown org before we get here;
+// the assertion is paranoia against gate-vs-handler skew.
+func TestGetMember_OrgSlugMismatch(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	q.On("GetOrganizationByName", mock.Anything, "ghost").
-		Return(db.Organization{}, pgx.ErrNoRows)
-
 	srv := newServerForMembers(q)
-	_, err := srv.GetMember(context.Background(), &iampb.GetMemberRequest{
+	_, err := srv.GetMember(memberTestCtx(), &iampb.GetMemberRequest{
 		Name: "organizations/ghost/members/user-" + uuid.New().String(),
 	})
 	require.Error(t, err)
 	st, _ := status.FromError(err)
-	assert.Equal(t, codes.NotFound, st.Code())
+	assert.Equal(t, codes.InvalidArgument, st.Code())
 }
 
 func TestListMembers_OrgScope(t *testing.T) {
@@ -104,7 +105,9 @@ func TestListMembers_OrgScope(t *testing.T) {
 	userB := uuid.MustParse("0192a000-0041-7000-8000-000000000041")
 	q := new(mocks.MockQuerier)
 	q.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
-	q.On("ListOrgMembers", mock.Anything, testOrg.ID).Return([]db.ListOrgMembersRow{
+	q.On("ListOrgMembers", mock.Anything, mock.MatchedBy(func(p db.ListOrgMembersParams) bool {
+		return p.OrgID == testOrg.ID
+	})).Return([]db.ListOrgMembersRow{
 		{
 			ID: uuid.New(), OrgID: testOrg.ID, RoleID: uuid.New(),
 			PrincipalKind: db.PrincipalKindUser, PrincipalID: userA,
@@ -118,13 +121,68 @@ func TestListMembers_OrgScope(t *testing.T) {
 	}, nil)
 
 	srv := newServerForMembers(q)
-	resp, err := srv.ListMembers(context.Background(), &iampb.ListMembersRequest{
+	resp, err := srv.ListMembers(memberTestCtx(), &iampb.ListMembersRequest{
 		Parent: "organizations/acme",
 	})
 	require.NoError(t, err)
 	require.Len(t, resp.GetMembers(), 2)
 	assert.Equal(t, "organizations/acme/roles/owner", resp.GetMembers()[0].GetRole())
 	assert.Equal(t, "organizations/acme/roles/editor", resp.GetMembers()[1].GetRole())
+}
+
+// TestListMembers_PaginationCursor pins the offset-token round trip.
+// 60 rows + page_size=50 → first page returns 50 rows + next_page_token=50.
+// Caller passes that token back; server returns the remaining 10 rows
+// with no next_page_token.
+func TestListMembers_PaginationCursor(t *testing.T) {
+	q := new(mocks.MockQuerier)
+	pageSize := int32(50)
+	// First-page request: handler asks for limit+1 = 51, gets 51 (more
+	// pages exist). Build 51 rows so handler sees the truncation signal.
+	firstPage := make([]db.ListOrgMembersRow, 51)
+	for i := range firstPage {
+		firstPage[i] = db.ListOrgMembersRow{
+			ID: uuid.New(), OrgID: testOrg.ID, RoleID: uuid.New(),
+			PrincipalKind: db.PrincipalKindUser, PrincipalID: uuid.New(),
+			RoleName: "viewer", Etag: "e", CreateTime: memberTestNow, UpdateTime: memberTestNow,
+		}
+	}
+	q.On("ListOrgMembers", mock.Anything, mock.MatchedBy(func(p db.ListOrgMembersParams) bool {
+		return p.Offset == 0 && p.Limit == 51
+	})).Return(firstPage, nil).Once()
+
+	// Second page from offset=50: 10 rows remaining, fewer than limit+1
+	// so no truncation signal.
+	secondPage := firstPage[:10]
+	q.On("ListOrgMembers", mock.Anything, mock.MatchedBy(func(p db.ListOrgMembersParams) bool {
+		return p.Offset == 50 && p.Limit == 51
+	})).Return(secondPage, nil).Once()
+
+	srv := newServerForMembers(q)
+	resp, err := srv.ListMembers(memberTestCtx(), &iampb.ListMembersRequest{
+		Parent: "organizations/acme", PageSize: pageSize,
+	})
+	require.NoError(t, err)
+	assert.Len(t, resp.GetMembers(), 50)
+	assert.Equal(t, "50", resp.GetNextPageToken())
+
+	resp, err = srv.ListMembers(memberTestCtx(), &iampb.ListMembersRequest{
+		Parent: "organizations/acme", PageSize: pageSize, PageToken: resp.GetNextPageToken(),
+	})
+	require.NoError(t, err)
+	assert.Len(t, resp.GetMembers(), 10)
+	assert.Empty(t, resp.GetNextPageToken(), "last page should not advertise more")
+}
+
+func TestListMembers_RejectsBadPageToken(t *testing.T) {
+	q := new(mocks.MockQuerier)
+	srv := newServerForMembers(q)
+	_, err := srv.ListMembers(memberTestCtx(), &iampb.ListMembersRequest{
+		Parent: "organizations/acme", PageToken: "not-an-int",
+	})
+	require.Error(t, err)
+	st, _ := status.FromError(err)
+	assert.Equal(t, codes.InvalidArgument, st.Code())
 }
 
 func TestListMembers_InvalidParentShape(t *testing.T) {
@@ -140,7 +198,7 @@ func TestListMembers_InvalidParentShape(t *testing.T) {
 		t.Run(p, func(t *testing.T) {
 			q := new(mocks.MockQuerier)
 			srv := newServerForMembers(q)
-			_, err := srv.ListMembers(context.Background(), &iampb.ListMembersRequest{Parent: p})
+			_, err := srv.ListMembers(memberTestCtx(), &iampb.ListMembersRequest{Parent: p})
 			require.Error(t, err)
 			st, _ := status.FromError(err)
 			assert.Equal(t, codes.InvalidArgument, st.Code())

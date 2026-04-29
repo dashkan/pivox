@@ -91,16 +91,19 @@ SELECT om.*, r.name AS role_name
    AND om.principal_id = $3;
 
 -- name: ListOrgMembers :many
--- Lists all org-scope role bindings for an org. Ordered by create_time
--- so paging by row position is stable. v1 caps the result at 1000 in
--- the handler since system-role member counts in normal orgs are far
--- below that; cursor-based paging is added when needed.
+-- Lists org-scope role bindings for an org with offset-based
+-- pagination. Ordered by (create_time, id) so paging is stable under
+-- concurrent inserts. The handler converts AIP-132 page_token /
+-- page_size into the offset / limit args here. Caller asks for
+-- limit+1 rows to detect "more pages exist" without a separate count
+-- query; the handler trims the extra row before responding.
 SELECT om.*, r.name AS role_name
   FROM org_members om
   JOIN roles r ON r.id = om.role_id
  WHERE om.org_id = $1
  ORDER BY om.create_time, om.id
- LIMIT 1000;
+ OFFSET sqlc.arg('offset')::bigint
+ LIMIT sqlc.arg('limit')::bigint;
 
 -- name: GetSpaceMember :one
 -- Companion to GetOrgMember at space scope. Note: this returns ONLY
@@ -116,13 +119,15 @@ SELECT sm.*, r.name AS role_name
 
 -- name: ListSpaceMembers :many
 -- Companion to ListOrgMembers at space scope. Same direct-only
--- semantic as GetSpaceMember.
+-- semantic as GetSpaceMember and the same offset+limit pagination
+-- contract.
 SELECT sm.*, r.name AS role_name
   FROM space_members sm
   JOIN roles r ON r.id = sm.role_id
  WHERE sm.space_id = $1
  ORDER BY sm.create_time, sm.id
- LIMIT 1000;
+ OFFSET sqlc.arg('offset')::bigint
+ LIMIT sqlc.arg('limit')::bigint;
 
 -- name: CreateOrgMember :one
 -- Inserts an org-level role binding and returns the server-generated

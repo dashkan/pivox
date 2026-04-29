@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -14,6 +15,7 @@ import (
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/permission"
 	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
+	"github.com/dashkan/pivox/internal/server"
 )
 
 // space-scope Member handlers. Companion to the org-scope Member
@@ -78,19 +80,14 @@ func (s *SpacesServer) GetMember(ctx context.Context, req *iampb.GetMemberReques
 	if err != nil {
 		return nil, err
 	}
-	org, err := s.queries.GetOrganizationByName(ctx, path.orgSlug)
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Member", req.GetName())
-	}
-	space, err := s.queries.GetSpaceByName(ctx, db.GetSpaceByNameParams{
-		OrgID: org.ID,
-		Name:  path.spaceSlug,
-	})
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Member", req.GetName())
+	resolvedOrg := server.MustResolvedOrgFromContext(ctx)
+	resolvedSpace := server.MustResolvedSpaceFromContext(ctx)
+	if path.orgSlug != resolvedOrg.Slug || path.spaceSlug != resolvedSpace.Slug {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("name",
+			"slugs in member path do not match resolved scope"))
 	}
 	row, err := s.queries.GetSpaceMember(ctx, db.GetSpaceMemberParams{
-		SpaceID:       space.ID,
+		SpaceID:       resolvedSpace.ID,
 		PrincipalKind: path.principalKind,
 		PrincipalID:   path.principalID,
 	})
@@ -103,32 +100,73 @@ func (s *SpacesServer) GetMember(ctx context.Context, req *iampb.GetMemberReques
 // ListMembers returns space-scope Members. Direct bindings only —
 // see GetMember doc comment for the inheritance caveat.
 func (s *SpacesServer) ListMembers(ctx context.Context, req *iampb.ListMembersRequest) (*iampb.ListMembersResponse, error) {
-	orgSlug, spaceSlug, err := parseSpaceMemberParent(req.GetParent())
+	parentOrgSlug, parentSpaceSlug, err := parseSpaceMemberParent(req.GetParent())
 	if err != nil {
 		return nil, err
 	}
-	org, err := s.queries.GetOrganizationByName(ctx, orgSlug)
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Organization", req.GetParent())
+	resolvedOrg := server.MustResolvedOrgFromContext(ctx)
+	resolvedSpace := server.MustResolvedSpaceFromContext(ctx)
+	if parentOrgSlug != resolvedOrg.Slug || parentSpaceSlug != resolvedSpace.Slug {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("parent",
+			"slugs in parent do not match resolved scope"))
 	}
-	space, err := s.queries.GetSpaceByName(ctx, db.GetSpaceByNameParams{
-		OrgID: org.ID,
-		Name:  spaceSlug,
+	pageSize, offset, err := parseMembersPaging(req.GetPageSize(), req.GetPageToken())
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.queries.ListSpaceMembers(ctx, db.ListSpaceMembersParams{
+		SpaceID: resolvedSpace.ID,
+		Offset:  offset,
+		Limit:   int64(pageSize) + 1,
 	})
 	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Space", req.GetParent())
-	}
-	rows, err := s.queries.ListSpaceMembers(ctx, space.ID)
-	if err != nil {
-		slog.ErrorContext(ctx, "list space members failed", "space_id", space.ID, "error", err)
+		slog.ErrorContext(ctx, "list space members failed", "space_id", resolvedSpace.ID, "error", err)
 		return nil, apierr.Internal("list members")
+	}
+	hasMore := len(rows) > int(pageSize)
+	if hasMore {
+		rows = rows[:pageSize]
 	}
 	out := make([]*iampb.Member, len(rows))
 	for i, r := range rows {
-		out[i] = convert.SpaceMemberToProto(r, orgSlug, spaceSlug)
+		out[i] = convert.SpaceMemberToProto(r, resolvedOrg.Slug, resolvedSpace.Slug)
 	}
-	return &iampb.ListMembersResponse{Members: out}, nil
+	resp := &iampb.ListMembersResponse{Members: out}
+	if hasMore {
+		resp.NextPageToken = encodeMembersPageToken(offset + int64(pageSize))
+	}
+	return resp, nil
 }
+
+const (
+	defaultMembersPageSize = 50
+	maxMembersPageSize     = 500
+)
+
+// parseMembersPaging mirrors the org-side helper; kept as a sibling
+// here rather than a shared package because the two services don't
+// share an internal helpers module yet and the function is small
+// enough that duplication is cheaper than introducing one.
+func parseMembersPaging(reqPageSize int32, pageToken string) (pageSize int32, offset int64, err error) {
+	pageSize = reqPageSize
+	if pageSize <= 0 {
+		pageSize = defaultMembersPageSize
+	}
+	if pageSize > maxMembersPageSize {
+		pageSize = maxMembersPageSize
+	}
+	if pageToken == "" {
+		return pageSize, 0, nil
+	}
+	off, parseErr := strconv.ParseInt(pageToken, 10, 64)
+	if parseErr != nil || off < 0 {
+		return 0, 0, apierr.InvalidArgument(apierr.FieldViolation("page_token",
+			"page_token is not a valid cursor"))
+	}
+	return pageSize, off, nil
+}
+
+func encodeMembersPageToken(off int64) string { return strconv.FormatInt(off, 10) }
 
 // CreateMember binds a principal (user or group) to a role at space
 // scope. The principal must already exist in the org that owns this
@@ -143,10 +181,17 @@ func (s *SpacesServer) ListMembers(ctx context.Context, req *iampb.ListMembersRe
 // never operationally ownerless even if no direct space-owner
 // binding exists.
 func (s *SpacesServer) CreateMember(ctx context.Context, req *iampb.CreateMemberRequest) (*iampb.Member, error) {
-	orgSlug, spaceSlug, err := parseSpaceMemberParent(req.GetParent())
+	parentOrgSlug, parentSpaceSlug, err := parseSpaceMemberParent(req.GetParent())
 	if err != nil {
 		return nil, err
 	}
+	resolvedOrg := server.MustResolvedOrgFromContext(ctx)
+	resolvedSpace := server.MustResolvedSpaceFromContext(ctx)
+	if parentOrgSlug != resolvedOrg.Slug || parentSpaceSlug != resolvedSpace.Slug {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("parent",
+			"slugs in parent do not match resolved scope"))
+	}
+	orgSlug := resolvedOrg.Slug
 	mem := req.GetMember()
 	if mem == nil {
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("member", "member is required"))
@@ -166,19 +211,8 @@ func (s *SpacesServer) CreateMember(ctx context.Context, req *iampb.CreateMember
 	if err != nil {
 		return nil, err
 	}
-	org, err := s.queries.GetOrganizationByName(ctx, orgSlug)
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Organization", req.GetParent())
-	}
-	space, err := s.queries.GetSpaceByName(ctx, db.GetSpaceByNameParams{
-		OrgID: org.ID,
-		Name:  spaceSlug,
-	})
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Space", req.GetParent())
-	}
 	role, err := s.queries.GetSystemRole(ctx, db.GetSystemRoleParams{
-		OrgID: org.ID,
+		OrgID: resolvedOrg.ID,
 		Name:  roleSlug,
 	})
 	if err != nil {
@@ -192,13 +226,13 @@ func (s *SpacesServer) CreateMember(ctx context.Context, req *iampb.CreateMember
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := db.New(tx)
 
-	if err := verifyPrincipalInOrg(ctx, qtx, org.ID, principalKind, principalID); err != nil {
+	if err := verifyPrincipalInOrg(ctx, qtx, resolvedOrg.ID, principalKind, principalID); err != nil {
 		return nil, err
 	}
 
 	row, err := qtx.CreateSpaceMember(ctx, db.CreateSpaceMemberParams{
 		ID:            uuid.New(),
-		SpaceID:       space.ID,
+		SpaceID:       resolvedSpace.ID,
 		RoleID:        role.ID,
 		PrincipalKind: principalKind,
 		PrincipalID:   principalID,
@@ -212,7 +246,7 @@ func (s *SpacesServer) CreateMember(ctx context.Context, req *iampb.CreateMember
 
 	return convert.SpaceMemberRowToProto(db.GetSpaceMemberRow{
 		ID:            row.ID,
-		SpaceID:       space.ID,
+		SpaceID:       resolvedSpace.ID,
 		RoleID:        role.ID,
 		PrincipalKind: principalKind,
 		PrincipalID:   principalID,
@@ -220,7 +254,7 @@ func (s *SpacesServer) CreateMember(ctx context.Context, req *iampb.CreateMember
 		Etag:          row.Etag,
 		CreateTime:    row.CreateTime,
 		UpdateTime:    row.UpdateTime,
-	}, orgSlug, spaceSlug), nil
+	}, orgSlug, resolvedSpace.Slug), nil
 }
 
 // UpdateMember mutates the role of an existing space-scope Member.
@@ -238,30 +272,25 @@ func (s *SpacesServer) UpdateMember(ctx context.Context, req *iampb.UpdateMember
 	if err != nil {
 		return nil, err
 	}
+	resolvedOrg := server.MustResolvedOrgFromContext(ctx)
+	resolvedSpace := server.MustResolvedSpaceFromContext(ctx)
+	if path.orgSlug != resolvedOrg.Slug || path.spaceSlug != resolvedSpace.Slug {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("member.name",
+			"slugs in member path do not match resolved scope"))
+	}
 	roleSlug, err := parseRoleRef(mem.GetRole(), path.orgSlug)
 	if err != nil {
 		return nil, err
 	}
-	org, err := s.queries.GetOrganizationByName(ctx, path.orgSlug)
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Member", mem.GetName())
-	}
-	space, err := s.queries.GetSpaceByName(ctx, db.GetSpaceByNameParams{
-		OrgID: org.ID,
-		Name:  path.spaceSlug,
-	})
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Member", mem.GetName())
-	}
 	newRole, err := s.queries.GetSystemRole(ctx, db.GetSystemRoleParams{
-		OrgID: org.ID,
+		OrgID: resolvedOrg.ID,
 		Name:  roleSlug,
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Role", mem.GetRole())
 	}
 	row, err := s.queries.UpdateSpaceMemberRole(ctx, db.UpdateSpaceMemberRoleParams{
-		SpaceID:       space.ID,
+		SpaceID:       resolvedSpace.ID,
 		PrincipalKind: path.principalKind,
 		PrincipalID:   path.principalID,
 		RoleID:        newRole.ID,
@@ -271,7 +300,7 @@ func (s *SpacesServer) UpdateMember(ctx context.Context, req *iampb.UpdateMember
 	}
 	return convert.SpaceMemberRowToProto(db.GetSpaceMemberRow{
 		ID:            row.ID,
-		SpaceID:       space.ID,
+		SpaceID:       resolvedSpace.ID,
 		RoleID:        newRole.ID,
 		PrincipalKind: path.principalKind,
 		PrincipalID:   path.principalID,
@@ -376,19 +405,14 @@ func (s *SpacesServer) DeleteMember(ctx context.Context, req *iampb.DeleteMember
 	if err != nil {
 		return nil, err
 	}
-	org, err := s.queries.GetOrganizationByName(ctx, path.orgSlug)
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Member", req.GetName())
-	}
-	space, err := s.queries.GetSpaceByName(ctx, db.GetSpaceByNameParams{
-		OrgID: org.ID,
-		Name:  path.spaceSlug,
-	})
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Member", req.GetName())
+	resolvedOrg := server.MustResolvedOrgFromContext(ctx)
+	resolvedSpace := server.MustResolvedSpaceFromContext(ctx)
+	if path.orgSlug != resolvedOrg.Slug || path.spaceSlug != resolvedSpace.Slug {
+		return nil, apierr.InvalidArgument(apierr.FieldViolation("name",
+			"slugs in member path do not match resolved scope"))
 	}
 	n, err := s.queries.DeleteSpaceMember(ctx, db.DeleteSpaceMemberParams{
-		SpaceID:       space.ID,
+		SpaceID:       resolvedSpace.ID,
 		PrincipalKind: path.principalKind,
 		PrincipalID:   path.principalID,
 	})

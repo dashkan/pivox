@@ -141,7 +141,7 @@ func TestDeleteOrganization_EtagMismatchFails(t *testing.T) {
 func TestRunDeleteOrganization_SoftDeletePhases(t *testing.T) {
 	orgID := uuid.MustParse("0192a000-aaaa-7000-8000-000000000001")
 	q := new(mocks.MockQuerier)
-	q.On("CancelRunningOpsForOrg", mock.Anything, pgtype.UUID{Bytes: orgID, Valid: true}).Return(nil)
+	q.On("CancelRunningOpsForOrg", mock.Anything, pgtype.UUID{Bytes: orgID, Valid: true}).Return([]uuid.UUID{}, nil)
 	q.On("SoftDeleteOrganization", mock.Anything, db.SoftDeleteOrganizationParams{
 		ID: orgID, DeletedBy: "caller-id",
 	}).Return(db.Organization{ID: orgID, Name: "acme", State: db.ResourceStateDELETEREQUESTED}, nil)
@@ -150,7 +150,7 @@ func TestRunDeleteOrganization_SoftDeletePhases(t *testing.T) {
 	progress := &fakeProgress{}
 	result, err := srv.runDeleteOrganization(
 		context.Background(), progress, orgID,
-		"organizations/acme", "caller-id", false /* force */)
+		"organizations/acme", "caller-id", false /* force */, "etag-1")
 	require.NoError(t, err)
 	assert.Equal(t, []apiv1.DeleteOrganizationMetadata_Phase{
 		apiv1.DeleteOrganizationMetadata_CANCELLING_OPERATIONS,
@@ -166,14 +166,17 @@ func TestRunDeleteOrganization_SoftDeletePhases(t *testing.T) {
 func TestRunDeleteOrganization_ForcePhases(t *testing.T) {
 	orgID := uuid.MustParse("0192a000-aaaa-7000-8000-000000000001")
 	q := new(mocks.MockQuerier)
-	q.On("CancelRunningOpsForOrg", mock.Anything, pgtype.UUID{Bytes: orgID, Valid: true}).Return(nil)
-	q.On("PurgeOrganization", mock.Anything, orgID).Return(nil)
+	q.On("CancelRunningOpsForOrg", mock.Anything, pgtype.UUID{Bytes: orgID, Valid: true}).Return([]uuid.UUID{}, nil)
+	q.On("PurgeOrganization", mock.Anything, db.PurgeOrganizationParams{
+		ID:   orgID,
+		Etag: "etag-1",
+	}).Return(orgID, nil)
 
 	srv := &OrganizationsServer{queries: q}
 	progress := &fakeProgress{}
 	_, err := srv.runDeleteOrganization(
 		context.Background(), progress, orgID,
-		"organizations/acme", "caller-id", true /* force */)
+		"organizations/acme", "caller-id", true /* force */, "etag-1")
 	require.NoError(t, err)
 	assert.Equal(t, []apiv1.DeleteOrganizationMetadata_Phase{
 		apiv1.DeleteOrganizationMetadata_CANCELLING_OPERATIONS,
@@ -191,26 +194,49 @@ func TestRunDeleteOrganization_RaceWithConcurrentDelete(t *testing.T) {
 	// The orchestrator must surface FAILED_PRECONDITION.
 	orgID := uuid.MustParse("0192a000-aaaa-7000-8000-000000000001")
 	q := new(mocks.MockQuerier)
-	q.On("CancelRunningOpsForOrg", mock.Anything, mock.Anything).Return(nil)
+	q.On("CancelRunningOpsForOrg", mock.Anything, mock.Anything).Return([]uuid.UUID{}, nil)
 	q.On("SoftDeleteOrganization", mock.Anything, mock.Anything).Return(db.Organization{}, pgx.ErrNoRows)
 
 	srv := &OrganizationsServer{queries: q}
 	_, err := srv.runDeleteOrganization(
 		context.Background(), &fakeProgress{}, orgID,
-		"organizations/acme", "caller-id", false)
+		"organizations/acme", "caller-id", false, "etag-1")
 	require.Error(t, err)
 	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+}
+
+// TestRunDeleteOrganization_ForceEtagDrift verifies that the
+// PURGING phase refuses to fire when the row's etag changed since
+// the handler validated it (e.g., a soft-delete + undelete cycle
+// raced the LRO worker). Without the guard, force-purge would wipe
+// the row anyway — the audit's primary concern.
+func TestRunDeleteOrganization_ForceEtagDrift(t *testing.T) {
+	orgID := uuid.MustParse("0192a000-aaaa-7000-8000-000000000001")
+	q := new(mocks.MockQuerier)
+	q.On("CancelRunningOpsForOrg", mock.Anything, mock.Anything).Return([]uuid.UUID{}, nil)
+	q.On("PurgeOrganization", mock.Anything, db.PurgeOrganizationParams{
+		ID:   orgID,
+		Etag: "stale-etag",
+	}).Return(uuid.Nil, pgx.ErrNoRows)
+
+	srv := &OrganizationsServer{queries: q}
+	_, err := srv.runDeleteOrganization(
+		context.Background(), &fakeProgress{}, orgID,
+		"organizations/acme", "caller-id", true /* force */, "stale-etag")
+	require.Error(t, err)
+	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+	assert.Contains(t, err.Error(), "revision changed")
 }
 
 func TestRunDeleteOrganization_CancelOpsFailureIsInternal(t *testing.T) {
 	orgID := uuid.MustParse("0192a000-aaaa-7000-8000-000000000001")
 	q := new(mocks.MockQuerier)
-	q.On("CancelRunningOpsForOrg", mock.Anything, mock.Anything).Return(errors.New("db down"))
+	q.On("CancelRunningOpsForOrg", mock.Anything, mock.Anything).Return([]uuid.UUID{}, errors.New("db down"))
 
 	srv := &OrganizationsServer{queries: q}
 	_, err := srv.runDeleteOrganization(
 		context.Background(), &fakeProgress{}, orgID,
-		"organizations/acme", "caller-id", false)
+		"organizations/acme", "caller-id", false, "etag-1")
 	require.Error(t, err)
 	assert.Equal(t, codes.Internal, status.Code(err))
 }

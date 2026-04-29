@@ -50,6 +50,36 @@ func (m *mockAuthService) DeleteUser(ctx context.Context, uid string) error {
 	return args.Error(0)
 }
 
+func (m *mockAuthService) CreateOidcProvider(ctx context.Context, cfg authn.OidcProviderConfig) error {
+	args := m.Called(ctx, cfg)
+	return args.Error(0)
+}
+
+func (m *mockAuthService) UpdateOidcProvider(ctx context.Context, cfg authn.OidcProviderConfig) error {
+	args := m.Called(ctx, cfg)
+	return args.Error(0)
+}
+
+func (m *mockAuthService) DeleteOidcProvider(ctx context.Context, providerID string) error {
+	args := m.Called(ctx, providerID)
+	return args.Error(0)
+}
+
+func (m *mockAuthService) CreateSamlProvider(ctx context.Context, cfg authn.SamlProviderConfig) error {
+	args := m.Called(ctx, cfg)
+	return args.Error(0)
+}
+
+func (m *mockAuthService) UpdateSamlProvider(ctx context.Context, cfg authn.SamlProviderConfig) error {
+	args := m.Called(ctx, cfg)
+	return args.Error(0)
+}
+
+func (m *mockAuthService) DeleteSamlProvider(ctx context.Context, providerID string) error {
+	args := m.Called(ctx, providerID)
+	return args.Error(0)
+}
+
 // --- Mock grpc.ServerStream ---
 
 type mockServerStream struct {

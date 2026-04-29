@@ -3,14 +3,19 @@ package server
 import (
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
+	"net/netip"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"golang.org/x/time/rate"
 
@@ -52,6 +57,17 @@ type InternalHooks struct {
 	delegatedCreateLimiter   *ipRateLimiter
 	delegatedCompleteLimiter *ipRateLimiter
 	delegatedPollLimiter     *ipRateLimiter
+
+	// Per-IP rate limiter for the SSO provider resolution endpoint.
+	// Called by Firebase blocking functions on every sign-in attempt;
+	// its traffic pattern is independent of token exchange so it gets
+	// its own bucket to avoid cross-endpoint pollution.
+	resolveProviderLimiter *ipRateLimiter
+
+	// trustedProxies are CIDR blocks whose connections are allowed
+	// to set X-Forwarded-For. Empty means "never trust the header"
+	// (default fail-closed). See clientIP.
+	trustedProxies []netip.Prefix
 }
 
 // Register mounts the internal endpoints on the given mux.
@@ -66,6 +82,8 @@ func (h *InternalHooks) Register(mux *http.ServeMux) {
 		h.rateLimitWith(h.delegatedCompleteLimiter, h.completeDelegatedAuthSession))
 	mux.HandleFunc("POST /internal/v1/auth:pollDelegatedAuthSession",
 		h.rateLimitWith(h.delegatedPollLimiter, h.pollDelegatedAuthSession))
+	mux.HandleFunc("POST /internal/v1/auth:resolveProvider",
+		h.rateLimitWith(h.resolveProviderLimiter, h.resolveProvider))
 }
 
 // syncFirebaseIdentityRequest is the payload sent by the Firebase
@@ -414,6 +432,84 @@ func (h *InternalHooks) pollDelegatedAuthSession(w http.ResponseWriter, r *http.
 	http.Error(w, "session not found", http.StatusNotFound)
 }
 
+// resolveProviderRequest is the payload for
+// POST /internal/v1/auth:resolveProvider. The Firebase pre-sign-in
+// hook calls this with the user's email to look up the right
+// SAML/OIDC provider id.
+type resolveProviderRequest struct {
+	Email string `json:"email"`
+}
+
+type resolveProviderResponse struct {
+	// ProviderID is the firebase_provider_id of the SsoConfig that
+	// matches the email's domain. Empty when no provider applies
+	// (response is 404 in that case).
+	ProviderID string `json:"provider_id"`
+}
+
+// resolveProvider maps an email's domain → verified Domain row →
+// enabled SsoConfig → firebase_provider_id. The Firebase
+// pre-sign-in blocking function calls this synchronously before
+// completing a federated sign-in; a NOT_FOUND tells Firebase to
+// fall back to password (or whatever else the project allows).
+//
+// Returns:
+//
+//	200 + JSON `{provider_id: "oidc.<slug>"}` when a match exists.
+//	404 when the email's domain isn't claimed, isn't verified, or
+//	    its SsoConfig is disabled. The error body is intentionally
+//	    generic — we don't disclose whether the domain is unknown
+//	    vs. unconfigured to avoid enumeration attacks.
+//	400 on malformed input (missing/invalid email).
+//
+// Authentication: this endpoint is called by Firebase blocking
+// functions over an internal channel. Same auth posture as the
+// other internal hooks (rate-limited; in production guarded by the
+// reverse proxy / VPC).
+func (h *InternalHooks) resolveProvider(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
+	var req resolveProviderRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Warn("resolveProvider: invalid request body", "error", err)
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	domain := emailDomain(req.Email)
+	if domain == "" {
+		http.Error(w, "email is required and must contain a domain", http.StatusBadRequest)
+		return
+	}
+	row, err := h.queries.ResolveProviderByDomain(r.Context(), domain)
+	if err != nil {
+		// pgx.ErrNoRows is the common case (no provider applies):
+		// domain not claimed, not VERIFIED, or SsoConfig disabled.
+		// Generic 404 to avoid enumeration leaks.
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.Error(w, "no provider configured for this domain", http.StatusNotFound)
+			return
+		}
+		h.logger.Error("resolveProvider: lookup failed", "domain", domain, "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(resolveProviderResponse{ProviderID: row.FirebaseProviderID}); err != nil {
+		h.logger.Warn("resolveProvider: write response failed", "error", err)
+	}
+}
+
+// emailDomain returns the lowercase domain part of an email or
+// empty if the address is malformed. We accept exactly one '@'
+// and require both sides to be non-empty.
+func emailDomain(email string) string {
+	at := strings.LastIndex(email, "@")
+	if at <= 0 || at == len(email)-1 {
+		return ""
+	}
+	return strings.ToLower(email[at+1:])
+}
+
 // rateLimit wraps a handler with per-IP rate limiting using the exchange limiter.
 func (h *InternalHooks) rateLimit(next http.HandlerFunc) http.HandlerFunc {
 	return h.rateLimitWith(h.exchangeLimiter, next)
@@ -425,17 +521,7 @@ func (h *InternalHooks) rateLimitWith(limiter *ipRateLimiter, next http.HandlerF
 			next(w, r)
 			return
 		}
-
-		// Use X-Forwarded-For if behind a reverse proxy, fall back to RemoteAddr.
-		ip := r.Header.Get("X-Forwarded-For")
-		if ip == "" {
-			ip = r.RemoteAddr
-		}
-		// Strip port from RemoteAddr (e.g., "192.168.1.1:12345" → "192.168.1.1").
-		if idx := strings.LastIndex(ip, ":"); idx != -1 {
-			ip = ip[:idx]
-		}
-
+		ip := h.clientIP(r)
 		if !limiter.allow(ip) {
 			h.logger.Warn("rate limit exceeded", "ip", ip, "path", r.URL.Path)
 			http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
@@ -443,6 +529,88 @@ func (h *InternalHooks) rateLimitWith(limiter *ipRateLimiter, next http.HandlerF
 		}
 		next(w, r)
 	}
+}
+
+// clientIP extracts the rate-limit identity from a request. The
+// algorithm:
+//
+//  1. Always start with r.RemoteAddr (the IP that opened the TCP
+//     connection). Strip the port.
+//  2. If RemoteAddr does not parse as an IP, return the raw value —
+//     the rate limiter treats it as an opaque key. This keeps tests
+//     and odd transports working without crashing.
+//  3. If RemoteAddr is NOT inside any configured trusted-proxies
+//     CIDR, return RemoteAddr. The X-Forwarded-For header is
+//     ignored — anyone could have set it.
+//  4. If RemoteAddr IS in a trusted-proxies CIDR, walk the
+//     X-Forwarded-For list right-to-left and return the first entry
+//     that is NOT itself in a trusted CIDR. (Trusted entries are
+//     proxy hops; we want the original client.) If every entry is
+//     trusted, fall back to RemoteAddr.
+//
+// trustedProxies defaulting to empty means "fail closed" — the header
+// is never honored and every request keys on RemoteAddr. Operators
+// who deploy behind a load balancer must explicitly configure the
+// LB's CIDR via the TrustedProxies config field.
+func (h *InternalHooks) clientIP(r *http.Request) string {
+	hostStr, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		hostStr = r.RemoteAddr
+	}
+	remoteIP, err := netip.ParseAddr(hostStr)
+	if err != nil {
+		return hostStr
+	}
+	if !ipInTrustedProxies(remoteIP, h.trustedProxies) {
+		return remoteIP.String()
+	}
+	xff := r.Header.Get("X-Forwarded-For")
+	if xff == "" {
+		return remoteIP.String()
+	}
+	parts := strings.Split(xff, ",")
+	for i := len(parts) - 1; i >= 0; i-- {
+		candidate, err := netip.ParseAddr(strings.TrimSpace(parts[i]))
+		if err != nil {
+			continue
+		}
+		if !ipInTrustedProxies(candidate, h.trustedProxies) {
+			return candidate.String()
+		}
+	}
+	return remoteIP.String()
+}
+
+// ipInTrustedProxies reports whether ip falls inside any of the
+// configured prefixes. An empty prefix list is a no-match — the
+// caller falls back to RemoteAddr.
+func ipInTrustedProxies(ip netip.Addr, prefixes []netip.Prefix) bool {
+	for _, p := range prefixes {
+		if p.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+// parseTrustedProxies converts the string CIDR list from config into
+// netip.Prefix values. Returns an error on any malformed entry so
+// startup fails loudly rather than silently falling back to "trust
+// nothing" — a misconfigured proxy list is more dangerous than no
+// proxy list, since the operator thinks the header is being honored.
+func parseTrustedProxies(cidrs []string) ([]netip.Prefix, error) {
+	if len(cidrs) == 0 {
+		return nil, nil
+	}
+	prefixes := make([]netip.Prefix, 0, len(cidrs))
+	for _, c := range cidrs {
+		p, err := netip.ParsePrefix(strings.TrimSpace(c))
+		if err != nil {
+			return nil, fmt.Errorf("trusted_proxies: %q is not a valid CIDR: %w", c, err)
+		}
+		prefixes = append(prefixes, p)
+	}
+	return prefixes, nil
 }
 
 // ipStaleAfter is how long an IP's limiter may sit unused before it is

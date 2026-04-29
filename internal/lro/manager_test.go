@@ -3,9 +3,11 @@ package lro
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"sync"
 	"testing"
 	"time"
 
@@ -305,6 +307,219 @@ func TestCancelOperation_NotFound(t *testing.T) {
 	require.Error(t, err)
 	st := status.Convert(err)
 	assert.Equal(t, codes.NotFound, st.Code())
+	mockQ.AssertExpectations(t)
+}
+
+// TestCancelOperation_CancelsInFlightGoroutine verifies that calling
+// CancelOperation actually unblocks a running WorkFunc by cancelling
+// the context the manager passed to it. Before the cancellation fix,
+// CancelOperation only wrote done=true to the DB and the goroutine
+// kept running until it finished naturally — silently overwriting the
+// cancel state. This test pins the goroutine-side behavior.
+func TestCancelOperation_CancelsInFlightGoroutine(t *testing.T) {
+	ctx := context.Background()
+	mockQ := new(mocks.MockQuerier)
+	m := NewManager(mockQ, newTestLogger())
+
+	// CreateAndRun mints its own opID inside; capture it from the
+	// CreateOperation call so the rest of the test references the
+	// same id the goroutine registers under. The mock returns a
+	// fixed Operation but its ID is overwritten by the matcher hook
+	// before the call returns, since dbToProto only reads the ID.
+	var opID uuid.UUID
+	var opMu sync.Mutex
+	mockQ.On("CreateOperation", ctx, mock.MatchedBy(func(p db.CreateOperationParams) bool {
+		opMu.Lock()
+		opID = p.ID
+		opMu.Unlock()
+		return p.Prefix == "assets"
+	})).Return(db.Operation{Prefix: "assets"}, nil).Run(func(args mock.Arguments) {
+		// noop — capture happens in MatchedBy.
+	})
+
+	// CancelOperation: race-safe SQL, accepts any opID.
+	mockQ.On("CancelOperation", ctx, mock.AnythingOfType("uuid.UUID")).
+		Return(db.Operation{Done: true}, nil)
+
+	// The work fn's ctx-cancellation will surface as Canceled, which
+	// runWork translates into FailOperation.
+	failed := make(chan struct{})
+	mockQ.On("FailOperation", mock.Anything, mock.AnythingOfType("db.FailOperationParams")).
+		Return(db.Operation{}, nil).Run(func(args mock.Arguments) {
+		close(failed)
+	})
+
+	started := make(chan struct{})
+	workCtxObserved := make(chan error, 1)
+	_, err := m.CreateAndRun(ctx, "assets", nil, func(workCtx context.Context, _ Progress) (proto.Message, error) {
+		close(started)
+		<-workCtx.Done()
+		workCtxObserved <- workCtx.Err()
+		return nil, workCtx.Err()
+	})
+	require.NoError(t, err)
+
+	// Wait for the goroutine to actually start before issuing the
+	// cancel; otherwise the cancel func wouldn't be registered yet.
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("work goroutine never started")
+	}
+
+	// Sanity: m.running must already hold the cancel fn for the
+	// captured opID. If not, the registration ordering in runWork
+	// is wrong.
+	opMu.Lock()
+	capturedID := opID
+	opMu.Unlock()
+	require.NotEqual(t, uuid.Nil, capturedID, "CreateOperation matcher never fired")
+
+	m.mu.Lock()
+	_, registered := m.running[capturedID]
+	m.mu.Unlock()
+	require.True(t, registered, "cancel fn not registered before CancelOperation called")
+
+	require.NoError(t, m.CancelOperation(ctx, fmt.Sprintf("operations/assets/%s", capturedID)))
+
+	select {
+	case err := <-workCtxObserved:
+		assert.ErrorIs(t, err, context.Canceled,
+			"work goroutine should have observed context.Canceled")
+	case <-time.After(2 * time.Second):
+		t.Fatal("CancelOperation did not unblock the work goroutine — cancel propagation broken")
+	}
+
+	select {
+	case <-failed:
+	case <-time.After(2 * time.Second):
+		t.Fatal("FailOperation never recorded the cancellation")
+	}
+}
+
+// TestCancelLocal_FiresCancelForRunningOpIDs verifies the helper used
+// by bulk-cancel SQL paths (CancelRunningOpsForOrg,
+// CancelDomainOpsForDomain). Those queries mark rows done in one
+// statement; CancelLocal then notifies any in-replica goroutines so
+// they don't run to completion before observing the change.
+func TestCancelLocal_FiresCancelForRunningOpIDs(t *testing.T) {
+	ctx := context.Background()
+	mockQ := new(mocks.MockQuerier)
+	m := NewManager(mockQ, newTestLogger())
+
+	var capturedIDs []uuid.UUID
+	mockQ.On("CreateOperation", ctx, mock.MatchedBy(func(p db.CreateOperationParams) bool {
+		capturedIDs = append(capturedIDs, p.ID)
+		return p.Prefix == "test"
+	})).Return(db.Operation{Prefix: "test"}, nil).Times(2)
+	mockQ.On("FailOperation", mock.Anything, mock.Anything).Return(db.Operation{}, nil).Times(2)
+
+	started := make(chan struct{}, 2)
+	observed := make(chan error, 2)
+	work := func(ctx context.Context, _ Progress) (proto.Message, error) {
+		started <- struct{}{}
+		<-ctx.Done()
+		observed <- ctx.Err()
+		return nil, ctx.Err()
+	}
+	_, err := m.CreateAndRun(ctx, "test", nil, work)
+	require.NoError(t, err)
+	_, err = m.CreateAndRun(ctx, "test", nil, work)
+	require.NoError(t, err)
+
+	// Wait for both goroutines.
+	for range 2 {
+		select {
+		case <-started:
+		case <-time.After(2 * time.Second):
+			t.Fatal("goroutines didn't start")
+		}
+	}
+
+	// Plus a third id that isn't running locally — CancelLocal must
+	// silently ignore unknown ids without crashing.
+	idsToCancel := append([]uuid.UUID{}, capturedIDs...)
+	idsToCancel = append(idsToCancel, uuid.New())
+
+	m.CancelLocal(idsToCancel...)
+
+	for range 2 {
+		select {
+		case e := <-observed:
+			assert.ErrorIs(t, e, context.Canceled)
+		case <-time.After(2 * time.Second):
+			t.Fatal("CancelLocal didn't propagate to a running goroutine")
+		}
+	}
+}
+
+// TestRunWork_DBFailureDoesNotNotifyListeners pins the #9 fix: when
+// CompleteOperation/FailOperation fails to write, listeners must NOT
+// wake up. Otherwise WaitOperation returns a not-done op, the caller
+// believes the operation is still running, but the goroutine is gone
+// — leaving the row permanently stuck until RecoverPending.
+//
+// Synchronization: we register the listener BEFORE the goroutine
+// returns by gating the work fn on a `release` channel. After the
+// listener is registered we close `release`, the work fn returns,
+// runWork hits the (failing) DB write, then exits. We then assert no
+// notification arrived. Avoids the timing-dependent "wait 100ms"
+// approach that would flake on slow CI.
+func TestRunWork_DBFailureDoesNotNotifyListeners(t *testing.T) {
+	ctx := context.Background()
+	mockQ := new(mocks.MockQuerier)
+	m := NewManager(mockQ, newTestLogger())
+
+	mockQ.On("CreateOperation", ctx, mock.MatchedBy(func(p db.CreateOperationParams) bool {
+		return p.Prefix == "test"
+	})).Return(db.Operation{Prefix: "test"}, nil)
+
+	// CompleteOperation fails AND signals when it has fired so the test
+	// knows runWork has finished its post-work bookkeeping. Without
+	// that signal we'd have to wait an arbitrary amount of time.
+	completeFired := make(chan struct{})
+	mockQ.On("CompleteOperation", mock.Anything, mock.Anything).
+		Return(db.Operation{}, errors.New("db connection lost")).
+		Run(func(args mock.Arguments) { close(completeFired) })
+
+	release := make(chan struct{})
+	op, err := m.CreateAndRun(ctx, "test", nil, func(_ context.Context, _ Progress) (proto.Message, error) {
+		<-release
+		return nil, nil
+	})
+	require.NoError(t, err)
+
+	// Subscribe a listener BEFORE the goroutine returns.
+	opID, err := uuid.Parse(op.GetName()[len("operations/test/"):])
+	require.NoError(t, err)
+	ch := make(chan struct{}, 1)
+	m.mu.Lock()
+	m.listeners[opID] = []chan struct{}{ch}
+	m.mu.Unlock()
+
+	close(release)
+
+	// Wait deterministically for runWork to reach the DB write.
+	select {
+	case <-completeFired:
+	case <-time.After(2 * time.Second):
+		t.Fatal("CompleteOperation was never called — runWork didn't finish")
+	}
+
+	// The DB write failed; listener must NOT have been notified.
+	select {
+	case <-ch:
+		t.Fatal("listener was notified despite DB failure — a stuck operation would never recover")
+	default:
+		// good: no notification
+	}
+}
+
+func TestCancelLocal_NoOpOnEmpty(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	m := NewManager(mockQ, newTestLogger())
+	// Should not panic, no DB calls.
+	m.CancelLocal()
 	mockQ.AssertExpectations(t)
 }
 

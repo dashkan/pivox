@@ -51,6 +51,13 @@ type Manager struct {
 
 	mu        sync.Mutex
 	listeners map[uuid.UUID][]chan struct{}
+	// running maps op id → cancel fn for the goroutine running its
+	// WorkFunc. CancelOperation calls the registered fn so the work
+	// goroutine sees ctx.Done() and aborts; without this, marking the
+	// DB row done is just a label and the goroutine runs to
+	// completion, overwriting the cancel state on success. The map
+	// is populated when runWork starts and cleared when it returns.
+	running map[uuid.UUID]context.CancelFunc
 }
 
 // NewManager creates a new LRO manager.
@@ -59,6 +66,7 @@ func NewManager(queries db.Querier, logger *slog.Logger) *Manager {
 		queries:   queries,
 		logger:    logger,
 		listeners: make(map[uuid.UUID][]chan struct{}),
+		running:   make(map[uuid.UUID]context.CancelFunc),
 	}
 }
 
@@ -132,10 +140,38 @@ func (m *Manager) createAndRun(ctx context.Context, prefix string, orgID pgtype.
 }
 
 func (m *Manager) runWork(opID uuid.UUID, work WorkFunc) {
-	ctx := context.Background()
+	// Two contexts:
+	//  - workCtx: cancellable, passed to the WorkFunc. CancelOperation
+	//    invokes the registered cancel fn so the work observes
+	//    ctx.Done() and aborts. Without this hook, CancelOperation
+	//    only marks the DB row and the goroutine runs to completion,
+	//    silently overwriting the cancel state on success.
+	//  - cleanupCtx: a separate Background context used for the final
+	//    Complete/Fail DB write. Cancellation must not block the
+	//    bookkeeping that records why the work stopped.
+	workCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	cleanupCtx := context.Background()
+
+	m.mu.Lock()
+	m.running[opID] = cancel
+	m.mu.Unlock()
+	defer func() {
+		m.mu.Lock()
+		delete(m.running, opID)
+		m.mu.Unlock()
+	}()
 
 	progress := &managerProgress{m: m, opID: opID}
-	result, err := work(ctx, progress)
+	result, err := work(workCtx, progress)
+	ctx := cleanupCtx
+	// dbDone tracks whether the bookkeeping row has been written
+	// (done=true). Listeners are only notified when this is true —
+	// otherwise WaitOperation would wake up, observe done=false, and
+	// the caller would see a stuck operation. A DB-write failure
+	// here is recovered on the next server restart via
+	// RecoverPending; we log loudly so the failure is investigable.
+	dbDone := false
 	if err != nil {
 		errCode := int32(codes.Internal)
 		errMsg := err.Error()
@@ -148,7 +184,10 @@ func (m *Manager) runWork(opID uuid.UUID, work WorkFunc) {
 			ErrorCode:    pgtype.Int4{Int32: errCode, Valid: true},
 			ErrorMessage: pgtype.Text{String: errMsg, Valid: true},
 		}); dbErr != nil {
-			m.logger.Error("failed to mark operation as failed", "op", opID, "error", dbErr)
+			m.logger.Error("lro: FailOperation DB write failed; row stuck done=false until RecoverPending",
+				"op", opID, "error", dbErr)
+		} else {
+			dbDone = true
 		}
 	} else {
 		var resultJSON json.RawMessage
@@ -156,13 +195,17 @@ func (m *Manager) runWork(opID uuid.UUID, work WorkFunc) {
 			var marshalErr error
 			resultJSON, marshalErr = marshalAny(result)
 			if marshalErr != nil {
-				m.logger.Error("failed to marshal operation result", "op", opID, "error", marshalErr)
+				m.logger.Error("lro: marshal operation result failed", "op", opID, "error", marshalErr)
 				if _, dbErr := m.queries.FailOperation(ctx, db.FailOperationParams{
 					ID:           opID,
 					ErrorCode:    pgtype.Int4{Int32: int32(codes.Internal), Valid: true},
 					ErrorMessage: pgtype.Text{String: "marshal result: " + marshalErr.Error(), Valid: true},
 				}); dbErr != nil {
-					m.logger.Error("failed to mark operation as failed after marshal error", "op", opID, "error", dbErr)
+					m.logger.Error("lro: FailOperation (marshal-error path) DB write failed; row stuck done=false until RecoverPending",
+						"op", opID, "error", dbErr)
+				} else {
+					dbDone = true
+					m.notifyListeners(opID)
 				}
 				return
 			}
@@ -171,11 +214,16 @@ func (m *Manager) runWork(opID uuid.UUID, work WorkFunc) {
 			ID:     opID,
 			Result: resultJSON,
 		}); dbErr != nil {
-			m.logger.Error("failed to complete operation", "op", opID, "error", dbErr)
+			m.logger.Error("lro: CompleteOperation DB write failed; row stuck done=false until RecoverPending",
+				"op", opID, "error", dbErr)
+		} else {
+			dbDone = true
 		}
 	}
 
-	m.notifyListeners(opID)
+	if dbDone {
+		m.notifyListeners(opID)
+	}
 }
 
 // parseOperationName extracts the UUID from "operations/{prefix}/{uuid}" or "operations/{uuid}".
@@ -300,12 +348,37 @@ func (m *Manager) DeleteOperation(ctx context.Context, name string) error {
 	return nil
 }
 
-// CancelOperation cancels a running operation.
+// CancelOperation cancels a running operation. Two-step:
+//  1. Cancel the in-flight goroutine (if any) by invoking the
+//     context.CancelFunc registered in runWork. The goroutine sees
+//     ctx.Done() and aborts; runWork then writes the failure to the
+//     DB via FailOperation as part of its normal exit path.
+//  2. Best-effort write `done=true, error=Cancelled` to the DB. This
+//     covers the case where the goroutine isn't on this replica
+//     (cross-replica cancellation) — without it, a cancel issued from
+//     a different server would only mark intent locally.
+//
+// When the goroutine IS local, both writes happen and the second one
+// is absorbed (race-safe SQL refuses to flip an already-done row).
+// When the goroutine is on another replica, only step 2 runs; the
+// remote goroutine continues until it next checks ctx.Done() / makes
+// a DB call that observes the cancelled row.
 func (m *Manager) CancelOperation(ctx context.Context, name string) error {
 	opID, err := parseOperationName(name)
 	if err != nil {
 		return apierr.InvalidArgument(apierr.FieldViolation("name", err.Error()))
 	}
+
+	// Step 1: cancel the in-flight goroutine on this replica, if any.
+	m.mu.Lock()
+	cancel, ok := m.running[opID]
+	m.mu.Unlock()
+	if ok {
+		cancel()
+	}
+
+	// Step 2: mark the DB row done. Race-safe: only flips
+	// done=false → done=true.
 	_, err = m.queries.CancelOperation(ctx, opID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -319,6 +392,30 @@ func (m *Manager) CancelOperation(ctx context.Context, name string) error {
 	}
 	m.notifyListeners(opID)
 	return nil
+}
+
+// CancelLocal fires the cancel func for any of the supplied opIDs
+// that are running on THIS replica. No DB write — callers use this
+// after a bulk SQL UPDATE has already marked the rows done. The bulk
+// SQL handles cross-replica completion (other replicas' goroutines
+// see ErrNoRows on their next DB poll); CancelLocal handles the
+// in-replica goroutines that would otherwise run to completion
+// before noticing the row was cancelled.
+func (m *Manager) CancelLocal(opIDs ...uuid.UUID) {
+	if len(opIDs) == 0 {
+		return
+	}
+	m.mu.Lock()
+	cancels := make([]context.CancelFunc, 0, len(opIDs))
+	for _, id := range opIDs {
+		if c, ok := m.running[id]; ok {
+			cancels = append(cancels, c)
+		}
+	}
+	m.mu.Unlock()
+	for _, c := range cancels {
+		c()
+	}
 }
 
 // RecoverPending marks any pending (non-done) operations as failed on startup.

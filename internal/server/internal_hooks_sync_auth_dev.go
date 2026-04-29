@@ -23,20 +23,27 @@ func NewInternalHooks(
 	cfg config.SyncAuthConfig,
 	dcfg config.DelegatedAuthConfig,
 	rateLimitEnabled bool,
+	trustedProxies []string,
 	logger *slog.Logger,
 	auth authn.Service,
 ) (*InternalHooks, error) {
+	prefixes, err := parseTrustedProxies(trustedProxies)
+	if err != nil {
+		return nil, err
+	}
 	h := &InternalHooks{
 		queries:          queries,
 		logger:           logger,
 		auth:             auth,
 		delegatedAuth:    dcfg,
 		rateLimitEnabled: rateLimitEnabled,
+		trustedProxies:   prefixes,
 		exchangeLimiter:  newIPRateLimiter(rate.Every(6*time.Second), 10),
 		// See internal_hooks_sync_auth.go for the rationale behind each limiter.
 		delegatedCreateLimiter:   newIPRateLimiter(rate.Every(10*time.Second), 3),
 		delegatedCompleteLimiter: newIPRateLimiter(rate.Every(6*time.Second), 10),
 		delegatedPollLimiter:     newIPRateLimiter(rate.Every(3*time.Second), 5),
+		resolveProviderLimiter:   newIPRateLimiter(rate.Every(2*time.Second), 10),
 	}
 	h.syncAuth = requireSecret(cfg.SharedSecret)
 	return h, nil

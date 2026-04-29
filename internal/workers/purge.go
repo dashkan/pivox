@@ -58,33 +58,11 @@ func (w *PurgeWorker) Run(ctx context.Context) error {
 	return loop(ctx, w.logger, w.Name(), w.interval, w.tick)
 }
 
-// tick runs a single scan-and-purge pass under the advisory lock.
+// tick takes the advisory lock and delegates to processBatch.
 // Errors are logged but never returned: a transient DB hiccup
 // shouldn't kill the worker.
 func (w *PurgeWorker) tick(ctx context.Context) {
-	acquired, err := withAdvisoryLock(ctx, w.pool, purgeWorkerLockID, func(workCtx context.Context) error {
-		orgs, err := w.queries.ListOrgsPastPurgeTime(workCtx)
-		if err != nil {
-			return err
-		}
-		if len(orgs) == 0 {
-			return nil
-		}
-		w.logger.Info("purge: cascading orgs past grace window", "count", len(orgs))
-		for _, o := range orgs {
-			// PurgeExpiredOrganization is the race-safe variant: it
-			// only fires on a row that's still soft-deleted with an
-			// elapsed purge_time. A concurrent UndeleteOrganization
-			// between the list and this delete is absorbed (no rows
-			// affected, no error from :exec).
-			if err := w.queries.PurgeExpiredOrganization(workCtx, o.ID); err != nil {
-				w.logger.Error("purge: PurgeExpiredOrganization failed", "org", o.Name, "error", err)
-				continue // proceed with the rest; stuck row will surface again next tick
-			}
-			w.logger.Info("purge: org cascaded", "org", o.Name)
-		}
-		return nil
-	})
+	acquired, err := withAdvisoryLock(ctx, w.pool, purgeWorkerLockID, w.processBatch)
 	if err != nil {
 		w.logger.Error("purge: tick failed", "error", err)
 		return
@@ -96,4 +74,31 @@ func (w *PurgeWorker) tick(ctx context.Context) {
 		// worker-not-running, which makes ops debugging painful.
 		w.logger.Debug("purge: skipped (advisory lock held by peer)")
 	}
+}
+
+// processBatch lists orgs past their purge window and cascades each
+// one. Split out so tests can exercise the inner logic without
+// needing a real *pgxpool.Pool for the advisory lock.
+func (w *PurgeWorker) processBatch(ctx context.Context) error {
+	orgs, err := w.queries.ListOrgsPastPurgeTime(ctx)
+	if err != nil {
+		return err
+	}
+	if len(orgs) == 0 {
+		return nil
+	}
+	w.logger.Info("purge: cascading orgs past grace window", "count", len(orgs))
+	for _, o := range orgs {
+		// PurgeExpiredOrganization is the race-safe variant: it
+		// only fires on a row that's still soft-deleted with an
+		// elapsed purge_time. A concurrent UndeleteOrganization
+		// between the list and this delete is absorbed (no rows
+		// affected, no error from :exec).
+		if err := w.queries.PurgeExpiredOrganization(ctx, o.ID); err != nil {
+			w.logger.Error("purge: PurgeExpiredOrganization failed", "org", o.Name, "error", err)
+			continue // proceed with the rest; stuck row will surface again next tick
+		}
+		w.logger.Info("purge: org cascaded", "org", o.Name)
+	}
+	return nil
 }

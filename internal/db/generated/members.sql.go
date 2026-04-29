@@ -468,8 +468,15 @@ SELECT om.id, om.org_id, om.role_id, om.principal_kind, om.principal_id, om.etag
   JOIN roles r ON r.id = om.role_id
  WHERE om.org_id = $1
  ORDER BY om.create_time, om.id
- LIMIT 1000
+ OFFSET $2::bigint
+ LIMIT $3::bigint
 `
+
+type ListOrgMembersParams struct {
+	OrgID  uuid.UUID `json:"org_id"`
+	Offset int64     `json:"offset"`
+	Limit  int64     `json:"limit"`
+}
 
 type ListOrgMembersRow struct {
 	ID            uuid.UUID     `json:"id"`
@@ -486,12 +493,14 @@ type ListOrgMembersRow struct {
 	RoleName      string        `json:"role_name"`
 }
 
-// Lists all org-scope role bindings for an org. Ordered by create_time
-// so paging by row position is stable. v1 caps the result at 1000 in
-// the handler since system-role member counts in normal orgs are far
-// below that; cursor-based paging is added when needed.
-func (q *Queries) ListOrgMembers(ctx context.Context, orgID uuid.UUID) ([]ListOrgMembersRow, error) {
-	rows, err := q.db.Query(ctx, listOrgMembers, orgID)
+// Lists org-scope role bindings for an org with offset-based
+// pagination. Ordered by (create_time, id) so paging is stable under
+// concurrent inserts. The handler converts AIP-132 page_token /
+// page_size into the offset / limit args here. Caller asks for
+// limit+1 rows to detect "more pages exist" without a separate count
+// query; the handler trims the extra row before responding.
+func (q *Queries) ListOrgMembers(ctx context.Context, arg ListOrgMembersParams) ([]ListOrgMembersRow, error) {
+	rows, err := q.db.Query(ctx, listOrgMembers, arg.OrgID, arg.Offset, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -576,8 +585,15 @@ SELECT sm.id, sm.space_id, sm.role_id, sm.principal_kind, sm.principal_id, sm.et
   JOIN roles r ON r.id = sm.role_id
  WHERE sm.space_id = $1
  ORDER BY sm.create_time, sm.id
- LIMIT 1000
+ OFFSET $2::bigint
+ LIMIT $3::bigint
 `
+
+type ListSpaceMembersParams struct {
+	SpaceID uuid.UUID `json:"space_id"`
+	Offset  int64     `json:"offset"`
+	Limit   int64     `json:"limit"`
+}
 
 type ListSpaceMembersRow struct {
 	ID            uuid.UUID     `json:"id"`
@@ -595,9 +611,10 @@ type ListSpaceMembersRow struct {
 }
 
 // Companion to ListOrgMembers at space scope. Same direct-only
-// semantic as GetSpaceMember.
-func (q *Queries) ListSpaceMembers(ctx context.Context, spaceID uuid.UUID) ([]ListSpaceMembersRow, error) {
-	rows, err := q.db.Query(ctx, listSpaceMembers, spaceID)
+// semantic as GetSpaceMember and the same offset+limit pagination
+// contract.
+func (q *Queries) ListSpaceMembers(ctx context.Context, arg ListSpaceMembersParams) ([]ListSpaceMembersRow, error) {
+	rows, err := q.db.Query(ctx, listSpaceMembers, arg.SpaceID, arg.Offset, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
