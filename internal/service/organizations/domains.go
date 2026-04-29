@@ -68,6 +68,24 @@ func effectiveDomainPollInterval() time.Duration {
 	return domainPollInterval
 }
 
+// graceForTest mirrors pollIntervalForTest for the verification
+// grace window. Production uses domainVerificationGrace (7 days);
+// tests exercising the EXPIRED path set this to a sub-second value
+// so the LRO ticks past the deadline without the test sleeping
+// for a week.
+var graceForTest time.Duration
+
+// SetDomainVerificationGraceForTest is the test-only override for
+// the verification grace window. Pass 0 to reset.
+func SetDomainVerificationGraceForTest(d time.Duration) { graceForTest = d }
+
+func effectiveDomainVerificationGrace() time.Duration {
+	if graceForTest > 0 {
+		return graceForTest
+	}
+	return domainVerificationGrace
+}
+
 // CreateDomain claims a DNS domain on behalf of the organization.
 // Issues a verification token (random 32-byte value, unpadded
 // base64url-encoded), inserts the domains row in PENDING state,
@@ -125,7 +143,7 @@ func (s *OrganizationsServer) CreateDomain(ctx context.Context, req *apiv1.Creat
 		VerificationToken: token,
 		Domain:            domainResource,
 	}
-	deadline := time.Now().Add(domainVerificationGrace)
+	deadline := time.Now().Add(effectiveDomainVerificationGrace())
 	domainID := domain.ID
 	orgID := resolvedOrg.ID
 	orgSlug := resolvedOrg.Slug
