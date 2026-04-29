@@ -449,7 +449,7 @@ plan is obsolete.)
       already gone. Out-of-process, lives in `deployments/firebase/functions/`;
       separate commit.
 
-### Step 6 — Workers (purge + verify-DNS), in-process
+### Step 6 — Workers (purge + verify-DNS), in-process ✅
 
 > **DNS verification is mocked for v1.** The stub resolver returns
 > "TXT matches" unconditionally (sub-decision #10). `CreateDomain` LRO
@@ -458,21 +458,36 @@ plan is obsolete.)
 > external admin uses SSO. Do not implement real DNS polling in this
 > phase — ship the stub, document the gap, move on.
 
-- [ ] New `internal/workers/` package. `type PurgeWorker struct{}`,
-      `type VerifyDomainWorker struct{}`, both expose `Run(ctx) error`.
-- [ ] Dependencies (db queries, logger, config, dns resolver) injected; no
-      reach into HTTP/gRPC server internals. Trivially transferable to a
-      dedicated `cmd/pivox-purge-worker/` binary later (sub-decision #9).
-- [ ] Purge worker: scans orgs past `purge_time`, drives final cascade, frees slug.
-- [ ] Verify-DNS worker: ticks `CreateDomain` LROs to VERIFIED via the stub
-      resolver. Backoff schedule (2 min × 1h → 30 min × 24h → 6h × 6d → EXPIRED)
-      is wire-only — when real DNS lands, the same schedule applies.
-- [ ] Postgres advisory lock so multi-replica deploys safely have one active
-      worker per type at a time.
-- [ ] `DNSResolver` interface in `internal/workers/`. Stub impl
-      (`StubDNSResolver`) always returns the expected TXT record, logged at
-      INFO so it's obvious the verification is faked. Real impl deferred
-      until pre-prod SSO go-live.
+- [x] New `internal/workers/` package. `PurgeWorker` and
+      `VerifyDomainWorker`, both expose `Run(ctx) error`. Common `loop`
+      helper, `RunAll(ctx, logger, ws...)` for fleet startup.
+- [x] Dependencies (`*pgxpool.Pool`, `db.Querier`, logger, DNSResolver,
+      tick interval) injected; no reach into HTTP/gRPC server internals.
+      Trivially transferable to a dedicated `cmd/pivox-purge-worker/` binary
+      later (sub-decision #9).
+- [x] Purge worker: scans `ListOrgsPastPurgeTime`, drives final cascade
+      via `PurgeOrganization`. FK ON DELETE CASCADE handles children.
+      Slug freed on row delete (UNIQUE constraint on `organizations.name`).
+      Per-row failure logged + skipped so a stuck row doesn't stall the batch.
+- [x] Verify-DNS worker: ticks PENDING domains to VERIFIED via the
+      stub `LookupTXT`. Lookup failure / empty-record path keeps the row
+      PENDING for retry next tick. Backoff schedule (2 min × 1h → 30 min × 24h
+      → 6h × 6d → EXPIRED) is wire-only this phase — with the stub every tick
+      "succeeds", so backoff has no observable effect; the real-DNS commit
+      grows the schedule into actual per-row state.
+- [x] Postgres advisory lock per worker type via
+      `withAdvisoryLock(pool, lockID, work)`. Session-scoped via a held
+      pool connection; auto-released if the conn is returned to the pool
+      mid-flight. Distinct lock IDs in `advisory_lock.go` (`purgeWorkerLockID`,
+      `verifyDomainWorkerLockID`) so different worker types don't serialize
+      against each other.
+- [x] `DNSResolver` interface + `StubDNSResolver` impl. Always returns a
+      single fake TXT record. Logged at INFO on every call so production
+      telemetry makes the fake DNS path obvious. Real impl deferred until
+      pre-prod SSO go-live.
+- [x] Wired in `cmd/pivox-cloud/main.go`: workers run alongside the gRPC
+      server via `workers.RunAll`; ctx cancellation stops both, WaitGroup
+      blocks the binary until they exit.
 
 ### Step 7 — Domain RPC handlers
 

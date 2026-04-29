@@ -186,6 +186,31 @@ func (m *MockQuerier) GetFirebaseIdentityByID(ctx context.Context, id uuid.UUID)
 	return args.Get(0).(db.FirebaseIdentity), args.Error(1)
 }
 
+func (m *MockQuerier) ListOrgsPastPurgeTime(ctx context.Context) ([]db.Organization, error) {
+	args := m.Called(ctx)
+	return args.Get(0).([]db.Organization), args.Error(1)
+}
+
+func (m *MockQuerier) PurgeExpiredOrganization(ctx context.Context, id uuid.UUID) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
+func (m *MockQuerier) ListPendingDomains(ctx context.Context) ([]db.Domain, error) {
+	args := m.Called(ctx)
+	return args.Get(0).([]db.Domain), args.Error(1)
+}
+
+func (m *MockQuerier) MarkDomainVerified(ctx context.Context, id uuid.UUID) (db.Domain, error) {
+	args := m.Called(ctx, id)
+	return args.Get(0).(db.Domain), args.Error(1)
+}
+
+func (m *MockQuerier) MarkDomainFailed(ctx context.Context, id uuid.UUID) (db.Domain, error) {
+	args := m.Called(ctx, id)
+	return args.Get(0).(db.Domain), args.Error(1)
+}
+
 // --- Users (per-org membership) ---
 
 func (m *MockQuerier) CreateUserMembership(ctx context.Context, arg db.CreateUserMembershipParams) (db.User, error) {

@@ -293,6 +293,19 @@ type Querier interface {
 	// soft-deleted user rows. No pagination — typical users are in 1-3
 	// orgs. The 1000-row LIMIT is a defensive backstop.
 	ListOrganizationsForFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) ([]Organization, error)
+	// ListOrgsPastPurgeTime returns soft-deleted orgs whose purge_time
+	// has elapsed. Used by PurgeWorker to drive the final cascade
+	// (DELETE FROM organizations + FK CASCADE) for orgs that finished
+	// their 30-day grace window without being undeleted. The 100-row
+	// LIMIT bounds the per-tick batch size — multi-replica deploys can
+	// run several worker instances; advisory locks ensure only one
+	// runs at a time per cluster.
+	ListOrgsPastPurgeTime(ctx context.Context) ([]Organization, error)
+	// ListPendingDomains returns all domains in PENDING state, ordered
+	// by oldest-first. Used by VerifyDomainWorker to drive PENDING →
+	// VERIFIED transitions. The 1000-row LIMIT is a defensive backstop
+	// (real load is well below that — every active org has 0–3 domains).
+	ListPendingDomains(ctx context.Context) ([]Domain, error)
 	ListPendingOperations(ctx context.Context) ([]Operation, error)
 	// Returns the entire global permission catalog. Static / code-defined
 	// in v1 (seeded by the migration); the Iam.ListPermissions RPC just
@@ -328,11 +341,28 @@ type Querier interface {
 	ListUsersByFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) ([]User, error)
 	ListUsersByOrg(ctx context.Context, orgID uuid.UUID) ([]User, error)
 	LookupApiKeyByKeyString(ctx context.Context, keyString string) (ApiKey, error)
+	// MarkDomainFailed flips a PENDING domain to FAILED. Same race-
+	// safety as MarkDomainVerified.
+	MarkDomainFailed(ctx context.Context, id uuid.UUID) (Domain, error)
+	// MarkDomainVerified flips a PENDING domain to VERIFIED, sets
+	// verified_time, and bumps revision/etag. Refuses to fire on a
+	// non-PENDING row so a race with a concurrent FAILED transition is
+	// absorbed (returns no rows).
+	MarkDomainVerified(ctx context.Context, id uuid.UUID) (Domain, error)
 	NextVersionNumber(ctx context.Context, assetID uuid.UUID) (int32, error)
-	// PurgeOrganization hard-deletes an org row. FK ON DELETE CASCADE
-	// removes spaces, members, domains, sso_configs, assets, requests,
-	// tags, api keys, and ai conversations transitively. Used by force=true
-	// DeleteOrganization and by the purge worker after grace expiry.
+	// PurgeExpiredOrganization is the purge-worker variant: deletes
+	// only soft-deleted orgs whose grace window has elapsed. The WHERE
+	// clause race-guards against a concurrent UndeleteOrganization
+	// that could fire between ListOrgsPastPurgeTime and this DELETE —
+	// a restored-to-ACTIVE org is left alone, matching the user's
+	// intent (they undeleted just before purge).
+	PurgeExpiredOrganization(ctx context.Context, id uuid.UUID) error
+	// PurgeOrganization hard-deletes an org row unconditionally. FK ON
+	// DELETE CASCADE removes spaces, members, domains, sso_configs,
+	// assets, requests, tags, api keys, and ai conversations
+	// transitively. Used by force=true DeleteOrganization where the
+	// caller has already validated state and intends to skip the
+	// 30-day grace window.
 	PurgeOrganization(ctx context.Context, id uuid.UUID) error
 	RotateRegistrationToken(ctx context.Context, arg RotateRegistrationTokenParams) (StorageGateway, error)
 	SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]Asset, error)

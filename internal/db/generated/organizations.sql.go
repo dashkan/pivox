@@ -171,14 +171,86 @@ func (q *Queries) GetOrganizationByNameForGate(ctx context.Context, name string)
 	return i, err
 }
 
+const listOrgsPastPurgeTime = `-- name: ListOrgsPastPurgeTime :many
+SELECT id, name, display_name, annotations, created_by_firebase_identity_id, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time FROM organizations
+ WHERE delete_time IS NOT NULL
+   AND purge_time IS NOT NULL
+   AND purge_time < now()
+ ORDER BY purge_time ASC
+ LIMIT 100
+`
+
+// ListOrgsPastPurgeTime returns soft-deleted orgs whose purge_time
+// has elapsed. Used by PurgeWorker to drive the final cascade
+// (DELETE FROM organizations + FK CASCADE) for orgs that finished
+// their 30-day grace window without being undeleted. The 100-row
+// LIMIT bounds the per-tick batch size — multi-replica deploys can
+// run several worker instances; advisory locks ensure only one
+// runs at a time per cluster.
+func (q *Queries) ListOrgsPastPurgeTime(ctx context.Context) ([]Organization, error) {
+	rows, err := q.db.Query(ctx, listOrgsPastPurgeTime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Organization{}
+	for rows.Next() {
+		var i Organization
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.DisplayName,
+			&i.Annotations,
+			&i.CreatedByFirebaseIdentityID,
+			&i.State,
+			&i.Etag,
+			&i.Revision,
+			&i.CreatedBy,
+			&i.UpdatedBy,
+			&i.DeletedBy,
+			&i.CreateTime,
+			&i.UpdateTime,
+			&i.DeleteTime,
+			&i.PurgeTime,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const purgeExpiredOrganization = `-- name: PurgeExpiredOrganization :exec
+DELETE FROM organizations
+ WHERE id = $1
+   AND delete_time IS NOT NULL
+   AND purge_time < now()
+`
+
+// PurgeExpiredOrganization is the purge-worker variant: deletes
+// only soft-deleted orgs whose grace window has elapsed. The WHERE
+// clause race-guards against a concurrent UndeleteOrganization
+// that could fire between ListOrgsPastPurgeTime and this DELETE —
+// a restored-to-ACTIVE org is left alone, matching the user's
+// intent (they undeleted just before purge).
+func (q *Queries) PurgeExpiredOrganization(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, purgeExpiredOrganization, id)
+	return err
+}
+
 const purgeOrganization = `-- name: PurgeOrganization :exec
 DELETE FROM organizations WHERE id = $1
 `
 
-// PurgeOrganization hard-deletes an org row. FK ON DELETE CASCADE
-// removes spaces, members, domains, sso_configs, assets, requests,
-// tags, api keys, and ai conversations transitively. Used by force=true
-// DeleteOrganization and by the purge worker after grace expiry.
+// PurgeOrganization hard-deletes an org row unconditionally. FK ON
+// DELETE CASCADE removes spaces, members, domains, sso_configs,
+// assets, requests, tags, api keys, and ai conversations
+// transitively. Used by force=true DeleteOrganization where the
+// caller has already validated state and intends to skip the
+// 30-day grace window.
 func (q *Queries) PurgeOrganization(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, purgeOrganization, id)
 	return err

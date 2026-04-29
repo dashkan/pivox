@@ -37,6 +37,7 @@ import (
 	"github.com/dashkan/pivox/internal/service/spaces"
 	"github.com/dashkan/pivox/internal/service/storage"
 	"github.com/dashkan/pivox/internal/service/tags"
+	"github.com/dashkan/pivox/internal/workers"
 
 	"github.com/dashkan/pivox/internal/service/aichat"
 	"github.com/dashkan/pivox/internal/service/aichat/model"
@@ -195,6 +196,17 @@ func serve(cmd *cobra.Command, args []string) error {
 			logger.Error("reaper stopped", "error", err)
 		}
 	}()
+
+	// Background workers: org/user purge cascade and domain
+	// verification. Both use Postgres advisory locks so multi-replica
+	// deploys leave at most one active worker per type at a time.
+	// DNS verification is mocked via StubDNSResolver per the locked
+	// IAM-roadmap decision; the real net.Resolver-backed impl wires
+	// in before pre-prod SSO go-live.
+	purgeWorker := workers.NewPurgeWorker(pool, queries, logger, 5*time.Minute)
+	verifyDomainWorker := workers.NewVerifyDomainWorker(pool, queries, workers.NewStubDNSResolver(logger), logger, 2*time.Minute)
+	workersWG := workers.RunAll(ctx, logger, purgeWorker, verifyDomainWorker)
+	defer workersWG.Wait()
 
 	// Cleanup loop for short-lived auth artifacts (deposit codes + delegated
 	// auth sessions). Runs inline rather than in its own package because the

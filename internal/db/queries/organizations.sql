@@ -48,12 +48,41 @@ SET state       = 'ACTIVE',
 WHERE id = $1 AND state = 'DELETE_REQUESTED' AND purge_time > now()
 RETURNING *;
 
--- PurgeOrganization hard-deletes an org row. FK ON DELETE CASCADE
--- removes spaces, members, domains, sso_configs, assets, requests,
--- tags, api keys, and ai conversations transitively. Used by force=true
--- DeleteOrganization and by the purge worker after grace expiry.
+-- PurgeOrganization hard-deletes an org row unconditionally. FK ON
+-- DELETE CASCADE removes spaces, members, domains, sso_configs,
+-- assets, requests, tags, api keys, and ai conversations
+-- transitively. Used by force=true DeleteOrganization where the
+-- caller has already validated state and intends to skip the
+-- 30-day grace window.
 -- name: PurgeOrganization :exec
 DELETE FROM organizations WHERE id = $1;
+
+-- PurgeExpiredOrganization is the purge-worker variant: deletes
+-- only soft-deleted orgs whose grace window has elapsed. The WHERE
+-- clause race-guards against a concurrent UndeleteOrganization
+-- that could fire between ListOrgsPastPurgeTime and this DELETE —
+-- a restored-to-ACTIVE org is left alone, matching the user's
+-- intent (they undeleted just before purge).
+-- name: PurgeExpiredOrganization :exec
+DELETE FROM organizations
+ WHERE id = $1
+   AND delete_time IS NOT NULL
+   AND purge_time < now();
+
+-- ListOrgsPastPurgeTime returns soft-deleted orgs whose purge_time
+-- has elapsed. Used by PurgeWorker to drive the final cascade
+-- (DELETE FROM organizations + FK CASCADE) for orgs that finished
+-- their 30-day grace window without being undeleted. The 100-row
+-- LIMIT bounds the per-tick batch size — multi-replica deploys can
+-- run several worker instances; advisory locks ensure only one
+-- runs at a time per cluster.
+-- name: ListOrgsPastPurgeTime :many
+SELECT * FROM organizations
+ WHERE delete_time IS NOT NULL
+   AND purge_time IS NOT NULL
+   AND purge_time < now()
+ ORDER BY purge_time ASC
+ LIMIT 100;
 
 -- CancelRunningOpsForOrg marks all running operations linked to the
 -- given org (via the operations.org_id reverse pointer) as
