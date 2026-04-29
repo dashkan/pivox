@@ -602,20 +602,41 @@ All resolved in this step before moving on to integration tests.
   ~1500 LOC of net-new test code. Tracked as Step 9 to keep the
   audit-fix diff focused and reviewable.
 
-### Phase 4 exit criteria — Step 9 (integration tests, deferred)
+### Phase 4 exit criteria — Step 9 (integration tests) ✅
 
-- [ ] All new/changed RPCs covered by integration tests.
-- [ ] Permission interceptor tests cover org+space, user+group, inheritance, deny paths.
-- [ ] Soft-delete → revive end-to-end test.
-- [ ] `DeleteUser` blocking → unblock-via-transfer / unblock-via-org-delete tests.
+Built on a shared end-to-end test harness in
+`internal/testutil/grpcharness/` (real Postgres testcontainer + the
+production interceptor chain: Auth + MembershipRequired + Permission
++ Validate). Each item below is a separate commit; the harness is
+reusable by Phase 5+ space-scoped tests without modification.
+
+- [x] All new/changed RPCs covered by integration tests. (Lifecycle,
+      Member CRUD, Domain LRO, DeleteUser/DeleteAccount split,
+      permission matrix — see items below.)
+- [x] Permission interceptor tests cover org+space, user+group,
+      inheritance, deny paths. (`internal/server/permission_e2e_test.go`)
+- [x] Soft-delete → revive end-to-end test.
+      (`internal/service/organizations/lifecycle_e2e_test.go`)
+- [x] `DeleteAccount` blocking → unblock-via-transfer /
+      unblock-via-org-delete tests. (`internal/service/iam/lifecycle_e2e_test.go`
+      — also covers the org-scoped `DeleteUser` after the A2 split.)
 - [x] `UpdateSsoConfig` → Firebase Admin SDK side-effect test (with mock).
       (Covered by the existing unit tests in
       `internal/service/organizations/sso_test.go`, which exercise the
       full handler against a mock implementing `authn.Service` —
       including the create-or-update fallback for both OIDC and SAML.)
-- [ ] `CreateDomain` LRO drives PENDING → VERIFIED → EXPIRED through stubbed DNS resolver.
-- [ ] Native macOS app rebuilds against regenerated stubs.
+- [x] `CreateDomain` LRO drives PENDING → VERIFIED → EXPIRED through
+      stubbed DNS resolver. (`internal/service/organizations/domains_e2e_test.go`)
+- [x] Native macOS app rebuilds against regenerated stubs.
+      Verified via `xcodebuild build -project build-xcode/Pivox.xcodeproj
+      -scheme Pivox` — clean BUILD SUCCEEDED including the new
+      `Iam.DeleteAccount` RPC + `accounts/me` resource stubs.
 - [ ] `make build && go test ./... && make api-lint && make lint` clean.
+      (Open: `internal/service/aichat` build-fail and
+      `internal/storageagent` runtime flake are pre-existing, not
+      Phase-4-introduced. Logged in roadmap "pre-existing test failures"
+      section. `make api-lint` has a pre-existing storage-gateway
+      lint warning unrelated to Phase 4.)
 
 ---
 
