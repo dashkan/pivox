@@ -299,7 +299,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	// user reads, group CRUD, DeleteUser LRO). Scope-divergent IAM
 	// ops (Member CRUD, TransferOwnership, TestIamPermissions) live
 	// on the scope-owning Organizations / Spaces services above.
-	iamv1.RegisterIamServer(grpcServer, iam.NewIamServer(queries, authSvc, callerIdentity, lroManager, permResolver))
+	iamv1.RegisterIamServer(grpcServer, iam.NewIamServer(queries, authSvc, callerIdentity, lroManager))
 
 	// Storage services
 	connMgr := agentstream.NewConnectionManager()

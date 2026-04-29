@@ -42,15 +42,15 @@ var File_pivox_iam_v1_iam_proto protoreflect.FileDescriptor
 
 const file_pivox_iam_v1_iam_proto_rawDesc = "" +
 	"\n" +
-	"\x16pivox/iam/v1/iam.proto\x12\fpivox.iam.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a#google/longrunning/operations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x19pivox/iam/v1/groups.proto\x1a\x1apivox/iam/v1/members.proto\x1a\x1epivox/iam/v1/permissions.proto\x1a\x18pivox/iam/v1/roles.proto\x1a\x18pivox/iam/v1/users.proto\x1a!pivox/permission/v1/options.proto2\xe2\x11\n" +
+	"\x16pivox/iam/v1/iam.proto\x12\fpivox.iam.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a#google/longrunning/operations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x19pivox/iam/v1/groups.proto\x1a\x1apivox/iam/v1/members.proto\x1a\x1epivox/iam/v1/permissions.proto\x1a\x18pivox/iam/v1/roles.proto\x1a\x18pivox/iam/v1/users.proto\x1a!pivox/permission/v1/options.proto2\xde\x11\n" +
 	"\x03Iam\x12|\n" +
 	"\aGetUser\x12\x1c.pivox.iam.v1.GetUserRequest\x1a\x12.pivox.iam.v1.User\"?\xdaA\x04name\x8a\xb5\x18\n" +
 	"users.read\x82\xd3\xe4\x93\x02$\x12\"/v1/{name=organizations/*/users/*}\x12\x8f\x01\n" +
 	"\tListUsers\x12\x1e.pivox.iam.v1.ListUsersRequest\x1a\x1f.pivox.iam.v1.ListUsersResponse\"A\xdaA\x06parent\x8a\xb5\x18\n" +
-	"users.read\x82\xd3\xe4\x93\x02$\x12\"/v1/{parent=organizations/*}/users\x12\xc1\x01\n" +
+	"users.read\x82\xd3\xe4\x93\x02$\x12\"/v1/{parent=organizations/*}/users\x12\xbd\x01\n" +
 	"\n" +
-	"DeleteUser\x12\x1f.pivox.iam.v1.DeleteUserRequest\x1a\x1d.google.longrunning.Operation\"s\xcaA+\n" +
-	"\x15google.protobuf.Empty\x12\x12DeleteUserMetadata\xdaA\x04name\x8a\xb5\x18\x10users.deleteSelf\x82\xd3\xe4\x93\x02$*\"/v1/{name=organizations/*/users/*}\x12|\n" +
+	"DeleteUser\x12\x1f.pivox.iam.v1.DeleteUserRequest\x1a\x1d.google.longrunning.Operation\"o\xcaA+\n" +
+	"\x15google.protobuf.Empty\x12\x12DeleteUserMetadata\xdaA\x04name\x8a\xb5\x18\fusers.delete\x82\xd3\xe4\x93\x02$*\"/v1/{name=organizations/*/users/*}\x12|\n" +
 	"\aGetRole\x12\x1c.pivox.iam.v1.GetRoleRequest\x1a\x12.pivox.iam.v1.Role\"?\xdaA\x04name\x8a\xb5\x18\n" +
 	"roles.read\x82\xd3\xe4\x93\x02$\x12\"/v1/{name=organizations/*/roles/*}\x12\x8f\x01\n" +
 	"\tListRoles\x12\x1e.pivox.iam.v1.ListRolesRequest\x1a\x1f.pivox.iam.v1.ListRolesResponse\"A\xdaA\x06parent\x8a\xb5\x18\n" +

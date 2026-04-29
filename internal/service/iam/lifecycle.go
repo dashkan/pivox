@@ -15,7 +15,6 @@ import (
 	"github.com/dashkan/pivox/internal/apierr"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/lro"
-	"github.com/dashkan/pivox/internal/permission"
 	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	"github.com/dashkan/pivox/internal/server"
 )
@@ -78,34 +77,6 @@ func (s *IamServer) DeleteUser(ctx context.Context, req *iampb.DeleteUserRequest
 		// this guard surfaces the misconfiguration after path
 		// validation runs (so caller-input errors take precedence).
 		return nil, apierr.Internal("DeleteUser is not configured on this server (auth/caller/lroManager deps missing)")
-	}
-
-	// Two-tier permission. The proto annotation gates the RPC with
-	// users.deleteSelf (granted to all roles) so any member can
-	// leave. When the target is NOT the caller, escalate to
-	// users.delete (owner-only) — that's the destructive verb
-	// against arbitrary users. resolveFirebaseIdentityID has
-	// already resolved "me" → caller's identity, so a UID match
-	// here is the self-target signal.
-	callerID, err := s.caller(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if firebaseIdentityID != callerID {
-		if s.resolver == nil {
-			return nil, apierr.Internal("DeleteUser requires permission resolver for cross-user deletes")
-		}
-		ok, err := s.resolver.HasPermission(ctx, callerID,
-			permission.OrgTarget(resolvedOrg.ID), permission.UsersDelete)
-		if err != nil {
-			slog.ErrorContext(ctx, "delete user: resolve users.delete permission failed",
-				"caller", callerID, "org_id", resolvedOrg.ID, "error", err)
-			return nil, apierr.Internal("evaluate users.delete permission")
-		}
-		if !ok {
-			return nil, apierr.PermissionDenied(
-				"users.delete is required to delete another user; only the caller's own account can be deleted with this role")
-		}
 	}
 
 	initialMeta := &iampb.DeleteUserMetadata{

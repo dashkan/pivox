@@ -72,12 +72,8 @@ permissions:
     roles: [owner, admin, editor, viewer]
   - id: users.delete
     display_name: Delete User
-    description: Delete another user globally (LRO; cascades memberships). Owner-only — destructive op against arbitrary users. Self-delete uses users.deleteSelf instead so admins/editors/viewers can leave an org without owner privileges.
+    description: Delete a user globally (LRO; cascades memberships)
     roles: [owner]
-  - id: users.deleteSelf
-    display_name: Delete Self
-    description: Delete one's own user account (LRO; cascades memberships across all orgs). Universally granted so every member can leave. The DeleteUser RPC is annotated with this permission; the handler bumps to users.delete when the target is a different user.
-    roles: [owner, admin, editor, viewer]
   - id: groups.create
     display_name: Create Group
     description: Create new groups

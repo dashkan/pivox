@@ -35,26 +35,19 @@ type IamServer struct {
 	auth       authn.Service
 	caller     server.CallerIdentityResolver
 	lroManager *lro.Manager
-	// resolver evaluates effective permissions for in-handler escalation
-	// checks. DeleteUser uses it for the users.delete bump when the
-	// target is a different user than the caller; the proto annotation
-	// gates everyone with users.deleteSelf, the resolver re-checks
-	// users.delete inside the handler.
-	resolver *permission.Resolver
 }
 
-// NewIamServer constructs the server. The auth/caller/lroManager/
-// resolver deps are required by DeleteUser (a global LRO that ends
-// with a Firebase Auth deletion); read-only handlers
-// (ListPermissions, GetRole, ListRoles) ignore them. Tests that
-// exercise only reads pass nils for the unused deps.
-func NewIamServer(queries db.Querier, auth authn.Service, caller server.CallerIdentityResolver, lroManager *lro.Manager, resolver *permission.Resolver) *IamServer {
+// NewIamServer constructs the server. The auth/caller/lroManager
+// deps are required by DeleteUser (a global LRO that ends with a
+// Firebase Auth deletion); read-only handlers (ListPermissions,
+// GetRole, ListRoles) ignore them. Tests that exercise only reads
+// pass nils for the unused deps.
+func NewIamServer(queries db.Querier, auth authn.Service, caller server.CallerIdentityResolver, lroManager *lro.Manager) *IamServer {
 	return &IamServer{
 		queries:    queries,
 		auth:       auth,
 		caller:     caller,
 		lroManager: lroManager,
-		resolver:   resolver,
 	}
 }
 

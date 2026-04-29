@@ -637,7 +637,7 @@ var GeneratedRegistry = Registry{
 		},
 	},
 	"/pivox.iam.v1.Iam/DeleteUser": {
-		Permission: permission.UsersDeleteSelf,
+		Permission: permission.UsersDelete,
 		Extract: func(req any) (ScopeRef, error) {
 			return ScopeFromPath("name", req.(*iamv1.DeleteUserRequest).GetName())
 		},
