@@ -272,7 +272,7 @@ func newPermissionHarness(t *testing.T) *grpcharness.Harness {
 			permResolver, callerIdentity, h.LROManager, h.Encryptor,
 		))
 		apiv1.RegisterSpacesServer(s, spaces.NewSpacesServer(
-			h.Pool, h.Pool, h.Queries, nil, permResolver, callerIdentity,
+			h.Pool, h.Pool, h.Queries, nil, permResolver, callerIdentity, h.LROManager,
 		))
 		iampb.RegisterIamServer(s, iam.NewIamServer(
 			h.Queries, h.Auth, callerIdentity, h.LROManager,

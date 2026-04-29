@@ -22,6 +22,8 @@ import (
 	"github.com/dashkan/pivox/internal/permission"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	"github.com/dashkan/pivox/internal/server"
+
+	"google.golang.org/protobuf/proto"
 )
 
 // TxBeginner abstracts transaction creation for testability.
@@ -33,31 +35,40 @@ type TxBeginner interface {
 
 type SpacesServer struct {
 	apiv1.UnimplementedSpacesServer
-	db       db.DBTX
-	pool     TxBeginner
-	queries  db.Querier
-	filter   *filter.ResourceFilter
-	codec    *appkey.Codec
-	resolver *permission.Resolver
-	caller   server.CallerIdentityResolver
+	db         db.DBTX
+	pool       TxBeginner
+	queries    db.Querier
+	filter     *filter.ResourceFilter
+	codec      *appkey.Codec
+	resolver   *permission.Resolver
+	caller     server.CallerIdentityResolver
+	lroManager *lro.Manager
 }
 
 // NewSpacesServer constructs the server. `resolver` and `caller` are
 // only consumed by the IAM-shaped handlers (TestIamPermissions and
 // space-scope Member CRUD). `pool` is used for tx-wrapped writes
 // (CreateMember principal validation + insert atomicity); tests that
-// only exercise reads may pass nil.
-func NewSpacesServer(pool db.DBTX, txPool TxBeginner, queries db.Querier, codec *appkey.Codec, resolver *permission.Resolver, caller server.CallerIdentityResolver) *SpacesServer {
+// only exercise reads may pass nil. `lroManager` drives the async
+// orchestrators for DeleteSpace/UndeleteSpace; tests that don't
+// exercise lifecycle paths may pass nil.
+func NewSpacesServer(pool db.DBTX, txPool TxBeginner, queries db.Querier, codec *appkey.Codec, resolver *permission.Resolver, caller server.CallerIdentityResolver, lroManager *lro.Manager) *SpacesServer {
 	return &SpacesServer{
-		db:       pool,
-		pool:     txPool,
-		queries:  queries,
-		filter:   filter.SpaceFilter(),
-		codec:    codec,
-		resolver: resolver,
-		caller:   caller,
+		db:         pool,
+		pool:       txPool,
+		queries:    queries,
+		filter:     filter.SpaceFilter(),
+		codec:      codec,
+		resolver:   resolver,
+		caller:     caller,
+		lroManager: lroManager,
 	}
 }
+
+// spaceLifecyclePrefix is the operation-name prefix for the
+// DeleteSpace / UndeleteSpace LROs. Mirrors orgLifecyclePrefix in
+// the organizations service.
+const spaceLifecyclePrefix = "spaces"
 
 // parseSpaceName parses "organizations/{org}/spaces/{space}" and returns (orgName, spaceName).
 func parseSpaceName(name string) (string, string, error) {
@@ -331,6 +342,16 @@ func (s *SpacesServer) UpdateSpace(ctx context.Context, req *apiv1.UpdateSpaceRe
 	return lro.DoneOperation(convert.SpaceToProto(result, resolvedOrg.Slug))
 }
 
+// DeleteSpace soft-deletes a space (force=false) or hard-deletes it
+// with a synchronous cascade (force=true). Mirrors the
+// DeleteOrganization shape: state validation + etag pinning at the
+// handler, phase-tracked LRO for the actual work. The purge worker
+// (workers.SpacePurgeWorker) runs the soft-delete cascade after
+// `purge_time` for force=false.
+//
+// force=true requires a non-empty etag pinning the row revision the
+// client read — destructive ops that bypass the grace window must
+// match the caller's view.
 func (s *SpacesServer) DeleteSpace(ctx context.Context, req *apiv1.DeleteSpaceRequest) (*longrunningpb.Operation, error) {
 	orgName, spaceName, err := parseSpaceName(req.GetName())
 	if err != nil {
@@ -346,28 +367,105 @@ func (s *SpacesServer) DeleteSpace(ctx context.Context, req *apiv1.DeleteSpaceRe
 		return nil, apierr.FailedPrecondition(
 			"space is not in ACTIVE state; current state is " + string(resolvedSpace.Row.State))
 	}
+	if req.GetForce() && req.GetEtag() == "" {
+		return nil, apierr.FailedPrecondition(
+			"force=true requires a non-empty etag pinning the space revision")
+	}
+	if req.GetEtag() != "" && req.GetEtag() != resolvedSpace.Row.Etag {
+		return nil, apierr.FailedPrecondition(
+			"etag mismatch; refresh the space and retry")
+	}
 
 	caller, err := s.caller(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	result, err := s.queries.SoftDeleteSpace(ctx, db.SoftDeleteSpaceParams{
-		ID:        resolvedSpace.ID,
-		DeletedBy: caller.String(),
+	spaceRsrc := "organizations/" + resolvedOrg.Slug + "/spaces/" + resolvedSpace.Slug
+	deletedBy := caller.String()
+	force := req.GetForce()
+	expectedEtag := resolvedSpace.Row.Etag
+
+	initialMeta := &apiv1.DeleteSpaceMetadata{
+		Phase: apiv1.DeleteSpaceMetadata_VALIDATING,
+		Space: spaceRsrc,
+	}
+
+	return s.lroManager.CreateAndRun(ctx, spaceLifecyclePrefix, initialMeta,
+		func(workCtx context.Context, progress lro.Progress) (proto.Message, error) {
+			return s.runDeleteSpace(workCtx, progress, resolvedSpace.ID, resolvedOrg.Slug, spaceRsrc, deletedBy, force, expectedEtag)
+		})
+}
+
+// runDeleteSpace orchestrates the DeleteSpace LRO. force=false drives
+// MARKING_DELETED → COMPLETED; force=true drives PURGING → COMPLETED.
+// CANCELLING_OPERATIONS is a no-op today (no space-scoped LROs
+// exist) but the phase is reported so callers can observe a stable
+// progression.
+func (s *SpacesServer) runDeleteSpace(
+	ctx context.Context,
+	progress lro.Progress,
+	spaceID uuid.UUID,
+	orgSlug, spaceRsrc, deletedBy string,
+	force bool,
+	expectedEtag string,
+) (proto.Message, error) {
+	updatePhase := func(phase apiv1.DeleteSpaceMetadata_Phase) {
+		progress.Update(ctx, &apiv1.DeleteSpaceMetadata{
+			Phase: phase,
+			Space: spaceRsrc,
+		})
+	}
+
+	if force {
+		// PURGING: hard-delete the space. FK ON DELETE CASCADE
+		// removes space_members, assets, and asset_requests
+		// transitively. Etag-guarded so a concurrent state mutation
+		// between handler validation and LRO worker execution
+		// refuses to purge a row the caller didn't approve.
+		updatePhase(apiv1.DeleteSpaceMetadata_PURGING)
+		if _, err := s.queries.PurgeSpace(ctx, db.PurgeSpaceParams{
+			ID:   spaceID,
+			Etag: expectedEtag,
+		}); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, apierr.FailedPrecondition(
+					"space revision changed since delete was requested; refresh and retry")
+			}
+			slog.ErrorContext(ctx, "delete space: purge failed", "space", spaceRsrc, "error", err)
+			return nil, apierr.Internal("purge space")
+		}
+		updatePhase(apiv1.DeleteSpaceMetadata_COMPLETED)
+		// Force path: row is gone. Surface the resource name only
+		// (no row to return).
+		return &apiv1.Space{Name: spaceRsrc}, nil
+	}
+
+	// MARKING_DELETED: soft-delete path. SoftDeleteSpace refuses to
+	// fire on a non-ACTIVE row (delete_time IS NULL guard), so a
+	// race with a concurrent delete surfaces no-rows.
+	updatePhase(apiv1.DeleteSpaceMetadata_MARKING_DELETED)
+	updated, err := s.queries.SoftDeleteSpace(ctx, db.SoftDeleteSpaceParams{
+		ID:        spaceID,
+		DeletedBy: deletedBy,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			// Lost the race with a concurrent delete — surface
-			// FailedPrecondition rather than NotFound; the caller's
-			// view of the row is now stale.
-			return nil, apierr.FailedPrecondition("space is not in ACTIVE state")
+			return nil, apierr.FailedPrecondition(
+				"space state changed; cannot soft-delete (was it already deleted?)")
 		}
-		return nil, apierr.HandleResourceError(err, "Space", req.GetName())
+		slog.ErrorContext(ctx, "delete space: soft-delete failed", "space", spaceRsrc, "error", err)
+		return nil, apierr.Internal("soft-delete space")
 	}
-	return lro.DoneOperation(convert.SpaceToProto(result, resolvedOrg.Slug))
+	updatePhase(apiv1.DeleteSpaceMetadata_COMPLETED)
+	return convert.SpaceToProto(updated, orgSlug), nil
 }
 
+// UndeleteSpace restores a soft-deleted space back to ACTIVE. Only
+// callable during the 30-day grace window — once `purge_time`
+// elapses the row is purged by SpacePurgeWorker and there's no way
+// back. Returns an LRO mirroring the AIP-164 shape; the actual work
+// is a single UPDATE so the LRO completes promptly.
 func (s *SpacesServer) UndeleteSpace(ctx context.Context, req *apiv1.UndeleteSpaceRequest) (*longrunningpb.Operation, error) {
 	orgName, spaceName, err := parseSpaceName(req.GetName())
 	if err != nil {
@@ -383,21 +481,41 @@ func (s *SpacesServer) UndeleteSpace(ctx context.Context, req *apiv1.UndeleteSpa
 		return nil, apierr.FailedPrecondition(
 			"space is not in DELETE_REQUESTED state; current state is " + string(resolvedSpace.Row.State))
 	}
+	if req.GetEtag() != "" && req.GetEtag() != resolvedSpace.Row.Etag {
+		return nil, apierr.FailedPrecondition(
+			"etag mismatch; refresh the space and retry")
+	}
 
 	caller, err := s.caller(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	result, err := s.queries.UndeleteSpace(ctx, db.UndeleteSpaceParams{
-		ID:        resolvedSpace.ID,
-		UpdatedBy: caller.String(),
-	})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, apierr.FailedPrecondition("space is not in DELETE_REQUESTED state")
-		}
-		return nil, apierr.HandleResourceError(err, "Space", req.GetName())
-	}
-	return lro.DoneOperation(convert.SpaceToProto(result, resolvedOrg.Slug))
+	spaceID := resolvedSpace.ID
+	orgSlug := resolvedOrg.Slug
+	updatedBy := caller.String()
+	spaceRsrc := "organizations/" + orgSlug + "/spaces/" + resolvedSpace.Slug
+	// UndeleteSpaceMetadata is intentionally empty — the LRO has only
+	// one phase and the space resource is encoded in the operation
+	// name, so there's nothing to surface mid-flight.
+	initialMeta := &apiv1.UndeleteSpaceMetadata{}
+
+	return s.lroManager.CreateAndRun(ctx, spaceLifecyclePrefix, initialMeta,
+		func(workCtx context.Context, _ lro.Progress) (proto.Message, error) {
+			updated, err := s.queries.UndeleteSpace(workCtx, db.UndeleteSpaceParams{
+				ID:        spaceID,
+				UpdatedBy: updatedBy,
+			})
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					// Either left DELETE_REQUESTED in a race or
+					// purge_time elapsed before the worker fired.
+					return nil, apierr.FailedPrecondition(
+						"space is no longer in DELETE_REQUESTED state (was it purged or restored concurrently?)")
+				}
+				slog.ErrorContext(workCtx, "undelete space failed", "space", spaceRsrc, "error", err)
+				return nil, apierr.Internal("undelete space")
+			}
+			return convert.SpaceToProto(updated, orgSlug), nil
+		})
 }

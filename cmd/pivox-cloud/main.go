@@ -204,8 +204,9 @@ func serve(cmd *cobra.Command, args []string) error {
 	// IAM-roadmap decision; the real net.Resolver-backed impl wires
 	// in before pre-prod SSO go-live.
 	purgeWorker := workers.NewPurgeWorker(pool, queries, logger, 5*time.Minute)
+	spacePurgeWorker := workers.NewSpacePurgeWorker(pool, queries, logger, 5*time.Minute)
 	verifyDomainWorker := workers.NewVerifyDomainWorker(pool, queries, workers.NewStubDNSResolver(logger), logger, 2*time.Minute)
-	workersWG := workers.RunAll(ctx, logger, purgeWorker, verifyDomainWorker)
+	workersWG := workers.RunAll(ctx, logger, purgeWorker, spacePurgeWorker, verifyDomainWorker)
 	defer workersWG.Wait()
 
 	// Cleanup loop for short-lived auth artifacts (deposit codes + delegated
@@ -288,7 +289,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	// reused here by service handlers (TestIamPermissions, etc.).
 	longrunningpb.RegisterOperationsServer(grpcServer, operations.NewOperationsServer(lroManager))
 
-	apiv1.RegisterSpacesServer(grpcServer, spaces.NewSpacesServer(pool, pool, queries, appCodec, permResolver, callerIdentity))
+	apiv1.RegisterSpacesServer(grpcServer, spaces.NewSpacesServer(pool, pool, queries, appCodec, permResolver, callerIdentity, lroManager))
 	apiv1.RegisterOrganizationsServer(grpcServer, organizations.NewOrganizationsServer(pool, queries, authSvc, appCodec, server.AuthenticatedUID, permResolver, callerIdentity, lroManager, enc))
 	apiv1.RegisterTagKeysServer(grpcServer, tags.NewTagKeysServer(pool, queries, appCodec))
 	apiv1.RegisterTagValuesServer(grpcServer, tags.NewTagValuesServer(pool, queries, appCodec))

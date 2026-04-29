@@ -180,6 +180,97 @@ func (q *Queries) GetSpaceIncludingDeleted(ctx context.Context, id uuid.UUID) (S
 	return i, err
 }
 
+const listSpacesPastPurgeTime = `-- name: ListSpacesPastPurgeTime :many
+SELECT id, org_id, name, display_name, labels, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time FROM spaces
+ WHERE delete_time IS NOT NULL
+   AND purge_time IS NOT NULL
+   AND purge_time < now()
+ ORDER BY purge_time ASC
+ LIMIT 100
+`
+
+// ListSpacesPastPurgeTime returns soft-deleted spaces whose
+// purge_time has elapsed. Used by SpacePurgeWorker to drive the
+// final cascade for spaces that finished their 30-day grace window
+// without being undeleted. The 100-row LIMIT bounds the per-tick
+// batch size; multi-replica deploys serialize on the worker's
+// advisory lock so only one runs at a time per cluster.
+func (q *Queries) ListSpacesPastPurgeTime(ctx context.Context) ([]Space, error) {
+	rows, err := q.db.Query(ctx, listSpacesPastPurgeTime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Space{}
+	for rows.Next() {
+		var i Space
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.Name,
+			&i.DisplayName,
+			&i.Labels,
+			&i.State,
+			&i.Etag,
+			&i.Revision,
+			&i.CreatedBy,
+			&i.UpdatedBy,
+			&i.DeletedBy,
+			&i.CreateTime,
+			&i.UpdateTime,
+			&i.DeleteTime,
+			&i.PurgeTime,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const purgeExpiredSpace = `-- name: PurgeExpiredSpace :exec
+DELETE FROM spaces
+ WHERE id = $1
+   AND delete_time IS NOT NULL
+   AND purge_time < now()
+`
+
+// PurgeExpiredSpace is the purge-worker variant: deletes only
+// soft-deleted spaces whose grace window has elapsed. The WHERE
+// clause race-guards against a concurrent UndeleteSpace that could
+// fire between ListSpacesPastPurgeTime and this DELETE — a restored
+// space is left alone, matching user intent.
+func (q *Queries) PurgeExpiredSpace(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, purgeExpiredSpace, id)
+	return err
+}
+
+const purgeSpace = `-- name: PurgeSpace :one
+DELETE FROM spaces WHERE id = $1 AND etag = $2 RETURNING id
+`
+
+type PurgeSpaceParams struct {
+	ID   uuid.UUID `json:"id"`
+	Etag string    `json:"etag"`
+}
+
+// PurgeSpace hard-deletes a space row, race-guarded by etag. FK
+// ON DELETE CASCADE removes space_members, assets, and asset_requests
+// transitively. Used by force=true DeleteSpace where the caller has
+// already validated state and pinned the row's revision; the etag
+// check refuses to fire if the row has been mutated since the
+// handler read it. Returns the deleted id on success; pgx.ErrNoRows
+// on etag drift, which the LRO surfaces as FailedPrecondition.
+func (q *Queries) PurgeSpace(ctx context.Context, arg PurgeSpaceParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, purgeSpace, arg.ID, arg.Etag)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const softDeleteSpace = `-- name: SoftDeleteSpace :one
 UPDATE spaces
 SET state = 'DELETE_REQUESTED',

@@ -438,6 +438,13 @@ type Querier interface {
 	// semantic as GetSpaceMember and the same offset+limit pagination
 	// contract.
 	ListSpaceMembers(ctx context.Context, arg ListSpaceMembersParams) ([]ListSpaceMembersRow, error)
+	// ListSpacesPastPurgeTime returns soft-deleted spaces whose
+	// purge_time has elapsed. Used by SpacePurgeWorker to drive the
+	// final cascade for spaces that finished their 30-day grace window
+	// without being undeleted. The 100-row LIMIT bounds the per-tick
+	// batch size; multi-replica deploys serialize on the worker's
+	// advisory lock so only one runs at a time per cluster.
+	ListSpacesPastPurgeTime(ctx context.Context) ([]Space, error)
 	ListStorageAgentAuditByAgent(ctx context.Context, arg ListStorageAgentAuditByAgentParams) ([]StorageAgentAudit, error)
 	ListStorageAgentAuditByGateway(ctx context.Context, arg ListStorageAgentAuditByGatewayParams) ([]StorageAgentAudit, error)
 	ListStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageAgent, error)
@@ -475,6 +482,12 @@ type Querier interface {
 	// a restored-to-ACTIVE org is left alone, matching the user's
 	// intent (they undeleted just before purge).
 	PurgeExpiredOrganization(ctx context.Context, id uuid.UUID) error
+	// PurgeExpiredSpace is the purge-worker variant: deletes only
+	// soft-deleted spaces whose grace window has elapsed. The WHERE
+	// clause race-guards against a concurrent UndeleteSpace that could
+	// fire between ListSpacesPastPurgeTime and this DELETE — a restored
+	// space is left alone, matching user intent.
+	PurgeExpiredSpace(ctx context.Context, id uuid.UUID) error
 	// PurgeOrganization hard-deletes an org row, race-guarded by etag.
 	// FK ON DELETE CASCADE removes spaces, members, domains,
 	// sso_configs, assets, requests, tags, api keys, and ai
@@ -486,6 +499,14 @@ type Querier interface {
 	// deleted id on success; pgx.ErrNoRows on etag drift, which the
 	// LRO surfaces as FailedPrecondition.
 	PurgeOrganization(ctx context.Context, arg PurgeOrganizationParams) (uuid.UUID, error)
+	// PurgeSpace hard-deletes a space row, race-guarded by etag. FK
+	// ON DELETE CASCADE removes space_members, assets, and asset_requests
+	// transitively. Used by force=true DeleteSpace where the caller has
+	// already validated state and pinned the row's revision; the etag
+	// check refuses to fire if the row has been mutated since the
+	// handler read it. Returns the deleted id on success; pgx.ErrNoRows
+	// on etag drift, which the LRO surfaces as FailedPrecondition.
+	PurgeSpace(ctx context.Context, arg PurgeSpaceParams) (uuid.UUID, error)
 	// ResolveProviderByDomain is the query backing the
 	// POST /internal/v1/auth:resolveProvider endpoint. Joins the
 	// email's domain to the SsoConfig via the verified Domain row and

@@ -376,6 +376,21 @@ func (m *MockQuerier) SoftDeleteSpace(ctx context.Context, arg db.SoftDeleteSpac
 	return args.Get(0).(db.Space), args.Error(1)
 }
 
+func (m *MockQuerier) PurgeSpace(ctx context.Context, arg db.PurgeSpaceParams) (uuid.UUID, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(uuid.UUID), args.Error(1)
+}
+
+func (m *MockQuerier) PurgeExpiredSpace(ctx context.Context, id uuid.UUID) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
+func (m *MockQuerier) ListSpacesPastPurgeTime(ctx context.Context) ([]db.Space, error) {
+	args := m.Called(ctx)
+	return args.Get(0).([]db.Space), args.Error(1)
+}
+
 func (m *MockQuerier) UndeleteSpace(ctx context.Context, arg db.UndeleteSpaceParams) (db.Space, error) {
 	args := m.Called(ctx, arg)
 	return args.Get(0).(db.Space), args.Error(1)

@@ -55,3 +55,38 @@ SET state = 'ACTIVE',
     etag = md5(now()::text)
 WHERE id = $1 AND delete_time IS NOT NULL
 RETURNING *;
+
+-- PurgeSpace hard-deletes a space row, race-guarded by etag. FK
+-- ON DELETE CASCADE removes space_members, assets, and asset_requests
+-- transitively. Used by force=true DeleteSpace where the caller has
+-- already validated state and pinned the row's revision; the etag
+-- check refuses to fire if the row has been mutated since the
+-- handler read it. Returns the deleted id on success; pgx.ErrNoRows
+-- on etag drift, which the LRO surfaces as FailedPrecondition.
+-- name: PurgeSpace :one
+DELETE FROM spaces WHERE id = $1 AND etag = $2 RETURNING id;
+
+-- PurgeExpiredSpace is the purge-worker variant: deletes only
+-- soft-deleted spaces whose grace window has elapsed. The WHERE
+-- clause race-guards against a concurrent UndeleteSpace that could
+-- fire between ListSpacesPastPurgeTime and this DELETE — a restored
+-- space is left alone, matching user intent.
+-- name: PurgeExpiredSpace :exec
+DELETE FROM spaces
+ WHERE id = $1
+   AND delete_time IS NOT NULL
+   AND purge_time < now();
+
+-- ListSpacesPastPurgeTime returns soft-deleted spaces whose
+-- purge_time has elapsed. Used by SpacePurgeWorker to drive the
+-- final cascade for spaces that finished their 30-day grace window
+-- without being undeleted. The 100-row LIMIT bounds the per-tick
+-- batch size; multi-replica deploys serialize on the worker's
+-- advisory lock so only one runs at a time per cluster.
+-- name: ListSpacesPastPurgeTime :many
+SELECT * FROM spaces
+ WHERE delete_time IS NOT NULL
+   AND purge_time IS NOT NULL
+   AND purge_time < now()
+ ORDER BY purge_time ASC
+ LIMIT 100;

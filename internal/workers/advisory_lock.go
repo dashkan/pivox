@@ -74,4 +74,5 @@ func withAdvisoryLock(ctx context.Context, pool *pgxpool.Pool, lockID int64, wor
 const (
 	purgeWorkerLockID        int64 = 0x70_69_76_70 // 'pivp'
 	verifyDomainWorkerLockID int64 = 0x70_69_76_64 // 'pivd'
+	spacePurgeWorkerLockID   int64 = 0x70_69_76_73 // 'pivs'
 )

@@ -304,7 +304,7 @@ func newMembersHarness(t *testing.T) *grpcharness.Harness {
 			permResolver, callerIdentity, h.LROManager, h.Encryptor,
 		))
 		apiv1.RegisterSpacesServer(s, spaces.NewSpacesServer(
-			h.Pool, h.Pool, h.Queries, nil, permResolver, callerIdentity,
+			h.Pool, h.Pool, h.Queries, nil, permResolver, callerIdentity, h.LROManager,
 		))
 	}))
 }

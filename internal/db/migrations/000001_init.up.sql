@@ -919,7 +919,7 @@ CREATE TYPE line_item_state AS ENUM (
 CREATE TABLE assets (
     id                  UUID PRIMARY KEY DEFAULT uuidv7(),
     -- relationships
-    space_id            UUID NOT NULL REFERENCES spaces(id),
+    space_id            UUID NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
     endpoint_id         UUID REFERENCES storage_endpoints(id),
     -- identity
     name                TEXT NOT NULL,
@@ -1017,7 +1017,7 @@ CREATE INDEX idx_renditions_version ON asset_renditions (version_id);
 CREATE TABLE asset_requests (
     id                UUID PRIMARY KEY DEFAULT uuidv7(),
     -- relationships
-    space_id          UUID NOT NULL REFERENCES spaces(id),
+    space_id          UUID NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
     -- identity
     name              TEXT NOT NULL,
     -- domain
