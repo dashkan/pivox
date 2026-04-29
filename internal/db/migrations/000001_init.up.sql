@@ -69,7 +69,10 @@ CREATE TABLE operations (
     -- known at create time (e.g. CreateOrganization). NULL also for
     -- DeleteOrganization itself: a self-pointing org_id would cause
     -- the LRO to cancel itself in the CANCELLING_OPERATIONS phase.
-    org_id      UUID REFERENCES organizations(id) ON DELETE SET NULL,
+    -- The FK to organizations(id) is added at the bottom of this
+    -- migration (forward reference: `operations` is declared before
+    -- `organizations` so the inline REFERENCES fails to resolve).
+    org_id      UUID,
     created_by  TEXT NOT NULL DEFAULT '',
     create_time TIMESTAMPTZ NOT NULL DEFAULT now(),
     update_time TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -440,6 +443,14 @@ CREATE INDEX idx_users_firebase_identity ON users (firebase_identity_id) WHERE d
 ALTER TABLE organizations
   ADD CONSTRAINT fk_organizations_created_by_firebase_identity
   FOREIGN KEY (created_by_firebase_identity_id) REFERENCES firebase_identities(id) ON DELETE SET NULL;
+
+-- FK from operations.org_id → organizations(id), deferred for the
+-- same reason: `operations` is declared above `organizations` (so the
+-- LRO Manager can reference operation-state queries from anywhere),
+-- and the inline REFERENCES would fail at table-creation time.
+ALTER TABLE operations
+  ADD CONSTRAINT fk_operations_org
+  FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE SET NULL;
 
 -- ============================================================================
 -- groups
