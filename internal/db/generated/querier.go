@@ -268,6 +268,11 @@ type Querier interface {
 	// GetEffectiveOrgRoles — principal_id and group_members.user_id are
 	// both firebase_identities.id, so no caller-resolution CTE.
 	GetEffectiveSpaceRoles(ctx context.Context, arg GetEffectiveSpaceRolesParams) ([]string, error)
+	// GetFirebaseIdentitiesByIDs is the batched lookup used by the audit
+	// resolver to inflate Actor messages on resource reads. The IDs are
+	// typically a deduped slice of cache misses; row order is not
+	// guaranteed and the caller should index results by id.
+	GetFirebaseIdentitiesByIDs(ctx context.Context, ids []uuid.UUID) ([]FirebaseIdentity, error)
 	// GetFirebaseIdentityByID looks up by primary key. Used by
 	// DeleteUser's DELETING_PIVOX_RECORDS phase to capture the
 	// firebase_uid before the row is hard-deleted, so the subsequent

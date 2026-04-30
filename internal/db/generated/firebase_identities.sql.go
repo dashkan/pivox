@@ -12,6 +12,45 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getFirebaseIdentitiesByIDs = `-- name: GetFirebaseIdentitiesByIDs :many
+SELECT id, firebase_uid, email, email_verified, display_name, photo_url, disabled, create_time, update_time, last_login_time FROM firebase_identities WHERE id = ANY($1::uuid[])
+`
+
+// GetFirebaseIdentitiesByIDs is the batched lookup used by the audit
+// resolver to inflate Actor messages on resource reads. The IDs are
+// typically a deduped slice of cache misses; row order is not
+// guaranteed and the caller should index results by id.
+func (q *Queries) GetFirebaseIdentitiesByIDs(ctx context.Context, ids []uuid.UUID) ([]FirebaseIdentity, error) {
+	rows, err := q.db.Query(ctx, getFirebaseIdentitiesByIDs, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []FirebaseIdentity{}
+	for rows.Next() {
+		var i FirebaseIdentity
+		if err := rows.Scan(
+			&i.ID,
+			&i.FirebaseUid,
+			&i.Email,
+			&i.EmailVerified,
+			&i.DisplayName,
+			&i.PhotoUrl,
+			&i.Disabled,
+			&i.CreateTime,
+			&i.UpdateTime,
+			&i.LastLoginTime,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getFirebaseIdentityByID = `-- name: GetFirebaseIdentityByID :one
 SELECT id, firebase_uid, email, email_verified, display_name, photo_url, disabled, create_time, update_time, last_login_time FROM firebase_identities WHERE id = $1
 `

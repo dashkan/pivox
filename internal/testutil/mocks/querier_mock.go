@@ -187,6 +187,11 @@ func (m *MockQuerier) GetFirebaseIdentityByID(ctx context.Context, id uuid.UUID)
 	return args.Get(0).(db.FirebaseIdentity), args.Error(1)
 }
 
+func (m *MockQuerier) GetFirebaseIdentitiesByIDs(ctx context.Context, ids []uuid.UUID) ([]db.FirebaseIdentity, error) {
+	args := m.Called(ctx, ids)
+	return args.Get(0).([]db.FirebaseIdentity), args.Error(1)
+}
+
 func (m *MockQuerier) ListOrgsPastPurgeTime(ctx context.Context) ([]db.Organization, error) {
 	args := m.Called(ctx)
 	return args.Get(0).([]db.Organization), args.Error(1)

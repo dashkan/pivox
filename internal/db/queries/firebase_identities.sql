@@ -29,3 +29,10 @@ SELECT * FROM firebase_identities WHERE firebase_uid = $1;
 -- DELETING_FIREBASE_IDENTITY phase can call auth.DeleteUser(uid).
 -- name: GetFirebaseIdentityByID :one
 SELECT * FROM firebase_identities WHERE id = $1;
+
+-- GetFirebaseIdentitiesByIDs is the batched lookup used by the audit
+-- resolver to inflate Actor messages on resource reads. The IDs are
+-- typically a deduped slice of cache misses; row order is not
+-- guaranteed and the caller should index results by id.
+-- name: GetFirebaseIdentitiesByIDs :many
+SELECT * FROM firebase_identities WHERE id = ANY(@ids::uuid[]);
