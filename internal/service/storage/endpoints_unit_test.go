@@ -729,7 +729,11 @@ func TestUnit_UpdateEndpoint_Success(t *testing.T) {
 	mockQ.On("UpdateStorageEndpoint", mock.Anything, mock.MatchedBy(func(p db.UpdateStorageEndpointParams) bool {
 		return p.ID == endpointID &&
 			p.DisplayName.Valid && p.DisplayName.String == "Renamed S3 Endpoint" &&
-			p.Configuration == nil // not in mask
+			p.Configuration == nil && // not in mask
+			// caller's pivox_user_id flows through to UpdatedBy (audit
+			// regression guard: pre-B-5 the field was the zero
+			// pgtype.UUID{} on every Update endpoint call).
+			p.UpdatedBy.Valid && p.UpdatedBy.Bytes == storageCallerPivoxUUID
 	})).Return(updatedEndpoint, nil)
 
 	resp, err := srv.UpdateEndpoint(ctx, &storagev1.UpdateEndpointRequest{
