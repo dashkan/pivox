@@ -58,7 +58,25 @@ class AuthService: NSObject {
   /// `ASWebAuthenticationSession.cancel()` triggers the completion
   /// handler with `ASWebAuthenticationSessionError.canceledLogin`,
   /// which the existing catch arms already swallow as not-an-error.
+  ///
+  /// Cleared inside the session's completion handler — i.e. as
+  /// soon as ASWebAuth hands the callback URL back, NOT when the
+  /// surrounding signIn() function returns. That gap (callback
+  /// fired → function exit) is the Firebase `signIn(with:
+  /// credential)` + sync-identity blocking-fn roundtrip, which can
+  /// take 2-3s; during that window the upstream OAuth is already
+  /// complete and a session-cancel would be a no-op.
+  /// `isOAuthCancellable` exposes the distinction so the UI can
+  /// flip from "Cancel sign-in" to a non-interactive loading state.
   private var activeAuthSession: ASWebAuthenticationSession?
+
+  /// True only while the ASWebAuthenticationSession is open and a
+  /// `cancelOAuth()` call would actually do something. False during
+  /// the post-callback Firebase + blocking-fn roundtrip: at that
+  /// point `isOAuthInProgress` is still true (the overall sign-in
+  /// hasn't returned) but the upstream OAuth has already minted a
+  /// token and there's nothing left for the client to cancel.
+  var isOAuthCancellable: Bool { activeAuthSession != nil }
 
   /// Non-nil while a sign-in attempt has succeeded past the first
   /// factor but still needs a TOTP code. The UI observes this and

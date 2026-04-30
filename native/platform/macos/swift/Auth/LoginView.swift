@@ -227,8 +227,21 @@ struct LoginView: View {
         // re-render. Living with it is fine — the morph is the
         // discoverable affordance, the flash is small.
         if auth.isOAuthInProgress {
-          AuthPrimaryButton("Cancel sign-in", action: auth.cancelOAuth)
-            .accessibilityIdentifier("login-cancel-oauth")
+          if auth.isOAuthCancellable {
+            // ASWebAuth sheet is open — clicking Cancel actually
+            // tears down the session.
+            AuthPrimaryButton("Cancel sign-in", action: auth.cancelOAuth)
+              .accessibilityIdentifier("login-cancel-oauth")
+          } else {
+            // Post-callback finalization (Firebase signIn(with:
+            // credential) + syncIdentity blocking fn). Upstream OAuth
+            // already minted a token; nothing left to cancel. Show a
+            // disabled loading state so the user has feedback that
+            // something's happening but can't click into a no-op.
+            AuthPrimaryButton("Signing in…", isLoading: true, action: {})
+              .disabled(true)
+              .accessibilityIdentifier("login-finalizing")
+          }
         } else {
           AuthPrimaryButton(
             didResolveAsPassword ? "Sign In" : "Continue",
