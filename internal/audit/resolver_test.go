@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -295,4 +296,116 @@ func TestResolver_DisabledCache_AlwaysQueries(t *testing.T) {
 		require.NoError(t, err)
 	}
 	q.AssertExpectations(t)
+}
+
+// TestResolver_InvalidateRace_DoesNotPoisonCache pins the load-bearing
+// concurrency guarantee added with the generation counter. Without
+// the gen check, this interleaving:
+//
+//	T1 Resolve(idA): cache miss → DB read (slow, returns "Stale")
+//	T2 mutation:     PG write
+//	T2 Invalidate(idA): cache.Remove (no-op, was empty)
+//	T1: r.cache.Add(idA, "Stale")  ← stale entry stuck for full TTL
+//
+// would let the next Resolve return "Stale" until the TTL expired —
+// exactly what synchronous Invalidate is meant to prevent. With the
+// gen counter, T1's post-DB cache.Add is skipped, so the next
+// Resolve re-queries and gets the fresh row.
+func TestResolver_InvalidateRace_DoesNotPoisonCache(t *testing.T) {
+	q := new(mocks.MockQuerier)
+	inFlight := make(chan struct{})
+	proceed := make(chan struct{})
+
+	// First call: blocks until proceed is signaled, then returns
+	// "Stale" — the pre-mutation row T1 saw.
+	q.On("GetIdentitiesByIDs", mock.Anything, []uuid.UUID{idA}).
+		Run(func(_ mock.Arguments) {
+			close(inFlight)
+			<-proceed
+		}).
+		Return([]db.Identity{{ID: idA, DisplayName: "Stale"}}, nil).Once()
+
+	// Second call (after Invalidate fires): the cache MUST be
+	// missing this id, so this fresh DB call must happen — and it
+	// returns the post-mutation value.
+	q.On("GetIdentitiesByIDs", mock.Anything, []uuid.UUID{idA}).
+		Return([]db.Identity{{ID: idA, DisplayName: "Fresh"}}, nil).Once()
+
+	r := NewResolver(Config{Queries: q})
+
+	// T1: in-flight Resolve
+	t1Done := make(chan struct{})
+	go func() {
+		defer close(t1Done)
+		_, err := r.Resolve(context.Background(), []uuid.UUID{idA})
+		require.NoError(t, err)
+	}()
+
+	<-inFlight        // wait until T1 is mid-DB-read
+	r.Invalidate(idA) // T2 fires invalidation
+	close(proceed)    // unblock T1's DB read
+	<-t1Done
+
+	// T1 may have returned "Stale" to its caller — that's fine, the
+	// pre-mutation read can't be retroactively undone. The contract
+	// is that NO subsequent Resolve sees "Stale": cache must NOT
+	// have been poisoned.
+	got, err := r.Resolve(context.Background(), []uuid.UUID{idA})
+	require.NoError(t, err)
+	assert.Equal(t, "Fresh", got[idA].GetDisplayName(),
+		"post-Invalidate Resolve must not see the stale value the racing T1 read")
+	q.AssertExpectations(t)
+}
+
+// TestResolver_Cache_TTLExpiryRefetches pins that the LRU honors the
+// configured TTL — entries past the TTL trigger a fresh DB call.
+// Tiny TTL keeps the test fast.
+func TestResolver_Cache_TTLExpiryRefetches(t *testing.T) {
+	q := new(mocks.MockQuerier)
+	q.On("GetIdentitiesByIDs", mock.Anything, []uuid.UUID{idA}).
+		Return([]db.Identity{{ID: idA, DisplayName: "v1"}}, nil).Once()
+	q.On("GetIdentitiesByIDs", mock.Anything, []uuid.UUID{idA}).
+		Return([]db.Identity{{ID: idA, DisplayName: "v2"}}, nil).Once()
+
+	r := NewResolver(Config{Queries: q, CacheTTL: 20 * time.Millisecond})
+	_, err := r.Resolve(context.Background(), []uuid.UUID{idA})
+	require.NoError(t, err)
+
+	time.Sleep(40 * time.Millisecond)
+
+	got, err := r.Resolve(context.Background(), []uuid.UUID{idA})
+	require.NoError(t, err)
+	assert.Equal(t, "v2", got[idA].GetDisplayName(),
+		"TTL-expired entry must be refetched")
+	q.AssertExpectations(t)
+}
+
+// TestResolver_Invalidate_SkipsZeroUUID pins that Invalidate(uuid.Nil)
+// is a safe no-op rather than removing some sentinel entry. The
+// resolver itself never caches uuid.Nil (dedupeNonZero strips it),
+// so the only way the test can detect mishandling is via panic;
+// the assertion is structural.
+func TestResolver_Invalidate_SkipsZeroUUID(t *testing.T) {
+	q := new(mocks.MockQuerier)
+	r := NewResolver(Config{Queries: q})
+	require.NotPanics(t, func() {
+		r.Invalidate(uuid.Nil, uuid.Nil)
+		r.Invalidate() // no ids at all
+	})
+}
+
+// TestResolver_NewResolver_PanicsOnInvalidConfig pins the panic
+// contract: missing Queries panics, and CacheTTL <= 0 with caching
+// enabled panics (we no longer silently disable the cache on negative
+// TTL — that path used to be ambiguous with the CacheSize disable
+// knob).
+func TestResolver_NewResolver_PanicsOnInvalidConfig(t *testing.T) {
+	require.PanicsWithValue(t,
+		"audit: Config.Queries is required",
+		func() { NewResolver(Config{}) })
+
+	q := new(mocks.MockQuerier)
+	require.PanicsWithValue(t,
+		"audit: Config.CacheTTL must be positive when caching is enabled",
+		func() { NewResolver(Config{Queries: q, CacheTTL: -1}) })
 }
