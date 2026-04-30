@@ -163,7 +163,7 @@ func (s *OrganizationsServer) ListOrganizations(ctx context.Context, req *apiv1.
 		return nil, apierr.HandleResourceError(err, "Identity", uid)
 	}
 
-	rows, err := s.queries.ListOrganizationsForIdentity(ctx, caller.ID)
+	rows, err := s.queries.ListOrganizationsForIdentity(ctx, convert.PgUUID(caller.ID))
 	if err != nil {
 		slog.ErrorContext(ctx, "list organizations failed", "identity_id", caller.ID, "error", err)
 		return nil, apierr.Internal("list organizations")

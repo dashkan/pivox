@@ -23,9 +23,9 @@
 CREATE TYPE resource_state AS ENUM ('ACTIVE', 'DELETE_REQUESTED');
 -- Principal kind for both org_members and space_members. Two tables
 -- give structural integrity by design (an org_members row physically
--- cannot be misinterpreted as a space membership), but the principal
--- shape is uniform across them.
-CREATE TYPE principal_kind AS ENUM ('user', 'group');
+-- cannot be misinterpreted as a space membership). Principal kind is
+-- now discriminated by which of (user_id, group_id) is populated —
+-- no separate enum needed.
 CREATE TYPE domain_state AS ENUM ('PENDING', 'VERIFIED', 'FAILED');
 CREATE TYPE invitation_state AS ENUM (
     'PENDING', 'ACCEPTED', 'DECLINED', 'REVOKED', 'EXPIRED'
@@ -606,27 +606,39 @@ CREATE INDEX idx_role_permissions_permission ON role_permissions (permission_id)
 -- cannot be misinterpreted as a space membership).
 -- ============================================================================
 CREATE TABLE org_members (
-    id             UUID PRIMARY KEY DEFAULT uuidv7(),
+    id          UUID PRIMARY KEY DEFAULT uuidv7(),
     -- relationships
-    org_id         UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-    role_id        UUID NOT NULL REFERENCES roles(id) ON DELETE RESTRICT,
-    principal_kind principal_kind NOT NULL,
-    principal_id   UUID NOT NULL,
+    org_id      UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    role_id     UUID NOT NULL REFERENCES roles(id) ON DELETE RESTRICT,
+    -- principal: exactly one of user_id or group_id is set, enforced
+    -- by the XOR check below. The columns themselves discriminate —
+    -- no separate principal_kind enum is needed. Filtered unique
+    -- indexes per-column give us "one binding per (org, principal)"
+    -- without a polymorphic UNIQUE.
+    user_id     UUID REFERENCES identities(id),
+    group_id    UUID REFERENCES groups(id) ON DELETE CASCADE,
+    CONSTRAINT org_members_principal_xor CHECK (
+        (user_id IS NOT NULL AND group_id IS NULL) OR
+        (user_id IS NULL AND group_id IS NOT NULL)
+    ),
     -- versioning
-    etag           TEXT NOT NULL DEFAULT md5(now()::text),
-    revision       INTEGER NOT NULL DEFAULT 1,
+    etag        TEXT NOT NULL DEFAULT md5(now()::text),
+    revision    INTEGER NOT NULL DEFAULT 1,
     -- audit
     created_by UUID REFERENCES identities(id),
     updated_by UUID REFERENCES identities(id),
     -- timestamps
-    create_time    TIMESTAMPTZ NOT NULL DEFAULT now(),
-    update_time    TIMESTAMPTZ NOT NULL DEFAULT now(),
-    -- constraints
-    UNIQUE(org_id, principal_kind, principal_id)
+    create_time TIMESTAMPTZ NOT NULL DEFAULT now(),
+    update_time TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_org_members_org ON org_members (org_id);
-CREATE INDEX idx_org_members_principal ON org_members (principal_kind, principal_id);
 CREATE INDEX idx_org_members_role ON org_members (role_id);
+-- Filtered unique indexes replace the prior UNIQUE(org_id,
+-- principal_kind, principal_id) tuple. PostgreSQL treats NULL as
+-- distinct in unique indexes, so we need the WHERE predicate to
+-- enforce uniqueness on the live (populated) column only.
+CREATE UNIQUE INDEX idx_org_members_user ON org_members (org_id, user_id) WHERE user_id IS NOT NULL;
+CREATE UNIQUE INDEX idx_org_members_group ON org_members (org_id, group_id) WHERE group_id IS NOT NULL;
 
 -- ============================================================================
 -- space_members (role binding at space scope)
@@ -636,27 +648,33 @@ CREATE INDEX idx_org_members_role ON org_members (role_id);
 -- by transitivity) is resolved at query time, not denormalized.
 -- ============================================================================
 CREATE TABLE space_members (
-    id             UUID PRIMARY KEY DEFAULT uuidv7(),
+    id          UUID PRIMARY KEY DEFAULT uuidv7(),
     -- relationships
-    space_id       UUID NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
-    role_id        UUID NOT NULL REFERENCES roles(id) ON DELETE RESTRICT,
-    principal_kind principal_kind NOT NULL,
-    principal_id   UUID NOT NULL,
+    space_id    UUID NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
+    role_id     UUID NOT NULL REFERENCES roles(id) ON DELETE RESTRICT,
+    -- principal: exactly one of user_id or group_id is set (XOR
+    -- check below). Same shape as org_members; see the structural
+    -- notes there.
+    user_id     UUID REFERENCES identities(id),
+    group_id    UUID REFERENCES groups(id) ON DELETE CASCADE,
+    CONSTRAINT space_members_principal_xor CHECK (
+        (user_id IS NOT NULL AND group_id IS NULL) OR
+        (user_id IS NULL AND group_id IS NOT NULL)
+    ),
     -- versioning
-    etag           TEXT NOT NULL DEFAULT md5(now()::text),
-    revision       INTEGER NOT NULL DEFAULT 1,
+    etag        TEXT NOT NULL DEFAULT md5(now()::text),
+    revision    INTEGER NOT NULL DEFAULT 1,
     -- audit
     created_by UUID REFERENCES identities(id),
     updated_by UUID REFERENCES identities(id),
     -- timestamps
-    create_time    TIMESTAMPTZ NOT NULL DEFAULT now(),
-    update_time    TIMESTAMPTZ NOT NULL DEFAULT now(),
-    -- constraints
-    UNIQUE(space_id, principal_kind, principal_id)
+    create_time TIMESTAMPTZ NOT NULL DEFAULT now(),
+    update_time TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_space_members_space ON space_members (space_id);
-CREATE INDEX idx_space_members_principal ON space_members (principal_kind, principal_id);
 CREATE INDEX idx_space_members_role ON space_members (role_id);
+CREATE UNIQUE INDEX idx_space_members_user ON space_members (space_id, user_id) WHERE user_id IS NOT NULL;
+CREATE UNIQUE INDEX idx_space_members_group ON space_members (space_id, group_id) WHERE group_id IS NOT NULL;
 
 -- ============================================================================
 -- invitations

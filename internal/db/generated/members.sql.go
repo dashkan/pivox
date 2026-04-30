@@ -13,41 +13,36 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const createOrgMember = `-- name: CreateOrgMember :one
-INSERT INTO org_members (id, org_id, role_id, principal_kind, principal_id, created_by)
-VALUES ($1, $2, $3, $4, $5, $6)
+const createOrgGroupMember = `-- name: CreateOrgGroupMember :one
+INSERT INTO org_members (id, org_id, role_id, group_id, created_by)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING id, etag, create_time, update_time
 `
 
-type CreateOrgMemberParams struct {
-	ID            uuid.UUID     `json:"id"`
-	OrgID         uuid.UUID     `json:"org_id"`
-	RoleID        uuid.UUID     `json:"role_id"`
-	PrincipalKind PrincipalKind `json:"principal_kind"`
-	PrincipalID   uuid.UUID     `json:"principal_id"`
-	CreatedBy     pgtype.UUID   `json:"created_by"`
+type CreateOrgGroupMemberParams struct {
+	ID        uuid.UUID   `json:"id"`
+	OrgID     uuid.UUID   `json:"org_id"`
+	RoleID    uuid.UUID   `json:"role_id"`
+	GroupID   pgtype.UUID `json:"group_id"`
+	CreatedBy pgtype.UUID `json:"created_by"`
 }
 
-type CreateOrgMemberRow struct {
+type CreateOrgGroupMemberRow struct {
 	ID         uuid.UUID `json:"id"`
 	Etag       string    `json:"etag"`
 	CreateTime time.Time `json:"create_time"`
 	UpdateTime time.Time `json:"update_time"`
 }
 
-// Inserts an org-level role binding and returns the server-generated
-// etag + timestamps so the handler can build the Member proto
-// response without a follow-up GetOrgMember round-trip.
-func (q *Queries) CreateOrgMember(ctx context.Context, arg CreateOrgMemberParams) (CreateOrgMemberRow, error) {
-	row := q.db.QueryRow(ctx, createOrgMember,
+func (q *Queries) CreateOrgGroupMember(ctx context.Context, arg CreateOrgGroupMemberParams) (CreateOrgGroupMemberRow, error) {
+	row := q.db.QueryRow(ctx, createOrgGroupMember,
 		arg.ID,
 		arg.OrgID,
 		arg.RoleID,
-		arg.PrincipalKind,
-		arg.PrincipalID,
+		arg.GroupID,
 		arg.CreatedBy,
 	)
-	var i CreateOrgMemberRow
+	var i CreateOrgGroupMemberRow
 	err := row.Scan(
 		&i.ID,
 		&i.Etag,
@@ -57,39 +52,38 @@ func (q *Queries) CreateOrgMember(ctx context.Context, arg CreateOrgMemberParams
 	return i, err
 }
 
-const createSpaceMember = `-- name: CreateSpaceMember :one
-INSERT INTO space_members (id, space_id, role_id, principal_kind, principal_id, created_by)
-VALUES ($1, $2, $3, $4, $5, $6)
+const createOrgUserMember = `-- name: CreateOrgUserMember :one
+INSERT INTO org_members (id, org_id, role_id, user_id, created_by)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING id, etag, create_time, update_time
 `
 
-type CreateSpaceMemberParams struct {
-	ID            uuid.UUID     `json:"id"`
-	SpaceID       uuid.UUID     `json:"space_id"`
-	RoleID        uuid.UUID     `json:"role_id"`
-	PrincipalKind PrincipalKind `json:"principal_kind"`
-	PrincipalID   uuid.UUID     `json:"principal_id"`
-	CreatedBy     pgtype.UUID   `json:"created_by"`
+type CreateOrgUserMemberParams struct {
+	ID        uuid.UUID   `json:"id"`
+	OrgID     uuid.UUID   `json:"org_id"`
+	RoleID    uuid.UUID   `json:"role_id"`
+	UserID    pgtype.UUID `json:"user_id"`
+	CreatedBy pgtype.UUID `json:"created_by"`
 }
 
-type CreateSpaceMemberRow struct {
+type CreateOrgUserMemberRow struct {
 	ID         uuid.UUID `json:"id"`
 	Etag       string    `json:"etag"`
 	CreateTime time.Time `json:"create_time"`
 	UpdateTime time.Time `json:"update_time"`
 }
 
-// Companion to CreateOrgMember at space scope.
-func (q *Queries) CreateSpaceMember(ctx context.Context, arg CreateSpaceMemberParams) (CreateSpaceMemberRow, error) {
-	row := q.db.QueryRow(ctx, createSpaceMember,
+// Inserts a user binding. The XOR check on the table guarantees
+// group_id stays NULL.
+func (q *Queries) CreateOrgUserMember(ctx context.Context, arg CreateOrgUserMemberParams) (CreateOrgUserMemberRow, error) {
+	row := q.db.QueryRow(ctx, createOrgUserMember,
 		arg.ID,
-		arg.SpaceID,
+		arg.OrgID,
 		arg.RoleID,
-		arg.PrincipalKind,
-		arg.PrincipalID,
+		arg.UserID,
 		arg.CreatedBy,
 	)
-	var i CreateSpaceMemberRow
+	var i CreateOrgUserMemberRow
 	err := row.Scan(
 		&i.ID,
 		&i.Etag,
@@ -99,44 +93,156 @@ func (q *Queries) CreateSpaceMember(ctx context.Context, arg CreateSpaceMemberPa
 	return i, err
 }
 
-const deleteOrgMember = `-- name: DeleteOrgMember :execrows
-DELETE FROM org_members
- WHERE org_id = $1
-   AND principal_kind = $2
-   AND principal_id = $3
+const createSpaceGroupMember = `-- name: CreateSpaceGroupMember :one
+INSERT INTO space_members (id, space_id, role_id, group_id, created_by)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, etag, create_time, update_time
 `
 
-type DeleteOrgMemberParams struct {
-	OrgID         uuid.UUID     `json:"org_id"`
-	PrincipalKind PrincipalKind `json:"principal_kind"`
-	PrincipalID   uuid.UUID     `json:"principal_id"`
+type CreateSpaceGroupMemberParams struct {
+	ID        uuid.UUID   `json:"id"`
+	SpaceID   uuid.UUID   `json:"space_id"`
+	RoleID    uuid.UUID   `json:"role_id"`
+	GroupID   pgtype.UUID `json:"group_id"`
+	CreatedBy pgtype.UUID `json:"created_by"`
 }
 
-// Returns the affected-row count so the handler can map "not found"
-// (0 rows) to gRPC NotFound rather than treating it as success.
-func (q *Queries) DeleteOrgMember(ctx context.Context, arg DeleteOrgMemberParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteOrgMember, arg.OrgID, arg.PrincipalKind, arg.PrincipalID)
+type CreateSpaceGroupMemberRow struct {
+	ID         uuid.UUID `json:"id"`
+	Etag       string    `json:"etag"`
+	CreateTime time.Time `json:"create_time"`
+	UpdateTime time.Time `json:"update_time"`
+}
+
+func (q *Queries) CreateSpaceGroupMember(ctx context.Context, arg CreateSpaceGroupMemberParams) (CreateSpaceGroupMemberRow, error) {
+	row := q.db.QueryRow(ctx, createSpaceGroupMember,
+		arg.ID,
+		arg.SpaceID,
+		arg.RoleID,
+		arg.GroupID,
+		arg.CreatedBy,
+	)
+	var i CreateSpaceGroupMemberRow
+	err := row.Scan(
+		&i.ID,
+		&i.Etag,
+		&i.CreateTime,
+		&i.UpdateTime,
+	)
+	return i, err
+}
+
+const createSpaceUserMember = `-- name: CreateSpaceUserMember :one
+INSERT INTO space_members (id, space_id, role_id, user_id, created_by)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, etag, create_time, update_time
+`
+
+type CreateSpaceUserMemberParams struct {
+	ID        uuid.UUID   `json:"id"`
+	SpaceID   uuid.UUID   `json:"space_id"`
+	RoleID    uuid.UUID   `json:"role_id"`
+	UserID    pgtype.UUID `json:"user_id"`
+	CreatedBy pgtype.UUID `json:"created_by"`
+}
+
+type CreateSpaceUserMemberRow struct {
+	ID         uuid.UUID `json:"id"`
+	Etag       string    `json:"etag"`
+	CreateTime time.Time `json:"create_time"`
+	UpdateTime time.Time `json:"update_time"`
+}
+
+func (q *Queries) CreateSpaceUserMember(ctx context.Context, arg CreateSpaceUserMemberParams) (CreateSpaceUserMemberRow, error) {
+	row := q.db.QueryRow(ctx, createSpaceUserMember,
+		arg.ID,
+		arg.SpaceID,
+		arg.RoleID,
+		arg.UserID,
+		arg.CreatedBy,
+	)
+	var i CreateSpaceUserMemberRow
+	err := row.Scan(
+		&i.ID,
+		&i.Etag,
+		&i.CreateTime,
+		&i.UpdateTime,
+	)
+	return i, err
+}
+
+const deleteOrgGroupMember = `-- name: DeleteOrgGroupMember :execrows
+DELETE FROM org_members
+ WHERE org_id = $1
+   AND group_id = $2
+`
+
+type DeleteOrgGroupMemberParams struct {
+	OrgID   uuid.UUID   `json:"org_id"`
+	GroupID pgtype.UUID `json:"group_id"`
+}
+
+func (q *Queries) DeleteOrgGroupMember(ctx context.Context, arg DeleteOrgGroupMemberParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteOrgGroupMember, arg.OrgID, arg.GroupID)
 	if err != nil {
 		return 0, err
 	}
 	return result.RowsAffected(), nil
 }
 
-const deleteSpaceMember = `-- name: DeleteSpaceMember :execrows
-DELETE FROM space_members
- WHERE space_id = $1
-   AND principal_kind = $2
-   AND principal_id = $3
+const deleteOrgUserMember = `-- name: DeleteOrgUserMember :execrows
+DELETE FROM org_members
+ WHERE org_id = $1
+   AND user_id = $2
 `
 
-type DeleteSpaceMemberParams struct {
-	SpaceID       uuid.UUID     `json:"space_id"`
-	PrincipalKind PrincipalKind `json:"principal_kind"`
-	PrincipalID   uuid.UUID     `json:"principal_id"`
+type DeleteOrgUserMemberParams struct {
+	OrgID  uuid.UUID   `json:"org_id"`
+	UserID pgtype.UUID `json:"user_id"`
 }
 
-func (q *Queries) DeleteSpaceMember(ctx context.Context, arg DeleteSpaceMemberParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteSpaceMember, arg.SpaceID, arg.PrincipalKind, arg.PrincipalID)
+// Returns the affected-row count so the handler can map "not found"
+// (0 rows) to gRPC NotFound rather than treating it as success.
+func (q *Queries) DeleteOrgUserMember(ctx context.Context, arg DeleteOrgUserMemberParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteOrgUserMember, arg.OrgID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteSpaceGroupMember = `-- name: DeleteSpaceGroupMember :execrows
+DELETE FROM space_members
+ WHERE space_id = $1
+   AND group_id = $2
+`
+
+type DeleteSpaceGroupMemberParams struct {
+	SpaceID uuid.UUID   `json:"space_id"`
+	GroupID pgtype.UUID `json:"group_id"`
+}
+
+func (q *Queries) DeleteSpaceGroupMember(ctx context.Context, arg DeleteSpaceGroupMemberParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteSpaceGroupMember, arg.SpaceID, arg.GroupID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteSpaceUserMember = `-- name: DeleteSpaceUserMember :execrows
+DELETE FROM space_members
+ WHERE space_id = $1
+   AND user_id = $2
+`
+
+type DeleteSpaceUserMemberParams struct {
+	SpaceID uuid.UUID   `json:"space_id"`
+	UserID  pgtype.UUID `json:"user_id"`
+}
+
+func (q *Queries) DeleteSpaceUserMember(ctx context.Context, arg DeleteSpaceUserMemberParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteSpaceUserMember, arg.SpaceID, arg.UserID)
 	if err != nil {
 		return 0, err
 	}
@@ -148,45 +254,37 @@ SELECT DISTINCT r.name
   FROM org_members om
   JOIN roles r ON r.id = om.role_id
  WHERE om.org_id = $1
-   -- v1 only resolves system roles against the in-memory matrix.
-   -- v2 (custom roles): drop this filter AND teach the resolver to
-   -- look up role_permissions rows for the non-system roles in the
-   -- result set; without that change, custom-role bindings would
-   -- silently never grant any permission.
    AND r.is_system = true
    AND (
-     (om.principal_kind = 'user'
-      AND om.principal_id = $2)
+     om.user_id = $2
      OR
-     (om.principal_kind = 'group'
-      AND om.principal_id IN (
-        SELECT gm.group_id
-          FROM group_members gm
-         WHERE gm.user_id = $2
-      ))
+     om.group_id IN (
+       SELECT gm.group_id
+         FROM group_members gm
+        WHERE gm.user_id = $2
+     )
    )
 `
 
 type GetEffectiveOrgRolesParams struct {
-	OrgID      uuid.UUID `json:"org_id"`
-	IdentityID uuid.UUID `json:"identity_id"`
+	OrgID      uuid.UUID   `json:"org_id"`
+	IdentityID pgtype.UUID `json:"identity_id"`
 }
 
-// Returns the system-role names a identity has at the given
-// org, considering both direct user bindings and group-derived
-// bindings (groups the user is a member of, which themselves have
-// org_members rows). Custom roles are excluded — v1 only resolves
-// against the system-role permission matrix.
+// Returns the system-role names an identity has at the given org,
+// considering both direct user bindings (org_members.user_id) and
+// group-derived bindings (org_members.group_id matching a group the
+// user is a member of via group_members). Custom roles are excluded
+// — v1 only resolves against the system-role permission matrix.
 //
 // Used by the permission resolver as the org-scope half of effective-
 // role resolution. Space-scope inheritance is handled at the resolver
 // layer by unioning this with `GetEffectiveSpaceRoles`.
 //
-// Post-Phase-7 unification: `org_members.principal_id` (when
-// principal_kind='user') and `group_members.user_id` both reference
-// `identities.id` directly. The previous per-org `users`
-// join row is gone, so this query no longer needs a caller-resolution
-// CTE. Returns the empty set if no bindings exist.
+// Post-principal-split: the polymorphic `principal_kind/principal_id`
+// pair was replaced by typed `user_id`/`group_id` columns (XOR
+// enforced at the row level). The OR branches below select on the
+// live column for each binding shape.
 func (q *Queries) GetEffectiveOrgRoles(ctx context.Context, arg GetEffectiveOrgRolesParams) ([]string, error) {
 	rows, err := q.db.Query(ctx, getEffectiveOrgRoles, arg.OrgID, arg.IdentityID)
 	if err != nil {
@@ -214,32 +312,26 @@ SELECT DISTINCT r.name
  WHERE sm.space_id = $1
    AND r.is_system = true
    AND (
-     (sm.principal_kind = 'user'
-      AND sm.principal_id = $2)
+     sm.user_id = $2
      OR
-     (sm.principal_kind = 'group'
-      AND sm.principal_id IN (
-        SELECT gm.group_id
-          FROM group_members gm
-         WHERE gm.user_id = $2
-      ))
+     sm.group_id IN (
+       SELECT gm.group_id
+         FROM group_members gm
+        WHERE gm.user_id = $2
+     )
    )
 `
 
 type GetEffectiveSpaceRolesParams struct {
-	SpaceID    uuid.UUID `json:"space_id"`
-	IdentityID uuid.UUID `json:"identity_id"`
+	SpaceID    uuid.UUID   `json:"space_id"`
+	IdentityID pgtype.UUID `json:"identity_id"`
 }
 
-// Returns the system-role names a identity has at the given
-// space — direct + group-derived space-level bindings only. Org-level
+// Returns the system-role names an identity has at the given space —
+// direct + group-derived space-level bindings only. Org-level
 // inheritance (an org-admin is also a space-admin) is the resolver's
 // responsibility to union in via GetEffectiveOrgRoles against the
 // space's parent org.
-//
-// Post-Phase-7 unification: same simplification as
-// GetEffectiveOrgRoles — principal_id and group_members.user_id are
-// both identities.id, so no caller-resolution CTE.
 func (q *Queries) GetEffectiveSpaceRoles(ctx context.Context, arg GetEffectiveSpaceRolesParams) ([]string, error) {
 	rows, err := q.db.Query(ctx, getEffectiveSpaceRoles, arg.SpaceID, arg.IdentityID)
 	if err != nil {
@@ -296,15 +388,13 @@ const getIdentityForMember = `-- name: GetIdentityForMember :one
 SELECT id, firebase_uid, email, email_verified, display_name, photo_url, disabled, is_deleted, create_time, update_time, last_login_time, delete_time FROM identities WHERE id = $1
 `
 
-// Verifies that a identity row exists for the given uuid.
-// Used by Member create handlers as the principal-existence check
-// before inserting a binding — org_members.principal_id has no FK
-// (it's polymorphic by principal_kind), so the check is
-// application-level. The previous version of this query
-// (`GetUserByID`) verified per-org membership via the dropped
-// `users` table; post-Phase-7 the membership check is "principal
-// has a identity row", and CreateMember separately validates
-// that the caller has org-level permission to create the binding.
+// Verifies that an identity row exists for the given uuid. Used by
+// Member create handlers as the principal-existence check before
+// inserting a binding. The org_members.user_id column DOES carry an
+// FK now (post-split), so an INSERT against a non-existent
+// identity_id would fail with a constraint violation — this query
+// is kept to surface the failure as a clean NotFound at the gRPC
+// layer rather than letting the FK error bubble up as Internal.
 func (q *Queries) GetIdentityForMember(ctx context.Context, id uuid.UUID) (Identity, error) {
 	row := q.db.QueryRow(ctx, getIdentityForMember, id)
 	var i Identity
@@ -325,49 +415,43 @@ func (q *Queries) GetIdentityForMember(ctx context.Context, id uuid.UUID) (Ident
 	return i, err
 }
 
-const getOrgMember = `-- name: GetOrgMember :one
-SELECT om.id, om.org_id, om.role_id, om.principal_kind, om.principal_id, om.etag, om.revision, om.created_by, om.updated_by, om.create_time, om.update_time, r.name AS role_name
+const getOrgMemberByGroup = `-- name: GetOrgMemberByGroup :one
+SELECT om.id, om.org_id, om.role_id, om.user_id, om.group_id, om.etag, om.revision, om.created_by, om.updated_by, om.create_time, om.update_time, r.name AS role_name
   FROM org_members om
   JOIN roles r ON r.id = om.role_id
  WHERE om.org_id = $1
-   AND om.principal_kind = $2
-   AND om.principal_id = $3
+   AND om.group_id = $2
 `
 
-type GetOrgMemberParams struct {
-	OrgID         uuid.UUID     `json:"org_id"`
-	PrincipalKind PrincipalKind `json:"principal_kind"`
-	PrincipalID   uuid.UUID     `json:"principal_id"`
+type GetOrgMemberByGroupParams struct {
+	OrgID   uuid.UUID   `json:"org_id"`
+	GroupID pgtype.UUID `json:"group_id"`
 }
 
-type GetOrgMemberRow struct {
-	ID            uuid.UUID     `json:"id"`
-	OrgID         uuid.UUID     `json:"org_id"`
-	RoleID        uuid.UUID     `json:"role_id"`
-	PrincipalKind PrincipalKind `json:"principal_kind"`
-	PrincipalID   uuid.UUID     `json:"principal_id"`
-	Etag          string        `json:"etag"`
-	Revision      int32         `json:"revision"`
-	CreatedBy     pgtype.UUID   `json:"created_by"`
-	UpdatedBy     pgtype.UUID   `json:"updated_by"`
-	CreateTime    time.Time     `json:"create_time"`
-	UpdateTime    time.Time     `json:"update_time"`
-	RoleName      string        `json:"role_name"`
+type GetOrgMemberByGroupRow struct {
+	ID         uuid.UUID   `json:"id"`
+	OrgID      uuid.UUID   `json:"org_id"`
+	RoleID     uuid.UUID   `json:"role_id"`
+	UserID     pgtype.UUID `json:"user_id"`
+	GroupID    pgtype.UUID `json:"group_id"`
+	Etag       string      `json:"etag"`
+	Revision   int32       `json:"revision"`
+	CreatedBy  pgtype.UUID `json:"created_by"`
+	UpdatedBy  pgtype.UUID `json:"updated_by"`
+	CreateTime time.Time   `json:"create_time"`
+	UpdateTime time.Time   `json:"update_time"`
+	RoleName   string      `json:"role_name"`
 }
 
-// Looks up a single org-scope role binding by (org, principal). Joins
-// to roles so the caller has the role name without a second query;
-// handlers convert this row directly to the Member proto's
-// `name = organizations/{org}/members/{member}` shape.
-func (q *Queries) GetOrgMember(ctx context.Context, arg GetOrgMemberParams) (GetOrgMemberRow, error) {
-	row := q.db.QueryRow(ctx, getOrgMember, arg.OrgID, arg.PrincipalKind, arg.PrincipalID)
-	var i GetOrgMemberRow
+func (q *Queries) GetOrgMemberByGroup(ctx context.Context, arg GetOrgMemberByGroupParams) (GetOrgMemberByGroupRow, error) {
+	row := q.db.QueryRow(ctx, getOrgMemberByGroup, arg.OrgID, arg.GroupID)
+	var i GetOrgMemberByGroupRow
 	err := row.Scan(
 		&i.ID,
 		&i.OrgID,
 		&i.RoleID,
-		&i.PrincipalKind,
-		&i.PrincipalID,
+		&i.UserID,
+		&i.GroupID,
 		&i.Etag,
 		&i.Revision,
 		&i.CreatedBy,
@@ -379,49 +463,144 @@ func (q *Queries) GetOrgMember(ctx context.Context, arg GetOrgMemberParams) (Get
 	return i, err
 }
 
-const getSpaceMember = `-- name: GetSpaceMember :one
-SELECT sm.id, sm.space_id, sm.role_id, sm.principal_kind, sm.principal_id, sm.etag, sm.revision, sm.created_by, sm.updated_by, sm.create_time, sm.update_time, r.name AS role_name
+const getOrgMemberByUser = `-- name: GetOrgMemberByUser :one
+SELECT om.id, om.org_id, om.role_id, om.user_id, om.group_id, om.etag, om.revision, om.created_by, om.updated_by, om.create_time, om.update_time, r.name AS role_name
+  FROM org_members om
+  JOIN roles r ON r.id = om.role_id
+ WHERE om.org_id = $1
+   AND om.user_id = $2
+`
+
+type GetOrgMemberByUserParams struct {
+	OrgID  uuid.UUID   `json:"org_id"`
+	UserID pgtype.UUID `json:"user_id"`
+}
+
+type GetOrgMemberByUserRow struct {
+	ID         uuid.UUID   `json:"id"`
+	OrgID      uuid.UUID   `json:"org_id"`
+	RoleID     uuid.UUID   `json:"role_id"`
+	UserID     pgtype.UUID `json:"user_id"`
+	GroupID    pgtype.UUID `json:"group_id"`
+	Etag       string      `json:"etag"`
+	Revision   int32       `json:"revision"`
+	CreatedBy  pgtype.UUID `json:"created_by"`
+	UpdatedBy  pgtype.UUID `json:"updated_by"`
+	CreateTime time.Time   `json:"create_time"`
+	UpdateTime time.Time   `json:"update_time"`
+	RoleName   string      `json:"role_name"`
+}
+
+// Looks up a single org-scope user binding. After the principal_id
+// split, user and group lookups are separate queries — the
+// predicate uses the typed column directly, and the filtered unique
+// indexes on (org_id, user_id) / (org_id, group_id) make these
+// lookups index-only.
+func (q *Queries) GetOrgMemberByUser(ctx context.Context, arg GetOrgMemberByUserParams) (GetOrgMemberByUserRow, error) {
+	row := q.db.QueryRow(ctx, getOrgMemberByUser, arg.OrgID, arg.UserID)
+	var i GetOrgMemberByUserRow
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.RoleID,
+		&i.UserID,
+		&i.GroupID,
+		&i.Etag,
+		&i.Revision,
+		&i.CreatedBy,
+		&i.UpdatedBy,
+		&i.CreateTime,
+		&i.UpdateTime,
+		&i.RoleName,
+	)
+	return i, err
+}
+
+const getSpaceMemberByGroup = `-- name: GetSpaceMemberByGroup :one
+SELECT sm.id, sm.space_id, sm.role_id, sm.user_id, sm.group_id, sm.etag, sm.revision, sm.created_by, sm.updated_by, sm.create_time, sm.update_time, r.name AS role_name
   FROM space_members sm
   JOIN roles r ON r.id = sm.role_id
  WHERE sm.space_id = $1
-   AND sm.principal_kind = $2
-   AND sm.principal_id = $3
+   AND sm.group_id = $2
 `
 
-type GetSpaceMemberParams struct {
-	SpaceID       uuid.UUID     `json:"space_id"`
-	PrincipalKind PrincipalKind `json:"principal_kind"`
-	PrincipalID   uuid.UUID     `json:"principal_id"`
+type GetSpaceMemberByGroupParams struct {
+	SpaceID uuid.UUID   `json:"space_id"`
+	GroupID pgtype.UUID `json:"group_id"`
 }
 
-type GetSpaceMemberRow struct {
-	ID            uuid.UUID     `json:"id"`
-	SpaceID       uuid.UUID     `json:"space_id"`
-	RoleID        uuid.UUID     `json:"role_id"`
-	PrincipalKind PrincipalKind `json:"principal_kind"`
-	PrincipalID   uuid.UUID     `json:"principal_id"`
-	Etag          string        `json:"etag"`
-	Revision      int32         `json:"revision"`
-	CreatedBy     pgtype.UUID   `json:"created_by"`
-	UpdatedBy     pgtype.UUID   `json:"updated_by"`
-	CreateTime    time.Time     `json:"create_time"`
-	UpdateTime    time.Time     `json:"update_time"`
-	RoleName      string        `json:"role_name"`
+type GetSpaceMemberByGroupRow struct {
+	ID         uuid.UUID   `json:"id"`
+	SpaceID    uuid.UUID   `json:"space_id"`
+	RoleID     uuid.UUID   `json:"role_id"`
+	UserID     pgtype.UUID `json:"user_id"`
+	GroupID    pgtype.UUID `json:"group_id"`
+	Etag       string      `json:"etag"`
+	Revision   int32       `json:"revision"`
+	CreatedBy  pgtype.UUID `json:"created_by"`
+	UpdatedBy  pgtype.UUID `json:"updated_by"`
+	CreateTime time.Time   `json:"create_time"`
+	UpdateTime time.Time   `json:"update_time"`
+	RoleName   string      `json:"role_name"`
 }
 
-// Companion to GetOrgMember at space scope. Note: this returns ONLY
-// direct space-level bindings; org-level inheritance (an org-admin
-// being implicitly a space-admin) is computed at the resolver layer,
-// not surfaced as a Member resource at the space scope.
-func (q *Queries) GetSpaceMember(ctx context.Context, arg GetSpaceMemberParams) (GetSpaceMemberRow, error) {
-	row := q.db.QueryRow(ctx, getSpaceMember, arg.SpaceID, arg.PrincipalKind, arg.PrincipalID)
-	var i GetSpaceMemberRow
+func (q *Queries) GetSpaceMemberByGroup(ctx context.Context, arg GetSpaceMemberByGroupParams) (GetSpaceMemberByGroupRow, error) {
+	row := q.db.QueryRow(ctx, getSpaceMemberByGroup, arg.SpaceID, arg.GroupID)
+	var i GetSpaceMemberByGroupRow
 	err := row.Scan(
 		&i.ID,
 		&i.SpaceID,
 		&i.RoleID,
-		&i.PrincipalKind,
-		&i.PrincipalID,
+		&i.UserID,
+		&i.GroupID,
+		&i.Etag,
+		&i.Revision,
+		&i.CreatedBy,
+		&i.UpdatedBy,
+		&i.CreateTime,
+		&i.UpdateTime,
+		&i.RoleName,
+	)
+	return i, err
+}
+
+const getSpaceMemberByUser = `-- name: GetSpaceMemberByUser :one
+SELECT sm.id, sm.space_id, sm.role_id, sm.user_id, sm.group_id, sm.etag, sm.revision, sm.created_by, sm.updated_by, sm.create_time, sm.update_time, r.name AS role_name
+  FROM space_members sm
+  JOIN roles r ON r.id = sm.role_id
+ WHERE sm.space_id = $1
+   AND sm.user_id = $2
+`
+
+type GetSpaceMemberByUserParams struct {
+	SpaceID uuid.UUID   `json:"space_id"`
+	UserID  pgtype.UUID `json:"user_id"`
+}
+
+type GetSpaceMemberByUserRow struct {
+	ID         uuid.UUID   `json:"id"`
+	SpaceID    uuid.UUID   `json:"space_id"`
+	RoleID     uuid.UUID   `json:"role_id"`
+	UserID     pgtype.UUID `json:"user_id"`
+	GroupID    pgtype.UUID `json:"group_id"`
+	Etag       string      `json:"etag"`
+	Revision   int32       `json:"revision"`
+	CreatedBy  pgtype.UUID `json:"created_by"`
+	UpdatedBy  pgtype.UUID `json:"updated_by"`
+	CreateTime time.Time   `json:"create_time"`
+	UpdateTime time.Time   `json:"update_time"`
+	RoleName   string      `json:"role_name"`
+}
+
+func (q *Queries) GetSpaceMemberByUser(ctx context.Context, arg GetSpaceMemberByUserParams) (GetSpaceMemberByUserRow, error) {
+	row := q.db.QueryRow(ctx, getSpaceMemberByUser, arg.SpaceID, arg.UserID)
+	var i GetSpaceMemberByUserRow
+	err := row.Scan(
+		&i.ID,
+		&i.SpaceID,
+		&i.RoleID,
+		&i.UserID,
+		&i.GroupID,
 		&i.Etag,
 		&i.Revision,
 		&i.CreatedBy,
@@ -454,7 +633,7 @@ func (q *Queries) GetSpaceParentOrg(ctx context.Context, id uuid.UUID) (uuid.UUI
 }
 
 const listOrgMembers = `-- name: ListOrgMembers :many
-SELECT om.id, om.org_id, om.role_id, om.principal_kind, om.principal_id, om.etag, om.revision, om.created_by, om.updated_by, om.create_time, om.update_time, r.name AS role_name
+SELECT om.id, om.org_id, om.role_id, om.user_id, om.group_id, om.etag, om.revision, om.created_by, om.updated_by, om.create_time, om.update_time, r.name AS role_name
   FROM org_members om
   JOIN roles r ON r.id = om.role_id
  WHERE om.org_id = $1
@@ -470,26 +649,25 @@ type ListOrgMembersParams struct {
 }
 
 type ListOrgMembersRow struct {
-	ID            uuid.UUID     `json:"id"`
-	OrgID         uuid.UUID     `json:"org_id"`
-	RoleID        uuid.UUID     `json:"role_id"`
-	PrincipalKind PrincipalKind `json:"principal_kind"`
-	PrincipalID   uuid.UUID     `json:"principal_id"`
-	Etag          string        `json:"etag"`
-	Revision      int32         `json:"revision"`
-	CreatedBy     pgtype.UUID   `json:"created_by"`
-	UpdatedBy     pgtype.UUID   `json:"updated_by"`
-	CreateTime    time.Time     `json:"create_time"`
-	UpdateTime    time.Time     `json:"update_time"`
-	RoleName      string        `json:"role_name"`
+	ID         uuid.UUID   `json:"id"`
+	OrgID      uuid.UUID   `json:"org_id"`
+	RoleID     uuid.UUID   `json:"role_id"`
+	UserID     pgtype.UUID `json:"user_id"`
+	GroupID    pgtype.UUID `json:"group_id"`
+	Etag       string      `json:"etag"`
+	Revision   int32       `json:"revision"`
+	CreatedBy  pgtype.UUID `json:"created_by"`
+	UpdatedBy  pgtype.UUID `json:"updated_by"`
+	CreateTime time.Time   `json:"create_time"`
+	UpdateTime time.Time   `json:"update_time"`
+	RoleName   string      `json:"role_name"`
 }
 
 // Lists org-scope role bindings for an org with offset-based
 // pagination. Ordered by (create_time, id) so paging is stable under
-// concurrent inserts. The handler converts AIP-132 page_token /
-// page_size into the offset / limit args here. Caller asks for
-// limit+1 rows to detect "more pages exist" without a separate count
-// query; the handler trims the extra row before responding.
+// concurrent inserts. Caller asks for limit+1 rows to detect "more
+// pages exist" without a separate count query; the handler trims the
+// extra row before responding.
 func (q *Queries) ListOrgMembers(ctx context.Context, arg ListOrgMembersParams) ([]ListOrgMembersRow, error) {
 	rows, err := q.db.Query(ctx, listOrgMembers, arg.OrgID, arg.Offset, arg.Limit)
 	if err != nil {
@@ -503,8 +681,8 @@ func (q *Queries) ListOrgMembers(ctx context.Context, arg ListOrgMembersParams) 
 			&i.ID,
 			&i.OrgID,
 			&i.RoleID,
-			&i.PrincipalKind,
-			&i.PrincipalID,
+			&i.UserID,
+			&i.GroupID,
 			&i.Etag,
 			&i.Revision,
 			&i.CreatedBy,
@@ -524,7 +702,7 @@ func (q *Queries) ListOrgMembers(ctx context.Context, arg ListOrgMembersParams) 
 }
 
 const listOrgOwnerMembers = `-- name: ListOrgOwnerMembers :many
-SELECT om.id, om.org_id, om.role_id, om.principal_kind, om.principal_id,
+SELECT om.id, om.org_id, om.role_id, om.user_id, om.group_id,
        om.etag, om.revision, om.created_by, om.updated_by,
        om.create_time, om.update_time
   FROM org_members om
@@ -551,8 +729,8 @@ func (q *Queries) ListOrgOwnerMembers(ctx context.Context, orgID uuid.UUID) ([]O
 			&i.ID,
 			&i.OrgID,
 			&i.RoleID,
-			&i.PrincipalKind,
-			&i.PrincipalID,
+			&i.UserID,
+			&i.GroupID,
 			&i.Etag,
 			&i.Revision,
 			&i.CreatedBy,
@@ -571,7 +749,7 @@ func (q *Queries) ListOrgOwnerMembers(ctx context.Context, orgID uuid.UUID) ([]O
 }
 
 const listSpaceMembers = `-- name: ListSpaceMembers :many
-SELECT sm.id, sm.space_id, sm.role_id, sm.principal_kind, sm.principal_id, sm.etag, sm.revision, sm.created_by, sm.updated_by, sm.create_time, sm.update_time, r.name AS role_name
+SELECT sm.id, sm.space_id, sm.role_id, sm.user_id, sm.group_id, sm.etag, sm.revision, sm.created_by, sm.updated_by, sm.create_time, sm.update_time, r.name AS role_name
   FROM space_members sm
   JOIN roles r ON r.id = sm.role_id
  WHERE sm.space_id = $1
@@ -587,23 +765,20 @@ type ListSpaceMembersParams struct {
 }
 
 type ListSpaceMembersRow struct {
-	ID            uuid.UUID     `json:"id"`
-	SpaceID       uuid.UUID     `json:"space_id"`
-	RoleID        uuid.UUID     `json:"role_id"`
-	PrincipalKind PrincipalKind `json:"principal_kind"`
-	PrincipalID   uuid.UUID     `json:"principal_id"`
-	Etag          string        `json:"etag"`
-	Revision      int32         `json:"revision"`
-	CreatedBy     pgtype.UUID   `json:"created_by"`
-	UpdatedBy     pgtype.UUID   `json:"updated_by"`
-	CreateTime    time.Time     `json:"create_time"`
-	UpdateTime    time.Time     `json:"update_time"`
-	RoleName      string        `json:"role_name"`
+	ID         uuid.UUID   `json:"id"`
+	SpaceID    uuid.UUID   `json:"space_id"`
+	RoleID     uuid.UUID   `json:"role_id"`
+	UserID     pgtype.UUID `json:"user_id"`
+	GroupID    pgtype.UUID `json:"group_id"`
+	Etag       string      `json:"etag"`
+	Revision   int32       `json:"revision"`
+	CreatedBy  pgtype.UUID `json:"created_by"`
+	UpdatedBy  pgtype.UUID `json:"updated_by"`
+	CreateTime time.Time   `json:"create_time"`
+	UpdateTime time.Time   `json:"update_time"`
+	RoleName   string      `json:"role_name"`
 }
 
-// Companion to ListOrgMembers at space scope. Same direct-only
-// semantic as GetSpaceMember and the same offset+limit pagination
-// contract.
 func (q *Queries) ListSpaceMembers(ctx context.Context, arg ListSpaceMembersParams) ([]ListSpaceMembersRow, error) {
 	rows, err := q.db.Query(ctx, listSpaceMembers, arg.SpaceID, arg.Offset, arg.Limit)
 	if err != nil {
@@ -617,8 +792,8 @@ func (q *Queries) ListSpaceMembers(ctx context.Context, arg ListSpaceMembersPara
 			&i.ID,
 			&i.SpaceID,
 			&i.RoleID,
-			&i.PrincipalKind,
-			&i.PrincipalID,
+			&i.UserID,
+			&i.GroupID,
 			&i.Etag,
 			&i.Revision,
 			&i.CreatedBy,
@@ -637,45 +812,33 @@ func (q *Queries) ListSpaceMembers(ctx context.Context, arg ListSpaceMembersPara
 	return items, nil
 }
 
-const updateOrgMemberRole = `-- name: UpdateOrgMemberRole :one
+const updateOrgGroupMemberRole = `-- name: UpdateOrgGroupMemberRole :one
 UPDATE org_members
-   SET role_id = $4,
+   SET role_id = $3,
        update_time = now(),
        revision = revision + 1,
        etag = md5(now()::text)
  WHERE org_id = $1
-   AND principal_kind = $2
-   AND principal_id = $3
+   AND group_id = $2
 RETURNING id, etag, create_time, update_time
 `
 
-type UpdateOrgMemberRoleParams struct {
-	OrgID         uuid.UUID     `json:"org_id"`
-	PrincipalKind PrincipalKind `json:"principal_kind"`
-	PrincipalID   uuid.UUID     `json:"principal_id"`
-	RoleID        uuid.UUID     `json:"role_id"`
+type UpdateOrgGroupMemberRoleParams struct {
+	OrgID   uuid.UUID   `json:"org_id"`
+	GroupID pgtype.UUID `json:"group_id"`
+	RoleID  uuid.UUID   `json:"role_id"`
 }
 
-type UpdateOrgMemberRoleRow struct {
+type UpdateOrgGroupMemberRoleRow struct {
 	ID         uuid.UUID `json:"id"`
 	Etag       string    `json:"etag"`
 	CreateTime time.Time `json:"create_time"`
 	UpdateTime time.Time `json:"update_time"`
 }
 
-// Mutates only the role; principal and scope are immutable. Bumps
-// revision + etag. Returns the new etag + timestamps so the handler
-// can build the Member proto response without a follow-up
-// GetOrgMember round-trip — the caller already knows the org slug
-// and new role name from validation.
-func (q *Queries) UpdateOrgMemberRole(ctx context.Context, arg UpdateOrgMemberRoleParams) (UpdateOrgMemberRoleRow, error) {
-	row := q.db.QueryRow(ctx, updateOrgMemberRole,
-		arg.OrgID,
-		arg.PrincipalKind,
-		arg.PrincipalID,
-		arg.RoleID,
-	)
-	var i UpdateOrgMemberRoleRow
+func (q *Queries) UpdateOrgGroupMemberRole(ctx context.Context, arg UpdateOrgGroupMemberRoleParams) (UpdateOrgGroupMemberRoleRow, error) {
+	row := q.db.QueryRow(ctx, updateOrgGroupMemberRole, arg.OrgID, arg.GroupID, arg.RoleID)
+	var i UpdateOrgGroupMemberRoleRow
 	err := row.Scan(
 		&i.ID,
 		&i.Etag,
@@ -685,41 +848,109 @@ func (q *Queries) UpdateOrgMemberRole(ctx context.Context, arg UpdateOrgMemberRo
 	return i, err
 }
 
-const updateSpaceMemberRole = `-- name: UpdateSpaceMemberRole :one
-UPDATE space_members
-   SET role_id = $4,
+const updateOrgUserMemberRole = `-- name: UpdateOrgUserMemberRole :one
+UPDATE org_members
+   SET role_id = $3,
        update_time = now(),
        revision = revision + 1,
        etag = md5(now()::text)
- WHERE space_id = $1
-   AND principal_kind = $2
-   AND principal_id = $3
+ WHERE org_id = $1
+   AND user_id = $2
 RETURNING id, etag, create_time, update_time
 `
 
-type UpdateSpaceMemberRoleParams struct {
-	SpaceID       uuid.UUID     `json:"space_id"`
-	PrincipalKind PrincipalKind `json:"principal_kind"`
-	PrincipalID   uuid.UUID     `json:"principal_id"`
-	RoleID        uuid.UUID     `json:"role_id"`
+type UpdateOrgUserMemberRoleParams struct {
+	OrgID  uuid.UUID   `json:"org_id"`
+	UserID pgtype.UUID `json:"user_id"`
+	RoleID uuid.UUID   `json:"role_id"`
 }
 
-type UpdateSpaceMemberRoleRow struct {
+type UpdateOrgUserMemberRoleRow struct {
 	ID         uuid.UUID `json:"id"`
 	Etag       string    `json:"etag"`
 	CreateTime time.Time `json:"create_time"`
 	UpdateTime time.Time `json:"update_time"`
 }
 
-// Companion to UpdateOrgMemberRole at space scope.
-func (q *Queries) UpdateSpaceMemberRole(ctx context.Context, arg UpdateSpaceMemberRoleParams) (UpdateSpaceMemberRoleRow, error) {
-	row := q.db.QueryRow(ctx, updateSpaceMemberRole,
-		arg.SpaceID,
-		arg.PrincipalKind,
-		arg.PrincipalID,
-		arg.RoleID,
+// Mutates only the role; principal and scope are immutable. Bumps
+// revision + etag. Returns the new etag + timestamps so the handler
+// can build the Member proto response without a follow-up
+// GetOrgMember* round-trip.
+func (q *Queries) UpdateOrgUserMemberRole(ctx context.Context, arg UpdateOrgUserMemberRoleParams) (UpdateOrgUserMemberRoleRow, error) {
+	row := q.db.QueryRow(ctx, updateOrgUserMemberRole, arg.OrgID, arg.UserID, arg.RoleID)
+	var i UpdateOrgUserMemberRoleRow
+	err := row.Scan(
+		&i.ID,
+		&i.Etag,
+		&i.CreateTime,
+		&i.UpdateTime,
 	)
-	var i UpdateSpaceMemberRoleRow
+	return i, err
+}
+
+const updateSpaceGroupMemberRole = `-- name: UpdateSpaceGroupMemberRole :one
+UPDATE space_members
+   SET role_id = $3,
+       update_time = now(),
+       revision = revision + 1,
+       etag = md5(now()::text)
+ WHERE space_id = $1
+   AND group_id = $2
+RETURNING id, etag, create_time, update_time
+`
+
+type UpdateSpaceGroupMemberRoleParams struct {
+	SpaceID uuid.UUID   `json:"space_id"`
+	GroupID pgtype.UUID `json:"group_id"`
+	RoleID  uuid.UUID   `json:"role_id"`
+}
+
+type UpdateSpaceGroupMemberRoleRow struct {
+	ID         uuid.UUID `json:"id"`
+	Etag       string    `json:"etag"`
+	CreateTime time.Time `json:"create_time"`
+	UpdateTime time.Time `json:"update_time"`
+}
+
+func (q *Queries) UpdateSpaceGroupMemberRole(ctx context.Context, arg UpdateSpaceGroupMemberRoleParams) (UpdateSpaceGroupMemberRoleRow, error) {
+	row := q.db.QueryRow(ctx, updateSpaceGroupMemberRole, arg.SpaceID, arg.GroupID, arg.RoleID)
+	var i UpdateSpaceGroupMemberRoleRow
+	err := row.Scan(
+		&i.ID,
+		&i.Etag,
+		&i.CreateTime,
+		&i.UpdateTime,
+	)
+	return i, err
+}
+
+const updateSpaceUserMemberRole = `-- name: UpdateSpaceUserMemberRole :one
+UPDATE space_members
+   SET role_id = $3,
+       update_time = now(),
+       revision = revision + 1,
+       etag = md5(now()::text)
+ WHERE space_id = $1
+   AND user_id = $2
+RETURNING id, etag, create_time, update_time
+`
+
+type UpdateSpaceUserMemberRoleParams struct {
+	SpaceID uuid.UUID   `json:"space_id"`
+	UserID  pgtype.UUID `json:"user_id"`
+	RoleID  uuid.UUID   `json:"role_id"`
+}
+
+type UpdateSpaceUserMemberRoleRow struct {
+	ID         uuid.UUID `json:"id"`
+	Etag       string    `json:"etag"`
+	CreateTime time.Time `json:"create_time"`
+	UpdateTime time.Time `json:"update_time"`
+}
+
+func (q *Queries) UpdateSpaceUserMemberRole(ctx context.Context, arg UpdateSpaceUserMemberRoleParams) (UpdateSpaceUserMemberRoleRow, error) {
+	row := q.db.QueryRow(ctx, updateSpaceUserMemberRole, arg.SpaceID, arg.UserID, arg.RoleID)
+	var i UpdateSpaceUserMemberRoleRow
 	err := row.Scan(
 		&i.ID,
 		&i.Etag,

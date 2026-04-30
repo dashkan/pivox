@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/permission"
 	"github.com/dashkan/pivox/internal/testutil/mocks"
@@ -34,12 +35,14 @@ func TestBootstrapOrgRoles_SeedsFourSystemRoles(t *testing.T) {
 		return true
 	})).Return(nil).Times(4)
 
-	// CreateOrgMember binds founder → owner.
-	var memberArg db.CreateOrgMemberParams
-	q.On("CreateOrgMember", mock.Anything, mock.MatchedBy(func(p db.CreateOrgMemberParams) bool {
+	// CreateOrgUserMember binds founder → owner. After the
+	// principal_id split, the founder path uses the typed user
+	// variant (no group binding).
+	var memberArg db.CreateOrgUserMemberParams
+	q.On("CreateOrgUserMember", mock.Anything, mock.MatchedBy(func(p db.CreateOrgUserMemberParams) bool {
 		memberArg = p
 		return true
-	})).Return(db.CreateOrgMemberRow{}, nil).Once()
+	})).Return(db.CreateOrgUserMemberRow{}, nil).Once()
 
 	err := bootstrapOrgRoles(context.Background(), q, orgID, founderUserID)
 	require.NoError(t, err)
@@ -62,8 +65,7 @@ func TestBootstrapOrgRoles_SeedsFourSystemRoles(t *testing.T) {
 	// Owner-binding sanity: principal is the founder user (not a
 	// group), and role_id points at the owner role just seeded.
 	assert.Equal(t, orgID, memberArg.OrgID)
-	assert.Equal(t, db.PrincipalKindUser, memberArg.PrincipalKind)
-	assert.Equal(t, founderUserID, memberArg.PrincipalID)
+	assert.Equal(t, convert.PgUUID(founderUserID), memberArg.UserID)
 	assert.Equal(t, createdRoles[permission.RoleOwner].ID, memberArg.RoleID,
 		"founder must be bound to the just-created owner role for this org")
 	// Audit `created_by` should be the founder UUID (PgUUID-wrapped).
@@ -84,15 +86,15 @@ func TestBootstrapOrgRoles_RoleInsertFailureBubblesUp(t *testing.T) {
 		uuid.New(), uuid.New())
 	require.Error(t, err)
 
-	// CreateOrgMember was NOT called — fail-fast on the first error.
-	q.AssertNotCalled(t, "CreateOrgMember", mock.Anything, mock.Anything)
+	// CreateOrgUserMember was NOT called — fail-fast on the first error.
+	q.AssertNotCalled(t, "CreateOrgUserMember", mock.Anything, mock.Anything)
 }
 
 func TestBootstrapOrgRoles_OwnerBindingFailureBubblesUp(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	q.On("CreateRole", mock.Anything, mock.Anything).Return(nil).Times(4)
-	q.On("CreateOrgMember", mock.Anything, mock.Anything).
-		Return(db.CreateOrgMemberRow{}, errors.New("fk violation")).Once()
+	q.On("CreateOrgUserMember", mock.Anything, mock.Anything).
+		Return(db.CreateOrgUserMemberRow{}, errors.New("fk violation")).Once()
 
 	err := bootstrapOrgRoles(context.Background(), q,
 		uuid.New(), uuid.New())

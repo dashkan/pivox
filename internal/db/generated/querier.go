@@ -71,8 +71,8 @@ type Querier interface {
 	// CountOrgOwnersExcludingUser is the org-local sole-owner guard for
 	// Iam.DeleteUser: it counts owner bindings in this org EXCLUDING the
 	// user being removed, so the handler can refuse if removing them
-	// would leave the org with zero owners. Counts both user and group
-	// principals (matches CountOwnersByOrg's group-owner support).
+	// would leave the org with zero owners. Counts both user and
+	// ACTIVE-group principals (matches CountOwnersByOrg).
 	// $2 is `identities.id`.
 	CountOrgOwnersExcludingUser(ctx context.Context, arg CountOrgOwnersExcludingUserParams) (int64, error)
 	// Counts org_members rows whose role is the system 'owner' role for
@@ -80,9 +80,10 @@ type Querier interface {
 	// handlers to enforce "≥1 owner". Group principals are counted only
 	// when the group itself is ACTIVE (a soft-deleted group's binding
 	// doesn't keep the org owner-ful). User principals are counted
-	// unconditionally — there's no per-org-user soft-delete state any
-	// more (Phase 7); a binding's existence equals its liveness.
-	// Keys on the stable `roles.name` slug, not display_name.
+	// unconditionally — an identity row is preserved across soft-delete
+	// but the membership cascade in DeleteAccount removes their
+	// org_members row before tombstoning, so a counted user binding
+	// always points at a live identity.
 	CountOwnersByOrg(ctx context.Context, orgID uuid.UUID) (int64, error)
 	CountRequestsBySpace(ctx context.Context, spaceID uuid.UUID) (int64, error)
 	CountStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) (int64, error)
@@ -121,10 +122,10 @@ type Querier interface {
 	// known at create time, including DeleteOrganization which must
 	// not self-cancel).
 	CreateOperation(ctx context.Context, arg CreateOperationParams) (Operation, error)
-	// Inserts an org-level role binding and returns the server-generated
-	// etag + timestamps so the handler can build the Member proto
-	// response without a follow-up GetOrgMember round-trip.
-	CreateOrgMember(ctx context.Context, arg CreateOrgMemberParams) (CreateOrgMemberRow, error)
+	CreateOrgGroupMember(ctx context.Context, arg CreateOrgGroupMemberParams) (CreateOrgGroupMemberRow, error)
+	// Inserts a user binding. The XOR check on the table guarantees
+	// group_id stays NULL.
+	CreateOrgUserMember(ctx context.Context, arg CreateOrgUserMemberParams) (CreateOrgUserMemberRow, error)
 	// `created_by` is the founder pointer post-cleanup (single UUID FK
 	// replacing the old `created_by_firebase_identity_id` + TEXT
 	// `created_by` pair).
@@ -138,8 +139,8 @@ type Querier interface {
 	// read-back round-trip.
 	CreateRole(ctx context.Context, arg CreateRoleParams) error
 	CreateSpace(ctx context.Context, arg CreateSpaceParams) (Space, error)
-	// Companion to CreateOrgMember at space scope.
-	CreateSpaceMember(ctx context.Context, arg CreateSpaceMemberParams) (CreateSpaceMemberRow, error)
+	CreateSpaceGroupMember(ctx context.Context, arg CreateSpaceGroupMemberParams) (CreateSpaceGroupMemberRow, error)
+	CreateSpaceUserMember(ctx context.Context, arg CreateSpaceUserMemberParams) (CreateSpaceUserMemberRow, error)
 	CreateStorageAgent(ctx context.Context, arg CreateStorageAgentParams) (StorageAgent, error)
 	CreateStorageAgentAudit(ctx context.Context, arg CreateStorageAgentAuditParams) error
 	CreateStorageEndpoint(ctx context.Context, arg CreateStorageEndpointParams) (StorageEndpoint, error)
@@ -161,48 +162,49 @@ type Querier interface {
 	DeleteExpiredDelegatedAuthSessions(ctx context.Context) error
 	DeleteExpiredOperations(ctx context.Context) error
 	DeleteExpiredStorageAgentAudit(ctx context.Context) (int64, error)
-	// DeleteGroupMembersForIdentity removes the firebase_identity
-	// from every group it belongs to, across all orgs. Cross-org variant
-	// for DeleteAccount. After Phase 7 unification, group_members.user_id
-	// IS identities.id, so this is a single straight DELETE
-	// without the prior subquery.
+	// DeleteGroupMembersForIdentity removes the identity from every
+	// group it belongs to, across all orgs. Cross-org variant for
+	// DeleteAccount. group_members.user_id is `identities.id` directly,
+	// so this is a single straight DELETE.
 	DeleteGroupMembersForIdentity(ctx context.Context, userID uuid.UUID) error
 	// DeleteGroupMembersForUserInOrg removes the user's membership in
-	// groups belonging to this org. After Phase 7 unification,
-	// group_members.user_id IS identities.id directly — same
-	// type as principal_id on the sibling tables, just a different
-	// column name (group_members has no principal_kind discriminator).
+	// groups belonging to this org. group_members.user_id IS
+	// identities.id (post-Phase-7).
 	// $2 is `identities.id`.
 	DeleteGroupMembersForUserInOrg(ctx context.Context, arg DeleteGroupMembersForUserInOrgParams) error
 	DeleteLineItem(ctx context.Context, id uuid.UUID) error
 	DeleteOperation(ctx context.Context, id uuid.UUID) error
-	// Returns the affected-row count so the handler can map "not found"
-	// (0 rows) to gRPC NotFound rather than treating it as success.
-	DeleteOrgMember(ctx context.Context, arg DeleteOrgMemberParams) (int64, error)
-	// DeleteOrgMembersForIdentity removes ALL org-scope role
-	// bindings across every org for this firebase_identity. Used by
-	// DeleteAccount's cross-org cascade. Org-scoped DeleteUser uses
-	// the per-org variant `DeleteOrgMembersForUserInOrg` below.
-	DeleteOrgMembersForIdentity(ctx context.Context, principalID uuid.UUID) error
+	DeleteOrgGroupMember(ctx context.Context, arg DeleteOrgGroupMemberParams) (int64, error)
+	// DeleteOrgMembersForIdentity removes ALL org-scope role bindings
+	// across every org for this identity (direct user bindings only —
+	// group-derived bindings stay because the group itself isn't being
+	// deleted; the user just gets removed from the group via
+	// DeleteGroupMembersForIdentity below). Used by DeleteAccount's
+	// cross-org cascade.
+	DeleteOrgMembersForIdentity(ctx context.Context, userID pgtype.UUID) error
 	// ===========================================================================
 	// Org-scoped cascade queries used by Iam.DeleteUser (org-scoped, sync
 	// post-Phase-7 — no LRO, no grace). They remove a single user's
 	// bindings within ONE org, leaving every other org untouched.
 	// ===========================================================================
 	// DeleteOrgMembersForUserInOrg removes the user's org-scope role
-	// bindings in a single org. Bounded by (org_id, principal_id).
-	// $2 is `identities.id` (post-Phase-7 unification).
+	// bindings in a single org. Bounded by (org_id, user_id).
+	// $2 is `identities.id`.
 	DeleteOrgMembersForUserInOrg(ctx context.Context, arg DeleteOrgMembersForUserInOrgParams) error
+	// Returns the affected-row count so the handler can map "not found"
+	// (0 rows) to gRPC NotFound rather than treating it as success.
+	DeleteOrgUserMember(ctx context.Context, arg DeleteOrgUserMemberParams) (int64, error)
 	DeleteRequest(ctx context.Context, id uuid.UUID) error
-	DeleteSpaceMember(ctx context.Context, arg DeleteSpaceMemberParams) (int64, error)
-	// DeleteSpaceMembersForIdentity is the cross-org space-
-	// scope analogue used by DeleteAccount.
-	DeleteSpaceMembersForIdentity(ctx context.Context, principalID uuid.UUID) error
+	DeleteSpaceGroupMember(ctx context.Context, arg DeleteSpaceGroupMemberParams) (int64, error)
+	// DeleteSpaceMembersForIdentity is the cross-org space-scope
+	// analogue used by DeleteAccount.
+	DeleteSpaceMembersForIdentity(ctx context.Context, userID pgtype.UUID) error
 	// DeleteSpaceMembersForUserInOrg removes the user's space-scope
 	// bindings for spaces in this org. Joins to spaces to bound by
 	// org_id, since space_members rows themselves only carry space_id.
 	// $2 is `identities.id`.
 	DeleteSpaceMembersForUserInOrg(ctx context.Context, arg DeleteSpaceMembersForUserInOrgParams) error
+	DeleteSpaceUserMember(ctx context.Context, arg DeleteSpaceUserMemberParams) (int64, error)
 	DeleteStorageAgent(ctx context.Context, id uuid.UUID) error
 	DeleteStorageEndpoint(ctx context.Context, id uuid.UUID) error
 	DeleteStorageGateway(ctx context.Context, id uuid.UUID) error
@@ -249,31 +251,26 @@ type Querier interface {
 	// segment (the domain string) to a row, scoped to org. Used by
 	// GetDomain handler.
 	GetDomainByName(ctx context.Context, arg GetDomainByNameParams) (Domain, error)
-	// Returns the system-role names a identity has at the given
-	// org, considering both direct user bindings and group-derived
-	// bindings (groups the user is a member of, which themselves have
-	// org_members rows). Custom roles are excluded — v1 only resolves
-	// against the system-role permission matrix.
+	// Returns the system-role names an identity has at the given org,
+	// considering both direct user bindings (org_members.user_id) and
+	// group-derived bindings (org_members.group_id matching a group the
+	// user is a member of via group_members). Custom roles are excluded
+	// — v1 only resolves against the system-role permission matrix.
 	//
 	// Used by the permission resolver as the org-scope half of effective-
 	// role resolution. Space-scope inheritance is handled at the resolver
 	// layer by unioning this with `GetEffectiveSpaceRoles`.
 	//
-	// Post-Phase-7 unification: `org_members.principal_id` (when
-	// principal_kind='user') and `group_members.user_id` both reference
-	// `identities.id` directly. The previous per-org `users`
-	// join row is gone, so this query no longer needs a caller-resolution
-	// CTE. Returns the empty set if no bindings exist.
+	// Post-principal-split: the polymorphic `principal_kind/principal_id`
+	// pair was replaced by typed `user_id`/`group_id` columns (XOR
+	// enforced at the row level). The OR branches below select on the
+	// live column for each binding shape.
 	GetEffectiveOrgRoles(ctx context.Context, arg GetEffectiveOrgRolesParams) ([]string, error)
-	// Returns the system-role names a identity has at the given
-	// space — direct + group-derived space-level bindings only. Org-level
+	// Returns the system-role names an identity has at the given space —
+	// direct + group-derived space-level bindings only. Org-level
 	// inheritance (an org-admin is also a space-admin) is the resolver's
 	// responsibility to union in via GetEffectiveOrgRoles against the
 	// space's parent org.
-	//
-	// Post-Phase-7 unification: same simplification as
-	// GetEffectiveOrgRoles — principal_id and group_members.user_id are
-	// both identities.id, so no caller-resolution CTE.
 	GetEffectiveSpaceRoles(ctx context.Context, arg GetEffectiveSpaceRolesParams) ([]string, error)
 	// Companion to GetIdentityForMember for groups.
 	GetGroupByID(ctx context.Context, arg GetGroupByIDParams) (Group, error)
@@ -295,15 +292,13 @@ type Querier interface {
 	// Returns soft-deleted rows too (callers like the resolver need them
 	// to render is_deleted=true Actor placeholders).
 	GetIdentityByID(ctx context.Context, id uuid.UUID) (Identity, error)
-	// Verifies that a identity row exists for the given uuid.
-	// Used by Member create handlers as the principal-existence check
-	// before inserting a binding — org_members.principal_id has no FK
-	// (it's polymorphic by principal_kind), so the check is
-	// application-level. The previous version of this query
-	// (`GetUserByID`) verified per-org membership via the dropped
-	// `users` table; post-Phase-7 the membership check is "principal
-	// has a identity row", and CreateMember separately validates
-	// that the caller has org-level permission to create the binding.
+	// Verifies that an identity row exists for the given uuid. Used by
+	// Member create handlers as the principal-existence check before
+	// inserting a binding. The org_members.user_id column DOES carry an
+	// FK now (post-split), so an INSERT against a non-existent
+	// identity_id would fail with a constraint violation — this query
+	// is kept to surface the failure as a clean NotFound at the gRPC
+	// layer rather than letting the FK error bubble up as Internal.
 	GetIdentityForMember(ctx context.Context, id uuid.UUID) (Identity, error)
 	GetLatestAssetVersion(ctx context.Context, assetID uuid.UUID) (AssetVersion, error)
 	GetLineItem(ctx context.Context, id uuid.UUID) (AssetRequestLineItem, error)
@@ -311,11 +306,13 @@ type Querier interface {
 	GetMessageByName(ctx context.Context, arg GetMessageByNameParams) (AiMessage, error)
 	GetNextSequenceForConversation(ctx context.Context, conversationID uuid.UUID) (int32, error)
 	GetOperation(ctx context.Context, id uuid.UUID) (Operation, error)
-	// Looks up a single org-scope role binding by (org, principal). Joins
-	// to roles so the caller has the role name without a second query;
-	// handlers convert this row directly to the Member proto's
-	// `name = organizations/{org}/members/{member}` shape.
-	GetOrgMember(ctx context.Context, arg GetOrgMemberParams) (GetOrgMemberRow, error)
+	GetOrgMemberByGroup(ctx context.Context, arg GetOrgMemberByGroupParams) (GetOrgMemberByGroupRow, error)
+	// Looks up a single org-scope user binding. After the principal_id
+	// split, user and group lookups are separate queries — the
+	// predicate uses the typed column directly, and the filtered unique
+	// indexes on (org_id, user_id) / (org_id, group_id) make these
+	// lookups index-only.
+	GetOrgMemberByUser(ctx context.Context, arg GetOrgMemberByUserParams) (GetOrgMemberByUserRow, error)
 	GetOrganization(ctx context.Context, id uuid.UUID) (Organization, error)
 	GetOrganizationByName(ctx context.Context, name string) (Organization, error)
 	// GetOrganizationByNameForGate looks up an org by slug regardless of
@@ -339,11 +336,8 @@ type Querier interface {
 	// work during the grace window and UndeleteSpace can target the row.
 	GetSpaceByNameForGate(ctx context.Context, arg GetSpaceByNameForGateParams) (Space, error)
 	GetSpaceIncludingDeleted(ctx context.Context, id uuid.UUID) (Space, error)
-	// Companion to GetOrgMember at space scope. Note: this returns ONLY
-	// direct space-level bindings; org-level inheritance (an org-admin
-	// being implicitly a space-admin) is computed at the resolver layer,
-	// not surfaced as a Member resource at the space scope.
-	GetSpaceMember(ctx context.Context, arg GetSpaceMemberParams) (GetSpaceMemberRow, error)
+	GetSpaceMemberByGroup(ctx context.Context, arg GetSpaceMemberByGroupParams) (GetSpaceMemberByGroupRow, error)
+	GetSpaceMemberByUser(ctx context.Context, arg GetSpaceMemberByUserParams) (GetSpaceMemberByUserRow, error)
 	// Resolves a space's parent org_id. Used by the permission resolver
 	// when a space-scoped permission check needs to fold in org-level
 	// inheritance.
@@ -388,14 +382,11 @@ type Querier interface {
 	GetTagKeyByNamespacedName(ctx context.Context, namespacedName string) (TagKey, error)
 	GetTagValue(ctx context.Context, id uuid.UUID) (TagValue, error)
 	GetTagValueByNamespacedName(ctx context.Context, namespacedName string) (TagValue, error)
-	// HardDeleteIdentity removes the firebase_identity row.
-	// group_members.user_id has ON DELETE CASCADE so group memberships
-	// transitively delete; org_members and space_members principal_id
-	// columns aren't FK'd (polymorphic by principal_kind) so the
-	// cross-org cascades above must run first. Called as the
-	// second-to-last step of DeleteAccount; the Firebase Auth identity
-	// itself is deleted last so a partial failure leaves a recoverable
-	// Firebase identity rather than orphaned Pivox state.
+	// HardDeleteIdentity removes the identity row entirely. Operator-only
+	// — the public DeleteAccount LRO uses SoftDeleteIdentity (which
+	// preserves the row so historical *_by audit references continue to
+	// resolve as is_deleted=true). HardDelete remains for terminal
+	// purges only.
 	HardDeleteIdentity(ctx context.Context, id uuid.UUID) error
 	IncrementConversationMessageCount(ctx context.Context, id uuid.UUID) error
 	IsOnlyArtifactVersion(ctx context.Context, artifactID uuid.UUID) (bool, error)
@@ -416,50 +407,35 @@ type Querier interface {
 	ListOperations(ctx context.Context, arg ListOperationsParams) ([]Operation, error)
 	// Lists org-scope role bindings for an org with offset-based
 	// pagination. Ordered by (create_time, id) so paging is stable under
-	// concurrent inserts. The handler converts AIP-132 page_token /
-	// page_size into the offset / limit args here. Caller asks for
-	// limit+1 rows to detect "more pages exist" without a separate count
-	// query; the handler trims the extra row before responding.
+	// concurrent inserts. Caller asks for limit+1 rows to detect "more
+	// pages exist" without a separate count query; the handler trims the
+	// extra row before responding.
 	ListOrgMembers(ctx context.Context, arg ListOrgMembersParams) ([]ListOrgMembersRow, error)
 	// Returns all org_members rows currently bound to the system 'owner'
 	// role for the given org. Used by TransferOwnership to find the
 	// current owner(s) to demote; in normal operation returns ≥1 row.
 	ListOrgOwnerMembers(ctx context.Context, orgID uuid.UUID) ([]OrgMember, error)
-	// Phase 7 unified per-org identity with identities. The
-	// per-org `users` join table was dropped; queries that used to
-	// resolve "users.id from (org, firebase_identity)" now reference
-	// `identities.id` directly. The handler reads it from the
-	// `pivox_user_id` ID-token claim — no DB lookup required.
+	// Phase 7 unified per-org identity with `identities`. The per-org
+	// `users` join table was dropped; queries that used to resolve
+	// "users.id from (org, identity)" now reference `identities.id`
+	// directly. The handler reads it from the `pivox_user_id` ID-token
+	// claim — no DB lookup required.
 	//
-	// Queries below are the reduced set still useful post-unification:
-	// listing orgs a user is a member of (for ListOrganizations and the
-	// membership interceptor), counting owners (for the ≥1-owner
-	// invariant), the cross-org cascades for DeleteAccount, and the
-	// per-org cascades for the now-sync `Iam.DeleteUser`.
-	// Lists all orgs the given firebase_identity has membership in,
-	// counting both direct user bindings AND group-mediated bindings
-	// (the user is in a group that has an org_members row).
+	// Post-principal-split (Phase 3 of the identities rework): the
+	// polymorphic `principal_kind/principal_id` pair on org_members /
+	// space_members was replaced by typed `user_id`/`group_id`
+	// columns with an XOR check. Direct user binding queries below
+	// read `user_id` directly; group-mediated lookups read `group_id`.
+	// Lists all orgs the given identity has membership in, counting
+	// both direct user bindings AND group-mediated bindings (the user
+	// is in a group that has an org_members row).
 	// Caller-scoped for `ListOrganizations` and the
 	// membership-required interceptor — every authenticated user is
 	// only ever shown orgs they actually belong to. Includes
 	// soft-deleted orgs so an owner can reach UndeleteOrganization
 	// during the 30-day grace window. Excludes purged orgs (the JOIN
 	// naturally drops those once their org row is gone).
-	//
-	// "Member" post-Phase-7 unification = at least one `org_members`
-	// row whose principal resolves to this firebase_identity:
-	//
-	//   - Direct: `(principal_kind = 'user', principal_id = $1)`
-	//   - Group-mediated: `(principal_kind = 'group', principal_id IN
-	//     (groups the user belongs to via group_members.user_id = $1))`
-	//
-	// Both must count or the membership-gate would reject a user whose
-	// only role-binding is via a group, even though they can clearly
-	// reach RPCs gated by that group's permissions. Group-mediated
-	// access was the old behavior pre-Phase-7 (users.id existed for
-	// group-only members and ListUsersByIdentity counted them);
-	// preserved here in the unified shape.
-	ListOrganizationsForIdentity(ctx context.Context, principalID uuid.UUID) ([]Organization, error)
+	ListOrganizationsForIdentity(ctx context.Context, userID pgtype.UUID) ([]Organization, error)
 	// ListOrgsPastPurgeTime returns soft-deleted orgs whose purge_time
 	// has elapsed. Used by PurgeWorker to drive the final cascade
 	// (DELETE FROM organizations + FK CASCADE) for orgs that finished
@@ -483,19 +459,16 @@ type Querier interface {
 	ListPermissions(ctx context.Context) ([]Permission, error)
 	ListRequestsBySpace(ctx context.Context, arg ListRequestsBySpaceParams) ([]AssetRequest, error)
 	ListRolesByOrg(ctx context.Context, orgID uuid.UUID) ([]Role, error)
-	// ListSoleOwnerOrgsForIdentity returns active orgs where
-	// the given firebase_identity is the ONLY owner. Used by
-	// DeleteAccount's VALIDATING phase to refuse deletion when the
-	// caller would leave any org without an owner.
+	// ListSoleOwnerOrgsForIdentity returns active orgs where the given
+	// identity is the ONLY owner. Used by DeleteAccount's VALIDATING
+	// phase to refuse deletion when the caller would leave any org
+	// without an owner.
 	//
-	// An org is "ONLY owned by this firebase_identity" iff:
+	// An org is "ONLY owned by this identity" iff:
 	//   - exactly one user-owner binding exists, and it points at this
-	//     firebase_identity, AND
+	//     identity, AND
 	//   - zero ACTIVE-group-owner bindings exist.
-	ListSoleOwnerOrgsForIdentity(ctx context.Context, principalID uuid.UUID) ([]Organization, error)
-	// Companion to ListOrgMembers at space scope. Same direct-only
-	// semantic as GetSpaceMember and the same offset+limit pagination
-	// contract.
+	ListSoleOwnerOrgsForIdentity(ctx context.Context, userID pgtype.UUID) ([]Organization, error)
 	ListSpaceMembers(ctx context.Context, arg ListSpaceMembersParams) ([]ListSpaceMembersRow, error)
 	// ListSpacesPastPurgeTime returns soft-deleted spaces whose
 	// purge_time has elapsed. Used by SpacePurgeWorker to drive the
@@ -610,20 +583,20 @@ type Querier interface {
 	UpdateLineItem(ctx context.Context, arg UpdateLineItemParams) (AssetRequestLineItem, error)
 	UpdateLineItemState(ctx context.Context, arg UpdateLineItemStateParams) error
 	UpdateOperationMetadata(ctx context.Context, arg UpdateOperationMetadataParams) error
+	UpdateOrgGroupMemberRole(ctx context.Context, arg UpdateOrgGroupMemberRoleParams) (UpdateOrgGroupMemberRoleRow, error)
 	// Mutates only the role; principal and scope are immutable. Bumps
 	// revision + etag. Returns the new etag + timestamps so the handler
 	// can build the Member proto response without a follow-up
-	// GetOrgMember round-trip — the caller already knows the org slug
-	// and new role name from validation.
-	UpdateOrgMemberRole(ctx context.Context, arg UpdateOrgMemberRoleParams) (UpdateOrgMemberRoleRow, error)
+	// GetOrgMember* round-trip.
+	UpdateOrgUserMemberRole(ctx context.Context, arg UpdateOrgUserMemberRoleParams) (UpdateOrgUserMemberRoleRow, error)
 	UpdateRequest(ctx context.Context, arg UpdateRequestParams) (AssetRequest, error)
 	UpdateRequestApproved(ctx context.Context, arg UpdateRequestApprovedParams) (AssetRequest, error)
 	UpdateRequestAssignee(ctx context.Context, arg UpdateRequestAssigneeParams) (AssetRequest, error)
 	UpdateRequestDelivered(ctx context.Context, arg UpdateRequestDeliveredParams) (AssetRequest, error)
 	UpdateRequestState(ctx context.Context, arg UpdateRequestStateParams) (AssetRequest, error)
 	UpdateSpace(ctx context.Context, arg UpdateSpaceParams) (Space, error)
-	// Companion to UpdateOrgMemberRole at space scope.
-	UpdateSpaceMemberRole(ctx context.Context, arg UpdateSpaceMemberRoleParams) (UpdateSpaceMemberRoleRow, error)
+	UpdateSpaceGroupMemberRole(ctx context.Context, arg UpdateSpaceGroupMemberRoleParams) (UpdateSpaceGroupMemberRoleRow, error)
+	UpdateSpaceUserMemberRole(ctx context.Context, arg UpdateSpaceUserMemberRoleParams) (UpdateSpaceUserMemberRoleRow, error)
 	UpdateStorageAgentCacheUsed(ctx context.Context, arg UpdateStorageAgentCacheUsedParams) error
 	UpdateStorageAgentCert(ctx context.Context, arg UpdateStorageAgentCertParams) error
 	UpdateStorageAgentHeartbeat(ctx context.Context, id uuid.UUID) error

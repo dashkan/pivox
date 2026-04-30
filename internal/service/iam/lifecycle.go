@@ -13,6 +13,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/dashkan/pivox/internal/apierr"
+	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/lro"
 	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
@@ -59,7 +60,7 @@ func (s *IamServer) DeleteUser(ctx context.Context, req *iampb.DeleteUserRequest
 	// silently succeed for a non-member uuid. Fail loud with NotFound
 	// so a malformed delete surfaces as such.
 	remainingOwners, err := s.queries.CountOrgOwnersExcludingUser(ctx,
-		db.CountOrgOwnersExcludingUserParams{OrgID: resolvedOrg.ID, PrincipalID: userID})
+		db.CountOrgOwnersExcludingUserParams{OrgID: resolvedOrg.ID, UserID: convert.PgUUID(userID)})
 	if err != nil {
 		slog.ErrorContext(ctx, "delete user: sole-owner check failed",
 			"org_id", resolvedOrg.ID, "user_id", userID, "error", err)
@@ -86,13 +87,13 @@ func (s *IamServer) DeleteUser(ctx context.Context, req *iampb.DeleteUserRequest
 	// failure mode of a partial cascade is benign — a retry
 	// completes the rest.
 	if err := s.queries.DeleteOrgMembersForUserInOrg(ctx,
-		db.DeleteOrgMembersForUserInOrgParams{OrgID: resolvedOrg.ID, PrincipalID: userID}); err != nil {
+		db.DeleteOrgMembersForUserInOrgParams{OrgID: resolvedOrg.ID, UserID: convert.PgUUID(userID)}); err != nil {
 		slog.ErrorContext(ctx, "delete user: revoke org members failed",
 			"org_id", resolvedOrg.ID, "user_id", userID, "error", err)
 		return nil, apierr.Internal("revoke org memberships")
 	}
 	if err := s.queries.DeleteSpaceMembersForUserInOrg(ctx,
-		db.DeleteSpaceMembersForUserInOrgParams{OrgID: resolvedOrg.ID, PrincipalID: userID}); err != nil {
+		db.DeleteSpaceMembersForUserInOrgParams{OrgID: resolvedOrg.ID, UserID: convert.PgUUID(userID)}); err != nil {
 		slog.ErrorContext(ctx, "delete user: revoke space members failed",
 			"org_id", resolvedOrg.ID, "user_id", userID, "error", err)
 		return nil, apierr.Internal("revoke space memberships")
@@ -214,7 +215,7 @@ func (s *IamServer) runDeleteAccount(
 	// this user is the sole user-owner — see the query's NOT
 	// EXISTS clause).
 	updatePhase(iampb.DeleteAccountMetadata_VALIDATING)
-	soleOwnerOrgs, err := s.queries.ListSoleOwnerOrgsForIdentity(ctx, firebaseIdentityID)
+	soleOwnerOrgs, err := s.queries.ListSoleOwnerOrgsForIdentity(ctx, convert.PgUUID(firebaseIdentityID))
 	if err != nil {
 		slog.ErrorContext(ctx, "delete account: sole-owner check failed",
 			"identity_id", firebaseIdentityID, "error", err)
@@ -234,12 +235,12 @@ func (s *IamServer) runDeleteAccount(
 	// identity_id at the SQL level so the DELETE can't
 	// reach rows that aren't this user's.
 	updatePhase(iampb.DeleteAccountMetadata_REVOKING_MEMBERSHIPS)
-	if err := s.queries.DeleteOrgMembersForIdentity(ctx, firebaseIdentityID); err != nil {
+	if err := s.queries.DeleteOrgMembersForIdentity(ctx, convert.PgUUID(firebaseIdentityID)); err != nil {
 		slog.ErrorContext(ctx, "delete account: revoke org members failed",
 			"identity_id", firebaseIdentityID, "error", err)
 		return nil, apierr.Internal("revoke org memberships")
 	}
-	if err := s.queries.DeleteSpaceMembersForIdentity(ctx, firebaseIdentityID); err != nil {
+	if err := s.queries.DeleteSpaceMembersForIdentity(ctx, convert.PgUUID(firebaseIdentityID)); err != nil {
 		slog.ErrorContext(ctx, "delete account: revoke space members failed",
 			"identity_id", firebaseIdentityID, "error", err)
 		return nil, apierr.Internal("revoke space memberships")

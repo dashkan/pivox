@@ -126,14 +126,13 @@ BEGIN
         RETURN;
     END IF;
 
-    INSERT INTO org_members (id, org_id, role_id, principal_kind, principal_id, created_by)
-    SELECT uuidv7(), acme_id, owner_id, 'user', ashkan_id, ashkan_id::text
+    INSERT INTO org_members (id, org_id, role_id, user_id, created_by)
+    SELECT uuidv7(), acme_id, owner_id, ashkan_id, ashkan_id
     WHERE NOT EXISTS (
         SELECT 1 FROM org_members
         WHERE org_id = acme_id
-          AND principal_kind = 'user'
-          AND principal_id   = ashkan_id
-          AND role_id        = owner_id
+          AND user_id = ashkan_id
+          AND role_id = owner_id
     );
 
     RAISE NOTICE 'Pass 2: bound ashkan as owner of acme (org=%, ashkan=%).', acme_id, ashkan_id;

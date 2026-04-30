@@ -6,8 +6,10 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/dashkan/pivox/internal/apierr"
@@ -33,7 +35,7 @@ import (
 type spaceMemberPath struct {
 	orgSlug       string
 	spaceSlug     string
-	principalKind db.PrincipalKind
+	principalKind permission.PrincipalKind
 	principalID   uuid.UUID
 }
 
@@ -86,15 +88,28 @@ func (s *SpacesServer) GetMember(ctx context.Context, req *iampb.GetMemberReques
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("name",
 			"slugs in member path do not match resolved scope"))
 	}
-	row, err := s.queries.GetSpaceMember(ctx, db.GetSpaceMemberParams{
-		SpaceID:       resolvedSpace.ID,
-		PrincipalKind: path.principalKind,
-		PrincipalID:   path.principalID,
-	})
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Member", req.GetName())
+	switch path.principalKind {
+	case permission.PrincipalKindUser:
+		row, err := s.queries.GetSpaceMemberByUser(ctx, db.GetSpaceMemberByUserParams{
+			SpaceID: resolvedSpace.ID,
+			UserID:  convert.PgUUID(path.principalID),
+		})
+		if err != nil {
+			return nil, apierr.HandleResourceError(err, "Member", req.GetName())
+		}
+		return convert.SpaceMemberByUserRowToProto(row, path.orgSlug, path.spaceSlug, nil), nil
+	case permission.PrincipalKindGroup:
+		row, err := s.queries.GetSpaceMemberByGroup(ctx, db.GetSpaceMemberByGroupParams{
+			SpaceID: resolvedSpace.ID,
+			GroupID: convert.PgUUID(path.principalID),
+		})
+		if err != nil {
+			return nil, apierr.HandleResourceError(err, "Member", req.GetName())
+		}
+		return convert.SpaceMemberByGroupRowToProto(row, path.orgSlug, path.spaceSlug, nil), nil
+	default:
+		return nil, apierr.Internal("unknown principal kind")
 	}
-	return convert.SpaceMemberRowToProto(row, path.orgSlug, path.spaceSlug, nil), nil
 }
 
 // ListMembers returns space-scope Members. Direct bindings only —
@@ -192,6 +207,7 @@ func (s *SpacesServer) CreateMember(ctx context.Context, req *iampb.CreateMember
 			"slugs in parent do not match resolved scope"))
 	}
 	orgSlug := resolvedOrg.Slug
+	spaceSlug := resolvedSpace.Slug
 	mem := req.GetMember()
 	if mem == nil {
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("member", "member is required"))
@@ -238,32 +254,46 @@ func (s *SpacesServer) CreateMember(ctx context.Context, req *iampb.CreateMember
 		return nil, err
 	}
 
-	row, err := qtx.CreateSpaceMember(ctx, db.CreateSpaceMemberParams{
-		ID:            uuid.New(),
-		SpaceID:       resolvedSpace.ID,
-		RoleID:        role.ID,
-		PrincipalKind: principalKind,
-		PrincipalID:   principalID,
-		CreatedBy:     convert.PgUUID(caller),
-	})
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Member", req.GetParent())
+	var (
+		memberID   uuid.UUID
+		etag       string
+		createTime time.Time
+		updateTime time.Time
+	)
+	switch principalKind {
+	case permission.PrincipalKindUser:
+		row, err := qtx.CreateSpaceUserMember(ctx, db.CreateSpaceUserMemberParams{
+			ID:        uuid.New(),
+			SpaceID:   resolvedSpace.ID,
+			RoleID:    role.ID,
+			UserID:    convert.PgUUID(principalID),
+			CreatedBy: convert.PgUUID(caller),
+		})
+		if err != nil {
+			return nil, apierr.HandleResourceError(err, "Member", req.GetParent())
+		}
+		memberID, etag, createTime, updateTime = row.ID, row.Etag, row.CreateTime, row.UpdateTime
+	case permission.PrincipalKindGroup:
+		row, err := qtx.CreateSpaceGroupMember(ctx, db.CreateSpaceGroupMemberParams{
+			ID:        uuid.New(),
+			SpaceID:   resolvedSpace.ID,
+			RoleID:    role.ID,
+			GroupID:   convert.PgUUID(principalID),
+			CreatedBy: convert.PgUUID(caller),
+		})
+		if err != nil {
+			return nil, apierr.HandleResourceError(err, "Member", req.GetParent())
+		}
+		memberID, etag, createTime, updateTime = row.ID, row.Etag, row.CreateTime, row.UpdateTime
+	default:
+		return nil, apierr.Internal("unknown principal kind")
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, apierr.Internal("commit transaction")
 	}
 
-	return convert.SpaceMemberRowToProto(db.GetSpaceMemberRow{
-		ID:            row.ID,
-		SpaceID:       resolvedSpace.ID,
-		RoleID:        role.ID,
-		PrincipalKind: principalKind,
-		PrincipalID:   principalID,
-		RoleName:      role.Name,
-		Etag:          row.Etag,
-		CreateTime:    row.CreateTime,
-		UpdateTime:    row.UpdateTime,
-	}, orgSlug, resolvedSpace.Slug, nil), nil
+	return buildSpaceMemberProto(orgSlug, spaceSlug, role.Name, principalKind, principalID,
+		memberID, etag, createTime, updateTime), nil
 }
 
 // UpdateMember mutates the role of an existing space-scope Member.
@@ -313,49 +343,63 @@ func (s *SpacesServer) UpdateMember(ctx context.Context, req *iampb.UpdateMember
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Role", mem.GetRole())
 	}
-	row, err := qtx.UpdateSpaceMemberRole(ctx, db.UpdateSpaceMemberRoleParams{
-		SpaceID:       resolvedSpace.ID,
-		PrincipalKind: path.principalKind,
-		PrincipalID:   path.principalID,
-		RoleID:        newRole.ID,
-	})
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Member", mem.GetName())
+
+	var (
+		memberID   uuid.UUID
+		etag       string
+		createTime time.Time
+		updateTime time.Time
+	)
+	switch path.principalKind {
+	case permission.PrincipalKindUser:
+		row, err := qtx.UpdateSpaceUserMemberRole(ctx, db.UpdateSpaceUserMemberRoleParams{
+			SpaceID: resolvedSpace.ID,
+			UserID:  convert.PgUUID(path.principalID),
+			RoleID:  newRole.ID,
+		})
+		if err != nil {
+			return nil, apierr.HandleResourceError(err, "Member", mem.GetName())
+		}
+		memberID, etag, createTime, updateTime = row.ID, row.Etag, row.CreateTime, row.UpdateTime
+	case permission.PrincipalKindGroup:
+		row, err := qtx.UpdateSpaceGroupMemberRole(ctx, db.UpdateSpaceGroupMemberRoleParams{
+			SpaceID: resolvedSpace.ID,
+			GroupID: convert.PgUUID(path.principalID),
+			RoleID:  newRole.ID,
+		})
+		if err != nil {
+			return nil, apierr.HandleResourceError(err, "Member", mem.GetName())
+		}
+		memberID, etag, createTime, updateTime = row.ID, row.Etag, row.CreateTime, row.UpdateTime
+	default:
+		return nil, apierr.Internal("unknown principal kind")
 	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return nil, apierr.Internal("commit transaction")
 	}
 
-	return convert.SpaceMemberRowToProto(db.GetSpaceMemberRow{
-		ID:            row.ID,
-		SpaceID:       resolvedSpace.ID,
-		RoleID:        newRole.ID,
-		PrincipalKind: path.principalKind,
-		PrincipalID:   path.principalID,
-		RoleName:      newRole.Name,
-		Etag:          row.Etag,
-		CreateTime:    row.CreateTime,
-		UpdateTime:    row.UpdateTime,
-	}, path.orgSlug, path.spaceSlug, nil), nil
+	return buildSpaceMemberProto(path.orgSlug, path.spaceSlug, newRole.Name, path.principalKind, path.principalID,
+		memberID, etag, createTime, updateTime), nil
 }
 
 // principalFromMember pulls (kind, id) out of the Member proto's
 // `principal` oneof. The principal resource ref must address the
 // same org as the parent.
-func principalFromMember(mem *iampb.Member, parentOrgSlug string) (db.PrincipalKind, uuid.UUID, error) {
+func principalFromMember(mem *iampb.Member, parentOrgSlug string) (permission.PrincipalKind, uuid.UUID, error) {
 	switch p := mem.GetPrincipal().(type) {
 	case *iampb.Member_User:
 		id, err := parsePrincipalRef(p.User, parentOrgSlug, "users")
 		if err != nil {
 			return "", uuid.Nil, err
 		}
-		return db.PrincipalKindUser, id, nil
+		return permission.PrincipalKindUser, id, nil
 	case *iampb.Member_Group:
 		id, err := parsePrincipalRef(p.Group, parentOrgSlug, "groups")
 		if err != nil {
 			return "", uuid.Nil, err
 		}
-		return db.PrincipalKindGroup, id, nil
+		return permission.PrincipalKindGroup, id, nil
 	default:
 		return "", uuid.Nil, apierr.InvalidArgument(apierr.FieldViolation("member.principal",
 			"exactly one of `user` or `group` must be set"))
@@ -398,21 +442,28 @@ func parseRoleRef(ref, parentOrgSlug string) (string, error) {
 	return parts[3], nil
 }
 
-// verifyPrincipalInOrg confirms the principal exists so we don't
-// insert dead bindings (space_members.principal_id is NOT a DB FK
-// — it's polymorphic by principal_kind). Post-Phase-7 the user
-// check is "firebase_identity row exists"; the per-org `users` row
-// was dropped. orgID is preserved on the signature but only used
-// for groups (which remain org-scoped).
-func verifyPrincipalInOrg(ctx context.Context, qtx db.Querier, orgID uuid.UUID, kind db.PrincipalKind, id uuid.UUID) error {
+// verifyPrincipalInOrg confirms the principal exists. Post-principal-
+// split, space_members.user_id and space_members.group_id ARE FK'd,
+// so an INSERT against a non-existent id would fail with a constraint
+// violation — this query surfaces the failure as a clean NotFound at
+// the gRPC layer rather than letting the FK error bubble up as
+// Internal. orgID is preserved on the signature but only used for
+// groups (which remain org-scoped).
+func verifyPrincipalInOrg(ctx context.Context, qtx db.Querier, orgID uuid.UUID, kind permission.PrincipalKind, id uuid.UUID) error {
 	switch kind {
-	case db.PrincipalKindUser:
+	case permission.PrincipalKindUser:
 		if _, err := qtx.GetIdentityForMember(ctx, id); err != nil {
-			return apierr.HandleResourceError(err, "User", id.String())
+			if isNotFound(err) {
+				return apierr.NotFound("User", id.String())
+			}
+			return apierr.Internal("verify user principal")
 		}
-	case db.PrincipalKindGroup:
+	case permission.PrincipalKindGroup:
 		if _, err := qtx.GetGroupByID(ctx, db.GetGroupByIDParams{ID: id, OrgID: orgID}); err != nil {
-			return apierr.HandleResourceError(err, "Group", id.String())
+			if isNotFound(err) {
+				return apierr.NotFound("Group", id.String())
+			}
+			return apierr.Internal("verify group principal")
 		}
 	}
 	return nil
@@ -442,16 +493,57 @@ func (s *SpacesServer) DeleteMember(ctx context.Context, req *iampb.DeleteMember
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("name",
 			"slugs in member path do not match resolved scope"))
 	}
-	n, err := s.queries.DeleteSpaceMember(ctx, db.DeleteSpaceMemberParams{
-		SpaceID:       resolvedSpace.ID,
-		PrincipalKind: path.principalKind,
-		PrincipalID:   path.principalID,
-	})
-	if err != nil {
+	var (
+		n    int64
+		err2 error
+	)
+	switch path.principalKind {
+	case permission.PrincipalKindUser:
+		n, err2 = s.queries.DeleteSpaceUserMember(ctx, db.DeleteSpaceUserMemberParams{
+			SpaceID: resolvedSpace.ID,
+			UserID:  convert.PgUUID(path.principalID),
+		})
+	case permission.PrincipalKindGroup:
+		n, err2 = s.queries.DeleteSpaceGroupMember(ctx, db.DeleteSpaceGroupMemberParams{
+			SpaceID: resolvedSpace.ID,
+			GroupID: convert.PgUUID(path.principalID),
+		})
+	default:
+		return nil, apierr.Internal("unknown principal kind")
+	}
+	if err2 != nil {
 		return nil, apierr.Internal("delete space member")
 	}
 	if n == 0 {
 		return nil, apierr.NotFound("Member", req.GetName())
 	}
 	return &emptypb.Empty{}, nil
+}
+
+// buildSpaceMemberProto constructs the Member wire shape from values
+// already in hand at the call site — avoiding a follow-up GetMember
+// round-trip after a write. Builds a synthetic ListSpaceMembersRow
+// because the converter uses that single shape for both list and
+// single-row paths.
+func buildSpaceMemberProto(orgSlug, spaceSlug, roleName string, kind permission.PrincipalKind, principalID, memberID uuid.UUID, etag string, createTime, updateTime time.Time) *iampb.Member {
+	row := db.ListSpaceMembersRow{
+		ID:         memberID,
+		RoleName:   roleName,
+		Etag:       etag,
+		CreateTime: createTime,
+		UpdateTime: updateTime,
+	}
+	switch kind {
+	case permission.PrincipalKindUser:
+		row.UserID = convert.PgUUID(principalID)
+	case permission.PrincipalKindGroup:
+		row.GroupID = convert.PgUUID(principalID)
+	}
+	return convert.SpaceMemberToProto(row, orgSlug, spaceSlug, nil)
+}
+
+// isNotFound returns true if err is pgx.ErrNoRows. Defined here as a
+// convenience so handler call sites stay readable.
+func isNotFound(err error) bool {
+	return err == pgx.ErrNoRows
 }

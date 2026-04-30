@@ -162,18 +162,18 @@ func (m *MockQuerier) CancelRunningOpsForOrg(ctx context.Context, orgID pgtype.U
 	return out, args.Error(1)
 }
 
-func (m *MockQuerier) ListSoleOwnerOrgsForIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) ([]db.Organization, error) {
-	args := m.Called(ctx, firebaseIdentityID)
+func (m *MockQuerier) ListSoleOwnerOrgsForIdentity(ctx context.Context, userID pgtype.UUID) ([]db.Organization, error) {
+	args := m.Called(ctx, userID)
 	return args.Get(0).([]db.Organization), args.Error(1)
 }
 
-func (m *MockQuerier) DeleteOrgMembersForIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) error {
-	args := m.Called(ctx, firebaseIdentityID)
+func (m *MockQuerier) DeleteOrgMembersForIdentity(ctx context.Context, userID pgtype.UUID) error {
+	args := m.Called(ctx, userID)
 	return args.Error(0)
 }
 
-func (m *MockQuerier) DeleteSpaceMembersForIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) error {
-	args := m.Called(ctx, firebaseIdentityID)
+func (m *MockQuerier) DeleteSpaceMembersForIdentity(ctx context.Context, userID pgtype.UUID) error {
+	args := m.Called(ctx, userID)
 	return args.Error(0)
 }
 
@@ -287,8 +287,8 @@ func (m *MockQuerier) GetSsoConfigByFirebaseProviderID(ctx context.Context, fire
 // row existence with `principal_kind='user'` and `principal_id` =
 // `identities.id`.
 
-func (m *MockQuerier) ListOrganizationsForIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) ([]db.Organization, error) {
-	args := m.Called(ctx, firebaseIdentityID)
+func (m *MockQuerier) ListOrganizationsForIdentity(ctx context.Context, userID pgtype.UUID) ([]db.Organization, error) {
+	args := m.Called(ctx, userID)
 	if v := args.Get(0); v != nil {
 		return v.([]db.Organization), args.Error(1)
 	}
@@ -1119,9 +1119,14 @@ func (m *MockQuerier) GetRoleByID(ctx context.Context, id uuid.UUID) (db.Role, e
 
 // --- Org members ---
 
-func (m *MockQuerier) CreateOrgMember(ctx context.Context, arg db.CreateOrgMemberParams) (db.CreateOrgMemberRow, error) {
+func (m *MockQuerier) CreateOrgUserMember(ctx context.Context, arg db.CreateOrgUserMemberParams) (db.CreateOrgUserMemberRow, error) {
 	args := m.Called(ctx, arg)
-	return args.Get(0).(db.CreateOrgMemberRow), args.Error(1)
+	return args.Get(0).(db.CreateOrgUserMemberRow), args.Error(1)
+}
+
+func (m *MockQuerier) CreateOrgGroupMember(ctx context.Context, arg db.CreateOrgGroupMemberParams) (db.CreateOrgGroupMemberRow, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.CreateOrgGroupMemberRow), args.Error(1)
 }
 
 // --- Permissions catalog ---
@@ -1141,9 +1146,14 @@ func (m *MockQuerier) GetPermission(ctx context.Context, permissionID string) (d
 
 // --- Member reads (org_members + space_members joined with roles) ---
 
-func (m *MockQuerier) GetOrgMember(ctx context.Context, arg db.GetOrgMemberParams) (db.GetOrgMemberRow, error) {
+func (m *MockQuerier) GetOrgMemberByUser(ctx context.Context, arg db.GetOrgMemberByUserParams) (db.GetOrgMemberByUserRow, error) {
 	args := m.Called(ctx, arg)
-	return args.Get(0).(db.GetOrgMemberRow), args.Error(1)
+	return args.Get(0).(db.GetOrgMemberByUserRow), args.Error(1)
+}
+
+func (m *MockQuerier) GetOrgMemberByGroup(ctx context.Context, arg db.GetOrgMemberByGroupParams) (db.GetOrgMemberByGroupRow, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.GetOrgMemberByGroupRow), args.Error(1)
 }
 
 func (m *MockQuerier) ListOrgMembers(ctx context.Context, arg db.ListOrgMembersParams) ([]db.ListOrgMembersRow, error) {
@@ -1154,9 +1164,14 @@ func (m *MockQuerier) ListOrgMembers(ctx context.Context, arg db.ListOrgMembersP
 	return nil, args.Error(1)
 }
 
-func (m *MockQuerier) GetSpaceMember(ctx context.Context, arg db.GetSpaceMemberParams) (db.GetSpaceMemberRow, error) {
+func (m *MockQuerier) GetSpaceMemberByUser(ctx context.Context, arg db.GetSpaceMemberByUserParams) (db.GetSpaceMemberByUserRow, error) {
 	args := m.Called(ctx, arg)
-	return args.Get(0).(db.GetSpaceMemberRow), args.Error(1)
+	return args.Get(0).(db.GetSpaceMemberByUserRow), args.Error(1)
+}
+
+func (m *MockQuerier) GetSpaceMemberByGroup(ctx context.Context, arg db.GetSpaceMemberByGroupParams) (db.GetSpaceMemberByGroupRow, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.GetSpaceMemberByGroupRow), args.Error(1)
 }
 
 func (m *MockQuerier) ListSpaceMembers(ctx context.Context, arg db.ListSpaceMembersParams) ([]db.ListSpaceMembersRow, error) {
@@ -1169,27 +1184,52 @@ func (m *MockQuerier) ListSpaceMembers(ctx context.Context, arg db.ListSpaceMemb
 
 // --- Member writes ---
 
-func (m *MockQuerier) CreateSpaceMember(ctx context.Context, arg db.CreateSpaceMemberParams) (db.CreateSpaceMemberRow, error) {
+func (m *MockQuerier) CreateSpaceUserMember(ctx context.Context, arg db.CreateSpaceUserMemberParams) (db.CreateSpaceUserMemberRow, error) {
 	args := m.Called(ctx, arg)
-	return args.Get(0).(db.CreateSpaceMemberRow), args.Error(1)
+	return args.Get(0).(db.CreateSpaceUserMemberRow), args.Error(1)
 }
 
-func (m *MockQuerier) UpdateOrgMemberRole(ctx context.Context, arg db.UpdateOrgMemberRoleParams) (db.UpdateOrgMemberRoleRow, error) {
+func (m *MockQuerier) CreateSpaceGroupMember(ctx context.Context, arg db.CreateSpaceGroupMemberParams) (db.CreateSpaceGroupMemberRow, error) {
 	args := m.Called(ctx, arg)
-	return args.Get(0).(db.UpdateOrgMemberRoleRow), args.Error(1)
+	return args.Get(0).(db.CreateSpaceGroupMemberRow), args.Error(1)
 }
 
-func (m *MockQuerier) UpdateSpaceMemberRole(ctx context.Context, arg db.UpdateSpaceMemberRoleParams) (db.UpdateSpaceMemberRoleRow, error) {
+func (m *MockQuerier) UpdateOrgUserMemberRole(ctx context.Context, arg db.UpdateOrgUserMemberRoleParams) (db.UpdateOrgUserMemberRoleRow, error) {
 	args := m.Called(ctx, arg)
-	return args.Get(0).(db.UpdateSpaceMemberRoleRow), args.Error(1)
+	return args.Get(0).(db.UpdateOrgUserMemberRoleRow), args.Error(1)
 }
 
-func (m *MockQuerier) DeleteOrgMember(ctx context.Context, arg db.DeleteOrgMemberParams) (int64, error) {
+func (m *MockQuerier) UpdateOrgGroupMemberRole(ctx context.Context, arg db.UpdateOrgGroupMemberRoleParams) (db.UpdateOrgGroupMemberRoleRow, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.UpdateOrgGroupMemberRoleRow), args.Error(1)
+}
+
+func (m *MockQuerier) UpdateSpaceUserMemberRole(ctx context.Context, arg db.UpdateSpaceUserMemberRoleParams) (db.UpdateSpaceUserMemberRoleRow, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.UpdateSpaceUserMemberRoleRow), args.Error(1)
+}
+
+func (m *MockQuerier) UpdateSpaceGroupMemberRole(ctx context.Context, arg db.UpdateSpaceGroupMemberRoleParams) (db.UpdateSpaceGroupMemberRoleRow, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.UpdateSpaceGroupMemberRoleRow), args.Error(1)
+}
+
+func (m *MockQuerier) DeleteOrgUserMember(ctx context.Context, arg db.DeleteOrgUserMemberParams) (int64, error) {
 	args := m.Called(ctx, arg)
 	return args.Get(0).(int64), args.Error(1)
 }
 
-func (m *MockQuerier) DeleteSpaceMember(ctx context.Context, arg db.DeleteSpaceMemberParams) (int64, error) {
+func (m *MockQuerier) DeleteOrgGroupMember(ctx context.Context, arg db.DeleteOrgGroupMemberParams) (int64, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+func (m *MockQuerier) DeleteSpaceUserMember(ctx context.Context, arg db.DeleteSpaceUserMemberParams) (int64, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+func (m *MockQuerier) DeleteSpaceGroupMember(ctx context.Context, arg db.DeleteSpaceGroupMemberParams) (int64, error) {
 	args := m.Called(ctx, arg)
 	return args.Get(0).(int64), args.Error(1)
 }

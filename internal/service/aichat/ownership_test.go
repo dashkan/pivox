@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
+	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/permission"
 	aiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1"
@@ -234,8 +235,8 @@ func TestGetConversation_AuditBypass_AdminWithReadAll(t *testing.T) {
 	q.On("GetOrganizationByName", mock.Anything, "acme").Return(org, nil)
 	q.On("GetConversationByName", mock.Anything, mock.Anything).Return(row, nil)
 	q.On("GetEffectiveOrgRoles", mock.Anything, db.GetEffectiveOrgRolesParams{
-		OrgID:              org.ID,
-		IdentityID: fixedUserID,
+		OrgID:      org.ID,
+		IdentityID: convert.PgUUID(fixedUserID),
 	}).Return([]string{permission.RoleAdmin}, nil)
 
 	ctx := authenticatedCtx("caller")
@@ -260,8 +261,8 @@ func TestDeleteConversation_AuditBypass_OwnerWithDeleteAll(t *testing.T) {
 	// Only owner (not admin) carries deleteAll — the audit-class
 	// permission is locked tighter than read for legal/cleanup use.
 	q.On("GetEffectiveOrgRoles", mock.Anything, db.GetEffectiveOrgRolesParams{
-		OrgID:              org.ID,
-		IdentityID: fixedUserID,
+		OrgID:      org.ID,
+		IdentityID: convert.PgUUID(fixedUserID),
 	}).Return([]string{permission.RoleOwner}, nil)
 	q.On("DeleteConversation", mock.Anything, row.ID).Return(nil)
 
@@ -285,8 +286,8 @@ func TestDeleteConversation_AdminCannotDeletePeer(t *testing.T) {
 	q.On("GetOrganizationByName", mock.Anything, "acme").Return(org, nil)
 	q.On("GetConversationByName", mock.Anything, mock.Anything).Return(row, nil)
 	q.On("GetEffectiveOrgRoles", mock.Anything, db.GetEffectiveOrgRolesParams{
-		OrgID:              org.ID,
-		IdentityID: fixedUserID,
+		OrgID:      org.ID,
+		IdentityID: convert.PgUUID(fixedUserID),
 	}).Return([]string{permission.RoleAdmin}, nil)
 
 	ctx := authenticatedCtx("caller")

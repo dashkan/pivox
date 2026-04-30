@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 )
 
@@ -79,8 +80,8 @@ func (r *Resolver) effectiveRoles(ctx context.Context, identity uuid.UUID, targe
 	switch {
 	case target.OrgID != uuid.Nil && target.SpaceID == uuid.Nil:
 		return r.queries.GetEffectiveOrgRoles(ctx, db.GetEffectiveOrgRolesParams{
-			OrgID:              target.OrgID,
-			IdentityID: identity,
+			OrgID:      target.OrgID,
+			IdentityID: convert.PgUUID(identity),
 		})
 
 	case target.SpaceID != uuid.Nil && target.OrgID == uuid.Nil:
@@ -101,15 +102,15 @@ func (r *Resolver) effectiveRoles(ctx context.Context, identity uuid.UUID, targe
 			return nil, fmt.Errorf("resolve parent org for space %s: %w", target.SpaceID, err)
 		}
 		spaceRoles, err := r.queries.GetEffectiveSpaceRoles(ctx, db.GetEffectiveSpaceRolesParams{
-			SpaceID:            target.SpaceID,
-			IdentityID: identity,
+			SpaceID:    target.SpaceID,
+			IdentityID: convert.PgUUID(identity),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("resolve space roles: %w", err)
 		}
 		orgRoles, err := r.queries.GetEffectiveOrgRoles(ctx, db.GetEffectiveOrgRolesParams{
-			OrgID:              parentOrg,
-			IdentityID: identity,
+			OrgID:      parentOrg,
+			IdentityID: convert.PgUUID(identity),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("resolve org roles for parent org: %w", err)

@@ -293,13 +293,12 @@ func (s *SpacesServer) CreateSpace(ctx context.Context, req *apiv1.CreateSpaceRe
 			"org_id", resolvedOrg.ID, "error", err)
 		return nil, apierr.Internal("resolve owner role")
 	}
-	if _, err := qtx.CreateSpaceMember(ctx, db.CreateSpaceMemberParams{
-		ID:            uuid.New(),
-		SpaceID:       result.ID,
-		RoleID:        ownerRole.ID,
-		PrincipalKind: db.PrincipalKindUser,
-		PrincipalID:   founderID,
-		CreatedBy:     createdBy,
+	if _, err := qtx.CreateSpaceUserMember(ctx, db.CreateSpaceUserMemberParams{
+		ID:        uuid.New(),
+		SpaceID:   result.ID,
+		RoleID:    ownerRole.ID,
+		UserID:    convert.PgUUID(founderID),
+		CreatedBy: createdBy,
 	}); err != nil {
 		slog.ErrorContext(ctx, "create space: seed founder owner binding failed",
 			"space_id", result.ID, "error", err)

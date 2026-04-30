@@ -7,7 +7,19 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/dashkan/pivox/internal/apierr"
-	db "github.com/dashkan/pivox/internal/db/generated"
+)
+
+// PrincipalKind discriminates the parsed Member resource name's
+// typed-prefix segment. The polymorphic SQL discriminator (the
+// `principal_kind` enum) was retired when org_members/space_members
+// switched to typed `user_id`/`group_id` columns; this Go-side enum
+// stays because the wire-level Member resource name still uses
+// `user-{uuid}` / `group-{uuid}` prefixes that callers parse.
+type PrincipalKind string
+
+const (
+	PrincipalKindUser  PrincipalKind = "user"
+	PrincipalKindGroup PrincipalKind = "group"
 )
 
 // ParseMemberSegment splits a Member resource name's typed-prefix
@@ -24,7 +36,7 @@ import (
 //
 // Returns InvalidArgument-shaped errors so handlers can surface them
 // without re-mapping.
-func ParseMemberSegment(seg string) (db.PrincipalKind, uuid.UUID, error) {
+func ParseMemberSegment(seg string) (PrincipalKind, uuid.UUID, error) {
 	idx := strings.IndexByte(seg, '-')
 	if idx <= 0 || idx == len(seg)-1 {
 		return "", uuid.Nil, apierr.InvalidArgument(apierr.FieldViolation("name",
@@ -38,9 +50,9 @@ func ParseMemberSegment(seg string) (db.PrincipalKind, uuid.UUID, error) {
 	}
 	switch prefix {
 	case "user":
-		return db.PrincipalKindUser, id, nil
+		return PrincipalKindUser, id, nil
 	case "group":
-		return db.PrincipalKindGroup, id, nil
+		return PrincipalKindGroup, id, nil
 	default:
 		return "", uuid.Nil, apierr.InvalidArgument(apierr.FieldViolation("name",
 			fmt.Sprintf("invalid member prefix %q: expected user or group", prefix)))

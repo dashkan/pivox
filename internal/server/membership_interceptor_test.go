@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/testutil/mocks"
 )
@@ -100,7 +101,7 @@ func TestMembershipInterceptor_MemberCaller(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	q.On("GetIdentityByFirebaseUID", mock.Anything, testMemberUID).
 		Return(testMemberIdentity, nil).Once()
-	q.On("ListOrganizationsForIdentity", mock.Anything, testMemberIdentity.ID).
+	q.On("ListOrganizationsForIdentity", mock.Anything, convert.PgUUID(testMemberIdentity.ID)).
 		Return([]db.Organization{{
 			ID:   uuid.New(),
 			Name: "acme",
@@ -126,7 +127,7 @@ func TestMembershipInterceptor_NoMembershipsDeniesAccess(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	q.On("GetIdentityByFirebaseUID", mock.Anything, testMemberUID).
 		Return(testMemberIdentity, nil).Once()
-	q.On("ListOrganizationsForIdentity", mock.Anything, testMemberIdentity.ID).
+	q.On("ListOrganizationsForIdentity", mock.Anything, convert.PgUUID(testMemberIdentity.ID)).
 		Return([]db.Organization{}, nil).Once()
 
 	interceptor := MembershipRequiredInterceptor(q)
@@ -199,7 +200,7 @@ func TestMembershipInterceptor_MembershipsLookupErrorReturnsInternal(t *testing.
 	q := new(mocks.MockQuerier)
 	q.On("GetIdentityByFirebaseUID", mock.Anything, testMemberUID).
 		Return(testMemberIdentity, nil).Once()
-	q.On("ListOrganizationsForIdentity", mock.Anything, testMemberIdentity.ID).
+	q.On("ListOrganizationsForIdentity", mock.Anything, convert.PgUUID(testMemberIdentity.ID)).
 		Return(nil, errors.New("db down")).Once()
 
 	interceptor := MembershipRequiredInterceptor(q)

@@ -20,6 +20,7 @@ import (
 
 	"github.com/dashkan/pivox/internal/appkey"
 	"github.com/dashkan/pivox/internal/authn"
+	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/filter"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
@@ -726,7 +727,7 @@ func TestUnit_ListOrganizations_OnlyReturnsCallerOrgs(t *testing.T) {
 			UpdateTime:  time.Date(2025, 9, 1, 0, 0, 0, 0, time.UTC),
 		},
 	}
-	mockQ.On("ListOrganizationsForIdentity", mock.Anything, testCallerIdentity.ID).Return(callerOrgs, nil)
+	mockQ.On("ListOrganizationsForIdentity", mock.Anything, convert.PgUUID(testCallerIdentity.ID)).Return(callerOrgs, nil)
 
 	srv := newListOrgsServer(mockQ)
 	resp, err := srv.ListOrganizations(context.Background(), &apiv1.ListOrganizationsRequest{})
@@ -740,7 +741,7 @@ func TestUnit_ListOrganizations_OnlyReturnsCallerOrgs(t *testing.T) {
 func TestUnit_ListOrganizations_QueryError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	expectGetIdentity(mockQ)
-	mockQ.On("ListOrganizationsForIdentity", mock.Anything, testCallerIdentity.ID).
+	mockQ.On("ListOrganizationsForIdentity", mock.Anything, convert.PgUUID(testCallerIdentity.ID)).
 		Return(nil, errors.New("connection refused"))
 	srv := newListOrgsServer(mockQ)
 
@@ -757,7 +758,7 @@ func TestUnit_ListOrganizations_IgnoresPaginationFields(t *testing.T) {
 	// query — handler returns all caller's orgs regardless.
 	mockQ := new(mocks.MockQuerier)
 	expectGetIdentity(mockQ)
-	mockQ.On("ListOrganizationsForIdentity", mock.Anything, testCallerIdentity.ID).
+	mockQ.On("ListOrganizationsForIdentity", mock.Anything, convert.PgUUID(testCallerIdentity.ID)).
 		Return([]db.Organization{}, nil)
 
 	srv := newListOrgsServer(mockQ)

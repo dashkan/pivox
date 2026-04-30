@@ -456,48 +456,6 @@ func (ns NullLineItemState) Value() (driver.Value, error) {
 	return string(ns.LineItemState), nil
 }
 
-type PrincipalKind string
-
-const (
-	PrincipalKindUser  PrincipalKind = "user"
-	PrincipalKindGroup PrincipalKind = "group"
-)
-
-func (e *PrincipalKind) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = PrincipalKind(s)
-	case string:
-		*e = PrincipalKind(s)
-	default:
-		return fmt.Errorf("unsupported scan type for PrincipalKind: %T", src)
-	}
-	return nil
-}
-
-type NullPrincipalKind struct {
-	PrincipalKind PrincipalKind `json:"principal_kind"`
-	Valid         bool          `json:"valid"` // Valid is true if PrincipalKind is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullPrincipalKind) Scan(value interface{}) error {
-	if value == nil {
-		ns.PrincipalKind, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.PrincipalKind.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullPrincipalKind) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.PrincipalKind), nil
-}
-
 type RenditionType string
 
 const (
@@ -1046,17 +1004,17 @@ type Operation struct {
 }
 
 type OrgMember struct {
-	ID            uuid.UUID     `json:"id"`
-	OrgID         uuid.UUID     `json:"org_id"`
-	RoleID        uuid.UUID     `json:"role_id"`
-	PrincipalKind PrincipalKind `json:"principal_kind"`
-	PrincipalID   uuid.UUID     `json:"principal_id"`
-	Etag          string        `json:"etag"`
-	Revision      int32         `json:"revision"`
-	CreatedBy     pgtype.UUID   `json:"created_by"`
-	UpdatedBy     pgtype.UUID   `json:"updated_by"`
-	CreateTime    time.Time     `json:"create_time"`
-	UpdateTime    time.Time     `json:"update_time"`
+	ID         uuid.UUID   `json:"id"`
+	OrgID      uuid.UUID   `json:"org_id"`
+	RoleID     uuid.UUID   `json:"role_id"`
+	UserID     pgtype.UUID `json:"user_id"`
+	GroupID    pgtype.UUID `json:"group_id"`
+	Etag       string      `json:"etag"`
+	Revision   int32       `json:"revision"`
+	CreatedBy  pgtype.UUID `json:"created_by"`
+	UpdatedBy  pgtype.UUID `json:"updated_by"`
+	CreateTime time.Time   `json:"create_time"`
+	UpdateTime time.Time   `json:"update_time"`
 }
 
 type Organization struct {
@@ -1130,17 +1088,17 @@ type Space struct {
 }
 
 type SpaceMember struct {
-	ID            uuid.UUID     `json:"id"`
-	SpaceID       uuid.UUID     `json:"space_id"`
-	RoleID        uuid.UUID     `json:"role_id"`
-	PrincipalKind PrincipalKind `json:"principal_kind"`
-	PrincipalID   uuid.UUID     `json:"principal_id"`
-	Etag          string        `json:"etag"`
-	Revision      int32         `json:"revision"`
-	CreatedBy     pgtype.UUID   `json:"created_by"`
-	UpdatedBy     pgtype.UUID   `json:"updated_by"`
-	CreateTime    time.Time     `json:"create_time"`
-	UpdateTime    time.Time     `json:"update_time"`
+	ID         uuid.UUID   `json:"id"`
+	SpaceID    uuid.UUID   `json:"space_id"`
+	RoleID     uuid.UUID   `json:"role_id"`
+	UserID     pgtype.UUID `json:"user_id"`
+	GroupID    pgtype.UUID `json:"group_id"`
+	Etag       string      `json:"etag"`
+	Revision   int32       `json:"revision"`
+	CreatedBy  pgtype.UUID `json:"created_by"`
+	UpdatedBy  pgtype.UUID `json:"updated_by"`
+	CreateTime time.Time   `json:"create_time"`
+	UpdateTime time.Time   `json:"update_time"`
 }
 
 type SsoConfig struct {

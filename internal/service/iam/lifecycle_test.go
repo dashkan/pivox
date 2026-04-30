@@ -17,6 +17,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/dashkan/pivox/internal/authn"
+	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/lro"
 	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
@@ -144,7 +145,7 @@ func TestDeleteUser_RejectsBadUserSegment(t *testing.T) {
 func TestDeleteUser_BlocksWhenLastOwner(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	q.On("CountOrgOwnersExcludingUser", mock.Anything, db.CountOrgOwnersExcludingUserParams{
-		OrgID: testHandlerOrgID, PrincipalID: testTargetUserID,
+		OrgID: testHandlerOrgID, UserID: convert.PgUUID(testTargetUserID),
 	}).Return(int64(0), nil)
 
 	srv := &IamServer{queries: q}
@@ -163,10 +164,10 @@ func TestDeleteUser_FullCascade(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	q.On("CountOrgOwnersExcludingUser", mock.Anything, mock.Anything).Return(int64(2), nil)
 	q.On("DeleteOrgMembersForUserInOrg", mock.Anything, db.DeleteOrgMembersForUserInOrgParams{
-		OrgID: testHandlerOrgID, PrincipalID: testTargetUserID,
+		OrgID: testHandlerOrgID, UserID: convert.PgUUID(testTargetUserID),
 	}).Return(nil)
 	q.On("DeleteSpaceMembersForUserInOrg", mock.Anything, db.DeleteSpaceMembersForUserInOrgParams{
-		OrgID: testHandlerOrgID, PrincipalID: testTargetUserID,
+		OrgID: testHandlerOrgID, UserID: convert.PgUUID(testTargetUserID),
 	}).Return(nil)
 	q.On("DeleteGroupMembersForUserInOrg", mock.Anything, db.DeleteGroupMembersForUserInOrgParams{
 		OrgID: testHandlerOrgID, UserID: testTargetUserID,
@@ -229,7 +230,7 @@ func TestDeleteAccount_PropagatesCallerResolutionFailure(t *testing.T) {
 func TestRunDeleteAccount_BlocksSoleOwner(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	identityID := uuid.MustParse("0192a000-bbbb-7000-8000-000000000002")
-	q.On("ListSoleOwnerOrgsForIdentity", mock.Anything, identityID).
+	q.On("ListSoleOwnerOrgsForIdentity", mock.Anything, convert.PgUUID(identityID)).
 		Return([]db.Organization{{Name: "acme"}, {Name: "beta"}}, nil)
 
 	srv := &IamServer{queries: q}
@@ -243,10 +244,10 @@ func TestRunDeleteAccount_BlocksSoleOwner(t *testing.T) {
 func TestRunDeleteAccount_FullCascade(t *testing.T) {
 	identityID := uuid.MustParse("0192a000-bbbb-7000-8000-000000000002")
 	q := new(mocks.MockQuerier)
-	q.On("ListSoleOwnerOrgsForIdentity", mock.Anything, identityID).
+	q.On("ListSoleOwnerOrgsForIdentity", mock.Anything, convert.PgUUID(identityID)).
 		Return([]db.Organization{}, nil)
-	q.On("DeleteOrgMembersForIdentity", mock.Anything, identityID).Return(nil)
-	q.On("DeleteSpaceMembersForIdentity", mock.Anything, identityID).Return(nil)
+	q.On("DeleteOrgMembersForIdentity", mock.Anything, convert.PgUUID(identityID)).Return(nil)
+	q.On("DeleteSpaceMembersForIdentity", mock.Anything, convert.PgUUID(identityID)).Return(nil)
 	q.On("GetIdentityByID", mock.Anything, identityID).
 		Return(db.Identity{ID: identityID, FirebaseUid: "fb-abc"}, nil)
 	q.On("SoftDeleteIdentity", mock.Anything, identityID).Return(identityID, nil)
@@ -279,8 +280,8 @@ func TestRunDeleteAccount_AlreadyGoneSurfacesInternal(t *testing.T) {
 	identityID := uuid.MustParse("0192a000-bbbb-7000-8000-000000000002")
 	q := new(mocks.MockQuerier)
 	q.On("ListSoleOwnerOrgsForIdentity", mock.Anything, mock.Anything).Return([]db.Organization{}, nil)
-	q.On("DeleteOrgMembersForIdentity", mock.Anything, identityID).Return(nil)
-	q.On("DeleteSpaceMembersForIdentity", mock.Anything, identityID).Return(nil)
+	q.On("DeleteOrgMembersForIdentity", mock.Anything, convert.PgUUID(identityID)).Return(nil)
+	q.On("DeleteSpaceMembersForIdentity", mock.Anything, convert.PgUUID(identityID)).Return(nil)
 	q.On("GetIdentityByID", mock.Anything, identityID).
 		Return(db.Identity{}, pgx.ErrNoRows)
 
@@ -295,8 +296,8 @@ func TestRunDeleteAccount_AuthFailureSurfaces(t *testing.T) {
 	identityID := uuid.MustParse("0192a000-bbbb-7000-8000-000000000002")
 	q := new(mocks.MockQuerier)
 	q.On("ListSoleOwnerOrgsForIdentity", mock.Anything, mock.Anything).Return([]db.Organization{}, nil)
-	q.On("DeleteOrgMembersForIdentity", mock.Anything, identityID).Return(nil)
-	q.On("DeleteSpaceMembersForIdentity", mock.Anything, identityID).Return(nil)
+	q.On("DeleteOrgMembersForIdentity", mock.Anything, convert.PgUUID(identityID)).Return(nil)
+	q.On("DeleteSpaceMembersForIdentity", mock.Anything, convert.PgUUID(identityID)).Return(nil)
 	q.On("GetIdentityByID", mock.Anything, identityID).
 		Return(db.Identity{ID: identityID, FirebaseUid: "fb-abc"}, nil)
 	q.On("SoftDeleteIdentity", mock.Anything, identityID).Return(identityID, nil)

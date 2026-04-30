@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	"github.com/dashkan/pivox/internal/testutil/mocks"
@@ -29,20 +30,18 @@ func TestSpaces_GetMember_GroupPrincipal(t *testing.T) {
 	spaceID := uuid.MustParse("0192a000-0020-7000-8000-000000000020")
 	groupID := uuid.MustParse("0192a000-0030-7000-8000-000000000030")
 	q := new(mocks.MockQuerier)
-	q.On("GetSpaceMember", mock.Anything, db.GetSpaceMemberParams{
-		SpaceID:       spaceID,
-		PrincipalKind: db.PrincipalKindGroup,
-		PrincipalID:   groupID,
-	}).Return(db.GetSpaceMemberRow{
-		ID:            uuid.New(),
-		SpaceID:       spaceID,
-		RoleID:        uuid.New(),
-		PrincipalKind: db.PrincipalKindGroup,
-		PrincipalID:   groupID,
-		RoleName:      "editor",
-		Etag:          "etag-sm",
-		CreateTime:    memberTestNow,
-		UpdateTime:    memberTestNow,
+	q.On("GetSpaceMemberByGroup", mock.Anything, db.GetSpaceMemberByGroupParams{
+		SpaceID: spaceID,
+		GroupID: convert.PgUUID(groupID),
+	}).Return(db.GetSpaceMemberByGroupRow{
+		ID:         uuid.New(),
+		SpaceID:    spaceID,
+		RoleID:     uuid.New(),
+		GroupID:    convert.PgUUID(groupID),
+		RoleName:   "editor",
+		Etag:       "etag-sm",
+		CreateTime: memberTestNow,
+		UpdateTime: memberTestNow,
 	}, nil)
 
 	srv := newServerForMembers(q)
@@ -102,7 +101,7 @@ func TestSpaces_ListMembers_DirectBindingsOnly(t *testing.T) {
 	})).Return([]db.ListSpaceMembersRow{
 		{
 			ID: uuid.New(), SpaceID: spaceID, RoleID: uuid.New(),
-			PrincipalKind: db.PrincipalKindUser, PrincipalID: userA,
+			UserID:   convert.PgUUID(userA),
 			RoleName: "viewer", Etag: "e", CreateTime: memberTestNow, UpdateTime: memberTestNow,
 		},
 	}, nil)

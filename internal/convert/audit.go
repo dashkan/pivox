@@ -40,6 +40,17 @@ func UUIDString(u pgtype.UUID) string {
 // nullable UUID columns. Trivial wrapper kept here so handlers
 // don't sprinkle `pgtype.UUID{Bytes: id, Valid: true}` literals
 // everywhere.
+//
+// `uuid.Nil` round-trips to `{Valid: false}` (SQL NULL), not a
+// zero-UUID literal. Reason: post-principal_id-split, the FKs on
+// `org_members.user_id` / `space_members.user_id` would reject a
+// zero-UUID with a constraint violation — surfaced as Internal at
+// the gRPC layer rather than the "param wasn't set" meaning the
+// caller intended. Treating uuid.Nil as NULL makes the failure
+// mode "you forgot to set it" instead of a confused FK error.
 func PgUUID(id uuid.UUID) pgtype.UUID {
+	if id == uuid.Nil {
+		return pgtype.UUID{}
+	}
 	return pgtype.UUID{Bytes: id, Valid: true}
 }

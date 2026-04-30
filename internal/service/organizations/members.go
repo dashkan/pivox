@@ -34,14 +34,11 @@ import (
 // `{member}` is `user-{uuid}` or `group-{uuid}`.
 type orgMemberPath struct {
 	orgSlug       string
-	principalKind db.PrincipalKind
+	principalKind permission.PrincipalKind
 	principalID   uuid.UUID
 }
 
 // parseOrgMemberName parses `organizations/{org}/members/{member}`.
-// The URL pattern at the gRPC layer already constrains the shape, but
-// we re-parse defensively in case grpc-gateway passes through a
-// malformed name.
 func parseOrgMemberName(name string) (orgMemberPath, error) {
 	parts := strings.Split(name, "/")
 	if len(parts) != 4 || parts[0] != "organizations" || parts[2] != "members" || parts[1] == "" || parts[3] == "" {
@@ -66,9 +63,9 @@ func parseOrgMemberParent(parent string) (string, error) {
 	return parts[1], nil
 }
 
-// GetMember resolves an org-scope Member by resource name. Reads from
-// the `org_members` table; space-scope members live on the Spaces
-// service.
+// GetMember resolves an org-scope Member by resource name. After the
+// principal-id split, the lookup branches on principalKind to hit
+// the correct typed query (GetOrgMemberByUser or GetOrgMemberByGroup).
 func (s *OrganizationsServer) GetMember(ctx context.Context, req *iampb.GetMemberRequest) (*iampb.Member, error) {
 	path, err := parseOrgMemberName(req.GetName())
 	if err != nil {
@@ -79,21 +76,32 @@ func (s *OrganizationsServer) GetMember(ctx context.Context, req *iampb.GetMembe
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("name",
 			"org slug in member path does not match resolved scope"))
 	}
-	row, err := s.queries.GetOrgMember(ctx, db.GetOrgMemberParams{
-		OrgID:         resolved.ID,
-		PrincipalKind: path.principalKind,
-		PrincipalID:   path.principalID,
-	})
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Member", req.GetName())
+	switch path.principalKind {
+	case permission.PrincipalKindUser:
+		row, err := s.queries.GetOrgMemberByUser(ctx, db.GetOrgMemberByUserParams{
+			OrgID:  resolved.ID,
+			UserID: convert.PgUUID(path.principalID),
+		})
+		if err != nil {
+			return nil, apierr.HandleResourceError(err, "Member", req.GetName())
+		}
+		return convert.OrgMemberByUserRowToProto(row, path.orgSlug, nil), nil
+	case permission.PrincipalKindGroup:
+		row, err := s.queries.GetOrgMemberByGroup(ctx, db.GetOrgMemberByGroupParams{
+			OrgID:   resolved.ID,
+			GroupID: convert.PgUUID(path.principalID),
+		})
+		if err != nil {
+			return nil, apierr.HandleResourceError(err, "Member", req.GetName())
+		}
+		return convert.OrgMemberByGroupRowToProto(row, path.orgSlug, nil), nil
+	default:
+		return nil, apierr.Internal("unknown principal kind")
 	}
-	return convert.OrgMemberRowToProto(row, path.orgSlug, nil), nil
 }
 
 // ListMembers returns org-scope Members with offset-based AIP-132
-// pagination. Default page size: 50; max: 500. The handler asks the
-// SQL for limit+1 rows so it can detect "more pages exist" without a
-// separate count query, then trims the extra row before responding.
+// pagination. Default page size: 50; max: 500.
 func (s *OrganizationsServer) ListMembers(ctx context.Context, req *iampb.ListMembersRequest) (*iampb.ListMembersResponse, error) {
 	parentSlug, err := parseOrgMemberParent(req.GetParent())
 	if err != nil {
@@ -165,8 +173,8 @@ func encodeMembersPageToken(off int64) string {
 }
 
 // CreateMember binds a principal (user or group) to a role at org
-// scope. The principal must already exist in this org and the role
-// must be a system role (v1).
+// scope. The principal must already exist; the role must be a
+// system role (v1).
 //
 // Tx-wrapped: principal-existence check + insert run in one
 // transaction so a concurrent principal soft-delete cannot race in
@@ -209,10 +217,8 @@ func (s *OrganizationsServer) CreateMember(ctx context.Context, req *iampb.Creat
 		return nil, err
 	}
 
-	// Tx-wrapped: role lookup + principal-existence check + insert run
-	// atomically. The role lookup inside the tx prevents a concurrent
-	// role rename (or v2 custom-role delete) from racing the binding
-	// insert and producing a row that points at a stale role id.
+	// Tx-wrapped: role lookup + principal-existence check + insert
+	// run atomically.
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return nil, apierr.Internal("begin transaction")
@@ -232,32 +238,50 @@ func (s *OrganizationsServer) CreateMember(ctx context.Context, req *iampb.Creat
 		return nil, err
 	}
 
-	row, err := qtx.CreateOrgMember(ctx, db.CreateOrgMemberParams{
-		ID:            uuid.New(),
-		OrgID:         resolved.ID,
-		RoleID:        role.ID,
-		PrincipalKind: principalKind,
-		PrincipalID:   principalID,
-		CreatedBy:     convert.PgUUID(caller),
-	})
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Member", req.GetParent())
+	var (
+		memberID   uuid.UUID
+		etag       string
+		createTime time.Time
+		updateTime time.Time
+	)
+	switch principalKind {
+	case permission.PrincipalKindUser:
+		row, err := qtx.CreateOrgUserMember(ctx, db.CreateOrgUserMemberParams{
+			ID:        uuid.New(),
+			OrgID:     resolved.ID,
+			RoleID:    role.ID,
+			UserID:    convert.PgUUID(principalID),
+			CreatedBy: convert.PgUUID(caller),
+		})
+		if err != nil {
+			return nil, apierr.HandleResourceError(err, "Member", req.GetParent())
+		}
+		memberID, etag, createTime, updateTime = row.ID, row.Etag, row.CreateTime, row.UpdateTime
+	case permission.PrincipalKindGroup:
+		row, err := qtx.CreateOrgGroupMember(ctx, db.CreateOrgGroupMemberParams{
+			ID:        uuid.New(),
+			OrgID:     resolved.ID,
+			RoleID:    role.ID,
+			GroupID:   convert.PgUUID(principalID),
+			CreatedBy: convert.PgUUID(caller),
+		})
+		if err != nil {
+			return nil, apierr.HandleResourceError(err, "Member", req.GetParent())
+		}
+		memberID, etag, createTime, updateTime = row.ID, row.Etag, row.CreateTime, row.UpdateTime
+	default:
+		return nil, apierr.Internal("unknown principal kind")
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, apierr.Internal("commit transaction")
 	}
 
 	return buildOrgMemberProto(orgSlug, role.Name, principalKind, principalID,
-		row.ID, row.Etag, row.CreateTime, row.UpdateTime), nil
+		memberID, etag, createTime, updateTime), nil
 }
 
 // UpdateMember mutates the role of an existing org-scope Member.
-// Only `role` is mutable. Refuses to demote the last owner (would
-// leave the org ownerless).
-//
-// Tx-wrapped: the count-owners check + role mutation run in one
-// transaction so concurrent admin actions cannot race the boundary
-// to zero owners.
+// Only `role` is mutable. Refuses to demote the last owner.
 func (s *OrganizationsServer) UpdateMember(ctx context.Context, req *iampb.UpdateMemberRequest) (*iampb.Member, error) {
 	mem := req.GetMember()
 	if mem == nil || mem.GetName() == "" {
@@ -280,11 +304,6 @@ func (s *OrganizationsServer) UpdateMember(ctx context.Context, req *iampb.Updat
 		return nil, err
 	}
 
-	// Tx-wrapped: role lookup + boundary check + role mutation run
-	// atomically. Without the role lookup inside the tx, a concurrent
-	// role rename (or v2 custom-role delete) could land between the
-	// lookup and the update and produce a binding that points at a
-	// stale role id.
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return nil, apierr.Internal("begin transaction")
@@ -300,15 +319,12 @@ func (s *OrganizationsServer) UpdateMember(ctx context.Context, req *iampb.Updat
 		return nil, apierr.HandleResourceError(err, "Role", mem.GetRole())
 	}
 
-	current, err := qtx.GetOrgMember(ctx, db.GetOrgMemberParams{
-		OrgID:         resolved.ID,
-		PrincipalKind: path.principalKind,
-		PrincipalID:   path.principalID,
-	})
+	currentRoleName, err := getOrgMemberRoleName(ctx, qtx, resolved.ID, path.principalKind, path.principalID)
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Member", mem.GetName())
 	}
-	if current.RoleName == permission.RoleOwner && newRole.Name != permission.RoleOwner {
+
+	if currentRoleName == permission.RoleOwner && newRole.Name != permission.RoleOwner {
 		count, err := qtx.CountOwnersByOrg(ctx, resolved.ID)
 		if err != nil {
 			return nil, apierr.Internal("count owners")
@@ -318,25 +334,47 @@ func (s *OrganizationsServer) UpdateMember(ctx context.Context, req *iampb.Updat
 		}
 	}
 
-	row, err := qtx.UpdateOrgMemberRole(ctx, db.UpdateOrgMemberRoleParams{
-		OrgID:         resolved.ID,
-		PrincipalKind: path.principalKind,
-		PrincipalID:   path.principalID,
-		RoleID:        newRole.ID,
-	})
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Member", mem.GetName())
+	var (
+		memberID   uuid.UUID
+		etag       string
+		createTime time.Time
+		updateTime time.Time
+	)
+	switch path.principalKind {
+	case permission.PrincipalKindUser:
+		row, err := qtx.UpdateOrgUserMemberRole(ctx, db.UpdateOrgUserMemberRoleParams{
+			OrgID:  resolved.ID,
+			UserID: convert.PgUUID(path.principalID),
+			RoleID: newRole.ID,
+		})
+		if err != nil {
+			return nil, apierr.HandleResourceError(err, "Member", mem.GetName())
+		}
+		memberID, etag, createTime, updateTime = row.ID, row.Etag, row.CreateTime, row.UpdateTime
+	case permission.PrincipalKindGroup:
+		row, err := qtx.UpdateOrgGroupMemberRole(ctx, db.UpdateOrgGroupMemberRoleParams{
+			OrgID:   resolved.ID,
+			GroupID: convert.PgUUID(path.principalID),
+			RoleID:  newRole.ID,
+		})
+		if err != nil {
+			return nil, apierr.HandleResourceError(err, "Member", mem.GetName())
+		}
+		memberID, etag, createTime, updateTime = row.ID, row.Etag, row.CreateTime, row.UpdateTime
+	default:
+		return nil, apierr.Internal("unknown principal kind")
 	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return nil, apierr.Internal("commit transaction")
 	}
 
 	return buildOrgMemberProto(path.orgSlug, newRole.Name, path.principalKind, path.principalID,
-		row.ID, row.Etag, row.CreateTime, row.UpdateTime), nil
+		memberID, etag, createTime, updateTime), nil
 }
 
 // DeleteMember removes an org-scope Member binding. Refuses to
-// delete the last owner (same boundary as UpdateMember).
+// delete the last owner.
 func (s *OrganizationsServer) DeleteMember(ctx context.Context, req *iampb.DeleteMemberRequest) (*emptypb.Empty, error) {
 	path, err := parseOrgMemberName(req.GetName())
 	if err != nil {
@@ -355,15 +393,11 @@ func (s *OrganizationsServer) DeleteMember(ctx context.Context, req *iampb.Delet
 	defer func() { _ = tx.Rollback(ctx) }()
 	qtx := db.New(tx)
 
-	current, err := qtx.GetOrgMember(ctx, db.GetOrgMemberParams{
-		OrgID:         resolved.ID,
-		PrincipalKind: path.principalKind,
-		PrincipalID:   path.principalID,
-	})
+	currentRoleName, err := getOrgMemberRoleName(ctx, qtx, resolved.ID, path.principalKind, path.principalID)
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Member", req.GetName())
 	}
-	if current.RoleName == permission.RoleOwner {
+	if currentRoleName == permission.RoleOwner {
 		count, err := qtx.CountOwnersByOrg(ctx, resolved.ID)
 		if err != nil {
 			return nil, apierr.Internal("count owners")
@@ -373,16 +407,25 @@ func (s *OrganizationsServer) DeleteMember(ctx context.Context, req *iampb.Delet
 		}
 	}
 
-	n, err := qtx.DeleteOrgMember(ctx, db.DeleteOrgMemberParams{
-		OrgID:         resolved.ID,
-		PrincipalKind: path.principalKind,
-		PrincipalID:   path.principalID,
-	})
+	var n int64
+	switch path.principalKind {
+	case permission.PrincipalKindUser:
+		n, err = qtx.DeleteOrgUserMember(ctx, db.DeleteOrgUserMemberParams{
+			OrgID:  resolved.ID,
+			UserID: convert.PgUUID(path.principalID),
+		})
+	case permission.PrincipalKindGroup:
+		n, err = qtx.DeleteOrgGroupMember(ctx, db.DeleteOrgGroupMemberParams{
+			OrgID:   resolved.ID,
+			GroupID: convert.PgUUID(path.principalID),
+		})
+	default:
+		return nil, apierr.Internal("unknown principal kind")
+	}
 	if err != nil {
 		return nil, apierr.Internal("delete org member")
 	}
 	if n == 0 {
-		// Lost a race against another deleter — treat as already-gone.
 		return nil, apierr.NotFound("Member", req.GetName())
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -391,23 +434,49 @@ func (s *OrganizationsServer) DeleteMember(ctx context.Context, req *iampb.Delet
 	return &emptypb.Empty{}, nil
 }
 
+// getOrgMemberRoleName returns the current role-name for an
+// org-scope (user or group) binding, or pgx.ErrNoRows if none.
+func getOrgMemberRoleName(ctx context.Context, qtx db.Querier, orgID uuid.UUID, kind permission.PrincipalKind, principalID uuid.UUID) (string, error) {
+	switch kind {
+	case permission.PrincipalKindUser:
+		row, err := qtx.GetOrgMemberByUser(ctx, db.GetOrgMemberByUserParams{
+			OrgID:  orgID,
+			UserID: convert.PgUUID(principalID),
+		})
+		if err != nil {
+			return "", err
+		}
+		return row.RoleName, nil
+	case permission.PrincipalKindGroup:
+		row, err := qtx.GetOrgMemberByGroup(ctx, db.GetOrgMemberByGroupParams{
+			OrgID:   orgID,
+			GroupID: convert.PgUUID(principalID),
+		})
+		if err != nil {
+			return "", err
+		}
+		return row.RoleName, nil
+	}
+	return "", apierr.Internal("unknown principal kind")
+}
+
 // principalFromMember pulls (kind, id) out of the Member proto's
 // `principal` oneof. The principal resource ref must address the
 // same org as the parent — caller passes parentOrgSlug for the check.
-func principalFromMember(mem *iampb.Member, parentOrgSlug string) (db.PrincipalKind, uuid.UUID, error) {
+func principalFromMember(mem *iampb.Member, parentOrgSlug string) (permission.PrincipalKind, uuid.UUID, error) {
 	switch p := mem.GetPrincipal().(type) {
 	case *iampb.Member_User:
 		id, err := parsePrincipalRef(p.User, parentOrgSlug, "users")
 		if err != nil {
 			return "", uuid.Nil, err
 		}
-		return db.PrincipalKindUser, id, nil
+		return permission.PrincipalKindUser, id, nil
 	case *iampb.Member_Group:
 		id, err := parsePrincipalRef(p.Group, parentOrgSlug, "groups")
 		if err != nil {
 			return "", uuid.Nil, err
 		}
-		return db.PrincipalKindGroup, id, nil
+		return permission.PrincipalKindGroup, id, nil
 	default:
 		return "", uuid.Nil, apierr.InvalidArgument(apierr.FieldViolation("member.principal",
 			"exactly one of `user` or `group` must be set"))
@@ -450,26 +519,22 @@ func parseRoleRef(ref, parentOrgSlug string) (string, error) {
 	return parts[3], nil
 }
 
-// verifyPrincipalInOrg confirms the principal exists so we don't
-// insert dead bindings (org_members.principal_id is NOT a DB FK —
-// it's polymorphic by principal_kind). Runs against the caller's
-// qtx so the check + subsequent insert are atomic.
-//
-// Post-Phase-7 user check is "firebase_identity row exists" — the
-// per-org `users` row was dropped and membership in an org is now
-// the existence of `org_members` rows (which we're about to
-// create). The orgID parameter is preserved on the signature but
-// only used for groups (which are still org-scoped).
-func verifyPrincipalInOrg(ctx context.Context, qtx db.Querier, orgID uuid.UUID, kind db.PrincipalKind, id uuid.UUID) error {
+// verifyPrincipalInOrg confirms the principal exists. Post-principal-
+// split, org_members.user_id and org_members.group_id ARE FK'd, so
+// an INSERT against a non-existent id would fail with a constraint
+// violation — this query surfaces the failure as a clean NotFound at
+// the gRPC layer rather than letting the FK error bubble up as
+// Internal.
+func verifyPrincipalInOrg(ctx context.Context, qtx db.Querier, orgID uuid.UUID, kind permission.PrincipalKind, id uuid.UUID) error {
 	switch kind {
-	case db.PrincipalKindUser:
+	case permission.PrincipalKindUser:
 		if _, err := qtx.GetIdentityForMember(ctx, id); err != nil {
 			if isNotFound(err) {
 				return apierr.NotFound("User", id.String())
 			}
 			return apierr.Internal("verify user principal")
 		}
-	case db.PrincipalKindGroup:
+	case permission.PrincipalKindGroup:
 		if _, err := qtx.GetGroupByID(ctx, db.GetGroupByIDParams{ID: id, OrgID: orgID}); err != nil {
 			if isNotFound(err) {
 				return apierr.NotFound("Group", id.String())
@@ -481,8 +546,6 @@ func verifyPrincipalInOrg(ctx context.Context, qtx db.Querier, orgID uuid.UUID, 
 }
 
 // validateRoleOnlyMask rejects update_mask paths other than "role".
-// Allows nil/empty (treats as "update all mutable fields", which is
-// just role today).
 func validateRoleOnlyMask(paths []string) error {
 	for _, p := range paths {
 		if p != "role" {
@@ -495,17 +558,24 @@ func validateRoleOnlyMask(paths []string) error {
 
 // buildOrgMemberProto constructs the Member wire shape from values
 // already in hand at the call site — avoiding a follow-up
-// GetOrgMember round-trip after a write.
-func buildOrgMemberProto(orgSlug, roleName string, kind db.PrincipalKind, principalID, memberID uuid.UUID, etag string, createTime, updateTime time.Time) *iampb.Member {
-	return convert.OrgMemberRowToProto(db.GetOrgMemberRow{
-		ID:            memberID,
-		PrincipalKind: kind,
-		PrincipalID:   principalID,
-		RoleName:      roleName,
-		Etag:          etag,
-		CreateTime:    createTime,
-		UpdateTime:    updateTime,
-	}, orgSlug, nil)
+// GetOrgMember round-trip after a write. Builds a synthetic
+// ListOrgMembersRow because the converter uses that single shape
+// for both list and single-row paths.
+func buildOrgMemberProto(orgSlug, roleName string, kind permission.PrincipalKind, principalID, memberID uuid.UUID, etag string, createTime, updateTime time.Time) *iampb.Member {
+	row := db.ListOrgMembersRow{
+		ID:         memberID,
+		RoleName:   roleName,
+		Etag:       etag,
+		CreateTime: createTime,
+		UpdateTime: updateTime,
+	}
+	switch kind {
+	case permission.PrincipalKindUser:
+		row.UserID = convert.PgUUID(principalID)
+	case permission.PrincipalKindGroup:
+		row.GroupID = convert.PgUUID(principalID)
+	}
+	return convert.OrgMemberToProto(row, orgSlug, nil)
 }
 
 // isNotFound returns true if err is pgx.ErrNoRows. Defined here as

@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/dashkan/pivox/internal/apierr"
+	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/permission"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
@@ -47,11 +48,11 @@ func (s *OrganizationsServer) TransferOwnership(ctx context.Context, req *apiv1.
 	qtx := db.New(tx)
 
 	// Target must already be an org member; verify and fetch current
-	// role (must NOT already be owner).
-	target, err := qtx.GetOrgMember(ctx, db.GetOrgMemberParams{
-		OrgID:         org.ID,
-		PrincipalKind: db.PrincipalKindUser,
-		PrincipalID:   newOwnerID,
+	// role (must NOT already be owner). Transfer is user-only — group
+	// owners are not transferable via this verb.
+	target, err := qtx.GetOrgMemberByUser(ctx, db.GetOrgMemberByUserParams{
+		OrgID:  org.ID,
+		UserID: convert.PgUUID(newOwnerID),
 	})
 	if err != nil {
 		if isNotFound(err) {
@@ -63,10 +64,19 @@ func (s *OrganizationsServer) TransferOwnership(ctx context.Context, req *apiv1.
 		return nil, apierr.FailedPrecondition("new_owner is already the owner")
 	}
 
-	// Current owners must be exactly 1 (the to-be-demoted user).
+	// Current owners must be exactly 1 user (the to-be-demoted user).
+	// Group-owner detection runs FIRST: a (1 group + 1 user) configuration
+	// would otherwise route through the multi-owner branch and steer the
+	// caller toward UpdateMember-only — without flagging that the group
+	// binding is what makes TransferOwnership the wrong verb here.
 	owners, err := qtx.ListOrgOwnerMembers(ctx, org.ID)
 	if err != nil {
 		return nil, apierr.Internal("list owners")
+	}
+	for _, o := range owners {
+		if !o.UserID.Valid {
+			return nil, apierr.FailedPrecondition("organization has a group owner; transfer via UpdateMember + CreateMember rather than TransferOwnership")
+		}
 	}
 	switch {
 	case len(owners) == 0:
@@ -75,9 +85,7 @@ func (s *OrganizationsServer) TransferOwnership(ctx context.Context, req *apiv1.
 		return nil, apierr.FailedPrecondition("organization has multiple owners; use UpdateMember to demote one and promote another")
 	}
 	prevOwner := owners[0]
-	if prevOwner.PrincipalKind != db.PrincipalKindUser {
-		return nil, apierr.FailedPrecondition("current owner is a group; transfer via UpdateMember + CreateMember rather than TransferOwnership")
-	}
+	prevOwnerID := uuid.UUID(prevOwner.UserID.Bytes)
 
 	// Resolve owner + admin role IDs in this org.
 	ownerRole, err := qtx.GetSystemRole(ctx, db.GetSystemRoleParams{OrgID: org.ID, Name: permission.RoleOwner})
@@ -92,19 +100,17 @@ func (s *OrganizationsServer) TransferOwnership(ctx context.Context, req *apiv1.
 	// Atomic two-row swap. Order matters only insofar as both must
 	// commit — if either fails, tx rolls back and ownership is
 	// unchanged.
-	if _, err := qtx.UpdateOrgMemberRole(ctx, db.UpdateOrgMemberRoleParams{
-		OrgID:         org.ID,
-		PrincipalKind: db.PrincipalKindUser,
-		PrincipalID:   prevOwner.PrincipalID,
-		RoleID:        adminRole.ID,
+	if _, err := qtx.UpdateOrgUserMemberRole(ctx, db.UpdateOrgUserMemberRoleParams{
+		OrgID:  org.ID,
+		UserID: convert.PgUUID(prevOwnerID),
+		RoleID: adminRole.ID,
 	}); err != nil {
 		return nil, apierr.Internal("demote current owner")
 	}
-	if _, err := qtx.UpdateOrgMemberRole(ctx, db.UpdateOrgMemberRoleParams{
-		OrgID:         org.ID,
-		PrincipalKind: db.PrincipalKindUser,
-		PrincipalID:   newOwnerID,
-		RoleID:        ownerRole.ID,
+	if _, err := qtx.UpdateOrgUserMemberRole(ctx, db.UpdateOrgUserMemberRoleParams{
+		OrgID:  org.ID,
+		UserID: convert.PgUUID(newOwnerID),
+		RoleID: ownerRole.ID,
 	}); err != nil {
 		return nil, apierr.Internal("promote target")
 	}
@@ -114,7 +120,7 @@ func (s *OrganizationsServer) TransferOwnership(ctx context.Context, req *apiv1.
 
 	return &apiv1.TransferOwnershipResponse{
 		NewOwner:      fmt.Sprintf("organizations/%s/users/%s", orgSlug, newOwnerID),
-		PreviousOwner: fmt.Sprintf("organizations/%s/users/%s", orgSlug, prevOwner.PrincipalID),
+		PreviousOwner: fmt.Sprintf("organizations/%s/users/%s", orgSlug, prevOwnerID),
 	}, nil
 }
 

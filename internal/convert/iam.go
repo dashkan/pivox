@@ -25,13 +25,12 @@ func PermissionToProto(p db.Permission) *iampb.Permission {
 // OrgMemberToProto converts a joined org_members row (member columns
 // plus the joined role.name) to the unified Member proto. The proto's
 // resource name encodes the principal as `user-{uuid}` or
-// `group-{uuid}` — uniqueness-by-construction means at most one
-// Member per (scope, principal). Caller passes the org slug; the
+// `group-{uuid}` — the XOR check on the row guarantees exactly one
+// of (user_id, group_id) is set. Caller passes the org slug; the
 // converter does NOT re-resolve it. `actors` is the pre-resolved
 // Actor map; pass nil to skip Actor inflation.
 func OrgMemberToProto(m db.ListOrgMembersRow, orgSlug string, actors map[uuid.UUID]*typespb.Actor) *iampb.Member {
 	pb := &iampb.Member{
-		Name:       fmt.Sprintf("organizations/%s/members/%s-%s", orgSlug, m.PrincipalKind, m.PrincipalID),
 		Role:       fmt.Sprintf("organizations/%s/roles/%s", orgSlug, m.RoleName),
 		Etag:       m.Etag,
 		CreatedBy:  actorOrNil(actors, m.CreatedBy),
@@ -39,35 +38,37 @@ func OrgMemberToProto(m db.ListOrgMembersRow, orgSlug string, actors map[uuid.UU
 		UpdatedBy:  actorOrNil(actors, m.UpdatedBy),
 		UpdateTime: timestamppb.New(m.UpdateTime),
 	}
-	switch m.PrincipalKind {
-	case db.PrincipalKindUser:
+	if m.UserID.Valid {
+		uid := uuid.UUID(m.UserID.Bytes)
+		pb.Name = fmt.Sprintf("organizations/%s/members/user-%s", orgSlug, uid)
 		pb.Principal = &iampb.Member_User{
-			User: fmt.Sprintf("organizations/%s/users/%s", orgSlug, m.PrincipalID),
+			User: fmt.Sprintf("organizations/%s/users/%s", orgSlug, uid),
 		}
-	case db.PrincipalKindGroup:
+	} else if m.GroupID.Valid {
+		gid := uuid.UUID(m.GroupID.Bytes)
+		pb.Name = fmt.Sprintf("organizations/%s/members/group-%s", orgSlug, gid)
 		pb.Principal = &iampb.Member_Group{
-			Group: fmt.Sprintf("organizations/%s/groups/%s", orgSlug, m.PrincipalID),
+			Group: fmt.Sprintf("organizations/%s/groups/%s", orgSlug, gid),
 		}
 	}
 	return pb
 }
 
-// OrgMemberRowToProto is the GetOrgMember equivalent of
-// OrgMemberToProto; sqlc generates separate row types for :one vs
-// :many even when the SELECT clauses match, so we provide both
-// converters as thin wrappers.
-func OrgMemberRowToProto(m db.GetOrgMemberRow, orgSlug string, actors map[uuid.UUID]*typespb.Actor) *iampb.Member {
+// OrgMemberByUserRowToProto converts a GetOrgMemberByUser row.
+func OrgMemberByUserRowToProto(m db.GetOrgMemberByUserRow, orgSlug string, actors map[uuid.UUID]*typespb.Actor) *iampb.Member {
+	return OrgMemberToProto(db.ListOrgMembersRow(m), orgSlug, actors)
+}
+
+// OrgMemberByGroupRowToProto converts a GetOrgMemberByGroup row.
+func OrgMemberByGroupRowToProto(m db.GetOrgMemberByGroupRow, orgSlug string, actors map[uuid.UUID]*typespb.Actor) *iampb.Member {
 	return OrgMemberToProto(db.ListOrgMembersRow(m), orgSlug, actors)
 }
 
 // SpaceMemberToProto converts a joined space_members row to the
-// unified Member proto at space scope. The resource name nests under
-// the space: `organizations/{org}/spaces/{space}/members/{member}`.
-// Caller passes both org and space slugs. `actors` is the pre-resolved
-// Actor map.
+// unified Member proto at space scope. Same shape as OrgMemberToProto
+// but the resource name nests under the space.
 func SpaceMemberToProto(m db.ListSpaceMembersRow, orgSlug, spaceSlug string, actors map[uuid.UUID]*typespb.Actor) *iampb.Member {
 	pb := &iampb.Member{
-		Name:       fmt.Sprintf("organizations/%s/spaces/%s/members/%s-%s", orgSlug, spaceSlug, m.PrincipalKind, m.PrincipalID),
 		Role:       fmt.Sprintf("organizations/%s/roles/%s", orgSlug, m.RoleName),
 		Etag:       m.Etag,
 		CreatedBy:  actorOrNil(actors, m.CreatedBy),
@@ -75,21 +76,29 @@ func SpaceMemberToProto(m db.ListSpaceMembersRow, orgSlug, spaceSlug string, act
 		UpdatedBy:  actorOrNil(actors, m.UpdatedBy),
 		UpdateTime: timestamppb.New(m.UpdateTime),
 	}
-	switch m.PrincipalKind {
-	case db.PrincipalKindUser:
+	if m.UserID.Valid {
+		uid := uuid.UUID(m.UserID.Bytes)
+		pb.Name = fmt.Sprintf("organizations/%s/spaces/%s/members/user-%s", orgSlug, spaceSlug, uid)
 		pb.Principal = &iampb.Member_User{
-			User: fmt.Sprintf("organizations/%s/users/%s", orgSlug, m.PrincipalID),
+			User: fmt.Sprintf("organizations/%s/users/%s", orgSlug, uid),
 		}
-	case db.PrincipalKindGroup:
+	} else if m.GroupID.Valid {
+		gid := uuid.UUID(m.GroupID.Bytes)
+		pb.Name = fmt.Sprintf("organizations/%s/spaces/%s/members/group-%s", orgSlug, spaceSlug, gid)
 		pb.Principal = &iampb.Member_Group{
-			Group: fmt.Sprintf("organizations/%s/groups/%s", orgSlug, m.PrincipalID),
+			Group: fmt.Sprintf("organizations/%s/groups/%s", orgSlug, gid),
 		}
 	}
 	return pb
 }
 
-// SpaceMemberRowToProto mirrors OrgMemberRowToProto for space scope.
-func SpaceMemberRowToProto(m db.GetSpaceMemberRow, orgSlug, spaceSlug string, actors map[uuid.UUID]*typespb.Actor) *iampb.Member {
+// SpaceMemberByUserRowToProto converts a GetSpaceMemberByUser row.
+func SpaceMemberByUserRowToProto(m db.GetSpaceMemberByUserRow, orgSlug, spaceSlug string, actors map[uuid.UUID]*typespb.Actor) *iampb.Member {
+	return SpaceMemberToProto(db.ListSpaceMembersRow(m), orgSlug, spaceSlug, actors)
+}
+
+// SpaceMemberByGroupRowToProto converts a GetSpaceMemberByGroup row.
+func SpaceMemberByGroupRowToProto(m db.GetSpaceMemberByGroupRow, orgSlug, spaceSlug string, actors map[uuid.UUID]*typespb.Actor) *iampb.Member {
 	return SpaceMemberToProto(db.ListSpaceMembersRow(m), orgSlug, spaceSlug, actors)
 }
 

@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
+	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	"github.com/dashkan/pivox/internal/testutil/mocks"
@@ -57,19 +58,20 @@ func memberRow(destWriters ...func(dest interface{}) bool) *mockRow {
 	}}
 }
 
-// scanGetOrgMemberRow stages a GetOrgMemberRow shape: 12 columns —
-// id, org_id, role_id, principal_kind, principal_id, etag, revision,
-// created_by, updated_by, create_time, update_time, role_name (joined).
-func scanGetOrgMemberRow(row db.GetOrgMemberRow) *mockRow {
+// scanGetOrgMemberByUserRow stages a GetOrgMemberByUserRow shape:
+// 12 columns — id, org_id, role_id, user_id, group_id, etag,
+// revision, created_by, updated_by, create_time, update_time,
+// role_name (joined).
+func scanGetOrgMemberByUserRow(row db.GetOrgMemberByUserRow) *mockRow {
 	return &mockRow{scanFunc: func(dest ...interface{}) error {
 		if len(dest) != 12 {
-			return errors.New("unexpected GetOrgMemberRow column count")
+			return errors.New("unexpected GetOrgMemberByUserRow column count")
 		}
 		*dest[0].(*uuid.UUID) = row.ID
 		*dest[1].(*uuid.UUID) = row.OrgID
 		*dest[2].(*uuid.UUID) = row.RoleID
-		*dest[3].(*db.PrincipalKind) = row.PrincipalKind
-		*dest[4].(*uuid.UUID) = row.PrincipalID
+		*dest[3].(*pgtype.UUID) = row.UserID
+		*dest[4].(*pgtype.UUID) = row.GroupID
 		*dest[5].(*string) = row.Etag
 		*dest[6].(*int32) = row.Revision
 		*dest[7].(*pgtype.UUID) = row.CreatedBy
@@ -159,12 +161,11 @@ func TestUpdateMember_BoundaryRejectsLastOwnerDemotion(t *testing.T) {
 		Return(scanRole(db.Role{ID: adminRoleID, OrgID: testOrg.ID, Name: "admin", IsSystem: true})).Once()
 	// Inside-tx: GetOrgMember returns current binding (owner role).
 	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
-		Return(scanGetOrgMemberRow(db.GetOrgMemberRow{
+		Return(scanGetOrgMemberByUserRow(db.GetOrgMemberByUserRow{
 			ID:            memberID,
 			OrgID:         testOrg.ID,
 			RoleID:        ownerRoleID,
-			PrincipalKind: db.PrincipalKindUser,
-			PrincipalID:   userID,
+			UserID:        convert.PgUUID(userID),
 			RoleName:      "owner",
 			Etag:          "etag-current",
 			CreateTime:    membersWriteTestNow,
@@ -214,12 +215,11 @@ func TestUpdateMember_AllowsDemotionWhenMultipleOwners(t *testing.T) {
 	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
 		Return(scanRole(db.Role{ID: adminRoleID, OrgID: testOrg.ID, Name: "admin", IsSystem: true})).Once()
 	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
-		Return(scanGetOrgMemberRow(db.GetOrgMemberRow{
+		Return(scanGetOrgMemberByUserRow(db.GetOrgMemberByUserRow{
 			ID:            memberID,
 			OrgID:         testOrg.ID,
 			RoleID:        ownerRoleID,
-			PrincipalKind: db.PrincipalKindUser,
-			PrincipalID:   userID,
+			UserID:        convert.PgUUID(userID),
 			RoleName:      "owner",
 			Etag:          "etag-current",
 			CreateTime:    membersWriteTestNow,
@@ -265,12 +265,11 @@ func TestDeleteMember_BoundaryRejectsLastOwner(t *testing.T) {
 
 	pool.On("Begin", mock.Anything).Return(tx, nil)
 	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
-		Return(scanGetOrgMemberRow(db.GetOrgMemberRow{
+		Return(scanGetOrgMemberByUserRow(db.GetOrgMemberByUserRow{
 			ID:            memberID,
 			OrgID:         testOrg.ID,
 			RoleID:        ownerRoleID,
-			PrincipalKind: db.PrincipalKindUser,
-			PrincipalID:   userID,
+			UserID:        convert.PgUUID(userID),
 			RoleName:      "owner",
 			CreateTime:    membersWriteTestNow,
 			UpdateTime:    membersWriteTestNow,
@@ -305,12 +304,11 @@ func TestDeleteMember_AllowsDeleteWhenMultipleOwners(t *testing.T) {
 
 	pool.On("Begin", mock.Anything).Return(tx, nil)
 	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
-		Return(scanGetOrgMemberRow(db.GetOrgMemberRow{
+		Return(scanGetOrgMemberByUserRow(db.GetOrgMemberByUserRow{
 			ID:            memberID,
 			OrgID:         testOrg.ID,
 			RoleID:        ownerRoleID,
-			PrincipalKind: db.PrincipalKindUser,
-			PrincipalID:   userID,
+			UserID:        convert.PgUUID(userID),
 			RoleName:      "owner",
 			CreateTime:    membersWriteTestNow,
 			UpdateTime:    membersWriteTestNow,

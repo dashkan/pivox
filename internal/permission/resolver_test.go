@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/testutil/mocks"
 )
@@ -26,8 +27,8 @@ var (
 func TestResolver_OrgScope_AdminGrantsExpectedPermission(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	q.On("GetEffectiveOrgRoles", mock.Anything, db.GetEffectiveOrgRolesParams{
-		OrgID:              testOrgID,
-		IdentityID: testIdentity,
+		OrgID:      testOrgID,
+		IdentityID: convert.PgUUID(testIdentity),
 	}).Return([]string{RoleAdmin}, nil)
 
 	r := NewResolver(q)
@@ -96,12 +97,12 @@ func TestResolver_SpaceScope_OrgRoleInherits(t *testing.T) {
 	q.On("GetSpaceParentOrg", mock.Anything, testSpaceID).
 		Return(testOrgID, nil)
 	q.On("GetEffectiveSpaceRoles", mock.Anything, db.GetEffectiveSpaceRolesParams{
-		SpaceID:            testSpaceID,
-		IdentityID: testIdentity,
+		SpaceID:    testSpaceID,
+		IdentityID: convert.PgUUID(testIdentity),
 	}).Return([]string{}, nil)
 	q.On("GetEffectiveOrgRoles", mock.Anything, db.GetEffectiveOrgRolesParams{
-		OrgID:              testOrgID,
-		IdentityID: testIdentity,
+		OrgID:      testOrgID,
+		IdentityID: convert.PgUUID(testIdentity),
 	}).Return([]string{RoleAdmin}, nil)
 
 	r := NewResolver(q)

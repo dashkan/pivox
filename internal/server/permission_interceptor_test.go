@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/permission"
 	aiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1"
@@ -64,7 +65,7 @@ func TestPermissionInterceptor_AllowsWhenPermissionGranted(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	q.On("GetOrganizationByNameForGate", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
 	q.On("GetEffectiveOrgRoles", mock.Anything, db.GetEffectiveOrgRolesParams{
-		OrgID: testPermOrgID, IdentityID: testPermCallerID,
+		OrgID: testPermOrgID, IdentityID: convert.PgUUID(testPermCallerID),
 	}).Return([]string{permission.RoleAdmin}, nil)
 
 	registry := Registry{
@@ -312,10 +313,10 @@ func TestPermissionInterceptor_SpaceScope_AllowsWhenPermissionGranted(t *testing
 	// Resolver path for SpaceTarget: GetSpaceParentOrg + GetEffectiveSpaceRoles + GetEffectiveOrgRoles.
 	q.On("GetSpaceParentOrg", mock.Anything, testPermSpaceID).Return(testPermOrgID, nil)
 	q.On("GetEffectiveSpaceRoles", mock.Anything, db.GetEffectiveSpaceRolesParams{
-		SpaceID: testPermSpaceID, IdentityID: testPermCallerID,
+		SpaceID: testPermSpaceID, IdentityID: convert.PgUUID(testPermCallerID),
 	}).Return([]string{permission.RoleEditor}, nil)
 	q.On("GetEffectiveOrgRoles", mock.Anything, db.GetEffectiveOrgRolesParams{
-		OrgID: testPermOrgID, IdentityID: testPermCallerID,
+		OrgID: testPermOrgID, IdentityID: convert.PgUUID(testPermCallerID),
 	}).Return([]string(nil), nil)
 
 	registry := Registry{

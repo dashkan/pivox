@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/dashkan/pivox/internal/apierr"
+	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 )
 
@@ -88,7 +89,7 @@ func requireMembership(ctx context.Context, queries db.Querier, fullMethod strin
 	// identities.id). `ListOrganizationsForIdentity`
 	// is the canonical query — same one ListOrganizations uses, so
 	// the gate and the read RPC see the same set.
-	orgs, err := queries.ListOrganizationsForIdentity(ctx, identity.ID)
+	orgs, err := queries.ListOrganizationsForIdentity(ctx, convert.PgUUID(identity.ID))
 	if err != nil {
 		slog.ErrorContext(ctx, "membership: lookup memberships failed", "identity_id", identity.ID, "error", err)
 		return apierr.Internal("lookup memberships")

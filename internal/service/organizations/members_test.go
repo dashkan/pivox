@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	"github.com/dashkan/pivox/internal/testutil/mocks"
@@ -32,20 +33,18 @@ func TestGetMember_OrgScope_UserPrincipal(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	userID := uuid.MustParse("0192a000-0010-7000-8000-000000000010")
 	q.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
-	q.On("GetOrgMember", mock.Anything, db.GetOrgMemberParams{
-		OrgID:         testOrg.ID,
-		PrincipalKind: db.PrincipalKindUser,
-		PrincipalID:   userID,
-	}).Return(db.GetOrgMemberRow{
-		ID:            uuid.New(),
-		OrgID:         testOrg.ID,
-		RoleID:        uuid.New(),
-		PrincipalKind: db.PrincipalKindUser,
-		PrincipalID:   userID,
-		RoleName:      "admin",
-		Etag:          "etag-m",
-		CreateTime:    memberTestNow,
-		UpdateTime:    memberTestNow,
+	q.On("GetOrgMemberByUser", mock.Anything, db.GetOrgMemberByUserParams{
+		OrgID:  testOrg.ID,
+		UserID: convert.PgUUID(userID),
+	}).Return(db.GetOrgMemberByUserRow{
+		ID:         uuid.New(),
+		OrgID:      testOrg.ID,
+		RoleID:     uuid.New(),
+		UserID:     convert.PgUUID(userID),
+		RoleName:   "admin",
+		Etag:       "etag-m",
+		CreateTime: memberTestNow,
+		UpdateTime: memberTestNow,
 	}, nil)
 
 	srv := newServerForMembers(q)
@@ -110,12 +109,12 @@ func TestListMembers_OrgScope(t *testing.T) {
 	})).Return([]db.ListOrgMembersRow{
 		{
 			ID: uuid.New(), OrgID: testOrg.ID, RoleID: uuid.New(),
-			PrincipalKind: db.PrincipalKindUser, PrincipalID: userA,
+			UserID:   convert.PgUUID(userA),
 			RoleName: "owner", Etag: "e1", CreateTime: memberTestNow, UpdateTime: memberTestNow,
 		},
 		{
 			ID: uuid.New(), OrgID: testOrg.ID, RoleID: uuid.New(),
-			PrincipalKind: db.PrincipalKindUser, PrincipalID: userB,
+			UserID:   convert.PgUUID(userB),
 			RoleName: "editor", Etag: "e2", CreateTime: memberTestNow, UpdateTime: memberTestNow,
 		},
 	}, nil)
@@ -143,7 +142,7 @@ func TestListMembers_PaginationCursor(t *testing.T) {
 	for i := range firstPage {
 		firstPage[i] = db.ListOrgMembersRow{
 			ID: uuid.New(), OrgID: testOrg.ID, RoleID: uuid.New(),
-			PrincipalKind: db.PrincipalKindUser, PrincipalID: uuid.New(),
+			UserID:   convert.PgUUID(uuid.New()),
 			RoleName: "viewer", Etag: "e", CreateTime: memberTestNow, UpdateTime: memberTestNow,
 		}
 	}
