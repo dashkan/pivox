@@ -24,17 +24,6 @@ import (
 	"github.com/dashkan/pivox/internal/testutil/mocks"
 )
 
-// fakeUserProgress captures DeleteUser phase updates.
-type fakeUserProgress struct {
-	phases []iampb.DeleteUserMetadata_Phase
-}
-
-func (f *fakeUserProgress) Update(_ context.Context, m proto.Message) {
-	if md, ok := m.(*iampb.DeleteUserMetadata); ok {
-		f.phases = append(f.phases, md.GetPhase())
-	}
-}
-
 // fakeAccountProgress captures DeleteAccount phase updates.
 type fakeAccountProgress struct {
 	phases []iampb.DeleteAccountMetadata_Phase
@@ -107,7 +96,7 @@ func resolvedOrgCtx() context.Context {
 
 func TestDeleteUser_RejectsMalformedPath(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	srv := &IamServer{queries: q, lroManager: lro.NewManager(q, silentLogger())}
+	srv := &IamServer{queries: q}
 	_, err := srv.DeleteUser(resolvedOrgCtx(), &iampb.DeleteUserRequest{Name: "users/foo"})
 	require.Error(t, err)
 	assert.Equal(t, codes.InvalidArgument, status.Code(err))
@@ -116,7 +105,7 @@ func TestDeleteUser_RejectsMalformedPath(t *testing.T) {
 func TestDeleteUser_RejectsOrgSlugMismatch(t *testing.T) {
 	// Defense against gate-vs-handler name drift.
 	q := new(mocks.MockQuerier)
-	srv := &IamServer{queries: q, lroManager: lro.NewManager(q, silentLogger())}
+	srv := &IamServer{queries: q}
 	_, err := srv.DeleteUser(resolvedOrgCtx(), &iampb.DeleteUserRequest{
 		Name: "organizations/different/users/" + testTargetUserID.String(),
 	})
@@ -130,7 +119,7 @@ func TestDeleteUser_RejectsOrgSlugMismatch(t *testing.T) {
 // message — no special-casing or cross-RPC redirect.
 func TestDeleteUser_RejectsMeTarget(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	srv := &IamServer{queries: q, lroManager: lro.NewManager(q, silentLogger())}
+	srv := &IamServer{queries: q}
 	_, err := srv.DeleteUser(resolvedOrgCtx(), &iampb.DeleteUserRequest{
 		Name: "organizations/acme/users/me",
 	})
@@ -140,7 +129,7 @@ func TestDeleteUser_RejectsMeTarget(t *testing.T) {
 
 func TestDeleteUser_RejectsBadUserSegment(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	srv := &IamServer{queries: q, lroManager: lro.NewManager(q, silentLogger())}
+	srv := &IamServer{queries: q}
 	_, err := srv.DeleteUser(resolvedOrgCtx(), &iampb.DeleteUserRequest{
 		Name: "organizations/acme/users/not-uuid",
 	})
@@ -148,25 +137,29 @@ func TestDeleteUser_RejectsBadUserSegment(t *testing.T) {
 	assert.Equal(t, codes.InvalidArgument, status.Code(err))
 }
 
-// --- runDeleteUser org-scoped orchestrator ---
-
-func TestRunDeleteUser_BlocksWhenLastOwner(t *testing.T) {
-	// Removing this user would leave 0 owners in the org —
-	// CountOrgOwnersExcludingUser returns 0, handler refuses.
+// TestDeleteUser_BlocksWhenLastOwner: refuses to remove the sole
+// owner. Post-Phase-7 DeleteUser is sync (no LRO orchestrator) so
+// this asserts the FAILED_PRECONDITION at the handler boundary
+// directly.
+func TestDeleteUser_BlocksWhenLastOwner(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	q.On("CountOrgOwnersExcludingUser", mock.Anything, db.CountOrgOwnersExcludingUserParams{
 		OrgID: testHandlerOrgID, PrincipalID: testTargetUserID,
 	}).Return(int64(0), nil)
 
 	srv := &IamServer{queries: q}
-	_, err := srv.runDeleteUser(context.Background(), &fakeUserProgress{},
-		testHandlerOrgID, testTargetUserID, "organizations/acme/users/x")
+	_, err := srv.DeleteUser(resolvedOrgCtx(), &iampb.DeleteUserRequest{
+		Name: "organizations/acme/users/" + testTargetUserID.String(),
+	})
 	require.Error(t, err)
 	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
 	assert.Contains(t, err.Error(), "no owners")
 }
 
-func TestRunDeleteUser_FullCascade(t *testing.T) {
+// TestDeleteUser_FullCascade pins the sync hard-delete path: with
+// remaining owners > 0, the handler fires the three deletes and
+// returns Empty.
+func TestDeleteUser_FullCascade(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	q.On("CountOrgOwnersExcludingUser", mock.Anything, mock.Anything).Return(int64(2), nil)
 	q.On("DeleteOrgMembersForUserInOrg", mock.Anything, db.DeleteOrgMembersForUserInOrgParams{
@@ -178,19 +171,13 @@ func TestRunDeleteUser_FullCascade(t *testing.T) {
 	q.On("DeleteGroupMembersForUserInOrg", mock.Anything, db.DeleteGroupMembersForUserInOrgParams{
 		OrgID: testHandlerOrgID, UserID: testTargetUserID,
 	}).Return(nil)
-	q.On("SoftDeleteUserInOrg", mock.Anything, testTargetUserID).Return(nil)
 
 	srv := &IamServer{queries: q}
-	progress := &fakeUserProgress{}
-	_, err := srv.runDeleteUser(context.Background(), progress,
-		testHandlerOrgID, testTargetUserID, "organizations/acme/users/x")
+	resp, err := srv.DeleteUser(resolvedOrgCtx(), &iampb.DeleteUserRequest{
+		Name: "organizations/acme/users/" + testTargetUserID.String(),
+	})
 	require.NoError(t, err)
-	assert.Equal(t, []iampb.DeleteUserMetadata_Phase{
-		iampb.DeleteUserMetadata_VALIDATING,
-		iampb.DeleteUserMetadata_REVOKING_MEMBERSHIPS,
-		iampb.DeleteUserMetadata_SOFT_DELETING_USER,
-		iampb.DeleteUserMetadata_COMPLETED,
-	}, progress.phases)
+	require.NotNil(t, resp)
 	q.AssertExpectations(t)
 }
 

@@ -401,39 +401,29 @@ CREATE TABLE firebase_identities (
 CREATE INDEX idx_firebase_identities_email ON firebase_identities (email);
 
 -- ============================================================================
--- users (per-org identity record)
+-- Per-org user identity has been unified with `firebase_identities`
+-- (Phase 7). The previous per-org `users` join row was dropped in
+-- favor of using `firebase_identities.id` as the universal user UUID
+-- across the API:
 --
--- One row per (org, firebase_identity) pairing — the per-org identity
--- record that says "this identity exists in this org". Created in two
--- ways:
---   1. By `CreateOrganization` for the founder.
---   2. By `AcceptInvitation` (future) for invitees.
+--   - `org_members.principal_id` (when principal_kind='user') →
+--     references `firebase_identities.id`
+--   - `space_members.principal_id` (when principal_kind='user') →
+--     same
+--   - `group_members.user_id` → references `firebase_identities.id`
+--   - `ai_conversations.creator_id` → same (added in the AI chat
+--     re-parent commit that ships alongside this one)
 --
--- Role bindings live in `org_members` (and `space_members` for space
--- scope), not on this table. "≥1 owner per org" is invariant; enforced
--- at the service mutation boundary by counting `org_members` rows
--- where `role_id` references the owner system role.
+-- Membership in an org = the existence of at least one `org_members`
+-- row binding the firebase_identity to that org via a role. Removing
+-- a user from an org is a hard-delete of those `org_members`/
+-- `space_members`/`group_members` rows; the `firebase_identities`
+-- row itself is unaffected.
+--
+-- Clients learn their own user UUID via the `pivox_user_id` Firebase
+-- ID-token custom claim, which the auth blocking function sets from
+-- the `/internal/v1/auth:syncFirebaseIdentity` response.
 -- ============================================================================
-CREATE TABLE users (
-    id                   UUID PRIMARY KEY DEFAULT uuidv7(),
-    -- relationships
-    org_id               UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-    firebase_identity_id UUID NOT NULL REFERENCES firebase_identities(id) ON DELETE CASCADE,
-    -- versioning
-    etag                 TEXT NOT NULL DEFAULT md5(now()::text),
-    revision             INTEGER NOT NULL DEFAULT 1,
-    -- audit
-    deleted_by           TEXT NOT NULL DEFAULT '',
-    -- timestamps
-    create_time          TIMESTAMPTZ NOT NULL DEFAULT now(),
-    update_time          TIMESTAMPTZ NOT NULL DEFAULT now(),
-    delete_time          TIMESTAMPTZ,
-    purge_time           TIMESTAMPTZ,
-    -- constraints
-    UNIQUE(org_id, firebase_identity_id)
-);
-CREATE INDEX idx_users_org ON users (org_id) WHERE delete_time IS NULL;
-CREATE INDEX idx_users_firebase_identity ON users (firebase_identity_id) WHERE delete_time IS NULL;
 
 -- FK from organizations.created_by_firebase_identity_id → firebase_identities.id,
 -- added here because `firebase_identities` was declared after `organizations` in
@@ -484,7 +474,7 @@ CREATE TABLE group_members (
     id         UUID PRIMARY KEY DEFAULT uuidv7(),
     -- relationships
     group_id   UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-    user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id    UUID NOT NULL REFERENCES firebase_identities(id) ON DELETE CASCADE,
     -- audit
     created_by TEXT NOT NULL DEFAULT '',
     -- timestamps

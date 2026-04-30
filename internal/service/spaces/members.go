@@ -398,13 +398,16 @@ func parseRoleRef(ref, parentOrgSlug string) (string, error) {
 	return parts[3], nil
 }
 
-// verifyPrincipalInOrg confirms the principal exists in this org so
-// we don't insert dead bindings (space_members.principal_id is NOT a
-// DB FK — it's polymorphic).
+// verifyPrincipalInOrg confirms the principal exists so we don't
+// insert dead bindings (space_members.principal_id is NOT a DB FK
+// — it's polymorphic by principal_kind). Post-Phase-7 the user
+// check is "firebase_identity row exists"; the per-org `users` row
+// was dropped. orgID is preserved on the signature but only used
+// for groups (which remain org-scoped).
 func verifyPrincipalInOrg(ctx context.Context, qtx db.Querier, orgID uuid.UUID, kind db.PrincipalKind, id uuid.UUID) error {
 	switch kind {
 	case db.PrincipalKindUser:
-		if _, err := qtx.GetUserByID(ctx, db.GetUserByIDParams{ID: id, OrgID: orgID}); err != nil {
+		if _, err := qtx.GetFirebaseIdentityForMember(ctx, id); err != nil {
 			return apierr.HandleResourceError(err, "User", id.String())
 		}
 	case db.PrincipalKindGroup:

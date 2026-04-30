@@ -73,15 +73,16 @@ type Querier interface {
 	// user being removed, so the handler can refuse if removing them
 	// would leave the org with zero owners. Counts both user and group
 	// principals (matches CountOwnersByOrg's group-owner support).
+	// $2 is `firebase_identities.id`.
 	CountOrgOwnersExcludingUser(ctx context.Context, arg CountOrgOwnersExcludingUserParams) (int64, error)
-	// Used by membership-mutation handlers to enforce "≥1 owner" — call
-	// before any role-change or delete that would reduce the owner count.
 	// Counts org_members rows whose role is the system 'owner' role for
-	// this org, regardless of principal kind. A binding is only counted
-	// when its principal is still live: users.delete_time IS NULL for
-	// user principals, groups.state = 'ACTIVE' for group principals.
-	// Keys on the stable `roles.name` slug, not display_name —
-	// display_name is mutable and i18n-eligible.
+	// this org, regardless of principal kind. Used by membership-mutation
+	// handlers to enforce "≥1 owner". Group principals are counted only
+	// when the group itself is ACTIVE (a soft-deleted group's binding
+	// doesn't keep the org owner-ful). User principals are counted
+	// unconditionally — there's no per-org-user soft-delete state any
+	// more (Phase 7); a binding's existence equals its liveness.
+	// Keys on the stable `roles.name` slug, not display_name.
 	CountOwnersByOrg(ctx context.Context, orgID uuid.UUID) (int64, error)
 	CountRequestsBySpace(ctx context.Context, spaceID uuid.UUID) (int64, error)
 	CountStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) (int64, error)
@@ -140,12 +141,6 @@ type Querier interface {
 	CreateTagBinding(ctx context.Context, arg CreateTagBindingParams) (TagBinding, error)
 	CreateTagKey(ctx context.Context, arg CreateTagKeyParams) (TagKey, error)
 	CreateTagValue(ctx context.Context, arg CreateTagValueParams) (TagValue, error)
-	// Creates a per-org identity row joining a firebase_identity to an
-	// org. Role bindings live in `org_members`, not on this table; the
-	// caller follows up with InsertOrgMember to bind the new user to a
-	// role. Used by `CreateOrganization` (founder) and the future
-	// `AcceptInvitation` flow (invitee).
-	CreateUserMembership(ctx context.Context, arg CreateUserMembershipParams) (User, error)
 	DeleteArtifact(ctx context.Context, id uuid.UUID) error
 	DeleteArtifactVersion(ctx context.Context, id uuid.UUID) error
 	DeleteAssetRenditionsByVersion(ctx context.Context, versionID uuid.UUID) error
@@ -160,49 +155,47 @@ type Querier interface {
 	DeleteExpiredDelegatedAuthSessions(ctx context.Context) error
 	DeleteExpiredOperations(ctx context.Context) error
 	DeleteExpiredStorageAgentAudit(ctx context.Context) (int64, error)
+	// DeleteGroupMembersForFirebaseIdentity removes the firebase_identity
+	// from every group it belongs to, across all orgs. Cross-org variant
+	// for DeleteAccount. After Phase 7 unification, group_members.user_id
+	// IS firebase_identities.id, so this is a single straight DELETE
+	// without the prior subquery.
+	DeleteGroupMembersForFirebaseIdentity(ctx context.Context, userID uuid.UUID) error
 	// DeleteGroupMembersForUserInOrg removes the user's membership in
-	// groups belonging to this org. group_members.user_id is the per-org
-	// users.id (NOT a firebase_identity_id), matching the column name in
-	// the schema. Sibling queries in this cascade family
-	// (DeleteOrgMembersForUserInOrg, DeleteSpaceMembersForUserInOrg) use
-	// `principal_id` because their tables discriminate user-vs-group
-	// principals; group_members has no such discriminator, so the column
-	// is just `user_id`. The generated sqlc struct field name therefore
-	// diverges (UserID vs PrincipalID) — that's intentional and reflects
-	// the schema, not a refactor leftover.
-	//
-	// groups themselves are scoped by org_id, so the join bounds the
-	// delete by org without an explicit principal-kind filter.
+	// groups belonging to this org. After Phase 7 unification,
+	// group_members.user_id IS firebase_identities.id directly — same
+	// type as principal_id on the sibling tables, just a different
+	// column name (group_members has no principal_kind discriminator).
+	// $2 is `firebase_identities.id`.
 	DeleteGroupMembersForUserInOrg(ctx context.Context, arg DeleteGroupMembersForUserInOrgParams) error
 	DeleteLineItem(ctx context.Context, id uuid.UUID) error
 	DeleteOperation(ctx context.Context, id uuid.UUID) error
 	// Returns the affected-row count so the handler can map "not found"
 	// (0 rows) to gRPC NotFound rather than treating it as success.
 	DeleteOrgMember(ctx context.Context, arg DeleteOrgMemberParams) (int64, error)
-	// DeleteOrgMembersForFirebaseIdentity removes all org-scope role
-	// bindings for users owned by this firebase_identity. The DELETE is
-	// explicit because org_members.principal_id has no FK on users
-	// (principal_kind discriminates user vs group).
-	DeleteOrgMembersForFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) error
+	// DeleteOrgMembersForFirebaseIdentity removes ALL org-scope role
+	// bindings across every org for this firebase_identity. Used by
+	// DeleteAccount's cross-org cascade. Org-scoped DeleteUser uses
+	// the per-org variant `DeleteOrgMembersForUserInOrg` below.
+	DeleteOrgMembersForFirebaseIdentity(ctx context.Context, principalID uuid.UUID) error
 	// ===========================================================================
-	// Org-scoped cascade queries used by Iam.DeleteUser (org-scoped).
-	// These are the per-org analogues of the Delete*ForFirebaseIdentity
-	// queries above: they remove a single user's bindings within ONE org,
-	// leaving every other org untouched. Used exclusively by DeleteUser;
-	// DeleteAccount uses the cross-org variants since account deletion
-	// spans every org the firebase_identity is in.
+	// Org-scoped cascade queries used by Iam.DeleteUser (org-scoped, sync
+	// post-Phase-7 — no LRO, no grace). They remove a single user's
+	// bindings within ONE org, leaving every other org untouched.
 	// ===========================================================================
 	// DeleteOrgMembersForUserInOrg removes the user's org-scope role
-	// bindings in a single org. Bounded by (org_id, principal_id) so
-	// bindings in other orgs are unaffected.
+	// bindings in a single org. Bounded by (org_id, principal_id).
+	// $2 is `firebase_identities.id` (post-Phase-7 unification).
 	DeleteOrgMembersForUserInOrg(ctx context.Context, arg DeleteOrgMembersForUserInOrgParams) error
 	DeleteRequest(ctx context.Context, id uuid.UUID) error
 	DeleteSpaceMember(ctx context.Context, arg DeleteSpaceMemberParams) (int64, error)
-	// DeleteSpaceMembersForFirebaseIdentity is the space-scope analogue.
-	DeleteSpaceMembersForFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) error
+	// DeleteSpaceMembersForFirebaseIdentity is the cross-org space-
+	// scope analogue used by DeleteAccount.
+	DeleteSpaceMembersForFirebaseIdentity(ctx context.Context, principalID uuid.UUID) error
 	// DeleteSpaceMembersForUserInOrg removes the user's space-scope
 	// bindings for spaces in this org. Joins to spaces to bound by
 	// org_id, since space_members rows themselves only carry space_id.
+	// $2 is `firebase_identities.id`.
 	DeleteSpaceMembersForUserInOrg(ctx context.Context, arg DeleteSpaceMembersForUserInOrgParams) error
 	DeleteStorageAgent(ctx context.Context, id uuid.UUID) error
 	DeleteStorageEndpoint(ctx context.Context, id uuid.UUID) error
@@ -210,9 +203,6 @@ type Querier interface {
 	DeleteTagBinding(ctx context.Context, id uuid.UUID) error
 	DeleteTagKey(ctx context.Context, id uuid.UUID) error
 	DeleteTagValue(ctx context.Context, id uuid.UUID) error
-	// Hard-delete used by tests + the DeleteUser LRO post-soft-delete
-	// purge. For ordinary user removal, prefer SoftDeleteUserMembership.
-	DeleteUserMembership(ctx context.Context, arg DeleteUserMembershipParams) error
 	FailOperation(ctx context.Context, arg FailOperationParams) (Operation, error)
 	GetApiKey(ctx context.Context, id uuid.UUID) (ApiKey, error)
 	GetApiKeyByOrgAndKeyID(ctx context.Context, arg GetApiKeyByOrgAndKeyIDParams) (ApiKey, error)
@@ -240,7 +230,7 @@ type Querier interface {
 	// segment (the domain string) to a row, scoped to org. Used by
 	// GetDomain handler.
 	GetDomainByName(ctx context.Context, arg GetDomainByNameParams) (Domain, error)
-	// Returns the system-role names a Firebase identity has at the given
+	// Returns the system-role names a firebase_identity has at the given
 	// org, considering both direct user bindings and group-derived
 	// bindings (groups the user is a member of, which themselves have
 	// org_members rows). Custom roles are excluded — v1 only resolves
@@ -250,17 +240,21 @@ type Querier interface {
 	// role resolution. Space-scope inheritance is handled at the resolver
 	// layer by unioning this with `GetEffectiveSpaceRoles`.
 	//
-	// Returns the empty set if the firebase_identity has no live user row
-	// in the org (caller is not a member, or membership was soft-deleted).
+	// Post-Phase-7 unification: `org_members.principal_id` (when
+	// principal_kind='user') and `group_members.user_id` both reference
+	// `firebase_identities.id` directly. The previous per-org `users`
+	// join row is gone, so this query no longer needs a caller-resolution
+	// CTE. Returns the empty set if no bindings exist.
 	GetEffectiveOrgRoles(ctx context.Context, arg GetEffectiveOrgRolesParams) ([]string, error)
-	// Returns the system-role names a Firebase identity has at the given
+	// Returns the system-role names a firebase_identity has at the given
 	// space — direct + group-derived space-level bindings only. Org-level
 	// inheritance (an org-admin is also a space-admin) is the resolver's
 	// responsibility to union in via GetEffectiveOrgRoles against the
 	// space's parent org.
 	//
-	// Returns the empty set if the firebase_identity has no live user row
-	// in the org that owns this space.
+	// Post-Phase-7 unification: same simplification as
+	// GetEffectiveOrgRoles — principal_id and group_members.user_id are
+	// both firebase_identities.id, so no caller-resolution CTE.
 	GetEffectiveSpaceRoles(ctx context.Context, arg GetEffectiveSpaceRolesParams) ([]string, error)
 	// GetFirebaseIdentityByID looks up by primary key. Used by
 	// DeleteUser's DELETING_PIVOX_RECORDS phase to capture the
@@ -268,7 +262,17 @@ type Querier interface {
 	// DELETING_FIREBASE_IDENTITY phase can call auth.DeleteUser(uid).
 	GetFirebaseIdentityByID(ctx context.Context, id uuid.UUID) (FirebaseIdentity, error)
 	GetFirebaseIdentityByUID(ctx context.Context, firebaseUid string) (FirebaseIdentity, error)
-	// Companion to GetUserByID for groups.
+	// Verifies that a firebase_identity row exists for the given uuid.
+	// Used by Member create handlers as the principal-existence check
+	// before inserting a binding — org_members.principal_id has no FK
+	// (it's polymorphic by principal_kind), so the check is
+	// application-level. The previous version of this query
+	// (`GetUserByID`) verified per-org membership via the dropped
+	// `users` table; post-Phase-7 the membership check is "principal
+	// has a firebase_identity row", and CreateMember separately validates
+	// that the caller has org-level permission to create the binding.
+	GetFirebaseIdentityForMember(ctx context.Context, id uuid.UUID) (FirebaseIdentity, error)
+	// Companion to GetFirebaseIdentityForMember for groups.
 	GetGroupByID(ctx context.Context, arg GetGroupByIDParams) (Group, error)
 	GetLatestAssetVersion(ctx context.Context, assetID uuid.UUID) (AssetVersion, error)
 	GetLineItem(ctx context.Context, id uuid.UUID) (AssetRequestLineItem, error)
@@ -342,21 +346,14 @@ type Querier interface {
 	GetTagKeyByNamespacedName(ctx context.Context, namespacedName string) (TagKey, error)
 	GetTagValue(ctx context.Context, id uuid.UUID) (TagValue, error)
 	GetTagValueByNamespacedName(ctx context.Context, namespacedName string) (TagValue, error)
-	// Verifies a user.id belongs to the given org and is not soft-deleted.
-	// Used by Member create handlers to confirm the principal exists in
-	// this org before inserting a binding — org_members.principal_id has
-	// no FK (it's polymorphic), so the check is application-level.
-	GetUserByID(ctx context.Context, arg GetUserByIDParams) (User, error)
-	GetUserMembership(ctx context.Context, arg GetUserMembershipParams) (User, error)
 	// HardDeleteFirebaseIdentity removes the firebase_identity row.
-	// Cascade chain (via FK ON DELETE CASCADE):
-	//   firebase_identities → users → group_members
-	// Explicit revocation queries above handle org_members and
-	// space_members because their `principal_id` is unFK'd (the
-	// principal_kind discriminator means we can't add a FK directly).
-	// Called as the second-to-last step of DeleteAccount; the Firebase
-	// Auth identity itself is deleted last so a partial failure leaves
-	// a recoverable Firebase identity rather than orphaned Pivox state.
+	// group_members.user_id has ON DELETE CASCADE so group memberships
+	// transitively delete; org_members and space_members principal_id
+	// columns aren't FK'd (polymorphic by principal_kind) so the
+	// cross-org cascades above must run first. Called as the
+	// second-to-last step of DeleteAccount; the Firebase Auth identity
+	// itself is deleted last so a partial failure leaves a recoverable
+	// Firebase identity rather than orphaned Pivox state.
 	HardDeleteFirebaseIdentity(ctx context.Context, id uuid.UUID) error
 	IncrementConversationMessageCount(ctx context.Context, id uuid.UUID) error
 	IsOnlyArtifactVersion(ctx context.Context, artifactID uuid.UUID) (bool, error)
@@ -386,12 +383,41 @@ type Querier interface {
 	// role for the given org. Used by TransferOwnership to find the
 	// current owner(s) to demote; in normal operation returns ≥1 row.
 	ListOrgOwnerMembers(ctx context.Context, orgID uuid.UUID) ([]OrgMember, error)
-	// Lists all organizations the given firebase_identity has membership in.
-	// Caller-scoped for `ListOrganizations`: every authenticated user is
-	// only ever shown orgs they belong to. Excludes soft-deleted orgs and
-	// soft-deleted user rows. No pagination — typical users are in 1-3
-	// orgs. The 1000-row LIMIT is a defensive backstop.
-	ListOrganizationsForFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) ([]Organization, error)
+	// Phase 7 unified per-org identity with firebase_identities. The
+	// per-org `users` join table was dropped; queries that used to
+	// resolve "users.id from (org, firebase_identity)" now reference
+	// `firebase_identities.id` directly. The handler reads it from the
+	// `pivox_user_id` ID-token claim — no DB lookup required.
+	//
+	// Queries below are the reduced set still useful post-unification:
+	// listing orgs a user is a member of (for ListOrganizations and the
+	// membership interceptor), counting owners (for the ≥1-owner
+	// invariant), the cross-org cascades for DeleteAccount, and the
+	// per-org cascades for the now-sync `Iam.DeleteUser`.
+	// Lists all orgs the given firebase_identity has membership in,
+	// counting both direct user bindings AND group-mediated bindings
+	// (the user is in a group that has an org_members row).
+	// Caller-scoped for `ListOrganizations` and the
+	// membership-required interceptor — every authenticated user is
+	// only ever shown orgs they actually belong to. Includes
+	// soft-deleted orgs so an owner can reach UndeleteOrganization
+	// during the 30-day grace window. Excludes purged orgs (the JOIN
+	// naturally drops those once their org row is gone).
+	//
+	// "Member" post-Phase-7 unification = at least one `org_members`
+	// row whose principal resolves to this firebase_identity:
+	//
+	//   - Direct: `(principal_kind = 'user', principal_id = $1)`
+	//   - Group-mediated: `(principal_kind = 'group', principal_id IN
+	//     (groups the user belongs to via group_members.user_id = $1))`
+	//
+	// Both must count or the membership-gate would reject a user whose
+	// only role-binding is via a group, even though they can clearly
+	// reach RPCs gated by that group's permissions. Group-mediated
+	// access was the old behavior pre-Phase-7 (users.id existed for
+	// group-only members and ListUsersByFirebaseIdentity counted them);
+	// preserved here in the unified shape.
+	ListOrganizationsForFirebaseIdentity(ctx context.Context, principalID uuid.UUID) ([]Organization, error)
 	// ListOrgsPastPurgeTime returns soft-deleted orgs whose purge_time
 	// has elapsed. Used by PurgeWorker to drive the final cascade
 	// (DELETE FROM organizations + FK CASCADE) for orgs that finished
@@ -415,25 +441,16 @@ type Querier interface {
 	ListPermissions(ctx context.Context) ([]Permission, error)
 	ListRequestsBySpace(ctx context.Context, arg ListRequestsBySpaceParams) ([]AssetRequest, error)
 	ListRolesByOrg(ctx context.Context, orgID uuid.UUID) ([]Role, error)
-	// ListSoleOwnerOrgsForFirebaseIdentity returns the set of active orgs
-	// where this firebase_identity is the ONLY owner. Used by DeleteUser's
-	// VALIDATING phase to refuse deletion when the caller would leave any
-	// org without an owner. Empty result means deletion is safe.
+	// ListSoleOwnerOrgsForFirebaseIdentity returns active orgs where
+	// the given firebase_identity is the ONLY owner. Used by
+	// DeleteAccount's VALIDATING phase to refuse deletion when the
+	// caller would leave any org without an owner.
 	//
 	// An org is "ONLY owned by this firebase_identity" iff:
-	//   - exactly one live user-owner binding exists, and it points to a
-	//     user belonging to this firebase_identity, AND
-	//   - zero live group-owner bindings exist.
-	//
-	// Live = users.delete_time IS NULL for user principals,
-	//        groups.state = 'ACTIVE' for group principals.
-	//
-	// A group-owner binding (even on a group with zero members) keeps the
-	// org out of this result set: the role is held by the group, so the
-	// org is not "only" owned by the user. This mirrors the
-	// CountOwnersByOrg invariant — both queries must count both
-	// principal kinds or the ≥1-owner gate has a hole.
-	ListSoleOwnerOrgsForFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) ([]Organization, error)
+	//   - exactly one user-owner binding exists, and it points at this
+	//     firebase_identity, AND
+	//   - zero ACTIVE-group-owner bindings exist.
+	ListSoleOwnerOrgsForFirebaseIdentity(ctx context.Context, principalID uuid.UUID) ([]Organization, error)
 	// Companion to ListOrgMembers at space scope. Same direct-only
 	// semantic as GetSpaceMember and the same offset+limit pagination
 	// contract.
@@ -449,22 +466,6 @@ type Querier interface {
 	ListStorageAgentAuditByGateway(ctx context.Context, arg ListStorageAgentAuditByGatewayParams) ([]StorageAgentAudit, error)
 	ListStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageAgent, error)
 	ListStorageEndpointsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageEndpoint, error)
-	// Lists all org memberships for a firebase_identity, including those
-	// in soft-deleted orgs so the owner can reach UndeleteOrganization
-	// during the 30-day grace window. Excludes:
-	//   - soft-deleted user rows (the per-org membership itself was
-	//     soft-deleted, distinct from the org being soft-deleted), and
-	//   - purged orgs (the org row is hard-deleted; the JOIN naturally
-	//     drops those).
-	//
-	// Used by the membership interceptor's gate, which decides whether a
-	// caller is "memberful enough" to reach the permission interceptor.
-	// Membership in a DELETE_REQUESTED org counts: the permission
-	// interceptor's soft-delete gate then narrows allowed permissions to
-	// reads + organizations.delete (which gates UndeleteOrganization),
-	// so the bootstrap path stays intact without granting mutate access.
-	ListUsersByFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) ([]User, error)
-	ListUsersByOrg(ctx context.Context, orgID uuid.UUID) ([]User, error)
 	LookupApiKeyByKeyString(ctx context.Context, keyString string) (ApiKey, error)
 	// MarkDomainFailed flips a PENDING domain to FAILED. Same race-
 	// safety as MarkDomainVerified.
@@ -527,13 +528,6 @@ type Querier interface {
 	// Returns the updated row.
 	SoftDeleteOrganization(ctx context.Context, arg SoftDeleteOrganizationParams) (Organization, error)
 	SoftDeleteSpace(ctx context.Context, arg SoftDeleteSpaceParams) (Space, error)
-	// SoftDeleteUserInOrg marks the per-org users row as soft-deleted
-	// with the standard 30-day grace + purge_time. Mirrors the org's
-	// own soft-delete pattern: the row remains queryable for grace,
-	// the purge worker hard-deletes after grace expiry. Race-safe via
-	// WHERE delete_time IS NULL — a second soft-delete is absorbed.
-	SoftDeleteUserInOrg(ctx context.Context, id uuid.UUID) error
-	SoftDeleteUserMembership(ctx context.Context, arg SoftDeleteUserMembershipParams) error
 	SumTokensByConversation(ctx context.Context, conversationID uuid.UUID) (int64, error)
 	UndeleteApiKey(ctx context.Context, arg UndeleteApiKeyParams) (ApiKey, error)
 	UndeleteAsset(ctx context.Context, id uuid.UUID) error

@@ -26,6 +26,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -87,20 +88,29 @@ type IamClient interface {
 	GetUser(ctx context.Context, in *GetUserRequest, opts ...grpc.CallOption) (*User, error)
 	// Lists users in an organization.
 	ListUsers(ctx context.Context, in *ListUsersRequest, opts ...grpc.CallOption) (*ListUsersResponse, error)
-	// Removes a user from an organization (LRO). Org-scoped: deletes
-	// the user's per-org bindings and their per-org users row in this
-	// org only. Their Pivox account, Firebase Auth identity, and
-	// memberships in other orgs are untouched. Use `DeleteAccount`
+	// Removes a user from an organization. Sync hard-delete: drops
+	// the user's `org_members`, `space_members` (for spaces in this
+	// org), and `group_members` (for groups in this org) rows. The
+	// user's Pivox account (`firebase_identities` row), Firebase Auth
+	// identity, content they own (audit-column references survive),
+	// and memberships in other orgs are untouched. Use `DeleteAccount`
 	// for full account deletion.
 	//
-	// Sole-owner blocking: if removing this user from this org would
-	// leave the org with zero owners, the LRO completes with
-	// FAILED_PRECONDITION. Resolve via `Organizations.TransferOwnership`
-	// first.
+	// Why sync, not LRO: this is a tiny pointer-row removal. Recovery
+	// from a mistake is just re-running `Iam.CreateMember` to re-add
+	// the user — their content is preserved because everything is
+	// keyed on `firebase_identities.id`. The org/space-delete LRO+grace
+	// pattern is reserved for ops where the cascade is destructive and
+	// unrecoverable without a grace window.
 	//
-	// The literal `me` is not a valid {user} segment for this RPC; v1
-	// has no self-leave-org capability.
-	DeleteUser(ctx context.Context, in *DeleteUserRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
+	// Sole-owner blocking: if removing this user would leave the org
+	// with zero owners (counting both user and active-group owners),
+	// returns FAILED_PRECONDITION. Resolve via
+	// `Organizations.TransferOwnership` first.
+	//
+	// The {user} segment is `firebase_identities.id`. The literal `me`
+	// is not a valid {user} segment; v1 has no self-leave-org.
+	DeleteUser(ctx context.Context, in *DeleteUserRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Deletes the authenticated caller's Pivox account (LRO). Cascades
 	// through Pivox-side state across every org the caller is in, then
 	// deletes the underlying Firebase Auth identity. Cross-org by
@@ -175,9 +185,9 @@ func (c *iamClient) ListUsers(ctx context.Context, in *ListUsersRequest, opts ..
 	return out, nil
 }
 
-func (c *iamClient) DeleteUser(ctx context.Context, in *DeleteUserRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error) {
+func (c *iamClient) DeleteUser(ctx context.Context, in *DeleteUserRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(longrunningpb.Operation)
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, Iam_DeleteUser_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -341,20 +351,29 @@ type IamServer interface {
 	GetUser(context.Context, *GetUserRequest) (*User, error)
 	// Lists users in an organization.
 	ListUsers(context.Context, *ListUsersRequest) (*ListUsersResponse, error)
-	// Removes a user from an organization (LRO). Org-scoped: deletes
-	// the user's per-org bindings and their per-org users row in this
-	// org only. Their Pivox account, Firebase Auth identity, and
-	// memberships in other orgs are untouched. Use `DeleteAccount`
+	// Removes a user from an organization. Sync hard-delete: drops
+	// the user's `org_members`, `space_members` (for spaces in this
+	// org), and `group_members` (for groups in this org) rows. The
+	// user's Pivox account (`firebase_identities` row), Firebase Auth
+	// identity, content they own (audit-column references survive),
+	// and memberships in other orgs are untouched. Use `DeleteAccount`
 	// for full account deletion.
 	//
-	// Sole-owner blocking: if removing this user from this org would
-	// leave the org with zero owners, the LRO completes with
-	// FAILED_PRECONDITION. Resolve via `Organizations.TransferOwnership`
-	// first.
+	// Why sync, not LRO: this is a tiny pointer-row removal. Recovery
+	// from a mistake is just re-running `Iam.CreateMember` to re-add
+	// the user — their content is preserved because everything is
+	// keyed on `firebase_identities.id`. The org/space-delete LRO+grace
+	// pattern is reserved for ops where the cascade is destructive and
+	// unrecoverable without a grace window.
 	//
-	// The literal `me` is not a valid {user} segment for this RPC; v1
-	// has no self-leave-org capability.
-	DeleteUser(context.Context, *DeleteUserRequest) (*longrunningpb.Operation, error)
+	// Sole-owner blocking: if removing this user would leave the org
+	// with zero owners (counting both user and active-group owners),
+	// returns FAILED_PRECONDITION. Resolve via
+	// `Organizations.TransferOwnership` first.
+	//
+	// The {user} segment is `firebase_identities.id`. The literal `me`
+	// is not a valid {user} segment; v1 has no self-leave-org.
+	DeleteUser(context.Context, *DeleteUserRequest) (*emptypb.Empty, error)
 	// Deletes the authenticated caller's Pivox account (LRO). Cascades
 	// through Pivox-side state across every org the caller is in, then
 	// deletes the underlying Firebase Auth identity. Cross-org by
@@ -415,7 +434,7 @@ func (UnimplementedIamServer) GetUser(context.Context, *GetUserRequest) (*User, 
 func (UnimplementedIamServer) ListUsers(context.Context, *ListUsersRequest) (*ListUsersResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListUsers not implemented")
 }
-func (UnimplementedIamServer) DeleteUser(context.Context, *DeleteUserRequest) (*longrunningpb.Operation, error) {
+func (UnimplementedIamServer) DeleteUser(context.Context, *DeleteUserRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteUser not implemented")
 }
 func (UnimplementedIamServer) DeleteAccount(context.Context, *DeleteAccountRequest) (*longrunningpb.Operation, error) {

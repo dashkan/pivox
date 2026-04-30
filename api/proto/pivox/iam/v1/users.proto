@@ -174,31 +174,9 @@ message DeleteUserRequest {
   string etag = 2 [(google.api.field_behavior) = OPTIONAL];
 }
 
-// A status object used as the `metadata` field for the Operation
-// returned by `Iam.DeleteUser`. Surfaces incremental progress through
-// the org-scoped cascade phases.
-message DeleteUserMetadata {
-  // Output only. The phase of the cascade currently executing.
-  enum Phase {
-    // Default; not used.
-    PHASE_UNSPECIFIED = 0;
-
-    // Validating preconditions (org-local sole-owner check).
-    VALIDATING = 1;
-
-    // Removing role / group memberships in this org.
-    REVOKING_MEMBERSHIPS = 2;
-
-    // Soft-deleting the per-org users row.
-    SOFT_DELETING_USER = 3;
-
-    // Done.
-    COMPLETED = 4;
-  }
-
-  // Output only. Current phase of the cascade.
-  Phase phase = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // Output only. Resource name of the user being deleted.
-  string user = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
-}
+// `DeleteUserMetadata` was retired post-Phase-7 along with the
+// org-scoped DeleteUser LRO orchestration. DeleteUser is now a sync
+// hard-delete returning google.protobuf.Empty; there's no
+// phase-progression metadata to surface. The wire-message namespace
+// stays free for a future re-introduction if a workflow ever
+// requires it.

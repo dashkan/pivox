@@ -59,7 +59,7 @@ async function syncFirebaseIdentity(
     photo_url: string;
     disabled: boolean;
   },
-): Promise<void> {
+): Promise<{ firebaseIdentityId: string }> {
   const url = `${pivoxApiUrl.value()}/internal/v1/auth:syncFirebaseIdentity`;
   const payload = { firebase_uid: firebaseUid, ...fields };
 
@@ -90,39 +90,61 @@ async function syncFirebaseIdentity(
     firebaseUid,
     firebaseIdentityId: data.firebase_identity_id,
   });
+  return { firebaseIdentityId: data.firebase_identity_id };
 }
 
 /**
  * Blocks user creation until the firebase_identity is synced to Pivox.
  * If the API is unreachable or returns an error, user creation fails.
+ *
+ * Sets the `pivox_user_id` custom claim on the issued token so the
+ * Pivox API can read the per-Pivox user UUID directly from the token
+ * without an extra lookup. This is the universal user identifier
+ * referenced by `org_members.principal_id`,
+ * `space_members.principal_id`, and `group_members.user_id` — every
+ * authenticated request carries it.
  */
 export const syncFirebaseIdentityOnCreate = beforeUserCreated(async (event) => {
   const user = event.data!;
 
-  await syncFirebaseIdentity(user.uid, {
+  const { firebaseIdentityId } = await syncFirebaseIdentity(user.uid, {
     email: user.email ?? "",
     email_verified: user.emailVerified ?? false,
     display_name: user.displayName ?? "",
     photo_url: user.photoURL ?? "",
     disabled: user.disabled ?? false,
   });
+
+  return {
+    customClaims: { pivox_user_id: firebaseIdentityId },
+  };
 });
 
 /**
  * Syncs firebase_identity fields on every sign-in. Catches up on any
  * changes made in Firebase (email, display name, photo, disabled, etc.)
  * since the last sync.
+ *
+ * Re-stamps the `pivox_user_id` custom claim on every token issuance.
+ * Setting it here as well as on create means a token issued before
+ * the claim was added (e.g. tokens cached on a client that signed
+ * up before this code shipped) gets the claim on its next refresh
+ * — no manual re-auth needed.
  */
 export const syncFirebaseIdentityOnSignIn = beforeUserSignedIn(async (event) => {
   const user = event.data!;
 
-  await syncFirebaseIdentity(user.uid, {
+  const { firebaseIdentityId } = await syncFirebaseIdentity(user.uid, {
     email: user.email ?? "",
     email_verified: user.emailVerified ?? false,
     display_name: user.displayName ?? "",
     photo_url: user.photoURL ?? "",
     disabled: user.disabled ?? false,
   });
+
+  return {
+    customClaims: { pivox_user_id: firebaseIdentityId },
+  };
 });
 
 // GitHub OAuth callback: removed.

@@ -219,25 +219,11 @@ func (s *SpacesServer) CreateSpace(ctx context.Context, req *apiv1.CreateSpaceRe
 	qtx := db.New(tx)
 	createdBy := callerFirebaseID.String()
 
-	// Resolve the founder's per-org user row inside the tx so a
-	// concurrent DeleteUser can't soft-delete the row between this
-	// lookup and the space_member insert below — without this we'd
-	// write a binding pointing at a doomed user (space_members.
-	// principal_id has no FK to users; PG can't catch the dangling
-	// reference for us).
-	founderUser, err := qtx.GetUserMembership(ctx, db.GetUserMembershipParams{
-		OrgID:              resolvedOrg.ID,
-		FirebaseIdentityID: callerFirebaseID,
-	})
-	if err != nil {
-		// The interceptor admitted this caller via an org-level
-		// binding, so the users row must exist. Reaching here means
-		// either a concurrent DeleteUser raced us into the tx or a
-		// server invariant is violated; surface Internal either way.
-		slog.ErrorContext(ctx, "create space: caller has no per-org user row",
-			"org_id", resolvedOrg.ID, "firebase_identity_id", callerFirebaseID, "error", err)
-		return nil, apierr.Internal("resolve caller user row")
-	}
+	// Post-Phase-7 the founder's principal_id IS the caller's
+	// firebase_identity_id — no per-org `users` row to resolve.
+	// `callerFirebaseID` is the firebase_identities.id (resolved
+	// via s.caller(ctx) which itself reads the verified token).
+	founderID := callerFirebaseID
 
 	result, err := qtx.CreateSpace(ctx, db.CreateSpaceParams{
 		ID:          uuid.New(),
@@ -269,7 +255,7 @@ func (s *SpacesServer) CreateSpace(ctx context.Context, req *apiv1.CreateSpaceRe
 		SpaceID:       result.ID,
 		RoleID:        ownerRole.ID,
 		PrincipalKind: db.PrincipalKindUser,
-		PrincipalID:   founderUser.ID,
+		PrincipalID:   founderID,
 		CreatedBy:     createdBy,
 	}); err != nil {
 		slog.ErrorContext(ctx, "create space: seed founder owner binding failed",

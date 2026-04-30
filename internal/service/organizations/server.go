@@ -179,23 +179,13 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 		return nil, apierr.HandleResourceError(err, "Organization", orgSlug)
 	}
 
-	// Founder gets a per-org user row in the same transaction.
-	founder, err := qtx.CreateUserMembership(ctx, db.CreateUserMembershipParams{
-		ID:                 uuid.New(),
-		OrgID:              org.ID,
-		FirebaseIdentityID: caller.ID,
-	})
-	if err != nil {
-		slog.ErrorContext(ctx, "create founder user row failed", "org_id", org.ID, "firebase_identity_id", caller.ID, "error", err)
-		return nil, apierr.Internal("create founder user row")
-	}
-
-	// Seed the 4 system roles for this org and bind the founder to
-	// the owner role. Atomic with the org/user creates above — a
-	// failure here rolls the whole bootstrap back, so no half-formed
-	// org ever exists. "≥1 owner per org" is established by
-	// definition for new orgs from this point forward.
-	if err := bootstrapOrgRoles(ctx, qtx, org.ID, founder.ID, caller.ID.String()); err != nil {
+	// Seed the 4 system roles for this org and bind the founder
+	// (caller's firebase_identity_id, the universal user uuid post-
+	// Phase-7) to the owner role. Atomic with the org create above —
+	// a failure here rolls the whole bootstrap back, so no half-formed
+	// org ever exists. "≥1 owner per org" is established by definition
+	// for new orgs from this point forward.
+	if err := bootstrapOrgRoles(ctx, qtx, org.ID, caller.ID, caller.ID.String()); err != nil {
 		slog.ErrorContext(ctx, "bootstrap org roles failed", "org_id", org.ID, "error", err)
 		return nil, apierr.Internal("bootstrap org roles")
 	}

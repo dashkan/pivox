@@ -82,12 +82,18 @@ func requireMembership(ctx context.Context, queries db.Querier, fullMethod strin
 		slog.ErrorContext(ctx, "membership: lookup firebase identity failed", "uid", uid, "error", err)
 		return apierr.Internal("lookup firebase identity")
 	}
-	memberships, err := queries.ListUsersByFirebaseIdentity(ctx, identity.ID)
+	// Membership = at least one org the caller's firebase_identity is
+	// a direct member of (post-Phase-7 unification: there's no per-org
+	// `users` row; membership is `org_members.principal_id` =
+	// firebase_identities.id). `ListOrganizationsForFirebaseIdentity`
+	// is the canonical query — same one ListOrganizations uses, so
+	// the gate and the read RPC see the same set.
+	orgs, err := queries.ListOrganizationsForFirebaseIdentity(ctx, identity.ID)
 	if err != nil {
 		slog.ErrorContext(ctx, "membership: lookup memberships failed", "firebase_identity_id", identity.ID, "error", err)
 		return apierr.Internal("lookup memberships")
 	}
-	if len(memberships) == 0 {
+	if len(orgs) == 0 {
 		return apierr.PermissionDenied(memberlessRecoveryMessage)
 	}
 	return nil

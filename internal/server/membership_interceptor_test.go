@@ -100,11 +100,10 @@ func TestMembershipInterceptor_MemberCaller(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	q.On("GetFirebaseIdentityByUID", mock.Anything, testMemberUID).
 		Return(testMemberIdentity, nil).Once()
-	q.On("ListUsersByFirebaseIdentity", mock.Anything, testMemberIdentity.ID).
-		Return([]db.User{{
-			ID:                 uuid.New(),
-			OrgID:              uuid.New(),
-			FirebaseIdentityID: testMemberIdentity.ID,
+	q.On("ListOrganizationsForFirebaseIdentity", mock.Anything, testMemberIdentity.ID).
+		Return([]db.Organization{{
+			ID:   uuid.New(),
+			Name: "acme",
 		}}, nil).Once()
 
 	interceptor := MembershipRequiredInterceptor(q)
@@ -127,8 +126,8 @@ func TestMembershipInterceptor_NoMembershipsDeniesAccess(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	q.On("GetFirebaseIdentityByUID", mock.Anything, testMemberUID).
 		Return(testMemberIdentity, nil).Once()
-	q.On("ListUsersByFirebaseIdentity", mock.Anything, testMemberIdentity.ID).
-		Return([]db.User{}, nil).Once()
+	q.On("ListOrganizationsForFirebaseIdentity", mock.Anything, testMemberIdentity.ID).
+		Return([]db.Organization{}, nil).Once()
 
 	interceptor := MembershipRequiredInterceptor(q)
 
@@ -200,7 +199,7 @@ func TestMembershipInterceptor_MembershipsLookupErrorReturnsInternal(t *testing.
 	q := new(mocks.MockQuerier)
 	q.On("GetFirebaseIdentityByUID", mock.Anything, testMemberUID).
 		Return(testMemberIdentity, nil).Once()
-	q.On("ListUsersByFirebaseIdentity", mock.Anything, testMemberIdentity.ID).
+	q.On("ListOrganizationsForFirebaseIdentity", mock.Anything, testMemberIdentity.ID).
 		Return(nil, errors.New("db down")).Once()
 
 	interceptor := MembershipRequiredInterceptor(q)

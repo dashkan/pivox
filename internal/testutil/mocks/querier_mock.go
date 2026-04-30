@@ -263,33 +263,14 @@ func (m *MockQuerier) ResolveProviderByDomain(ctx context.Context, domain string
 	return args.Get(0).(db.ResolveProviderByDomainRow), args.Error(1)
 }
 
-// --- Users (per-org membership) ---
-
-func (m *MockQuerier) CreateUserMembership(ctx context.Context, arg db.CreateUserMembershipParams) (db.User, error) {
-	args := m.Called(ctx, arg)
-	return args.Get(0).(db.User), args.Error(1)
-}
-
-func (m *MockQuerier) GetUserMembership(ctx context.Context, arg db.GetUserMembershipParams) (db.User, error) {
-	args := m.Called(ctx, arg)
-	return args.Get(0).(db.User), args.Error(1)
-}
-
-func (m *MockQuerier) ListUsersByOrg(ctx context.Context, orgID uuid.UUID) ([]db.User, error) {
-	args := m.Called(ctx, orgID)
-	if v := args.Get(0); v != nil {
-		return v.([]db.User), args.Error(1)
-	}
-	return nil, args.Error(1)
-}
-
-func (m *MockQuerier) ListUsersByFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) ([]db.User, error) {
-	args := m.Called(ctx, firebaseIdentityID)
-	if v := args.Get(0); v != nil {
-		return v.([]db.User), args.Error(1)
-	}
-	return nil, args.Error(1)
-}
+// --- User membership (post-Phase-7 unification) ---
+//
+// The dropped `users` table's queries (CreateUserMembership /
+// GetUserMembership / ListUsersByOrg / ListUsersByFirebaseIdentity /
+// DeleteUserMembership / SoftDeleteUserMembership / GetUserByID /
+// SoftDeleteUserInOrg) are gone. Membership is now `org_members`
+// row existence with `principal_kind='user'` and `principal_id` =
+// `firebase_identities.id`.
 
 func (m *MockQuerier) ListOrganizationsForFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) ([]db.Organization, error) {
 	args := m.Called(ctx, firebaseIdentityID)
@@ -319,24 +300,14 @@ func (m *MockQuerier) DeleteGroupMembersForUserInOrg(ctx context.Context, arg db
 	return args.Error(0)
 }
 
-func (m *MockQuerier) SoftDeleteUserInOrg(ctx context.Context, id uuid.UUID) error {
-	args := m.Called(ctx, id)
+func (m *MockQuerier) DeleteGroupMembersForFirebaseIdentity(ctx context.Context, firebaseIdentityID uuid.UUID) error {
+	args := m.Called(ctx, firebaseIdentityID)
 	return args.Error(0)
 }
 
 func (m *MockQuerier) CountOwnersByOrg(ctx context.Context, orgID uuid.UUID) (int64, error) {
 	args := m.Called(ctx, orgID)
 	return args.Get(0).(int64), args.Error(1)
-}
-
-func (m *MockQuerier) DeleteUserMembership(ctx context.Context, arg db.DeleteUserMembershipParams) error {
-	args := m.Called(ctx, arg)
-	return args.Error(0)
-}
-
-func (m *MockQuerier) SoftDeleteUserMembership(ctx context.Context, arg db.SoftDeleteUserMembershipParams) error {
-	args := m.Called(ctx, arg)
-	return args.Error(0)
 }
 
 // --- Spaces ---
@@ -1203,9 +1174,9 @@ func (m *MockQuerier) DeleteSpaceMember(ctx context.Context, arg db.DeleteSpaceM
 	return args.Get(0).(int64), args.Error(1)
 }
 
-func (m *MockQuerier) GetUserByID(ctx context.Context, arg db.GetUserByIDParams) (db.User, error) {
-	args := m.Called(ctx, arg)
-	return args.Get(0).(db.User), args.Error(1)
+func (m *MockQuerier) GetFirebaseIdentityForMember(ctx context.Context, id uuid.UUID) (db.FirebaseIdentity, error) {
+	args := m.Called(ctx, id)
+	return args.Get(0).(db.FirebaseIdentity), args.Error(1)
 }
 
 func (m *MockQuerier) GetGroupByID(ctx context.Context, arg db.GetGroupByIDParams) (db.Group, error) {

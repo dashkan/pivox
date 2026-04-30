@@ -143,12 +143,6 @@ func (q *Queries) DeleteSpaceMember(ctx context.Context, arg DeleteSpaceMemberPa
 }
 
 const getEffectiveOrgRoles = `-- name: GetEffectiveOrgRoles :many
-WITH caller AS (
-  SELECT id FROM users
-   WHERE org_id = $1
-     AND firebase_identity_id = $2
-     AND delete_time IS NULL
-)
 SELECT DISTINCT r.name
   FROM org_members om
   JOIN roles r ON r.id = om.role_id
@@ -161,13 +155,13 @@ SELECT DISTINCT r.name
    AND r.is_system = true
    AND (
      (om.principal_kind = 'user'
-      AND om.principal_id IN (SELECT id FROM caller))
+      AND om.principal_id = $2)
      OR
      (om.principal_kind = 'group'
       AND om.principal_id IN (
         SELECT gm.group_id
           FROM group_members gm
-         WHERE gm.user_id IN (SELECT id FROM caller)
+         WHERE gm.user_id = $2
       ))
    )
 `
@@ -177,7 +171,7 @@ type GetEffectiveOrgRolesParams struct {
 	FirebaseIdentityID uuid.UUID `json:"firebase_identity_id"`
 }
 
-// Returns the system-role names a Firebase identity has at the given
+// Returns the system-role names a firebase_identity has at the given
 // org, considering both direct user bindings and group-derived
 // bindings (groups the user is a member of, which themselves have
 // org_members rows). Custom roles are excluded — v1 only resolves
@@ -187,8 +181,11 @@ type GetEffectiveOrgRolesParams struct {
 // role resolution. Space-scope inheritance is handled at the resolver
 // layer by unioning this with `GetEffectiveSpaceRoles`.
 //
-// Returns the empty set if the firebase_identity has no live user row
-// in the org (caller is not a member, or membership was soft-deleted).
+// Post-Phase-7 unification: `org_members.principal_id` (when
+// principal_kind='user') and `group_members.user_id` both reference
+// `firebase_identities.id` directly. The previous per-org `users`
+// join row is gone, so this query no longer needs a caller-resolution
+// CTE. Returns the empty set if no bindings exist.
 func (q *Queries) GetEffectiveOrgRoles(ctx context.Context, arg GetEffectiveOrgRolesParams) ([]string, error) {
 	rows, err := q.db.Query(ctx, getEffectiveOrgRoles, arg.OrgID, arg.FirebaseIdentityID)
 	if err != nil {
@@ -210,33 +207,20 @@ func (q *Queries) GetEffectiveOrgRoles(ctx context.Context, arg GetEffectiveOrgR
 }
 
 const getEffectiveSpaceRoles = `-- name: GetEffectiveSpaceRoles :many
-WITH caller AS (
-  SELECT u.id
-    FROM users u
-    JOIN spaces s ON s.org_id = u.org_id
-   WHERE s.id = $1
-     AND u.firebase_identity_id = $2
-     AND u.delete_time IS NULL
-)
 SELECT DISTINCT r.name
   FROM space_members sm
   JOIN roles r ON r.id = sm.role_id
  WHERE sm.space_id = $1
-   -- v1 only resolves system roles against the in-memory matrix.
-   -- v2 (custom roles): drop this filter AND teach the resolver to
-   -- look up role_permissions rows for the non-system roles in the
-   -- result set; without that change, custom-role bindings would
-   -- silently never grant any permission.
    AND r.is_system = true
    AND (
      (sm.principal_kind = 'user'
-      AND sm.principal_id IN (SELECT id FROM caller))
+      AND sm.principal_id = $2)
      OR
      (sm.principal_kind = 'group'
       AND sm.principal_id IN (
         SELECT gm.group_id
           FROM group_members gm
-         WHERE gm.user_id IN (SELECT id FROM caller)
+         WHERE gm.user_id = $2
       ))
    )
 `
@@ -246,14 +230,15 @@ type GetEffectiveSpaceRolesParams struct {
 	FirebaseIdentityID uuid.UUID `json:"firebase_identity_id"`
 }
 
-// Returns the system-role names a Firebase identity has at the given
+// Returns the system-role names a firebase_identity has at the given
 // space — direct + group-derived space-level bindings only. Org-level
 // inheritance (an org-admin is also a space-admin) is the resolver's
 // responsibility to union in via GetEffectiveOrgRoles against the
 // space's parent org.
 //
-// Returns the empty set if the firebase_identity has no live user row
-// in the org that owns this space.
+// Post-Phase-7 unification: same simplification as
+// GetEffectiveOrgRoles — principal_id and group_members.user_id are
+// both firebase_identities.id, so no caller-resolution CTE.
 func (q *Queries) GetEffectiveSpaceRoles(ctx context.Context, arg GetEffectiveSpaceRolesParams) ([]string, error) {
 	rows, err := q.db.Query(ctx, getEffectiveSpaceRoles, arg.SpaceID, arg.FirebaseIdentityID)
 	if err != nil {
@@ -274,6 +259,37 @@ func (q *Queries) GetEffectiveSpaceRoles(ctx context.Context, arg GetEffectiveSp
 	return items, nil
 }
 
+const getFirebaseIdentityForMember = `-- name: GetFirebaseIdentityForMember :one
+SELECT id, firebase_uid, email, email_verified, display_name, photo_url, disabled, create_time, update_time, last_login_time FROM firebase_identities WHERE id = $1
+`
+
+// Verifies that a firebase_identity row exists for the given uuid.
+// Used by Member create handlers as the principal-existence check
+// before inserting a binding — org_members.principal_id has no FK
+// (it's polymorphic by principal_kind), so the check is
+// application-level. The previous version of this query
+// (`GetUserByID`) verified per-org membership via the dropped
+// `users` table; post-Phase-7 the membership check is "principal
+// has a firebase_identity row", and CreateMember separately validates
+// that the caller has org-level permission to create the binding.
+func (q *Queries) GetFirebaseIdentityForMember(ctx context.Context, id uuid.UUID) (FirebaseIdentity, error) {
+	row := q.db.QueryRow(ctx, getFirebaseIdentityForMember, id)
+	var i FirebaseIdentity
+	err := row.Scan(
+		&i.ID,
+		&i.FirebaseUid,
+		&i.Email,
+		&i.EmailVerified,
+		&i.DisplayName,
+		&i.PhotoUrl,
+		&i.Disabled,
+		&i.CreateTime,
+		&i.UpdateTime,
+		&i.LastLoginTime,
+	)
+	return i, err
+}
+
 const getGroupByID = `-- name: GetGroupByID :one
 SELECT id, org_id, display_name, description, annotations, state, etag, revision, created_by, updated_by, create_time, update_time FROM groups
  WHERE id = $1
@@ -285,7 +301,7 @@ type GetGroupByIDParams struct {
 	OrgID uuid.UUID `json:"org_id"`
 }
 
-// Companion to GetUserByID for groups.
+// Companion to GetFirebaseIdentityForMember for groups.
 func (q *Queries) GetGroupByID(ctx context.Context, arg GetGroupByIDParams) (Group, error) {
 	row := q.db.QueryRow(ctx, getGroupByID, arg.ID, arg.OrgID)
 	var i Group
@@ -432,40 +448,6 @@ func (q *Queries) GetSpaceParentOrg(ctx context.Context, id uuid.UUID) (uuid.UUI
 	var org_id uuid.UUID
 	err := row.Scan(&org_id)
 	return org_id, err
-}
-
-const getUserByID = `-- name: GetUserByID :one
-SELECT id, org_id, firebase_identity_id, etag, revision, deleted_by, create_time, update_time, delete_time, purge_time FROM users
- WHERE id = $1
-   AND org_id = $2
-   AND delete_time IS NULL
-`
-
-type GetUserByIDParams struct {
-	ID    uuid.UUID `json:"id"`
-	OrgID uuid.UUID `json:"org_id"`
-}
-
-// Verifies a user.id belongs to the given org and is not soft-deleted.
-// Used by Member create handlers to confirm the principal exists in
-// this org before inserting a binding — org_members.principal_id has
-// no FK (it's polymorphic), so the check is application-level.
-func (q *Queries) GetUserByID(ctx context.Context, arg GetUserByIDParams) (User, error) {
-	row := q.db.QueryRow(ctx, getUserByID, arg.ID, arg.OrgID)
-	var i User
-	err := row.Scan(
-		&i.ID,
-		&i.OrgID,
-		&i.FirebaseIdentityID,
-		&i.Etag,
-		&i.Revision,
-		&i.DeletedBy,
-		&i.CreateTime,
-		&i.UpdateTime,
-		&i.DeleteTime,
-		&i.PurgeTime,
-	)
-	return i, err
 }
 
 const listOrgMembers = `-- name: ListOrgMembers :many

@@ -73,26 +73,31 @@ service Iam {
     option (pivox.permission.v1.required_permission) = "users.read";
   }
 
-  // Removes a user from an organization (LRO). Org-scoped: deletes
-  // the user's per-org bindings and their per-org users row in this
-  // org only. Their Pivox account, Firebase Auth identity, and
-  // memberships in other orgs are untouched. Use `DeleteAccount`
+  // Removes a user from an organization. Sync hard-delete: drops
+  // the user's `org_members`, `space_members` (for spaces in this
+  // org), and `group_members` (for groups in this org) rows. The
+  // user's Pivox account (`firebase_identities` row), Firebase Auth
+  // identity, content they own (audit-column references survive),
+  // and memberships in other orgs are untouched. Use `DeleteAccount`
   // for full account deletion.
   //
-  // Sole-owner blocking: if removing this user from this org would
-  // leave the org with zero owners, the LRO completes with
-  // FAILED_PRECONDITION. Resolve via `Organizations.TransferOwnership`
-  // first.
+  // Why sync, not LRO: this is a tiny pointer-row removal. Recovery
+  // from a mistake is just re-running `Iam.CreateMember` to re-add
+  // the user — their content is preserved because everything is
+  // keyed on `firebase_identities.id`. The org/space-delete LRO+grace
+  // pattern is reserved for ops where the cascade is destructive and
+  // unrecoverable without a grace window.
   //
-  // The literal `me` is not a valid {user} segment for this RPC; v1
-  // has no self-leave-org capability.
-  rpc DeleteUser(DeleteUserRequest) returns (google.longrunning.Operation) {
+  // Sole-owner blocking: if removing this user would leave the org
+  // with zero owners (counting both user and active-group owners),
+  // returns FAILED_PRECONDITION. Resolve via
+  // `Organizations.TransferOwnership` first.
+  //
+  // The {user} segment is `firebase_identities.id`. The literal `me`
+  // is not a valid {user} segment; v1 has no self-leave-org.
+  rpc DeleteUser(DeleteUserRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {delete: "/v1/{name=organizations/*/users/*}"};
     option (google.api.method_signature) = "name";
-    option (google.longrunning.operation_info) = {
-      response_type: "google.protobuf.Empty"
-      metadata_type: "DeleteUserMetadata"
-    };
     option (pivox.permission.v1.required_permission) = "users.delete";
   }
 

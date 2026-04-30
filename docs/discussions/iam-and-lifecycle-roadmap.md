@@ -718,26 +718,88 @@ macOS-first; Windows shell mirrors after.
 - [ ] Re-import `google/iam/v1/iam_policy.proto` for full `GetIamPolicy`/`SetIamPolicy` projection over `members` table — when fine-grain sharing arrives.
 - [ ] `Group` cross-org? Today scoped to single org. Cross-org sharing is a future feature.
 - [ ] Audit log for IAM mutations.
-- [ ] **AI chat: re-parent to user + creator-owned permissions model** (deferred). Two coupled changes that ship together:
+## Phase 7 — User identity unification + AI chat re-parent
 
-  **Resource path change:** `organizations/*/conversations/*` → `organizations/*/users/*/conversations/*`. Conversations are personal, not org-shared. Path encodes ownership, the user segment is the parent. Same applies to nested `messages/*`, `artifacts/*`, `artifacts/*/versions/*`. Affects:
-  - `pivox/ai/v1/conversations.proto` — `option (google.api.resource).pattern`, all RPC URL bindings.
-  - `pivox/ai/v1/messages.proto`, `artifacts.proto` — same.
-  - DB: `ai_conversations` already has `created_by` (the user) — no schema change, just a uniqueness constraint check.
-  - Handlers: parse `(org, user, conversation)` from name; reject if path's user segment != caller.
-  - Native macOS client: regenerated stubs + every callsite that builds a conversation path.
-  - Migration: rewrite seeded permission IDs and the test fixtures referencing old path.
+One commit, several coupled changes. The trigger is the AI chat re-parent (paths under `organizations/{org}/users/{user}/conversations/{...}`), but it forced a deeper question — what *is* "user id"? The current chain has three identifiers (`firebase_uid` string, `firebase_identities.id` UUID, per-org `users.id` UUID); the per-org layer adds no value once we've decided memberships should ride parent-org lifecycle. Collapsing it lets the client construct paths from a Firebase token claim with zero round-trips and aligns with how every other platform (AWS, GCP, Firebase itself) does user identity.
 
-  **Permissions model:** Org/space role matrix doesn't fit personal artifacts. Current placeholder `ai.conversations.{read,create,update,delete}` granted to editor/admin/owner is wrong — editor/viewer reading other people's chats is a privacy violation.
-  - Creator: full CRUD on own conversations.
-  - Owner: read (audit) + delete (departed-employee cleanup).
-  - Admin: read (audit), no delete.
-  - Editor/viewer: zero access to others' conversations.
-  - `ai.chat.stream`: subscription/license gate (separate from conversation access).
-  - Resource-instance-level authorization (handler checks `created_by == caller`), not just role-based gating.
-  - New permissions: `ai.conversations.readAll` [owner, admin], `ai.conversations.deleteAll` [owner].
+### Schema changes
 
-  Address when wiring the AI chat interceptor; both changes land in the same commit since the path change forces every callsite anyway.
+- **Drop the `users` table entirely.** No per-org user row.
+- **`firebase_identities.id` becomes the universal user-uuid.** It's already a UUID, already created on first sign-in, already 1:1 with the firebase identity.
+- **Repoint principal references** to `firebase_identities.id`:
+  - `org_members.principal_id` (was `users.id`)
+  - `space_members.principal_id` (was `users.id`)
+  - `group_members.user_id` (was `users.id`)
+- **`ai_conversations.creator_id`** = `firebase_identities.id` (UUID FK). The existing `created_by` TEXT column (firebase UID) stays as the audit-only field.
+- **No soft-delete on membership tables** (`org_members`, `space_members`, `group_members`). They ride the parent's lifecycle. See "Why no LRO on membership ops" below.
+- **Pre-prod scope**: edit `000001_init.up.sql` directly, drop+recreate dev DB.
+
+### Firebase custom claim
+
+- Server-side blocking func sets a `pivox_user_id` claim on the Firebase ID token, populated from `firebase_identities.id` at identity-sync time.
+- Client reads the claim from the verified token; uses it to build paths.
+- We already use blocking funcs (SSO bootstrap), so this is one more claim, not new infrastructure.
+- Auth interceptor surfaces the claim as `pivox.UserID(ctx)` for handlers that need it.
+
+### Resource path changes (AI chat)
+
+- `organizations/{org}/conversations/{c}` → `organizations/{org}/users/{user}/conversations/{c}`.
+- Same depth added to `messages/{m}`, `artifacts/{a}`, `artifacts/{a}/versions/{v}`.
+- `{user}` is `firebase_identities.id` (UUID). Strict parse — no `me` sentinel, no special casing, matches every other user-rooted path.
+- Affects `pivox/ai/v1/conversations.proto`, `messages.proto`, `artifacts.proto`, `ai_chat.proto` (RPC URL bindings + `ArtifactEnd.artifact_version`).
+- `ListConversations` parent shifts to `organizations/{org}/users/{user}` (per-user listing).
+- `GenerateContent` / `StreamGenerateContent` `parent` stays `organizations/{org}` (org-scoped); the `conversation` field carries the full new path when stateful.
+
+### Handler changes (`internal/service/aichat/`)
+
+- Parsers for the new path shape (`names.go`).
+- `resolveConversation` enforces:
+  1. Path's `user-uuid` matches the row's `creator_id` (defensive — surfaces NotFound on mismatch so a malformed path can't probe ownership)
+  2. Caller's `pivox_user_id` claim matches the path's `user-uuid` OR caller carries `ai.conversations.readAll` / `deleteAll`
+- Creator-only ops (Create, Update, Delete artifact version, Summarize, GenerateContent stateful): no audit-bypass.
+- Read ops (Get conversation, List conversations, Get message, List messages, Get artifact, etc.): allow audit bypass via `*All` perm.
+
+### Permission catalog
+
+- New: `ai.conversations.readAll` [owner, admin] — audit/compliance read-any.
+- New: `ai.conversations.deleteAll` [owner] — departed-employee cleanup.
+- Keep base CRUD perms (`ai.conversations.{read,create,update,delete}`) granted to all roles — every member uses AI chat for their own conversations. The handler creator-check enforces the privacy boundary on top.
+- `ai.chat.stream` extended to viewer (a viewer-role user still gets a personal AI chat experience).
+
+### Why no LRO on membership ops
+
+LRO + grace exists to make destructive cascades reversible. Apply only when removal is genuinely unrecoverable:
+
+| RPC | Has LRO? | Should have LRO? | Why |
+|---|---|---|---|
+| `DeleteOrganization` | yes | yes | Cascade wipes all org data — assets, conversations, everything. No way back without backup. |
+| `DeleteSpace` | yes | yes | Same, scoped to space. |
+| `DeleteAccount` | yes | yes | Cross-org cascade + firebase identity deletion + can't be undone by re-add. |
+| `Iam.DeleteUser` (org-scoped) | yes | **NO — drop in Phase 7** | Removes a tiny pointer row. User content stays (created_by / creator_id reference firebase_identities.id, which survives). Recovery = re-run `CreateMember`. |
+| `Iam.DeleteGroup` | no | no | Already sync. Re-creatable, bindings re-creatable. |
+| `Iam.DeleteRole` (when ships) | no | no | Re-creatable. |
+| `DeleteMember` (org + space) | no | no | Already sync. |
+
+Net change in Phase 7: `Iam.DeleteUser` becomes sync hard-delete. Drops `userLifecyclePrefix`, the soft-delete-grace queries (`SoftDeleteUserInOrg`, `CountOrgOwnersExcludingUser`, etc.), and the LRO orchestration (`runDeleteUser`).
+
+### Native macOS client
+
+- `OrgService` reads `pivox_user_id` from the Firebase token (via `Auth.currentUser.getIDTokenResult()`, which exposes claims).
+- Path construction in AI chat callsites (`ConversationListViewModel.swift`, `AIChatContainerView.swift`, `ConversationViewModel.swift`) uses the claim's UUID directly.
+- Stale-conversation guard in `AIChatContainerView` keeps working — `orgPrefix` returns the first two path segments either way.
+
+### Test fixture sweep
+
+- Every aichat test gets the new path shape with the per-test fixture user-uuid.
+- Add `mockCallerWithClaim(uid string, identityID uuid.UUID)` test helper that wires the auth-context with the claim populated. Drops the `GetFirebaseIdentityByUID` + `GetUserMembership` chain mocks.
+- `internal/permission/matrix_test.go`: viewer cantDo list updated (drop `AiConversationsCreate`; add `AiConversationsReadAll`, `AiConversationsDeleteAll`).
+- `internal/permission/matrix_test.go` `TestPermissions_MigrationMatchesConstants`: new perms seeded in init migration.
+
+### Out of scope for Phase 7
+
+- The Phase 6 UI work for spaces / orgs / SSO config. Phase 7 is backend + macOS-shared-models only.
+- Cross-org user identity flows beyond what unification gives for free.
+- Audit log for IAM mutations (still future).
 
 ---
 

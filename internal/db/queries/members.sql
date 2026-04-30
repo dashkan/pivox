@@ -1,5 +1,5 @@
 -- name: GetEffectiveOrgRoles :many
--- Returns the system-role names a Firebase identity has at the given
+-- Returns the system-role names a firebase_identity has at the given
 -- org, considering both direct user bindings and group-derived
 -- bindings (groups the user is a member of, which themselves have
 -- org_members rows). Custom roles are excluded — v1 only resolves
@@ -9,14 +9,11 @@
 -- role resolution. Space-scope inheritance is handled at the resolver
 -- layer by unioning this with `GetEffectiveSpaceRoles`.
 --
--- Returns the empty set if the firebase_identity has no live user row
--- in the org (caller is not a member, or membership was soft-deleted).
-WITH caller AS (
-  SELECT id FROM users
-   WHERE org_id = sqlc.arg(org_id)
-     AND firebase_identity_id = sqlc.arg(firebase_identity_id)
-     AND delete_time IS NULL
-)
+-- Post-Phase-7 unification: `org_members.principal_id` (when
+-- principal_kind='user') and `group_members.user_id` both reference
+-- `firebase_identities.id` directly. The previous per-org `users`
+-- join row is gone, so this query no longer needs a caller-resolution
+-- CTE. Returns the empty set if no bindings exist.
 SELECT DISTINCT r.name
   FROM org_members om
   JOIN roles r ON r.id = om.role_id
@@ -29,52 +26,40 @@ SELECT DISTINCT r.name
    AND r.is_system = true
    AND (
      (om.principal_kind = 'user'
-      AND om.principal_id IN (SELECT id FROM caller))
+      AND om.principal_id = sqlc.arg(firebase_identity_id))
      OR
      (om.principal_kind = 'group'
       AND om.principal_id IN (
         SELECT gm.group_id
           FROM group_members gm
-         WHERE gm.user_id IN (SELECT id FROM caller)
+         WHERE gm.user_id = sqlc.arg(firebase_identity_id)
       ))
    );
 
 -- name: GetEffectiveSpaceRoles :many
--- Returns the system-role names a Firebase identity has at the given
+-- Returns the system-role names a firebase_identity has at the given
 -- space — direct + group-derived space-level bindings only. Org-level
 -- inheritance (an org-admin is also a space-admin) is the resolver's
 -- responsibility to union in via GetEffectiveOrgRoles against the
 -- space's parent org.
 --
--- Returns the empty set if the firebase_identity has no live user row
--- in the org that owns this space.
-WITH caller AS (
-  SELECT u.id
-    FROM users u
-    JOIN spaces s ON s.org_id = u.org_id
-   WHERE s.id = sqlc.arg(space_id)
-     AND u.firebase_identity_id = sqlc.arg(firebase_identity_id)
-     AND u.delete_time IS NULL
-)
+-- Post-Phase-7 unification: same simplification as
+-- GetEffectiveOrgRoles — principal_id and group_members.user_id are
+-- both firebase_identities.id, so no caller-resolution CTE.
 SELECT DISTINCT r.name
   FROM space_members sm
   JOIN roles r ON r.id = sm.role_id
  WHERE sm.space_id = sqlc.arg(space_id)
-   -- v1 only resolves system roles against the in-memory matrix.
-   -- v2 (custom roles): drop this filter AND teach the resolver to
-   -- look up role_permissions rows for the non-system roles in the
-   -- result set; without that change, custom-role bindings would
-   -- silently never grant any permission.
    AND r.is_system = true
    AND (
      (sm.principal_kind = 'user'
-      AND sm.principal_id IN (SELECT id FROM caller))
+      AND sm.principal_id = sqlc.arg(firebase_identity_id))
      OR
      (sm.principal_kind = 'group'
       AND sm.principal_id IN (
         SELECT gm.group_id
           FROM group_members gm
-         WHERE gm.user_id IN (SELECT id FROM caller)
+         WHERE gm.user_id = sqlc.arg(firebase_identity_id)
       ))
    );
 
@@ -185,18 +170,20 @@ DELETE FROM space_members
    AND principal_kind = $2
    AND principal_id = $3;
 
--- name: GetUserByID :one
--- Verifies a user.id belongs to the given org and is not soft-deleted.
--- Used by Member create handlers to confirm the principal exists in
--- this org before inserting a binding — org_members.principal_id has
--- no FK (it's polymorphic), so the check is application-level.
-SELECT * FROM users
- WHERE id = $1
-   AND org_id = $2
-   AND delete_time IS NULL;
+-- name: GetFirebaseIdentityForMember :one
+-- Verifies that a firebase_identity row exists for the given uuid.
+-- Used by Member create handlers as the principal-existence check
+-- before inserting a binding — org_members.principal_id has no FK
+-- (it's polymorphic by principal_kind), so the check is
+-- application-level. The previous version of this query
+-- (`GetUserByID`) verified per-org membership via the dropped
+-- `users` table; post-Phase-7 the membership check is "principal
+-- has a firebase_identity row", and CreateMember separately validates
+-- that the caller has org-level permission to create the binding.
+SELECT * FROM firebase_identities WHERE id = $1;
 
 -- name: GetGroupByID :one
--- Companion to GetUserByID for groups.
+-- Companion to GetFirebaseIdentityForMember for groups.
 SELECT * FROM groups
  WHERE id = $1
    AND org_id = $2;

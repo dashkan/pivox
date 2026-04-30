@@ -1265,16 +1265,3 @@ type TagValue struct {
 	CreateTime     time.Time       `json:"create_time"`
 	UpdateTime     time.Time       `json:"update_time"`
 }
-
-type User struct {
-	ID                 uuid.UUID          `json:"id"`
-	OrgID              uuid.UUID          `json:"org_id"`
-	FirebaseIdentityID uuid.UUID          `json:"firebase_identity_id"`
-	Etag               string             `json:"etag"`
-	Revision           int32              `json:"revision"`
-	DeletedBy          string             `json:"deleted_by"`
-	CreateTime         time.Time          `json:"create_time"`
-	UpdateTime         time.Time          `json:"update_time"`
-	DeleteTime         pgtype.Timestamptz `json:"delete_time"`
-	PurgeTime          pgtype.Timestamptz `json:"purge_time"`
-}

@@ -24,18 +24,13 @@ import (
 // via CreateOrganization, which seeds the 4 system roles in the
 // same transaction).
 //
-// Returns the per-org user uuid (the principal_id used in
-// org_members and as the {user} segment of the resource path).
+// Returns the user UUID (the principal_id used in org_members and
+// the {user} segment of resource paths). Post-Phase-7 unification
+// this is `firebase_identities.id` — the global Pivox user uuid,
+// not a per-org join row.
 func (h *Harness) SeedMembership(t *testing.T, orgID uuid.UUID, identity *Caller, role string) uuid.UUID {
 	t.Helper()
 	ctx := context.Background()
-
-	user, err := h.Queries.CreateUserMembership(ctx, db.CreateUserMembershipParams{
-		ID:                 uuid.New(),
-		OrgID:              orgID,
-		FirebaseIdentityID: identity.FirebaseIdentityID,
-	})
-	require.NoError(t, err)
 
 	roleRow, err := h.Queries.GetSystemRole(ctx, db.GetSystemRoleParams{
 		OrgID: orgID,
@@ -48,32 +43,26 @@ func (h *Harness) SeedMembership(t *testing.T, orgID uuid.UUID, identity *Caller
 		OrgID:         orgID,
 		RoleID:        roleRow.ID,
 		PrincipalKind: db.PrincipalKindUser,
-		PrincipalID:   user.ID,
+		PrincipalID:   identity.FirebaseIdentityID,
 		CreatedBy:     identity.FirebaseIdentityID.String(),
 	})
 	require.NoError(t, err)
 
-	return user.ID
+	return identity.FirebaseIdentityID
 }
 
-// SeedUserMembershipOnly creates a per-org users row joining a
-// firebase_identity to an org WITHOUT any role binding. Returns the
-// per-org users.id. Useful for tests that want to verify a caller
-// reaches a specific RPC via group-mediated permissions without a
-// direct org_members row clouding the assertion.
-//
-// In production, the only path to a per-org users row is
-// CreateOrganization (founder) or AcceptInvitation (invitee). This
-// helper bypasses both for test setup convenience.
+// SeedUserMembershipOnly is retained for compatibility with E2E
+// tests that previously created a `users` row without an
+// org_members binding (to verify group-mediated access reached the
+// handler). Post-Phase-7 there's no `users` table — "membership"
+// is just the existence of a binding. So this helper is now a
+// no-op that returns the caller's user UUID directly. Tests that
+// relied on the "user-row-but-no-binding" middle state should
+// either drop that scenario or seed a group_members row instead.
 func (h *Harness) SeedUserMembershipOnly(t *testing.T, orgID uuid.UUID, identity *Caller) uuid.UUID {
 	t.Helper()
-	user, err := h.Queries.CreateUserMembership(context.Background(), db.CreateUserMembershipParams{
-		ID:                 uuid.New(),
-		OrgID:              orgID,
-		FirebaseIdentityID: identity.FirebaseIdentityID,
-	})
-	require.NoError(t, err)
-	return user.ID
+	_ = orgID
+	return identity.FirebaseIdentityID
 }
 
 // LookupOrgID resolves a slug to its uuid. Convenience for tests
@@ -87,22 +76,16 @@ func (h *Harness) LookupOrgID(t *testing.T, slug string) uuid.UUID {
 	return org.ID
 }
 
-// LookupOrgUserID resolves a firebase_identity's per-org users.id —
-// the principal_id used in org_members and the {user} segment of
-// resource paths. Tests need this when CreateOrganization (which
-// creates the founder's user row internally) didn't surface the id
-// and the test now needs to address that user via the gRPC API.
+// LookupOrgUserID returns the firebase_identity_id directly —
+// post-Phase-7 unification the per-org user uuid IS the
+// firebase_identity_id, and there's no per-org users row to look
+// up. The orgID parameter is preserved on the signature for
+// caller compatibility but is no longer relevant: a
+// firebase_identity has the same uuid in every org.
 func (h *Harness) LookupOrgUserID(t *testing.T, orgID, firebaseIdentityID uuid.UUID) uuid.UUID {
 	t.Helper()
-	users, err := h.Queries.ListUsersByFirebaseIdentity(context.Background(), firebaseIdentityID)
-	require.NoError(t, err)
-	for _, u := range users {
-		if u.OrgID == orgID {
-			return u.ID
-		}
-	}
-	t.Fatalf("no per-org user row for firebase_identity=%s in org=%s", firebaseIdentityID, orgID)
-	return uuid.Nil
+	_ = orgID
+	return firebaseIdentityID
 }
 
 // permission.RoleOwner / RoleAdmin / RoleEditor / RoleViewer are the

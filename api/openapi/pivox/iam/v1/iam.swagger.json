@@ -685,14 +685,15 @@
         ]
       },
       "delete": {
-        "summary": "Removes a user from an organization (LRO). Org-scoped: deletes\nthe user's per-org bindings and their per-org users row in this\norg only. Their Pivox account, Firebase Auth identity, and\nmemberships in other orgs are untouched. Use `DeleteAccount`\nfor full account deletion.",
-        "description": "Sole-owner blocking: if removing this user from this org would\nleave the org with zero owners, the LRO completes with\nFAILED_PRECONDITION. Resolve via `Organizations.TransferOwnership`\nfirst.\n\nThe literal `me` is not a valid {user} segment for this RPC; v1\nhas no self-leave-org capability.",
+        "summary": "Removes a user from an organization. Sync hard-delete: drops\nthe user's `org_members`, `space_members` (for spaces in this\norg), and `group_members` (for groups in this org) rows. The\nuser's Pivox account (`firebase_identities` row), Firebase Auth\nidentity, content they own (audit-column references survive),\nand memberships in other orgs are untouched. Use `DeleteAccount`\nfor full account deletion.",
+        "description": "Why sync, not LRO: this is a tiny pointer-row removal. Recovery\nfrom a mistake is just re-running `Iam.CreateMember` to re-add\nthe user — their content is preserved because everything is\nkeyed on `firebase_identities.id`. The org/space-delete LRO+grace\npattern is reserved for ops where the cascade is destructive and\nunrecoverable without a grace window.\n\nSole-owner blocking: if removing this user would leave the org\nwith zero owners (counting both user and active-group owners),\nreturns FAILED_PRECONDITION. Resolve via\n`Organizations.TransferOwnership` first.\n\nThe {user} segment is `firebase_identities.id`. The literal `me`\nis not a valid {user} segment; v1 has no self-leave-org.",
         "operationId": "Iam_DeleteUser",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/longrunningOperation"
+              "type": "object",
+              "properties": {}
             }
           },
           "default": {

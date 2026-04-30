@@ -175,27 +175,27 @@ func TestE2E_DeleteUser_AdminRemovesUserFromOrg(t *testing.T) {
 	targetUserAID := h.SeedMembership(t, orgAID, target, grpcharness.RoleEditor)
 	_ = h.SeedMembership(t, orgBID, target, grpcharness.RoleEditor)
 
-	// Owner removes target from Org A.
-	op, err := iamClient.DeleteUser(ctx, &iampb.DeleteUserRequest{
+	// Owner removes target from Org A. Sync hard-delete post-Phase-7
+	// — the org_members rows for target in Org A are gone; their
+	// rows in Org B are untouched.
+	_, err := iamClient.DeleteUser(ctx, &iampb.DeleteUserRequest{
 		Name: "organizations/org-a/users/" + targetUserAID.String(),
 	})
 	require.NoError(t, err)
-	waitOp(t, h, op, "DeleteUser org-a")
 
-	// Org A: target's user row is soft-deleted (purge_time set).
-	users, err := h.Queries.ListUsersByFirebaseIdentity(ctx, target.FirebaseIdentityID)
+	// Use ListOrganizationsForFirebaseIdentity (which is membership
+	// = direct org_members row) to confirm Org A is gone, Org B
+	// remains.
+	orgs, err := h.Queries.ListOrganizationsForFirebaseIdentity(ctx, target.FirebaseIdentityID)
 	require.NoError(t, err)
-	// ListUsersByFirebaseIdentity excludes soft-deleted users
-	// (u.delete_time IS NULL), so target should now appear in
-	// Org B only.
 	gotOrgs := map[string]bool{}
-	for _, u := range users {
-		gotOrgs[u.OrgID.String()] = true
+	for _, o := range orgs {
+		gotOrgs[o.ID.String()] = true
 	}
 	assert.False(t, gotOrgs[orgAID.String()],
-		"target's per-org users row in Org A should be soft-deleted (excluded from query)")
+		"target's binding in Org A should be hard-deleted")
 	assert.True(t, gotOrgs[orgBID.String()],
-		"target's per-org users row in Org B should be untouched")
+		"target's binding in Org B should be untouched")
 }
 
 // TestE2E_DeleteUser_LastOwnerBlocked: removing the only owner of an
@@ -223,13 +223,14 @@ func TestE2E_DeleteUser_LastOwnerBlocked(t *testing.T) {
 	h.SeedMembership(t, orgID, other, grpcharness.RoleAdmin)
 
 	// Owner attempts to remove themselves — would leave 0 owners.
-	op, err := iamClient.DeleteUser(ctx, &iampb.DeleteUserRequest{
+	// Sync hard-delete returns FailedPrecondition directly.
+	_, err := iamClient.DeleteUser(ctx, &iampb.DeleteUserRequest{
 		Name: "organizations/single-owner-org/users/" + ownerUserID.String(),
 	})
-	require.NoError(t, err)
-	final := waitOpExpectFailure(t, h, op, "DeleteUser last-owner")
-	assert.Equal(t, int32(codes.FailedPrecondition), final.GetError().GetCode())
-	assert.Contains(t, final.GetError().GetMessage(), "no owners")
+	require.Error(t, err)
+	st, _ := status.FromError(err)
+	assert.Equal(t, codes.FailedPrecondition, st.Code())
+	assert.Contains(t, st.Message(), "no owners")
 }
 
 // TestE2E_DeleteUser_RejectsMeTarget: the literal `me` is not

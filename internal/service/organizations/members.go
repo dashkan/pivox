@@ -450,14 +450,20 @@ func parseRoleRef(ref, parentOrgSlug string) (string, error) {
 	return parts[3], nil
 }
 
-// verifyPrincipalInOrg confirms the principal exists in this org so
-// we don't insert dead bindings (org_members.principal_id is NOT a
-// DB FK — it's polymorphic). Runs against the caller's qtx so the
-// check + subsequent insert are atomic.
+// verifyPrincipalInOrg confirms the principal exists so we don't
+// insert dead bindings (org_members.principal_id is NOT a DB FK —
+// it's polymorphic by principal_kind). Runs against the caller's
+// qtx so the check + subsequent insert are atomic.
+//
+// Post-Phase-7 user check is "firebase_identity row exists" — the
+// per-org `users` row was dropped and membership in an org is now
+// the existence of `org_members` rows (which we're about to
+// create). The orgID parameter is preserved on the signature but
+// only used for groups (which are still org-scoped).
 func verifyPrincipalInOrg(ctx context.Context, qtx db.Querier, orgID uuid.UUID, kind db.PrincipalKind, id uuid.UUID) error {
 	switch kind {
 	case db.PrincipalKindUser:
-		if _, err := qtx.GetUserByID(ctx, db.GetUserByIDParams{ID: id, OrgID: orgID}); err != nil {
+		if _, err := qtx.GetFirebaseIdentityForMember(ctx, id); err != nil {
 			if isNotFound(err) {
 				return apierr.NotFound("User", id.String())
 			}

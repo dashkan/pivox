@@ -24,6 +24,7 @@
 
 import GRPCCore
 import GRPCProtobuf
+import SwiftProtobuf
 
 // MARK: - pivox.iam.v1.Iam
 
@@ -65,7 +66,7 @@ public enum Pivox_Iam_V1_Iam: Sendable {
             /// Request type for "DeleteUser".
             public typealias Input = Pivox_Iam_V1_DeleteUserRequest
             /// Response type for "DeleteUser".
-            public typealias Output = Google_Longrunning_Operation
+            public typealias Output = SwiftProtobuf.Google_Protobuf_Empty
             /// Descriptor for "DeleteUser".
             public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "pivox.iam.v1.Iam"),
@@ -344,24 +345,33 @@ extension Pivox_Iam_V1_Iam {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Removes a user from an organization (LRO). Org-scoped: deletes
-        /// > the user's per-org bindings and their per-org users row in this
-        /// > org only. Their Pivox account, Firebase Auth identity, and
-        /// > memberships in other orgs are untouched. Use `DeleteAccount`
+        /// > Removes a user from an organization. Sync hard-delete: drops
+        /// > the user's `org_members`, `space_members` (for spaces in this
+        /// > org), and `group_members` (for groups in this org) rows. The
+        /// > user's Pivox account (`firebase_identities` row), Firebase Auth
+        /// > identity, content they own (audit-column references survive),
+        /// > and memberships in other orgs are untouched. Use `DeleteAccount`
         /// > for full account deletion.
         /// > 
-        /// > Sole-owner blocking: if removing this user from this org would
-        /// > leave the org with zero owners, the LRO completes with
-        /// > FAILED_PRECONDITION. Resolve via `Organizations.TransferOwnership`
-        /// > first.
+        /// > Why sync, not LRO: this is a tiny pointer-row removal. Recovery
+        /// > from a mistake is just re-running `Iam.CreateMember` to re-add
+        /// > the user — their content is preserved because everything is
+        /// > keyed on `firebase_identities.id`. The org/space-delete LRO+grace
+        /// > pattern is reserved for ops where the cascade is destructive and
+        /// > unrecoverable without a grace window.
         /// > 
-        /// > The literal `me` is not a valid {user} segment for this RPC; v1
-        /// > has no self-leave-org capability.
+        /// > Sole-owner blocking: if removing this user would leave the org
+        /// > with zero owners (counting both user and active-group owners),
+        /// > returns FAILED_PRECONDITION. Resolve via
+        /// > `Organizations.TransferOwnership` first.
+        /// > 
+        /// > The {user} segment is `firebase_identities.id`. The literal `me`
+        /// > is not a valid {user} segment; v1 has no self-leave-org.
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Pivox_Iam_V1_DeleteUserRequest` message.
         ///   - serializer: A serializer for `Pivox_Iam_V1_DeleteUserRequest` messages.
-        ///   - deserializer: A deserializer for `Google_Longrunning_Operation` messages.
+        ///   - deserializer: A deserializer for `SwiftProtobuf.Google_Protobuf_Empty` messages.
         ///   - options: Options to apply to this RPC.
         ///   - handleResponse: A closure which handles the response, the result of which is
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
@@ -370,9 +380,9 @@ extension Pivox_Iam_V1_Iam {
         func deleteUser<Result>(
             request: GRPCCore.ClientRequest<Pivox_Iam_V1_DeleteUserRequest>,
             serializer: some GRPCCore.MessageSerializer<Pivox_Iam_V1_DeleteUserRequest>,
-            deserializer: some GRPCCore.MessageDeserializer<Google_Longrunning_Operation>,
+            deserializer: some GRPCCore.MessageDeserializer<SwiftProtobuf.Google_Protobuf_Empty>,
             options: GRPCCore.CallOptions,
-            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<SwiftProtobuf.Google_Protobuf_Empty>) async throws -> Result
         ) async throws -> Result where Result: Sendable
 
         /// Call the "DeleteAccount" method.
@@ -789,24 +799,33 @@ extension Pivox_Iam_V1_Iam {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Removes a user from an organization (LRO). Org-scoped: deletes
-        /// > the user's per-org bindings and their per-org users row in this
-        /// > org only. Their Pivox account, Firebase Auth identity, and
-        /// > memberships in other orgs are untouched. Use `DeleteAccount`
+        /// > Removes a user from an organization. Sync hard-delete: drops
+        /// > the user's `org_members`, `space_members` (for spaces in this
+        /// > org), and `group_members` (for groups in this org) rows. The
+        /// > user's Pivox account (`firebase_identities` row), Firebase Auth
+        /// > identity, content they own (audit-column references survive),
+        /// > and memberships in other orgs are untouched. Use `DeleteAccount`
         /// > for full account deletion.
         /// > 
-        /// > Sole-owner blocking: if removing this user from this org would
-        /// > leave the org with zero owners, the LRO completes with
-        /// > FAILED_PRECONDITION. Resolve via `Organizations.TransferOwnership`
-        /// > first.
+        /// > Why sync, not LRO: this is a tiny pointer-row removal. Recovery
+        /// > from a mistake is just re-running `Iam.CreateMember` to re-add
+        /// > the user — their content is preserved because everything is
+        /// > keyed on `firebase_identities.id`. The org/space-delete LRO+grace
+        /// > pattern is reserved for ops where the cascade is destructive and
+        /// > unrecoverable without a grace window.
         /// > 
-        /// > The literal `me` is not a valid {user} segment for this RPC; v1
-        /// > has no self-leave-org capability.
+        /// > Sole-owner blocking: if removing this user would leave the org
+        /// > with zero owners (counting both user and active-group owners),
+        /// > returns FAILED_PRECONDITION. Resolve via
+        /// > `Organizations.TransferOwnership` first.
+        /// > 
+        /// > The {user} segment is `firebase_identities.id`. The literal `me`
+        /// > is not a valid {user} segment; v1 has no self-leave-org.
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Pivox_Iam_V1_DeleteUserRequest` message.
         ///   - serializer: A serializer for `Pivox_Iam_V1_DeleteUserRequest` messages.
-        ///   - deserializer: A deserializer for `Google_Longrunning_Operation` messages.
+        ///   - deserializer: A deserializer for `SwiftProtobuf.Google_Protobuf_Empty` messages.
         ///   - options: Options to apply to this RPC.
         ///   - handleResponse: A closure which handles the response, the result of which is
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
@@ -815,9 +834,9 @@ extension Pivox_Iam_V1_Iam {
         public func deleteUser<Result>(
             request: GRPCCore.ClientRequest<Pivox_Iam_V1_DeleteUserRequest>,
             serializer: some GRPCCore.MessageSerializer<Pivox_Iam_V1_DeleteUserRequest>,
-            deserializer: some GRPCCore.MessageDeserializer<Google_Longrunning_Operation>,
+            deserializer: some GRPCCore.MessageDeserializer<SwiftProtobuf.Google_Protobuf_Empty>,
             options: GRPCCore.CallOptions = .defaults,
-            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result = { response in
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<SwiftProtobuf.Google_Protobuf_Empty>) async throws -> Result = { response in
                 try response.message
             }
         ) async throws -> Result where Result: Sendable {
@@ -1327,19 +1346,28 @@ extension Pivox_Iam_V1_Iam.ClientProtocol {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Removes a user from an organization (LRO). Org-scoped: deletes
-    /// > the user's per-org bindings and their per-org users row in this
-    /// > org only. Their Pivox account, Firebase Auth identity, and
-    /// > memberships in other orgs are untouched. Use `DeleteAccount`
+    /// > Removes a user from an organization. Sync hard-delete: drops
+    /// > the user's `org_members`, `space_members` (for spaces in this
+    /// > org), and `group_members` (for groups in this org) rows. The
+    /// > user's Pivox account (`firebase_identities` row), Firebase Auth
+    /// > identity, content they own (audit-column references survive),
+    /// > and memberships in other orgs are untouched. Use `DeleteAccount`
     /// > for full account deletion.
     /// > 
-    /// > Sole-owner blocking: if removing this user from this org would
-    /// > leave the org with zero owners, the LRO completes with
-    /// > FAILED_PRECONDITION. Resolve via `Organizations.TransferOwnership`
-    /// > first.
+    /// > Why sync, not LRO: this is a tiny pointer-row removal. Recovery
+    /// > from a mistake is just re-running `Iam.CreateMember` to re-add
+    /// > the user — their content is preserved because everything is
+    /// > keyed on `firebase_identities.id`. The org/space-delete LRO+grace
+    /// > pattern is reserved for ops where the cascade is destructive and
+    /// > unrecoverable without a grace window.
     /// > 
-    /// > The literal `me` is not a valid {user} segment for this RPC; v1
-    /// > has no self-leave-org capability.
+    /// > Sole-owner blocking: if removing this user would leave the org
+    /// > with zero owners (counting both user and active-group owners),
+    /// > returns FAILED_PRECONDITION. Resolve via
+    /// > `Organizations.TransferOwnership` first.
+    /// > 
+    /// > The {user} segment is `firebase_identities.id`. The literal `me`
+    /// > is not a valid {user} segment; v1 has no self-leave-org.
     ///
     /// - Parameters:
     ///   - request: A request containing a single `Pivox_Iam_V1_DeleteUserRequest` message.
@@ -1351,14 +1379,14 @@ extension Pivox_Iam_V1_Iam.ClientProtocol {
     public func deleteUser<Result>(
         request: GRPCCore.ClientRequest<Pivox_Iam_V1_DeleteUserRequest>,
         options: GRPCCore.CallOptions = .defaults,
-        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result = { response in
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<SwiftProtobuf.Google_Protobuf_Empty>) async throws -> Result = { response in
             try response.message
         }
     ) async throws -> Result where Result: Sendable {
         try await self.deleteUser(
             request: request,
             serializer: GRPCProtobuf.ProtobufSerializer<Pivox_Iam_V1_DeleteUserRequest>(),
-            deserializer: GRPCProtobuf.ProtobufDeserializer<Google_Longrunning_Operation>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<SwiftProtobuf.Google_Protobuf_Empty>(),
             options: options,
             onResponse: handleResponse
         )
@@ -1807,19 +1835,28 @@ extension Pivox_Iam_V1_Iam.ClientProtocol {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Removes a user from an organization (LRO). Org-scoped: deletes
-    /// > the user's per-org bindings and their per-org users row in this
-    /// > org only. Their Pivox account, Firebase Auth identity, and
-    /// > memberships in other orgs are untouched. Use `DeleteAccount`
+    /// > Removes a user from an organization. Sync hard-delete: drops
+    /// > the user's `org_members`, `space_members` (for spaces in this
+    /// > org), and `group_members` (for groups in this org) rows. The
+    /// > user's Pivox account (`firebase_identities` row), Firebase Auth
+    /// > identity, content they own (audit-column references survive),
+    /// > and memberships in other orgs are untouched. Use `DeleteAccount`
     /// > for full account deletion.
     /// > 
-    /// > Sole-owner blocking: if removing this user from this org would
-    /// > leave the org with zero owners, the LRO completes with
-    /// > FAILED_PRECONDITION. Resolve via `Organizations.TransferOwnership`
-    /// > first.
+    /// > Why sync, not LRO: this is a tiny pointer-row removal. Recovery
+    /// > from a mistake is just re-running `Iam.CreateMember` to re-add
+    /// > the user — their content is preserved because everything is
+    /// > keyed on `firebase_identities.id`. The org/space-delete LRO+grace
+    /// > pattern is reserved for ops where the cascade is destructive and
+    /// > unrecoverable without a grace window.
     /// > 
-    /// > The literal `me` is not a valid {user} segment for this RPC; v1
-    /// > has no self-leave-org capability.
+    /// > Sole-owner blocking: if removing this user would leave the org
+    /// > with zero owners (counting both user and active-group owners),
+    /// > returns FAILED_PRECONDITION. Resolve via
+    /// > `Organizations.TransferOwnership` first.
+    /// > 
+    /// > The {user} segment is `firebase_identities.id`. The literal `me`
+    /// > is not a valid {user} segment; v1 has no self-leave-org.
     ///
     /// - Parameters:
     ///   - message: request message to send.
@@ -1833,7 +1870,7 @@ extension Pivox_Iam_V1_Iam.ClientProtocol {
         _ message: Pivox_Iam_V1_DeleteUserRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
-        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Google_Longrunning_Operation>) async throws -> Result = { response in
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<SwiftProtobuf.Google_Protobuf_Empty>) async throws -> Result = { response in
             try response.message
         }
     ) async throws -> Result where Result: Sendable {

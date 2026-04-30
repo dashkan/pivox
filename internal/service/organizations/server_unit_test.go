@@ -326,34 +326,10 @@ func expectBootstrapExecs(tx *mockTx) {
 		}})
 }
 
-// membershipRow returns a mockRow whose Scan populates a db.User
-// with the given values. Column order matches the sqlc-generated
-// RETURNING clause for CreateUserMembership.
-//
-// Phase 4 step 1: `users` no longer carries a role column — role
-// bindings live in `org_members`. Founder owner-binding lands in
-// step 3+ (Iam handlers).
-func membershipRow(u db.User) *mockRow {
-	return &mockRow{scanFunc: func(dest ...interface{}) error {
-		// Column order: id, org_id, firebase_identity_id, etag,
-		// revision, deleted_by, create_time, update_time, delete_time,
-		// purge_time
-		if len(dest) != 10 {
-			return errors.New("unexpected number of scan destinations")
-		}
-		*dest[0].(*uuid.UUID) = u.ID
-		*dest[1].(*uuid.UUID) = u.OrgID
-		*dest[2].(*uuid.UUID) = u.FirebaseIdentityID
-		*dest[3].(*string) = u.Etag
-		*dest[4].(*int32) = u.Revision
-		*dest[5].(*string) = u.DeletedBy
-		*dest[6].(*time.Time) = u.CreateTime
-		*dest[7].(*time.Time) = u.UpdateTime
-		// dest[8], dest[9] are *pgtype.Timestamptz (delete_time,
-		// purge_time) — leave as zero value
-		return nil
-	}}
-}
+// `membershipRow` helper was retired post-Phase-7 along with the
+// per-org `users` table. CreateOrganization no longer mints a
+// users row — the founder's `firebase_identities.id` is bound
+// directly to the owner role via `org_members`.
 
 // orgRow returns a mockRow whose Scan populates a db.Organization with the
 // given values. The column order matches the sqlc-generated RETURNING clause.
@@ -416,18 +392,10 @@ func TestUnit_CreateOrganization_Success(t *testing.T) {
 	// 2. CreateOrganization via qtx — calls QueryRow on the tx
 	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
 		Return(orgRow(createdOrg)).Once()
-	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
-		Return(membershipRow(db.User{
-			ID:                 uuid.New(),
-			OrgID:              createdOrg.ID,
-			FirebaseIdentityID: testCallerIdentity.ID,
-			Etag:               "etag-membership",
-			Revision:           1,
-			CreateTime:         createdOrg.CreateTime,
-			UpdateTime:         createdOrg.UpdateTime,
-		})).Once()
-
-	// 3. Founder bootstrap: 4 role inserts + 1 org_member insert.
+	// 3. Founder bootstrap: 4 role inserts + 1 org_member insert
+	// (binds the founder's `firebase_identities.id` directly to the
+	// owner role; the dropped `users` table no longer needs a
+	// CreateUserMembership round-trip).
 	expectBootstrapExecs(tx)
 
 	// 3. Commit
@@ -495,25 +463,10 @@ func TestUnit_CreateOrganization_CreatesOwnerMembership(t *testing.T) {
 	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
 		Return(orgRow(createdOrg)).Once()
 
-	// Second QueryRow: membership create. Capture the args so the
-	// test can assert role='owner', org_id, and firebase_identity_id
-	// reach the tx exactly as expected.
-	var capturedMembershipArgs []interface{}
-	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			capturedMembershipArgs = args.Get(2).([]interface{})
-		}).
-		Return(membershipRow(db.User{
-			ID:                 uuid.New(),
-			OrgID:              createdOrg.ID,
-			FirebaseIdentityID: testCallerIdentity.ID,
-			Etag:               "etag-membership",
-			Revision:           1,
-			CreateTime:         createdOrg.CreateTime,
-			UpdateTime:         createdOrg.UpdateTime,
-		})).Once()
-
-	// Founder bootstrap: 4 role inserts + 1 org_member insert.
+	// Founder bootstrap: 4 role :exec inserts + 1 org_member :one
+	// QueryRow insert. Post-Phase-7: the founder's
+	// `firebase_identities.id` is bound directly to the owner role
+	// — no separate `users` row insert.
 	expectBootstrapExecs(tx)
 
 	tx.On("Commit", mock.Anything).Return(nil)
@@ -525,27 +478,12 @@ func TestUnit_CreateOrganization_CreatesOwnerMembership(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// CreateUserMembership SQL args order: id, org_id,
-	// firebase_identity_id. We don't pin the membership UUID (it's
-	// randomly generated), so args[0] is just asserted non-zero. The
-	// remaining two are the load-bearing invariants this test guards.
-	require.Len(t, capturedMembershipArgs, 3,
-		"CreateUserMembership should receive 3 args: id, org_id, firebase_identity_id")
-	assert.NotEqual(t, uuid.Nil, capturedMembershipArgs[0],
-		"membership id must be assigned")
-	assert.Equal(t, createdOrg.ID, capturedMembershipArgs[1],
-		"org_id must reference the just-created org")
-	assert.Equal(t, testCallerIdentity.ID, capturedMembershipArgs[2],
-		"firebase_identity_id must reference the authenticated caller")
-
-	// The founder owner-role binding itself is asserted in
-	// `bootstrap_test.go` (TestBootstrapOrgRoles_SeedsFourSystemRoles)
-	// against a MockQuerier directly — no need to re-parse SQL here.
 	// What this test verifies is *integration*: that CreateOrganization
 	// actually invokes the bootstrap, observable as exactly 4 Exec
 	// calls on the tx (the 4 system role :exec inserts). The
 	// CreateOrgMember insert is a :one RETURNING and goes through
-	// QueryRow, accounted for separately.
+	// QueryRow. Bootstrap correctness is asserted unit-side in
+	// `bootstrap_test.go` (TestBootstrapOrgRoles_SeedsFourSystemRoles).
 	tx.AssertNumberOfCalls(t, "Exec", 4)
 }
 
@@ -596,16 +534,6 @@ func TestUnit_CreateOrganization_CommitFailure(t *testing.T) {
 	// CreateOrganization in DB succeeds.
 	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
 		Return(orgRow(createdOrg)).Once()
-	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
-		Return(membershipRow(db.User{
-			ID:                 uuid.New(),
-			OrgID:              createdOrg.ID,
-			FirebaseIdentityID: testCallerIdentity.ID,
-			Etag:               "etag-membership",
-			Revision:           1,
-			CreateTime:         createdOrg.CreateTime,
-			UpdateTime:         createdOrg.UpdateTime,
-		})).Once()
 
 	// Founder bootstrap completes; commit is what fails.
 	expectBootstrapExecs(tx)
@@ -664,19 +592,9 @@ func TestUnit_CreateOrganization_AutoGeneratedSlug(t *testing.T) {
 			UpdateTime:  time.Date(2025, 8, 1, 10, 0, 0, 0, time.UTC),
 		})).Once()
 
-	// Owner membership row created in the same tx.
-	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
-		Return(membershipRow(db.User{
-			ID:                 uuid.New(),
-			OrgID:              uuid.MustParse("0192a000-0005-7000-8000-000000000005"),
-			FirebaseIdentityID: testCallerIdentity.ID,
-			Etag:               "etag-membership",
-			Revision:           1,
-			CreateTime:         time.Date(2025, 8, 1, 10, 0, 0, 0, time.UTC),
-			UpdateTime:         time.Date(2025, 8, 1, 10, 0, 0, 0, time.UTC),
-		})).Once()
-
-	// Founder bootstrap inside the same tx.
+	// Founder bootstrap inside the same tx (4 role :execs + 1
+	// org_member :one QueryRow). No more `users` row insert
+	// post-Phase-7.
 	expectBootstrapExecs(tx)
 
 	// Commit succeeds.

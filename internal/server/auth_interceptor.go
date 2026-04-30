@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
@@ -13,6 +14,16 @@ import (
 
 // authContextKey is the context key for the authenticated UID.
 type authContextKey struct{}
+
+// pivoxUserIDKey is the context key for the caller's per-Pivox
+// `firebase_identities.id` UUID. Populated by the auth interceptor
+// from the `pivox_user_id` Firebase ID-token custom claim, which is
+// set during identity sync by the Firebase blocking function.
+//
+// All membership tables (`org_members.principal_id`,
+// `space_members.principal_id`, `group_members.user_id`) reference
+// this UUID — it's the universal user identifier across the API.
+type pivoxUserIDKey struct{}
 
 // Canonical Unauthenticated messages. Centralized so both the unary
 // and stream interceptors return identical errors and so any future
@@ -49,6 +60,39 @@ func MustAuthenticatedUID(ctx context.Context) string {
 	return uid
 }
 
+// PivoxUserID extracts the verified Pivox user UUID
+// (`firebase_identities.id`) from the context. Returns the UUID and
+// true when the auth interceptor extracted a `pivox_user_id` claim
+// from the verified ID token.
+func PivoxUserID(ctx context.Context) (uuid.UUID, bool) {
+	id, ok := ctx.Value(pivoxUserIDKey{}).(uuid.UUID)
+	return id, ok
+}
+
+// WithPivoxUserID returns a new context with the given UUID set as
+// if the auth interceptor had extracted it from a verified token's
+// `pivox_user_id` claim. Intended for tests.
+func WithPivoxUserID(ctx context.Context, id uuid.UUID) context.Context {
+	return context.WithValue(ctx, pivoxUserIDKey{}, id)
+}
+
+// MustPivoxUserID extracts the verified Pivox user UUID from the
+// context. Panics if the context does not contain one — only call
+// from handlers behind the auth interceptor where the blocking
+// function is guaranteed to have set the claim.
+//
+// Token-issued-before-claim-set is a transient case the interceptor
+// handles by failing the request with Unauthenticated, prompting the
+// client to refresh; by the time a handler runs, the claim is
+// guaranteed present.
+func MustPivoxUserID(ctx context.Context) uuid.UUID {
+	id, ok := PivoxUserID(ctx)
+	if !ok {
+		panic("server: MustPivoxUserID called without pivox_user_id claim on context")
+	}
+	return id
+}
+
 // authenticate is the shared body for both unary and stream auth
 // interceptors. Returns the augmented context (with the verified UID)
 // or an apierr.Unauthenticated error. Single source of truth for
@@ -72,7 +116,22 @@ func authenticate(ctx context.Context, auth authn.Service) (context.Context, err
 	if err != nil {
 		return nil, apierr.Unauthenticated(errInvalidOrExpiredID)
 	}
-	return context.WithValue(ctx, authContextKey{}, identity.UID), nil
+	ctx = context.WithValue(ctx, authContextKey{}, identity.UID)
+	// `pivox_user_id` is set by the Firebase blocking function from
+	// the identity-sync RPC's response. Tokens minted before the
+	// claim was added (e.g. a freshly upgraded server seeing a
+	// stale-cached client token) carry no claim — those callers must
+	// refresh their token to land. We return the original token-
+	// verification error message so clients can't probe whether
+	// they're on an old token vs. a wrong-credential.
+	if claim, ok := identity.Claims["pivox_user_id"].(string); ok && claim != "" {
+		uid, parseErr := uuid.Parse(claim)
+		if parseErr != nil {
+			return nil, apierr.Unauthenticated(errInvalidOrExpiredID)
+		}
+		ctx = context.WithValue(ctx, pivoxUserIDKey{}, uid)
+	}
+	return ctx, nil
 }
 
 // AuthInterceptor returns a gRPC unary server interceptor that verifies
