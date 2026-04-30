@@ -102,7 +102,12 @@ func newBrokerHarness(t *testing.T) *brokerHarness {
 		GitHubClientID:     "gh-id",
 		GitHubClientSecret: "gh-secret",
 	}
-	b := NewOAuthBroker(q, passthroughEncryptor{}, cfg, slog.Default())
+	b := NewOAuthBroker(OAuthBrokerConfig{
+		Queries:   q,
+		Encryptor: passthroughEncryptor{},
+		Broker:    cfg,
+		Logger:    slog.Default(),
+	})
 	return &brokerHarness{broker: b, q: q, idp: idp}
 }
 

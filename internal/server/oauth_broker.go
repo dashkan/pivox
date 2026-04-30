@@ -70,21 +70,48 @@ type discoveryCacheEntry struct {
 
 const oidcDiscoveryCacheTTL = 5 * time.Minute
 
-// NewOAuthBroker wires the broker. `cfg` carries the HMAC app key,
-// the public base URL used to build redirect_uri, and static
-// GitHub credentials. Dynamic OIDC providers are resolved per
-// request from the DB.
-func NewOAuthBroker(
-	queries db.Querier,
-	encryptor crypto.Encryptor,
-	cfg config.OAuthBrokerConfig,
-	logger *slog.Logger,
-) *OAuthBroker {
+// OAuthBrokerConfig is the constructor input for OAuthBroker. Named
+// with the `OAuthBroker` prefix to disambiguate from the unrelated
+// settings struct `config.OAuthBrokerConfig` (HMAC app key, base
+// URL, GitHub creds) which is held inside this Config as `Broker`.
+type OAuthBrokerConfig struct {
+	// Queries is the sqlc query interface. Required.
+	Queries db.Querier
+	// Encryptor decrypts per-org SSO client secrets stored in the
+	// `sso_configs` table. Required.
+	Encryptor crypto.Encryptor
+	// Broker carries the HMAC app key, the public base URL used to
+	// build redirect_uri, and static GitHub credentials. Required —
+	// the broker can't sign / verify state tokens or build callback
+	// URLs without it.
+	Broker config.OAuthBrokerConfig
+	// Logger is the slog logger used for broker-side audit lines.
+	// Required.
+	Logger *slog.Logger
+}
+
+// NewOAuthBroker constructs an OAuthBroker from cfg. Panics on a
+// missing required field — startup-time programmer error, fail loud
+// on boot.
+//
+// Dynamic OIDC providers are resolved per-request from the DB; the
+// settings struct (cfg.Broker) only supplies the static GitHub
+// credentials and the broker's own URL configuration.
+func NewOAuthBroker(cfg OAuthBrokerConfig) *OAuthBroker {
+	if cfg.Queries == nil {
+		panic("server: OAuthBrokerConfig.Queries is required")
+	}
+	if cfg.Encryptor == nil {
+		panic("server: OAuthBrokerConfig.Encryptor is required")
+	}
+	if cfg.Logger == nil {
+		panic("server: OAuthBrokerConfig.Logger is required")
+	}
 	return &OAuthBroker{
-		queries:   queries,
-		logger:    logger,
-		encryptor: encryptor,
-		cfg:       cfg,
+		queries:   cfg.Queries,
+		logger:    cfg.Logger,
+		encryptor: cfg.Encryptor,
+		cfg:       cfg.Broker,
 		// Same shape as exchangeLimiter — start/callback are
 		// browser-redirect-driven so traffic per-IP is naturally
 		// low. 6s refill / 10 burst keeps a reasonable upper bound.

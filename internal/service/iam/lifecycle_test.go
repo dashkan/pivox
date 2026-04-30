@@ -212,7 +212,7 @@ func TestDeleteAccount_PropagatesCallerResolutionFailure(t *testing.T) {
 	srv := &IamServer{
 		queries:    new(mocks.MockQuerier),
 		auth:       new(mockAuthService),
-		lroManager: lro.NewManager(new(mocks.MockQuerier), silentLogger()),
+		lroManager: lro.NewManager(lro.ManagerConfig{Queries: new(mocks.MockQuerier), Logger: silentLogger()}),
 		caller: func(context.Context) (uuid.UUID, error) {
 			return uuid.Nil, status.Error(codes.NotFound, "firebase identity not yet synced")
 		},

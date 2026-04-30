@@ -88,7 +88,7 @@ func (m *mockLROManager) CancelOperation(ctx context.Context, name string) error
 func newTestServer() *OperationsServer {
 	mockQ := new(mocks.MockQuerier)
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	manager := lro.NewManager(mockQ, logger)
+	manager := lro.NewManager(lro.ManagerConfig{Queries: mockQ, Logger: logger})
 	return NewOperationsServer(Config{LRO: manager})
 }
 
@@ -244,7 +244,7 @@ func TestUnit_ListOperations_DefaultPageSize(t *testing.T) {
 	// on a zero page size.
 	mockQ := new(mocks.MockQuerier)
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	manager := lro.NewManager(mockQ, logger)
+	manager := lro.NewManager(lro.ManagerConfig{Queries: mockQ, Logger: logger})
 	srv := NewOperationsServer(Config{LRO: manager})
 	ctx := context.Background()
 

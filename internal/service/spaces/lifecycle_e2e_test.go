@@ -366,7 +366,12 @@ func TestE2E_SpacePurgeWorker_CascadesPastGrace(t *testing.T) {
 	// Run a single processBatch tick directly (bypassing the
 	// advisory-lock dance the full Run loop adds — the lock is a
 	// multi-replica coordination token, not needed in-process).
-	worker := workers.NewSpacePurgeWorker(h.Pool, h.Queries, slog.New(slog.NewTextHandler(io.Discard, nil)), time.Minute)
+	worker := workers.NewSpacePurgeWorker(workers.SpacePurgeConfig{
+		Pool:     h.Pool,
+		Queries:  h.Queries,
+		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Interval: time.Minute,
+	})
 	require.NoError(t, worker.ProcessBatchForTest(ctx))
 
 	// Slug is now free; recreating the space with the same id must

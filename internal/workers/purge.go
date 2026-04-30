@@ -37,13 +37,46 @@ type PurgeWorker struct {
 	interval time.Duration
 }
 
-// NewPurgeWorker constructs a worker. `interval` controls how often
-// the scan runs; production typically uses a few minutes, tests
-// override to milliseconds. `pool` is required (advisory locks
-// need a real connection); `queries` is the typed wrapper used for
-// the actual scan and purge calls.
-func NewPurgeWorker(pool *pgxpool.Pool, queries db.Querier, logger *slog.Logger, interval time.Duration) *PurgeWorker {
-	return &PurgeWorker{pool: pool, queries: queries, logger: logger, interval: interval}
+// DefaultPurgeInterval is the production scan cadence — used when
+// PurgeConfig.Interval is left zero. Mirrors the cmd/pivox-cloud
+// boot wiring so tests and call sites that omit Interval get the
+// same behavior production does.
+const DefaultPurgeInterval = 5 * time.Minute
+
+// PurgeConfig is the constructor input for PurgeWorker.
+type PurgeConfig struct {
+	// Pool is the pgx pool used for advisory locks (which need a
+	// real connection, not the typed wrapper). Required.
+	Pool *pgxpool.Pool
+	// Queries is the sqlc query interface used for the scan and
+	// purge calls. Required.
+	Queries db.Querier
+	// Logger is the slog logger used for sweep / failure lines.
+	// Required.
+	Logger *slog.Logger
+	// Interval is the tick cadence; production typically uses a few
+	// minutes, tests override to milliseconds. Zero ⇒
+	// DefaultPurgeInterval.
+	Interval time.Duration
+}
+
+// NewPurgeWorker constructs a worker from cfg. Panics on a missing
+// required field — startup-time programmer error, fail loud on boot.
+func NewPurgeWorker(cfg PurgeConfig) *PurgeWorker {
+	if cfg.Pool == nil {
+		panic("workers: PurgeConfig.Pool is required")
+	}
+	if cfg.Queries == nil {
+		panic("workers: PurgeConfig.Queries is required")
+	}
+	if cfg.Logger == nil {
+		panic("workers: PurgeConfig.Logger is required")
+	}
+	interval := cfg.Interval
+	if interval == 0 {
+		interval = DefaultPurgeInterval
+	}
+	return &PurgeWorker{pool: cfg.Pool, queries: cfg.Queries, logger: cfg.Logger, interval: interval}
 }
 
 // Name implements Worker. Used in startup/shutdown logs.

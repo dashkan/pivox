@@ -68,7 +68,14 @@ func Connect(ctx context.Context, addr string, useTLS bool, token string, cfg *C
 		return fmt.Errorf("open stream: %w", err)
 	}
 
-	stream := NewStream(bidi, handshakeTimeout, cfg.Sessions, cfg.Endpoints, cfg.Denied, logger)
+	stream := NewStream(StreamConfig{
+		Stream:    bidi,
+		Timeout:   handshakeTimeout,
+		Sessions:  cfg.Sessions,
+		Endpoints: cfg.Endpoints,
+		Denied:    cfg.Denied,
+		Logger:    logger,
+	})
 
 	// Start the receive loop in the background. It will return when the
 	// stream is closed or errors out.

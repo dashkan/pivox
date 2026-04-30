@@ -34,13 +34,42 @@ type SpacePurgeWorker struct {
 	interval time.Duration
 }
 
-// NewSpacePurgeWorker constructs a worker. `interval` controls how
-// often the scan runs; production typically uses a few minutes,
-// tests override to milliseconds. `pool` is required (advisory
-// locks need a real connection); `queries` is the typed wrapper
-// used for the actual scan and purge calls.
-func NewSpacePurgeWorker(pool *pgxpool.Pool, queries db.Querier, logger *slog.Logger, interval time.Duration) *SpacePurgeWorker {
-	return &SpacePurgeWorker{pool: pool, queries: queries, logger: logger, interval: interval}
+// DefaultSpacePurgeInterval is the production scan cadence — used
+// when SpacePurgeConfig.Interval is left zero.
+const DefaultSpacePurgeInterval = 5 * time.Minute
+
+// SpacePurgeConfig is the constructor input for SpacePurgeWorker.
+type SpacePurgeConfig struct {
+	// Pool is the pgx pool used for advisory locks. Required.
+	Pool *pgxpool.Pool
+	// Queries is the sqlc query interface. Required.
+	Queries db.Querier
+	// Logger is the slog logger used for sweep / failure lines.
+	// Required.
+	Logger *slog.Logger
+	// Interval is the tick cadence. Zero ⇒
+	// DefaultSpacePurgeInterval.
+	Interval time.Duration
+}
+
+// NewSpacePurgeWorker constructs a worker from cfg. Panics on a
+// missing required field — startup-time programmer error, fail loud
+// on boot.
+func NewSpacePurgeWorker(cfg SpacePurgeConfig) *SpacePurgeWorker {
+	if cfg.Pool == nil {
+		panic("workers: SpacePurgeConfig.Pool is required")
+	}
+	if cfg.Queries == nil {
+		panic("workers: SpacePurgeConfig.Queries is required")
+	}
+	if cfg.Logger == nil {
+		panic("workers: SpacePurgeConfig.Logger is required")
+	}
+	interval := cfg.Interval
+	if interval == 0 {
+		interval = DefaultSpacePurgeInterval
+	}
+	return &SpacePurgeWorker{pool: cfg.Pool, queries: cfg.Queries, logger: cfg.Logger, interval: interval}
 }
 
 // Name implements Worker.

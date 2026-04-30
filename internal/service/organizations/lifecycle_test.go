@@ -100,7 +100,7 @@ func newLifecycleServer(q db.Querier, lroManager *lro.Manager, caller server.Cal
 }
 
 func newTestLROManager(q db.Querier) *lro.Manager {
-	return lro.NewManager(q, slogTestLogger())
+	return lro.NewManager(lro.ManagerConfig{Queries: q, Logger: slogTestLogger()})
 }
 
 func TestDeleteOrganization_RejectsNonActiveOrg(t *testing.T) {

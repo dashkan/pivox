@@ -18,7 +18,7 @@ func TestNewReaper(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	r := NewReaper(mockQ, 1*time.Hour, logger)
+	r := NewReaper(ReaperConfig{Queries: mockQ, Interval: 1 * time.Hour, Logger: logger})
 	require.NotNil(t, r)
 	assert.Equal(t, 1*time.Hour, r.interval)
 	assert.NotNil(t, r.queries)
@@ -30,7 +30,7 @@ func TestReaper_Run(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	// Use a very short interval so the ticker fires quickly.
-	r := NewReaper(mockQ, 10*time.Millisecond, logger)
+	r := NewReaper(ReaperConfig{Queries: mockQ, Interval: 10 * time.Millisecond, Logger: logger})
 
 	called := make(chan struct{}, 10)
 	mockQ.On("DeleteExpiredOperations", mock.Anything).Return(nil).Run(func(_ mock.Arguments) {

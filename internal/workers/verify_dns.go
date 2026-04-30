@@ -29,13 +29,49 @@ type VerifyDomainWorker struct {
 	interval time.Duration
 }
 
-// NewVerifyDomainWorker constructs a worker. `resolver` is the
-// DNS seam — production passes StubDNSResolver until real DNS
-// lands. `interval` is the tick cadence; the v1 stub doesn't need
-// fine-grained ticks, so a 2-minute production interval and
-// millisecond test interval both work.
-func NewVerifyDomainWorker(pool *pgxpool.Pool, queries db.Querier, resolver DNSResolver, logger *slog.Logger, interval time.Duration) *VerifyDomainWorker {
-	return &VerifyDomainWorker{pool: pool, queries: queries, resolver: resolver, logger: logger, interval: interval}
+// DefaultVerifyDomainInterval is the production scan cadence — used
+// when VerifyDomainConfig.Interval is left zero. The v1 stub
+// resolver doesn't need fine-grained ticks, so 2 minutes is fine.
+const DefaultVerifyDomainInterval = 2 * time.Minute
+
+// VerifyDomainConfig is the constructor input for VerifyDomainWorker.
+type VerifyDomainConfig struct {
+	// Pool is the pgx pool used for advisory locks. Required.
+	Pool *pgxpool.Pool
+	// Queries is the sqlc query interface. Required.
+	Queries db.Querier
+	// Resolver is the DNS seam — production passes StubDNSResolver
+	// until real DNS lands. Required.
+	Resolver DNSResolver
+	// Logger is the slog logger used for verification / failure
+	// lines. Required.
+	Logger *slog.Logger
+	// Interval is the tick cadence. Zero ⇒
+	// DefaultVerifyDomainInterval.
+	Interval time.Duration
+}
+
+// NewVerifyDomainWorker constructs a worker from cfg. Panics on a
+// missing required field — startup-time programmer error, fail loud
+// on boot.
+func NewVerifyDomainWorker(cfg VerifyDomainConfig) *VerifyDomainWorker {
+	if cfg.Pool == nil {
+		panic("workers: VerifyDomainConfig.Pool is required")
+	}
+	if cfg.Queries == nil {
+		panic("workers: VerifyDomainConfig.Queries is required")
+	}
+	if cfg.Resolver == nil {
+		panic("workers: VerifyDomainConfig.Resolver is required")
+	}
+	if cfg.Logger == nil {
+		panic("workers: VerifyDomainConfig.Logger is required")
+	}
+	interval := cfg.Interval
+	if interval == 0 {
+		interval = DefaultVerifyDomainInterval
+	}
+	return &VerifyDomainWorker{pool: cfg.Pool, queries: cfg.Queries, resolver: cfg.Resolver, logger: cfg.Logger, interval: interval}
 }
 
 // Name implements Worker.

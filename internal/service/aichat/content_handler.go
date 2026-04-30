@@ -39,13 +39,31 @@ type ContentHandler struct {
 	logger   *slog.Logger
 }
 
-// NewContentHandler creates a new content handler. The supplied
-// Server provides the queries + permission resolver used for
-// ownership enforcement; without it the handler can't run the
-// path-vs-row creator check that the gRPC artifact handlers depend
-// on.
-func NewContentHandler(srv *Server, logger *slog.Logger) *ContentHandler {
-	return &ContentHandler{resolver: srv, logger: logger}
+// ContentHandlerConfig is the constructor input for ContentHandler.
+// Suffixed to avoid colliding with the package-level Config used by
+// Server.
+type ContentHandlerConfig struct {
+	// Server provides the queries + permission resolver used for
+	// ownership enforcement; without it the handler can't run the
+	// path-vs-row creator check that the gRPC artifact handlers
+	// depend on. Required.
+	Server *Server
+	// Logger is the slog logger used for content-write failures.
+	// Required.
+	Logger *slog.Logger
+}
+
+// NewContentHandler constructs a content handler from cfg. Panics on
+// a missing required field — startup-time programmer error, fail
+// loud on boot.
+func NewContentHandler(cfg ContentHandlerConfig) *ContentHandler {
+	if cfg.Server == nil {
+		panic("aichat: ContentHandlerConfig.Server is required")
+	}
+	if cfg.Logger == nil {
+		panic("aichat: ContentHandlerConfig.Logger is required")
+	}
+	return &ContentHandler{resolver: cfg.Server, logger: cfg.Logger}
 }
 
 func (h *ContentHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

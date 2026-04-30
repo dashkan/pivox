@@ -35,7 +35,7 @@ func TestNewManager(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	logger := newTestLogger()
 
-	m := NewManager(mockQ, logger)
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: logger})
 	require.NotNil(t, m)
 	assert.NotNil(t, m.queries)
 	assert.NotNil(t, m.logger)
@@ -99,7 +99,7 @@ func TestParseOperationName(t *testing.T) {
 func TestGetOperation_Found(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	opID := uuid.New()
 	dbOp := db.Operation{
@@ -120,7 +120,7 @@ func TestGetOperation_Found(t *testing.T) {
 func TestGetOperation_NotFound(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	opID := uuid.New()
 	mockQ.On("GetOperation", ctx, opID).Return(db.Operation{}, pgx.ErrNoRows)
@@ -135,7 +135,7 @@ func TestGetOperation_NotFound(t *testing.T) {
 func TestGetOperation_InvalidName(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	_, err := m.GetOperation(ctx, "bad-name")
 	require.Error(t, err)
@@ -146,7 +146,7 @@ func TestGetOperation_InvalidName(t *testing.T) {
 func TestListOperations_Success(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	op1 := db.Operation{ID: uuid.New(), Prefix: "assets", Done: false}
 	op2 := db.Operation{ID: uuid.New(), Prefix: "assets", Done: true}
@@ -165,7 +165,7 @@ func TestListOperations_Success(t *testing.T) {
 func TestListOperations_Empty(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	mockQ.On("ListOperations", ctx, db.ListOperationsParams{
 		Limit:        int32(100),
@@ -195,7 +195,7 @@ func TestListOperations_PageSize(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			mockQ := new(mocks.MockQuerier)
-			m := NewManager(mockQ, newTestLogger())
+			m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 			mockQ.On("ListOperations", ctx, db.ListOperationsParams{
 				Limit:        tt.want,
@@ -212,7 +212,7 @@ func TestListOperations_PageSize(t *testing.T) {
 func TestDeleteOperation_Done(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	opID := uuid.New()
 	mockQ.On("GetOperation", ctx, opID).Return(db.Operation{
@@ -229,7 +229,7 @@ func TestDeleteOperation_Done(t *testing.T) {
 func TestDeleteOperation_Running(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	opID := uuid.New()
 	mockQ.On("GetOperation", ctx, opID).Return(db.Operation{
@@ -247,7 +247,7 @@ func TestDeleteOperation_Running(t *testing.T) {
 func TestDeleteOperation_NotFound(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	opID := uuid.New()
 	mockQ.On("GetOperation", ctx, opID).Return(db.Operation{}, pgx.ErrNoRows)
@@ -262,7 +262,7 @@ func TestDeleteOperation_NotFound(t *testing.T) {
 func TestCancelOperation_Success(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	opID := uuid.New()
 	mockQ.On("CancelOperation", ctx, opID).Return(db.Operation{
@@ -278,7 +278,7 @@ func TestCancelOperation_Success(t *testing.T) {
 func TestCancelOperation_AlreadyDone(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	opID := uuid.New()
 	// CancelOperation returns ErrNoRows (no running op to cancel)
@@ -297,7 +297,7 @@ func TestCancelOperation_AlreadyDone(t *testing.T) {
 func TestCancelOperation_NotFound(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	opID := uuid.New()
 	mockQ.On("CancelOperation", ctx, opID).Return(db.Operation{}, pgx.ErrNoRows)
@@ -319,7 +319,7 @@ func TestCancelOperation_NotFound(t *testing.T) {
 func TestCancelOperation_CancelsInFlightGoroutine(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	// CreateAndRun mints its own opID inside; capture it from the
 	// CreateOperation call so the rest of the test references the
@@ -405,7 +405,7 @@ func TestCancelOperation_CancelsInFlightGoroutine(t *testing.T) {
 func TestCancelLocal_FiresCancelForRunningOpIDs(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	var capturedIDs []uuid.UUID
 	mockQ.On("CreateOperation", ctx, mock.MatchedBy(func(p db.CreateOperationParams) bool {
@@ -468,7 +468,7 @@ func TestCancelLocal_FiresCancelForRunningOpIDs(t *testing.T) {
 func TestRunWork_DBFailureDoesNotNotifyListeners(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	mockQ.On("CreateOperation", ctx, mock.MatchedBy(func(p db.CreateOperationParams) bool {
 		return p.Prefix == "test"
@@ -517,7 +517,7 @@ func TestRunWork_DBFailureDoesNotNotifyListeners(t *testing.T) {
 
 func TestCancelLocal_NoOpOnEmpty(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 	// Should not panic, no DB calls.
 	m.CancelLocal()
 	mockQ.AssertExpectations(t)
@@ -526,7 +526,7 @@ func TestCancelLocal_NoOpOnEmpty(t *testing.T) {
 func TestRecoverPending_Success(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	op1 := db.Operation{ID: uuid.New(), Prefix: "a"}
 	op2 := db.Operation{ID: uuid.New(), Prefix: "b"}
@@ -547,7 +547,7 @@ func TestRecoverPending_Success(t *testing.T) {
 func TestRecoverPending_Empty(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	mockQ.On("ListPendingOperations", ctx).Return([]db.Operation{}, nil)
 
@@ -560,7 +560,7 @@ func TestRecoverPending_Empty(t *testing.T) {
 func TestCreateAndRun(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	mockQ.On("CreateOperation", ctx, mock.MatchedBy(func(p db.CreateOperationParams) bool {
 		return p.Prefix == "assets"
@@ -600,7 +600,7 @@ func TestCreateAndRun(t *testing.T) {
 func TestRunWork_Failure(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	mockQ.On("CreateOperation", ctx, mock.Anything).Return(db.Operation{Prefix: "assets", Done: false}, nil)
 
@@ -626,7 +626,7 @@ func TestRunWork_Failure(t *testing.T) {
 func TestRunWork_GRPCStatusError(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	mockQ.On("CreateOperation", ctx, mock.Anything).Return(db.Operation{Prefix: "assets", Done: false}, nil)
 
@@ -652,7 +652,7 @@ func TestRunWork_GRPCStatusError(t *testing.T) {
 func TestRunWork_SuccessWithNilResult(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	mockQ.On("CreateOperation", ctx, mock.Anything).Return(db.Operation{Prefix: "assets", Done: false}, nil)
 
@@ -815,7 +815,7 @@ func TestDbToProto(t *testing.T) {
 func TestWaitOperation_AlreadyDone(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	opID := uuid.New()
 	mockQ.On("GetOperation", ctx, opID).Return(db.Operation{
@@ -832,7 +832,7 @@ func TestWaitOperation_AlreadyDone(t *testing.T) {
 
 func TestWaitOperation_WaitsForCompletion(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	opID := uuid.New()
 	opName := fmt.Sprintf("operations/assets/%s", opID)
@@ -875,7 +875,7 @@ func TestWaitOperation_WaitsForCompletion(t *testing.T) {
 
 func TestWaitOperation_ContextCancelled(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	opID := uuid.New()
 	opName := fmt.Sprintf("operations/assets/%s", opID)
@@ -913,7 +913,7 @@ func TestWaitOperation_ContextCancelled(t *testing.T) {
 func TestCreateAndRun_WithMetadata(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	metadata, err := structpb.NewStruct(map[string]interface{}{"progress": "0%"})
 	require.NoError(t, err)
@@ -947,7 +947,7 @@ func TestCreateAndRun_WithMetadata(t *testing.T) {
 func TestCreateAndRun_CreateOperationError(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	mockQ.On("CreateOperation", ctx, mock.Anything).Return(db.Operation{}, fmt.Errorf("db down"))
 
@@ -965,7 +965,7 @@ func TestRunWork_MarshalResultError(t *testing.T) {
 	// that returns a message causing marshalAny to fail. We use a bare proto.Message
 	// interface implementation that isn't registered in the protobuf type registry.
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	opID := uuid.New()
 
@@ -996,7 +996,7 @@ func TestRunWork_MarshalResultError(t *testing.T) {
 func TestDeleteOperation_InvalidName(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	err := m.DeleteOperation(ctx, "bad-name")
 	require.Error(t, err)
@@ -1007,7 +1007,7 @@ func TestDeleteOperation_InvalidName(t *testing.T) {
 func TestDeleteOperation_DBError(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	opID := uuid.New()
 	mockQ.On("GetOperation", ctx, opID).Return(db.Operation{}, fmt.Errorf("connection refused"))
@@ -1021,7 +1021,7 @@ func TestDeleteOperation_DBError(t *testing.T) {
 func TestDeleteOperation_DeleteDBError(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	opID := uuid.New()
 	mockQ.On("GetOperation", ctx, opID).Return(db.Operation{ID: opID, Done: true}, nil)
@@ -1037,7 +1037,7 @@ func TestDeleteOperation_DeleteDBError(t *testing.T) {
 func TestCancelOperation_InvalidName(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	err := m.CancelOperation(ctx, "bad-name")
 	require.Error(t, err)
@@ -1048,7 +1048,7 @@ func TestCancelOperation_InvalidName(t *testing.T) {
 func TestCancelOperation_DBError(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	opID := uuid.New()
 	mockQ.On("CancelOperation", ctx, opID).Return(db.Operation{}, fmt.Errorf("connection refused"))
@@ -1063,7 +1063,7 @@ func TestCancelOperation_DBError(t *testing.T) {
 func TestRecoverPending_ListError(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	mockQ.On("ListPendingOperations", ctx).Return([]db.Operation{}, fmt.Errorf("db down"))
 
@@ -1076,7 +1076,7 @@ func TestRecoverPending_ListError(t *testing.T) {
 func TestRecoverPending_FailOperationError(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	op := db.Operation{ID: uuid.New(), Prefix: "a"}
 	mockQ.On("ListPendingOperations", ctx).Return([]db.Operation{op}, nil)
@@ -1093,7 +1093,7 @@ func TestRecoverPending_FailOperationError(t *testing.T) {
 func TestGetOperation_DBError(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	opID := uuid.New()
 	mockQ.On("GetOperation", ctx, opID).Return(db.Operation{}, fmt.Errorf("connection refused"))
@@ -1108,7 +1108,7 @@ func TestGetOperation_DBError(t *testing.T) {
 func TestListOperations_DBError(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	mockQ.On("ListOperations", ctx, mock.Anything).Return([]db.Operation{}, fmt.Errorf("db down"))
 
@@ -1122,7 +1122,7 @@ func TestListOperations_DBError(t *testing.T) {
 func TestListOperations_SkipsBadConversion(t *testing.T) {
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	good := db.Operation{ID: uuid.New(), Prefix: "assets", Done: false}
 	// Bad operation: Done=true with invalid metadata JSON that will cause unmarshalAny to fail
@@ -1210,7 +1210,7 @@ func TestRunWork_FailOperationDBError(t *testing.T) {
 	// Test that when work fails AND FailOperation also fails, we just log (no panic)
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	mockQ.On("CreateOperation", ctx, mock.Anything).Return(db.Operation{
 		ID:     uuid.New(),
@@ -1240,7 +1240,7 @@ func TestRunWork_CompleteOperationDBError(t *testing.T) {
 	// Test that when work succeeds but CompleteOperation fails, we just log
 	ctx := context.Background()
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	mockQ.On("CreateOperation", ctx, mock.Anything).Return(db.Operation{
 		ID:     uuid.New(),
@@ -1270,7 +1270,7 @@ func TestRunWork_CompleteOperationDBError(t *testing.T) {
 func TestRunWork_MarshalResultError_FailOperationAlsoFails(t *testing.T) {
 	// When marshal error occurs and FailOperation also fails, we just log both
 	mockQ := new(mocks.MockQuerier)
-	m := NewManager(mockQ, newTestLogger())
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	opID := uuid.New()
 
@@ -1299,7 +1299,7 @@ func TestReaper_Run_DeleteError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	logger := newTestLogger()
 
-	r := NewReaper(mockQ, 10*time.Millisecond, logger)
+	r := NewReaper(ReaperConfig{Queries: mockQ, Interval: 10 * time.Millisecond, Logger: logger})
 
 	called := make(chan struct{}, 10)
 	mockQ.On("DeleteExpiredOperations", mock.Anything).Return(fmt.Errorf("db error")).Run(func(_ mock.Arguments) {

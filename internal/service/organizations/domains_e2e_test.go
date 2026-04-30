@@ -203,7 +203,13 @@ func newDomainsHarness(t *testing.T) *grpcharness.Harness {
 // need verification to fire simply skip this call.
 func startVerifyWorker(t *testing.T, h *grpcharness.Harness, resolver workers.DNSResolver, interval time.Duration) {
 	t.Helper()
-	w := workers.NewVerifyDomainWorker(h.Pool, h.Queries, resolver, silentDomainLogger(), interval)
+	w := workers.NewVerifyDomainWorker(workers.VerifyDomainConfig{
+		Pool:     h.Pool,
+		Queries:  h.Queries,
+		Resolver: resolver,
+		Logger:   silentDomainLogger(),
+		Interval: interval,
+	})
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() {

@@ -8,6 +8,12 @@ import (
 	db "github.com/dashkan/pivox/internal/db/generated"
 )
 
+// DefaultReaperInterval is the production scan cadence — used when
+// ReaperConfig.Interval is left zero. Mirrors the cmd/pivox-cloud
+// boot wiring so tests and call sites that omit Interval get the
+// same behavior production does.
+const DefaultReaperInterval = 5 * time.Minute
+
 // Reaper periodically deletes expired operations.
 type Reaper struct {
 	queries  db.Querier
@@ -15,12 +21,33 @@ type Reaper struct {
 	logger   *slog.Logger
 }
 
-// NewReaper creates a new operation reaper.
-func NewReaper(queries db.Querier, interval time.Duration, logger *slog.Logger) *Reaper {
+// ReaperConfig is the constructor input for Reaper.
+type ReaperConfig struct {
+	// Queries is the sqlc query interface. Required.
+	Queries db.Querier
+	// Interval is the scan cadence. Zero ⇒ DefaultReaperInterval.
+	Interval time.Duration
+	// Logger is the slog logger used for sweep failures. Required.
+	Logger *slog.Logger
+}
+
+// NewReaper constructs a Reaper from cfg. Panics on a missing
+// required field — startup-time programmer error, fail loud on boot.
+func NewReaper(cfg ReaperConfig) *Reaper {
+	if cfg.Queries == nil {
+		panic("lro: ReaperConfig.Queries is required")
+	}
+	if cfg.Logger == nil {
+		panic("lro: ReaperConfig.Logger is required")
+	}
+	interval := cfg.Interval
+	if interval == 0 {
+		interval = DefaultReaperInterval
+	}
 	return &Reaper{
-		queries:  queries,
+		queries:  cfg.Queries,
 		interval: interval,
-		logger:   logger,
+		logger:   cfg.Logger,
 	}
 }
 

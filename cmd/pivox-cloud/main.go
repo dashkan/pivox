@@ -197,7 +197,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("initialize app key: %w", err)
 	}
-	lroManager := lro.NewManager(queries, logger)
+	lroManager := lro.NewManager(lro.ManagerConfig{Queries: queries, Logger: logger})
 
 	// Recover any pending operations from previous run
 	if err := lroManager.RecoverPending(ctx); err != nil {
@@ -205,7 +205,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	}
 
 	// Start the operation reaper
-	reaper := lro.NewReaper(queries, 5*time.Minute, logger)
+	reaper := lro.NewReaper(lro.ReaperConfig{Queries: queries, Interval: 5 * time.Minute, Logger: logger})
 	go func() {
 		if err := reaper.Run(ctx); err != nil && ctx.Err() == nil {
 			logger.Error("reaper stopped", "error", err)
@@ -218,9 +218,25 @@ func serve(cmd *cobra.Command, args []string) error {
 	// DNS verification is mocked via StubDNSResolver per the locked
 	// IAM-roadmap decision; the real net.Resolver-backed impl wires
 	// in before pre-prod SSO go-live.
-	purgeWorker := workers.NewPurgeWorker(pool, queries, logger, 5*time.Minute)
-	spacePurgeWorker := workers.NewSpacePurgeWorker(pool, queries, logger, 5*time.Minute)
-	verifyDomainWorker := workers.NewVerifyDomainWorker(pool, queries, workers.NewStubDNSResolver(logger), logger, 2*time.Minute)
+	purgeWorker := workers.NewPurgeWorker(workers.PurgeConfig{
+		Pool:     pool,
+		Queries:  queries,
+		Logger:   logger,
+		Interval: 5 * time.Minute,
+	})
+	spacePurgeWorker := workers.NewSpacePurgeWorker(workers.SpacePurgeConfig{
+		Pool:     pool,
+		Queries:  queries,
+		Logger:   logger,
+		Interval: 5 * time.Minute,
+	})
+	verifyDomainWorker := workers.NewVerifyDomainWorker(workers.VerifyDomainConfig{
+		Pool:     pool,
+		Queries:  queries,
+		Resolver: workers.NewStubDNSResolver(logger),
+		Logger:   logger,
+		Interval: 2 * time.Minute,
+	})
 	workersWG := workers.RunAll(ctx, logger, purgeWorker, spacePurgeWorker, verifyDomainWorker)
 	defer workersWG.Wait()
 
@@ -464,7 +480,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	// The handler shares the gRPC server's resolveConversation +
 	// permission resolver so the path-vs-row creator check and
 	// `ai.conversations.readAll` audit-bypass match the gRPC RPCs.
-	contentHandler := aichat.NewContentHandler(aiChatServer, logger)
+	contentHandler := aichat.NewContentHandler(aichat.ContentHandlerConfig{Server: aiChatServer, Logger: logger})
 	if err := gwMux.HandlePath(
 		"GET",
 		"/v1/organizations/{org}/users/{user}/conversations/{conv}/artifacts/{art}/versions/{ver}:content",
@@ -479,7 +495,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("dial local gRPC for SSE handler: %w", err)
 	}
-	sseHandler := aichat.NewSSEHandler(aiv1.NewAiChatClient(grpcConn), logger)
+	sseHandler := aichat.NewSSEHandler(aichat.SSEHandlerConfig{Client: aiv1.NewAiChatClient(grpcConn), Logger: logger})
 	if err := gwMux.HandlePath(
 		"POST",
 		"/v1/ai:streamGenerateContent",
@@ -511,7 +527,12 @@ func serve(cmd *cobra.Command, args []string) error {
 	// Migrated server-side from the TanStack `start` /api/oauth/*
 	// routes so auth machinery (DB-backed SsoConfig + KMS-encrypted
 	// client_secret) lives next to syncIdentity et al.
-	oauthBroker := server.NewOAuthBroker(queries, enc, cfg.OAuthBroker, logger)
+	oauthBroker := server.NewOAuthBroker(server.OAuthBrokerConfig{
+		Queries:   queries,
+		Encryptor: enc,
+		Broker:    cfg.OAuthBroker,
+		Logger:    logger,
+	})
 	oauthBroker.Register(httpMux)
 
 	httpMux.Handle("/", gwMux)

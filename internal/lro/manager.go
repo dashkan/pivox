@@ -60,11 +60,27 @@ type Manager struct {
 	running map[uuid.UUID]context.CancelFunc
 }
 
-// NewManager creates a new LRO manager.
-func NewManager(queries db.Querier, logger *slog.Logger) *Manager {
+// ManagerConfig is the constructor input for Manager.
+type ManagerConfig struct {
+	// Queries is the sqlc query interface. Required.
+	Queries db.Querier
+	// Logger is the slog logger used for failure / progress lines.
+	// Required.
+	Logger *slog.Logger
+}
+
+// NewManager constructs a Manager from cfg. Panics on a missing
+// required field — startup-time programmer error, fail loud on boot.
+func NewManager(cfg ManagerConfig) *Manager {
+	if cfg.Queries == nil {
+		panic("lro: ManagerConfig.Queries is required")
+	}
+	if cfg.Logger == nil {
+		panic("lro: ManagerConfig.Logger is required")
+	}
 	return &Manager{
-		queries:   queries,
-		logger:    logger,
+		queries:   cfg.Queries,
+		logger:    cfg.Logger,
 		listeners: make(map[uuid.UUID][]chan struct{}),
 		running:   make(map[uuid.UUID]context.CancelFunc),
 	}

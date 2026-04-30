@@ -250,7 +250,7 @@ func TestIntegration_ContentHandler_InlineArtifact(t *testing.T) {
 	require.NotEmpty(t, ver.ID)
 
 	// Serve via content handler
-	h := aichat.NewContentHandler(queries, slog.Default())
+	h := aichat.NewContentHandler(aichat.ContentHandlerConfig{Server: queries, Logger: slog.Default()})
 	path := "/v1/organizations/" + org.Name + "/conversations/" + conv.Name + "/artifacts/art1/versions/v1:content"
 	req := httptest.NewRequest(http.MethodGet, path, nil)
 	req = req.WithContext(server.WithAuthenticatedUID(req.Context(), testUID))

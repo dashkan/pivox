@@ -28,18 +28,65 @@ type Stream struct {
 	logger    *slog.Logger
 }
 
-// NewStream creates a Stream wrapper around the given bidi gRPC stream.
-// The caller must start ReceiveLoop in a separate goroutine before calling
-// any request/response method (e.g. Handshake).
-func NewStream(stream agentv1.AgentService_ConnectClient, timeout time.Duration, sessions *SessionStore, endpoints *EndpointStore, denied *DeniedPatterns, logger *slog.Logger) *Stream {
+// DefaultStreamTimeout is the round-trip timeout used when
+// StreamConfig.Timeout is left zero.
+const DefaultStreamTimeout = 30 * time.Second
+
+// StreamConfig is the constructor input for Stream. Suffixed to
+// avoid colliding with the package-level Config used by HTTPServer.
+type StreamConfig struct {
+	// Stream is the bidirectional gRPC stream the wrapper drives.
+	// Required.
+	Stream agentv1.AgentService_ConnectClient
+	// Timeout caps a single request/response round-trip. Zero ⇒
+	// DefaultStreamTimeout.
+	Timeout time.Duration
+	// Sessions tracks short-lived agent-issued session tokens granted
+	// by the control plane. Required.
+	Sessions *SessionStore
+	// Endpoints tracks the local endpoint registry pushed by the
+	// control plane. Required.
+	Endpoints *EndpointStore
+	// Denied tracks the deny-list patterns pushed by the control
+	// plane. Required.
+	Denied *DeniedPatterns
+	// Logger is the slog logger used for stream-side audit lines.
+	// Required.
+	Logger *slog.Logger
+}
+
+// NewStream constructs a Stream wrapper from cfg. Panics on a
+// missing required field — startup-time programmer error, fail loud
+// on boot. The caller must start ReceiveLoop in a separate goroutine
+// before calling any request/response method (e.g. Handshake).
+func NewStream(cfg StreamConfig) *Stream {
+	if cfg.Stream == nil {
+		panic("storageagent: StreamConfig.Stream is required")
+	}
+	if cfg.Sessions == nil {
+		panic("storageagent: StreamConfig.Sessions is required")
+	}
+	if cfg.Endpoints == nil {
+		panic("storageagent: StreamConfig.Endpoints is required")
+	}
+	if cfg.Denied == nil {
+		panic("storageagent: StreamConfig.Denied is required")
+	}
+	if cfg.Logger == nil {
+		panic("storageagent: StreamConfig.Logger is required")
+	}
+	timeout := cfg.Timeout
+	if timeout == 0 {
+		timeout = DefaultStreamTimeout
+	}
 	return &Stream{
-		stream:    stream,
+		stream:    cfg.Stream,
 		pending:   make(map[string]chan *agentv1.ControlMessage),
 		timeout:   timeout,
-		sessions:  sessions,
-		endpoints: endpoints,
-		denied:    denied,
-		logger:    logger,
+		sessions:  cfg.Sessions,
+		endpoints: cfg.Endpoints,
+		denied:    cfg.Denied,
+		logger:    cfg.Logger,
 	}
 }
 

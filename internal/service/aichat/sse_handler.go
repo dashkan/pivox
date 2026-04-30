@@ -22,9 +22,28 @@ type SSEHandler struct {
 	logger     *slog.Logger
 }
 
-// NewSSEHandler creates a new SSE handler.
-func NewSSEHandler(client aiv1.AiChatClient, logger *slog.Logger) *SSEHandler {
-	return &SSEHandler{grpcClient: client, logger: logger}
+// SSEHandlerConfig is the constructor input for SSEHandler. Suffixed
+// to avoid colliding with the package-level Config used by Server.
+type SSEHandlerConfig struct {
+	// Client is the local AiChat gRPC client the handler self-dials
+	// to drive StreamGenerateContent. Required.
+	Client aiv1.AiChatClient
+	// Logger is the slog logger used for stream-side error lines.
+	// Required.
+	Logger *slog.Logger
+}
+
+// NewSSEHandler constructs an SSE handler from cfg. Panics on a
+// missing required field — startup-time programmer error, fail loud
+// on boot.
+func NewSSEHandler(cfg SSEHandlerConfig) *SSEHandler {
+	if cfg.Client == nil {
+		panic("aichat: SSEHandlerConfig.Client is required")
+	}
+	if cfg.Logger == nil {
+		panic("aichat: SSEHandlerConfig.Logger is required")
+	}
+	return &SSEHandler{grpcClient: cfg.Client, logger: cfg.Logger}
 }
 
 // sseStreamRequest is the JSON body for POST /v1/ai:streamGenerateContent.

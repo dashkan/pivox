@@ -105,7 +105,7 @@ func New(t *testing.T, opts ...Option) *Harness {
 	enc, err := crypto.NewEncryptor()
 	require.NoError(t, err)
 
-	lroManager := lro.NewManager(queries, testLogger())
+	lroManager := lro.NewManager(lro.ManagerConfig{Queries: queries, Logger: testLogger()})
 
 	h := &Harness{
 		Pool:       pool,

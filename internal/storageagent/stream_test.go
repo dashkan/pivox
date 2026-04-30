@@ -80,14 +80,14 @@ func (m *mockBidiStream) sentMessages() []*agentv1.AgentMessage {
 }
 
 func newTestStream(bidi *mockBidiStream) *Stream {
-	return NewStream(
-		bidi,
-		2*time.Second,
-		NewSessionStore(),
-		NewEndpointStore(NewMemoryCache(10, 1024)),
-		NewDeniedPatterns(),
-		slog.Default(),
-	)
+	return NewStream(StreamConfig{
+		Stream:    bidi,
+		Timeout:   2 * time.Second,
+		Sessions:  NewSessionStore(),
+		Endpoints: NewEndpointStore(NewMemoryCache(10, 1024)),
+		Denied:    NewDeniedPatterns(),
+		Logger:    slog.Default(),
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -217,12 +217,14 @@ func TestHandshake_Success(t *testing.T) {
 func TestHandshake_Timeout(t *testing.T) {
 	bidi := newMockBidiStream()
 	// Use a very short timeout to trigger expiry.
-	s := NewStream(bidi, 50*time.Millisecond,
-		NewSessionStore(),
-		NewEndpointStore(NewMemoryCache(10, 1024)),
-		NewDeniedPatterns(),
-		slog.Default(),
-	)
+	s := NewStream(StreamConfig{
+		Stream:    bidi,
+		Timeout:   50 * time.Millisecond,
+		Sessions:  NewSessionStore(),
+		Endpoints: NewEndpointStore(NewMemoryCache(10, 1024)),
+		Denied:    NewDeniedPatterns(),
+		Logger:    slog.Default(),
+	})
 
 	// Start ReceiveLoop but never send a response.
 	go func() {
@@ -317,9 +319,14 @@ func TestReceiveLoop_ClosePendingChannels(t *testing.T) {
 func TestHandleServerMessage_SessionGrant(t *testing.T) {
 	bidi := newMockBidiStream()
 	sessions := NewSessionStore()
-	s := NewStream(bidi, time.Second, sessions,
-		NewEndpointStore(NewMemoryCache(10, 1024)),
-		NewDeniedPatterns(), slog.Default())
+	s := NewStream(StreamConfig{
+		Stream:    bidi,
+		Timeout:   time.Second,
+		Sessions:  sessions,
+		Endpoints: NewEndpointStore(NewMemoryCache(10, 1024)),
+		Denied:    NewDeniedPatterns(),
+		Logger:    slog.Default(),
+	})
 
 	expiry := time.Now().Add(time.Hour)
 	s.handleServerMessage(&agentv1.ControlMessage{
@@ -339,9 +346,14 @@ func TestHandleServerMessage_SessionRevoke(t *testing.T) {
 	bidi := newMockBidiStream()
 	sessions := NewSessionStore()
 	sessions.Grant("revoke-me-token1", []string{"/data/*"}, time.Now().Add(time.Hour))
-	s := NewStream(bidi, time.Second, sessions,
-		NewEndpointStore(NewMemoryCache(10, 1024)),
-		NewDeniedPatterns(), slog.Default())
+	s := NewStream(StreamConfig{
+		Stream:    bidi,
+		Timeout:   time.Second,
+		Sessions:  sessions,
+		Endpoints: NewEndpointStore(NewMemoryCache(10, 1024)),
+		Denied:    NewDeniedPatterns(),
+		Logger:    slog.Default(),
+	})
 
 	s.handleServerMessage(&agentv1.ControlMessage{
 		Message: &agentv1.ControlMessage_SessionRevoke{
@@ -357,9 +369,14 @@ func TestHandleServerMessage_SessionRevoke(t *testing.T) {
 func TestHandleServerMessage_ConfigUpdate_DeniedPatterns(t *testing.T) {
 	bidi := newMockBidiStream()
 	denied := NewDeniedPatterns()
-	s := NewStream(bidi, time.Second, NewSessionStore(),
-		NewEndpointStore(NewMemoryCache(10, 1024)),
-		denied, slog.Default())
+	s := NewStream(StreamConfig{
+		Stream:    bidi,
+		Timeout:   time.Second,
+		Sessions:  NewSessionStore(),
+		Endpoints: NewEndpointStore(NewMemoryCache(10, 1024)),
+		Denied:    denied,
+		Logger:    slog.Default(),
+	})
 
 	s.handleServerMessage(&agentv1.ControlMessage{
 		Message: &agentv1.ControlMessage_ConfigUpdate{
@@ -377,8 +394,14 @@ func TestHandleServerMessage_ConfigUpdate_DeniedPatterns(t *testing.T) {
 func TestHandleServerMessage_ConfigUpdate_Endpoints(t *testing.T) {
 	bidi := newMockBidiStream()
 	endpoints := NewEndpointStore(NewMemoryCache(10, 1024))
-	s := NewStream(bidi, time.Second, NewSessionStore(),
-		endpoints, NewDeniedPatterns(), slog.Default())
+	s := NewStream(StreamConfig{
+		Stream:    bidi,
+		Timeout:   time.Second,
+		Sessions:  NewSessionStore(),
+		Endpoints: endpoints,
+		Denied:    NewDeniedPatterns(),
+		Logger:    slog.Default(),
+	})
 
 	s.handleServerMessage(&agentv1.ControlMessage{
 		Message: &agentv1.ControlMessage_ConfigUpdate{
