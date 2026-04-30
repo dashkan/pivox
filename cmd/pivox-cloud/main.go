@@ -305,7 +305,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	// reused here by service handlers (TestIamPermissions, etc.).
 	longrunningpb.RegisterOperationsServer(grpcServer, operations.NewOperationsServer(lroManager))
 
-	apiv1.RegisterSpacesServer(grpcServer, spaces.NewSpacesServer(pool, pool, queries, appCodec, permResolver, callerIdentity, lroManager))
+	apiv1.RegisterSpacesServer(grpcServer, spaces.NewSpacesServer(pool, queries, appCodec, permResolver, callerIdentity, auditResolver, lroManager))
 	apiv1.RegisterOrganizationsServer(grpcServer, organizations.NewOrganizationsServer(pool, queries, authSvc, appCodec, server.AuthenticatedUID, permResolver, callerIdentity, auditResolver, lroManager, enc))
 	apiv1.RegisterTagKeysServer(grpcServer, tags.NewTagKeysServer(pool, queries, appCodec))
 	apiv1.RegisterTagValuesServer(grpcServer, tags.NewTagValuesServer(pool, queries, appCodec))

@@ -36,7 +36,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 
 /// A space is a high-level Pivox entity. It is a
 /// container for ACLs, APIs, and other Pivox resources.
-public struct Pivox_Api_V1_Space: Sendable {
+public struct Pivox_Api_V1_Space: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -44,10 +44,10 @@ public struct Pivox_Api_V1_Space: Sendable {
   /// Output only. The unique resource name of the space.
   ///
   /// Example: `organizations/123/spaces/my-space`
-  public var name: String = String()
-
-  /// Output only. The space lifecycle state.
-  public var state: Pivox_Api_V1_Space.State = .unspecified
+  public var name: String {
+    get {_storage._name}
+    set {_uniqueStorage()._name = newValue}
+  }
 
   /// Optional. A user-assigned display name of the space.
   /// When present it must be between 4 to 30 characters.
@@ -55,53 +55,95 @@ public struct Pivox_Api_V1_Space: Sendable {
   /// hyphen, single-quote, double-quote, space, and exclamation point.
   ///
   /// Example: `My Space`
-  public var displayName: String = String()
+  public var displayName: String {
+    get {_storage._displayName}
+    set {_uniqueStorage()._displayName = newValue}
+  }
+
+  /// Output only. The space lifecycle state.
+  public var state: Pivox_Api_V1_Space.State {
+    get {_storage._state}
+    set {_uniqueStorage()._state = newValue}
+  }
+
+  /// Output only. The identity that created this space.
+  public var createdBy: Pivox_Api_V1_Actor {
+    get {_storage._createdBy ?? Pivox_Api_V1_Actor()}
+    set {_uniqueStorage()._createdBy = newValue}
+  }
+  /// Returns true if `createdBy` has been explicitly set.
+  public var hasCreatedBy: Bool {_storage._createdBy != nil}
+  /// Clears the value of `createdBy`. Subsequent reads from it will return its default value.
+  public mutating func clearCreatedBy() {_uniqueStorage()._createdBy = nil}
 
   /// Output only. Creation time.
   public var createTime: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {_createTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
-    set {_createTime = newValue}
+    get {_storage._createTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._createTime = newValue}
   }
   /// Returns true if `createTime` has been explicitly set.
-  public var hasCreateTime: Bool {self._createTime != nil}
+  public var hasCreateTime: Bool {_storage._createTime != nil}
   /// Clears the value of `createTime`. Subsequent reads from it will return its default value.
-  public mutating func clearCreateTime() {self._createTime = nil}
+  public mutating func clearCreateTime() {_uniqueStorage()._createTime = nil}
+
+  /// Output only. The identity that last modified this space.
+  public var updatedBy: Pivox_Api_V1_Actor {
+    get {_storage._updatedBy ?? Pivox_Api_V1_Actor()}
+    set {_uniqueStorage()._updatedBy = newValue}
+  }
+  /// Returns true if `updatedBy` has been explicitly set.
+  public var hasUpdatedBy: Bool {_storage._updatedBy != nil}
+  /// Clears the value of `updatedBy`. Subsequent reads from it will return its default value.
+  public mutating func clearUpdatedBy() {_uniqueStorage()._updatedBy = nil}
 
   /// Output only. The most recent time this resource was modified.
   public var updateTime: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {_updateTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
-    set {_updateTime = newValue}
+    get {_storage._updateTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._updateTime = newValue}
   }
   /// Returns true if `updateTime` has been explicitly set.
-  public var hasUpdateTime: Bool {self._updateTime != nil}
+  public var hasUpdateTime: Bool {_storage._updateTime != nil}
   /// Clears the value of `updateTime`. Subsequent reads from it will return its default value.
-  public mutating func clearUpdateTime() {self._updateTime = nil}
+  public mutating func clearUpdateTime() {_uniqueStorage()._updateTime = nil}
+
+  /// Output only. The identity that requested deletion of this space.
+  public var deletedBy: Pivox_Api_V1_Actor {
+    get {_storage._deletedBy ?? Pivox_Api_V1_Actor()}
+    set {_uniqueStorage()._deletedBy = newValue}
+  }
+  /// Returns true if `deletedBy` has been explicitly set.
+  public var hasDeletedBy: Bool {_storage._deletedBy != nil}
+  /// Clears the value of `deletedBy`. Subsequent reads from it will return its default value.
+  public mutating func clearDeletedBy() {_uniqueStorage()._deletedBy = nil}
 
   /// Output only. The time at which this resource was requested for deletion.
   public var deleteTime: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {_deleteTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
-    set {_deleteTime = newValue}
+    get {_storage._deleteTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._deleteTime = newValue}
   }
   /// Returns true if `deleteTime` has been explicitly set.
-  public var hasDeleteTime: Bool {self._deleteTime != nil}
+  public var hasDeleteTime: Bool {_storage._deleteTime != nil}
   /// Clears the value of `deleteTime`. Subsequent reads from it will return its default value.
-  public mutating func clearDeleteTime() {self._deleteTime = nil}
+  public mutating func clearDeleteTime() {_uniqueStorage()._deleteTime = nil}
 
   /// Output only. The time at which this space will be purged.
   /// Approximately 30 days after deletion.
   public var purgeTime: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {_purgeTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
-    set {_purgeTime = newValue}
+    get {_storage._purgeTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._purgeTime = newValue}
   }
   /// Returns true if `purgeTime` has been explicitly set.
-  public var hasPurgeTime: Bool {self._purgeTime != nil}
+  public var hasPurgeTime: Bool {_storage._purgeTime != nil}
   /// Clears the value of `purgeTime`. Subsequent reads from it will return its default value.
-  public mutating func clearPurgeTime() {self._purgeTime = nil}
+  public mutating func clearPurgeTime() {_uniqueStorage()._purgeTime = nil}
 
   /// Output only. A checksum computed by the server based on the current value
   /// of the Space resource. This may be sent on update and delete requests to
   /// ensure the client has an up-to-date value before proceeding.
-  public var etag: String = String()
+  public var etag: String {
+    get {_storage._etag}
+    set {_uniqueStorage()._etag = newValue}
+  }
 
   /// Optional. The labels associated with this space.
   ///
@@ -117,7 +159,10 @@ public struct Pivox_Api_V1_Space: Sendable {
   /// depend on specific characters being disallowed.
   ///
   /// Example: `"myBusinessDimension" : "businessValue"`
-  public var labels: Dictionary<String,String> = [:]
+  public var labels: Dictionary<String,String> {
+    get {_storage._labels}
+    set {_uniqueStorage()._labels = newValue}
+  }
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -174,10 +219,7 @@ public struct Pivox_Api_V1_Space: Sendable {
 
   public init() {}
 
-  fileprivate var _createTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
-  fileprivate var _updateTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
-  fileprivate var _deleteTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
-  fileprivate var _purgeTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 /// The request sent to the
@@ -583,73 +625,146 @@ fileprivate let _protobuf_package = "pivox.api.v1"
 
 extension Pivox_Api_V1_Space: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".Space"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{2}\u{3}state\0\u{3}display_name\0\u{3}create_time\0\u{3}update_time\0\u{3}delete_time\0\u{1}etag\0\u{1}labels\0\u{4}\u{2}purge_time\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}display_name\0\u{1}state\0\u{3}created_by\0\u{3}create_time\0\u{3}updated_by\0\u{3}update_time\0\u{3}deleted_by\0\u{3}delete_time\0\u{3}purge_time\0\u{1}etag\0\u{1}labels\0")
+
+  fileprivate class _StorageClass {
+    var _name: String = String()
+    var _displayName: String = String()
+    var _state: Pivox_Api_V1_Space.State = .unspecified
+    var _createdBy: Pivox_Api_V1_Actor? = nil
+    var _createTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _updatedBy: Pivox_Api_V1_Actor? = nil
+    var _updateTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _deletedBy: Pivox_Api_V1_Actor? = nil
+    var _deleteTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _purgeTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _etag: String = String()
+    var _labels: Dictionary<String,String> = [:]
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _name = source._name
+      _displayName = source._displayName
+      _state = source._state
+      _createdBy = source._createdBy
+      _createTime = source._createTime
+      _updatedBy = source._updatedBy
+      _updateTime = source._updateTime
+      _deletedBy = source._deletedBy
+      _deleteTime = source._deleteTime
+      _purgeTime = source._purgeTime
+      _etag = source._etag
+      _labels = source._labels
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.name) }()
-      case 4: try { try decoder.decodeSingularEnumField(value: &self.state) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self.displayName) }()
-      case 6: try { try decoder.decodeSingularMessageField(value: &self._createTime) }()
-      case 7: try { try decoder.decodeSingularMessageField(value: &self._updateTime) }()
-      case 8: try { try decoder.decodeSingularMessageField(value: &self._deleteTime) }()
-      case 9: try { try decoder.decodeSingularStringField(value: &self.etag) }()
-      case 10: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.labels) }()
-      case 12: try { try decoder.decodeSingularMessageField(value: &self._purgeTime) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._name) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._displayName) }()
+        case 3: try { try decoder.decodeSingularEnumField(value: &_storage._state) }()
+        case 4: try { try decoder.decodeSingularMessageField(value: &_storage._createdBy) }()
+        case 5: try { try decoder.decodeSingularMessageField(value: &_storage._createTime) }()
+        case 6: try { try decoder.decodeSingularMessageField(value: &_storage._updatedBy) }()
+        case 7: try { try decoder.decodeSingularMessageField(value: &_storage._updateTime) }()
+        case 8: try { try decoder.decodeSingularMessageField(value: &_storage._deletedBy) }()
+        case 9: try { try decoder.decodeSingularMessageField(value: &_storage._deleteTime) }()
+        case 10: try { try decoder.decodeSingularMessageField(value: &_storage._purgeTime) }()
+        case 11: try { try decoder.decodeSingularStringField(value: &_storage._etag) }()
+        case 12: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &_storage._labels) }()
+        default: break
+        }
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.name.isEmpty {
-      try visitor.visitSingularStringField(value: self.name, fieldNumber: 1)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if !_storage._name.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._name, fieldNumber: 1)
+      }
+      if !_storage._displayName.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._displayName, fieldNumber: 2)
+      }
+      if _storage._state != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._state, fieldNumber: 3)
+      }
+      try { if let v = _storage._createdBy {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+      } }()
+      try { if let v = _storage._createTime {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+      } }()
+      try { if let v = _storage._updatedBy {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+      } }()
+      try { if let v = _storage._updateTime {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
+      } }()
+      try { if let v = _storage._deletedBy {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+      } }()
+      try { if let v = _storage._deleteTime {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+      } }()
+      try { if let v = _storage._purgeTime {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
+      } }()
+      if !_storage._etag.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._etag, fieldNumber: 11)
+      }
+      if !_storage._labels.isEmpty {
+        try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: _storage._labels, fieldNumber: 12)
+      }
     }
-    if self.state != .unspecified {
-      try visitor.visitSingularEnumField(value: self.state, fieldNumber: 4)
-    }
-    if !self.displayName.isEmpty {
-      try visitor.visitSingularStringField(value: self.displayName, fieldNumber: 5)
-    }
-    try { if let v = self._createTime {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
-    } }()
-    try { if let v = self._updateTime {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
-    } }()
-    try { if let v = self._deleteTime {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
-    } }()
-    if !self.etag.isEmpty {
-      try visitor.visitSingularStringField(value: self.etag, fieldNumber: 9)
-    }
-    if !self.labels.isEmpty {
-      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.labels, fieldNumber: 10)
-    }
-    try { if let v = self._purgeTime {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 12)
-    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Pivox_Api_V1_Space, rhs: Pivox_Api_V1_Space) -> Bool {
-    if lhs.name != rhs.name {return false}
-    if lhs.state != rhs.state {return false}
-    if lhs.displayName != rhs.displayName {return false}
-    if lhs._createTime != rhs._createTime {return false}
-    if lhs._updateTime != rhs._updateTime {return false}
-    if lhs._deleteTime != rhs._deleteTime {return false}
-    if lhs._purgeTime != rhs._purgeTime {return false}
-    if lhs.etag != rhs.etag {return false}
-    if lhs.labels != rhs.labels {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._name != rhs_storage._name {return false}
+        if _storage._displayName != rhs_storage._displayName {return false}
+        if _storage._state != rhs_storage._state {return false}
+        if _storage._createdBy != rhs_storage._createdBy {return false}
+        if _storage._createTime != rhs_storage._createTime {return false}
+        if _storage._updatedBy != rhs_storage._updatedBy {return false}
+        if _storage._updateTime != rhs_storage._updateTime {return false}
+        if _storage._deletedBy != rhs_storage._deletedBy {return false}
+        if _storage._deleteTime != rhs_storage._deleteTime {return false}
+        if _storage._purgeTime != rhs_storage._purgeTime {return false}
+        if _storage._etag != rhs_storage._etag {return false}
+        if _storage._labels != rhs_storage._labels {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

@@ -12,9 +12,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/appkey"
+	"github.com/dashkan/pivox/internal/audit"
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/filter"
@@ -42,27 +44,60 @@ type SpacesServer struct {
 	codec      *appkey.Codec
 	resolver   *permission.Resolver
 	caller     server.CallerIdentityResolver
+	audit      *audit.Resolver
 	lroManager *lro.Manager
 }
 
 // NewSpacesServer constructs the server. `resolver` and `caller` are
 // only consumed by the IAM-shaped handlers (TestIamPermissions and
-// space-scope Member CRUD). `pool` is used for tx-wrapped writes
-// (CreateMember principal validation + insert atomicity); tests that
-// only exercise reads may pass nil. `lroManager` drives the async
-// orchestrators for DeleteSpace/UndeleteSpace; tests that don't
-// exercise lifecycle paths may pass nil.
-func NewSpacesServer(pool db.DBTX, txPool TxBeginner, queries db.Querier, codec *appkey.Codec, resolver *permission.Resolver, caller server.CallerIdentityResolver, lroManager *lro.Manager) *SpacesServer {
+// space-scope Member CRUD). `pool` is used both for filter reads
+// (db.DBTX) and tx-wrapped writes (TxBeginner); *pgxpool.Pool
+// satisfies both. `lroManager` drives the async orchestrators for
+// DeleteSpace/UndeleteSpace; tests that don't exercise lifecycle
+// paths may pass nil. `auditResolver` inflates audit-field UUIDs into
+// Actor protos; nil yields proto fields without Actor data
+// (acceptable in tests). Tests that need to mock the tx surface
+// build a SpacesServer literal directly with the local TxBeginner
+// interface, mirroring the OrganizationsServer test pattern.
+func NewSpacesServer(pool *pgxpool.Pool, queries db.Querier, codec *appkey.Codec, resolver *permission.Resolver, caller server.CallerIdentityResolver, auditResolver *audit.Resolver, lroManager *lro.Manager) *SpacesServer {
 	return &SpacesServer{
 		db:         pool,
-		pool:       txPool,
+		pool:       pool,
 		queries:    queries,
 		filter:     filter.SpaceFilter(),
 		codec:      codec,
 		resolver:   resolver,
 		caller:     caller,
+		audit:      auditResolver,
 		lroManager: lroManager,
 	}
+}
+
+// resolveSpaceActors gathers the union of *_by UUIDs across the page
+// and resolves them in a single batched call. Returns nil when no
+// audit resolver is wired.
+func (s *SpacesServer) resolveSpaceActors(ctx context.Context, spaces []db.Space) (map[uuid.UUID]*apiv1.Actor, error) {
+	if s.audit == nil {
+		return nil, nil
+	}
+	ids := make([]uuid.UUID, 0, len(spaces)*3)
+	for _, p := range spaces {
+		if p.CreatedBy.Valid {
+			ids = append(ids, p.CreatedBy.Bytes)
+		}
+		if p.UpdatedBy.Valid {
+			ids = append(ids, p.UpdatedBy.Bytes)
+		}
+		if p.DeletedBy.Valid {
+			ids = append(ids, p.DeletedBy.Bytes)
+		}
+	}
+	actors, err := s.audit.Resolve(ctx, ids)
+	if err != nil {
+		slog.ErrorContext(ctx, "resolve space actors failed", "error", err)
+		return nil, apierr.Internal("resolve actors")
+	}
+	return actors, nil
 }
 
 // spaceLifecyclePrefix is the operation-name prefix for the
@@ -107,7 +142,11 @@ func (s *SpacesServer) GetSpace(ctx context.Context, req *apiv1.GetSpaceRequest)
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("name",
 			"space path does not match resolved scope"))
 	}
-	return convert.SpaceToProto(resolvedSpace.Row, resolvedOrg.Slug), nil
+	actors, err := s.resolveSpaceActors(ctx, []db.Space{resolvedSpace.Row})
+	if err != nil {
+		return nil, err
+	}
+	return convert.SpaceToProto(resolvedSpace.Row, resolvedOrg.Slug, actors), nil
 }
 
 func (s *SpacesServer) ListSpaces(ctx context.Context, req *apiv1.ListSpacesRequest) (*apiv1.ListSpacesResponse, error) {
@@ -156,9 +195,13 @@ func (s *SpacesServer) ListSpaces(ctx context.Context, req *apiv1.ListSpacesRequ
 		results = results[:pageSize]
 	}
 
+	actors, err := s.resolveSpaceActors(ctx, results)
+	if err != nil {
+		return nil, err
+	}
 	spaces := make([]*apiv1.Space, 0, len(results))
 	for _, r := range results {
-		spaces = append(spaces, convert.SpaceToProto(r, resolvedOrg.Slug))
+		spaces = append(spaces, convert.SpaceToProto(r, resolvedOrg.Slug, actors))
 	}
 
 	return &apiv1.ListSpacesResponse{
@@ -267,7 +310,15 @@ func (s *SpacesServer) CreateSpace(ctx context.Context, req *apiv1.CreateSpaceRe
 		return nil, apierr.Internal("commit transaction")
 	}
 
-	return lro.DoneOperation(convert.SpaceToProto(result, resolvedOrg.Slug))
+	// Best-effort enrichment after commit: state has landed, don't
+	// fail the create on a transient identity lookup error.
+	actors, resolveErr := s.resolveSpaceActors(ctx, []db.Space{result})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "create space: actor resolution failed; returning proto without audit actors",
+			"space_id", result.ID, "error", resolveErr)
+		actors = nil
+	}
+	return lro.DoneOperation(convert.SpaceToProto(result, resolvedOrg.Slug, actors))
 }
 
 func (s *SpacesServer) UpdateSpace(ctx context.Context, req *apiv1.UpdateSpaceRequest) (*longrunningpb.Operation, error) {
@@ -324,7 +375,14 @@ func (s *SpacesServer) UpdateSpace(ctx context.Context, req *apiv1.UpdateSpaceRe
 		return nil, apierr.HandleResourceError(err, "Space", space.GetName())
 	}
 
-	return lro.DoneOperation(convert.SpaceToProto(result, resolvedOrg.Slug))
+	// Best-effort enrichment after commit.
+	actors, resolveErr := s.resolveSpaceActors(ctx, []db.Space{result})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "update space: actor resolution failed; returning proto without audit actors",
+			"space_id", result.ID, "error", resolveErr)
+		actors = nil
+	}
+	return lro.DoneOperation(convert.SpaceToProto(result, resolvedOrg.Slug, actors))
 }
 
 // DeleteSpace soft-deletes a space (force=false) or hard-deletes it
@@ -443,7 +501,14 @@ func (s *SpacesServer) runDeleteSpace(
 		return nil, apierr.Internal("soft-delete space")
 	}
 	updatePhase(apiv1.DeleteSpaceMetadata_COMPLETED)
-	return convert.SpaceToProto(updated, orgSlug), nil
+	// Best-effort enrichment after commit.
+	actors, resolveErr := s.resolveSpaceActors(ctx, []db.Space{updated})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "delete space: actor resolution failed; returning proto without audit actors",
+			"space", spaceRsrc, "error", resolveErr)
+		actors = nil
+	}
+	return convert.SpaceToProto(updated, orgSlug, actors), nil
 }
 
 // UndeleteSpace restores a soft-deleted space back to ACTIVE. Only
@@ -498,6 +563,13 @@ func (s *SpacesServer) UndeleteSpace(ctx context.Context, req *apiv1.UndeleteSpa
 				slog.ErrorContext(workCtx, "undelete space failed", "space", spaceRsrc, "error", err)
 				return nil, apierr.Internal("undelete space")
 			}
-			return convert.SpaceToProto(updated, orgSlug), nil
+			// Best-effort enrichment after commit.
+			actors, resolveErr := s.resolveSpaceActors(workCtx, []db.Space{updated})
+			if resolveErr != nil {
+				slog.WarnContext(workCtx, "undelete space: actor resolution failed; returning proto without audit actors",
+					"space", spaceRsrc, "error", resolveErr)
+				actors = nil
+			}
+			return convert.SpaceToProto(updated, orgSlug, actors), nil
 		})
 }

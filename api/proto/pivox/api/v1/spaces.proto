@@ -25,6 +25,7 @@ import "google/longrunning/operations.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
+import "pivox/api/v1/actor.proto";
 import "pivox/iam/v1/members.proto";
 import "pivox/iam/v1/permissions.proto";
 import "pivox/permission/v1/options.proto";
@@ -253,37 +254,46 @@ message Space {
   // Example: `organizations/123/spaces/my-space`
   string name = 1 [(google.api.field_behavior) = IDENTIFIER];
 
-  // Output only. The space lifecycle state.
-  State state = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
-
   // Optional. A user-assigned display name of the space.
   // When present it must be between 4 to 30 characters.
   // Allowed characters are: lowercase and uppercase letters, numbers,
   // hyphen, single-quote, double-quote, space, and exclamation point.
   //
   // Example: `My Space`
-  string display_name = 5 [
+  string display_name = 2 [
     (google.api.field_behavior) = OPTIONAL,
     (buf.validate.field).string.max_len = 30
   ];
 
+  // Output only. The space lifecycle state.
+  State state = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The identity that created this space.
+  Actor created_by = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
   // Output only. Creation time.
-  google.protobuf.Timestamp create_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The identity that last modified this space.
+  Actor updated_by = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. The most recent time this resource was modified.
   google.protobuf.Timestamp update_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
 
+  // Output only. The identity that requested deletion of this space.
+  Actor deleted_by = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+
   // Output only. The time at which this resource was requested for deletion.
-  google.protobuf.Timestamp delete_time = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp delete_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. The time at which this space will be purged.
   // Approximately 30 days after deletion.
-  google.protobuf.Timestamp purge_time = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp purge_time = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. A checksum computed by the server based on the current value
   // of the Space resource. This may be sent on update and delete requests to
   // ensure the client has an up-to-date value before proceeding.
-  string etag = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string etag = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Optional. The labels associated with this space.
   //
@@ -299,7 +309,7 @@ message Space {
   // depend on specific characters being disallowed.
   //
   // Example: `"myBusinessDimension" : "businessValue"`
-  map<string, string> labels = 10 [(google.api.field_behavior) = OPTIONAL];
+  map<string, string> labels = 12 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // The request sent to the

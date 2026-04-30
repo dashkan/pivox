@@ -92,7 +92,7 @@ func spaceCRUDCtx() context.Context {
 }
 
 func TestUnit_GetSpace_Success(t *testing.T) {
-	srv := NewSpacesServer(nil, nil, new(mocks.MockQuerier), nil, nil, nil, nil)
+	srv := NewSpacesServer(nil, new(mocks.MockQuerier), nil, nil, nil, nil, nil)
 	resp, err := srv.GetSpace(spaceCRUDCtx(), &apiv1.GetSpaceRequest{
 		Name: "organizations/acme/spaces/my-space",
 	})
@@ -103,7 +103,7 @@ func TestUnit_GetSpace_Success(t *testing.T) {
 }
 
 func TestUnit_GetSpace_InvalidName(t *testing.T) {
-	srv := NewSpacesServer(nil, nil, new(mocks.MockQuerier), nil, nil, nil, nil)
+	srv := NewSpacesServer(nil, new(mocks.MockQuerier), nil, nil, nil, nil, nil)
 	_, err := srv.GetSpace(context.Background(), &apiv1.GetSpaceRequest{
 		Name: "invalid/format",
 	})
@@ -118,7 +118,7 @@ func TestUnit_GetSpace_InvalidName(t *testing.T) {
 // unknown slug before the handler runs); the assertion is paranoia
 // against gate-vs-handler skew.
 func TestUnit_GetSpace_SlugMismatch(t *testing.T) {
-	srv := NewSpacesServer(nil, nil, new(mocks.MockQuerier), nil, nil, nil, nil)
+	srv := NewSpacesServer(nil, new(mocks.MockQuerier), nil, nil, nil, nil, nil)
 	_, err := srv.GetSpace(spaceCRUDCtx(), &apiv1.GetSpaceRequest{
 		Name: "organizations/acme/spaces/different-space",
 	})
@@ -129,7 +129,7 @@ func TestUnit_GetSpace_SlugMismatch(t *testing.T) {
 }
 
 func TestUnit_CreateSpace_InvalidParent(t *testing.T) {
-	srv := NewSpacesServer(nil, nil, new(mocks.MockQuerier), nil, nil, nil, nil)
+	srv := NewSpacesServer(nil, new(mocks.MockQuerier), nil, nil, nil, nil, nil)
 	_, err := srv.CreateSpace(context.Background(), &apiv1.CreateSpaceRequest{
 		Parent: "bad/parent/format",
 		Space:  &apiv1.Space{DisplayName: "Test"},
@@ -141,7 +141,7 @@ func TestUnit_CreateSpace_InvalidParent(t *testing.T) {
 }
 
 func TestUnit_UpdateSpace_InvalidName(t *testing.T) {
-	srv := NewSpacesServer(nil, nil, new(mocks.MockQuerier), nil, nil, nil, nil)
+	srv := NewSpacesServer(nil, new(mocks.MockQuerier), nil, nil, nil, nil, nil)
 	_, err := srv.UpdateSpace(context.Background(), &apiv1.UpdateSpaceRequest{
 		Space: &apiv1.Space{Name: "bad/format"},
 	})
@@ -152,7 +152,7 @@ func TestUnit_UpdateSpace_InvalidName(t *testing.T) {
 }
 
 func TestUnit_UpdateSpace_SlugMismatch(t *testing.T) {
-	srv := NewSpacesServer(nil, nil, new(mocks.MockQuerier), nil, nil, nil, nil)
+	srv := NewSpacesServer(nil, new(mocks.MockQuerier), nil, nil, nil, nil, nil)
 	_, err := srv.UpdateSpace(spaceCRUDCtx(), &apiv1.UpdateSpaceRequest{
 		Space: &apiv1.Space{
 			Name:        "organizations/acme/spaces/different-space",
@@ -172,7 +172,7 @@ func TestUnit_UpdateSpace_SlugMismatch(t *testing.T) {
 // internal/server/permission_interceptor_test.go pins that behavior.
 
 func TestUnit_DeleteSpace_InvalidName(t *testing.T) {
-	srv := NewSpacesServer(nil, nil, new(mocks.MockQuerier), nil, nil, nil, nil)
+	srv := NewSpacesServer(nil, new(mocks.MockQuerier), nil, nil, nil, nil, nil)
 	_, err := srv.DeleteSpace(context.Background(), &apiv1.DeleteSpaceRequest{
 		Name: "bad/format",
 	})
@@ -192,7 +192,7 @@ func TestUnit_DeleteSpace_NotActive(t *testing.T) {
 		ID: testProjID, Slug: testDBSpace.Name, Row: deleted,
 	})
 
-	srv := NewSpacesServer(nil, nil, new(mocks.MockQuerier), nil, nil, nil, nil)
+	srv := NewSpacesServer(nil, new(mocks.MockQuerier), nil, nil, nil, nil, nil)
 	_, err := srv.DeleteSpace(ctx, &apiv1.DeleteSpaceRequest{
 		Name: "organizations/acme/spaces/my-space",
 	})
@@ -203,7 +203,7 @@ func TestUnit_DeleteSpace_NotActive(t *testing.T) {
 }
 
 func TestUnit_UndeleteSpace_InvalidName(t *testing.T) {
-	srv := NewSpacesServer(nil, nil, new(mocks.MockQuerier), nil, nil, nil, nil)
+	srv := NewSpacesServer(nil, new(mocks.MockQuerier), nil, nil, nil, nil, nil)
 	_, err := srv.UndeleteSpace(context.Background(), &apiv1.UndeleteSpaceRequest{
 		Name: "bad/format",
 	})
@@ -217,7 +217,7 @@ func TestUnit_UndeleteSpace_InvalidName(t *testing.T) {
 // Undelete only fires on DELETE_REQUESTED, surfacing
 // FailedPrecondition if the space is already ACTIVE.
 func TestUnit_UndeleteSpace_NotDeleted(t *testing.T) {
-	srv := NewSpacesServer(nil, nil, new(mocks.MockQuerier), nil, nil, nil, nil)
+	srv := NewSpacesServer(nil, new(mocks.MockQuerier), nil, nil, nil, nil, nil)
 	_, err := srv.UndeleteSpace(spaceCRUDCtx(), &apiv1.UndeleteSpaceRequest{
 		Name: "organizations/acme/spaces/my-space",
 	})
@@ -228,7 +228,7 @@ func TestUnit_UndeleteSpace_NotDeleted(t *testing.T) {
 }
 
 func TestUnit_ListSpaces_InvalidParent(t *testing.T) {
-	srv := NewSpacesServer(nil, nil, new(mocks.MockQuerier), nil, nil, nil, nil)
+	srv := NewSpacesServer(nil, new(mocks.MockQuerier), nil, nil, nil, nil, nil)
 	_, err := srv.ListSpaces(context.Background(), &apiv1.ListSpacesRequest{
 		Parent: "badprefix/acme",
 	})
@@ -243,7 +243,7 @@ func TestUnit_ListSpaces_InvalidParent(t *testing.T) {
 // scope guard. Production never reaches this because the interceptor
 // 404s; the assertion is paranoia against gate-vs-handler skew.
 func TestUnit_ListSpaces_SlugMismatch(t *testing.T) {
-	srv := NewSpacesServer(nil, nil, new(mocks.MockQuerier), nil, nil, nil, nil)
+	srv := NewSpacesServer(nil, new(mocks.MockQuerier), nil, nil, nil, nil, nil)
 	ctx := server.WithResolvedOrgForTest(context.Background(), &server.ResolvedOrg{
 		ID: testOrgID, Slug: "acme", Row: testOrg,
 	})

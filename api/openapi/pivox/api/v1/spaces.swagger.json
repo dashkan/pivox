@@ -268,14 +268,19 @@
             "schema": {
               "type": "object",
               "properties": {
+                "displayName": {
+                  "type": "string",
+                  "description": "Optional. A user-assigned display name of the space.\nWhen present it must be between 4 to 30 characters.\nAllowed characters are: lowercase and uppercase letters, numbers,\nhyphen, single-quote, double-quote, space, and exclamation point.\n\nExample: `My Space`"
+                },
                 "state": {
                   "$ref": "#/definitions/v1SpaceState",
                   "description": "Output only. The space lifecycle state.",
                   "readOnly": true
                 },
-                "displayName": {
-                  "type": "string",
-                  "description": "Optional. A user-assigned display name of the space.\nWhen present it must be between 4 to 30 characters.\nAllowed characters are: lowercase and uppercase letters, numbers,\nhyphen, single-quote, double-quote, space, and exclamation point.\n\nExample: `My Space`"
+                "createdBy": {
+                  "$ref": "#/definitions/v1Actor",
+                  "description": "Output only. The identity that created this space.",
+                  "readOnly": true
                 },
                 "createTime": {
                   "type": "string",
@@ -283,10 +288,20 @@
                   "description": "Output only. Creation time.",
                   "readOnly": true
                 },
+                "updatedBy": {
+                  "$ref": "#/definitions/v1Actor",
+                  "description": "Output only. The identity that last modified this space.",
+                  "readOnly": true
+                },
                 "updateTime": {
                   "type": "string",
                   "format": "date-time",
                   "description": "Output only. The most recent time this resource was modified.",
+                  "readOnly": true
+                },
+                "deletedBy": {
+                  "$ref": "#/definitions/v1Actor",
+                  "description": "Output only. The identity that requested deletion of this space.",
                   "readOnly": true
                 },
                 "deleteTime": {
@@ -799,6 +814,28 @@
       },
       "description": "The `Status` type defines a logical error model that is suitable for\ndifferent programming environments, including REST APIs and RPC APIs. It is\nused by [gRPC](https://github.com/grpc). Each `Status` message contains\nthree pieces of data: error code, error message, and error details.\n\nYou can find out more about this error model and how to work with it in the\n[API Design Guide](https://cloud.google.com/apis/design/errors)."
     },
+    "v1Actor": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The identity's stable UUID (firebase_identities.id). Always\npopulated when the column is non-null in the database, even for\nsoft-deleted identities."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Resolved display name. Empty for soft-deleted identities."
+        },
+        "email": {
+          "type": "string",
+          "description": "Resolved email address. Empty for soft-deleted identities."
+        },
+        "isDeleted": {
+          "type": "boolean",
+          "description": "True when the identity has been soft-deleted. PII fields are\nblanked out in that case while id is preserved."
+        }
+      },
+      "description": "Actor is a resolved reference to an identity. It is used flat on\nresources to expose audit fields (created_by, updated_by, deleted_by)\nper AIP-148, and can be reused at non-audit positions like assignee\nor approver.\n\nResolution is performed server-side via the audit.Resolver, which\nbatches lookups against firebase_identities and caches recent\nresults. When the underlying identity is soft-deleted the resolver\nblanks out PII (display_name, email) and sets is_deleted=true while\npreserving the id so that historical references remain stable."
+    },
     "v1ListMembersResponse": {
       "type": "object",
       "properties": {
@@ -886,14 +923,19 @@
           "description": "Output only. The unique resource name of the space.\n\nExample: `organizations/123/spaces/my-space`",
           "readOnly": true
         },
+        "displayName": {
+          "type": "string",
+          "description": "Optional. A user-assigned display name of the space.\nWhen present it must be between 4 to 30 characters.\nAllowed characters are: lowercase and uppercase letters, numbers,\nhyphen, single-quote, double-quote, space, and exclamation point.\n\nExample: `My Space`"
+        },
         "state": {
           "$ref": "#/definitions/v1SpaceState",
           "description": "Output only. The space lifecycle state.",
           "readOnly": true
         },
-        "displayName": {
-          "type": "string",
-          "description": "Optional. A user-assigned display name of the space.\nWhen present it must be between 4 to 30 characters.\nAllowed characters are: lowercase and uppercase letters, numbers,\nhyphen, single-quote, double-quote, space, and exclamation point.\n\nExample: `My Space`"
+        "createdBy": {
+          "$ref": "#/definitions/v1Actor",
+          "description": "Output only. The identity that created this space.",
+          "readOnly": true
         },
         "createTime": {
           "type": "string",
@@ -901,10 +943,20 @@
           "description": "Output only. Creation time.",
           "readOnly": true
         },
+        "updatedBy": {
+          "$ref": "#/definitions/v1Actor",
+          "description": "Output only. The identity that last modified this space.",
+          "readOnly": true
+        },
         "updateTime": {
           "type": "string",
           "format": "date-time",
           "description": "Output only. The most recent time this resource was modified.",
+          "readOnly": true
+        },
+        "deletedBy": {
+          "$ref": "#/definitions/v1Actor",
+          "description": "Output only. The identity that requested deletion of this space.",
           "readOnly": true
         },
         "deleteTime": {

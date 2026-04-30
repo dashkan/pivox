@@ -1318,7 +1318,7 @@ func TestSpaceToProto(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pb := SpaceToProto(tt.space, tt.orgName)
+			pb := SpaceToProto(tt.space, tt.orgName, nil)
 			require.NotNil(t, pb)
 			assert.Equal(t, tt.space.DisplayName, pb.DisplayName)
 			assert.Equal(t, tt.space.Etag, pb.Etag)
@@ -1327,6 +1327,54 @@ func TestSpaceToProto(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSpaceToProto_Actors(t *testing.T) {
+	creator := uuid.New()
+	updater := uuid.New()
+	deleter := uuid.New()
+	now := time.Date(2026, 4, 30, 10, 0, 0, 0, time.UTC)
+	actors := map[uuid.UUID]*apiv1.Actor{
+		creator: {Id: creator.String(), DisplayName: "Alice"},
+		updater: {Id: updater.String(), DisplayName: "Bob"},
+		deleter: {Id: deleter.String(), IsDeleted: true},
+	}
+
+	t.Run("active space populates created_by + updated_by", func(t *testing.T) {
+		pb := SpaceToProto(db.Space{
+			Name:       "p1",
+			State:      db.ResourceStateACTIVE,
+			CreatedBy:  PgUUID(creator),
+			UpdatedBy:  PgUUID(updater),
+			CreateTime: now,
+			UpdateTime: now,
+		}, "acme", actors)
+
+		require.NotNil(t, pb.GetCreatedBy())
+		assert.Equal(t, "Alice", pb.GetCreatedBy().GetDisplayName())
+		require.NotNil(t, pb.GetUpdatedBy())
+		assert.Equal(t, "Bob", pb.GetUpdatedBy().GetDisplayName())
+		assert.Nil(t, pb.GetDeletedBy(), "DeletedBy column NULL on active space")
+	})
+
+	t.Run("soft-deleted space surfaces deleted_by Actor", func(t *testing.T) {
+		// Primary case where deleted_by is populated — must not be
+		// dropped by the converter.
+		pb := SpaceToProto(db.Space{
+			Name:       "p1",
+			State:      db.ResourceStateDELETEREQUESTED,
+			CreatedBy:  PgUUID(creator),
+			UpdatedBy:  PgUUID(deleter),
+			DeletedBy:  PgUUID(deleter),
+			CreateTime: now,
+			UpdateTime: now,
+			DeleteTime: pgtype.Timestamptz{Time: now, Valid: true},
+		}, "acme", actors)
+
+		require.NotNil(t, pb.GetDeletedBy())
+		assert.Equal(t, deleter.String(), pb.GetDeletedBy().GetId())
+		assert.True(t, pb.GetDeletedBy().GetIsDeleted())
+	})
 }
 
 func TestSpaceState(t *testing.T) {

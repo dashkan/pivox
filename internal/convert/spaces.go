@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	db "github.com/dashkan/pivox/internal/db/generated"
@@ -12,14 +13,19 @@ import (
 
 // SpaceToProto converts a DB space to proto.
 // orgName is the organization slug (e.g. "meridian-broadcasting").
-func SpaceToProto(p db.Space, orgName string) *apiv1.Space {
+// `actors` is the pre-resolved Actor map for the calling page; pass
+// nil when no actors are needed.
+func SpaceToProto(p db.Space, orgName string, actors map[uuid.UUID]*apiv1.Actor) *apiv1.Space {
 	pb := &apiv1.Space{
 		Name:        fmt.Sprintf("organizations/%s/spaces/%s", orgName, p.Name),
 		DisplayName: p.DisplayName,
 		State:       spaceState(p.State),
 		Etag:        p.Etag,
+		CreatedBy:   actorOrNil(actors, p.CreatedBy),
 		CreateTime:  timestamppb.New(p.CreateTime),
+		UpdatedBy:   actorOrNil(actors, p.UpdatedBy),
 		UpdateTime:  timestamppb.New(p.UpdateTime),
+		DeletedBy:   actorOrNil(actors, p.DeletedBy),
 	}
 	if p.DeleteTime.Valid {
 		pb.DeleteTime = timestamppb.New(p.DeleteTime.Time)
