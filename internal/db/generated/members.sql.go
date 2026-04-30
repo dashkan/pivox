@@ -352,69 +352,6 @@ func (q *Queries) GetEffectiveSpaceRoles(ctx context.Context, arg GetEffectiveSp
 	return items, nil
 }
 
-const getGroupByID = `-- name: GetGroupByID :one
-SELECT id, org_id, display_name, description, annotations, state, etag, revision, created_by, updated_by, create_time, update_time FROM groups
- WHERE id = $1
-   AND org_id = $2
-`
-
-type GetGroupByIDParams struct {
-	ID    uuid.UUID `json:"id"`
-	OrgID uuid.UUID `json:"org_id"`
-}
-
-// Companion to GetIdentityForMember for groups.
-func (q *Queries) GetGroupByID(ctx context.Context, arg GetGroupByIDParams) (Group, error) {
-	row := q.db.QueryRow(ctx, getGroupByID, arg.ID, arg.OrgID)
-	var i Group
-	err := row.Scan(
-		&i.ID,
-		&i.OrgID,
-		&i.DisplayName,
-		&i.Description,
-		&i.Annotations,
-		&i.State,
-		&i.Etag,
-		&i.Revision,
-		&i.CreatedBy,
-		&i.UpdatedBy,
-		&i.CreateTime,
-		&i.UpdateTime,
-	)
-	return i, err
-}
-
-const getIdentityForMember = `-- name: GetIdentityForMember :one
-SELECT id, firebase_uid, email, email_verified, display_name, photo_url, disabled, is_deleted, create_time, update_time, last_login_time, delete_time FROM identities WHERE id = $1
-`
-
-// Verifies that an identity row exists for the given uuid. Used by
-// Member create handlers as the principal-existence check before
-// inserting a binding. The org_members.user_id column DOES carry an
-// FK now (post-split), so an INSERT against a non-existent
-// identity_id would fail with a constraint violation — this query
-// is kept to surface the failure as a clean NotFound at the gRPC
-// layer rather than letting the FK error bubble up as Internal.
-func (q *Queries) GetIdentityForMember(ctx context.Context, id uuid.UUID) (Identity, error) {
-	row := q.db.QueryRow(ctx, getIdentityForMember, id)
-	var i Identity
-	err := row.Scan(
-		&i.ID,
-		&i.FirebaseUid,
-		&i.Email,
-		&i.EmailVerified,
-		&i.DisplayName,
-		&i.PhotoUrl,
-		&i.Disabled,
-		&i.IsDeleted,
-		&i.CreateTime,
-		&i.UpdateTime,
-		&i.LastLoginTime,
-		&i.DeleteTime,
-	)
-	return i, err
-}
-
 const getOrgMemberByGroup = `-- name: GetOrgMemberByGroup :one
 SELECT om.id, om.org_id, om.role_id, om.user_id, om.group_id, om.etag, om.revision, om.created_by, om.updated_by, om.create_time, om.update_time, r.name AS role_name
   FROM org_members om

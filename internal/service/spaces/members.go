@@ -250,8 +250,14 @@ func (s *SpacesServer) CreateMember(ctx context.Context, req *iampb.CreateMember
 		return nil, apierr.HandleResourceError(err, "Role", mem.GetRole())
 	}
 
-	if err := verifyPrincipalInOrg(ctx, qtx, resolvedOrg.ID, principalKind, principalID); err != nil {
-		return nil, err
+	// No application-level pre-check that the principal exists —
+	// post-principal-id-split, space_members.user_id / .group_id
+	// carry FKs to identities / groups, so an INSERT against a
+	// non-existent or hard-deleted principal fails with SQLSTATE
+	// 23503 which `apierr.HandleResourceError` maps to NotFound.
+	principalResourceType := "User"
+	if principalKind == permission.PrincipalKindGroup {
+		principalResourceType = "Group"
 	}
 
 	var (
@@ -270,7 +276,9 @@ func (s *SpacesServer) CreateMember(ctx context.Context, req *iampb.CreateMember
 			CreatedBy: convert.PgUUID(caller),
 		})
 		if err != nil {
-			return nil, apierr.HandleResourceError(err, "Member", req.GetParent())
+			// FK-violation on the principal column (post-issue-#10
+			// HandleResourceError maps 23503 → NotFound).
+			return nil, apierr.HandleResourceError(err, principalResourceType, principalID.String())
 		}
 		memberID, etag, createTime, updateTime = row.ID, row.Etag, row.CreateTime, row.UpdateTime
 	case permission.PrincipalKindGroup:
@@ -282,7 +290,9 @@ func (s *SpacesServer) CreateMember(ctx context.Context, req *iampb.CreateMember
 			CreatedBy: convert.PgUUID(caller),
 		})
 		if err != nil {
-			return nil, apierr.HandleResourceError(err, "Member", req.GetParent())
+			// FK-violation on the principal column (post-issue-#10
+			// HandleResourceError maps 23503 → NotFound).
+			return nil, apierr.HandleResourceError(err, principalResourceType, principalID.String())
 		}
 		memberID, etag, createTime, updateTime = row.ID, row.Etag, row.CreateTime, row.UpdateTime
 	default:
@@ -440,33 +450,6 @@ func parseRoleRef(ref, parentOrgSlug string) (string, error) {
 			fmt.Sprintf("role org %q does not match parent org %q", parts[1], parentOrgSlug)))
 	}
 	return parts[3], nil
-}
-
-// verifyPrincipalInOrg confirms the principal exists. Post-principal-
-// split, space_members.user_id and space_members.group_id ARE FK'd,
-// so an INSERT against a non-existent id would fail with a constraint
-// violation — this query surfaces the failure as a clean NotFound at
-// the gRPC layer rather than letting the FK error bubble up as
-// Internal. orgID is preserved on the signature but only used for
-// groups (which remain org-scoped).
-func verifyPrincipalInOrg(ctx context.Context, qtx db.Querier, orgID uuid.UUID, kind permission.PrincipalKind, id uuid.UUID) error {
-	switch kind {
-	case permission.PrincipalKindUser:
-		if _, err := qtx.GetIdentityForMember(ctx, id); err != nil {
-			if isNotFound(err) {
-				return apierr.NotFound("User", id.String())
-			}
-			return apierr.Internal("verify user principal")
-		}
-	case permission.PrincipalKindGroup:
-		if _, err := qtx.GetGroupByID(ctx, db.GetGroupByIDParams{ID: id, OrgID: orgID}); err != nil {
-			if isNotFound(err) {
-				return apierr.NotFound("Group", id.String())
-			}
-			return apierr.Internal("verify group principal")
-		}
-	}
-	return nil
 }
 
 // validateRoleOnlyMask rejects update_mask paths other than "role".

@@ -1234,16 +1234,6 @@ func (m *MockQuerier) DeleteSpaceGroupMember(ctx context.Context, arg db.DeleteS
 	return args.Get(0).(int64), args.Error(1)
 }
 
-func (m *MockQuerier) GetIdentityForMember(ctx context.Context, id uuid.UUID) (db.Identity, error) {
-	args := m.Called(ctx, id)
-	return args.Get(0).(db.Identity), args.Error(1)
-}
-
-func (m *MockQuerier) GetGroupByID(ctx context.Context, arg db.GetGroupByIDParams) (db.Group, error) {
-	args := m.Called(ctx, arg)
-	return args.Get(0).(db.Group), args.Error(1)
-}
-
 func (m *MockQuerier) ListOrgOwnerMembers(ctx context.Context, orgID uuid.UUID) ([]db.OrgMember, error) {
 	args := m.Called(ctx, orgID)
 	if v := args.Get(0); v != nil {

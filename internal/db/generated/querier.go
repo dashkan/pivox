@@ -272,8 +272,6 @@ type Querier interface {
 	// responsibility to union in via GetEffectiveOrgRoles against the
 	// space's parent org.
 	GetEffectiveSpaceRoles(ctx context.Context, arg GetEffectiveSpaceRolesParams) ([]string, error)
-	// Companion to GetIdentityForMember for groups.
-	GetGroupByID(ctx context.Context, arg GetGroupByIDParams) (Group, error)
 	// GetIdentitiesByIDs is the batched lookup used by the audit
 	// resolver to inflate Actor messages on resource reads. The IDs are
 	// typically a deduped slice of cache misses; row order is not
@@ -292,14 +290,6 @@ type Querier interface {
 	// Returns soft-deleted rows too (callers like the resolver need them
 	// to render is_deleted=true Actor placeholders).
 	GetIdentityByID(ctx context.Context, id uuid.UUID) (Identity, error)
-	// Verifies that an identity row exists for the given uuid. Used by
-	// Member create handlers as the principal-existence check before
-	// inserting a binding. The org_members.user_id column DOES carry an
-	// FK now (post-split), so an INSERT against a non-existent
-	// identity_id would fail with a constraint violation — this query
-	// is kept to surface the failure as a clean NotFound at the gRPC
-	// layer rather than letting the FK error bubble up as Internal.
-	GetIdentityForMember(ctx context.Context, id uuid.UUID) (Identity, error)
 	GetLatestAssetVersion(ctx context.Context, assetID uuid.UUID) (AssetVersion, error)
 	GetLineItem(ctx context.Context, id uuid.UUID) (AssetRequestLineItem, error)
 	GetLineItemByName(ctx context.Context, arg GetLineItemByNameParams) (AssetRequestLineItem, error)

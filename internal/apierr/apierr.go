@@ -141,19 +141,39 @@ func QuotaExceeded(subject, description string, retryDelay time.Duration) error 
 // status errors. Recognizes:
 //   - `pgx.ErrNoRows` → NotFound
 //   - Postgres unique-violation (SQLSTATE 23505) → AlreadyExists
+//   - Postgres FK-violation (SQLSTATE 23503) → NotFound
 //   - everything else → Internal
 //
-// The unique-violation check uses `errors.As` against `pgconn.PgError`
-// + the SQLSTATE constant, NOT a substring match on the error message.
-// String-matching driver messages is fragile (driver upgrades, locale
-// differences); structured codes are stable across pgx versions.
+// FK-violation → NotFound: post-issue-#7 the polymorphic principal_id
+// columns split into typed user_id/group_id with real FKs. Handlers
+// no longer need an application-level "does this principal exist?"
+// pre-check before INSERT — the FK enforces it. If the principal
+// gets hard-deleted between a caller's resolve and our INSERT,
+// Postgres returns 23503; mapping that to NotFound surfaces the
+// race cleanly to the client instead of an opaque Internal.
+//
+// Caller passes `resourceType`/`resourceName` we attribute the
+// NotFound to. Extracting which referenced table from
+// `pgErr.ConstraintName` (e.g. `org_members_user_id_fkey` → `User`)
+// would be brittle — caller knows the semantic context, we don't.
+//
+// The SQLSTATE checks use `errors.As` against `pgconn.PgError`
+// + structured code constants, NOT substring matches on the error
+// message. String-matching driver messages is fragile (driver
+// upgrades, locale differences); structured codes are stable across
+// pgx versions.
 func HandleResourceError(err error, resourceType, resourceName string) error {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return NotFound(resourceType, resourceName)
 	}
 	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == PgUniqueViolation {
-		return AlreadyExists(resourceType, resourceName)
+	if errors.As(err, &pgErr) {
+		switch pgErr.Code {
+		case PgUniqueViolation:
+			return AlreadyExists(resourceType, resourceName)
+		case PgForeignKeyViolation:
+			return NotFound(resourceType, resourceName)
+		}
 	}
 	return Internal("database error")
 }

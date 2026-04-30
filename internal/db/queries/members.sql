@@ -193,22 +193,6 @@ DELETE FROM space_members
  WHERE space_id = $1
    AND group_id = $2;
 
--- name: GetIdentityForMember :one
--- Verifies that an identity row exists for the given uuid. Used by
--- Member create handlers as the principal-existence check before
--- inserting a binding. The org_members.user_id column DOES carry an
--- FK now (post-split), so an INSERT against a non-existent
--- identity_id would fail with a constraint violation — this query
--- is kept to surface the failure as a clean NotFound at the gRPC
--- layer rather than letting the FK error bubble up as Internal.
-SELECT * FROM identities WHERE id = $1;
-
--- name: GetGroupByID :one
--- Companion to GetIdentityForMember for groups.
-SELECT * FROM groups
- WHERE id = $1
-   AND org_id = $2;
-
 -- name: ListOrgOwnerMembers :many
 -- Returns all org_members rows currently bound to the system 'owner'
 -- role for the given org. Used by TransferOwnership to find the

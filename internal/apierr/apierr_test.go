@@ -212,9 +212,14 @@ func TestHandleResourceError(t *testing.T) {
 			wantCode: codes.AlreadyExists,
 		},
 		{
-			name:     "pgconn FK violation (23503) does NOT map to AlreadyExists, falls through to Internal",
+			name:     "pgconn FK violation (23503) maps to NotFound",
 			err:      fkViolation,
-			wantCode: codes.Internal,
+			wantCode: codes.NotFound,
+		},
+		{
+			name:     "wrapped pgconn FK violation maps to NotFound",
+			err:      fmt.Errorf("insert failed: %w", fkViolation),
+			wantCode: codes.NotFound,
 		},
 		{
 			name:     "string-shaped 'duplicate key' error does NOT match — must be a real PgError",
