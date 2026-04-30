@@ -1,8 +1,12 @@
 # IAM, Lifecycle, and Spaces Roadmap
 
-**Status**: in progress
+**Status**: phases 1–7 shipped. Open items rolled over to
+[`sso-config-and-iam-rollovers.md`](./sso-config-and-iam-rollovers.md);
+this doc is preserved as historical context for the multi-phase
+plan. Don't add new tasks here — track them in the rollover doc.
 **Owner**: Ashkan
 **Started**: 2026-04-26
+**Closed**: 2026-04-30
 
 ## Working agreement
 
