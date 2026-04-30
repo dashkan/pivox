@@ -1,3 +1,4 @@
+import OSLog
 import PivoxModels
 import SwiftUI
 
@@ -332,6 +333,16 @@ struct NewChatView: View {
         Task {
             do {
                 let userID = await AIChatService.shared.pivoxUserID()
+                if userID.isEmpty {
+                    // Empty claim usually means the ID token was minted
+                    // before the syncIdentity blocking-fn deployment, or
+                    // the token cached on the client predates a Pivox
+                    // identity-id rotation (e.g. dev DB reseed).
+                    PivoxLog.chat.error(
+                        "sendFirst: pivox_user_id claim missing — token refresh needed")
+                    isCreating = false
+                    return
+                }
                 let request = Pivox_Ai_V1_CreateConversationRequest.with {
                     // Per-user parent post-Phase-7. The user-uuid
                     // comes from the `pivox_user_id` ID-token claim.
@@ -341,9 +352,18 @@ struct NewChatView: View {
                     }
                 }
                 let conv = try await client.createConversation(request)
+                PivoxLog.chat.info("sendFirst: createConversation OK name=\(conv.name)")
                 inputText = ""
                 onCreated(conv.name, text)
             } catch {
+                // gRPC status codes + our server-side error messages
+                // don't carry PII so the visible log uses standard
+                // interpolation. NSError userInfo (which CAN carry
+                // request bodies) goes through `debugSensitive` —
+                // DEBUG-only, never reaches release builds.
+                PivoxLog.chat.error(
+                    "sendFirst: createConversation failed: \(error.localizedDescription)")
+                PivoxLog.chat.debugSensitive("sendFirst error detail: \(String(reflecting: error))")
                 isCreating = false
             }
         }

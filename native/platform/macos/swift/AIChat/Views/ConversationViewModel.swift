@@ -246,6 +246,8 @@ public final class ConversationViewModel: ObservableObject {
         // for a brand-new conversation. Belt-and-suspenders against
         // a heuristic that would be silently wrong.
         let isFirstTurn = isNew || messages.count == 1
+        PivoxLog.chat.info(
+            "send: streamGenerateContent starting conversation=\(self.conversationName) firstTurn=\(isFirstTurn)")
         streamTask = Task {
             do {
                 let eventStream = client.streamGenerateContent(request)
@@ -254,6 +256,7 @@ public final class ConversationViewModel: ObservableObject {
                     handle(serverEvent)
                 }
                 commitInFlight()
+                PivoxLog.chat.info("send: stream completed conversation=\(self.conversationName)")
                 if isFirstTurn {
                     // Brand-new conversation just finished its first
                     // turn. Trigger auto-summarize in the background;
@@ -265,7 +268,16 @@ public final class ConversationViewModel: ObservableObject {
                 }
             } catch is CancellationError {
                 commitInFlight()
+                PivoxLog.chat.debug("send: stream cancelled (re-mount or user navigated away)")
             } catch {
+                // gRPC status codes + our server-side error messages
+                // don't carry PII so the visible log uses standard
+                // interpolation. NSError userInfo (which CAN carry
+                // request bodies) goes through `debugSensitive` —
+                // DEBUG-only, never reaches release builds.
+                PivoxLog.chat.error(
+                    "send: stream failed: \(error.localizedDescription)")
+                PivoxLog.chat.debugSensitive("send error detail: \(String(reflecting: error))")
                 state = .error(error.localizedDescription)
             }
         }
