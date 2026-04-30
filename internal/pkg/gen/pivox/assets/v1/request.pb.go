@@ -24,6 +24,7 @@ import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
 	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/permission/v1"
+	types "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -284,12 +285,12 @@ type Request struct {
 	Annotations map[string]string `protobuf:"bytes,13,rep,name=annotations,proto3" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Output only. A checksum computed by the server.
 	Etag string `protobuf:"bytes,14,opt,name=etag,proto3" json:"etag,omitempty"`
-	// Output only. The user who created the request.
-	Creator string `protobuf:"bytes,15,opt,name=creator,proto3" json:"creator,omitempty"`
-	// Output only. The user who last updated the request.
-	Updater string `protobuf:"bytes,16,opt,name=updater,proto3" json:"updater,omitempty"`
+	// Output only. The identity that created the request.
+	CreatedBy *types.Actor `protobuf:"bytes,15,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
 	// Output only. Timestamp when the request was created.
-	CreateTime *timestamppb.Timestamp `protobuf:"bytes,17,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	CreateTime *timestamppb.Timestamp `protobuf:"bytes,16,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	// Output only. The identity that last modified the request.
+	UpdatedBy *types.Actor `protobuf:"bytes,17,opt,name=updated_by,json=updatedBy,proto3" json:"updated_by,omitempty"`
 	// Output only. Timestamp when the request was last modified.
 	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,18,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
 	// Output only. The time at which the request was soft-deleted.
@@ -428,23 +429,23 @@ func (x *Request) GetEtag() string {
 	return ""
 }
 
-func (x *Request) GetCreator() string {
+func (x *Request) GetCreatedBy() *types.Actor {
 	if x != nil {
-		return x.Creator
+		return x.CreatedBy
 	}
-	return ""
-}
-
-func (x *Request) GetUpdater() string {
-	if x != nil {
-		return x.Updater
-	}
-	return ""
+	return nil
 }
 
 func (x *Request) GetCreateTime() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreateTime
+	}
+	return nil
+}
+
+func (x *Request) GetUpdatedBy() *types.Actor {
+	if x != nil {
+		return x.UpdatedBy
 	}
 	return nil
 }
@@ -492,12 +493,14 @@ type LineItem struct {
 	MediaType Asset_MediaType `protobuf:"varint,6,opt,name=media_type,json=mediaType,proto3,enum=pivox.assets.v1.Asset_MediaType" json:"media_type,omitempty"`
 	// Optional. Annotations associated with this line item.
 	Annotations map[string]string `protobuf:"bytes,7,rep,name=annotations,proto3" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	// Output only. The user who created this line item.
-	Creator string `protobuf:"bytes,8,opt,name=creator,proto3" json:"creator,omitempty"`
+	// Output only. The identity that created this line item.
+	CreatedBy *types.Actor `protobuf:"bytes,8,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
 	// Output only. Timestamp when this line item was created.
 	CreateTime *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	// Output only. The identity that last modified this line item.
+	UpdatedBy *types.Actor `protobuf:"bytes,10,opt,name=updated_by,json=updatedBy,proto3" json:"updated_by,omitempty"`
 	// Output only. Timestamp when this line item was last modified.
-	UpdateTime    *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	UpdateTime    *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -581,16 +584,23 @@ func (x *LineItem) GetAnnotations() map[string]string {
 	return nil
 }
 
-func (x *LineItem) GetCreator() string {
+func (x *LineItem) GetCreatedBy() *types.Actor {
 	if x != nil {
-		return x.Creator
+		return x.CreatedBy
 	}
-	return ""
+	return nil
 }
 
 func (x *LineItem) GetCreateTime() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreateTime
+	}
+	return nil
+}
+
+func (x *LineItem) GetUpdatedBy() *types.Actor {
+	if x != nil {
+		return x.UpdatedBy
 	}
 	return nil
 }
@@ -2127,7 +2137,7 @@ var File_pivox_assets_v1_request_proto protoreflect.FileDescriptor
 
 const file_pivox_assets_v1_request_proto_rawDesc = "" +
 	"\n" +
-	"\x1dpivox/assets/v1/request.proto\x12\x0fpivox.assets.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bpivox/assets/v1/asset.proto\x1a!pivox/permission/v1/options.proto\"\xcc\v\n" +
+	"\x1dpivox/assets/v1/request.proto\x12\x0fpivox.assets.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bpivox/assets/v1/asset.proto\x1a!pivox/permission/v1/options.proto\x1a\x17pivox/types/actor.proto\"\xfe\v\n" +
 	"\aRequest\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12.\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\v\xe0A\x02\xbaH\x05r\x03\x18\xff\x01R\vdisplayName\x12-\n" +
@@ -2144,11 +2154,13 @@ const file_pivox_assets_v1_request_proto_rawDesc = "" +
 	"\n" +
 	"line_items\x18\f \x03(\v2\x19.pivox.assets.v1.LineItemB\x03\xe0A\x03R\tlineItems\x12P\n" +
 	"\vannotations\x18\r \x03(\v2).pivox.assets.v1.Request.AnnotationsEntryB\x03\xe0A\x01R\vannotations\x12\x17\n" +
-	"\x04etag\x18\x0e \x01(\tB\x03\xe0A\x03R\x04etag\x12\x1d\n" +
-	"\acreator\x18\x0f \x01(\tB\x03\xe0A\x03R\acreator\x12\x1d\n" +
-	"\aupdater\x18\x10 \x01(\tB\x03\xe0A\x03R\aupdater\x12@\n" +
-	"\vcreate_time\x18\x11 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"createTime\x12@\n" +
+	"\x04etag\x18\x0e \x01(\tB\x03\xe0A\x03R\x04etag\x126\n" +
+	"\n" +
+	"created_by\x18\x0f \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tcreatedBy\x12@\n" +
+	"\vcreate_time\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"createTime\x126\n" +
+	"\n" +
+	"updated_by\x18\x11 \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tupdatedBy\x12@\n" +
 	"\vupdate_time\x18\x12 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"updateTime\x12@\n" +
 	"\vdelete_time\x18\x13 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
@@ -2176,7 +2188,7 @@ const file_pivox_assets_v1_request_proto_rawDesc = "" +
 	"\x04HIGH\x10\x03\x12\n" +
 	"\n" +
 	"\x06URGENT\x10\x04:l\xeaAi\n" +
-	"\x14pivox.assets/Request\x12>organizations/{organization}/spaces/{space}/requests/{request}*\brequests2\arequest\"\xe8\x06\n" +
+	"\x14pivox.assets/Request\x12>organizations/{organization}/spaces/{space}/requests/{request}*\brequests2\arequest\"\xb9\a\n" +
 	"\bLineItem\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12.\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\v\xe0A\x02\xbaH\x05r\x03\x18\xff\x01R\vdisplayName\x12-\n" +
@@ -2186,12 +2198,15 @@ const file_pivox_assets_v1_request_proto_rawDesc = "" +
 	"\x12pivox.assets/AssetR\x05asset\x12D\n" +
 	"\n" +
 	"media_type\x18\x06 \x01(\x0e2 .pivox.assets.v1.Asset.MediaTypeB\x03\xe0A\x01R\tmediaType\x12Q\n" +
-	"\vannotations\x18\a \x03(\v2*.pivox.assets.v1.LineItem.AnnotationsEntryB\x03\xe0A\x01R\vannotations\x12\x1d\n" +
-	"\acreator\x18\b \x01(\tB\x03\xe0A\x03R\acreator\x12@\n" +
+	"\vannotations\x18\a \x03(\v2*.pivox.assets.v1.LineItem.AnnotationsEntryB\x03\xe0A\x01R\vannotations\x126\n" +
+	"\n" +
+	"created_by\x18\b \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tcreatedBy\x12@\n" +
 	"\vcreate_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"createTime\x12@\n" +
-	"\vupdate_time\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"createTime\x126\n" +
+	"\n" +
+	"updated_by\x18\n" +
+	" \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tupdatedBy\x12@\n" +
+	"\vupdate_time\x18\v \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"updateTime\x1a>\n" +
 	"\x10AnnotationsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
@@ -2384,11 +2399,12 @@ var file_pivox_assets_v1_request_proto_goTypes = []any{
 	nil,                             // 33: pivox.assets.v1.Request.AnnotationsEntry
 	nil,                             // 34: pivox.assets.v1.LineItem.AnnotationsEntry
 	(*timestamppb.Timestamp)(nil),   // 35: google.protobuf.Timestamp
-	(Asset_MediaType)(0),            // 36: pivox.assets.v1.Asset.MediaType
-	(*fieldmaskpb.FieldMask)(nil),   // 37: google.protobuf.FieldMask
-	(CreateAssetMetadata_Step)(0),   // 38: pivox.assets.v1.CreateAssetMetadata.Step
-	(*UploadInfo)(nil),              // 39: pivox.assets.v1.UploadInfo
-	(*longrunningpb.Operation)(nil), // 40: google.longrunning.Operation
+	(*types.Actor)(nil),             // 36: pivox.types.Actor
+	(Asset_MediaType)(0),            // 37: pivox.assets.v1.Asset.MediaType
+	(*fieldmaskpb.FieldMask)(nil),   // 38: google.protobuf.FieldMask
+	(CreateAssetMetadata_Step)(0),   // 39: pivox.assets.v1.CreateAssetMetadata.Step
+	(*UploadInfo)(nil),              // 40: pivox.assets.v1.UploadInfo
+	(*longrunningpb.Operation)(nil), // 41: google.longrunning.Operation
 }
 var file_pivox_assets_v1_request_proto_depIdxs = []int32{
 	0,  // 0: pivox.assets.v1.Request.state:type_name -> pivox.assets.v1.Request.State
@@ -2398,68 +2414,72 @@ var file_pivox_assets_v1_request_proto_depIdxs = []int32{
 	35, // 4: pivox.assets.v1.Request.approved_time:type_name -> google.protobuf.Timestamp
 	4,  // 5: pivox.assets.v1.Request.line_items:type_name -> pivox.assets.v1.LineItem
 	33, // 6: pivox.assets.v1.Request.annotations:type_name -> pivox.assets.v1.Request.AnnotationsEntry
-	35, // 7: pivox.assets.v1.Request.create_time:type_name -> google.protobuf.Timestamp
-	35, // 8: pivox.assets.v1.Request.update_time:type_name -> google.protobuf.Timestamp
-	35, // 9: pivox.assets.v1.Request.delete_time:type_name -> google.protobuf.Timestamp
-	35, // 10: pivox.assets.v1.Request.purge_time:type_name -> google.protobuf.Timestamp
-	2,  // 11: pivox.assets.v1.LineItem.state:type_name -> pivox.assets.v1.LineItem.State
-	36, // 12: pivox.assets.v1.LineItem.media_type:type_name -> pivox.assets.v1.Asset.MediaType
-	34, // 13: pivox.assets.v1.LineItem.annotations:type_name -> pivox.assets.v1.LineItem.AnnotationsEntry
-	35, // 14: pivox.assets.v1.LineItem.create_time:type_name -> google.protobuf.Timestamp
-	35, // 15: pivox.assets.v1.LineItem.update_time:type_name -> google.protobuf.Timestamp
-	3,  // 16: pivox.assets.v1.CreateRequestRequest.request:type_name -> pivox.assets.v1.Request
-	3,  // 17: pivox.assets.v1.ListRequestsResponse.requests:type_name -> pivox.assets.v1.Request
-	3,  // 18: pivox.assets.v1.UpdateRequestRequest.request:type_name -> pivox.assets.v1.Request
-	37, // 19: pivox.assets.v1.UpdateRequestRequest.update_mask:type_name -> google.protobuf.FieldMask
-	4,  // 20: pivox.assets.v1.CreateLineItemRequest.line_item:type_name -> pivox.assets.v1.LineItem
-	4,  // 21: pivox.assets.v1.ListLineItemsResponse.line_items:type_name -> pivox.assets.v1.LineItem
-	4,  // 22: pivox.assets.v1.UpdateLineItemRequest.line_item:type_name -> pivox.assets.v1.LineItem
-	37, // 23: pivox.assets.v1.UpdateLineItemRequest.update_mask:type_name -> google.protobuf.FieldMask
-	38, // 24: pivox.assets.v1.FulfillLineItemMetadata.step:type_name -> pivox.assets.v1.CreateAssetMetadata.Step
-	39, // 25: pivox.assets.v1.FulfillLineItemMetadata.upload_info:type_name -> pivox.assets.v1.UploadInfo
-	5,  // 26: pivox.assets.v1.Requests.CreateRequest:input_type -> pivox.assets.v1.CreateRequestRequest
-	7,  // 27: pivox.assets.v1.Requests.GetRequest:input_type -> pivox.assets.v1.GetRequestRequest
-	8,  // 28: pivox.assets.v1.Requests.ListRequests:input_type -> pivox.assets.v1.ListRequestsRequest
-	10, // 29: pivox.assets.v1.Requests.UpdateRequest:input_type -> pivox.assets.v1.UpdateRequestRequest
-	12, // 30: pivox.assets.v1.Requests.DeleteRequest:input_type -> pivox.assets.v1.DeleteRequestRequest
-	14, // 31: pivox.assets.v1.Requests.SubmitRequest:input_type -> pivox.assets.v1.SubmitRequestRequest
-	15, // 32: pivox.assets.v1.Requests.AssignRequest:input_type -> pivox.assets.v1.AssignRequestRequest
-	16, // 33: pivox.assets.v1.Requests.ClaimRequest:input_type -> pivox.assets.v1.ClaimRequestRequest
-	17, // 34: pivox.assets.v1.Requests.DeliverRequest:input_type -> pivox.assets.v1.DeliverRequestRequest
-	18, // 35: pivox.assets.v1.Requests.ApproveRequest:input_type -> pivox.assets.v1.ApproveRequestRequest
-	19, // 36: pivox.assets.v1.Requests.RequestRevision:input_type -> pivox.assets.v1.RequestRevisionRequest
-	20, // 37: pivox.assets.v1.Requests.RejectRequest:input_type -> pivox.assets.v1.RejectRequestRequest
-	21, // 38: pivox.assets.v1.Requests.CancelRequest:input_type -> pivox.assets.v1.CancelRequestRequest
-	22, // 39: pivox.assets.v1.Requests.CreateLineItem:input_type -> pivox.assets.v1.CreateLineItemRequest
-	24, // 40: pivox.assets.v1.Requests.GetLineItem:input_type -> pivox.assets.v1.GetLineItemRequest
-	25, // 41: pivox.assets.v1.Requests.ListLineItems:input_type -> pivox.assets.v1.ListLineItemsRequest
-	27, // 42: pivox.assets.v1.Requests.UpdateLineItem:input_type -> pivox.assets.v1.UpdateLineItemRequest
-	29, // 43: pivox.assets.v1.Requests.DeleteLineItem:input_type -> pivox.assets.v1.DeleteLineItemRequest
-	31, // 44: pivox.assets.v1.Requests.FulfillLineItem:input_type -> pivox.assets.v1.FulfillLineItemRequest
-	40, // 45: pivox.assets.v1.Requests.CreateRequest:output_type -> google.longrunning.Operation
-	3,  // 46: pivox.assets.v1.Requests.GetRequest:output_type -> pivox.assets.v1.Request
-	9,  // 47: pivox.assets.v1.Requests.ListRequests:output_type -> pivox.assets.v1.ListRequestsResponse
-	40, // 48: pivox.assets.v1.Requests.UpdateRequest:output_type -> google.longrunning.Operation
-	40, // 49: pivox.assets.v1.Requests.DeleteRequest:output_type -> google.longrunning.Operation
-	3,  // 50: pivox.assets.v1.Requests.SubmitRequest:output_type -> pivox.assets.v1.Request
-	3,  // 51: pivox.assets.v1.Requests.AssignRequest:output_type -> pivox.assets.v1.Request
-	3,  // 52: pivox.assets.v1.Requests.ClaimRequest:output_type -> pivox.assets.v1.Request
-	3,  // 53: pivox.assets.v1.Requests.DeliverRequest:output_type -> pivox.assets.v1.Request
-	3,  // 54: pivox.assets.v1.Requests.ApproveRequest:output_type -> pivox.assets.v1.Request
-	3,  // 55: pivox.assets.v1.Requests.RequestRevision:output_type -> pivox.assets.v1.Request
-	3,  // 56: pivox.assets.v1.Requests.RejectRequest:output_type -> pivox.assets.v1.Request
-	3,  // 57: pivox.assets.v1.Requests.CancelRequest:output_type -> pivox.assets.v1.Request
-	40, // 58: pivox.assets.v1.Requests.CreateLineItem:output_type -> google.longrunning.Operation
-	4,  // 59: pivox.assets.v1.Requests.GetLineItem:output_type -> pivox.assets.v1.LineItem
-	26, // 60: pivox.assets.v1.Requests.ListLineItems:output_type -> pivox.assets.v1.ListLineItemsResponse
-	40, // 61: pivox.assets.v1.Requests.UpdateLineItem:output_type -> google.longrunning.Operation
-	40, // 62: pivox.assets.v1.Requests.DeleteLineItem:output_type -> google.longrunning.Operation
-	40, // 63: pivox.assets.v1.Requests.FulfillLineItem:output_type -> google.longrunning.Operation
-	45, // [45:64] is the sub-list for method output_type
-	26, // [26:45] is the sub-list for method input_type
-	26, // [26:26] is the sub-list for extension type_name
-	26, // [26:26] is the sub-list for extension extendee
-	0,  // [0:26] is the sub-list for field type_name
+	36, // 7: pivox.assets.v1.Request.created_by:type_name -> pivox.types.Actor
+	35, // 8: pivox.assets.v1.Request.create_time:type_name -> google.protobuf.Timestamp
+	36, // 9: pivox.assets.v1.Request.updated_by:type_name -> pivox.types.Actor
+	35, // 10: pivox.assets.v1.Request.update_time:type_name -> google.protobuf.Timestamp
+	35, // 11: pivox.assets.v1.Request.delete_time:type_name -> google.protobuf.Timestamp
+	35, // 12: pivox.assets.v1.Request.purge_time:type_name -> google.protobuf.Timestamp
+	2,  // 13: pivox.assets.v1.LineItem.state:type_name -> pivox.assets.v1.LineItem.State
+	37, // 14: pivox.assets.v1.LineItem.media_type:type_name -> pivox.assets.v1.Asset.MediaType
+	34, // 15: pivox.assets.v1.LineItem.annotations:type_name -> pivox.assets.v1.LineItem.AnnotationsEntry
+	36, // 16: pivox.assets.v1.LineItem.created_by:type_name -> pivox.types.Actor
+	35, // 17: pivox.assets.v1.LineItem.create_time:type_name -> google.protobuf.Timestamp
+	36, // 18: pivox.assets.v1.LineItem.updated_by:type_name -> pivox.types.Actor
+	35, // 19: pivox.assets.v1.LineItem.update_time:type_name -> google.protobuf.Timestamp
+	3,  // 20: pivox.assets.v1.CreateRequestRequest.request:type_name -> pivox.assets.v1.Request
+	3,  // 21: pivox.assets.v1.ListRequestsResponse.requests:type_name -> pivox.assets.v1.Request
+	3,  // 22: pivox.assets.v1.UpdateRequestRequest.request:type_name -> pivox.assets.v1.Request
+	38, // 23: pivox.assets.v1.UpdateRequestRequest.update_mask:type_name -> google.protobuf.FieldMask
+	4,  // 24: pivox.assets.v1.CreateLineItemRequest.line_item:type_name -> pivox.assets.v1.LineItem
+	4,  // 25: pivox.assets.v1.ListLineItemsResponse.line_items:type_name -> pivox.assets.v1.LineItem
+	4,  // 26: pivox.assets.v1.UpdateLineItemRequest.line_item:type_name -> pivox.assets.v1.LineItem
+	38, // 27: pivox.assets.v1.UpdateLineItemRequest.update_mask:type_name -> google.protobuf.FieldMask
+	39, // 28: pivox.assets.v1.FulfillLineItemMetadata.step:type_name -> pivox.assets.v1.CreateAssetMetadata.Step
+	40, // 29: pivox.assets.v1.FulfillLineItemMetadata.upload_info:type_name -> pivox.assets.v1.UploadInfo
+	5,  // 30: pivox.assets.v1.Requests.CreateRequest:input_type -> pivox.assets.v1.CreateRequestRequest
+	7,  // 31: pivox.assets.v1.Requests.GetRequest:input_type -> pivox.assets.v1.GetRequestRequest
+	8,  // 32: pivox.assets.v1.Requests.ListRequests:input_type -> pivox.assets.v1.ListRequestsRequest
+	10, // 33: pivox.assets.v1.Requests.UpdateRequest:input_type -> pivox.assets.v1.UpdateRequestRequest
+	12, // 34: pivox.assets.v1.Requests.DeleteRequest:input_type -> pivox.assets.v1.DeleteRequestRequest
+	14, // 35: pivox.assets.v1.Requests.SubmitRequest:input_type -> pivox.assets.v1.SubmitRequestRequest
+	15, // 36: pivox.assets.v1.Requests.AssignRequest:input_type -> pivox.assets.v1.AssignRequestRequest
+	16, // 37: pivox.assets.v1.Requests.ClaimRequest:input_type -> pivox.assets.v1.ClaimRequestRequest
+	17, // 38: pivox.assets.v1.Requests.DeliverRequest:input_type -> pivox.assets.v1.DeliverRequestRequest
+	18, // 39: pivox.assets.v1.Requests.ApproveRequest:input_type -> pivox.assets.v1.ApproveRequestRequest
+	19, // 40: pivox.assets.v1.Requests.RequestRevision:input_type -> pivox.assets.v1.RequestRevisionRequest
+	20, // 41: pivox.assets.v1.Requests.RejectRequest:input_type -> pivox.assets.v1.RejectRequestRequest
+	21, // 42: pivox.assets.v1.Requests.CancelRequest:input_type -> pivox.assets.v1.CancelRequestRequest
+	22, // 43: pivox.assets.v1.Requests.CreateLineItem:input_type -> pivox.assets.v1.CreateLineItemRequest
+	24, // 44: pivox.assets.v1.Requests.GetLineItem:input_type -> pivox.assets.v1.GetLineItemRequest
+	25, // 45: pivox.assets.v1.Requests.ListLineItems:input_type -> pivox.assets.v1.ListLineItemsRequest
+	27, // 46: pivox.assets.v1.Requests.UpdateLineItem:input_type -> pivox.assets.v1.UpdateLineItemRequest
+	29, // 47: pivox.assets.v1.Requests.DeleteLineItem:input_type -> pivox.assets.v1.DeleteLineItemRequest
+	31, // 48: pivox.assets.v1.Requests.FulfillLineItem:input_type -> pivox.assets.v1.FulfillLineItemRequest
+	41, // 49: pivox.assets.v1.Requests.CreateRequest:output_type -> google.longrunning.Operation
+	3,  // 50: pivox.assets.v1.Requests.GetRequest:output_type -> pivox.assets.v1.Request
+	9,  // 51: pivox.assets.v1.Requests.ListRequests:output_type -> pivox.assets.v1.ListRequestsResponse
+	41, // 52: pivox.assets.v1.Requests.UpdateRequest:output_type -> google.longrunning.Operation
+	41, // 53: pivox.assets.v1.Requests.DeleteRequest:output_type -> google.longrunning.Operation
+	3,  // 54: pivox.assets.v1.Requests.SubmitRequest:output_type -> pivox.assets.v1.Request
+	3,  // 55: pivox.assets.v1.Requests.AssignRequest:output_type -> pivox.assets.v1.Request
+	3,  // 56: pivox.assets.v1.Requests.ClaimRequest:output_type -> pivox.assets.v1.Request
+	3,  // 57: pivox.assets.v1.Requests.DeliverRequest:output_type -> pivox.assets.v1.Request
+	3,  // 58: pivox.assets.v1.Requests.ApproveRequest:output_type -> pivox.assets.v1.Request
+	3,  // 59: pivox.assets.v1.Requests.RequestRevision:output_type -> pivox.assets.v1.Request
+	3,  // 60: pivox.assets.v1.Requests.RejectRequest:output_type -> pivox.assets.v1.Request
+	3,  // 61: pivox.assets.v1.Requests.CancelRequest:output_type -> pivox.assets.v1.Request
+	41, // 62: pivox.assets.v1.Requests.CreateLineItem:output_type -> google.longrunning.Operation
+	4,  // 63: pivox.assets.v1.Requests.GetLineItem:output_type -> pivox.assets.v1.LineItem
+	26, // 64: pivox.assets.v1.Requests.ListLineItems:output_type -> pivox.assets.v1.ListLineItemsResponse
+	41, // 65: pivox.assets.v1.Requests.UpdateLineItem:output_type -> google.longrunning.Operation
+	41, // 66: pivox.assets.v1.Requests.DeleteLineItem:output_type -> google.longrunning.Operation
+	41, // 67: pivox.assets.v1.Requests.FulfillLineItem:output_type -> google.longrunning.Operation
+	49, // [49:68] is the sub-list for method output_type
+	30, // [30:49] is the sub-list for method input_type
+	30, // [30:30] is the sub-list for extension type_name
+	30, // [30:30] is the sub-list for extension extendee
+	0,  // [0:30] is the sub-list for field type_name
 }
 
 func init() { file_pivox_assets_v1_request_proto_init() }

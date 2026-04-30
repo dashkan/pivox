@@ -49,7 +49,7 @@ func setupAssetFixture(t *testing.T) assetFixture {
 		assetID:   uuid.New(),
 		mockQ:     new(mocks.MockQuerier),
 	}
-	f.server = NewAssetsServer(nil, f.mockQ)
+	f.server = NewAssetsServer(nil, f.mockQ, nil)
 	return f
 }
 

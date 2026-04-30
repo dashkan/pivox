@@ -325,8 +325,8 @@ func serve(cmd *cobra.Command, args []string) error {
 	storagev1.RegisterEndpointsServer(grpcServer, storage.NewEndpointsServer(queries, enc))
 
 	// Asset and request services
-	assetsv1.RegisterAssetsServer(grpcServer, assets.NewAssetsServer(pool, queries))
-	assetsv1.RegisterRequestsServer(grpcServer, requests.NewRequestsServer(queries))
+	assetsv1.RegisterAssetsServer(grpcServer, assets.NewAssetsServer(pool, queries, auditResolver))
+	assetsv1.RegisterRequestsServer(grpcServer, requests.NewRequestsServer(queries, auditResolver))
 
 	// AI Chat service
 	ollamaURL := must(f.GetString("ollama-url"))

@@ -27,6 +27,7 @@ import "google/protobuf/field_mask.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 import "pivox/permission/v1/options.proto";
+import "pivox/types/actor.proto";
 
 option go_package = "pivox/assets/v1;assetsv1";
 
@@ -295,6 +296,14 @@ message Asset {
   // Output only. Total number of versions.
   int32 version_count = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
 
+  // Input only. The time-to-live for the asset, as an alternative to
+  // setting expire_time directly. The server computes expire_time from
+  // create_time + ttl.
+  google.protobuf.Duration ttl = 12 [
+    (google.api.field_behavior) = INPUT_ONLY,
+    (google.api.field_behavior) = OPTIONAL
+  ];
+
   // Output only. Duration of the media, for video and audio assets.
   google.protobuf.Duration duration = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
 
@@ -309,14 +318,6 @@ message Asset {
   // Can be set directly or via a retention policy (tag-based rules).
   google.protobuf.Timestamp expire_time = 18 [(google.api.field_behavior) = OPTIONAL];
 
-  // Input only. The time-to-live for the asset, as an alternative to
-  // setting expire_time directly. The server computes expire_time from
-  // create_time + ttl.
-  google.protobuf.Duration ttl = 27 [
-    (google.api.field_behavior) = INPUT_ONLY,
-    (google.api.field_behavior) = OPTIONAL
-  ];
-
   // Optional. Annotations associated with this asset.
   map<string, string> annotations = 19 [(google.api.field_behavior) = OPTIONAL];
 
@@ -324,23 +325,26 @@ message Asset {
   // value of the Asset resource.
   string etag = 20 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  // Output only. The user who created the asset.
-  string creator = 21 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // Output only. The user who last updated the asset.
-  string updater = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Output only. The identity that created this asset.
+  pivox.types.Actor created_by = 21 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when the asset was created.
-  google.protobuf.Timestamp create_time = 23 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The identity that last modified this asset.
+  pivox.types.Actor updated_by = 23 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when the asset was last modified.
   google.protobuf.Timestamp update_time = 24 [(google.api.field_behavior) = OUTPUT_ONLY];
 
+  // Output only. The identity that requested deletion of this asset.
+  pivox.types.Actor deleted_by = 25 [(google.api.field_behavior) = OUTPUT_ONLY];
+
   // Output only. The time at which the asset was soft-deleted.
-  google.protobuf.Timestamp delete_time = 25 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp delete_time = 26 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. The time at which the asset will be permanently purged.
-  google.protobuf.Timestamp purge_time = 26 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp purge_time = 27 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // A specific version of an asset. A version is either an upload
@@ -387,8 +391,8 @@ message AssetVersion {
   // Output only. If the ingestion pipeline failed, the error details.
   string ingestion_error = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  // Output only. The user who created this version.
-  string creator = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Output only. The identity that created this version.
+  pivox.types.Actor created_by = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when this version was created.
   google.protobuf.Timestamp create_time = 11 [(google.api.field_behavior) = OUTPUT_ONLY];

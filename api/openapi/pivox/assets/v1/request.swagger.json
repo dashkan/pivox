@@ -360,20 +360,20 @@
                   "description": "Output only. A checksum computed by the server.",
                   "readOnly": true
                 },
-                "creator": {
-                  "type": "string",
-                  "description": "Output only. The user who created the request.",
-                  "readOnly": true
-                },
-                "updater": {
-                  "type": "string",
-                  "description": "Output only. The user who last updated the request.",
+                "createdBy": {
+                  "$ref": "#/definitions/typesActor",
+                  "description": "Output only. The identity that created the request.",
                   "readOnly": true
                 },
                 "createTime": {
                   "type": "string",
                   "format": "date-time",
                   "description": "Output only. Timestamp when the request was created.",
+                  "readOnly": true
+                },
+                "updatedBy": {
+                  "$ref": "#/definitions/typesActor",
+                  "description": "Output only. The identity that last modified the request.",
                   "readOnly": true
                 },
                 "updateTime": {
@@ -704,15 +704,20 @@
                   },
                   "description": "Optional. Annotations associated with this line item."
                 },
-                "creator": {
-                  "type": "string",
-                  "description": "Output only. The user who created this line item.",
+                "createdBy": {
+                  "$ref": "#/definitions/typesActor",
+                  "description": "Output only. The identity that created this line item.",
                   "readOnly": true
                 },
                 "createTime": {
                   "type": "string",
                   "format": "date-time",
                   "description": "Output only. Timestamp when this line item was created.",
+                  "readOnly": true
+                },
+                "updatedBy": {
+                  "$ref": "#/definitions/typesActor",
+                  "description": "Output only. The identity that last modified this line item.",
                   "readOnly": true
                 },
                 "updateTime": {
@@ -1375,6 +1380,32 @@
       },
       "description": "The `Status` type defines a logical error model that is suitable for\ndifferent programming environments, including REST APIs and RPC APIs. It is\nused by [gRPC](https://github.com/grpc). Each `Status` message contains\nthree pieces of data: error code, error message, and error details.\n\nYou can find out more about this error model and how to work with it in the\n[API Design Guide](https://cloud.google.com/apis/design/errors)."
     },
+    "typesActor": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The identity's stable UUID (firebase_identities.id). Always\npopulated when the column is non-null in the database, even for\nsoft-deleted identities.",
+          "readOnly": true
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Resolved display name. Empty for soft-deleted identities.",
+          "readOnly": true
+        },
+        "email": {
+          "type": "string",
+          "description": "Resolved email address. Empty for soft-deleted identities.",
+          "readOnly": true
+        },
+        "isDeleted": {
+          "type": "boolean",
+          "description": "True when the identity has been soft-deleted. PII fields are\nblanked out in that case while id is preserved.",
+          "readOnly": true
+        }
+      },
+      "description": "Actor is a resolved reference to an identity. It is used flat on\nresources to expose audit fields (created_by, updated_by, deleted_by)\nper AIP-148, and can be reused at non-audit positions like assignee\nor approver.\n\nActor lives in `pivox.types` (unversioned — type definitions are\nshared infrastructure, not an API surface) so every domain package\n(pivox.api.v1, pivox.ai.v1, pivox.assets.v1, pivox.iam.v1,\npivox.storage.v1) can reference it without crossing into a peer\ndomain — the api-linter's foreign-type-reference rule (AIP-215)\nconsiders `pivox.types` a shared types namespace.\n\nResolution is performed server-side via the audit.Resolver, which\nbatches lookups against firebase_identities and caches recent\nresults. When the underlying identity is soft-deleted the resolver\nblanks out PII (display_name, email) and sets is_deleted=true while\npreserving the id so that historical references remain stable."
+    },
     "v1LineItem": {
       "type": "object",
       "properties": {
@@ -1412,15 +1443,20 @@
           },
           "description": "Optional. Annotations associated with this line item."
         },
-        "creator": {
-          "type": "string",
-          "description": "Output only. The user who created this line item.",
+        "createdBy": {
+          "$ref": "#/definitions/typesActor",
+          "description": "Output only. The identity that created this line item.",
           "readOnly": true
         },
         "createTime": {
           "type": "string",
           "format": "date-time",
           "description": "Output only. Timestamp when this line item was created.",
+          "readOnly": true
+        },
+        "updatedBy": {
+          "$ref": "#/definitions/typesActor",
+          "description": "Output only. The identity that last modified this line item.",
           "readOnly": true
         },
         "updateTime": {
@@ -1563,20 +1599,20 @@
           "description": "Output only. A checksum computed by the server.",
           "readOnly": true
         },
-        "creator": {
-          "type": "string",
-          "description": "Output only. The user who created the request.",
-          "readOnly": true
-        },
-        "updater": {
-          "type": "string",
-          "description": "Output only. The user who last updated the request.",
+        "createdBy": {
+          "$ref": "#/definitions/typesActor",
+          "description": "Output only. The identity that created the request.",
           "readOnly": true
         },
         "createTime": {
           "type": "string",
           "format": "date-time",
           "description": "Output only. Timestamp when the request was created.",
+          "readOnly": true
+        },
+        "updatedBy": {
+          "$ref": "#/definitions/typesActor",
+          "description": "Output only. The identity that last modified the request.",
           "readOnly": true
         },
         "updateTime": {

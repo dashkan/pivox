@@ -6,17 +6,20 @@ import (
 	"math"
 	"time"
 
+	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	db "github.com/dashkan/pivox/internal/db/generated"
 	assetsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1"
+	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 )
 
 // AssetToProto converts a DB asset to proto.
 // spaceName is the full resource name of the parent space
-// (e.g. "organizations/acme/spaces/my-space").
-func AssetToProto(row db.Asset, spaceName string) *assetsv1.Asset {
+// (e.g. "organizations/acme/spaces/my-space"). `actors` is the
+// pre-resolved Actor map; pass nil to skip Actor inflation.
+func AssetToProto(row db.Asset, spaceName string, actors map[uuid.UUID]*typespb.Actor) *assetsv1.Asset {
 	pb := &assetsv1.Asset{
 		Name:           fmt.Sprintf("%s/assets/%s", spaceName, row.Name),
 		DisplayName:    row.DisplayName,
@@ -27,10 +30,11 @@ func AssetToProto(row db.Asset, spaceName string) *assetsv1.Asset {
 		ChecksumSha256: row.ChecksumSha256,
 		SizeBytes:      row.SizeBytes,
 		Etag:           row.Etag,
-		Creator:        UUIDString(row.CreatedBy),
-		Updater:        UUIDString(row.UpdatedBy),
+		CreatedBy:      actorOrNil(actors, row.CreatedBy),
 		CreateTime:     timestamppb.New(row.CreateTime),
+		UpdatedBy:      actorOrNil(actors, row.UpdatedBy),
 		UpdateTime:     timestamppb.New(row.UpdateTime),
+		DeletedBy:      actorOrNil(actors, row.DeletedBy),
 	}
 
 	if row.MediaType.Valid {
@@ -69,8 +73,9 @@ func AssetToProto(row db.Asset, spaceName string) *assetsv1.Asset {
 
 // AssetVersionToProto converts a DB asset version to proto.
 // assetName is the full resource name of the parent asset
-// (e.g. "organizations/acme/spaces/my-space/assets/abc123").
-func AssetVersionToProto(row db.AssetVersion, assetName string) *assetsv1.AssetVersion {
+// (e.g. "organizations/acme/spaces/my-space/assets/abc123"). `actors`
+// is the pre-resolved Actor map; pass nil to skip Actor inflation.
+func AssetVersionToProto(row db.AssetVersion, assetName string, actors map[uuid.UUID]*typespb.Actor) *assetsv1.AssetVersion {
 	return &assetsv1.AssetVersion{
 		Name:           fmt.Sprintf("%s/versions/%s", assetName, row.ID.String()),
 		VersionNumber:  row.VersionNumber,
@@ -80,7 +85,7 @@ func AssetVersionToProto(row db.AssetVersion, assetName string) *assetsv1.AssetV
 		StorageKey:     row.StorageKey,
 		ChangeNote:     row.ChangeNote,
 		IngestionError: row.IngestionError,
-		Creator:        UUIDString(row.CreatedBy),
+		CreatedBy:      actorOrNil(actors, row.CreatedBy),
 		CreateTime:     timestamppb.New(row.CreateTime),
 	}
 }

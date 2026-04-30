@@ -11,23 +11,78 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/dashkan/pivox/internal/apierr"
+	"github.com/dashkan/pivox/internal/audit"
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/lro"
 	assetsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1"
+	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
+
+	"log/slog"
 )
 
 type AssetsServer struct {
 	assetsv1.UnimplementedAssetsServer
 	db      db.DBTX
 	queries db.Querier
+	audit   *audit.Resolver
 }
 
-func NewAssetsServer(pool db.DBTX, queries db.Querier) *AssetsServer {
+// NewAssetsServer constructs the server. `auditResolver` inflates
+// audit-field UUIDs into Actor protos; nil leaves Actor fields unset
+// (acceptable in tests).
+func NewAssetsServer(pool db.DBTX, queries db.Querier, auditResolver *audit.Resolver) *AssetsServer {
 	return &AssetsServer{
 		db:      pool,
 		queries: queries,
+		audit:   auditResolver,
 	}
+}
+
+// resolveAssetActors gathers created_by/updated_by/deleted_by UUIDs
+// across the page and resolves them in a single batched call.
+func (s *AssetsServer) resolveAssetActors(ctx context.Context, rows []db.Asset) (map[uuid.UUID]*typespb.Actor, error) {
+	if s.audit == nil {
+		return nil, nil
+	}
+	ids := make([]uuid.UUID, 0, len(rows)*3)
+	for _, r := range rows {
+		if r.CreatedBy.Valid {
+			ids = append(ids, r.CreatedBy.Bytes)
+		}
+		if r.UpdatedBy.Valid {
+			ids = append(ids, r.UpdatedBy.Bytes)
+		}
+		if r.DeletedBy.Valid {
+			ids = append(ids, r.DeletedBy.Bytes)
+		}
+	}
+	actors, err := s.audit.Resolve(ctx, ids)
+	if err != nil {
+		slog.ErrorContext(ctx, "resolve asset actors failed", "error", err)
+		return nil, apierr.Internal("resolve actors")
+	}
+	return actors, nil
+}
+
+// resolveAssetVersionActors gathers created_by UUIDs (versions are
+// immutable so no updated_by).
+func (s *AssetsServer) resolveAssetVersionActors(ctx context.Context, rows []db.AssetVersion) (map[uuid.UUID]*typespb.Actor, error) {
+	if s.audit == nil {
+		return nil, nil
+	}
+	ids := make([]uuid.UUID, 0, len(rows))
+	for _, r := range rows {
+		if r.CreatedBy.Valid {
+			ids = append(ids, r.CreatedBy.Bytes)
+		}
+	}
+	actors, err := s.audit.Resolve(ctx, ids)
+	if err != nil {
+		slog.ErrorContext(ctx, "resolve asset version actors failed", "error", err)
+		return nil, apierr.Internal("resolve actors")
+	}
+	return actors, nil
 }
 
 // parseAssetName parses "organizations/{org}/spaces/{space}/assets/{asset}".
@@ -76,7 +131,11 @@ func (s *AssetsServer) GetAsset(ctx context.Context, req *assetsv1.GetAssetReque
 	}
 
 	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
-	proto := convert.AssetToProto(asset, parentName)
+	actors, err := s.resolveAssetActors(ctx, []db.Asset{asset})
+	if err != nil {
+		return nil, err
+	}
+	proto := convert.AssetToProto(asset, parentName, actors)
 
 	// Populate latest version and version count.
 	count, err := s.queries.CountAssetVersions(ctx, asset.ID)
@@ -86,7 +145,11 @@ func (s *AssetsServer) GetAsset(ctx context.Context, req *assetsv1.GetAssetReque
 	latestVersion, err := s.queries.GetLatestAssetVersion(ctx, asset.ID)
 	if err == nil {
 		assetFullName := fmt.Sprintf("%s/assets/%s", parentName, assetName)
-		proto.LatestVersion = convert.AssetVersionToProto(latestVersion, assetFullName)
+		versionActors, vErr := s.resolveAssetVersionActors(ctx, []db.AssetVersion{latestVersion})
+		if vErr != nil {
+			return nil, vErr
+		}
+		proto.LatestVersion = convert.AssetVersionToProto(latestVersion, assetFullName, versionActors)
 		// Populate renditions on the latest version.
 		renditions, err := s.queries.ListAssetRenditions(ctx, latestVersion.ID)
 		if err == nil {
@@ -119,14 +182,14 @@ func (s *AssetsServer) ListAssets(ctx context.Context, req *assetsv1.ListAssetsR
 	if req.GetShowDeleted() {
 		rows, err = s.queries.ListAssetsBySpaceWithDeleted(ctx, db.ListAssetsBySpaceWithDeletedParams{
 			SpaceID: spaceID,
-			Limit:     pageSize + 1,
-			Offset:    0,
+			Limit:   pageSize + 1,
+			Offset:  0,
 		})
 	} else {
 		rows, err = s.queries.ListAssetsBySpace(ctx, db.ListAssetsBySpaceParams{
 			SpaceID: spaceID,
-			Limit:     pageSize + 1,
-			Offset:    0,
+			Limit:   pageSize + 1,
+			Offset:  0,
 		})
 	}
 	if err != nil {
@@ -140,9 +203,13 @@ func (s *AssetsServer) ListAssets(ctx context.Context, req *assetsv1.ListAssetsR
 	}
 
 	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
+	actors, err := s.resolveAssetActors(ctx, rows)
+	if err != nil {
+		return nil, err
+	}
 	assets := make([]*assetsv1.Asset, 0, len(rows))
 	for _, r := range rows {
-		assets = append(assets, convert.AssetToProto(r, parentName))
+		assets = append(assets, convert.AssetToProto(r, parentName, actors))
 	}
 
 	return &assetsv1.ListAssetsResponse{
@@ -187,7 +254,7 @@ func (s *AssetsServer) CreateAsset(ctx context.Context, req *assetsv1.CreateAsse
 
 	result, err := s.queries.CreateAsset(ctx, db.CreateAssetParams{
 		ID:          uuid.New(),
-		SpaceID:   spaceID,
+		SpaceID:     spaceID,
 		EndpointID:  endpointID,
 		Name:        assetName,
 		DisplayName: asset.GetDisplayName(),
@@ -204,7 +271,13 @@ func (s *AssetsServer) CreateAsset(ctx context.Context, req *assetsv1.CreateAsse
 	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
 
 	if isPlaceholder {
-		return lro.DoneOperation(convert.AssetToProto(result, parentName))
+		actors, resolveErr := s.resolveAssetActors(ctx, []db.Asset{result})
+		if resolveErr != nil {
+			slog.WarnContext(ctx, "create asset: actor resolution failed; returning proto without audit actors",
+				"asset_id", result.ID, "error", resolveErr)
+			actors = nil
+		}
+		return lro.DoneOperation(convert.AssetToProto(result, parentName, actors))
 	}
 
 	// Non-placeholder: for now just mark as ACTIVE (real pipeline later).
@@ -213,7 +286,13 @@ func (s *AssetsServer) CreateAsset(ctx context.Context, req *assetsv1.CreateAsse
 		State: db.AssetStateACTIVE,
 	})
 	result.State = db.AssetStateACTIVE
-	return lro.DoneOperation(convert.AssetToProto(result, parentName))
+	actors, resolveErr := s.resolveAssetActors(ctx, []db.Asset{result})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "create asset: actor resolution failed; returning proto without audit actors",
+			"asset_id", result.ID, "error", resolveErr)
+		actors = nil
+	}
+	return lro.DoneOperation(convert.AssetToProto(result, parentName, actors))
 }
 
 func (s *AssetsServer) UpdateAsset(ctx context.Context, req *assetsv1.UpdateAssetRequest) (*longrunningpb.Operation, error) {
@@ -262,7 +341,13 @@ func (s *AssetsServer) UpdateAsset(ctx context.Context, req *assetsv1.UpdateAsse
 	}
 
 	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
-	return lro.DoneOperation(convert.AssetToProto(result, parentName))
+	actors, resolveErr := s.resolveAssetActors(ctx, []db.Asset{result})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "update asset: actor resolution failed; returning proto without audit actors",
+			"asset_id", result.ID, "error", resolveErr)
+		actors = nil
+	}
+	return lro.DoneOperation(convert.AssetToProto(result, parentName, actors))
 }
 
 func (s *AssetsServer) DeleteAsset(ctx context.Context, req *assetsv1.DeleteAssetRequest) (*longrunningpb.Operation, error) {
@@ -290,7 +375,13 @@ func (s *AssetsServer) DeleteAsset(ctx context.Context, req *assetsv1.DeleteAsse
 
 	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
 	existing.State = db.AssetStateDELETEREQUESTED
-	return lro.DoneOperation(convert.AssetToProto(existing, parentName))
+	actors, resolveErr := s.resolveAssetActors(ctx, []db.Asset{existing})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "delete asset: actor resolution failed; returning proto without audit actors",
+			"asset_id", existing.ID, "error", resolveErr)
+		actors = nil
+	}
+	return lro.DoneOperation(convert.AssetToProto(existing, parentName, actors))
 }
 
 func (s *AssetsServer) UndeleteAsset(ctx context.Context, req *assetsv1.UndeleteAssetRequest) (*longrunningpb.Operation, error) {
@@ -323,5 +414,11 @@ func (s *AssetsServer) UndeleteAsset(ctx context.Context, req *assetsv1.Undelete
 	}
 
 	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
-	return lro.DoneOperation(convert.AssetToProto(updated, parentName))
+	actors, resolveErr := s.resolveAssetActors(ctx, []db.Asset{updated})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "undelete asset: actor resolution failed; returning proto without audit actors",
+			"asset_id", updated.ID, "error", resolveErr)
+		actors = nil
+	}
+	return lro.DoneOperation(convert.AssetToProto(updated, parentName, actors))
 }

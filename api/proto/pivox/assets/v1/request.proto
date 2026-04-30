@@ -26,6 +26,7 @@ import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "pivox/assets/v1/asset.proto";
 import "pivox/permission/v1/options.proto";
+import "pivox/types/actor.proto";
 
 option go_package = "pivox/assets/v1;assetsv1";
 
@@ -418,14 +419,14 @@ message Request {
   // Output only. A checksum computed by the server.
   string etag = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  // Output only. The user who created the request.
-  string creator = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // Output only. The user who last updated the request.
-  string updater = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Output only. The identity that created the request.
+  pivox.types.Actor created_by = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when the request was created.
-  google.protobuf.Timestamp create_time = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The identity that last modified the request.
+  pivox.types.Actor updated_by = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when the request was last modified.
   google.protobuf.Timestamp update_time = 18 [(google.api.field_behavior) = OUTPUT_ONLY];
@@ -502,14 +503,17 @@ message LineItem {
   // Optional. Annotations associated with this line item.
   map<string, string> annotations = 7 [(google.api.field_behavior) = OPTIONAL];
 
-  // Output only. The user who created this line item.
-  string creator = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Output only. The identity that created this line item.
+  pivox.types.Actor created_by = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when this line item was created.
   google.protobuf.Timestamp create_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
 
+  // Output only. The identity that last modified this line item.
+  pivox.types.Actor updated_by = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+
   // Output only. Timestamp when this line item was last modified.
-  google.protobuf.Timestamp update_time = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // The request sent to the CreateRequest method.

@@ -6,27 +6,81 @@ import (
 	"fmt"
 	"strings"
 
+	"log/slog"
+
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/dashkan/pivox/internal/apierr"
+	"github.com/dashkan/pivox/internal/audit"
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/lro"
 	assetsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1"
+	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 	"github.com/dashkan/pivox/internal/server"
 )
 
 type RequestsServer struct {
 	assetsv1.UnimplementedRequestsServer
 	queries db.Querier
+	audit   *audit.Resolver
 }
 
-func NewRequestsServer(queries db.Querier) *RequestsServer {
+// NewRequestsServer constructs the server. `auditResolver` inflates
+// audit-field UUIDs into Actor protos; nil leaves Actor fields unset.
+func NewRequestsServer(queries db.Querier, auditResolver *audit.Resolver) *RequestsServer {
 	return &RequestsServer{
 		queries: queries,
+		audit:   auditResolver,
 	}
+}
+
+// resolveRequestActors gathers created_by/updated_by UUIDs across the
+// page and resolves them in a single batched call.
+func (s *RequestsServer) resolveRequestActors(ctx context.Context, rows []db.AssetRequest) (map[uuid.UUID]*typespb.Actor, error) {
+	if s.audit == nil {
+		return nil, nil
+	}
+	ids := make([]uuid.UUID, 0, len(rows)*2)
+	for _, r := range rows {
+		if r.CreatedBy.Valid {
+			ids = append(ids, r.CreatedBy.Bytes)
+		}
+		if r.UpdatedBy.Valid {
+			ids = append(ids, r.UpdatedBy.Bytes)
+		}
+	}
+	actors, err := s.audit.Resolve(ctx, ids)
+	if err != nil {
+		slog.ErrorContext(ctx, "resolve request actors failed", "error", err)
+		return nil, apierr.Internal("resolve actors")
+	}
+	return actors, nil
+}
+
+// resolveLineItemActors gathers created_by/updated_by UUIDs across
+// the page.
+func (s *RequestsServer) resolveLineItemActors(ctx context.Context, rows []db.AssetRequestLineItem) (map[uuid.UUID]*typespb.Actor, error) {
+	if s.audit == nil {
+		return nil, nil
+	}
+	ids := make([]uuid.UUID, 0, len(rows)*2)
+	for _, r := range rows {
+		if r.CreatedBy.Valid {
+			ids = append(ids, r.CreatedBy.Bytes)
+		}
+		if r.UpdatedBy.Valid {
+			ids = append(ids, r.UpdatedBy.Bytes)
+		}
+	}
+	actors, err := s.audit.Resolve(ctx, ids)
+	if err != nil {
+		slog.ErrorContext(ctx, "resolve line item actors failed", "error", err)
+		return nil, apierr.Internal("resolve actors")
+	}
+	return actors, nil
 }
 
 // parseRequestName parses "organizations/{org}/spaces/{space}/requests/{request}".
@@ -76,7 +130,11 @@ func (s *RequestsServer) GetRequest(ctx context.Context, req *assetsv1.GetReques
 	}
 
 	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
-	proto := convert.RequestToProto(request, parentName)
+	actors, err := s.resolveRequestActors(ctx, []db.AssetRequest{request})
+	if err != nil {
+		return nil, err
+	}
+	proto := convert.RequestToProto(request, parentName, actors)
 
 	// Populate line items, counts.
 	lineItems, err := s.queries.ListLineItemsByRequest(ctx, db.ListLineItemsByRequestParams{
@@ -86,8 +144,12 @@ func (s *RequestsServer) GetRequest(ctx context.Context, req *assetsv1.GetReques
 	})
 	if err == nil {
 		requestFullName := fmt.Sprintf("%s/requests/%s", parentName, requestName)
+		liActors, liErr := s.resolveLineItemActors(ctx, lineItems)
+		if liErr != nil {
+			return nil, liErr
+		}
 		for _, li := range lineItems {
-			proto.LineItems = append(proto.LineItems, convert.LineItemToProto(li, requestFullName, parentName))
+			proto.LineItems = append(proto.LineItems, convert.LineItemToProto(li, requestFullName, parentName, liActors))
 		}
 		proto.LineItemCount = int32(len(lineItems))
 	}
@@ -136,9 +198,13 @@ func (s *RequestsServer) ListRequests(ctx context.Context, req *assetsv1.ListReq
 	}
 
 	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
+	actors, err := s.resolveRequestActors(ctx, rows)
+	if err != nil {
+		return nil, err
+	}
 	requests := make([]*assetsv1.Request, 0, len(rows))
 	for _, r := range rows {
-		requests = append(requests, convert.RequestToProto(r, parentName))
+		requests = append(requests, convert.RequestToProto(r, parentName, actors))
 	}
 
 	return &assetsv1.ListRequestsResponse{
@@ -239,7 +305,12 @@ func (s *RequestsServer) CreateRequest(ctx context.Context, req *assetsv1.Create
 		}
 	}
 
-	return lro.DoneOperation(convert.RequestToProto(result, parentName))
+	actors, resolveErr := s.resolveRequestActors(ctx, []db.AssetRequest{result})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "request: actor resolution failed; returning proto without audit actors", "request_id", result.ID, "error", resolveErr)
+		actors = nil
+	}
+	return lro.DoneOperation(convert.RequestToProto(result, parentName, actors))
 }
 
 func (s *RequestsServer) UpdateRequest(ctx context.Context, req *assetsv1.UpdateRequestRequest) (*longrunningpb.Operation, error) {
@@ -296,7 +367,12 @@ func (s *RequestsServer) UpdateRequest(ctx context.Context, req *assetsv1.Update
 	}
 
 	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
-	return lro.DoneOperation(convert.RequestToProto(result, parentName))
+	actors, resolveErr := s.resolveRequestActors(ctx, []db.AssetRequest{result})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "request: actor resolution failed; returning proto without audit actors", "request_id", result.ID, "error", resolveErr)
+		actors = nil
+	}
+	return lro.DoneOperation(convert.RequestToProto(result, parentName, actors))
 }
 
 func (s *RequestsServer) DeleteRequest(ctx context.Context, req *assetsv1.DeleteRequestRequest) (*longrunningpb.Operation, error) {
@@ -321,7 +397,12 @@ func (s *RequestsServer) DeleteRequest(ctx context.Context, req *assetsv1.Delete
 
 	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
 	existing.State = db.RequestStateCANCELLED
-	return lro.DoneOperation(convert.RequestToProto(existing, parentName))
+	actors, resolveErr := s.resolveRequestActors(ctx, []db.AssetRequest{existing})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "request: actor resolution failed; returning proto without audit actors", "request_id", existing.ID, "error", resolveErr)
+		actors = nil
+	}
+	return lro.DoneOperation(convert.RequestToProto(existing, parentName, actors))
 }
 
 // SubmitRequest transitions DRAFT → OPEN.
@@ -360,7 +441,12 @@ func (s *RequestsServer) AssignRequest(ctx context.Context, req *assetsv1.Assign
 	}
 
 	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
-	return convert.RequestToProto(result, parentName), nil
+	actors, resolveErr := s.resolveRequestActors(ctx, []db.AssetRequest{result})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "request: actor resolution failed; returning proto without audit actors", "request_id", result.ID, "error", resolveErr)
+		actors = nil
+	}
+	return convert.RequestToProto(result, parentName, actors), nil
 }
 
 // ClaimRequest self-assigns the caller.
@@ -401,7 +487,12 @@ func (s *RequestsServer) ClaimRequest(ctx context.Context, req *assetsv1.ClaimRe
 	}
 
 	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
-	return convert.RequestToProto(result, parentName), nil
+	actors, resolveErr := s.resolveRequestActors(ctx, []db.AssetRequest{result})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "request: actor resolution failed; returning proto without audit actors", "request_id", result.ID, "error", resolveErr)
+		actors = nil
+	}
+	return convert.RequestToProto(result, parentName, actors), nil
 }
 
 // DeliverRequest transitions IN_PROGRESS → DELIVERED.
@@ -454,7 +545,12 @@ func (s *RequestsServer) CancelRequest(ctx context.Context, req *assetsv1.Cancel
 	}
 
 	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
-	return convert.RequestToProto(result, parentName), nil
+	actors, resolveErr := s.resolveRequestActors(ctx, []db.AssetRequest{result})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "request: actor resolution failed; returning proto without audit actors", "request_id", result.ID, "error", resolveErr)
+		actors = nil
+	}
+	return convert.RequestToProto(result, parentName, actors), nil
 }
 
 // transitionRequest is a helper for simple state transitions.
@@ -487,5 +583,10 @@ func (s *RequestsServer) transitionRequest(ctx context.Context, name string, fro
 	}
 
 	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
-	return convert.RequestToProto(result, parentName), nil
+	actors, resolveErr := s.resolveRequestActors(ctx, []db.AssetRequest{result})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "request: actor resolution failed; returning proto without audit actors", "request_id", result.ID, "error", resolveErr)
+		actors = nil
+	}
+	return convert.RequestToProto(result, parentName, actors), nil
 }

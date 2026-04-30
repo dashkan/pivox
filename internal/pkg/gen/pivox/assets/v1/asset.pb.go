@@ -24,6 +24,7 @@ import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
 	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/permission/v1"
+	types "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -493,6 +494,10 @@ type Asset struct {
 	LatestVersion *AssetVersion `protobuf:"bytes,10,opt,name=latest_version,json=latestVersion,proto3" json:"latest_version,omitempty"`
 	// Output only. Total number of versions.
 	VersionCount int32 `protobuf:"varint,11,opt,name=version_count,json=versionCount,proto3" json:"version_count,omitempty"`
+	// Input only. The time-to-live for the asset, as an alternative to
+	// setting expire_time directly. The server computes expire_time from
+	// create_time + ttl.
+	Ttl *durationpb.Duration `protobuf:"bytes,12,opt,name=ttl,proto3" json:"ttl,omitempty"`
 	// Output only. Duration of the media, for video and audio assets.
 	Duration *durationpb.Duration `protobuf:"bytes,15,opt,name=duration,proto3" json:"duration,omitempty"`
 	// Output only. Width in pixels, for image and video assets.
@@ -503,27 +508,25 @@ type Asset struct {
 	// a background reaper will soft-delete the asset after this time.
 	// Can be set directly or via a retention policy (tag-based rules).
 	ExpireTime *timestamppb.Timestamp `protobuf:"bytes,18,opt,name=expire_time,json=expireTime,proto3" json:"expire_time,omitempty"`
-	// Input only. The time-to-live for the asset, as an alternative to
-	// setting expire_time directly. The server computes expire_time from
-	// create_time + ttl.
-	Ttl *durationpb.Duration `protobuf:"bytes,27,opt,name=ttl,proto3" json:"ttl,omitempty"`
 	// Optional. Annotations associated with this asset.
 	Annotations map[string]string `protobuf:"bytes,19,rep,name=annotations,proto3" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Output only. A checksum computed by the server based on the current
 	// value of the Asset resource.
 	Etag string `protobuf:"bytes,20,opt,name=etag,proto3" json:"etag,omitempty"`
-	// Output only. The user who created the asset.
-	Creator string `protobuf:"bytes,21,opt,name=creator,proto3" json:"creator,omitempty"`
-	// Output only. The user who last updated the asset.
-	Updater string `protobuf:"bytes,22,opt,name=updater,proto3" json:"updater,omitempty"`
+	// Output only. The identity that created this asset.
+	CreatedBy *types.Actor `protobuf:"bytes,21,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
 	// Output only. Timestamp when the asset was created.
-	CreateTime *timestamppb.Timestamp `protobuf:"bytes,23,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	CreateTime *timestamppb.Timestamp `protobuf:"bytes,22,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	// Output only. The identity that last modified this asset.
+	UpdatedBy *types.Actor `protobuf:"bytes,23,opt,name=updated_by,json=updatedBy,proto3" json:"updated_by,omitempty"`
 	// Output only. Timestamp when the asset was last modified.
 	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,24,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	// Output only. The identity that requested deletion of this asset.
+	DeletedBy *types.Actor `protobuf:"bytes,25,opt,name=deleted_by,json=deletedBy,proto3" json:"deleted_by,omitempty"`
 	// Output only. The time at which the asset was soft-deleted.
-	DeleteTime *timestamppb.Timestamp `protobuf:"bytes,25,opt,name=delete_time,json=deleteTime,proto3" json:"delete_time,omitempty"`
+	DeleteTime *timestamppb.Timestamp `protobuf:"bytes,26,opt,name=delete_time,json=deleteTime,proto3" json:"delete_time,omitempty"`
 	// Output only. The time at which the asset will be permanently purged.
-	PurgeTime     *timestamppb.Timestamp `protobuf:"bytes,26,opt,name=purge_time,json=purgeTime,proto3" json:"purge_time,omitempty"`
+	PurgeTime     *timestamppb.Timestamp `protobuf:"bytes,27,opt,name=purge_time,json=purgeTime,proto3" json:"purge_time,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -642,6 +645,13 @@ func (x *Asset) GetVersionCount() int32 {
 	return 0
 }
 
+func (x *Asset) GetTtl() *durationpb.Duration {
+	if x != nil {
+		return x.Ttl
+	}
+	return nil
+}
+
 func (x *Asset) GetDuration() *durationpb.Duration {
 	if x != nil {
 		return x.Duration
@@ -670,13 +680,6 @@ func (x *Asset) GetExpireTime() *timestamppb.Timestamp {
 	return nil
 }
 
-func (x *Asset) GetTtl() *durationpb.Duration {
-	if x != nil {
-		return x.Ttl
-	}
-	return nil
-}
-
 func (x *Asset) GetAnnotations() map[string]string {
 	if x != nil {
 		return x.Annotations
@@ -691,18 +694,11 @@ func (x *Asset) GetEtag() string {
 	return ""
 }
 
-func (x *Asset) GetCreator() string {
+func (x *Asset) GetCreatedBy() *types.Actor {
 	if x != nil {
-		return x.Creator
+		return x.CreatedBy
 	}
-	return ""
-}
-
-func (x *Asset) GetUpdater() string {
-	if x != nil {
-		return x.Updater
-	}
-	return ""
+	return nil
 }
 
 func (x *Asset) GetCreateTime() *timestamppb.Timestamp {
@@ -712,9 +708,23 @@ func (x *Asset) GetCreateTime() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *Asset) GetUpdatedBy() *types.Actor {
+	if x != nil {
+		return x.UpdatedBy
+	}
+	return nil
+}
+
 func (x *Asset) GetUpdateTime() *timestamppb.Timestamp {
 	if x != nil {
 		return x.UpdateTime
+	}
+	return nil
+}
+
+func (x *Asset) GetDeletedBy() *types.Actor {
+	if x != nil {
+		return x.DeletedBy
 	}
 	return nil
 }
@@ -762,8 +772,8 @@ type AssetVersion struct {
 	ChangeNote string `protobuf:"bytes,8,opt,name=change_note,json=changeNote,proto3" json:"change_note,omitempty"`
 	// Output only. If the ingestion pipeline failed, the error details.
 	IngestionError string `protobuf:"bytes,9,opt,name=ingestion_error,json=ingestionError,proto3" json:"ingestion_error,omitempty"`
-	// Output only. The user who created this version.
-	Creator string `protobuf:"bytes,10,opt,name=creator,proto3" json:"creator,omitempty"`
+	// Output only. The identity that created this version.
+	CreatedBy *types.Actor `protobuf:"bytes,10,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
 	// Output only. Timestamp when this version was created.
 	CreateTime *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
 	// Output only. The version this was derived from. Empty for upload
@@ -869,11 +879,11 @@ func (x *AssetVersion) GetIngestionError() string {
 	return ""
 }
 
-func (x *AssetVersion) GetCreator() string {
+func (x *AssetVersion) GetCreatedBy() *types.Actor {
 	if x != nil {
-		return x.Creator
+		return x.CreatedBy
 	}
-	return ""
+	return nil
 }
 
 func (x *AssetVersion) GetCreateTime() *timestamppb.Timestamp {
@@ -2682,7 +2692,7 @@ var File_pivox_assets_v1_asset_proto protoreflect.FileDescriptor
 
 const file_pivox_assets_v1_asset_proto_rawDesc = "" +
 	"\n" +
-	"\x1bpivox/assets/v1/asset.proto\x12\x0fpivox.assets.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!pivox/permission/v1/options.proto\"\xc4\f\n" +
+	"\x1bpivox/assets/v1/asset.proto\x12\x0fpivox.assets.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!pivox/permission/v1/options.proto\x1a\x17pivox/types/actor.proto\"\xae\r\n" +
 	"\x05Asset\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12.\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\v\xe0A\x02\xbaH\x05r\x03\x18\xff\x01R\vdisplayName\x127\n" +
@@ -2700,25 +2710,29 @@ const file_pivox_assets_v1_asset_proto_rawDesc = "" +
 	"size_bytes\x18\t \x01(\x03B\x03\xe0A\x03R\tsizeBytes\x12I\n" +
 	"\x0elatest_version\x18\n" +
 	" \x01(\v2\x1d.pivox.assets.v1.AssetVersionB\x03\xe0A\x03R\rlatestVersion\x12(\n" +
-	"\rversion_count\x18\v \x01(\x05B\x03\xe0A\x03R\fversionCount\x12:\n" +
+	"\rversion_count\x18\v \x01(\x05B\x03\xe0A\x03R\fversionCount\x123\n" +
+	"\x03ttl\x18\f \x01(\v2\x19.google.protobuf.DurationB\x06\xe0A\x04\xe0A\x01R\x03ttl\x12:\n" +
 	"\bduration\x18\x0f \x01(\v2\x19.google.protobuf.DurationB\x03\xe0A\x03R\bduration\x12\x19\n" +
 	"\x05width\x18\x10 \x01(\x05B\x03\xe0A\x03R\x05width\x12\x1b\n" +
 	"\x06height\x18\x11 \x01(\x05B\x03\xe0A\x03R\x06height\x12@\n" +
 	"\vexpire_time\x18\x12 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x01R\n" +
-	"expireTime\x123\n" +
-	"\x03ttl\x18\x1b \x01(\v2\x19.google.protobuf.DurationB\x06\xe0A\x04\xe0A\x01R\x03ttl\x12N\n" +
+	"expireTime\x12N\n" +
 	"\vannotations\x18\x13 \x03(\v2'.pivox.assets.v1.Asset.AnnotationsEntryB\x03\xe0A\x01R\vannotations\x12\x17\n" +
-	"\x04etag\x18\x14 \x01(\tB\x03\xe0A\x03R\x04etag\x12\x1d\n" +
-	"\acreator\x18\x15 \x01(\tB\x03\xe0A\x03R\acreator\x12\x1d\n" +
-	"\aupdater\x18\x16 \x01(\tB\x03\xe0A\x03R\aupdater\x12@\n" +
-	"\vcreate_time\x18\x17 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"createTime\x12@\n" +
+	"\x04etag\x18\x14 \x01(\tB\x03\xe0A\x03R\x04etag\x126\n" +
+	"\n" +
+	"created_by\x18\x15 \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tcreatedBy\x12@\n" +
+	"\vcreate_time\x18\x16 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"createTime\x126\n" +
+	"\n" +
+	"updated_by\x18\x17 \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tupdatedBy\x12@\n" +
 	"\vupdate_time\x18\x18 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"updateTime\x12@\n" +
-	"\vdelete_time\x18\x19 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"updateTime\x126\n" +
+	"\n" +
+	"deleted_by\x18\x19 \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tdeletedBy\x12@\n" +
+	"\vdelete_time\x18\x1a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"deleteTime\x12>\n" +
 	"\n" +
-	"purge_time\x18\x1a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\tpurgeTime\x1a>\n" +
+	"purge_time\x18\x1b \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\tpurgeTime\x1a>\n" +
 	"\x10AnnotationsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"m\n" +
@@ -2738,7 +2752,7 @@ const file_pivox_assets_v1_asset_proto_rawDesc = "" +
 	"\x05VIDEO\x10\x02\x12\t\n" +
 	"\x05AUDIO\x10\x03\x12\f\n" +
 	"\bDOCUMENT\x10\x04:b\xeaA_\n" +
-	"\x12pivox.assets/Asset\x12:organizations/{organization}/spaces/{space}/assets/{asset}*\x06assets2\x05asset\"\xe6\x05\n" +
+	"\x12pivox.assets/Asset\x12:organizations/{organization}/spaces/{space}/assets/{asset}*\x06assets2\x05asset\"\xff\x05\n" +
 	"\fAssetVersion\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12*\n" +
 	"\x0eversion_number\x18\x02 \x01(\x05B\x03\xe0A\x03R\rversionNumber\x12,\n" +
@@ -2753,9 +2767,10 @@ const file_pivox_assets_v1_asset_proto_rawDesc = "" +
 	"renditions\x12$\n" +
 	"\vchange_note\x18\b \x01(\tB\x03\xe0A\x01R\n" +
 	"changeNote\x12,\n" +
-	"\x0fingestion_error\x18\t \x01(\tB\x03\xe0A\x03R\x0eingestionError\x12\x1d\n" +
-	"\acreator\x18\n" +
-	" \x01(\tB\x03\xe0A\x03R\acreator\x12@\n" +
+	"\x0fingestion_error\x18\t \x01(\tB\x03\xe0A\x03R\x0eingestionError\x126\n" +
+	"\n" +
+	"created_by\x18\n" +
+	" \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tcreatedBy\x12@\n" +
 	"\vcreate_time\x18\v \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"createTime\x12H\n" +
 	"\x0esource_version\x18\f \x01(\tB!\xe0A\x03\xfaA\x1b\n" +
@@ -3011,70 +3026,75 @@ var file_pivox_assets_v1_asset_proto_goTypes = []any{
 	nil,                                // 35: pivox.assets.v1.UploadInfo.HeadersEntry
 	(*durationpb.Duration)(nil),        // 36: google.protobuf.Duration
 	(*timestamppb.Timestamp)(nil),      // 37: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),      // 38: google.protobuf.FieldMask
-	(*structpb.Struct)(nil),            // 39: google.protobuf.Struct
-	(*longrunningpb.Operation)(nil),    // 40: google.longrunning.Operation
+	(*types.Actor)(nil),                // 38: pivox.types.Actor
+	(*fieldmaskpb.FieldMask)(nil),      // 39: google.protobuf.FieldMask
+	(*structpb.Struct)(nil),            // 40: google.protobuf.Struct
+	(*longrunningpb.Operation)(nil),    // 41: google.longrunning.Operation
 }
 var file_pivox_assets_v1_asset_proto_depIdxs = []int32{
 	0,  // 0: pivox.assets.v1.Asset.state:type_name -> pivox.assets.v1.Asset.State
 	1,  // 1: pivox.assets.v1.Asset.media_type:type_name -> pivox.assets.v1.Asset.MediaType
 	7,  // 2: pivox.assets.v1.Asset.latest_version:type_name -> pivox.assets.v1.AssetVersion
-	36, // 3: pivox.assets.v1.Asset.duration:type_name -> google.protobuf.Duration
-	37, // 4: pivox.assets.v1.Asset.expire_time:type_name -> google.protobuf.Timestamp
-	36, // 5: pivox.assets.v1.Asset.ttl:type_name -> google.protobuf.Duration
+	36, // 3: pivox.assets.v1.Asset.ttl:type_name -> google.protobuf.Duration
+	36, // 4: pivox.assets.v1.Asset.duration:type_name -> google.protobuf.Duration
+	37, // 5: pivox.assets.v1.Asset.expire_time:type_name -> google.protobuf.Timestamp
 	34, // 6: pivox.assets.v1.Asset.annotations:type_name -> pivox.assets.v1.Asset.AnnotationsEntry
-	37, // 7: pivox.assets.v1.Asset.create_time:type_name -> google.protobuf.Timestamp
-	37, // 8: pivox.assets.v1.Asset.update_time:type_name -> google.protobuf.Timestamp
-	37, // 9: pivox.assets.v1.Asset.delete_time:type_name -> google.protobuf.Timestamp
-	37, // 10: pivox.assets.v1.Asset.purge_time:type_name -> google.protobuf.Timestamp
-	10, // 11: pivox.assets.v1.AssetVersion.renditions:type_name -> pivox.assets.v1.Rendition
-	37, // 12: pivox.assets.v1.AssetVersion.create_time:type_name -> google.protobuf.Timestamp
-	8,  // 13: pivox.assets.v1.AssetVersion.crop:type_name -> pivox.assets.v1.Crop
-	9,  // 14: pivox.assets.v1.Crop.area:type_name -> pivox.assets.v1.CropArea
-	2,  // 15: pivox.assets.v1.Rendition.type:type_name -> pivox.assets.v1.Rendition.Type
-	3,  // 16: pivox.assets.v1.UploadInfo.method:type_name -> pivox.assets.v1.UploadInfo.Method
-	35, // 17: pivox.assets.v1.UploadInfo.headers:type_name -> pivox.assets.v1.UploadInfo.HeadersEntry
-	12, // 18: pivox.assets.v1.UploadInfo.parts:type_name -> pivox.assets.v1.UploadPart
-	6,  // 19: pivox.assets.v1.CreateAssetRequest.asset:type_name -> pivox.assets.v1.Asset
-	4,  // 20: pivox.assets.v1.CreateAssetMetadata.step:type_name -> pivox.assets.v1.CreateAssetMetadata.Step
-	11, // 21: pivox.assets.v1.CreateAssetMetadata.upload_info:type_name -> pivox.assets.v1.UploadInfo
-	6,  // 22: pivox.assets.v1.ListAssetsResponse.assets:type_name -> pivox.assets.v1.Asset
-	6,  // 23: pivox.assets.v1.UpdateAssetRequest.asset:type_name -> pivox.assets.v1.Asset
-	38, // 24: pivox.assets.v1.UpdateAssetRequest.update_mask:type_name -> google.protobuf.FieldMask
-	7,  // 25: pivox.assets.v1.CreateAssetVersionRequest.asset_version:type_name -> pivox.assets.v1.AssetVersion
-	8,  // 26: pivox.assets.v1.CreateAssetVersionRequest.crop:type_name -> pivox.assets.v1.Crop
-	4,  // 27: pivox.assets.v1.CreateAssetVersionMetadata.step:type_name -> pivox.assets.v1.CreateAssetMetadata.Step
-	11, // 28: pivox.assets.v1.CreateAssetVersionMetadata.upload_info:type_name -> pivox.assets.v1.UploadInfo
-	7,  // 29: pivox.assets.v1.ListAssetVersionsResponse.versions:type_name -> pivox.assets.v1.AssetVersion
-	5,  // 30: pivox.assets.v1.ImportAssetsMetadata.phase:type_name -> pivox.assets.v1.ImportAssetsMetadata.Phase
-	39, // 31: pivox.assets.v1.AssetMetadata.metadata:type_name -> google.protobuf.Struct
-	13, // 32: pivox.assets.v1.Assets.CreateAsset:input_type -> pivox.assets.v1.CreateAssetRequest
-	15, // 33: pivox.assets.v1.Assets.GetAsset:input_type -> pivox.assets.v1.GetAssetRequest
-	16, // 34: pivox.assets.v1.Assets.ListAssets:input_type -> pivox.assets.v1.ListAssetsRequest
-	18, // 35: pivox.assets.v1.Assets.UpdateAsset:input_type -> pivox.assets.v1.UpdateAssetRequest
-	20, // 36: pivox.assets.v1.Assets.DeleteAsset:input_type -> pivox.assets.v1.DeleteAssetRequest
-	22, // 37: pivox.assets.v1.Assets.UndeleteAsset:input_type -> pivox.assets.v1.UndeleteAssetRequest
-	24, // 38: pivox.assets.v1.Assets.CreateAssetVersion:input_type -> pivox.assets.v1.CreateAssetVersionRequest
-	26, // 39: pivox.assets.v1.Assets.GetAssetVersion:input_type -> pivox.assets.v1.GetAssetVersionRequest
-	27, // 40: pivox.assets.v1.Assets.ListAssetVersions:input_type -> pivox.assets.v1.ListAssetVersionsRequest
-	29, // 41: pivox.assets.v1.Assets.ImportAssets:input_type -> pivox.assets.v1.ImportAssetsRequest
-	32, // 42: pivox.assets.v1.Assets.GetAssetMetadata:input_type -> pivox.assets.v1.GetAssetMetadataRequest
-	40, // 43: pivox.assets.v1.Assets.CreateAsset:output_type -> google.longrunning.Operation
-	6,  // 44: pivox.assets.v1.Assets.GetAsset:output_type -> pivox.assets.v1.Asset
-	17, // 45: pivox.assets.v1.Assets.ListAssets:output_type -> pivox.assets.v1.ListAssetsResponse
-	40, // 46: pivox.assets.v1.Assets.UpdateAsset:output_type -> google.longrunning.Operation
-	40, // 47: pivox.assets.v1.Assets.DeleteAsset:output_type -> google.longrunning.Operation
-	40, // 48: pivox.assets.v1.Assets.UndeleteAsset:output_type -> google.longrunning.Operation
-	40, // 49: pivox.assets.v1.Assets.CreateAssetVersion:output_type -> google.longrunning.Operation
-	7,  // 50: pivox.assets.v1.Assets.GetAssetVersion:output_type -> pivox.assets.v1.AssetVersion
-	28, // 51: pivox.assets.v1.Assets.ListAssetVersions:output_type -> pivox.assets.v1.ListAssetVersionsResponse
-	40, // 52: pivox.assets.v1.Assets.ImportAssets:output_type -> google.longrunning.Operation
-	33, // 53: pivox.assets.v1.Assets.GetAssetMetadata:output_type -> pivox.assets.v1.AssetMetadata
-	43, // [43:54] is the sub-list for method output_type
-	32, // [32:43] is the sub-list for method input_type
-	32, // [32:32] is the sub-list for extension type_name
-	32, // [32:32] is the sub-list for extension extendee
-	0,  // [0:32] is the sub-list for field type_name
+	38, // 7: pivox.assets.v1.Asset.created_by:type_name -> pivox.types.Actor
+	37, // 8: pivox.assets.v1.Asset.create_time:type_name -> google.protobuf.Timestamp
+	38, // 9: pivox.assets.v1.Asset.updated_by:type_name -> pivox.types.Actor
+	37, // 10: pivox.assets.v1.Asset.update_time:type_name -> google.protobuf.Timestamp
+	38, // 11: pivox.assets.v1.Asset.deleted_by:type_name -> pivox.types.Actor
+	37, // 12: pivox.assets.v1.Asset.delete_time:type_name -> google.protobuf.Timestamp
+	37, // 13: pivox.assets.v1.Asset.purge_time:type_name -> google.protobuf.Timestamp
+	10, // 14: pivox.assets.v1.AssetVersion.renditions:type_name -> pivox.assets.v1.Rendition
+	38, // 15: pivox.assets.v1.AssetVersion.created_by:type_name -> pivox.types.Actor
+	37, // 16: pivox.assets.v1.AssetVersion.create_time:type_name -> google.protobuf.Timestamp
+	8,  // 17: pivox.assets.v1.AssetVersion.crop:type_name -> pivox.assets.v1.Crop
+	9,  // 18: pivox.assets.v1.Crop.area:type_name -> pivox.assets.v1.CropArea
+	2,  // 19: pivox.assets.v1.Rendition.type:type_name -> pivox.assets.v1.Rendition.Type
+	3,  // 20: pivox.assets.v1.UploadInfo.method:type_name -> pivox.assets.v1.UploadInfo.Method
+	35, // 21: pivox.assets.v1.UploadInfo.headers:type_name -> pivox.assets.v1.UploadInfo.HeadersEntry
+	12, // 22: pivox.assets.v1.UploadInfo.parts:type_name -> pivox.assets.v1.UploadPart
+	6,  // 23: pivox.assets.v1.CreateAssetRequest.asset:type_name -> pivox.assets.v1.Asset
+	4,  // 24: pivox.assets.v1.CreateAssetMetadata.step:type_name -> pivox.assets.v1.CreateAssetMetadata.Step
+	11, // 25: pivox.assets.v1.CreateAssetMetadata.upload_info:type_name -> pivox.assets.v1.UploadInfo
+	6,  // 26: pivox.assets.v1.ListAssetsResponse.assets:type_name -> pivox.assets.v1.Asset
+	6,  // 27: pivox.assets.v1.UpdateAssetRequest.asset:type_name -> pivox.assets.v1.Asset
+	39, // 28: pivox.assets.v1.UpdateAssetRequest.update_mask:type_name -> google.protobuf.FieldMask
+	7,  // 29: pivox.assets.v1.CreateAssetVersionRequest.asset_version:type_name -> pivox.assets.v1.AssetVersion
+	8,  // 30: pivox.assets.v1.CreateAssetVersionRequest.crop:type_name -> pivox.assets.v1.Crop
+	4,  // 31: pivox.assets.v1.CreateAssetVersionMetadata.step:type_name -> pivox.assets.v1.CreateAssetMetadata.Step
+	11, // 32: pivox.assets.v1.CreateAssetVersionMetadata.upload_info:type_name -> pivox.assets.v1.UploadInfo
+	7,  // 33: pivox.assets.v1.ListAssetVersionsResponse.versions:type_name -> pivox.assets.v1.AssetVersion
+	5,  // 34: pivox.assets.v1.ImportAssetsMetadata.phase:type_name -> pivox.assets.v1.ImportAssetsMetadata.Phase
+	40, // 35: pivox.assets.v1.AssetMetadata.metadata:type_name -> google.protobuf.Struct
+	13, // 36: pivox.assets.v1.Assets.CreateAsset:input_type -> pivox.assets.v1.CreateAssetRequest
+	15, // 37: pivox.assets.v1.Assets.GetAsset:input_type -> pivox.assets.v1.GetAssetRequest
+	16, // 38: pivox.assets.v1.Assets.ListAssets:input_type -> pivox.assets.v1.ListAssetsRequest
+	18, // 39: pivox.assets.v1.Assets.UpdateAsset:input_type -> pivox.assets.v1.UpdateAssetRequest
+	20, // 40: pivox.assets.v1.Assets.DeleteAsset:input_type -> pivox.assets.v1.DeleteAssetRequest
+	22, // 41: pivox.assets.v1.Assets.UndeleteAsset:input_type -> pivox.assets.v1.UndeleteAssetRequest
+	24, // 42: pivox.assets.v1.Assets.CreateAssetVersion:input_type -> pivox.assets.v1.CreateAssetVersionRequest
+	26, // 43: pivox.assets.v1.Assets.GetAssetVersion:input_type -> pivox.assets.v1.GetAssetVersionRequest
+	27, // 44: pivox.assets.v1.Assets.ListAssetVersions:input_type -> pivox.assets.v1.ListAssetVersionsRequest
+	29, // 45: pivox.assets.v1.Assets.ImportAssets:input_type -> pivox.assets.v1.ImportAssetsRequest
+	32, // 46: pivox.assets.v1.Assets.GetAssetMetadata:input_type -> pivox.assets.v1.GetAssetMetadataRequest
+	41, // 47: pivox.assets.v1.Assets.CreateAsset:output_type -> google.longrunning.Operation
+	6,  // 48: pivox.assets.v1.Assets.GetAsset:output_type -> pivox.assets.v1.Asset
+	17, // 49: pivox.assets.v1.Assets.ListAssets:output_type -> pivox.assets.v1.ListAssetsResponse
+	41, // 50: pivox.assets.v1.Assets.UpdateAsset:output_type -> google.longrunning.Operation
+	41, // 51: pivox.assets.v1.Assets.DeleteAsset:output_type -> google.longrunning.Operation
+	41, // 52: pivox.assets.v1.Assets.UndeleteAsset:output_type -> google.longrunning.Operation
+	41, // 53: pivox.assets.v1.Assets.CreateAssetVersion:output_type -> google.longrunning.Operation
+	7,  // 54: pivox.assets.v1.Assets.GetAssetVersion:output_type -> pivox.assets.v1.AssetVersion
+	28, // 55: pivox.assets.v1.Assets.ListAssetVersions:output_type -> pivox.assets.v1.ListAssetVersionsResponse
+	41, // 56: pivox.assets.v1.Assets.ImportAssets:output_type -> google.longrunning.Operation
+	33, // 57: pivox.assets.v1.Assets.GetAssetMetadata:output_type -> pivox.assets.v1.AssetMetadata
+	47, // [47:58] is the sub-list for method output_type
+	36, // [36:47] is the sub-list for method input_type
+	36, // [36:36] is the sub-list for extension type_name
+	36, // [36:36] is the sub-list for extension extendee
+	0,  // [0:36] is the sub-list for field type_name
 }
 
 func init() { file_pivox_assets_v1_asset_proto_init() }

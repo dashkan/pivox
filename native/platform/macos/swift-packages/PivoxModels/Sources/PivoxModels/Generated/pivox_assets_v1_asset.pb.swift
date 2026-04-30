@@ -134,6 +134,18 @@ public struct Pivox_Assets_V1_Asset: @unchecked Sendable {
     set {_uniqueStorage()._versionCount = newValue}
   }
 
+  /// Input only. The time-to-live for the asset, as an alternative to
+  /// setting expire_time directly. The server computes expire_time from
+  /// create_time + ttl.
+  public var ttl: SwiftProtobuf.Google_Protobuf_Duration {
+    get {_storage._ttl ?? SwiftProtobuf.Google_Protobuf_Duration()}
+    set {_uniqueStorage()._ttl = newValue}
+  }
+  /// Returns true if `ttl` has been explicitly set.
+  public var hasTtl: Bool {_storage._ttl != nil}
+  /// Clears the value of `ttl`. Subsequent reads from it will return its default value.
+  public mutating func clearTtl() {_uniqueStorage()._ttl = nil}
+
   /// Output only. Duration of the media, for video and audio assets.
   public var duration: SwiftProtobuf.Google_Protobuf_Duration {
     get {_storage._duration ?? SwiftProtobuf.Google_Protobuf_Duration()}
@@ -168,18 +180,6 @@ public struct Pivox_Assets_V1_Asset: @unchecked Sendable {
   /// Clears the value of `expireTime`. Subsequent reads from it will return its default value.
   public mutating func clearExpireTime() {_uniqueStorage()._expireTime = nil}
 
-  /// Input only. The time-to-live for the asset, as an alternative to
-  /// setting expire_time directly. The server computes expire_time from
-  /// create_time + ttl.
-  public var ttl: SwiftProtobuf.Google_Protobuf_Duration {
-    get {_storage._ttl ?? SwiftProtobuf.Google_Protobuf_Duration()}
-    set {_uniqueStorage()._ttl = newValue}
-  }
-  /// Returns true if `ttl` has been explicitly set.
-  public var hasTtl: Bool {_storage._ttl != nil}
-  /// Clears the value of `ttl`. Subsequent reads from it will return its default value.
-  public mutating func clearTtl() {_uniqueStorage()._ttl = nil}
-
   /// Optional. Annotations associated with this asset.
   public var annotations: Dictionary<String,String> {
     get {_storage._annotations}
@@ -193,17 +193,15 @@ public struct Pivox_Assets_V1_Asset: @unchecked Sendable {
     set {_uniqueStorage()._etag = newValue}
   }
 
-  /// Output only. The user who created the asset.
-  public var creator: String {
-    get {_storage._creator}
-    set {_uniqueStorage()._creator = newValue}
+  /// Output only. The identity that created this asset.
+  public var createdBy: Pivox_Types_Actor {
+    get {_storage._createdBy ?? Pivox_Types_Actor()}
+    set {_uniqueStorage()._createdBy = newValue}
   }
-
-  /// Output only. The user who last updated the asset.
-  public var updater: String {
-    get {_storage._updater}
-    set {_uniqueStorage()._updater = newValue}
-  }
+  /// Returns true if `createdBy` has been explicitly set.
+  public var hasCreatedBy: Bool {_storage._createdBy != nil}
+  /// Clears the value of `createdBy`. Subsequent reads from it will return its default value.
+  public mutating func clearCreatedBy() {_uniqueStorage()._createdBy = nil}
 
   /// Output only. Timestamp when the asset was created.
   public var createTime: SwiftProtobuf.Google_Protobuf_Timestamp {
@@ -215,6 +213,16 @@ public struct Pivox_Assets_V1_Asset: @unchecked Sendable {
   /// Clears the value of `createTime`. Subsequent reads from it will return its default value.
   public mutating func clearCreateTime() {_uniqueStorage()._createTime = nil}
 
+  /// Output only. The identity that last modified this asset.
+  public var updatedBy: Pivox_Types_Actor {
+    get {_storage._updatedBy ?? Pivox_Types_Actor()}
+    set {_uniqueStorage()._updatedBy = newValue}
+  }
+  /// Returns true if `updatedBy` has been explicitly set.
+  public var hasUpdatedBy: Bool {_storage._updatedBy != nil}
+  /// Clears the value of `updatedBy`. Subsequent reads from it will return its default value.
+  public mutating func clearUpdatedBy() {_uniqueStorage()._updatedBy = nil}
+
   /// Output only. Timestamp when the asset was last modified.
   public var updateTime: SwiftProtobuf.Google_Protobuf_Timestamp {
     get {_storage._updateTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
@@ -224,6 +232,16 @@ public struct Pivox_Assets_V1_Asset: @unchecked Sendable {
   public var hasUpdateTime: Bool {_storage._updateTime != nil}
   /// Clears the value of `updateTime`. Subsequent reads from it will return its default value.
   public mutating func clearUpdateTime() {_uniqueStorage()._updateTime = nil}
+
+  /// Output only. The identity that requested deletion of this asset.
+  public var deletedBy: Pivox_Types_Actor {
+    get {_storage._deletedBy ?? Pivox_Types_Actor()}
+    set {_uniqueStorage()._deletedBy = newValue}
+  }
+  /// Returns true if `deletedBy` has been explicitly set.
+  public var hasDeletedBy: Bool {_storage._deletedBy != nil}
+  /// Clears the value of `deletedBy`. Subsequent reads from it will return its default value.
+  public mutating func clearDeletedBy() {_uniqueStorage()._deletedBy = nil}
 
   /// Output only. The time at which the asset was soft-deleted.
   public var deleteTime: SwiftProtobuf.Google_Protobuf_Timestamp {
@@ -446,11 +464,15 @@ public struct Pivox_Assets_V1_AssetVersion: @unchecked Sendable {
     set {_uniqueStorage()._ingestionError = newValue}
   }
 
-  /// Output only. The user who created this version.
-  public var creator: String {
-    get {_storage._creator}
-    set {_uniqueStorage()._creator = newValue}
+  /// Output only. The identity that created this version.
+  public var createdBy: Pivox_Types_Actor {
+    get {_storage._createdBy ?? Pivox_Types_Actor()}
+    set {_uniqueStorage()._createdBy = newValue}
   }
+  /// Returns true if `createdBy` has been explicitly set.
+  public var hasCreatedBy: Bool {_storage._createdBy != nil}
+  /// Clears the value of `createdBy`. Subsequent reads from it will return its default value.
+  public mutating func clearCreatedBy() {_uniqueStorage()._createdBy = nil}
 
   /// Output only. Timestamp when this version was created.
   public var createTime: SwiftProtobuf.Google_Protobuf_Timestamp {
@@ -1448,7 +1470,7 @@ fileprivate let _protobuf_package = "pivox.assets.v1"
 
 extension Pivox_Assets_V1_Asset: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".Asset"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}display_name\0\u{1}state\0\u{3}media_type\0\u{3}content_type\0\u{3}import_path\0\u{1}endpoint\0\u{3}checksum_sha256\0\u{3}size_bytes\0\u{3}latest_version\0\u{3}version_count\0\u{2}\u{4}duration\0\u{1}width\0\u{1}height\0\u{3}expire_time\0\u{1}annotations\0\u{1}etag\0\u{1}creator\0\u{1}updater\0\u{3}create_time\0\u{3}update_time\0\u{3}delete_time\0\u{3}purge_time\0\u{1}ttl\0\u{1}filename\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}display_name\0\u{1}state\0\u{3}media_type\0\u{3}content_type\0\u{3}import_path\0\u{1}endpoint\0\u{3}checksum_sha256\0\u{3}size_bytes\0\u{3}latest_version\0\u{3}version_count\0\u{1}ttl\0\u{2}\u{3}duration\0\u{1}width\0\u{1}height\0\u{3}expire_time\0\u{1}annotations\0\u{1}etag\0\u{3}created_by\0\u{3}create_time\0\u{3}updated_by\0\u{3}update_time\0\u{3}deleted_by\0\u{3}delete_time\0\u{3}purge_time\0\u{1}filename\0")
 
   fileprivate class _StorageClass {
     var _name: String = String()
@@ -1463,17 +1485,18 @@ extension Pivox_Assets_V1_Asset: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
     var _sizeBytes: Int64 = 0
     var _latestVersion: Pivox_Assets_V1_AssetVersion? = nil
     var _versionCount: Int32 = 0
+    var _ttl: SwiftProtobuf.Google_Protobuf_Duration? = nil
     var _duration: SwiftProtobuf.Google_Protobuf_Duration? = nil
     var _width: Int32 = 0
     var _height: Int32 = 0
     var _expireTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
-    var _ttl: SwiftProtobuf.Google_Protobuf_Duration? = nil
     var _annotations: Dictionary<String,String> = [:]
     var _etag: String = String()
-    var _creator: String = String()
-    var _updater: String = String()
+    var _createdBy: Pivox_Types_Actor? = nil
     var _createTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _updatedBy: Pivox_Types_Actor? = nil
     var _updateTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _deletedBy: Pivox_Types_Actor? = nil
     var _deleteTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     var _purgeTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 
@@ -1498,17 +1521,18 @@ extension Pivox_Assets_V1_Asset: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
       _sizeBytes = source._sizeBytes
       _latestVersion = source._latestVersion
       _versionCount = source._versionCount
+      _ttl = source._ttl
       _duration = source._duration
       _width = source._width
       _height = source._height
       _expireTime = source._expireTime
-      _ttl = source._ttl
       _annotations = source._annotations
       _etag = source._etag
-      _creator = source._creator
-      _updater = source._updater
+      _createdBy = source._createdBy
       _createTime = source._createTime
+      _updatedBy = source._updatedBy
       _updateTime = source._updateTime
+      _deletedBy = source._deletedBy
       _deleteTime = source._deleteTime
       _purgeTime = source._purgeTime
     }
@@ -1540,19 +1564,20 @@ extension Pivox_Assets_V1_Asset: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
         case 9: try { try decoder.decodeSingularInt64Field(value: &_storage._sizeBytes) }()
         case 10: try { try decoder.decodeSingularMessageField(value: &_storage._latestVersion) }()
         case 11: try { try decoder.decodeSingularInt32Field(value: &_storage._versionCount) }()
+        case 12: try { try decoder.decodeSingularMessageField(value: &_storage._ttl) }()
         case 15: try { try decoder.decodeSingularMessageField(value: &_storage._duration) }()
         case 16: try { try decoder.decodeSingularInt32Field(value: &_storage._width) }()
         case 17: try { try decoder.decodeSingularInt32Field(value: &_storage._height) }()
         case 18: try { try decoder.decodeSingularMessageField(value: &_storage._expireTime) }()
         case 19: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &_storage._annotations) }()
         case 20: try { try decoder.decodeSingularStringField(value: &_storage._etag) }()
-        case 21: try { try decoder.decodeSingularStringField(value: &_storage._creator) }()
-        case 22: try { try decoder.decodeSingularStringField(value: &_storage._updater) }()
-        case 23: try { try decoder.decodeSingularMessageField(value: &_storage._createTime) }()
+        case 21: try { try decoder.decodeSingularMessageField(value: &_storage._createdBy) }()
+        case 22: try { try decoder.decodeSingularMessageField(value: &_storage._createTime) }()
+        case 23: try { try decoder.decodeSingularMessageField(value: &_storage._updatedBy) }()
         case 24: try { try decoder.decodeSingularMessageField(value: &_storage._updateTime) }()
-        case 25: try { try decoder.decodeSingularMessageField(value: &_storage._deleteTime) }()
-        case 26: try { try decoder.decodeSingularMessageField(value: &_storage._purgeTime) }()
-        case 27: try { try decoder.decodeSingularMessageField(value: &_storage._ttl) }()
+        case 25: try { try decoder.decodeSingularMessageField(value: &_storage._deletedBy) }()
+        case 26: try { try decoder.decodeSingularMessageField(value: &_storage._deleteTime) }()
+        case 27: try { try decoder.decodeSingularMessageField(value: &_storage._purgeTime) }()
         case 28: try { try decoder.decodeSingularStringField(value: &_storage._filename) }()
         default: break
         }
@@ -1599,6 +1624,9 @@ extension Pivox_Assets_V1_Asset: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
       if _storage._versionCount != 0 {
         try visitor.visitSingularInt32Field(value: _storage._versionCount, fieldNumber: 11)
       }
+      try { if let v = _storage._ttl {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 12)
+      } }()
       try { if let v = _storage._duration {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 15)
       } }()
@@ -1617,25 +1645,25 @@ extension Pivox_Assets_V1_Asset: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
       if !_storage._etag.isEmpty {
         try visitor.visitSingularStringField(value: _storage._etag, fieldNumber: 20)
       }
-      if !_storage._creator.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._creator, fieldNumber: 21)
-      }
-      if !_storage._updater.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._updater, fieldNumber: 22)
-      }
+      try { if let v = _storage._createdBy {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 21)
+      } }()
       try { if let v = _storage._createTime {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 22)
+      } }()
+      try { if let v = _storage._updatedBy {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 23)
       } }()
       try { if let v = _storage._updateTime {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 24)
       } }()
-      try { if let v = _storage._deleteTime {
+      try { if let v = _storage._deletedBy {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 25)
       } }()
-      try { if let v = _storage._purgeTime {
+      try { if let v = _storage._deleteTime {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 26)
       } }()
-      try { if let v = _storage._ttl {
+      try { if let v = _storage._purgeTime {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 27)
       } }()
       if !_storage._filename.isEmpty {
@@ -1662,17 +1690,18 @@ extension Pivox_Assets_V1_Asset: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
         if _storage._sizeBytes != rhs_storage._sizeBytes {return false}
         if _storage._latestVersion != rhs_storage._latestVersion {return false}
         if _storage._versionCount != rhs_storage._versionCount {return false}
+        if _storage._ttl != rhs_storage._ttl {return false}
         if _storage._duration != rhs_storage._duration {return false}
         if _storage._width != rhs_storage._width {return false}
         if _storage._height != rhs_storage._height {return false}
         if _storage._expireTime != rhs_storage._expireTime {return false}
-        if _storage._ttl != rhs_storage._ttl {return false}
         if _storage._annotations != rhs_storage._annotations {return false}
         if _storage._etag != rhs_storage._etag {return false}
-        if _storage._creator != rhs_storage._creator {return false}
-        if _storage._updater != rhs_storage._updater {return false}
+        if _storage._createdBy != rhs_storage._createdBy {return false}
         if _storage._createTime != rhs_storage._createTime {return false}
+        if _storage._updatedBy != rhs_storage._updatedBy {return false}
         if _storage._updateTime != rhs_storage._updateTime {return false}
+        if _storage._deletedBy != rhs_storage._deletedBy {return false}
         if _storage._deleteTime != rhs_storage._deleteTime {return false}
         if _storage._purgeTime != rhs_storage._purgeTime {return false}
         return true
@@ -1694,7 +1723,7 @@ extension Pivox_Assets_V1_Asset.MediaType: SwiftProtobuf._ProtoNameProviding {
 
 extension Pivox_Assets_V1_AssetVersion: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".AssetVersion"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}version_number\0\u{3}checksum_sha256\0\u{3}size_bytes\0\u{3}mime_type\0\u{3}storage_key\0\u{1}renditions\0\u{3}change_note\0\u{3}ingestion_error\0\u{1}creator\0\u{3}create_time\0\u{3}source_version\0\u{1}crop\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}version_number\0\u{3}checksum_sha256\0\u{3}size_bytes\0\u{3}mime_type\0\u{3}storage_key\0\u{1}renditions\0\u{3}change_note\0\u{3}ingestion_error\0\u{3}created_by\0\u{3}create_time\0\u{3}source_version\0\u{1}crop\0")
 
   fileprivate class _StorageClass {
     var _name: String = String()
@@ -1706,7 +1735,7 @@ extension Pivox_Assets_V1_AssetVersion: SwiftProtobuf.Message, SwiftProtobuf._Me
     var _renditions: [Pivox_Assets_V1_Rendition] = []
     var _changeNote: String = String()
     var _ingestionError: String = String()
-    var _creator: String = String()
+    var _createdBy: Pivox_Types_Actor? = nil
     var _createTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     var _sourceVersion: String = String()
     var _crop: Pivox_Assets_V1_Crop? = nil
@@ -1729,7 +1758,7 @@ extension Pivox_Assets_V1_AssetVersion: SwiftProtobuf.Message, SwiftProtobuf._Me
       _renditions = source._renditions
       _changeNote = source._changeNote
       _ingestionError = source._ingestionError
-      _creator = source._creator
+      _createdBy = source._createdBy
       _createTime = source._createTime
       _sourceVersion = source._sourceVersion
       _crop = source._crop
@@ -1760,7 +1789,7 @@ extension Pivox_Assets_V1_AssetVersion: SwiftProtobuf.Message, SwiftProtobuf._Me
         case 7: try { try decoder.decodeRepeatedMessageField(value: &_storage._renditions) }()
         case 8: try { try decoder.decodeSingularStringField(value: &_storage._changeNote) }()
         case 9: try { try decoder.decodeSingularStringField(value: &_storage._ingestionError) }()
-        case 10: try { try decoder.decodeSingularStringField(value: &_storage._creator) }()
+        case 10: try { try decoder.decodeSingularMessageField(value: &_storage._createdBy) }()
         case 11: try { try decoder.decodeSingularMessageField(value: &_storage._createTime) }()
         case 12: try { try decoder.decodeSingularStringField(value: &_storage._sourceVersion) }()
         case 13: try { try decoder.decodeSingularMessageField(value: &_storage._crop) }()
@@ -1803,9 +1832,9 @@ extension Pivox_Assets_V1_AssetVersion: SwiftProtobuf.Message, SwiftProtobuf._Me
       if !_storage._ingestionError.isEmpty {
         try visitor.visitSingularStringField(value: _storage._ingestionError, fieldNumber: 9)
       }
-      if !_storage._creator.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._creator, fieldNumber: 10)
-      }
+      try { if let v = _storage._createdBy {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
+      } }()
       try { if let v = _storage._createTime {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 11)
       } }()
@@ -1833,7 +1862,7 @@ extension Pivox_Assets_V1_AssetVersion: SwiftProtobuf.Message, SwiftProtobuf._Me
         if _storage._renditions != rhs_storage._renditions {return false}
         if _storage._changeNote != rhs_storage._changeNote {return false}
         if _storage._ingestionError != rhs_storage._ingestionError {return false}
-        if _storage._creator != rhs_storage._creator {return false}
+        if _storage._createdBy != rhs_storage._createdBy {return false}
         if _storage._createTime != rhs_storage._createTime {return false}
         if _storage._sourceVersion != rhs_storage._sourceVersion {return false}
         if _storage._crop != rhs_storage._crop {return false}

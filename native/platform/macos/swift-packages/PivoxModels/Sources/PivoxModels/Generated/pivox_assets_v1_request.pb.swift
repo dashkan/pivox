@@ -143,17 +143,15 @@ public struct Pivox_Assets_V1_Request: @unchecked Sendable {
     set {_uniqueStorage()._etag = newValue}
   }
 
-  /// Output only. The user who created the request.
-  public var creator: String {
-    get {_storage._creator}
-    set {_uniqueStorage()._creator = newValue}
+  /// Output only. The identity that created the request.
+  public var createdBy: Pivox_Types_Actor {
+    get {_storage._createdBy ?? Pivox_Types_Actor()}
+    set {_uniqueStorage()._createdBy = newValue}
   }
-
-  /// Output only. The user who last updated the request.
-  public var updater: String {
-    get {_storage._updater}
-    set {_uniqueStorage()._updater = newValue}
-  }
+  /// Returns true if `createdBy` has been explicitly set.
+  public var hasCreatedBy: Bool {_storage._createdBy != nil}
+  /// Clears the value of `createdBy`. Subsequent reads from it will return its default value.
+  public mutating func clearCreatedBy() {_uniqueStorage()._createdBy = nil}
 
   /// Output only. Timestamp when the request was created.
   public var createTime: SwiftProtobuf.Google_Protobuf_Timestamp {
@@ -164,6 +162,16 @@ public struct Pivox_Assets_V1_Request: @unchecked Sendable {
   public var hasCreateTime: Bool {_storage._createTime != nil}
   /// Clears the value of `createTime`. Subsequent reads from it will return its default value.
   public mutating func clearCreateTime() {_uniqueStorage()._createTime = nil}
+
+  /// Output only. The identity that last modified the request.
+  public var updatedBy: Pivox_Types_Actor {
+    get {_storage._updatedBy ?? Pivox_Types_Actor()}
+    set {_uniqueStorage()._updatedBy = newValue}
+  }
+  /// Returns true if `updatedBy` has been explicitly set.
+  public var hasUpdatedBy: Bool {_storage._updatedBy != nil}
+  /// Clears the value of `updatedBy`. Subsequent reads from it will return its default value.
+  public mutating func clearUpdatedBy() {_uniqueStorage()._updatedBy = nil}
 
   /// Output only. Timestamp when the request was last modified.
   public var updateTime: SwiftProtobuf.Google_Protobuf_Timestamp {
@@ -344,57 +352,95 @@ public struct Pivox_Assets_V1_Request: @unchecked Sendable {
 /// A line item within a request. Each line item represents a single
 /// deliverable and is linked to a PLACEHOLDER asset that is fulfilled
 /// when the artist uploads the file.
-public struct Pivox_Assets_V1_LineItem: Sendable {
+public struct Pivox_Assets_V1_LineItem: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Output only. The resource name of the line item. Format:
   /// `organizations/{organization}/spaces/{space}/requests/{request}/lineItems/{line_item}`
-  public var name: String = String()
+  public var name: String {
+    get {_storage._name}
+    set {_uniqueStorage()._name = newValue}
+  }
 
   /// Required. A human-readable name for the deliverable.
-  public var displayName: String = String()
+  public var displayName: String {
+    get {_storage._displayName}
+    set {_uniqueStorage()._displayName = newValue}
+  }
 
   /// Optional. A description of what is expected for this deliverable.
-  public var description_p: String = String()
+  public var description_p: String {
+    get {_storage._description_p}
+    set {_uniqueStorage()._description_p = newValue}
+  }
 
   /// Output only. The current state of the line item.
-  public var state: Pivox_Assets_V1_LineItem.State = .unspecified
+  public var state: Pivox_Assets_V1_LineItem.State {
+    get {_storage._state}
+    set {_uniqueStorage()._state = newValue}
+  }
 
   /// Output only. The linked PLACEHOLDER asset. Created when the line
   /// item is created. Transitions to ACTIVE when the artist fulfills
   /// the line item.
-  public var asset: String = String()
+  public var asset: String {
+    get {_storage._asset}
+    set {_uniqueStorage()._asset = newValue}
+  }
 
   /// Optional. The expected media type for this deliverable.
-  public var mediaType: Pivox_Assets_V1_Asset.MediaType = .unspecified
+  public var mediaType: Pivox_Assets_V1_Asset.MediaType {
+    get {_storage._mediaType}
+    set {_uniqueStorage()._mediaType = newValue}
+  }
 
   /// Optional. Annotations associated with this line item.
-  public var annotations: Dictionary<String,String> = [:]
+  public var annotations: Dictionary<String,String> {
+    get {_storage._annotations}
+    set {_uniqueStorage()._annotations = newValue}
+  }
 
-  /// Output only. The user who created this line item.
-  public var creator: String = String()
+  /// Output only. The identity that created this line item.
+  public var createdBy: Pivox_Types_Actor {
+    get {_storage._createdBy ?? Pivox_Types_Actor()}
+    set {_uniqueStorage()._createdBy = newValue}
+  }
+  /// Returns true if `createdBy` has been explicitly set.
+  public var hasCreatedBy: Bool {_storage._createdBy != nil}
+  /// Clears the value of `createdBy`. Subsequent reads from it will return its default value.
+  public mutating func clearCreatedBy() {_uniqueStorage()._createdBy = nil}
 
   /// Output only. Timestamp when this line item was created.
   public var createTime: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {_createTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
-    set {_createTime = newValue}
+    get {_storage._createTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._createTime = newValue}
   }
   /// Returns true if `createTime` has been explicitly set.
-  public var hasCreateTime: Bool {self._createTime != nil}
+  public var hasCreateTime: Bool {_storage._createTime != nil}
   /// Clears the value of `createTime`. Subsequent reads from it will return its default value.
-  public mutating func clearCreateTime() {self._createTime = nil}
+  public mutating func clearCreateTime() {_uniqueStorage()._createTime = nil}
+
+  /// Output only. The identity that last modified this line item.
+  public var updatedBy: Pivox_Types_Actor {
+    get {_storage._updatedBy ?? Pivox_Types_Actor()}
+    set {_uniqueStorage()._updatedBy = newValue}
+  }
+  /// Returns true if `updatedBy` has been explicitly set.
+  public var hasUpdatedBy: Bool {_storage._updatedBy != nil}
+  /// Clears the value of `updatedBy`. Subsequent reads from it will return its default value.
+  public mutating func clearUpdatedBy() {_uniqueStorage()._updatedBy = nil}
 
   /// Output only. Timestamp when this line item was last modified.
   public var updateTime: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {_updateTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
-    set {_updateTime = newValue}
+    get {_storage._updateTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._updateTime = newValue}
   }
   /// Returns true if `updateTime` has been explicitly set.
-  public var hasUpdateTime: Bool {self._updateTime != nil}
+  public var hasUpdateTime: Bool {_storage._updateTime != nil}
   /// Clears the value of `updateTime`. Subsequent reads from it will return its default value.
-  public mutating func clearUpdateTime() {self._updateTime = nil}
+  public mutating func clearUpdateTime() {_uniqueStorage()._updateTime = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -463,8 +509,7 @@ public struct Pivox_Assets_V1_LineItem: Sendable {
 
   public init() {}
 
-  fileprivate var _createTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
-  fileprivate var _updateTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 /// The request sent to the CreateRequest method.
@@ -1026,7 +1071,7 @@ fileprivate let _protobuf_package = "pivox.assets.v1"
 
 extension Pivox_Assets_V1_Request: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".Request"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}display_name\0\u{1}description\0\u{1}state\0\u{1}priority\0\u{1}assignee\0\u{3}due_time\0\u{3}delivered_time\0\u{3}approved_time\0\u{3}line_item_count\0\u{3}fulfilled_count\0\u{3}line_items\0\u{1}annotations\0\u{1}etag\0\u{1}creator\0\u{1}updater\0\u{3}create_time\0\u{3}update_time\0\u{3}delete_time\0\u{3}purge_time\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}display_name\0\u{1}description\0\u{1}state\0\u{1}priority\0\u{1}assignee\0\u{3}due_time\0\u{3}delivered_time\0\u{3}approved_time\0\u{3}line_item_count\0\u{3}fulfilled_count\0\u{3}line_items\0\u{1}annotations\0\u{1}etag\0\u{3}created_by\0\u{3}create_time\0\u{3}updated_by\0\u{3}update_time\0\u{3}delete_time\0\u{3}purge_time\0")
 
   fileprivate class _StorageClass {
     var _name: String = String()
@@ -1043,9 +1088,9 @@ extension Pivox_Assets_V1_Request: SwiftProtobuf.Message, SwiftProtobuf._Message
     var _lineItems: [Pivox_Assets_V1_LineItem] = []
     var _annotations: Dictionary<String,String> = [:]
     var _etag: String = String()
-    var _creator: String = String()
-    var _updater: String = String()
+    var _createdBy: Pivox_Types_Actor? = nil
     var _createTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _updatedBy: Pivox_Types_Actor? = nil
     var _updateTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     var _deleteTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     var _purgeTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
@@ -1073,9 +1118,9 @@ extension Pivox_Assets_V1_Request: SwiftProtobuf.Message, SwiftProtobuf._Message
       _lineItems = source._lineItems
       _annotations = source._annotations
       _etag = source._etag
-      _creator = source._creator
-      _updater = source._updater
+      _createdBy = source._createdBy
       _createTime = source._createTime
+      _updatedBy = source._updatedBy
       _updateTime = source._updateTime
       _deleteTime = source._deleteTime
       _purgeTime = source._purgeTime
@@ -1111,9 +1156,9 @@ extension Pivox_Assets_V1_Request: SwiftProtobuf.Message, SwiftProtobuf._Message
         case 12: try { try decoder.decodeRepeatedMessageField(value: &_storage._lineItems) }()
         case 13: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &_storage._annotations) }()
         case 14: try { try decoder.decodeSingularStringField(value: &_storage._etag) }()
-        case 15: try { try decoder.decodeSingularStringField(value: &_storage._creator) }()
-        case 16: try { try decoder.decodeSingularStringField(value: &_storage._updater) }()
-        case 17: try { try decoder.decodeSingularMessageField(value: &_storage._createTime) }()
+        case 15: try { try decoder.decodeSingularMessageField(value: &_storage._createdBy) }()
+        case 16: try { try decoder.decodeSingularMessageField(value: &_storage._createTime) }()
+        case 17: try { try decoder.decodeSingularMessageField(value: &_storage._updatedBy) }()
         case 18: try { try decoder.decodeSingularMessageField(value: &_storage._updateTime) }()
         case 19: try { try decoder.decodeSingularMessageField(value: &_storage._deleteTime) }()
         case 20: try { try decoder.decodeSingularMessageField(value: &_storage._purgeTime) }()
@@ -1171,13 +1216,13 @@ extension Pivox_Assets_V1_Request: SwiftProtobuf.Message, SwiftProtobuf._Message
       if !_storage._etag.isEmpty {
         try visitor.visitSingularStringField(value: _storage._etag, fieldNumber: 14)
       }
-      if !_storage._creator.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._creator, fieldNumber: 15)
-      }
-      if !_storage._updater.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._updater, fieldNumber: 16)
-      }
+      try { if let v = _storage._createdBy {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 15)
+      } }()
       try { if let v = _storage._createTime {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 16)
+      } }()
+      try { if let v = _storage._updatedBy {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 17)
       } }()
       try { if let v = _storage._updateTime {
@@ -1212,9 +1257,9 @@ extension Pivox_Assets_V1_Request: SwiftProtobuf.Message, SwiftProtobuf._Message
         if _storage._lineItems != rhs_storage._lineItems {return false}
         if _storage._annotations != rhs_storage._annotations {return false}
         if _storage._etag != rhs_storage._etag {return false}
-        if _storage._creator != rhs_storage._creator {return false}
-        if _storage._updater != rhs_storage._updater {return false}
+        if _storage._createdBy != rhs_storage._createdBy {return false}
         if _storage._createTime != rhs_storage._createTime {return false}
+        if _storage._updatedBy != rhs_storage._updatedBy {return false}
         if _storage._updateTime != rhs_storage._updateTime {return false}
         if _storage._deleteTime != rhs_storage._deleteTime {return false}
         if _storage._purgeTime != rhs_storage._purgeTime {return false}
@@ -1237,78 +1282,139 @@ extension Pivox_Assets_V1_Request.Priority: SwiftProtobuf._ProtoNameProviding {
 
 extension Pivox_Assets_V1_LineItem: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LineItem"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}display_name\0\u{1}description\0\u{1}state\0\u{1}asset\0\u{3}media_type\0\u{1}annotations\0\u{1}creator\0\u{3}create_time\0\u{3}update_time\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}display_name\0\u{1}description\0\u{1}state\0\u{1}asset\0\u{3}media_type\0\u{1}annotations\0\u{3}created_by\0\u{3}create_time\0\u{3}updated_by\0\u{3}update_time\0")
+
+  fileprivate class _StorageClass {
+    var _name: String = String()
+    var _displayName: String = String()
+    var _description_p: String = String()
+    var _state: Pivox_Assets_V1_LineItem.State = .unspecified
+    var _asset: String = String()
+    var _mediaType: Pivox_Assets_V1_Asset.MediaType = .unspecified
+    var _annotations: Dictionary<String,String> = [:]
+    var _createdBy: Pivox_Types_Actor? = nil
+    var _createTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _updatedBy: Pivox_Types_Actor? = nil
+    var _updateTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _name = source._name
+      _displayName = source._displayName
+      _description_p = source._description_p
+      _state = source._state
+      _asset = source._asset
+      _mediaType = source._mediaType
+      _annotations = source._annotations
+      _createdBy = source._createdBy
+      _createTime = source._createTime
+      _updatedBy = source._updatedBy
+      _updateTime = source._updateTime
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.name) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.displayName) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.description_p) }()
-      case 4: try { try decoder.decodeSingularEnumField(value: &self.state) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self.asset) }()
-      case 6: try { try decoder.decodeSingularEnumField(value: &self.mediaType) }()
-      case 7: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.annotations) }()
-      case 8: try { try decoder.decodeSingularStringField(value: &self.creator) }()
-      case 9: try { try decoder.decodeSingularMessageField(value: &self._createTime) }()
-      case 10: try { try decoder.decodeSingularMessageField(value: &self._updateTime) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._name) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._displayName) }()
+        case 3: try { try decoder.decodeSingularStringField(value: &_storage._description_p) }()
+        case 4: try { try decoder.decodeSingularEnumField(value: &_storage._state) }()
+        case 5: try { try decoder.decodeSingularStringField(value: &_storage._asset) }()
+        case 6: try { try decoder.decodeSingularEnumField(value: &_storage._mediaType) }()
+        case 7: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &_storage._annotations) }()
+        case 8: try { try decoder.decodeSingularMessageField(value: &_storage._createdBy) }()
+        case 9: try { try decoder.decodeSingularMessageField(value: &_storage._createTime) }()
+        case 10: try { try decoder.decodeSingularMessageField(value: &_storage._updatedBy) }()
+        case 11: try { try decoder.decodeSingularMessageField(value: &_storage._updateTime) }()
+        default: break
+        }
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.name.isEmpty {
-      try visitor.visitSingularStringField(value: self.name, fieldNumber: 1)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if !_storage._name.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._name, fieldNumber: 1)
+      }
+      if !_storage._displayName.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._displayName, fieldNumber: 2)
+      }
+      if !_storage._description_p.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._description_p, fieldNumber: 3)
+      }
+      if _storage._state != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._state, fieldNumber: 4)
+      }
+      if !_storage._asset.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._asset, fieldNumber: 5)
+      }
+      if _storage._mediaType != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._mediaType, fieldNumber: 6)
+      }
+      if !_storage._annotations.isEmpty {
+        try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: _storage._annotations, fieldNumber: 7)
+      }
+      try { if let v = _storage._createdBy {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+      } }()
+      try { if let v = _storage._createTime {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+      } }()
+      try { if let v = _storage._updatedBy {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
+      } }()
+      try { if let v = _storage._updateTime {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 11)
+      } }()
     }
-    if !self.displayName.isEmpty {
-      try visitor.visitSingularStringField(value: self.displayName, fieldNumber: 2)
-    }
-    if !self.description_p.isEmpty {
-      try visitor.visitSingularStringField(value: self.description_p, fieldNumber: 3)
-    }
-    if self.state != .unspecified {
-      try visitor.visitSingularEnumField(value: self.state, fieldNumber: 4)
-    }
-    if !self.asset.isEmpty {
-      try visitor.visitSingularStringField(value: self.asset, fieldNumber: 5)
-    }
-    if self.mediaType != .unspecified {
-      try visitor.visitSingularEnumField(value: self.mediaType, fieldNumber: 6)
-    }
-    if !self.annotations.isEmpty {
-      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.annotations, fieldNumber: 7)
-    }
-    if !self.creator.isEmpty {
-      try visitor.visitSingularStringField(value: self.creator, fieldNumber: 8)
-    }
-    try { if let v = self._createTime {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
-    } }()
-    try { if let v = self._updateTime {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
-    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Pivox_Assets_V1_LineItem, rhs: Pivox_Assets_V1_LineItem) -> Bool {
-    if lhs.name != rhs.name {return false}
-    if lhs.displayName != rhs.displayName {return false}
-    if lhs.description_p != rhs.description_p {return false}
-    if lhs.state != rhs.state {return false}
-    if lhs.asset != rhs.asset {return false}
-    if lhs.mediaType != rhs.mediaType {return false}
-    if lhs.annotations != rhs.annotations {return false}
-    if lhs.creator != rhs.creator {return false}
-    if lhs._createTime != rhs._createTime {return false}
-    if lhs._updateTime != rhs._updateTime {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._name != rhs_storage._name {return false}
+        if _storage._displayName != rhs_storage._displayName {return false}
+        if _storage._description_p != rhs_storage._description_p {return false}
+        if _storage._state != rhs_storage._state {return false}
+        if _storage._asset != rhs_storage._asset {return false}
+        if _storage._mediaType != rhs_storage._mediaType {return false}
+        if _storage._annotations != rhs_storage._annotations {return false}
+        if _storage._createdBy != rhs_storage._createdBy {return false}
+        if _storage._createTime != rhs_storage._createTime {return false}
+        if _storage._updatedBy != rhs_storage._updatedBy {return false}
+        if _storage._updateTime != rhs_storage._updateTime {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

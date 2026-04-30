@@ -4,16 +4,19 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	db "github.com/dashkan/pivox/internal/db/generated"
 	assetsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1"
+	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 )
 
 // RequestToProto converts a DB request to proto.
 // spaceName is the full resource name of the parent space
-// (e.g. "organizations/acme/spaces/my-space").
-func RequestToProto(row db.AssetRequest, spaceName string) *assetsv1.Request {
+// (e.g. "organizations/acme/spaces/my-space"). `actors` is the
+// pre-resolved Actor map; pass nil to skip Actor inflation.
+func RequestToProto(row db.AssetRequest, spaceName string, actors map[uuid.UUID]*typespb.Actor) *assetsv1.Request {
 	pb := &assetsv1.Request{
 		Name:        fmt.Sprintf("%s/requests/%s", spaceName, row.Name),
 		DisplayName: row.DisplayName,
@@ -22,9 +25,9 @@ func RequestToProto(row db.AssetRequest, spaceName string) *assetsv1.Request {
 		Priority:    requestPriority(row.Priority),
 		Assignee:    row.Assignee,
 		Etag:        row.Etag,
-		Creator:     UUIDString(row.CreatedBy),
-		Updater:     UUIDString(row.UpdatedBy),
+		CreatedBy:   actorOrNil(actors, row.CreatedBy),
 		CreateTime:  timestamppb.New(row.CreateTime),
+		UpdatedBy:   actorOrNil(actors, row.UpdatedBy),
 		UpdateTime:  timestamppb.New(row.UpdateTime),
 	}
 	if row.DueTime.Valid {
@@ -48,15 +51,17 @@ func RequestToProto(row db.AssetRequest, spaceName string) *assetsv1.Request {
 // requestName is the full resource name of the parent request
 // (e.g. "organizations/acme/spaces/my-space/requests/req-1").
 // spaceName is the full resource name of the parent space
-// (e.g. "organizations/acme/spaces/my-space").
-func LineItemToProto(row db.AssetRequestLineItem, requestName string, spaceName string) *assetsv1.LineItem {
+// (e.g. "organizations/acme/spaces/my-space"). `actors` is the
+// pre-resolved Actor map; pass nil to skip Actor inflation.
+func LineItemToProto(row db.AssetRequestLineItem, requestName string, spaceName string, actors map[uuid.UUID]*typespb.Actor) *assetsv1.LineItem {
 	pb := &assetsv1.LineItem{
 		Name:        fmt.Sprintf("%s/lineItems/%s", requestName, row.Name),
 		DisplayName: row.DisplayName,
 		Description: row.Description,
 		State:       lineItemState(row.State),
-		Creator:     UUIDString(row.CreatedBy),
+		CreatedBy:   actorOrNil(actors, row.CreatedBy),
 		CreateTime:  timestamppb.New(row.CreateTime),
+		UpdatedBy:   actorOrNil(actors, row.UpdatedBy),
 		UpdateTime:  timestamppb.New(row.UpdateTime),
 	}
 	if row.MediaType.Valid {

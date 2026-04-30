@@ -158,7 +158,7 @@ func TestAssetToProto(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pb := AssetToProto(tt.row, tt.spaceName)
+			pb := AssetToProto(tt.row, tt.spaceName, nil)
 			require.NotNil(t, pb)
 			assert.Equal(t, tt.wantName, pb.Name)
 			assert.Equal(t, tt.wantState, pb.State)
@@ -169,8 +169,6 @@ func TestAssetToProto(t *testing.T) {
 			assert.Equal(t, tt.row.ChecksumSha256, pb.ChecksumSha256)
 			assert.Equal(t, tt.row.SizeBytes, pb.SizeBytes)
 			assert.Equal(t, tt.row.Etag, pb.Etag)
-			assert.Equal(t, UUIDString(tt.row.CreatedBy), pb.Creator)
-			assert.Equal(t, UUIDString(tt.row.UpdatedBy), pb.Updater)
 			if tt.checkFunc != nil {
 				tt.checkFunc(t, pb)
 			}
@@ -222,7 +220,7 @@ func TestAssetVersionToProto(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pb := AssetVersionToProto(tt.row, tt.assetName)
+			pb := AssetVersionToProto(tt.row, tt.assetName, nil)
 			require.NotNil(t, pb)
 			assert.Contains(t, pb.Name, tt.assetName+"/versions/")
 			assert.Equal(t, tt.row.VersionNumber, pb.VersionNumber)
@@ -232,7 +230,6 @@ func TestAssetVersionToProto(t *testing.T) {
 			assert.Equal(t, tt.row.StorageKey, pb.StorageKey)
 			assert.Equal(t, tt.row.ChangeNote, pb.ChangeNote)
 			assert.Equal(t, tt.row.IngestionError, pb.IngestionError)
-			assert.Equal(t, UUIDString(tt.row.CreatedBy), pb.Creator)
 		})
 	}
 }
@@ -542,7 +539,7 @@ func TestRequestToProto(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pb := RequestToProto(tt.row, tt.spaceName)
+			pb := RequestToProto(tt.row, tt.spaceName, nil)
 			require.NotNil(t, pb)
 			assert.Equal(t, tt.spaceName+"/requests/"+tt.row.Name, pb.Name)
 			assert.Equal(t, tt.row.DisplayName, pb.DisplayName)
@@ -550,8 +547,6 @@ func TestRequestToProto(t *testing.T) {
 			assert.Equal(t, tt.wantState, pb.State)
 			assert.Equal(t, tt.row.Assignee, pb.Assignee)
 			assert.Equal(t, tt.row.Etag, pb.Etag)
-			assert.Equal(t, UUIDString(tt.row.CreatedBy), pb.Creator)
-			assert.Equal(t, UUIDString(tt.row.UpdatedBy), pb.Updater)
 			if tt.checkFunc != nil {
 				tt.checkFunc(t, pb)
 			}
@@ -621,12 +616,11 @@ func TestLineItemToProto(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pb := LineItemToProto(tt.row, tt.requestName, tt.spaceName)
+			pb := LineItemToProto(tt.row, tt.requestName, tt.spaceName, nil)
 			require.NotNil(t, pb)
 			assert.Equal(t, tt.requestName+"/lineItems/"+tt.row.Name, pb.Name)
 			assert.Equal(t, tt.row.DisplayName, pb.DisplayName)
 			assert.Equal(t, tt.row.Description, pb.Description)
-			assert.Equal(t, UUIDString(tt.row.CreatedBy), pb.Creator)
 			if tt.checkFunc != nil {
 				tt.checkFunc(t, pb)
 			}
@@ -783,8 +777,6 @@ func TestStorageGatewayToProto(t *testing.T) {
 			assert.Equal(t, tt.gw.TargetVersion, pb.TargetVersion)
 			assert.Equal(t, tt.gw.CurrentVersion, pb.CurrentVersion)
 			assert.Equal(t, tt.gw.Etag, pb.Etag)
-			assert.Equal(t, UUIDString(tt.gw.CreatedBy), pb.Creator)
-			assert.Equal(t, UUIDString(tt.gw.UpdatedBy), pb.Updater)
 			if tt.checkFunc != nil {
 				tt.checkFunc(t, pb)
 			}
@@ -971,8 +963,6 @@ func TestEndpointToProto(t *testing.T) {
 			assert.Equal(t, tt.gatewayName+"/endpoints/"+tt.ep.Name, pb.Name)
 			assert.Equal(t, tt.ep.DisplayName, pb.DisplayName)
 			assert.Equal(t, tt.ep.Etag, pb.Etag)
-			assert.Equal(t, UUIDString(tt.ep.CreatedBy), pb.Creator)
-			assert.Equal(t, UUIDString(tt.ep.UpdatedBy), pb.Updater)
 			if tt.checkFunc != nil {
 				tt.checkFunc(t, pb)
 			}

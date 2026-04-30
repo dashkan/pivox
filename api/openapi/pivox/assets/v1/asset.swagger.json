@@ -367,6 +367,10 @@
                   "description": "Output only. Total number of versions.",
                   "readOnly": true
                 },
+                "ttl": {
+                  "type": "string",
+                  "description": "Input only. The time-to-live for the asset, as an alternative to\nsetting expire_time directly. The server computes expire_time from\ncreate_time + ttl."
+                },
                 "duration": {
                   "type": "string",
                   "description": "Output only. Duration of the media, for video and audio assets.",
@@ -389,10 +393,6 @@
                   "format": "date-time",
                   "description": "Optional. The time at which this asset should expire. When set,\na background reaper will soft-delete the asset after this time.\nCan be set directly or via a retention policy (tag-based rules)."
                 },
-                "ttl": {
-                  "type": "string",
-                  "description": "Input only. The time-to-live for the asset, as an alternative to\nsetting expire_time directly. The server computes expire_time from\ncreate_time + ttl."
-                },
                 "annotations": {
                   "type": "object",
                   "additionalProperties": {
@@ -405,14 +405,9 @@
                   "description": "Output only. A checksum computed by the server based on the current\nvalue of the Asset resource.",
                   "readOnly": true
                 },
-                "creator": {
-                  "type": "string",
-                  "description": "Output only. The user who created the asset.",
-                  "readOnly": true
-                },
-                "updater": {
-                  "type": "string",
-                  "description": "Output only. The user who last updated the asset.",
+                "createdBy": {
+                  "$ref": "#/definitions/typesActor",
+                  "description": "Output only. The identity that created this asset.",
                   "readOnly": true
                 },
                 "createTime": {
@@ -421,10 +416,20 @@
                   "description": "Output only. Timestamp when the asset was created.",
                   "readOnly": true
                 },
+                "updatedBy": {
+                  "$ref": "#/definitions/typesActor",
+                  "description": "Output only. The identity that last modified this asset.",
+                  "readOnly": true
+                },
                 "updateTime": {
                   "type": "string",
                   "format": "date-time",
                   "description": "Output only. Timestamp when the asset was last modified.",
+                  "readOnly": true
+                },
+                "deletedBy": {
+                  "$ref": "#/definitions/typesActor",
+                  "description": "Output only. The identity that requested deletion of this asset.",
                   "readOnly": true
                 },
                 "deleteTime": {
@@ -957,6 +962,32 @@
       },
       "description": "The `Status` type defines a logical error model that is suitable for\ndifferent programming environments, including REST APIs and RPC APIs. It is\nused by [gRPC](https://github.com/grpc). Each `Status` message contains\nthree pieces of data: error code, error message, and error details.\n\nYou can find out more about this error model and how to work with it in the\n[API Design Guide](https://cloud.google.com/apis/design/errors)."
     },
+    "typesActor": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The identity's stable UUID (firebase_identities.id). Always\npopulated when the column is non-null in the database, even for\nsoft-deleted identities.",
+          "readOnly": true
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Resolved display name. Empty for soft-deleted identities.",
+          "readOnly": true
+        },
+        "email": {
+          "type": "string",
+          "description": "Resolved email address. Empty for soft-deleted identities.",
+          "readOnly": true
+        },
+        "isDeleted": {
+          "type": "boolean",
+          "description": "True when the identity has been soft-deleted. PII fields are\nblanked out in that case while id is preserved.",
+          "readOnly": true
+        }
+      },
+      "description": "Actor is a resolved reference to an identity. It is used flat on\nresources to expose audit fields (created_by, updated_by, deleted_by)\nper AIP-148, and can be reused at non-audit positions like assignee\nor approver.\n\nActor lives in `pivox.types` (unversioned — type definitions are\nshared infrastructure, not an API surface) so every domain package\n(pivox.api.v1, pivox.ai.v1, pivox.assets.v1, pivox.iam.v1,\npivox.storage.v1) can reference it without crossing into a peer\ndomain — the api-linter's foreign-type-reference rule (AIP-215)\nconsiders `pivox.types` a shared types namespace.\n\nResolution is performed server-side via the audit.Resolver, which\nbatches lookups against firebase_identities and caches recent\nresults. When the underlying identity is soft-deleted the resolver\nblanks out PII (display_name, email) and sets is_deleted=true while\npreserving the id so that historical references remain stable."
+    },
     "v1Asset": {
       "type": "object",
       "properties": {
@@ -1021,6 +1052,10 @@
           "description": "Output only. Total number of versions.",
           "readOnly": true
         },
+        "ttl": {
+          "type": "string",
+          "description": "Input only. The time-to-live for the asset, as an alternative to\nsetting expire_time directly. The server computes expire_time from\ncreate_time + ttl."
+        },
         "duration": {
           "type": "string",
           "description": "Output only. Duration of the media, for video and audio assets.",
@@ -1043,10 +1078,6 @@
           "format": "date-time",
           "description": "Optional. The time at which this asset should expire. When set,\na background reaper will soft-delete the asset after this time.\nCan be set directly or via a retention policy (tag-based rules)."
         },
-        "ttl": {
-          "type": "string",
-          "description": "Input only. The time-to-live for the asset, as an alternative to\nsetting expire_time directly. The server computes expire_time from\ncreate_time + ttl."
-        },
         "annotations": {
           "type": "object",
           "additionalProperties": {
@@ -1059,14 +1090,9 @@
           "description": "Output only. A checksum computed by the server based on the current\nvalue of the Asset resource.",
           "readOnly": true
         },
-        "creator": {
-          "type": "string",
-          "description": "Output only. The user who created the asset.",
-          "readOnly": true
-        },
-        "updater": {
-          "type": "string",
-          "description": "Output only. The user who last updated the asset.",
+        "createdBy": {
+          "$ref": "#/definitions/typesActor",
+          "description": "Output only. The identity that created this asset.",
           "readOnly": true
         },
         "createTime": {
@@ -1075,10 +1101,20 @@
           "description": "Output only. Timestamp when the asset was created.",
           "readOnly": true
         },
+        "updatedBy": {
+          "$ref": "#/definitions/typesActor",
+          "description": "Output only. The identity that last modified this asset.",
+          "readOnly": true
+        },
         "updateTime": {
           "type": "string",
           "format": "date-time",
           "description": "Output only. Timestamp when the asset was last modified.",
+          "readOnly": true
+        },
+        "deletedBy": {
+          "$ref": "#/definitions/typesActor",
+          "description": "Output only. The identity that requested deletion of this asset.",
           "readOnly": true
         },
         "deleteTime": {
@@ -1181,9 +1217,9 @@
           "description": "Output only. If the ingestion pipeline failed, the error details.",
           "readOnly": true
         },
-        "creator": {
-          "type": "string",
-          "description": "Output only. The user who created this version.",
+        "createdBy": {
+          "$ref": "#/definitions/typesActor",
+          "description": "Output only. The identity that created this version.",
           "readOnly": true
         },
         "createTime": {
