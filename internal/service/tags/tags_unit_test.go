@@ -20,6 +20,7 @@ import (
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	"github.com/dashkan/pivox/internal/apierr"
+	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	"github.com/dashkan/pivox/internal/server"
@@ -133,7 +134,8 @@ func TestUnit_CreateTagKey_Success(t *testing.T) {
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
 	mockQ.On("CreateTagKey", mock.Anything, mock.MatchedBy(func(p db.CreateTagKeyParams) bool {
-		return p.OrgID == testOrgID && p.ShortName == "env"
+		return p.OrgID == testOrgID && p.ShortName == "env" &&
+			p.CreatedBy == convert.PgUUID(tagCallerPivoxUUID)
 	})).Return(testTagKey, nil)
 
 	resp, err := srv.CreateTagKey(ctx, &apiv1.CreateTagKeyRequest{
@@ -178,7 +180,8 @@ func TestUnit_UpdateTagKey_WithMask(t *testing.T) {
 	updatedKey.Description = "Updated description"
 	mockQ.On("GetTagKey", mock.Anything, testTagKeyID).Return(testTagKey, nil)
 	mockQ.On("UpdateTagKey", mock.Anything, mock.MatchedBy(func(p db.UpdateTagKeyParams) bool {
-		return p.ID == testTagKeyID && p.Description.Valid && p.Description.String == "Updated description"
+		return p.ID == testTagKeyID && p.Description.Valid && p.Description.String == "Updated description" &&
+			p.UpdatedBy == convert.PgUUID(tagCallerPivoxUUID)
 	})).Return(updatedKey, nil)
 
 	resp, err := srv.UpdateTagKey(ctx, &apiv1.UpdateTagKeyRequest{
@@ -203,7 +206,8 @@ func TestUnit_UpdateTagKey_NoMask(t *testing.T) {
 	updatedKey.Description = "Full update"
 	mockQ.On("GetTagKey", mock.Anything, testTagKeyID).Return(testTagKey, nil)
 	mockQ.On("UpdateTagKey", mock.Anything, mock.MatchedBy(func(p db.UpdateTagKeyParams) bool {
-		return p.ID == testTagKeyID && p.Description.Valid && p.Description.String == "Full update"
+		return p.ID == testTagKeyID && p.Description.Valid && p.Description.String == "Full update" &&
+			p.UpdatedBy == convert.PgUUID(tagCallerPivoxUUID)
 	})).Return(updatedKey, nil)
 
 	resp, err := srv.UpdateTagKey(ctx, &apiv1.UpdateTagKeyRequest{
@@ -286,7 +290,8 @@ func TestUnit_CreateTagValue_Success(t *testing.T) {
 
 	mockQ.On("GetTagKey", mock.Anything, testTagKeyID).Return(testTagKey, nil)
 	mockQ.On("CreateTagValue", mock.Anything, mock.MatchedBy(func(p db.CreateTagValueParams) bool {
-		return p.TagKeyID == testTagKeyID && p.ShortName == "prod"
+		return p.TagKeyID == testTagKeyID && p.ShortName == "prod" &&
+			p.CreatedBy == convert.PgUUID(tagCallerPivoxUUID)
 	})).Return(testTagValue, nil)
 
 	resp, err := srv.CreateTagValue(ctx, &apiv1.CreateTagValueRequest{
@@ -353,7 +358,8 @@ func TestUnit_UpdateTagValue_WithMask(t *testing.T) {
 
 	mockQ.On("GetTagValue", mock.Anything, testTagValID).Return(testTagValue, nil)
 	mockQ.On("UpdateTagValue", mock.Anything, mock.MatchedBy(func(p db.UpdateTagValueParams) bool {
-		return p.ID == testTagValID && p.Description.Valid && p.Description.String == "Staging"
+		return p.ID == testTagValID && p.Description.Valid && p.Description.String == "Staging" &&
+			p.UpdatedBy == convert.PgUUID(tagCallerPivoxUUID)
 	})).Return(updatedVal, nil)
 
 	resp, err := srv.UpdateTagValue(ctx, &apiv1.UpdateTagValueRequest{
@@ -380,7 +386,8 @@ func TestUnit_UpdateTagValue_NoMask(t *testing.T) {
 
 	mockQ.On("GetTagValue", mock.Anything, testTagValID).Return(testTagValue, nil)
 	mockQ.On("UpdateTagValue", mock.Anything, mock.MatchedBy(func(p db.UpdateTagValueParams) bool {
-		return p.ID == testTagValID && p.Description.Valid && p.Description.String == "Full update"
+		return p.ID == testTagValID && p.Description.Valid && p.Description.String == "Full update" &&
+			p.UpdatedBy == convert.PgUUID(tagCallerPivoxUUID)
 	})).Return(updatedVal, nil)
 
 	resp, err := srv.UpdateTagValue(ctx, &apiv1.UpdateTagValueRequest{
@@ -466,7 +473,8 @@ func TestUnit_CreateTagBinding_Success(t *testing.T) {
 	tvName := "tagKeys/" + testTagKeyID.String() + "/tagValues/" + testTagValID.String()
 	mockQ.On("GetTagValue", mock.Anything, testTagValID).Return(testTagValue, nil)
 	mockQ.On("CreateTagBinding", mock.Anything, mock.MatchedBy(func(p db.CreateTagBindingParams) bool {
-		return p.TagValueID == testTagValID && p.ParentResource == "organizations/acme/storageGateways/gw-1"
+		return p.TagValueID == testTagValID && p.ParentResource == "organizations/acme/storageGateways/gw-1" &&
+			p.CreatedBy == convert.PgUUID(tagCallerPivoxUUID)
 	})).Return(testTagBinding, nil)
 
 	resp, err := srv.CreateTagBinding(ctx, &apiv1.CreateTagBindingRequest{
