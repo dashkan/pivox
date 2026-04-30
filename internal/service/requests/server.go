@@ -83,6 +83,39 @@ func (s *RequestsServer) resolveLineItemActors(ctx context.Context, rows []db.As
 	return actors, nil
 }
 
+// resolveLineItemAssetNames batch-fetches `assets.name` for every
+// non-null `asset_id` across the page so LineItemToProto can render
+// `pb.Asset` as a valid resource reference without an N+1 fetch.
+// Returns nil when there are no asset_ids to resolve.
+func (s *RequestsServer) resolveLineItemAssetNames(ctx context.Context, rows []db.AssetRequestLineItem) (map[uuid.UUID]string, error) {
+	ids := make([]uuid.UUID, 0, len(rows))
+	seen := make(map[uuid.UUID]struct{}, len(rows))
+	for _, r := range rows {
+		if !r.AssetID.Valid {
+			continue
+		}
+		id := uuid.UUID(r.AssetID.Bytes)
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	pairs, err := s.queries.GetAssetNamesByIDs(ctx, ids)
+	if err != nil {
+		slog.ErrorContext(ctx, "resolve line item asset names failed", "error", err)
+		return nil, apierr.Internal("resolve asset names")
+	}
+	out := make(map[uuid.UUID]string, len(pairs))
+	for _, p := range pairs {
+		out[p.ID] = p.Name
+	}
+	return out, nil
+}
+
 // parseRequestName parses "organizations/{org}/spaces/{space}/requests/{request}".
 func parseRequestName(name string) (orgName, spaceName, requestName string, err error) {
 	parts := strings.Split(name, "/")
@@ -148,8 +181,12 @@ func (s *RequestsServer) GetRequest(ctx context.Context, req *assetsv1.GetReques
 		if liErr != nil {
 			return nil, liErr
 		}
+		assetNames, anErr := s.resolveLineItemAssetNames(ctx, lineItems)
+		if anErr != nil {
+			return nil, anErr
+		}
 		for _, li := range lineItems {
-			proto.LineItems = append(proto.LineItems, convert.LineItemToProto(li, requestFullName, parentName, liActors))
+			proto.LineItems = append(proto.LineItems, convert.LineItemToProto(li, requestFullName, parentName, liActors, assetNames))
 		}
 		proto.LineItemCount = int32(len(lineItems))
 	}

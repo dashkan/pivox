@@ -232,6 +232,41 @@ func (q *Queries) GetAssetByName(ctx context.Context, arg GetAssetByNameParams) 
 	return i, err
 }
 
+const getAssetNamesByIDs = `-- name: GetAssetNamesByIDs :many
+SELECT id, name FROM assets WHERE id = ANY($1::uuid[])
+`
+
+type GetAssetNamesByIDsRow struct {
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
+}
+
+// GetAssetNamesByIDs is the batched lookup used to resolve
+// line-item → asset resource names without an N+1 fetch loop.
+// Returns (id, name) pairs for the IDs that exist; missing IDs
+// (e.g. a line_item whose asset was purged via SET NULL cascade,
+// or whose asset row was hard-deleted before this column moved
+// to soft-delete) are simply absent from the result set.
+func (q *Queries) GetAssetNamesByIDs(ctx context.Context, ids []uuid.UUID) ([]GetAssetNamesByIDsRow, error) {
+	rows, err := q.db.Query(ctx, getAssetNamesByIDs, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetAssetNamesByIDsRow{}
+	for rows.Next() {
+		var i GetAssetNamesByIDsRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAssetsBySpace = `-- name: ListAssetsBySpace :many
 SELECT id, space_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets
 WHERE space_id = $1 AND delete_time IS NULL

@@ -13,9 +13,9 @@ import (
 
 	db "github.com/dashkan/pivox/internal/db/generated"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
-	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 	assetsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1"
 	storagev1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"
+	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 )
 
 // ---------------------------------------------------------------------------
@@ -561,11 +561,14 @@ func TestLineItemToProto(t *testing.T) {
 	annotationsJSON, err := json.Marshal(annotations)
 	require.NoError(t, err)
 
+	assetID := uuid.New()
+
 	tests := []struct {
 		name        string
 		row         db.AssetRequestLineItem
 		requestName string
 		spaceName   string
+		assetNames  map[uuid.UUID]string
 		checkFunc   func(t *testing.T, pb *assetsv1.LineItem)
 	}{
 		{
@@ -577,7 +580,7 @@ func TestLineItemToProto(t *testing.T) {
 				Description: "Need photo",
 				State:       db.LineItemStatePENDING,
 				MediaType:   db.NullAssetMediaType{AssetMediaType: db.AssetMediaTypeIMAGE, Valid: true},
-				AssetID:     pgtype.UUID{Bytes: uuid.New(), Valid: true},
+				AssetID:     pgtype.UUID{Bytes: assetID, Valid: true},
 				Annotations: annotationsJSON,
 				CreatedBy:   pgtype.UUID{},
 				CreateTime:  now,
@@ -585,9 +588,12 @@ func TestLineItemToProto(t *testing.T) {
 			},
 			requestName: "organizations/acme/spaces/p1/requests/req-1",
 			spaceName:   "organizations/acme/spaces/p1",
+			assetNames:  map[uuid.UUID]string{assetID: "asset-slug-abc"},
 			checkFunc: func(t *testing.T, pb *assetsv1.LineItem) {
 				assert.Equal(t, assetsv1.Asset_IMAGE, pb.MediaType)
-				assert.NotEmpty(t, pb.Asset)
+				// pb.Asset uses the asset's slug from the assetNames
+				// map, NOT the line item's name.
+				assert.Equal(t, "organizations/acme/spaces/p1/assets/asset-slug-abc", pb.Asset)
 				assert.Equal(t, map[string]string{"source": "import"}, pb.Annotations)
 			},
 		},
@@ -612,11 +618,34 @@ func TestLineItemToProto(t *testing.T) {
 				assert.Nil(t, pb.Annotations)
 			},
 		},
+		{
+			name: "line item with asset_id but missing assetNames map drops to empty (defense in depth)",
+			row: db.AssetRequestLineItem{
+				ID:          uuid.New(),
+				Name:        "li-3",
+				DisplayName: "Orphaned",
+				State:       db.LineItemStatePENDING,
+				AssetID:     pgtype.UUID{Bytes: uuid.New(), Valid: true},
+				CreatedBy:   pgtype.UUID{},
+				CreateTime:  now,
+				UpdateTime:  updated,
+			},
+			requestName: "organizations/acme/spaces/p1/requests/req-1",
+			spaceName:   "organizations/acme/spaces/p1",
+			assetNames:  nil,
+			checkFunc: func(t *testing.T, pb *assetsv1.LineItem) {
+				// Without the assetNames map, the converter cannot
+				// render a valid asset reference — leave it empty
+				// rather than rendering the line_item's name (the
+				// pre-B-4 bug).
+				assert.Empty(t, pb.Asset)
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pb := LineItemToProto(tt.row, tt.requestName, tt.spaceName, nil)
+			pb := LineItemToProto(tt.row, tt.requestName, tt.spaceName, nil, tt.assetNames)
 			require.NotNil(t, pb)
 			assert.Equal(t, tt.requestName+"/lineItems/"+tt.row.Name, pb.Name)
 			assert.Equal(t, tt.row.DisplayName, pb.DisplayName)

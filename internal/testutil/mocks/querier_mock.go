@@ -523,6 +523,11 @@ func (m *MockQuerier) GetAssetByChecksum(ctx context.Context, arg db.GetAssetByC
 	return args.Get(0).(db.Asset), args.Error(1)
 }
 
+func (m *MockQuerier) GetAssetNamesByIDs(ctx context.Context, ids []uuid.UUID) ([]db.GetAssetNamesByIDsRow, error) {
+	args := m.Called(ctx, ids)
+	return args.Get(0).([]db.GetAssetNamesByIDsRow), args.Error(1)
+}
+
 func (m *MockQuerier) GetAssetByName(ctx context.Context, arg db.GetAssetByNameParams) (db.Asset, error) {
 	args := m.Called(ctx, arg)
 	return args.Get(0).(db.Asset), args.Error(1)

@@ -6,6 +6,15 @@ RETURNING *;
 -- name: GetAsset :one
 SELECT * FROM assets WHERE id = $1;
 
+-- GetAssetNamesByIDs is the batched lookup used to resolve
+-- line-item → asset resource names without an N+1 fetch loop.
+-- Returns (id, name) pairs for the IDs that exist; missing IDs
+-- (e.g. a line_item whose asset was purged via SET NULL cascade,
+-- or whose asset row was hard-deleted before this column moved
+-- to soft-delete) are simply absent from the result set.
+-- name: GetAssetNamesByIDs :many
+SELECT id, name FROM assets WHERE id = ANY(@ids::uuid[]);
+
 -- name: GetAssetByName :one
 SELECT * FROM assets WHERE space_id = $1 AND name = $2;
 

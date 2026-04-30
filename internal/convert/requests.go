@@ -53,7 +53,11 @@ func RequestToProto(row db.AssetRequest, spaceName string, actors map[uuid.UUID]
 // spaceName is the full resource name of the parent space
 // (e.g. "organizations/acme/spaces/my-space"). `actors` is the
 // pre-resolved Actor map; pass nil to skip Actor inflation.
-func LineItemToProto(row db.AssetRequestLineItem, requestName string, spaceName string, actors map[uuid.UUID]*typespb.Actor) *assetsv1.LineItem {
+// `assetNames` maps `asset_request_line_items.asset_id` (UUID) to
+// `assets.name` (slug) so the line item's `asset` resource_reference
+// can be rendered without an N+1 fetch. Pass nil if asset resolution
+// is intentionally skipped — `pb.Asset` will be empty in that case.
+func LineItemToProto(row db.AssetRequestLineItem, requestName string, spaceName string, actors map[uuid.UUID]*typespb.Actor, assetNames map[uuid.UUID]string) *assetsv1.LineItem {
 	pb := &assetsv1.LineItem{
 		Name:        fmt.Sprintf("%s/lineItems/%s", requestName, row.Name),
 		DisplayName: row.DisplayName,
@@ -67,8 +71,10 @@ func LineItemToProto(row db.AssetRequestLineItem, requestName string, spaceName 
 	if row.MediaType.Valid {
 		pb.MediaType = assetMediaType(row.MediaType.AssetMediaType)
 	}
-	if row.AssetID.Valid {
-		pb.Asset = fmt.Sprintf("%s/assets/%s", spaceName, row.Name)
+	if row.AssetID.Valid && assetNames != nil {
+		if assetSlug, ok := assetNames[row.AssetID.Bytes]; ok {
+			pb.Asset = fmt.Sprintf("%s/assets/%s", spaceName, assetSlug)
+		}
 	}
 	if len(row.Annotations) > 0 {
 		annotations := make(map[string]string)

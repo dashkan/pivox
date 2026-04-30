@@ -221,6 +221,13 @@ type Querier interface {
 	GetAsset(ctx context.Context, id uuid.UUID) (Asset, error)
 	GetAssetByChecksum(ctx context.Context, arg GetAssetByChecksumParams) (Asset, error)
 	GetAssetByName(ctx context.Context, arg GetAssetByNameParams) (Asset, error)
+	// GetAssetNamesByIDs is the batched lookup used to resolve
+	// line-item → asset resource names without an N+1 fetch loop.
+	// Returns (id, name) pairs for the IDs that exist; missing IDs
+	// (e.g. a line_item whose asset was purged via SET NULL cascade,
+	// or whose asset row was hard-deleted before this column moved
+	// to soft-delete) are simply absent from the result set.
+	GetAssetNamesByIDs(ctx context.Context, ids []uuid.UUID) ([]GetAssetNamesByIDsRow, error)
 	GetAssetVersion(ctx context.Context, id uuid.UUID) (AssetVersion, error)
 	GetAssetVersionByNumber(ctx context.Context, arg GetAssetVersionByNumberParams) (AssetVersion, error)
 	GetConversationByID(ctx context.Context, id uuid.UUID) (AiConversation, error)
