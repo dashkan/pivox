@@ -22,6 +22,13 @@ extension Notification.Name {
     /// when no older pages remain. Tiered so a single keypress
     /// never cascades multiple pagination loads.
     static let aiChatScrollUp = Notification.Name("pivox.aiChat.scrollUp")
+
+    /// Posted by `ConversationViewModel.loadHistory()` when the
+    /// server returns NotFound — the conversation was deleted in
+    /// another session. The panel drops back to New Chat rather
+    /// than stranding the user on an error card. `userInfo`
+    /// carries the gone resource name under "conversation".
+    static let aiChatConversationGone = Notification.Name("pivox.aiChat.conversationGone")
 }
 
 /// AI chat surface. Renders whichever stage the shared
@@ -81,8 +88,13 @@ struct AIChatPanel: View {
         // server has since deleted it, ConversationView's loadHistory
         // will surface the error and the user picks another from
         // history or starts new.
+        // Only restore if the saved name belongs to the current org —
+        // a fresh DB or an org switch leaves a stale pointer that
+        // would 404 / PermissionDenied on first load.
         let saved = AppStateBridge.shared().loadString(forKey: Self.lastConversationKey)
-        _conversationName = State(initialValue: (saved?.isEmpty == false) ? saved : nil)
+        let prefix = "organizations/\(orgName)/"
+        let valid = (saved?.isEmpty == false) && (saved?.hasPrefix(prefix) == true)
+        _conversationName = State(initialValue: valid ? saved : nil)
     }
 
     var body: some View {
@@ -218,6 +230,17 @@ struct AIChatPanel: View {
             // conversation the user explicitly dismissed.
             AppStateBridge.shared().save(newName ?? "",
                                          forKey: Self.lastConversationKey)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .aiChatConversationGone)) { note in
+            // Server says the conversation no longer exists. Match
+            // against the *currently displayed* name so a stale
+            // notification from a previously-viewed conversation
+            // doesn't yank the user out of a different one. Fall
+            // back to New Chat.
+            guard let gone = note.userInfo?["conversation"] as? String,
+                  gone == conversationName else { return }
+            conversationName = nil
+            pendingMessage = nil
         }
     }
 }

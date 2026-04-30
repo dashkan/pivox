@@ -1,6 +1,7 @@
 package aichat
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/dashkan/pivox/internal/appkey"
@@ -26,6 +27,19 @@ type Server struct {
 	messageFilter         *filter.ResourceFilter
 	artifactFilter        *filter.ResourceFilter
 	artifactVersionFilter *filter.ResourceFilter
+}
+
+// getArtifactByName / getArtifactVersionForContent are tiny query
+// adapters that let ContentHandler depend on a small interface
+// (`conversationResolver`) instead of the full Server struct, so
+// content_handler tests can stub them without standing up a real
+// Server (model, codec, filters, ...).
+func (s *Server) getArtifactByName(ctx context.Context, params db.GetArtifactByNameParams) (db.AiArtifact, error) {
+	return s.queries.GetArtifactByName(ctx, params)
+}
+
+func (s *Server) getArtifactVersionForContent(ctx context.Context, params db.GetArtifactVersionForContentParams) (db.GetArtifactVersionForContentRow, error) {
+	return s.queries.GetArtifactVersionForContent(ctx, params)
 }
 
 // NewServer creates a new AiChat service server. `resolver` is

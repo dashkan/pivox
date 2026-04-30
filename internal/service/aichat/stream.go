@@ -86,12 +86,14 @@ func (s *Server) runGenerate(
 	// interceptor — by the time this runs, the request is well-formed.
 	_ = server.MustAuthenticatedUID(ctx) // surfaces the unauth error early
 
-	// Validate the parent org regardless of stateful/stateless —
-	// without this the stateless path would happily run inference
-	// for any org name a caller invents, including ones they don't
-	// belong to. parseOrgScope accepts any path that starts with
-	// `organizations/{org}/...` so this same parent shape works for
-	// both Phase-7 user-rooted paths and the bare org parent.
+	// Validate the parent org is well-formed and exists. Cross-org
+	// tenancy itself is enforced upstream by the permission
+	// interceptor checking `ai.chat.stream` against this org —
+	// `parseOrgScope` only does syntactic extraction and `resolveOrg`
+	// only verifies the org row exists, neither of which gates on
+	// caller membership. parseOrgScope accepts any path that starts
+	// with `organizations/{org}/...` so this same parent shape works
+	// for both Phase-7 user-rooted paths and the bare org parent.
 	orgName, err := parseOrgScope(req.GetParent())
 	if err != nil {
 		return nil, nil, "", apierr.InvalidArgument(apierr.FieldViolation("parent", err.Error()))

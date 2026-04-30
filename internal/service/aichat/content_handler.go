@@ -1,66 +1,76 @@
 package aichat
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	db "github.com/dashkan/pivox/internal/db/generated"
-	"github.com/dashkan/pivox/internal/server"
+	"github.com/dashkan/pivox/internal/permission"
 )
+
+// conversationResolver is the small slice of *Server that ContentHandler
+// depends on. Pulling it behind an interface lets the unit tests stub
+// the conversation resolution + queries without standing up a real
+// Server (which would drag in the model, codec, filters, etc.).
+type conversationResolver interface {
+	resolveConversation(ctx context.Context, orgName string, pathUser uuid.UUID, convName, allPerm string) (db.AiConversation, error)
+	getArtifactByName(ctx context.Context, params db.GetArtifactByNameParams) (db.AiArtifact, error)
+	getArtifactVersionForContent(ctx context.Context, params db.GetArtifactVersionForContentParams) (db.GetArtifactVersionForContentRow, error)
+}
 
 // ContentHandler serves inline artifact version content over HTTP.
 // Asset-backed versions are not served here — clients use the asset system.
+//
+// Ownership reuses the gRPC artifact handlers' resolveConversation
+// (path-vs-row creator check + audit-bypass via
+// `ai.conversations.readAll`). The HTTP path mirrors the gRPC
+// artifact version resource shape post-Phase-7:
+//
+//	/v1/organizations/{org}/users/{user}/conversations/{conv}/artifacts/{art}/versions/{ver}:content
 type ContentHandler struct {
-	queries db.Querier
-	logger  *slog.Logger
+	resolver conversationResolver
+	logger   *slog.Logger
 }
 
-// NewContentHandler creates a new content handler.
-func NewContentHandler(queries db.Querier, logger *slog.Logger) *ContentHandler {
-	return &ContentHandler{queries: queries, logger: logger}
+// NewContentHandler creates a new content handler. The supplied
+// Server provides the queries + permission resolver used for
+// ownership enforcement; without it the handler can't run the
+// path-vs-row creator check that the gRPC artifact handlers depend
+// on.
+func NewContentHandler(srv *Server, logger *slog.Logger) *ContentHandler {
+	return &ContentHandler{resolver: srv, logger: logger}
 }
 
 func (h *ContentHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	uid, ok := server.AuthenticatedUID(ctx)
-	if !ok || uid == "" {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	// Parse path: /v1/organizations/{org}/conversations/{conv}/artifacts/{art}/versions/{ver}:content
-	orgName, convName, artName, verName, ok := parseContentPath(r.URL.Path)
+	// Parse the new shape:
+	//   /v1/organizations/{org}/users/{user}/conversations/{conv}/artifacts/{art}/versions/{ver}:content
+	orgName, pathUser, convName, artName, verName, ok := parseContentPath(r.URL.Path)
 	if !ok {
 		http.NotFound(w, r)
 		return
 	}
 
-	// Resolve through the resource hierarchy.
-	org, err := h.queries.GetOrganizationByName(ctx, orgName)
+	// Mirror the gRPC artifact handlers: path-vs-row creator check
+	// plus optional audit-bypass via `ai.conversations.readAll` so
+	// admins/owners can pull a peer's artifact for legal/audit. The
+	// auth interceptor populates the pivox_user_id claim or rejects
+	// the request before we get here.
+	conv, err := h.resolver.resolveConversation(ctx, orgName, pathUser, convName, permission.AiConversationsReadAll)
 	if err != nil {
-		http.NotFound(w, r)
+		writeAPIError(w, r, err)
 		return
 	}
 
-	conv, err := h.queries.GetConversationByName(ctx, db.GetConversationByNameParams{
-		OrgID: org.ID,
-		Name:  convName,
-	})
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-
-	// Verify the caller owns the conversation.
-	if conv.CreatedBy != uid {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
-
-	art, err := h.queries.GetArtifactByName(ctx, db.GetArtifactByNameParams{
+	art, err := h.resolver.getArtifactByName(ctx, db.GetArtifactByNameParams{
 		ConversationID: conv.ID,
 		Name:           artName,
 	})
@@ -69,7 +79,7 @@ func (h *ContentHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	row, err := h.queries.GetArtifactVersionForContent(ctx, db.GetArtifactVersionForContentParams{
+	row, err := h.resolver.getArtifactVersionForContent(ctx, db.GetArtifactVersionForContentParams{
 		ArtifactID: art.ID,
 		Name:       verName,
 	})
@@ -105,29 +115,51 @@ func (h *ContentHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// parseContentPath extracts org, conv, artifact, version from:
-// /v1/organizations/{org}/conversations/{conv}/artifacts/{art}/versions/{ver}:content
-func parseContentPath(path string) (org, conv, art, ver string, ok bool) {
+// writeAPIError maps the gRPC-status errors that resolveConversation
+// returns onto HTTP status codes. NotFound stays 404 (preserves the
+// existence-probe defense in resolveConversation); PermissionDenied
+// → 403; anything else degrades to 500.
+func writeAPIError(w http.ResponseWriter, r *http.Request, err error) {
+	switch status.Code(err) {
+	case codes.NotFound:
+		http.NotFound(w, r)
+	case codes.PermissionDenied:
+		http.Error(w, "forbidden", http.StatusForbidden)
+	case codes.Unauthenticated:
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	default:
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	}
+}
+
+// parseContentPath extracts org, user-uuid, conv, artifact, version from:
+// /v1/organizations/{org}/users/{user}/conversations/{conv}/artifacts/{art}/versions/{ver}:content
+func parseContentPath(path string) (org string, user uuid.UUID, conv, art, ver string, ok bool) {
 	// Strip ":content" suffix.
 	path, found := strings.CutSuffix(path, ":content")
 	if !found {
-		return "", "", "", "", false
+		return "", uuid.Nil, "", "", "", false
 	}
 
 	// Strip leading "/v1/" prefix.
 	path, found = strings.CutPrefix(path, "/v1/")
 	if !found {
-		return "", "", "", "", false
+		return "", uuid.Nil, "", "", "", false
 	}
 
-	// Now parse: organizations/{org}/conversations/{conv}/artifacts/{art}/versions/{ver}
+	// Now parse: organizations/{org}/users/{user}/conversations/{conv}/artifacts/{art}/versions/{ver}
 	parts := strings.Split(path, "/")
-	if len(parts) != 8 ||
+	if len(parts) != 10 ||
 		parts[0] != "organizations" ||
-		parts[2] != "conversations" ||
-		parts[4] != "artifacts" ||
-		parts[6] != "versions" {
-		return "", "", "", "", false
+		parts[2] != "users" ||
+		parts[4] != "conversations" ||
+		parts[6] != "artifacts" ||
+		parts[8] != "versions" {
+		return "", uuid.Nil, "", "", "", false
 	}
-	return parts[1], parts[3], parts[5], parts[7], true
+	uid, parseErr := uuid.Parse(parts[3])
+	if parseErr != nil {
+		return "", uuid.Nil, "", "", "", false
+	}
+	return parts[1], uid, parts[5], parts[7], parts[9], true
 }

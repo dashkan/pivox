@@ -78,13 +78,9 @@ func WithPivoxUserID(ctx context.Context, id uuid.UUID) context.Context {
 
 // MustPivoxUserID extracts the verified Pivox user UUID from the
 // context. Panics if the context does not contain one — only call
-// from handlers behind the auth interceptor where the blocking
-// function is guaranteed to have set the claim.
-//
-// Token-issued-before-claim-set is a transient case the interceptor
-// handles by failing the request with Unauthenticated, prompting the
-// client to refresh; by the time a handler runs, the claim is
-// guaranteed present.
+// from handlers behind the auth interceptor, which rejects any
+// token without a `pivox_user_id` claim with Unauthenticated, so
+// by the time a handler runs the claim is guaranteed present.
 func MustPivoxUserID(ctx context.Context) uuid.UUID {
 	id, ok := PivoxUserID(ctx)
 	if !ok {
@@ -117,20 +113,23 @@ func authenticate(ctx context.Context, auth authn.Service) (context.Context, err
 		return nil, apierr.Unauthenticated(errInvalidOrExpiredID)
 	}
 	ctx = context.WithValue(ctx, authContextKey{}, identity.UID)
-	// `pivox_user_id` is set by the Firebase blocking function from
-	// the identity-sync RPC's response. Tokens minted before the
-	// claim was added (e.g. a freshly upgraded server seeing a
-	// stale-cached client token) carry no claim — those callers must
-	// refresh their token to land. We return the original token-
-	// verification error message so clients can't probe whether
-	// they're on an old token vs. a wrong-credential.
-	if claim, ok := identity.Claims["pivox_user_id"].(string); ok && claim != "" {
-		uid, parseErr := uuid.Parse(claim)
-		if parseErr != nil {
-			return nil, apierr.Unauthenticated(errInvalidOrExpiredID)
-		}
-		ctx = context.WithValue(ctx, pivoxUserIDKey{}, uid)
+	// `pivox_user_id` is set by the Firebase blocking function during
+	// identity sync. Every authenticated token must carry it — handlers
+	// downstream rely on `MustPivoxUserID(ctx)` for ownership checks
+	// and panic if the claim is missing. Reject here with the same
+	// Unauthenticated message used for token verification failures so
+	// clients can't probe whether their token is missing the claim vs.
+	// invalid; the right client response in either case is "refresh
+	// the ID token (forcing a re-mint that runs the blocking fn)."
+	claim, ok := identity.Claims["pivox_user_id"].(string)
+	if !ok || claim == "" {
+		return nil, apierr.Unauthenticated(errInvalidOrExpiredID)
 	}
+	uid, parseErr := uuid.Parse(claim)
+	if parseErr != nil {
+		return nil, apierr.Unauthenticated(errInvalidOrExpiredID)
+	}
+	ctx = context.WithValue(ctx, pivoxUserIDKey{}, uid)
 	return ctx, nil
 }
 

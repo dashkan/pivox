@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -15,6 +16,12 @@ import (
 
 	"github.com/dashkan/pivox/internal/authn"
 )
+
+// claims helper builds the minimal Claims map that the interceptor
+// requires — every authenticated request must carry `pivox_user_id`.
+func claimsWithPivoxUserID(id uuid.UUID) map[string]any {
+	return map[string]any{"pivox_user_id": id.String()}
+}
 
 // --- Mock authn.Service ---
 
@@ -134,16 +141,22 @@ func TestAuthInterceptor_ValidToken(t *testing.T) {
 	md := metadata.New(map[string]string{"authorization": "Bearer test-token"})
 	ctx := metadata.NewIncomingContext(context.Background(), md)
 
+	pivoxUID := uuid.New()
 	auth.On("VerifyToken", mock.Anything, "test-token").Return(&authn.Identity{
-		UID:   "user-789",
-		Email: "user@example.com",
+		UID:    "user-789",
+		Email:  "user@example.com",
+		Claims: claimsWithPivoxUserID(pivoxUID),
 	}, nil)
 
 	var capturedUID string
+	var capturedPivoxUID uuid.UUID
 	handler := func(ctx context.Context, req any) (any, error) {
 		uid, ok := AuthenticatedUID(ctx)
 		require.True(t, ok)
 		capturedUID = uid
+		pid, pok := PivoxUserID(ctx)
+		require.True(t, pok)
+		capturedPivoxUID = pid
 		return "ok", nil
 	}
 
@@ -156,6 +169,7 @@ func TestAuthInterceptor_ValidToken(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "ok", resp)
 	assert.Equal(t, "user-789", capturedUID)
+	assert.Equal(t, pivoxUID, capturedPivoxUID)
 	auth.AssertExpectations(t)
 }
 
@@ -249,15 +263,21 @@ func TestAuthStreamInterceptor_ValidToken(t *testing.T) {
 	md := metadata.New(map[string]string{"authorization": "Bearer stream-token"})
 	ctx := metadata.NewIncomingContext(context.Background(), md)
 
+	pivoxUID := uuid.New()
 	auth.On("VerifyToken", mock.Anything, "stream-token").Return(&authn.Identity{
-		UID: "stream-user",
+		UID:    "stream-user",
+		Claims: claimsWithPivoxUserID(pivoxUID),
 	}, nil)
 
 	var capturedUID string
+	var capturedPivoxUID uuid.UUID
 	handler := func(srv any, stream grpc.ServerStream) error {
 		uid, ok := AuthenticatedUID(stream.Context())
 		require.True(t, ok)
 		capturedUID = uid
+		pid, pok := PivoxUserID(stream.Context())
+		require.True(t, pok)
+		capturedPivoxUID = pid
 		return nil
 	}
 
@@ -270,5 +290,129 @@ func TestAuthStreamInterceptor_ValidToken(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "stream-user", capturedUID)
+	assert.Equal(t, pivoxUID, capturedPivoxUID)
+	auth.AssertExpectations(t)
+}
+
+// --- pivox_user_id claim handling ---
+
+func TestPivoxUserID_Present(t *testing.T) {
+	want := uuid.New()
+	ctx := WithPivoxUserID(context.Background(), want)
+	got, ok := PivoxUserID(ctx)
+
+	assert.True(t, ok)
+	assert.Equal(t, want, got)
+}
+
+func TestPivoxUserID_Missing(t *testing.T) {
+	ctx := context.Background()
+	_, ok := PivoxUserID(ctx)
+
+	assert.False(t, ok)
+}
+
+func TestMustPivoxUserID_Present(t *testing.T) {
+	want := uuid.New()
+	ctx := WithPivoxUserID(context.Background(), want)
+
+	assert.Equal(t, want, MustPivoxUserID(ctx))
+}
+
+func TestMustPivoxUserID_Panics(t *testing.T) {
+	assert.Panics(t, func() {
+		MustPivoxUserID(context.Background())
+	})
+}
+
+func TestAuthInterceptor_RejectsMissingPivoxUserID(t *testing.T) {
+	auth := new(mockAuthService)
+	interceptor := AuthInterceptor(auth)
+
+	md := metadata.New(map[string]string{"authorization": "Bearer no-claim-token"})
+	ctx := metadata.NewIncomingContext(context.Background(), md)
+
+	auth.On("VerifyToken", mock.Anything, "no-claim-token").Return(&authn.Identity{
+		UID:    "user-noclaim",
+		Claims: map[string]any{},
+	}, nil)
+
+	info := &grpc.UnaryServerInfo{FullMethod: "/pivox.api.v1.Spaces/GetSpace"}
+	_, err := interceptor(ctx, nil, info, nil)
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.Unauthenticated, st.Code())
+	assert.Contains(t, st.Message(), "invalid or expired token")
+	auth.AssertExpectations(t)
+}
+
+func TestAuthInterceptor_RejectsEmptyPivoxUserID(t *testing.T) {
+	auth := new(mockAuthService)
+	interceptor := AuthInterceptor(auth)
+
+	md := metadata.New(map[string]string{"authorization": "Bearer empty-claim-token"})
+	ctx := metadata.NewIncomingContext(context.Background(), md)
+
+	auth.On("VerifyToken", mock.Anything, "empty-claim-token").Return(&authn.Identity{
+		UID:    "user-empty",
+		Claims: map[string]any{"pivox_user_id": ""},
+	}, nil)
+
+	info := &grpc.UnaryServerInfo{FullMethod: "/pivox.api.v1.Spaces/GetSpace"}
+	_, err := interceptor(ctx, nil, info, nil)
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.Unauthenticated, st.Code())
+	auth.AssertExpectations(t)
+}
+
+func TestAuthInterceptor_RejectsNonStringPivoxUserID(t *testing.T) {
+	auth := new(mockAuthService)
+	interceptor := AuthInterceptor(auth)
+
+	md := metadata.New(map[string]string{"authorization": "Bearer wrong-type-token"})
+	ctx := metadata.NewIncomingContext(context.Background(), md)
+
+	// Firebase claims arrive as `any` from JSON decode; a malformed
+	// claim value (number, bool, map) must be rejected.
+	auth.On("VerifyToken", mock.Anything, "wrong-type-token").Return(&authn.Identity{
+		UID:    "user-wrongtype",
+		Claims: map[string]any{"pivox_user_id": 12345},
+	}, nil)
+
+	info := &grpc.UnaryServerInfo{FullMethod: "/pivox.api.v1.Spaces/GetSpace"}
+	_, err := interceptor(ctx, nil, info, nil)
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.Unauthenticated, st.Code())
+	auth.AssertExpectations(t)
+}
+
+func TestAuthInterceptor_RejectsInvalidUUIDPivoxUserID(t *testing.T) {
+	auth := new(mockAuthService)
+	interceptor := AuthInterceptor(auth)
+
+	md := metadata.New(map[string]string{"authorization": "Bearer bad-uuid-token"})
+	ctx := metadata.NewIncomingContext(context.Background(), md)
+
+	auth.On("VerifyToken", mock.Anything, "bad-uuid-token").Return(&authn.Identity{
+		UID:    "user-baduuid",
+		Claims: map[string]any{"pivox_user_id": "not-a-uuid"},
+	}, nil)
+
+	info := &grpc.UnaryServerInfo{FullMethod: "/pivox.api.v1.Spaces/GetSpace"}
+	_, err := interceptor(ctx, nil, info, nil)
+
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.Unauthenticated, st.Code())
+	assert.Contains(t, st.Message(), "invalid or expired token")
 	auth.AssertExpectations(t)
 }

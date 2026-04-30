@@ -91,12 +91,16 @@ func New(t *testing.T, opts ...Option) *Harness {
 	for _, o := range opts {
 		o(cfg)
 	}
-	if cfg.auth == nil {
-		cfg.auth = testAuthService{}
-	}
 
 	pool, queries, dbCleanup := testutil.SetupTestDB(t)
 	t.Cleanup(dbCleanup)
+
+	if cfg.auth == nil {
+		// Default authn looks identities up via queries to populate the
+		// `pivox_user_id` claim — matches the production interceptor's
+		// post-Phase-7 contract.
+		cfg.auth = testAuthService{queries: queries}
+	}
 
 	enc, err := crypto.NewEncryptor()
 	require.NoError(t, err)

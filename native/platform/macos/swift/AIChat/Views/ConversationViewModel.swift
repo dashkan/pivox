@@ -1,4 +1,5 @@
 import Foundation
+import GRPCCore
 import OSLog
 import PivoxModels
 import SwiftUI
@@ -128,6 +129,18 @@ public final class ConversationViewModel: ObservableObject {
                 response.nextPageToken.isEmpty ? "nil" : "set")
         } catch {
             guard state == .loading else { return }
+            // NotFound = the conversation was deleted (probably from another
+            // session/device). That's not a session error to retry — the
+            // resource is gone. Signal the panel so it drops back to New
+            // Chat instead of stranding the user on an error card.
+            if let rpc = error as? RPCError, rpc.code == .notFound {
+                NotificationCenter.default.post(
+                    name: .aiChatConversationGone,
+                    object: nil,
+                    userInfo: ["conversation": conversationName])
+                state = .idle
+                return
+            }
             state = .error(error.localizedDescription)
         }
     }
@@ -284,11 +297,14 @@ public final class ConversationViewModel: ObservableObject {
     }
 
     /// Extracts the `organizations/{org}` parent prefix from a full
-    /// conversation resource name `organizations/{org}/conversations/{conv}`.
-    /// The server requires `parent` on `GenerateContentRequest`.
+    /// conversation resource name. The server requires `parent` on
+    /// `GenerateContentRequest`.
+    ///
+    /// Post-Phase-7 conversation names are
+    /// `organizations/{org}/users/{user}/conversations/{conv}` — the
+    /// first two segments still spell the org parent, so taking the
+    /// first two segments stays correct.
     private func parentOrgName(from convName: String) -> String {
-        // Conversation names are exactly `organizations/{org}/conversations/{c}`.
-        // Take the first two path segments.
         let parts = convName.split(separator: "/")
         guard parts.count >= 2 else { return "" }
         return "\(parts[0])/\(parts[1])"

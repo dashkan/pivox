@@ -395,11 +395,14 @@ func serve(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// AI Chat HTTP handlers (inline artifact content + SSE stream)
-	contentHandler := aichat.NewContentHandler(queries, logger)
+	// AI Chat HTTP handlers (inline artifact content + SSE stream).
+	// The handler shares the gRPC server's resolveConversation +
+	// permission resolver so the path-vs-row creator check and
+	// `ai.conversations.readAll` audit-bypass match the gRPC RPCs.
+	contentHandler := aichat.NewContentHandler(aiChatServer, logger)
 	if err := gwMux.HandlePath(
 		"GET",
-		"/v1/organizations/{org}/conversations/{conv}/artifacts/{art}/versions/{ver}:content",
+		"/v1/organizations/{org}/users/{user}/conversations/{conv}/artifacts/{art}/versions/{ver}:content",
 		func(w http.ResponseWriter, r *http.Request, _ map[string]string) {
 			contentHandler.ServeHTTP(w, r)
 		},
