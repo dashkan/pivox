@@ -4,15 +4,19 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	db "github.com/dashkan/pivox/internal/db/generated"
 	storagev1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"
+	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 )
 
 // StorageGatewayToProto converts a DB storage gateway to proto.
 // orgName is the organization slug (e.g. "meridian-broadcasting").
-func StorageGatewayToProto(gw db.StorageGateway, orgName string) *storagev1.StorageGateway {
+// `actors` is the pre-resolved Actor map; pass nil to skip Actor
+// inflation.
+func StorageGatewayToProto(gw db.StorageGateway, orgName string, actors map[uuid.UUID]*typespb.Actor) *storagev1.StorageGateway {
 	pb := &storagev1.StorageGateway{
 		Name:              fmt.Sprintf("organizations/%s/storageGateways/%s", orgName, gw.Name),
 		DisplayName:       gw.DisplayName,
@@ -24,9 +28,9 @@ func StorageGatewayToProto(gw db.StorageGateway, orgName string) *storagev1.Stor
 		CurrentVersion:    gw.CurrentVersion,
 		CertState:         certState(gw.CertState),
 		Etag:              gw.Etag,
-		Creator:           UUIDString(gw.CreatedBy),
-		Updater:           UUIDString(gw.UpdatedBy),
+		CreatedBy:         actorOrNil(actors, gw.CreatedBy),
 		CreateTime:        timestamppb.New(gw.CreateTime),
+		UpdatedBy:         actorOrNil(actors, gw.UpdatedBy),
 		UpdateTime:        timestamppb.New(gw.UpdateTime),
 	}
 	if gw.CertExpiryTime.Valid {
@@ -62,11 +66,12 @@ func AgentToProto(a db.StorageAgent, gatewayName string) *storagev1.Agent {
 
 // EndpointToProto converts a DB endpoint to proto.
 // gatewayName is the full resource name of the parent storage gateway
-// (e.g. "organizations/acme/storageGateways/gw-1").
+// (e.g. "organizations/acme/storageGateways/gw-1"). `actors` is the
+// pre-resolved Actor map; pass nil to skip Actor inflation.
 //
 // Note: credentials inside the configuration are stripped — they are
 // INPUT_ONLY and never returned in responses.
-func EndpointToProto(ep db.StorageEndpoint, gatewayName string) *storagev1.Endpoint {
+func EndpointToProto(ep db.StorageEndpoint, gatewayName string, actors map[uuid.UUID]*typespb.Actor) *storagev1.Endpoint {
 	pb := &storagev1.Endpoint{
 		Name:        fmt.Sprintf("%s/endpoints/%s", gatewayName, ep.Name),
 		DisplayName: ep.DisplayName,
@@ -78,9 +83,9 @@ func EndpointToProto(ep db.StorageEndpoint, gatewayName string) *storagev1.Endpo
 			TtlHours:       ep.CacheTtlHours,
 		},
 		Etag:       ep.Etag,
-		Creator:    UUIDString(ep.CreatedBy),
-		Updater:    UUIDString(ep.UpdatedBy),
+		CreatedBy:  actorOrNil(actors, ep.CreatedBy),
 		CreateTime: timestamppb.New(ep.CreateTime),
+		UpdatedBy:  actorOrNil(actors, ep.UpdatedBy),
 		UpdateTime: timestamppb.New(ep.UpdateTime),
 	}
 

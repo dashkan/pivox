@@ -24,6 +24,7 @@ import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
 	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/permission/v1"
+	types "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -182,12 +183,12 @@ type Endpoint struct {
 	// Output only. A checksum computed by the server based on the current
 	// value of the Endpoint resource.
 	Etag string `protobuf:"bytes,6,opt,name=etag,proto3" json:"etag,omitempty"`
-	// Output only. The resource name of the user who created the endpoint.
-	Creator string `protobuf:"bytes,7,opt,name=creator,proto3" json:"creator,omitempty"`
-	// Output only. The resource name of the user who last updated the endpoint.
-	Updater string `protobuf:"bytes,8,opt,name=updater,proto3" json:"updater,omitempty"`
+	// Output only. The identity that created the endpoint.
+	CreatedBy *types.Actor `protobuf:"bytes,7,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
 	// Output only. Timestamp when the endpoint was created.
-	CreateTime *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	CreateTime *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	// Output only. The identity that last modified the endpoint.
+	UpdatedBy *types.Actor `protobuf:"bytes,9,opt,name=updated_by,json=updatedBy,proto3" json:"updated_by,omitempty"`
 	// Output only. Timestamp when the endpoint was last modified.
 	UpdateTime    *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -291,23 +292,23 @@ func (x *Endpoint) GetEtag() string {
 	return ""
 }
 
-func (x *Endpoint) GetCreator() string {
+func (x *Endpoint) GetCreatedBy() *types.Actor {
 	if x != nil {
-		return x.Creator
+		return x.CreatedBy
 	}
-	return ""
-}
-
-func (x *Endpoint) GetUpdater() string {
-	if x != nil {
-		return x.Updater
-	}
-	return ""
+	return nil
 }
 
 func (x *Endpoint) GetCreateTime() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreateTime
+	}
+	return nil
+}
+
+func (x *Endpoint) GetUpdatedBy() *types.Actor {
+	if x != nil {
+		return x.UpdatedBy
 	}
 	return nil
 }
@@ -1168,7 +1169,7 @@ var File_pivox_storage_v1_endpoint_proto protoreflect.FileDescriptor
 
 const file_pivox_storage_v1_endpoint_proto_rawDesc = "" +
 	"\n" +
-	"\x1fpivox/storage/v1/endpoint.proto\x12\x10pivox.storage.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!pivox/permission/v1/options.proto\"\xac\a\n" +
+	"\x1fpivox/storage/v1/endpoint.proto\x12\x10pivox.storage.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!pivox/permission/v1/options.proto\x1a\x17pivox/types/actor.proto\"\xde\a\n" +
 	"\bEndpoint\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12-\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\n" +
@@ -1180,11 +1181,13 @@ const file_pivox_storage_v1_endpoint_proto_rawDesc = "" +
 	"filesystem\x12E\n" +
 	"\fcache_config\x18\f \x01(\v2\x1d.pivox.storage.v1.CacheConfigB\x03\xe0A\x01R\vcacheConfig\x12R\n" +
 	"\vannotations\x18\x05 \x03(\v2+.pivox.storage.v1.Endpoint.AnnotationsEntryB\x03\xe0A\x01R\vannotations\x12\x17\n" +
-	"\x04etag\x18\x06 \x01(\tB\x03\xe0A\x03R\x04etag\x12\x1d\n" +
-	"\acreator\x18\a \x01(\tB\x03\xe0A\x03R\acreator\x12\x1d\n" +
-	"\aupdater\x18\b \x01(\tB\x03\xe0A\x03R\aupdater\x12@\n" +
-	"\vcreate_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"createTime\x12@\n" +
+	"\x04etag\x18\x06 \x01(\tB\x03\xe0A\x03R\x04etag\x126\n" +
+	"\n" +
+	"created_by\x18\a \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tcreatedBy\x12@\n" +
+	"\vcreate_time\x18\b \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"createTime\x126\n" +
+	"\n" +
+	"updated_by\x18\t \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tupdatedBy\x12@\n" +
 	"\vupdate_time\x18\n" +
 	" \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"updateTime\x1a>\n" +
@@ -1297,9 +1300,10 @@ var file_pivox_storage_v1_endpoint_proto_goTypes = []any{
 	(*DeleteEndpointRequest)(nil),   // 14: pivox.storage.v1.DeleteEndpointRequest
 	(*DeleteEndpointMetadata)(nil),  // 15: pivox.storage.v1.DeleteEndpointMetadata
 	nil,                             // 16: pivox.storage.v1.Endpoint.AnnotationsEntry
-	(*timestamppb.Timestamp)(nil),   // 17: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),   // 18: google.protobuf.FieldMask
-	(*longrunningpb.Operation)(nil), // 19: google.longrunning.Operation
+	(*types.Actor)(nil),             // 17: pivox.types.Actor
+	(*timestamppb.Timestamp)(nil),   // 18: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),   // 19: google.protobuf.FieldMask
+	(*longrunningpb.Operation)(nil), // 20: google.longrunning.Operation
 }
 var file_pivox_storage_v1_endpoint_proto_depIdxs = []int32{
 	0,  // 0: pivox.storage.v1.Endpoint.state:type_name -> pivox.storage.v1.Endpoint.State
@@ -1307,29 +1311,31 @@ var file_pivox_storage_v1_endpoint_proto_depIdxs = []int32{
 	5,  // 2: pivox.storage.v1.Endpoint.filesystem:type_name -> pivox.storage.v1.FileSystemConfiguration
 	6,  // 3: pivox.storage.v1.Endpoint.cache_config:type_name -> pivox.storage.v1.CacheConfig
 	16, // 4: pivox.storage.v1.Endpoint.annotations:type_name -> pivox.storage.v1.Endpoint.AnnotationsEntry
-	17, // 5: pivox.storage.v1.Endpoint.create_time:type_name -> google.protobuf.Timestamp
-	17, // 6: pivox.storage.v1.Endpoint.update_time:type_name -> google.protobuf.Timestamp
-	4,  // 7: pivox.storage.v1.S3Configuration.access_key:type_name -> pivox.storage.v1.S3AccessKeyCredentials
-	1,  // 8: pivox.storage.v1.CacheConfig.eviction_policy:type_name -> pivox.storage.v1.CacheConfig.EvictionPolicy
-	2,  // 9: pivox.storage.v1.CreateEndpointRequest.endpoint:type_name -> pivox.storage.v1.Endpoint
-	2,  // 10: pivox.storage.v1.ListEndpointsResponse.endpoints:type_name -> pivox.storage.v1.Endpoint
-	2,  // 11: pivox.storage.v1.UpdateEndpointRequest.endpoint:type_name -> pivox.storage.v1.Endpoint
-	18, // 12: pivox.storage.v1.UpdateEndpointRequest.update_mask:type_name -> google.protobuf.FieldMask
-	7,  // 13: pivox.storage.v1.Endpoints.CreateEndpoint:input_type -> pivox.storage.v1.CreateEndpointRequest
-	9,  // 14: pivox.storage.v1.Endpoints.GetEndpoint:input_type -> pivox.storage.v1.GetEndpointRequest
-	10, // 15: pivox.storage.v1.Endpoints.ListEndpoints:input_type -> pivox.storage.v1.ListEndpointsRequest
-	12, // 16: pivox.storage.v1.Endpoints.UpdateEndpoint:input_type -> pivox.storage.v1.UpdateEndpointRequest
-	14, // 17: pivox.storage.v1.Endpoints.DeleteEndpoint:input_type -> pivox.storage.v1.DeleteEndpointRequest
-	19, // 18: pivox.storage.v1.Endpoints.CreateEndpoint:output_type -> google.longrunning.Operation
-	2,  // 19: pivox.storage.v1.Endpoints.GetEndpoint:output_type -> pivox.storage.v1.Endpoint
-	11, // 20: pivox.storage.v1.Endpoints.ListEndpoints:output_type -> pivox.storage.v1.ListEndpointsResponse
-	19, // 21: pivox.storage.v1.Endpoints.UpdateEndpoint:output_type -> google.longrunning.Operation
-	19, // 22: pivox.storage.v1.Endpoints.DeleteEndpoint:output_type -> google.longrunning.Operation
-	18, // [18:23] is the sub-list for method output_type
-	13, // [13:18] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	17, // 5: pivox.storage.v1.Endpoint.created_by:type_name -> pivox.types.Actor
+	18, // 6: pivox.storage.v1.Endpoint.create_time:type_name -> google.protobuf.Timestamp
+	17, // 7: pivox.storage.v1.Endpoint.updated_by:type_name -> pivox.types.Actor
+	18, // 8: pivox.storage.v1.Endpoint.update_time:type_name -> google.protobuf.Timestamp
+	4,  // 9: pivox.storage.v1.S3Configuration.access_key:type_name -> pivox.storage.v1.S3AccessKeyCredentials
+	1,  // 10: pivox.storage.v1.CacheConfig.eviction_policy:type_name -> pivox.storage.v1.CacheConfig.EvictionPolicy
+	2,  // 11: pivox.storage.v1.CreateEndpointRequest.endpoint:type_name -> pivox.storage.v1.Endpoint
+	2,  // 12: pivox.storage.v1.ListEndpointsResponse.endpoints:type_name -> pivox.storage.v1.Endpoint
+	2,  // 13: pivox.storage.v1.UpdateEndpointRequest.endpoint:type_name -> pivox.storage.v1.Endpoint
+	19, // 14: pivox.storage.v1.UpdateEndpointRequest.update_mask:type_name -> google.protobuf.FieldMask
+	7,  // 15: pivox.storage.v1.Endpoints.CreateEndpoint:input_type -> pivox.storage.v1.CreateEndpointRequest
+	9,  // 16: pivox.storage.v1.Endpoints.GetEndpoint:input_type -> pivox.storage.v1.GetEndpointRequest
+	10, // 17: pivox.storage.v1.Endpoints.ListEndpoints:input_type -> pivox.storage.v1.ListEndpointsRequest
+	12, // 18: pivox.storage.v1.Endpoints.UpdateEndpoint:input_type -> pivox.storage.v1.UpdateEndpointRequest
+	14, // 19: pivox.storage.v1.Endpoints.DeleteEndpoint:input_type -> pivox.storage.v1.DeleteEndpointRequest
+	20, // 20: pivox.storage.v1.Endpoints.CreateEndpoint:output_type -> google.longrunning.Operation
+	2,  // 21: pivox.storage.v1.Endpoints.GetEndpoint:output_type -> pivox.storage.v1.Endpoint
+	11, // 22: pivox.storage.v1.Endpoints.ListEndpoints:output_type -> pivox.storage.v1.ListEndpointsResponse
+	20, // 23: pivox.storage.v1.Endpoints.UpdateEndpoint:output_type -> google.longrunning.Operation
+	20, // 24: pivox.storage.v1.Endpoints.DeleteEndpoint:output_type -> google.longrunning.Operation
+	20, // [20:25] is the sub-list for method output_type
+	15, // [15:20] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_pivox_storage_v1_endpoint_proto_init() }

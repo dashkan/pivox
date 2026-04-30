@@ -44,8 +44,8 @@ func TestIntegration_Storage_GatewayLifecycle(t *testing.T) {
 	conns := agentstream.NewConnectionManager()
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		storagev1.RegisterStorageGatewaysServer(s, storage.NewStorageGatewaysServer(queries, enc, conns))
-		storagev1.RegisterEndpointsServer(s, storage.NewEndpointsServer(queries, enc))
+		storagev1.RegisterStorageGatewaysServer(s, storage.NewStorageGatewaysServer(queries, enc, conns, nil))
+		storagev1.RegisterEndpointsServer(s, storage.NewEndpointsServer(queries, enc, nil))
 	})
 
 	gwClient := storagev1.NewStorageGatewaysClient(conn)

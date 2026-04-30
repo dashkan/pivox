@@ -113,17 +113,15 @@ public struct Pivox_Storage_V1_Endpoint: @unchecked Sendable {
     set {_uniqueStorage()._etag = newValue}
   }
 
-  /// Output only. The resource name of the user who created the endpoint.
-  public var creator: String {
-    get {_storage._creator}
-    set {_uniqueStorage()._creator = newValue}
+  /// Output only. The identity that created the endpoint.
+  public var createdBy: Pivox_Types_Actor {
+    get {_storage._createdBy ?? Pivox_Types_Actor()}
+    set {_uniqueStorage()._createdBy = newValue}
   }
-
-  /// Output only. The resource name of the user who last updated the endpoint.
-  public var updater: String {
-    get {_storage._updater}
-    set {_uniqueStorage()._updater = newValue}
-  }
+  /// Returns true if `createdBy` has been explicitly set.
+  public var hasCreatedBy: Bool {_storage._createdBy != nil}
+  /// Clears the value of `createdBy`. Subsequent reads from it will return its default value.
+  public mutating func clearCreatedBy() {_uniqueStorage()._createdBy = nil}
 
   /// Output only. Timestamp when the endpoint was created.
   public var createTime: SwiftProtobuf.Google_Protobuf_Timestamp {
@@ -134,6 +132,16 @@ public struct Pivox_Storage_V1_Endpoint: @unchecked Sendable {
   public var hasCreateTime: Bool {_storage._createTime != nil}
   /// Clears the value of `createTime`. Subsequent reads from it will return its default value.
   public mutating func clearCreateTime() {_uniqueStorage()._createTime = nil}
+
+  /// Output only. The identity that last modified the endpoint.
+  public var updatedBy: Pivox_Types_Actor {
+    get {_storage._updatedBy ?? Pivox_Types_Actor()}
+    set {_uniqueStorage()._updatedBy = newValue}
+  }
+  /// Returns true if `updatedBy` has been explicitly set.
+  public var hasUpdatedBy: Bool {_storage._updatedBy != nil}
+  /// Clears the value of `updatedBy`. Subsequent reads from it will return its default value.
+  public mutating func clearUpdatedBy() {_uniqueStorage()._updatedBy = nil}
 
   /// Output only. Timestamp when the endpoint was last modified.
   public var updateTime: SwiftProtobuf.Google_Protobuf_Timestamp {
@@ -599,7 +607,7 @@ fileprivate let _protobuf_package = "pivox.storage.v1"
 
 extension Pivox_Storage_V1_Endpoint: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".Endpoint"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}display_name\0\u{1}state\0\u{1}s3\0\u{1}annotations\0\u{1}etag\0\u{1}creator\0\u{1}updater\0\u{3}create_time\0\u{3}update_time\0\u{1}filesystem\0\u{3}cache_config\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}display_name\0\u{1}state\0\u{1}s3\0\u{1}annotations\0\u{1}etag\0\u{3}created_by\0\u{3}create_time\0\u{3}updated_by\0\u{3}update_time\0\u{1}filesystem\0\u{3}cache_config\0")
 
   fileprivate class _StorageClass {
     var _name: String = String()
@@ -609,9 +617,9 @@ extension Pivox_Storage_V1_Endpoint: SwiftProtobuf.Message, SwiftProtobuf._Messa
     var _cacheConfig: Pivox_Storage_V1_CacheConfig? = nil
     var _annotations: Dictionary<String,String> = [:]
     var _etag: String = String()
-    var _creator: String = String()
-    var _updater: String = String()
+    var _createdBy: Pivox_Types_Actor? = nil
     var _createTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _updatedBy: Pivox_Types_Actor? = nil
     var _updateTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 
       // This property is used as the initial default value for new instances of the type.
@@ -630,9 +638,9 @@ extension Pivox_Storage_V1_Endpoint: SwiftProtobuf.Message, SwiftProtobuf._Messa
       _cacheConfig = source._cacheConfig
       _annotations = source._annotations
       _etag = source._etag
-      _creator = source._creator
-      _updater = source._updater
+      _createdBy = source._createdBy
       _createTime = source._createTime
+      _updatedBy = source._updatedBy
       _updateTime = source._updateTime
     }
   }
@@ -670,9 +678,9 @@ extension Pivox_Storage_V1_Endpoint: SwiftProtobuf.Message, SwiftProtobuf._Messa
         }()
         case 5: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &_storage._annotations) }()
         case 6: try { try decoder.decodeSingularStringField(value: &_storage._etag) }()
-        case 7: try { try decoder.decodeSingularStringField(value: &_storage._creator) }()
-        case 8: try { try decoder.decodeSingularStringField(value: &_storage._updater) }()
-        case 9: try { try decoder.decodeSingularMessageField(value: &_storage._createTime) }()
+        case 7: try { try decoder.decodeSingularMessageField(value: &_storage._createdBy) }()
+        case 8: try { try decoder.decodeSingularMessageField(value: &_storage._createTime) }()
+        case 9: try { try decoder.decodeSingularMessageField(value: &_storage._updatedBy) }()
         case 10: try { try decoder.decodeSingularMessageField(value: &_storage._updateTime) }()
         case 11: try {
           var v: Pivox_Storage_V1_FileSystemConfiguration?
@@ -718,13 +726,13 @@ extension Pivox_Storage_V1_Endpoint: SwiftProtobuf.Message, SwiftProtobuf._Messa
       if !_storage._etag.isEmpty {
         try visitor.visitSingularStringField(value: _storage._etag, fieldNumber: 6)
       }
-      if !_storage._creator.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._creator, fieldNumber: 7)
-      }
-      if !_storage._updater.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._updater, fieldNumber: 8)
-      }
+      try { if let v = _storage._createdBy {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
+      } }()
       try { if let v = _storage._createTime {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+      } }()
+      try { if let v = _storage._updatedBy {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
       } }()
       try { if let v = _storage._updateTime {
@@ -752,9 +760,9 @@ extension Pivox_Storage_V1_Endpoint: SwiftProtobuf.Message, SwiftProtobuf._Messa
         if _storage._cacheConfig != rhs_storage._cacheConfig {return false}
         if _storage._annotations != rhs_storage._annotations {return false}
         if _storage._etag != rhs_storage._etag {return false}
-        if _storage._creator != rhs_storage._creator {return false}
-        if _storage._updater != rhs_storage._updater {return false}
+        if _storage._createdBy != rhs_storage._createdBy {return false}
         if _storage._createTime != rhs_storage._createTime {return false}
+        if _storage._updatedBy != rhs_storage._updatedBy {return false}
         if _storage._updateTime != rhs_storage._updateTime {return false}
         return true
       }

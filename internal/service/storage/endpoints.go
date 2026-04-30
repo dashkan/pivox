@@ -6,16 +6,20 @@ import (
 	"fmt"
 	"strings"
 
+	"log/slog"
+
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/dashkan/pivox/internal/apierr"
+	"github.com/dashkan/pivox/internal/audit"
 	"github.com/dashkan/pivox/internal/convert"
 	"github.com/dashkan/pivox/internal/crypto"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/lro"
 	storagev1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"
+	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 	"github.com/dashkan/pivox/internal/server"
 )
 
@@ -23,13 +27,40 @@ type EndpointsServer struct {
 	storagev1.UnimplementedEndpointsServer
 	queries   db.Querier
 	encryptor crypto.Encryptor
+	audit     *audit.Resolver
 }
 
-func NewEndpointsServer(queries db.Querier, enc crypto.Encryptor) *EndpointsServer {
+// NewEndpointsServer constructs the server. `auditResolver` inflates
+// audit-field UUIDs into Actor protos; nil leaves Actor fields unset.
+func NewEndpointsServer(queries db.Querier, enc crypto.Encryptor, auditResolver *audit.Resolver) *EndpointsServer {
 	return &EndpointsServer{
 		queries:   queries,
 		encryptor: enc,
+		audit:     auditResolver,
 	}
+}
+
+// resolveEndpointActors gathers created_by/updated_by UUIDs across
+// the page and resolves them in a single batched call.
+func (s *EndpointsServer) resolveEndpointActors(ctx context.Context, rows []db.StorageEndpoint) (map[uuid.UUID]*typespb.Actor, error) {
+	if s.audit == nil {
+		return nil, nil
+	}
+	ids := make([]uuid.UUID, 0, len(rows)*2)
+	for _, r := range rows {
+		if r.CreatedBy.Valid {
+			ids = append(ids, r.CreatedBy.Bytes)
+		}
+		if r.UpdatedBy.Valid {
+			ids = append(ids, r.UpdatedBy.Bytes)
+		}
+	}
+	actors, err := s.audit.Resolve(ctx, ids)
+	if err != nil {
+		slog.ErrorContext(ctx, "resolve endpoint actors failed", "error", err)
+		return nil, apierr.Internal("resolve actors")
+	}
+	return actors, nil
 }
 
 func parseEndpointName(name string) (orgName, gwName, endpointName string, err error) {
@@ -155,7 +186,13 @@ func (s *EndpointsServer) CreateEndpoint(ctx context.Context, req *storagev1.Cre
 	}
 
 	gatewayName := fmt.Sprintf("organizations/%s/storageGateways/%s", orgName, gwName)
-	return lro.DoneOperation(convert.EndpointToProto(result, gatewayName))
+	actors, resolveErr := s.resolveEndpointActors(ctx, []db.StorageEndpoint{result})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "create endpoint: actor resolution failed; returning proto without audit actors",
+			"endpoint_id", result.ID, "error", resolveErr)
+		actors = nil
+	}
+	return lro.DoneOperation(convert.EndpointToProto(result, gatewayName, actors))
 }
 
 func (s *EndpointsServer) GetEndpoint(ctx context.Context, req *storagev1.GetEndpointRequest) (*storagev1.Endpoint, error) {
@@ -178,7 +215,11 @@ func (s *EndpointsServer) GetEndpoint(ctx context.Context, req *storagev1.GetEnd
 	}
 
 	gatewayName := fmt.Sprintf("organizations/%s/storageGateways/%s", orgName, gwName)
-	return convert.EndpointToProto(endpoint, gatewayName), nil
+	actors, err := s.resolveEndpointActors(ctx, []db.StorageEndpoint{endpoint})
+	if err != nil {
+		return nil, err
+	}
+	return convert.EndpointToProto(endpoint, gatewayName, actors), nil
 }
 
 func (s *EndpointsServer) ListEndpoints(ctx context.Context, req *storagev1.ListEndpointsRequest) (*storagev1.ListEndpointsResponse, error) {
@@ -198,9 +239,13 @@ func (s *EndpointsServer) ListEndpoints(ctx context.Context, req *storagev1.List
 	}
 
 	gatewayName := fmt.Sprintf("organizations/%s/storageGateways/%s", orgName, gwName)
+	actors, err := s.resolveEndpointActors(ctx, endpoints)
+	if err != nil {
+		return nil, err
+	}
 	pbEndpoints := make([]*storagev1.Endpoint, 0, len(endpoints))
 	for _, ep := range endpoints {
-		pbEndpoints = append(pbEndpoints, convert.EndpointToProto(ep, gatewayName))
+		pbEndpoints = append(pbEndpoints, convert.EndpointToProto(ep, gatewayName, actors))
 	}
 
 	return &storagev1.ListEndpointsResponse{
@@ -230,7 +275,7 @@ func (s *EndpointsServer) UpdateEndpoint(ctx context.Context, req *storagev1.Upd
 
 	updateParams := db.UpdateStorageEndpointParams{
 		ID:        existing.ID,
-		UpdatedBy: pgtype.UUID{},
+		UpdatedBy: convert.PgUUID(server.MustPivoxUserID(ctx)),
 	}
 
 	mask := req.GetUpdateMask()
@@ -296,7 +341,13 @@ func (s *EndpointsServer) UpdateEndpoint(ctx context.Context, req *storagev1.Upd
 	}
 
 	gatewayName := fmt.Sprintf("organizations/%s/storageGateways/%s", orgName, gwName)
-	return lro.DoneOperation(convert.EndpointToProto(result, gatewayName))
+	actors, resolveErr := s.resolveEndpointActors(ctx, []db.StorageEndpoint{result})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "update endpoint: actor resolution failed; returning proto without audit actors",
+			"endpoint_id", result.ID, "error", resolveErr)
+		actors = nil
+	}
+	return lro.DoneOperation(convert.EndpointToProto(result, gatewayName, actors))
 }
 
 func (s *EndpointsServer) DeleteEndpoint(ctx context.Context, req *storagev1.DeleteEndpointRequest) (*longrunningpb.Operation, error) {

@@ -26,6 +26,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "pivox/permission/v1/options.proto";
+import "pivox/types/actor.proto";
 
 option go_package = "pivox/storage/v1;storagev1";
 
@@ -272,16 +273,14 @@ message StorageGateway {
   // requests to ensure the client has an up-to-date value before proceeding.
   string etag = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  // Output only. The resource name of the user who created the storage
-  // gateway.
-  string creator = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // Output only. The resource name of the user who last updated the storage
-  // gateway.
-  string updater = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Output only. The identity that created the storage gateway.
+  pivox.types.Actor created_by = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when the storage gateway was created.
-  google.protobuf.Timestamp create_time = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The identity that last modified the storage gateway.
+  pivox.types.Actor updated_by = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when the storage gateway was last modified.
   google.protobuf.Timestamp update_time = 17 [(google.api.field_behavior) = OUTPUT_ONLY];

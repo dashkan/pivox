@@ -798,7 +798,7 @@ func TestStorageGatewayToProto(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pb := StorageGatewayToProto(tt.gw, tt.orgName)
+			pb := StorageGatewayToProto(tt.gw, tt.orgName, nil)
 			require.NotNil(t, pb)
 			assert.Equal(t, tt.gw.DisplayName, pb.DisplayName)
 			assert.Equal(t, tt.gw.Hostname, pb.Hostname)
@@ -987,7 +987,7 @@ func TestEndpointToProto(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pb := EndpointToProto(tt.ep, tt.gatewayName)
+			pb := EndpointToProto(tt.ep, tt.gatewayName, nil)
 			require.NotNil(t, pb)
 			assert.Equal(t, tt.gatewayName+"/endpoints/"+tt.ep.Name, pb.Name)
 			assert.Equal(t, tt.ep.DisplayName, pb.DisplayName)

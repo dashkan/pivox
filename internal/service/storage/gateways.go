@@ -17,14 +17,18 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"log/slog"
+
 	"github.com/dashkan/pivox/internal/agentstream"
 	"github.com/dashkan/pivox/internal/apierr"
+	"github.com/dashkan/pivox/internal/audit"
 	"github.com/dashkan/pivox/internal/convert"
 	"github.com/dashkan/pivox/internal/crypto"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/lro"
 	agentv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/agent/v1"
 	storagev1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"
+	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 	"github.com/dashkan/pivox/internal/resource"
 	"github.com/dashkan/pivox/internal/server"
 )
@@ -34,16 +38,44 @@ type StorageGatewaysServer struct {
 	queries           db.Querier
 	encryptor         crypto.Encryptor
 	conns             *agentstream.ConnectionManager
+	audit             *audit.Resolver
 	sessionSigningKey []byte
 }
 
-func NewStorageGatewaysServer(queries db.Querier, enc crypto.Encryptor, conns *agentstream.ConnectionManager) *StorageGatewaysServer {
+// NewStorageGatewaysServer constructs the server. `auditResolver`
+// inflates audit-field UUIDs into Actor protos; nil leaves Actor
+// fields unset (acceptable in tests).
+func NewStorageGatewaysServer(queries db.Querier, enc crypto.Encryptor, conns *agentstream.ConnectionManager, auditResolver *audit.Resolver) *StorageGatewaysServer {
 	return &StorageGatewaysServer{
 		queries:           queries,
 		encryptor:         enc,
 		conns:             conns,
+		audit:             auditResolver,
 		sessionSigningKey: []byte("pivox-dev-session-signing-key-do-not-use-in-prod"), // TODO: load from key management system in prod
 	}
+}
+
+// resolveGatewayActors gathers created_by/updated_by UUIDs across the
+// page and resolves them in a single batched call.
+func (s *StorageGatewaysServer) resolveGatewayActors(ctx context.Context, rows []db.StorageGateway) (map[uuid.UUID]*typespb.Actor, error) {
+	if s.audit == nil {
+		return nil, nil
+	}
+	ids := make([]uuid.UUID, 0, len(rows)*2)
+	for _, r := range rows {
+		if r.CreatedBy.Valid {
+			ids = append(ids, r.CreatedBy.Bytes)
+		}
+		if r.UpdatedBy.Valid {
+			ids = append(ids, r.UpdatedBy.Bytes)
+		}
+	}
+	actors, err := s.audit.Resolve(ctx, ids)
+	if err != nil {
+		slog.ErrorContext(ctx, "resolve gateway actors failed", "error", err)
+		return nil, apierr.Internal("resolve actors")
+	}
+	return actors, nil
 }
 
 // parseStorageGatewayName parses "organizations/{org}/storageGateways/{gw}" and returns (orgName, gwName).
@@ -94,7 +126,13 @@ func (s *StorageGatewaysServer) CreateStorageGateway(ctx context.Context, req *s
 		return nil, apierr.HandleResourceError(err, "StorageGateway", gwName)
 	}
 
-	return lro.DoneOperation(convert.StorageGatewayToProto(result, orgName))
+	actors, resolveErr := s.resolveGatewayActors(ctx, []db.StorageGateway{result})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "create gateway: actor resolution failed; returning proto without audit actors",
+			"gateway_id", result.ID, "error", resolveErr)
+		actors = nil
+	}
+	return lro.DoneOperation(convert.StorageGatewayToProto(result, orgName, actors))
 }
 
 func (s *StorageGatewaysServer) GetStorageGateway(ctx context.Context, req *storagev1.GetStorageGatewayRequest) (*storagev1.StorageGateway, error) {
@@ -116,7 +154,11 @@ func (s *StorageGatewaysServer) GetStorageGateway(ctx context.Context, req *stor
 		return nil, apierr.HandleResourceError(err, "StorageGateway", req.GetName())
 	}
 
-	return convert.StorageGatewayToProto(gw, orgName), nil
+	actors, err := s.resolveGatewayActors(ctx, []db.StorageGateway{gw})
+	if err != nil {
+		return nil, err
+	}
+	return convert.StorageGatewayToProto(gw, orgName, actors), nil
 }
 
 func (s *StorageGatewaysServer) ListStorageGateways(_ context.Context, _ *storagev1.ListStorageGatewaysRequest) (*storagev1.ListStorageGatewaysResponse, error) {
@@ -182,7 +224,13 @@ func (s *StorageGatewaysServer) UpdateStorageGateway(ctx context.Context, req *s
 		return nil, apierr.HandleResourceError(err, "StorageGateway", gw.GetName())
 	}
 
-	return lro.DoneOperation(convert.StorageGatewayToProto(result, orgName))
+	actors, resolveErr := s.resolveGatewayActors(ctx, []db.StorageGateway{result})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "update gateway: actor resolution failed; returning proto without audit actors",
+			"gateway_id", result.ID, "error", resolveErr)
+		actors = nil
+	}
+	return lro.DoneOperation(convert.StorageGatewayToProto(result, orgName, actors))
 }
 
 func (s *StorageGatewaysServer) DeleteStorageGateway(ctx context.Context, req *storagev1.DeleteStorageGatewayRequest) (*longrunningpb.Operation, error) {
@@ -240,7 +288,13 @@ func (s *StorageGatewaysServer) RotateRegistrationToken(ctx context.Context, req
 		return nil, apierr.HandleResourceError(err, "StorageGateway", req.GetName())
 	}
 
-	return convert.StorageGatewayToProto(result, orgName), nil
+	actors, resolveErr := s.resolveGatewayActors(ctx, []db.StorageGateway{result})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "rotate registration token: actor resolution failed; returning proto without audit actors",
+			"gateway_id", result.ID, "error", resolveErr)
+		actors = nil
+	}
+	return convert.StorageGatewayToProto(result, orgName, actors), nil
 }
 
 func (s *StorageGatewaysServer) GetInstallScript(ctx context.Context, req *storagev1.GetInstallScriptRequest) (*storagev1.GetInstallScriptResponse, error) {

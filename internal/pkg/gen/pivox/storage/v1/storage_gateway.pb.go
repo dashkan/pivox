@@ -24,6 +24,7 @@ import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
 	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/permission/v1"
+	types "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -264,14 +265,12 @@ type StorageGateway struct {
 	// of the StorageGateway resource. This may be sent on update and delete
 	// requests to ensure the client has an up-to-date value before proceeding.
 	Etag string `protobuf:"bytes,13,opt,name=etag,proto3" json:"etag,omitempty"`
-	// Output only. The resource name of the user who created the storage
-	// gateway.
-	Creator string `protobuf:"bytes,14,opt,name=creator,proto3" json:"creator,omitempty"`
-	// Output only. The resource name of the user who last updated the storage
-	// gateway.
-	Updater string `protobuf:"bytes,15,opt,name=updater,proto3" json:"updater,omitempty"`
+	// Output only. The identity that created the storage gateway.
+	CreatedBy *types.Actor `protobuf:"bytes,14,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
 	// Output only. Timestamp when the storage gateway was created.
-	CreateTime *timestamppb.Timestamp `protobuf:"bytes,16,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	CreateTime *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	// Output only. The identity that last modified the storage gateway.
+	UpdatedBy *types.Actor `protobuf:"bytes,16,opt,name=updated_by,json=updatedBy,proto3" json:"updated_by,omitempty"`
 	// Output only. Timestamp when the storage gateway was last modified.
 	UpdateTime    *timestamppb.Timestamp `protobuf:"bytes,17,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -392,23 +391,23 @@ func (x *StorageGateway) GetEtag() string {
 	return ""
 }
 
-func (x *StorageGateway) GetCreator() string {
+func (x *StorageGateway) GetCreatedBy() *types.Actor {
 	if x != nil {
-		return x.Creator
+		return x.CreatedBy
 	}
-	return ""
-}
-
-func (x *StorageGateway) GetUpdater() string {
-	if x != nil {
-		return x.Updater
-	}
-	return ""
+	return nil
 }
 
 func (x *StorageGateway) GetCreateTime() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreateTime
+	}
+	return nil
+}
+
+func (x *StorageGateway) GetUpdatedBy() *types.Actor {
+	if x != nil {
+		return x.UpdatedBy
 	}
 	return nil
 }
@@ -1553,7 +1552,8 @@ var File_pivox_storage_v1_storage_gateway_proto protoreflect.FileDescriptor
 
 const file_pivox_storage_v1_storage_gateway_proto_rawDesc = "" +
 	"\n" +
-	"&pivox/storage/v1/storage_gateway.proto\x12\x10pivox.storage.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!pivox/permission/v1/options.proto\"\xd0\t\n" +
+	"&pivox/storage/v1/storage_gateway.proto\x12\x10pivox.storage.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!pivox/permission/v1/options.proto\x1a\x17pivox/types/actor.proto\"\x82\n" +
+	"\n" +
 	"\x0eStorageGateway\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12-\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\n" +
@@ -1569,11 +1569,13 @@ const file_pivox_storage_v1_storage_gateway_proto_rawDesc = "" +
 	" \x01(\x0e2*.pivox.storage.v1.StorageGateway.CertStateB\x03\xe0A\x03R\tcertState\x12I\n" +
 	"\x10cert_expiry_time\x18\v \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\x0ecertExpiryTime\x12X\n" +
 	"\vannotations\x18\f \x03(\v21.pivox.storage.v1.StorageGateway.AnnotationsEntryB\x03\xe0A\x01R\vannotations\x12\x17\n" +
-	"\x04etag\x18\r \x01(\tB\x03\xe0A\x03R\x04etag\x12\x1d\n" +
-	"\acreator\x18\x0e \x01(\tB\x03\xe0A\x03R\acreator\x12\x1d\n" +
-	"\aupdater\x18\x0f \x01(\tB\x03\xe0A\x03R\aupdater\x12@\n" +
-	"\vcreate_time\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"createTime\x12@\n" +
+	"\x04etag\x18\r \x01(\tB\x03\xe0A\x03R\x04etag\x126\n" +
+	"\n" +
+	"created_by\x18\x0e \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tcreatedBy\x12@\n" +
+	"\vcreate_time\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"createTime\x126\n" +
+	"\n" +
+	"updated_by\x18\x10 \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tupdatedBy\x12@\n" +
 	"\vupdate_time\x18\x11 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"updateTime\x1a>\n" +
 	"\x10AnnotationsEntry\x12\x10\n" +
@@ -1728,49 +1730,52 @@ var file_pivox_storage_v1_storage_gateway_proto_goTypes = []any{
 	(*CreateStorageSessionResponse)(nil),            // 21: pivox.storage.v1.CreateStorageSessionResponse
 	nil,                                             // 22: pivox.storage.v1.StorageGateway.AnnotationsEntry
 	(*timestamppb.Timestamp)(nil),                   // 23: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),                   // 24: google.protobuf.FieldMask
-	(*durationpb.Duration)(nil),                     // 25: google.protobuf.Duration
-	(*longrunningpb.Operation)(nil),                 // 26: google.longrunning.Operation
+	(*types.Actor)(nil),                             // 24: pivox.types.Actor
+	(*fieldmaskpb.FieldMask)(nil),                   // 25: google.protobuf.FieldMask
+	(*durationpb.Duration)(nil),                     // 26: google.protobuf.Duration
+	(*longrunningpb.Operation)(nil),                 // 27: google.longrunning.Operation
 }
 var file_pivox_storage_v1_storage_gateway_proto_depIdxs = []int32{
 	0,  // 0: pivox.storage.v1.StorageGateway.state:type_name -> pivox.storage.v1.StorageGateway.State
 	1,  // 1: pivox.storage.v1.StorageGateway.cert_state:type_name -> pivox.storage.v1.StorageGateway.CertState
 	23, // 2: pivox.storage.v1.StorageGateway.cert_expiry_time:type_name -> google.protobuf.Timestamp
 	22, // 3: pivox.storage.v1.StorageGateway.annotations:type_name -> pivox.storage.v1.StorageGateway.AnnotationsEntry
-	23, // 4: pivox.storage.v1.StorageGateway.create_time:type_name -> google.protobuf.Timestamp
-	23, // 5: pivox.storage.v1.StorageGateway.update_time:type_name -> google.protobuf.Timestamp
-	3,  // 6: pivox.storage.v1.CreateStorageGatewayRequest.storage_gateway:type_name -> pivox.storage.v1.StorageGateway
-	3,  // 7: pivox.storage.v1.ListStorageGatewaysResponse.storage_gateways:type_name -> pivox.storage.v1.StorageGateway
-	3,  // 8: pivox.storage.v1.UpdateStorageGatewayRequest.storage_gateway:type_name -> pivox.storage.v1.StorageGateway
-	24, // 9: pivox.storage.v1.UpdateStorageGatewayRequest.update_mask:type_name -> google.protobuf.FieldMask
-	2,  // 10: pivox.storage.v1.UpgradeGatewayMetadata.phase:type_name -> pivox.storage.v1.UpgradeGatewayMetadata.UpgradeGatewayPhase
-	25, // 11: pivox.storage.v1.CreateStorageSessionRequest.ttl:type_name -> google.protobuf.Duration
-	23, // 12: pivox.storage.v1.CreateStorageSessionResponse.expiry:type_name -> google.protobuf.Timestamp
-	4,  // 13: pivox.storage.v1.StorageGateways.CreateStorageGateway:input_type -> pivox.storage.v1.CreateStorageGatewayRequest
-	6,  // 14: pivox.storage.v1.StorageGateways.GetStorageGateway:input_type -> pivox.storage.v1.GetStorageGatewayRequest
-	7,  // 15: pivox.storage.v1.StorageGateways.ListStorageGateways:input_type -> pivox.storage.v1.ListStorageGatewaysRequest
-	9,  // 16: pivox.storage.v1.StorageGateways.UpdateStorageGateway:input_type -> pivox.storage.v1.UpdateStorageGatewayRequest
-	11, // 17: pivox.storage.v1.StorageGateways.DeleteStorageGateway:input_type -> pivox.storage.v1.DeleteStorageGatewayRequest
-	13, // 18: pivox.storage.v1.StorageGateways.RotateRegistrationToken:input_type -> pivox.storage.v1.RotateRegistrationTokenRequest
-	14, // 19: pivox.storage.v1.StorageGateways.GetInstallScript:input_type -> pivox.storage.v1.GetInstallScriptRequest
-	16, // 20: pivox.storage.v1.StorageGateways.GetUninstallScript:input_type -> pivox.storage.v1.GetUninstallScriptRequest
-	18, // 21: pivox.storage.v1.StorageGateways.UpgradeGateway:input_type -> pivox.storage.v1.UpgradeGatewayRequest
-	20, // 22: pivox.storage.v1.StorageGateways.CreateStorageSession:input_type -> pivox.storage.v1.CreateStorageSessionRequest
-	26, // 23: pivox.storage.v1.StorageGateways.CreateStorageGateway:output_type -> google.longrunning.Operation
-	3,  // 24: pivox.storage.v1.StorageGateways.GetStorageGateway:output_type -> pivox.storage.v1.StorageGateway
-	8,  // 25: pivox.storage.v1.StorageGateways.ListStorageGateways:output_type -> pivox.storage.v1.ListStorageGatewaysResponse
-	26, // 26: pivox.storage.v1.StorageGateways.UpdateStorageGateway:output_type -> google.longrunning.Operation
-	26, // 27: pivox.storage.v1.StorageGateways.DeleteStorageGateway:output_type -> google.longrunning.Operation
-	3,  // 28: pivox.storage.v1.StorageGateways.RotateRegistrationToken:output_type -> pivox.storage.v1.StorageGateway
-	15, // 29: pivox.storage.v1.StorageGateways.GetInstallScript:output_type -> pivox.storage.v1.GetInstallScriptResponse
-	17, // 30: pivox.storage.v1.StorageGateways.GetUninstallScript:output_type -> pivox.storage.v1.GetUninstallScriptResponse
-	26, // 31: pivox.storage.v1.StorageGateways.UpgradeGateway:output_type -> google.longrunning.Operation
-	21, // 32: pivox.storage.v1.StorageGateways.CreateStorageSession:output_type -> pivox.storage.v1.CreateStorageSessionResponse
-	23, // [23:33] is the sub-list for method output_type
-	13, // [13:23] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	24, // 4: pivox.storage.v1.StorageGateway.created_by:type_name -> pivox.types.Actor
+	23, // 5: pivox.storage.v1.StorageGateway.create_time:type_name -> google.protobuf.Timestamp
+	24, // 6: pivox.storage.v1.StorageGateway.updated_by:type_name -> pivox.types.Actor
+	23, // 7: pivox.storage.v1.StorageGateway.update_time:type_name -> google.protobuf.Timestamp
+	3,  // 8: pivox.storage.v1.CreateStorageGatewayRequest.storage_gateway:type_name -> pivox.storage.v1.StorageGateway
+	3,  // 9: pivox.storage.v1.ListStorageGatewaysResponse.storage_gateways:type_name -> pivox.storage.v1.StorageGateway
+	3,  // 10: pivox.storage.v1.UpdateStorageGatewayRequest.storage_gateway:type_name -> pivox.storage.v1.StorageGateway
+	25, // 11: pivox.storage.v1.UpdateStorageGatewayRequest.update_mask:type_name -> google.protobuf.FieldMask
+	2,  // 12: pivox.storage.v1.UpgradeGatewayMetadata.phase:type_name -> pivox.storage.v1.UpgradeGatewayMetadata.UpgradeGatewayPhase
+	26, // 13: pivox.storage.v1.CreateStorageSessionRequest.ttl:type_name -> google.protobuf.Duration
+	23, // 14: pivox.storage.v1.CreateStorageSessionResponse.expiry:type_name -> google.protobuf.Timestamp
+	4,  // 15: pivox.storage.v1.StorageGateways.CreateStorageGateway:input_type -> pivox.storage.v1.CreateStorageGatewayRequest
+	6,  // 16: pivox.storage.v1.StorageGateways.GetStorageGateway:input_type -> pivox.storage.v1.GetStorageGatewayRequest
+	7,  // 17: pivox.storage.v1.StorageGateways.ListStorageGateways:input_type -> pivox.storage.v1.ListStorageGatewaysRequest
+	9,  // 18: pivox.storage.v1.StorageGateways.UpdateStorageGateway:input_type -> pivox.storage.v1.UpdateStorageGatewayRequest
+	11, // 19: pivox.storage.v1.StorageGateways.DeleteStorageGateway:input_type -> pivox.storage.v1.DeleteStorageGatewayRequest
+	13, // 20: pivox.storage.v1.StorageGateways.RotateRegistrationToken:input_type -> pivox.storage.v1.RotateRegistrationTokenRequest
+	14, // 21: pivox.storage.v1.StorageGateways.GetInstallScript:input_type -> pivox.storage.v1.GetInstallScriptRequest
+	16, // 22: pivox.storage.v1.StorageGateways.GetUninstallScript:input_type -> pivox.storage.v1.GetUninstallScriptRequest
+	18, // 23: pivox.storage.v1.StorageGateways.UpgradeGateway:input_type -> pivox.storage.v1.UpgradeGatewayRequest
+	20, // 24: pivox.storage.v1.StorageGateways.CreateStorageSession:input_type -> pivox.storage.v1.CreateStorageSessionRequest
+	27, // 25: pivox.storage.v1.StorageGateways.CreateStorageGateway:output_type -> google.longrunning.Operation
+	3,  // 26: pivox.storage.v1.StorageGateways.GetStorageGateway:output_type -> pivox.storage.v1.StorageGateway
+	8,  // 27: pivox.storage.v1.StorageGateways.ListStorageGateways:output_type -> pivox.storage.v1.ListStorageGatewaysResponse
+	27, // 28: pivox.storage.v1.StorageGateways.UpdateStorageGateway:output_type -> google.longrunning.Operation
+	27, // 29: pivox.storage.v1.StorageGateways.DeleteStorageGateway:output_type -> google.longrunning.Operation
+	3,  // 30: pivox.storage.v1.StorageGateways.RotateRegistrationToken:output_type -> pivox.storage.v1.StorageGateway
+	15, // 31: pivox.storage.v1.StorageGateways.GetInstallScript:output_type -> pivox.storage.v1.GetInstallScriptResponse
+	17, // 32: pivox.storage.v1.StorageGateways.GetUninstallScript:output_type -> pivox.storage.v1.GetUninstallScriptResponse
+	27, // 33: pivox.storage.v1.StorageGateways.UpgradeGateway:output_type -> google.longrunning.Operation
+	21, // 34: pivox.storage.v1.StorageGateways.CreateStorageSession:output_type -> pivox.storage.v1.CreateStorageSessionResponse
+	25, // [25:35] is the sub-list for method output_type
+	15, // [15:25] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_pivox_storage_v1_storage_gateway_proto_init() }

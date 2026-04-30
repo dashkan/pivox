@@ -25,6 +25,7 @@ import "google/longrunning/operations.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "pivox/permission/v1/options.proto";
+import "pivox/types/actor.proto";
 
 option go_package = "pivox/storage/v1;storagev1";
 
@@ -166,14 +167,14 @@ message Endpoint {
   // value of the Endpoint resource.
   string etag = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  // Output only. The resource name of the user who created the endpoint.
-  string creator = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // Output only. The resource name of the user who last updated the endpoint.
-  string updater = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Output only. The identity that created the endpoint.
+  pivox.types.Actor created_by = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when the endpoint was created.
-  google.protobuf.Timestamp create_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The identity that last modified the endpoint.
+  pivox.types.Actor updated_by = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when the endpoint was last modified.
   google.protobuf.Timestamp update_time = 10 [(google.api.field_behavior) = OUTPUT_ONLY];

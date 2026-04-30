@@ -320,9 +320,9 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	// Storage services
 	connMgr := agentstream.NewConnectionManager()
-	storagev1.RegisterStorageGatewaysServer(grpcServer, storage.NewStorageGatewaysServer(queries, enc, connMgr))
+	storagev1.RegisterStorageGatewaysServer(grpcServer, storage.NewStorageGatewaysServer(queries, enc, connMgr, auditResolver))
 	storagev1.RegisterAgentsServer(grpcServer, storage.NewAgentsServer(queries))
-	storagev1.RegisterEndpointsServer(grpcServer, storage.NewEndpointsServer(queries, enc))
+	storagev1.RegisterEndpointsServer(grpcServer, storage.NewEndpointsServer(queries, enc, auditResolver))
 
 	// Asset and request services
 	assetsv1.RegisterAssetsServer(grpcServer, assets.NewAssetsServer(pool, queries, auditResolver))
