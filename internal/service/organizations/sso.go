@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net"
+	"net/netip"
+	"net/url"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -334,7 +337,43 @@ func validateOidc(o *apiv1.OidcConfig) error {
 			"sso_config.oidc.response_type",
 			"at least one of code / id_token must be true"))
 	}
+	// RFC 8414 §3 requires HTTPS for the issuer. Without this an
+	// admin could persist an http:// issuer that the OAuth broker
+	// would later reject — better to surface the misconfiguration
+	// at write time. Localhost http:// is allowed because dev IdPs
+	// (Keycloak in docker) commonly run without TLS. Mirror of
+	// `requireSecureIssuer` in internal/server/oauth_broker.go.
+	if iss := o.GetIssuer(); iss != "" {
+		u, err := url.Parse(iss)
+		if err != nil {
+			return apierr.InvalidArgument(apierr.FieldViolation(
+				"sso_config.oidc.issuer",
+				"invalid URL: "+err.Error()))
+		}
+		if u.Scheme != "https" && !(u.Scheme == "http" && isLoopbackHost(u.Host)) {
+			return apierr.InvalidArgument(apierr.FieldViolation(
+				"sso_config.oidc.issuer",
+				"issuer must be https (http only allowed for localhost)"))
+		}
+	}
 	return nil
+}
+
+// isLoopbackHost mirrors the broker's localhost check; kept local
+// so this package doesn't import internal/server.
+func isLoopbackHost(host string) bool {
+	h, _, err := net.SplitHostPort(host)
+	if err != nil {
+		h = host
+	}
+	if h == "localhost" {
+		return true
+	}
+	addr, err := netip.ParseAddr(h)
+	if err != nil {
+		return false
+	}
+	return addr.IsLoopback()
 }
 
 // pgUUID wraps a uuid.UUID into the pgtype shape sqlc expects on

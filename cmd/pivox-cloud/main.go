@@ -88,6 +88,14 @@ func main() {
 	f.String("ollama-url", envOrDefault("PIVOX_OLLAMA_URL", "http://localhost:11434"), "Ollama API base URL")
 	f.String("ollama-model", envOrDefault("PIVOX_OLLAMA_MODEL", "qwen3-vl"), "Ollama model to use for AI chat")
 
+	// OAuth broker (federated sign-in for native + web). The app
+	// key signs the broker's `state` token; base URL is the public
+	// origin used to construct the IdP-facing redirect_uri.
+	f.String("oauth-broker-base-url", envOrDefault("PIVOX_OAUTH_BROKER_BASE_URL", "https://pivox.ngrok.app"), "Public origin used to build OAuth broker callback URLs")
+	f.String("oauth-broker-app-key", envOrDefault("PIVOX_APP_KEY", ""), "HMAC key for OAuth broker state token (≥32 bytes)")
+	f.String("github-client-id", envOrDefault("GITHUB_CLIENT_ID", ""), "GitHub OAuth app client ID (broker)")
+	f.String("github-client-secret", envOrDefault("GITHUB_CLIENT_SECRET", ""), "GitHub OAuth app client secret (broker)")
+
 	addSyncAuthFlags(rootCmd)
 
 	if err := rootCmd.Execute(); err != nil {
@@ -139,6 +147,12 @@ func serve(cmd *cobra.Command, args []string) error {
 		DelegatedAuth: config.DelegatedAuthConfig{
 			SessionTTL:   sessionTTL,
 			PollInterval: pollInterval,
+		},
+		OAuthBroker: config.OAuthBrokerConfig{
+			AppKey:             must(f.GetString("oauth-broker-app-key")),
+			BaseURL:            must(f.GetString("oauth-broker-base-url")),
+			GitHubClientID:     must(f.GetString("github-client-id")),
+			GitHubClientSecret: must(f.GetString("github-client-secret")),
 		},
 	}
 
@@ -432,6 +446,14 @@ func serve(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("initialize internal hooks: %w", err)
 	}
 	hooks.Register(httpMux)
+
+	// OAuth broker for federated sign-in (GitHub, OIDC SSO).
+	// Migrated server-side from the TanStack `start` /api/oauth/*
+	// routes so auth machinery (DB-backed SsoConfig + KMS-encrypted
+	// client_secret) lives next to syncFirebaseIdentity et al.
+	oauthBroker := server.NewOAuthBroker(queries, enc, cfg.OAuthBroker, logger)
+	oauthBroker.Register(httpMux)
+
 	httpMux.Handle("/", gwMux)
 
 	restServer := &http.Server{

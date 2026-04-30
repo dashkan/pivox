@@ -11,6 +11,53 @@ import (
 	"github.com/google/uuid"
 )
 
+const getSsoConfigByFirebaseProviderID = `-- name: GetSsoConfigByFirebaseProviderID :one
+SELECT s.org_id,
+       s.firebase_provider_id,
+       s.oidc_config,
+       s.saml_config,
+       s.client_secret_ciphertext,
+       o.name AS org_slug
+  FROM sso_configs s
+  JOIN organizations o ON o.id = s.org_id
+ WHERE s.firebase_provider_id = $1
+   AND s.enabled              = true
+ LIMIT 1
+`
+
+type GetSsoConfigByFirebaseProviderIDRow struct {
+	OrgID                  uuid.UUID `json:"org_id"`
+	FirebaseProviderID     string    `json:"firebase_provider_id"`
+	OidcConfig             []byte    `json:"oidc_config"`
+	SamlConfig             []byte    `json:"saml_config"`
+	ClientSecretCiphertext []byte    `json:"client_secret_ciphertext"`
+	OrgSlug                string    `json:"org_slug"`
+}
+
+// GetSsoConfigByFirebaseProviderID is the query backing the
+// POST /internal/v1/sso:getProviderConfig endpoint. The OAuth
+// broker (web/start) calls this with a provider id (e.g. `oidc.acme`)
+// to fetch the issuer / client_id / encrypted client_secret it needs
+// to drive the OIDC code-flow handshake against the IdP. Joins
+// organizations so the broker can include the org slug in the
+// response (used in logs + as a context tag).
+// Returns no rows when the provider id is unknown OR SsoConfig is
+// disabled — broker-callable identifiers should both be present and
+// enabled to drive a valid sign-in.
+func (q *Queries) GetSsoConfigByFirebaseProviderID(ctx context.Context, firebaseProviderID string) (GetSsoConfigByFirebaseProviderIDRow, error) {
+	row := q.db.QueryRow(ctx, getSsoConfigByFirebaseProviderID, firebaseProviderID)
+	var i GetSsoConfigByFirebaseProviderIDRow
+	err := row.Scan(
+		&i.OrgID,
+		&i.FirebaseProviderID,
+		&i.OidcConfig,
+		&i.SamlConfig,
+		&i.ClientSecretCiphertext,
+		&i.OrgSlug,
+	)
+	return i, err
+}
+
 const getSsoConfigByOrgID = `-- name: GetSsoConfigByOrgID :one
 SELECT id, org_id, firebase_provider_id, display_name, enabled, oidc_config, saml_config, client_secret_ciphertext, etag, revision, created_by, updated_by, create_time, update_time FROM sso_configs WHERE org_id = $1
 `

@@ -1,4 +1,5 @@
 import Cocoa
+import OSLog
 import SwiftUI
 
 class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
@@ -275,7 +276,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     do {
       delegatedAuth = try coordinator.beginSignin(sessionCode: sessionCode)
     } catch {
-      NSLog("[PivoxApp] Delegated signin init failed: \(error.localizedDescription)")
+      PivoxLog.auth.error("delegated signin init failed: \(error.localizedDescription)")
       return
     }
 
@@ -315,7 +316,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
   private func finishDelegatedFlow(sessionCode: String, result: Result<Void, Error>) {
     guard let flow = delegatedFlows.removeValue(forKey: sessionCode) else { return }
     if case .failure(let error) = result {
-      NSLog("[PivoxApp] Delegated signin failed: \(error.localizedDescription)")
+      PivoxLog.auth.error("delegated signin failed: \(error.localizedDescription)")
     }
     flow.window.orderOut(nil)
     flow.window.close()

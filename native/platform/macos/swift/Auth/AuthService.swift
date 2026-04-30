@@ -4,6 +4,7 @@ import CryptoKit
 import FirebaseAuth
 import FirebaseCore
 import Foundation
+import OSLog
 
 /// Manages authentication state using Firebase Apple SDK.
 /// Observable by SwiftUI views for reactive auth state updates.
@@ -301,7 +302,7 @@ class AuthService: NSObject {
   // MARK: - GitHub Sign-In
   //
   // Flow:
-  //   1. ASWebAuthenticationSession opens `<broker>/api/oauth/github/start`
+  //   1. ASWebAuthenticationSession opens `<broker>/internal/v1/auth/github/start`
   //      on our start-app backend.
   //   2. The broker 302's to github.com/login/oauth/authorize with its
   //      own client_id and redirect_uri (the broker's own callback).
@@ -361,7 +362,7 @@ class AuthService: NSObject {
       let encodedReturn = githubReturnURL.addingPercentEncoding(
         withAllowedCharacters: .urlQueryAllowed),
       let startURL = URL(
-        string: "\(Self.brokerBaseURL)/api/oauth/github/start?return=\(encodedReturn)")
+        string: "\(Self.brokerBaseURL)/internal/v1/auth/github/start?return=\(encodedReturn)")
     else {
       throw NSError(
         domain: "AuthService", code: -1,
@@ -417,6 +418,228 @@ class AuthService: NSObject {
         userInfo: [NSLocalizedDescriptionKey: "Callback missing access_token"])
     }
     return accessToken
+  }
+
+  // MARK: - SSO (OIDC) Sign-In
+
+  /// Asks the Pivox backend whether the given email's domain is
+  /// served by an enterprise SSO provider. Returns the Firebase
+  /// provider ID (e.g. `oidc.acme`) on hit, or nil on miss.
+  ///
+  /// 404 from the backend (the existence-probe-defended response for
+  /// "no provider configured") maps to nil, not an error — callers
+  /// surface a generic "couldn't sign in" rather than disclosing
+  /// whether the domain is unknown vs. unconfigured.
+  ///
+  /// Authentication: the resolver endpoint is intentionally public
+  /// (only rate-limited) — pre-auth clients need to call it to
+  /// discover their SSO provider before any token exists.
+  func resolveSSOProvider(email: String) async throws -> String? {
+    let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return nil }
+
+    guard let url = URL(string: "\(Self.brokerBaseURL)/internal/v1/auth:resolveProvider") else {
+      return nil
+    }
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    request.httpBody = try JSONSerialization.data(withJSONObject: ["email": trimmed])
+
+    let (data, response) = try await URLSession.shared.data(for: request)
+    guard let http = response as? HTTPURLResponse else { return nil }
+    switch http.statusCode {
+    case 200:
+      let raw = try? JSONSerialization.jsonObject(with: data)
+      guard
+        let decoded = raw as? [String: Any],
+        let providerID = decoded["provider_id"] as? String
+      else { return nil }
+      return providerID
+    case 404:
+      return nil
+    default:
+      throw NSError(
+        domain: "AuthService", code: http.statusCode,
+        userInfo: [NSLocalizedDescriptionKey: "SSO provider lookup failed"])
+    }
+  }
+
+  /// Starts the OIDC sign-in for the given provider via the Pivox
+  /// broker (`/internal/v1/auth/{providerID}/start`). Mirrors the GitHub
+  /// broker flow:
+  ///
+  ///   1. Open `<broker>/internal/v1/auth/<providerID>/start?return=pivox://auth-complete`
+  ///      in `ASWebAuthenticationSession`.
+  ///   2. Broker → IdP authorize → user authenticates → IdP →
+  ///      broker callback → broker exchanges code → tokens using
+  ///      the IdP's client_secret (held server-side, never reaches
+  ///      this binary).
+  ///   3. Broker redirects to `pivox://auth-complete#kind=oidc_id_token&token=…&access_token=…&nonce=…`.
+  ///   4. We parse the fragment and build a Firebase `OAuthCredential`
+  ///      with the id_token + rawNonce, then `signIn(with: credential)`.
+  ///      Firebase verifies the id_token against its OIDC provider
+  ///      config (issuer + client_id + signature) — no FB hosted
+  ///      handler involved.
+  func signInWithSSO(providerID: String, loginHint: String? = nil) async {
+    guard !isOAuthInProgress else { return }
+    isOAuthInProgress = true
+    defer { isOAuthInProgress = false }
+    errorMessage = nil
+
+    do {
+      let (idToken, rawNonce) = try await performSSOOAuth(providerID: providerID, loginHint: loginHint)
+      // The Obj-C `credential(withProviderID:idToken:rawNonce:)` is
+      // @available(swift 1000.0) — i.e. unavailable in Swift. The
+      // Swift form takes `AuthProviderID`; `.custom(_:)` lifts an
+      // arbitrary provider string (e.g. "oidc.acme") into the type.
+      let credential = OAuthProvider.credential(
+        providerID: AuthProviderID.custom(providerID),
+        idToken: idToken,
+        rawNonce: rawNonce
+      )
+      let result = try await resolvedAuth.signIn(with: credential)
+      currentUser = result.user
+
+      if persistCredentials, let token = try? await result.user.getIDToken() {
+        appState.saveSecure(token, forKey: "firebase_id_token")
+      }
+    } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
+      return
+    } catch {
+      if let resolver = multiFactorResolver(from: error) {
+        pendingMFAResolver = resolver
+        return
+      }
+      // Surface a friendly message to the user; log structured
+      // error to the unified log. Firebase's localizedDescription
+      // for many OIDC failure modes is the unhelpful "An internal
+      // error has occurred, print and inspect the error details" —
+      // operators need NSError.userInfo to diagnose, but userInfo
+      // can carry the raw id_token, so it goes through
+      // `debugSensitive` (no-op in release). The correlation ID
+      // ties the user-facing error message to the log line.
+      let ns = error as NSError
+      let correlation = UUID().uuidString.prefix(8)
+      PivoxLog.sso.error(
+        "sign-in failed correlation=\(correlation) provider=\(providerID) domain=\(ns.domain) code=\(ns.code) localized=\(ns.localizedDescription)"
+      )
+      PivoxLog.sso.debugSensitive("userInfo=\(ns.userInfo)")
+      errorMessage =
+        ssoFriendlyMessage(for: error)
+        ?? "Sign-in failed. Please try again or contact support. (\(correlation))"
+    }
+  }
+
+  /// Maps known Firebase + transport errors to user-friendly copy.
+  /// Returns nil for unrecognized errors so the caller can fall back
+  /// to a generic message + correlation ID.
+  private func ssoFriendlyMessage(for error: Error) -> String? {
+    let ns = error as NSError
+    if ns.domain == "FIRAuthErrorDomain" {
+      switch AuthErrorCode(rawValue: ns.code) {
+      case .accountExistsWithDifferentCredential, .credentialAlreadyInUse, .emailAlreadyInUse:
+        return "This email is already linked to a different sign-in method. Sign in with that method first, then link SSO from your profile."
+      case .userDisabled:
+        return "Your account has been disabled. Contact your administrator."
+      case .invalidCredential:
+        return "Sign-in didn't complete. Please try again."
+      case .networkError:
+        return "Couldn't reach the sign-in service. Check your connection and try again."
+      case .tooManyRequests:
+        return "Too many sign-in attempts. Please wait a moment and try again."
+      default:
+        return nil
+      }
+    }
+    return nil
+  }
+
+  /// Drives the broker round-trip for an OIDC provider. Returns the
+  /// IdP's id_token plus the nonce the broker echoed (FB requires
+  /// rawNonce on `OAuthProvider.credential` to verify the id_token's
+  /// `nonce` claim — the broker bound this nonce into the original
+  /// authorize request via the signed state token).
+  private func performSSOOAuth(providerID: String, loginHint: String? = nil) async throws -> (idToken: String, rawNonce: String) {
+    let returnURL = "pivox://auth-complete"
+    guard
+      let encodedReturn = returnURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+      let encodedProvider = providerID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
+    else {
+      throw NSError(
+        domain: "AuthService", code: -1,
+        userInfo: [NSLocalizedDescriptionKey: "Failed to build SSO broker URL"])
+    }
+    var startURLString =
+      "\(Self.brokerBaseURL)/internal/v1/auth/\(encodedProvider)/start?return=\(encodedReturn)"
+    // Pre-fill the IdP login page with the email the user already
+    // typed on our SSO screen — saves a re-type. The broker forwards
+    // this verbatim as the OIDC `login_hint` query param.
+    if let hint = loginHint?.trimmingCharacters(in: .whitespacesAndNewlines), !hint.isEmpty,
+      let encodedHint = hint.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+    {
+      startURLString += "&login_hint=\(encodedHint)"
+    }
+    guard let startURL = URL(string: startURLString) else {
+      throw NSError(
+        domain: "AuthService", code: -1,
+        userInfo: [NSLocalizedDescriptionKey: "Failed to build SSO broker URL"])
+    }
+
+    let finalURL = try await withCheckedThrowingContinuation {
+      (continuation: CheckedContinuation<URL, Error>) in
+      let session = ASWebAuthenticationSession(
+        url: startURL,
+        callbackURLScheme: "pivox"
+      ) { url, error in
+        if let error = error {
+          continuation.resume(throwing: error)
+        } else if let url = url {
+          continuation.resume(returning: url)
+        } else {
+          continuation.resume(
+            throwing: NSError(
+              domain: "AuthService", code: -1,
+              userInfo: [NSLocalizedDescriptionKey: "No callback URL received"]))
+        }
+      }
+      session.presentationContextProvider = self
+      session.prefersEphemeralWebBrowserSession = false
+      session.start()
+    }
+
+    let fragment = finalURL.fragment ?? ""
+    let items = URLComponents(string: "?\(fragment)")?.queryItems ?? []
+
+    if let errorCode = items.first(where: { $0.name == "error" })?.value {
+      let description =
+        items.first(where: { $0.name == "error_description" })?.value ?? errorCode
+      throw NSError(
+        domain: "AuthService", code: -1,
+        userInfo: [NSLocalizedDescriptionKey: "SSO sign-in failed: \(description)"])
+    }
+
+    guard items.first(where: { $0.name == "provider" })?.value == providerID else {
+      throw NSError(
+        domain: "AuthService", code: -1,
+        userInfo: [NSLocalizedDescriptionKey: "Broker returned wrong provider"])
+    }
+    guard items.first(where: { $0.name == "kind" })?.value == "oidc_id_token" else {
+      throw NSError(
+        domain: "AuthService", code: -1,
+        userInfo: [NSLocalizedDescriptionKey: "Broker returned unexpected credential kind"])
+    }
+    guard let idToken = items.first(where: { $0.name == "token" })?.value else {
+      throw NSError(
+        domain: "AuthService", code: -1,
+        userInfo: [NSLocalizedDescriptionKey: "Callback missing id_token"])
+    }
+    guard let rawNonce = items.first(where: { $0.name == "nonce" })?.value else {
+      throw NSError(
+        domain: "AuthService", code: -1,
+        userInfo: [NSLocalizedDescriptionKey: "Callback missing nonce"])
+    }
+    return (idToken, rawNonce)
   }
 
   // MARK: - PKCE Helpers

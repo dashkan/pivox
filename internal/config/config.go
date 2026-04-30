@@ -32,6 +32,31 @@ type Config struct {
 	TrustedProxies []string
 	SyncAuth       SyncAuthConfig
 	DelegatedAuth  DelegatedAuthConfig
+	OAuthBroker    OAuthBrokerConfig
+}
+
+// OAuthBrokerConfig controls the server-side OAuth/OIDC broker that
+// handles federated sign-in for native and web clients (formerly the
+// TanStack `start` /api/oauth/* routes; consolidated server-side so
+// auth machinery lives next to syncFirebaseIdentity, exchangeToken,
+// resolveProvider, etc.). The broker drives the IdP code-flow
+// handshake using the client_secret stored server-side and returns
+// to the native app via a custom URL scheme with the IdP token in
+// the URL fragment. See `internal_hooks_oauth_broker.go`.
+type OAuthBrokerConfig struct {
+	// AppKey is the HMAC secret used to sign the broker's `state`
+	// token. ≥32 bytes. Rotating this invalidates every in-flight
+	// flow but does not affect any persistent server state.
+	AppKey string
+
+	// BaseURL is the server's public origin used to construct the
+	// IdP-facing redirect_uri (`{BaseURL}/api/oauth/{provider}/callback`).
+	// Must match what the IdP has on file as a Valid Redirect URI.
+	BaseURL string
+
+	// GitHub OAuth app credentials. Empty disables GitHub federation.
+	GitHubClientID     string
+	GitHubClientSecret string
 }
 
 // DelegatedAuthConfig controls the delegated auth session flow used by

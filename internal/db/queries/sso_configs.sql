@@ -56,3 +56,26 @@ SELECT s.firebase_provider_id, s.org_id
    AND d.state       = 'VERIFIED'
    AND s.enabled     = true
  LIMIT 1;
+
+-- GetSsoConfigByFirebaseProviderID is the query backing the
+-- POST /internal/v1/sso:getProviderConfig endpoint. The OAuth
+-- broker (web/start) calls this with a provider id (e.g. `oidc.acme`)
+-- to fetch the issuer / client_id / encrypted client_secret it needs
+-- to drive the OIDC code-flow handshake against the IdP. Joins
+-- organizations so the broker can include the org slug in the
+-- response (used in logs + as a context tag).
+-- Returns no rows when the provider id is unknown OR SsoConfig is
+-- disabled — broker-callable identifiers should both be present and
+-- enabled to drive a valid sign-in.
+-- name: GetSsoConfigByFirebaseProviderID :one
+SELECT s.org_id,
+       s.firebase_provider_id,
+       s.oidc_config,
+       s.saml_config,
+       s.client_secret_ciphertext,
+       o.name AS org_slug
+  FROM sso_configs s
+  JOIN organizations o ON o.id = s.org_id
+ WHERE s.firebase_provider_id = $1
+   AND s.enabled              = true
+ LIMIT 1;

@@ -3,6 +3,7 @@ import Foundation
 import GRPCCore
 import GRPCNIOTransportHTTP2
 import GRPCProtobuf
+import OSLog
 import PivoxModels
 import SwiftProtobuf
 
@@ -185,7 +186,7 @@ struct FirebaseAuthInterceptor: ClientInterceptor {
         } catch {
             // Log the underlying error for diagnostics; surface only the
             // generic ChatClientError to the caller.
-            NSLog("[ChatClient] Firebase getIDToken failed: %@", String(describing: error))
+            PivoxLog.chat.error("Firebase getIDToken failed: \(String(describing: error))")
             throw ChatClientError.authenticationRequired
         }
     }

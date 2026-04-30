@@ -263,6 +263,11 @@ func (m *MockQuerier) ResolveProviderByDomain(ctx context.Context, domain string
 	return args.Get(0).(db.ResolveProviderByDomainRow), args.Error(1)
 }
 
+func (m *MockQuerier) GetSsoConfigByFirebaseProviderID(ctx context.Context, firebaseProviderID string) (db.GetSsoConfigByFirebaseProviderIDRow, error) {
+	args := m.Called(ctx, firebaseProviderID)
+	return args.Get(0).(db.GetSsoConfigByFirebaseProviderIDRow), args.Error(1)
+}
+
 // --- User membership (post-Phase-7 unification) ---
 //
 // The dropped `users` table's queries (CreateUserMembership /

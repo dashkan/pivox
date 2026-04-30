@@ -2,6 +2,7 @@ import SwiftUI
 
 struct LoginView: View {
   var onSwitchToRegister: () -> Void
+  var onSwitchToSSO: () -> Void
   // Injectable AuthService so delegated auth flows (AUTHN-07) can reuse the
   // same UI against a named Firebase backend. Defaults to the shared instance
   // for normal app launches.
@@ -23,9 +24,14 @@ struct LoginView: View {
     case email, password
   }
 
-  init(auth: AuthService = .shared, onSwitchToRegister: @escaping () -> Void) {
+  init(
+    auth: AuthService = .shared,
+    onSwitchToRegister: @escaping () -> Void,
+    onSwitchToSSO: @escaping () -> Void = {}
+  ) {
     self.auth = auth
     self.onSwitchToRegister = onSwitchToRegister
+    self.onSwitchToSSO = onSwitchToSSO
     let state = AppStateBridge.shared()
     let savedEmail = state.loadString(forKey: "remembered_email") ?? ""
     _email = State(initialValue: savedEmail)
@@ -221,6 +227,26 @@ struct LoginView: View {
         .buttonStyle(.bordered)
         .controlSize(.large)
         .disabled(isLoading)
+
+        // SSO is intentionally a separate explicit screen — auto-
+        // probing the resolver as the user types would enumerate
+        // which domains have SSO configured. The button hands off
+        // to a dedicated SSO view that owns its own email field
+        // and provider-resolution flow.
+        Button(action: onSwitchToSSO) {
+          HStack {
+            Image(systemName: "key.shield")
+              .resizable()
+              .aspectRatio(contentMode: .fit)
+              .frame(width: 16, height: 16)
+            Text("Sign in with SSO")
+          }
+          .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.large)
+        .disabled(isLoading)
+        .accessibilityIdentifier("login-sso")
       }
 
       // Footer
@@ -252,6 +278,7 @@ struct LoginView: View {
       }
     }
   }
+
 }
 
 /// Second-factor challenge shown on the login card when the first

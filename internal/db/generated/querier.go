@@ -329,6 +329,17 @@ type Querier interface {
 	// window). Filtering on delete_time would break those flows by
 	// returning ErrNoRows after the gate has already admitted the row.
 	GetSpaceParentOrg(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
+	// GetSsoConfigByFirebaseProviderID is the query backing the
+	// POST /internal/v1/sso:getProviderConfig endpoint. The OAuth
+	// broker (web/start) calls this with a provider id (e.g. `oidc.acme`)
+	// to fetch the issuer / client_id / encrypted client_secret it needs
+	// to drive the OIDC code-flow handshake against the IdP. Joins
+	// organizations so the broker can include the org slug in the
+	// response (used in logs + as a context tag).
+	// Returns no rows when the provider id is unknown OR SsoConfig is
+	// disabled — broker-callable identifiers should both be present and
+	// enabled to drive a valid sign-in.
+	GetSsoConfigByFirebaseProviderID(ctx context.Context, firebaseProviderID string) (GetSsoConfigByFirebaseProviderIDRow, error)
 	// GetSsoConfigByOrgID looks up the SSO config row for an org, if
 	// one exists. UNIQUE(org_id) ensures at most one row. Used by
 	// DeleteDomain to enforce the "last verified domain on an enabled

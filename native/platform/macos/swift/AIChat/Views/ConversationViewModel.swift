@@ -4,8 +4,6 @@ import OSLog
 import PivoxModels
 import SwiftUI
 
-private let paginationLog = OSLog(subsystem: "pivox.transcript", category: "pagination")
-
 @MainActor
 public final class ConversationViewModel: ObservableObject {
     @Published public var messages: [Pivox_Ai_V1_Message] = []
@@ -123,10 +121,9 @@ public final class ConversationViewModel: ObservableObject {
                 messages.insert(contentsOf: ordered, at: 0)
             }
             olderCursor = response.nextPageToken.isEmpty ? nil : response.nextPageToken
-            os_log(.debug, log: paginationLog,
-                "loadHistory: +%d msgs, total=%d, nextToken=%{public}@",
-                ordered.count, messages.count,
-                response.nextPageToken.isEmpty ? "nil" : "set")
+            PivoxLog.transcript.debug(
+                "loadHistory: +\(ordered.count) msgs, total=\(self.messages.count), nextToken=\(response.nextPageToken.isEmpty ? "nil" : "set")"
+            )
         } catch {
             guard state == .loading else { return }
             // NotFound = the conversation was deleted (probably from another
@@ -150,14 +147,14 @@ public final class ConversationViewModel: ObservableObject {
     /// after the await returns.
     public func loadOlder() async {
         guard let token = olderCursor, !token.isEmpty else {
-            os_log(.debug, log: paginationLog, "loadOlder: skipped (no cursor)")
+            PivoxLog.transcript.debug("loadOlder: skipped (no cursor)")
             return
         }
         guard !isLoadingOlder else {
-            os_log(.debug, log: paginationLog, "loadOlder: skipped (already loading)")
+            PivoxLog.transcript.debug("loadOlder: skipped (already loading)")
             return
         }
-        os_log(.debug, log: paginationLog, "loadOlder: starting, token present")
+        PivoxLog.transcript.debug("loadOlder: starting, token present")
         isLoadingOlder = true
         defer { isLoadingOlder = false }
         do {
@@ -171,14 +168,11 @@ public final class ConversationViewModel: ObservableObject {
             Self.prewarmMarkdownCache(for: ordered)
             messages.insert(contentsOf: ordered, at: 0)
             olderCursor = response.nextPageToken.isEmpty ? nil : response.nextPageToken
-            os_log(.debug, log: paginationLog,
-                "loadOlder: +%d msgs, total=%d, nextToken=%{public}@",
-                ordered.count, messages.count,
-                response.nextPageToken.isEmpty ? "nil (no more pages)" : "set")
+            PivoxLog.transcript.debug(
+                "loadOlder: +\(ordered.count) msgs, total=\(self.messages.count), nextToken=\(response.nextPageToken.isEmpty ? "nil (no more pages)" : "set")"
+            )
         } catch {
-            os_log(.error, log: paginationLog,
-                "loadOlder: failed %{public}@",
-                "\(error)")
+            PivoxLog.transcript.error("loadOlder: failed \(error.localizedDescription)")
         }
     }
 

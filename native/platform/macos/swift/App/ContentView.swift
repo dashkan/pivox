@@ -495,18 +495,25 @@ struct LibraryPlaceholderView: View {
   }
 }
 
-/// Routes between login and registration screens.
+/// Routes between login, registration, and SSO screens.
 struct AuthRouter: View {
-  @State private var showRegister = false
+  enum Screen { case login, register, sso }
+  @State private var screen: Screen = .login
 
   var body: some View {
-    if showRegister {
+    switch screen {
+    case .register:
       RegisterView(
-        onSwitchToLogin: { showRegister = false }
+        onSwitchToLogin: { screen = .login }
       )
-    } else {
+    case .sso:
+      SsoLoginView(
+        onSwitchToLogin: { screen = .login }
+      )
+    case .login:
       LoginView(
-        onSwitchToRegister: { showRegister = true }
+        onSwitchToRegister: { screen = .register },
+        onSwitchToSSO: { screen = .sso }
       )
     }
   }
