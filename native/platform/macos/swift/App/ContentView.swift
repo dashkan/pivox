@@ -495,9 +495,12 @@ struct LibraryPlaceholderView: View {
   }
 }
 
-/// Routes between login, registration, and SSO screens.
+/// Routes between login and registration. SSO is no longer a
+/// separate screen — `LoginView` resolves SSO-vs-password from the
+/// email after the first submit, so a single email entry handles
+/// both flows.
 struct AuthRouter: View {
-  enum Screen { case login, register, sso }
+  enum Screen { case login, register }
   @State private var screen: Screen = .login
 
   var body: some View {
@@ -506,14 +509,9 @@ struct AuthRouter: View {
       RegisterView(
         onSwitchToLogin: { screen = .login }
       )
-    case .sso:
-      SsoLoginView(
-        onSwitchToLogin: { screen = .login }
-      )
     case .login:
       LoginView(
-        onSwitchToRegister: { screen = .register },
-        onSwitchToSSO: { screen = .sso }
+        onSwitchToRegister: { screen = .register }
       )
     }
   }

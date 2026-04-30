@@ -1,8 +1,31 @@
 import SwiftUI
 
+/// Email-first sign-in. Single entry point that resolves SSO vs.
+/// password from the email after the user submits step 1:
+///
+///   Step 1 — email only, "Continue" button.
+///     ↳ resolveSSOProvider(email)
+///         ↳ provider id    → kick off OIDC broker flow.
+///         ↳ nil            → step 2 (password resubmit).
+///         ↳ error          → generic message, stay on step 1.
+///
+///   Step 2 — password field revealed below the (now read-only)
+///   email, "Sign In" button. Submits email+password.
+///
+/// Why this shape: pre-Phase-X the landing page had two buttons
+/// ("Sign In" + "Sign in with SSO") and a separate `SsoLoginView`,
+/// which forced users to know which mechanism their org used and
+/// produced a dead-end "SSO is not available for this email" failure
+/// when they guessed wrong. Email-first is the modern default
+/// (Slack/Notion/Linear/Vercel) and lets an org enable SSO without
+/// requiring users to switch buttons — the existing email path just
+/// works.
+///
+/// Sign-up is intentionally unaware of SSO. SSO accounts come in via
+/// invite or IdP auto-provisioning; the registration surface stays
+/// password-only and routes here only for sign-in.
 struct LoginView: View {
   var onSwitchToRegister: () -> Void
-  var onSwitchToSSO: () -> Void
   // Injectable AuthService so delegated auth flows (AUTHN-07) can reuse the
   // same UI against a named Firebase backend. Defaults to the shared instance
   // for normal app launches.
@@ -14,6 +37,12 @@ struct LoginView: View {
   @State private var password = ""
   @State private var rememberMe: Bool
   @State private var isLoading = false
+  /// Email→provider resolve completed and returned no SSO provider.
+  /// Reveals the password field and switches the primary button to
+  /// "Sign In". Only ever flips false→true within a session — once
+  /// we've established the email is password-auth, we don't bounce
+  /// the user back to step 1 mid-attempt.
+  @State private var didResolveAsPassword = false
   @FocusState private var focusedField: Field?
   /// DEBUG-only toggle (⌘⇧G) so we can A/B the glass card
   /// treatment live without rebuilding. Persists across launches so
@@ -26,12 +55,10 @@ struct LoginView: View {
 
   init(
     auth: AuthService = .shared,
-    onSwitchToRegister: @escaping () -> Void,
-    onSwitchToSSO: @escaping () -> Void = {}
+    onSwitchToRegister: @escaping () -> Void
   ) {
     self.auth = auth
     self.onSwitchToRegister = onSwitchToRegister
-    self.onSwitchToSSO = onSwitchToSSO
     let state = AppStateBridge.shared()
     let savedEmail = state.loadString(forKey: "remembered_email") ?? ""
     _email = State(initialValue: savedEmail)
@@ -130,19 +157,37 @@ struct LoginView: View {
           // Contacts-suggestion hint and doesn't trigger autofill.
           .textContentType(.username)
           .focused($focusedField, equals: .email)
-          .onSubmit { focusedField = .password }
+          .onSubmit { submit() }
           .disabled(isLoading)
           .accessibilityLabel("Email address")
           .accessibilityIdentifier("login-email")
+          // Editing the email after step 1 invalidates the SSO/password
+          // decision — they may be typing a different domain. Roll
+          // back to step 1 so the next submit re-resolves.
+          .onChange(of: email) { _, _ in
+            if didResolveAsPassword {
+              didResolveAsPassword = false
+              password = ""
+            }
+          }
 
-        SecureField("Password", text: $password)
-          .textFieldStyle(.roundedBorder)
-          .textContentType(.password)
-          .focused($focusedField, equals: .password)
-          .onSubmit { submitSignIn() }
-          .disabled(isLoading)
-          .accessibilityLabel("Password")
-          .accessibilityIdentifier("login-password")
+        // Password field is mounted only after step 1 completes with
+        // "no SSO" — keeping it gated avoids autofill prompting
+        // during the email-only state and preserves the email-first
+        // visual model. macOS keychain autofill triggers on
+        // SecureField focus regardless of mount-vs-hidden, so a
+        // conditional mount works without losing fill.
+        if didResolveAsPassword {
+          SecureField("Password", text: $password)
+            .textFieldStyle(.roundedBorder)
+            .textContentType(.password)
+            .focused($focusedField, equals: .password)
+            .onSubmit { submit() }
+            .disabled(isLoading)
+            .accessibilityLabel("Password")
+            .accessibilityIdentifier("login-password")
+            .transition(.opacity.combined(with: .move(edge: .top)))
+        }
 
         HStack {
           Toggle("Remember me", isOn: $rememberMe)
@@ -151,31 +196,25 @@ struct LoginView: View {
             .disabled(isLoading)
             .accessibilityIdentifier("login-remember-me")
           Spacer()
-          Button("Forgot password?") {}
-            .buttonStyle(.link)
-            .font(theme.bodyFont)
-            .disabled(isLoading)
-            .accessibilityIdentifier("login-forgot-password")
+          if didResolveAsPassword {
+            Button("Forgot password?") {}
+              .buttonStyle(.link)
+              .font(theme.bodyFont)
+              .disabled(isLoading)
+              .accessibilityIdentifier("login-forgot-password")
+          }
         }
 
-        AuthPrimaryButton("Sign In", isLoading: isLoading, action: submitSignIn)
-          .disabled(email.isEmpty || password.isEmpty || isLoading)
-          .accessibilityIdentifier("login-sign-in")
-
-        // SSO sits as a peer of the primary Sign In button — same
-        // shape and width, accent-tinted outline instead of filled
-        // so the password flow remains the visual default. The
-        // dedicated SsoLoginView owns the email entry +
-        // provider-resolution flow; clicking here just navigates,
-        // it doesn't probe (silent probe would enumerate which
-        // domains have SSO configured).
-        AuthSecondaryButton(
-          "Sign in with SSO",
-          systemImage: "key.shield",
-          action: onSwitchToSSO
+        // Primary button label tracks state: Continue (step 1) →
+        // Sign In (step 2). Single action handler branches on
+        // `didResolveAsPassword`.
+        AuthPrimaryButton(
+          didResolveAsPassword ? "Sign In" : "Continue",
+          isLoading: isLoading,
+          action: submit
         )
-        .disabled(isLoading)
-        .accessibilityIdentifier("login-sso")
+        .disabled(primaryDisabled)
+        .accessibilityIdentifier("login-sign-in")
 
         // Error message — pre-allocated space to prevent layout shift.
         Text(auth.errorMessage ?? " ")
@@ -185,6 +224,7 @@ struct LoginView: View {
           .opacity(auth.errorMessage != nil ? 1 : 0)
           .accessibilityIdentifier("login-error")
       }
+      .animation(.easeInOut(duration: 0.18), value: didResolveAsPassword)
 
       // Flexible gap inside the upper (fixed-height) section. Grows
       // on Login (shorter form), collapses on Register (taller).
@@ -261,8 +301,65 @@ struct LoginView: View {
     .glassCardIfEnabled(useGlassCard)
   }
 
-  private func submitSignIn() {
-    guard !email.isEmpty, !password.isEmpty, !isLoading else { return }
+  /// Primary button is disabled when the visible-field invariants
+  /// aren't met for the current step. Step 1 needs an email; step 2
+  /// needs both fields populated.
+  private var primaryDisabled: Bool {
+    if isLoading { return true }
+    if didResolveAsPassword {
+      return email.isEmpty || password.isEmpty
+    }
+    return email.isEmpty
+  }
+
+  /// Single submit handler. Step 1 resolves SSO-vs-password; step 2
+  /// runs the password sign-in. Same handler so `onSubmit` on the
+  /// email field, `onSubmit` on the password field, and the primary
+  /// button all share one path.
+  private func submit() {
+    guard !isLoading else { return }
+    if didResolveAsPassword {
+      submitPassword()
+    } else {
+      submitEmail()
+    }
+  }
+
+  private func submitEmail() {
+    let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return }
+    isLoading = true
+    auth.errorMessage = nil
+    Task {
+      defer { isLoading = false }
+      do {
+        if let providerID = try await auth.resolveSSOProvider(email: trimmed) {
+          // SSO domain — hand off to the OIDC broker flow.
+          // signInWithSSO sets `auth.errorMessage` on failure so the
+          // UI surfaces it the same way password auth does.
+          await auth.signInWithSSO(providerID: providerID, loginHint: trimmed)
+          if auth.isSignedIn {
+            appState.save(rememberMe ? trimmed : "", forKey: "remembered_email")
+          }
+        } else {
+          // No SSO provider for this email — reveal the password
+          // field and let the user resubmit. The "no account exists"
+          // case falls through to step 2 and surfaces from the
+          // server's normal invalid-credentials response, matching
+          // existing password-auth messaging (intentional —
+          // `resolveProvider` is public, so we don't disclose
+          // existence here).
+          didResolveAsPassword = true
+          focusedField = .password
+        }
+      } catch {
+        auth.errorMessage = "Couldn't reach the sign-in service. Try again."
+      }
+    }
+  }
+
+  private func submitPassword() {
+    guard !email.isEmpty, !password.isEmpty else { return }
     isLoading = true
     Task {
       await auth.signIn(email: email, password: password)
