@@ -42,15 +42,36 @@ type StorageGatewaysServer struct {
 	sessionSigningKey []byte
 }
 
-// NewStorageGatewaysServer constructs the server. `auditResolver`
-// inflates audit-field UUIDs into Actor protos; nil leaves Actor
-// fields unset (acceptable in tests).
-func NewStorageGatewaysServer(queries db.Querier, enc crypto.Encryptor, conns *agentstream.ConnectionManager, auditResolver *audit.Resolver) *StorageGatewaysServer {
+// StorageGatewaysConfig is the constructor input for
+// StorageGatewaysServer.
+type StorageGatewaysConfig struct {
+	// Queries is the sqlc query interface. Required.
+	Queries db.Querier
+	// Encryptor wraps Cloud KMS for column-level encryption.
+	// Optional.
+	Encryptor crypto.Encryptor
+	// Conns tracks connected agents and routes outbound messages.
+	// Required.
+	Conns *agentstream.ConnectionManager
+	// AuditResolver inflates audit-field UUIDs into Actor protos.
+	// Optional; nil leaves Actor fields unset.
+	AuditResolver *audit.Resolver
+}
+
+// NewStorageGatewaysServer constructs the server from cfg. Panics on
+// a missing required field.
+func NewStorageGatewaysServer(cfg StorageGatewaysConfig) *StorageGatewaysServer {
+	if cfg.Queries == nil {
+		panic("storage: StorageGatewaysConfig.Queries is required")
+	}
+	if cfg.Conns == nil {
+		panic("storage: StorageGatewaysConfig.Conns is required")
+	}
 	return &StorageGatewaysServer{
-		queries:           queries,
-		encryptor:         enc,
-		conns:             conns,
-		audit:             auditResolver,
+		queries:           cfg.Queries,
+		encryptor:         cfg.Encryptor,
+		conns:             cfg.Conns,
+		audit:             cfg.AuditResolver,
 		sessionSigningKey: []byte("pivox-dev-session-signing-key-do-not-use-in-prod"), // TODO: load from key management system in prod
 	}
 }

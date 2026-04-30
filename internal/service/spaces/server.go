@@ -49,28 +49,63 @@ type SpacesServer struct {
 	lroManager *lro.Manager
 }
 
-// NewSpacesServer constructs the server. `resolver` and `caller` are
-// only consumed by the IAM-shaped handlers (TestIamPermissions and
-// space-scope Member CRUD). `pool` is used both for filter reads
-// (db.DBTX) and tx-wrapped writes (TxBeginner); *pgxpool.Pool
-// satisfies both. `lroManager` drives the async orchestrators for
-// DeleteSpace/UndeleteSpace; tests that don't exercise lifecycle
-// paths may pass nil. `auditResolver` inflates audit-field UUIDs into
-// Actor protos; nil yields proto fields without Actor data
-// (acceptable in tests). Tests that need to mock the tx surface
-// build a SpacesServer literal directly with the local TxBeginner
-// interface, mirroring the OrganizationsServer test pattern.
-func NewSpacesServer(pool *pgxpool.Pool, queries db.Querier, codec *appkey.Codec, resolver *permission.Resolver, caller server.CallerIdentityResolver, auditResolver *audit.Resolver, lroManager *lro.Manager) *SpacesServer {
+// Config is the constructor input for SpacesServer. `resolver` and
+// `caller` are only consumed by the IAM-shaped handlers
+// (TestIamPermissions and space-scope Member CRUD). `Pool` is used
+// both for filter reads (db.DBTX) and tx-wrapped writes (TxBeginner);
+// *pgxpool.Pool satisfies both. Tests that need to mock the tx
+// surface build a SpacesServer literal directly with the local
+// TxBeginner interface, mirroring the OrganizationsServer test
+// pattern.
+type Config struct {
+	// Pool is the database pool. Required.
+	Pool *pgxpool.Pool
+	// Queries is the sqlc query interface. Required.
+	Queries db.Querier
+	// Codec opaque-encodes resource names. Required.
+	Codec *appkey.Codec
+	// Resolver gates per-resource permission checks. Optional;
+	// nil is acceptable in unit tests that don't exercise the
+	// permission paths.
+	Resolver *permission.Resolver
+	// Caller resolves the caller identity. Required in production;
+	// unit tests stub via struct literal.
+	Caller server.CallerIdentityResolver
+	// AuditResolver inflates audit-field UUIDs into Actor protos.
+	// Optional; nil leaves Actor fields unset.
+	AuditResolver *audit.Resolver
+	// LROManager drives the async orchestrators for
+	// DeleteSpace/UndeleteSpace. Optional in tests that don't
+	// exercise lifecycle paths.
+	LROManager *lro.Manager
+}
+
+// NewSpacesServer constructs the server from cfg. Panics on a
+// missing required field — a startup-time programmer error rather
+// than a runtime failure.
+func NewSpacesServer(cfg Config) *SpacesServer {
+	if cfg.Pool == nil {
+		panic("spaces: Config.Pool is required")
+	}
+	if cfg.Queries == nil {
+		panic("spaces: Config.Queries is required")
+	}
+	if cfg.Codec == nil {
+		panic("spaces: Config.Codec is required")
+	}
+	if cfg.Caller == nil {
+		panic("spaces: Config.Caller is required")
+	}
 	return &SpacesServer{
-		db:         pool,
-		pool:       pool,
-		queries:    queries,
+		db:         cfg.Pool,
+		pool:       cfg.Pool,
+		queries:    cfg.Queries,
 		filter:     filter.SpaceFilter(),
-		codec:      codec,
-		resolver:   resolver,
-		caller:     caller,
-		audit:      auditResolver,
-		lroManager: lroManager,
+		codec:      cfg.Codec,
+		resolver:   cfg.Resolver,
+		caller:     cfg.Caller,
+		audit:      cfg.AuditResolver,
+		lroManager: cfg.LROManager,
 	}
 }
 

@@ -28,14 +28,30 @@ type AssetsServer struct {
 	audit   *audit.Resolver
 }
 
-// NewAssetsServer constructs the server. `auditResolver` inflates
-// audit-field UUIDs into Actor protos; nil leaves Actor fields unset
-// (acceptable in tests).
-func NewAssetsServer(pool db.DBTX, queries db.Querier, auditResolver *audit.Resolver) *AssetsServer {
+// Config is the constructor input for AssetsServer.
+type Config struct {
+	// Pool is the database pool used for reads. Required.
+	Pool db.DBTX
+	// Queries is the sqlc query interface. Required.
+	Queries db.Querier
+	// AuditResolver inflates audit-field UUIDs into Actor protos.
+	// Optional; nil leaves Actor fields unset.
+	AuditResolver *audit.Resolver
+}
+
+// NewAssetsServer constructs the server from cfg. Panics on a missing
+// required field.
+func NewAssetsServer(cfg Config) *AssetsServer {
+	if cfg.Pool == nil {
+		panic("assets: Config.Pool is required")
+	}
+	if cfg.Queries == nil {
+		panic("assets: Config.Queries is required")
+	}
 	return &AssetsServer{
-		db:      pool,
-		queries: queries,
-		audit:   auditResolver,
+		db:      cfg.Pool,
+		queries: cfg.Queries,
+		audit:   cfg.AuditResolver,
 	}
 }
 

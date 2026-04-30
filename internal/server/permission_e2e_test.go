@@ -4,6 +4,7 @@ package server_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +15,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/dashkan/pivox/internal/appkey"
+	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/permission"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
@@ -139,13 +142,12 @@ func TestE2E_Permission_GroupBindingGrantsAccess(t *testing.T) {
 		OrgID: orgID, Name: grpcharness.RoleAdmin,
 	})
 	require.NoError(t, err)
-	_, err = h.Queries.CreateOrgMember(ctx, db.CreateOrgMemberParams{
-		ID:            uuid.New(),
-		OrgID:         orgID,
-		RoleID:        adminRole.ID,
-		PrincipalKind: db.PrincipalKindGroup,
-		PrincipalID:   groupID,
-		CreatedBy:     owner.IdentityID.String(),
+	_, err = h.Queries.CreateOrgGroupMember(ctx, db.CreateOrgGroupMemberParams{
+		ID:        uuid.New(),
+		OrgID:     orgID,
+		RoleID:    adminRole.ID,
+		GroupID:   convert.PgUUID(groupID),
+		CreatedBy: convert.PgUUID(owner.IdentityID),
 	})
 	require.NoError(t, err)
 
@@ -267,16 +269,33 @@ func newPermissionHarness(t *testing.T) *grpcharness.Harness {
 	return grpcharness.New(t, grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
 		callerIdentity := server.NewCallerIdentityResolver(h.Queries)
 		permResolver := permission.NewResolver(h.Queries)
-		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(
-			h.Pool, h.Queries, h.Auth, nil, server.AuthenticatedUID,
-			permResolver, callerIdentity, h.LROManager, h.Encryptor,
-		))
-		apiv1.RegisterSpacesServer(s, spaces.NewSpacesServer(
-			h.Pool, h.Pool, h.Queries, nil, permResolver, callerIdentity, h.LROManager,
-		))
-		iampb.RegisterIamServer(s, iam.NewIamServer(
-			h.Queries, h.Auth, callerIdentity, h.LROManager,
-		))
+		codec, err := appkey.NewFromHex(strings.Repeat("ab", 32))
+		require.NoError(t, err)
+		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(organizations.Config{
+			Pool:       h.Pool,
+			Queries:    h.Queries,
+			Auth:       h.Auth,
+			Codec:      codec,
+			ReadUID:    server.AuthenticatedUID,
+			Resolver:   permResolver,
+			Caller:     callerIdentity,
+			LROManager: h.LROManager,
+			Encryptor:  h.Encryptor,
+		}))
+		apiv1.RegisterSpacesServer(s, spaces.NewSpacesServer(spaces.Config{
+			Pool:       h.Pool,
+			Queries:    h.Queries,
+			Codec:      codec,
+			Resolver:   permResolver,
+			Caller:     callerIdentity,
+			LROManager: h.LROManager,
+		}))
+		iampb.RegisterIamServer(s, iam.NewIamServer(iam.Config{
+			Queries:    h.Queries,
+			Auth:       h.Auth,
+			Caller:     callerIdentity,
+			LROManager: h.LROManager,
+		}))
 	}))
 }
 

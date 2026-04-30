@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -54,7 +55,7 @@ func TestIntegration_Assets_PlaceholderLifecycle(t *testing.T) {
 	defer cleanup()
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		assetsv1.RegisterAssetsServer(s, assets.NewAssetsServer(pool, queries, nil))
+		assetsv1.RegisterAssetsServer(s, assets.NewAssetsServer(assets.Config{Pool: pool, Queries: queries}))
 	})
 
 	client := assetsv1.NewAssetsClient(conn)
@@ -144,7 +145,7 @@ func TestIntegration_Assets_ListAssets(t *testing.T) {
 	defer cleanup()
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		assetsv1.RegisterAssetsServer(s, assets.NewAssetsServer(pool, queries, nil))
+		assetsv1.RegisterAssetsServer(s, assets.NewAssetsServer(assets.Config{Pool: pool, Queries: queries}))
 	})
 
 	client := assetsv1.NewAssetsClient(conn)
@@ -220,7 +221,7 @@ func TestIntegration_Assets_WithFile(t *testing.T) {
 	defer cleanup()
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		assetsv1.RegisterAssetsServer(s, assets.NewAssetsServer(pool, queries, nil))
+		assetsv1.RegisterAssetsServer(s, assets.NewAssetsServer(assets.Config{Pool: pool, Queries: queries}))
 	})
 
 	client := assetsv1.NewAssetsClient(conn)

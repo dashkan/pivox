@@ -49,7 +49,14 @@ func newAuthTestHTTPServer(t *testing.T) (*HTTPServer, *SessionStore, *EndpointS
 	endpoints := NewEndpointStore(cache)
 	denied := NewDeniedPatterns()
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	srv := NewHTTPServer(sessions, endpoints, denied, testAuthSigningKey, "https://example.com", logger)
+	srv := NewHTTPServer(Config{
+		Sessions:   sessions,
+		Endpoints:  endpoints,
+		Denied:     denied,
+		SigningKey: testAuthSigningKey,
+		CORSOrigin: "https://example.com",
+		Logger:     logger,
+	})
 	return srv, sessions, endpoints, denied
 }
 

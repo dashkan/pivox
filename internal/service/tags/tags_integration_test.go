@@ -5,15 +5,18 @@ package tags_test
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/dashkan/pivox/internal/appkey"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	"github.com/dashkan/pivox/internal/service/tags"
@@ -40,10 +43,19 @@ func TestIntegration_Tags_FullLifecycle(t *testing.T) {
 	pool, queries, cleanup := testutil.SetupTestDB(t)
 	defer cleanup()
 
+	codec, err := appkey.NewFromHex(strings.Repeat("ab", 32))
+	require.NoError(t, err)
+
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		apiv1.RegisterTagKeysServer(s, tags.NewTagKeysServer(pool, queries, nil, nil))
-		apiv1.RegisterTagValuesServer(s, tags.NewTagValuesServer(pool, queries, nil, nil))
-		apiv1.RegisterTagBindingsServer(s, tags.NewTagBindingsServer(pool, queries, nil, nil))
+		apiv1.RegisterTagKeysServer(s, tags.NewTagKeysServer(tags.TagKeysConfig{
+			Pool: pool, Queries: queries, Codec: codec,
+		}))
+		apiv1.RegisterTagValuesServer(s, tags.NewTagValuesServer(tags.TagValuesConfig{
+			Pool: pool, Queries: queries, Codec: codec,
+		}))
+		apiv1.RegisterTagBindingsServer(s, tags.NewTagBindingsServer(tags.TagBindingsConfig{
+			Pool: pool, Queries: queries, Codec: codec,
+		}))
 	})
 
 	keysClient := apiv1.NewTagKeysClient(conn)

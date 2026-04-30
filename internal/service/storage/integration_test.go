@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -44,8 +45,12 @@ func TestIntegration_Storage_GatewayLifecycle(t *testing.T) {
 	conns := agentstream.NewConnectionManager()
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		storagev1.RegisterStorageGatewaysServer(s, storage.NewStorageGatewaysServer(queries, enc, conns, nil))
-		storagev1.RegisterEndpointsServer(s, storage.NewEndpointsServer(queries, enc, nil))
+		storagev1.RegisterStorageGatewaysServer(s, storage.NewStorageGatewaysServer(storage.StorageGatewaysConfig{
+			Queries: queries, Encryptor: enc, Conns: conns,
+		}))
+		storagev1.RegisterEndpointsServer(s, storage.NewEndpointsServer(storage.EndpointsConfig{
+			Queries: queries, Encryptor: enc,
+		}))
 	})
 
 	gwClient := storagev1.NewStorageGatewaysClient(conn)

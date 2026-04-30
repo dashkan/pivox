@@ -27,29 +27,29 @@ import (
 
 const (
 	testOrg       = "acme"
-	testSpace   = "proj1"
+	testSpace     = "proj1"
 	testAssetName = "asset-abc123"
 	testParent    = "organizations/acme/spaces/proj1"
 	testAssetFull = "organizations/acme/spaces/proj1/assets/asset-abc123"
 )
 
 type assetFixture struct {
-	orgID     uuid.UUID
+	orgID   uuid.UUID
 	spaceID uuid.UUID
-	assetID   uuid.UUID
-	mockQ     *mocks.MockQuerier
-	server    *AssetsServer
+	assetID uuid.UUID
+	mockQ   *mocks.MockQuerier
+	server  *AssetsServer
 }
 
 func setupAssetFixture(t *testing.T) assetFixture {
 	t.Helper()
 	f := assetFixture{
-		orgID:     uuid.New(),
+		orgID:   uuid.New(),
 		spaceID: uuid.New(),
-		assetID:   uuid.New(),
-		mockQ:     new(mocks.MockQuerier),
+		assetID: uuid.New(),
+		mockQ:   new(mocks.MockQuerier),
 	}
-	f.server = NewAssetsServer(nil, f.mockQ, nil)
+	f.server = &AssetsServer{queries: f.mockQ}
 	return f
 }
 
@@ -64,7 +64,7 @@ func makeAsset(id, spaceID uuid.UUID, name string, state db.AssetState) db.Asset
 	now := time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC)
 	return db.Asset{
 		ID:          id,
-		SpaceID:   spaceID,
+		SpaceID:     spaceID,
 		Name:        name,
 		DisplayName: "Test Asset",
 		State:       state,

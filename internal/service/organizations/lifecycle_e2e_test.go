@@ -4,6 +4,7 @@ package organizations_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/dashkan/pivox/internal/appkey"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	"github.com/dashkan/pivox/internal/server"
 	"github.com/dashkan/pivox/internal/service/organizations"
@@ -129,10 +131,18 @@ func TestE2E_OrgSoftDeleteRevive(t *testing.T) {
 func newLifecycleHarness(t *testing.T) *grpcharness.Harness {
 	return grpcharness.New(t, grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
 		callerIdentity := server.NewCallerIdentityResolver(h.Queries)
-		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(
-			h.Pool, h.Queries, h.Auth, nil, server.AuthenticatedUID,
-			nil, callerIdentity, h.LROManager, h.Encryptor,
-		))
+		codec, err := appkey.NewFromHex(strings.Repeat("ab", 32))
+		require.NoError(t, err)
+		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(organizations.Config{
+			Pool:       h.Pool,
+			Queries:    h.Queries,
+			Auth:       h.Auth,
+			Codec:      codec,
+			ReadUID:    server.AuthenticatedUID,
+			Caller:     callerIdentity,
+			LROManager: h.LROManager,
+			Encryptor:  h.Encryptor,
+		}))
 	}))
 }
 

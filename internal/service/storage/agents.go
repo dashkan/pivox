@@ -18,9 +18,20 @@ type AgentsServer struct {
 	queries db.Querier
 }
 
-func NewAgentsServer(queries db.Querier) *AgentsServer {
+// AgentsConfig is the constructor input for AgentsServer.
+type AgentsConfig struct {
+	// Queries is the sqlc query interface. Required.
+	Queries db.Querier
+}
+
+// NewAgentsServer constructs the server from cfg. Panics on a missing
+// required field.
+func NewAgentsServer(cfg AgentsConfig) *AgentsServer {
+	if cfg.Queries == nil {
+		panic("storage: AgentsConfig.Queries is required")
+	}
 	return &AgentsServer{
-		queries: queries,
+		queries: cfg.Queries,
 	}
 }
 

@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	db "github.com/dashkan/pivox/internal/db/generated"
+	"github.com/dashkan/pivox/internal/filter"
 	aiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1"
 	"github.com/dashkan/pivox/internal/service/aichat/model"
 	"github.com/dashkan/pivox/internal/service/aichat/tools"
@@ -24,7 +25,7 @@ import (
 func TestSummarizeConversation_NoOpWhenTitleUserSet(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, nil, nil, slog.Default())
+	srv := &Server{queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	uid := "user1"
@@ -54,7 +55,7 @@ func TestSummarizeConversation_NoOpWhenTitleUserSet(t *testing.T) {
 func TestSummarizeConversation_NoOpWhenTranscriptEmpty(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, nil, nil, slog.Default())
+	srv := &Server{queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	uid := "user1"
@@ -86,7 +87,7 @@ func TestSummarizeConversation_HappyPathWritesViaSetAutoTitle(t *testing.T) {
 			{Kind: "finish"},
 		},
 	}
-	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, nil, nil, slog.Default())
+	srv := &Server{queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	uid := "user1"
@@ -137,7 +138,7 @@ func TestSummarizeConversation_HappyPathWritesViaSetAutoTitle(t *testing.T) {
 func TestSummarizeConversation_RejectsNonOwner(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, nil, nil, slog.Default())
+	srv := &Server{queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	// Conversation owned by a different user-uuid than the path's
@@ -161,7 +162,7 @@ func TestSummarizeConversation_RejectsNonOwner(t *testing.T) {
 func TestSummarizeConversation_NotFound(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, nil, nil, slog.Default())
+	srv := &Server{queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	ctx := authenticatedCtx("user1")
@@ -219,7 +220,7 @@ func TestSanitizeTitle(t *testing.T) {
 // trigger — destroying auto-summarize forever for that conversation.
 func TestUpdateConversation_RejectsMissingMask(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	srv := NewServer(nil, q, nil, nil, nil, nil, nil, slog.Default())
+	srv := &Server{queries: q, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	uid := "user1"
@@ -267,7 +268,7 @@ func TestRunGenerate_OrgMembershipCheckRejectsPhantomOrg(t *testing.T) {
 	llm := &mockLanguageModel{
 		events: []model.ModelEvent{{Kind: "text_delta", Text: "should not run"}},
 	}
-	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, nil, nil, slog.Default())
+	srv := &Server{queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	ctx := authenticatedCtx("user1")
 	q.On("GetOrganizationByName", mock.Anything, "phantom").Return(

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -42,7 +43,9 @@ func TestIntegration_ApiKeys(t *testing.T) {
 	codec, err := appkey.NewFromHex(strings.Repeat("ab", 32))
 	require.NoError(t, err)
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		apiv1.RegisterApiKeysServer(s, apikeys.NewApiKeysServer(pool, queries, codec))
+		apiv1.RegisterApiKeysServer(s, apikeys.NewApiKeysServer(apikeys.Config{
+			Pool: pool, Queries: queries, Codec: codec,
+		}))
 	})
 
 	client := apiv1.NewApiKeysClient(conn)

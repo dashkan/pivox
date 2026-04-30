@@ -29,12 +29,33 @@ type AgentServiceServer struct {
 	conns   *agentstream.ConnectionManager
 }
 
-// NewAgentServiceServer creates a new AgentServiceServer.
-func NewAgentServiceServer(queries db.Querier, logger *slog.Logger, conns *agentstream.ConnectionManager) *AgentServiceServer {
+// AgentServiceConfig is the constructor input for AgentServiceServer.
+type AgentServiceConfig struct {
+	// Queries is the sqlc query interface. Required.
+	Queries db.Querier
+	// Logger is the structured logger. Required.
+	Logger *slog.Logger
+	// Conns tracks connected agents and routes outbound messages.
+	// Required.
+	Conns *agentstream.ConnectionManager
+}
+
+// NewAgentServiceServer constructs the server from cfg. Panics on a
+// missing required field.
+func NewAgentServiceServer(cfg AgentServiceConfig) *AgentServiceServer {
+	if cfg.Queries == nil {
+		panic("storage: AgentServiceConfig.Queries is required")
+	}
+	if cfg.Logger == nil {
+		panic("storage: AgentServiceConfig.Logger is required")
+	}
+	if cfg.Conns == nil {
+		panic("storage: AgentServiceConfig.Conns is required")
+	}
 	return &AgentServiceServer{
-		queries: queries,
-		logger:  logger,
-		conns:   conns,
+		queries: cfg.Queries,
+		logger:  cfg.Logger,
+		conns:   cfg.Conns,
 	}
 }
 

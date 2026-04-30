@@ -28,12 +28,24 @@ type RequestsServer struct {
 	audit   *audit.Resolver
 }
 
-// NewRequestsServer constructs the server. `auditResolver` inflates
-// audit-field UUIDs into Actor protos; nil leaves Actor fields unset.
-func NewRequestsServer(queries db.Querier, auditResolver *audit.Resolver) *RequestsServer {
+// Config is the constructor input for RequestsServer.
+type Config struct {
+	// Queries is the sqlc query interface. Required.
+	Queries db.Querier
+	// AuditResolver inflates audit-field UUIDs into Actor protos.
+	// Optional; nil leaves Actor fields unset.
+	AuditResolver *audit.Resolver
+}
+
+// NewRequestsServer constructs the server from cfg. Panics on a
+// missing required field.
+func NewRequestsServer(cfg Config) *RequestsServer {
+	if cfg.Queries == nil {
+		panic("requests: Config.Queries is required")
+	}
 	return &RequestsServer{
-		queries: queries,
-		audit:   auditResolver,
+		queries: cfg.Queries,
+		audit:   cfg.AuditResolver,
 	}
 }
 

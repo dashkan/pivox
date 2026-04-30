@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -19,6 +20,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
 
+	"github.com/dashkan/pivox/internal/appkey"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	aiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1"
 	"github.com/dashkan/pivox/internal/server"
@@ -38,7 +40,16 @@ func setupIntegration(t *testing.T) (aiv1.AiChatClient, *db.Queries, func()) {
 
 	// Mock model that returns a fixed response.
 	llm := &fixedModel{text: "Hello from integration test!"}
-	srv := aichat.NewServer(pool, queries, llm, tools.NewRegistry(), nil, nil, slog.Default())
+	codec, err := appkey.NewFromHex(strings.Repeat("ab", 32))
+	require.NoError(t, err)
+	srv := aichat.NewServer(aichat.Config{
+		Pool:    pool,
+		Queries: queries,
+		Model:   llm,
+		Tools:   tools.NewRegistry(),
+		Codec:   codec,
+		Logger:  slog.Default(),
+	})
 
 	// gRPC server with a fake auth interceptor that injects testUID.
 	lis := bufconn.Listen(1024 * 1024)
@@ -295,7 +306,7 @@ func TestIntegration_DeleteConversationCascade(t *testing.T) {
 }
 
 func TestIntegration_StreamWrongOwner(t *testing.T) {
-	_, queries, cleanup := testutil.SetupTestDB(t)
+	pool, queries, cleanup := testutil.SetupTestDB(t)
 	defer cleanup()
 
 	org := createTestOrg(t, queries)
@@ -310,7 +321,19 @@ func TestIntegration_StreamWrongOwner(t *testing.T) {
 	require.NoError(t, err)
 
 	llm := &fixedModel{text: "should not reach here"}
-	srv := aichat.NewServer(nil, queries, llm, tools.NewRegistry(), nil, nil, slog.Default())
+	codec, err := appkey.NewFromHex(strings.Repeat("ab", 32))
+	require.NoError(t, err)
+	// `pool` is unused in the rejection path; pass a non-nil
+	// pool from the surrounding test setup so Config required-
+	// field checks succeed without changing test semantics.
+	srv := aichat.NewServer(aichat.Config{
+		Pool:    pool,
+		Queries: queries,
+		Model:   llm,
+		Tools:   tools.NewRegistry(),
+		Codec:   codec,
+		Logger:  slog.Default(),
+	})
 
 	lis := bufconn.Listen(1024 * 1024)
 	grpcServer := grpc.NewServer(

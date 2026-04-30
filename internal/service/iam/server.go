@@ -37,17 +37,42 @@ type IamServer struct {
 	lroManager *lro.Manager
 }
 
-// NewIamServer constructs the server. The auth/caller/lroManager
-// deps are required by DeleteUser (a global LRO that ends with a
-// Firebase Auth deletion); read-only handlers (ListPermissions,
-// GetRole, ListRoles) ignore them. Tests that exercise only reads
-// pass nils for the unused deps.
-func NewIamServer(queries db.Querier, auth authn.Service, caller server.CallerIdentityResolver, lroManager *lro.Manager) *IamServer {
+// Config is the constructor input for IamServer. The auth/caller/
+// LROManager deps are required by DeleteUser (a global LRO that ends
+// with a Firebase Auth deletion); read-only handlers (ListPermissions,
+// GetRole, ListRoles) ignore them. Unit tests that exercise only
+// reads build an IamServer struct literal directly.
+type Config struct {
+	// Queries is the sqlc query interface. Required.
+	Queries db.Querier
+	// Auth is the authn service. Required.
+	Auth authn.Service
+	// Caller resolves the caller identity. Required.
+	Caller server.CallerIdentityResolver
+	// LROManager drives DeleteUser. Required.
+	LROManager *lro.Manager
+}
+
+// NewIamServer constructs the server from cfg. Panics on a missing
+// required field.
+func NewIamServer(cfg Config) *IamServer {
+	if cfg.Queries == nil {
+		panic("iam: Config.Queries is required")
+	}
+	if cfg.Auth == nil {
+		panic("iam: Config.Auth is required")
+	}
+	if cfg.Caller == nil {
+		panic("iam: Config.Caller is required")
+	}
+	if cfg.LROManager == nil {
+		panic("iam: Config.LROManager is required")
+	}
 	return &IamServer{
-		queries:    queries,
-		auth:       auth,
-		caller:     caller,
-		lroManager: lroManager,
+		queries:    cfg.Queries,
+		auth:       cfg.Auth,
+		caller:     cfg.Caller,
+		lroManager: cfg.LROManager,
 	}
 }
 

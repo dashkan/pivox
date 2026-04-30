@@ -93,7 +93,13 @@ func runStorage(cmd *cobra.Command, args []string) error {
 	denied := agent.NewDeniedPatterns()
 
 	// Start the HTTP file server alongside the bidi connection.
-	httpServer := agent.NewHTTPServer(sessions, endpoints, denied, nil, "*", logger)
+	httpServer := agent.NewHTTPServer(agent.Config{
+		Sessions:   sessions,
+		Endpoints:  endpoints,
+		Denied:     denied,
+		CORSOrigin: "*",
+		Logger:     logger,
+	})
 
 	go func() {
 		addr := fmt.Sprintf("%s:%d", bind, port)

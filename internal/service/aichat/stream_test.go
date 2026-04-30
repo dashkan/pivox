@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	db "github.com/dashkan/pivox/internal/db/generated"
+	"github.com/dashkan/pivox/internal/filter"
 	aiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1"
 	"github.com/dashkan/pivox/internal/server"
 	"github.com/dashkan/pivox/internal/service/aichat/model"
@@ -173,7 +174,7 @@ func TestStreamGenerateContent_HappyPath(t *testing.T) {
 			{Kind: "finish"},
 		},
 	}
-	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, nil, nil, slog.Default())
+	srv := &Server{queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	uid := "user1"
@@ -230,7 +231,7 @@ func TestStreamGenerateContent_ToolResultResumesGeneration(t *testing.T) {
 			{Kind: "finish"},
 		},
 	}
-	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, nil, nil, slog.Default())
+	srv := &Server{queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	uid := "user1"
@@ -286,7 +287,7 @@ func TestStreamGenerateContent_ToolResultResumesGeneration(t *testing.T) {
 func TestStreamGenerateContent_WrongOwner(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, nil, nil, nil, nil, slog.Default())
+	srv := &Server{queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	// Conversation owned by a different user-uuid than the path-bound
@@ -309,7 +310,7 @@ func TestStreamGenerateContent_WrongOwner(t *testing.T) {
 func TestStreamGenerateContent_ModelError(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{err: io.ErrUnexpectedEOF}
-	srv := NewServer(nil, q, llm, nil, nil, nil, nil, slog.Default())
+	srv := &Server{queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	uid := "user1"
@@ -349,7 +350,7 @@ func TestGenerateContent_UnaryAccumulatesText(t *testing.T) {
 			{Kind: "finish"},
 		},
 	}
-	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, nil, nil, slog.Default())
+	srv := &Server{queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	uid := "user1"
@@ -392,7 +393,7 @@ func TestGenerateContent_StatelessSkipsPersistence(t *testing.T) {
 			{Kind: "finish"},
 		},
 	}
-	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, nil, nil, slog.Default())
+	srv := &Server{queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	ctx := authenticatedCtx("user1")
@@ -440,7 +441,7 @@ func TestGenerateContent_StatelessSkipsPersistence(t *testing.T) {
 func TestStreamGenerateContent_ConversationOrgMismatchRejected(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, nil, nil, nil, nil, slog.Default())
+	srv := &Server{queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	ctx := authenticatedCtx("user1")
@@ -475,7 +476,7 @@ func TestExtractText(t *testing.T) {
 
 func TestLoadModelHistory_BudgetTruncation(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	srv := NewServer(nil, q, nil, nil, nil, nil, nil, slog.Default())
+	srv := &Server{queries: q, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	convID := uuid.New()
 	partsJSON, _ := marshalParts([]*aiv1.MessagePart{
@@ -538,7 +539,7 @@ func TestDbMessageToModel(t *testing.T) {
 func TestStreamGenerateContent_InvalidConversationReturnsNotFound(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, nil, nil, nil, nil, slog.Default())
+	srv := &Server{queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	ctx := authenticatedCtx("user1")
@@ -557,7 +558,7 @@ func TestStreamGenerateContent_InvalidConversationReturnsNotFound(t *testing.T) 
 func TestStreamGenerateContent_InvalidConversationNameReturnsInvalidArgument(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, nil, nil, nil, nil, slog.Default())
+	srv := &Server{queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	ctx := authenticatedCtx("user1")

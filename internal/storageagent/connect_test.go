@@ -40,28 +40,26 @@ func TestVersion(t *testing.T) {
 
 func TestListenAndServe_InvalidAddr(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	srv := NewHTTPServer(
-		NewSessionStore(),
-		NewEndpointStore(NewMemoryCache(10, 1024)),
-		NewDeniedPatterns(),
-		nil,
-		"",
-		logger,
-	)
+	srv := NewHTTPServer(Config{
+		Sessions:  NewSessionStore(),
+		Endpoints: NewEndpointStore(NewMemoryCache(10, 1024)),
+		Denied:    NewDeniedPatterns(),
+		Logger:    logger,
+	})
 	err := srv.ListenAndServe("invalid-not-a-port-!!!!")
 	require.Error(t, err)
 }
 
 func TestListenAndServe_Success(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	srv := NewHTTPServer(
-		NewSessionStore(),
-		NewEndpointStore(NewMemoryCache(10, 1024)),
-		NewDeniedPatterns(),
-		[]byte("test-key"),
-		"*",
-		logger,
-	)
+	srv := NewHTTPServer(Config{
+		Sessions:   NewSessionStore(),
+		Endpoints:  NewEndpointStore(NewMemoryCache(10, 1024)),
+		Denied:     NewDeniedPatterns(),
+		SigningKey: []byte("test-key"),
+		CORSOrigin: "*",
+		Logger:     logger,
+	})
 
 	// Pick a random free port by binding to :0.
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -101,7 +99,7 @@ func setupAgentGRPC(t *testing.T, mockQ *mocks.MockQuerier) string {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	srv := grpc.NewServer()
-	agentv1.RegisterAgentServiceServer(srv, storage.NewAgentServiceServer(mockQ, logger, connMgr))
+	agentv1.RegisterAgentServiceServer(srv, storage.NewAgentServiceServer(storage.AgentServiceConfig{Queries: mockQ, Logger: logger, Conns: connMgr}))
 
 	go func() { _ = srv.Serve(lis) }()
 	t.Cleanup(func() { srv.Stop() })
@@ -116,7 +114,14 @@ func newConnectConfig(t *testing.T) *ConnectConfig {
 		Sessions:  NewSessionStore(),
 		Endpoints: NewEndpointStore(NewMemoryCache(10, 1024)),
 		Denied:    NewDeniedPatterns(),
-		HTTP:      NewHTTPServer(NewSessionStore(), NewEndpointStore(NewMemoryCache(10, 1024)), NewDeniedPatterns(), []byte("key"), "*", logger),
+		HTTP: NewHTTPServer(Config{
+			Sessions:   NewSessionStore(),
+			Endpoints:  NewEndpointStore(NewMemoryCache(10, 1024)),
+			Denied:     NewDeniedPatterns(),
+			SigningKey: []byte("key"),
+			CORSOrigin: "*",
+			Logger:     logger,
+		}),
 	}
 }
 
@@ -336,7 +341,7 @@ func TestConnect_TLS(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	srv := grpc.NewServer()
-	agentv1.RegisterAgentServiceServer(srv, storage.NewAgentServiceServer(mockQ, logger, connMgr))
+	agentv1.RegisterAgentServiceServer(srv, storage.NewAgentServiceServer(storage.AgentServiceConfig{Queries: mockQ, Logger: logger, Conns: connMgr}))
 	go func() { _ = srv.Serve(lis) }()
 	t.Cleanup(func() { srv.Stop() })
 

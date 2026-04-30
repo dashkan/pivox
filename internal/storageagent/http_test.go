@@ -35,7 +35,14 @@ func newTestHTTPServer(t *testing.T) (*HTTPServer, *SessionStore, *EndpointStore
 	endpoints := NewEndpointStore(cache)
 	denied := NewDeniedPatterns()
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	srv := NewHTTPServer(sessions, endpoints, denied, testSigningKey, "https://example.com", logger)
+	srv := NewHTTPServer(Config{
+		Sessions:   sessions,
+		Endpoints:  endpoints,
+		Denied:     denied,
+		SigningKey: testSigningKey,
+		CORSOrigin: "https://example.com",
+		Logger:     logger,
+	})
 	return srv, sessions, endpoints, denied
 }
 
@@ -285,7 +292,13 @@ func TestHTTP_NilDeniedPatterns_SkipsDeniedCheck(t *testing.T) {
 	endpoints := NewEndpointStore(cache)
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 
-	srv := NewHTTPServer(sessions, endpoints, nil, testSigningKey, "https://example.com", logger)
+	srv := NewHTTPServer(Config{
+		Sessions:   sessions,
+		Endpoints:  endpoints,
+		SigningKey: testSigningKey,
+		CORSOrigin: "https://example.com",
+		Logger:     logger,
+	})
 
 	dir := t.TempDir()
 	err := os.WriteFile(filepath.Join(dir, "file.txt"), []byte("content"), 0o644)

@@ -61,7 +61,7 @@ func setupRequestFixture(t *testing.T) requestFixture {
 		requestID: uuid.New(),
 		mockQ:     new(mocks.MockQuerier),
 	}
-	f.server = NewRequestsServer(f.mockQ, nil)
+	f.server = &RequestsServer{queries: f.mockQ}
 	return f
 }
 

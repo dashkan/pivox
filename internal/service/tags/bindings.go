@@ -29,16 +29,37 @@ type TagBindingsServer struct {
 	audit   *audit.Resolver
 }
 
-// NewTagBindingsServer constructs the server. `auditResolver`
-// inflates audit-field UUIDs into Actor protos; nil leaves Actor
-// fields unset.
-func NewTagBindingsServer(pool db.DBTX, queries db.Querier, codec *appkey.Codec, auditResolver *audit.Resolver) *TagBindingsServer {
+// TagBindingsConfig is the constructor input for TagBindingsServer.
+type TagBindingsConfig struct {
+	// Pool is the database pool used for filter reads. Required.
+	Pool db.DBTX
+	// Queries is the sqlc query interface. Required.
+	Queries db.Querier
+	// Codec opaque-encodes resource names. Required.
+	Codec *appkey.Codec
+	// AuditResolver inflates audit-field UUIDs into Actor protos.
+	// Optional; nil leaves Actor fields unset.
+	AuditResolver *audit.Resolver
+}
+
+// NewTagBindingsServer constructs the server from cfg. Panics on a
+// missing required field.
+func NewTagBindingsServer(cfg TagBindingsConfig) *TagBindingsServer {
+	if cfg.Pool == nil {
+		panic("tags: TagBindingsConfig.Pool is required")
+	}
+	if cfg.Queries == nil {
+		panic("tags: TagBindingsConfig.Queries is required")
+	}
+	if cfg.Codec == nil {
+		panic("tags: TagBindingsConfig.Codec is required")
+	}
 	return &TagBindingsServer{
-		db:      pool,
-		queries: queries,
+		db:      cfg.Pool,
+		queries: cfg.Queries,
 		filter:  filter.TagBindingFilter(),
-		codec:   codec,
-		audit:   auditResolver,
+		codec:   cfg.Codec,
+		audit:   cfg.AuditResolver,
 	}
 }
 

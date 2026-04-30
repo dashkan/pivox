@@ -189,7 +189,7 @@ func TestNewAgentServiceServer(t *testing.T) {
 	logger := slog.Default()
 	conns := agentstream.NewConnectionManager()
 
-	srv := NewAgentServiceServer(mockQ, logger, conns)
+	srv := NewAgentServiceServer(AgentServiceConfig{Queries: mockQ, Logger: logger, Conns: conns})
 	require.NotNil(t, srv)
 	assert.Equal(t, mockQ, srv.queries)
 	assert.Equal(t, logger, srv.logger)
@@ -235,7 +235,7 @@ func (s *mockConnectStream) RecvMsg(any) error            { return nil }
 func TestConnect_InvalidFirstMessage(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	conns := agentstream.NewConnectionManager()
-	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
+	srv := NewAgentServiceServer(AgentServiceConfig{Queries: mockQ, Logger: slog.Default(), Conns: conns})
 
 	gateway := db.StorageGateway{ID: uuid.New(), Name: "gw-bad-first"}
 
@@ -266,7 +266,7 @@ func TestConnect_InvalidFirstMessage(t *testing.T) {
 func TestConnect_HandshakeAndHeartbeat(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	conns := agentstream.NewConnectionManager()
-	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
+	srv := NewAgentServiceServer(AgentServiceConfig{Queries: mockQ, Logger: slog.Default(), Conns: conns})
 
 	gatewayID := uuid.New()
 	agentID2 := uuid.New()
@@ -350,7 +350,7 @@ func TestConnect_HandshakeAndHeartbeat(t *testing.T) {
 func TestConnect_GatewayActivation(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	conns := agentstream.NewConnectionManager()
-	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
+	srv := NewAgentServiceServer(AgentServiceConfig{Queries: mockQ, Logger: slog.Default(), Conns: conns})
 
 	gatewayID := uuid.New()
 	agentID3 := uuid.New()
@@ -416,7 +416,7 @@ func TestConnect_GatewayActivation(t *testing.T) {
 func TestAuditMessage_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	conns := agentstream.NewConnectionManager()
-	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
+	srv := NewAgentServiceServer(AgentServiceConfig{Queries: mockQ, Logger: slog.Default(), Conns: conns})
 
 	gatewayID := uuid.New()
 	agentID4 := uuid.New()
@@ -439,7 +439,7 @@ func TestAuditMessage_Success(t *testing.T) {
 func TestAuditMessage_DBError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	conns := agentstream.NewConnectionManager()
-	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
+	srv := NewAgentServiceServer(AgentServiceConfig{Queries: mockQ, Logger: slog.Default(), Conns: conns})
 
 	mockQ.On("CreateStorageAgentAudit", mock.Anything, mock.Anything).
 		Return(errors.New("db error"))
@@ -467,7 +467,7 @@ func TestAuditMessage_DBError(t *testing.T) {
 func TestConnect_NoAuthenticatedGateway(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	conns := agentstream.NewConnectionManager()
-	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
+	srv := NewAgentServiceServer(AgentServiceConfig{Queries: mockQ, Logger: slog.Default(), Conns: conns})
 
 	stream := &mockConnectStream{
 		ctx: context.Background(),
@@ -487,7 +487,7 @@ func TestConnect_NoAuthenticatedGateway(t *testing.T) {
 func TestConnect_AgentLookupDBError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	conns := agentstream.NewConnectionManager()
-	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
+	srv := NewAgentServiceServer(AgentServiceConfig{Queries: mockQ, Logger: slog.Default(), Conns: conns})
 
 	gatewayID := uuid.New()
 	gateway := db.StorageGateway{
@@ -528,7 +528,7 @@ func TestConnect_AgentLookupDBError(t *testing.T) {
 func TestConnect_CreateAgentDBError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	conns := agentstream.NewConnectionManager()
-	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
+	srv := NewAgentServiceServer(AgentServiceConfig{Queries: mockQ, Logger: slog.Default(), Conns: conns})
 
 	gatewayID := uuid.New()
 	gateway := db.StorageGateway{
@@ -571,7 +571,7 @@ func TestConnect_CreateAgentDBError(t *testing.T) {
 func TestConnect_ReconnectingAgentStateUpdateError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	conns := agentstream.NewConnectionManager()
-	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
+	srv := NewAgentServiceServer(AgentServiceConfig{Queries: mockQ, Logger: slog.Default(), Conns: conns})
 
 	gatewayID := uuid.New()
 	existingAgentID := uuid.New()
@@ -622,7 +622,7 @@ func TestConnect_ReconnectingAgentStateUpdateError(t *testing.T) {
 func TestConnect_ListEndpointsError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	conns := agentstream.NewConnectionManager()
-	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
+	srv := NewAgentServiceServer(AgentServiceConfig{Queries: mockQ, Logger: slog.Default(), Conns: conns})
 
 	gatewayID := uuid.New()
 	agentIDx := uuid.New()
@@ -672,7 +672,7 @@ func TestConnect_ListEndpointsError(t *testing.T) {
 func TestConnect_ReconnectingAgent(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	conns := agentstream.NewConnectionManager()
-	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
+	srv := NewAgentServiceServer(AgentServiceConfig{Queries: mockQ, Logger: slog.Default(), Conns: conns})
 
 	gatewayID := uuid.New()
 	existingAgentID := uuid.New()
@@ -729,7 +729,7 @@ func TestConnect_ReconnectingAgent(t *testing.T) {
 func TestConnect_ReceiveLoop_MessageTypes(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	conns := agentstream.NewConnectionManager()
-	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
+	srv := NewAgentServiceServer(AgentServiceConfig{Queries: mockQ, Logger: slog.Default(), Conns: conns})
 
 	gatewayID := uuid.New()
 	agentIDy := uuid.New()
@@ -841,7 +841,7 @@ func (s *mockConnectStreamWithSendError) Send(_ *agentv1.ControlMessage) error {
 func TestConnect_SendAckError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	conns := agentstream.NewConnectionManager()
-	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
+	srv := NewAgentServiceServer(AgentServiceConfig{Queries: mockQ, Logger: slog.Default(), Conns: conns})
 
 	gatewayID := uuid.New()
 	agentIDz := uuid.New()
@@ -927,7 +927,7 @@ func (s *mockConnectStreamWithRecvError) RecvMsg(any) error            { return 
 func TestConnect_RecvLoopError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	conns := agentstream.NewConnectionManager()
-	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
+	srv := NewAgentServiceServer(AgentServiceConfig{Queries: mockQ, Logger: slog.Default(), Conns: conns})
 
 	gatewayID := uuid.New()
 	agentIDr := uuid.New()
@@ -984,7 +984,7 @@ func TestConnect_RecvLoopError(t *testing.T) {
 func TestConnect_HeartbeatUpdateError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	conns := agentstream.NewConnectionManager()
-	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
+	srv := NewAgentServiceServer(AgentServiceConfig{Queries: mockQ, Logger: slog.Default(), Conns: conns})
 
 	gatewayID := uuid.New()
 	agentIDhb := uuid.New()
@@ -1049,7 +1049,7 @@ func TestConnect_HeartbeatUpdateError(t *testing.T) {
 func TestConnect_DisconnectErrors(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	conns := agentstream.NewConnectionManager()
-	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
+	srv := NewAgentServiceServer(AgentServiceConfig{Queries: mockQ, Logger: slog.Default(), Conns: conns})
 
 	gatewayID := uuid.New()
 	agentIDdc := uuid.New()
@@ -1104,7 +1104,7 @@ func TestConnect_DisconnectErrors(t *testing.T) {
 func TestConnect_GatewayOfflineUpdateError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	conns := agentstream.NewConnectionManager()
-	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
+	srv := NewAgentServiceServer(AgentServiceConfig{Queries: mockQ, Logger: slog.Default(), Conns: conns})
 
 	gatewayID := uuid.New()
 	agentIDoc := uuid.New()
@@ -1162,7 +1162,7 @@ func TestConnect_GatewayOfflineUpdateError(t *testing.T) {
 func TestConnect_BuildEndpointConfigsError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	conns := agentstream.NewConnectionManager()
-	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
+	srv := NewAgentServiceServer(AgentServiceConfig{Queries: mockQ, Logger: slog.Default(), Conns: conns})
 
 	gatewayID := uuid.New()
 	agentIDcfg := uuid.New()
@@ -1239,7 +1239,7 @@ func (s *mockConnectStreamImmediateErr) RecvMsg(any) error            { return n
 func TestConnect_InitialRecvError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	conns := agentstream.NewConnectionManager()
-	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
+	srv := NewAgentServiceServer(AgentServiceConfig{Queries: mockQ, Logger: slog.Default(), Conns: conns})
 
 	gateway := db.StorageGateway{ID: uuid.New(), Name: "gw-recv-init-err"}
 
@@ -1263,7 +1263,7 @@ func TestConnect_InitialRecvError(t *testing.T) {
 func TestConnect_GatewayActivationError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	conns := agentstream.NewConnectionManager()
-	srv := NewAgentServiceServer(mockQ, slog.Default(), conns)
+	srv := NewAgentServiceServer(AgentServiceConfig{Queries: mockQ, Logger: slog.Default(), Conns: conns})
 
 	gatewayID := uuid.New()
 	agentIDact := uuid.New()

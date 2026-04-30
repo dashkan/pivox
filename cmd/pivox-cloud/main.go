@@ -303,30 +303,67 @@ func serve(cmd *cobra.Command, args []string) error {
 	// Register all services. permResolver and callerIdentity were
 	// constructed above for the permission interceptor and are
 	// reused here by service handlers (TestIamPermissions, etc.).
-	longrunningpb.RegisterOperationsServer(grpcServer, operations.NewOperationsServer(lroManager))
+	longrunningpb.RegisterOperationsServer(grpcServer, operations.NewOperationsServer(operations.Config{LRO: lroManager}))
 
-	apiv1.RegisterSpacesServer(grpcServer, spaces.NewSpacesServer(pool, queries, appCodec, permResolver, callerIdentity, auditResolver, lroManager))
-	apiv1.RegisterOrganizationsServer(grpcServer, organizations.NewOrganizationsServer(pool, queries, authSvc, appCodec, server.AuthenticatedUID, permResolver, callerIdentity, auditResolver, lroManager, enc))
-	apiv1.RegisterTagKeysServer(grpcServer, tags.NewTagKeysServer(pool, queries, appCodec, auditResolver))
-	apiv1.RegisterTagValuesServer(grpcServer, tags.NewTagValuesServer(pool, queries, appCodec, auditResolver))
-	apiv1.RegisterTagBindingsServer(grpcServer, tags.NewTagBindingsServer(pool, queries, appCodec, auditResolver))
-	apiv1.RegisterApiKeysServer(grpcServer, apikeys.NewApiKeysServer(pool, queries, appCodec, auditResolver))
+	apiv1.RegisterSpacesServer(grpcServer, spaces.NewSpacesServer(spaces.Config{
+		Pool:          pool,
+		Queries:       queries,
+		Codec:         appCodec,
+		Resolver:      permResolver,
+		Caller:        callerIdentity,
+		AuditResolver: auditResolver,
+		LROManager:    lroManager,
+	}))
+	apiv1.RegisterOrganizationsServer(grpcServer, organizations.NewOrganizationsServer(organizations.Config{
+		Pool:          pool,
+		Queries:       queries,
+		Auth:          authSvc,
+		Codec:         appCodec,
+		ReadUID:       server.AuthenticatedUID,
+		Resolver:      permResolver,
+		Caller:        callerIdentity,
+		AuditResolver: auditResolver,
+		LROManager:    lroManager,
+		Encryptor:     enc,
+	}))
+	apiv1.RegisterTagKeysServer(grpcServer, tags.NewTagKeysServer(tags.TagKeysConfig{
+		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
+	}))
+	apiv1.RegisterTagValuesServer(grpcServer, tags.NewTagValuesServer(tags.TagValuesConfig{
+		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
+	}))
+	apiv1.RegisterTagBindingsServer(grpcServer, tags.NewTagBindingsServer(tags.TagBindingsConfig{
+		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
+	}))
+	apiv1.RegisterApiKeysServer(grpcServer, apikeys.NewApiKeysServer(apikeys.Config{
+		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
+	}))
 
 	// Iam service: cross-cutting IAM (role reads, permission catalog,
 	// user reads, group CRUD, DeleteUser LRO). Scope-divergent IAM
 	// ops (Member CRUD, TransferOwnership, TestIamPermissions) live
 	// on the scope-owning Organizations / Spaces services above.
-	iamv1.RegisterIamServer(grpcServer, iam.NewIamServer(queries, authSvc, callerIdentity, lroManager))
+	iamv1.RegisterIamServer(grpcServer, iam.NewIamServer(iam.Config{
+		Queries: queries, Auth: authSvc, Caller: callerIdentity, LROManager: lroManager,
+	}))
 
 	// Storage services
 	connMgr := agentstream.NewConnectionManager()
-	storagev1.RegisterStorageGatewaysServer(grpcServer, storage.NewStorageGatewaysServer(queries, enc, connMgr, auditResolver))
-	storagev1.RegisterAgentsServer(grpcServer, storage.NewAgentsServer(queries))
-	storagev1.RegisterEndpointsServer(grpcServer, storage.NewEndpointsServer(queries, enc, auditResolver))
+	storagev1.RegisterStorageGatewaysServer(grpcServer, storage.NewStorageGatewaysServer(storage.StorageGatewaysConfig{
+		Queries: queries, Encryptor: enc, Conns: connMgr, AuditResolver: auditResolver,
+	}))
+	storagev1.RegisterAgentsServer(grpcServer, storage.NewAgentsServer(storage.AgentsConfig{Queries: queries}))
+	storagev1.RegisterEndpointsServer(grpcServer, storage.NewEndpointsServer(storage.EndpointsConfig{
+		Queries: queries, Encryptor: enc, AuditResolver: auditResolver,
+	}))
 
 	// Asset and request services
-	assetsv1.RegisterAssetsServer(grpcServer, assets.NewAssetsServer(pool, queries, auditResolver))
-	assetsv1.RegisterRequestsServer(grpcServer, requests.NewRequestsServer(queries, auditResolver))
+	assetsv1.RegisterAssetsServer(grpcServer, assets.NewAssetsServer(assets.Config{
+		Pool: pool, Queries: queries, AuditResolver: auditResolver,
+	}))
+	assetsv1.RegisterRequestsServer(grpcServer, requests.NewRequestsServer(requests.Config{
+		Queries: queries, AuditResolver: auditResolver,
+	}))
 
 	// AI Chat service
 	ollamaURL := must(f.GetString("ollama-url"))
@@ -336,7 +373,16 @@ func serve(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("initialize Ollama adapter: %w", err)
 	}
 	toolRegistry := tools.NewRegistry()
-	aiChatServer := aichat.NewServer(pool, queries, llm, toolRegistry, appCodec, permResolver, auditResolver, logger)
+	aiChatServer := aichat.NewServer(aichat.Config{
+		Pool:          pool,
+		Queries:       queries,
+		Model:         llm,
+		Tools:         toolRegistry,
+		Codec:         appCodec,
+		Resolver:      permResolver,
+		AuditResolver: auditResolver,
+		Logger:        logger,
+	})
 	aiv1.RegisterAiChatServer(grpcServer, aiChatServer)
 
 	reflection.Register(grpcServer)
@@ -373,7 +419,9 @@ func serve(cmd *cobra.Command, args []string) error {
 			server.AgentAuthStreamInterceptor(queries),
 		),
 	)
-	agentv1.RegisterAgentServiceServer(serviceGRPCServer, storage.NewAgentServiceServer(queries, logger, connMgr))
+	agentv1.RegisterAgentServiceServer(serviceGRPCServer, storage.NewAgentServiceServer(storage.AgentServiceConfig{
+		Queries: queries, Logger: logger, Conns: connMgr,
+	}))
 	reflection.Register(serviceGRPCServer)
 
 	serviceGRPCLis, err := net.Listen("tcp", cfg.ServiceGRPCPort)

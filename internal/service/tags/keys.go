@@ -30,15 +30,37 @@ type TagKeysServer struct {
 	audit   *audit.Resolver
 }
 
-// NewTagKeysServer constructs the server. `auditResolver` inflates
-// audit-field UUIDs into Actor protos; nil leaves Actor fields unset.
-func NewTagKeysServer(pool db.DBTX, queries db.Querier, codec *appkey.Codec, auditResolver *audit.Resolver) *TagKeysServer {
+// TagKeysConfig is the constructor input for TagKeysServer.
+type TagKeysConfig struct {
+	// Pool is the database pool used for filter reads. Required.
+	Pool db.DBTX
+	// Queries is the sqlc query interface. Required.
+	Queries db.Querier
+	// Codec opaque-encodes resource names. Required.
+	Codec *appkey.Codec
+	// AuditResolver inflates audit-field UUIDs into Actor protos.
+	// Optional; nil leaves Actor fields unset.
+	AuditResolver *audit.Resolver
+}
+
+// NewTagKeysServer constructs the server from cfg. Panics on a
+// missing required field.
+func NewTagKeysServer(cfg TagKeysConfig) *TagKeysServer {
+	if cfg.Pool == nil {
+		panic("tags: TagKeysConfig.Pool is required")
+	}
+	if cfg.Queries == nil {
+		panic("tags: TagKeysConfig.Queries is required")
+	}
+	if cfg.Codec == nil {
+		panic("tags: TagKeysConfig.Codec is required")
+	}
 	return &TagKeysServer{
-		db:      pool,
-		queries: queries,
+		db:      cfg.Pool,
+		queries: cfg.Queries,
 		filter:  filter.TagKeyFilter(),
-		codec:   codec,
-		audit:   auditResolver,
+		codec:   cfg.Codec,
+		audit:   cfg.AuditResolver,
 	}
 }
 

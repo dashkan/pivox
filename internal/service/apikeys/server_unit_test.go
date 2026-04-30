@@ -60,7 +60,7 @@ var (
 
 func TestUnit_CreateKey_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewApiKeysServer(nil, mockQ, nil, nil)
+	srv := &ApiKeysServer{queries: mockQ}
 	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
@@ -94,7 +94,7 @@ func TestUnit_CreateKey_Success(t *testing.T) {
 
 func TestUnit_CreateKey_InvalidParent(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewApiKeysServer(nil, mockQ, nil, nil)
+	srv := &ApiKeysServer{queries: mockQ}
 	ctx := callerCtx()
 
 	_, err := srv.CreateKey(ctx, &apiv1.CreateKeyRequest{
@@ -112,7 +112,7 @@ func TestUnit_CreateKey_InvalidParent(t *testing.T) {
 
 func TestUnit_GetKey_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewApiKeysServer(nil, mockQ, nil, nil)
+	srv := &ApiKeysServer{queries: mockQ}
 	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
@@ -135,7 +135,7 @@ func TestUnit_GetKey_Success(t *testing.T) {
 
 func TestUnit_GetKey_NotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewApiKeysServer(nil, mockQ, nil, nil)
+	srv := &ApiKeysServer{queries: mockQ}
 	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
@@ -156,7 +156,7 @@ func TestUnit_GetKey_NotFound(t *testing.T) {
 
 func TestUnit_DeleteKey_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewApiKeysServer(nil, mockQ, nil, nil)
+	srv := &ApiKeysServer{queries: mockQ}
 	ctx := callerCtx()
 
 	deletedKey := testDBKey
@@ -184,7 +184,7 @@ func TestUnit_DeleteKey_Success(t *testing.T) {
 
 func TestUnit_UndeleteKey_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewApiKeysServer(nil, mockQ, nil, nil)
+	srv := &ApiKeysServer{queries: mockQ}
 	ctx := callerCtx()
 
 	undeletedKey := testDBKey
@@ -212,7 +212,7 @@ func TestUnit_UndeleteKey_Success(t *testing.T) {
 
 func TestUnit_LookupKey_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewApiKeysServer(nil, mockQ, nil, nil)
+	srv := &ApiKeysServer{queries: mockQ}
 	ctx := callerCtx()
 
 	mockQ.On("LookupApiKeyByKeyString", mock.Anything, "the-secret-key-string").Return(testDBKey, nil)
@@ -230,7 +230,7 @@ func TestUnit_LookupKey_Success(t *testing.T) {
 
 func TestUnit_UpdateKey_WithFieldMask(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewApiKeysServer(nil, mockQ, nil, nil)
+	srv := &ApiKeysServer{queries: mockQ}
 	ctx := callerCtx()
 
 	updatedKey := testDBKey
@@ -265,7 +265,7 @@ func TestUnit_UpdateKey_WithFieldMask(t *testing.T) {
 
 func TestUnit_GetKeyString_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewApiKeysServer(nil, mockQ, nil, nil)
+	srv := &ApiKeysServer{queries: mockQ}
 	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
@@ -285,7 +285,7 @@ func TestUnit_GetKeyString_Success(t *testing.T) {
 
 func TestUnit_UpdateKey_NoMask(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewApiKeysServer(nil, mockQ, nil, nil)
+	srv := &ApiKeysServer{queries: mockQ}
 	ctx := callerCtx()
 
 	updatedKey := testDBKey
@@ -368,7 +368,7 @@ func TestUnit_CreateKey_ErrorPaths(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
-			srv := NewApiKeysServer(nil, mockQ, nil, nil)
+			srv := &ApiKeysServer{queries: mockQ}
 			tc.setup(mockQ)
 
 			_, err := srv.CreateKey(callerCtx(), tc.req)
@@ -422,7 +422,7 @@ func TestUnit_GetKeyString_ErrorPaths(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
-			srv := NewApiKeysServer(nil, mockQ, nil, nil)
+			srv := &ApiKeysServer{queries: mockQ}
 			tc.setup(mockQ)
 
 			_, err := srv.GetKeyString(callerCtx(), tc.req)
@@ -500,7 +500,7 @@ func TestUnit_UpdateKey_ErrorPaths(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
-			srv := NewApiKeysServer(nil, mockQ, nil, nil)
+			srv := &ApiKeysServer{queries: mockQ}
 			tc.setup(mockQ)
 
 			_, err := srv.UpdateKey(callerCtx(), tc.req)
@@ -570,7 +570,7 @@ func TestUnit_DeleteKey_ErrorPaths(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
-			srv := NewApiKeysServer(nil, mockQ, nil, nil)
+			srv := &ApiKeysServer{queries: mockQ}
 			tc.setup(mockQ)
 
 			_, err := srv.DeleteKey(callerCtx(), tc.req)
@@ -640,7 +640,7 @@ func TestUnit_UndeleteKey_ErrorPaths(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
-			srv := NewApiKeysServer(nil, mockQ, nil, nil)
+			srv := &ApiKeysServer{queries: mockQ}
 			tc.setup(mockQ)
 
 			_, err := srv.UndeleteKey(callerCtx(), tc.req)
@@ -685,7 +685,7 @@ func TestUnit_LookupKey_ErrorPaths(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
-			srv := NewApiKeysServer(nil, mockQ, nil, nil)
+			srv := &ApiKeysServer{queries: mockQ}
 			tc.setup(mockQ)
 
 			_, err := srv.LookupKey(callerCtx(), tc.req)
@@ -727,7 +727,7 @@ func TestUnit_ListKeys_ErrorPaths(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
-			srv := NewApiKeysServer(nil, mockQ, nil, nil)
+			srv := &ApiKeysServer{queries: mockQ}
 			tc.setup(mockQ)
 
 			_, err := srv.ListKeys(callerCtx(), tc.req)
@@ -769,7 +769,7 @@ func TestUnit_GetKey_ErrorPaths(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
-			srv := NewApiKeysServer(nil, mockQ, nil, nil)
+			srv := &ApiKeysServer{queries: mockQ}
 			tc.setup(mockQ)
 
 			_, err := srv.GetKey(callerCtx(), tc.req)

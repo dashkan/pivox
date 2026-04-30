@@ -15,6 +15,7 @@ import (
 
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
+	"github.com/dashkan/pivox/internal/filter"
 	"github.com/dashkan/pivox/internal/permission"
 	aiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1"
 	"github.com/dashkan/pivox/internal/testutil/mocks"
@@ -61,7 +62,7 @@ func peerConversation(orgID uuid.UUID, name string) db.AiConversation {
 
 func TestGetConversation_PathRowMismatch(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	srv := NewServer(nil, q, nil, nil, nil, nil, nil, slog.Default())
+	srv := &Server{queries: q, logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	// Path claims peerUserID owns conv1 but the row says someone else.
@@ -88,7 +89,7 @@ func TestGetConversation_PathRowMismatch(t *testing.T) {
 
 func TestGetConversation_CallerNotPathUser_NotFound(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	srv := NewServer(nil, q, nil, nil, nil, nil, nil, slog.Default())
+	srv := &Server{queries: q, logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	row := peerConversation(org.ID, "conv1")
@@ -107,7 +108,7 @@ func TestGetConversation_CallerNotPathUser_NotFound(t *testing.T) {
 
 func TestGetMessage_CallerNotPathUser_NotFound(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	srv := NewServer(nil, q, nil, nil, nil, nil, nil, slog.Default())
+	srv := &Server{queries: q, logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	row := peerConversation(org.ID, "conv1")
@@ -126,7 +127,7 @@ func TestGetMessage_CallerNotPathUser_NotFound(t *testing.T) {
 
 func TestListMessages_CallerNotPathUser_NotFound(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	srv := NewServer(nil, q, nil, nil, nil, nil, nil, slog.Default())
+	srv := &Server{queries: q, logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	row := peerConversation(org.ID, "conv1")
@@ -145,7 +146,7 @@ func TestListMessages_CallerNotPathUser_NotFound(t *testing.T) {
 
 func TestGetArtifact_CallerNotPathUser_NotFound(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	srv := NewServer(nil, q, nil, nil, nil, nil, nil, slog.Default())
+	srv := &Server{queries: q, logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	row := peerConversation(org.ID, "conv1")
@@ -164,7 +165,7 @@ func TestGetArtifact_CallerNotPathUser_NotFound(t *testing.T) {
 
 func TestListArtifacts_CallerNotPathUser_NotFound(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	srv := NewServer(nil, q, nil, nil, nil, nil, nil, slog.Default())
+	srv := &Server{queries: q, logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	row := peerConversation(org.ID, "conv1")
@@ -183,7 +184,7 @@ func TestListArtifacts_CallerNotPathUser_NotFound(t *testing.T) {
 
 func TestGetArtifactVersion_CallerNotPathUser_NotFound(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	srv := NewServer(nil, q, nil, nil, nil, nil, nil, slog.Default())
+	srv := &Server{queries: q, logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	row := peerConversation(org.ID, "conv1")
@@ -202,7 +203,7 @@ func TestGetArtifactVersion_CallerNotPathUser_NotFound(t *testing.T) {
 
 func TestListConversations_CallerNotPathUser_NotFound(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	srv := NewServer(nil, q, nil, nil, nil, nil, nil, slog.Default())
+	srv := &Server{queries: q, logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	q.On("GetOrganizationByName", mock.Anything, "acme").Return(org, nil)
@@ -227,7 +228,7 @@ func TestListConversations_CallerNotPathUser_NotFound(t *testing.T) {
 func TestGetConversation_AuditBypass_AdminWithReadAll(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	resolver := permission.NewResolver(q)
-	srv := NewServer(nil, q, nil, nil, nil, resolver, nil, slog.Default())
+	srv := &Server{queries: q, logger: slog.Default(), resolver: resolver, conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	row := peerConversation(org.ID, "conv1")
@@ -251,7 +252,7 @@ func TestGetConversation_AuditBypass_AdminWithReadAll(t *testing.T) {
 func TestDeleteConversation_AuditBypass_OwnerWithDeleteAll(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	resolver := permission.NewResolver(q)
-	srv := NewServer(nil, q, nil, nil, nil, resolver, nil, slog.Default())
+	srv := &Server{queries: q, logger: slog.Default(), resolver: resolver, conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	row := peerConversation(org.ID, "conv1")
@@ -278,7 +279,7 @@ func TestDeleteConversation_AdminCannotDeletePeer(t *testing.T) {
 	// perm, deleting a peer's conversation must surface NotFound.
 	q := new(mocks.MockQuerier)
 	resolver := permission.NewResolver(q)
-	srv := NewServer(nil, q, nil, nil, nil, resolver, nil, slog.Default())
+	srv := &Server{queries: q, logger: slog.Default(), resolver: resolver, conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	row := peerConversation(org.ID, "conv1")
@@ -304,7 +305,7 @@ func TestDeleteConversation_AdminCannotDeletePeer(t *testing.T) {
 func TestUpdateConversation_OwnerCannotEditPeer(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	resolver := permission.NewResolver(q)
-	srv := NewServer(nil, q, nil, nil, nil, resolver, nil, slog.Default())
+	srv := &Server{queries: q, logger: slog.Default(), resolver: resolver, conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	row := peerConversation(org.ID, "conv1")

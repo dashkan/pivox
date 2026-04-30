@@ -25,10 +25,20 @@ type OperationsServer struct {
 	lro LROManager
 }
 
-// NewOperationsServer returns a new OperationsServer backed by the given LRO
-// manager.
-func NewOperationsServer(lro LROManager) *OperationsServer {
-	return &OperationsServer{lro: lro}
+// Config is the constructor input for OperationsServer.
+type Config struct {
+	// LRO is the long-running operation manager that backs all
+	// handlers on this server. Required.
+	LRO LROManager
+}
+
+// NewOperationsServer constructs the server from cfg. Panics on a
+// missing required field.
+func NewOperationsServer(cfg Config) *OperationsServer {
+	if cfg.LRO == nil {
+		panic("operations: Config.LRO is required")
+	}
+	return &OperationsServer{lro: cfg.LRO}
 }
 
 // GetOperation returns the latest state of a long-running operation.

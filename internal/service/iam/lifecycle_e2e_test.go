@@ -4,6 +4,7 @@ package iam_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,6 +16,8 @@ import (
 
 	"google.golang.org/grpc/status"
 
+	"github.com/dashkan/pivox/internal/appkey"
+	"github.com/dashkan/pivox/internal/convert"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	"github.com/dashkan/pivox/internal/server"
@@ -186,7 +189,7 @@ func TestE2E_DeleteUser_AdminRemovesUserFromOrg(t *testing.T) {
 	// Use ListOrganizationsForIdentity (which is membership
 	// = direct org_members row) to confirm Org A is gone, Org B
 	// remains.
-	orgs, err := h.Queries.ListOrganizationsForIdentity(ctx, target.IdentityID)
+	orgs, err := h.Queries.ListOrganizationsForIdentity(ctx, convert.PgUUID(target.IdentityID))
 	require.NoError(t, err)
 	gotOrgs := map[string]bool{}
 	for _, o := range orgs {
@@ -264,13 +267,24 @@ func TestE2E_DeleteUser_RejectsMeTarget(t *testing.T) {
 func newIamHarness(t *testing.T) *grpcharness.Harness {
 	return grpcharness.New(t, grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
 		callerIdentity := server.NewCallerIdentityResolver(h.Queries)
-		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(
-			h.Pool, h.Queries, h.Auth, nil, server.AuthenticatedUID,
-			nil, callerIdentity, h.LROManager, h.Encryptor,
-		))
-		iampb.RegisterIamServer(s, iam.NewIamServer(
-			h.Queries, h.Auth, callerIdentity, h.LROManager,
-		))
+		codec, err := appkey.NewFromHex(strings.Repeat("ab", 32))
+		require.NoError(t, err)
+		apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(organizations.Config{
+			Pool:       h.Pool,
+			Queries:    h.Queries,
+			Auth:       h.Auth,
+			Codec:      codec,
+			ReadUID:    server.AuthenticatedUID,
+			Caller:     callerIdentity,
+			LROManager: h.LROManager,
+			Encryptor:  h.Encryptor,
+		}))
+		iampb.RegisterIamServer(s, iam.NewIamServer(iam.Config{
+			Queries:    h.Queries,
+			Auth:       h.Auth,
+			Caller:     callerIdentity,
+			LROManager: h.LROManager,
+		}))
 	}))
 }
 

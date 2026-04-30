@@ -33,15 +33,39 @@ type ApiKeysServer struct {
 	audit   *audit.Resolver
 }
 
-// NewApiKeysServer constructs the server. `auditResolver` inflates
-// audit-field UUIDs into Actor protos; nil leaves Actor fields unset.
-func NewApiKeysServer(pool db.DBTX, queries db.Querier, codec *appkey.Codec, auditResolver *audit.Resolver) *ApiKeysServer {
+// Config is the constructor input for ApiKeysServer.
+type Config struct {
+	// Pool is the database pool used for reads. Required.
+	Pool db.DBTX
+	// Queries is the sqlc query interface. Required.
+	Queries db.Querier
+	// Codec opaque-encodes resource names. Required.
+	Codec *appkey.Codec
+	// AuditResolver inflates audit-field UUIDs into Actor protos.
+	// Optional; nil leaves Actor fields unset.
+	AuditResolver *audit.Resolver
+}
+
+// NewApiKeysServer constructs the server from cfg. Panics on a
+// missing required field — a startup-time programmer error rather
+// than a runtime failure, so unwound at the call site by reading the
+// panic message during boot.
+func NewApiKeysServer(cfg Config) *ApiKeysServer {
+	if cfg.Pool == nil {
+		panic("apikeys: Config.Pool is required")
+	}
+	if cfg.Queries == nil {
+		panic("apikeys: Config.Queries is required")
+	}
+	if cfg.Codec == nil {
+		panic("apikeys: Config.Codec is required")
+	}
 	return &ApiKeysServer{
-		db:      pool,
-		queries: queries,
+		db:      cfg.Pool,
+		queries: cfg.Queries,
 		filter:  filter.ApiKeyFilter(),
-		codec:   codec,
-		audit:   auditResolver,
+		codec:   cfg.Codec,
+		audit:   cfg.AuditResolver,
 	}
 }
 

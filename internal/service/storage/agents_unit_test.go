@@ -33,7 +33,7 @@ var (
 )
 
 func newAgentsServer(q *mocks.MockQuerier) *AgentsServer {
-	return NewAgentsServer(q)
+	return NewAgentsServer(AgentsConfig{Queries: q})
 }
 
 // ---------------------------------------------------------------------------

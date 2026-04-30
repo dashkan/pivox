@@ -23,15 +23,46 @@ type HTTPServer struct {
 	logger     *slog.Logger
 }
 
-// NewHTTPServer creates a new HTTPServer.
-func NewHTTPServer(sessions *SessionStore, endpoints *EndpointStore, denied *DeniedPatterns, signingKey []byte, corsOrigin string, logger *slog.Logger) *HTTPServer {
+// Config is the constructor input for HTTPServer.
+type Config struct {
+	// Sessions tracks active session tokens and authorizes paths.
+	// Required.
+	Sessions *SessionStore
+	// Endpoints serves files from configured storage endpoints.
+	// Required.
+	Endpoints *EndpointStore
+	// Denied is the set of soft-deleted patterns blocked from
+	// being served. Optional; nil disables the check.
+	Denied *DeniedPatterns
+	// SigningKey is the HMAC key used to validate session JWTs.
+	// Optional; can be set later via SetSigningKey.
+	SigningKey []byte
+	// CORSOrigin is the allowed CORS origin. Optional; can be
+	// set later via SetCORSOrigin.
+	CORSOrigin string
+	// Logger is the structured logger. Required.
+	Logger *slog.Logger
+}
+
+// NewHTTPServer constructs the server from cfg. Panics on a missing
+// required field.
+func NewHTTPServer(cfg Config) *HTTPServer {
+	if cfg.Sessions == nil {
+		panic("storageagent: Config.Sessions is required")
+	}
+	if cfg.Endpoints == nil {
+		panic("storageagent: Config.Endpoints is required")
+	}
+	if cfg.Logger == nil {
+		panic("storageagent: Config.Logger is required")
+	}
 	return &HTTPServer{
-		sessions:   sessions,
-		endpoints:  endpoints,
-		denied:     denied,
-		signingKey: signingKey,
-		corsOrigin: corsOrigin,
-		logger:     logger,
+		sessions:   cfg.Sessions,
+		endpoints:  cfg.Endpoints,
+		denied:     cfg.Denied,
+		signingKey: cfg.SigningKey,
+		corsOrigin: cfg.CORSOrigin,
+		logger:     cfg.Logger,
 	}
 }
 

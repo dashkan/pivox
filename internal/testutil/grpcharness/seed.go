@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/permission"
 )
@@ -38,13 +39,16 @@ func (h *Harness) SeedMembership(t *testing.T, orgID uuid.UUID, identity *Caller
 	})
 	require.NoError(t, err, "system role %q not found in org %s — was the org created via CreateOrganization?", role, orgID)
 
-	_, err = h.Queries.CreateOrgMember(ctx, db.CreateOrgMemberParams{
-		ID:            uuid.New(),
-		OrgID:         orgID,
-		RoleID:        roleRow.ID,
-		PrincipalKind: db.PrincipalKindUser,
-		PrincipalID:   identity.IdentityID,
-		CreatedBy:     identity.IdentityID.String(),
+	// Post-principal-id-split: members carry typed user_id /
+	// group_id columns instead of (principal_kind, principal_id).
+	// This helper only seeds user bindings; group memberships go via
+	// a separate path.
+	_, err = h.Queries.CreateOrgUserMember(ctx, db.CreateOrgUserMemberParams{
+		ID:        uuid.New(),
+		OrgID:     orgID,
+		RoleID:    roleRow.ID,
+		UserID:    convert.PgUUID(identity.IdentityID),
+		CreatedBy: convert.PgUUID(identity.IdentityID),
 	})
 	require.NoError(t, err)
 

@@ -30,13 +30,28 @@ type EndpointsServer struct {
 	audit     *audit.Resolver
 }
 
-// NewEndpointsServer constructs the server. `auditResolver` inflates
-// audit-field UUIDs into Actor protos; nil leaves Actor fields unset.
-func NewEndpointsServer(queries db.Querier, enc crypto.Encryptor, auditResolver *audit.Resolver) *EndpointsServer {
+// EndpointsConfig is the constructor input for EndpointsServer.
+type EndpointsConfig struct {
+	// Queries is the sqlc query interface. Required.
+	Queries db.Querier
+	// Encryptor wraps Cloud KMS for column-level encryption.
+	// Optional.
+	Encryptor crypto.Encryptor
+	// AuditResolver inflates audit-field UUIDs into Actor protos.
+	// Optional; nil leaves Actor fields unset.
+	AuditResolver *audit.Resolver
+}
+
+// NewEndpointsServer constructs the server from cfg. Panics on a
+// missing required field.
+func NewEndpointsServer(cfg EndpointsConfig) *EndpointsServer {
+	if cfg.Queries == nil {
+		panic("storage: EndpointsConfig.Queries is required")
+	}
 	return &EndpointsServer{
-		queries:   queries,
-		encryptor: enc,
-		audit:     auditResolver,
+		queries:   cfg.Queries,
+		encryptor: cfg.Encryptor,
+		audit:     cfg.AuditResolver,
 	}
 }
 

@@ -89,7 +89,7 @@ func newTestServer() *OperationsServer {
 	mockQ := new(mocks.MockQuerier)
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 	manager := lro.NewManager(mockQ, logger)
-	return NewOperationsServer(manager)
+	return NewOperationsServer(Config{LRO: manager})
 }
 
 func TestUnit_GetOperation_EmptyName(t *testing.T) {
@@ -106,7 +106,7 @@ func TestUnit_GetOperation_EmptyName(t *testing.T) {
 
 func TestUnit_GetOperation_Success(t *testing.T) {
 	mgr := new(mockLROManager)
-	srv := NewOperationsServer(mgr)
+	srv := NewOperationsServer(Config{LRO: mgr})
 	ctx := context.Background()
 
 	op := &longrunningpb.Operation{Name: "operations/test/123", Done: true}
@@ -124,7 +124,7 @@ func TestUnit_GetOperation_Success(t *testing.T) {
 
 func TestUnit_ListOperations_WithResults(t *testing.T) {
 	mgr := new(mockLROManager)
-	srv := NewOperationsServer(mgr)
+	srv := NewOperationsServer(Config{LRO: mgr})
 	ctx := context.Background()
 
 	ops := []*longrunningpb.Operation{
@@ -145,7 +145,7 @@ func TestUnit_ListOperations_WithResults(t *testing.T) {
 
 func TestUnit_WaitOperation_Success(t *testing.T) {
 	mgr := new(mockLROManager)
-	srv := NewOperationsServer(mgr)
+	srv := NewOperationsServer(Config{LRO: mgr})
 	ctx := context.Background()
 
 	op := &longrunningpb.Operation{Name: "operations/test/456", Done: true}
@@ -162,7 +162,7 @@ func TestUnit_WaitOperation_Success(t *testing.T) {
 
 func TestUnit_WaitOperation_WithTimeout(t *testing.T) {
 	mgr := new(mockLROManager)
-	srv := NewOperationsServer(mgr)
+	srv := NewOperationsServer(Config{LRO: mgr})
 	ctx := context.Background()
 
 	// When timeout is set, the server creates a derived context with deadline.
@@ -182,7 +182,7 @@ func TestUnit_WaitOperation_WithTimeout(t *testing.T) {
 
 func TestUnit_DeleteOperation_Success(t *testing.T) {
 	mgr := new(mockLROManager)
-	srv := NewOperationsServer(mgr)
+	srv := NewOperationsServer(Config{LRO: mgr})
 	ctx := context.Background()
 
 	mgr.On("DeleteOperation", mock.Anything, "operations/test/del").Return(nil)
@@ -198,7 +198,7 @@ func TestUnit_DeleteOperation_Success(t *testing.T) {
 
 func TestUnit_CancelOperation_Success(t *testing.T) {
 	mgr := new(mockLROManager)
-	srv := NewOperationsServer(mgr)
+	srv := NewOperationsServer(Config{LRO: mgr})
 	ctx := context.Background()
 
 	mgr.On("CancelOperation", mock.Anything, "operations/test/cancel").Return(nil)
@@ -245,7 +245,7 @@ func TestUnit_ListOperations_DefaultPageSize(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 	manager := lro.NewManager(mockQ, logger)
-	srv := NewOperationsServer(manager)
+	srv := NewOperationsServer(Config{LRO: manager})
 	ctx := context.Background()
 
 	// The Manager's ListOperations will call queries.ListOperations.

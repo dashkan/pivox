@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -54,7 +55,7 @@ func TestIntegration_Requests_ApproveWorkflow(t *testing.T) {
 	defer cleanup()
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(queries, nil))
+		assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(requests.Config{Queries: queries}))
 	})
 
 	client := assetsv1.NewRequestsClient(conn)
@@ -144,7 +145,7 @@ func TestIntegration_Requests_ListRequests(t *testing.T) {
 	defer cleanup()
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(queries, nil))
+		assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(requests.Config{Queries: queries}))
 	})
 
 	client := assetsv1.NewRequestsClient(conn)
@@ -217,7 +218,7 @@ func TestIntegration_Requests_RejectWorkflow(t *testing.T) {
 	defer cleanup()
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(queries, nil))
+		assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(requests.Config{Queries: queries}))
 	})
 
 	client := assetsv1.NewRequestsClient(conn)
@@ -262,7 +263,7 @@ func TestIntegration_Requests_CancelWorkflow(t *testing.T) {
 	defer cleanup()
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(queries, nil))
+		assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(requests.Config{Queries: queries}))
 	})
 
 	client := assetsv1.NewRequestsClient(conn)

@@ -113,27 +113,65 @@ func (s *Server) getArtifactVersionForContent(ctx context.Context, params db.Get
 	return s.queries.GetArtifactVersionForContent(ctx, params)
 }
 
-// NewServer creates a new AiChat service server. `resolver` is
-// consumed by the per-resource ownership checks to ask "does the
+// Config is the constructor input for the AiChat Server. `Resolver`
+// is consumed by the per-resource ownership checks to ask "does the
 // caller carry the `*All` audit permission?" — a regular member
 // can only act on their own conversations; an admin/owner can
-// audit/clean up any user's. Tests that don't exercise the
-// ownership audit-bypass path may pass nil. `auditResolver`
-// inflates audit-field UUIDs into Actor protos; nil leaves Actor
-// fields unset (acceptable in tests).
-func NewServer(pool db.DBTX, queries db.Querier, llm model.LanguageModel, toolRegistry *tools.Registry, codec *appkey.Codec, resolver *permission.Resolver, auditResolver *audit.Resolver, logger *slog.Logger) *Server {
+// audit/clean up any user's.
+type Config struct {
+	// Pool is the database pool used for reads. Required.
+	Pool db.DBTX
+	// Queries is the sqlc query interface. Required.
+	Queries db.Querier
+	// Model is the LLM backing the chat handlers. Required.
+	Model model.LanguageModel
+	// Tools is the optional tool registry. Nil falls back to an
+	// empty default registry.
+	Tools *tools.Registry
+	// Codec opaque-encodes resource names. Required.
+	Codec *appkey.Codec
+	// Resolver gates the `*All` audit-bypass permission. Optional;
+	// tests that don't exercise the bypass path may pass nil.
+	Resolver *permission.Resolver
+	// AuditResolver inflates audit-field UUIDs into Actor protos.
+	// Optional; nil leaves Actor fields unset.
+	AuditResolver *audit.Resolver
+	// Logger is the structured logger. Required.
+	Logger *slog.Logger
+}
+
+// NewServer constructs the AiChat server from cfg. Panics on a
+// missing required field — a startup-time programmer error rather
+// than a runtime failure.
+func NewServer(cfg Config) *Server {
+	if cfg.Pool == nil {
+		panic("aichat: Config.Pool is required")
+	}
+	if cfg.Queries == nil {
+		panic("aichat: Config.Queries is required")
+	}
+	if cfg.Model == nil {
+		panic("aichat: Config.Model is required")
+	}
+	if cfg.Codec == nil {
+		panic("aichat: Config.Codec is required")
+	}
+	if cfg.Logger == nil {
+		panic("aichat: Config.Logger is required")
+	}
+	toolRegistry := cfg.Tools
 	if toolRegistry == nil {
 		toolRegistry = tools.NewRegistry()
 	}
 	return &Server{
-		db:                    pool,
-		queries:               queries,
-		model:                 llm,
+		db:                    cfg.Pool,
+		queries:               cfg.Queries,
+		model:                 cfg.Model,
 		tools:                 toolRegistry,
-		logger:                logger,
-		codec:                 codec,
-		resolver:              resolver,
-		audit:                 auditResolver,
+		logger:                cfg.Logger,
+		codec:                 cfg.Codec,
+		resolver:              cfg.Resolver,
+		audit:                 cfg.AuditResolver,
 		conversationFilter:    filter.ConversationFilter(),
 		messageFilter:         filter.MessageFilter(),
 		artifactFilter:        filter.ArtifactFilter(),

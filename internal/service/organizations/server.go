@@ -63,20 +63,77 @@ type OrganizationsServer struct {
 	encryptor crypto.Encryptor
 }
 
-func NewOrganizationsServer(pool *pgxpool.Pool, queries db.Querier, auth authn.Service, codec *appkey.Codec, readUID AuthContextReader, resolver *permission.Resolver, caller server.CallerIdentityResolver, auditResolver *audit.Resolver, lroManager *lro.Manager, encryptor crypto.Encryptor) *OrganizationsServer {
+// Config is the constructor input for OrganizationsServer.
+type Config struct {
+	// Pool is the database pool, used both as a db.DBTX for filter
+	// reads and as a tx beginner for write paths. Required.
+	Pool *pgxpool.Pool
+	// Queries is the sqlc query interface. Required.
+	Queries db.Querier
+	// Auth is the authn service used by the registration / SSO
+	// paths. Required.
+	Auth authn.Service
+	// Codec opaque-encodes resource names. Required.
+	Codec *appkey.Codec
+	// ReadUID extracts the caller's Firebase UID from context.
+	// Required.
+	ReadUID AuthContextReader
+	// Resolver gates per-resource permission checks. Optional;
+	// nil is acceptable in unit tests that don't exercise the
+	// permission paths.
+	Resolver *permission.Resolver
+	// Caller resolves the caller identity for handlers that need
+	// the pivox identity_id. Required in production; unit tests
+	// stub via struct literal.
+	Caller server.CallerIdentityResolver
+	// AuditResolver inflates audit-field UUIDs into Actor protos.
+	// Optional; nil leaves Actor fields unset.
+	AuditResolver *audit.Resolver
+	// LROManager drives the asynchronous orchestrators for
+	// DeleteOrganization / UndeleteOrganization. Optional in
+	// tests that don't exercise lifecycle paths.
+	LROManager *lro.Manager
+	// Encryptor wraps Cloud KMS for column-level encryption of
+	// SsoConfig.client_secret. Optional in tests that don't
+	// exercise the SSO path.
+	Encryptor crypto.Encryptor
+}
+
+// NewOrganizationsServer constructs the server from cfg. Panics on a
+// missing required field — a startup-time programmer error rather
+// than a runtime failure.
+func NewOrganizationsServer(cfg Config) *OrganizationsServer {
+	if cfg.Pool == nil {
+		panic("organizations: Config.Pool is required")
+	}
+	if cfg.Queries == nil {
+		panic("organizations: Config.Queries is required")
+	}
+	if cfg.Auth == nil {
+		panic("organizations: Config.Auth is required")
+	}
+	if cfg.Codec == nil {
+		panic("organizations: Config.Codec is required")
+	}
+	if cfg.ReadUID == nil {
+		panic("organizations: Config.ReadUID is required")
+	}
+	if cfg.Caller == nil {
+		panic("organizations: Config.Caller is required")
+	}
 	return &OrganizationsServer{
-		db:         pool,
-		pool:       pool,
-		queries:    queries,
-		auth:       auth,
+		db:         cfg.Pool,
+		pool:       cfg.Pool,
+		queries:    cfg.Queries,
+		auth:       cfg.Auth,
 		filter:     filter.OrganizationFilter(),
-		codec:      codec,
-		readUID:    readUID,
-		resolver:   resolver,
-		caller:     caller,
-		audit:      auditResolver,
-		lroManager: lroManager,
-		encryptor:  encryptor,
+		codec:      cfg.Codec,
+		readUID:    cfg.ReadUID,
+		resolver:   cfg.Resolver,
+		caller:     cfg.Caller,
+		audit:      cfg.AuditResolver,
+		lroManager: cfg.LROManager,
+		encryptor:  cfg.Encryptor,
 	}
 }
 
