@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/dashkan/pivox/internal/apierr"
+	"github.com/dashkan/pivox/internal/audit"
 	"github.com/dashkan/pivox/internal/authn"
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
@@ -35,6 +36,10 @@ type IamServer struct {
 	auth       authn.Service
 	caller     server.CallerIdentityResolver
 	lroManager *lro.Manager
+	// audit is non-nil when the resolver wants invalidation
+	// callbacks on identity mutations (DeleteAccount soft-delete).
+	// Optional — read-only deployments may skip it.
+	audit *audit.Resolver
 }
 
 // Config is the constructor input for IamServer. The auth/caller/
@@ -51,6 +56,12 @@ type Config struct {
 	Caller server.CallerIdentityResolver
 	// LROManager drives DeleteUser. Required.
 	LROManager *lro.Manager
+	// AuditResolver receives Invalidate() calls when identities
+	// mutate (DeleteAccount blanks PII + flips is_deleted). Optional;
+	// nil disables cache-invalidation, which is fine for read-only
+	// deployments and any test that doesn't assert on cache
+	// coherence.
+	AuditResolver *audit.Resolver
 }
 
 // NewIamServer constructs the server from cfg. Panics on a missing
@@ -73,6 +84,7 @@ func NewIamServer(cfg Config) *IamServer {
 		auth:       cfg.Auth,
 		caller:     cfg.Caller,
 		lroManager: cfg.LROManager,
+		audit:      cfg.AuditResolver,
 	}
 }
 

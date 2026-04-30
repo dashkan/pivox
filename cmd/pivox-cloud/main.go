@@ -265,7 +265,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	// permission-checked, well-formed requests.
 	permResolver := permission.NewResolver(queries)
 	callerIdentity := server.NewCallerIdentityResolver(queries)
-	auditResolver := audit.NewResolver(queries)
+	auditResolver := audit.NewResolver(audit.Config{Queries: queries})
 	permissionInterceptor := server.PermissionInterceptor(
 		server.GeneratedRegistry, server.GeneratedExempt,
 		queries, permResolver, callerIdentity,
@@ -344,7 +344,8 @@ func serve(cmd *cobra.Command, args []string) error {
 	// ops (Member CRUD, TransferOwnership, TestIamPermissions) live
 	// on the scope-owning Organizations / Spaces services above.
 	iamv1.RegisterIamServer(grpcServer, iam.NewIamServer(iam.Config{
-		Queries: queries, Auth: authSvc, Caller: callerIdentity, LROManager: lroManager,
+		Queries: queries, Auth: authSvc, Caller: callerIdentity,
+		LROManager: lroManager, AuditResolver: auditResolver,
 	}))
 
 	// Storage services
@@ -491,7 +492,16 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	// HTTP mux: internal hooks + gRPC gateway (fallback)
 	httpMux := http.NewServeMux()
-	hooks, err := server.NewInternalHooks(queries, cfg.SyncAuth, cfg.DelegatedAuth, cfg.RateLimitEnabled, cfg.TrustedProxies, logger, authSvc)
+	hooks, err := server.NewInternalHooks(server.InternalHooksConfig{
+		Queries:          queries,
+		SyncAuth:         cfg.SyncAuth,
+		DelegatedAuth:    cfg.DelegatedAuth,
+		RateLimitEnabled: cfg.RateLimitEnabled,
+		TrustedProxies:   cfg.TrustedProxies,
+		Logger:           logger,
+		Auth:             authSvc,
+		AuditResolver:    auditResolver,
+	})
 	if err != nil {
 		return fmt.Errorf("initialize internal hooks: %w", err)
 	}

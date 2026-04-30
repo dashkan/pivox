@@ -19,10 +19,44 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"golang.org/x/time/rate"
 
+	"github.com/dashkan/pivox/internal/audit"
 	"github.com/dashkan/pivox/internal/authn"
 	"github.com/dashkan/pivox/internal/config"
 	db "github.com/dashkan/pivox/internal/db/generated"
 )
+
+// InternalHooksConfig is the constructor input for NewInternalHooks.
+// Both the prod (`!dev`) and dev variants of NewInternalHooks take
+// the same Config — the only difference between them is which auth
+// strategy gets bound to the syncIdentity endpoint (OIDC vs.
+// shared-secret).
+type InternalHooksConfig struct {
+	// Queries is the sqlc query interface. Required.
+	Queries db.Querier
+	// SyncAuth carries OIDC validation settings (prod) or the shared
+	// secret (dev). The active fields differ per build tag, but the
+	// struct itself is shared.
+	SyncAuth config.SyncAuthConfig
+	// DelegatedAuth governs the delegated-auth endpoints.
+	DelegatedAuth config.DelegatedAuthConfig
+	// RateLimitEnabled gates every per-IP rate limiter. False is
+	// fine for deployments where a reverse proxy owns rate limiting.
+	RateLimitEnabled bool
+	// TrustedProxies is the list of CIDR blocks whose connections
+	// may set X-Forwarded-For. Empty ⇒ never trust the header
+	// (fail-closed). See clientIP.
+	TrustedProxies []string
+	// Logger is the slog.Logger used for warning/error events.
+	// Required.
+	Logger *slog.Logger
+	// Auth is the authn service. Required.
+	Auth authn.Service
+	// AuditResolver receives Invalidate() calls when the
+	// syncIdentity webhook upserts an existing identity row.
+	// Optional; nil disables cache-invalidation (audit cache will
+	// catch up via TTL expiry).
+	AuditResolver *audit.Resolver
+}
 
 // InternalHooks handles internal webhook endpoints that are not part of the
 // public gRPC/REST API. These are called by Firebase Functions and other
@@ -32,6 +66,11 @@ type InternalHooks struct {
 	logger        *slog.Logger
 	auth          authn.Service
 	delegatedAuth config.DelegatedAuthConfig
+	// audit receives Invalidate() calls when syncIdentity upserts
+	// an existing identity row (display_name / photo_url / email
+	// changes from Firebase). Optional — if nil, the audit cache
+	// catches up via TTL.
+	audit *audit.Resolver
 
 	// rateLimitEnabled gates every rateLimitWith middleware. When false the
 	// limiter instances are still kept (so toggling back on does not require
@@ -130,6 +169,15 @@ func (h *InternalHooks) syncIdentity(w http.ResponseWriter, r *http.Request) {
 		h.logger.Error("failed to upsert identity", "firebase_uid", req.FirebaseUID, "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
+	}
+
+	// Drop any cached Actor — the upsert may have changed
+	// display_name / photo_url / email (Firebase profile-edit path)
+	// or email_verified. New identity rows aren't cached yet so the
+	// call is a no-op for the create path; the cost is one map
+	// delete per webhook call.
+	if h.audit != nil {
+		h.audit.Invalidate(identity.ID)
 	}
 
 	h.logger.Info("identity synced", "firebase_uid", req.FirebaseUID, "identity_id", identity.ID)

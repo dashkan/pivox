@@ -284,6 +284,12 @@ func (s *IamServer) runDeleteAccount(
 			"id", firebaseIdentityID, "error", err)
 		return nil, apierr.Internal("soft-delete identity")
 	}
+	// PII just got blanked; drop any cached Actor for this id so the
+	// next read on this instance sees the soft-deleted state
+	// immediately. Other instances catch up via TTL expiry.
+	if s.audit != nil {
+		s.audit.Invalidate(firebaseIdentityID)
+	}
 
 	// DELETING_FIREBASE_IDENTITY: last so a failure leaves Pivox
 	// state already cleaned up while the Firebase identity remains

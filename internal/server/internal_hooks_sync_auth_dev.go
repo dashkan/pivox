@@ -8,35 +8,33 @@ import (
 	"time"
 
 	"golang.org/x/time/rate"
-
-	"github.com/dashkan/pivox/internal/authn"
-	"github.com/dashkan/pivox/internal/config"
-	db "github.com/dashkan/pivox/internal/db/generated"
 )
 
 // NewInternalHooks creates a new internal hooks handler with shared secret
 // authentication for the auth:syncIdentity endpoint. This is the
 // dev-mode fallback for when the Firebase Functions emulator cannot mint
-// OIDC tokens.
-func NewInternalHooks(
-	queries db.Querier,
-	cfg config.SyncAuthConfig,
-	dcfg config.DelegatedAuthConfig,
-	rateLimitEnabled bool,
-	trustedProxies []string,
-	logger *slog.Logger,
-	auth authn.Service,
-) (*InternalHooks, error) {
-	prefixes, err := parseTrustedProxies(trustedProxies)
+// OIDC tokens. See InternalHooksConfig in internal_hooks.go.
+func NewInternalHooks(cfg InternalHooksConfig) (*InternalHooks, error) {
+	if cfg.Queries == nil {
+		panic("server: InternalHooksConfig.Queries is required")
+	}
+	if cfg.Logger == nil {
+		panic("server: InternalHooksConfig.Logger is required")
+	}
+	if cfg.Auth == nil {
+		panic("server: InternalHooksConfig.Auth is required")
+	}
+	prefixes, err := parseTrustedProxies(cfg.TrustedProxies)
 	if err != nil {
 		return nil, err
 	}
 	h := &InternalHooks{
-		queries:          queries,
-		logger:           logger,
-		auth:             auth,
-		delegatedAuth:    dcfg,
-		rateLimitEnabled: rateLimitEnabled,
+		queries:          cfg.Queries,
+		logger:           cfg.Logger,
+		auth:             cfg.Auth,
+		delegatedAuth:    cfg.DelegatedAuth,
+		audit:            cfg.AuditResolver,
+		rateLimitEnabled: cfg.RateLimitEnabled,
 		trustedProxies:   prefixes,
 		exchangeLimiter:  newIPRateLimiter(rate.Every(6*time.Second), 10),
 		// See internal_hooks_sync_auth.go for the rationale behind each limiter.
@@ -45,7 +43,7 @@ func NewInternalHooks(
 		delegatedPollLimiter:     newIPRateLimiter(rate.Every(3*time.Second), 5),
 		resolveProviderLimiter:   newIPRateLimiter(rate.Every(2*time.Second), 10),
 	}
-	h.syncAuth = requireSecret(cfg.SharedSecret)
+	h.syncAuth = requireSecret(cfg.SyncAuth.SharedSecret)
 	return h, nil
 }
 
