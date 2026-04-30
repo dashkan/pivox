@@ -5,7 +5,6 @@ import (
 
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/emptypb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/convert"
@@ -87,23 +86,20 @@ func (s *Server) ListArtifactVersions(ctx context.Context, req *aiv1.ListArtifac
 		results = results[:pageSize]
 	}
 
+	actors, err := s.resolveArtifactVersionActors(ctx, results)
+	if err != nil {
+		return nil, err
+	}
+	artFullName := buildArtifactName(orgName, pathUser, convName, artName)
 	versions := make([]*aiv1.ArtifactVersion, 0, len(results))
 	for _, r := range results {
-		pb := &aiv1.ArtifactVersion{
-			Name:       buildArtifactVersionName(orgName, pathUser, convName, artName, r.Name),
-			CreateTime: timestamppb.New(r.CreateTime),
-		}
-		if r.InlineContentType.Valid {
-			pb.Content = &aiv1.ArtifactVersion_Inline{
-				Inline: &aiv1.InlineContent{
-					MimeType:  r.InlineContentType.String,
-					SizeBytes: r.InlineSizeBytes.Int64,
-				},
-			}
-		} else if r.AssetVersionName.Valid {
-			pb.Content = &aiv1.ArtifactVersion_AssetVersion{
-				AssetVersion: r.AssetVersionName.String,
-			}
+		pb := convert.ArtifactVersionToProtoAi(r, artFullName, actors)
+		// List responses strip inline `data` to keep payloads small;
+		// callers fetch full bytes via :content. Drop the `Data`
+		// field while preserving mime + size so the client still
+		// knows what's in the version.
+		if inline := pb.GetInline(); inline != nil {
+			inline.Data = nil
 		}
 		versions = append(versions, pb)
 	}

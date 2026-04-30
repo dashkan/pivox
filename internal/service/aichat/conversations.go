@@ -30,7 +30,10 @@ func (s *Server) GetConversation(ctx context.Context, req *aiv1.GetConversationR
 	if err != nil {
 		return nil, err
 	}
-	actors, _ := s.resolveConversationActors(ctx, []db.AiConversation{row})
+	actors, err := s.resolveConversationActors(ctx, []db.AiConversation{row})
+	if err != nil {
+		return nil, err
+	}
 	return convert.ConversationToProto(row, orgName, actors), nil
 }
 
@@ -134,7 +137,14 @@ func (s *Server) CreateConversation(ctx context.Context, req *aiv1.CreateConvers
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Conversation", "")
 	}
-	actors, _ := s.resolveConversationActors(ctx, []db.AiConversation{row})
+	// Best-effort enrichment after commit: don't fail the create on
+	// a transient identity lookup error.
+	actors, resolveErr := s.resolveConversationActors(ctx, []db.AiConversation{row})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "create conversation: actor resolution failed; returning proto without audit actors",
+			"conversation_id", row.ID, "error", resolveErr)
+		actors = nil
+	}
 	return convert.ConversationToProto(row, orgName, actors), nil
 }
 
@@ -184,7 +194,12 @@ func (s *Server) UpdateConversation(ctx context.Context, req *aiv1.UpdateConvers
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Conversation", conv.GetName())
 	}
-	actors, _ := s.resolveConversationActors(ctx, []db.AiConversation{row})
+	actors, resolveErr := s.resolveConversationActors(ctx, []db.AiConversation{row})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "update conversation: actor resolution failed; returning proto without audit actors",
+			"conversation_id", row.ID, "error", resolveErr)
+		actors = nil
+	}
 	return convert.ConversationToProto(row, orgName, actors), nil
 }
 
@@ -203,7 +218,10 @@ func (s *Server) SummarizeConversation(ctx context.Context, req *aiv1.SummarizeC
 
 	// Hard short-circuit: never overwrite a user-set title.
 	if row.TitleUserSet {
-		actors, _ := s.resolveConversationActors(ctx, []db.AiConversation{row})
+		actors, err := s.resolveConversationActors(ctx, []db.AiConversation{row})
+		if err != nil {
+			return nil, err
+		}
 		return convert.ConversationToProto(row, orgName, actors), nil
 	}
 
@@ -214,7 +232,10 @@ func (s *Server) SummarizeConversation(ctx context.Context, req *aiv1.SummarizeC
 	}
 	transcript := renderTranscriptForSummary(history)
 	if transcript == "" {
-		actors, _ := s.resolveConversationActors(ctx, []db.AiConversation{row})
+		actors, err := s.resolveConversationActors(ctx, []db.AiConversation{row})
+		if err != nil {
+			return nil, err
+		}
 		return convert.ConversationToProto(row, orgName, actors), nil
 	}
 
@@ -240,7 +261,10 @@ func (s *Server) SummarizeConversation(ctx context.Context, req *aiv1.SummarizeC
 	}
 	title := sanitizeTitle(extractTextFromMessage(msg))
 	if title == "" {
-		actors, _ := s.resolveConversationActors(ctx, []db.AiConversation{row})
+		actors, err := s.resolveConversationActors(ctx, []db.AiConversation{row})
+		if err != nil {
+			return nil, err
+		}
 		return convert.ConversationToProto(row, orgName, actors), nil
 	}
 
@@ -251,7 +275,13 @@ func (s *Server) SummarizeConversation(ctx context.Context, req *aiv1.SummarizeC
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Conversation", req.GetName())
 	}
-	actors, _ := s.resolveConversationActors(ctx, []db.AiConversation{updated})
+	// Best-effort enrichment after commit.
+	actors, resolveErr := s.resolveConversationActors(ctx, []db.AiConversation{updated})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "summarize conversation: actor resolution failed; returning proto without audit actors",
+			"conversation_id", updated.ID, "error", resolveErr)
+		actors = nil
+	}
 	return convert.ConversationToProto(updated, orgName, actors), nil
 }
 
