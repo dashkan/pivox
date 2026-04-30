@@ -6,6 +6,7 @@ import (
 
 	db "github.com/dashkan/pivox/internal/db/generated"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
+	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 )
 
 // OrganizationToProto converts a DB row to its proto representation.
@@ -14,7 +15,7 @@ import (
 // actors are needed (e.g. a partial response that intentionally omits
 // audit fields). Unknown IDs in the map yield no Actor on the proto
 // — the resolver guarantees a placeholder for every requested id.
-func OrganizationToProto(o db.Organization, actors map[uuid.UUID]*apiv1.Actor) *apiv1.Organization {
+func OrganizationToProto(o db.Organization, actors map[uuid.UUID]*typespb.Actor) *apiv1.Organization {
 	pb := &apiv1.Organization{
 		Name:        "organizations/" + o.Name,
 		DisplayName: o.DisplayName,

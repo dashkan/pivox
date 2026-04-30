@@ -30,7 +30,8 @@ func (s *Server) GetConversation(ctx context.Context, req *aiv1.GetConversationR
 	if err != nil {
 		return nil, err
 	}
-	return convert.ConversationToProto(row, orgName), nil
+	actors, _ := s.resolveConversationActors(ctx, []db.AiConversation{row})
+	return convert.ConversationToProto(row, orgName, actors), nil
 }
 
 func (s *Server) ListConversations(ctx context.Context, req *aiv1.ListConversationsRequest) (*aiv1.ListConversationsResponse, error) {
@@ -87,9 +88,13 @@ func (s *Server) ListConversations(ctx context.Context, req *aiv1.ListConversati
 		results = results[:pageSize]
 	}
 
+	actors, err := s.resolveConversationActors(ctx, results)
+	if err != nil {
+		return nil, err
+	}
 	convs := make([]*aiv1.Conversation, 0, len(results))
 	for _, r := range results {
-		convs = append(convs, convert.ConversationToProto(r, orgName))
+		convs = append(convs, convert.ConversationToProto(r, orgName, actors))
 	}
 
 	return &aiv1.ListConversationsResponse{
@@ -129,7 +134,8 @@ func (s *Server) CreateConversation(ctx context.Context, req *aiv1.CreateConvers
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Conversation", "")
 	}
-	return convert.ConversationToProto(row, orgName), nil
+	actors, _ := s.resolveConversationActors(ctx, []db.AiConversation{row})
+	return convert.ConversationToProto(row, orgName, actors), nil
 }
 
 func (s *Server) UpdateConversation(ctx context.Context, req *aiv1.UpdateConversationRequest) (*aiv1.Conversation, error) {
@@ -178,7 +184,8 @@ func (s *Server) UpdateConversation(ctx context.Context, req *aiv1.UpdateConvers
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Conversation", conv.GetName())
 	}
-	return convert.ConversationToProto(row, orgName), nil
+	actors, _ := s.resolveConversationActors(ctx, []db.AiConversation{row})
+	return convert.ConversationToProto(row, orgName, actors), nil
 }
 
 // SummarizeConversation generates a short title for the conversation
@@ -196,7 +203,8 @@ func (s *Server) SummarizeConversation(ctx context.Context, req *aiv1.SummarizeC
 
 	// Hard short-circuit: never overwrite a user-set title.
 	if row.TitleUserSet {
-		return convert.ConversationToProto(row, orgName), nil
+		actors, _ := s.resolveConversationActors(ctx, []db.AiConversation{row})
+		return convert.ConversationToProto(row, orgName, actors), nil
 	}
 
 	history, err := s.loadModelHistory(ctx, row.ID)
@@ -206,7 +214,8 @@ func (s *Server) SummarizeConversation(ctx context.Context, req *aiv1.SummarizeC
 	}
 	transcript := renderTranscriptForSummary(history)
 	if transcript == "" {
-		return convert.ConversationToProto(row, orgName), nil
+		actors, _ := s.resolveConversationActors(ctx, []db.AiConversation{row})
+		return convert.ConversationToProto(row, orgName, actors), nil
 	}
 
 	genReq := &aiv1.GenerateContentRequest{
@@ -231,7 +240,8 @@ func (s *Server) SummarizeConversation(ctx context.Context, req *aiv1.SummarizeC
 	}
 	title := sanitizeTitle(extractTextFromMessage(msg))
 	if title == "" {
-		return convert.ConversationToProto(row, orgName), nil
+		actors, _ := s.resolveConversationActors(ctx, []db.AiConversation{row})
+		return convert.ConversationToProto(row, orgName, actors), nil
 	}
 
 	updated, err := s.queries.SetAutoTitle(ctx, db.SetAutoTitleParams{
@@ -241,7 +251,8 @@ func (s *Server) SummarizeConversation(ctx context.Context, req *aiv1.SummarizeC
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Conversation", req.GetName())
 	}
-	return convert.ConversationToProto(updated, orgName), nil
+	actors, _ := s.resolveConversationActors(ctx, []db.AiConversation{updated})
+	return convert.ConversationToProto(updated, orgName, actors), nil
 }
 
 const summarySystemPrompt = "You generate concise conversation titles. " +

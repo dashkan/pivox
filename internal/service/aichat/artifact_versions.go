@@ -35,7 +35,11 @@ func (s *Server) GetArtifactVersion(ctx context.Context, req *aiv1.GetArtifactVe
 	}
 
 	artFullName := buildArtifactName(orgName, pathUser, convName, artName)
-	return convert.ArtifactVersionToProtoAi(row, artFullName), nil
+	actors, err := s.resolveArtifactVersionActors(ctx, []db.AiArtifactVersion{row})
+	if err != nil {
+		return nil, err
+	}
+	return convert.ArtifactVersionToProtoAi(row, artFullName, actors), nil
 }
 
 func (s *Server) ListArtifactVersions(ctx context.Context, req *aiv1.ListArtifactVersionsRequest) (*aiv1.ListArtifactVersionsResponse, error) {

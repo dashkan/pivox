@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	db "github.com/dashkan/pivox/internal/db/generated"
-	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
+	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 )
 
 // Resolver inflates audit-field UUIDs into Actor protos. The current
@@ -30,8 +30,8 @@ func NewResolver(queries db.Querier) *Resolver {
 // no row are still returned in the map as `is_deleted=true`
 // placeholders so callers can render audit fields without losing the
 // reference.
-func (r *Resolver) Resolve(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]*apiv1.Actor, error) {
-	out := make(map[uuid.UUID]*apiv1.Actor, len(ids))
+func (r *Resolver) Resolve(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]*typespb.Actor, error) {
+	out := make(map[uuid.UUID]*typespb.Actor, len(ids))
 
 	deduped := dedupeNonZero(ids)
 	if len(deduped) == 0 {
@@ -44,7 +44,7 @@ func (r *Resolver) Resolve(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]
 	}
 
 	for _, row := range rows {
-		out[row.ID] = &apiv1.Actor{
+		out[row.ID] = &typespb.Actor{
 			Id:          row.ID.String(),
 			DisplayName: row.DisplayName,
 			Email:       row.Email,
@@ -55,7 +55,7 @@ func (r *Resolver) Resolve(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]
 		if _, ok := out[id]; ok {
 			continue
 		}
-		out[id] = &apiv1.Actor{Id: id.String(), IsDeleted: true}
+		out[id] = &typespb.Actor{Id: id.String(), IsDeleted: true}
 	}
 
 	return out, nil
@@ -64,7 +64,7 @@ func (r *Resolver) Resolve(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]
 // ResolveOne is a convenience for handlers that need a single Actor.
 // Returns nil for the zero UUID so the caller can leave the proto
 // field unset rather than render an empty Actor.
-func (r *Resolver) ResolveOne(ctx context.Context, id uuid.UUID) (*apiv1.Actor, error) {
+func (r *Resolver) ResolveOne(ctx context.Context, id uuid.UUID) (*typespb.Actor, error) {
 	if id == uuid.Nil {
 		return nil, nil
 	}

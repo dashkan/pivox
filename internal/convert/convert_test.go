@@ -13,6 +13,7 @@ import (
 
 	db "github.com/dashkan/pivox/internal/db/generated"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
+	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 	assetsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1"
 	storagev1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"
 )
@@ -1158,7 +1159,7 @@ func TestOrganizationToProto_Actors(t *testing.T) {
 	unknown := uuid.New() // an audit ID the resolver didn't return — converter must drop it
 	now := time.Date(2026, 4, 30, 10, 0, 0, 0, time.UTC)
 
-	actors := map[uuid.UUID]*apiv1.Actor{
+	actors := map[uuid.UUID]*typespb.Actor{
 		creator: {Id: creator.String(), DisplayName: "Alice", Email: "alice@example.com"},
 		updater: {Id: updater.String(), DisplayName: "Bob", Email: "bob@example.com"},
 		deleter: {Id: deleter.String(), IsDeleted: true},
@@ -1334,7 +1335,7 @@ func TestSpaceToProto_Actors(t *testing.T) {
 	updater := uuid.New()
 	deleter := uuid.New()
 	now := time.Date(2026, 4, 30, 10, 0, 0, 0, time.UTC)
-	actors := map[uuid.UUID]*apiv1.Actor{
+	actors := map[uuid.UUID]*typespb.Actor{
 		creator: {Id: creator.String(), DisplayName: "Alice"},
 		updater: {Id: updater.String(), DisplayName: "Bob"},
 		deleter: {Id: deleter.String(), IsDeleted: true},

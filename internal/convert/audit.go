@@ -4,7 +4,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
+	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 )
 
 // actorOrNil looks up a pre-resolved Actor for the given pgtype.UUID
@@ -12,7 +12,7 @@ import (
 // (e.g. partial responses that intentionally skip audit). Returning
 // nil leaves the proto field unset rather than rendering an empty
 // Actor envelope.
-func actorOrNil(actors map[uuid.UUID]*apiv1.Actor, u pgtype.UUID) *apiv1.Actor {
+func actorOrNil(actors map[uuid.UUID]*typespb.Actor, u pgtype.UUID) *typespb.Actor {
 	if !u.Valid || actors == nil {
 		return nil
 	}

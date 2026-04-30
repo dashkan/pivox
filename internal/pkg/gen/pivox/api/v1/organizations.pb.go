@@ -25,6 +25,7 @@ import (
 	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
 	v1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/permission/v1"
+	types "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -378,15 +379,15 @@ type Organization struct {
 	// Output only. The organization's current lifecycle state.
 	State Organization_State `protobuf:"varint,3,opt,name=state,proto3,enum=pivox.api.v1.Organization_State" json:"state,omitempty"`
 	// Output only. The identity that created this organization.
-	CreatedBy *Actor `protobuf:"bytes,4,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	CreatedBy *types.Actor `protobuf:"bytes,4,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
 	// Output only. Timestamp when the Organization was created.
 	CreateTime *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
 	// Output only. The identity that last modified this organization.
-	UpdatedBy *Actor `protobuf:"bytes,6,opt,name=updated_by,json=updatedBy,proto3" json:"updated_by,omitempty"`
+	UpdatedBy *types.Actor `protobuf:"bytes,6,opt,name=updated_by,json=updatedBy,proto3" json:"updated_by,omitempty"`
 	// Output only. Timestamp when the Organization was last modified.
 	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
 	// Output only. The identity that requested deletion of this organization.
-	DeletedBy *Actor `protobuf:"bytes,8,opt,name=deleted_by,json=deletedBy,proto3" json:"deleted_by,omitempty"`
+	DeletedBy *types.Actor `protobuf:"bytes,8,opt,name=deleted_by,json=deletedBy,proto3" json:"deleted_by,omitempty"`
 	// Output only. Timestamp when the Organization was requested for deletion.
 	DeleteTime *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=delete_time,json=deleteTime,proto3" json:"delete_time,omitempty"`
 	// Output only. The time at which this organization will be purged.
@@ -454,7 +455,7 @@ func (x *Organization) GetState() Organization_State {
 	return Organization_STATE_UNSPECIFIED
 }
 
-func (x *Organization) GetCreatedBy() *Actor {
+func (x *Organization) GetCreatedBy() *types.Actor {
 	if x != nil {
 		return x.CreatedBy
 	}
@@ -468,7 +469,7 @@ func (x *Organization) GetCreateTime() *timestamppb.Timestamp {
 	return nil
 }
 
-func (x *Organization) GetUpdatedBy() *Actor {
+func (x *Organization) GetUpdatedBy() *types.Actor {
 	if x != nil {
 		return x.UpdatedBy
 	}
@@ -482,7 +483,7 @@ func (x *Organization) GetUpdateTime() *timestamppb.Timestamp {
 	return nil
 }
 
-func (x *Organization) GetDeletedBy() *Actor {
+func (x *Organization) GetDeletedBy() *types.Actor {
 	if x != nil {
 		return x.DeletedBy
 	}
@@ -2035,7 +2036,7 @@ var File_pivox_api_v1_organizations_proto protoreflect.FileDescriptor
 
 const file_pivox_api_v1_organizations_proto_rawDesc = "" +
 	"\n" +
-	" pivox/api/v1/organizations.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18pivox/api/v1/actor.proto\x1a\x1apivox/api/v1/domains.proto\x1a\x16pivox/api/v1/sso.proto\x1a\x1apivox/iam/v1/members.proto\x1a\x1epivox/iam/v1/permissions.proto\x1a!pivox/permission/v1/options.proto\"\xa8\x01\n" +
+	" pivox/api/v1/organizations.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1apivox/api/v1/domains.proto\x1a\x16pivox/api/v1/sso.proto\x1a\x1apivox/iam/v1/members.proto\x1a\x1epivox/iam/v1/permissions.proto\x1a!pivox/permission/v1/options.proto\x1a\x17pivox/types/actor.proto\"\xa8\x01\n" +
 	"\x18TransferOwnershipRequest\x128\n" +
 	"\x04name\x18\x01 \x01(\tB$\xe0A\x02\xfaA\x18\n" +
 	"\x16pivox.api/Organization\xbaH\x03\xc8\x01\x01R\x04name\x129\n" +
@@ -2046,21 +2047,21 @@ const file_pivox_api_v1_organizations_proto_rawDesc = "" +
 	"\tnew_owner\x18\x01 \x01(\tB\x16\xe0A\x03\xfaA\x10\n" +
 	"\x0epivox.iam/UserR\bnewOwner\x12=\n" +
 	"\x0eprevious_owner\x18\x02 \x01(\tB\x16\xe0A\x03\xfaA\x10\n" +
-	"\x0epivox.iam/UserR\rpreviousOwner\"\x84\a\n" +
+	"\x0epivox.iam/UserR\rpreviousOwner\"\x81\a\n" +
 	"\fOrganization\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12&\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\x03\xe0A\x03R\vdisplayName\x12;\n" +
-	"\x05state\x18\x03 \x01(\x0e2 .pivox.api.v1.Organization.StateB\x03\xe0A\x03R\x05state\x127\n" +
+	"\x05state\x18\x03 \x01(\x0e2 .pivox.api.v1.Organization.StateB\x03\xe0A\x03R\x05state\x126\n" +
 	"\n" +
-	"created_by\x18\x04 \x01(\v2\x13.pivox.api.v1.ActorB\x03\xe0A\x03R\tcreatedBy\x12@\n" +
+	"created_by\x18\x04 \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tcreatedBy\x12@\n" +
 	"\vcreate_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"createTime\x127\n" +
+	"createTime\x126\n" +
 	"\n" +
-	"updated_by\x18\x06 \x01(\v2\x13.pivox.api.v1.ActorB\x03\xe0A\x03R\tupdatedBy\x12@\n" +
+	"updated_by\x18\x06 \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tupdatedBy\x12@\n" +
 	"\vupdate_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"updateTime\x127\n" +
+	"updateTime\x126\n" +
 	"\n" +
-	"deleted_by\x18\b \x01(\v2\x13.pivox.api.v1.ActorB\x03\xe0A\x03R\tdeletedBy\x12@\n" +
+	"deleted_by\x18\b \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tdeletedBy\x12@\n" +
 	"\vdelete_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"deleteTime\x12>\n" +
 	"\n" +
@@ -2283,7 +2284,7 @@ var file_pivox_api_v1_organizations_proto_goTypes = []any{
 	(*GetInvitationPolicyRequest)(nil),    // 28: pivox.api.v1.GetInvitationPolicyRequest
 	(*UpdateInvitationPolicyRequest)(nil), // 29: pivox.api.v1.UpdateInvitationPolicyRequest
 	nil,                                   // 30: pivox.api.v1.Organization.AnnotationsEntry
-	(*Actor)(nil),                         // 31: pivox.api.v1.Actor
+	(*types.Actor)(nil),                   // 31: pivox.types.Actor
 	(*timestamppb.Timestamp)(nil),         // 32: google.protobuf.Timestamp
 	(*fieldmaskpb.FieldMask)(nil),         // 33: google.protobuf.FieldMask
 	(*GetSsoConfigRequest)(nil),           // 34: pivox.api.v1.GetSsoConfigRequest
@@ -2309,11 +2310,11 @@ var file_pivox_api_v1_organizations_proto_goTypes = []any{
 }
 var file_pivox_api_v1_organizations_proto_depIdxs = []int32{
 	0,  // 0: pivox.api.v1.Organization.state:type_name -> pivox.api.v1.Organization.State
-	31, // 1: pivox.api.v1.Organization.created_by:type_name -> pivox.api.v1.Actor
+	31, // 1: pivox.api.v1.Organization.created_by:type_name -> pivox.types.Actor
 	32, // 2: pivox.api.v1.Organization.create_time:type_name -> google.protobuf.Timestamp
-	31, // 3: pivox.api.v1.Organization.updated_by:type_name -> pivox.api.v1.Actor
+	31, // 3: pivox.api.v1.Organization.updated_by:type_name -> pivox.types.Actor
 	32, // 4: pivox.api.v1.Organization.update_time:type_name -> google.protobuf.Timestamp
-	31, // 5: pivox.api.v1.Organization.deleted_by:type_name -> pivox.api.v1.Actor
+	31, // 5: pivox.api.v1.Organization.deleted_by:type_name -> pivox.types.Actor
 	32, // 6: pivox.api.v1.Organization.delete_time:type_name -> google.protobuf.Timestamp
 	32, // 7: pivox.api.v1.Organization.purge_time:type_name -> google.protobuf.Timestamp
 	30, // 8: pivox.api.v1.Organization.annotations:type_name -> pivox.api.v1.Organization.AnnotationsEntry
@@ -2399,7 +2400,6 @@ func file_pivox_api_v1_organizations_proto_init() {
 	if File_pivox_api_v1_organizations_proto != nil {
 		return
 	}
-	file_pivox_api_v1_actor_proto_init()
 	file_pivox_api_v1_domains_proto_init()
 	file_pivox_api_v1_sso_proto_init()
 	type x struct{}

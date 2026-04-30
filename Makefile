@@ -34,18 +34,23 @@ run-server:
 run-agent:
 	go run ./cmd/pivox-agent storage --token dev-token-local
 
-# Hot reload via air (https://github.com/air-verse/air). Two
-# targets so the build-tag mode is explicit at the command line —
+# Hot reload via air (https://github.com/air-verse/air). Install
+# air separately (`go install github.com/air-verse/air@latest` or
+# `brew install air`) — it's not bundled in tools/go.mod because
+# its transitive tablewriter v1.x conflicts with api-linter's v0.x
+# requirement.
+#
+# Two targets so the build-tag mode is explicit at the command line —
 # configs/air.toml builds without `-tags dev`, configs/air.dev.toml
 # builds with it. Both write their binary into ./tmp/ under
 # different names so the two modes can run side-by-side without
 # stomping each other.
 
 air:
-	$(TOOL) air -c configs/air.toml
+	air -c configs/air.toml
 
 dev-air:
-	$(TOOL) air -c configs/air.dev.toml
+	air -c configs/air.dev.toml
 
 test:
 	go test ./...

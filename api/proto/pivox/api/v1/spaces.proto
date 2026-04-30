@@ -25,10 +25,10 @@ import "google/longrunning/operations.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
-import "pivox/api/v1/actor.proto";
 import "pivox/iam/v1/members.proto";
 import "pivox/iam/v1/permissions.proto";
 import "pivox/permission/v1/options.proto";
+import "pivox/types/actor.proto";
 
 option go_package = "pivox/api/v1;apiv1";
 
@@ -269,19 +269,19 @@ message Space {
   State state = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. The identity that created this space.
-  Actor created_by = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  pivox.types.Actor created_by = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Creation time.
   google.protobuf.Timestamp create_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. The identity that last modified this space.
-  Actor updated_by = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  pivox.types.Actor updated_by = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. The most recent time this resource was modified.
   google.protobuf.Timestamp update_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. The identity that requested deletion of this space.
-  Actor deleted_by = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  pivox.types.Actor deleted_by = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. The time at which this resource was requested for deletion.
   google.protobuf.Timestamp delete_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];

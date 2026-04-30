@@ -67,8 +67,8 @@ public struct Pivox_Api_V1_Space: @unchecked Sendable {
   }
 
   /// Output only. The identity that created this space.
-  public var createdBy: Pivox_Api_V1_Actor {
-    get {_storage._createdBy ?? Pivox_Api_V1_Actor()}
+  public var createdBy: Pivox_Types_Actor {
+    get {_storage._createdBy ?? Pivox_Types_Actor()}
     set {_uniqueStorage()._createdBy = newValue}
   }
   /// Returns true if `createdBy` has been explicitly set.
@@ -87,8 +87,8 @@ public struct Pivox_Api_V1_Space: @unchecked Sendable {
   public mutating func clearCreateTime() {_uniqueStorage()._createTime = nil}
 
   /// Output only. The identity that last modified this space.
-  public var updatedBy: Pivox_Api_V1_Actor {
-    get {_storage._updatedBy ?? Pivox_Api_V1_Actor()}
+  public var updatedBy: Pivox_Types_Actor {
+    get {_storage._updatedBy ?? Pivox_Types_Actor()}
     set {_uniqueStorage()._updatedBy = newValue}
   }
   /// Returns true if `updatedBy` has been explicitly set.
@@ -107,8 +107,8 @@ public struct Pivox_Api_V1_Space: @unchecked Sendable {
   public mutating func clearUpdateTime() {_uniqueStorage()._updateTime = nil}
 
   /// Output only. The identity that requested deletion of this space.
-  public var deletedBy: Pivox_Api_V1_Actor {
-    get {_storage._deletedBy ?? Pivox_Api_V1_Actor()}
+  public var deletedBy: Pivox_Types_Actor {
+    get {_storage._deletedBy ?? Pivox_Types_Actor()}
     set {_uniqueStorage()._deletedBy = newValue}
   }
   /// Returns true if `deletedBy` has been explicitly set.
@@ -631,11 +631,11 @@ extension Pivox_Api_V1_Space: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     var _name: String = String()
     var _displayName: String = String()
     var _state: Pivox_Api_V1_Space.State = .unspecified
-    var _createdBy: Pivox_Api_V1_Actor? = nil
+    var _createdBy: Pivox_Types_Actor? = nil
     var _createTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
-    var _updatedBy: Pivox_Api_V1_Actor? = nil
+    var _updatedBy: Pivox_Types_Actor? = nil
     var _updateTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
-    var _deletedBy: Pivox_Api_V1_Actor? = nil
+    var _deletedBy: Pivox_Types_Actor? = nil
     var _deleteTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     var _purgeTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     var _etag: String = String()

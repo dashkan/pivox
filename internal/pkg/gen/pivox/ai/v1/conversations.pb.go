@@ -22,6 +22,7 @@ package aiv1
 
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
+	types "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -45,7 +46,9 @@ type Conversation struct {
 	// The resource name of the conversation.
 	// Format: `organizations/{organization}/users/{user}/conversations/{conversation}`
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	// Output only. The user who created this conversation.
+	// Output only. Path-style creator reference, denormalized from the
+	// resource path. Kept alongside `created_by` for clients that
+	// resolve the user via routing rather than the structured Actor.
 	// Format: `organizations/{organization}/users/{user}`
 	Creator string `protobuf:"bytes,2,opt,name=creator,proto3" json:"creator,omitempty"`
 	// The conversation title. May be set by the user or auto-generated.
@@ -63,24 +66,28 @@ type Conversation struct {
 	// summary from `:summarize`. Used to suppress regeneration:
 	// re-running `:summarize` on a conversation whose title the user
 	// has already curated would overwrite their work.
-	TitleUserSet bool `protobuf:"varint,12,opt,name=title_user_set,json=titleUserSet,proto3" json:"title_user_set,omitempty"`
+	TitleUserSet bool `protobuf:"varint,4,opt,name=title_user_set,json=titleUserSet,proto3" json:"title_user_set,omitempty"`
 	// An optional description of the conversation.
-	Description string `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	Description string `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
 	// Whether the conversation is archived.
-	Archived bool `protobuf:"varint,5,opt,name=archived,proto3" json:"archived,omitempty"`
+	Archived bool `protobuf:"varint,6,opt,name=archived,proto3" json:"archived,omitempty"`
 	// Whether the conversation is pinned.
-	Pinned bool `protobuf:"varint,6,opt,name=pinned,proto3" json:"pinned,omitempty"`
+	Pinned bool `protobuf:"varint,7,opt,name=pinned,proto3" json:"pinned,omitempty"`
 	// Output only. The number of messages in the conversation.
-	MessageCount int32 `protobuf:"varint,7,opt,name=message_count,json=messageCount,proto3" json:"message_count,omitempty"`
+	MessageCount int32 `protobuf:"varint,8,opt,name=message_count,json=messageCount,proto3" json:"message_count,omitempty"`
 	// Output only. The time of the last message in the conversation.
-	LastMessageTime *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=last_message_time,json=lastMessageTime,proto3" json:"last_message_time,omitempty"`
+	LastMessageTime *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=last_message_time,json=lastMessageTime,proto3" json:"last_message_time,omitempty"`
+	// Output only. The identity that created this conversation.
+	CreatedBy *types.Actor `protobuf:"bytes,10,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
 	// Output only. When the conversation was created.
-	CreateTime *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	CreateTime *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	// Output only. The identity that last modified this conversation.
+	UpdatedBy *types.Actor `protobuf:"bytes,12,opt,name=updated_by,json=updatedBy,proto3" json:"updated_by,omitempty"`
 	// Output only. When the conversation was last updated.
-	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
 	// Output only. A checksum computed by the server based on the current value
 	// of the Conversation resource.
-	Etag          string `protobuf:"bytes,11,opt,name=etag,proto3" json:"etag,omitempty"`
+	Etag          string `protobuf:"bytes,14,opt,name=etag,proto3" json:"etag,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -178,9 +185,23 @@ func (x *Conversation) GetLastMessageTime() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *Conversation) GetCreatedBy() *types.Actor {
+	if x != nil {
+		return x.CreatedBy
+	}
+	return nil
+}
+
 func (x *Conversation) GetCreateTime() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreateTime
+	}
+	return nil
+}
+
+func (x *Conversation) GetUpdatedBy() *types.Actor {
+	if x != nil {
+		return x.UpdatedBy
 	}
 	return nil
 }
@@ -574,23 +595,27 @@ var File_pivox_ai_v1_conversations_proto protoreflect.FileDescriptor
 
 const file_pivox_ai_v1_conversations_proto_rawDesc = "" +
 	"\n" +
-	"\x1fpivox/ai/v1/conversations.proto\x12\vpivox.ai.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x86\x05\n" +
+	"\x1fpivox/ai/v1/conversations.proto\x12\vpivox.ai.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17pivox/types/actor.proto\"\xf6\x05\n" +
 	"\fConversation\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12\x1d\n" +
 	"\acreator\x18\x02 \x01(\tB\x03\xe0A\x03R\acreator\x12\x19\n" +
 	"\x05title\x18\x03 \x01(\tB\x03\xe0A\x01R\x05title\x12)\n" +
-	"\x0etitle_user_set\x18\f \x01(\bB\x03\xe0A\x03R\ftitleUserSet\x12%\n" +
-	"\vdescription\x18\x04 \x01(\tB\x03\xe0A\x01R\vdescription\x12\x1f\n" +
-	"\barchived\x18\x05 \x01(\bB\x03\xe0A\x01R\barchived\x12\x1b\n" +
-	"\x06pinned\x18\x06 \x01(\bB\x03\xe0A\x01R\x06pinned\x12(\n" +
-	"\rmessage_count\x18\a \x01(\x05B\x03\xe0A\x03R\fmessageCount\x12K\n" +
-	"\x11last_message_time\x18\b \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\x0flastMessageTime\x12@\n" +
-	"\vcreate_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"createTime\x12@\n" +
-	"\vupdate_time\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"\x0etitle_user_set\x18\x04 \x01(\bB\x03\xe0A\x03R\ftitleUserSet\x12%\n" +
+	"\vdescription\x18\x05 \x01(\tB\x03\xe0A\x01R\vdescription\x12\x1f\n" +
+	"\barchived\x18\x06 \x01(\bB\x03\xe0A\x01R\barchived\x12\x1b\n" +
+	"\x06pinned\x18\a \x01(\bB\x03\xe0A\x01R\x06pinned\x12(\n" +
+	"\rmessage_count\x18\b \x01(\x05B\x03\xe0A\x03R\fmessageCount\x12K\n" +
+	"\x11last_message_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\x0flastMessageTime\x126\n" +
+	"\n" +
+	"created_by\x18\n" +
+	" \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tcreatedBy\x12@\n" +
+	"\vcreate_time\x18\v \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"createTime\x126\n" +
+	"\n" +
+	"updated_by\x18\f \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tupdatedBy\x12@\n" +
+	"\vupdate_time\x18\r \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"updateTime\x12\x17\n" +
-	"\x04etag\x18\v \x01(\tB\x03\xe0A\x03R\x04etag:\x7f\xeaA|\n" +
+	"\x04etag\x18\x0e \x01(\tB\x03\xe0A\x03R\x04etag:\x7f\xeaA|\n" +
 	"\x15pivox.ai/Conversation\x12Forganizations/{organization}/users/{user}/conversations/{conversation}*\rconversations2\fconversation\"Q\n" +
 	"\x16GetConversationRequest\x127\n" +
 	"\x04name\x18\x01 \x01(\tB#\xe0A\x02\xfaA\x17\n" +
@@ -639,21 +664,24 @@ var file_pivox_ai_v1_conversations_proto_goTypes = []any{
 	(*UpdateConversationRequest)(nil), // 5: pivox.ai.v1.UpdateConversationRequest
 	(*DeleteConversationRequest)(nil), // 6: pivox.ai.v1.DeleteConversationRequest
 	(*timestamppb.Timestamp)(nil),     // 7: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),     // 8: google.protobuf.FieldMask
+	(*types.Actor)(nil),               // 8: pivox.types.Actor
+	(*fieldmaskpb.FieldMask)(nil),     // 9: google.protobuf.FieldMask
 }
 var file_pivox_ai_v1_conversations_proto_depIdxs = []int32{
 	7, // 0: pivox.ai.v1.Conversation.last_message_time:type_name -> google.protobuf.Timestamp
-	7, // 1: pivox.ai.v1.Conversation.create_time:type_name -> google.protobuf.Timestamp
-	7, // 2: pivox.ai.v1.Conversation.update_time:type_name -> google.protobuf.Timestamp
-	0, // 3: pivox.ai.v1.ListConversationsResponse.conversations:type_name -> pivox.ai.v1.Conversation
-	0, // 4: pivox.ai.v1.CreateConversationRequest.conversation:type_name -> pivox.ai.v1.Conversation
-	0, // 5: pivox.ai.v1.UpdateConversationRequest.conversation:type_name -> pivox.ai.v1.Conversation
-	8, // 6: pivox.ai.v1.UpdateConversationRequest.update_mask:type_name -> google.protobuf.FieldMask
-	7, // [7:7] is the sub-list for method output_type
-	7, // [7:7] is the sub-list for method input_type
-	7, // [7:7] is the sub-list for extension type_name
-	7, // [7:7] is the sub-list for extension extendee
-	0, // [0:7] is the sub-list for field type_name
+	8, // 1: pivox.ai.v1.Conversation.created_by:type_name -> pivox.types.Actor
+	7, // 2: pivox.ai.v1.Conversation.create_time:type_name -> google.protobuf.Timestamp
+	8, // 3: pivox.ai.v1.Conversation.updated_by:type_name -> pivox.types.Actor
+	7, // 4: pivox.ai.v1.Conversation.update_time:type_name -> google.protobuf.Timestamp
+	0, // 5: pivox.ai.v1.ListConversationsResponse.conversations:type_name -> pivox.ai.v1.Conversation
+	0, // 6: pivox.ai.v1.CreateConversationRequest.conversation:type_name -> pivox.ai.v1.Conversation
+	0, // 7: pivox.ai.v1.UpdateConversationRequest.conversation:type_name -> pivox.ai.v1.Conversation
+	9, // 8: pivox.ai.v1.UpdateConversationRequest.update_mask:type_name -> google.protobuf.FieldMask
+	9, // [9:9] is the sub-list for method output_type
+	9, // [9:9] is the sub-list for method input_type
+	9, // [9:9] is the sub-list for extension type_name
+	9, // [9:9] is the sub-list for extension extendee
+	0, // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_pivox_ai_v1_conversations_proto_init() }

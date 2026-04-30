@@ -20,6 +20,7 @@ import "buf/validate/validate.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
 import "google/protobuf/timestamp.proto";
+import "pivox/types/actor.proto";
 
 option go_package = "pivox/ai/v1;aiv1";
 
@@ -54,11 +55,17 @@ message Artifact {
     (google.api.resource_reference) = {type: "pivox.ai/ArtifactVersion"}
   ];
 
+  // Output only. The identity that created this artifact.
+  pivox.types.Actor created_by = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
   // Output only. When the artifact was created.
-  google.protobuf.Timestamp create_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The identity that last modified this artifact.
+  pivox.types.Actor updated_by = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. When the artifact was last updated.
-  google.protobuf.Timestamp update_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // A single version of an artifact. Content is stored either inline (small
@@ -86,8 +93,11 @@ message ArtifactVersion {
     string asset_version = 3;
   }
 
+  // Output only. The identity that created this version.
+  pivox.types.Actor created_by = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
   // Output only. When this version was created.
-  google.protobuf.Timestamp create_time = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Inline content stored directly in the artifact version.

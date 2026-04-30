@@ -16,11 +16,12 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        (unknown)
-// source: pivox/api/v1/actor.proto
+// source: pivox/types/actor.proto
 
-package apiv1
+package types
 
 import (
+	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -39,6 +40,13 @@ const (
 // resources to expose audit fields (created_by, updated_by, deleted_by)
 // per AIP-148, and can be reused at non-audit positions like assignee
 // or approver.
+//
+// Actor lives in `pivox.types` (unversioned — type definitions are
+// shared infrastructure, not an API surface) so every domain package
+// (pivox.api.v1, pivox.ai.v1, pivox.assets.v1, pivox.iam.v1,
+// pivox.storage.v1) can reference it without crossing into a peer
+// domain — the api-linter's foreign-type-reference rule (AIP-215)
+// considers `pivox.types` a shared types namespace.
 //
 // Resolution is performed server-side via the audit.Resolver, which
 // batches lookups against firebase_identities and caches recent
@@ -64,7 +72,7 @@ type Actor struct {
 
 func (x *Actor) Reset() {
 	*x = Actor{}
-	mi := &file_pivox_api_v1_actor_proto_msgTypes[0]
+	mi := &file_pivox_types_actor_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -76,7 +84,7 @@ func (x *Actor) String() string {
 func (*Actor) ProtoMessage() {}
 
 func (x *Actor) ProtoReflect() protoreflect.Message {
-	mi := &file_pivox_api_v1_actor_proto_msgTypes[0]
+	mi := &file_pivox_types_actor_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -89,7 +97,7 @@ func (x *Actor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Actor.ProtoReflect.Descriptor instead.
 func (*Actor) Descriptor() ([]byte, []int) {
-	return file_pivox_api_v1_actor_proto_rawDescGZIP(), []int{0}
+	return file_pivox_types_actor_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *Actor) GetId() string {
@@ -120,37 +128,37 @@ func (x *Actor) GetIsDeleted() bool {
 	return false
 }
 
-var File_pivox_api_v1_actor_proto protoreflect.FileDescriptor
+var File_pivox_types_actor_proto protoreflect.FileDescriptor
 
-const file_pivox_api_v1_actor_proto_rawDesc = "" +
+const file_pivox_types_actor_proto_rawDesc = "" +
 	"\n" +
-	"\x18pivox/api/v1/actor.proto\x12\fpivox.api.v1\"o\n" +
-	"\x05Actor\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
-	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12\x14\n" +
-	"\x05email\x18\x03 \x01(\tR\x05email\x12\x1d\n" +
+	"\x17pivox/types/actor.proto\x12\vpivox.types\x1a\x1fgoogle/api/field_behavior.proto\"\x83\x01\n" +
+	"\x05Actor\x12\x13\n" +
+	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x03R\x02id\x12&\n" +
+	"\fdisplay_name\x18\x02 \x01(\tB\x03\xe0A\x03R\vdisplayName\x12\x19\n" +
+	"\x05email\x18\x03 \x01(\tB\x03\xe0A\x03R\x05email\x12\"\n" +
 	"\n" +
-	"is_deleted\x18\x04 \x01(\bR\tisDeletedB\xae\x01\n" +
-	"\x10com.pivox.api.v1B\n" +
-	"ActorProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
+	"is_deleted\x18\x04 \x01(\bB\x03\xe0A\x03R\tisDeletedB\xa1\x01\n" +
+	"\x0fcom.pivox.typesB\n" +
+	"ActorProtoP\x01Z5github.com/dashkan/pivox/internal/pkg/gen/pivox/types\xa2\x02\x03PTX\xaa\x02\vPivox.Types\xca\x02\vPivox\\Types\xe2\x02\x17Pivox\\Types\\GPBMetadata\xea\x02\fPivox::Typesb\x06proto3"
 
 var (
-	file_pivox_api_v1_actor_proto_rawDescOnce sync.Once
-	file_pivox_api_v1_actor_proto_rawDescData []byte
+	file_pivox_types_actor_proto_rawDescOnce sync.Once
+	file_pivox_types_actor_proto_rawDescData []byte
 )
 
-func file_pivox_api_v1_actor_proto_rawDescGZIP() []byte {
-	file_pivox_api_v1_actor_proto_rawDescOnce.Do(func() {
-		file_pivox_api_v1_actor_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_pivox_api_v1_actor_proto_rawDesc), len(file_pivox_api_v1_actor_proto_rawDesc)))
+func file_pivox_types_actor_proto_rawDescGZIP() []byte {
+	file_pivox_types_actor_proto_rawDescOnce.Do(func() {
+		file_pivox_types_actor_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_pivox_types_actor_proto_rawDesc), len(file_pivox_types_actor_proto_rawDesc)))
 	})
-	return file_pivox_api_v1_actor_proto_rawDescData
+	return file_pivox_types_actor_proto_rawDescData
 }
 
-var file_pivox_api_v1_actor_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
-var file_pivox_api_v1_actor_proto_goTypes = []any{
-	(*Actor)(nil), // 0: pivox.api.v1.Actor
+var file_pivox_types_actor_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
+var file_pivox_types_actor_proto_goTypes = []any{
+	(*Actor)(nil), // 0: pivox.types.Actor
 }
-var file_pivox_api_v1_actor_proto_depIdxs = []int32{
+var file_pivox_types_actor_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
 	0, // [0:0] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
@@ -158,26 +166,26 @@ var file_pivox_api_v1_actor_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_pivox_api_v1_actor_proto_init() }
-func file_pivox_api_v1_actor_proto_init() {
-	if File_pivox_api_v1_actor_proto != nil {
+func init() { file_pivox_types_actor_proto_init() }
+func file_pivox_types_actor_proto_init() {
+	if File_pivox_types_actor_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pivox_api_v1_actor_proto_rawDesc), len(file_pivox_api_v1_actor_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pivox_types_actor_proto_rawDesc), len(file_pivox_types_actor_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   1,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_pivox_api_v1_actor_proto_goTypes,
-		DependencyIndexes: file_pivox_api_v1_actor_proto_depIdxs,
-		MessageInfos:      file_pivox_api_v1_actor_proto_msgTypes,
+		GoTypes:           file_pivox_types_actor_proto_goTypes,
+		DependencyIndexes: file_pivox_types_actor_proto_depIdxs,
+		MessageInfos:      file_pivox_types_actor_proto_msgTypes,
 	}.Build()
-	File_pivox_api_v1_actor_proto = out.File
-	file_pivox_api_v1_actor_proto_goTypes = nil
-	file_pivox_api_v1_actor_proto_depIdxs = nil
+	File_pivox_types_actor_proto = out.File
+	file_pivox_types_actor_proto_goTypes = nil
+	file_pivox_types_actor_proto_depIdxs = nil
 }

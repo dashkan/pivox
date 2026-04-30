@@ -23,6 +23,7 @@ import (
 	"github.com/dashkan/pivox/internal/lro"
 	"github.com/dashkan/pivox/internal/permission"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
+	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 	"github.com/dashkan/pivox/internal/server"
 
 	"google.golang.org/protobuf/proto"
@@ -76,7 +77,7 @@ func NewSpacesServer(pool *pgxpool.Pool, queries db.Querier, codec *appkey.Codec
 // resolveSpaceActors gathers the union of *_by UUIDs across the page
 // and resolves them in a single batched call. Returns nil when no
 // audit resolver is wired.
-func (s *SpacesServer) resolveSpaceActors(ctx context.Context, spaces []db.Space) (map[uuid.UUID]*apiv1.Actor, error) {
+func (s *SpacesServer) resolveSpaceActors(ctx context.Context, spaces []db.Space) (map[uuid.UUID]*typespb.Actor, error) {
 	if s.audit == nil {
 		return nil, nil
 	}

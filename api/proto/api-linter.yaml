@@ -5,6 +5,18 @@
     - 'core::0191::java-package'
     - 'core::0191::java-multiple-files'
     - 'core::0191::java-outer-classname'
+    # We use a structured Actor message for audit fields
+    # (created_by/updated_by/deleted_by) instead of the AIP-148
+    # `creator string` convention, so we can carry display_name +
+    # email + is_deleted without an extra round-trip. The 'by'
+    # preposition rule fires on those names — intentional departure.
+    - 'core::0140::prepositions'
+    # `pivox.types` is a shared types namespace deliberately
+    # referenced from every domain package (pivox.api.v1, pivox.ai.v1,
+    # etc.). The api-linter has no "common types" exception so the
+    # foreign-type-reference rule fires on every import; suppress
+    # globally rather than annotating each call site.
+    - 'core::0215::foreign-type-reference'
 - included_paths:
     - 'api/proto/pivox/api/v1/watch.proto'
   disabled_rules:

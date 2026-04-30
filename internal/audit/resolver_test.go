@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
+	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 	"github.com/dashkan/pivox/internal/testutil/mocks"
 
 	db "github.com/dashkan/pivox/internal/db/generated"
@@ -44,8 +44,8 @@ func TestResolver_Resolve_HappyPath(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, got, 2)
-	assert.Equal(t, &apiv1.Actor{Id: idA.String(), DisplayName: "Alice", Email: "a@example.com"}, got[idA])
-	assert.Equal(t, &apiv1.Actor{Id: idB.String(), DisplayName: "Bob", Email: "b@example.com"}, got[idB])
+	assert.Equal(t, &typespb.Actor{Id: idA.String(), DisplayName: "Alice", Email: "a@example.com"}, got[idA])
+	assert.Equal(t, &typespb.Actor{Id: idB.String(), DisplayName: "Bob", Email: "b@example.com"}, got[idB])
 	q.AssertExpectations(t)
 }
 
@@ -120,8 +120,8 @@ func TestResolver_Resolve_MissingIDsReturnPlaceholder(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, got, 2)
-	assert.Equal(t, &apiv1.Actor{Id: idA.String(), DisplayName: "Alice", Email: "a@example.com"}, got[idA])
-	assert.Equal(t, &apiv1.Actor{Id: idB.String(), IsDeleted: true}, got[idB])
+	assert.Equal(t, &typespb.Actor{Id: idA.String(), DisplayName: "Alice", Email: "a@example.com"}, got[idA])
+	assert.Equal(t, &typespb.Actor{Id: idB.String(), IsDeleted: true}, got[idB])
 }
 
 func TestResolver_Resolve_DBError(t *testing.T) {

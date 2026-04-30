@@ -9,13 +9,14 @@ import (
 
 	db "github.com/dashkan/pivox/internal/db/generated"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
+	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 )
 
 // SpaceToProto converts a DB space to proto.
 // orgName is the organization slug (e.g. "meridian-broadcasting").
 // `actors` is the pre-resolved Actor map for the calling page; pass
 // nil when no actors are needed.
-func SpaceToProto(p db.Space, orgName string, actors map[uuid.UUID]*apiv1.Actor) *apiv1.Space {
+func SpaceToProto(p db.Space, orgName string, actors map[uuid.UUID]*typespb.Actor) *apiv1.Space {
 	pb := &apiv1.Space{
 		Name:        fmt.Sprintf("organizations/%s/spaces/%s", orgName, p.Name),
 		DisplayName: p.DisplayName,

@@ -22,6 +22,7 @@ package aiv1
 
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
+	types "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -55,10 +56,14 @@ type Artifact struct {
 	// Output only. The resource name of the latest version.
 	// Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
 	LatestVersion string `protobuf:"bytes,5,opt,name=latest_version,json=latestVersion,proto3" json:"latest_version,omitempty"`
+	// Output only. The identity that created this artifact.
+	CreatedBy *types.Actor `protobuf:"bytes,6,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
 	// Output only. When the artifact was created.
-	CreateTime *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	CreateTime *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	// Output only. The identity that last modified this artifact.
+	UpdatedBy *types.Actor `protobuf:"bytes,8,opt,name=updated_by,json=updatedBy,proto3" json:"updated_by,omitempty"`
 	// Output only. When the artifact was last updated.
-	UpdateTime    *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	UpdateTime    *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -128,9 +133,23 @@ func (x *Artifact) GetLatestVersion() string {
 	return ""
 }
 
+func (x *Artifact) GetCreatedBy() *types.Actor {
+	if x != nil {
+		return x.CreatedBy
+	}
+	return nil
+}
+
 func (x *Artifact) GetCreateTime() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreateTime
+	}
+	return nil
+}
+
+func (x *Artifact) GetUpdatedBy() *types.Actor {
+	if x != nil {
+		return x.UpdatedBy
 	}
 	return nil
 }
@@ -157,8 +176,10 @@ type ArtifactVersion struct {
 	//	*ArtifactVersion_Inline
 	//	*ArtifactVersion_AssetVersion
 	Content isArtifactVersion_Content `protobuf_oneof:"content"`
+	// Output only. The identity that created this version.
+	CreatedBy *types.Actor `protobuf:"bytes,4,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
 	// Output only. When this version was created.
-	CreateTime    *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	CreateTime    *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -223,6 +244,13 @@ func (x *ArtifactVersion) GetAssetVersion() string {
 		}
 	}
 	return ""
+}
+
+func (x *ArtifactVersion) GetCreatedBy() *types.Actor {
+	if x != nil {
+		return x.CreatedBy
+	}
+	return nil
 }
 
 func (x *ArtifactVersion) GetCreateTime() *timestamppb.Timestamp {
@@ -797,24 +825,30 @@ var File_pivox_ai_v1_artifacts_proto protoreflect.FileDescriptor
 
 const file_pivox_ai_v1_artifacts_proto_rawDesc = "" +
 	"\n" +
-	"\x1bpivox/ai/v1/artifacts.proto\x12\vpivox.ai.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xd7\x03\n" +
+	"\x1bpivox/ai/v1/artifacts.proto\x12\vpivox.ai.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17pivox/types/actor.proto\"\xc7\x04\n" +
 	"\bArtifact\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12\x17\n" +
 	"\x04type\x18\x02 \x01(\tB\x03\xe0A\x03R\x04type\x12\x19\n" +
 	"\x05title\x18\x03 \x01(\tB\x03\xe0A\x03R\x05title\x12%\n" +
 	"\vdescription\x18\x04 \x01(\tB\x03\xe0A\x03R\vdescription\x12G\n" +
 	"\x0elatest_version\x18\x05 \x01(\tB \xe0A\x03\xfaA\x1a\n" +
-	"\x18pivox.ai/ArtifactVersionR\rlatestVersion\x12@\n" +
-	"\vcreate_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"createTime\x12@\n" +
-	"\vupdate_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"\x18pivox.ai/ArtifactVersionR\rlatestVersion\x126\n" +
+	"\n" +
+	"created_by\x18\x06 \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tcreatedBy\x12@\n" +
+	"\vcreate_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"createTime\x126\n" +
+	"\n" +
+	"updated_by\x18\b \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tupdatedBy\x12@\n" +
+	"\vupdate_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"updateTime:\x89\x01\xeaA\x85\x01\n" +
-	"\x11pivox.ai/Artifact\x12[organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}*\tartifacts2\bartifact\"\x80\x03\n" +
+	"\x11pivox.ai/Artifact\x12[organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}*\tartifacts2\bartifact\"\xb8\x03\n" +
 	"\x0fArtifactVersion\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x124\n" +
 	"\x06inline\x18\x02 \x01(\v2\x1a.pivox.ai.v1.InlineContentH\x00R\x06inline\x12%\n" +
-	"\rasset_version\x18\x03 \x01(\tH\x00R\fassetVersion\x12@\n" +
-	"\vcreate_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"\rasset_version\x18\x03 \x01(\tH\x00R\fassetVersion\x126\n" +
+	"\n" +
+	"created_by\x18\x04 \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tcreatedBy\x12@\n" +
+	"\vcreate_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"createTime:\xa9\x01\xeaA\xa5\x01\n" +
 	"\x18pivox.ai/ArtifactVersion\x12norganizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}/versions/{version}*\bversions2\x0fartifactVersionB\t\n" +
 	"\acontent\"_\n" +
@@ -883,20 +917,24 @@ var file_pivox_ai_v1_artifacts_proto_goTypes = []any{
 	(*ListArtifactVersionsRequest)(nil),  // 8: pivox.ai.v1.ListArtifactVersionsRequest
 	(*ListArtifactVersionsResponse)(nil), // 9: pivox.ai.v1.ListArtifactVersionsResponse
 	(*DeleteArtifactVersionRequest)(nil), // 10: pivox.ai.v1.DeleteArtifactVersionRequest
-	(*timestamppb.Timestamp)(nil),        // 11: google.protobuf.Timestamp
+	(*types.Actor)(nil),                  // 11: pivox.types.Actor
+	(*timestamppb.Timestamp)(nil),        // 12: google.protobuf.Timestamp
 }
 var file_pivox_ai_v1_artifacts_proto_depIdxs = []int32{
-	11, // 0: pivox.ai.v1.Artifact.create_time:type_name -> google.protobuf.Timestamp
-	11, // 1: pivox.ai.v1.Artifact.update_time:type_name -> google.protobuf.Timestamp
-	2,  // 2: pivox.ai.v1.ArtifactVersion.inline:type_name -> pivox.ai.v1.InlineContent
-	11, // 3: pivox.ai.v1.ArtifactVersion.create_time:type_name -> google.protobuf.Timestamp
-	0,  // 4: pivox.ai.v1.ListArtifactsResponse.artifacts:type_name -> pivox.ai.v1.Artifact
-	1,  // 5: pivox.ai.v1.ListArtifactVersionsResponse.versions:type_name -> pivox.ai.v1.ArtifactVersion
-	6,  // [6:6] is the sub-list for method output_type
-	6,  // [6:6] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	11, // 0: pivox.ai.v1.Artifact.created_by:type_name -> pivox.types.Actor
+	12, // 1: pivox.ai.v1.Artifact.create_time:type_name -> google.protobuf.Timestamp
+	11, // 2: pivox.ai.v1.Artifact.updated_by:type_name -> pivox.types.Actor
+	12, // 3: pivox.ai.v1.Artifact.update_time:type_name -> google.protobuf.Timestamp
+	2,  // 4: pivox.ai.v1.ArtifactVersion.inline:type_name -> pivox.ai.v1.InlineContent
+	11, // 5: pivox.ai.v1.ArtifactVersion.created_by:type_name -> pivox.types.Actor
+	12, // 6: pivox.ai.v1.ArtifactVersion.create_time:type_name -> google.protobuf.Timestamp
+	0,  // 7: pivox.ai.v1.ListArtifactsResponse.artifacts:type_name -> pivox.ai.v1.Artifact
+	1,  // 8: pivox.ai.v1.ListArtifactVersionsResponse.versions:type_name -> pivox.ai.v1.ArtifactVersion
+	9,  // [9:9] is the sub-list for method output_type
+	9,  // [9:9] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_pivox_ai_v1_artifacts_proto_init() }

@@ -25,6 +25,7 @@ import (
 	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
 	v1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/permission/v1"
+	types "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -192,15 +193,15 @@ type Space struct {
 	// Output only. The space lifecycle state.
 	State Space_State `protobuf:"varint,3,opt,name=state,proto3,enum=pivox.api.v1.Space_State" json:"state,omitempty"`
 	// Output only. The identity that created this space.
-	CreatedBy *Actor `protobuf:"bytes,4,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	CreatedBy *types.Actor `protobuf:"bytes,4,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
 	// Output only. Creation time.
 	CreateTime *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
 	// Output only. The identity that last modified this space.
-	UpdatedBy *Actor `protobuf:"bytes,6,opt,name=updated_by,json=updatedBy,proto3" json:"updated_by,omitempty"`
+	UpdatedBy *types.Actor `protobuf:"bytes,6,opt,name=updated_by,json=updatedBy,proto3" json:"updated_by,omitempty"`
 	// Output only. The most recent time this resource was modified.
 	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
 	// Output only. The identity that requested deletion of this space.
-	DeletedBy *Actor `protobuf:"bytes,8,opt,name=deleted_by,json=deletedBy,proto3" json:"deleted_by,omitempty"`
+	DeletedBy *types.Actor `protobuf:"bytes,8,opt,name=deleted_by,json=deletedBy,proto3" json:"deleted_by,omitempty"`
 	// Output only. The time at which this resource was requested for deletion.
 	DeleteTime *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=delete_time,json=deleteTime,proto3" json:"delete_time,omitempty"`
 	// Output only. The time at which this space will be purged.
@@ -280,7 +281,7 @@ func (x *Space) GetState() Space_State {
 	return Space_STATE_UNSPECIFIED
 }
 
-func (x *Space) GetCreatedBy() *Actor {
+func (x *Space) GetCreatedBy() *types.Actor {
 	if x != nil {
 		return x.CreatedBy
 	}
@@ -294,7 +295,7 @@ func (x *Space) GetCreateTime() *timestamppb.Timestamp {
 	return nil
 }
 
-func (x *Space) GetUpdatedBy() *Actor {
+func (x *Space) GetUpdatedBy() *types.Actor {
 	if x != nil {
 		return x.UpdatedBy
 	}
@@ -308,7 +309,7 @@ func (x *Space) GetUpdateTime() *timestamppb.Timestamp {
 	return nil
 }
 
-func (x *Space) GetDeletedBy() *Actor {
+func (x *Space) GetDeletedBy() *types.Actor {
 	if x != nil {
 		return x.DeletedBy
 	}
@@ -1096,22 +1097,22 @@ var File_pivox_api_v1_spaces_proto protoreflect.FileDescriptor
 
 const file_pivox_api_v1_spaces_proto_rawDesc = "" +
 	"\n" +
-	"\x19pivox/api/v1/spaces.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18pivox/api/v1/actor.proto\x1a\x1apivox/iam/v1/members.proto\x1a\x1epivox/iam/v1/permissions.proto\x1a!pivox/permission/v1/options.proto\"\xdc\x06\n" +
+	"\x19pivox/api/v1/spaces.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1apivox/iam/v1/members.proto\x1a\x1epivox/iam/v1/permissions.proto\x1a!pivox/permission/v1/options.proto\x1a\x17pivox/types/actor.proto\"\xd9\x06\n" +
 	"\x05Space\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12-\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\n" +
 	"\xe0A\x01\xbaH\x04r\x02\x18\x1eR\vdisplayName\x124\n" +
-	"\x05state\x18\x03 \x01(\x0e2\x19.pivox.api.v1.Space.StateB\x03\xe0A\x03R\x05state\x127\n" +
+	"\x05state\x18\x03 \x01(\x0e2\x19.pivox.api.v1.Space.StateB\x03\xe0A\x03R\x05state\x126\n" +
 	"\n" +
-	"created_by\x18\x04 \x01(\v2\x13.pivox.api.v1.ActorB\x03\xe0A\x03R\tcreatedBy\x12@\n" +
+	"created_by\x18\x04 \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tcreatedBy\x12@\n" +
 	"\vcreate_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"createTime\x127\n" +
+	"createTime\x126\n" +
 	"\n" +
-	"updated_by\x18\x06 \x01(\v2\x13.pivox.api.v1.ActorB\x03\xe0A\x03R\tupdatedBy\x12@\n" +
+	"updated_by\x18\x06 \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tupdatedBy\x12@\n" +
 	"\vupdate_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"updateTime\x127\n" +
+	"updateTime\x126\n" +
 	"\n" +
-	"deleted_by\x18\b \x01(\v2\x13.pivox.api.v1.ActorB\x03\xe0A\x03R\tdeletedBy\x12@\n" +
+	"deleted_by\x18\b \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tdeletedBy\x12@\n" +
 	"\vdelete_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"deleteTime\x12>\n" +
 	"\n" +
@@ -1230,7 +1231,7 @@ var file_pivox_api_v1_spaces_proto_goTypes = []any{
 	(*DeleteSpaceMetadata)(nil),           // 12: pivox.api.v1.DeleteSpaceMetadata
 	(*UndeleteSpaceMetadata)(nil),         // 13: pivox.api.v1.UndeleteSpaceMetadata
 	nil,                                   // 14: pivox.api.v1.Space.LabelsEntry
-	(*Actor)(nil),                         // 15: pivox.api.v1.Actor
+	(*types.Actor)(nil),                   // 15: pivox.types.Actor
 	(*timestamppb.Timestamp)(nil),         // 16: google.protobuf.Timestamp
 	(*fieldmaskpb.FieldMask)(nil),         // 17: google.protobuf.FieldMask
 	(*v1.GetMemberRequest)(nil),           // 18: pivox.iam.v1.GetMemberRequest
@@ -1247,11 +1248,11 @@ var file_pivox_api_v1_spaces_proto_goTypes = []any{
 }
 var file_pivox_api_v1_spaces_proto_depIdxs = []int32{
 	0,  // 0: pivox.api.v1.Space.state:type_name -> pivox.api.v1.Space.State
-	15, // 1: pivox.api.v1.Space.created_by:type_name -> pivox.api.v1.Actor
+	15, // 1: pivox.api.v1.Space.created_by:type_name -> pivox.types.Actor
 	16, // 2: pivox.api.v1.Space.create_time:type_name -> google.protobuf.Timestamp
-	15, // 3: pivox.api.v1.Space.updated_by:type_name -> pivox.api.v1.Actor
+	15, // 3: pivox.api.v1.Space.updated_by:type_name -> pivox.types.Actor
 	16, // 4: pivox.api.v1.Space.update_time:type_name -> google.protobuf.Timestamp
-	15, // 5: pivox.api.v1.Space.deleted_by:type_name -> pivox.api.v1.Actor
+	15, // 5: pivox.api.v1.Space.deleted_by:type_name -> pivox.types.Actor
 	16, // 6: pivox.api.v1.Space.delete_time:type_name -> google.protobuf.Timestamp
 	16, // 7: pivox.api.v1.Space.purge_time:type_name -> google.protobuf.Timestamp
 	14, // 8: pivox.api.v1.Space.labels:type_name -> pivox.api.v1.Space.LabelsEntry
@@ -1296,7 +1297,6 @@ func file_pivox_api_v1_spaces_proto_init() {
 	if File_pivox_api_v1_spaces_proto != nil {
 		return
 	}
-	file_pivox_api_v1_actor_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

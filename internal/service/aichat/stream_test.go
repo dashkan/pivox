@@ -173,7 +173,7 @@ func TestStreamGenerateContent_HappyPath(t *testing.T) {
 			{Kind: "finish"},
 		},
 	}
-	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, nil, slog.Default())
+	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, nil, nil, slog.Default())
 
 	org := testOrg()
 	uid := "user1"
@@ -230,7 +230,7 @@ func TestStreamGenerateContent_ToolResultResumesGeneration(t *testing.T) {
 			{Kind: "finish"},
 		},
 	}
-	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, nil, slog.Default())
+	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, nil, nil, slog.Default())
 
 	org := testOrg()
 	uid := "user1"
@@ -286,7 +286,7 @@ func TestStreamGenerateContent_ToolResultResumesGeneration(t *testing.T) {
 func TestStreamGenerateContent_WrongOwner(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, nil, nil, nil, slog.Default())
+	srv := NewServer(nil, q, llm, nil, nil, nil, nil, slog.Default())
 
 	org := testOrg()
 	// Conversation owned by a different user-uuid than the path-bound
@@ -309,7 +309,7 @@ func TestStreamGenerateContent_WrongOwner(t *testing.T) {
 func TestStreamGenerateContent_ModelError(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{err: io.ErrUnexpectedEOF}
-	srv := NewServer(nil, q, llm, nil, nil, nil, slog.Default())
+	srv := NewServer(nil, q, llm, nil, nil, nil, nil, slog.Default())
 
 	org := testOrg()
 	uid := "user1"
@@ -349,7 +349,7 @@ func TestGenerateContent_UnaryAccumulatesText(t *testing.T) {
 			{Kind: "finish"},
 		},
 	}
-	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, nil, slog.Default())
+	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, nil, nil, slog.Default())
 
 	org := testOrg()
 	uid := "user1"
@@ -392,7 +392,7 @@ func TestGenerateContent_StatelessSkipsPersistence(t *testing.T) {
 			{Kind: "finish"},
 		},
 	}
-	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, nil, slog.Default())
+	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, nil, nil, slog.Default())
 
 	org := testOrg()
 	ctx := authenticatedCtx("user1")
@@ -440,7 +440,7 @@ func TestGenerateContent_StatelessSkipsPersistence(t *testing.T) {
 func TestStreamGenerateContent_ConversationOrgMismatchRejected(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, nil, nil, nil, slog.Default())
+	srv := NewServer(nil, q, llm, nil, nil, nil, nil, slog.Default())
 
 	org := testOrg()
 	ctx := authenticatedCtx("user1")
@@ -475,7 +475,7 @@ func TestExtractText(t *testing.T) {
 
 func TestLoadModelHistory_BudgetTruncation(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	srv := NewServer(nil, q, nil, nil, nil, nil, slog.Default())
+	srv := NewServer(nil, q, nil, nil, nil, nil, nil, slog.Default())
 
 	convID := uuid.New()
 	partsJSON, _ := marshalParts([]*aiv1.MessagePart{
@@ -538,7 +538,7 @@ func TestDbMessageToModel(t *testing.T) {
 func TestStreamGenerateContent_InvalidConversationReturnsNotFound(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, nil, nil, nil, slog.Default())
+	srv := NewServer(nil, q, llm, nil, nil, nil, nil, slog.Default())
 
 	org := testOrg()
 	ctx := authenticatedCtx("user1")
@@ -557,7 +557,7 @@ func TestStreamGenerateContent_InvalidConversationReturnsNotFound(t *testing.T) 
 func TestStreamGenerateContent_InvalidConversationNameReturnsInvalidArgument(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, nil, nil, nil, slog.Default())
+	srv := NewServer(nil, q, llm, nil, nil, nil, nil, slog.Default())
 
 	org := testOrg()
 	ctx := authenticatedCtx("user1")

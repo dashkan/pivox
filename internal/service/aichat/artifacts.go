@@ -34,7 +34,11 @@ func (s *Server) GetArtifact(ctx context.Context, req *aiv1.GetArtifactRequest) 
 	}
 
 	convFullName := buildConversationName(orgName, pathUser, convName)
-	return convert.ArtifactToProto(row, convFullName), nil
+	actors, err := s.resolveArtifactActors(ctx, []db.AiArtifact{row})
+	if err != nil {
+		return nil, err
+	}
+	return convert.ArtifactToProto(row, convFullName, actors), nil
 }
 
 func (s *Server) ListArtifacts(ctx context.Context, req *aiv1.ListArtifactsRequest) (*aiv1.ListArtifactsResponse, error) {
@@ -83,9 +87,13 @@ func (s *Server) ListArtifacts(ctx context.Context, req *aiv1.ListArtifactsReque
 	}
 
 	convFullName := buildConversationName(orgName, pathUser, convName)
+	actors, err := s.resolveArtifactActors(ctx, results)
+	if err != nil {
+		return nil, err
+	}
 	artifacts := make([]*aiv1.Artifact, 0, len(results))
 	for _, r := range results {
-		artifacts = append(artifacts, convert.ArtifactToProto(r, convFullName))
+		artifacts = append(artifacts, convert.ArtifactToProto(r, convFullName, actors))
 	}
 
 	return &aiv1.ListArtifactsResponse{

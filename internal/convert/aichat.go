@@ -4,19 +4,22 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/google/uuid"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	db "github.com/dashkan/pivox/internal/db/generated"
 	aiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1"
+	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 )
 
 // ConversationToProto converts a DB conversation to proto.
 // orgName is the organization segment (e.g. "acme"). The resource
 // name encodes ownership via the creator's `firebase_identities.id`
 // in the `users/{user}` segment — same uuid the handler enforces
-// path-vs-caller against.
-func ConversationToProto(row db.AiConversation, orgName string) *aiv1.Conversation {
+// path-vs-caller against. `actors` is the pre-resolved Actor map for
+// the calling page; pass nil to skip Actor inflation.
+func ConversationToProto(row db.AiConversation, orgName string, actors map[uuid.UUID]*typespb.Actor) *aiv1.Conversation {
 	pb := &aiv1.Conversation{
 		Name:         fmt.Sprintf("organizations/%s/users/%s/conversations/%s", orgName, row.CreatedBy, row.Name),
 		Creator:      fmt.Sprintf("organizations/%s/users/%s", orgName, row.CreatedBy),
@@ -29,6 +32,12 @@ func ConversationToProto(row db.AiConversation, orgName string) *aiv1.Conversati
 		Etag:         row.Etag,
 		CreateTime:   timestamppb.New(row.CreateTime),
 		UpdateTime:   timestamppb.New(row.UpdateTime),
+	}
+	if actors != nil {
+		// CreatedBy on ai_conversations is NOT NULL UUID, so we can
+		// look up directly without a Valid check.
+		pb.CreatedBy = actors[row.CreatedBy]
+		pb.UpdatedBy = actorOrNil(actors, row.UpdatedBy)
 	}
 	if row.LastMessageTime.Valid {
 		pb.LastMessageTime = timestamppb.New(row.LastMessageTime.Time)
@@ -62,15 +71,18 @@ func MessageToProto(row db.AiMessage, convName string) (*aiv1.Message, error) {
 }
 
 // ArtifactToProto converts a DB artifact to proto.
-// convName is the full conversation resource name.
-func ArtifactToProto(row db.AiArtifact, convName string) *aiv1.Artifact {
+// convName is the full conversation resource name. `actors` is the
+// pre-resolved Actor map; pass nil to skip Actor inflation.
+func ArtifactToProto(row db.AiArtifact, convName string, actors map[uuid.UUID]*typespb.Actor) *aiv1.Artifact {
 	artName := fmt.Sprintf("%s/artifacts/%s", convName, row.Name)
 	pb := &aiv1.Artifact{
 		Name:        artName,
 		Type:        row.Type,
 		Title:       row.Title,
 		Description: row.Description,
+		CreatedBy:   actorOrNil(actors, row.CreatedBy),
 		CreateTime:  timestamppb.New(row.CreateTime),
+		UpdatedBy:   actorOrNil(actors, row.UpdatedBy),
 		UpdateTime:  timestamppb.New(row.UpdateTime),
 	}
 	// LatestVersionID exists on `row` but the version's resource name
@@ -80,10 +92,12 @@ func ArtifactToProto(row db.AiArtifact, convName string) *aiv1.Artifact {
 }
 
 // ArtifactVersionToProtoAi converts a DB artifact version to proto.
-// artName is the full artifact resource name.
-func ArtifactVersionToProtoAi(row db.AiArtifactVersion, artName string) *aiv1.ArtifactVersion {
+// artName is the full artifact resource name. `actors` is the
+// pre-resolved Actor map; pass nil to skip Actor inflation.
+func ArtifactVersionToProtoAi(row db.AiArtifactVersion, artName string, actors map[uuid.UUID]*typespb.Actor) *aiv1.ArtifactVersion {
 	pb := &aiv1.ArtifactVersion{
 		Name:       fmt.Sprintf("%s/versions/%s", artName, row.Name),
+		CreatedBy:  actorOrNil(actors, row.CreatedBy),
 		CreateTime: timestamppb.New(row.CreateTime),
 	}
 

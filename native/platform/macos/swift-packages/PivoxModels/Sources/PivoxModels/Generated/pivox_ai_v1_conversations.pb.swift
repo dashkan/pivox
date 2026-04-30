@@ -35,18 +35,26 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 }
 
 /// A conversation represents a single chat thread between a user and the AI.
-public struct Pivox_Ai_V1_Conversation: Sendable {
+public struct Pivox_Ai_V1_Conversation: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// The resource name of the conversation.
   /// Format: `organizations/{organization}/users/{user}/conversations/{conversation}`
-  public var name: String = String()
+  public var name: String {
+    get {_storage._name}
+    set {_uniqueStorage()._name = newValue}
+  }
 
-  /// Output only. The user who created this conversation.
+  /// Output only. Path-style creator reference, denormalized from the
+  /// resource path. Kept alongside `created_by` for clients that
+  /// resolve the user via routing rather than the structured Actor.
   /// Format: `organizations/{organization}/users/{user}`
-  public var creator: String = String()
+  public var creator: String {
+    get {_storage._creator}
+    set {_uniqueStorage()._creator = newValue}
+  }
 
   /// The conversation title. May be set by the user or auto-generated.
   ///
@@ -56,7 +64,10 @@ public struct Pivox_Ai_V1_Conversation: Sendable {
   /// first turn lands. Only an explicit `UpdateConversation` whose
   /// update mask covers `title` flips `title_user_set` to true and
   /// makes the title sticky against future `:summarize` calls.
-  public var title: String = String()
+  public var title: String {
+    get {_storage._title}
+    set {_uniqueStorage()._title = newValue}
+  }
 
   /// Output only. Whether the user has set the title via an explicit
   /// `UpdateConversation` call (mask covering `title`) — as opposed
@@ -64,61 +75,97 @@ public struct Pivox_Ai_V1_Conversation: Sendable {
   /// summary from `:summarize`. Used to suppress regeneration:
   /// re-running `:summarize` on a conversation whose title the user
   /// has already curated would overwrite their work.
-  public var titleUserSet: Bool = false
+  public var titleUserSet: Bool {
+    get {_storage._titleUserSet}
+    set {_uniqueStorage()._titleUserSet = newValue}
+  }
 
   /// An optional description of the conversation.
-  public var description_p: String = String()
+  public var description_p: String {
+    get {_storage._description_p}
+    set {_uniqueStorage()._description_p = newValue}
+  }
 
   /// Whether the conversation is archived.
-  public var archived: Bool = false
+  public var archived: Bool {
+    get {_storage._archived}
+    set {_uniqueStorage()._archived = newValue}
+  }
 
   /// Whether the conversation is pinned.
-  public var pinned: Bool = false
+  public var pinned: Bool {
+    get {_storage._pinned}
+    set {_uniqueStorage()._pinned = newValue}
+  }
 
   /// Output only. The number of messages in the conversation.
-  public var messageCount: Int32 = 0
+  public var messageCount: Int32 {
+    get {_storage._messageCount}
+    set {_uniqueStorage()._messageCount = newValue}
+  }
 
   /// Output only. The time of the last message in the conversation.
   public var lastMessageTime: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {_lastMessageTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
-    set {_lastMessageTime = newValue}
+    get {_storage._lastMessageTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._lastMessageTime = newValue}
   }
   /// Returns true if `lastMessageTime` has been explicitly set.
-  public var hasLastMessageTime: Bool {self._lastMessageTime != nil}
+  public var hasLastMessageTime: Bool {_storage._lastMessageTime != nil}
   /// Clears the value of `lastMessageTime`. Subsequent reads from it will return its default value.
-  public mutating func clearLastMessageTime() {self._lastMessageTime = nil}
+  public mutating func clearLastMessageTime() {_uniqueStorage()._lastMessageTime = nil}
+
+  /// Output only. The identity that created this conversation.
+  public var createdBy: Pivox_Types_Actor {
+    get {_storage._createdBy ?? Pivox_Types_Actor()}
+    set {_uniqueStorage()._createdBy = newValue}
+  }
+  /// Returns true if `createdBy` has been explicitly set.
+  public var hasCreatedBy: Bool {_storage._createdBy != nil}
+  /// Clears the value of `createdBy`. Subsequent reads from it will return its default value.
+  public mutating func clearCreatedBy() {_uniqueStorage()._createdBy = nil}
 
   /// Output only. When the conversation was created.
   public var createTime: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {_createTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
-    set {_createTime = newValue}
+    get {_storage._createTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._createTime = newValue}
   }
   /// Returns true if `createTime` has been explicitly set.
-  public var hasCreateTime: Bool {self._createTime != nil}
+  public var hasCreateTime: Bool {_storage._createTime != nil}
   /// Clears the value of `createTime`. Subsequent reads from it will return its default value.
-  public mutating func clearCreateTime() {self._createTime = nil}
+  public mutating func clearCreateTime() {_uniqueStorage()._createTime = nil}
+
+  /// Output only. The identity that last modified this conversation.
+  public var updatedBy: Pivox_Types_Actor {
+    get {_storage._updatedBy ?? Pivox_Types_Actor()}
+    set {_uniqueStorage()._updatedBy = newValue}
+  }
+  /// Returns true if `updatedBy` has been explicitly set.
+  public var hasUpdatedBy: Bool {_storage._updatedBy != nil}
+  /// Clears the value of `updatedBy`. Subsequent reads from it will return its default value.
+  public mutating func clearUpdatedBy() {_uniqueStorage()._updatedBy = nil}
 
   /// Output only. When the conversation was last updated.
   public var updateTime: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {_updateTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
-    set {_updateTime = newValue}
+    get {_storage._updateTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._updateTime = newValue}
   }
   /// Returns true if `updateTime` has been explicitly set.
-  public var hasUpdateTime: Bool {self._updateTime != nil}
+  public var hasUpdateTime: Bool {_storage._updateTime != nil}
   /// Clears the value of `updateTime`. Subsequent reads from it will return its default value.
-  public mutating func clearUpdateTime() {self._updateTime = nil}
+  public mutating func clearUpdateTime() {_uniqueStorage()._updateTime = nil}
 
   /// Output only. A checksum computed by the server based on the current value
   /// of the Conversation resource.
-  public var etag: String = String()
+  public var etag: String {
+    get {_storage._etag}
+    set {_uniqueStorage()._etag = newValue}
+  }
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _lastMessageTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
-  fileprivate var _createTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
-  fileprivate var _updateTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 /// Request message for `GetConversation`.
@@ -290,88 +337,160 @@ fileprivate let _protobuf_package = "pivox.ai.v1"
 
 extension Pivox_Ai_V1_Conversation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".Conversation"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}creator\0\u{1}title\0\u{1}description\0\u{1}archived\0\u{1}pinned\0\u{3}message_count\0\u{3}last_message_time\0\u{3}create_time\0\u{3}update_time\0\u{1}etag\0\u{3}title_user_set\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}creator\0\u{1}title\0\u{3}title_user_set\0\u{1}description\0\u{1}archived\0\u{1}pinned\0\u{3}message_count\0\u{3}last_message_time\0\u{3}created_by\0\u{3}create_time\0\u{3}updated_by\0\u{3}update_time\0\u{1}etag\0")
+
+  fileprivate class _StorageClass {
+    var _name: String = String()
+    var _creator: String = String()
+    var _title: String = String()
+    var _titleUserSet: Bool = false
+    var _description_p: String = String()
+    var _archived: Bool = false
+    var _pinned: Bool = false
+    var _messageCount: Int32 = 0
+    var _lastMessageTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _createdBy: Pivox_Types_Actor? = nil
+    var _createTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _updatedBy: Pivox_Types_Actor? = nil
+    var _updateTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _etag: String = String()
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _name = source._name
+      _creator = source._creator
+      _title = source._title
+      _titleUserSet = source._titleUserSet
+      _description_p = source._description_p
+      _archived = source._archived
+      _pinned = source._pinned
+      _messageCount = source._messageCount
+      _lastMessageTime = source._lastMessageTime
+      _createdBy = source._createdBy
+      _createTime = source._createTime
+      _updatedBy = source._updatedBy
+      _updateTime = source._updateTime
+      _etag = source._etag
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.name) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.creator) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.title) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self.description_p) }()
-      case 5: try { try decoder.decodeSingularBoolField(value: &self.archived) }()
-      case 6: try { try decoder.decodeSingularBoolField(value: &self.pinned) }()
-      case 7: try { try decoder.decodeSingularInt32Field(value: &self.messageCount) }()
-      case 8: try { try decoder.decodeSingularMessageField(value: &self._lastMessageTime) }()
-      case 9: try { try decoder.decodeSingularMessageField(value: &self._createTime) }()
-      case 10: try { try decoder.decodeSingularMessageField(value: &self._updateTime) }()
-      case 11: try { try decoder.decodeSingularStringField(value: &self.etag) }()
-      case 12: try { try decoder.decodeSingularBoolField(value: &self.titleUserSet) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._name) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._creator) }()
+        case 3: try { try decoder.decodeSingularStringField(value: &_storage._title) }()
+        case 4: try { try decoder.decodeSingularBoolField(value: &_storage._titleUserSet) }()
+        case 5: try { try decoder.decodeSingularStringField(value: &_storage._description_p) }()
+        case 6: try { try decoder.decodeSingularBoolField(value: &_storage._archived) }()
+        case 7: try { try decoder.decodeSingularBoolField(value: &_storage._pinned) }()
+        case 8: try { try decoder.decodeSingularInt32Field(value: &_storage._messageCount) }()
+        case 9: try { try decoder.decodeSingularMessageField(value: &_storage._lastMessageTime) }()
+        case 10: try { try decoder.decodeSingularMessageField(value: &_storage._createdBy) }()
+        case 11: try { try decoder.decodeSingularMessageField(value: &_storage._createTime) }()
+        case 12: try { try decoder.decodeSingularMessageField(value: &_storage._updatedBy) }()
+        case 13: try { try decoder.decodeSingularMessageField(value: &_storage._updateTime) }()
+        case 14: try { try decoder.decodeSingularStringField(value: &_storage._etag) }()
+        default: break
+        }
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.name.isEmpty {
-      try visitor.visitSingularStringField(value: self.name, fieldNumber: 1)
-    }
-    if !self.creator.isEmpty {
-      try visitor.visitSingularStringField(value: self.creator, fieldNumber: 2)
-    }
-    if !self.title.isEmpty {
-      try visitor.visitSingularStringField(value: self.title, fieldNumber: 3)
-    }
-    if !self.description_p.isEmpty {
-      try visitor.visitSingularStringField(value: self.description_p, fieldNumber: 4)
-    }
-    if self.archived != false {
-      try visitor.visitSingularBoolField(value: self.archived, fieldNumber: 5)
-    }
-    if self.pinned != false {
-      try visitor.visitSingularBoolField(value: self.pinned, fieldNumber: 6)
-    }
-    if self.messageCount != 0 {
-      try visitor.visitSingularInt32Field(value: self.messageCount, fieldNumber: 7)
-    }
-    try { if let v = self._lastMessageTime {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
-    } }()
-    try { if let v = self._createTime {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
-    } }()
-    try { if let v = self._updateTime {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
-    } }()
-    if !self.etag.isEmpty {
-      try visitor.visitSingularStringField(value: self.etag, fieldNumber: 11)
-    }
-    if self.titleUserSet != false {
-      try visitor.visitSingularBoolField(value: self.titleUserSet, fieldNumber: 12)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if !_storage._name.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._name, fieldNumber: 1)
+      }
+      if !_storage._creator.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._creator, fieldNumber: 2)
+      }
+      if !_storage._title.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._title, fieldNumber: 3)
+      }
+      if _storage._titleUserSet != false {
+        try visitor.visitSingularBoolField(value: _storage._titleUserSet, fieldNumber: 4)
+      }
+      if !_storage._description_p.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._description_p, fieldNumber: 5)
+      }
+      if _storage._archived != false {
+        try visitor.visitSingularBoolField(value: _storage._archived, fieldNumber: 6)
+      }
+      if _storage._pinned != false {
+        try visitor.visitSingularBoolField(value: _storage._pinned, fieldNumber: 7)
+      }
+      if _storage._messageCount != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._messageCount, fieldNumber: 8)
+      }
+      try { if let v = _storage._lastMessageTime {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+      } }()
+      try { if let v = _storage._createdBy {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
+      } }()
+      try { if let v = _storage._createTime {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 11)
+      } }()
+      try { if let v = _storage._updatedBy {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 12)
+      } }()
+      try { if let v = _storage._updateTime {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 13)
+      } }()
+      if !_storage._etag.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._etag, fieldNumber: 14)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Pivox_Ai_V1_Conversation, rhs: Pivox_Ai_V1_Conversation) -> Bool {
-    if lhs.name != rhs.name {return false}
-    if lhs.creator != rhs.creator {return false}
-    if lhs.title != rhs.title {return false}
-    if lhs.titleUserSet != rhs.titleUserSet {return false}
-    if lhs.description_p != rhs.description_p {return false}
-    if lhs.archived != rhs.archived {return false}
-    if lhs.pinned != rhs.pinned {return false}
-    if lhs.messageCount != rhs.messageCount {return false}
-    if lhs._lastMessageTime != rhs._lastMessageTime {return false}
-    if lhs._createTime != rhs._createTime {return false}
-    if lhs._updateTime != rhs._updateTime {return false}
-    if lhs.etag != rhs.etag {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._name != rhs_storage._name {return false}
+        if _storage._creator != rhs_storage._creator {return false}
+        if _storage._title != rhs_storage._title {return false}
+        if _storage._titleUserSet != rhs_storage._titleUserSet {return false}
+        if _storage._description_p != rhs_storage._description_p {return false}
+        if _storage._archived != rhs_storage._archived {return false}
+        if _storage._pinned != rhs_storage._pinned {return false}
+        if _storage._messageCount != rhs_storage._messageCount {return false}
+        if _storage._lastMessageTime != rhs_storage._lastMessageTime {return false}
+        if _storage._createdBy != rhs_storage._createdBy {return false}
+        if _storage._createTime != rhs_storage._createTime {return false}
+        if _storage._updatedBy != rhs_storage._updatedBy {return false}
+        if _storage._updateTime != rhs_storage._updateTime {return false}
+        if _storage._etag != rhs_storage._etag {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

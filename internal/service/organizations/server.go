@@ -21,6 +21,7 @@ import (
 	"github.com/dashkan/pivox/internal/lro"
 	"github.com/dashkan/pivox/internal/permission"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
+	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 	"github.com/dashkan/pivox/internal/resource"
 	"github.com/dashkan/pivox/internal/server"
 )
@@ -107,7 +108,7 @@ func (s *OrganizationsServer) GetOrganization(ctx context.Context, req *apiv1.Ge
 // resolveOrgActors resolves the union of created_by/updated_by/
 // deleted_by UUIDs across the page into a single Actor map. Returns
 // nil when no audit resolver is wired (tests, partial responses).
-func (s *OrganizationsServer) resolveOrgActors(ctx context.Context, orgs []db.Organization) (map[uuid.UUID]*apiv1.Actor, error) {
+func (s *OrganizationsServer) resolveOrgActors(ctx context.Context, orgs []db.Organization) (map[uuid.UUID]*typespb.Actor, error) {
 	if s.audit == nil {
 		return nil, nil
 	}
