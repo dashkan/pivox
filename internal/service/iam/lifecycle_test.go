@@ -249,7 +249,7 @@ func TestRunDeleteAccount_FullCascade(t *testing.T) {
 	q.On("DeleteSpaceMembersForIdentity", mock.Anything, identityID).Return(nil)
 	q.On("GetIdentityByID", mock.Anything, identityID).
 		Return(db.Identity{ID: identityID, FirebaseUid: "fb-abc"}, nil)
-	q.On("SoftDeleteIdentity", mock.Anything, identityID).Return(nil)
+	q.On("SoftDeleteIdentity", mock.Anything, identityID).Return(identityID, nil)
 
 	auth := new(mockAuthService)
 	auth.On("DeleteUser", mock.Anything, "fb-abc").Return(nil)
@@ -299,7 +299,7 @@ func TestRunDeleteAccount_AuthFailureSurfaces(t *testing.T) {
 	q.On("DeleteSpaceMembersForIdentity", mock.Anything, identityID).Return(nil)
 	q.On("GetIdentityByID", mock.Anything, identityID).
 		Return(db.Identity{ID: identityID, FirebaseUid: "fb-abc"}, nil)
-	q.On("SoftDeleteIdentity", mock.Anything, identityID).Return(nil)
+	q.On("SoftDeleteIdentity", mock.Anything, identityID).Return(identityID, nil)
 
 	auth := new(mockAuthService)
 	auth.On("DeleteUser", mock.Anything, "fb-abc").Return(errors.New("firebase down"))

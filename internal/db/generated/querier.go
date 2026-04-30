@@ -568,8 +568,17 @@ type Querier interface {
 	// is_deleted, stamps delete_time. The row is preserved so any
 	// *_by audit field that points at this identity continues to
 	// resolve (the audit resolver renders is_deleted=true with empty
-	// PII rather than dropping the reference). Idempotent.
-	SoftDeleteIdentity(ctx context.Context, id uuid.UUID) error
+	// PII rather than dropping the reference).
+	//
+	// Returns the row's id so the caller can verify the UPDATE actually
+	// landed. The predicate excludes already-soft-deleted rows so a
+	// second call surfaces ErrNoRows — the caller is expected to
+	// distinguish "real first-time tombstone" from "wrong ID / already
+	// tombstoned" rather than silently no-op-and-continue (a wrong id
+	// would otherwise let the LRO proceed to auth.DeleteUser with a
+	// firebase_uid that doesn't belong to the row we thought we
+	// deleted).
+	SoftDeleteIdentity(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
 	// SoftDeleteOrganization transitions an ACTIVE org to DELETE_REQUESTED.
 	// Sets delete_time=now, purge_time=now+30 days, deleted_by=$2. Refuses
 	// to soft-delete an already-soft-deleted org (matches no rows).
@@ -634,6 +643,19 @@ type Querier interface {
 	// still specifically holds a Firebase UID — the table name dropped
 	// the prefix because identities will eventually carry non-Firebase
 	// principal sources too.
+	//
+	// Soft-delete revival: if the existing row is `is_deleted = true`
+	// (the same Firebase UID is being recycled — e.g. after a prior
+	// DeleteAccount + Firebase re-signup with a reused UID), the
+	// conflict path resets `is_deleted` to false and clears
+	// `delete_time`. Without this the row would stay tombstoned, the
+	// new user could not sign in via `GetIdentityByFirebaseUID` (which
+	// excludes tombstones), AND the new user's PII would be written
+	// onto a row whose `id` is still referenced by the previous
+	// identity's audit trail — leaking that PII through every cached
+	// *_by Actor lookup. UID recycling is rare in production (Firebase
+	// normally issues a fresh UID on re-signup) but the constraint
+	// forces this to be defensible regardless.
 	UpsertIdentity(ctx context.Context, arg UpsertIdentityParams) (Identity, error)
 	// UpsertSsoConfig is the create-or-update for the per-org SsoConfig
 	// singleton. ON CONFLICT (org_id) DO UPDATE — UNIQUE(org_id)

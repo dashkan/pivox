@@ -267,7 +267,18 @@ func (s *IamServer) runDeleteAccount(
 			"id", firebaseIdentityID, "error", err)
 		return nil, apierr.Internal("lookup identity")
 	}
-	if err := s.queries.SoftDeleteIdentity(ctx, firebaseIdentityID); err != nil {
+	// SoftDeleteIdentity returns the row's id when the UPDATE actually
+	// landed; ErrNoRows means the row was already soft-deleted (or
+	// the id doesn't exist — but GetIdentityByID just succeeded above
+	// so concurrent purge is the only realistic cause). We treat that
+	// as fatal rather than silently advancing to auth.DeleteUser with
+	// a possibly-stale firebase_uid.
+	if _, err := s.queries.SoftDeleteIdentity(ctx, firebaseIdentityID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			slog.ErrorContext(ctx, "delete account: soft-delete identity touched zero rows; row already tombstoned or concurrently purged",
+				"id", firebaseIdentityID)
+			return nil, apierr.Internal("soft-delete identity: row already tombstoned")
+		}
 		slog.ErrorContext(ctx, "delete account: soft-delete identity failed",
 			"id", firebaseIdentityID, "error", err)
 		return nil, apierr.Internal("soft-delete identity")
