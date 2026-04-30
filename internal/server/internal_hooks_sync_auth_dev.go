@@ -3,7 +3,6 @@
 package server
 
 import (
-	"log/slog"
 	"net/http"
 	"time"
 

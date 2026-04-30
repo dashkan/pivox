@@ -293,6 +293,78 @@ func TestE2E_OrgMember_RejectsCrossOrgPath(t *testing.T) {
 		"cross-org member lookup must surface NotFound / InvalidArgument / PermissionDenied; got %v", got)
 }
 
+// TestE2E_OrgMember_CreateMember_FKRaceReturnsNotFound pins the
+// SQLSTATE 23503 → NotFound mapping introduced in #10 against a real
+// PG. Sequence:
+//
+//  1. Founder creates org. CreateMember is reachable through the
+//     interceptor chain because the harness wires permResolver
+//     (without it CreateMember would have been gated at the perm
+//     check long before the FK violation could fire — that gap was
+//     the original blocker for landing this test).
+//  2. Seed a target identity row, capture its UUID.
+//  3. Hard-DELETE the target identity directly via h.Pool, simulating
+//     the race window where a caller resolves an identity, then it
+//     gets purged before the CreateMember handler's INSERT fires. Hard
+//     delete is operator-only — no public RPC takes this path — so we
+//     issue raw SQL rather than going through any production handler.
+//  4. CreateMember pointing at the now-dangling UUID. Pre-#10 the
+//     handler's verifyPrincipalInOrg pre-check would 404 cleanly;
+//     with that gone, the FK violation on org_members.user_id flows
+//     through `apierr.HandleResourceError`, which (post-#10) maps
+//     SQLSTATE 23503 to NotFound rather than Internal.
+//
+// Asserts NotFound — the load-bearing post-condition. If a future
+// change either undoes the apierr mapping or restores
+// verifyPrincipalInOrg in a way that masks the FK path, this test
+// catches it.
+func TestE2E_OrgMember_CreateMember_FKRaceReturnsNotFound(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	h := newMembersHarness(t)
+	ctx := context.Background()
+
+	owner := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "owner-fkrace"})
+	h.SetCaller(owner)
+	orgClient := apiv1.NewOrganizationsClient(h.Conn())
+	createOrg(t, orgClient, "fkrace-org", "FK Race Org")
+
+	// Seed a target identity. We intentionally do NOT bind it as a
+	// member — we want to exercise the path where the CreateMember
+	// handler's INSERT references an identities row that disappears
+	// between resolve and INSERT, not a failed update on an
+	// existing binding.
+	target := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "target-fkrace"})
+
+	// Hard-delete the target identity directly via the pool. The
+	// production code path for identity removal is SoftDelete (PII
+	// blank + tombstone); hard-delete is operator-only and not
+	// exposed as an RPC. Direct SQL is the only way to recreate the
+	// race in a test.
+	_, err := h.Pool.Exec(ctx,
+		`DELETE FROM identities WHERE id = $1`, target.IdentityID)
+	require.NoError(t, err, "hard-delete of unbound target identity must succeed")
+
+	// CreateMember now references a dangling identities.id. The FK
+	// on org_members.user_id rejects the INSERT with 23503, which
+	// the apierr layer maps to NotFound for the principal's resource
+	// type (User).
+	_, err = orgClient.CreateMember(ctx, &iampb.CreateMemberRequest{
+		Parent: "organizations/fkrace-org",
+		Member: &iampb.Member{
+			Principal: &iampb.Member_User{
+				User: "organizations/fkrace-org/users/" + target.IdentityID.String(),
+			},
+			Role: "organizations/fkrace-org/roles/editor",
+		},
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.NotFound, status.Code(err),
+		"FK violation on dangling principal must surface as NotFound (#10)")
+}
+
 // ---------------------------------------------------------------------------
 // helpers
 // ---------------------------------------------------------------------------

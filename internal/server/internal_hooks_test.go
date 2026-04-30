@@ -43,7 +43,7 @@ func TestNewInternalHooks_Dev(t *testing.T) {
 	auth := new(mockAuthService)
 	logger := slog.Default()
 
-	h, err := NewInternalHooks(mockQ, config.SyncAuthConfig{SharedSecret: "test-secret"}, testDelegatedAuthConfig(), true, nil, logger, auth)
+	h, err := NewInternalHooks(InternalHooksConfig{Queries: mockQ, SyncAuth: config.SyncAuthConfig{SharedSecret: "test-secret"}, DelegatedAuth: testDelegatedAuthConfig(), RateLimitEnabled: true, Logger: logger, Auth: auth})
 	require.NoError(t, err)
 	require.NotNil(t, h)
 	assert.NotNil(t, h.syncAuth)
@@ -70,7 +70,7 @@ func TestRegister_AllRoutes(t *testing.T) {
 	mockQ.On("ResolveProviderByDomain", mock.Anything, mock.Anything).
 		Return(db.ResolveProviderByDomainRow{}, pgx.ErrNoRows).Maybe()
 
-	h, err := NewInternalHooks(mockQ, config.SyncAuthConfig{SharedSecret: "s"}, testDelegatedAuthConfig(), true, nil, logger, auth)
+	h, err := NewInternalHooks(InternalHooksConfig{Queries: mockQ, SyncAuth: config.SyncAuthConfig{SharedSecret: "s"}, DelegatedAuth: testDelegatedAuthConfig(), RateLimitEnabled: true, Logger: logger, Auth: auth})
 	require.NoError(t, err)
 
 	mux := http.NewServeMux()
@@ -158,7 +158,7 @@ func newTestHooks(t *testing.T, mockQ *mocks.MockQuerier, auth *mockAuthService)
 
 func newTestHooksWithConfig(t *testing.T, mockQ *mocks.MockQuerier, auth *mockAuthService, dcfg config.DelegatedAuthConfig) *InternalHooks {
 	t.Helper()
-	h, err := NewInternalHooks(mockQ, config.SyncAuthConfig{SharedSecret: "s"}, dcfg, true, nil, slog.Default(), auth)
+	h, err := NewInternalHooks(InternalHooksConfig{Queries: mockQ, SyncAuth: config.SyncAuthConfig{SharedSecret: "s"}, DelegatedAuth: dcfg, RateLimitEnabled: true, Logger: slog.Default(), Auth: auth})
 	require.NoError(t, err)
 	return h
 }
