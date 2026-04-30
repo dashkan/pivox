@@ -65,7 +65,8 @@ func TestUnit_CreateKey_Success(t *testing.T) {
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
 	mockQ.On("CreateApiKey", mock.Anything, mock.MatchedBy(func(p db.CreateApiKeyParams) bool {
-		return p.OrgID == testOrgID && p.DisplayName == "New Key" && p.KeyID == "custom-id"
+		return p.OrgID == testOrgID && p.DisplayName == "New Key" && p.KeyID == "custom-id" &&
+			p.CreatedBy == convert.PgUUID(apikeyCallerPivoxUUID)
 	})).Return(db.ApiKey{
 		ID:          uuid.New(),
 		OrgID:       testOrgID,
