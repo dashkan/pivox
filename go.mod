@@ -13,19 +13,19 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jackc/pgx/v5 v5.9.2
-	github.com/minio/minio-go/v7 v7.0.100
-	github.com/ollama/ollama v0.21.2
+	github.com/minio/minio-go/v7 v7.1.0
+	github.com/ollama/ollama v0.22.1
 	github.com/pgvector/pgvector-go v0.3.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.42.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.42.0
-	go.einride.tech/aip v0.86.0
+	go.einride.tech/aip v0.86.1
 	golang.org/x/time v0.15.0
-	google.golang.org/api v0.276.0
-	google.golang.org/genproto/googleapis/api v0.0.0-20260420184626-e10c466a9529
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260420184626-e10c466a9529
+	google.golang.org/api v0.277.0
+	google.golang.org/genproto/googleapis/api v0.0.0-20260427160629-7cedc36a6bc4
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260427160629-7cedc36a6bc4
 	google.golang.org/grpc v1.80.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
@@ -49,7 +49,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
-	github.com/buger/jsonparser v1.1.2 // indirect
+	github.com/buger/jsonparser v1.2.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cncf/xds/go v0.0.0-20260202195803-dba9d589def2 // indirect
@@ -116,6 +116,7 @@ require (
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
+	github.com/zeebo/xxh3 v1.1.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.43.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.68.0 // indirect
@@ -134,5 +135,5 @@ require (
 	golang.org/x/sys v0.43.0 // indirect
 	golang.org/x/text v0.36.0 // indirect
 	google.golang.org/appengine/v2 v2.0.6 // indirect
-	google.golang.org/genproto v0.0.0-20260420184626-e10c466a9529 // indirect
+	google.golang.org/genproto v0.0.0-20260427160629-7cedc36a6bc4 // indirect
 )
