@@ -26,7 +26,7 @@ import (
 //
 // Returns the user UUID (the principal_id used in org_members and
 // the {user} segment of resource paths). Post-Phase-7 unification
-// this is `firebase_identities.id` — the global Pivox user uuid,
+// this is `identities.id` — the global Pivox user uuid,
 // not a per-org join row.
 func (h *Harness) SeedMembership(t *testing.T, orgID uuid.UUID, identity *Caller, role string) uuid.UUID {
 	t.Helper()
@@ -43,12 +43,12 @@ func (h *Harness) SeedMembership(t *testing.T, orgID uuid.UUID, identity *Caller
 		OrgID:         orgID,
 		RoleID:        roleRow.ID,
 		PrincipalKind: db.PrincipalKindUser,
-		PrincipalID:   identity.FirebaseIdentityID,
-		CreatedBy:     identity.FirebaseIdentityID.String(),
+		PrincipalID:   identity.IdentityID,
+		CreatedBy:     identity.IdentityID.String(),
 	})
 	require.NoError(t, err)
 
-	return identity.FirebaseIdentityID
+	return identity.IdentityID
 }
 
 // SeedUserMembershipOnly is retained for compatibility with E2E
@@ -62,7 +62,7 @@ func (h *Harness) SeedMembership(t *testing.T, orgID uuid.UUID, identity *Caller
 func (h *Harness) SeedUserMembershipOnly(t *testing.T, orgID uuid.UUID, identity *Caller) uuid.UUID {
 	t.Helper()
 	_ = orgID
-	return identity.FirebaseIdentityID
+	return identity.IdentityID
 }
 
 // LookupOrgID resolves a slug to its uuid. Convenience for tests
@@ -76,9 +76,9 @@ func (h *Harness) LookupOrgID(t *testing.T, slug string) uuid.UUID {
 	return org.ID
 }
 
-// LookupOrgUserID returns the firebase_identity_id directly —
+// LookupOrgUserID returns the identity_id directly —
 // post-Phase-7 unification the per-org user uuid IS the
-// firebase_identity_id, and there's no per-org users row to look
+// identity_id, and there's no per-org users row to look
 // up. The orgID parameter is preserved on the signature for
 // caller compatibility but is no longer relevant: a
 // firebase_identity has the same uuid in every org.

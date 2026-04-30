@@ -80,7 +80,7 @@ func (r *Resolver) effectiveRoles(ctx context.Context, identity uuid.UUID, targe
 	case target.OrgID != uuid.Nil && target.SpaceID == uuid.Nil:
 		return r.queries.GetEffectiveOrgRoles(ctx, db.GetEffectiveOrgRolesParams{
 			OrgID:              target.OrgID,
-			FirebaseIdentityID: identity,
+			IdentityID: identity,
 		})
 
 	case target.SpaceID != uuid.Nil && target.OrgID == uuid.Nil:
@@ -102,14 +102,14 @@ func (r *Resolver) effectiveRoles(ctx context.Context, identity uuid.UUID, targe
 		}
 		spaceRoles, err := r.queries.GetEffectiveSpaceRoles(ctx, db.GetEffectiveSpaceRolesParams{
 			SpaceID:            target.SpaceID,
-			FirebaseIdentityID: identity,
+			IdentityID: identity,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("resolve space roles: %w", err)
 		}
 		orgRoles, err := r.queries.GetEffectiveOrgRoles(ctx, db.GetEffectiveOrgRolesParams{
 			OrgID:              parentOrg,
-			FirebaseIdentityID: identity,
+			IdentityID: identity,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("resolve org roles for parent org: %w", err)

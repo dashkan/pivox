@@ -15,7 +15,7 @@ import (
 
 // ConversationToProto converts a DB conversation to proto.
 // orgName is the organization segment (e.g. "acme"). The resource
-// name encodes ownership via the creator's `firebase_identities.id`
+// name encodes ownership via the creator's `identities.id`
 // in the `users/{user}` segment — same uuid the handler enforces
 // path-vs-caller against. `actors` is the pre-resolved Actor map for
 // the calling page; pass nil to skip Actor inflation.

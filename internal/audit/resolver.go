@@ -1,6 +1,6 @@
 // Package audit resolves UUID audit fields (created_by, updated_by,
 // deleted_by) into proto-friendly Actor messages by batching lookups
-// against firebase_identities. A single Resolver is bound to the
+// against identities. A single Resolver is bound to the
 // server lifetime and shared across handlers.
 package audit
 
@@ -38,7 +38,7 @@ func (r *Resolver) Resolve(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]
 		return out, nil
 	}
 
-	rows, err := r.queries.GetFirebaseIdentitiesByIDs(ctx, deduped)
+	rows, err := r.queries.GetIdentitiesByIDs(ctx, deduped)
 	if err != nil {
 		return nil, err
 	}

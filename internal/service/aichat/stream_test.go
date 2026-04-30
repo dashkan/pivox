@@ -80,7 +80,7 @@ func (s *mockServerStream) SendMsg(any) error            { return nil }
 func (s *mockServerStream) RecvMsg(any) error            { return nil }
 
 // fixedUserID is the per-test caller's pivox user UUID
-// (firebase_identities.id). Stable so paths can be constructed
+// (identities.id). Stable so paths can be constructed
 // without juggling fresh uuids per call.
 var fixedUserID = uuid.MustParse("0192a000-0009-7000-8000-000000000001")
 

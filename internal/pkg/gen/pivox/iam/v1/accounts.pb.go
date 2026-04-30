@@ -47,7 +47,7 @@ const (
 	DeleteAccountMetadata_VALIDATING DeleteAccountMetadata_Phase = 1
 	// Removing role / group memberships across all orgs.
 	DeleteAccountMetadata_REVOKING_MEMBERSHIPS DeleteAccountMetadata_Phase = 2
-	// Hard-deleting Pivox-side records (firebase_identities row;
+	// Hard-deleting Pivox-side records (identities row;
 	// FK cascade removes per-org users + group_members).
 	DeleteAccountMetadata_DELETING_PIVOX_RECORDS DeleteAccountMetadata_Phase = 3
 	// Deleting the Firebase Auth identity (last step).
@@ -113,12 +113,12 @@ func (DeleteAccountMetadata_Phase) EnumDescriptor() ([]byte, []int) {
 //   - Profile fields (email, display_name, photo_url, email_verified)
 //     live in Firebase Auth and are mutated through the Firebase SDK
 //     on the client. Pivox replicates them via the
-//     `auth:syncFirebaseIdentity` blocking trigger on every sign-in.
+//     `auth:syncIdentity` blocking trigger on every sign-in.
 //     Surfacing Get/Update here would either expose stale replicas or
 //     force Pivox to write through to Firebase from the server, both
 //     of which violate the "Firebase owns the account profile" rule.
 //
-//   - Create is implicit via Firebase sign-up + the syncFirebaseIdentity
+//   - Create is implicit via Firebase sign-up + the syncIdentity
 //     trigger; not a public RPC.
 //
 // (-- api-linter: core::0121::resource-must-support-get=disabled
@@ -244,7 +244,7 @@ func (x *DeleteAccountRequest) GetName() string {
 //  2. REVOKING_MEMBERSHIPS — drops every org_members and
 //     space_members row whose principal is a per-org users row
 //     owned by this firebase_identity. Cross-org by design.
-//  3. DELETING_PIVOX_RECORDS — hard-deletes the firebase_identities
+//  3. DELETING_PIVOX_RECORDS — hard-deletes the identities
 //     row. ON DELETE CASCADE removes per-org users + their
 //     group_members.
 //  4. DELETING_FIREBASE_IDENTITY — calls Firebase Admin SDK

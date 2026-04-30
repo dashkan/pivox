@@ -16,7 +16,7 @@ import (
 type authContextKey struct{}
 
 // pivoxUserIDKey is the context key for the caller's per-Pivox
-// `firebase_identities.id` UUID. Populated by the auth interceptor
+// `identities.id` UUID. Populated by the auth interceptor
 // from the `pivox_user_id` Firebase ID-token custom claim, which is
 // set during identity sync by the Firebase blocking function.
 //
@@ -61,7 +61,7 @@ func MustAuthenticatedUID(ctx context.Context) string {
 }
 
 // PivoxUserID extracts the verified Pivox user UUID
-// (`firebase_identities.id`) from the context. Returns the UUID and
+// (`identities.id`) from the context. Returns the UUID and
 // true when the auth interceptor extracted a `pivox_user_id` claim
 // from the verified ID token.
 func PivoxUserID(ctx context.Context) (uuid.UUID, bool) {

@@ -40,7 +40,7 @@ type CountOrgOwnersExcludingUserParams struct {
 // user being removed, so the handler can refuse if removing them
 // would leave the org with zero owners. Counts both user and group
 // principals (matches CountOwnersByOrg's group-owner support).
-// $2 is `firebase_identities.id`.
+// $2 is `identities.id`.
 func (q *Queries) CountOrgOwnersExcludingUser(ctx context.Context, arg CountOrgOwnersExcludingUserParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countOrgOwnersExcludingUser, arg.OrgID, arg.PrincipalID)
 	var count int64
@@ -81,17 +81,17 @@ func (q *Queries) CountOwnersByOrg(ctx context.Context, orgID uuid.UUID) (int64,
 	return count, err
 }
 
-const deleteGroupMembersForFirebaseIdentity = `-- name: DeleteGroupMembersForFirebaseIdentity :exec
+const deleteGroupMembersForIdentity = `-- name: DeleteGroupMembersForIdentity :exec
 DELETE FROM group_members WHERE user_id = $1
 `
 
-// DeleteGroupMembersForFirebaseIdentity removes the firebase_identity
+// DeleteGroupMembersForIdentity removes the firebase_identity
 // from every group it belongs to, across all orgs. Cross-org variant
 // for DeleteAccount. After Phase 7 unification, group_members.user_id
-// IS firebase_identities.id, so this is a single straight DELETE
+// IS identities.id, so this is a single straight DELETE
 // without the prior subquery.
-func (q *Queries) DeleteGroupMembersForFirebaseIdentity(ctx context.Context, userID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, deleteGroupMembersForFirebaseIdentity, userID)
+func (q *Queries) DeleteGroupMembersForIdentity(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteGroupMembersForIdentity, userID)
 	return err
 }
 
@@ -108,27 +108,27 @@ type DeleteGroupMembersForUserInOrgParams struct {
 
 // DeleteGroupMembersForUserInOrg removes the user's membership in
 // groups belonging to this org. After Phase 7 unification,
-// group_members.user_id IS firebase_identities.id directly — same
+// group_members.user_id IS identities.id directly — same
 // type as principal_id on the sibling tables, just a different
 // column name (group_members has no principal_kind discriminator).
-// $2 is `firebase_identities.id`.
+// $2 is `identities.id`.
 func (q *Queries) DeleteGroupMembersForUserInOrg(ctx context.Context, arg DeleteGroupMembersForUserInOrgParams) error {
 	_, err := q.db.Exec(ctx, deleteGroupMembersForUserInOrg, arg.OrgID, arg.UserID)
 	return err
 }
 
-const deleteOrgMembersForFirebaseIdentity = `-- name: DeleteOrgMembersForFirebaseIdentity :exec
+const deleteOrgMembersForIdentity = `-- name: DeleteOrgMembersForIdentity :exec
 DELETE FROM org_members
  WHERE principal_kind = 'user'
    AND principal_id = $1
 `
 
-// DeleteOrgMembersForFirebaseIdentity removes ALL org-scope role
+// DeleteOrgMembersForIdentity removes ALL org-scope role
 // bindings across every org for this firebase_identity. Used by
 // DeleteAccount's cross-org cascade. Org-scoped DeleteUser uses
 // the per-org variant `DeleteOrgMembersForUserInOrg` below.
-func (q *Queries) DeleteOrgMembersForFirebaseIdentity(ctx context.Context, principalID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, deleteOrgMembersForFirebaseIdentity, principalID)
+func (q *Queries) DeleteOrgMembersForIdentity(ctx context.Context, principalID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteOrgMembersForIdentity, principalID)
 	return err
 }
 
@@ -152,22 +152,22 @@ type DeleteOrgMembersForUserInOrgParams struct {
 // ===========================================================================
 // DeleteOrgMembersForUserInOrg removes the user's org-scope role
 // bindings in a single org. Bounded by (org_id, principal_id).
-// $2 is `firebase_identities.id` (post-Phase-7 unification).
+// $2 is `identities.id` (post-Phase-7 unification).
 func (q *Queries) DeleteOrgMembersForUserInOrg(ctx context.Context, arg DeleteOrgMembersForUserInOrgParams) error {
 	_, err := q.db.Exec(ctx, deleteOrgMembersForUserInOrg, arg.OrgID, arg.PrincipalID)
 	return err
 }
 
-const deleteSpaceMembersForFirebaseIdentity = `-- name: DeleteSpaceMembersForFirebaseIdentity :exec
+const deleteSpaceMembersForIdentity = `-- name: DeleteSpaceMembersForIdentity :exec
 DELETE FROM space_members
  WHERE principal_kind = 'user'
    AND principal_id = $1
 `
 
-// DeleteSpaceMembersForFirebaseIdentity is the cross-org space-
+// DeleteSpaceMembersForIdentity is the cross-org space-
 // scope analogue used by DeleteAccount.
-func (q *Queries) DeleteSpaceMembersForFirebaseIdentity(ctx context.Context, principalID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, deleteSpaceMembersForFirebaseIdentity, principalID)
+func (q *Queries) DeleteSpaceMembersForIdentity(ctx context.Context, principalID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteSpaceMembersForIdentity, principalID)
 	return err
 }
 
@@ -186,17 +186,17 @@ type DeleteSpaceMembersForUserInOrgParams struct {
 // DeleteSpaceMembersForUserInOrg removes the user's space-scope
 // bindings for spaces in this org. Joins to spaces to bound by
 // org_id, since space_members rows themselves only carry space_id.
-// $2 is `firebase_identities.id`.
+// $2 is `identities.id`.
 func (q *Queries) DeleteSpaceMembersForUserInOrg(ctx context.Context, arg DeleteSpaceMembersForUserInOrgParams) error {
 	_, err := q.db.Exec(ctx, deleteSpaceMembersForUserInOrg, arg.OrgID, arg.PrincipalID)
 	return err
 }
 
-const hardDeleteFirebaseIdentity = `-- name: HardDeleteFirebaseIdentity :exec
-DELETE FROM firebase_identities WHERE id = $1
+const hardDeleteIdentity = `-- name: HardDeleteIdentity :exec
+DELETE FROM identities WHERE id = $1
 `
 
-// HardDeleteFirebaseIdentity removes the firebase_identity row.
+// HardDeleteIdentity removes the firebase_identity row.
 // group_members.user_id has ON DELETE CASCADE so group memberships
 // transitively delete; org_members and space_members principal_id
 // columns aren't FK'd (polymorphic by principal_kind) so the
@@ -204,12 +204,12 @@ DELETE FROM firebase_identities WHERE id = $1
 // second-to-last step of DeleteAccount; the Firebase Auth identity
 // itself is deleted last so a partial failure leaves a recoverable
 // Firebase identity rather than orphaned Pivox state.
-func (q *Queries) HardDeleteFirebaseIdentity(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.Exec(ctx, hardDeleteFirebaseIdentity, id)
+func (q *Queries) HardDeleteIdentity(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, hardDeleteIdentity, id)
 	return err
 }
 
-const listOrganizationsForFirebaseIdentity = `-- name: ListOrganizationsForFirebaseIdentity :many
+const listOrganizationsForIdentity = `-- name: ListOrganizationsForIdentity :many
 
 SELECT DISTINCT o.id, o.name, o.display_name, o.annotations, o.state, o.etag, o.revision, o.created_by, o.updated_by, o.deleted_by, o.create_time, o.update_time, o.delete_time, o.purge_time
   FROM organizations o
@@ -225,10 +225,10 @@ SELECT DISTINCT o.id, o.name, o.display_name, o.annotations, o.state, o.etag, o.
  LIMIT 1000
 `
 
-// Phase 7 unified per-org identity with firebase_identities. The
+// Phase 7 unified per-org identity with identities. The
 // per-org `users` join table was dropped; queries that used to
 // resolve "users.id from (org, firebase_identity)" now reference
-// `firebase_identities.id` directly. The handler reads it from the
+// `identities.id` directly. The handler reads it from the
 // `pivox_user_id` ID-token claim — no DB lookup required.
 //
 // Queries below are the reduced set still useful post-unification:
@@ -257,10 +257,10 @@ SELECT DISTINCT o.id, o.name, o.display_name, o.annotations, o.state, o.etag, o.
 // only role-binding is via a group, even though they can clearly
 // reach RPCs gated by that group's permissions. Group-mediated
 // access was the old behavior pre-Phase-7 (users.id existed for
-// group-only members and ListUsersByFirebaseIdentity counted them);
+// group-only members and ListUsersByIdentity counted them);
 // preserved here in the unified shape.
-func (q *Queries) ListOrganizationsForFirebaseIdentity(ctx context.Context, principalID uuid.UUID) ([]Organization, error) {
-	rows, err := q.db.Query(ctx, listOrganizationsForFirebaseIdentity, principalID)
+func (q *Queries) ListOrganizationsForIdentity(ctx context.Context, principalID uuid.UUID) ([]Organization, error) {
+	rows, err := q.db.Query(ctx, listOrganizationsForIdentity, principalID)
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +294,7 @@ func (q *Queries) ListOrganizationsForFirebaseIdentity(ctx context.Context, prin
 	return items, nil
 }
 
-const listSoleOwnerOrgsForFirebaseIdentity = `-- name: ListSoleOwnerOrgsForFirebaseIdentity :many
+const listSoleOwnerOrgsForIdentity = `-- name: ListSoleOwnerOrgsForIdentity :many
 SELECT o.id, o.name, o.display_name, o.annotations, o.state, o.etag, o.revision, o.created_by, o.updated_by, o.deleted_by, o.create_time, o.update_time, o.delete_time, o.purge_time
   FROM organizations o
  WHERE o.delete_time IS NULL
@@ -322,7 +322,7 @@ SELECT o.id, o.name, o.display_name, o.annotations, o.state, o.etag, o.revision,
    )
 `
 
-// ListSoleOwnerOrgsForFirebaseIdentity returns active orgs where
+// ListSoleOwnerOrgsForIdentity returns active orgs where
 // the given firebase_identity is the ONLY owner. Used by
 // DeleteAccount's VALIDATING phase to refuse deletion when the
 // caller would leave any org without an owner.
@@ -331,8 +331,8 @@ SELECT o.id, o.name, o.display_name, o.annotations, o.state, o.etag, o.revision,
 //   - exactly one user-owner binding exists, and it points at this
 //     firebase_identity, AND
 //   - zero ACTIVE-group-owner bindings exist.
-func (q *Queries) ListSoleOwnerOrgsForFirebaseIdentity(ctx context.Context, principalID uuid.UUID) ([]Organization, error) {
-	rows, err := q.db.Query(ctx, listSoleOwnerOrgsForFirebaseIdentity, principalID)
+func (q *Queries) ListSoleOwnerOrgsForIdentity(ctx context.Context, principalID uuid.UUID) ([]Organization, error) {
+	rows, err := q.db.Query(ctx, listSoleOwnerOrgsForIdentity, principalID)
 	if err != nil {
 		return nil, err
 	}

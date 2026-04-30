@@ -101,13 +101,13 @@ CREATE TABLE organizations (
     etag                  TEXT NOT NULL DEFAULT md5(now()::text),
     revision              INTEGER NOT NULL DEFAULT 1,
     -- audit. `created_by` doubles as the immutable founder pointer
-    -- (FK to firebase_identities; soft-delete-only policy means it
+    -- (FK to identities; soft-delete-only policy means it
     -- never dangles, so we don't need a separate "founder UUID"
     -- column). Ownership is tracked via `org_members` rows bound
     -- to the system 'owner' role; "≥1 owner" is enforced at the
     -- service mutation boundary, not here. updated_by / deleted_by
     -- nullable because the row may have never been touched / soft-
-    -- deleted. FK added below the firebase_identities declaration
+    -- deleted. FK added below the identities declaration
     -- (forward-ref).
     created_by            UUID,
     updated_by            UUID,
@@ -380,9 +380,9 @@ CREATE INDEX idx_api_keys_org ON api_keys (org_id) WHERE delete_time IS NULL;
 CREATE INDEX idx_api_keys_key_string ON api_keys (key_string) WHERE delete_time IS NULL;
 
 -- ============================================================================
--- firebase_identities (global Firebase Auth cache — internal, no proto)
+-- identities (global Firebase Auth cache — internal, no proto)
 -- ============================================================================
-CREATE TABLE firebase_identities (
+CREATE TABLE identities (
     id              UUID PRIMARY KEY DEFAULT uuidv7(),
     -- identity (Firebase)
     firebase_uid    TEXT NOT NULL UNIQUE,
@@ -397,26 +397,26 @@ CREATE TABLE firebase_identities (
     update_time     TIMESTAMPTZ NOT NULL DEFAULT now(),
     last_login_time TIMESTAMPTZ
 );
-CREATE INDEX idx_firebase_identities_email ON firebase_identities (email);
+CREATE INDEX idx_identities_email ON identities (email);
 
 -- ============================================================================
--- Per-org user identity has been unified with `firebase_identities`
+-- Per-org user identity has been unified with `identities`
 -- (Phase 7). The previous per-org `users` join row was dropped in
--- favor of using `firebase_identities.id` as the universal user UUID
+-- favor of using `identities.id` as the universal user UUID
 -- across the API:
 --
 --   - `org_members.principal_id` (when principal_kind='user') →
---     references `firebase_identities.id`
+--     references `identities.id`
 --   - `space_members.principal_id` (when principal_kind='user') →
 --     same
---   - `group_members.user_id` → references `firebase_identities.id`
+--   - `group_members.user_id` → references `identities.id`
 --   - `ai_conversations.creator_id` → same (added in the AI chat
 --     re-parent commit that ships alongside this one)
 --
 -- Membership in an org = the existence of at least one `org_members`
 -- row binding the firebase_identity to that org via a role. Removing
 -- a user from an org is a hard-delete of those `org_members`/
--- `space_members`/`group_members` rows; the `firebase_identities`
+-- `space_members`/`group_members` rows; the `identities`
 -- row itself is unaffected.
 --
 -- Clients learn their own user UUID via the `pivox_user_id` Firebase
@@ -424,42 +424,42 @@ CREATE INDEX idx_firebase_identities_email ON firebase_identities (email);
 -- the `/internal/v1/auth:syncFirebaseIdentity` response.
 -- ============================================================================
 
--- Forward-referenced FKs from audit columns → firebase_identities(id),
--- added here because `firebase_identities` is declared after the
+-- Forward-referenced FKs from audit columns → identities(id),
+-- added here because `identities` is declared after the
 -- audit-bearing tables in this migration. NO `ON DELETE` clauses —
 -- identity rows are soft-deleted only (Phase 7+ policy), so the FKs
 -- never dangle and cascade behavior never fires. Tables declared
--- AFTER firebase_identities (groups, role_*, members, domains,
+-- AFTER identities (groups, role_*, members, domains,
 -- sso_configs, ai_*, etc.) carry their FKs inline at column
 -- declaration; only this block handles the forward-refs.
 ALTER TABLE operations
-  ADD CONSTRAINT fk_operations_created_by FOREIGN KEY (created_by) REFERENCES firebase_identities(id);
+  ADD CONSTRAINT fk_operations_created_by FOREIGN KEY (created_by) REFERENCES identities(id);
 ALTER TABLE organizations
-  ADD CONSTRAINT fk_organizations_created_by FOREIGN KEY (created_by) REFERENCES firebase_identities(id),
-  ADD CONSTRAINT fk_organizations_updated_by FOREIGN KEY (updated_by) REFERENCES firebase_identities(id),
-  ADD CONSTRAINT fk_organizations_deleted_by FOREIGN KEY (deleted_by) REFERENCES firebase_identities(id);
+  ADD CONSTRAINT fk_organizations_created_by FOREIGN KEY (created_by) REFERENCES identities(id),
+  ADD CONSTRAINT fk_organizations_updated_by FOREIGN KEY (updated_by) REFERENCES identities(id),
+  ADD CONSTRAINT fk_organizations_deleted_by FOREIGN KEY (deleted_by) REFERENCES identities(id);
 ALTER TABLE spaces
-  ADD CONSTRAINT fk_spaces_created_by FOREIGN KEY (created_by) REFERENCES firebase_identities(id),
-  ADD CONSTRAINT fk_spaces_updated_by FOREIGN KEY (updated_by) REFERENCES firebase_identities(id),
-  ADD CONSTRAINT fk_spaces_deleted_by FOREIGN KEY (deleted_by) REFERENCES firebase_identities(id);
+  ADD CONSTRAINT fk_spaces_created_by FOREIGN KEY (created_by) REFERENCES identities(id),
+  ADD CONSTRAINT fk_spaces_updated_by FOREIGN KEY (updated_by) REFERENCES identities(id),
+  ADD CONSTRAINT fk_spaces_deleted_by FOREIGN KEY (deleted_by) REFERENCES identities(id);
 ALTER TABLE storage_gateways
-  ADD CONSTRAINT fk_storage_gateways_created_by FOREIGN KEY (created_by) REFERENCES firebase_identities(id),
-  ADD CONSTRAINT fk_storage_gateways_updated_by FOREIGN KEY (updated_by) REFERENCES firebase_identities(id);
+  ADD CONSTRAINT fk_storage_gateways_created_by FOREIGN KEY (created_by) REFERENCES identities(id),
+  ADD CONSTRAINT fk_storage_gateways_updated_by FOREIGN KEY (updated_by) REFERENCES identities(id);
 ALTER TABLE storage_endpoints
-  ADD CONSTRAINT fk_storage_endpoints_created_by FOREIGN KEY (created_by) REFERENCES firebase_identities(id),
-  ADD CONSTRAINT fk_storage_endpoints_updated_by FOREIGN KEY (updated_by) REFERENCES firebase_identities(id);
+  ADD CONSTRAINT fk_storage_endpoints_created_by FOREIGN KEY (created_by) REFERENCES identities(id),
+  ADD CONSTRAINT fk_storage_endpoints_updated_by FOREIGN KEY (updated_by) REFERENCES identities(id);
 ALTER TABLE tag_keys
-  ADD CONSTRAINT fk_tag_keys_created_by FOREIGN KEY (created_by) REFERENCES firebase_identities(id),
-  ADD CONSTRAINT fk_tag_keys_updated_by FOREIGN KEY (updated_by) REFERENCES firebase_identities(id);
+  ADD CONSTRAINT fk_tag_keys_created_by FOREIGN KEY (created_by) REFERENCES identities(id),
+  ADD CONSTRAINT fk_tag_keys_updated_by FOREIGN KEY (updated_by) REFERENCES identities(id);
 ALTER TABLE tag_values
-  ADD CONSTRAINT fk_tag_values_created_by FOREIGN KEY (created_by) REFERENCES firebase_identities(id),
-  ADD CONSTRAINT fk_tag_values_updated_by FOREIGN KEY (updated_by) REFERENCES firebase_identities(id);
+  ADD CONSTRAINT fk_tag_values_created_by FOREIGN KEY (created_by) REFERENCES identities(id),
+  ADD CONSTRAINT fk_tag_values_updated_by FOREIGN KEY (updated_by) REFERENCES identities(id);
 ALTER TABLE tag_bindings
-  ADD CONSTRAINT fk_tag_bindings_created_by FOREIGN KEY (created_by) REFERENCES firebase_identities(id);
+  ADD CONSTRAINT fk_tag_bindings_created_by FOREIGN KEY (created_by) REFERENCES identities(id);
 ALTER TABLE api_keys
-  ADD CONSTRAINT fk_api_keys_created_by FOREIGN KEY (created_by) REFERENCES firebase_identities(id),
-  ADD CONSTRAINT fk_api_keys_updated_by FOREIGN KEY (updated_by) REFERENCES firebase_identities(id),
-  ADD CONSTRAINT fk_api_keys_deleted_by FOREIGN KEY (deleted_by) REFERENCES firebase_identities(id);
+  ADD CONSTRAINT fk_api_keys_created_by FOREIGN KEY (created_by) REFERENCES identities(id),
+  ADD CONSTRAINT fk_api_keys_updated_by FOREIGN KEY (updated_by) REFERENCES identities(id),
+  ADD CONSTRAINT fk_api_keys_deleted_by FOREIGN KEY (deleted_by) REFERENCES identities(id);
 
 -- FK from operations.org_id → organizations(id), deferred for the
 -- same reason: `operations` is declared above `organizations` (so the
@@ -486,8 +486,8 @@ CREATE TABLE groups (
     etag         TEXT NOT NULL DEFAULT md5(now()::text),
     revision     INTEGER NOT NULL DEFAULT 1,
     -- audit
-    created_by UUID REFERENCES firebase_identities(id),
-    updated_by UUID REFERENCES firebase_identities(id),
+    created_by UUID REFERENCES identities(id),
+    updated_by UUID REFERENCES identities(id),
     -- timestamps
     create_time  TIMESTAMPTZ NOT NULL DEFAULT now(),
     update_time  TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -501,9 +501,9 @@ CREATE TABLE group_members (
     id         UUID PRIMARY KEY DEFAULT uuidv7(),
     -- relationships
     group_id   UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-    user_id    UUID NOT NULL REFERENCES firebase_identities(id) ON DELETE CASCADE,
+    user_id    UUID NOT NULL REFERENCES identities(id) ON DELETE CASCADE,
     -- audit
-    created_by UUID REFERENCES firebase_identities(id),
+    created_by UUID REFERENCES identities(id),
     -- timestamps
     create_time TIMESTAMPTZ NOT NULL DEFAULT now(),
     -- constraints
@@ -551,8 +551,8 @@ CREATE TABLE roles (
     etag         TEXT NOT NULL DEFAULT md5(now()::text),
     revision     INTEGER NOT NULL DEFAULT 1,
     -- audit
-    created_by UUID REFERENCES firebase_identities(id),
-    updated_by UUID REFERENCES firebase_identities(id),
+    created_by UUID REFERENCES identities(id),
+    updated_by UUID REFERENCES identities(id),
     -- timestamps
     create_time  TIMESTAMPTZ NOT NULL DEFAULT now(),
     update_time  TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -597,8 +597,8 @@ CREATE TABLE org_members (
     etag           TEXT NOT NULL DEFAULT md5(now()::text),
     revision       INTEGER NOT NULL DEFAULT 1,
     -- audit
-    created_by UUID REFERENCES firebase_identities(id),
-    updated_by UUID REFERENCES firebase_identities(id),
+    created_by UUID REFERENCES identities(id),
+    updated_by UUID REFERENCES identities(id),
     -- timestamps
     create_time    TIMESTAMPTZ NOT NULL DEFAULT now(),
     update_time    TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -627,8 +627,8 @@ CREATE TABLE space_members (
     etag           TEXT NOT NULL DEFAULT md5(now()::text),
     revision       INTEGER NOT NULL DEFAULT 1,
     -- audit
-    created_by UUID REFERENCES firebase_identities(id),
-    updated_by UUID REFERENCES firebase_identities(id),
+    created_by UUID REFERENCES identities(id),
+    updated_by UUID REFERENCES identities(id),
     -- timestamps
     create_time    TIMESTAMPTZ NOT NULL DEFAULT now(),
     update_time    TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -655,7 +655,7 @@ CREATE TABLE invitations (
     -- versioning
     etag        TEXT NOT NULL DEFAULT md5(now()::text),
     -- audit
-    created_by UUID REFERENCES firebase_identities(id),
+    created_by UUID REFERENCES identities(id),
     -- timestamps
     create_time TIMESTAMPTZ NOT NULL DEFAULT now(),
     expire_time TIMESTAMPTZ NOT NULL DEFAULT now() + INTERVAL '7 days',
@@ -714,8 +714,8 @@ CREATE TABLE domains (
     etag               TEXT NOT NULL DEFAULT md5(now()::text),
     revision           INTEGER NOT NULL DEFAULT 1,
     -- audit
-    created_by UUID REFERENCES firebase_identities(id),
-    updated_by UUID REFERENCES firebase_identities(id),
+    created_by UUID REFERENCES identities(id),
+    updated_by UUID REFERENCES identities(id),
     -- timestamps
     create_time        TIMESTAMPTZ NOT NULL DEFAULT now(),
     update_time        TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -750,8 +750,8 @@ CREATE TABLE sso_configs (
     etag                       TEXT NOT NULL DEFAULT md5(now()::text),
     revision                   INTEGER NOT NULL DEFAULT 1,
     -- audit
-    created_by UUID REFERENCES firebase_identities(id),
-    updated_by UUID REFERENCES firebase_identities(id),
+    created_by UUID REFERENCES identities(id),
+    updated_by UUID REFERENCES identities(id),
     -- timestamps
     create_time                TIMESTAMPTZ NOT NULL DEFAULT now(),
     update_time                TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -968,9 +968,9 @@ CREATE TABLE assets (
     etag                TEXT NOT NULL DEFAULT md5(now()::text),
     revision            INTEGER NOT NULL DEFAULT 1,
     -- audit
-    created_by UUID REFERENCES firebase_identities(id),
-    updated_by UUID REFERENCES firebase_identities(id),
-    deleted_by UUID REFERENCES firebase_identities(id),
+    created_by UUID REFERENCES identities(id),
+    updated_by UUID REFERENCES identities(id),
+    deleted_by UUID REFERENCES identities(id),
     -- timestamps
     create_time         TIMESTAMPTZ NOT NULL DEFAULT now(),
     update_time         TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -1003,7 +1003,7 @@ CREATE TABLE asset_versions (
     change_note       TEXT NOT NULL DEFAULT '',
     ingestion_error   TEXT NOT NULL DEFAULT '',
     -- audit
-    created_by UUID REFERENCES firebase_identities(id),
+    created_by UUID REFERENCES identities(id),
     -- timestamps
     create_time       TIMESTAMPTZ NOT NULL DEFAULT now(),
     -- constraints
@@ -1049,8 +1049,8 @@ CREATE TABLE asset_requests (
     etag              TEXT NOT NULL DEFAULT md5(now()::text),
     revision          INTEGER NOT NULL DEFAULT 1,
     -- audit
-    created_by UUID REFERENCES firebase_identities(id),
-    updated_by UUID REFERENCES firebase_identities(id),
+    created_by UUID REFERENCES identities(id),
+    updated_by UUID REFERENCES identities(id),
     -- timestamps
     create_time       TIMESTAMPTZ NOT NULL DEFAULT now(),
     update_time       TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -1090,8 +1090,8 @@ CREATE TABLE asset_request_line_items (
     -- state
     state             line_item_state NOT NULL DEFAULT 'PENDING',
     -- audit
-    created_by UUID REFERENCES firebase_identities(id),
-    updated_by UUID REFERENCES firebase_identities(id),
+    created_by UUID REFERENCES identities(id),
+    updated_by UUID REFERENCES identities(id),
     -- timestamps
     create_time       TIMESTAMPTZ NOT NULL DEFAULT now(),
     update_time       TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -1151,14 +1151,14 @@ CREATE TABLE ai_conversations (
     etag            TEXT NOT NULL DEFAULT md5(now()::text),
     revision        INTEGER NOT NULL DEFAULT 1,
     -- audit. `created_by` is load-bearing: it doubles as the
-    -- conversation owner's firebase_identities.id (the resource
+    -- conversation owner's identities.id (the resource
     -- path carries it as `users/{user}`), and the handler enforces
     -- `created_by == caller's pivox_user_id` unless the caller
     -- holds `ai.conversations.readAll` / `deleteAll`. NOT NULL —
     -- every conversation has a creator. Soft-delete-only on
     -- identities means the FK never dangles.
-    created_by      UUID NOT NULL REFERENCES firebase_identities(id),
-    updated_by UUID REFERENCES firebase_identities(id),
+    created_by      UUID NOT NULL REFERENCES identities(id),
+    updated_by UUID REFERENCES identities(id),
     -- timestamps
     create_time     TIMESTAMPTZ NOT NULL DEFAULT now(),
     update_time     TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -1221,7 +1221,7 @@ CREATE TABLE ai_artifact_versions (
     -- ordering
     sequence             INTEGER NOT NULL,  -- v1 = 1, v2 = 2, ...
     -- audit
-    created_by UUID REFERENCES firebase_identities(id),
+    created_by UUID REFERENCES identities(id),
     -- timestamps
     create_time          TIMESTAMPTZ NOT NULL DEFAULT now(),
     -- constraints
@@ -1249,8 +1249,8 @@ CREATE TABLE ai_artifacts (
     description     TEXT NOT NULL DEFAULT '',
     latest_version_id UUID REFERENCES ai_artifact_versions(id) DEFERRABLE INITIALLY DEFERRED,
     -- audit
-    created_by UUID REFERENCES firebase_identities(id),
-    updated_by UUID REFERENCES firebase_identities(id),
+    created_by UUID REFERENCES identities(id),
+    updated_by UUID REFERENCES identities(id),
     -- timestamps
     create_time     TIMESTAMPTZ NOT NULL DEFAULT now(),
     update_time     TIMESTAMPTZ NOT NULL DEFAULT now(),

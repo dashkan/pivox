@@ -38,7 +38,7 @@ type Config struct {
 // OAuthBrokerConfig controls the server-side OAuth/OIDC broker that
 // handles federated sign-in for native and web clients (formerly the
 // TanStack `start` /api/oauth/* routes; consolidated server-side so
-// auth machinery lives next to syncFirebaseIdentity, exchangeToken,
+// auth machinery lives next to syncIdentity, exchangeToken,
 // resolveProvider, etc.). The broker drives the IdP code-flow
 // handshake using the client_secret stored server-side and returns
 // to the native app via a custom URL scheme with the IdP token in

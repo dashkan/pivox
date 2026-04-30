@@ -235,7 +235,7 @@ func TestGetConversation_AuditBypass_AdminWithReadAll(t *testing.T) {
 	q.On("GetConversationByName", mock.Anything, mock.Anything).Return(row, nil)
 	q.On("GetEffectiveOrgRoles", mock.Anything, db.GetEffectiveOrgRolesParams{
 		OrgID:              org.ID,
-		FirebaseIdentityID: fixedUserID,
+		IdentityID: fixedUserID,
 	}).Return([]string{permission.RoleAdmin}, nil)
 
 	ctx := authenticatedCtx("caller")
@@ -261,7 +261,7 @@ func TestDeleteConversation_AuditBypass_OwnerWithDeleteAll(t *testing.T) {
 	// permission is locked tighter than read for legal/cleanup use.
 	q.On("GetEffectiveOrgRoles", mock.Anything, db.GetEffectiveOrgRolesParams{
 		OrgID:              org.ID,
-		FirebaseIdentityID: fixedUserID,
+		IdentityID: fixedUserID,
 	}).Return([]string{permission.RoleOwner}, nil)
 	q.On("DeleteConversation", mock.Anything, row.ID).Return(nil)
 
@@ -286,7 +286,7 @@ func TestDeleteConversation_AdminCannotDeletePeer(t *testing.T) {
 	q.On("GetConversationByName", mock.Anything, mock.Anything).Return(row, nil)
 	q.On("GetEffectiveOrgRoles", mock.Anything, db.GetEffectiveOrgRolesParams{
 		OrgID:              org.ID,
-		FirebaseIdentityID: fixedUserID,
+		IdentityID: fixedUserID,
 	}).Return([]string{permission.RoleAdmin}, nil)
 
 	ctx := authenticatedCtx("caller")

@@ -64,7 +64,7 @@ func TestPermissionInterceptor_AllowsWhenPermissionGranted(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	q.On("GetOrganizationByNameForGate", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
 	q.On("GetEffectiveOrgRoles", mock.Anything, db.GetEffectiveOrgRolesParams{
-		OrgID: testPermOrgID, FirebaseIdentityID: testPermCallerID,
+		OrgID: testPermOrgID, IdentityID: testPermCallerID,
 	}).Return([]string{permission.RoleAdmin}, nil)
 
 	registry := Registry{
@@ -312,10 +312,10 @@ func TestPermissionInterceptor_SpaceScope_AllowsWhenPermissionGranted(t *testing
 	// Resolver path for SpaceTarget: GetSpaceParentOrg + GetEffectiveSpaceRoles + GetEffectiveOrgRoles.
 	q.On("GetSpaceParentOrg", mock.Anything, testPermSpaceID).Return(testPermOrgID, nil)
 	q.On("GetEffectiveSpaceRoles", mock.Anything, db.GetEffectiveSpaceRolesParams{
-		SpaceID: testPermSpaceID, FirebaseIdentityID: testPermCallerID,
+		SpaceID: testPermSpaceID, IdentityID: testPermCallerID,
 	}).Return([]string{permission.RoleEditor}, nil)
 	q.On("GetEffectiveOrgRoles", mock.Anything, db.GetEffectiveOrgRolesParams{
-		OrgID: testPermOrgID, FirebaseIdentityID: testPermCallerID,
+		OrgID: testPermOrgID, IdentityID: testPermCallerID,
 	}).Return([]string(nil), nil)
 
 	registry := Registry{

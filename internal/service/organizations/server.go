@@ -151,7 +151,7 @@ func (s *OrganizationsServer) ListOrganizations(ctx context.Context, req *apiv1.
 		return nil, apierr.Unauthenticated("missing authenticated caller")
 	}
 
-	caller, err := s.queries.GetFirebaseIdentityByUID(ctx, uid)
+	caller, err := s.queries.GetIdentityByFirebaseUID(ctx, uid)
 	if err != nil {
 		// No firebase_identity row yet (race with the sync-identity
 		// webhook on a freshly-Firebase-registered user). Memberless
@@ -160,12 +160,12 @@ func (s *OrganizationsServer) ListOrganizations(ctx context.Context, req *apiv1.
 		if errors.Is(err, pgx.ErrNoRows) {
 			return &apiv1.ListOrganizationsResponse{}, nil
 		}
-		return nil, apierr.HandleResourceError(err, "FirebaseIdentity", uid)
+		return nil, apierr.HandleResourceError(err, "Identity", uid)
 	}
 
-	rows, err := s.queries.ListOrganizationsForFirebaseIdentity(ctx, caller.ID)
+	rows, err := s.queries.ListOrganizationsForIdentity(ctx, caller.ID)
 	if err != nil {
-		slog.ErrorContext(ctx, "list organizations failed", "firebase_identity_id", caller.ID, "error", err)
+		slog.ErrorContext(ctx, "list organizations failed", "identity_id", caller.ID, "error", err)
 		return nil, apierr.Internal("list organizations")
 	}
 
@@ -183,16 +183,16 @@ func (s *OrganizationsServer) ListOrganizations(ctx context.Context, req *apiv1.
 func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1.CreateOrganizationRequest) (*longrunningpb.Operation, error) {
 	// Resolve caller → firebase_identity row. The caller's Firebase
 	// UID comes from the auth interceptor; we map it to a Pivox
-	// `firebase_identities` row so the new org can record both the
-	// immutable founder pointer (`created_by_firebase_identity_id`)
+	// `identities` row so the new org can record both the
+	// immutable founder pointer (`created_by_identity_id`)
 	// and the per-org owner membership.
 	uid, ok := s.readUID(ctx)
 	if !ok {
 		return nil, apierr.Unauthenticated("missing authenticated caller")
 	}
-	caller, err := s.queries.GetFirebaseIdentityByUID(ctx, uid)
+	caller, err := s.queries.GetIdentityByFirebaseUID(ctx, uid)
 	if err != nil {
-		return nil, apierr.HandleResourceError(err, "FirebaseIdentity", uid)
+		return nil, apierr.HandleResourceError(err, "Identity", uid)
 	}
 
 	orgSlug := req.GetOrganizationId()
@@ -220,7 +220,7 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 	}
 
 	// Seed the 4 system roles for this org and bind the founder
-	// (caller's firebase_identity_id, the universal user uuid post-
+	// (caller's identity_id, the universal user uuid post-
 	// Phase-7) to the owner role. Atomic with the org create above —
 	// a failure here rolls the whole bootstrap back, so no half-formed
 	// org ever exists. "≥1 owner per org" is established by definition

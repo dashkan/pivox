@@ -3,7 +3,7 @@
 package config
 
 // SyncAuthConfig holds configuration for authenticating internal service-to-service
-// calls (e.g., Firebase Functions → auth:syncFirebaseIdentity). In production, this
+// calls (e.g., Firebase Functions → auth:syncIdentity). In production, this
 // uses Google Cloud OIDC identity tokens verified against the caller's service account.
 type SyncAuthConfig struct {
 	// AllowedServiceAccounts is a list of service account emails permitted to

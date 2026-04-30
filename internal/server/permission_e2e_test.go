@@ -145,7 +145,7 @@ func TestE2E_Permission_GroupBindingGrantsAccess(t *testing.T) {
 		RoleID:        adminRole.ID,
 		PrincipalKind: db.PrincipalKindGroup,
 		PrincipalID:   groupID,
-		CreatedBy:     owner.FirebaseIdentityID.String(),
+		CreatedBy:     owner.IdentityID.String(),
 	})
 	require.NoError(t, err)
 

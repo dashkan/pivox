@@ -96,7 +96,7 @@ func TestE2E_DeleteAccount_UnblockViaTransferOwnership(t *testing.T) {
 
 // TestE2E_DeleteAccount_UnblockViaDeleteOrg pins recovery path 2:
 // soft-delete the only blocking org first; sole-owner check excludes
-// soft-deleted orgs (ListSoleOwnerOrgsForFirebaseIdentity has
+// soft-deleted orgs (ListSoleOwnerOrgsForIdentity has
 // `o.delete_time IS NULL`), so DeleteAccount then succeeds.
 func TestE2E_DeleteAccount_UnblockViaDeleteOrg(t *testing.T) {
 	if testing.Short() {
@@ -183,10 +183,10 @@ func TestE2E_DeleteUser_AdminRemovesUserFromOrg(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Use ListOrganizationsForFirebaseIdentity (which is membership
+	// Use ListOrganizationsForIdentity (which is membership
 	// = direct org_members row) to confirm Org A is gone, Org B
 	// remains.
-	orgs, err := h.Queries.ListOrganizationsForFirebaseIdentity(ctx, target.FirebaseIdentityID)
+	orgs, err := h.Queries.ListOrganizationsForIdentity(ctx, target.IdentityID)
 	require.NoError(t, err)
 	gotOrgs := map[string]bool{}
 	for _, o := range orgs {
@@ -216,7 +216,7 @@ func TestE2E_DeleteUser_LastOwnerBlocked(t *testing.T) {
 	h.SetCaller(owner)
 	createOrg(t, orgClient, "single-owner-org", "Single Owner Org")
 	orgID := h.LookupOrgID(t, "single-owner-org")
-	ownerUserID := h.LookupOrgUserID(t, orgID, owner.FirebaseIdentityID)
+	ownerUserID := h.LookupOrgUserID(t, orgID, owner.IdentityID)
 
 	// Add a successor as Admin (does NOT count as an owner).
 	other := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "other"})

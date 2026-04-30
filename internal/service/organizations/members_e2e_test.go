@@ -109,7 +109,7 @@ func TestE2E_OrgMember_UpdateRoleRejectsLastOwnerDemotion(t *testing.T) {
 	orgClient := apiv1.NewOrganizationsClient(h.Conn())
 	createOrg(t, orgClient, "single-owner", "Single Owner")
 	orgID := h.LookupOrgID(t, "single-owner")
-	founderUserID := h.LookupOrgUserID(t, orgID, owner.FirebaseIdentityID)
+	founderUserID := h.LookupOrgUserID(t, orgID, owner.IdentityID)
 	memberName := "organizations/single-owner/members/user-" + founderUserID.String()
 
 	_, err := orgClient.UpdateMember(ctx, &iampb.UpdateMemberRequest{

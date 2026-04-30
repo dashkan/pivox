@@ -452,7 +452,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	// OAuth broker for federated sign-in (GitHub, OIDC SSO).
 	// Migrated server-side from the TanStack `start` /api/oauth/*
 	// routes so auth machinery (DB-backed SsoConfig + KMS-encrypted
-	// client_secret) lives next to syncFirebaseIdentity et al.
+	// client_secret) lives next to syncIdentity et al.
 	oauthBroker := server.NewOAuthBroker(queries, enc, cfg.OAuthBroker, logger)
 	oauthBroker.Register(httpMux)
 

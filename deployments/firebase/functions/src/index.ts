@@ -47,10 +47,10 @@ async function getAuthorizationHeader(targetAudience: string): Promise<string> {
 }
 
 /**
- * Calls the Pivox internal sync endpoint to upsert a firebase_identity row.
+ * Calls the Pivox internal sync endpoint to upsert a identity row.
  * Throws on failure so blocking functions reject the auth operation.
  */
-async function syncFirebaseIdentity(
+async function syncIdentity(
   firebaseUid: string,
   fields: {
     email: string;
@@ -59,8 +59,8 @@ async function syncFirebaseIdentity(
     photo_url: string;
     disabled: boolean;
   },
-): Promise<{ firebaseIdentityId: string }> {
-  const url = `${pivoxApiUrl.value()}/internal/v1/auth:syncFirebaseIdentity`;
+): Promise<{ identityId: string }> {
+  const url = `${pivoxApiUrl.value()}/internal/v1/auth:syncIdentity`;
   const payload = { firebase_uid: firebaseUid, ...fields };
 
   // The audience for the OIDC token is the base URL of the API server.
@@ -77,24 +77,24 @@ async function syncFirebaseIdentity(
 
   if (!res.ok) {
     const body = await res.text();
-    logger.error("Failed to sync firebase identity", {
+    logger.error("Failed to sync identity", {
       status: res.status,
       body,
       firebaseUid,
     });
-    throw new HttpsError("internal", "Failed to sync firebase identity");
+    throw new HttpsError("internal", "Failed to sync identity");
   }
 
-  const data = (await res.json()) as { firebase_identity_id: string };
-  logger.info("Firebase identity synced", {
+  const data = (await res.json()) as { identity_id: string };
+  logger.info("Identity synced", {
     firebaseUid,
-    firebaseIdentityId: data.firebase_identity_id,
+    identityId: data.identity_id,
   });
-  return { firebaseIdentityId: data.firebase_identity_id };
+  return { identityId: data.identity_id };
 }
 
 /**
- * Blocks user creation until the firebase_identity is synced to Pivox.
+ * Blocks user creation until the identity is synced to Pivox.
  * If the API is unreachable or returns an error, user creation fails.
  *
  * Sets the `pivox_user_id` custom claim on the issued token so the
@@ -104,10 +104,10 @@ async function syncFirebaseIdentity(
  * `space_members.principal_id`, and `group_members.user_id` — every
  * authenticated request carries it.
  */
-export const syncFirebaseIdentityOnCreate = beforeUserCreated(async (event) => {
+export const syncIdentityOnCreate = beforeUserCreated(async (event) => {
   const user = event.data!;
 
-  const { firebaseIdentityId } = await syncFirebaseIdentity(user.uid, {
+  const { identityId } = await syncIdentity(user.uid, {
     email: user.email ?? "",
     email_verified: user.emailVerified ?? false,
     display_name: user.displayName ?? "",
@@ -116,12 +116,12 @@ export const syncFirebaseIdentityOnCreate = beforeUserCreated(async (event) => {
   });
 
   return {
-    customClaims: { pivox_user_id: firebaseIdentityId },
+    customClaims: { pivox_user_id: identityId },
   };
 });
 
 /**
- * Syncs firebase_identity fields on every sign-in. Catches up on any
+ * Syncs identity fields on every sign-in. Catches up on any
  * changes made in Firebase (email, display name, photo, disabled, etc.)
  * since the last sync.
  *
@@ -131,10 +131,10 @@ export const syncFirebaseIdentityOnCreate = beforeUserCreated(async (event) => {
  * up before this code shipped) gets the claim on its next refresh
  * — no manual re-auth needed.
  */
-export const syncFirebaseIdentityOnSignIn = beforeUserSignedIn(async (event) => {
+export const syncIdentityOnSignIn = beforeUserSignedIn(async (event) => {
   const user = event.data!;
 
-  const { firebaseIdentityId } = await syncFirebaseIdentity(user.uid, {
+  const { identityId } = await syncIdentity(user.uid, {
     email: user.email ?? "",
     email_verified: user.emailVerified ?? false,
     display_name: user.displayName ?? "",
@@ -143,7 +143,7 @@ export const syncFirebaseIdentityOnSignIn = beforeUserSignedIn(async (event) => 
   });
 
   return {
-    customClaims: { pivox_user_id: firebaseIdentityId },
+    customClaims: { pivox_user_id: identityId },
   };
 });
 

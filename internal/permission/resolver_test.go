@@ -27,7 +27,7 @@ func TestResolver_OrgScope_AdminGrantsExpectedPermission(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	q.On("GetEffectiveOrgRoles", mock.Anything, db.GetEffectiveOrgRolesParams{
 		OrgID:              testOrgID,
-		FirebaseIdentityID: testIdentity,
+		IdentityID: testIdentity,
 	}).Return([]string{RoleAdmin}, nil)
 
 	r := NewResolver(q)
@@ -97,11 +97,11 @@ func TestResolver_SpaceScope_OrgRoleInherits(t *testing.T) {
 		Return(testOrgID, nil)
 	q.On("GetEffectiveSpaceRoles", mock.Anything, db.GetEffectiveSpaceRolesParams{
 		SpaceID:            testSpaceID,
-		FirebaseIdentityID: testIdentity,
+		IdentityID: testIdentity,
 	}).Return([]string{}, nil)
 	q.On("GetEffectiveOrgRoles", mock.Anything, db.GetEffectiveOrgRolesParams{
 		OrgID:              testOrgID,
-		FirebaseIdentityID: testIdentity,
+		IdentityID: testIdentity,
 	}).Return([]string{RoleAdmin}, nil)
 
 	r := NewResolver(q)

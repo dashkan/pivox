@@ -81,7 +81,7 @@ func TestRegister_AllRoutes(t *testing.T) {
 		method string
 		path   string
 	}{
-		{"POST", "/internal/v1/auth:syncFirebaseIdentity"},
+		{"POST", "/internal/v1/auth:syncIdentity"},
 		{"POST", "/internal/v1/auth:exchangeToken"},
 		{"POST", "/internal/v1/auth:depositToken"},
 		{"POST", "/internal/v1/auth:consumeToken"},
@@ -148,7 +148,7 @@ func TestRequireSecret_MissingHeader(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// syncFirebaseIdentity
+// syncIdentity
 // ---------------------------------------------------------------------------
 
 func newTestHooks(t *testing.T, mockQ *mocks.MockQuerier, auth *mockAuthService) *InternalHooks {
@@ -301,20 +301,20 @@ func TestSyncFirebaseIdentity_Success(t *testing.T) {
 	h := newTestHooks(t, mockQ, auth)
 
 	identityID := uuid.New()
-	mockQ.On("UpsertFirebaseIdentity", mock.Anything, mock.MatchedBy(func(p db.UpsertFirebaseIdentityParams) bool {
+	mockQ.On("UpsertIdentity", mock.Anything, mock.MatchedBy(func(p db.UpsertIdentityParams) bool {
 		return p.FirebaseUid == "uid-123" && p.Email == "test@example.com"
-	})).Return(db.FirebaseIdentity{ID: identityID, FirebaseUid: "uid-123"}, nil)
+	})).Return(db.Identity{ID: identityID, FirebaseUid: "uid-123"}, nil)
 
 	body := `{"firebase_uid":"uid-123","email":"test@example.com","display_name":"Test User"}`
-	req := httptest.NewRequest("POST", "/internal/v1/auth:syncFirebaseIdentity", strings.NewReader(body))
+	req := httptest.NewRequest("POST", "/internal/v1/auth:syncIdentity", strings.NewReader(body))
 	rr := httptest.NewRecorder()
 
-	h.syncFirebaseIdentity(rr, req)
+	h.syncIdentity(rr, req)
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 	var resp map[string]string
 	require.NoError(t, json.NewDecoder(rr.Body).Decode(&resp))
-	assert.Equal(t, identityID.String(), resp["firebase_identity_id"])
+	assert.Equal(t, identityID.String(), resp["identity_id"])
 	mockQ.AssertExpectations(t)
 }
 
@@ -323,10 +323,10 @@ func TestSyncFirebaseIdentity_InvalidJSON(t *testing.T) {
 	auth := new(mockAuthService)
 	h := newTestHooks(t, mockQ, auth)
 
-	req := httptest.NewRequest("POST", "/internal/v1/auth:syncFirebaseIdentity", strings.NewReader("not json"))
+	req := httptest.NewRequest("POST", "/internal/v1/auth:syncIdentity", strings.NewReader("not json"))
 	rr := httptest.NewRecorder()
 
-	h.syncFirebaseIdentity(rr, req)
+	h.syncIdentity(rr, req)
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 }
@@ -337,10 +337,10 @@ func TestSyncFirebaseIdentity_MissingUID(t *testing.T) {
 	h := newTestHooks(t, mockQ, auth)
 
 	body := `{"email":"test@example.com"}`
-	req := httptest.NewRequest("POST", "/internal/v1/auth:syncFirebaseIdentity", strings.NewReader(body))
+	req := httptest.NewRequest("POST", "/internal/v1/auth:syncIdentity", strings.NewReader(body))
 	rr := httptest.NewRecorder()
 
-	h.syncFirebaseIdentity(rr, req)
+	h.syncIdentity(rr, req)
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 	assert.Contains(t, rr.Body.String(), "firebase_uid is required")
@@ -351,14 +351,14 @@ func TestSyncFirebaseIdentity_DBError(t *testing.T) {
 	auth := new(mockAuthService)
 	h := newTestHooks(t, mockQ, auth)
 
-	mockQ.On("UpsertFirebaseIdentity", mock.Anything, mock.Anything).
-		Return(db.FirebaseIdentity{}, errors.New("db down"))
+	mockQ.On("UpsertIdentity", mock.Anything, mock.Anything).
+		Return(db.Identity{}, errors.New("db down"))
 
 	body := `{"firebase_uid":"uid-123","email":"test@example.com"}`
-	req := httptest.NewRequest("POST", "/internal/v1/auth:syncFirebaseIdentity", strings.NewReader(body))
+	req := httptest.NewRequest("POST", "/internal/v1/auth:syncIdentity", strings.NewReader(body))
 	rr := httptest.NewRecorder()
 
-	h.syncFirebaseIdentity(rr, req)
+	h.syncIdentity(rr, req)
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	mockQ.AssertExpectations(t)

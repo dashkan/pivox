@@ -262,8 +262,8 @@ func (s *SpacesServer) CreateSpace(ctx context.Context, req *apiv1.CreateSpaceRe
 
 	qtx := db.New(tx)
 	// Post-Phase-7 the founder's principal_id IS the caller's
-	// firebase_identity_id — no per-org `users` row to resolve.
-	// `callerFirebaseID` is the firebase_identities.id (resolved
+	// identity_id — no per-org `users` row to resolve.
+	// `callerFirebaseID` is the identities.id (resolved
 	// via s.caller(ctx) which itself reads the verified token).
 	founderID := callerFirebaseID
 	createdBy := convert.PgUUID(callerFirebaseID)

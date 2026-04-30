@@ -11,7 +11,7 @@ import (
 //
 //   organizations/{org}/users/{user}/conversations/{conv}[/messages/{msg}|/artifacts/{art}[/versions/{ver}]]
 //
-// `{user}` is the Pivox user UUID = `firebase_identities.id` — the
+// `{user}` is the Pivox user UUID = `identities.id` — the
 // same identifier the auth interceptor extracts from the
 // `pivox_user_id` token claim and exposes as
 // `server.MustPivoxUserID(ctx)`. Strict UUID parse — no `me`

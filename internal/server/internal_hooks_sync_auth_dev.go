@@ -15,7 +15,7 @@ import (
 )
 
 // NewInternalHooks creates a new internal hooks handler with shared secret
-// authentication for the auth:syncFirebaseIdentity endpoint. This is the
+// authentication for the auth:syncIdentity endpoint. This is the
 // dev-mode fallback for when the Firebase Functions emulator cannot mint
 // OIDC tokens.
 func NewInternalHooks(

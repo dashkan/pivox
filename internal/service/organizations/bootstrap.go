@@ -35,7 +35,7 @@ var systemRoles = []struct {
 // exist in the same transaction (FK targets must resolve at commit
 // time). bootstrapOrgRoles itself does not begin or commit.
 //
-// `founderID` is the founder's `firebase_identities.id` — the
+// `founderID` is the founder's `identities.id` — the
 // universal user uuid post-Phase-7 unification (no per-org `users`
 // row exists or is needed; the membership IS the org_members row).
 func bootstrapOrgRoles(ctx context.Context, qtx db.Querier, orgID, founderID uuid.UUID) error {

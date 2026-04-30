@@ -16,10 +16,10 @@ import (
 // SetCaller swaps which Caller subsequent gRPC requests authenticate
 // as. The harness's test authn.Service trusts UID verbatim — the
 // bearer token IS the UID — so a Caller is fully described by its
-// (UID, FirebaseIdentityID).
+// (UID, IdentityID).
 type Caller struct {
 	UID                string
-	FirebaseIdentityID uuid.UUID
+	IdentityID uuid.UUID
 	Email              string
 	DisplayName        string
 }
@@ -33,11 +33,11 @@ type SeedIdentityOpts struct {
 	DisplayName string // default: "Test <UID>"
 }
 
-// SeedIdentity inserts a firebase_identities row and returns a
+// SeedIdentity inserts a identities row and returns a
 // Caller pointing at it. Use SetCaller(caller) on the harness to
 // authenticate subsequent RPCs as this identity. Identity-shape
 // fields (email, display name) are stored exactly as passed; the
-// rest of the system reads them via GetFirebaseIdentityByUID.
+// rest of the system reads them via GetIdentityByFirebaseUID.
 func (h *Harness) SeedIdentity(t *testing.T, opts SeedIdentityOpts) *Caller {
 	t.Helper()
 
@@ -51,8 +51,8 @@ func (h *Harness) SeedIdentity(t *testing.T, opts SeedIdentityOpts) *Caller {
 		opts.DisplayName = "Test " + opts.UID
 	}
 
-	identity, err := h.Queries.UpsertFirebaseIdentity(context.Background(),
-		db.UpsertFirebaseIdentityParams{
+	identity, err := h.Queries.UpsertIdentity(context.Background(),
+		db.UpsertIdentityParams{
 			FirebaseUid:   opts.UID,
 			Email:         opts.Email,
 			EmailVerified: true,
@@ -62,7 +62,7 @@ func (h *Harness) SeedIdentity(t *testing.T, opts SeedIdentityOpts) *Caller {
 
 	return &Caller{
 		UID:                opts.UID,
-		FirebaseIdentityID: identity.ID,
+		IdentityID: identity.ID,
 		Email:              opts.Email,
 		DisplayName:        opts.DisplayName,
 	}

@@ -204,8 +204,8 @@ func TestDeleteAccount_FailsLoudOnNilDeps(t *testing.T) {
 // TestDeleteAccount_PropagatesCallerResolutionFailure pins that
 // DeleteAccount surfaces caller-resolution errors directly rather
 // than masking them. A common failure mode: Firebase token is valid
-// (auth interceptor passed) but the firebase_identities row hasn't
-// synced yet (race with the syncFirebaseIdentity webhook). The
+// (auth interceptor passed) but the identities row hasn't
+// synced yet (race with the syncIdentity webhook). The
 // caller resolver returns NotFound; the handler must surface that.
 func TestDeleteAccount_PropagatesCallerResolutionFailure(t *testing.T) {
 	srv := &IamServer{
@@ -229,7 +229,7 @@ func TestDeleteAccount_PropagatesCallerResolutionFailure(t *testing.T) {
 func TestRunDeleteAccount_BlocksSoleOwner(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	identityID := uuid.MustParse("0192a000-bbbb-7000-8000-000000000002")
-	q.On("ListSoleOwnerOrgsForFirebaseIdentity", mock.Anything, identityID).
+	q.On("ListSoleOwnerOrgsForIdentity", mock.Anything, identityID).
 		Return([]db.Organization{{Name: "acme"}, {Name: "beta"}}, nil)
 
 	srv := &IamServer{queries: q}
@@ -243,13 +243,13 @@ func TestRunDeleteAccount_BlocksSoleOwner(t *testing.T) {
 func TestRunDeleteAccount_FullCascade(t *testing.T) {
 	identityID := uuid.MustParse("0192a000-bbbb-7000-8000-000000000002")
 	q := new(mocks.MockQuerier)
-	q.On("ListSoleOwnerOrgsForFirebaseIdentity", mock.Anything, identityID).
+	q.On("ListSoleOwnerOrgsForIdentity", mock.Anything, identityID).
 		Return([]db.Organization{}, nil)
-	q.On("DeleteOrgMembersForFirebaseIdentity", mock.Anything, identityID).Return(nil)
-	q.On("DeleteSpaceMembersForFirebaseIdentity", mock.Anything, identityID).Return(nil)
-	q.On("GetFirebaseIdentityByID", mock.Anything, identityID).
-		Return(db.FirebaseIdentity{ID: identityID, FirebaseUid: "fb-abc"}, nil)
-	q.On("HardDeleteFirebaseIdentity", mock.Anything, identityID).Return(nil)
+	q.On("DeleteOrgMembersForIdentity", mock.Anything, identityID).Return(nil)
+	q.On("DeleteSpaceMembersForIdentity", mock.Anything, identityID).Return(nil)
+	q.On("GetIdentityByID", mock.Anything, identityID).
+		Return(db.Identity{ID: identityID, FirebaseUid: "fb-abc"}, nil)
+	q.On("HardDeleteIdentity", mock.Anything, identityID).Return(nil)
 
 	auth := new(mockAuthService)
 	auth.On("DeleteUser", mock.Anything, "fb-abc").Return(nil)
@@ -278,28 +278,28 @@ func TestRunDeleteAccount_AlreadyGoneSurfacesInternal(t *testing.T) {
 	// failure and reconciles manually.
 	identityID := uuid.MustParse("0192a000-bbbb-7000-8000-000000000002")
 	q := new(mocks.MockQuerier)
-	q.On("ListSoleOwnerOrgsForFirebaseIdentity", mock.Anything, mock.Anything).Return([]db.Organization{}, nil)
-	q.On("DeleteOrgMembersForFirebaseIdentity", mock.Anything, identityID).Return(nil)
-	q.On("DeleteSpaceMembersForFirebaseIdentity", mock.Anything, identityID).Return(nil)
-	q.On("GetFirebaseIdentityByID", mock.Anything, identityID).
-		Return(db.FirebaseIdentity{}, pgx.ErrNoRows)
+	q.On("ListSoleOwnerOrgsForIdentity", mock.Anything, mock.Anything).Return([]db.Organization{}, nil)
+	q.On("DeleteOrgMembersForIdentity", mock.Anything, identityID).Return(nil)
+	q.On("DeleteSpaceMembersForIdentity", mock.Anything, identityID).Return(nil)
+	q.On("GetIdentityByID", mock.Anything, identityID).
+		Return(db.Identity{}, pgx.ErrNoRows)
 
 	srv := &IamServer{queries: q}
 	_, err := srv.runDeleteAccount(context.Background(), &fakeAccountProgress{}, identityID)
 	require.Error(t, err)
 	assert.Equal(t, codes.Internal, status.Code(err))
-	q.AssertNotCalled(t, "HardDeleteFirebaseIdentity", mock.Anything, mock.Anything)
+	q.AssertNotCalled(t, "HardDeleteIdentity", mock.Anything, mock.Anything)
 }
 
 func TestRunDeleteAccount_AuthFailureSurfaces(t *testing.T) {
 	identityID := uuid.MustParse("0192a000-bbbb-7000-8000-000000000002")
 	q := new(mocks.MockQuerier)
-	q.On("ListSoleOwnerOrgsForFirebaseIdentity", mock.Anything, mock.Anything).Return([]db.Organization{}, nil)
-	q.On("DeleteOrgMembersForFirebaseIdentity", mock.Anything, identityID).Return(nil)
-	q.On("DeleteSpaceMembersForFirebaseIdentity", mock.Anything, identityID).Return(nil)
-	q.On("GetFirebaseIdentityByID", mock.Anything, identityID).
-		Return(db.FirebaseIdentity{ID: identityID, FirebaseUid: "fb-abc"}, nil)
-	q.On("HardDeleteFirebaseIdentity", mock.Anything, identityID).Return(nil)
+	q.On("ListSoleOwnerOrgsForIdentity", mock.Anything, mock.Anything).Return([]db.Organization{}, nil)
+	q.On("DeleteOrgMembersForIdentity", mock.Anything, identityID).Return(nil)
+	q.On("DeleteSpaceMembersForIdentity", mock.Anything, identityID).Return(nil)
+	q.On("GetIdentityByID", mock.Anything, identityID).
+		Return(db.Identity{ID: identityID, FirebaseUid: "fb-abc"}, nil)
+	q.On("HardDeleteIdentity", mock.Anything, identityID).Return(nil)
 
 	auth := new(mockAuthService)
 	auth.On("DeleteUser", mock.Anything, "fb-abc").Return(errors.New("firebase down"))

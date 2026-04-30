@@ -30,7 +30,7 @@ DROP TABLE IF EXISTS permissions;
 DROP TABLE IF EXISTS group_members;
 DROP TABLE IF EXISTS groups;
 DROP TABLE IF EXISTS users;
-DROP TABLE IF EXISTS firebase_identities;
+DROP TABLE IF EXISTS identities;
 DROP TABLE IF EXISTS api_keys;
 DROP TABLE IF EXISTS tag_bindings;
 DROP TABLE IF EXISTS tag_values;

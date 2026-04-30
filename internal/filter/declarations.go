@@ -148,7 +148,7 @@ func TagBindingFilter() *ResourceFilter {
 // ConversationFilter returns the filter config for AI chat
 // conversations. Access-controlled by (org_id, creator_id) —
 // conversations are private to their creator
-// (`firebase_identities.id` post-Phase-7). The handler decides
+// (`identities.id` post-Phase-7). The handler decides
 // whether to filter by the caller's own user-uuid (regular path) or
 // by an arbitrary user-uuid (admin/`*All` path) before calling
 // filter.Query.

@@ -100,7 +100,7 @@ func NewOAuthBroker(
 //	GET /internal/v1/auth/{provider}/callback?code=…&state=…
 //
 // Same `/internal/v1/auth/` prefix as the JSON RPC siblings in
-// internal_hooks.go (`auth:syncFirebaseIdentity`, `auth:exchangeToken`,
+// internal_hooks.go (`auth:syncIdentity`, `auth:exchangeToken`,
 // `auth:resolveProvider`, etc.) — nginx already routes the prefix to
 // the Go REST listener so no proxy change is needed when the broker
 // came over from TanStack. Despite the `internal/` name the routes

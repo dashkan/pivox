@@ -1,7 +1,7 @@
--- Phase 7 unified per-org identity with firebase_identities. The
+-- Phase 7 unified per-org identity with identities. The
 -- per-org `users` join table was dropped; queries that used to
 -- resolve "users.id from (org, firebase_identity)" now reference
--- `firebase_identities.id` directly. The handler reads it from the
+-- `identities.id` directly. The handler reads it from the
 -- `pivox_user_id` ID-token claim — no DB lookup required.
 --
 -- Queries below are the reduced set still useful post-unification:
@@ -10,7 +10,7 @@
 -- invariant), the cross-org cascades for DeleteAccount, and the
 -- per-org cascades for the now-sync `Iam.DeleteUser`.
 
--- name: ListOrganizationsForFirebaseIdentity :many
+-- name: ListOrganizationsForIdentity :many
 -- Lists all orgs the given firebase_identity has membership in,
 -- counting both direct user bindings AND group-mediated bindings
 -- (the user is in a group that has an org_members row).
@@ -32,7 +32,7 @@
 -- only role-binding is via a group, even though they can clearly
 -- reach RPCs gated by that group's permissions. Group-mediated
 -- access was the old behavior pre-Phase-7 (users.id existed for
--- group-only members and ListUsersByFirebaseIdentity counted them);
+-- group-only members and ListUsersByIdentity counted them);
 -- preserved here in the unified shape.
 SELECT DISTINCT o.*
   FROM organizations o
@@ -72,7 +72,7 @@ SELECT COUNT(*)
            AND g.state = 'ACTIVE'))
    );
 
--- ListSoleOwnerOrgsForFirebaseIdentity returns active orgs where
+-- ListSoleOwnerOrgsForIdentity returns active orgs where
 -- the given firebase_identity is the ONLY owner. Used by
 -- DeleteAccount's VALIDATING phase to refuse deletion when the
 -- caller would leave any org without an owner.
@@ -81,7 +81,7 @@ SELECT COUNT(*)
 --   - exactly one user-owner binding exists, and it points at this
 --     firebase_identity, AND
 --   - zero ACTIVE-group-owner bindings exist.
--- name: ListSoleOwnerOrgsForFirebaseIdentity :many
+-- name: ListSoleOwnerOrgsForIdentity :many
 SELECT o.*
   FROM organizations o
  WHERE o.delete_time IS NULL
@@ -108,31 +108,31 @@ SELECT o.*
         AND g2.state = 'ACTIVE'
    );
 
--- DeleteOrgMembersForFirebaseIdentity removes ALL org-scope role
+-- DeleteOrgMembersForIdentity removes ALL org-scope role
 -- bindings across every org for this firebase_identity. Used by
 -- DeleteAccount's cross-org cascade. Org-scoped DeleteUser uses
 -- the per-org variant `DeleteOrgMembersForUserInOrg` below.
--- name: DeleteOrgMembersForFirebaseIdentity :exec
+-- name: DeleteOrgMembersForIdentity :exec
 DELETE FROM org_members
  WHERE principal_kind = 'user'
    AND principal_id = $1;
 
--- DeleteSpaceMembersForFirebaseIdentity is the cross-org space-
+-- DeleteSpaceMembersForIdentity is the cross-org space-
 -- scope analogue used by DeleteAccount.
--- name: DeleteSpaceMembersForFirebaseIdentity :exec
+-- name: DeleteSpaceMembersForIdentity :exec
 DELETE FROM space_members
  WHERE principal_kind = 'user'
    AND principal_id = $1;
 
--- DeleteGroupMembersForFirebaseIdentity removes the firebase_identity
+-- DeleteGroupMembersForIdentity removes the firebase_identity
 -- from every group it belongs to, across all orgs. Cross-org variant
 -- for DeleteAccount. After Phase 7 unification, group_members.user_id
--- IS firebase_identities.id, so this is a single straight DELETE
+-- IS identities.id, so this is a single straight DELETE
 -- without the prior subquery.
--- name: DeleteGroupMembersForFirebaseIdentity :exec
+-- name: DeleteGroupMembersForIdentity :exec
 DELETE FROM group_members WHERE user_id = $1;
 
--- HardDeleteFirebaseIdentity removes the firebase_identity row.
+-- HardDeleteIdentity removes the firebase_identity row.
 -- group_members.user_id has ON DELETE CASCADE so group memberships
 -- transitively delete; org_members and space_members principal_id
 -- columns aren't FK'd (polymorphic by principal_kind) so the
@@ -140,8 +140,8 @@ DELETE FROM group_members WHERE user_id = $1;
 -- second-to-last step of DeleteAccount; the Firebase Auth identity
 -- itself is deleted last so a partial failure leaves a recoverable
 -- Firebase identity rather than orphaned Pivox state.
--- name: HardDeleteFirebaseIdentity :exec
-DELETE FROM firebase_identities WHERE id = $1;
+-- name: HardDeleteIdentity :exec
+DELETE FROM identities WHERE id = $1;
 
 -- ===========================================================================
 -- Org-scoped cascade queries used by Iam.DeleteUser (org-scoped, sync
@@ -151,7 +151,7 @@ DELETE FROM firebase_identities WHERE id = $1;
 
 -- DeleteOrgMembersForUserInOrg removes the user's org-scope role
 -- bindings in a single org. Bounded by (org_id, principal_id).
--- $2 is `firebase_identities.id` (post-Phase-7 unification).
+-- $2 is `identities.id` (post-Phase-7 unification).
 -- name: DeleteOrgMembersForUserInOrg :exec
 DELETE FROM org_members
  WHERE org_id = $1
@@ -161,7 +161,7 @@ DELETE FROM org_members
 -- DeleteSpaceMembersForUserInOrg removes the user's space-scope
 -- bindings for spaces in this org. Joins to spaces to bound by
 -- org_id, since space_members rows themselves only carry space_id.
--- $2 is `firebase_identities.id`.
+-- $2 is `identities.id`.
 -- name: DeleteSpaceMembersForUserInOrg :exec
 DELETE FROM space_members
  WHERE principal_kind = 'user'
@@ -170,10 +170,10 @@ DELETE FROM space_members
 
 -- DeleteGroupMembersForUserInOrg removes the user's membership in
 -- groups belonging to this org. After Phase 7 unification,
--- group_members.user_id IS firebase_identities.id directly — same
+-- group_members.user_id IS identities.id directly — same
 -- type as principal_id on the sibling tables, just a different
 -- column name (group_members has no principal_kind discriminator).
--- $2 is `firebase_identities.id`.
+-- $2 is `identities.id`.
 -- name: DeleteGroupMembersForUserInOrg :exec
 DELETE FROM group_members
  WHERE user_id = $2
@@ -184,7 +184,7 @@ DELETE FROM group_members
 -- user being removed, so the handler can refuse if removing them
 -- would leave the org with zero owners. Counts both user and group
 -- principals (matches CountOwnersByOrg's group-owner support).
--- $2 is `firebase_identities.id`.
+-- $2 is `identities.id`.
 -- name: CountOrgOwnersExcludingUser :one
 SELECT COUNT(*)
   FROM org_members om

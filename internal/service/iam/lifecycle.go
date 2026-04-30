@@ -30,7 +30,7 @@ const accountLifecyclePrefix = "accounts"
 // hard-delete. Recovery from a mistake is just re-creating the
 // org_members row via Iam.CreateMember (the user's Pivox identity
 // and content survive the membership removal because everything
-// is keyed on `firebase_identities.id`).
+// is keyed on `identities.id`).
 // ===========================================================================
 
 // DeleteUser hard-deletes the membership rows binding a user to a
@@ -38,7 +38,7 @@ const accountLifecyclePrefix = "accounts"
 // spaces in this org), and `group_members` (for groups in this
 // org) — no LRO, no grace window. The user's Pivox account, their
 // other-org memberships, and any content they own (audit columns
-// reference `firebase_identities.id` which survives) are unaffected.
+// reference `identities.id` which survives) are unaffected.
 // Use Iam.DeleteAccount for global account deletion.
 //
 // Refuses if removing the user would leave the org with zero owners
@@ -46,7 +46,7 @@ const accountLifecyclePrefix = "accounts"
 // a group-owner keeps the org covered).
 //
 // Permission: `users.delete` on the path's org (interceptor-gated).
-// The {user} segment is `firebase_identities.id`.
+// The {user} segment is `identities.id`.
 func (s *IamServer) DeleteUser(ctx context.Context, req *iampb.DeleteUserRequest) (*emptypb.Empty, error) {
 	resolvedOrg := server.MustResolvedOrgFromContext(ctx)
 	userID, err := parseUserUUID(req.GetName(), resolvedOrg.Slug)
@@ -109,7 +109,7 @@ func (s *IamServer) DeleteUser(ctx context.Context, req *iampb.DeleteUserRequest
 
 // parseUserUUID pulls the {user} part out of `organizations/{org}/
 // users/{user}` and parses it as a UUID. Post-Phase-7 the {user}
-// segment is `firebase_identities.id`. There's no v1 self-leave-org
+// segment is `identities.id`. There's no v1 self-leave-org
 // capability so the literal `me` doesn't get a special case here —
 // uuid.Parse rejects it generically.
 func parseUserUUID(name, expectedOrg string) (uuid.UUID, error) {
@@ -153,7 +153,7 @@ func parseUserUUID(name, expectedOrg string) (uuid.UUID, error) {
 //     space_members row whose principal is a per-org users row
 //     owned by this firebase_identity. Cross-org.
 //  3. DELETING_PIVOX_RECORDS — capture the Firebase UID, then
-//     hard-delete the firebase_identities row. ON DELETE CASCADE
+//     hard-delete the identities row. ON DELETE CASCADE
 //     removes per-org users + their group_members.
 //  4. DELETING_FIREBASE_IDENTITY — Firebase Admin SDK DeleteUser.
 //     Idempotent on already-deleted UIDs so retry-from-this-phase
@@ -193,7 +193,7 @@ func (s *IamServer) DeleteAccount(ctx context.Context, req *iampb.DeleteAccountR
 }
 
 // runDeleteAccount executes the cross-org cascade. The
-// firebase_identities row is hard-deleted second-to-last so a
+// identities row is hard-deleted second-to-last so a
 // partial failure leaves a recoverable Firebase identity rather
 // than orphaned Pivox state.
 func (s *IamServer) runDeleteAccount(
@@ -214,10 +214,10 @@ func (s *IamServer) runDeleteAccount(
 	// this user is the sole user-owner — see the query's NOT
 	// EXISTS clause).
 	updatePhase(iampb.DeleteAccountMetadata_VALIDATING)
-	soleOwnerOrgs, err := s.queries.ListSoleOwnerOrgsForFirebaseIdentity(ctx, firebaseIdentityID)
+	soleOwnerOrgs, err := s.queries.ListSoleOwnerOrgsForIdentity(ctx, firebaseIdentityID)
 	if err != nil {
 		slog.ErrorContext(ctx, "delete account: sole-owner check failed",
-			"firebase_identity_id", firebaseIdentityID, "error", err)
+			"identity_id", firebaseIdentityID, "error", err)
 		return nil, apierr.Internal("sole-owner check")
 	}
 	if len(soleOwnerOrgs) > 0 {
@@ -231,17 +231,17 @@ func (s *IamServer) runDeleteAccount(
 	}
 
 	// REVOKING_MEMBERSHIPS: cross-org drop. Bounded by
-	// firebase_identity_id at the SQL level so the DELETE can't
+	// identity_id at the SQL level so the DELETE can't
 	// reach rows that aren't this user's.
 	updatePhase(iampb.DeleteAccountMetadata_REVOKING_MEMBERSHIPS)
-	if err := s.queries.DeleteOrgMembersForFirebaseIdentity(ctx, firebaseIdentityID); err != nil {
+	if err := s.queries.DeleteOrgMembersForIdentity(ctx, firebaseIdentityID); err != nil {
 		slog.ErrorContext(ctx, "delete account: revoke org members failed",
-			"firebase_identity_id", firebaseIdentityID, "error", err)
+			"identity_id", firebaseIdentityID, "error", err)
 		return nil, apierr.Internal("revoke org memberships")
 	}
-	if err := s.queries.DeleteSpaceMembersForFirebaseIdentity(ctx, firebaseIdentityID); err != nil {
+	if err := s.queries.DeleteSpaceMembersForIdentity(ctx, firebaseIdentityID); err != nil {
 		slog.ErrorContext(ctx, "delete account: revoke space members failed",
-			"firebase_identity_id", firebaseIdentityID, "error", err)
+			"identity_id", firebaseIdentityID, "error", err)
 		return nil, apierr.Internal("revoke space memberships")
 	}
 
@@ -250,7 +250,7 @@ func (s *IamServer) runDeleteAccount(
 	// hard-delete. FK cascade removes per-org users +
 	// group_members.
 	updatePhase(iampb.DeleteAccountMetadata_DELETING_PIVOX_RECORDS)
-	identity, err := s.queries.GetFirebaseIdentityByID(ctx, firebaseIdentityID)
+	identity, err := s.queries.GetIdentityByID(ctx, firebaseIdentityID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			// Pivox-side row already gone but auth.DeleteUser
@@ -259,7 +259,7 @@ func (s *IamServer) runDeleteAccount(
 			// firebase_uid and can't complete the cascade. Loud
 			// log + Internal so operators reconcile by hand.
 			slog.ErrorContext(ctx, "delete account: firebase_identity already gone but uid unknown — Firebase Auth account likely orphaned, manual cleanup required",
-				"firebase_identity_id", firebaseIdentityID)
+				"identity_id", firebaseIdentityID)
 			return nil, apierr.Internal(
 				"firebase identity already removed from Pivox but its Firebase Auth UID is unknown; operator must reconcile manually")
 		}
@@ -267,7 +267,7 @@ func (s *IamServer) runDeleteAccount(
 			"id", firebaseIdentityID, "error", err)
 		return nil, apierr.Internal("lookup firebase identity")
 	}
-	if err := s.queries.HardDeleteFirebaseIdentity(ctx, firebaseIdentityID); err != nil {
+	if err := s.queries.HardDeleteIdentity(ctx, firebaseIdentityID); err != nil {
 		slog.ErrorContext(ctx, "delete account: hard-delete firebase_identity failed",
 			"id", firebaseIdentityID, "error", err)
 		return nil, apierr.Internal("delete firebase identity")

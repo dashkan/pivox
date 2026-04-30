@@ -27,14 +27,14 @@ var (
 
 func TestResolver_Resolve_HappyPath(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	q.On("GetFirebaseIdentitiesByIDs", mock.Anything, mock.MatchedBy(func(ids []uuid.UUID) bool {
+	q.On("GetIdentitiesByIDs", mock.Anything, mock.MatchedBy(func(ids []uuid.UUID) bool {
 		// Caller may pass IDs in any order — we only care about set equality.
 		got := append([]uuid.UUID(nil), ids...)
 		sort.Slice(got, func(i, j int) bool { return got[i].String() < got[j].String() })
 		want := []uuid.UUID{idA, idB}
 		sort.Slice(want, func(i, j int) bool { return want[i].String() < want[j].String() })
 		return len(got) == len(want) && got[0] == want[0] && got[1] == want[1]
-	})).Return([]db.FirebaseIdentity{
+	})).Return([]db.Identity{
 		{ID: idA, Email: "a@example.com", DisplayName: "Alice"},
 		{ID: idB, Email: "b@example.com", DisplayName: "Bob"},
 	}, nil)
@@ -55,9 +55,9 @@ func TestResolver_Resolve_DedupesInputIDs(t *testing.T) {
 	// duplicates are common. The resolver must dedupe before hitting
 	// the DB — otherwise the same identity is fetched N times.
 	q := new(mocks.MockQuerier)
-	q.On("GetFirebaseIdentitiesByIDs", mock.Anything, mock.MatchedBy(func(ids []uuid.UUID) bool {
+	q.On("GetIdentitiesByIDs", mock.Anything, mock.MatchedBy(func(ids []uuid.UUID) bool {
 		return len(ids) == 1 && ids[0] == idA
-	})).Return([]db.FirebaseIdentity{
+	})).Return([]db.Identity{
 		{ID: idA, Email: "a@example.com", DisplayName: "Alice"},
 	}, nil)
 
@@ -73,9 +73,9 @@ func TestResolver_Resolve_SkipsZeroUUIDs(t *testing.T) {
 	// zero `uuid.UUID` from the converter layer; passing it through
 	// to a DB lookup would be wasted work and could mask real bugs.
 	q := new(mocks.MockQuerier)
-	q.On("GetFirebaseIdentitiesByIDs", mock.Anything, mock.MatchedBy(func(ids []uuid.UUID) bool {
+	q.On("GetIdentitiesByIDs", mock.Anything, mock.MatchedBy(func(ids []uuid.UUID) bool {
 		return len(ids) == 1 && ids[0] == idA
-	})).Return([]db.FirebaseIdentity{
+	})).Return([]db.Identity{
 		{ID: idA, Email: "a@example.com", DisplayName: "Alice"},
 	}, nil)
 
@@ -110,8 +110,8 @@ func TestResolver_Resolve_MissingIDsReturnPlaceholder(t *testing.T) {
 	// PII blank. Callers consuming the map by ID would otherwise
 	// silently drop the audit field.
 	q := new(mocks.MockQuerier)
-	q.On("GetFirebaseIdentitiesByIDs", mock.Anything, mock.Anything).
-		Return([]db.FirebaseIdentity{
+	q.On("GetIdentitiesByIDs", mock.Anything, mock.Anything).
+		Return([]db.Identity{
 			{ID: idA, Email: "a@example.com", DisplayName: "Alice"},
 		}, nil)
 
@@ -126,8 +126,8 @@ func TestResolver_Resolve_MissingIDsReturnPlaceholder(t *testing.T) {
 
 func TestResolver_Resolve_DBError(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	q.On("GetFirebaseIdentitiesByIDs", mock.Anything, mock.Anything).
-		Return([]db.FirebaseIdentity{}, errors.New("connection reset"))
+	q.On("GetIdentitiesByIDs", mock.Anything, mock.Anything).
+		Return([]db.Identity{}, errors.New("connection reset"))
 
 	r := NewResolver(q)
 	_, err := r.Resolve(context.Background(), []uuid.UUID{idA})
@@ -149,8 +149,8 @@ func TestResolver_ResolveOne_ZeroUUID(t *testing.T) {
 
 func TestResolver_ResolveOne_HappyPath(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	q.On("GetFirebaseIdentitiesByIDs", mock.Anything, []uuid.UUID{idA}).
-		Return([]db.FirebaseIdentity{
+	q.On("GetIdentitiesByIDs", mock.Anything, []uuid.UUID{idA}).
+		Return([]db.Identity{
 			{ID: idA, Email: "a@example.com", DisplayName: "Alice"},
 		}, nil)
 

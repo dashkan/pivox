@@ -168,11 +168,11 @@ SELECT DISTINCT r.name
 `
 
 type GetEffectiveOrgRolesParams struct {
-	OrgID              uuid.UUID `json:"org_id"`
-	FirebaseIdentityID uuid.UUID `json:"firebase_identity_id"`
+	OrgID      uuid.UUID `json:"org_id"`
+	IdentityID uuid.UUID `json:"identity_id"`
 }
 
-// Returns the system-role names a firebase_identity has at the given
+// Returns the system-role names a identity has at the given
 // org, considering both direct user bindings and group-derived
 // bindings (groups the user is a member of, which themselves have
 // org_members rows). Custom roles are excluded — v1 only resolves
@@ -184,11 +184,11 @@ type GetEffectiveOrgRolesParams struct {
 //
 // Post-Phase-7 unification: `org_members.principal_id` (when
 // principal_kind='user') and `group_members.user_id` both reference
-// `firebase_identities.id` directly. The previous per-org `users`
+// `identities.id` directly. The previous per-org `users`
 // join row is gone, so this query no longer needs a caller-resolution
 // CTE. Returns the empty set if no bindings exist.
 func (q *Queries) GetEffectiveOrgRoles(ctx context.Context, arg GetEffectiveOrgRolesParams) ([]string, error) {
-	rows, err := q.db.Query(ctx, getEffectiveOrgRoles, arg.OrgID, arg.FirebaseIdentityID)
+	rows, err := q.db.Query(ctx, getEffectiveOrgRoles, arg.OrgID, arg.IdentityID)
 	if err != nil {
 		return nil, err
 	}
@@ -227,11 +227,11 @@ SELECT DISTINCT r.name
 `
 
 type GetEffectiveSpaceRolesParams struct {
-	SpaceID            uuid.UUID `json:"space_id"`
-	FirebaseIdentityID uuid.UUID `json:"firebase_identity_id"`
+	SpaceID    uuid.UUID `json:"space_id"`
+	IdentityID uuid.UUID `json:"identity_id"`
 }
 
-// Returns the system-role names a firebase_identity has at the given
+// Returns the system-role names a identity has at the given
 // space — direct + group-derived space-level bindings only. Org-level
 // inheritance (an org-admin is also a space-admin) is the resolver's
 // responsibility to union in via GetEffectiveOrgRoles against the
@@ -239,9 +239,9 @@ type GetEffectiveSpaceRolesParams struct {
 //
 // Post-Phase-7 unification: same simplification as
 // GetEffectiveOrgRoles — principal_id and group_members.user_id are
-// both firebase_identities.id, so no caller-resolution CTE.
+// both identities.id, so no caller-resolution CTE.
 func (q *Queries) GetEffectiveSpaceRoles(ctx context.Context, arg GetEffectiveSpaceRolesParams) ([]string, error) {
-	rows, err := q.db.Query(ctx, getEffectiveSpaceRoles, arg.SpaceID, arg.FirebaseIdentityID)
+	rows, err := q.db.Query(ctx, getEffectiveSpaceRoles, arg.SpaceID, arg.IdentityID)
 	if err != nil {
 		return nil, err
 	}
@@ -260,37 +260,6 @@ func (q *Queries) GetEffectiveSpaceRoles(ctx context.Context, arg GetEffectiveSp
 	return items, nil
 }
 
-const getFirebaseIdentityForMember = `-- name: GetFirebaseIdentityForMember :one
-SELECT id, firebase_uid, email, email_verified, display_name, photo_url, disabled, create_time, update_time, last_login_time FROM firebase_identities WHERE id = $1
-`
-
-// Verifies that a firebase_identity row exists for the given uuid.
-// Used by Member create handlers as the principal-existence check
-// before inserting a binding — org_members.principal_id has no FK
-// (it's polymorphic by principal_kind), so the check is
-// application-level. The previous version of this query
-// (`GetUserByID`) verified per-org membership via the dropped
-// `users` table; post-Phase-7 the membership check is "principal
-// has a firebase_identity row", and CreateMember separately validates
-// that the caller has org-level permission to create the binding.
-func (q *Queries) GetFirebaseIdentityForMember(ctx context.Context, id uuid.UUID) (FirebaseIdentity, error) {
-	row := q.db.QueryRow(ctx, getFirebaseIdentityForMember, id)
-	var i FirebaseIdentity
-	err := row.Scan(
-		&i.ID,
-		&i.FirebaseUid,
-		&i.Email,
-		&i.EmailVerified,
-		&i.DisplayName,
-		&i.PhotoUrl,
-		&i.Disabled,
-		&i.CreateTime,
-		&i.UpdateTime,
-		&i.LastLoginTime,
-	)
-	return i, err
-}
-
 const getGroupByID = `-- name: GetGroupByID :one
 SELECT id, org_id, display_name, description, annotations, state, etag, revision, created_by, updated_by, create_time, update_time FROM groups
  WHERE id = $1
@@ -302,7 +271,7 @@ type GetGroupByIDParams struct {
 	OrgID uuid.UUID `json:"org_id"`
 }
 
-// Companion to GetFirebaseIdentityForMember for groups.
+// Companion to GetIdentityForMember for groups.
 func (q *Queries) GetGroupByID(ctx context.Context, arg GetGroupByIDParams) (Group, error) {
 	row := q.db.QueryRow(ctx, getGroupByID, arg.ID, arg.OrgID)
 	var i Group
@@ -319,6 +288,37 @@ func (q *Queries) GetGroupByID(ctx context.Context, arg GetGroupByIDParams) (Gro
 		&i.UpdatedBy,
 		&i.CreateTime,
 		&i.UpdateTime,
+	)
+	return i, err
+}
+
+const getIdentityForMember = `-- name: GetIdentityForMember :one
+SELECT id, firebase_uid, email, email_verified, display_name, photo_url, disabled, create_time, update_time, last_login_time FROM identities WHERE id = $1
+`
+
+// Verifies that a identity row exists for the given uuid.
+// Used by Member create handlers as the principal-existence check
+// before inserting a binding — org_members.principal_id has no FK
+// (it's polymorphic by principal_kind), so the check is
+// application-level. The previous version of this query
+// (`GetUserByID`) verified per-org membership via the dropped
+// `users` table; post-Phase-7 the membership check is "principal
+// has a identity row", and CreateMember separately validates
+// that the caller has org-level permission to create the binding.
+func (q *Queries) GetIdentityForMember(ctx context.Context, id uuid.UUID) (Identity, error) {
+	row := q.db.QueryRow(ctx, getIdentityForMember, id)
+	var i Identity
+	err := row.Scan(
+		&i.ID,
+		&i.FirebaseUid,
+		&i.Email,
+		&i.EmailVerified,
+		&i.DisplayName,
+		&i.PhotoUrl,
+		&i.Disabled,
+		&i.CreateTime,
+		&i.UpdateTime,
+		&i.LastLoginTime,
 	)
 	return i, err
 }

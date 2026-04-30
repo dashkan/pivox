@@ -17,7 +17,7 @@ import (
 //
 // Post-Phase-7, the real auth interceptor requires a `pivox_user_id`
 // claim on every authenticated token. To match that contract here,
-// VerifyToken looks up the `firebase_identities` row by UID and
+// VerifyToken looks up the `identities` row by UID and
 // populates the claim with its UUID. SeedIdentity creates the row up
 // front, so any caller created via the harness flow naturally has
 // the claim. A token whose UID is not seeded yields an Identity with
@@ -36,7 +36,7 @@ type testAuthService struct {
 func (s testAuthService) VerifyToken(ctx context.Context, token string) (*authn.Identity, error) {
 	id := &authn.Identity{UID: token}
 	if s.queries != nil {
-		if row, err := s.queries.GetFirebaseIdentityByUID(ctx, token); err == nil {
+		if row, err := s.queries.GetIdentityByFirebaseUID(ctx, token); err == nil {
 			id.Email = row.Email
 			id.Claims = map[string]any{"pivox_user_id": row.ID.String()}
 		}

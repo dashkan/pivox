@@ -18,11 +18,11 @@ import (
 )
 
 // Canonical caller used across the interceptor tests. The mock querier
-// returns this firebase_identity from `GetFirebaseIdentityByUID` for
+// returns this firebase_identity from `GetIdentityByFirebaseUID` for
 // the matching UID.
 const testMemberUID = "fb-member-uid"
 
-var testMemberIdentity = db.FirebaseIdentity{
+var testMemberIdentity = db.Identity{
 	ID:          uuid.MustParse("0192a000-cccc-7000-8000-000000000001"),
 	FirebaseUid: testMemberUID,
 	Email:       "member@example.com",
@@ -47,7 +47,7 @@ func authedCtx(uid string) context.Context {
 func TestMembershipInterceptor_AllowlistedMethodSkipsCheck(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	// No mock expectations on q — allowlisted methods must not query
-	// the DB at all. If the interceptor reaches GetFirebaseIdentityByUID
+	// the DB at all. If the interceptor reaches GetIdentityByFirebaseUID
 	// for an allowlisted method, the mock will fail the test.
 	interceptor := MembershipRequiredInterceptor(q)
 
@@ -98,9 +98,9 @@ func TestMembershipInterceptor_AllAllowlistedMethods(t *testing.T) {
 
 func TestMembershipInterceptor_MemberCaller(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	q.On("GetFirebaseIdentityByUID", mock.Anything, testMemberUID).
+	q.On("GetIdentityByFirebaseUID", mock.Anything, testMemberUID).
 		Return(testMemberIdentity, nil).Once()
-	q.On("ListOrganizationsForFirebaseIdentity", mock.Anything, testMemberIdentity.ID).
+	q.On("ListOrganizationsForIdentity", mock.Anything, testMemberIdentity.ID).
 		Return([]db.Organization{{
 			ID:   uuid.New(),
 			Name: "acme",
@@ -124,9 +124,9 @@ func TestMembershipInterceptor_MemberCaller(t *testing.T) {
 
 func TestMembershipInterceptor_NoMembershipsDeniesAccess(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	q.On("GetFirebaseIdentityByUID", mock.Anything, testMemberUID).
+	q.On("GetIdentityByFirebaseUID", mock.Anything, testMemberUID).
 		Return(testMemberIdentity, nil).Once()
-	q.On("ListOrganizationsForFirebaseIdentity", mock.Anything, testMemberIdentity.ID).
+	q.On("ListOrganizationsForIdentity", mock.Anything, testMemberIdentity.ID).
 		Return([]db.Organization{}, nil).Once()
 
 	interceptor := MembershipRequiredInterceptor(q)
@@ -173,8 +173,8 @@ func TestMembershipInterceptor_NoAuthContextRejected(t *testing.T) {
 
 func TestMembershipInterceptor_AccountLookupErrorReturnsInternal(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	q.On("GetFirebaseIdentityByUID", mock.Anything, testMemberUID).
-		Return(db.FirebaseIdentity{}, errors.New("db down")).Once()
+	q.On("GetIdentityByFirebaseUID", mock.Anything, testMemberUID).
+		Return(db.Identity{}, errors.New("db down")).Once()
 
 	interceptor := MembershipRequiredInterceptor(q)
 
@@ -197,9 +197,9 @@ func TestMembershipInterceptor_AccountLookupErrorReturnsInternal(t *testing.T) {
 
 func TestMembershipInterceptor_MembershipsLookupErrorReturnsInternal(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	q.On("GetFirebaseIdentityByUID", mock.Anything, testMemberUID).
+	q.On("GetIdentityByFirebaseUID", mock.Anything, testMemberUID).
 		Return(testMemberIdentity, nil).Once()
-	q.On("ListOrganizationsForFirebaseIdentity", mock.Anything, testMemberIdentity.ID).
+	q.On("ListOrganizationsForIdentity", mock.Anything, testMemberIdentity.ID).
 		Return(nil, errors.New("db down")).Once()
 
 	interceptor := MembershipRequiredInterceptor(q)

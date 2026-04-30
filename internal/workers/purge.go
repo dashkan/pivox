@@ -27,7 +27,7 @@ import (
 //
 // PurgeWorker does NOT operate on soft-deleted users yet — user
 // soft-delete is implicit in the DeleteUser LRO (no row-level
-// soft-delete state for firebase_identities). When per-user soft
+// soft-delete state for identities). When per-user soft
 // delete lands, this worker grows a parallel users.purge_time
 // scan.
 type PurgeWorker struct {

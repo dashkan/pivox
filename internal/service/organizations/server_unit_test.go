@@ -273,7 +273,7 @@ func (m *mockAuthService) DeleteSamlProvider(ctx context.Context, providerID str
 
 // newCreateOrgServer builds an OrganizationsServer wired with the mock pool,
 // auth service, and querier needed by CreateOrganization. The querier is
-// where `GetFirebaseIdentityByUID` (the pre-tx caller-resolution lookup)
+// where `GetIdentityByFirebaseUID` (the pre-tx caller-resolution lookup)
 // fires; the readUID closure stubs the auth-context UID extraction so
 // tests don't need to wire the production interceptor.
 func newCreateOrgServer(pool TxBeginner, auth authn.Service, q db.Querier) *OrganizationsServer {
@@ -288,14 +288,14 @@ func newCreateOrgServer(pool TxBeginner, auth authn.Service, q db.Querier) *Orga
 
 // testFirebaseUID is the canonical caller UID used by all
 // CreateOrganization unit tests. The matching firebase_identity row
-// is returned by the GetFirebaseIdentityByUID mock setup.
+// is returned by the GetIdentityByFirebaseUID mock setup.
 const testFirebaseUID = "fb-test-uid"
 
 // testCallerIdentity is the canonical caller firebase_identity
-// returned by `GetFirebaseIdentityByUID` in CreateOrganization unit
+// returned by `GetIdentityByFirebaseUID` in CreateOrganization unit
 // tests. Tests that exercise the founder-pointer / membership path
 // can compare against `testCallerIdentity.ID`.
-var testCallerIdentity = db.FirebaseIdentity{
+var testCallerIdentity = db.Identity{
 	ID:          uuid.MustParse("0192a000-aaaa-7000-8000-000000000001"),
 	FirebaseUid: testFirebaseUID,
 	Email:       "test@example.com",
@@ -305,7 +305,7 @@ var testCallerIdentity = db.FirebaseIdentity{
 // fires before the tx begins. Every CreateOrganization test that
 // passes `WithAuthenticatedUID`-equivalent context needs this.
 func expectGetIdentity(q *mocks.MockQuerier) {
-	q.On("GetFirebaseIdentityByUID", mock.Anything, testFirebaseUID).
+	q.On("GetIdentityByFirebaseUID", mock.Anything, testFirebaseUID).
 		Return(testCallerIdentity, nil).Once()
 }
 
@@ -329,7 +329,7 @@ func expectBootstrapExecs(tx *mockTx) {
 
 // `membershipRow` helper was retired post-Phase-7 along with the
 // per-org `users` table. CreateOrganization no longer mints a
-// users row — the founder's `firebase_identities.id` is bound
+// users row — the founder's `identities.id` is bound
 // directly to the owner role via `org_members`.
 
 // orgRow returns a mockRow whose Scan populates a db.Organization with the
@@ -392,7 +392,7 @@ func TestUnit_CreateOrganization_Success(t *testing.T) {
 	tx.On("QueryRow", mock.Anything, mock.Anything, mock.Anything).
 		Return(orgRow(createdOrg)).Once()
 	// 3. Founder bootstrap: 4 role inserts + 1 org_member insert
-	// (binds the founder's `firebase_identities.id` directly to the
+	// (binds the founder's `identities.id` directly to the
 	// owner role; the dropped `users` table no longer needs a
 	// CreateUserMembership round-trip).
 	expectBootstrapExecs(tx)
@@ -464,7 +464,7 @@ func TestUnit_CreateOrganization_CreatesOwnerMembership(t *testing.T) {
 
 	// Founder bootstrap: 4 role :exec inserts + 1 org_member :one
 	// QueryRow insert. Post-Phase-7: the founder's
-	// `firebase_identities.id` is bound directly to the owner role
+	// `identities.id` is bound directly to the owner role
 	// — no separate `users` row insert.
 	expectBootstrapExecs(tx)
 
@@ -677,11 +677,11 @@ func TestUnit_ListOrganizations_Unauthenticated(t *testing.T) {
 func TestUnit_ListOrganizations_NoIdentityRowReturnsEmpty(t *testing.T) {
 	// Race with the sync-identity webhook on a freshly-Firebase-
 	// registered user: caller has a valid token but no
-	// `firebase_identities` row yet. Memberless state — must return
+	// `identities` row yet. Memberless state — must return
 	// empty list, not an error.
 	mockQ := new(mocks.MockQuerier)
-	mockQ.On("GetFirebaseIdentityByUID", mock.Anything, testFirebaseUID).
-		Return(db.FirebaseIdentity{}, pgx.ErrNoRows)
+	mockQ.On("GetIdentityByFirebaseUID", mock.Anything, testFirebaseUID).
+		Return(db.Identity{}, pgx.ErrNoRows)
 	srv := newListOrgsServer(mockQ)
 
 	resp, err := srv.ListOrganizations(context.Background(), &apiv1.ListOrganizationsRequest{})
@@ -693,8 +693,8 @@ func TestUnit_ListOrganizations_NoIdentityRowReturnsEmpty(t *testing.T) {
 
 func TestUnit_ListOrganizations_IdentityLookupError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	mockQ.On("GetFirebaseIdentityByUID", mock.Anything, mock.Anything).
-		Return(db.FirebaseIdentity{}, errors.New("connection refused"))
+	mockQ.On("GetIdentityByFirebaseUID", mock.Anything, mock.Anything).
+		Return(db.Identity{}, errors.New("connection refused"))
 	srv := newListOrgsServer(mockQ)
 
 	_, err := srv.ListOrganizations(context.Background(), &apiv1.ListOrganizationsRequest{})
@@ -707,8 +707,8 @@ func TestUnit_ListOrganizations_IdentityLookupError(t *testing.T) {
 
 func TestUnit_ListOrganizations_OnlyReturnsCallerOrgs(t *testing.T) {
 	// Caller-scoping: the handler MUST scope through
-	// ListOrganizationsForFirebaseIdentity, which JOINs users →
-	// organizations on firebase_identity_id. Caller never sees orgs
+	// ListOrganizationsForIdentity, which JOINs users →
+	// organizations on identity_id. Caller never sees orgs
 	// they aren't a member of.
 	mockQ := new(mocks.MockQuerier)
 	expectGetIdentity(mockQ)
@@ -726,7 +726,7 @@ func TestUnit_ListOrganizations_OnlyReturnsCallerOrgs(t *testing.T) {
 			UpdateTime:  time.Date(2025, 9, 1, 0, 0, 0, 0, time.UTC),
 		},
 	}
-	mockQ.On("ListOrganizationsForFirebaseIdentity", mock.Anything, testCallerIdentity.ID).Return(callerOrgs, nil)
+	mockQ.On("ListOrganizationsForIdentity", mock.Anything, testCallerIdentity.ID).Return(callerOrgs, nil)
 
 	srv := newListOrgsServer(mockQ)
 	resp, err := srv.ListOrganizations(context.Background(), &apiv1.ListOrganizationsRequest{})
@@ -740,7 +740,7 @@ func TestUnit_ListOrganizations_OnlyReturnsCallerOrgs(t *testing.T) {
 func TestUnit_ListOrganizations_QueryError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	expectGetIdentity(mockQ)
-	mockQ.On("ListOrganizationsForFirebaseIdentity", mock.Anything, testCallerIdentity.ID).
+	mockQ.On("ListOrganizationsForIdentity", mock.Anything, testCallerIdentity.ID).
 		Return(nil, errors.New("connection refused"))
 	srv := newListOrgsServer(mockQ)
 
@@ -757,7 +757,7 @@ func TestUnit_ListOrganizations_IgnoresPaginationFields(t *testing.T) {
 	// query — handler returns all caller's orgs regardless.
 	mockQ := new(mocks.MockQuerier)
 	expectGetIdentity(mockQ)
-	mockQ.On("ListOrganizationsForFirebaseIdentity", mock.Anything, testCallerIdentity.ID).
+	mockQ.On("ListOrganizationsForIdentity", mock.Anything, testCallerIdentity.ID).
 		Return([]db.Organization{}, nil)
 
 	srv := newListOrgsServer(mockQ)

@@ -56,7 +56,7 @@ func TestE2E_CreateSpace_SeedsFounderOwnerBinding(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, orgOp.GetDone())
 	orgID := h.LookupOrgID(t, "spaces-e2e-org")
-	founderUserID := h.LookupOrgUserID(t, orgID, owner.FirebaseIdentityID)
+	founderUserID := h.LookupOrgUserID(t, orgID, owner.IdentityID)
 
 	spacesClient := apiv1.NewSpacesClient(h.Conn())
 	op, err := spacesClient.CreateSpace(ctx, &apiv1.CreateSpaceRequest{

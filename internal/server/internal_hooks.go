@@ -39,7 +39,7 @@ type InternalHooks struct {
 	// a reverse proxy owns rate limiting.
 	rateLimitEnabled bool
 
-	// syncAuth protects the auth:syncFirebaseIdentity endpoint. The
+	// syncAuth protects the auth:syncIdentity endpoint. The
 	// implementation is selected at compile time via build tags:
 	//   - Production (default): Google Cloud OIDC identity token verification
 	//   - Dev (go build -tags dev): static shared secret
@@ -72,7 +72,7 @@ type InternalHooks struct {
 
 // Register mounts the internal endpoints on the given mux.
 func (h *InternalHooks) Register(mux *http.ServeMux) {
-	mux.HandleFunc("POST /internal/v1/auth:syncFirebaseIdentity", h.syncAuth(h.syncFirebaseIdentity))
+	mux.HandleFunc("POST /internal/v1/auth:syncIdentity", h.syncAuth(h.syncIdentity))
 	mux.HandleFunc("POST /internal/v1/auth:exchangeToken", h.rateLimit(h.exchangeToken))
 	mux.HandleFunc("POST /internal/v1/auth:depositToken", h.depositToken)
 	mux.HandleFunc("POST /internal/v1/auth:consumeToken", h.consumeToken)
@@ -86,9 +86,9 @@ func (h *InternalHooks) Register(mux *http.ServeMux) {
 		h.rateLimitWith(h.resolveProviderLimiter, h.resolveProvider))
 }
 
-// syncFirebaseIdentityRequest is the payload sent by the Firebase
+// syncIdentityRequest is the payload sent by the Firebase
 // onUserCreated / onUserSignedIn blocking functions.
-type syncFirebaseIdentityRequest struct {
+type syncIdentityRequest struct {
 	FirebaseUID   string `json:"firebase_uid"`
 	Email         string `json:"email"`
 	EmailVerified bool   `json:"email_verified"`
@@ -97,15 +97,15 @@ type syncFirebaseIdentityRequest struct {
 	Disabled      bool   `json:"disabled"`
 }
 
-// syncFirebaseIdentity upserts a Firebase Auth user into the
-// firebase_identities table. Called by the Firebase Function blocking
+// syncIdentity upserts a Firebase Auth user into the
+// identities table. Called by the Firebase Function blocking
 // triggers on user create / sign-in so the cloud has a Pivox-side
 // identity row before any org-scoped RPC runs.
-func (h *InternalHooks) syncFirebaseIdentity(w http.ResponseWriter, r *http.Request) {
+func (h *InternalHooks) syncIdentity(w http.ResponseWriter, r *http.Request) {
 	// AUTHN-05: Limit request body to 8 KB (sync payloads are small JSON).
 	r.Body = http.MaxBytesReader(w, r.Body, 8<<10)
 
-	var req syncFirebaseIdentityRequest
+	var req syncIdentityRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.logger.Warn("invalid sync identity request", "error", err)
 		http.Error(w, "invalid request body", http.StatusBadRequest)
@@ -117,7 +117,7 @@ func (h *InternalHooks) syncFirebaseIdentity(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	identity, err := h.queries.UpsertFirebaseIdentity(r.Context(), db.UpsertFirebaseIdentityParams{
+	identity, err := h.queries.UpsertIdentity(r.Context(), db.UpsertIdentityParams{
 		FirebaseUid:   req.FirebaseUID,
 		Email:         req.Email,
 		EmailVerified: req.EmailVerified,
@@ -127,17 +127,17 @@ func (h *InternalHooks) syncFirebaseIdentity(w http.ResponseWriter, r *http.Requ
 		LastLoginTime: pgtype.Timestamptz{}, // not set on creation
 	})
 	if err != nil {
-		h.logger.Error("failed to upsert firebase identity", "firebase_uid", req.FirebaseUID, "error", err)
+		h.logger.Error("failed to upsert identity", "firebase_uid", req.FirebaseUID, "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
-	h.logger.Info("firebase identity synced", "firebase_uid", req.FirebaseUID, "firebase_identity_id", identity.ID)
+	h.logger.Info("identity synced", "firebase_uid", req.FirebaseUID, "identity_id", identity.ID)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(map[string]string{
-		"firebase_identity_id": identity.ID.String(),
+		"identity_id": identity.ID.String(),
 	}); err != nil {
 		h.logger.Warn("write sync-identity response failed", "error", err)
 	}

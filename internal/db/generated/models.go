@@ -969,19 +969,6 @@ type Domain struct {
 	VerifiedTime      pgtype.Timestamptz `json:"verified_time"`
 }
 
-type FirebaseIdentity struct {
-	ID            uuid.UUID          `json:"id"`
-	FirebaseUid   string             `json:"firebase_uid"`
-	Email         string             `json:"email"`
-	EmailVerified bool               `json:"email_verified"`
-	DisplayName   string             `json:"display_name"`
-	PhotoUrl      string             `json:"photo_url"`
-	Disabled      bool               `json:"disabled"`
-	CreateTime    time.Time          `json:"create_time"`
-	UpdateTime    time.Time          `json:"update_time"`
-	LastLoginTime pgtype.Timestamptz `json:"last_login_time"`
-}
-
 type Group struct {
 	ID          uuid.UUID       `json:"id"`
 	OrgID       uuid.UUID       `json:"org_id"`
@@ -1003,6 +990,19 @@ type GroupMember struct {
 	UserID     uuid.UUID   `json:"user_id"`
 	CreatedBy  pgtype.UUID `json:"created_by"`
 	CreateTime time.Time   `json:"create_time"`
+}
+
+type Identity struct {
+	ID            uuid.UUID          `json:"id"`
+	FirebaseUid   string             `json:"firebase_uid"`
+	Email         string             `json:"email"`
+	EmailVerified bool               `json:"email_verified"`
+	DisplayName   string             `json:"display_name"`
+	PhotoUrl      string             `json:"photo_url"`
+	Disabled      bool               `json:"disabled"`
+	CreateTime    time.Time          `json:"create_time"`
+	UpdateTime    time.Time          `json:"update_time"`
+	LastLoginTime pgtype.Timestamptz `json:"last_login_time"`
 }
 
 type Invitation struct {

@@ -463,7 +463,7 @@ func parseRoleRef(ref, parentOrgSlug string) (string, error) {
 func verifyPrincipalInOrg(ctx context.Context, qtx db.Querier, orgID uuid.UUID, kind db.PrincipalKind, id uuid.UUID) error {
 	switch kind {
 	case db.PrincipalKindUser:
-		if _, err := qtx.GetFirebaseIdentityForMember(ctx, id); err != nil {
+		if _, err := qtx.GetIdentityForMember(ctx, id); err != nil {
 			if isNotFound(err) {
 				return apierr.NotFound("User", id.String())
 			}
