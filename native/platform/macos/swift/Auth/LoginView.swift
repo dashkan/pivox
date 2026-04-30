@@ -284,16 +284,28 @@ struct LoginView: View {
         .disabled(isLoading)
       }
 
-      // Footer
-      HStack(spacing: 4) {
-        Text("Don't have an account?")
-          .font(theme.bodyFont)
-          .foregroundStyle(.secondary)
-        Button("Create one", action: onSwitchToRegister)
+      // Footer: switch to register, OR — while an ASWebAuthentication
+      // session is open — a Cancel link that hands control back to
+      // the user without making them hunt for the system sheet's
+      // close button. Shown for any OAuth round-trip (Google, GitHub,
+      // SSO); covers wrong-email recovery and any future flow where
+      // the user wants to bail mid-redirect.
+      if auth.isOAuthInProgress {
+        Button("Cancel sign-in") { auth.cancelOAuth() }
           .buttonStyle(.link)
           .font(theme.bodyFont)
-          .disabled(isLoading)
-          .accessibilityIdentifier("login-switch-register")
+          .accessibilityIdentifier("login-cancel-oauth")
+      } else {
+        HStack(spacing: 4) {
+          Text("Don't have an account?")
+            .font(theme.bodyFont)
+            .foregroundStyle(.secondary)
+          Button("Create one", action: onSwitchToRegister)
+            .buttonStyle(.link)
+            .font(theme.bodyFont)
+            .disabled(isLoading)
+            .accessibilityIdentifier("login-switch-register")
+        }
       }
     }
     .padding(32)

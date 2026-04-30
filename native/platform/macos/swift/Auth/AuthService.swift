@@ -39,7 +39,26 @@ class AuthService: NSObject {
     return currentUser != nil
   }
   var errorMessage: String?
-  private var isOAuthInProgress = false
+  /// True while an ASWebAuthenticationSession is open (Google,
+  /// GitHub, or SSO). Read by the UI to show a "Cancel sign-in"
+  /// affordance — most of the time the system browser sheet's own
+  /// Close button is enough, but the in-app cancel covers cases
+  /// where the user has switched back to the Pivox window without
+  /// noticing the sheet, or the sheet is below other windows on a
+  /// busy desktop. Also gives us a clean recovery path if a future
+  /// session-callback bug ever leaves the flag stuck on.
+  ///
+  /// `private(set)` so views can observe but only auth methods
+  /// here can flip the flag.
+  private(set) var isOAuthInProgress = false
+
+  /// The currently-running OAuth session, if any. Held so
+  /// `cancelOAuth()` can hand control back to the user without
+  /// waiting for them to find the sheet's Close button.
+  /// `ASWebAuthenticationSession.cancel()` triggers the completion
+  /// handler with `ASWebAuthenticationSessionError.canceledLogin`,
+  /// which the existing catch arms already swallow as not-an-error.
+  private var activeAuthSession: ASWebAuthenticationSession?
 
   /// Non-nil while a sign-in attempt has succeeded past the first
   /// factor but still needs a TOTP code. The UI observes this and
@@ -244,7 +263,8 @@ class AuthService: NSObject {
     let callbackURL = try await withCheckedThrowingContinuation {
       (continuation: CheckedContinuation<URL, Error>) in
       let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: callbackScheme) {
-        url, error in
+        [weak self] url, error in
+        self?.activeAuthSession = nil
         if let error = error {
           continuation.resume(throwing: error)
         } else if let url = url {
@@ -258,6 +278,7 @@ class AuthService: NSObject {
       }
       session.presentationContextProvider = self
       session.prefersEphemeralWebBrowserSession = false
+      self.activeAuthSession = session
       session.start()
     }
 
@@ -374,7 +395,8 @@ class AuthService: NSObject {
       let session = ASWebAuthenticationSession(
         url: startURL,
         callbackURLScheme: githubCallbackScheme
-      ) { url, error in
+      ) { [weak self] url, error in
+        self?.activeAuthSession = nil
         if let error = error {
           continuation.resume(throwing: error)
         } else if let url = url {
@@ -388,6 +410,7 @@ class AuthService: NSObject {
       }
       session.presentationContextProvider = self
       session.prefersEphemeralWebBrowserSession = false
+      self.activeAuthSession = session
       session.start()
     }
 
@@ -591,7 +614,8 @@ class AuthService: NSObject {
       let session = ASWebAuthenticationSession(
         url: startURL,
         callbackURLScheme: "pivox"
-      ) { url, error in
+      ) { [weak self] url, error in
+        self?.activeAuthSession = nil
         if let error = error {
           continuation.resume(throwing: error)
         } else if let url = url {
@@ -605,6 +629,7 @@ class AuthService: NSObject {
       }
       session.presentationContextProvider = self
       session.prefersEphemeralWebBrowserSession = false
+      self.activeAuthSession = session
       session.start()
     }
 
@@ -874,6 +899,22 @@ class AuthService: NSObject {
   /// Drop the pending MFA sign-in. No-op if there's none in flight.
   func cancelMFASignIn() {
     pendingMFAResolver = nil
+  }
+
+  /// Cancel a pending Google / GitHub / SSO sign-in by tearing down
+  /// the active `ASWebAuthenticationSession`. The completion handler
+  /// fires with `ASWebAuthenticationSessionError.canceledLogin`,
+  /// which the existing catch arms in `signInWithGoogle`,
+  /// `signInWithGitHub`, and `signInWithSSO` already swallow as
+  /// "user-initiated cancel, not an error" — so the UI returns to
+  /// the pre-flight state without an error message. No-op if no
+  /// session is in flight.
+  func cancelOAuth() {
+    activeAuthSession?.cancel()
+    // Don't nil out `activeAuthSession` here — let the session's
+    // completion handler do it after `.canceledLogin` is delivered.
+    // Pre-emptively clearing would leak the session if a callback
+    // failure ever arrived between cancel() and the callback.
   }
 
   /// Pulls a `MultiFactorResolver` out of a sign-in error when
