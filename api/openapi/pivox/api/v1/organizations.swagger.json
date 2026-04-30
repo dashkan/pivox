@@ -242,16 +242,31 @@
                   "description": "Output only. The organization's current lifecycle state.",
                   "readOnly": true
                 },
+                "createdBy": {
+                  "$ref": "#/definitions/v1Actor",
+                  "description": "Output only. The identity that created this organization.",
+                  "readOnly": true
+                },
                 "createTime": {
                   "type": "string",
                   "format": "date-time",
                   "description": "Output only. Timestamp when the Organization was created.",
                   "readOnly": true
                 },
+                "updatedBy": {
+                  "$ref": "#/definitions/v1Actor",
+                  "description": "Output only. The identity that last modified this organization.",
+                  "readOnly": true
+                },
                 "updateTime": {
                   "type": "string",
                   "format": "date-time",
                   "description": "Output only. Timestamp when the Organization was last modified.",
+                  "readOnly": true
+                },
+                "deletedBy": {
+                  "$ref": "#/definitions/v1Actor",
+                  "description": "Output only. The identity that requested deletion of this organization.",
                   "readOnly": true
                 },
                 "deleteTime": {
@@ -1459,6 +1474,28 @@
       },
       "description": "Response message for `AcceptInvitation`."
     },
+    "v1Actor": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The identity's stable UUID (firebase_identities.id). Always\npopulated when the column is non-null in the database, even for\nsoft-deleted identities."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Resolved display name. Empty for soft-deleted identities."
+        },
+        "email": {
+          "type": "string",
+          "description": "Resolved email address. Empty for soft-deleted identities."
+        },
+        "isDeleted": {
+          "type": "boolean",
+          "description": "True when the identity has been soft-deleted. PII fields are\nblanked out in that case while id is preserved."
+        }
+      },
+      "description": "Actor is a resolved reference to an identity. It is used flat on\nresources to expose audit fields (created_by, updated_by, deleted_by)\nper AIP-148, and can be reused at non-audit positions like assignee\nor approver.\n\nResolution is performed server-side via the audit.Resolver, which\nbatches lookups against firebase_identities and caches recent\nresults. When the underlying identity is soft-deleted the resolver\nblanks out PII (display_name, email) and sets is_deleted=true while\npreserving the id so that historical references remain stable."
+    },
     "v1DeclineInvitationResponse": {
       "type": "object",
       "properties": {
@@ -1794,16 +1831,31 @@
           "description": "Output only. The organization's current lifecycle state.",
           "readOnly": true
         },
+        "createdBy": {
+          "$ref": "#/definitions/v1Actor",
+          "description": "Output only. The identity that created this organization.",
+          "readOnly": true
+        },
         "createTime": {
           "type": "string",
           "format": "date-time",
           "description": "Output only. Timestamp when the Organization was created.",
           "readOnly": true
         },
+        "updatedBy": {
+          "$ref": "#/definitions/v1Actor",
+          "description": "Output only. The identity that last modified this organization.",
+          "readOnly": true
+        },
         "updateTime": {
           "type": "string",
           "format": "date-time",
           "description": "Output only. Timestamp when the Organization was last modified.",
+          "readOnly": true
+        },
+        "deletedBy": {
+          "$ref": "#/definitions/v1Actor",
+          "description": "Output only. The identity that requested deletion of this organization.",
           "readOnly": true
         },
         "deleteTime": {

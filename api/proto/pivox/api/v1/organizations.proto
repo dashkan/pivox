@@ -25,6 +25,7 @@ import "google/longrunning/operations.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
+import "pivox/api/v1/actor.proto";
 import "pivox/api/v1/domains.proto";
 import "pivox/api/v1/sso.proto";
 import "pivox/iam/v1/members.proto";
@@ -451,16 +452,25 @@ message Organization {
   string display_name = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. The organization's current lifecycle state.
-  State state = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  State state = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The identity that created this organization.
+  Actor created_by = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when the Organization was created.
   google.protobuf.Timestamp create_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 
+  // Output only. The identity that last modified this organization.
+  Actor updated_by = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
   // Output only. Timestamp when the Organization was last modified.
-  google.protobuf.Timestamp update_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The identity that requested deletion of this organization.
+  Actor deleted_by = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when the Organization was requested for deletion.
-  google.protobuf.Timestamp delete_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp delete_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. The time at which this organization will be purged.
   // Approximately 30 days after deletion.
@@ -469,7 +479,7 @@ message Organization {
   // Output only. A checksum computed by the server based on the current value
   // of the Organization resource. This may be sent on update and delete
   // requests to ensure the client has an up-to-date value before proceeding.
-  string etag = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string etag = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Optional. Labels associated with this organization.
   // Labels are key-value pairs that can be used to organize and track resources.

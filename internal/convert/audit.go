@@ -3,7 +3,21 @@ package convert
 import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
+
+	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 )
+
+// actorOrNil looks up a pre-resolved Actor for the given pgtype.UUID
+// and returns nil when the column is NULL or the lookup map is nil
+// (e.g. partial responses that intentionally skip audit). Returning
+// nil leaves the proto field unset rather than rendering an empty
+// Actor envelope.
+func actorOrNil(actors map[uuid.UUID]*apiv1.Actor, u pgtype.UUID) *apiv1.Actor {
+	if !u.Valid || actors == nil {
+		return nil
+	}
+	return actors[u.Bytes]
+}
 
 // UUIDString returns the canonical hyphenated string form of a
 // pgtype.UUID, or empty when the value is NULL. Used by the convert

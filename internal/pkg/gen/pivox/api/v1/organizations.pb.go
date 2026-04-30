@@ -376,20 +376,26 @@ type Organization struct {
 	// "acme.com") of the customer that owns the organization.
 	DisplayName string `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
 	// Output only. The organization's current lifecycle state.
-	State Organization_State `protobuf:"varint,4,opt,name=state,proto3,enum=pivox.api.v1.Organization_State" json:"state,omitempty"`
+	State Organization_State `protobuf:"varint,3,opt,name=state,proto3,enum=pivox.api.v1.Organization_State" json:"state,omitempty"`
+	// Output only. The identity that created this organization.
+	CreatedBy *Actor `protobuf:"bytes,4,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
 	// Output only. Timestamp when the Organization was created.
 	CreateTime *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	// Output only. The identity that last modified this organization.
+	UpdatedBy *Actor `protobuf:"bytes,6,opt,name=updated_by,json=updatedBy,proto3" json:"updated_by,omitempty"`
 	// Output only. Timestamp when the Organization was last modified.
-	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	// Output only. The identity that requested deletion of this organization.
+	DeletedBy *Actor `protobuf:"bytes,8,opt,name=deleted_by,json=deletedBy,proto3" json:"deleted_by,omitempty"`
 	// Output only. Timestamp when the Organization was requested for deletion.
-	DeleteTime *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=delete_time,json=deleteTime,proto3" json:"delete_time,omitempty"`
+	DeleteTime *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=delete_time,json=deleteTime,proto3" json:"delete_time,omitempty"`
 	// Output only. The time at which this organization will be purged.
 	// Approximately 30 days after deletion.
 	PurgeTime *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=purge_time,json=purgeTime,proto3" json:"purge_time,omitempty"`
 	// Output only. A checksum computed by the server based on the current value
 	// of the Organization resource. This may be sent on update and delete
 	// requests to ensure the client has an up-to-date value before proceeding.
-	Etag string `protobuf:"bytes,8,opt,name=etag,proto3" json:"etag,omitempty"`
+	Etag string `protobuf:"bytes,11,opt,name=etag,proto3" json:"etag,omitempty"`
 	// Optional. Labels associated with this organization.
 	// Labels are key-value pairs that can be used to organize and track resources.
 	Annotations   map[string]string `protobuf:"bytes,12,rep,name=annotations,proto3" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
@@ -448,6 +454,13 @@ func (x *Organization) GetState() Organization_State {
 	return Organization_STATE_UNSPECIFIED
 }
 
+func (x *Organization) GetCreatedBy() *Actor {
+	if x != nil {
+		return x.CreatedBy
+	}
+	return nil
+}
+
 func (x *Organization) GetCreateTime() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreateTime
@@ -455,9 +468,23 @@ func (x *Organization) GetCreateTime() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *Organization) GetUpdatedBy() *Actor {
+	if x != nil {
+		return x.UpdatedBy
+	}
+	return nil
+}
+
 func (x *Organization) GetUpdateTime() *timestamppb.Timestamp {
 	if x != nil {
 		return x.UpdateTime
+	}
+	return nil
+}
+
+func (x *Organization) GetDeletedBy() *Actor {
+	if x != nil {
+		return x.DeletedBy
 	}
 	return nil
 }
@@ -2008,7 +2035,7 @@ var File_pivox_api_v1_organizations_proto protoreflect.FileDescriptor
 
 const file_pivox_api_v1_organizations_proto_rawDesc = "" +
 	"\n" +
-	" pivox/api/v1/organizations.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1apivox/api/v1/domains.proto\x1a\x16pivox/api/v1/sso.proto\x1a\x1apivox/iam/v1/members.proto\x1a\x1epivox/iam/v1/permissions.proto\x1a!pivox/permission/v1/options.proto\"\xa8\x01\n" +
+	" pivox/api/v1/organizations.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18pivox/api/v1/actor.proto\x1a\x1apivox/api/v1/domains.proto\x1a\x16pivox/api/v1/sso.proto\x1a\x1apivox/iam/v1/members.proto\x1a\x1epivox/iam/v1/permissions.proto\x1a!pivox/permission/v1/options.proto\"\xa8\x01\n" +
 	"\x18TransferOwnershipRequest\x128\n" +
 	"\x04name\x18\x01 \x01(\tB$\xe0A\x02\xfaA\x18\n" +
 	"\x16pivox.api/Organization\xbaH\x03\xc8\x01\x01R\x04name\x129\n" +
@@ -2019,21 +2046,27 @@ const file_pivox_api_v1_organizations_proto_rawDesc = "" +
 	"\tnew_owner\x18\x01 \x01(\tB\x16\xe0A\x03\xfaA\x10\n" +
 	"\x0epivox.iam/UserR\bnewOwner\x12=\n" +
 	"\x0eprevious_owner\x18\x02 \x01(\tB\x16\xe0A\x03\xfaA\x10\n" +
-	"\x0epivox.iam/UserR\rpreviousOwner\"\xd9\x05\n" +
+	"\x0epivox.iam/UserR\rpreviousOwner\"\x84\a\n" +
 	"\fOrganization\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12&\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\x03\xe0A\x03R\vdisplayName\x12;\n" +
-	"\x05state\x18\x04 \x01(\x0e2 .pivox.api.v1.Organization.StateB\x03\xe0A\x03R\x05state\x12@\n" +
+	"\x05state\x18\x03 \x01(\x0e2 .pivox.api.v1.Organization.StateB\x03\xe0A\x03R\x05state\x127\n" +
+	"\n" +
+	"created_by\x18\x04 \x01(\v2\x13.pivox.api.v1.ActorB\x03\xe0A\x03R\tcreatedBy\x12@\n" +
 	"\vcreate_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"createTime\x12@\n" +
-	"\vupdate_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"updateTime\x12@\n" +
-	"\vdelete_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"createTime\x127\n" +
+	"\n" +
+	"updated_by\x18\x06 \x01(\v2\x13.pivox.api.v1.ActorB\x03\xe0A\x03R\tupdatedBy\x12@\n" +
+	"\vupdate_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"updateTime\x127\n" +
+	"\n" +
+	"deleted_by\x18\b \x01(\v2\x13.pivox.api.v1.ActorB\x03\xe0A\x03R\tdeletedBy\x12@\n" +
+	"\vdelete_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"deleteTime\x12>\n" +
 	"\n" +
 	"purge_time\x18\n" +
 	" \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\tpurgeTime\x12\x17\n" +
-	"\x04etag\x18\b \x01(\tB\x03\xe0A\x03R\x04etag\x12R\n" +
+	"\x04etag\x18\v \x01(\tB\x03\xe0A\x03R\x04etag\x12R\n" +
 	"\vannotations\x18\f \x03(\v2+.pivox.api.v1.Organization.AnnotationsEntryB\x03\xe0A\x01R\vannotations\x1a>\n" +
 	"\x10AnnotationsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
@@ -2250,111 +2283,115 @@ var file_pivox_api_v1_organizations_proto_goTypes = []any{
 	(*GetInvitationPolicyRequest)(nil),    // 28: pivox.api.v1.GetInvitationPolicyRequest
 	(*UpdateInvitationPolicyRequest)(nil), // 29: pivox.api.v1.UpdateInvitationPolicyRequest
 	nil,                                   // 30: pivox.api.v1.Organization.AnnotationsEntry
-	(*timestamppb.Timestamp)(nil),         // 31: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),         // 32: google.protobuf.FieldMask
-	(*GetSsoConfigRequest)(nil),           // 33: pivox.api.v1.GetSsoConfigRequest
-	(*UpdateSsoConfigRequest)(nil),        // 34: pivox.api.v1.UpdateSsoConfigRequest
-	(*CreateDomainRequest)(nil),           // 35: pivox.api.v1.CreateDomainRequest
-	(*ListDomainsRequest)(nil),            // 36: pivox.api.v1.ListDomainsRequest
-	(*GetDomainRequest)(nil),              // 37: pivox.api.v1.GetDomainRequest
-	(*DeleteDomainRequest)(nil),           // 38: pivox.api.v1.DeleteDomainRequest
-	(*v1.GetMemberRequest)(nil),           // 39: pivox.iam.v1.GetMemberRequest
-	(*v1.ListMembersRequest)(nil),         // 40: pivox.iam.v1.ListMembersRequest
-	(*v1.CreateMemberRequest)(nil),        // 41: pivox.iam.v1.CreateMemberRequest
-	(*v1.UpdateMemberRequest)(nil),        // 42: pivox.iam.v1.UpdateMemberRequest
-	(*v1.DeleteMemberRequest)(nil),        // 43: pivox.iam.v1.DeleteMemberRequest
-	(*v1.TestIamPermissionsRequest)(nil),  // 44: pivox.iam.v1.TestIamPermissionsRequest
-	(*longrunningpb.Operation)(nil),       // 45: google.longrunning.Operation
-	(*SsoConfig)(nil),                     // 46: pivox.api.v1.SsoConfig
-	(*ListDomainsResponse)(nil),           // 47: pivox.api.v1.ListDomainsResponse
-	(*Domain)(nil),                        // 48: pivox.api.v1.Domain
-	(*v1.Member)(nil),                     // 49: pivox.iam.v1.Member
-	(*v1.ListMembersResponse)(nil),        // 50: pivox.iam.v1.ListMembersResponse
-	(*emptypb.Empty)(nil),                 // 51: google.protobuf.Empty
-	(*v1.TestIamPermissionsResponse)(nil), // 52: pivox.iam.v1.TestIamPermissionsResponse
+	(*Actor)(nil),                         // 31: pivox.api.v1.Actor
+	(*timestamppb.Timestamp)(nil),         // 32: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),         // 33: google.protobuf.FieldMask
+	(*GetSsoConfigRequest)(nil),           // 34: pivox.api.v1.GetSsoConfigRequest
+	(*UpdateSsoConfigRequest)(nil),        // 35: pivox.api.v1.UpdateSsoConfigRequest
+	(*CreateDomainRequest)(nil),           // 36: pivox.api.v1.CreateDomainRequest
+	(*ListDomainsRequest)(nil),            // 37: pivox.api.v1.ListDomainsRequest
+	(*GetDomainRequest)(nil),              // 38: pivox.api.v1.GetDomainRequest
+	(*DeleteDomainRequest)(nil),           // 39: pivox.api.v1.DeleteDomainRequest
+	(*v1.GetMemberRequest)(nil),           // 40: pivox.iam.v1.GetMemberRequest
+	(*v1.ListMembersRequest)(nil),         // 41: pivox.iam.v1.ListMembersRequest
+	(*v1.CreateMemberRequest)(nil),        // 42: pivox.iam.v1.CreateMemberRequest
+	(*v1.UpdateMemberRequest)(nil),        // 43: pivox.iam.v1.UpdateMemberRequest
+	(*v1.DeleteMemberRequest)(nil),        // 44: pivox.iam.v1.DeleteMemberRequest
+	(*v1.TestIamPermissionsRequest)(nil),  // 45: pivox.iam.v1.TestIamPermissionsRequest
+	(*longrunningpb.Operation)(nil),       // 46: google.longrunning.Operation
+	(*SsoConfig)(nil),                     // 47: pivox.api.v1.SsoConfig
+	(*ListDomainsResponse)(nil),           // 48: pivox.api.v1.ListDomainsResponse
+	(*Domain)(nil),                        // 49: pivox.api.v1.Domain
+	(*v1.Member)(nil),                     // 50: pivox.iam.v1.Member
+	(*v1.ListMembersResponse)(nil),        // 51: pivox.iam.v1.ListMembersResponse
+	(*emptypb.Empty)(nil),                 // 52: google.protobuf.Empty
+	(*v1.TestIamPermissionsResponse)(nil), // 53: pivox.iam.v1.TestIamPermissionsResponse
 }
 var file_pivox_api_v1_organizations_proto_depIdxs = []int32{
 	0,  // 0: pivox.api.v1.Organization.state:type_name -> pivox.api.v1.Organization.State
-	31, // 1: pivox.api.v1.Organization.create_time:type_name -> google.protobuf.Timestamp
-	31, // 2: pivox.api.v1.Organization.update_time:type_name -> google.protobuf.Timestamp
-	31, // 3: pivox.api.v1.Organization.delete_time:type_name -> google.protobuf.Timestamp
-	31, // 4: pivox.api.v1.Organization.purge_time:type_name -> google.protobuf.Timestamp
-	30, // 5: pivox.api.v1.Organization.annotations:type_name -> pivox.api.v1.Organization.AnnotationsEntry
-	5,  // 6: pivox.api.v1.CreateOrganizationRequest.organization:type_name -> pivox.api.v1.Organization
-	5,  // 7: pivox.api.v1.UpdateOrganizationRequest.organization:type_name -> pivox.api.v1.Organization
-	32, // 8: pivox.api.v1.UpdateOrganizationRequest.update_mask:type_name -> google.protobuf.FieldMask
-	5,  // 9: pivox.api.v1.ListOrganizationsResponse.organizations:type_name -> pivox.api.v1.Organization
-	1,  // 10: pivox.api.v1.DeleteOrganizationMetadata.phase:type_name -> pivox.api.v1.DeleteOrganizationMetadata.Phase
-	2,  // 11: pivox.api.v1.Invitation.state:type_name -> pivox.api.v1.Invitation.State
-	31, // 12: pivox.api.v1.Invitation.create_time:type_name -> google.protobuf.Timestamp
-	31, // 13: pivox.api.v1.Invitation.expire_time:type_name -> google.protobuf.Timestamp
-	31, // 14: pivox.api.v1.Invitation.accept_time:type_name -> google.protobuf.Timestamp
-	31, // 15: pivox.api.v1.InvitationPolicy.update_time:type_name -> google.protobuf.Timestamp
-	17, // 16: pivox.api.v1.CreateInvitationRequest.invitation:type_name -> pivox.api.v1.Invitation
-	17, // 17: pivox.api.v1.ListInvitationsResponse.invitations:type_name -> pivox.api.v1.Invitation
-	17, // 18: pivox.api.v1.AcceptInvitationResponse.invitation:type_name -> pivox.api.v1.Invitation
-	17, // 19: pivox.api.v1.DeclineInvitationResponse.invitation:type_name -> pivox.api.v1.Invitation
-	18, // 20: pivox.api.v1.UpdateInvitationPolicyRequest.invitation_policy:type_name -> pivox.api.v1.InvitationPolicy
-	32, // 21: pivox.api.v1.UpdateInvitationPolicyRequest.update_mask:type_name -> google.protobuf.FieldMask
-	6,  // 22: pivox.api.v1.Organizations.GetOrganization:input_type -> pivox.api.v1.GetOrganizationRequest
-	7,  // 23: pivox.api.v1.Organizations.ListOrganizations:input_type -> pivox.api.v1.ListOrganizationsRequest
-	8,  // 24: pivox.api.v1.Organizations.CreateOrganization:input_type -> pivox.api.v1.CreateOrganizationRequest
-	9,  // 25: pivox.api.v1.Organizations.UpdateOrganization:input_type -> pivox.api.v1.UpdateOrganizationRequest
-	13, // 26: pivox.api.v1.Organizations.DeleteOrganization:input_type -> pivox.api.v1.DeleteOrganizationRequest
-	15, // 27: pivox.api.v1.Organizations.UndeleteOrganization:input_type -> pivox.api.v1.UndeleteOrganizationRequest
-	33, // 28: pivox.api.v1.Organizations.GetSsoConfig:input_type -> pivox.api.v1.GetSsoConfigRequest
-	34, // 29: pivox.api.v1.Organizations.UpdateSsoConfig:input_type -> pivox.api.v1.UpdateSsoConfigRequest
-	35, // 30: pivox.api.v1.Organizations.CreateDomain:input_type -> pivox.api.v1.CreateDomainRequest
-	36, // 31: pivox.api.v1.Organizations.ListDomains:input_type -> pivox.api.v1.ListDomainsRequest
-	37, // 32: pivox.api.v1.Organizations.GetDomain:input_type -> pivox.api.v1.GetDomainRequest
-	38, // 33: pivox.api.v1.Organizations.DeleteDomain:input_type -> pivox.api.v1.DeleteDomainRequest
-	19, // 34: pivox.api.v1.Organizations.CreateInvitation:input_type -> pivox.api.v1.CreateInvitationRequest
-	20, // 35: pivox.api.v1.Organizations.ListInvitations:input_type -> pivox.api.v1.ListInvitationsRequest
-	22, // 36: pivox.api.v1.Organizations.GetInvitation:input_type -> pivox.api.v1.GetInvitationRequest
-	23, // 37: pivox.api.v1.Organizations.AcceptInvitation:input_type -> pivox.api.v1.AcceptInvitationRequest
-	25, // 38: pivox.api.v1.Organizations.DeclineInvitation:input_type -> pivox.api.v1.DeclineInvitationRequest
-	27, // 39: pivox.api.v1.Organizations.DeleteInvitation:input_type -> pivox.api.v1.DeleteInvitationRequest
-	28, // 40: pivox.api.v1.Organizations.GetInvitationPolicy:input_type -> pivox.api.v1.GetInvitationPolicyRequest
-	29, // 41: pivox.api.v1.Organizations.UpdateInvitationPolicy:input_type -> pivox.api.v1.UpdateInvitationPolicyRequest
-	39, // 42: pivox.api.v1.Organizations.GetMember:input_type -> pivox.iam.v1.GetMemberRequest
-	40, // 43: pivox.api.v1.Organizations.ListMembers:input_type -> pivox.iam.v1.ListMembersRequest
-	41, // 44: pivox.api.v1.Organizations.CreateMember:input_type -> pivox.iam.v1.CreateMemberRequest
-	42, // 45: pivox.api.v1.Organizations.UpdateMember:input_type -> pivox.iam.v1.UpdateMemberRequest
-	43, // 46: pivox.api.v1.Organizations.DeleteMember:input_type -> pivox.iam.v1.DeleteMemberRequest
-	3,  // 47: pivox.api.v1.Organizations.TransferOwnership:input_type -> pivox.api.v1.TransferOwnershipRequest
-	44, // 48: pivox.api.v1.Organizations.TestIamPermissions:input_type -> pivox.iam.v1.TestIamPermissionsRequest
-	5,  // 49: pivox.api.v1.Organizations.GetOrganization:output_type -> pivox.api.v1.Organization
-	10, // 50: pivox.api.v1.Organizations.ListOrganizations:output_type -> pivox.api.v1.ListOrganizationsResponse
-	45, // 51: pivox.api.v1.Organizations.CreateOrganization:output_type -> google.longrunning.Operation
-	45, // 52: pivox.api.v1.Organizations.UpdateOrganization:output_type -> google.longrunning.Operation
-	45, // 53: pivox.api.v1.Organizations.DeleteOrganization:output_type -> google.longrunning.Operation
-	45, // 54: pivox.api.v1.Organizations.UndeleteOrganization:output_type -> google.longrunning.Operation
-	46, // 55: pivox.api.v1.Organizations.GetSsoConfig:output_type -> pivox.api.v1.SsoConfig
-	46, // 56: pivox.api.v1.Organizations.UpdateSsoConfig:output_type -> pivox.api.v1.SsoConfig
-	45, // 57: pivox.api.v1.Organizations.CreateDomain:output_type -> google.longrunning.Operation
-	47, // 58: pivox.api.v1.Organizations.ListDomains:output_type -> pivox.api.v1.ListDomainsResponse
-	48, // 59: pivox.api.v1.Organizations.GetDomain:output_type -> pivox.api.v1.Domain
-	48, // 60: pivox.api.v1.Organizations.DeleteDomain:output_type -> pivox.api.v1.Domain
-	17, // 61: pivox.api.v1.Organizations.CreateInvitation:output_type -> pivox.api.v1.Invitation
-	21, // 62: pivox.api.v1.Organizations.ListInvitations:output_type -> pivox.api.v1.ListInvitationsResponse
-	17, // 63: pivox.api.v1.Organizations.GetInvitation:output_type -> pivox.api.v1.Invitation
-	24, // 64: pivox.api.v1.Organizations.AcceptInvitation:output_type -> pivox.api.v1.AcceptInvitationResponse
-	26, // 65: pivox.api.v1.Organizations.DeclineInvitation:output_type -> pivox.api.v1.DeclineInvitationResponse
-	17, // 66: pivox.api.v1.Organizations.DeleteInvitation:output_type -> pivox.api.v1.Invitation
-	18, // 67: pivox.api.v1.Organizations.GetInvitationPolicy:output_type -> pivox.api.v1.InvitationPolicy
-	18, // 68: pivox.api.v1.Organizations.UpdateInvitationPolicy:output_type -> pivox.api.v1.InvitationPolicy
-	49, // 69: pivox.api.v1.Organizations.GetMember:output_type -> pivox.iam.v1.Member
-	50, // 70: pivox.api.v1.Organizations.ListMembers:output_type -> pivox.iam.v1.ListMembersResponse
-	49, // 71: pivox.api.v1.Organizations.CreateMember:output_type -> pivox.iam.v1.Member
-	49, // 72: pivox.api.v1.Organizations.UpdateMember:output_type -> pivox.iam.v1.Member
-	51, // 73: pivox.api.v1.Organizations.DeleteMember:output_type -> google.protobuf.Empty
-	4,  // 74: pivox.api.v1.Organizations.TransferOwnership:output_type -> pivox.api.v1.TransferOwnershipResponse
-	52, // 75: pivox.api.v1.Organizations.TestIamPermissions:output_type -> pivox.iam.v1.TestIamPermissionsResponse
-	49, // [49:76] is the sub-list for method output_type
-	22, // [22:49] is the sub-list for method input_type
-	22, // [22:22] is the sub-list for extension type_name
-	22, // [22:22] is the sub-list for extension extendee
-	0,  // [0:22] is the sub-list for field type_name
+	31, // 1: pivox.api.v1.Organization.created_by:type_name -> pivox.api.v1.Actor
+	32, // 2: pivox.api.v1.Organization.create_time:type_name -> google.protobuf.Timestamp
+	31, // 3: pivox.api.v1.Organization.updated_by:type_name -> pivox.api.v1.Actor
+	32, // 4: pivox.api.v1.Organization.update_time:type_name -> google.protobuf.Timestamp
+	31, // 5: pivox.api.v1.Organization.deleted_by:type_name -> pivox.api.v1.Actor
+	32, // 6: pivox.api.v1.Organization.delete_time:type_name -> google.protobuf.Timestamp
+	32, // 7: pivox.api.v1.Organization.purge_time:type_name -> google.protobuf.Timestamp
+	30, // 8: pivox.api.v1.Organization.annotations:type_name -> pivox.api.v1.Organization.AnnotationsEntry
+	5,  // 9: pivox.api.v1.CreateOrganizationRequest.organization:type_name -> pivox.api.v1.Organization
+	5,  // 10: pivox.api.v1.UpdateOrganizationRequest.organization:type_name -> pivox.api.v1.Organization
+	33, // 11: pivox.api.v1.UpdateOrganizationRequest.update_mask:type_name -> google.protobuf.FieldMask
+	5,  // 12: pivox.api.v1.ListOrganizationsResponse.organizations:type_name -> pivox.api.v1.Organization
+	1,  // 13: pivox.api.v1.DeleteOrganizationMetadata.phase:type_name -> pivox.api.v1.DeleteOrganizationMetadata.Phase
+	2,  // 14: pivox.api.v1.Invitation.state:type_name -> pivox.api.v1.Invitation.State
+	32, // 15: pivox.api.v1.Invitation.create_time:type_name -> google.protobuf.Timestamp
+	32, // 16: pivox.api.v1.Invitation.expire_time:type_name -> google.protobuf.Timestamp
+	32, // 17: pivox.api.v1.Invitation.accept_time:type_name -> google.protobuf.Timestamp
+	32, // 18: pivox.api.v1.InvitationPolicy.update_time:type_name -> google.protobuf.Timestamp
+	17, // 19: pivox.api.v1.CreateInvitationRequest.invitation:type_name -> pivox.api.v1.Invitation
+	17, // 20: pivox.api.v1.ListInvitationsResponse.invitations:type_name -> pivox.api.v1.Invitation
+	17, // 21: pivox.api.v1.AcceptInvitationResponse.invitation:type_name -> pivox.api.v1.Invitation
+	17, // 22: pivox.api.v1.DeclineInvitationResponse.invitation:type_name -> pivox.api.v1.Invitation
+	18, // 23: pivox.api.v1.UpdateInvitationPolicyRequest.invitation_policy:type_name -> pivox.api.v1.InvitationPolicy
+	33, // 24: pivox.api.v1.UpdateInvitationPolicyRequest.update_mask:type_name -> google.protobuf.FieldMask
+	6,  // 25: pivox.api.v1.Organizations.GetOrganization:input_type -> pivox.api.v1.GetOrganizationRequest
+	7,  // 26: pivox.api.v1.Organizations.ListOrganizations:input_type -> pivox.api.v1.ListOrganizationsRequest
+	8,  // 27: pivox.api.v1.Organizations.CreateOrganization:input_type -> pivox.api.v1.CreateOrganizationRequest
+	9,  // 28: pivox.api.v1.Organizations.UpdateOrganization:input_type -> pivox.api.v1.UpdateOrganizationRequest
+	13, // 29: pivox.api.v1.Organizations.DeleteOrganization:input_type -> pivox.api.v1.DeleteOrganizationRequest
+	15, // 30: pivox.api.v1.Organizations.UndeleteOrganization:input_type -> pivox.api.v1.UndeleteOrganizationRequest
+	34, // 31: pivox.api.v1.Organizations.GetSsoConfig:input_type -> pivox.api.v1.GetSsoConfigRequest
+	35, // 32: pivox.api.v1.Organizations.UpdateSsoConfig:input_type -> pivox.api.v1.UpdateSsoConfigRequest
+	36, // 33: pivox.api.v1.Organizations.CreateDomain:input_type -> pivox.api.v1.CreateDomainRequest
+	37, // 34: pivox.api.v1.Organizations.ListDomains:input_type -> pivox.api.v1.ListDomainsRequest
+	38, // 35: pivox.api.v1.Organizations.GetDomain:input_type -> pivox.api.v1.GetDomainRequest
+	39, // 36: pivox.api.v1.Organizations.DeleteDomain:input_type -> pivox.api.v1.DeleteDomainRequest
+	19, // 37: pivox.api.v1.Organizations.CreateInvitation:input_type -> pivox.api.v1.CreateInvitationRequest
+	20, // 38: pivox.api.v1.Organizations.ListInvitations:input_type -> pivox.api.v1.ListInvitationsRequest
+	22, // 39: pivox.api.v1.Organizations.GetInvitation:input_type -> pivox.api.v1.GetInvitationRequest
+	23, // 40: pivox.api.v1.Organizations.AcceptInvitation:input_type -> pivox.api.v1.AcceptInvitationRequest
+	25, // 41: pivox.api.v1.Organizations.DeclineInvitation:input_type -> pivox.api.v1.DeclineInvitationRequest
+	27, // 42: pivox.api.v1.Organizations.DeleteInvitation:input_type -> pivox.api.v1.DeleteInvitationRequest
+	28, // 43: pivox.api.v1.Organizations.GetInvitationPolicy:input_type -> pivox.api.v1.GetInvitationPolicyRequest
+	29, // 44: pivox.api.v1.Organizations.UpdateInvitationPolicy:input_type -> pivox.api.v1.UpdateInvitationPolicyRequest
+	40, // 45: pivox.api.v1.Organizations.GetMember:input_type -> pivox.iam.v1.GetMemberRequest
+	41, // 46: pivox.api.v1.Organizations.ListMembers:input_type -> pivox.iam.v1.ListMembersRequest
+	42, // 47: pivox.api.v1.Organizations.CreateMember:input_type -> pivox.iam.v1.CreateMemberRequest
+	43, // 48: pivox.api.v1.Organizations.UpdateMember:input_type -> pivox.iam.v1.UpdateMemberRequest
+	44, // 49: pivox.api.v1.Organizations.DeleteMember:input_type -> pivox.iam.v1.DeleteMemberRequest
+	3,  // 50: pivox.api.v1.Organizations.TransferOwnership:input_type -> pivox.api.v1.TransferOwnershipRequest
+	45, // 51: pivox.api.v1.Organizations.TestIamPermissions:input_type -> pivox.iam.v1.TestIamPermissionsRequest
+	5,  // 52: pivox.api.v1.Organizations.GetOrganization:output_type -> pivox.api.v1.Organization
+	10, // 53: pivox.api.v1.Organizations.ListOrganizations:output_type -> pivox.api.v1.ListOrganizationsResponse
+	46, // 54: pivox.api.v1.Organizations.CreateOrganization:output_type -> google.longrunning.Operation
+	46, // 55: pivox.api.v1.Organizations.UpdateOrganization:output_type -> google.longrunning.Operation
+	46, // 56: pivox.api.v1.Organizations.DeleteOrganization:output_type -> google.longrunning.Operation
+	46, // 57: pivox.api.v1.Organizations.UndeleteOrganization:output_type -> google.longrunning.Operation
+	47, // 58: pivox.api.v1.Organizations.GetSsoConfig:output_type -> pivox.api.v1.SsoConfig
+	47, // 59: pivox.api.v1.Organizations.UpdateSsoConfig:output_type -> pivox.api.v1.SsoConfig
+	46, // 60: pivox.api.v1.Organizations.CreateDomain:output_type -> google.longrunning.Operation
+	48, // 61: pivox.api.v1.Organizations.ListDomains:output_type -> pivox.api.v1.ListDomainsResponse
+	49, // 62: pivox.api.v1.Organizations.GetDomain:output_type -> pivox.api.v1.Domain
+	49, // 63: pivox.api.v1.Organizations.DeleteDomain:output_type -> pivox.api.v1.Domain
+	17, // 64: pivox.api.v1.Organizations.CreateInvitation:output_type -> pivox.api.v1.Invitation
+	21, // 65: pivox.api.v1.Organizations.ListInvitations:output_type -> pivox.api.v1.ListInvitationsResponse
+	17, // 66: pivox.api.v1.Organizations.GetInvitation:output_type -> pivox.api.v1.Invitation
+	24, // 67: pivox.api.v1.Organizations.AcceptInvitation:output_type -> pivox.api.v1.AcceptInvitationResponse
+	26, // 68: pivox.api.v1.Organizations.DeclineInvitation:output_type -> pivox.api.v1.DeclineInvitationResponse
+	17, // 69: pivox.api.v1.Organizations.DeleteInvitation:output_type -> pivox.api.v1.Invitation
+	18, // 70: pivox.api.v1.Organizations.GetInvitationPolicy:output_type -> pivox.api.v1.InvitationPolicy
+	18, // 71: pivox.api.v1.Organizations.UpdateInvitationPolicy:output_type -> pivox.api.v1.InvitationPolicy
+	50, // 72: pivox.api.v1.Organizations.GetMember:output_type -> pivox.iam.v1.Member
+	51, // 73: pivox.api.v1.Organizations.ListMembers:output_type -> pivox.iam.v1.ListMembersResponse
+	50, // 74: pivox.api.v1.Organizations.CreateMember:output_type -> pivox.iam.v1.Member
+	50, // 75: pivox.api.v1.Organizations.UpdateMember:output_type -> pivox.iam.v1.Member
+	52, // 76: pivox.api.v1.Organizations.DeleteMember:output_type -> google.protobuf.Empty
+	4,  // 77: pivox.api.v1.Organizations.TransferOwnership:output_type -> pivox.api.v1.TransferOwnershipResponse
+	53, // 78: pivox.api.v1.Organizations.TestIamPermissions:output_type -> pivox.iam.v1.TestIamPermissionsResponse
+	52, // [52:79] is the sub-list for method output_type
+	25, // [25:52] is the sub-list for method input_type
+	25, // [25:25] is the sub-list for extension type_name
+	25, // [25:25] is the sub-list for extension extendee
+	0,  // [0:25] is the sub-list for field type_name
 }
 
 func init() { file_pivox_api_v1_organizations_proto_init() }
@@ -2362,6 +2399,7 @@ func file_pivox_api_v1_organizations_proto_init() {
 	if File_pivox_api_v1_organizations_proto != nil {
 		return
 	}
+	file_pivox_api_v1_actor_proto_init()
 	file_pivox_api_v1_domains_proto_init()
 	file_pivox_api_v1_sso_proto_init()
 	type x struct{}

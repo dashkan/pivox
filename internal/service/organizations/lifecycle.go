@@ -200,7 +200,17 @@ func (s *OrganizationsServer) runDeleteOrganization(
 	}
 
 	updatePhase(apiv1.DeleteOrganizationMetadata_COMPLETED)
-	return convert.OrganizationToProto(updated), nil
+	// State transition has committed. Treat actor resolution as a
+	// best-effort enrichment so a transient identity-lookup failure
+	// doesn't poison the LRO and force the client to retry an
+	// operation that has already taken effect.
+	actors, resolveErr := s.resolveOrgActors(ctx, []db.Organization{updated})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "delete org: actor resolution failed; returning proto without audit actors",
+			"org", orgName, "error", resolveErr)
+		actors = nil
+	}
+	return convert.OrganizationToProto(updated, actors), nil
 }
 
 // UndeleteOrganization restores a soft-deleted organization back to
@@ -238,6 +248,14 @@ func (s *OrganizationsServer) UndeleteOrganization(ctx context.Context, req *api
 				slog.ErrorContext(workCtx, "undelete org: query failed", "org", orgName, "error", err)
 				return nil, apierr.Internal("undelete organization")
 			}
-			return convert.OrganizationToProto(updated), nil
+			// Best-effort enrichment: state has committed, don't fail
+			// the LRO on a transient identity lookup error.
+			actors, resolveErr := s.resolveOrgActors(workCtx, []db.Organization{updated})
+			if resolveErr != nil {
+				slog.WarnContext(workCtx, "undelete org: actor resolution failed; returning proto without audit actors",
+					"org", orgName, "error", resolveErr)
+				actors = nil
+			}
+			return convert.OrganizationToProto(updated, actors), nil
 		})
 }

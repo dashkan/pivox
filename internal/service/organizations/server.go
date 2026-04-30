@@ -12,6 +12,7 @@ import (
 
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/appkey"
+	"github.com/dashkan/pivox/internal/audit"
 	"github.com/dashkan/pivox/internal/authn"
 	"github.com/dashkan/pivox/internal/convert"
 	"github.com/dashkan/pivox/internal/crypto"
@@ -47,6 +48,10 @@ type OrganizationsServer struct {
 	readUID  AuthContextReader
 	resolver *permission.Resolver
 	caller   server.CallerIdentityResolver
+	// audit inflates created_by/updated_by/deleted_by UUIDs into
+	// Actor protos. Optional in tests that don't assert on audit
+	// output (the converters tolerate a nil map).
+	audit *audit.Resolver
 	// lroManager drives the asynchronous orchestrators for
 	// DeleteOrganization and UndeleteOrganization. Optional in
 	// tests that don't exercise lifecycle paths.
@@ -57,7 +62,7 @@ type OrganizationsServer struct {
 	encryptor crypto.Encryptor
 }
 
-func NewOrganizationsServer(pool *pgxpool.Pool, queries db.Querier, auth authn.Service, codec *appkey.Codec, readUID AuthContextReader, resolver *permission.Resolver, caller server.CallerIdentityResolver, lroManager *lro.Manager, encryptor crypto.Encryptor) *OrganizationsServer {
+func NewOrganizationsServer(pool *pgxpool.Pool, queries db.Querier, auth authn.Service, codec *appkey.Codec, readUID AuthContextReader, resolver *permission.Resolver, caller server.CallerIdentityResolver, auditResolver *audit.Resolver, lroManager *lro.Manager, encryptor crypto.Encryptor) *OrganizationsServer {
 	return &OrganizationsServer{
 		db:         pool,
 		pool:       pool,
@@ -68,6 +73,7 @@ func NewOrganizationsServer(pool *pgxpool.Pool, queries db.Querier, auth authn.S
 		readUID:    readUID,
 		resolver:   resolver,
 		caller:     caller,
+		audit:      auditResolver,
 		lroManager: lroManager,
 		encryptor:  encryptor,
 	}
@@ -91,7 +97,38 @@ func (s *OrganizationsServer) GetOrganization(ctx context.Context, req *apiv1.Ge
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("name",
 			"org slug in path does not match resolved scope"))
 	}
-	return convert.OrganizationToProto(resolved.Row), nil
+	actors, err := s.resolveOrgActors(ctx, []db.Organization{resolved.Row})
+	if err != nil {
+		return nil, err
+	}
+	return convert.OrganizationToProto(resolved.Row, actors), nil
+}
+
+// resolveOrgActors resolves the union of created_by/updated_by/
+// deleted_by UUIDs across the page into a single Actor map. Returns
+// nil when no audit resolver is wired (tests, partial responses).
+func (s *OrganizationsServer) resolveOrgActors(ctx context.Context, orgs []db.Organization) (map[uuid.UUID]*apiv1.Actor, error) {
+	if s.audit == nil {
+		return nil, nil
+	}
+	ids := make([]uuid.UUID, 0, len(orgs)*3)
+	for _, o := range orgs {
+		if o.CreatedBy.Valid {
+			ids = append(ids, o.CreatedBy.Bytes)
+		}
+		if o.UpdatedBy.Valid {
+			ids = append(ids, o.UpdatedBy.Bytes)
+		}
+		if o.DeletedBy.Valid {
+			ids = append(ids, o.DeletedBy.Bytes)
+		}
+	}
+	actors, err := s.audit.Resolve(ctx, ids)
+	if err != nil {
+		slog.ErrorContext(ctx, "resolve org actors failed", "error", err)
+		return nil, apierr.Internal("resolve actors")
+	}
+	return actors, nil
 }
 
 // ListOrganizations is the post-signin "which orgs am I in?" query.
@@ -131,9 +168,13 @@ func (s *OrganizationsServer) ListOrganizations(ctx context.Context, req *apiv1.
 		return nil, apierr.Internal("list organizations")
 	}
 
+	actors, err := s.resolveOrgActors(ctx, rows)
+	if err != nil {
+		return nil, err
+	}
 	orgs := make([]*apiv1.Organization, 0, len(rows))
 	for _, o := range rows {
-		orgs = append(orgs, convert.OrganizationToProto(o))
+		orgs = append(orgs, convert.OrganizationToProto(o, actors))
 	}
 	return &apiv1.ListOrganizationsResponse{Organizations: orgs}, nil
 }
@@ -193,5 +234,13 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 		return nil, apierr.Internal("commit transaction")
 	}
 
-	return lro.DoneOperation(convert.OrganizationToProto(org))
+	// Best-effort enrichment: org has committed, don't fail the
+	// create on a transient identity lookup error.
+	actors, resolveErr := s.resolveOrgActors(ctx, []db.Organization{org})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "create org: actor resolution failed; returning proto without audit actors",
+			"org_id", org.ID, "error", resolveErr)
+		actors = nil
+	}
+	return lro.DoneOperation(convert.OrganizationToProto(org, actors))
 }

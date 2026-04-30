@@ -32,12 +32,12 @@ func TestAssetToProto(t *testing.T) {
 	expireTime := now.Add(72 * time.Hour)
 
 	tests := []struct {
-		name        string
-		row         db.Asset
+		name      string
+		row       db.Asset
 		spaceName string
-		wantName    string
-		wantState   assetsv1.Asset_State
-		checkFunc   func(t *testing.T, pb *assetsv1.Asset)
+		wantName  string
+		wantState assetsv1.Asset_State
+		checkFunc func(t *testing.T, pb *assetsv1.Asset)
 	}{
 		{
 			name: "active asset with all optional fields",
@@ -66,8 +66,8 @@ func TestAssetToProto(t *testing.T) {
 				ExpireTime:      pgtype.Timestamptz{Time: expireTime, Valid: true},
 			},
 			spaceName: "organizations/acme/spaces/my-space",
-			wantName:    "organizations/acme/spaces/my-space/assets/abc123",
-			wantState:   assetsv1.Asset_ACTIVE,
+			wantName:  "organizations/acme/spaces/my-space/assets/abc123",
+			wantState: assetsv1.Asset_ACTIVE,
 			checkFunc: func(t *testing.T, pb *assetsv1.Asset) {
 				assert.Equal(t, assetsv1.Asset_IMAGE, pb.MediaType)
 				assert.Equal(t, int32(1920), pb.Width)
@@ -101,8 +101,8 @@ func TestAssetToProto(t *testing.T) {
 				ExpireTime:      pgtype.Timestamptz{Valid: false},
 			},
 			spaceName: "organizations/acme/spaces/my-space",
-			wantName:    "organizations/acme/spaces/my-space/assets/def456",
-			wantState:   assetsv1.Asset_PLACEHOLDER,
+			wantName:  "organizations/acme/spaces/my-space/assets/def456",
+			wantState: assetsv1.Asset_PLACEHOLDER,
 			checkFunc: func(t *testing.T, pb *assetsv1.Asset) {
 				assert.Equal(t, assetsv1.Asset_MEDIA_TYPE_UNSPECIFIED, pb.MediaType)
 				assert.Equal(t, int32(0), pb.Width)
@@ -124,8 +124,8 @@ func TestAssetToProto(t *testing.T) {
 				UpdateTime: updated,
 			},
 			spaceName: "organizations/acme/spaces/p1",
-			wantName:    "organizations/acme/spaces/p1/assets/proc1",
-			wantState:   assetsv1.Asset_PROCESSING,
+			wantName:  "organizations/acme/spaces/p1/assets/proc1",
+			wantState: assetsv1.Asset_PROCESSING,
 		},
 		{
 			name: "failed state",
@@ -137,8 +137,8 @@ func TestAssetToProto(t *testing.T) {
 				UpdateTime: updated,
 			},
 			spaceName: "organizations/acme/spaces/p1",
-			wantName:    "organizations/acme/spaces/p1/assets/fail1",
-			wantState:   assetsv1.Asset_FAILED,
+			wantName:  "organizations/acme/spaces/p1/assets/fail1",
+			wantState: assetsv1.Asset_FAILED,
 		},
 		{
 			name: "delete_requested state",
@@ -150,8 +150,8 @@ func TestAssetToProto(t *testing.T) {
 				UpdateTime: updated,
 			},
 			spaceName: "organizations/acme/spaces/p1",
-			wantName:    "organizations/acme/spaces/p1/assets/del1",
-			wantState:   assetsv1.Asset_DELETE_REQUESTED,
+			wantName:  "organizations/acme/spaces/p1/assets/del1",
+			wantState: assetsv1.Asset_DELETE_REQUESTED,
 		},
 	}
 
@@ -478,11 +478,11 @@ func TestRequestToProto(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		name        string
-		row         db.AssetRequest
+		name      string
+		row       db.AssetRequest
 		spaceName string
-		wantState   assetsv1.Request_State
-		checkFunc   func(t *testing.T, pb *assetsv1.Request)
+		wantState assetsv1.Request_State
+		checkFunc func(t *testing.T, pb *assetsv1.Request)
 	}{
 		{
 			name: "full request with all timestamps",
@@ -505,7 +505,7 @@ func TestRequestToProto(t *testing.T) {
 				Annotations:   annotationsJSON,
 			},
 			spaceName: "organizations/acme/spaces/p1",
-			wantState:   assetsv1.Request_OPEN,
+			wantState: assetsv1.Request_OPEN,
 			checkFunc: func(t *testing.T, pb *assetsv1.Request) {
 				assert.NotNil(t, pb.DueTime)
 				assert.NotNil(t, pb.DeliveredTime)
@@ -527,7 +527,7 @@ func TestRequestToProto(t *testing.T) {
 				UpdateTime:  updated,
 			},
 			spaceName: "organizations/acme/spaces/p1",
-			wantState:   assetsv1.Request_DRAFT,
+			wantState: assetsv1.Request_DRAFT,
 			checkFunc: func(t *testing.T, pb *assetsv1.Request) {
 				assert.Nil(t, pb.DeleteTime)
 				assert.Nil(t, pb.PurgeTime)
@@ -569,7 +569,7 @@ func TestLineItemToProto(t *testing.T) {
 		name        string
 		row         db.AssetRequestLineItem
 		requestName string
-		spaceName string
+		spaceName   string
 		checkFunc   func(t *testing.T, pb *assetsv1.LineItem)
 	}{
 		{
@@ -588,7 +588,7 @@ func TestLineItemToProto(t *testing.T) {
 				UpdateTime:  updated,
 			},
 			requestName: "organizations/acme/spaces/p1/requests/req-1",
-			spaceName: "organizations/acme/spaces/p1",
+			spaceName:   "organizations/acme/spaces/p1",
 			checkFunc: func(t *testing.T, pb *assetsv1.LineItem) {
 				assert.Equal(t, assetsv1.Asset_IMAGE, pb.MediaType)
 				assert.NotEmpty(t, pb.Asset)
@@ -609,7 +609,7 @@ func TestLineItemToProto(t *testing.T) {
 				UpdateTime:  updated,
 			},
 			requestName: "organizations/acme/spaces/p1/requests/req-1",
-			spaceName: "organizations/acme/spaces/p1",
+			spaceName:   "organizations/acme/spaces/p1",
 			checkFunc: func(t *testing.T, pb *assetsv1.LineItem) {
 				assert.Equal(t, assetsv1.Asset_MEDIA_TYPE_UNSPECIFIED, pb.MediaType)
 				assert.Empty(t, pb.Asset)
@@ -1140,7 +1140,7 @@ func TestOrganizationToProto(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pb := OrganizationToProto(tt.org)
+			pb := OrganizationToProto(tt.org, nil)
 			require.NotNil(t, pb)
 			assert.Equal(t, tt.org.DisplayName, pb.DisplayName)
 			assert.Equal(t, tt.org.Etag, pb.Etag)
@@ -1149,6 +1149,83 @@ func TestOrganizationToProto(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestOrganizationToProto_Actors(t *testing.T) {
+	creator := uuid.New()
+	updater := uuid.New()
+	deleter := uuid.New()
+	unknown := uuid.New() // an audit ID the resolver didn't return — converter must drop it
+	now := time.Date(2026, 4, 30, 10, 0, 0, 0, time.UTC)
+
+	actors := map[uuid.UUID]*apiv1.Actor{
+		creator: {Id: creator.String(), DisplayName: "Alice", Email: "alice@example.com"},
+		updater: {Id: updater.String(), DisplayName: "Bob", Email: "bob@example.com"},
+		deleter: {Id: deleter.String(), IsDeleted: true},
+	}
+
+	t.Run("all three audit fields populated", func(t *testing.T) {
+		pb := OrganizationToProto(db.Organization{
+			Name:       "acme",
+			State:      db.ResourceStateACTIVE,
+			CreatedBy:  PgUUID(creator),
+			UpdatedBy:  PgUUID(updater),
+			DeletedBy:  PgUUID(deleter),
+			CreateTime: now,
+			UpdateTime: now,
+		}, actors)
+
+		require.NotNil(t, pb.GetCreatedBy())
+		assert.Equal(t, "Alice", pb.GetCreatedBy().GetDisplayName())
+		require.NotNil(t, pb.GetUpdatedBy())
+		assert.Equal(t, "Bob", pb.GetUpdatedBy().GetDisplayName())
+		require.NotNil(t, pb.GetDeletedBy())
+		assert.True(t, pb.GetDeletedBy().GetIsDeleted())
+	})
+
+	t.Run("null audit columns produce nil Actors, not empty envelopes", func(t *testing.T) {
+		// pgtype.UUID.Valid=false means SQL NULL — proto field stays
+		// unset rather than rendering an empty Actor.
+		pb := OrganizationToProto(db.Organization{
+			Name:       "acme",
+			State:      db.ResourceStateACTIVE,
+			CreateTime: now,
+			UpdateTime: now,
+			// CreatedBy/UpdatedBy/DeletedBy left zero
+		}, actors)
+
+		assert.Nil(t, pb.GetCreatedBy())
+		assert.Nil(t, pb.GetUpdatedBy())
+		assert.Nil(t, pb.GetDeletedBy())
+	})
+
+	t.Run("unknown ID in column drops to nil rather than panicking", func(t *testing.T) {
+		// Defense in depth: if the handler somehow forgot to include
+		// an ID in the resolver call, we must not panic on the missing
+		// map lookup. Resolver contract is to always include
+		// placeholders, but converters shouldn't assume it.
+		pb := OrganizationToProto(db.Organization{
+			Name:       "acme",
+			CreatedBy:  PgUUID(unknown),
+			CreateTime: now,
+			UpdateTime: now,
+		}, actors)
+
+		assert.Nil(t, pb.GetCreatedBy())
+	})
+
+	t.Run("nil actors map yields no Actor fields without panicking", func(t *testing.T) {
+		// Used when handlers intentionally skip resolution (partial
+		// responses, error paths, etc.).
+		pb := OrganizationToProto(db.Organization{
+			Name:       "acme",
+			CreatedBy:  PgUUID(creator),
+			CreateTime: now,
+			UpdateTime: now,
+		}, nil)
+
+		assert.Nil(t, pb.GetCreatedBy())
+	})
 }
 
 func TestOrgState(t *testing.T) {
@@ -1184,7 +1261,7 @@ func TestSpaceToProto(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		space   db.Space
+		space     db.Space
 		orgName   string
 		checkFunc func(t *testing.T, pb *apiv1.Space)
 	}{

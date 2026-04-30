@@ -23,6 +23,7 @@ import (
 
 	"github.com/dashkan/pivox/internal/agentstream"
 	"github.com/dashkan/pivox/internal/appkey"
+	"github.com/dashkan/pivox/internal/audit"
 	"github.com/dashkan/pivox/internal/config"
 	"github.com/dashkan/pivox/internal/crypto"
 	db "github.com/dashkan/pivox/internal/db/generated"
@@ -264,6 +265,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	// permission-checked, well-formed requests.
 	permResolver := permission.NewResolver(queries)
 	callerIdentity := server.NewCallerIdentityResolver(queries)
+	auditResolver := audit.NewResolver(queries)
 	permissionInterceptor := server.PermissionInterceptor(
 		server.GeneratedRegistry, server.GeneratedExempt,
 		queries, permResolver, callerIdentity,
@@ -304,7 +306,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	longrunningpb.RegisterOperationsServer(grpcServer, operations.NewOperationsServer(lroManager))
 
 	apiv1.RegisterSpacesServer(grpcServer, spaces.NewSpacesServer(pool, pool, queries, appCodec, permResolver, callerIdentity, lroManager))
-	apiv1.RegisterOrganizationsServer(grpcServer, organizations.NewOrganizationsServer(pool, queries, authSvc, appCodec, server.AuthenticatedUID, permResolver, callerIdentity, lroManager, enc))
+	apiv1.RegisterOrganizationsServer(grpcServer, organizations.NewOrganizationsServer(pool, queries, authSvc, appCodec, server.AuthenticatedUID, permResolver, callerIdentity, auditResolver, lroManager, enc))
 	apiv1.RegisterTagKeysServer(grpcServer, tags.NewTagKeysServer(pool, queries, appCodec))
 	apiv1.RegisterTagValuesServer(grpcServer, tags.NewTagValuesServer(pool, queries, appCodec))
 	apiv1.RegisterTagBindingsServer(grpcServer, tags.NewTagBindingsServer(pool, queries, appCodec))
