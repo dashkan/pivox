@@ -1,22 +1,27 @@
 package convert
 
 import (
+	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	db "github.com/dashkan/pivox/internal/db/generated"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
+	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 )
 
 // DomainToProto converts a db.Domain row into the wire-level
 // apiv1.Domain. The resource name is constructed from the parent
 // org slug (looked up by the caller — this fn doesn't issue
-// queries) and the domain itself.
-func DomainToProto(d db.Domain, orgSlug string) *apiv1.Domain {
+// queries) and the domain itself. `actors` is the pre-resolved Actor
+// map; pass nil to skip Actor inflation.
+func DomainToProto(d db.Domain, orgSlug string, actors map[uuid.UUID]*typespb.Actor) *apiv1.Domain {
 	pb := &apiv1.Domain{
 		Name:       "organizations/" + orgSlug + "/domains/" + d.Domain,
 		Domain:     d.Domain,
 		State:      domainState(d.State),
+		CreatedBy:  actorOrNil(actors, d.CreatedBy),
 		CreateTime: timestamppb.New(d.CreateTime),
+		UpdatedBy:  actorOrNil(actors, d.UpdatedBy),
 		UpdateTime: timestamppb.New(d.UpdateTime),
 		Etag:       d.Etag,
 	}

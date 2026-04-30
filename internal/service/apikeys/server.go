@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"math/big"
 	"strings"
 
@@ -14,10 +15,13 @@ import (
 
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/appkey"
+	"github.com/dashkan/pivox/internal/audit"
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/filter"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
+	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
+	"github.com/dashkan/pivox/internal/server"
 )
 
 type ApiKeysServer struct {
@@ -26,15 +30,45 @@ type ApiKeysServer struct {
 	queries db.Querier
 	filter  *filter.ResourceFilter
 	codec   *appkey.Codec
+	audit   *audit.Resolver
 }
 
-func NewApiKeysServer(pool db.DBTX, queries db.Querier, codec *appkey.Codec) *ApiKeysServer {
+// NewApiKeysServer constructs the server. `auditResolver` inflates
+// audit-field UUIDs into Actor protos; nil leaves Actor fields unset.
+func NewApiKeysServer(pool db.DBTX, queries db.Querier, codec *appkey.Codec, auditResolver *audit.Resolver) *ApiKeysServer {
 	return &ApiKeysServer{
 		db:      pool,
 		queries: queries,
 		filter:  filter.ApiKeyFilter(),
 		codec:   codec,
+		audit:   auditResolver,
 	}
+}
+
+// resolveApiKeyActors gathers created_by/updated_by/deleted_by UUIDs
+// across the page and resolves them in a single batched call.
+func (s *ApiKeysServer) resolveApiKeyActors(ctx context.Context, rows []db.ApiKey) (map[uuid.UUID]*typespb.Actor, error) {
+	if s.audit == nil {
+		return nil, nil
+	}
+	ids := make([]uuid.UUID, 0, len(rows)*3)
+	for _, r := range rows {
+		if r.CreatedBy.Valid {
+			ids = append(ids, r.CreatedBy.Bytes)
+		}
+		if r.UpdatedBy.Valid {
+			ids = append(ids, r.UpdatedBy.Bytes)
+		}
+		if r.DeletedBy.Valid {
+			ids = append(ids, r.DeletedBy.Bytes)
+		}
+	}
+	actors, err := s.audit.Resolve(ctx, ids)
+	if err != nil {
+		slog.ErrorContext(ctx, "resolve api key actors failed", "error", err)
+		return nil, apierr.Internal("resolve actors")
+	}
+	return actors, nil
 }
 
 func (s *ApiKeysServer) CreateKey(ctx context.Context, req *apiv1.CreateKeyRequest) (*apiv1.Key, error) {
@@ -76,12 +110,18 @@ func (s *ApiKeysServer) CreateKey(ctx context.Context, req *apiv1.CreateKeyReque
 		KeyString:    keyString,
 		Annotations:  annotationsJSON,
 		Restrictions: restrictionsBytes,
-		CreatedBy:    pgtype.UUID{},
+		CreatedBy:    convert.PgUUID(server.MustPivoxUserID(ctx)),
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Key", "")
 	}
-	return convert.ApiKeyToProto(created, orgName), nil
+	actors, resolveErr := s.resolveApiKeyActors(ctx, []db.ApiKey{created})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "create api key: actor resolution failed; returning proto without audit actors",
+			"key_id", created.ID, "error", resolveErr)
+		actors = nil
+	}
+	return convert.ApiKeyToProto(created, orgName, actors), nil
 }
 
 func (s *ApiKeysServer) ListKeys(ctx context.Context, req *apiv1.ListKeysRequest) (*apiv1.ListKeysResponse, error) {
@@ -129,9 +169,13 @@ func (s *ApiKeysServer) ListKeys(ctx context.Context, req *apiv1.ListKeysRequest
 		results = results[:pageSize]
 	}
 
+	actors, err := s.resolveApiKeyActors(ctx, results)
+	if err != nil {
+		return nil, err
+	}
 	keys := make([]*apiv1.Key, 0, len(results))
 	for _, k := range results {
-		keys = append(keys, convert.ApiKeyToProto(k, orgName))
+		keys = append(keys, convert.ApiKeyToProto(k, orgName, actors))
 	}
 
 	return &apiv1.ListKeysResponse{
@@ -153,7 +197,11 @@ func (s *ApiKeysServer) GetKey(ctx context.Context, req *apiv1.GetKeyRequest) (*
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Key", req.GetName())
 	}
-	return convert.ApiKeyToProto(key, orgName), nil
+	actors, err := s.resolveApiKeyActors(ctx, []db.ApiKey{key})
+	if err != nil {
+		return nil, err
+	}
+	return convert.ApiKeyToProto(key, orgName, actors), nil
 }
 
 func (s *ApiKeysServer) GetKeyString(ctx context.Context, req *apiv1.GetKeyStringRequest) (*apiv1.GetKeyStringResponse, error) {
@@ -192,7 +240,7 @@ func (s *ApiKeysServer) UpdateKey(ctx context.Context, req *apiv1.UpdateKeyReque
 
 	updateParams := db.UpdateApiKeyParams{
 		ID:        existing.ID,
-		UpdatedBy: pgtype.UUID{},
+		UpdatedBy: convert.PgUUID(server.MustPivoxUserID(ctx)),
 	}
 
 	mask := req.GetUpdateMask()
@@ -234,7 +282,13 @@ func (s *ApiKeysServer) UpdateKey(ctx context.Context, req *apiv1.UpdateKeyReque
 		return nil, apierr.HandleResourceError(err, "Key", key.GetName())
 	}
 
-	return convert.ApiKeyToProto(updated, orgName), nil
+	actors, resolveErr := s.resolveApiKeyActors(ctx, []db.ApiKey{updated})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "update api key: actor resolution failed; returning proto without audit actors",
+			"key_id", updated.ID, "error", resolveErr)
+		actors = nil
+	}
+	return convert.ApiKeyToProto(updated, orgName, actors), nil
 }
 
 func (s *ApiKeysServer) DeleteKey(ctx context.Context, req *apiv1.DeleteKeyRequest) (*apiv1.Key, error) {
@@ -250,11 +304,17 @@ func (s *ApiKeysServer) DeleteKey(ctx context.Context, req *apiv1.DeleteKeyReque
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Key", req.GetName())
 	}
-	result, err := s.queries.SoftDeleteApiKey(ctx, db.SoftDeleteApiKeyParams{ID: existing.ID, DeletedBy: pgtype.UUID{}})
+	result, err := s.queries.SoftDeleteApiKey(ctx, db.SoftDeleteApiKeyParams{ID: existing.ID, DeletedBy: convert.PgUUID(server.MustPivoxUserID(ctx))})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Key", req.GetName())
 	}
-	return convert.ApiKeyToProto(result, orgName), nil
+	actors, resolveErr := s.resolveApiKeyActors(ctx, []db.ApiKey{result})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "delete api key: actor resolution failed; returning proto without audit actors",
+			"key_id", result.ID, "error", resolveErr)
+		actors = nil
+	}
+	return convert.ApiKeyToProto(result, orgName, actors), nil
 }
 
 func (s *ApiKeysServer) UndeleteKey(ctx context.Context, req *apiv1.UndeleteKeyRequest) (*apiv1.Key, error) {
@@ -271,11 +331,17 @@ func (s *ApiKeysServer) UndeleteKey(ctx context.Context, req *apiv1.UndeleteKeyR
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Key", req.GetName())
 	}
-	result, err := s.queries.UndeleteApiKey(ctx, db.UndeleteApiKeyParams{ID: existing.ID, UpdatedBy: pgtype.UUID{}})
+	result, err := s.queries.UndeleteApiKey(ctx, db.UndeleteApiKeyParams{ID: existing.ID, UpdatedBy: convert.PgUUID(server.MustPivoxUserID(ctx))})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Key", req.GetName())
 	}
-	return convert.ApiKeyToProto(result, orgName), nil
+	actors, resolveErr := s.resolveApiKeyActors(ctx, []db.ApiKey{result})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "undelete api key: actor resolution failed; returning proto without audit actors",
+			"key_id", result.ID, "error", resolveErr)
+		actors = nil
+	}
+	return convert.ApiKeyToProto(result, orgName, actors), nil
 }
 
 func (s *ApiKeysServer) LookupKey(ctx context.Context, req *apiv1.LookupKeyRequest) (*apiv1.LookupKeyResponse, error) {

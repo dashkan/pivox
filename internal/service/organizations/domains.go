@@ -192,7 +192,7 @@ func (s *OrganizationsServer) runVerifyDomain(
 				LastCheckTime: timestamppb.Now(),
 				AttemptCount:  attempts,
 			})
-			return convert.DomainToProto(d, orgSlug), true, nil
+			return convert.DomainToProto(d, orgSlug, nil), true, nil
 		case db.DomainStateFAILED:
 			progress.Update(ctx, &apiv1.CreateDomainMetadata{
 				Phase:         apiv1.CreateDomainMetadata_FAILED,
@@ -261,7 +261,7 @@ func (s *OrganizationsServer) GetDomain(ctx context.Context, req *apiv1.GetDomai
 		slog.ErrorContext(ctx, "get domain: lookup failed", "name", req.GetName(), "error", err)
 		return nil, apierr.Internal("lookup domain")
 	}
-	return convert.DomainToProto(row, resolvedOrg.Slug), nil
+	return convert.DomainToProto(row, resolvedOrg.Slug, nil), nil
 }
 
 // ListDomains returns all domains in the parent org. Pagination
@@ -278,7 +278,7 @@ func (s *OrganizationsServer) ListDomains(ctx context.Context, req *apiv1.ListDo
 	}
 	out := make([]*apiv1.Domain, len(rows))
 	for i, r := range rows {
-		out[i] = convert.DomainToProto(r, resolvedOrg.Slug)
+		out[i] = convert.DomainToProto(r, resolvedOrg.Slug, nil)
 	}
 	return &apiv1.ListDomainsResponse{Domains: out}, nil
 }
@@ -352,7 +352,7 @@ func (s *OrganizationsServer) DeleteDomain(ctx context.Context, req *apiv1.Delet
 		slog.ErrorContext(ctx, "delete domain: delete failed", "id", row.ID, "error", err)
 		return nil, apierr.Internal("delete domain")
 	}
-	return convert.DomainToProto(row, resolvedOrg.Slug), nil
+	return convert.DomainToProto(row, resolvedOrg.Slug, nil), nil
 }
 
 // guardLastVerifiedDomain returns FAILED_PRECONDITION when

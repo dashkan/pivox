@@ -47,78 +47,116 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 /// resources in `state=VERIFIED` route to this SsoConfig when
 /// `enabled=true`. There is at most one SsoConfig per org so the
 /// mapping is unambiguous.
-public struct Pivox_Api_V1_SsoConfig: Sendable {
+public struct Pivox_Api_V1_SsoConfig: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// The resource name of the SsoConfig. Format:
   /// `organizations/{organization}/ssoConfig`.
-  public var name: String = String()
+  public var name: String {
+    get {_storage._name}
+    set {_uniqueStorage()._name = newValue}
+  }
 
   /// Output only. The Firebase Auth provider id. Server-managed; the
   /// server creates / updates the underlying Firebase provider config
   /// when this SsoConfig is updated. Format: `oidc.<slug>` for OIDC,
   /// `saml.<slug>` for SAML.
-  public var firebaseProviderID: String = String()
+  public var firebaseProviderID: String {
+    get {_storage._firebaseProviderID}
+    set {_uniqueStorage()._firebaseProviderID = newValue}
+  }
 
   /// Required. Human-readable display name shown on the sign-in
   /// screen and in the Firebase console.
-  public var displayName: String = String()
+  public var displayName: String {
+    get {_storage._displayName}
+    set {_uniqueStorage()._displayName = newValue}
+  }
 
   /// Optional. Whether SSO is currently active. When `false`, the
   /// SsoConfig remains stored but `auth:resolveProvider` returns
   /// NOT_FOUND for the org's domains and no Firebase provider is
   /// exposed.
-  public var enabled: Bool = false
+  public var enabled: Bool {
+    get {_storage._enabled}
+    set {_uniqueStorage()._enabled = newValue}
+  }
 
   /// Required. The provider type and its configuration. Exactly one
   /// of `oidc` or `saml` is set; enforced by the protobuf wire format.
-  public var config: Pivox_Api_V1_SsoConfig.OneOf_Config? = nil
+  public var config: OneOf_Config? {
+    get {return _storage._config}
+    set {_uniqueStorage()._config = newValue}
+  }
 
   /// OIDC provider configuration. Set when the IDP supports OAuth
   /// 2.0 / OpenID Connect.
   public var oidc: Pivox_Api_V1_OidcConfig {
     get {
-      if case .oidc(let v)? = config {return v}
+      if case .oidc(let v)? = _storage._config {return v}
       return Pivox_Api_V1_OidcConfig()
     }
-    set {config = .oidc(newValue)}
+    set {_uniqueStorage()._config = .oidc(newValue)}
   }
 
   /// SAML 2.0 provider configuration. Set when the IDP only speaks
   /// SAML.
   public var saml: Pivox_Api_V1_SamlConfig {
     get {
-      if case .saml(let v)? = config {return v}
+      if case .saml(let v)? = _storage._config {return v}
       return Pivox_Api_V1_SamlConfig()
     }
-    set {config = .saml(newValue)}
+    set {_uniqueStorage()._config = .saml(newValue)}
   }
+
+  /// Output only. The identity that created this SSO config.
+  public var createdBy: Pivox_Types_Actor {
+    get {_storage._createdBy ?? Pivox_Types_Actor()}
+    set {_uniqueStorage()._createdBy = newValue}
+  }
+  /// Returns true if `createdBy` has been explicitly set.
+  public var hasCreatedBy: Bool {_storage._createdBy != nil}
+  /// Clears the value of `createdBy`. Subsequent reads from it will return its default value.
+  public mutating func clearCreatedBy() {_uniqueStorage()._createdBy = nil}
 
   /// Output only. Timestamp when the SsoConfig was created.
   public var createTime: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {_createTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
-    set {_createTime = newValue}
+    get {_storage._createTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._createTime = newValue}
   }
   /// Returns true if `createTime` has been explicitly set.
-  public var hasCreateTime: Bool {self._createTime != nil}
+  public var hasCreateTime: Bool {_storage._createTime != nil}
   /// Clears the value of `createTime`. Subsequent reads from it will return its default value.
-  public mutating func clearCreateTime() {self._createTime = nil}
+  public mutating func clearCreateTime() {_uniqueStorage()._createTime = nil}
+
+  /// Output only. The identity that last modified this SSO config.
+  public var updatedBy: Pivox_Types_Actor {
+    get {_storage._updatedBy ?? Pivox_Types_Actor()}
+    set {_uniqueStorage()._updatedBy = newValue}
+  }
+  /// Returns true if `updatedBy` has been explicitly set.
+  public var hasUpdatedBy: Bool {_storage._updatedBy != nil}
+  /// Clears the value of `updatedBy`. Subsequent reads from it will return its default value.
+  public mutating func clearUpdatedBy() {_uniqueStorage()._updatedBy = nil}
 
   /// Output only. Timestamp when the SsoConfig was last modified.
   public var updateTime: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {_updateTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
-    set {_updateTime = newValue}
+    get {_storage._updateTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._updateTime = newValue}
   }
   /// Returns true if `updateTime` has been explicitly set.
-  public var hasUpdateTime: Bool {self._updateTime != nil}
+  public var hasUpdateTime: Bool {_storage._updateTime != nil}
   /// Clears the value of `updateTime`. Subsequent reads from it will return its default value.
-  public mutating func clearUpdateTime() {self._updateTime = nil}
+  public mutating func clearUpdateTime() {_uniqueStorage()._updateTime = nil}
 
   /// Output only. A checksum computed by the server based on the
   /// current value of the SsoConfig resource.
-  public var etag: String = String()
+  public var etag: String {
+    get {_storage._etag}
+    set {_uniqueStorage()._etag = newValue}
+  }
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -136,8 +174,7 @@ public struct Pivox_Api_V1_SsoConfig: Sendable {
 
   public init() {}
 
-  fileprivate var _createTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
-  fileprivate var _updateTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 /// OIDC provider configuration. Maps onto Firebase Admin SDK's
@@ -319,101 +356,165 @@ fileprivate let _protobuf_package = "pivox.api.v1"
 
 extension Pivox_Api_V1_SsoConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SsoConfig"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}firebase_provider_id\0\u{3}display_name\0\u{1}enabled\0\u{1}oidc\0\u{1}saml\0\u{3}create_time\0\u{3}update_time\0\u{1}etag\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}firebase_provider_id\0\u{3}display_name\0\u{1}enabled\0\u{1}oidc\0\u{1}saml\0\u{3}created_by\0\u{3}create_time\0\u{3}updated_by\0\u{3}update_time\0\u{1}etag\0")
+
+  fileprivate class _StorageClass {
+    var _name: String = String()
+    var _firebaseProviderID: String = String()
+    var _displayName: String = String()
+    var _enabled: Bool = false
+    var _config: Pivox_Api_V1_SsoConfig.OneOf_Config?
+    var _createdBy: Pivox_Types_Actor? = nil
+    var _createTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _updatedBy: Pivox_Types_Actor? = nil
+    var _updateTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _etag: String = String()
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _name = source._name
+      _firebaseProviderID = source._firebaseProviderID
+      _displayName = source._displayName
+      _enabled = source._enabled
+      _config = source._config
+      _createdBy = source._createdBy
+      _createTime = source._createTime
+      _updatedBy = source._updatedBy
+      _updateTime = source._updateTime
+      _etag = source._etag
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.name) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.firebaseProviderID) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.displayName) }()
-      case 4: try { try decoder.decodeSingularBoolField(value: &self.enabled) }()
-      case 5: try {
-        var v: Pivox_Api_V1_OidcConfig?
-        var hadOneofValue = false
-        if let current = self.config {
-          hadOneofValue = true
-          if case .oidc(let m) = current {v = m}
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._name) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._firebaseProviderID) }()
+        case 3: try { try decoder.decodeSingularStringField(value: &_storage._displayName) }()
+        case 4: try { try decoder.decodeSingularBoolField(value: &_storage._enabled) }()
+        case 5: try {
+          var v: Pivox_Api_V1_OidcConfig?
+          var hadOneofValue = false
+          if let current = _storage._config {
+            hadOneofValue = true
+            if case .oidc(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._config = .oidc(v)
+          }
+        }()
+        case 6: try {
+          var v: Pivox_Api_V1_SamlConfig?
+          var hadOneofValue = false
+          if let current = _storage._config {
+            hadOneofValue = true
+            if case .saml(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._config = .saml(v)
+          }
+        }()
+        case 7: try { try decoder.decodeSingularMessageField(value: &_storage._createdBy) }()
+        case 8: try { try decoder.decodeSingularMessageField(value: &_storage._createTime) }()
+        case 9: try { try decoder.decodeSingularMessageField(value: &_storage._updatedBy) }()
+        case 10: try { try decoder.decodeSingularMessageField(value: &_storage._updateTime) }()
+        case 11: try { try decoder.decodeSingularStringField(value: &_storage._etag) }()
+        default: break
         }
-        try decoder.decodeSingularMessageField(value: &v)
-        if let v = v {
-          if hadOneofValue {try decoder.handleConflictingOneOf()}
-          self.config = .oidc(v)
-        }
-      }()
-      case 6: try {
-        var v: Pivox_Api_V1_SamlConfig?
-        var hadOneofValue = false
-        if let current = self.config {
-          hadOneofValue = true
-          if case .saml(let m) = current {v = m}
-        }
-        try decoder.decodeSingularMessageField(value: &v)
-        if let v = v {
-          if hadOneofValue {try decoder.handleConflictingOneOf()}
-          self.config = .saml(v)
-        }
-      }()
-      case 7: try { try decoder.decodeSingularMessageField(value: &self._createTime) }()
-      case 8: try { try decoder.decodeSingularMessageField(value: &self._updateTime) }()
-      case 9: try { try decoder.decodeSingularStringField(value: &self.etag) }()
-      default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.name.isEmpty {
-      try visitor.visitSingularStringField(value: self.name, fieldNumber: 1)
-    }
-    if !self.firebaseProviderID.isEmpty {
-      try visitor.visitSingularStringField(value: self.firebaseProviderID, fieldNumber: 2)
-    }
-    if !self.displayName.isEmpty {
-      try visitor.visitSingularStringField(value: self.displayName, fieldNumber: 3)
-    }
-    if self.enabled != false {
-      try visitor.visitSingularBoolField(value: self.enabled, fieldNumber: 4)
-    }
-    switch self.config {
-    case .oidc?: try {
-      guard case .oidc(let v)? = self.config else { preconditionFailure() }
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
-    }()
-    case .saml?: try {
-      guard case .saml(let v)? = self.config else { preconditionFailure() }
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
-    }()
-    case nil: break
-    }
-    try { if let v = self._createTime {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
-    } }()
-    try { if let v = self._updateTime {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
-    } }()
-    if !self.etag.isEmpty {
-      try visitor.visitSingularStringField(value: self.etag, fieldNumber: 9)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if !_storage._name.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._name, fieldNumber: 1)
+      }
+      if !_storage._firebaseProviderID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._firebaseProviderID, fieldNumber: 2)
+      }
+      if !_storage._displayName.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._displayName, fieldNumber: 3)
+      }
+      if _storage._enabled != false {
+        try visitor.visitSingularBoolField(value: _storage._enabled, fieldNumber: 4)
+      }
+      switch _storage._config {
+      case .oidc?: try {
+        guard case .oidc(let v)? = _storage._config else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+      }()
+      case .saml?: try {
+        guard case .saml(let v)? = _storage._config else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+      }()
+      case nil: break
+      }
+      try { if let v = _storage._createdBy {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
+      } }()
+      try { if let v = _storage._createTime {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+      } }()
+      try { if let v = _storage._updatedBy {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+      } }()
+      try { if let v = _storage._updateTime {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
+      } }()
+      if !_storage._etag.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._etag, fieldNumber: 11)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Pivox_Api_V1_SsoConfig, rhs: Pivox_Api_V1_SsoConfig) -> Bool {
-    if lhs.name != rhs.name {return false}
-    if lhs.firebaseProviderID != rhs.firebaseProviderID {return false}
-    if lhs.displayName != rhs.displayName {return false}
-    if lhs.enabled != rhs.enabled {return false}
-    if lhs.config != rhs.config {return false}
-    if lhs._createTime != rhs._createTime {return false}
-    if lhs._updateTime != rhs._updateTime {return false}
-    if lhs.etag != rhs.etag {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._name != rhs_storage._name {return false}
+        if _storage._firebaseProviderID != rhs_storage._firebaseProviderID {return false}
+        if _storage._displayName != rhs_storage._displayName {return false}
+        if _storage._enabled != rhs_storage._enabled {return false}
+        if _storage._config != rhs_storage._config {return false}
+        if _storage._createdBy != rhs_storage._createdBy {return false}
+        if _storage._createTime != rhs_storage._createTime {return false}
+        if _storage._updatedBy != rhs_storage._updatedBy {return false}
+        if _storage._updateTime != rhs_storage._updateTime {return false}
+        if _storage._etag != rhs_storage._etag {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

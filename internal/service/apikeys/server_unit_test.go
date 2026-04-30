@@ -17,10 +17,21 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
+	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
+	"github.com/dashkan/pivox/internal/server"
 	"github.com/dashkan/pivox/internal/testutil/mocks"
 )
+
+// apikeyCallerPivoxUUID is the canonical caller pivox_user_id used by
+// apikeys-service tests that exercise audit fields on Create/Update
+// paths.
+var apikeyCallerPivoxUUID = uuid.MustParse("0192a000-cccc-7000-8000-00000000eeee")
+
+func callerCtx() context.Context {
+	return server.WithPivoxUserID(context.Background(), apikeyCallerPivoxUUID)
+}
 
 var (
 	testOrgID = uuid.MustParse("0192a000-0001-7000-8000-000000000001")
@@ -49,8 +60,8 @@ var (
 
 func TestUnit_CreateKey_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewApiKeysServer(nil, mockQ, nil)
-	ctx := context.Background()
+	srv := NewApiKeysServer(nil, mockQ, nil, nil)
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
 	mockQ.On("CreateApiKey", mock.Anything, mock.MatchedBy(func(p db.CreateApiKeyParams) bool {
@@ -82,8 +93,8 @@ func TestUnit_CreateKey_Success(t *testing.T) {
 
 func TestUnit_CreateKey_InvalidParent(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewApiKeysServer(nil, mockQ, nil)
-	ctx := context.Background()
+	srv := NewApiKeysServer(nil, mockQ, nil, nil)
+	ctx := callerCtx()
 
 	_, err := srv.CreateKey(ctx, &apiv1.CreateKeyRequest{
 		Parent: "bad-parent",
@@ -100,8 +111,8 @@ func TestUnit_CreateKey_InvalidParent(t *testing.T) {
 
 func TestUnit_GetKey_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewApiKeysServer(nil, mockQ, nil)
-	ctx := context.Background()
+	srv := NewApiKeysServer(nil, mockQ, nil, nil)
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
 	mockQ.On("GetApiKeyByOrgAndKeyID", mock.Anything, db.GetApiKeyByOrgAndKeyIDParams{
@@ -123,8 +134,8 @@ func TestUnit_GetKey_Success(t *testing.T) {
 
 func TestUnit_GetKey_NotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewApiKeysServer(nil, mockQ, nil)
-	ctx := context.Background()
+	srv := NewApiKeysServer(nil, mockQ, nil, nil)
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
 	mockQ.On("GetApiKeyByOrgAndKeyID", mock.Anything, db.GetApiKeyByOrgAndKeyIDParams{
@@ -144,8 +155,8 @@ func TestUnit_GetKey_NotFound(t *testing.T) {
 
 func TestUnit_DeleteKey_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewApiKeysServer(nil, mockQ, nil)
-	ctx := context.Background()
+	srv := NewApiKeysServer(nil, mockQ, nil, nil)
+	ctx := callerCtx()
 
 	deletedKey := testDBKey
 	deletedKey.DeleteTime = pgtype.Timestamptz{Time: time.Now(), Valid: true}
@@ -157,7 +168,7 @@ func TestUnit_DeleteKey_Success(t *testing.T) {
 	}).Return(testDBKey, nil)
 	mockQ.On("SoftDeleteApiKey", mock.Anything, db.SoftDeleteApiKeyParams{
 		ID:        testKeyID,
-		DeletedBy: pgtype.UUID{},
+		DeletedBy: convert.PgUUID(apikeyCallerPivoxUUID),
 	}).Return(deletedKey, nil)
 
 	resp, err := srv.DeleteKey(ctx, &apiv1.DeleteKeyRequest{
@@ -172,8 +183,8 @@ func TestUnit_DeleteKey_Success(t *testing.T) {
 
 func TestUnit_UndeleteKey_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewApiKeysServer(nil, mockQ, nil)
-	ctx := context.Background()
+	srv := NewApiKeysServer(nil, mockQ, nil, nil)
+	ctx := callerCtx()
 
 	undeletedKey := testDBKey
 	undeletedKey.DeleteTime = pgtype.Timestamptz{} // cleared
@@ -185,7 +196,7 @@ func TestUnit_UndeleteKey_Success(t *testing.T) {
 	}).Return(testDBKey, nil)
 	mockQ.On("UndeleteApiKey", mock.Anything, db.UndeleteApiKeyParams{
 		ID:        testKeyID,
-		UpdatedBy: pgtype.UUID{},
+		UpdatedBy: convert.PgUUID(apikeyCallerPivoxUUID),
 	}).Return(undeletedKey, nil)
 
 	resp, err := srv.UndeleteKey(ctx, &apiv1.UndeleteKeyRequest{
@@ -200,8 +211,8 @@ func TestUnit_UndeleteKey_Success(t *testing.T) {
 
 func TestUnit_LookupKey_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewApiKeysServer(nil, mockQ, nil)
-	ctx := context.Background()
+	srv := NewApiKeysServer(nil, mockQ, nil, nil)
+	ctx := callerCtx()
 
 	mockQ.On("LookupApiKeyByKeyString", mock.Anything, "the-secret-key-string").Return(testDBKey, nil)
 	mockQ.On("GetOrganization", mock.Anything, testOrgID).Return(testOrg, nil)
@@ -218,8 +229,8 @@ func TestUnit_LookupKey_Success(t *testing.T) {
 
 func TestUnit_UpdateKey_WithFieldMask(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewApiKeysServer(nil, mockQ, nil)
-	ctx := context.Background()
+	srv := NewApiKeysServer(nil, mockQ, nil, nil)
+	ctx := callerCtx()
 
 	updatedKey := testDBKey
 	updatedKey.DisplayName = "Updated Name"
@@ -253,8 +264,8 @@ func TestUnit_UpdateKey_WithFieldMask(t *testing.T) {
 
 func TestUnit_GetKeyString_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewApiKeysServer(nil, mockQ, nil)
-	ctx := context.Background()
+	srv := NewApiKeysServer(nil, mockQ, nil, nil)
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
 	mockQ.On("GetApiKeyByOrgAndKeyID", mock.Anything, db.GetApiKeyByOrgAndKeyIDParams{
@@ -273,8 +284,8 @@ func TestUnit_GetKeyString_Success(t *testing.T) {
 
 func TestUnit_UpdateKey_NoMask(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := NewApiKeysServer(nil, mockQ, nil)
-	ctx := context.Background()
+	srv := NewApiKeysServer(nil, mockQ, nil, nil)
+	ctx := callerCtx()
 
 	updatedKey := testDBKey
 	updatedKey.DisplayName = "New Name"
@@ -356,10 +367,10 @@ func TestUnit_CreateKey_ErrorPaths(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
-			srv := NewApiKeysServer(nil, mockQ, nil)
+			srv := NewApiKeysServer(nil, mockQ, nil, nil)
 			tc.setup(mockQ)
 
-			_, err := srv.CreateKey(context.Background(), tc.req)
+			_, err := srv.CreateKey(callerCtx(), tc.req)
 
 			require.Error(t, err)
 			st, ok := status.FromError(err)
@@ -410,10 +421,10 @@ func TestUnit_GetKeyString_ErrorPaths(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
-			srv := NewApiKeysServer(nil, mockQ, nil)
+			srv := NewApiKeysServer(nil, mockQ, nil, nil)
 			tc.setup(mockQ)
 
-			_, err := srv.GetKeyString(context.Background(), tc.req)
+			_, err := srv.GetKeyString(callerCtx(), tc.req)
 
 			require.Error(t, err)
 			st, ok := status.FromError(err)
@@ -488,10 +499,10 @@ func TestUnit_UpdateKey_ErrorPaths(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
-			srv := NewApiKeysServer(nil, mockQ, nil)
+			srv := NewApiKeysServer(nil, mockQ, nil, nil)
 			tc.setup(mockQ)
 
-			_, err := srv.UpdateKey(context.Background(), tc.req)
+			_, err := srv.UpdateKey(callerCtx(), tc.req)
 
 			require.Error(t, err)
 			st, ok := status.FromError(err)
@@ -547,7 +558,7 @@ func TestUnit_DeleteKey_ErrorPaths(t *testing.T) {
 				}).Return(testDBKey, nil)
 				mockQ.On("SoftDeleteApiKey", mock.Anything, db.SoftDeleteApiKeyParams{
 					ID:        testKeyID,
-					DeletedBy: pgtype.UUID{},
+					DeletedBy: convert.PgUUID(apikeyCallerPivoxUUID),
 				}).Return(db.ApiKey{}, pgx.ErrNoRows)
 			},
 			req:      &apiv1.DeleteKeyRequest{Name: "organizations/acme/keys/my-key"},
@@ -558,10 +569,10 @@ func TestUnit_DeleteKey_ErrorPaths(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
-			srv := NewApiKeysServer(nil, mockQ, nil)
+			srv := NewApiKeysServer(nil, mockQ, nil, nil)
 			tc.setup(mockQ)
 
-			_, err := srv.DeleteKey(context.Background(), tc.req)
+			_, err := srv.DeleteKey(callerCtx(), tc.req)
 
 			require.Error(t, err)
 			st, ok := status.FromError(err)
@@ -617,7 +628,7 @@ func TestUnit_UndeleteKey_ErrorPaths(t *testing.T) {
 				}).Return(testDBKey, nil)
 				mockQ.On("UndeleteApiKey", mock.Anything, db.UndeleteApiKeyParams{
 					ID:        testKeyID,
-					UpdatedBy: pgtype.UUID{},
+					UpdatedBy: convert.PgUUID(apikeyCallerPivoxUUID),
 				}).Return(db.ApiKey{}, pgx.ErrNoRows)
 			},
 			req:      &apiv1.UndeleteKeyRequest{Name: "organizations/acme/keys/my-key"},
@@ -628,10 +639,10 @@ func TestUnit_UndeleteKey_ErrorPaths(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
-			srv := NewApiKeysServer(nil, mockQ, nil)
+			srv := NewApiKeysServer(nil, mockQ, nil, nil)
 			tc.setup(mockQ)
 
-			_, err := srv.UndeleteKey(context.Background(), tc.req)
+			_, err := srv.UndeleteKey(callerCtx(), tc.req)
 
 			require.Error(t, err)
 			st, ok := status.FromError(err)
@@ -673,10 +684,10 @@ func TestUnit_LookupKey_ErrorPaths(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
-			srv := NewApiKeysServer(nil, mockQ, nil)
+			srv := NewApiKeysServer(nil, mockQ, nil, nil)
 			tc.setup(mockQ)
 
-			_, err := srv.LookupKey(context.Background(), tc.req)
+			_, err := srv.LookupKey(callerCtx(), tc.req)
 
 			require.Error(t, err)
 			st, ok := status.FromError(err)
@@ -715,10 +726,10 @@ func TestUnit_ListKeys_ErrorPaths(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
-			srv := NewApiKeysServer(nil, mockQ, nil)
+			srv := NewApiKeysServer(nil, mockQ, nil, nil)
 			tc.setup(mockQ)
 
-			_, err := srv.ListKeys(context.Background(), tc.req)
+			_, err := srv.ListKeys(callerCtx(), tc.req)
 
 			require.Error(t, err)
 			st, ok := status.FromError(err)
@@ -757,10 +768,10 @@ func TestUnit_GetKey_ErrorPaths(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
-			srv := NewApiKeysServer(nil, mockQ, nil)
+			srv := NewApiKeysServer(nil, mockQ, nil, nil)
 			tc.setup(mockQ)
 
-			_, err := srv.GetKey(context.Background(), tc.req)
+			_, err := srv.GetKey(callerCtx(), tc.req)
 
 			require.Error(t, err)
 			st, ok := status.FromError(err)

@@ -310,7 +310,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	apiv1.RegisterTagKeysServer(grpcServer, tags.NewTagKeysServer(pool, queries, appCodec, auditResolver))
 	apiv1.RegisterTagValuesServer(grpcServer, tags.NewTagValuesServer(pool, queries, appCodec, auditResolver))
 	apiv1.RegisterTagBindingsServer(grpcServer, tags.NewTagBindingsServer(pool, queries, appCodec, auditResolver))
-	apiv1.RegisterApiKeysServer(grpcServer, apikeys.NewApiKeysServer(pool, queries, appCodec))
+	apiv1.RegisterApiKeysServer(grpcServer, apikeys.NewApiKeysServer(pool, queries, appCodec, auditResolver))
 
 	// Iam service: cross-cutting IAM (role reads, permission catalog,
 	// user reads, group CRUD, DeleteUser LRO). Scope-divergent IAM

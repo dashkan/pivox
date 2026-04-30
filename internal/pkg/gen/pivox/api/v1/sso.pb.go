@@ -22,6 +22,7 @@ package apiv1
 
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
+	types "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -78,13 +79,17 @@ type SsoConfig struct {
 	//	*SsoConfig_Oidc
 	//	*SsoConfig_Saml
 	Config isSsoConfig_Config `protobuf_oneof:"config"`
+	// Output only. The identity that created this SSO config.
+	CreatedBy *types.Actor `protobuf:"bytes,7,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
 	// Output only. Timestamp when the SsoConfig was created.
-	CreateTime *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	CreateTime *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	// Output only. The identity that last modified this SSO config.
+	UpdatedBy *types.Actor `protobuf:"bytes,9,opt,name=updated_by,json=updatedBy,proto3" json:"updated_by,omitempty"`
 	// Output only. Timestamp when the SsoConfig was last modified.
-	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
 	// Output only. A checksum computed by the server based on the
 	// current value of the SsoConfig resource.
-	Etag          string `protobuf:"bytes,9,opt,name=etag,proto3" json:"etag,omitempty"`
+	Etag          string `protobuf:"bytes,11,opt,name=etag,proto3" json:"etag,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -172,9 +177,23 @@ func (x *SsoConfig) GetSaml() *SamlConfig {
 	return nil
 }
 
+func (x *SsoConfig) GetCreatedBy() *types.Actor {
+	if x != nil {
+		return x.CreatedBy
+	}
+	return nil
+}
+
 func (x *SsoConfig) GetCreateTime() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreateTime
+	}
+	return nil
+}
+
+func (x *SsoConfig) GetUpdatedBy() *types.Actor {
+	if x != nil {
+		return x.UpdatedBy
 	}
 	return nil
 }
@@ -585,19 +604,24 @@ var File_pivox_api_v1_sso_proto protoreflect.FileDescriptor
 
 const file_pivox_api_v1_sso_proto_rawDesc = "" +
 	"\n" +
-	"\x16pivox/api/v1/sso.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x8b\x04\n" +
+	"\x16pivox/api/v1/sso.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17pivox/types/actor.proto\"\xfb\x04\n" +
 	"\tSsoConfig\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x125\n" +
 	"\x14firebase_provider_id\x18\x02 \x01(\tB\x03\xe0A\x03R\x12firebaseProviderId\x12/\n" +
 	"\fdisplay_name\x18\x03 \x01(\tB\f\xe0A\x02\xbaH\x06r\x04\x10\x01\x18?R\vdisplayName\x12\x1d\n" +
 	"\aenabled\x18\x04 \x01(\bB\x03\xe0A\x01R\aenabled\x12.\n" +
 	"\x04oidc\x18\x05 \x01(\v2\x18.pivox.api.v1.OidcConfigH\x00R\x04oidc\x12.\n" +
-	"\x04saml\x18\x06 \x01(\v2\x18.pivox.api.v1.SamlConfigH\x00R\x04saml\x12@\n" +
-	"\vcreate_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"createTime\x12@\n" +
-	"\vupdate_time\x18\b \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"\x04saml\x18\x06 \x01(\v2\x18.pivox.api.v1.SamlConfigH\x00R\x04saml\x126\n" +
+	"\n" +
+	"created_by\x18\a \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tcreatedBy\x12@\n" +
+	"\vcreate_time\x18\b \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"createTime\x126\n" +
+	"\n" +
+	"updated_by\x18\t \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tupdatedBy\x12@\n" +
+	"\vupdate_time\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"updateTime\x12\x17\n" +
-	"\x04etag\x18\t \x01(\tB\x03\xe0A\x03R\x04etag:W\xeaAT\n" +
+	"\x04etag\x18\v \x01(\tB\x03\xe0A\x03R\x04etag:W\xeaAT\n" +
 	"\x13pivox.api/SsoConfig\x12&organizations/{organization}/ssoConfig*\n" +
 	"ssoConfigs2\tssoConfigB\b\n" +
 	"\x06config\"\xf1\x02\n" +
@@ -654,22 +678,25 @@ var file_pivox_api_v1_sso_proto_goTypes = []any{
 	(*GetSsoConfigRequest)(nil),     // 3: pivox.api.v1.GetSsoConfigRequest
 	(*UpdateSsoConfigRequest)(nil),  // 4: pivox.api.v1.UpdateSsoConfigRequest
 	(*OidcConfig_ResponseType)(nil), // 5: pivox.api.v1.OidcConfig.ResponseType
-	(*timestamppb.Timestamp)(nil),   // 6: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),   // 7: google.protobuf.FieldMask
+	(*types.Actor)(nil),             // 6: pivox.types.Actor
+	(*timestamppb.Timestamp)(nil),   // 7: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),   // 8: google.protobuf.FieldMask
 }
 var file_pivox_api_v1_sso_proto_depIdxs = []int32{
 	1, // 0: pivox.api.v1.SsoConfig.oidc:type_name -> pivox.api.v1.OidcConfig
 	2, // 1: pivox.api.v1.SsoConfig.saml:type_name -> pivox.api.v1.SamlConfig
-	6, // 2: pivox.api.v1.SsoConfig.create_time:type_name -> google.protobuf.Timestamp
-	6, // 3: pivox.api.v1.SsoConfig.update_time:type_name -> google.protobuf.Timestamp
-	5, // 4: pivox.api.v1.OidcConfig.response_type:type_name -> pivox.api.v1.OidcConfig.ResponseType
-	0, // 5: pivox.api.v1.UpdateSsoConfigRequest.sso_config:type_name -> pivox.api.v1.SsoConfig
-	7, // 6: pivox.api.v1.UpdateSsoConfigRequest.update_mask:type_name -> google.protobuf.FieldMask
-	7, // [7:7] is the sub-list for method output_type
-	7, // [7:7] is the sub-list for method input_type
-	7, // [7:7] is the sub-list for extension type_name
-	7, // [7:7] is the sub-list for extension extendee
-	0, // [0:7] is the sub-list for field type_name
+	6, // 2: pivox.api.v1.SsoConfig.created_by:type_name -> pivox.types.Actor
+	7, // 3: pivox.api.v1.SsoConfig.create_time:type_name -> google.protobuf.Timestamp
+	6, // 4: pivox.api.v1.SsoConfig.updated_by:type_name -> pivox.types.Actor
+	7, // 5: pivox.api.v1.SsoConfig.update_time:type_name -> google.protobuf.Timestamp
+	5, // 6: pivox.api.v1.OidcConfig.response_type:type_name -> pivox.api.v1.OidcConfig.ResponseType
+	0, // 7: pivox.api.v1.UpdateSsoConfigRequest.sso_config:type_name -> pivox.api.v1.SsoConfig
+	8, // 8: pivox.api.v1.UpdateSsoConfigRequest.update_mask:type_name -> google.protobuf.FieldMask
+	9, // [9:9] is the sub-list for method output_type
+	9, // [9:9] is the sub-list for method input_type
+	9, // [9:9] is the sub-list for extension type_name
+	9, // [9:9] is the sub-list for extension extendee
+	0, // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_pivox_api_v1_sso_proto_init() }

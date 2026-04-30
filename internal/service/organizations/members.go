@@ -87,7 +87,7 @@ func (s *OrganizationsServer) GetMember(ctx context.Context, req *iampb.GetMembe
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Member", req.GetName())
 	}
-	return convert.OrgMemberRowToProto(row, path.orgSlug), nil
+	return convert.OrgMemberRowToProto(row, path.orgSlug, nil), nil
 }
 
 // ListMembers returns org-scope Members with offset-based AIP-132
@@ -123,7 +123,7 @@ func (s *OrganizationsServer) ListMembers(ctx context.Context, req *iampb.ListMe
 	}
 	out := make([]*iampb.Member, len(rows))
 	for i, r := range rows {
-		out[i] = convert.OrgMemberToProto(r, resolved.Slug)
+		out[i] = convert.OrgMemberToProto(r, resolved.Slug, nil)
 	}
 	resp := &iampb.ListMembersResponse{Members: out}
 	if hasMore {
@@ -505,7 +505,7 @@ func buildOrgMemberProto(orgSlug, roleName string, kind db.PrincipalKind, princi
 		Etag:          etag,
 		CreateTime:    createTime,
 		UpdateTime:    updateTime,
-	}, orgSlug)
+	}, orgSlug, nil)
 }
 
 // isNotFound returns true if err is pgx.ErrNoRows. Defined here as

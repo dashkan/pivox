@@ -4,29 +4,33 @@ import (
 	"encoding/json"
 	"log/slog"
 
+	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	db "github.com/dashkan/pivox/internal/db/generated"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
+	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 )
 
 // SsoConfigToProto wraps a db.SsoConfig row into the wire-level
 // apiv1.SsoConfig. The resource name is constructed from the parent
 // org slug; the OIDC/SAML JSONB columns are unmarshaled into the
-// proto oneof.
+// proto oneof. `actors` is the pre-resolved Actor map.
 //
 // client_secret is NEVER returned to clients (per the proto's
 // OUTPUT_ONLY-by-design treatment). The KMS ciphertext stays at
 // rest; UpdateSsoConfig is the only path that decrypts it, and only
 // to forward to Firebase Admin SDK.
-func SsoConfigToProto(s db.SsoConfig, orgSlug string) *apiv1.SsoConfig {
+func SsoConfigToProto(s db.SsoConfig, orgSlug string, actors map[uuid.UUID]*typespb.Actor) *apiv1.SsoConfig {
 	pb := &apiv1.SsoConfig{
 		Name:               "organizations/" + orgSlug + "/ssoConfig",
 		FirebaseProviderId: s.FirebaseProviderID,
 		DisplayName:        s.DisplayName,
 		Enabled:            s.Enabled,
 		Etag:               s.Etag,
+		CreatedBy:          actorOrNil(actors, s.CreatedBy),
 		CreateTime:         timestamppb.New(s.CreateTime),
+		UpdatedBy:          actorOrNil(actors, s.UpdatedBy),
 		UpdateTime:         timestamppb.New(s.UpdateTime),
 	}
 

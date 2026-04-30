@@ -94,7 +94,7 @@ func (s *SpacesServer) GetMember(ctx context.Context, req *iampb.GetMemberReques
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Member", req.GetName())
 	}
-	return convert.SpaceMemberRowToProto(row, path.orgSlug, path.spaceSlug), nil
+	return convert.SpaceMemberRowToProto(row, path.orgSlug, path.spaceSlug, nil), nil
 }
 
 // ListMembers returns space-scope Members. Direct bindings only —
@@ -129,7 +129,7 @@ func (s *SpacesServer) ListMembers(ctx context.Context, req *iampb.ListMembersRe
 	}
 	out := make([]*iampb.Member, len(rows))
 	for i, r := range rows {
-		out[i] = convert.SpaceMemberToProto(r, resolvedOrg.Slug, resolvedSpace.Slug)
+		out[i] = convert.SpaceMemberToProto(r, resolvedOrg.Slug, resolvedSpace.Slug, nil)
 	}
 	resp := &iampb.ListMembersResponse{Members: out}
 	if hasMore {
@@ -263,7 +263,7 @@ func (s *SpacesServer) CreateMember(ctx context.Context, req *iampb.CreateMember
 		Etag:          row.Etag,
 		CreateTime:    row.CreateTime,
 		UpdateTime:    row.UpdateTime,
-	}, orgSlug, resolvedSpace.Slug), nil
+	}, orgSlug, resolvedSpace.Slug, nil), nil
 }
 
 // UpdateMember mutates the role of an existing space-scope Member.
@@ -336,7 +336,7 @@ func (s *SpacesServer) UpdateMember(ctx context.Context, req *iampb.UpdateMember
 		Etag:          row.Etag,
 		CreateTime:    row.CreateTime,
 		UpdateTime:    row.UpdateTime,
-	}, path.orgSlug, path.spaceSlug), nil
+	}, path.orgSlug, path.spaceSlug, nil), nil
 }
 
 // principalFromMember pulls (kind, id) out of the Member proto's

@@ -25,6 +25,7 @@ import "google/protobuf/empty.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "pivox/permission/v1/options.proto";
+import "pivox/types/actor.proto";
 
 option go_package = "pivox/api/v1;apiv1";
 
@@ -137,34 +138,43 @@ message Key {
   // This field can be accessed only through the `GetKeyString` method.
   string key_string = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
 
+  // Output only. The identity that created this API key.
+  pivox.types.Actor created_by = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
   // Output only. A timestamp identifying the time this key was originally
   // created.
-  google.protobuf.Timestamp create_time = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The identity that last modified this API key.
+  pivox.types.Actor updated_by = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. A timestamp identifying the time this key was last
   // updated.
-  google.protobuf.Timestamp update_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The identity that requested deletion of this API key.
+  pivox.types.Actor deleted_by = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. A timestamp when this key was deleted. If the resource is not
   // deleted, this must be empty.
-  google.protobuf.Timestamp delete_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp delete_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. The time at which this key will be purged.
   // Approximately 30 days after deletion.
-  google.protobuf.Timestamp purge_time = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp purge_time = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Optional. Annotations is an unstructured key-value map stored with a policy that
   // may be set by external tools to store and retrieve arbitrary metadata.
   // They are not queryable and should be preserved when modifying objects.
-  map<string, string> annotations = 8 [(google.api.field_behavior) = OPTIONAL];
+  map<string, string> annotations = 11 [(google.api.field_behavior) = OPTIONAL];
 
   // Optional. Key restrictions.
-  Restrictions restrictions = 9 [(google.api.field_behavior) = OPTIONAL];
+  Restrictions restrictions = 12 [(google.api.field_behavior) = OPTIONAL];
 
   // Output only. A checksum computed by the server based on the current value
   // of the Key resource. This may be sent on update and delete requests to
   // ensure the client has an up-to-date value before proceeding.
-  string etag = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string etag = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Describes the restrictions on the key.

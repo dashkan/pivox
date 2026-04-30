@@ -1598,7 +1598,7 @@ func TestApiKeyToProto(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pb := ApiKeyToProto(tt.key, tt.orgName)
+			pb := ApiKeyToProto(tt.key, tt.orgName, nil)
 			require.NotNil(t, pb)
 			assert.Equal(t, tt.key.DisplayName, pb.DisplayName)
 			assert.Equal(t, tt.key.Etag, pb.Etag)

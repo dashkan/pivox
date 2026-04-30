@@ -41,7 +41,7 @@ func (s *OrganizationsServer) GetSsoConfig(ctx context.Context, req *apiv1.GetSs
 		slog.ErrorContext(ctx, "get sso config: lookup failed", "org_id", resolved.ID, "error", err)
 		return nil, apierr.Internal("lookup sso config")
 	}
-	return convert.SsoConfigToProto(row, resolved.Slug), nil
+	return convert.SsoConfigToProto(row, resolved.Slug, nil), nil
 }
 
 // UpdateSsoConfig is the singleton create-or-update for the
@@ -166,7 +166,7 @@ func (s *OrganizationsServer) UpdateSsoConfig(ctx context.Context, req *apiv1.Up
 		slog.ErrorContext(ctx, "update sso config: upsert failed", "org_id", resolved.ID, "error", err)
 		return nil, apierr.Internal("upsert sso config")
 	}
-	return convert.SsoConfigToProto(row, resolved.Slug), nil
+	return convert.SsoConfigToProto(row, resolved.Slug, nil), nil
 }
 
 // applyOidcProvider validates, builds, and applies the OIDC provider

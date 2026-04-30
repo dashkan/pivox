@@ -21,6 +21,7 @@ import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
+import "pivox/types/actor.proto";
 
 option go_package = "pivox/api/v1;apiv1";
 
@@ -83,15 +84,21 @@ message SsoConfig {
     SamlConfig saml = 6;
   }
 
+  // Output only. The identity that created this SSO config.
+  pivox.types.Actor created_by = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+
   // Output only. Timestamp when the SsoConfig was created.
-  google.protobuf.Timestamp create_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The identity that last modified this SSO config.
+  pivox.types.Actor updated_by = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when the SsoConfig was last modified.
-  google.protobuf.Timestamp update_time = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. A checksum computed by the server based on the
   // current value of the SsoConfig resource.
-  string etag = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string etag = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // OIDC provider configuration. Maps onto Firebase Admin SDK's

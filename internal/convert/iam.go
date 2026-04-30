@@ -3,10 +3,12 @@ package convert
 import (
 	"fmt"
 
+	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	db "github.com/dashkan/pivox/internal/db/generated"
 	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
+	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 )
 
 // PermissionToProto converts a DB permission row to its wire shape.
@@ -25,13 +27,16 @@ func PermissionToProto(p db.Permission) *iampb.Permission {
 // resource name encodes the principal as `user-{uuid}` or
 // `group-{uuid}` — uniqueness-by-construction means at most one
 // Member per (scope, principal). Caller passes the org slug; the
-// converter does NOT re-resolve it.
-func OrgMemberToProto(m db.ListOrgMembersRow, orgSlug string) *iampb.Member {
+// converter does NOT re-resolve it. `actors` is the pre-resolved
+// Actor map; pass nil to skip Actor inflation.
+func OrgMemberToProto(m db.ListOrgMembersRow, orgSlug string, actors map[uuid.UUID]*typespb.Actor) *iampb.Member {
 	pb := &iampb.Member{
 		Name:       fmt.Sprintf("organizations/%s/members/%s-%s", orgSlug, m.PrincipalKind, m.PrincipalID),
 		Role:       fmt.Sprintf("organizations/%s/roles/%s", orgSlug, m.RoleName),
 		Etag:       m.Etag,
+		CreatedBy:  actorOrNil(actors, m.CreatedBy),
 		CreateTime: timestamppb.New(m.CreateTime),
+		UpdatedBy:  actorOrNil(actors, m.UpdatedBy),
 		UpdateTime: timestamppb.New(m.UpdateTime),
 	}
 	switch m.PrincipalKind {
@@ -51,20 +56,23 @@ func OrgMemberToProto(m db.ListOrgMembersRow, orgSlug string) *iampb.Member {
 // OrgMemberToProto; sqlc generates separate row types for :one vs
 // :many even when the SELECT clauses match, so we provide both
 // converters as thin wrappers.
-func OrgMemberRowToProto(m db.GetOrgMemberRow, orgSlug string) *iampb.Member {
-	return OrgMemberToProto(db.ListOrgMembersRow(m), orgSlug)
+func OrgMemberRowToProto(m db.GetOrgMemberRow, orgSlug string, actors map[uuid.UUID]*typespb.Actor) *iampb.Member {
+	return OrgMemberToProto(db.ListOrgMembersRow(m), orgSlug, actors)
 }
 
 // SpaceMemberToProto converts a joined space_members row to the
 // unified Member proto at space scope. The resource name nests under
 // the space: `organizations/{org}/spaces/{space}/members/{member}`.
-// Caller passes both org and space slugs.
-func SpaceMemberToProto(m db.ListSpaceMembersRow, orgSlug, spaceSlug string) *iampb.Member {
+// Caller passes both org and space slugs. `actors` is the pre-resolved
+// Actor map.
+func SpaceMemberToProto(m db.ListSpaceMembersRow, orgSlug, spaceSlug string, actors map[uuid.UUID]*typespb.Actor) *iampb.Member {
 	pb := &iampb.Member{
 		Name:       fmt.Sprintf("organizations/%s/spaces/%s/members/%s-%s", orgSlug, spaceSlug, m.PrincipalKind, m.PrincipalID),
 		Role:       fmt.Sprintf("organizations/%s/roles/%s", orgSlug, m.RoleName),
 		Etag:       m.Etag,
+		CreatedBy:  actorOrNil(actors, m.CreatedBy),
 		CreateTime: timestamppb.New(m.CreateTime),
+		UpdatedBy:  actorOrNil(actors, m.UpdatedBy),
 		UpdateTime: timestamppb.New(m.UpdateTime),
 	}
 	switch m.PrincipalKind {
@@ -81,8 +89,8 @@ func SpaceMemberToProto(m db.ListSpaceMembersRow, orgSlug, spaceSlug string) *ia
 }
 
 // SpaceMemberRowToProto mirrors OrgMemberRowToProto for space scope.
-func SpaceMemberRowToProto(m db.GetSpaceMemberRow, orgSlug, spaceSlug string) *iampb.Member {
-	return SpaceMemberToProto(db.ListSpaceMembersRow(m), orgSlug, spaceSlug)
+func SpaceMemberRowToProto(m db.GetSpaceMemberRow, orgSlug, spaceSlug string, actors map[uuid.UUID]*typespb.Actor) *iampb.Member {
+	return SpaceMemberToProto(db.ListSpaceMembersRow(m), orgSlug, spaceSlug, actors)
 }
 
 // RoleToProto converts a DB role row to its wire shape. `orgName` is

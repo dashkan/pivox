@@ -89,6 +89,16 @@ public struct Pivox_Iam_V1_Member: Sendable {
   /// system roles (`owner`, `admin`, `editor`, `viewer`).
   public var role: String = String()
 
+  /// Output only. The identity that created this membership.
+  public var createdBy: Pivox_Types_Actor {
+    get {_createdBy ?? Pivox_Types_Actor()}
+    set {_createdBy = newValue}
+  }
+  /// Returns true if `createdBy` has been explicitly set.
+  public var hasCreatedBy: Bool {self._createdBy != nil}
+  /// Clears the value of `createdBy`. Subsequent reads from it will return its default value.
+  public mutating func clearCreatedBy() {self._createdBy = nil}
+
   /// Output only. Timestamp when this binding was created.
   public var createTime: SwiftProtobuf.Google_Protobuf_Timestamp {
     get {_createTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
@@ -98,6 +108,16 @@ public struct Pivox_Iam_V1_Member: Sendable {
   public var hasCreateTime: Bool {self._createTime != nil}
   /// Clears the value of `createTime`. Subsequent reads from it will return its default value.
   public mutating func clearCreateTime() {self._createTime = nil}
+
+  /// Output only. The identity that last modified this membership.
+  public var updatedBy: Pivox_Types_Actor {
+    get {_updatedBy ?? Pivox_Types_Actor()}
+    set {_updatedBy = newValue}
+  }
+  /// Returns true if `updatedBy` has been explicitly set.
+  public var hasUpdatedBy: Bool {self._updatedBy != nil}
+  /// Clears the value of `updatedBy`. Subsequent reads from it will return its default value.
+  public mutating func clearUpdatedBy() {self._updatedBy = nil}
 
   /// Output only. Timestamp when this binding was last modified.
   public var updateTime: SwiftProtobuf.Google_Protobuf_Timestamp {
@@ -132,7 +152,9 @@ public struct Pivox_Iam_V1_Member: Sendable {
 
   public init() {}
 
+  fileprivate var _createdBy: Pivox_Types_Actor? = nil
   fileprivate var _createTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+  fileprivate var _updatedBy: Pivox_Types_Actor? = nil
   fileprivate var _updateTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
 
@@ -205,7 +227,7 @@ public struct Pivox_Iam_V1_ListMembersResponse: Sendable {
 }
 
 /// Request message for `Iam.CreateMember`.
-public struct Pivox_Iam_V1_CreateMemberRequest: Sendable {
+public struct Pivox_Iam_V1_CreateMemberRequest: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -213,37 +235,43 @@ public struct Pivox_Iam_V1_CreateMemberRequest: Sendable {
   /// Required. The parent scope. Format:
   /// `organizations/{organization}` or
   /// `organizations/{organization}/spaces/{space}`.
-  public var parent: String = String()
+  public var parent: String {
+    get {_storage._parent}
+    set {_uniqueStorage()._parent = newValue}
+  }
 
   /// Required. The Member to create. The `principal` oneof must be set
   /// and `role` must reference an existing system role.
   public var member: Pivox_Iam_V1_Member {
-    get {_member ?? Pivox_Iam_V1_Member()}
-    set {_member = newValue}
+    get {_storage._member ?? Pivox_Iam_V1_Member()}
+    set {_uniqueStorage()._member = newValue}
   }
   /// Returns true if `member` has been explicitly set.
-  public var hasMember: Bool {self._member != nil}
+  public var hasMember: Bool {_storage._member != nil}
   /// Clears the value of `member`. Subsequent reads from it will return its default value.
-  public mutating func clearMember() {self._member = nil}
+  public mutating func clearMember() {_uniqueStorage()._member = nil}
 
   /// Optional. A client-specified member ID. If provided, must be
   /// `user-{user_id}` or `group-{group_id}` and must agree with the
   /// `principal` oneof. If omitted, the server derives it from
   /// `member.principal`.
-  public var memberID: String = String()
+  public var memberID: String {
+    get {_storage._memberID}
+    set {_uniqueStorage()._memberID = newValue}
+  }
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _member: Pivox_Iam_V1_Member? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 /// Request message for `Iam.UpdateMember`.
 ///
 /// Only the `role` field is mutable. To change the principal, delete
 /// and recreate the Member.
-public struct Pivox_Iam_V1_UpdateMemberRequest: Sendable {
+public struct Pivox_Iam_V1_UpdateMemberRequest: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -251,31 +279,30 @@ public struct Pivox_Iam_V1_UpdateMemberRequest: Sendable {
   /// Required. The Member with updated fields. The `name` field must
   /// identify the existing member.
   public var member: Pivox_Iam_V1_Member {
-    get {_member ?? Pivox_Iam_V1_Member()}
-    set {_member = newValue}
+    get {_storage._member ?? Pivox_Iam_V1_Member()}
+    set {_uniqueStorage()._member = newValue}
   }
   /// Returns true if `member` has been explicitly set.
-  public var hasMember: Bool {self._member != nil}
+  public var hasMember: Bool {_storage._member != nil}
   /// Clears the value of `member`. Subsequent reads from it will return its default value.
-  public mutating func clearMember() {self._member = nil}
+  public mutating func clearMember() {_uniqueStorage()._member = nil}
 
   /// Optional. The fields to update. Only `role` may be updated. If
   /// omitted, only `role` is updated.
   public var updateMask: SwiftProtobuf.Google_Protobuf_FieldMask {
-    get {_updateMask ?? SwiftProtobuf.Google_Protobuf_FieldMask()}
-    set {_updateMask = newValue}
+    get {_storage._updateMask ?? SwiftProtobuf.Google_Protobuf_FieldMask()}
+    set {_uniqueStorage()._updateMask = newValue}
   }
   /// Returns true if `updateMask` has been explicitly set.
-  public var hasUpdateMask: Bool {self._updateMask != nil}
+  public var hasUpdateMask: Bool {_storage._updateMask != nil}
   /// Clears the value of `updateMask`. Subsequent reads from it will return its default value.
-  public mutating func clearUpdateMask() {self._updateMask = nil}
+  public mutating func clearUpdateMask() {_uniqueStorage()._updateMask = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _member: Pivox_Iam_V1_Member? = nil
-  fileprivate var _updateMask: SwiftProtobuf.Google_Protobuf_FieldMask? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 /// Request message for `Iam.DeleteMember`.
@@ -303,7 +330,7 @@ fileprivate let _protobuf_package = "pivox.iam.v1"
 
 extension Pivox_Iam_V1_Member: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".Member"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}user\0\u{1}group\0\u{1}role\0\u{3}create_time\0\u{3}update_time\0\u{1}etag\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}user\0\u{1}group\0\u{1}role\0\u{3}created_by\0\u{3}create_time\0\u{3}updated_by\0\u{3}update_time\0\u{1}etag\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -329,9 +356,11 @@ extension Pivox_Iam_V1_Member: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
         }
       }()
       case 4: try { try decoder.decodeSingularStringField(value: &self.role) }()
-      case 5: try { try decoder.decodeSingularMessageField(value: &self._createTime) }()
-      case 6: try { try decoder.decodeSingularMessageField(value: &self._updateTime) }()
-      case 7: try { try decoder.decodeSingularStringField(value: &self.etag) }()
+      case 5: try { try decoder.decodeSingularMessageField(value: &self._createdBy) }()
+      case 6: try { try decoder.decodeSingularMessageField(value: &self._createTime) }()
+      case 7: try { try decoder.decodeSingularMessageField(value: &self._updatedBy) }()
+      case 8: try { try decoder.decodeSingularMessageField(value: &self._updateTime) }()
+      case 9: try { try decoder.decodeSingularStringField(value: &self.etag) }()
       default: break
       }
     }
@@ -359,14 +388,20 @@ extension Pivox_Iam_V1_Member: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
     if !self.role.isEmpty {
       try visitor.visitSingularStringField(value: self.role, fieldNumber: 4)
     }
-    try { if let v = self._createTime {
+    try { if let v = self._createdBy {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
     } }()
-    try { if let v = self._updateTime {
+    try { if let v = self._createTime {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
     } }()
+    try { if let v = self._updatedBy {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
+    } }()
+    try { if let v = self._updateTime {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+    } }()
     if !self.etag.isEmpty {
-      try visitor.visitSingularStringField(value: self.etag, fieldNumber: 7)
+      try visitor.visitSingularStringField(value: self.etag, fieldNumber: 9)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -375,7 +410,9 @@ extension Pivox_Iam_V1_Member: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
     if lhs.name != rhs.name {return false}
     if lhs.principal != rhs.principal {return false}
     if lhs.role != rhs.role {return false}
+    if lhs._createdBy != rhs._createdBy {return false}
     if lhs._createTime != rhs._createTime {return false}
+    if lhs._updatedBy != rhs._updatedBy {return false}
     if lhs._updateTime != rhs._updateTime {return false}
     if lhs.etag != rhs.etag {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -502,41 +539,81 @@ extension Pivox_Iam_V1_CreateMemberRequest: SwiftProtobuf.Message, SwiftProtobuf
   public static let protoMessageName: String = _protobuf_package + ".CreateMemberRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}parent\0\u{1}member\0\u{3}member_id\0")
 
+  fileprivate class _StorageClass {
+    var _parent: String = String()
+    var _member: Pivox_Iam_V1_Member? = nil
+    var _memberID: String = String()
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _parent = source._parent
+      _member = source._member
+      _memberID = source._memberID
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.parent) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._member) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.memberID) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._parent) }()
+        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._member) }()
+        case 3: try { try decoder.decodeSingularStringField(value: &_storage._memberID) }()
+        default: break
+        }
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.parent.isEmpty {
-      try visitor.visitSingularStringField(value: self.parent, fieldNumber: 1)
-    }
-    try { if let v = self._member {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
-    if !self.memberID.isEmpty {
-      try visitor.visitSingularStringField(value: self.memberID, fieldNumber: 3)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if !_storage._parent.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._parent, fieldNumber: 1)
+      }
+      try { if let v = _storage._member {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+      } }()
+      if !_storage._memberID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._memberID, fieldNumber: 3)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Pivox_Iam_V1_CreateMemberRequest, rhs: Pivox_Iam_V1_CreateMemberRequest) -> Bool {
-    if lhs.parent != rhs.parent {return false}
-    if lhs._member != rhs._member {return false}
-    if lhs.memberID != rhs.memberID {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._parent != rhs_storage._parent {return false}
+        if _storage._member != rhs_storage._member {return false}
+        if _storage._memberID != rhs_storage._memberID {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -546,36 +623,74 @@ extension Pivox_Iam_V1_UpdateMemberRequest: SwiftProtobuf.Message, SwiftProtobuf
   public static let protoMessageName: String = _protobuf_package + ".UpdateMemberRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}member\0\u{3}update_mask\0")
 
+  fileprivate class _StorageClass {
+    var _member: Pivox_Iam_V1_Member? = nil
+    var _updateMask: SwiftProtobuf.Google_Protobuf_FieldMask? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _member = source._member
+      _updateMask = source._updateMask
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._member) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._updateMask) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._member) }()
+        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._updateMask) }()
+        default: break
+        }
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._member {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._updateMask {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      try { if let v = _storage._member {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+      } }()
+      try { if let v = _storage._updateMask {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+      } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Pivox_Iam_V1_UpdateMemberRequest, rhs: Pivox_Iam_V1_UpdateMemberRequest) -> Bool {
-    if lhs._member != rhs._member {return false}
-    if lhs._updateMask != rhs._updateMask {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._member != rhs_storage._member {return false}
+        if _storage._updateMask != rhs_storage._updateMask {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

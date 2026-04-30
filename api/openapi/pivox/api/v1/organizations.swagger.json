@@ -1091,10 +1091,20 @@
                   "type": "string",
                   "description": "Required. Reference to the role this principal holds at this scope.\nFormat: `organizations/{organization}/roles/{role}`. v1 accepts only\nsystem roles (`owner`, `admin`, `editor`, `viewer`)."
                 },
+                "createdBy": {
+                  "$ref": "#/definitions/typesActor",
+                  "description": "Output only. The identity that created this membership.",
+                  "readOnly": true
+                },
                 "createTime": {
                   "type": "string",
                   "format": "date-time",
                   "description": "Output only. Timestamp when this binding was created.",
+                  "readOnly": true
+                },
+                "updatedBy": {
+                  "$ref": "#/definitions/typesActor",
+                  "description": "Output only. The identity that last modified this membership.",
                   "readOnly": true
                 },
                 "updateTime": {
@@ -1205,10 +1215,20 @@
                   "$ref": "#/definitions/v1SamlConfig",
                   "description": "SAML 2.0 provider configuration. Set when the IDP only speaks\nSAML."
                 },
+                "createdBy": {
+                  "$ref": "#/definitions/typesActor",
+                  "description": "Output only. The identity that created this SSO config.",
+                  "readOnly": true
+                },
                 "createTime": {
                   "type": "string",
                   "format": "date-time",
                   "description": "Output only. Timestamp when the SsoConfig was created.",
+                  "readOnly": true
+                },
+                "updatedBy": {
+                  "$ref": "#/definitions/typesActor",
+                  "description": "Output only. The identity that last modified this SSO config.",
                   "readOnly": true
                 },
                 "updateTime": {
@@ -1533,10 +1553,20 @@
           "description": "Output only. Timestamp when the domain transitioned to\n`VERIFIED`, or unset if it has never verified successfully.",
           "readOnly": true
         },
+        "createdBy": {
+          "$ref": "#/definitions/typesActor",
+          "description": "Output only. The identity that registered this domain.",
+          "readOnly": true
+        },
         "createTime": {
           "type": "string",
           "format": "date-time",
           "description": "Output only. Timestamp when the Domain row was created.",
+          "readOnly": true
+        },
+        "updatedBy": {
+          "$ref": "#/definitions/typesActor",
+          "description": "Output only. The identity that last modified this domain.",
           "readOnly": true
         },
         "updateTime": {
@@ -1766,10 +1796,20 @@
           "type": "string",
           "description": "Required. Reference to the role this principal holds at this scope.\nFormat: `organizations/{organization}/roles/{role}`. v1 accepts only\nsystem roles (`owner`, `admin`, `editor`, `viewer`)."
         },
+        "createdBy": {
+          "$ref": "#/definitions/typesActor",
+          "description": "Output only. The identity that created this membership.",
+          "readOnly": true
+        },
         "createTime": {
           "type": "string",
           "format": "date-time",
           "description": "Output only. Timestamp when this binding was created.",
+          "readOnly": true
+        },
+        "updatedBy": {
+          "$ref": "#/definitions/typesActor",
+          "description": "Output only. The identity that last modified this membership.",
           "readOnly": true
         },
         "updateTime": {
@@ -1983,10 +2023,20 @@
           "$ref": "#/definitions/v1SamlConfig",
           "description": "SAML 2.0 provider configuration. Set when the IDP only speaks\nSAML."
         },
+        "createdBy": {
+          "$ref": "#/definitions/typesActor",
+          "description": "Output only. The identity that created this SSO config.",
+          "readOnly": true
+        },
         "createTime": {
           "type": "string",
           "format": "date-time",
           "description": "Output only. Timestamp when the SsoConfig was created.",
+          "readOnly": true
+        },
+        "updatedBy": {
+          "$ref": "#/definitions/typesActor",
+          "description": "Output only. The identity that last modified this SSO config.",
           "readOnly": true
         },
         "updateTime": {

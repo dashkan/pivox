@@ -20,6 +20,7 @@ import "buf/validate/validate.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
 import "google/protobuf/timestamp.proto";
+import "pivox/types/actor.proto";
 
 option go_package = "pivox/api/v1;apiv1";
 
@@ -87,15 +88,21 @@ message Domain {
   // `VERIFIED`, or unset if it has never verified successfully.
   google.protobuf.Timestamp verified_time = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
 
+  // Output only. The identity that registered this domain.
+  pivox.types.Actor created_by = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
   // Output only. Timestamp when the Domain row was created.
-  google.protobuf.Timestamp create_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The identity that last modified this domain.
+  pivox.types.Actor updated_by = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when the Domain was last modified.
-  google.protobuf.Timestamp update_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. A checksum computed by the server based on the
   // current value of the Domain resource.
-  string etag = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string etag = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Request message for `Organizations.CreateDomain`.

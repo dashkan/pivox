@@ -23,6 +23,7 @@ package apiv1
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/permission/v1"
+	types "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -56,28 +57,34 @@ type Key struct {
 	// Output only. An encrypted and signed value held by this key.
 	// This field can be accessed only through the `GetKeyString` method.
 	KeyString string `protobuf:"bytes,3,opt,name=key_string,json=keyString,proto3" json:"key_string,omitempty"`
+	// Output only. The identity that created this API key.
+	CreatedBy *types.Actor `protobuf:"bytes,4,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
 	// Output only. A timestamp identifying the time this key was originally
 	// created.
-	CreateTime *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	CreateTime *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	// Output only. The identity that last modified this API key.
+	UpdatedBy *types.Actor `protobuf:"bytes,6,opt,name=updated_by,json=updatedBy,proto3" json:"updated_by,omitempty"`
 	// Output only. A timestamp identifying the time this key was last
 	// updated.
-	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	// Output only. The identity that requested deletion of this API key.
+	DeletedBy *types.Actor `protobuf:"bytes,8,opt,name=deleted_by,json=deletedBy,proto3" json:"deleted_by,omitempty"`
 	// Output only. A timestamp when this key was deleted. If the resource is not
 	// deleted, this must be empty.
-	DeleteTime *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=delete_time,json=deleteTime,proto3" json:"delete_time,omitempty"`
+	DeleteTime *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=delete_time,json=deleteTime,proto3" json:"delete_time,omitempty"`
 	// Output only. The time at which this key will be purged.
 	// Approximately 30 days after deletion.
-	PurgeTime *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=purge_time,json=purgeTime,proto3" json:"purge_time,omitempty"`
+	PurgeTime *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=purge_time,json=purgeTime,proto3" json:"purge_time,omitempty"`
 	// Optional. Annotations is an unstructured key-value map stored with a policy that
 	// may be set by external tools to store and retrieve arbitrary metadata.
 	// They are not queryable and should be preserved when modifying objects.
-	Annotations map[string]string `protobuf:"bytes,8,rep,name=annotations,proto3" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Annotations map[string]string `protobuf:"bytes,11,rep,name=annotations,proto3" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Optional. Key restrictions.
-	Restrictions *Restrictions `protobuf:"bytes,9,opt,name=restrictions,proto3" json:"restrictions,omitempty"`
+	Restrictions *Restrictions `protobuf:"bytes,12,opt,name=restrictions,proto3" json:"restrictions,omitempty"`
 	// Output only. A checksum computed by the server based on the current value
 	// of the Key resource. This may be sent on update and delete requests to
 	// ensure the client has an up-to-date value before proceeding.
-	Etag          string `protobuf:"bytes,11,opt,name=etag,proto3" json:"etag,omitempty"`
+	Etag          string `protobuf:"bytes,13,opt,name=etag,proto3" json:"etag,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -133,6 +140,13 @@ func (x *Key) GetKeyString() string {
 	return ""
 }
 
+func (x *Key) GetCreatedBy() *types.Actor {
+	if x != nil {
+		return x.CreatedBy
+	}
+	return nil
+}
+
 func (x *Key) GetCreateTime() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreateTime
@@ -140,9 +154,23 @@ func (x *Key) GetCreateTime() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *Key) GetUpdatedBy() *types.Actor {
+	if x != nil {
+		return x.UpdatedBy
+	}
+	return nil
+}
+
 func (x *Key) GetUpdateTime() *timestamppb.Timestamp {
 	if x != nil {
 		return x.UpdateTime
+	}
+	return nil
+}
+
+func (x *Key) GetDeletedBy() *types.Actor {
+	if x != nil {
+		return x.DeletedBy
 	}
 	return nil
 }
@@ -1270,23 +1298,30 @@ var File_pivox_api_v1_apikeys_proto protoreflect.FileDescriptor
 
 const file_pivox_api_v1_apikeys_proto_rawDesc = "" +
 	"\n" +
-	"\x1apivox/api/v1/apikeys.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!pivox/permission/v1/options.proto\"\xa1\x05\n" +
+	"\x1apivox/api/v1/apikeys.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!pivox/permission/v1/options.proto\x1a\x17pivox/types/actor.proto\"\xc9\x06\n" +
 	"\x03Key\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12&\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\x03\xe0A\x01R\vdisplayName\x12\"\n" +
 	"\n" +
-	"key_string\x18\x03 \x01(\tB\x03\xe0A\x03R\tkeyString\x12@\n" +
-	"\vcreate_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"createTime\x12@\n" +
-	"\vupdate_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"updateTime\x12@\n" +
-	"\vdelete_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"key_string\x18\x03 \x01(\tB\x03\xe0A\x03R\tkeyString\x126\n" +
+	"\n" +
+	"created_by\x18\x04 \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tcreatedBy\x12@\n" +
+	"\vcreate_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"createTime\x126\n" +
+	"\n" +
+	"updated_by\x18\x06 \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tupdatedBy\x12@\n" +
+	"\vupdate_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"updateTime\x126\n" +
+	"\n" +
+	"deleted_by\x18\b \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tdeletedBy\x12@\n" +
+	"\vdelete_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"deleteTime\x12>\n" +
 	"\n" +
-	"purge_time\x18\f \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\tpurgeTime\x12I\n" +
-	"\vannotations\x18\b \x03(\v2\".pivox.api.v1.Key.AnnotationsEntryB\x03\xe0A\x01R\vannotations\x12C\n" +
-	"\frestrictions\x18\t \x01(\v2\x1a.pivox.api.v1.RestrictionsB\x03\xe0A\x01R\frestrictions\x12\x17\n" +
-	"\x04etag\x18\v \x01(\tB\x03\xe0A\x03R\x04etag\x1a>\n" +
+	"purge_time\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\tpurgeTime\x12I\n" +
+	"\vannotations\x18\v \x03(\v2\".pivox.api.v1.Key.AnnotationsEntryB\x03\xe0A\x01R\vannotations\x12C\n" +
+	"\frestrictions\x18\f \x01(\v2\x1a.pivox.api.v1.RestrictionsB\x03\xe0A\x01R\frestrictions\x12\x17\n" +
+	"\x04etag\x18\r \x01(\tB\x03\xe0A\x03R\x04etag\x1a>\n" +
 	"\x10AnnotationsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01:F\xeaAC\n" +
@@ -1401,47 +1436,51 @@ var file_pivox_api_v1_apikeys_proto_goTypes = []any{
 	(*LookupKeyRequest)(nil),       // 17: pivox.api.v1.LookupKeyRequest
 	(*LookupKeyResponse)(nil),      // 18: pivox.api.v1.LookupKeyResponse
 	nil,                            // 19: pivox.api.v1.Key.AnnotationsEntry
-	(*timestamppb.Timestamp)(nil),  // 20: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),  // 21: google.protobuf.FieldMask
+	(*types.Actor)(nil),            // 20: pivox.types.Actor
+	(*timestamppb.Timestamp)(nil),  // 21: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),  // 22: google.protobuf.FieldMask
 }
 var file_pivox_api_v1_apikeys_proto_depIdxs = []int32{
-	20, // 0: pivox.api.v1.Key.create_time:type_name -> google.protobuf.Timestamp
-	20, // 1: pivox.api.v1.Key.update_time:type_name -> google.protobuf.Timestamp
-	20, // 2: pivox.api.v1.Key.delete_time:type_name -> google.protobuf.Timestamp
-	20, // 3: pivox.api.v1.Key.purge_time:type_name -> google.protobuf.Timestamp
-	19, // 4: pivox.api.v1.Key.annotations:type_name -> pivox.api.v1.Key.AnnotationsEntry
-	1,  // 5: pivox.api.v1.Key.restrictions:type_name -> pivox.api.v1.Restrictions
-	2,  // 6: pivox.api.v1.Restrictions.browser_key_restrictions:type_name -> pivox.api.v1.BrowserKeyRestrictions
-	3,  // 7: pivox.api.v1.Restrictions.server_key_restrictions:type_name -> pivox.api.v1.ServerKeyRestrictions
-	4,  // 8: pivox.api.v1.Restrictions.android_key_restrictions:type_name -> pivox.api.v1.AndroidKeyRestrictions
-	6,  // 9: pivox.api.v1.Restrictions.ios_key_restrictions:type_name -> pivox.api.v1.IosKeyRestrictions
-	7,  // 10: pivox.api.v1.Restrictions.api_targets:type_name -> pivox.api.v1.ApiTarget
-	5,  // 11: pivox.api.v1.AndroidKeyRestrictions.allowed_applications:type_name -> pivox.api.v1.AndroidApplication
-	0,  // 12: pivox.api.v1.CreateKeyRequest.key:type_name -> pivox.api.v1.Key
-	0,  // 13: pivox.api.v1.ListKeysResponse.keys:type_name -> pivox.api.v1.Key
-	0,  // 14: pivox.api.v1.UpdateKeyRequest.key:type_name -> pivox.api.v1.Key
-	21, // 15: pivox.api.v1.UpdateKeyRequest.update_mask:type_name -> google.protobuf.FieldMask
-	8,  // 16: pivox.api.v1.ApiKeys.CreateKey:input_type -> pivox.api.v1.CreateKeyRequest
-	9,  // 17: pivox.api.v1.ApiKeys.ListKeys:input_type -> pivox.api.v1.ListKeysRequest
-	11, // 18: pivox.api.v1.ApiKeys.GetKey:input_type -> pivox.api.v1.GetKeyRequest
-	12, // 19: pivox.api.v1.ApiKeys.GetKeyString:input_type -> pivox.api.v1.GetKeyStringRequest
-	14, // 20: pivox.api.v1.ApiKeys.UpdateKey:input_type -> pivox.api.v1.UpdateKeyRequest
-	15, // 21: pivox.api.v1.ApiKeys.DeleteKey:input_type -> pivox.api.v1.DeleteKeyRequest
-	16, // 22: pivox.api.v1.ApiKeys.UndeleteKey:input_type -> pivox.api.v1.UndeleteKeyRequest
-	17, // 23: pivox.api.v1.ApiKeys.LookupKey:input_type -> pivox.api.v1.LookupKeyRequest
-	0,  // 24: pivox.api.v1.ApiKeys.CreateKey:output_type -> pivox.api.v1.Key
-	10, // 25: pivox.api.v1.ApiKeys.ListKeys:output_type -> pivox.api.v1.ListKeysResponse
-	0,  // 26: pivox.api.v1.ApiKeys.GetKey:output_type -> pivox.api.v1.Key
-	13, // 27: pivox.api.v1.ApiKeys.GetKeyString:output_type -> pivox.api.v1.GetKeyStringResponse
-	0,  // 28: pivox.api.v1.ApiKeys.UpdateKey:output_type -> pivox.api.v1.Key
-	0,  // 29: pivox.api.v1.ApiKeys.DeleteKey:output_type -> pivox.api.v1.Key
-	0,  // 30: pivox.api.v1.ApiKeys.UndeleteKey:output_type -> pivox.api.v1.Key
-	18, // 31: pivox.api.v1.ApiKeys.LookupKey:output_type -> pivox.api.v1.LookupKeyResponse
-	24, // [24:32] is the sub-list for method output_type
-	16, // [16:24] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	20, // 0: pivox.api.v1.Key.created_by:type_name -> pivox.types.Actor
+	21, // 1: pivox.api.v1.Key.create_time:type_name -> google.protobuf.Timestamp
+	20, // 2: pivox.api.v1.Key.updated_by:type_name -> pivox.types.Actor
+	21, // 3: pivox.api.v1.Key.update_time:type_name -> google.protobuf.Timestamp
+	20, // 4: pivox.api.v1.Key.deleted_by:type_name -> pivox.types.Actor
+	21, // 5: pivox.api.v1.Key.delete_time:type_name -> google.protobuf.Timestamp
+	21, // 6: pivox.api.v1.Key.purge_time:type_name -> google.protobuf.Timestamp
+	19, // 7: pivox.api.v1.Key.annotations:type_name -> pivox.api.v1.Key.AnnotationsEntry
+	1,  // 8: pivox.api.v1.Key.restrictions:type_name -> pivox.api.v1.Restrictions
+	2,  // 9: pivox.api.v1.Restrictions.browser_key_restrictions:type_name -> pivox.api.v1.BrowserKeyRestrictions
+	3,  // 10: pivox.api.v1.Restrictions.server_key_restrictions:type_name -> pivox.api.v1.ServerKeyRestrictions
+	4,  // 11: pivox.api.v1.Restrictions.android_key_restrictions:type_name -> pivox.api.v1.AndroidKeyRestrictions
+	6,  // 12: pivox.api.v1.Restrictions.ios_key_restrictions:type_name -> pivox.api.v1.IosKeyRestrictions
+	7,  // 13: pivox.api.v1.Restrictions.api_targets:type_name -> pivox.api.v1.ApiTarget
+	5,  // 14: pivox.api.v1.AndroidKeyRestrictions.allowed_applications:type_name -> pivox.api.v1.AndroidApplication
+	0,  // 15: pivox.api.v1.CreateKeyRequest.key:type_name -> pivox.api.v1.Key
+	0,  // 16: pivox.api.v1.ListKeysResponse.keys:type_name -> pivox.api.v1.Key
+	0,  // 17: pivox.api.v1.UpdateKeyRequest.key:type_name -> pivox.api.v1.Key
+	22, // 18: pivox.api.v1.UpdateKeyRequest.update_mask:type_name -> google.protobuf.FieldMask
+	8,  // 19: pivox.api.v1.ApiKeys.CreateKey:input_type -> pivox.api.v1.CreateKeyRequest
+	9,  // 20: pivox.api.v1.ApiKeys.ListKeys:input_type -> pivox.api.v1.ListKeysRequest
+	11, // 21: pivox.api.v1.ApiKeys.GetKey:input_type -> pivox.api.v1.GetKeyRequest
+	12, // 22: pivox.api.v1.ApiKeys.GetKeyString:input_type -> pivox.api.v1.GetKeyStringRequest
+	14, // 23: pivox.api.v1.ApiKeys.UpdateKey:input_type -> pivox.api.v1.UpdateKeyRequest
+	15, // 24: pivox.api.v1.ApiKeys.DeleteKey:input_type -> pivox.api.v1.DeleteKeyRequest
+	16, // 25: pivox.api.v1.ApiKeys.UndeleteKey:input_type -> pivox.api.v1.UndeleteKeyRequest
+	17, // 26: pivox.api.v1.ApiKeys.LookupKey:input_type -> pivox.api.v1.LookupKeyRequest
+	0,  // 27: pivox.api.v1.ApiKeys.CreateKey:output_type -> pivox.api.v1.Key
+	10, // 28: pivox.api.v1.ApiKeys.ListKeys:output_type -> pivox.api.v1.ListKeysResponse
+	0,  // 29: pivox.api.v1.ApiKeys.GetKey:output_type -> pivox.api.v1.Key
+	13, // 30: pivox.api.v1.ApiKeys.GetKeyString:output_type -> pivox.api.v1.GetKeyStringResponse
+	0,  // 31: pivox.api.v1.ApiKeys.UpdateKey:output_type -> pivox.api.v1.Key
+	0,  // 32: pivox.api.v1.ApiKeys.DeleteKey:output_type -> pivox.api.v1.Key
+	0,  // 33: pivox.api.v1.ApiKeys.UndeleteKey:output_type -> pivox.api.v1.Key
+	18, // 34: pivox.api.v1.ApiKeys.LookupKey:output_type -> pivox.api.v1.LookupKeyResponse
+	27, // [27:35] is the sub-list for method output_type
+	19, // [19:27] is the sub-list for method input_type
+	19, // [19:19] is the sub-list for extension type_name
+	19, // [19:19] is the sub-list for extension extendee
+	0,  // [0:19] is the sub-list for field type_name
 }
 
 func init() { file_pivox_api_v1_apikeys_proto_init() }

@@ -43,7 +43,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 /// caller (a verified domain routes to the org's enabled SsoConfig),
 /// but future features (email allowlist, custom invitation domains,
 /// branding) consume the same resource.
-public struct Pivox_Api_V1_Domain: Sendable {
+public struct Pivox_Api_V1_Domain: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -51,49 +51,81 @@ public struct Pivox_Api_V1_Domain: Sendable {
   /// Output only. The resource name of the Domain. Format:
   /// `organizations/{organization}/domains/{domain}`. The trailing
   /// segment is the domain name itself (lowercase canonical form).
-  public var name: String = String()
+  public var name: String {
+    get {_storage._name}
+    set {_uniqueStorage()._name = newValue}
+  }
 
   /// Required on Create. The fully qualified domain name. Stored
   /// lowercase; case-insensitive on read.
-  public var domain: String = String()
+  public var domain: String {
+    get {_storage._domain}
+    set {_uniqueStorage()._domain = newValue}
+  }
 
   /// Output only. Last known verification state.
-  public var state: Pivox_Api_V1_Domain.State = .unspecified
+  public var state: Pivox_Api_V1_Domain.State {
+    get {_storage._state}
+    set {_uniqueStorage()._state = newValue}
+  }
 
   /// Output only. Timestamp when the domain transitioned to
   /// `VERIFIED`, or unset if it has never verified successfully.
   public var verifiedTime: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {_verifiedTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
-    set {_verifiedTime = newValue}
+    get {_storage._verifiedTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._verifiedTime = newValue}
   }
   /// Returns true if `verifiedTime` has been explicitly set.
-  public var hasVerifiedTime: Bool {self._verifiedTime != nil}
+  public var hasVerifiedTime: Bool {_storage._verifiedTime != nil}
   /// Clears the value of `verifiedTime`. Subsequent reads from it will return its default value.
-  public mutating func clearVerifiedTime() {self._verifiedTime = nil}
+  public mutating func clearVerifiedTime() {_uniqueStorage()._verifiedTime = nil}
+
+  /// Output only. The identity that registered this domain.
+  public var createdBy: Pivox_Types_Actor {
+    get {_storage._createdBy ?? Pivox_Types_Actor()}
+    set {_uniqueStorage()._createdBy = newValue}
+  }
+  /// Returns true if `createdBy` has been explicitly set.
+  public var hasCreatedBy: Bool {_storage._createdBy != nil}
+  /// Clears the value of `createdBy`. Subsequent reads from it will return its default value.
+  public mutating func clearCreatedBy() {_uniqueStorage()._createdBy = nil}
 
   /// Output only. Timestamp when the Domain row was created.
   public var createTime: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {_createTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
-    set {_createTime = newValue}
+    get {_storage._createTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._createTime = newValue}
   }
   /// Returns true if `createTime` has been explicitly set.
-  public var hasCreateTime: Bool {self._createTime != nil}
+  public var hasCreateTime: Bool {_storage._createTime != nil}
   /// Clears the value of `createTime`. Subsequent reads from it will return its default value.
-  public mutating func clearCreateTime() {self._createTime = nil}
+  public mutating func clearCreateTime() {_uniqueStorage()._createTime = nil}
+
+  /// Output only. The identity that last modified this domain.
+  public var updatedBy: Pivox_Types_Actor {
+    get {_storage._updatedBy ?? Pivox_Types_Actor()}
+    set {_uniqueStorage()._updatedBy = newValue}
+  }
+  /// Returns true if `updatedBy` has been explicitly set.
+  public var hasUpdatedBy: Bool {_storage._updatedBy != nil}
+  /// Clears the value of `updatedBy`. Subsequent reads from it will return its default value.
+  public mutating func clearUpdatedBy() {_uniqueStorage()._updatedBy = nil}
 
   /// Output only. Timestamp when the Domain was last modified.
   public var updateTime: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {_updateTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
-    set {_updateTime = newValue}
+    get {_storage._updateTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._updateTime = newValue}
   }
   /// Returns true if `updateTime` has been explicitly set.
-  public var hasUpdateTime: Bool {self._updateTime != nil}
+  public var hasUpdateTime: Bool {_storage._updateTime != nil}
   /// Clears the value of `updateTime`. Subsequent reads from it will return its default value.
-  public mutating func clearUpdateTime() {self._updateTime = nil}
+  public mutating func clearUpdateTime() {_uniqueStorage()._updateTime = nil}
 
   /// Output only. A checksum computed by the server based on the
   /// current value of the Domain resource.
-  public var etag: String = String()
+  public var etag: String {
+    get {_storage._etag}
+    set {_uniqueStorage()._etag = newValue}
+  }
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -158,9 +190,7 @@ public struct Pivox_Api_V1_Domain: Sendable {
 
   public init() {}
 
-  fileprivate var _verifiedTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
-  fileprivate var _createTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
-  fileprivate var _updateTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 /// Request message for `Organizations.CreateDomain`.
@@ -389,63 +419,125 @@ fileprivate let _protobuf_package = "pivox.api.v1"
 
 extension Pivox_Api_V1_Domain: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".Domain"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}domain\0\u{1}state\0\u{3}verified_time\0\u{3}create_time\0\u{3}update_time\0\u{1}etag\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}domain\0\u{1}state\0\u{3}verified_time\0\u{3}created_by\0\u{3}create_time\0\u{3}updated_by\0\u{3}update_time\0\u{1}etag\0")
+
+  fileprivate class _StorageClass {
+    var _name: String = String()
+    var _domain: String = String()
+    var _state: Pivox_Api_V1_Domain.State = .unspecified
+    var _verifiedTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _createdBy: Pivox_Types_Actor? = nil
+    var _createTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _updatedBy: Pivox_Types_Actor? = nil
+    var _updateTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _etag: String = String()
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _name = source._name
+      _domain = source._domain
+      _state = source._state
+      _verifiedTime = source._verifiedTime
+      _createdBy = source._createdBy
+      _createTime = source._createTime
+      _updatedBy = source._updatedBy
+      _updateTime = source._updateTime
+      _etag = source._etag
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.name) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.domain) }()
-      case 3: try { try decoder.decodeSingularEnumField(value: &self.state) }()
-      case 4: try { try decoder.decodeSingularMessageField(value: &self._verifiedTime) }()
-      case 5: try { try decoder.decodeSingularMessageField(value: &self._createTime) }()
-      case 6: try { try decoder.decodeSingularMessageField(value: &self._updateTime) }()
-      case 7: try { try decoder.decodeSingularStringField(value: &self.etag) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._name) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._domain) }()
+        case 3: try { try decoder.decodeSingularEnumField(value: &_storage._state) }()
+        case 4: try { try decoder.decodeSingularMessageField(value: &_storage._verifiedTime) }()
+        case 5: try { try decoder.decodeSingularMessageField(value: &_storage._createdBy) }()
+        case 6: try { try decoder.decodeSingularMessageField(value: &_storage._createTime) }()
+        case 7: try { try decoder.decodeSingularMessageField(value: &_storage._updatedBy) }()
+        case 8: try { try decoder.decodeSingularMessageField(value: &_storage._updateTime) }()
+        case 9: try { try decoder.decodeSingularStringField(value: &_storage._etag) }()
+        default: break
+        }
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.name.isEmpty {
-      try visitor.visitSingularStringField(value: self.name, fieldNumber: 1)
-    }
-    if !self.domain.isEmpty {
-      try visitor.visitSingularStringField(value: self.domain, fieldNumber: 2)
-    }
-    if self.state != .unspecified {
-      try visitor.visitSingularEnumField(value: self.state, fieldNumber: 3)
-    }
-    try { if let v = self._verifiedTime {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
-    } }()
-    try { if let v = self._createTime {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
-    } }()
-    try { if let v = self._updateTime {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
-    } }()
-    if !self.etag.isEmpty {
-      try visitor.visitSingularStringField(value: self.etag, fieldNumber: 7)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if !_storage._name.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._name, fieldNumber: 1)
+      }
+      if !_storage._domain.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._domain, fieldNumber: 2)
+      }
+      if _storage._state != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._state, fieldNumber: 3)
+      }
+      try { if let v = _storage._verifiedTime {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+      } }()
+      try { if let v = _storage._createdBy {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+      } }()
+      try { if let v = _storage._createTime {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+      } }()
+      try { if let v = _storage._updatedBy {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
+      } }()
+      try { if let v = _storage._updateTime {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+      } }()
+      if !_storage._etag.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._etag, fieldNumber: 9)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Pivox_Api_V1_Domain, rhs: Pivox_Api_V1_Domain) -> Bool {
-    if lhs.name != rhs.name {return false}
-    if lhs.domain != rhs.domain {return false}
-    if lhs.state != rhs.state {return false}
-    if lhs._verifiedTime != rhs._verifiedTime {return false}
-    if lhs._createTime != rhs._createTime {return false}
-    if lhs._updateTime != rhs._updateTime {return false}
-    if lhs.etag != rhs.etag {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._name != rhs_storage._name {return false}
+        if _storage._domain != rhs_storage._domain {return false}
+        if _storage._state != rhs_storage._state {return false}
+        if _storage._verifiedTime != rhs_storage._verifiedTime {return false}
+        if _storage._createdBy != rhs_storage._createdBy {return false}
+        if _storage._createTime != rhs_storage._createTime {return false}
+        if _storage._updatedBy != rhs_storage._updatedBy {return false}
+        if _storage._updateTime != rhs_storage._updateTime {return false}
+        if _storage._etag != rhs_storage._etag {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

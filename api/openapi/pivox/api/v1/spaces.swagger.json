@@ -616,10 +616,20 @@
                   "type": "string",
                   "description": "Required. Reference to the role this principal holds at this scope.\nFormat: `organizations/{organization}/roles/{role}`. v1 accepts only\nsystem roles (`owner`, `admin`, `editor`, `viewer`)."
                 },
+                "createdBy": {
+                  "$ref": "#/definitions/typesActor",
+                  "description": "Output only. The identity that created this membership.",
+                  "readOnly": true
+                },
                 "createTime": {
                   "type": "string",
                   "format": "date-time",
                   "description": "Output only. Timestamp when this binding was created.",
+                  "readOnly": true
+                },
+                "updatedBy": {
+                  "$ref": "#/definitions/typesActor",
+                  "description": "Output only. The identity that last modified this membership.",
                   "readOnly": true
                 },
                 "updateTime": {
@@ -895,10 +905,20 @@
           "type": "string",
           "description": "Required. Reference to the role this principal holds at this scope.\nFormat: `organizations/{organization}/roles/{role}`. v1 accepts only\nsystem roles (`owner`, `admin`, `editor`, `viewer`)."
         },
+        "createdBy": {
+          "$ref": "#/definitions/typesActor",
+          "description": "Output only. The identity that created this membership.",
+          "readOnly": true
+        },
         "createTime": {
           "type": "string",
           "format": "date-time",
           "description": "Output only. Timestamp when this binding was created.",
+          "readOnly": true
+        },
+        "updatedBy": {
+          "$ref": "#/definitions/typesActor",
+          "description": "Output only. The identity that last modified this membership.",
           "readOnly": true
         },
         "updateTime": {

@@ -22,6 +22,7 @@ package iamv1
 
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
+	types "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -77,14 +78,18 @@ type Member struct {
 	// Format: `organizations/{organization}/roles/{role}`. v1 accepts only
 	// system roles (`owner`, `admin`, `editor`, `viewer`).
 	Role string `protobuf:"bytes,4,opt,name=role,proto3" json:"role,omitempty"`
+	// Output only. The identity that created this membership.
+	CreatedBy *types.Actor `protobuf:"bytes,5,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
 	// Output only. Timestamp when this binding was created.
-	CreateTime *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	CreateTime *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	// Output only. The identity that last modified this membership.
+	UpdatedBy *types.Actor `protobuf:"bytes,7,opt,name=updated_by,json=updatedBy,proto3" json:"updated_by,omitempty"`
 	// Output only. Timestamp when this binding was last modified.
-	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
 	// Output only. A checksum computed by the server based on the current
 	// value of the Member resource. Sent on update and delete requests for
 	// optimistic concurrency control.
-	Etag          string `protobuf:"bytes,7,opt,name=etag,proto3" json:"etag,omitempty"`
+	Etag          string `protobuf:"bytes,9,opt,name=etag,proto3" json:"etag,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -158,9 +163,23 @@ func (x *Member) GetRole() string {
 	return ""
 }
 
+func (x *Member) GetCreatedBy() *types.Actor {
+	if x != nil {
+		return x.CreatedBy
+	}
+	return nil
+}
+
 func (x *Member) GetCreateTime() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreateTime
+	}
+	return nil
+}
+
+func (x *Member) GetUpdatedBy() *types.Actor {
+	if x != nil {
+		return x.UpdatedBy
 	}
 	return nil
 }
@@ -582,7 +601,7 @@ var File_pivox_iam_v1_members_proto protoreflect.FileDescriptor
 
 const file_pivox_iam_v1_members_proto_rawDesc = "" +
 	"\n" +
-	"\x1apivox/iam/v1/members.proto\x12\fpivox.iam.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xed\x03\n" +
+	"\x1apivox/iam/v1/members.proto\x12\fpivox.iam.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17pivox/types/actor.proto\"\xdd\x04\n" +
 	"\x06Member\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12)\n" +
 	"\x04user\x18\x02 \x01(\tB\x13\xfaA\x10\n" +
@@ -590,12 +609,16 @@ const file_pivox_iam_v1_members_proto_rawDesc = "" +
 	"\x05group\x18\x03 \x01(\tB\x14\xfaA\x11\n" +
 	"\x0fpivox.iam/GroupH\x00R\x05group\x120\n" +
 	"\x04role\x18\x04 \x01(\tB\x1c\xe0A\x02\xfaA\x10\n" +
-	"\x0epivox.iam/Role\xbaH\x03\xc8\x01\x01R\x04role\x12@\n" +
-	"\vcreate_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"createTime\x12@\n" +
-	"\vupdate_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"\x0epivox.iam/Role\xbaH\x03\xc8\x01\x01R\x04role\x126\n" +
+	"\n" +
+	"created_by\x18\x05 \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tcreatedBy\x12@\n" +
+	"\vcreate_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"createTime\x126\n" +
+	"\n" +
+	"updated_by\x18\a \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tupdatedBy\x12@\n" +
+	"\vupdate_time\x18\b \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"updateTime\x12\x17\n" +
-	"\x04etag\x18\a \x01(\tB\x03\xe0A\x03R\x04etag:\x94\x01\xeaA\x90\x01\n" +
+	"\x04etag\x18\t \x01(\tB\x03\xe0A\x03R\x04etag:\x94\x01\xeaA\x90\x01\n" +
 	"\x10pivox.iam/Member\x12-organizations/{organization}/members/{member}\x12<organizations/{organization}/spaces/{space}/members/{member}*\amembers2\x06memberB\v\n" +
 	"\tprincipal\"F\n" +
 	"\x10GetMemberRequest\x122\n" +
@@ -646,21 +669,24 @@ var file_pivox_iam_v1_members_proto_goTypes = []any{
 	(*CreateMemberRequest)(nil),   // 4: pivox.iam.v1.CreateMemberRequest
 	(*UpdateMemberRequest)(nil),   // 5: pivox.iam.v1.UpdateMemberRequest
 	(*DeleteMemberRequest)(nil),   // 6: pivox.iam.v1.DeleteMemberRequest
-	(*timestamppb.Timestamp)(nil), // 7: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil), // 8: google.protobuf.FieldMask
+	(*types.Actor)(nil),           // 7: pivox.types.Actor
+	(*timestamppb.Timestamp)(nil), // 8: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil), // 9: google.protobuf.FieldMask
 }
 var file_pivox_iam_v1_members_proto_depIdxs = []int32{
-	7, // 0: pivox.iam.v1.Member.create_time:type_name -> google.protobuf.Timestamp
-	7, // 1: pivox.iam.v1.Member.update_time:type_name -> google.protobuf.Timestamp
-	0, // 2: pivox.iam.v1.ListMembersResponse.members:type_name -> pivox.iam.v1.Member
-	0, // 3: pivox.iam.v1.CreateMemberRequest.member:type_name -> pivox.iam.v1.Member
-	0, // 4: pivox.iam.v1.UpdateMemberRequest.member:type_name -> pivox.iam.v1.Member
-	8, // 5: pivox.iam.v1.UpdateMemberRequest.update_mask:type_name -> google.protobuf.FieldMask
-	6, // [6:6] is the sub-list for method output_type
-	6, // [6:6] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	7, // 0: pivox.iam.v1.Member.created_by:type_name -> pivox.types.Actor
+	8, // 1: pivox.iam.v1.Member.create_time:type_name -> google.protobuf.Timestamp
+	7, // 2: pivox.iam.v1.Member.updated_by:type_name -> pivox.types.Actor
+	8, // 3: pivox.iam.v1.Member.update_time:type_name -> google.protobuf.Timestamp
+	0, // 4: pivox.iam.v1.ListMembersResponse.members:type_name -> pivox.iam.v1.Member
+	0, // 5: pivox.iam.v1.CreateMemberRequest.member:type_name -> pivox.iam.v1.Member
+	0, // 6: pivox.iam.v1.UpdateMemberRequest.member:type_name -> pivox.iam.v1.Member
+	9, // 7: pivox.iam.v1.UpdateMemberRequest.update_mask:type_name -> google.protobuf.FieldMask
+	8, // [8:8] is the sub-list for method output_type
+	8, // [8:8] is the sub-list for method input_type
+	8, // [8:8] is the sub-list for extension type_name
+	8, // [8:8] is the sub-list for extension extendee
+	0, // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_pivox_iam_v1_members_proto_init() }
