@@ -277,7 +277,7 @@ class AuthService: NSObject {
         }
       }
       session.presentationContextProvider = self
-      session.prefersEphemeralWebBrowserSession = true
+      session.prefersEphemeralWebBrowserSession = false
       self.activeAuthSession = session
       session.start()
     }
@@ -409,7 +409,7 @@ class AuthService: NSObject {
         }
       }
       session.presentationContextProvider = self
-      session.prefersEphemeralWebBrowserSession = true
+      session.prefersEphemeralWebBrowserSession = false
       self.activeAuthSession = session
       session.start()
     }
@@ -628,7 +628,7 @@ class AuthService: NSObject {
         }
       }
       session.presentationContextProvider = self
-      session.prefersEphemeralWebBrowserSession = true
+      session.prefersEphemeralWebBrowserSession = false
       self.activeAuthSession = session
       session.start()
     }
