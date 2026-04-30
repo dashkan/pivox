@@ -123,7 +123,7 @@ func (s *OrganizationsServer) CreateDomain(ctx context.Context, req *apiv1.Creat
 		OrgID:             resolvedOrg.ID,
 		Domain:            domainStr,
 		VerificationToken: token,
-		CreatedBy:         caller.String(),
+		CreatedBy:         convert.PgUUID(caller),
 	})
 	if err != nil {
 		// Translate the global UNIQUE(domain) violation into

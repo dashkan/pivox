@@ -68,7 +68,7 @@ func TestContentHandler_InlineHappyPath(t *testing.T) {
 	user := fixedUserID
 	artID := uuid.New()
 	stub := &stubResolver{
-		conv: db.AiConversation{ID: uuid.New(), CreatorID: user, Name: "conv1"},
+		conv: db.AiConversation{ID: uuid.New(), CreatedBy: user, Name: "conv1"},
 		art:  db.AiArtifact{ID: artID, Name: "art1", CreateTime: time.Now(), UpdateTime: time.Now()},
 		row: db.GetArtifactVersionForContentRow{
 			ID:                uuid.New(),
@@ -104,7 +104,7 @@ func TestContentHandler_InlineHappyPath(t *testing.T) {
 func TestContentHandler_AssetBacked(t *testing.T) {
 	user := fixedUserID
 	stub := &stubResolver{
-		conv: db.AiConversation{ID: uuid.New(), CreatorID: user},
+		conv: db.AiConversation{ID: uuid.New(), CreatedBy: user},
 		art:  db.AiArtifact{ID: uuid.New(), CreateTime: time.Now(), UpdateTime: time.Now()},
 		row: db.GetArtifactVersionForContentRow{
 			ID:               uuid.New(),
@@ -152,7 +152,7 @@ func TestContentHandler_IfNoneMatch(t *testing.T) {
 	user := fixedUserID
 	artID := uuid.New()
 	stub := &stubResolver{
-		conv: db.AiConversation{ID: uuid.New(), CreatorID: user},
+		conv: db.AiConversation{ID: uuid.New(), CreatedBy: user},
 		art:  db.AiArtifact{ID: artID, CreateTime: time.Now(), UpdateTime: time.Now()},
 		row: db.GetArtifactVersionForContentRow{
 			ID:                uuid.New(),

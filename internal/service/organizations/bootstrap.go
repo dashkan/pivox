@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/permission"
 )
@@ -37,7 +38,7 @@ var systemRoles = []struct {
 // `founderID` is the founder's `firebase_identities.id` — the
 // universal user uuid post-Phase-7 unification (no per-org `users`
 // row exists or is needed; the membership IS the org_members row).
-func bootstrapOrgRoles(ctx context.Context, qtx db.Querier, orgID, founderID uuid.UUID, createdBy string) error {
+func bootstrapOrgRoles(ctx context.Context, qtx db.Querier, orgID, founderID uuid.UUID) error {
 	var ownerRoleID uuid.UUID
 	for _, r := range systemRoles {
 		id := uuid.New()
@@ -58,14 +59,16 @@ func bootstrapOrgRoles(ctx context.Context, qtx db.Querier, orgID, founderID uui
 
 	// Bind the founder to the just-created owner role. Using
 	// PrincipalKind=user (not group) because group bindings are
-	// added later via group-membership ops.
+	// added later via group-membership ops. The founder's UUID
+	// doubles as the audit `created_by` here — same person, same
+	// row creation event.
 	if _, err := qtx.CreateOrgMember(ctx, db.CreateOrgMemberParams{
 		ID:            uuid.New(),
 		OrgID:         orgID,
 		RoleID:        ownerRoleID,
 		PrincipalKind: db.PrincipalKindUser,
 		PrincipalID:   founderID,
-		CreatedBy:     createdBy,
+		CreatedBy:     convert.PgUUID(founderID),
 	}); err != nil {
 		return fmt.Errorf("bind founder to owner role: %w", err)
 	}

@@ -100,7 +100,7 @@ func ScanConversations(rows pgx.Rows) ([]db.AiConversation, error) {
 		if err := rows.Scan(
 			&c.ID,
 			&c.OrgID,
-			&c.CreatorID,
+			&c.CreatedBy,
 			&c.Name,
 			&c.Title,
 			&c.TitleUserSet,
@@ -164,7 +164,7 @@ func ScanOrganizations(rows pgx.Rows) ([]db.Organization, error) {
 			&o.Name,
 			&o.DisplayName,
 			&o.Annotations,
-			&o.CreatedByFirebaseIdentityID,
+			&o.CreatedBy,
 			&o.State,
 			&o.Etag,
 			&o.Revision,

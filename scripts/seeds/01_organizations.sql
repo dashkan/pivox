@@ -12,4 +12,4 @@ INSERT INTO organizations (id, name, display_name, create_time, update_time) VAL
     ('0192a000-0001-7000-8000-00000000000a', 'starlight-studios',      'Starlight Studios International','2025-09-30 14:30:00+00', '2026-02-20 17:00:00+00');
 
 -- One soft-deleted org for filter testing
-UPDATE organizations SET state = 'DELETE_REQUESTED', delete_time = '2026-02-01 10:00:00+00', deleted_by = 'admin@lakeshore.example' WHERE name = 'lakeshore-public';
+UPDATE organizations SET state = 'DELETE_REQUESTED', delete_time = '2026-02-01 10:00:00+00', deleted_by = NULL WHERE name = 'lakeshore-public';

@@ -16,6 +16,7 @@ import (
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/lro"
 	storagev1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"
+	"github.com/dashkan/pivox/internal/server"
 )
 
 type EndpointsServer struct {
@@ -147,7 +148,7 @@ func (s *EndpointsServer) CreateEndpoint(ctx context.Context, req *storagev1.Cre
 		CacheEviction:  cacheEviction,
 		CacheTtlHours:  cacheTtlHours,
 		Annotations:    annotationsJSON,
-		CreatedBy:      "",
+		CreatedBy:      convert.PgUUID(server.MustPivoxUserID(ctx)),
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Endpoint", "")
@@ -229,7 +230,7 @@ func (s *EndpointsServer) UpdateEndpoint(ctx context.Context, req *storagev1.Upd
 
 	updateParams := db.UpdateStorageEndpointParams{
 		ID:        existing.ID,
-		UpdatedBy: "",
+		UpdatedBy: pgtype.UUID{},
 	}
 
 	mask := req.GetUpdateMask()

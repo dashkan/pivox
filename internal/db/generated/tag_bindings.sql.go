@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createTagBinding = `-- name: CreateTagBinding :one
@@ -18,10 +19,10 @@ RETURNING id, parent_resource, tag_value_id, origin, annotations, etag, created_
 `
 
 type CreateTagBindingParams struct {
-	ID             uuid.UUID `json:"id"`
-	ParentResource string    `json:"parent_resource"`
-	TagValueID     uuid.UUID `json:"tag_value_id"`
-	CreatedBy      string    `json:"created_by"`
+	ID             uuid.UUID   `json:"id"`
+	ParentResource string      `json:"parent_resource"`
+	TagValueID     uuid.UUID   `json:"tag_value_id"`
+	CreatedBy      pgtype.UUID `json:"created_by"`
 }
 
 func (q *Queries) CreateTagBinding(ctx context.Context, arg CreateTagBindingParams) (TagBinding, error) {

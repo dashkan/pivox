@@ -15,6 +15,7 @@ import (
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/lro"
 	assetsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1"
+	"github.com/dashkan/pivox/internal/server"
 )
 
 type RequestsServer struct {
@@ -120,8 +121,8 @@ func (s *RequestsServer) ListRequests(ctx context.Context, req *assetsv1.ListReq
 	var rows []db.AssetRequest
 	rows, err = s.queries.ListRequestsBySpace(ctx, db.ListRequestsBySpaceParams{
 		SpaceID: spaceID,
-		Limit:     pageSize + 1,
-		Offset:    0,
+		Limit:   pageSize + 1,
+		Offset:  0,
 	})
 	_ = req.GetShowDeleted() // soft-delete removed; flag is a no-op
 	if err != nil {
@@ -169,9 +170,10 @@ func (s *RequestsServer) CreateRequest(ctx context.Context, req *assetsv1.Create
 		dueTime = pgtype.Timestamptz{Time: request.GetDueTime().AsTime(), Valid: true}
 	}
 
+	caller := convert.PgUUID(server.MustPivoxUserID(ctx))
 	result, err := s.queries.CreateRequest(ctx, db.CreateRequestParams{
 		ID:          uuid.New(),
-		SpaceID:   spaceID,
+		SpaceID:     spaceID,
 		Name:        requestName,
 		DisplayName: request.GetDisplayName(),
 		Description: request.GetDescription(),
@@ -179,7 +181,7 @@ func (s *RequestsServer) CreateRequest(ctx context.Context, req *assetsv1.Create
 		Priority:    priority,
 		Assignee:    request.GetAssignee(),
 		DueTime:     dueTime,
-		CreatedBy:   "",
+		CreatedBy:   caller,
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Request", "")
@@ -195,12 +197,12 @@ func (s *RequestsServer) CreateRequest(ctx context.Context, req *assetsv1.Create
 		// Create placeholder asset.
 		asset, err := s.queries.CreateAsset(ctx, db.CreateAssetParams{
 			ID:          uuid.New(),
-			SpaceID:   spaceID,
+			SpaceID:     spaceID,
 			Name:        assetName,
 			DisplayName: li.GetDisplayName(),
 			State:       db.AssetStatePLACEHOLDER,
 			Annotations: json.RawMessage("{}"),
-			CreatedBy:   "",
+			CreatedBy:   caller,
 		})
 		if err != nil {
 			return nil, apierr.HandleResourceError(err, "Asset", "")
@@ -230,7 +232,7 @@ func (s *RequestsServer) CreateRequest(ctx context.Context, req *assetsv1.Create
 			Description: li.GetDescription(),
 			MediaType:   mediaType,
 			Annotations: liAnnotations,
-			CreatedBy:   "",
+			CreatedBy:   caller,
 		})
 		if err != nil {
 			return nil, apierr.HandleResourceError(err, "LineItem", "")
@@ -258,7 +260,7 @@ func (s *RequestsServer) UpdateRequest(ctx context.Context, req *assetsv1.Update
 
 	updateParams := db.UpdateRequestParams{
 		ID:        existing.ID,
-		UpdatedBy: "",
+		UpdatedBy: convert.PgUUID(server.MustPivoxUserID(ctx)),
 	}
 
 	mask := req.GetUpdateMask()
@@ -351,7 +353,7 @@ func (s *RequestsServer) AssignRequest(ctx context.Context, req *assetsv1.Assign
 		ID:        existing.ID,
 		Assignee:  req.GetAssignee(),
 		State:     db.RequestStateINPROGRESS,
-		UpdatedBy: "",
+		UpdatedBy: pgtype.UUID{},
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Request", req.GetName())
@@ -381,12 +383,16 @@ func (s *RequestsServer) ClaimRequest(ctx context.Context, req *assetsv1.ClaimRe
 		return nil, apierr.FailedPrecondition(fmt.Sprintf("can only claim OPEN requests, got %s", existing.State))
 	}
 
-	// TODO: get caller identity from context
-	caller := ""
-
+	// TODO: pass the caller's pivox_user_id through to the
+	// `assignee` column once that column also moves to UUID FK
+	// (it's currently TEXT and stores the firebase_uid). For now,
+	// only the audit `updated_by` is populated with the caller's
+	// UUID; `assignee` is left empty until the broader UUID
+	// migration covers it.
+	caller := convert.PgUUID(server.MustPivoxUserID(ctx))
 	result, err := s.queries.UpdateRequestAssignee(ctx, db.UpdateRequestAssigneeParams{
 		ID:        existing.ID,
-		Assignee:  caller,
+		Assignee:  "",
 		State:     db.RequestStateINPROGRESS,
 		UpdatedBy: caller,
 	})
@@ -441,7 +447,7 @@ func (s *RequestsServer) CancelRequest(ctx context.Context, req *assetsv1.Cancel
 	result, err := s.queries.UpdateRequestState(ctx, db.UpdateRequestStateParams{
 		ID:        existing.ID,
 		State:     db.RequestStateCANCELLED,
-		UpdatedBy: "",
+		UpdatedBy: pgtype.UUID{},
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Request", req.GetName())
@@ -474,7 +480,7 @@ func (s *RequestsServer) transitionRequest(ctx context.Context, name string, fro
 	result, err := s.queries.UpdateRequestState(ctx, db.UpdateRequestStateParams{
 		ID:        existing.ID,
 		State:     toState,
-		UpdatedBy: "",
+		UpdatedBy: pgtype.UUID{},
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Request", name)

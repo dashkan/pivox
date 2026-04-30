@@ -87,7 +87,7 @@ func (s *OrganizationsServer) DeleteOrganization(ctx context.Context, req *apiv1
 	}
 
 	orgName := "organizations/" + resolved.Slug
-	deletedBy := caller.String()
+	deletedBy := convert.PgUUID(caller)
 	force := req.GetForce()
 
 	initialMeta := &apiv1.DeleteOrganizationMetadata{
@@ -118,7 +118,7 @@ func (s *OrganizationsServer) runDeleteOrganization(
 	ctx context.Context,
 	progress lro.Progress,
 	orgID uuid.UUID,
-	orgName, deletedBy string,
+	orgName string, deletedBy pgtype.UUID,
 	force bool,
 	expectedEtag string,
 ) (proto.Message, error) {

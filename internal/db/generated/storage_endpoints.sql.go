@@ -30,7 +30,7 @@ type CreateStorageEndpointParams struct {
 	CacheEviction  EvictionPolicy  `json:"cache_eviction"`
 	CacheTtlHours  int32           `json:"cache_ttl_hours"`
 	Annotations    json.RawMessage `json:"annotations"`
-	CreatedBy      string          `json:"created_by"`
+	CreatedBy      pgtype.UUID     `json:"created_by"`
 }
 
 func (q *Queries) CreateStorageEndpoint(ctx context.Context, arg CreateStorageEndpointParams) (StorageEndpoint, error) {
@@ -203,7 +203,7 @@ RETURNING id, gateway_id, name, display_name, configuration, cache_enabled, cach
 
 type UpdateStorageEndpointParams struct {
 	ID             uuid.UUID          `json:"id"`
-	UpdatedBy      string             `json:"updated_by"`
+	UpdatedBy      pgtype.UUID        `json:"updated_by"`
 	DisplayName    pgtype.Text        `json:"display_name"`
 	Configuration  []byte             `json:"configuration"`
 	CacheEnabled   pgtype.Bool        `json:"cache_enabled"`

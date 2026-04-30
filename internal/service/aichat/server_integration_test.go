@@ -305,7 +305,7 @@ func TestIntegration_StreamWrongOwner(t *testing.T) {
 		OrgID:     org.ID,
 		Name:      "conv-" + uuid.New().String()[:8],
 		Title:     "Other's Chat",
-		CreatedBy: "other-user",
+		CreatedBy: pgtype.UUID{},
 	})
 	require.NoError(t, err)
 

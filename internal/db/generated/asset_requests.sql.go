@@ -39,7 +39,7 @@ type CreateRequestParams struct {
 	Priority    RequestPriority    `json:"priority"`
 	Assignee    string             `json:"assignee"`
 	DueTime     pgtype.Timestamptz `json:"due_time"`
-	CreatedBy   string             `json:"created_by"`
+	CreatedBy   pgtype.UUID        `json:"created_by"`
 }
 
 func (q *Queries) CreateRequest(ctx context.Context, arg CreateRequestParams) (AssetRequest, error) {
@@ -222,7 +222,7 @@ RETURNING id, space_id, name, display_name, description, priority, assignee, ann
 
 type UpdateRequestParams struct {
 	ID          uuid.UUID           `json:"id"`
-	UpdatedBy   string              `json:"updated_by"`
+	UpdatedBy   pgtype.UUID         `json:"updated_by"`
 	DisplayName pgtype.Text         `json:"display_name"`
 	Description pgtype.Text         `json:"description"`
 	Priority    NullRequestPriority `json:"priority"`
@@ -277,8 +277,8 @@ RETURNING id, space_id, name, display_name, description, priority, assignee, ann
 `
 
 type UpdateRequestApprovedParams struct {
-	ID        uuid.UUID `json:"id"`
-	UpdatedBy string    `json:"updated_by"`
+	ID        uuid.UUID   `json:"id"`
+	UpdatedBy pgtype.UUID `json:"updated_by"`
 }
 
 func (q *Queries) UpdateRequestApproved(ctx context.Context, arg UpdateRequestApprovedParams) (AssetRequest, error) {
@@ -323,7 +323,7 @@ type UpdateRequestAssigneeParams struct {
 	ID        uuid.UUID    `json:"id"`
 	Assignee  string       `json:"assignee"`
 	State     RequestState `json:"state"`
-	UpdatedBy string       `json:"updated_by"`
+	UpdatedBy pgtype.UUID  `json:"updated_by"`
 }
 
 func (q *Queries) UpdateRequestAssignee(ctx context.Context, arg UpdateRequestAssigneeParams) (AssetRequest, error) {
@@ -370,8 +370,8 @@ RETURNING id, space_id, name, display_name, description, priority, assignee, ann
 `
 
 type UpdateRequestDeliveredParams struct {
-	ID        uuid.UUID `json:"id"`
-	UpdatedBy string    `json:"updated_by"`
+	ID        uuid.UUID   `json:"id"`
+	UpdatedBy pgtype.UUID `json:"updated_by"`
 }
 
 func (q *Queries) UpdateRequestDelivered(ctx context.Context, arg UpdateRequestDeliveredParams) (AssetRequest, error) {
@@ -414,7 +414,7 @@ RETURNING id, space_id, name, display_name, description, priority, assignee, ann
 type UpdateRequestStateParams struct {
 	ID        uuid.UUID    `json:"id"`
 	State     RequestState `json:"state"`
-	UpdatedBy string       `json:"updated_by"`
+	UpdatedBy pgtype.UUID  `json:"updated_by"`
 }
 
 func (q *Queries) UpdateRequestState(ctx context.Context, arg UpdateRequestStateParams) (AssetRequest, error) {

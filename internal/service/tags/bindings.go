@@ -5,6 +5,7 @@ import (
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/appkey"
@@ -120,7 +121,7 @@ func (s *TagBindingsServer) CreateTagBinding(ctx context.Context, req *apiv1.Cre
 		ID:             uuid.New(),
 		ParentResource: req.GetParent(),
 		TagValueID:     tagValue.ID,
-		CreatedBy:      "",
+		CreatedBy:      pgtype.UUID{},
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "TagBinding", "")

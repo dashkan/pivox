@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -71,8 +72,8 @@ func scanGetOrgMemberRow(row db.GetOrgMemberRow) *mockRow {
 		*dest[4].(*uuid.UUID) = row.PrincipalID
 		*dest[5].(*string) = row.Etag
 		*dest[6].(*int32) = row.Revision
-		*dest[7].(*string) = row.CreatedBy
-		*dest[8].(*string) = row.UpdatedBy
+		*dest[7].(*pgtype.UUID) = row.CreatedBy
+		*dest[8].(*pgtype.UUID) = row.UpdatedBy
 		*dest[9].(*time.Time) = row.CreateTime
 		*dest[10].(*time.Time) = row.UpdateTime
 		*dest[11].(*string) = row.RoleName
@@ -99,8 +100,8 @@ func scanRole(r db.Role) *mockRow {
 		*dest[7].(*db.ResourceState) = r.State
 		*dest[8].(*string) = r.Etag
 		*dest[9].(*int32) = r.Revision
-		*dest[10].(*string) = r.CreatedBy
-		*dest[11].(*string) = r.UpdatedBy
+		*dest[10].(*pgtype.UUID) = r.CreatedBy
+		*dest[11].(*pgtype.UUID) = r.UpdatedBy
 		*dest[12].(*time.Time) = r.CreateTime
 		*dest[13].(*time.Time) = r.UpdateTime
 		return nil

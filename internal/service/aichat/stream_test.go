@@ -101,12 +101,16 @@ func testOrg() db.Organization {
 	}
 }
 
+// `uid` retained on the signature for backward compat with existing
+// callers — only the test fixture uses fixedUserID for both creator
+// and authorization. Unused on the row now that audit + ownership
+// merged into a single column.
 func testConversation(orgID uuid.UUID, uid string) db.AiConversation {
+	_ = uid
 	return db.AiConversation{
 		ID:         uuid.New(),
 		OrgID:      orgID,
-		CreatorID:  fixedUserID,
-		CreatedBy:  uid,
+		CreatedBy:  fixedUserID,
 		Name:       "conv1",
 		CreateTime: time.Now(),
 		UpdateTime: time.Now(),
@@ -289,7 +293,7 @@ func TestStreamGenerateContent_WrongOwner(t *testing.T) {
 	// caller. resolveConversation must surface NotFound (path-vs-row
 	// creator_id mismatch) rather than leak ownership.
 	conv := testConversation(org.ID, "other-user")
-	conv.CreatorID = uuid.MustParse("0192a000-0099-7000-8000-000000000099")
+	conv.CreatedBy = uuid.MustParse("0192a000-0099-7000-8000-000000000099")
 	ctx := authenticatedCtx("user1")
 
 	q.On("GetOrganizationByName", mock.Anything, "acme").Return(org, nil)

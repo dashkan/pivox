@@ -8,7 +8,6 @@ import (
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/dashkan/pivox/internal/apierr"
@@ -169,11 +168,10 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 	qtx := db.New(tx)
 
 	org, err := qtx.CreateOrganization(ctx, db.CreateOrganizationParams{
-		ID:                          uuid.New(),
-		Name:                        orgSlug,
-		DisplayName:                 req.GetOrganization().GetDisplayName(),
-		CreatedByFirebaseIdentityID: pgtype.UUID{Bytes: caller.ID, Valid: true},
-		CreatedBy:                   caller.ID.String(),
+		ID:          uuid.New(),
+		Name:        orgSlug,
+		DisplayName: req.GetOrganization().GetDisplayName(),
+		CreatedBy:   convert.PgUUID(caller.ID),
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Organization", orgSlug)
@@ -185,7 +183,7 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 	// a failure here rolls the whole bootstrap back, so no half-formed
 	// org ever exists. "≥1 owner per org" is established by definition
 	// for new orgs from this point forward.
-	if err := bootstrapOrgRoles(ctx, qtx, org.ID, caller.ID, caller.ID.String()); err != nil {
+	if err := bootstrapOrgRoles(ctx, qtx, org.ID, caller.ID); err != nil {
 		slog.ErrorContext(ctx, "bootstrap org roles failed", "org_id", org.ID, "error", err)
 		return nil, apierr.Internal("bootstrap org roles")
 	}

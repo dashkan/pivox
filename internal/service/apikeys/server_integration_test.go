@@ -25,7 +25,7 @@ func createTestOrg(t *testing.T, queries *db.Queries, name string) db.Organizati
 		ID:          uuid.New(),
 		Name:        name,
 		DisplayName: "Test Org " + name,
-		CreatedBy:   "test",
+		CreatedBy:   pgtype.UUID{},
 	})
 	require.NoError(t, err)
 	return org

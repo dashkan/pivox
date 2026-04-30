@@ -195,7 +195,7 @@ func (s *AssetsServer) CreateAsset(ctx context.Context, req *assetsv1.CreateAsse
 		Filename:    req.GetFilename(),
 		State:       state,
 		Annotations: annotationsJSON,
-		CreatedBy:   "",
+		CreatedBy:   pgtype.UUID{},
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Asset", "")
@@ -234,7 +234,7 @@ func (s *AssetsServer) UpdateAsset(ctx context.Context, req *assetsv1.UpdateAsse
 
 	updateParams := db.UpdateAssetParams{
 		ID:        existing.ID,
-		UpdatedBy: "",
+		UpdatedBy: pgtype.UUID{},
 	}
 
 	mask := req.GetUpdateMask()
@@ -282,7 +282,7 @@ func (s *AssetsServer) DeleteAsset(ctx context.Context, req *assetsv1.DeleteAsse
 
 	err = s.queries.SoftDeleteAsset(ctx, db.SoftDeleteAssetParams{
 		ID:        existing.ID,
-		DeletedBy: "",
+		DeletedBy: pgtype.UUID{},
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Asset", req.GetName())

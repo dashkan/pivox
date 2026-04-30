@@ -76,7 +76,7 @@ func (s *ApiKeysServer) CreateKey(ctx context.Context, req *apiv1.CreateKeyReque
 		KeyString:    keyString,
 		Annotations:  annotationsJSON,
 		Restrictions: restrictionsBytes,
-		CreatedBy:    "",
+		CreatedBy:    pgtype.UUID{},
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Key", "")
@@ -192,7 +192,7 @@ func (s *ApiKeysServer) UpdateKey(ctx context.Context, req *apiv1.UpdateKeyReque
 
 	updateParams := db.UpdateApiKeyParams{
 		ID:        existing.ID,
-		UpdatedBy: "",
+		UpdatedBy: pgtype.UUID{},
 	}
 
 	mask := req.GetUpdateMask()
@@ -250,7 +250,7 @@ func (s *ApiKeysServer) DeleteKey(ctx context.Context, req *apiv1.DeleteKeyReque
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Key", req.GetName())
 	}
-	result, err := s.queries.SoftDeleteApiKey(ctx, db.SoftDeleteApiKeyParams{ID: existing.ID, DeletedBy: ""})
+	result, err := s.queries.SoftDeleteApiKey(ctx, db.SoftDeleteApiKeyParams{ID: existing.ID, DeletedBy: pgtype.UUID{}})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Key", req.GetName())
 	}
@@ -271,7 +271,7 @@ func (s *ApiKeysServer) UndeleteKey(ctx context.Context, req *apiv1.UndeleteKeyR
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Key", req.GetName())
 	}
-	result, err := s.queries.UndeleteApiKey(ctx, db.UndeleteApiKeyParams{ID: existing.ID, UpdatedBy: ""})
+	result, err := s.queries.UndeleteApiKey(ctx, db.UndeleteApiKeyParams{ID: existing.ID, UpdatedBy: pgtype.UUID{}})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Key", req.GetName())
 	}

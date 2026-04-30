@@ -48,7 +48,7 @@ func peerConversation(orgID uuid.UUID, name string) db.AiConversation {
 	return db.AiConversation{
 		ID:         uuid.New(),
 		OrgID:      orgID,
-		CreatorID:  peerUserID,
+		CreatedBy:  peerUserID,
 		Name:       name,
 		CreateTime: time.Now(),
 		UpdateTime: time.Now(),
@@ -65,7 +65,7 @@ func TestGetConversation_PathRowMismatch(t *testing.T) {
 	org := testOrg()
 	// Path claims peerUserID owns conv1 but the row says someone else.
 	row := peerConversation(org.ID, "conv1")
-	row.CreatorID = uuid.MustParse("0192a000-1111-7000-8000-000000001111")
+	row.CreatedBy = uuid.MustParse("0192a000-1111-7000-8000-000000001111")
 
 	q.On("GetOrganizationByName", mock.Anything, "acme").Return(org, nil)
 	q.On("GetConversationByName", mock.Anything, mock.Anything).Return(row, nil)

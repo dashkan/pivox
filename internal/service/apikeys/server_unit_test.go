@@ -157,7 +157,7 @@ func TestUnit_DeleteKey_Success(t *testing.T) {
 	}).Return(testDBKey, nil)
 	mockQ.On("SoftDeleteApiKey", mock.Anything, db.SoftDeleteApiKeyParams{
 		ID:        testKeyID,
-		DeletedBy: "",
+		DeletedBy: pgtype.UUID{},
 	}).Return(deletedKey, nil)
 
 	resp, err := srv.DeleteKey(ctx, &apiv1.DeleteKeyRequest{
@@ -185,7 +185,7 @@ func TestUnit_UndeleteKey_Success(t *testing.T) {
 	}).Return(testDBKey, nil)
 	mockQ.On("UndeleteApiKey", mock.Anything, db.UndeleteApiKeyParams{
 		ID:        testKeyID,
-		UpdatedBy: "",
+		UpdatedBy: pgtype.UUID{},
 	}).Return(undeletedKey, nil)
 
 	resp, err := srv.UndeleteKey(ctx, &apiv1.UndeleteKeyRequest{
@@ -547,7 +547,7 @@ func TestUnit_DeleteKey_ErrorPaths(t *testing.T) {
 				}).Return(testDBKey, nil)
 				mockQ.On("SoftDeleteApiKey", mock.Anything, db.SoftDeleteApiKeyParams{
 					ID:        testKeyID,
-					DeletedBy: "",
+					DeletedBy: pgtype.UUID{},
 				}).Return(db.ApiKey{}, pgx.ErrNoRows)
 			},
 			req:      &apiv1.DeleteKeyRequest{Name: "organizations/acme/keys/my-key"},
@@ -617,7 +617,7 @@ func TestUnit_UndeleteKey_ErrorPaths(t *testing.T) {
 				}).Return(testDBKey, nil)
 				mockQ.On("UndeleteApiKey", mock.Anything, db.UndeleteApiKeyParams{
 					ID:        testKeyID,
-					UpdatedBy: "",
+					UpdatedBy: pgtype.UUID{},
 				}).Return(db.ApiKey{}, pgx.ErrNoRows)
 			},
 			req:      &apiv1.UndeleteKeyRequest{Name: "organizations/acme/keys/my-key"},

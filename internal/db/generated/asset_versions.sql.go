@@ -72,15 +72,15 @@ RETURNING id, asset_id, version_number, checksum_sha256, size_bytes, mime_type, 
 `
 
 type CreateAssetVersionParams struct {
-	ID             uuid.UUID `json:"id"`
-	AssetID        uuid.UUID `json:"asset_id"`
-	VersionNumber  int32     `json:"version_number"`
-	ChecksumSha256 string    `json:"checksum_sha256"`
-	SizeBytes      int64     `json:"size_bytes"`
-	MimeType       string    `json:"mime_type"`
-	StorageKey     string    `json:"storage_key"`
-	ChangeNote     string    `json:"change_note"`
-	CreatedBy      string    `json:"created_by"`
+	ID             uuid.UUID   `json:"id"`
+	AssetID        uuid.UUID   `json:"asset_id"`
+	VersionNumber  int32       `json:"version_number"`
+	ChecksumSha256 string      `json:"checksum_sha256"`
+	SizeBytes      int64       `json:"size_bytes"`
+	MimeType       string      `json:"mime_type"`
+	StorageKey     string      `json:"storage_key"`
+	ChangeNote     string      `json:"change_note"`
+	CreatedBy      pgtype.UUID `json:"created_by"`
 }
 
 func (q *Queries) CreateAssetVersion(ctx context.Context, arg CreateAssetVersionParams) (AssetVersion, error) {

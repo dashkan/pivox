@@ -81,7 +81,7 @@ type CreateOperationParams struct {
 	ID        uuid.UUID   `json:"id"`
 	Prefix    string      `json:"prefix"`
 	Metadata  []byte      `json:"metadata"`
-	CreatedBy string      `json:"created_by"`
+	CreatedBy pgtype.UUID `json:"created_by"`
 	OrgID     pgtype.UUID `json:"org_id"`
 }
 

@@ -85,10 +85,10 @@ RETURNING id, org_id, domain, verification_token, state, etag, revision, created
 `
 
 type CreateDomainParams struct {
-	OrgID             uuid.UUID `json:"org_id"`
-	Domain            string    `json:"domain"`
-	VerificationToken string    `json:"verification_token"`
-	CreatedBy         string    `json:"created_by"`
+	OrgID             uuid.UUID   `json:"org_id"`
+	Domain            string      `json:"domain"`
+	VerificationToken string      `json:"verification_token"`
+	CreatedBy         pgtype.UUID `json:"created_by"`
 }
 
 // CreateDomain inserts a new PENDING domain. UNIQUE(domain) is a

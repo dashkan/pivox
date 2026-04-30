@@ -25,7 +25,7 @@ func createTestOrg(t *testing.T, queries *db.Queries, name string) db.Organizati
 		ID:          uuid.New(),
 		Name:        name,
 		DisplayName: "Test Org " + name,
-		CreatedBy:   "test",
+		CreatedBy:   pgtype.UUID{},
 	})
 	require.NoError(t, err)
 	return org
@@ -39,7 +39,7 @@ func createTestSpace(t *testing.T, queries *db.Queries, orgID uuid.UUID, name st
 		Name:        name,
 		DisplayName: "Test Space " + name,
 		Labels:      json.RawMessage("{}"),
-		CreatedBy:   "test",
+		CreatedBy:   pgtype.UUID{},
 	})
 	require.NoError(t, err)
 	return space

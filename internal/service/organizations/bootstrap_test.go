@@ -26,7 +26,6 @@ func TestBootstrapOrgRoles_SeedsFourSystemRoles(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	orgID := uuid.MustParse("0192a000-bbbb-7000-8000-000000000001")
 	founderUserID := uuid.MustParse("0192a000-bbbb-7000-8000-000000000002")
-	createdBy := "founder@example.com"
 
 	// Capture every CreateRole call so we can assert names + flags.
 	createdRoles := map[string]db.CreateRoleParams{}
@@ -42,7 +41,7 @@ func TestBootstrapOrgRoles_SeedsFourSystemRoles(t *testing.T) {
 		return true
 	})).Return(db.CreateOrgMemberRow{}, nil).Once()
 
-	err := bootstrapOrgRoles(context.Background(), q, orgID, founderUserID, createdBy)
+	err := bootstrapOrgRoles(context.Background(), q, orgID, founderUserID)
 	require.NoError(t, err)
 
 	// Exactly the 4 system roles, all flagged is_system.
@@ -67,7 +66,9 @@ func TestBootstrapOrgRoles_SeedsFourSystemRoles(t *testing.T) {
 	assert.Equal(t, founderUserID, memberArg.PrincipalID)
 	assert.Equal(t, createdRoles[permission.RoleOwner].ID, memberArg.RoleID,
 		"founder must be bound to the just-created owner role for this org")
-	assert.Equal(t, createdBy, memberArg.CreatedBy)
+	// Audit `created_by` should be the founder UUID (PgUUID-wrapped).
+	require.True(t, memberArg.CreatedBy.Valid)
+	assert.Equal(t, founderUserID, uuid.UUID(memberArg.CreatedBy.Bytes))
 
 	q.AssertExpectations(t)
 }
@@ -80,7 +81,7 @@ func TestBootstrapOrgRoles_RoleInsertFailureBubblesUp(t *testing.T) {
 		Return(errors.New("constraint violation")).Once()
 
 	err := bootstrapOrgRoles(context.Background(), q,
-		uuid.New(), uuid.New(), "")
+		uuid.New(), uuid.New())
 	require.Error(t, err)
 
 	// CreateOrgMember was NOT called — fail-fast on the first error.
@@ -94,6 +95,6 @@ func TestBootstrapOrgRoles_OwnerBindingFailureBubblesUp(t *testing.T) {
 		Return(db.CreateOrgMemberRow{}, errors.New("fk violation")).Once()
 
 	err := bootstrapOrgRoles(context.Background(), q,
-		uuid.New(), uuid.New(), "")
+		uuid.New(), uuid.New())
 	require.Error(t, err)
 }

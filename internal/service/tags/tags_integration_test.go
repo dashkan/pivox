@@ -26,7 +26,7 @@ func createTagTestOrg(t *testing.T, queries *db.Queries, name string) db.Organiz
 		ID:          uuid.New(),
 		Name:        name,
 		DisplayName: "Test Org " + name,
-		CreatedBy:   "test",
+		CreatedBy:   pgtype.UUID{},
 	})
 	require.NoError(t, err)
 	return org

@@ -30,12 +30,12 @@ RETURNING id, tag_key_id, short_name, namespaced_name, description, annotations,
 `
 
 type CreateTagValueParams struct {
-	ID             uuid.UUID `json:"id"`
-	TagKeyID       uuid.UUID `json:"tag_key_id"`
-	ShortName      string    `json:"short_name"`
-	NamespacedName string    `json:"namespaced_name"`
-	Description    string    `json:"description"`
-	CreatedBy      string    `json:"created_by"`
+	ID             uuid.UUID   `json:"id"`
+	TagKeyID       uuid.UUID   `json:"tag_key_id"`
+	ShortName      string      `json:"short_name"`
+	NamespacedName string      `json:"namespaced_name"`
+	Description    string      `json:"description"`
+	CreatedBy      pgtype.UUID `json:"created_by"`
 }
 
 func (q *Queries) CreateTagValue(ctx context.Context, arg CreateTagValueParams) (TagValue, error) {
@@ -135,7 +135,7 @@ RETURNING id, tag_key_id, short_name, namespaced_name, description, annotations,
 
 type UpdateTagValueParams struct {
 	ID          uuid.UUID   `json:"id"`
-	UpdatedBy   string      `json:"updated_by"`
+	UpdatedBy   pgtype.UUID `json:"updated_by"`
 	Description pgtype.Text `json:"description"`
 }
 

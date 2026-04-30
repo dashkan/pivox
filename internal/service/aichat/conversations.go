@@ -118,15 +118,13 @@ func (s *Server) CreateConversation(ctx context.Context, req *aiv1.CreateConvers
 		return nil, apierr.PermissionDenied("conversations may only be created under the caller's own user-uuid")
 	}
 
-	uid := server.MustAuthenticatedUID(ctx)
 	conv := req.GetConversation()
 	row, err := s.queries.CreateConversation(ctx, db.CreateConversationParams{
 		OrgID:       orgID,
-		CreatorID:   callerUserID,
 		Name:        uuid.New().String()[:12],
 		Title:       conv.GetTitle(),
 		Description: conv.GetDescription(),
-		CreatedBy:   uid,
+		CreatedBy:   callerUserID,
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Conversation", "")
@@ -156,10 +154,9 @@ func (s *Server) UpdateConversation(ctx context.Context, req *aiv1.UpdateConvers
 			"update_mask is required and must list at least one field"))
 	}
 
-	uid := server.MustAuthenticatedUID(ctx)
 	params := db.UpdateConversationParams{
 		ID:        existing.ID,
-		UpdatedBy: uid,
+		UpdatedBy: convert.PgUUID(server.MustPivoxUserID(ctx)),
 	}
 	for _, path := range mask.GetPaths() {
 		switch path {
@@ -387,7 +384,7 @@ func (s *Server) resolveConversation(ctx context.Context, orgName string, pathUs
 	if err != nil {
 		return db.AiConversation{}, apierr.HandleResourceError(err, "Conversation", buildConversationName(orgName, pathUser, convName))
 	}
-	if conv.CreatorID != pathUser {
+	if conv.CreatedBy != pathUser {
 		// Path's user segment doesn't match the row's owner — surface
 		// as NotFound so a malformed path can't probe ownership.
 		return db.AiConversation{}, apierr.HandleResourceError(pgx.ErrNoRows, "Conversation", buildConversationName(orgName, pathUser, convName))

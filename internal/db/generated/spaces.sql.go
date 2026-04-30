@@ -25,7 +25,7 @@ type CreateSpaceParams struct {
 	Name        string          `json:"name"`
 	DisplayName string          `json:"display_name"`
 	Labels      json.RawMessage `json:"labels"`
-	CreatedBy   string          `json:"created_by"`
+	CreatedBy   pgtype.UUID     `json:"created_by"`
 }
 
 func (q *Queries) CreateSpace(ctx context.Context, arg CreateSpaceParams) (Space, error) {
@@ -286,8 +286,8 @@ RETURNING id, org_id, name, display_name, labels, state, etag, revision, created
 `
 
 type SoftDeleteSpaceParams struct {
-	ID        uuid.UUID `json:"id"`
-	DeletedBy string    `json:"deleted_by"`
+	ID        uuid.UUID   `json:"id"`
+	DeletedBy pgtype.UUID `json:"deleted_by"`
 }
 
 func (q *Queries) SoftDeleteSpace(ctx context.Context, arg SoftDeleteSpaceParams) (Space, error) {
@@ -318,7 +318,7 @@ UPDATE spaces
 SET state = 'ACTIVE',
     delete_time = NULL,
     purge_time = NULL,
-    deleted_by = '',
+    deleted_by = NULL,
     revision = revision + 1,
     updated_by = $2,
     update_time = now(),
@@ -328,8 +328,8 @@ RETURNING id, org_id, name, display_name, labels, state, etag, revision, created
 `
 
 type UndeleteSpaceParams struct {
-	ID        uuid.UUID `json:"id"`
-	UpdatedBy string    `json:"updated_by"`
+	ID        uuid.UUID   `json:"id"`
+	UpdatedBy pgtype.UUID `json:"updated_by"`
 }
 
 func (q *Queries) UndeleteSpace(ctx context.Context, arg UndeleteSpaceParams) (Space, error) {
@@ -369,7 +369,7 @@ RETURNING id, org_id, name, display_name, labels, state, etag, revision, created
 
 type UpdateSpaceParams struct {
 	ID          uuid.UUID   `json:"id"`
-	UpdatedBy   string      `json:"updated_by"`
+	UpdatedBy   pgtype.UUID `json:"updated_by"`
 	DisplayName pgtype.Text `json:"display_name"`
 	Labels      []byte      `json:"labels"`
 }

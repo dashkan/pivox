@@ -18,8 +18,8 @@ import (
 // path-vs-caller against.
 func ConversationToProto(row db.AiConversation, orgName string) *aiv1.Conversation {
 	pb := &aiv1.Conversation{
-		Name:         fmt.Sprintf("organizations/%s/users/%s/conversations/%s", orgName, row.CreatorID, row.Name),
-		Creator:      fmt.Sprintf("organizations/%s/users/%s", orgName, row.CreatorID),
+		Name:         fmt.Sprintf("organizations/%s/users/%s/conversations/%s", orgName, row.CreatedBy, row.Name),
+		Creator:      fmt.Sprintf("organizations/%s/users/%s", orgName, row.CreatedBy),
 		Title:        row.Title,
 		TitleUserSet: row.TitleUserSet,
 		Description:  row.Description,

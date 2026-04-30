@@ -26,6 +26,7 @@ import (
 	agentv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/agent/v1"
 	storagev1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"
 	"github.com/dashkan/pivox/internal/resource"
+	"github.com/dashkan/pivox/internal/server"
 )
 
 type StorageGatewaysServer struct {
@@ -87,7 +88,7 @@ func (s *StorageGatewaysServer) CreateStorageGateway(ctx context.Context, req *s
 		RegistrationToken: registrationToken,
 		Hostname:          hostname,
 		Annotations:       annotationsJSON,
-		CreatedBy:         "",
+		CreatedBy:         convert.PgUUID(server.MustPivoxUserID(ctx)),
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "StorageGateway", gwName)
@@ -144,7 +145,7 @@ func (s *StorageGatewaysServer) UpdateStorageGateway(ctx context.Context, req *s
 
 	updateParams := db.UpdateStorageGatewayParams{
 		ID:        existing.ID,
-		UpdatedBy: "",
+		UpdatedBy: convert.PgUUID(server.MustPivoxUserID(ctx)),
 	}
 
 	mask := req.GetUpdateMask()

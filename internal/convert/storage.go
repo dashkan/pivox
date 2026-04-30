@@ -24,8 +24,8 @@ func StorageGatewayToProto(gw db.StorageGateway, orgName string) *storagev1.Stor
 		CurrentVersion:    gw.CurrentVersion,
 		CertState:         certState(gw.CertState),
 		Etag:              gw.Etag,
-		Creator:           gw.CreatedBy,
-		Updater:           gw.UpdatedBy,
+		Creator:           UUIDString(gw.CreatedBy),
+		Updater:           UUIDString(gw.UpdatedBy),
 		CreateTime:        timestamppb.New(gw.CreateTime),
 		UpdateTime:        timestamppb.New(gw.UpdateTime),
 	}
@@ -78,8 +78,8 @@ func EndpointToProto(ep db.StorageEndpoint, gatewayName string) *storagev1.Endpo
 			TtlHours:       ep.CacheTtlHours,
 		},
 		Etag:       ep.Etag,
-		Creator:    ep.CreatedBy,
-		Updater:    ep.UpdatedBy,
+		Creator:    UUIDString(ep.CreatedBy),
+		Updater:    UUIDString(ep.UpdatedBy),
 		CreateTime: timestamppb.New(ep.CreateTime),
 		UpdateTime: timestamppb.New(ep.UpdateTime),
 	}

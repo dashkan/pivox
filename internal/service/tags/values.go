@@ -151,7 +151,7 @@ func (s *TagValuesServer) CreateTagValue(ctx context.Context, req *apiv1.CreateT
 		ShortName:      tagValueID,
 		NamespacedName: namespacedName,
 		Description:    tagValue.GetDescription(),
-		CreatedBy:      "",
+		CreatedBy:      pgtype.UUID{},
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "TagValue", "")
@@ -174,7 +174,7 @@ func (s *TagValuesServer) UpdateTagValue(ctx context.Context, req *apiv1.UpdateT
 
 	updateParams := db.UpdateTagValueParams{
 		ID:        existing.ID,
-		UpdatedBy: "",
+		UpdatedBy: pgtype.UUID{},
 	}
 
 	mask := req.GetUpdateMask()

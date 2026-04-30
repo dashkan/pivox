@@ -238,7 +238,7 @@ func (s *OrganizationsServer) CreateMember(ctx context.Context, req *iampb.Creat
 		RoleID:        role.ID,
 		PrincipalKind: principalKind,
 		PrincipalID:   principalID,
-		CreatedBy:     caller.String(),
+		CreatedBy:     convert.PgUUID(caller),
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Member", req.GetParent())

@@ -314,7 +314,7 @@ func TestDeleteAsset_Success(t *testing.T) {
 
 	f.mockQ.On("SoftDeleteAsset", mock.Anything, db.SoftDeleteAssetParams{
 		ID:        f.assetID,
-		DeletedBy: "",
+		DeletedBy: pgtype.UUID{},
 	}).Return(nil)
 
 	op, err := f.server.DeleteAsset(context.Background(), &assetsv1.DeleteAssetRequest{

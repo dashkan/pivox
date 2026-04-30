@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createOrgMember = `-- name: CreateOrgMember :one
@@ -24,7 +25,7 @@ type CreateOrgMemberParams struct {
 	RoleID        uuid.UUID     `json:"role_id"`
 	PrincipalKind PrincipalKind `json:"principal_kind"`
 	PrincipalID   uuid.UUID     `json:"principal_id"`
-	CreatedBy     string        `json:"created_by"`
+	CreatedBy     pgtype.UUID   `json:"created_by"`
 }
 
 type CreateOrgMemberRow struct {
@@ -68,7 +69,7 @@ type CreateSpaceMemberParams struct {
 	RoleID        uuid.UUID     `json:"role_id"`
 	PrincipalKind PrincipalKind `json:"principal_kind"`
 	PrincipalID   uuid.UUID     `json:"principal_id"`
-	CreatedBy     string        `json:"created_by"`
+	CreatedBy     pgtype.UUID   `json:"created_by"`
 }
 
 type CreateSpaceMemberRow struct {
@@ -345,8 +346,8 @@ type GetOrgMemberRow struct {
 	PrincipalID   uuid.UUID     `json:"principal_id"`
 	Etag          string        `json:"etag"`
 	Revision      int32         `json:"revision"`
-	CreatedBy     string        `json:"created_by"`
-	UpdatedBy     string        `json:"updated_by"`
+	CreatedBy     pgtype.UUID   `json:"created_by"`
+	UpdatedBy     pgtype.UUID   `json:"updated_by"`
 	CreateTime    time.Time     `json:"create_time"`
 	UpdateTime    time.Time     `json:"update_time"`
 	RoleName      string        `json:"role_name"`
@@ -399,8 +400,8 @@ type GetSpaceMemberRow struct {
 	PrincipalID   uuid.UUID     `json:"principal_id"`
 	Etag          string        `json:"etag"`
 	Revision      int32         `json:"revision"`
-	CreatedBy     string        `json:"created_by"`
-	UpdatedBy     string        `json:"updated_by"`
+	CreatedBy     pgtype.UUID   `json:"created_by"`
+	UpdatedBy     pgtype.UUID   `json:"updated_by"`
 	CreateTime    time.Time     `json:"create_time"`
 	UpdateTime    time.Time     `json:"update_time"`
 	RoleName      string        `json:"role_name"`
@@ -474,8 +475,8 @@ type ListOrgMembersRow struct {
 	PrincipalID   uuid.UUID     `json:"principal_id"`
 	Etag          string        `json:"etag"`
 	Revision      int32         `json:"revision"`
-	CreatedBy     string        `json:"created_by"`
-	UpdatedBy     string        `json:"updated_by"`
+	CreatedBy     pgtype.UUID   `json:"created_by"`
+	UpdatedBy     pgtype.UUID   `json:"updated_by"`
 	CreateTime    time.Time     `json:"create_time"`
 	UpdateTime    time.Time     `json:"update_time"`
 	RoleName      string        `json:"role_name"`
@@ -591,8 +592,8 @@ type ListSpaceMembersRow struct {
 	PrincipalID   uuid.UUID     `json:"principal_id"`
 	Etag          string        `json:"etag"`
 	Revision      int32         `json:"revision"`
-	CreatedBy     string        `json:"created_by"`
-	UpdatedBy     string        `json:"updated_by"`
+	CreatedBy     pgtype.UUID   `json:"created_by"`
+	UpdatedBy     pgtype.UUID   `json:"updated_by"`
 	CreateTime    time.Time     `json:"create_time"`
 	UpdateTime    time.Time     `json:"update_time"`
 	RoleName      string        `json:"role_name"`

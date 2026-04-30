@@ -28,7 +28,7 @@ func createTestOrg(t *testing.T, queries *db.Queries, suffix string) db.Organiza
 		ID:          id,
 		Name:        "organizations/" + id.String()[:8] + "-" + suffix,
 		DisplayName: "Org " + suffix,
-		CreatedBy:   "test",
+		CreatedBy:   pgtype.UUID{},
 	})
 	require.NoError(t, err)
 	return org
@@ -43,7 +43,7 @@ func createTestSpace(t *testing.T, queries *db.Queries, orgID uuid.UUID, display
 		Name:        "spaces/" + id.String()[:8],
 		DisplayName: displayName,
 		Labels:      json.RawMessage("{}"),
-		CreatedBy:   "test",
+		CreatedBy:   pgtype.UUID{},
 	})
 	require.NoError(t, err)
 	return p
@@ -58,7 +58,7 @@ func createTestTagKey(t *testing.T, queries *db.Queries, orgID uuid.UUID, shortN
 		ShortName:      shortName,
 		NamespacedName: orgID.String() + "/" + shortName,
 		Description:    "tag key " + shortName,
-		CreatedBy:      "test",
+		CreatedBy:      pgtype.UUID{},
 	})
 	require.NoError(t, err)
 	return tk
@@ -73,7 +73,7 @@ func createTestTagValue(t *testing.T, queries *db.Queries, tagKeyID uuid.UUID, s
 		ShortName:      shortName,
 		NamespacedName: nsPrefix + "/" + shortName,
 		Description:    "tag value " + shortName,
-		CreatedBy:      "test",
+		CreatedBy:      pgtype.UUID{},
 	})
 	require.NoError(t, err)
 	return tv
@@ -85,7 +85,7 @@ func createTestTagBinding(t *testing.T, queries *db.Queries, parentResource stri
 		ID:             uuid.New(),
 		ParentResource: parentResource,
 		TagValueID:     tagValueID,
-		CreatedBy:      "test",
+		CreatedBy:      pgtype.UUID{},
 	})
 	require.NoError(t, err)
 	return tb
@@ -102,7 +102,7 @@ func createTestApiKey(t *testing.T, queries *db.Queries, orgID uuid.UUID, displa
 		KeyString:    uuid.New().String(),
 		Annotations:  json.RawMessage("{}"),
 		Restrictions: nil,
-		CreatedBy:    "test",
+		CreatedBy:    pgtype.UUID{},
 	})
 	require.NoError(t, err)
 	return k
@@ -233,7 +233,7 @@ func TestQueryIntegration_Spaces_SoftDelete(t *testing.T) {
 
 	_, err := queries.SoftDeleteSpace(ctx, db.SoftDeleteSpaceParams{
 		ID:        p.ID,
-		DeletedBy: "test",
+		DeletedBy: pgtype.UUID{},
 	})
 	require.NoError(t, err)
 
@@ -424,7 +424,7 @@ func TestQueryIntegration_ApiKeys_SoftDelete(t *testing.T) {
 
 	_, err := queries.SoftDeleteApiKey(ctx, db.SoftDeleteApiKeyParams{
 		ID:        k.ID,
-		DeletedBy: "test",
+		DeletedBy: pgtype.UUID{},
 	})
 	require.NoError(t, err)
 

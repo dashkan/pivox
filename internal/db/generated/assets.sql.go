@@ -40,7 +40,7 @@ type CreateAssetParams struct {
 	Filename    string          `json:"filename"`
 	State       AssetState      `json:"state"`
 	Annotations json.RawMessage `json:"annotations"`
-	CreatedBy   string          `json:"created_by"`
+	CreatedBy   pgtype.UUID     `json:"created_by"`
 }
 
 func (q *Queries) CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset, error) {
@@ -505,8 +505,8 @@ WHERE id = $1
 `
 
 type SoftDeleteAssetParams struct {
-	ID        uuid.UUID `json:"id"`
-	DeletedBy string    `json:"deleted_by"`
+	ID        uuid.UUID   `json:"id"`
+	DeletedBy pgtype.UUID `json:"deleted_by"`
 }
 
 func (q *Queries) SoftDeleteAsset(ctx context.Context, arg SoftDeleteAssetParams) error {
@@ -545,7 +545,7 @@ RETURNING id, space_id, endpoint_id, name, display_name, import_path, filename, 
 
 type UpdateAssetParams struct {
 	ID          uuid.UUID          `json:"id"`
-	UpdatedBy   string             `json:"updated_by"`
+	UpdatedBy   pgtype.UUID        `json:"updated_by"`
 	DisplayName pgtype.Text        `json:"display_name"`
 	Annotations []byte             `json:"annotations"`
 	ExpireTime  pgtype.Timestamptz `json:"expire_time"`

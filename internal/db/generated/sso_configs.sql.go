@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const getSsoConfigByFirebaseProviderID = `-- name: GetSsoConfigByFirebaseProviderID :one
@@ -141,14 +142,14 @@ RETURNING id, org_id, firebase_provider_id, display_name, enabled, oidc_config, 
 `
 
 type UpsertSsoConfigParams struct {
-	OrgID                  uuid.UUID `json:"org_id"`
-	FirebaseProviderID     string    `json:"firebase_provider_id"`
-	DisplayName            string    `json:"display_name"`
-	Enabled                bool      `json:"enabled"`
-	OidcConfig             []byte    `json:"oidc_config"`
-	SamlConfig             []byte    `json:"saml_config"`
-	ClientSecretCiphertext []byte    `json:"client_secret_ciphertext"`
-	CreatedBy              string    `json:"created_by"`
+	OrgID                  uuid.UUID   `json:"org_id"`
+	FirebaseProviderID     string      `json:"firebase_provider_id"`
+	DisplayName            string      `json:"display_name"`
+	Enabled                bool        `json:"enabled"`
+	OidcConfig             []byte      `json:"oidc_config"`
+	SamlConfig             []byte      `json:"saml_config"`
+	ClientSecretCiphertext []byte      `json:"client_secret_ciphertext"`
+	CreatedBy              pgtype.UUID `json:"created_by"`
 }
 
 // UpsertSsoConfig is the create-or-update for the per-org SsoConfig

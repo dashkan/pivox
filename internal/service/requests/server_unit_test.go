@@ -20,6 +20,7 @@ import (
 
 	db "github.com/dashkan/pivox/internal/db/generated"
 	assetsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1"
+	"github.com/dashkan/pivox/internal/server"
 	"github.com/dashkan/pivox/internal/testutil/mocks"
 )
 
@@ -27,15 +28,26 @@ import (
 
 const (
 	testOrg     = "acme"
-	testSpace = "proj1"
+	testSpace   = "proj1"
 	testReqName = "req-abc123"
 	testParent  = "organizations/acme/spaces/proj1"
 	testFull    = "organizations/acme/spaces/proj1/requests/req-abc123"
 )
 
+// callerPivoxUUID is the canonical caller pivox_user_id used by tests
+// that exercise audit fields on the writes path (ClaimRequest etc.).
+var callerPivoxUUID = uuid.MustParse("0192a000-cccc-7000-8000-000000000001")
+
+// callerCtx returns a background context carrying callerPivoxUUID as
+// the pivox_user_id claim — required by every Create/Update path that
+// reads the caller for audit fields via `MustPivoxUserID`.
+func callerCtx() context.Context {
+	return server.WithPivoxUserID(context.Background(), callerPivoxUUID)
+}
+
 type requestFixture struct {
 	orgID     uuid.UUID
-	spaceID uuid.UUID
+	spaceID   uuid.UUID
 	requestID uuid.UUID
 	mockQ     *mocks.MockQuerier
 	server    *RequestsServer
@@ -45,7 +57,7 @@ func setupRequestFixture(t *testing.T) requestFixture {
 	t.Helper()
 	f := requestFixture{
 		orgID:     uuid.New(),
-		spaceID: uuid.New(),
+		spaceID:   uuid.New(),
 		requestID: uuid.New(),
 		mockQ:     new(mocks.MockQuerier),
 	}
@@ -65,7 +77,7 @@ func makeRequest(id, spaceID uuid.UUID, name string, state db.RequestState) db.A
 	now := time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC)
 	return db.AssetRequest{
 		ID:          id,
-		SpaceID:   spaceID,
+		SpaceID:     spaceID,
 		Name:        name,
 		DisplayName: "Test Request",
 		Description: "A test request",
@@ -100,7 +112,8 @@ func TestCreateRequest_Success(t *testing.T) {
 		return p.RequestID == f.requestID && p.AssetID.Valid
 	})).Return(db.AssetRequestLineItem{ID: uuid.New(), Name: "li-1"}, nil)
 
-	op, err := f.server.CreateRequest(context.Background(), &assetsv1.CreateRequestRequest{
+	ctx := server.WithPivoxUserID(context.Background(), callerPivoxUUID)
+	op, err := f.server.CreateRequest(ctx, &assetsv1.CreateRequestRequest{
 		Parent: testParent,
 		Request: &assetsv1.Request{
 			DisplayName: "New Request",
@@ -186,7 +199,7 @@ func TestSubmitRequest_ValidTransition(t *testing.T) {
 	f.mockQ.On("UpdateRequestState", mock.Anything, db.UpdateRequestStateParams{
 		ID:        f.requestID,
 		State:     db.RequestStateOPEN,
-		UpdatedBy: "",
+		UpdatedBy: pgtype.UUID{},
 	}).Return(transitioned, nil)
 
 	resp, err := f.server.SubmitRequest(context.Background(), &assetsv1.SubmitRequestRequest{
@@ -232,7 +245,7 @@ func TestAssignRequest_FromOpen(t *testing.T) {
 		ID:        f.requestID,
 		Assignee:  "users/jane",
 		State:     db.RequestStateINPROGRESS,
-		UpdatedBy: "",
+		UpdatedBy: pgtype.UUID{},
 	}).Return(assigned, nil)
 
 	resp, err := f.server.AssignRequest(context.Background(), &assetsv1.AssignRequestRequest{
@@ -261,7 +274,7 @@ func TestAssignRequest_FromInProgress(t *testing.T) {
 		ID:        f.requestID,
 		Assignee:  "users/bob",
 		State:     db.RequestStateINPROGRESS,
-		UpdatedBy: "",
+		UpdatedBy: pgtype.UUID{},
 	}).Return(reassigned, nil)
 
 	resp, err := f.server.AssignRequest(context.Background(), &assetsv1.AssignRequestRequest{
@@ -309,10 +322,11 @@ func TestClaimRequest_Success(t *testing.T) {
 		ID:        f.requestID,
 		Assignee:  "",
 		State:     db.RequestStateINPROGRESS,
-		UpdatedBy: "",
+		UpdatedBy: pgtype.UUID{Bytes: callerPivoxUUID, Valid: true},
 	}).Return(claimed, nil)
 
-	resp, err := f.server.ClaimRequest(context.Background(), &assetsv1.ClaimRequestRequest{
+	ctx := server.WithPivoxUserID(context.Background(), callerPivoxUUID)
+	resp, err := f.server.ClaimRequest(ctx, &assetsv1.ClaimRequestRequest{
 		Name: testFull,
 	})
 
@@ -353,7 +367,7 @@ func TestDeliverRequest_Success(t *testing.T) {
 	f.mockQ.On("UpdateRequestState", mock.Anything, db.UpdateRequestStateParams{
 		ID:        f.requestID,
 		State:     db.RequestStateDELIVERED,
-		UpdatedBy: "",
+		UpdatedBy: pgtype.UUID{},
 	}).Return(delivered, nil)
 
 	resp, err := f.server.DeliverRequest(context.Background(), &assetsv1.DeliverRequestRequest{
@@ -397,7 +411,7 @@ func TestApproveRequest_Success(t *testing.T) {
 	f.mockQ.On("UpdateRequestState", mock.Anything, db.UpdateRequestStateParams{
 		ID:        f.requestID,
 		State:     db.RequestStateAPPROVED,
-		UpdatedBy: "",
+		UpdatedBy: pgtype.UUID{},
 	}).Return(approved, nil)
 
 	resp, err := f.server.ApproveRequest(context.Background(), &assetsv1.ApproveRequestRequest{
@@ -441,7 +455,7 @@ func TestRequestRevision_Success(t *testing.T) {
 	f.mockQ.On("UpdateRequestState", mock.Anything, db.UpdateRequestStateParams{
 		ID:        f.requestID,
 		State:     db.RequestStateREVISIONREQUESTED,
-		UpdatedBy: "",
+		UpdatedBy: pgtype.UUID{},
 	}).Return(revised, nil)
 
 	resp, err := f.server.RequestRevision(context.Background(), &assetsv1.RequestRevisionRequest{
@@ -468,7 +482,7 @@ func TestRejectRequest_Success(t *testing.T) {
 	f.mockQ.On("UpdateRequestState", mock.Anything, db.UpdateRequestStateParams{
 		ID:        f.requestID,
 		State:     db.RequestStateREJECTED,
-		UpdatedBy: "",
+		UpdatedBy: pgtype.UUID{},
 	}).Return(rejected, nil)
 
 	resp, err := f.server.RejectRequest(context.Background(), &assetsv1.RejectRequestRequest{
@@ -495,7 +509,7 @@ func TestCancelRequest_FromDraft(t *testing.T) {
 	f.mockQ.On("UpdateRequestState", mock.Anything, db.UpdateRequestStateParams{
 		ID:        f.requestID,
 		State:     db.RequestStateCANCELLED,
-		UpdatedBy: "",
+		UpdatedBy: pgtype.UUID{},
 	}).Return(cancelled, nil)
 
 	resp, err := f.server.CancelRequest(context.Background(), &assetsv1.CancelRequestRequest{
@@ -520,7 +534,7 @@ func TestCancelRequest_FromOpen(t *testing.T) {
 	f.mockQ.On("UpdateRequestState", mock.Anything, db.UpdateRequestStateParams{
 		ID:        f.requestID,
 		State:     db.RequestStateCANCELLED,
-		UpdatedBy: "",
+		UpdatedBy: pgtype.UUID{},
 	}).Return(cancelled, nil)
 
 	resp, err := f.server.CancelRequest(context.Background(), &assetsv1.CancelRequestRequest{
@@ -545,7 +559,7 @@ func TestCancelRequest_FromInProgress(t *testing.T) {
 	f.mockQ.On("UpdateRequestState", mock.Anything, db.UpdateRequestStateParams{
 		ID:        f.requestID,
 		State:     db.RequestStateCANCELLED,
-		UpdatedBy: "",
+		UpdatedBy: pgtype.UUID{},
 	}).Return(cancelled, nil)
 
 	resp, err := f.server.CancelRequest(context.Background(), &assetsv1.CancelRequestRequest{
@@ -611,7 +625,8 @@ func TestUpdateRequest_WithFieldMask(t *testing.T) {
 			p.Priority.Valid && p.Priority.RequestPriority == db.RequestPriority("HIGH")
 	})).Return(updated, nil)
 
-	op, err := f.server.UpdateRequest(context.Background(), &assetsv1.UpdateRequestRequest{
+	ctx := server.WithPivoxUserID(context.Background(), callerPivoxUUID)
+	op, err := f.server.UpdateRequest(ctx, &assetsv1.UpdateRequestRequest{
 		Request: &assetsv1.Request{
 			Name:        testFull,
 			DisplayName: "Updated",
@@ -645,7 +660,8 @@ func TestUpdateRequest_NoMask(t *testing.T) {
 			p.Description.Valid && p.Description.String == "Full description"
 	})).Return(updated, nil)
 
-	op, err := f.server.UpdateRequest(context.Background(), &assetsv1.UpdateRequestRequest{
+	ctx := server.WithPivoxUserID(context.Background(), callerPivoxUUID)
+	op, err := f.server.UpdateRequest(ctx, &assetsv1.UpdateRequestRequest{
 		Request: &assetsv1.Request{
 			Name:        testFull,
 			DisplayName: "Full Update",
@@ -710,7 +726,7 @@ func TestCreateRequest_DBError(t *testing.T) {
 	f.mockQ.On("CreateRequest", mock.Anything, mock.Anything).
 		Return(db.AssetRequest{}, errors.New("connection reset"))
 
-	_, err := f.server.CreateRequest(context.Background(), &assetsv1.CreateRequestRequest{
+	_, err := f.server.CreateRequest(callerCtx(), &assetsv1.CreateRequestRequest{
 		Parent:  testParent,
 		Request: &assetsv1.Request{DisplayName: "New Request"},
 	})
@@ -731,7 +747,7 @@ func TestCreateRequest_CreateAssetError(t *testing.T) {
 	f.mockQ.On("CreateAsset", mock.Anything, mock.Anything).
 		Return(db.Asset{}, errors.New("asset insert failed"))
 
-	_, err := f.server.CreateRequest(context.Background(), &assetsv1.CreateRequestRequest{
+	_, err := f.server.CreateRequest(callerCtx(), &assetsv1.CreateRequestRequest{
 		Parent: testParent,
 		Request: &assetsv1.Request{
 			DisplayName: "New Request",
@@ -759,7 +775,7 @@ func TestCreateRequest_CreateLineItemError(t *testing.T) {
 	f.mockQ.On("CreateLineItem", mock.Anything, mock.Anything).
 		Return(db.AssetRequestLineItem{}, errors.New("line item insert failed"))
 
-	_, err := f.server.CreateRequest(context.Background(), &assetsv1.CreateRequestRequest{
+	_, err := f.server.CreateRequest(callerCtx(), &assetsv1.CreateRequestRequest{
 		Parent: testParent,
 		Request: &assetsv1.Request{
 			DisplayName: "New Request",
@@ -780,7 +796,7 @@ func TestCreateRequest_NoLineItems_Success(t *testing.T) {
 	created := makeRequest(f.requestID, f.spaceID, "placeholder", db.RequestStateDRAFT)
 	f.mockQ.On("CreateRequest", mock.Anything, mock.Anything).Return(created, nil)
 
-	op, err := f.server.CreateRequest(context.Background(), &assetsv1.CreateRequestRequest{
+	op, err := f.server.CreateRequest(callerCtx(), &assetsv1.CreateRequestRequest{
 		Parent:  testParent,
 		Request: &assetsv1.Request{DisplayName: "New Request"},
 	})
@@ -878,7 +894,7 @@ func TestUpdateRequest_DBError(t *testing.T) {
 	f.mockQ.On("UpdateRequest", mock.Anything, mock.Anything).
 		Return(db.AssetRequest{}, errors.New("db failure"))
 
-	_, err := f.server.UpdateRequest(context.Background(), &assetsv1.UpdateRequestRequest{
+	_, err := f.server.UpdateRequest(callerCtx(), &assetsv1.UpdateRequestRequest{
 		Request: &assetsv1.Request{Name: testFull, DisplayName: "Updated"},
 	})
 
@@ -902,7 +918,7 @@ func TestUpdateRequest_DueTimeFieldMask(t *testing.T) {
 		return p.ID == f.requestID && p.DueTime.Valid && p.DueTime.Time.Equal(due)
 	})).Return(updated, nil)
 
-	op, err := f.server.UpdateRequest(context.Background(), &assetsv1.UpdateRequestRequest{
+	op, err := f.server.UpdateRequest(callerCtx(), &assetsv1.UpdateRequestRequest{
 		Request: &assetsv1.Request{
 			Name:    testFull,
 			DueTime: timestamppb.New(due),
@@ -928,7 +944,7 @@ func TestUpdateRequest_AnnotationsFieldMask(t *testing.T) {
 		return p.ID == f.requestID && p.Annotations != nil
 	})).Return(updated, nil)
 
-	op, err := f.server.UpdateRequest(context.Background(), &assetsv1.UpdateRequestRequest{
+	op, err := f.server.UpdateRequest(callerCtx(), &assetsv1.UpdateRequestRequest{
 		Request: &assetsv1.Request{
 			Name: testFull,
 		},
@@ -1088,7 +1104,8 @@ func TestClaimRequest_UpdateAssigneeDBError(t *testing.T) {
 	f.mockQ.On("UpdateRequestAssignee", mock.Anything, mock.Anything).
 		Return(db.AssetRequest{}, errors.New("db failure"))
 
-	_, err := f.server.ClaimRequest(context.Background(), &assetsv1.ClaimRequestRequest{
+	ctx := server.WithPivoxUserID(context.Background(), callerPivoxUUID)
+	_, err := f.server.ClaimRequest(ctx, &assetsv1.ClaimRequestRequest{
 		Name: testFull,
 	})
 

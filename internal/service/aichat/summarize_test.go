@@ -144,7 +144,7 @@ func TestSummarizeConversation_RejectsNonOwner(t *testing.T) {
 	// caller — resolveConversation must surface NotFound (path-vs-row
 	// creator_id mismatch).
 	conv := testConversation(org.ID, "other-user")
-	conv.CreatorID = uuid.MustParse("0192a000-0099-7000-8000-000000000099")
+	conv.CreatedBy = uuid.MustParse("0192a000-0099-7000-8000-000000000099")
 	ctx := authenticatedCtx("user1")
 
 	q.On("GetOrganizationByName", mock.Anything, "acme").Return(org, nil)

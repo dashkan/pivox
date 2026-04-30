@@ -52,8 +52,8 @@ func TestAssetToProto(t *testing.T) {
 				ChecksumSha256:  "sha256-hash",
 				SizeBytes:       1024,
 				Etag:            "etag-1",
-				CreatedBy:       "user@test.com",
-				UpdatedBy:       "user@test.com",
+				CreatedBy:       pgtype.UUID{},
+				UpdatedBy:       pgtype.UUID{},
 				CreateTime:      now,
 				UpdateTime:      updated,
 				MediaType:       db.NullAssetMediaType{AssetMediaType: db.AssetMediaTypeIMAGE, Valid: true},
@@ -168,8 +168,8 @@ func TestAssetToProto(t *testing.T) {
 			assert.Equal(t, tt.row.ChecksumSha256, pb.ChecksumSha256)
 			assert.Equal(t, tt.row.SizeBytes, pb.SizeBytes)
 			assert.Equal(t, tt.row.Etag, pb.Etag)
-			assert.Equal(t, tt.row.CreatedBy, pb.Creator)
-			assert.Equal(t, tt.row.UpdatedBy, pb.Updater)
+			assert.Equal(t, UUIDString(tt.row.CreatedBy), pb.Creator)
+			assert.Equal(t, UUIDString(tt.row.UpdatedBy), pb.Updater)
 			if tt.checkFunc != nil {
 				tt.checkFunc(t, pb)
 			}
@@ -198,7 +198,7 @@ func TestAssetVersionToProto(t *testing.T) {
 				StorageKey:     "s3://bucket/key",
 				ChangeNote:     "Updated quality",
 				IngestionError: "",
-				CreatedBy:      "editor@test.com",
+				CreatedBy:      pgtype.UUID{},
 				CreateTime:     now,
 			},
 			assetName: "organizations/acme/spaces/p1/assets/abc",
@@ -212,7 +212,7 @@ func TestAssetVersionToProto(t *testing.T) {
 				MimeType:       "image/jpeg",
 				StorageKey:     "s3://bucket/fail",
 				IngestionError: "transcoding failed",
-				CreatedBy:      "user@test.com",
+				CreatedBy:      pgtype.UUID{},
 				CreateTime:     now,
 			},
 			assetName: "organizations/acme/spaces/p1/assets/def",
@@ -231,7 +231,7 @@ func TestAssetVersionToProto(t *testing.T) {
 			assert.Equal(t, tt.row.StorageKey, pb.StorageKey)
 			assert.Equal(t, tt.row.ChangeNote, pb.ChangeNote)
 			assert.Equal(t, tt.row.IngestionError, pb.IngestionError)
-			assert.Equal(t, tt.row.CreatedBy, pb.Creator)
+			assert.Equal(t, UUIDString(tt.row.CreatedBy), pb.Creator)
 		})
 	}
 }
@@ -495,8 +495,8 @@ func TestRequestToProto(t *testing.T) {
 				Priority:      db.RequestPriorityHIGH,
 				Assignee:      "editor@test.com",
 				Etag:          "etag-req",
-				CreatedBy:     "user@test.com",
-				UpdatedBy:     "manager@test.com",
+				CreatedBy:     pgtype.UUID{},
+				UpdatedBy:     pgtype.UUID{},
 				CreateTime:    now,
 				UpdateTime:    updated,
 				DueTime:       pgtype.Timestamptz{Time: dueTime, Valid: true},
@@ -522,7 +522,7 @@ func TestRequestToProto(t *testing.T) {
 				DisplayName: "Simple Request",
 				State:       db.RequestStateDRAFT,
 				Priority:    db.RequestPriorityNORMAL,
-				CreatedBy:   "user@test.com",
+				CreatedBy:   pgtype.UUID{},
 				CreateTime:  now,
 				UpdateTime:  updated,
 			},
@@ -549,8 +549,8 @@ func TestRequestToProto(t *testing.T) {
 			assert.Equal(t, tt.wantState, pb.State)
 			assert.Equal(t, tt.row.Assignee, pb.Assignee)
 			assert.Equal(t, tt.row.Etag, pb.Etag)
-			assert.Equal(t, tt.row.CreatedBy, pb.Creator)
-			assert.Equal(t, tt.row.UpdatedBy, pb.Updater)
+			assert.Equal(t, UUIDString(tt.row.CreatedBy), pb.Creator)
+			assert.Equal(t, UUIDString(tt.row.UpdatedBy), pb.Updater)
 			if tt.checkFunc != nil {
 				tt.checkFunc(t, pb)
 			}
@@ -583,7 +583,7 @@ func TestLineItemToProto(t *testing.T) {
 				MediaType:   db.NullAssetMediaType{AssetMediaType: db.AssetMediaTypeIMAGE, Valid: true},
 				AssetID:     pgtype.UUID{Bytes: uuid.New(), Valid: true},
 				Annotations: annotationsJSON,
-				CreatedBy:   "user@test.com",
+				CreatedBy:   pgtype.UUID{},
 				CreateTime:  now,
 				UpdateTime:  updated,
 			},
@@ -604,7 +604,7 @@ func TestLineItemToProto(t *testing.T) {
 				State:       db.LineItemStateINPROGRESS,
 				MediaType:   db.NullAssetMediaType{Valid: false},
 				AssetID:     pgtype.UUID{Valid: false},
-				CreatedBy:   "user@test.com",
+				CreatedBy:   pgtype.UUID{},
 				CreateTime:  now,
 				UpdateTime:  updated,
 			},
@@ -625,7 +625,7 @@ func TestLineItemToProto(t *testing.T) {
 			assert.Equal(t, tt.requestName+"/lineItems/"+tt.row.Name, pb.Name)
 			assert.Equal(t, tt.row.DisplayName, pb.DisplayName)
 			assert.Equal(t, tt.row.Description, pb.Description)
-			assert.Equal(t, tt.row.CreatedBy, pb.Creator)
+			assert.Equal(t, UUIDString(tt.row.CreatedBy), pb.Creator)
 			if tt.checkFunc != nil {
 				tt.checkFunc(t, pb)
 			}
@@ -734,8 +734,8 @@ func TestStorageGatewayToProto(t *testing.T) {
 				CertState:         db.CertStateACTIVE,
 				CertExpiryTime:    pgtype.Timestamptz{Time: certExpiry, Valid: true},
 				Etag:              "etag-gw",
-				CreatedBy:         "admin@test.com",
-				UpdatedBy:         "admin@test.com",
+				CreatedBy:         pgtype.UUID{},
+				UpdatedBy:         pgtype.UUID{},
 				CreateTime:        now,
 				UpdateTime:        updated,
 				Annotations:       annotationsJSON,
@@ -782,8 +782,8 @@ func TestStorageGatewayToProto(t *testing.T) {
 			assert.Equal(t, tt.gw.TargetVersion, pb.TargetVersion)
 			assert.Equal(t, tt.gw.CurrentVersion, pb.CurrentVersion)
 			assert.Equal(t, tt.gw.Etag, pb.Etag)
-			assert.Equal(t, tt.gw.CreatedBy, pb.Creator)
-			assert.Equal(t, tt.gw.UpdatedBy, pb.Updater)
+			assert.Equal(t, UUIDString(tt.gw.CreatedBy), pb.Creator)
+			assert.Equal(t, UUIDString(tt.gw.UpdatedBy), pb.Updater)
 			if tt.checkFunc != nil {
 				tt.checkFunc(t, pb)
 			}
@@ -896,8 +896,8 @@ func TestEndpointToProto(t *testing.T) {
 				CacheEviction:  db.EvictionPolicyLRU,
 				CacheTtlHours:  24,
 				Etag:           "etag-ep",
-				CreatedBy:      "admin@test.com",
-				UpdatedBy:      "admin@test.com",
+				CreatedBy:      pgtype.UUID{},
+				UpdatedBy:      pgtype.UUID{},
 				CreateTime:     now,
 				UpdateTime:     updated,
 				Annotations:    annotationsJSON,
@@ -928,8 +928,8 @@ func TestEndpointToProto(t *testing.T) {
 				CacheEnabled:  false,
 				CacheEviction: db.EvictionPolicyLFU,
 				Etag:          "etag-ep2",
-				CreatedBy:     "admin@test.com",
-				UpdatedBy:     "admin@test.com",
+				CreatedBy:     pgtype.UUID{},
+				UpdatedBy:     pgtype.UUID{},
 				CreateTime:    now,
 				UpdateTime:    updated,
 			},
@@ -970,8 +970,8 @@ func TestEndpointToProto(t *testing.T) {
 			assert.Equal(t, tt.gatewayName+"/endpoints/"+tt.ep.Name, pb.Name)
 			assert.Equal(t, tt.ep.DisplayName, pb.DisplayName)
 			assert.Equal(t, tt.ep.Etag, pb.Etag)
-			assert.Equal(t, tt.ep.CreatedBy, pb.Creator)
-			assert.Equal(t, tt.ep.UpdatedBy, pb.Updater)
+			assert.Equal(t, UUIDString(tt.ep.CreatedBy), pb.Creator)
+			assert.Equal(t, UUIDString(tt.ep.UpdatedBy), pb.Updater)
 			if tt.checkFunc != nil {
 				tt.checkFunc(t, pb)
 			}

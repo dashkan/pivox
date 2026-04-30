@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -335,27 +336,25 @@ func expectBootstrapExecs(tx *mockTx) {
 // given values. The column order matches the sqlc-generated RETURNING clause.
 func orgRow(org db.Organization) *mockRow {
 	return &mockRow{scanFunc: func(dest ...interface{}) error {
-		// Column order: id, name, display_name, annotations,
-		// created_by_firebase_identity_id, state, etag, revision,
-		// created_by, updated_by, deleted_by, create_time, update_time,
-		// delete_time, purge_time
-		if len(dest) != 15 {
+		// Column order: id, name, display_name, annotations, state,
+		// etag, revision, created_by, updated_by, deleted_by,
+		// create_time, update_time, delete_time, purge_time
+		if len(dest) != 14 {
 			return errors.New("unexpected number of scan destinations")
 		}
 		*dest[0].(*uuid.UUID) = org.ID
 		*dest[1].(*string) = org.Name
 		*dest[2].(*string) = org.DisplayName
 		*dest[3].(*json.RawMessage) = org.Annotations
-		// dest[4] is *pgtype.UUID — leave as zero value
-		*dest[5].(*db.ResourceState) = org.State
-		*dest[6].(*string) = org.Etag
-		*dest[7].(*int32) = org.Revision
-		*dest[8].(*string) = org.CreatedBy
-		*dest[9].(*string) = org.UpdatedBy
-		*dest[10].(*string) = org.DeletedBy
-		*dest[11].(*time.Time) = org.CreateTime
-		*dest[12].(*time.Time) = org.UpdateTime
-		// dest[13], dest[14] are *pgtype.Timestamptz — leave as zero
+		*dest[4].(*db.ResourceState) = org.State
+		*dest[5].(*string) = org.Etag
+		*dest[6].(*int32) = org.Revision
+		*dest[7].(*pgtype.UUID) = org.CreatedBy
+		*dest[8].(*pgtype.UUID) = org.UpdatedBy
+		*dest[9].(*pgtype.UUID) = org.DeletedBy
+		*dest[10].(*time.Time) = org.CreateTime
+		*dest[11].(*time.Time) = org.UpdateTime
+		// dest[12], dest[13] are *pgtype.Timestamptz — leave as zero
 		return nil
 	}}
 }

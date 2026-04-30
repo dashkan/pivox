@@ -27,8 +27,8 @@ func AssetToProto(row db.Asset, spaceName string) *assetsv1.Asset {
 		ChecksumSha256: row.ChecksumSha256,
 		SizeBytes:      row.SizeBytes,
 		Etag:           row.Etag,
-		Creator:        row.CreatedBy,
-		Updater:        row.UpdatedBy,
+		Creator:        UUIDString(row.CreatedBy),
+		Updater:        UUIDString(row.UpdatedBy),
 		CreateTime:     timestamppb.New(row.CreateTime),
 		UpdateTime:     timestamppb.New(row.UpdateTime),
 	}
@@ -80,7 +80,7 @@ func AssetVersionToProto(row db.AssetVersion, assetName string) *assetsv1.AssetV
 		StorageKey:     row.StorageKey,
 		ChangeNote:     row.ChangeNote,
 		IngestionError: row.IngestionError,
-		Creator:        row.CreatedBy,
+		Creator:        UUIDString(row.CreatedBy),
 		CreateTime:     timestamppb.New(row.CreateTime),
 	}
 }

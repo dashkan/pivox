@@ -121,7 +121,7 @@ func (s *OrganizationsServer) UpdateSsoConfig(ctx context.Context, req *apiv1.Up
 		OrgID:       resolved.ID,
 		DisplayName: cfg.GetDisplayName(),
 		Enabled:     cfg.GetEnabled(),
-		CreatedBy:   caller.String(),
+		CreatedBy:   convert.PgUUID(caller),
 	}
 
 	switch {

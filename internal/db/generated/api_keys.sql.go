@@ -27,7 +27,7 @@ type CreateApiKeyParams struct {
 	KeyString    string          `json:"key_string"`
 	Annotations  json.RawMessage `json:"annotations"`
 	Restrictions []byte          `json:"restrictions"`
-	CreatedBy    string          `json:"created_by"`
+	CreatedBy    pgtype.UUID     `json:"created_by"`
 }
 
 func (q *Queries) CreateApiKey(ctx context.Context, arg CreateApiKeyParams) (ApiKey, error) {
@@ -205,8 +205,8 @@ RETURNING id, org_id, key_id, key_string, display_name, annotations, restriction
 `
 
 type SoftDeleteApiKeyParams struct {
-	ID        uuid.UUID `json:"id"`
-	DeletedBy string    `json:"deleted_by"`
+	ID        uuid.UUID   `json:"id"`
+	DeletedBy pgtype.UUID `json:"deleted_by"`
 }
 
 func (q *Queries) SoftDeleteApiKey(ctx context.Context, arg SoftDeleteApiKeyParams) (ApiKey, error) {
@@ -247,8 +247,8 @@ RETURNING id, org_id, key_id, key_string, display_name, annotations, restriction
 `
 
 type UndeleteApiKeyParams struct {
-	ID        uuid.UUID `json:"id"`
-	UpdatedBy string    `json:"updated_by"`
+	ID        uuid.UUID   `json:"id"`
+	UpdatedBy pgtype.UUID `json:"updated_by"`
 }
 
 func (q *Queries) UndeleteApiKey(ctx context.Context, arg UndeleteApiKeyParams) (ApiKey, error) {
@@ -290,7 +290,7 @@ RETURNING id, org_id, key_id, key_string, display_name, annotations, restriction
 
 type UpdateApiKeyParams struct {
 	ID           uuid.UUID   `json:"id"`
-	UpdatedBy    string      `json:"updated_by"`
+	UpdatedBy    pgtype.UUID `json:"updated_by"`
 	DisplayName  pgtype.Text `json:"display_name"`
 	Annotations  []byte      `json:"annotations"`
 	Restrictions []byte      `json:"restrictions"`

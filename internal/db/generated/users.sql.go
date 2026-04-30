@@ -211,7 +211,7 @@ func (q *Queries) HardDeleteFirebaseIdentity(ctx context.Context, id uuid.UUID) 
 
 const listOrganizationsForFirebaseIdentity = `-- name: ListOrganizationsForFirebaseIdentity :many
 
-SELECT DISTINCT o.id, o.name, o.display_name, o.annotations, o.created_by_firebase_identity_id, o.state, o.etag, o.revision, o.created_by, o.updated_by, o.deleted_by, o.create_time, o.update_time, o.delete_time, o.purge_time
+SELECT DISTINCT o.id, o.name, o.display_name, o.annotations, o.state, o.etag, o.revision, o.created_by, o.updated_by, o.deleted_by, o.create_time, o.update_time, o.delete_time, o.purge_time
   FROM organizations o
   JOIN org_members om ON om.org_id = o.id
  WHERE (
@@ -273,7 +273,6 @@ func (q *Queries) ListOrganizationsForFirebaseIdentity(ctx context.Context, prin
 			&i.Name,
 			&i.DisplayName,
 			&i.Annotations,
-			&i.CreatedByFirebaseIdentityID,
 			&i.State,
 			&i.Etag,
 			&i.Revision,
@@ -296,7 +295,7 @@ func (q *Queries) ListOrganizationsForFirebaseIdentity(ctx context.Context, prin
 }
 
 const listSoleOwnerOrgsForFirebaseIdentity = `-- name: ListSoleOwnerOrgsForFirebaseIdentity :many
-SELECT o.id, o.name, o.display_name, o.annotations, o.created_by_firebase_identity_id, o.state, o.etag, o.revision, o.created_by, o.updated_by, o.deleted_by, o.create_time, o.update_time, o.delete_time, o.purge_time
+SELECT o.id, o.name, o.display_name, o.annotations, o.state, o.etag, o.revision, o.created_by, o.updated_by, o.deleted_by, o.create_time, o.update_time, o.delete_time, o.purge_time
   FROM organizations o
  WHERE o.delete_time IS NULL
    AND o.id IN (
@@ -346,7 +345,6 @@ func (q *Queries) ListSoleOwnerOrgsForFirebaseIdentity(ctx context.Context, prin
 			&i.Name,
 			&i.DisplayName,
 			&i.Annotations,
-			&i.CreatedByFirebaseIdentityID,
 			&i.State,
 			&i.Etag,
 			&i.Revision,

@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -75,7 +74,7 @@ func newEndpointsServer(q *mocks.MockQuerier) *EndpointsServer {
 func TestUnit_CreateEndpoint_S3(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -118,7 +117,7 @@ func TestUnit_CreateEndpoint_S3(t *testing.T) {
 func TestUnit_CreateEndpoint_Filesystem(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -157,7 +156,7 @@ func TestUnit_CreateEndpoint_Filesystem(t *testing.T) {
 func TestUnit_GetEndpoint_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -188,7 +187,7 @@ func TestUnit_GetEndpoint_Success(t *testing.T) {
 func TestUnit_GetEndpoint_NotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -218,7 +217,7 @@ func TestUnit_GetEndpoint_NotFound(t *testing.T) {
 func TestUnit_DeleteEndpoint_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -247,7 +246,7 @@ func TestUnit_DeleteEndpoint_Success(t *testing.T) {
 func TestUnit_CreateEndpoint_InvalidParent(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	_, err := srv.CreateEndpoint(ctx, &storagev1.CreateEndpointRequest{
 		Parent: "bad-parent",
@@ -267,7 +266,7 @@ func TestUnit_CreateEndpoint_InvalidParent(t *testing.T) {
 func TestUnit_CreateEndpoint_OrgNotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "no-org").
 		Return(db.Organization{}, pgx.ErrNoRows)
@@ -291,7 +290,7 @@ func TestUnit_CreateEndpoint_OrgNotFound(t *testing.T) {
 func TestUnit_CreateEndpoint_InvalidConfig(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -315,7 +314,7 @@ func TestUnit_CreateEndpoint_InvalidConfig(t *testing.T) {
 func TestUnit_CreateEndpoint_DBError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -344,7 +343,7 @@ func TestUnit_CreateEndpoint_DBError(t *testing.T) {
 func TestUnit_CreateEndpoint_WithLFUCachePolicy(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -377,7 +376,7 @@ func TestUnit_CreateEndpoint_WithLFUCachePolicy(t *testing.T) {
 func TestUnit_CreateEndpoint_WithAnnotations(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -408,7 +407,7 @@ func TestUnit_CreateEndpoint_WithAnnotations(t *testing.T) {
 func TestUnit_GetEndpoint_InvalidName(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	_, err := srv.GetEndpoint(ctx, &storagev1.GetEndpointRequest{
 		Name: "bad-name",
@@ -423,7 +422,7 @@ func TestUnit_GetEndpoint_InvalidName(t *testing.T) {
 func TestUnit_GetEndpoint_GatewayNotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -449,7 +448,7 @@ func TestUnit_GetEndpoint_GatewayNotFound(t *testing.T) {
 func TestUnit_ListEndpoints_InvalidParent(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	_, err := srv.ListEndpoints(ctx, &storagev1.ListEndpointsRequest{
 		Parent: "bad-parent",
@@ -464,7 +463,7 @@ func TestUnit_ListEndpoints_InvalidParent(t *testing.T) {
 func TestUnit_ListEndpoints_GatewayNotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -486,7 +485,7 @@ func TestUnit_ListEndpoints_GatewayNotFound(t *testing.T) {
 func TestUnit_ListEndpoints_DBError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -618,7 +617,7 @@ func TestUnit_ConfigToJSON_S3WithoutAccessKey(t *testing.T) {
 func TestUnit_DeleteEndpoint_InvalidName(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	_, err := srv.DeleteEndpoint(ctx, &storagev1.DeleteEndpointRequest{
 		Name: "bad-name",
@@ -633,7 +632,7 @@ func TestUnit_DeleteEndpoint_InvalidName(t *testing.T) {
 func TestUnit_DeleteEndpoint_GatewayNotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -655,7 +654,7 @@ func TestUnit_DeleteEndpoint_GatewayNotFound(t *testing.T) {
 func TestUnit_DeleteEndpoint_EndpointNotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -681,7 +680,7 @@ func TestUnit_DeleteEndpoint_EndpointNotFound(t *testing.T) {
 func TestUnit_DeleteEndpoint_DeleteFails(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -713,7 +712,7 @@ func TestUnit_DeleteEndpoint_DeleteFails(t *testing.T) {
 func TestUnit_UpdateEndpoint_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	updatedEndpoint := testEndpoint
 	updatedEndpoint.DisplayName = "Renamed S3 Endpoint"
@@ -759,7 +758,7 @@ func TestUnit_UpdateEndpoint_Success(t *testing.T) {
 func TestUnit_ListEndpoints_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -789,7 +788,7 @@ func TestUnit_ListEndpoints_Success(t *testing.T) {
 func TestUnit_UpdateEndpoint_InvalidName(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	_, err := srv.UpdateEndpoint(ctx, &storagev1.UpdateEndpointRequest{
 		Endpoint: &storagev1.Endpoint{
@@ -806,7 +805,7 @@ func TestUnit_UpdateEndpoint_InvalidName(t *testing.T) {
 func TestUnit_UpdateEndpoint_GatewayNotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -830,7 +829,7 @@ func TestUnit_UpdateEndpoint_GatewayNotFound(t *testing.T) {
 func TestUnit_UpdateEndpoint_EndpointNotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -858,7 +857,7 @@ func TestUnit_UpdateEndpoint_EndpointNotFound(t *testing.T) {
 func TestUnit_UpdateEndpoint_UpdateFails(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -892,7 +891,7 @@ func TestUnit_UpdateEndpoint_UpdateFails(t *testing.T) {
 func TestUnit_UpdateEndpoint_FieldMask_Configuration(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -930,7 +929,7 @@ func TestUnit_UpdateEndpoint_FieldMask_Configuration(t *testing.T) {
 func TestUnit_UpdateEndpoint_FieldMask_InvalidConfig(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -962,7 +961,7 @@ func TestUnit_UpdateEndpoint_FieldMask_InvalidConfig(t *testing.T) {
 func TestUnit_UpdateEndpoint_FieldMask_CacheConfig_LFU(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -1000,7 +999,7 @@ func TestUnit_UpdateEndpoint_FieldMask_CacheConfig_LFU(t *testing.T) {
 func TestUnit_UpdateEndpoint_FieldMask_Annotations(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -1033,7 +1032,7 @@ func TestUnit_UpdateEndpoint_FieldMask_Annotations(t *testing.T) {
 func TestUnit_UpdateEndpoint_NoMask_AllFields(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -1072,7 +1071,7 @@ func TestUnit_UpdateEndpoint_NoMask_AllFields(t *testing.T) {
 func TestUnit_UpdateEndpoint_NoMask_NoConfig(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -1103,7 +1102,7 @@ func TestUnit_UpdateEndpoint_NoMask_NoConfig(t *testing.T) {
 func TestUnit_UpdateEndpoint_NoMask_LFUCachePolicy(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newEndpointsServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{

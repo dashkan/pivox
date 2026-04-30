@@ -22,8 +22,8 @@ func RequestToProto(row db.AssetRequest, spaceName string) *assetsv1.Request {
 		Priority:    requestPriority(row.Priority),
 		Assignee:    row.Assignee,
 		Etag:        row.Etag,
-		Creator:     row.CreatedBy,
-		Updater:     row.UpdatedBy,
+		Creator:     UUIDString(row.CreatedBy),
+		Updater:     UUIDString(row.UpdatedBy),
 		CreateTime:  timestamppb.New(row.CreateTime),
 		UpdateTime:  timestamppb.New(row.UpdateTime),
 	}
@@ -55,7 +55,7 @@ func LineItemToProto(row db.AssetRequestLineItem, requestName string, spaceName 
 		DisplayName: row.DisplayName,
 		Description: row.Description,
 		State:       lineItemState(row.State),
-		Creator:     row.CreatedBy,
+		Creator:     UUIDString(row.CreatedBy),
 		CreateTime:  timestamppb.New(row.CreateTime),
 		UpdateTime:  timestamppb.New(row.UpdateTime),
 	}

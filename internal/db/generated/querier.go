@@ -100,6 +100,9 @@ type Querier interface {
 	CreateAssetVersion(ctx context.Context, arg CreateAssetVersionParams) (AssetVersion, error)
 	// Stores a Firebase ID token behind a short-lived opaque code.
 	CreateAuthTokenCode(ctx context.Context, idToken string) (AuthTokenCode, error)
+	// `created_by` doubles as the conversation owner / authorization
+	// key (the `users/{user}` resource path segment). NOT NULL on the
+	// column; every conversation has a creator.
 	CreateConversation(ctx context.Context, arg CreateConversationParams) (AiConversation, error)
 	// Creates a new delegated auth session. The code and expiry are chosen by the
 	// server so we can control both TTL and the entropy source (crypto/rand).
@@ -122,6 +125,9 @@ type Querier interface {
 	// etag + timestamps so the handler can build the Member proto
 	// response without a follow-up GetOrgMember round-trip.
 	CreateOrgMember(ctx context.Context, arg CreateOrgMemberParams) (CreateOrgMemberRow, error)
+	// `created_by` is the founder pointer post-cleanup (single UUID FK
+	// replacing the old `created_by_firebase_identity_id` + TEXT
+	// `created_by` pair).
 	CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error)
 	CreateRequest(ctx context.Context, arg CreateRequestParams) (AssetRequest, error)
 	// Inserts a role row. Used by CreateOrganization to seed the 4 system
@@ -222,7 +228,7 @@ type Querier interface {
 	// without an ownership filter. The handler enforces creator-only or
 	// `*All`-permission access on top of this. Used by the read/update/
 	// delete handlers as the row-fetch step; they then compare
-	// `creator_id` against the path's user-uuid AND the caller's
+	// `created_by` against the path's user-uuid AND the caller's
 	// `pivox_user_id` claim before returning.
 	GetConversationByName(ctx context.Context, arg GetConversationByNameParams) (AiConversation, error)
 	// Returns the state of a session without mutating it. Used by pollers to

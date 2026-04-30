@@ -13,8 +13,11 @@ SELECT * FROM organizations WHERE name = $1 AND delete_time IS NULL;
 SELECT * FROM organizations WHERE name = $1;
 
 -- name: CreateOrganization :one
-INSERT INTO organizations (id, name, display_name, created_by_firebase_identity_id, created_by, updated_by)
-VALUES ($1, $2, $3, $4, $5, $5)
+-- `created_by` is the founder pointer post-cleanup (single UUID FK
+-- replacing the old `created_by_firebase_identity_id` + TEXT
+-- `created_by` pair).
+INSERT INTO organizations (id, name, display_name, created_by)
+VALUES ($1, $2, $3, $4)
 RETURNING *;
 
 -- SoftDeleteOrganization transitions an ACTIVE org to DELETE_REQUESTED.
@@ -41,7 +44,7 @@ UPDATE organizations
 SET state       = 'ACTIVE',
     delete_time = NULL,
     purge_time  = NULL,
-    deleted_by  = '',
+    deleted_by  = NULL,
     update_time = now(),
     revision    = revision + 1,
     etag        = md5(now()::text || revision::text)

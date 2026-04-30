@@ -52,7 +52,7 @@ type CreateLineItemParams struct {
 	Description string             `json:"description"`
 	MediaType   NullAssetMediaType `json:"media_type"`
 	Annotations json.RawMessage    `json:"annotations"`
-	CreatedBy   string             `json:"created_by"`
+	CreatedBy   pgtype.UUID        `json:"created_by"`
 }
 
 func (q *Queries) CreateLineItem(ctx context.Context, arg CreateLineItemParams) (AssetRequestLineItem, error) {
@@ -210,7 +210,7 @@ RETURNING id, request_id, asset_id, name, display_name, description, media_type,
 
 type UpdateLineItemParams struct {
 	ID          uuid.UUID   `json:"id"`
-	UpdatedBy   string      `json:"updated_by"`
+	UpdatedBy   pgtype.UUID `json:"updated_by"`
 	DisplayName pgtype.Text `json:"display_name"`
 	Description pgtype.Text `json:"description"`
 	Annotations []byte      `json:"annotations"`
@@ -252,7 +252,7 @@ WHERE id = $1
 type UpdateLineItemStateParams struct {
 	ID        uuid.UUID     `json:"id"`
 	State     LineItemState `json:"state"`
-	UpdatedBy string        `json:"updated_by"`
+	UpdatedBy pgtype.UUID   `json:"updated_by"`
 }
 
 func (q *Queries) UpdateLineItemState(ctx context.Context, arg UpdateLineItemStateParams) error {

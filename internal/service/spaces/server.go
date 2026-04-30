@@ -217,13 +217,12 @@ func (s *SpacesServer) CreateSpace(ctx context.Context, req *apiv1.CreateSpaceRe
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := db.New(tx)
-	createdBy := callerFirebaseID.String()
-
 	// Post-Phase-7 the founder's principal_id IS the caller's
 	// firebase_identity_id — no per-org `users` row to resolve.
 	// `callerFirebaseID` is the firebase_identities.id (resolved
 	// via s.caller(ctx) which itself reads the verified token).
 	founderID := callerFirebaseID
+	createdBy := convert.PgUUID(callerFirebaseID)
 
 	result, err := qtx.CreateSpace(ctx, db.CreateSpaceParams{
 		ID:          uuid.New(),
@@ -293,7 +292,7 @@ func (s *SpacesServer) UpdateSpace(ctx context.Context, req *apiv1.UpdateSpaceRe
 
 	updateParams := db.UpdateSpaceParams{
 		ID:        resolvedSpace.ID,
-		UpdatedBy: caller.String(),
+		UpdatedBy: convert.PgUUID(caller),
 	}
 
 	mask := req.GetUpdateMask()
@@ -368,7 +367,7 @@ func (s *SpacesServer) DeleteSpace(ctx context.Context, req *apiv1.DeleteSpaceRe
 	}
 
 	spaceRsrc := "organizations/" + resolvedOrg.Slug + "/spaces/" + resolvedSpace.Slug
-	deletedBy := caller.String()
+	deletedBy := convert.PgUUID(caller)
 	force := req.GetForce()
 	expectedEtag := resolvedSpace.Row.Etag
 
@@ -392,7 +391,7 @@ func (s *SpacesServer) runDeleteSpace(
 	ctx context.Context,
 	progress lro.Progress,
 	spaceID uuid.UUID,
-	orgSlug, spaceRsrc, deletedBy string,
+	orgSlug, spaceRsrc string, deletedBy pgtype.UUID,
 	force bool,
 	expectedEtag string,
 ) (proto.Message, error) {
@@ -479,7 +478,7 @@ func (s *SpacesServer) UndeleteSpace(ctx context.Context, req *apiv1.UndeleteSpa
 
 	spaceID := resolvedSpace.ID
 	orgSlug := resolvedOrg.Slug
-	updatedBy := caller.String()
+	updatedBy := convert.PgUUID(caller)
 	spaceRsrc := "organizations/" + orgSlug + "/spaces/" + resolvedSpace.Slug
 	initialMeta := &apiv1.UndeleteSpaceMetadata{Space: spaceRsrc}
 

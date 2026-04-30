@@ -774,8 +774,8 @@ type AiArtifact struct {
 	Title           string      `json:"title"`
 	Description     string      `json:"description"`
 	LatestVersionID pgtype.UUID `json:"latest_version_id"`
-	CreatedBy       string      `json:"created_by"`
-	UpdatedBy       string      `json:"updated_by"`
+	CreatedBy       pgtype.UUID `json:"created_by"`
+	UpdatedBy       pgtype.UUID `json:"updated_by"`
 	CreateTime      time.Time   `json:"create_time"`
 	UpdateTime      time.Time   `json:"update_time"`
 }
@@ -789,14 +789,13 @@ type AiArtifactVersion struct {
 	InlineSizeBytes   pgtype.Int8 `json:"inline_size_bytes"`
 	AssetVersionName  pgtype.Text `json:"asset_version_name"`
 	Sequence          int32       `json:"sequence"`
-	CreatedBy         string      `json:"created_by"`
+	CreatedBy         pgtype.UUID `json:"created_by"`
 	CreateTime        time.Time   `json:"create_time"`
 }
 
 type AiConversation struct {
 	ID              uuid.UUID          `json:"id"`
 	OrgID           uuid.UUID          `json:"org_id"`
-	CreatorID       uuid.UUID          `json:"creator_id"`
 	Name            string             `json:"name"`
 	Title           string             `json:"title"`
 	TitleUserSet    bool               `json:"title_user_set"`
@@ -807,8 +806,8 @@ type AiConversation struct {
 	LastMessageTime pgtype.Timestamptz `json:"last_message_time"`
 	Etag            string             `json:"etag"`
 	Revision        int32              `json:"revision"`
-	CreatedBy       string             `json:"created_by"`
-	UpdatedBy       string             `json:"updated_by"`
+	CreatedBy       uuid.UUID          `json:"created_by"`
+	UpdatedBy       pgtype.UUID        `json:"updated_by"`
 	CreateTime      time.Time          `json:"create_time"`
 	UpdateTime      time.Time          `json:"update_time"`
 }
@@ -834,9 +833,9 @@ type ApiKey struct {
 	Restrictions []byte             `json:"restrictions"`
 	Etag         string             `json:"etag"`
 	Revision     int32              `json:"revision"`
-	CreatedBy    string             `json:"created_by"`
-	UpdatedBy    string             `json:"updated_by"`
-	DeletedBy    string             `json:"deleted_by"`
+	CreatedBy    pgtype.UUID        `json:"created_by"`
+	UpdatedBy    pgtype.UUID        `json:"updated_by"`
+	DeletedBy    pgtype.UUID        `json:"deleted_by"`
 	CreateTime   time.Time          `json:"create_time"`
 	UpdateTime   time.Time          `json:"update_time"`
 	DeleteTime   pgtype.Timestamptz `json:"delete_time"`
@@ -867,9 +866,9 @@ type Asset struct {
 	State             AssetState         `json:"state"`
 	Etag              string             `json:"etag"`
 	Revision          int32              `json:"revision"`
-	CreatedBy         string             `json:"created_by"`
-	UpdatedBy         string             `json:"updated_by"`
-	DeletedBy         string             `json:"deleted_by"`
+	CreatedBy         pgtype.UUID        `json:"created_by"`
+	UpdatedBy         pgtype.UUID        `json:"updated_by"`
+	DeletedBy         pgtype.UUID        `json:"deleted_by"`
 	CreateTime        time.Time          `json:"create_time"`
 	UpdateTime        time.Time          `json:"update_time"`
 	DeleteTime        pgtype.Timestamptz `json:"delete_time"`
@@ -900,8 +899,8 @@ type AssetRequest struct {
 	State         RequestState       `json:"state"`
 	Etag          string             `json:"etag"`
 	Revision      int32              `json:"revision"`
-	CreatedBy     string             `json:"created_by"`
-	UpdatedBy     string             `json:"updated_by"`
+	CreatedBy     pgtype.UUID        `json:"created_by"`
+	UpdatedBy     pgtype.UUID        `json:"updated_by"`
 	CreateTime    time.Time          `json:"create_time"`
 	UpdateTime    time.Time          `json:"update_time"`
 	DueTime       pgtype.Timestamptz `json:"due_time"`
@@ -919,24 +918,24 @@ type AssetRequestLineItem struct {
 	MediaType   NullAssetMediaType `json:"media_type"`
 	Annotations json.RawMessage    `json:"annotations"`
 	State       LineItemState      `json:"state"`
-	CreatedBy   string             `json:"created_by"`
-	UpdatedBy   string             `json:"updated_by"`
+	CreatedBy   pgtype.UUID        `json:"created_by"`
+	UpdatedBy   pgtype.UUID        `json:"updated_by"`
 	CreateTime  time.Time          `json:"create_time"`
 	UpdateTime  time.Time          `json:"update_time"`
 }
 
 type AssetVersion struct {
-	ID             uuid.UUID `json:"id"`
-	AssetID        uuid.UUID `json:"asset_id"`
-	VersionNumber  int32     `json:"version_number"`
-	ChecksumSha256 string    `json:"checksum_sha256"`
-	SizeBytes      int64     `json:"size_bytes"`
-	MimeType       string    `json:"mime_type"`
-	StorageKey     string    `json:"storage_key"`
-	ChangeNote     string    `json:"change_note"`
-	IngestionError string    `json:"ingestion_error"`
-	CreatedBy      string    `json:"created_by"`
-	CreateTime     time.Time `json:"create_time"`
+	ID             uuid.UUID   `json:"id"`
+	AssetID        uuid.UUID   `json:"asset_id"`
+	VersionNumber  int32       `json:"version_number"`
+	ChecksumSha256 string      `json:"checksum_sha256"`
+	SizeBytes      int64       `json:"size_bytes"`
+	MimeType       string      `json:"mime_type"`
+	StorageKey     string      `json:"storage_key"`
+	ChangeNote     string      `json:"change_note"`
+	IngestionError string      `json:"ingestion_error"`
+	CreatedBy      pgtype.UUID `json:"created_by"`
+	CreateTime     time.Time   `json:"create_time"`
 }
 
 type AuthTokenCode struct {
@@ -963,8 +962,8 @@ type Domain struct {
 	State             DomainState        `json:"state"`
 	Etag              string             `json:"etag"`
 	Revision          int32              `json:"revision"`
-	CreatedBy         string             `json:"created_by"`
-	UpdatedBy         string             `json:"updated_by"`
+	CreatedBy         pgtype.UUID        `json:"created_by"`
+	UpdatedBy         pgtype.UUID        `json:"updated_by"`
 	CreateTime        time.Time          `json:"create_time"`
 	UpdateTime        time.Time          `json:"update_time"`
 	VerifiedTime      pgtype.Timestamptz `json:"verified_time"`
@@ -992,18 +991,18 @@ type Group struct {
 	State       ResourceState   `json:"state"`
 	Etag        string          `json:"etag"`
 	Revision    int32           `json:"revision"`
-	CreatedBy   string          `json:"created_by"`
-	UpdatedBy   string          `json:"updated_by"`
+	CreatedBy   pgtype.UUID     `json:"created_by"`
+	UpdatedBy   pgtype.UUID     `json:"updated_by"`
 	CreateTime  time.Time       `json:"create_time"`
 	UpdateTime  time.Time       `json:"update_time"`
 }
 
 type GroupMember struct {
-	ID         uuid.UUID `json:"id"`
-	GroupID    uuid.UUID `json:"group_id"`
-	UserID     uuid.UUID `json:"user_id"`
-	CreatedBy  string    `json:"created_by"`
-	CreateTime time.Time `json:"create_time"`
+	ID         uuid.UUID   `json:"id"`
+	GroupID    uuid.UUID   `json:"group_id"`
+	UserID     uuid.UUID   `json:"user_id"`
+	CreatedBy  pgtype.UUID `json:"created_by"`
+	CreateTime time.Time   `json:"create_time"`
 }
 
 type Invitation struct {
@@ -1014,7 +1013,7 @@ type Invitation struct {
 	Token      string             `json:"token"`
 	State      InvitationState    `json:"state"`
 	Etag       string             `json:"etag"`
-	CreatedBy  string             `json:"created_by"`
+	CreatedBy  pgtype.UUID        `json:"created_by"`
 	CreateTime time.Time          `json:"create_time"`
 	ExpireTime time.Time          `json:"expire_time"`
 	AcceptTime pgtype.Timestamptz `json:"accept_time"`
@@ -1038,7 +1037,7 @@ type Operation struct {
 	ErrorCode    pgtype.Int4 `json:"error_code"`
 	ErrorMessage pgtype.Text `json:"error_message"`
 	OrgID        pgtype.UUID `json:"org_id"`
-	CreatedBy    string      `json:"created_by"`
+	CreatedBy    pgtype.UUID `json:"created_by"`
 	CreateTime   time.Time   `json:"create_time"`
 	UpdateTime   time.Time   `json:"update_time"`
 	ExpireTime   time.Time   `json:"expire_time"`
@@ -1052,28 +1051,27 @@ type OrgMember struct {
 	PrincipalID   uuid.UUID     `json:"principal_id"`
 	Etag          string        `json:"etag"`
 	Revision      int32         `json:"revision"`
-	CreatedBy     string        `json:"created_by"`
-	UpdatedBy     string        `json:"updated_by"`
+	CreatedBy     pgtype.UUID   `json:"created_by"`
+	UpdatedBy     pgtype.UUID   `json:"updated_by"`
 	CreateTime    time.Time     `json:"create_time"`
 	UpdateTime    time.Time     `json:"update_time"`
 }
 
 type Organization struct {
-	ID                          uuid.UUID          `json:"id"`
-	Name                        string             `json:"name"`
-	DisplayName                 string             `json:"display_name"`
-	Annotations                 json.RawMessage    `json:"annotations"`
-	CreatedByFirebaseIdentityID pgtype.UUID        `json:"created_by_firebase_identity_id"`
-	State                       ResourceState      `json:"state"`
-	Etag                        string             `json:"etag"`
-	Revision                    int32              `json:"revision"`
-	CreatedBy                   string             `json:"created_by"`
-	UpdatedBy                   string             `json:"updated_by"`
-	DeletedBy                   string             `json:"deleted_by"`
-	CreateTime                  time.Time          `json:"create_time"`
-	UpdateTime                  time.Time          `json:"update_time"`
-	DeleteTime                  pgtype.Timestamptz `json:"delete_time"`
-	PurgeTime                   pgtype.Timestamptz `json:"purge_time"`
+	ID          uuid.UUID          `json:"id"`
+	Name        string             `json:"name"`
+	DisplayName string             `json:"display_name"`
+	Annotations json.RawMessage    `json:"annotations"`
+	State       ResourceState      `json:"state"`
+	Etag        string             `json:"etag"`
+	Revision    int32              `json:"revision"`
+	CreatedBy   pgtype.UUID        `json:"created_by"`
+	UpdatedBy   pgtype.UUID        `json:"updated_by"`
+	DeletedBy   pgtype.UUID        `json:"deleted_by"`
+	CreateTime  time.Time          `json:"create_time"`
+	UpdateTime  time.Time          `json:"update_time"`
+	DeleteTime  pgtype.Timestamptz `json:"delete_time"`
+	PurgeTime   pgtype.Timestamptz `json:"purge_time"`
 }
 
 type Permission struct {
@@ -1100,8 +1098,8 @@ type Role struct {
 	State       ResourceState   `json:"state"`
 	Etag        string          `json:"etag"`
 	Revision    int32           `json:"revision"`
-	CreatedBy   string          `json:"created_by"`
-	UpdatedBy   string          `json:"updated_by"`
+	CreatedBy   pgtype.UUID     `json:"created_by"`
+	UpdatedBy   pgtype.UUID     `json:"updated_by"`
 	CreateTime  time.Time       `json:"create_time"`
 	UpdateTime  time.Time       `json:"update_time"`
 }
@@ -1120,9 +1118,9 @@ type Space struct {
 	State       ResourceState      `json:"state"`
 	Etag        string             `json:"etag"`
 	Revision    int32              `json:"revision"`
-	CreatedBy   string             `json:"created_by"`
-	UpdatedBy   string             `json:"updated_by"`
-	DeletedBy   string             `json:"deleted_by"`
+	CreatedBy   pgtype.UUID        `json:"created_by"`
+	UpdatedBy   pgtype.UUID        `json:"updated_by"`
+	DeletedBy   pgtype.UUID        `json:"deleted_by"`
 	CreateTime  time.Time          `json:"create_time"`
 	UpdateTime  time.Time          `json:"update_time"`
 	DeleteTime  pgtype.Timestamptz `json:"delete_time"`
@@ -1137,27 +1135,27 @@ type SpaceMember struct {
 	PrincipalID   uuid.UUID     `json:"principal_id"`
 	Etag          string        `json:"etag"`
 	Revision      int32         `json:"revision"`
-	CreatedBy     string        `json:"created_by"`
-	UpdatedBy     string        `json:"updated_by"`
+	CreatedBy     pgtype.UUID   `json:"created_by"`
+	UpdatedBy     pgtype.UUID   `json:"updated_by"`
 	CreateTime    time.Time     `json:"create_time"`
 	UpdateTime    time.Time     `json:"update_time"`
 }
 
 type SsoConfig struct {
-	ID                     uuid.UUID `json:"id"`
-	OrgID                  uuid.UUID `json:"org_id"`
-	FirebaseProviderID     string    `json:"firebase_provider_id"`
-	DisplayName            string    `json:"display_name"`
-	Enabled                bool      `json:"enabled"`
-	OidcConfig             []byte    `json:"oidc_config"`
-	SamlConfig             []byte    `json:"saml_config"`
-	ClientSecretCiphertext []byte    `json:"client_secret_ciphertext"`
-	Etag                   string    `json:"etag"`
-	Revision               int32     `json:"revision"`
-	CreatedBy              string    `json:"created_by"`
-	UpdatedBy              string    `json:"updated_by"`
-	CreateTime             time.Time `json:"create_time"`
-	UpdateTime             time.Time `json:"update_time"`
+	ID                     uuid.UUID   `json:"id"`
+	OrgID                  uuid.UUID   `json:"org_id"`
+	FirebaseProviderID     string      `json:"firebase_provider_id"`
+	DisplayName            string      `json:"display_name"`
+	Enabled                bool        `json:"enabled"`
+	OidcConfig             []byte      `json:"oidc_config"`
+	SamlConfig             []byte      `json:"saml_config"`
+	ClientSecretCiphertext []byte      `json:"client_secret_ciphertext"`
+	Etag                   string      `json:"etag"`
+	Revision               int32       `json:"revision"`
+	CreatedBy              pgtype.UUID `json:"created_by"`
+	UpdatedBy              pgtype.UUID `json:"updated_by"`
+	CreateTime             time.Time   `json:"create_time"`
+	UpdateTime             time.Time   `json:"update_time"`
 }
 
 type StorageAgent struct {
@@ -1198,8 +1196,8 @@ type StorageEndpoint struct {
 	State          EndpointState   `json:"state"`
 	Etag           string          `json:"etag"`
 	Revision       int32           `json:"revision"`
-	CreatedBy      string          `json:"created_by"`
-	UpdatedBy      string          `json:"updated_by"`
+	CreatedBy      pgtype.UUID     `json:"created_by"`
+	UpdatedBy      pgtype.UUID     `json:"updated_by"`
 	CreateTime     time.Time       `json:"create_time"`
 	UpdateTime     time.Time       `json:"update_time"`
 }
@@ -1220,8 +1218,8 @@ type StorageGateway struct {
 	CertExpiryTime    pgtype.Timestamptz  `json:"cert_expiry_time"`
 	Etag              string              `json:"etag"`
 	Revision          int32               `json:"revision"`
-	CreatedBy         string              `json:"created_by"`
-	UpdatedBy         string              `json:"updated_by"`
+	CreatedBy         pgtype.UUID         `json:"created_by"`
+	UpdatedBy         pgtype.UUID         `json:"updated_by"`
 	CreateTime        time.Time           `json:"create_time"`
 	UpdateTime        time.Time           `json:"update_time"`
 }
@@ -1233,7 +1231,7 @@ type TagBinding struct {
 	Origin         TagBindingOrigin `json:"origin"`
 	Annotations    json.RawMessage  `json:"annotations"`
 	Etag           string           `json:"etag"`
-	CreatedBy      string           `json:"created_by"`
+	CreatedBy      pgtype.UUID      `json:"created_by"`
 	CreateTime     time.Time        `json:"create_time"`
 }
 
@@ -1246,8 +1244,8 @@ type TagKey struct {
 	Annotations    json.RawMessage `json:"annotations"`
 	Etag           string          `json:"etag"`
 	Revision       int32           `json:"revision"`
-	CreatedBy      string          `json:"created_by"`
-	UpdatedBy      string          `json:"updated_by"`
+	CreatedBy      pgtype.UUID     `json:"created_by"`
+	UpdatedBy      pgtype.UUID     `json:"updated_by"`
 	CreateTime     time.Time       `json:"create_time"`
 	UpdateTime     time.Time       `json:"update_time"`
 }
@@ -1261,8 +1259,8 @@ type TagValue struct {
 	Annotations    json.RawMessage `json:"annotations"`
 	Etag           string          `json:"etag"`
 	Revision       int32           `json:"revision"`
-	CreatedBy      string          `json:"created_by"`
-	UpdatedBy      string          `json:"updated_by"`
+	CreatedBy      pgtype.UUID     `json:"created_by"`
+	UpdatedBy      pgtype.UUID     `json:"updated_by"`
 	CreateTime     time.Time       `json:"create_time"`
 	UpdateTime     time.Time       `json:"update_time"`
 }

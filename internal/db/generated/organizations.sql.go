@@ -61,25 +61,26 @@ func (q *Queries) CancelRunningOpsForOrg(ctx context.Context, orgID pgtype.UUID)
 }
 
 const createOrganization = `-- name: CreateOrganization :one
-INSERT INTO organizations (id, name, display_name, created_by_firebase_identity_id, created_by, updated_by)
-VALUES ($1, $2, $3, $4, $5, $5)
-RETURNING id, name, display_name, annotations, created_by_firebase_identity_id, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time
+INSERT INTO organizations (id, name, display_name, created_by)
+VALUES ($1, $2, $3, $4)
+RETURNING id, name, display_name, annotations, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time
 `
 
 type CreateOrganizationParams struct {
-	ID                          uuid.UUID   `json:"id"`
-	Name                        string      `json:"name"`
-	DisplayName                 string      `json:"display_name"`
-	CreatedByFirebaseIdentityID pgtype.UUID `json:"created_by_firebase_identity_id"`
-	CreatedBy                   string      `json:"created_by"`
+	ID          uuid.UUID   `json:"id"`
+	Name        string      `json:"name"`
+	DisplayName string      `json:"display_name"`
+	CreatedBy   pgtype.UUID `json:"created_by"`
 }
 
+// `created_by` is the founder pointer post-cleanup (single UUID FK
+// replacing the old `created_by_firebase_identity_id` + TEXT
+// `created_by` pair).
 func (q *Queries) CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error) {
 	row := q.db.QueryRow(ctx, createOrganization,
 		arg.ID,
 		arg.Name,
 		arg.DisplayName,
-		arg.CreatedByFirebaseIdentityID,
 		arg.CreatedBy,
 	)
 	var i Organization
@@ -88,7 +89,6 @@ func (q *Queries) CreateOrganization(ctx context.Context, arg CreateOrganization
 		&i.Name,
 		&i.DisplayName,
 		&i.Annotations,
-		&i.CreatedByFirebaseIdentityID,
 		&i.State,
 		&i.Etag,
 		&i.Revision,
@@ -104,7 +104,7 @@ func (q *Queries) CreateOrganization(ctx context.Context, arg CreateOrganization
 }
 
 const getOrganization = `-- name: GetOrganization :one
-SELECT id, name, display_name, annotations, created_by_firebase_identity_id, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time FROM organizations WHERE id = $1 AND delete_time IS NULL
+SELECT id, name, display_name, annotations, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time FROM organizations WHERE id = $1 AND delete_time IS NULL
 `
 
 func (q *Queries) GetOrganization(ctx context.Context, id uuid.UUID) (Organization, error) {
@@ -115,7 +115,6 @@ func (q *Queries) GetOrganization(ctx context.Context, id uuid.UUID) (Organizati
 		&i.Name,
 		&i.DisplayName,
 		&i.Annotations,
-		&i.CreatedByFirebaseIdentityID,
 		&i.State,
 		&i.Etag,
 		&i.Revision,
@@ -131,7 +130,7 @@ func (q *Queries) GetOrganization(ctx context.Context, id uuid.UUID) (Organizati
 }
 
 const getOrganizationByName = `-- name: GetOrganizationByName :one
-SELECT id, name, display_name, annotations, created_by_firebase_identity_id, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time FROM organizations WHERE name = $1 AND delete_time IS NULL
+SELECT id, name, display_name, annotations, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time FROM organizations WHERE name = $1 AND delete_time IS NULL
 `
 
 func (q *Queries) GetOrganizationByName(ctx context.Context, name string) (Organization, error) {
@@ -142,7 +141,6 @@ func (q *Queries) GetOrganizationByName(ctx context.Context, name string) (Organ
 		&i.Name,
 		&i.DisplayName,
 		&i.Annotations,
-		&i.CreatedByFirebaseIdentityID,
 		&i.State,
 		&i.Etag,
 		&i.Revision,
@@ -158,7 +156,7 @@ func (q *Queries) GetOrganizationByName(ctx context.Context, name string) (Organ
 }
 
 const getOrganizationByNameForGate = `-- name: GetOrganizationByNameForGate :one
-SELECT id, name, display_name, annotations, created_by_firebase_identity_id, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time FROM organizations WHERE name = $1
+SELECT id, name, display_name, annotations, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time FROM organizations WHERE name = $1
 `
 
 // GetOrganizationByNameForGate looks up an org by slug regardless of
@@ -174,7 +172,6 @@ func (q *Queries) GetOrganizationByNameForGate(ctx context.Context, name string)
 		&i.Name,
 		&i.DisplayName,
 		&i.Annotations,
-		&i.CreatedByFirebaseIdentityID,
 		&i.State,
 		&i.Etag,
 		&i.Revision,
@@ -190,7 +187,7 @@ func (q *Queries) GetOrganizationByNameForGate(ctx context.Context, name string)
 }
 
 const listOrgsPastPurgeTime = `-- name: ListOrgsPastPurgeTime :many
-SELECT id, name, display_name, annotations, created_by_firebase_identity_id, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time FROM organizations
+SELECT id, name, display_name, annotations, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time FROM organizations
  WHERE delete_time IS NOT NULL
    AND purge_time IS NOT NULL
    AND purge_time < now()
@@ -219,7 +216,6 @@ func (q *Queries) ListOrgsPastPurgeTime(ctx context.Context) ([]Organization, er
 			&i.Name,
 			&i.DisplayName,
 			&i.Annotations,
-			&i.CreatedByFirebaseIdentityID,
 			&i.State,
 			&i.Etag,
 			&i.Revision,
@@ -295,12 +291,12 @@ SET state       = 'DELETE_REQUESTED',
     revision    = revision + 1,
     etag        = md5(now()::text || revision::text)
 WHERE id = $1 AND state = 'ACTIVE'
-RETURNING id, name, display_name, annotations, created_by_firebase_identity_id, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time
+RETURNING id, name, display_name, annotations, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time
 `
 
 type SoftDeleteOrganizationParams struct {
-	ID        uuid.UUID `json:"id"`
-	DeletedBy string    `json:"deleted_by"`
+	ID        uuid.UUID   `json:"id"`
+	DeletedBy pgtype.UUID `json:"deleted_by"`
 }
 
 // SoftDeleteOrganization transitions an ACTIVE org to DELETE_REQUESTED.
@@ -315,7 +311,6 @@ func (q *Queries) SoftDeleteOrganization(ctx context.Context, arg SoftDeleteOrga
 		&i.Name,
 		&i.DisplayName,
 		&i.Annotations,
-		&i.CreatedByFirebaseIdentityID,
 		&i.State,
 		&i.Etag,
 		&i.Revision,
@@ -335,12 +330,12 @@ UPDATE organizations
 SET state       = 'ACTIVE',
     delete_time = NULL,
     purge_time  = NULL,
-    deleted_by  = '',
+    deleted_by  = NULL,
     update_time = now(),
     revision    = revision + 1,
     etag        = md5(now()::text || revision::text)
 WHERE id = $1 AND state = 'DELETE_REQUESTED' AND purge_time > now()
-RETURNING id, name, display_name, annotations, created_by_firebase_identity_id, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time
+RETURNING id, name, display_name, annotations, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time
 `
 
 // UndeleteOrganization restores a DELETE_REQUESTED org to ACTIVE,
@@ -354,7 +349,6 @@ func (q *Queries) UndeleteOrganization(ctx context.Context, id uuid.UUID) (Organ
 		&i.Name,
 		&i.DisplayName,
 		&i.Annotations,
-		&i.CreatedByFirebaseIdentityID,
 		&i.State,
 		&i.Etag,
 		&i.Revision,

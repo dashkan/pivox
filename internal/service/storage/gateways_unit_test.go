@@ -22,14 +22,25 @@ import (
 	"github.com/dashkan/pivox/internal/agentstream"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	storagev1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"
+	"github.com/dashkan/pivox/internal/server"
 	"github.com/dashkan/pivox/internal/testutil/mocks"
 )
 
+// callerCtx returns a background context carrying the canonical caller
+// pivox_user_id used by storage write-path tests. The audit-fields
+// sweep made `created_by`/`updated_by` UUID FKs sourced from
+// `MustPivoxUserID(ctx)`, so any Create/Update test that reaches the
+// query needs a context with this claim.
+func callerCtx() context.Context {
+	return server.WithPivoxUserID(context.Background(), storageCallerPivoxUUID)
+}
+
 // Shared test fixtures for the storage package tests.
 var (
-	gwOrgID = uuid.MustParse("0192a000-0001-7000-8000-000000000001")
-	gwID    = uuid.MustParse("0192a000-0010-7000-8000-000000000001")
-	gwOrg   = db.Organization{
+	storageCallerPivoxUUID = uuid.MustParse("0192a000-cccc-7000-8000-000000000010")
+	gwOrgID                = uuid.MustParse("0192a000-0001-7000-8000-000000000001")
+	gwID                   = uuid.MustParse("0192a000-0010-7000-8000-000000000001")
+	gwOrg                  = db.Organization{
 		ID:          gwOrgID,
 		Name:        "acme",
 		DisplayName: "Acme Corp",
@@ -75,7 +86,7 @@ func newGatewayServer(q *mocks.MockQuerier) *StorageGatewaysServer {
 func TestUnit_CreateStorageGateway_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("CreateStorageGateway", mock.Anything, mock.MatchedBy(func(p db.CreateStorageGatewayParams) bool {
@@ -107,7 +118,7 @@ func TestUnit_CreateStorageGateway_Success(t *testing.T) {
 func TestUnit_GetStorageGateway_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -131,7 +142,7 @@ func TestUnit_GetStorageGateway_Success(t *testing.T) {
 func TestUnit_GetStorageGateway_NotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -157,7 +168,7 @@ func TestUnit_GetStorageGateway_NotFound(t *testing.T) {
 func TestUnit_DeleteStorageGateway_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -182,7 +193,7 @@ func TestUnit_DeleteStorageGateway_Success(t *testing.T) {
 func TestUnit_RotateRegistrationToken_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	rotatedGW := testGateway
 	rotatedGW.RegistrationToken = "new-token-xyz"
@@ -213,7 +224,7 @@ func TestUnit_RotateRegistrationToken_Success(t *testing.T) {
 func TestUnit_GetInstallScript_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -234,7 +245,7 @@ func TestUnit_GetInstallScript_Success(t *testing.T) {
 func TestUnit_GetInstallScript_WithFlags(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -268,7 +279,7 @@ func TestUnit_GetInstallScript_WithFlags(t *testing.T) {
 func TestUnit_UpdateStorageGateway_WithFieldMask(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	updatedGW := testGateway
 	updatedGW.DisplayName = "Updated Gateway"
@@ -307,7 +318,7 @@ func TestUnit_UpdateStorageGateway_WithFieldMask(t *testing.T) {
 func TestUnit_UpdateStorageGateway_NoMask(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	updatedGW := testGateway
 	updatedGW.DisplayName = "Full Update"
@@ -351,7 +362,7 @@ func TestUnit_UpdateStorageGateway_NoMask(t *testing.T) {
 func TestUnit_GetUninstallScript_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -431,7 +442,7 @@ func TestUnit_ParseStorageGatewayName_Invalid(t *testing.T) {
 func TestUnit_GetStorageGateway_OrgNotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "missing-org").
 		Return(db.Organization{}, pgx.ErrNoRows)
@@ -454,7 +465,7 @@ func TestUnit_GetStorageGateway_OrgNotFound(t *testing.T) {
 func TestUnit_GetStorageGateway_InvalidName(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	_, err := srv.GetStorageGateway(ctx, &storagev1.GetStorageGatewayRequest{
 		Name: "bad-name",
@@ -473,7 +484,7 @@ func TestUnit_GetStorageGateway_InvalidName(t *testing.T) {
 func TestUnit_UpdateStorageGateway_InvalidName(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	_, err := srv.UpdateStorageGateway(ctx, &storagev1.UpdateStorageGatewayRequest{
 		StorageGateway: &storagev1.StorageGateway{
@@ -490,7 +501,7 @@ func TestUnit_UpdateStorageGateway_InvalidName(t *testing.T) {
 func TestUnit_UpdateStorageGateway_OrgNotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "no-org").
 		Return(db.Organization{}, pgx.ErrNoRows)
@@ -511,7 +522,7 @@ func TestUnit_UpdateStorageGateway_OrgNotFound(t *testing.T) {
 func TestUnit_UpdateStorageGateway_GatewayNotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -535,7 +546,7 @@ func TestUnit_UpdateStorageGateway_GatewayNotFound(t *testing.T) {
 func TestUnit_UpdateStorageGateway_UpdateFails(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -562,7 +573,7 @@ func TestUnit_UpdateStorageGateway_UpdateFails(t *testing.T) {
 func TestUnit_UpdateStorageGateway_FieldMask_AllPaths(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	updatedGW := testGateway
 	updatedGW.IpAddresses = []string{"10.0.0.5"}
@@ -597,7 +608,7 @@ func TestUnit_UpdateStorageGateway_FieldMask_AllPaths(t *testing.T) {
 func TestUnit_UpdateStorageGateway_NoMask_WithAnnotations(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	updatedGW := testGateway
 
@@ -630,7 +641,7 @@ func TestUnit_UpdateStorageGateway_NoMask_WithAnnotations(t *testing.T) {
 func TestUnit_DeleteStorageGateway_InvalidName(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	_, err := srv.DeleteStorageGateway(ctx, &storagev1.DeleteStorageGatewayRequest{
 		Name: "not/a/valid/name/at/all/extra",
@@ -645,7 +656,7 @@ func TestUnit_DeleteStorageGateway_InvalidName(t *testing.T) {
 func TestUnit_DeleteStorageGateway_OrgNotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "no-org").
 		Return(db.Organization{}, pgx.ErrNoRows)
@@ -664,7 +675,7 @@ func TestUnit_DeleteStorageGateway_OrgNotFound(t *testing.T) {
 func TestUnit_DeleteStorageGateway_GatewayNotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -686,7 +697,7 @@ func TestUnit_DeleteStorageGateway_GatewayNotFound(t *testing.T) {
 func TestUnit_DeleteStorageGateway_DeleteFails(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -714,7 +725,7 @@ func TestUnit_DeleteStorageGateway_DeleteFails(t *testing.T) {
 func TestUnit_RotateRegistrationToken_InvalidName(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	_, err := srv.RotateRegistrationToken(ctx, &storagev1.RotateRegistrationTokenRequest{
 		Name: "bad-name",
@@ -729,7 +740,7 @@ func TestUnit_RotateRegistrationToken_InvalidName(t *testing.T) {
 func TestUnit_RotateRegistrationToken_OrgNotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "no-org").
 		Return(db.Organization{}, pgx.ErrNoRows)
@@ -748,7 +759,7 @@ func TestUnit_RotateRegistrationToken_OrgNotFound(t *testing.T) {
 func TestUnit_RotateRegistrationToken_GatewayNotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -770,7 +781,7 @@ func TestUnit_RotateRegistrationToken_GatewayNotFound(t *testing.T) {
 func TestUnit_RotateRegistrationToken_DBError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -798,7 +809,7 @@ func TestUnit_RotateRegistrationToken_DBError(t *testing.T) {
 func TestUnit_GetUninstallScript_InvalidName(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	_, err := srv.GetUninstallScript(ctx, &storagev1.GetUninstallScriptRequest{
 		Name: "bad-name",
@@ -813,7 +824,7 @@ func TestUnit_GetUninstallScript_InvalidName(t *testing.T) {
 func TestUnit_GetUninstallScript_OrgNotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "no-org").
 		Return(db.Organization{}, pgx.ErrNoRows)
@@ -832,7 +843,7 @@ func TestUnit_GetUninstallScript_OrgNotFound(t *testing.T) {
 func TestUnit_GetUninstallScript_GatewayNotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -858,7 +869,7 @@ func TestUnit_GetUninstallScript_GatewayNotFound(t *testing.T) {
 func TestUnit_GetInstallScript_InvalidName(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	_, err := srv.GetInstallScript(ctx, &storagev1.GetInstallScriptRequest{
 		Name: "bad-name",
@@ -873,7 +884,7 @@ func TestUnit_GetInstallScript_InvalidName(t *testing.T) {
 func TestUnit_GetInstallScript_OrgNotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "no-org").
 		Return(db.Organization{}, pgx.ErrNoRows)
@@ -892,7 +903,7 @@ func TestUnit_GetInstallScript_OrgNotFound(t *testing.T) {
 func TestUnit_GetInstallScript_GatewayNotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -914,7 +925,7 @@ func TestUnit_GetInstallScript_GatewayNotFound(t *testing.T) {
 func TestUnit_GetInstallScript_WithProxyFlags(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("GetStorageGatewayByName", mock.Anything, db.GetStorageGatewayByNameParams{
@@ -944,7 +955,7 @@ func TestUnit_GetInstallScript_WithProxyFlags(t *testing.T) {
 func TestUnit_CreateStorageGateway_OrgNotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "no-org").
 		Return(db.Organization{}, pgx.ErrNoRows)
@@ -966,7 +977,7 @@ func TestUnit_CreateStorageGateway_OrgNotFound(t *testing.T) {
 func TestUnit_CreateStorageGateway_DBError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("CreateStorageGateway", mock.Anything, mock.Anything).
@@ -989,7 +1000,7 @@ func TestUnit_CreateStorageGateway_DBError(t *testing.T) {
 func TestUnit_CreateStorageGateway_AutoGeneratedID(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("CreateStorageGateway", mock.Anything, mock.MatchedBy(func(p db.CreateStorageGatewayParams) bool {
@@ -1013,7 +1024,7 @@ func TestUnit_CreateStorageGateway_AutoGeneratedID(t *testing.T) {
 func TestUnit_CreateStorageGateway_WithAnnotations(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	srv := newGatewayServer(mockQ)
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(gwOrg, nil)
 	mockQ.On("CreateStorageGateway", mock.Anything, mock.MatchedBy(func(p db.CreateStorageGatewayParams) bool {
@@ -1047,7 +1058,7 @@ func TestUnit_CreateStorageSession_Success(t *testing.T) {
 		conns:             conns,
 		sessionSigningKey: []byte("test-key"),
 	}
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	resp, err := srv.CreateStorageSession(ctx, &storagev1.CreateStorageSessionRequest{})
 
@@ -1068,7 +1079,7 @@ func TestUnit_CreateStorageSession_WithCustomTTL(t *testing.T) {
 		conns:             conns,
 		sessionSigningKey: []byte("test-key"),
 	}
-	ctx := context.Background()
+	ctx := callerCtx()
 
 	customTTL := 30 * time.Minute
 	resp, err := srv.CreateStorageSession(ctx, &storagev1.CreateStorageSessionRequest{

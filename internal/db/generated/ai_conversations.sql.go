@@ -13,24 +13,25 @@ import (
 )
 
 const createConversation = `-- name: CreateConversation :one
-INSERT INTO ai_conversations (org_id, creator_id, name, title, description, created_by, updated_by)
-VALUES ($1, $2, $3, $4, $5, $6, $6)
-RETURNING id, org_id, creator_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time
+INSERT INTO ai_conversations (org_id, name, title, description, created_by)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, org_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time
 `
 
 type CreateConversationParams struct {
 	OrgID       uuid.UUID `json:"org_id"`
-	CreatorID   uuid.UUID `json:"creator_id"`
 	Name        string    `json:"name"`
 	Title       string    `json:"title"`
 	Description string    `json:"description"`
-	CreatedBy   string    `json:"created_by"`
+	CreatedBy   uuid.UUID `json:"created_by"`
 }
 
+// `created_by` doubles as the conversation owner / authorization
+// key (the `users/{user}` resource path segment). NOT NULL on the
+// column; every conversation has a creator.
 func (q *Queries) CreateConversation(ctx context.Context, arg CreateConversationParams) (AiConversation, error) {
 	row := q.db.QueryRow(ctx, createConversation,
 		arg.OrgID,
-		arg.CreatorID,
 		arg.Name,
 		arg.Title,
 		arg.Description,
@@ -40,7 +41,6 @@ func (q *Queries) CreateConversation(ctx context.Context, arg CreateConversation
 	err := row.Scan(
 		&i.ID,
 		&i.OrgID,
-		&i.CreatorID,
 		&i.Name,
 		&i.Title,
 		&i.TitleUserSet,
@@ -69,7 +69,7 @@ func (q *Queries) DeleteConversation(ctx context.Context, id uuid.UUID) error {
 }
 
 const getConversationByID = `-- name: GetConversationByID :one
-SELECT id, org_id, creator_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time FROM ai_conversations WHERE id = $1
+SELECT id, org_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time FROM ai_conversations WHERE id = $1
 `
 
 func (q *Queries) GetConversationByID(ctx context.Context, id uuid.UUID) (AiConversation, error) {
@@ -78,7 +78,6 @@ func (q *Queries) GetConversationByID(ctx context.Context, id uuid.UUID) (AiConv
 	err := row.Scan(
 		&i.ID,
 		&i.OrgID,
-		&i.CreatorID,
 		&i.Name,
 		&i.Title,
 		&i.TitleUserSet,
@@ -98,7 +97,7 @@ func (q *Queries) GetConversationByID(ctx context.Context, id uuid.UUID) (AiConv
 }
 
 const getConversationByName = `-- name: GetConversationByName :one
-SELECT id, org_id, creator_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time FROM ai_conversations WHERE org_id = $1 AND name = $2
+SELECT id, org_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time FROM ai_conversations WHERE org_id = $1 AND name = $2
 `
 
 type GetConversationByNameParams struct {
@@ -110,7 +109,7 @@ type GetConversationByNameParams struct {
 // without an ownership filter. The handler enforces creator-only or
 // `*All`-permission access on top of this. Used by the read/update/
 // delete handlers as the row-fetch step; they then compare
-// `creator_id` against the path's user-uuid AND the caller's
+// `created_by` against the path's user-uuid AND the caller's
 // `pivox_user_id` claim before returning.
 func (q *Queries) GetConversationByName(ctx context.Context, arg GetConversationByNameParams) (AiConversation, error) {
 	row := q.db.QueryRow(ctx, getConversationByName, arg.OrgID, arg.Name)
@@ -118,7 +117,6 @@ func (q *Queries) GetConversationByName(ctx context.Context, arg GetConversation
 	err := row.Scan(
 		&i.ID,
 		&i.OrgID,
-		&i.CreatorID,
 		&i.Name,
 		&i.Title,
 		&i.TitleUserSet,
@@ -157,7 +155,7 @@ SET title = $2,
     update_time = now(),
     etag = md5(now()::text)
 WHERE id = $1
-RETURNING id, org_id, creator_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time
+RETURNING id, org_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time
 `
 
 type SetAutoTitleParams struct {
@@ -173,7 +171,6 @@ func (q *Queries) SetAutoTitle(ctx context.Context, arg SetAutoTitleParams) (AiC
 	err := row.Scan(
 		&i.ID,
 		&i.OrgID,
-		&i.CreatorID,
 		&i.Name,
 		&i.Title,
 		&i.TitleUserSet,
@@ -208,12 +205,12 @@ SET title = COALESCE($3, title),
     update_time = now(),
     etag = md5(now()::text)
 WHERE id = $1
-RETURNING id, org_id, creator_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time
+RETURNING id, org_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time
 `
 
 type UpdateConversationParams struct {
 	ID          uuid.UUID   `json:"id"`
-	UpdatedBy   string      `json:"updated_by"`
+	UpdatedBy   pgtype.UUID `json:"updated_by"`
 	Title       pgtype.Text `json:"title"`
 	Description pgtype.Text `json:"description"`
 	Archived    pgtype.Bool `json:"archived"`
@@ -240,7 +237,6 @@ func (q *Queries) UpdateConversation(ctx context.Context, arg UpdateConversation
 	err := row.Scan(
 		&i.ID,
 		&i.OrgID,
-		&i.CreatorID,
 		&i.Name,
 		&i.Title,
 		&i.TitleUserSet,

@@ -143,14 +143,14 @@ func TestRunDeleteOrganization_SoftDeletePhases(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	q.On("CancelRunningOpsForOrg", mock.Anything, pgtype.UUID{Bytes: orgID, Valid: true}).Return([]uuid.UUID{}, nil)
 	q.On("SoftDeleteOrganization", mock.Anything, db.SoftDeleteOrganizationParams{
-		ID: orgID, DeletedBy: "caller-id",
+		ID: orgID, DeletedBy: pgtype.UUID{},
 	}).Return(db.Organization{ID: orgID, Name: "acme", State: db.ResourceStateDELETEREQUESTED}, nil)
 
 	srv := &OrganizationsServer{queries: q}
 	progress := &fakeProgress{}
 	result, err := srv.runDeleteOrganization(
 		context.Background(), progress, orgID,
-		"organizations/acme", "caller-id", false /* force */, "etag-1")
+		"organizations/acme", pgtype.UUID{}, false /* force */, "etag-1")
 	require.NoError(t, err)
 	assert.Equal(t, []apiv1.DeleteOrganizationMetadata_Phase{
 		apiv1.DeleteOrganizationMetadata_CANCELLING_OPERATIONS,
@@ -176,7 +176,7 @@ func TestRunDeleteOrganization_ForcePhases(t *testing.T) {
 	progress := &fakeProgress{}
 	_, err := srv.runDeleteOrganization(
 		context.Background(), progress, orgID,
-		"organizations/acme", "caller-id", true /* force */, "etag-1")
+		"organizations/acme", pgtype.UUID{}, true /* force */, "etag-1")
 	require.NoError(t, err)
 	assert.Equal(t, []apiv1.DeleteOrganizationMetadata_Phase{
 		apiv1.DeleteOrganizationMetadata_CANCELLING_OPERATIONS,
@@ -200,7 +200,7 @@ func TestRunDeleteOrganization_RaceWithConcurrentDelete(t *testing.T) {
 	srv := &OrganizationsServer{queries: q}
 	_, err := srv.runDeleteOrganization(
 		context.Background(), &fakeProgress{}, orgID,
-		"organizations/acme", "caller-id", false, "etag-1")
+		"organizations/acme", pgtype.UUID{}, false, "etag-1")
 	require.Error(t, err)
 	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
 }
@@ -222,7 +222,7 @@ func TestRunDeleteOrganization_ForceEtagDrift(t *testing.T) {
 	srv := &OrganizationsServer{queries: q}
 	_, err := srv.runDeleteOrganization(
 		context.Background(), &fakeProgress{}, orgID,
-		"organizations/acme", "caller-id", true /* force */, "stale-etag")
+		"organizations/acme", pgtype.UUID{}, true /* force */, "stale-etag")
 	require.Error(t, err)
 	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
 	assert.Contains(t, err.Error(), "revision changed")
@@ -236,7 +236,7 @@ func TestRunDeleteOrganization_CancelOpsFailureIsInternal(t *testing.T) {
 	srv := &OrganizationsServer{queries: q}
 	_, err := srv.runDeleteOrganization(
 		context.Background(), &fakeProgress{}, orgID,
-		"organizations/acme", "caller-id", false, "etag-1")
+		"organizations/acme", pgtype.UUID{}, false, "etag-1")
 	require.Error(t, err)
 	assert.Equal(t, codes.Internal, status.Code(err))
 }

@@ -28,7 +28,7 @@ type CreateStorageGatewayParams struct {
 	RegistrationToken string          `json:"registration_token"`
 	Hostname          string          `json:"hostname"`
 	Annotations       json.RawMessage `json:"annotations"`
-	CreatedBy         string          `json:"created_by"`
+	CreatedBy         pgtype.UUID     `json:"created_by"`
 }
 
 func (q *Queries) CreateStorageGateway(ctx context.Context, arg CreateStorageGatewayParams) (StorageGateway, error) {
@@ -230,7 +230,7 @@ RETURNING id, org_id, name, display_name, ip_addresses, registration_token, targ
 
 type UpdateStorageGatewayParams struct {
 	ID            uuid.UUID   `json:"id"`
-	UpdatedBy     string      `json:"updated_by"`
+	UpdatedBy     pgtype.UUID `json:"updated_by"`
 	DisplayName   pgtype.Text `json:"display_name"`
 	IpAddresses   []string    `json:"ip_addresses"`
 	TargetVersion pgtype.Text `json:"target_version"`

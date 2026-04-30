@@ -48,7 +48,7 @@ UPDATE spaces
 SET state = 'ACTIVE',
     delete_time = NULL,
     purge_time = NULL,
-    deleted_by = '',
+    deleted_by = NULL,
     revision = revision + 1,
     updated_by = $2,
     update_time = now(),
