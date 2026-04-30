@@ -219,22 +219,25 @@ struct LoginView: View {
         // — the in-app primary-button cancel covers all those cases
         // without making the user hunt.
         //
-        // Single AuthPrimaryButton with conditional props (rather
-        // than an if/else swap) so the view identity stays stable
-        // across the morph — SwiftUI's implicit transition would
-        // otherwise fade the old button out and the new one in,
-        // producing a visible flash right at the moment the user
-        // expects the OAuth sheet to appear.
-        AuthPrimaryButton(
-          auth.isOAuthInProgress
-            ? "Cancel sign-in"
-            : (didResolveAsPassword ? "Sign In" : "Continue"),
-          isLoading: !auth.isOAuthInProgress && isLoading,
-          action: auth.isOAuthInProgress ? auth.cancelOAuth : submit
-        )
-        .disabled(!auth.isOAuthInProgress && primaryDisabled)
-        .accessibilityIdentifier(
-          auth.isOAuthInProgress ? "login-cancel-oauth" : "login-sign-in")
+        // SwiftUI animates the cross-state swap with a brief
+        // fade-flash. Two attempts to suppress it didn't help
+        // (single-button-with-conditional-props, skip-spinner-during-
+        // step-1); the flash appears to be inherent to how the
+        // ASWebAuth sheet animates into place, not the button
+        // re-render. Living with it is fine — the morph is the
+        // discoverable affordance, the flash is small.
+        if auth.isOAuthInProgress {
+          AuthPrimaryButton("Cancel sign-in", action: auth.cancelOAuth)
+            .accessibilityIdentifier("login-cancel-oauth")
+        } else {
+          AuthPrimaryButton(
+            didResolveAsPassword ? "Sign In" : "Continue",
+            isLoading: isLoading,
+            action: submit
+          )
+          .disabled(primaryDisabled)
+          .accessibilityIdentifier("login-sign-in")
+        }
 
         // Error message — pre-allocated space to prevent layout shift.
         Text(auth.errorMessage ?? " ")
