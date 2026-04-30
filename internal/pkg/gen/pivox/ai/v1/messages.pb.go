@@ -104,7 +104,7 @@ func (Role) EnumDescriptor() ([]byte, []int) {
 type Message struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The resource name of the message.
-	// Format: `organizations/{organization}/conversations/{conversation}/messages/{message}`
+	// Format: `organizations/{organization}/users/{user}/conversations/{conversation}/messages/{message}`
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Output only. The role of the message author.
 	Role Role `protobuf:"varint,2,opt,name=role,proto3,enum=pivox.ai.v1.Role" json:"role,omitempty"`
@@ -601,7 +601,7 @@ func (x *FilePart) GetUrl() string {
 type GetMessageRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The resource name of the message to retrieve.
-	// Format: `organizations/{organization}/conversations/{conversation}/messages/{message}`
+	// Format: `organizations/{organization}/users/{user}/conversations/{conversation}/messages/{message}`
 	Name          string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -648,7 +648,7 @@ func (x *GetMessageRequest) GetName() string {
 type ListMessagesRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The parent conversation.
-	// Format: `organizations/{organization}/conversations/{conversation}`
+	// Format: `organizations/{organization}/users/{user}/conversations/{conversation}`
 	Parent string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
 	// Optional. Maximum number of messages to return.
 	PageSize int32 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
@@ -787,14 +787,14 @@ var File_pivox_ai_v1_messages_proto protoreflect.FileDescriptor
 
 const file_pivox_ai_v1_messages_proto_rawDesc = "" +
 	"\n" +
-	"\x1apivox/ai/v1/messages.proto\x12\vpivox.ai.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xbd\x02\n" +
+	"\x1apivox/ai/v1/messages.proto\x12\vpivox.ai.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xcc\x02\n" +
 	"\aMessage\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12*\n" +
 	"\x04role\x18\x02 \x01(\x0e2\x11.pivox.ai.v1.RoleB\x03\xe0A\x03R\x04role\x123\n" +
 	"\x05parts\x18\x03 \x03(\v2\x18.pivox.ai.v1.MessagePartB\x03\xe0A\x03R\x05parts\x12@\n" +
 	"\vcreate_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"createTime:v\xeaAs\n" +
-	"\x10pivox.ai/Message\x12Lorganizations/{organization}/conversations/{conversation}/messages/{message}*\bmessages2\amessage\"\xa5\x02\n" +
+	"createTime:\x84\x01\xeaA\x80\x01\n" +
+	"\x10pivox.ai/Message\x12Yorganizations/{organization}/users/{user}/conversations/{conversation}/messages/{message}*\bmessages2\amessage\"\xa5\x02\n" +
 	"\vMessagePart\x12+\n" +
 	"\x04text\x18\x01 \x01(\v2\x15.pivox.ai.v1.TextPartH\x00R\x04text\x12:\n" +
 	"\treasoning\x18\x02 \x01(\v2\x1a.pivox.ai.v1.ReasoningPartH\x00R\treasoning\x128\n" +

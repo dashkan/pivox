@@ -99,7 +99,7 @@ public struct Pivox_Ai_V1_Message: Sendable {
   // methods supported on all messages.
 
   /// The resource name of the message.
-  /// Format: `organizations/{organization}/conversations/{conversation}/messages/{message}`
+  /// Format: `organizations/{organization}/users/{user}/conversations/{conversation}/messages/{message}`
   public var name: String = String()
 
   /// Output only. The role of the message author.
@@ -295,7 +295,7 @@ public struct Pivox_Ai_V1_GetMessageRequest: Sendable {
   // methods supported on all messages.
 
   /// Required. The resource name of the message to retrieve.
-  /// Format: `organizations/{organization}/conversations/{conversation}/messages/{message}`
+  /// Format: `organizations/{organization}/users/{user}/conversations/{conversation}/messages/{message}`
   public var name: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -310,7 +310,7 @@ public struct Pivox_Ai_V1_ListMessagesRequest: Sendable {
   // methods supported on all messages.
 
   /// Required. The parent conversation.
-  /// Format: `organizations/{organization}/conversations/{conversation}`
+  /// Format: `organizations/{organization}/users/{user}/conversations/{conversation}`
   public var parent: String = String()
 
   /// Optional. Maximum number of messages to return.

@@ -1108,6 +1108,15 @@ CREATE TABLE ai_conversations (
     id              UUID PRIMARY KEY DEFAULT uuidv7(),
     -- relationships
     org_id          UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    -- creator_id is the conversation owner's `firebase_identities.id`
+    -- (the universal Pivox user uuid post-Phase-7). This is the
+    -- load-bearing field for ownership checks: the resource path
+    -- carries it as the `users/{user}` segment, the handler enforces
+    -- `creator_id == caller's pivox_user_id claim` unless the caller
+    -- holds `ai.conversations.readAll` / `deleteAll` for audit/
+    -- cleanup. Cascade delete tracks the firebase_identity row so a
+    -- DeleteAccount cleanup wipes the user's conversations too.
+    creator_id      UUID NOT NULL REFERENCES firebase_identities(id) ON DELETE CASCADE,
     -- identity
     name            TEXT NOT NULL,  -- stable ID used in resource name
     -- domain
@@ -1136,13 +1145,13 @@ CREATE TABLE ai_conversations (
 -- access control; `id DESC` at the end serves both the default newest-first
 -- sort and cursor-based pagination (`WHERE id < $cursor`) as a pure index
 -- scan. `uuidv7()` gives time-ordered + unique, so `id DESC` == chronological.
-CREATE INDEX idx_ai_conversations_creator ON ai_conversations (org_id, created_by, id DESC);
+CREATE INDEX idx_ai_conversations_creator ON ai_conversations (org_id, creator_id, id DESC);
 
 -- Partial index for the "non-archived" filtered list, which is the common case.
-CREATE INDEX idx_ai_conversations_active ON ai_conversations (org_id, created_by, id DESC) WHERE archived = FALSE;
+CREATE INDEX idx_ai_conversations_active ON ai_conversations (org_id, creator_id, id DESC) WHERE archived = FALSE;
 
 -- Partial index for "pinned first" views.
-CREATE INDEX idx_ai_conversations_pinned ON ai_conversations (org_id, created_by, id DESC) WHERE pinned = TRUE;
+CREATE INDEX idx_ai_conversations_pinned ON ai_conversations (org_id, creator_id, id DESC) WHERE pinned = TRUE;
 
 -- ============================================================================
 -- AI chat — ai_messages
@@ -1233,12 +1242,21 @@ ALTER TABLE ai_artifact_versions ADD CONSTRAINT fk_ai_artifact_versions_artifact
 CREATE INDEX idx_ai_artifact_versions_artifact ON ai_artifact_versions (artifact_id, id DESC);
 CREATE INDEX idx_ai_artifact_versions_asset ON ai_artifact_versions (asset_version_name) WHERE asset_version_name IS NOT NULL;
 
--- AI chat permissions. Messages, artifacts, and artifact versions are
--- facets of a conversation — their reads roll up to ai.conversations.read,
--- and artifact/version mutations roll up to ai.conversations.update/delete.
+-- AI chat permissions. Conversations are personal post-Phase-7;
+-- messages, artifacts, and artifact versions are facets of a
+-- conversation — their reads roll up to ai.conversations.read, and
+-- artifact/version mutations roll up to
+-- ai.conversations.update/delete. The base CRUD perms gate
+-- org-level eligibility; the handler enforces creator-only
+-- ownership on top so a viewer can manage their OWN conversations
+-- but cannot reach a peer's. The `*All` audit perms bypass the
+-- creator check for legal-hold and departed-employee cleanup
+-- workflows.
 INSERT INTO permissions (permission_id, display_name, description) VALUES
-  ('ai.conversations.read', 'Read Conversations', 'View and list conversations, messages, artifacts, and artifact versions'),
-  ('ai.conversations.create', 'Create Conversation', 'Create conversations'),
-  ('ai.conversations.update', 'Update Conversation', 'Modify conversations and their artifacts'),
-  ('ai.conversations.delete', 'Delete Conversation', 'Delete conversations and their artifacts'),
+  ('ai.conversations.read', 'Read Own Conversations', 'View and list the caller''s own conversations, messages, artifacts, and artifact versions'),
+  ('ai.conversations.create', 'Create Conversation', 'Create conversations under the caller''s own user-uuid'),
+  ('ai.conversations.update', 'Update Own Conversation', 'Modify the caller''s own conversations and their artifacts'),
+  ('ai.conversations.delete', 'Delete Own Conversation', 'Delete the caller''s own conversations and their artifacts'),
+  ('ai.conversations.readAll', 'Read All Conversations', 'Read any user''s conversations in the organization (audit/compliance)'),
+  ('ai.conversations.deleteAll', 'Delete All Conversations', 'Delete any user''s conversations in the organization (departed-employee cleanup)'),
   ('ai.chat.stream', 'Stream Chat', 'Use AI chat streaming');

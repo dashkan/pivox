@@ -79,8 +79,19 @@ func (s *mockServerStream) SetTrailer(metadata.MD)       {}
 func (s *mockServerStream) SendMsg(any) error            { return nil }
 func (s *mockServerStream) RecvMsg(any) error            { return nil }
 
+// fixedUserID is the per-test caller's pivox user UUID
+// (firebase_identities.id). Stable so paths can be constructed
+// without juggling fresh uuids per call.
+var fixedUserID = uuid.MustParse("0192a000-0009-7000-8000-000000000001")
+
+// authenticatedCtx builds the same context shape the production
+// auth interceptor produces: firebase UID + pivox_user_id claim.
+// Post-Phase-7 handlers read the claim via MustPivoxUserID for
+// ownership checks, so tests must seed both.
 func authenticatedCtx(uid string) context.Context {
-	return server.WithAuthenticatedUID(context.Background(), uid)
+	ctx := server.WithAuthenticatedUID(context.Background(), uid)
+	ctx = server.WithPivoxUserID(ctx, fixedUserID)
+	return ctx
 }
 
 func testOrg() db.Organization {
@@ -94,12 +105,19 @@ func testConversation(orgID uuid.UUID, uid string) db.AiConversation {
 	return db.AiConversation{
 		ID:         uuid.New(),
 		OrgID:      orgID,
+		CreatorID:  fixedUserID,
 		CreatedBy:  uid,
 		Name:       "conv1",
 		CreateTime: time.Now(),
 		UpdateTime: time.Now(),
 		Etag:       "etag1",
 	}
+}
+
+// testConvPath returns the resource name a caller would send for
+// the fixture conversation, including the path-bound user-uuid.
+func testConvPath(orgName, convName string) string {
+	return "organizations/" + orgName + "/users/" + fixedUserID.String() + "/conversations/" + convName
 }
 
 // userTextRequest builds a stateful GenerateContentRequest with a
@@ -151,7 +169,7 @@ func TestStreamGenerateContent_HappyPath(t *testing.T) {
 			{Kind: "finish"},
 		},
 	}
-	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, slog.Default())
+	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, nil, slog.Default())
 
 	org := testOrg()
 	uid := "user1"
@@ -167,7 +185,7 @@ func TestStreamGenerateContent_HappyPath(t *testing.T) {
 	q.On("IncrementConversationMessageCount", mock.Anything, conv.ID).Return(nil)
 	q.On("ListMessagesNewestFirst", mock.Anything, mock.Anything).Return([]db.AiMessage{}, nil)
 
-	req := userTextRequest("organizations/acme/conversations/conv1", "Hi")
+	req := userTextRequest(testConvPath("acme", "conv1"), "Hi")
 	stream := &mockServerStream{ctx: ctx}
 
 	err := srv.StreamGenerateContent(req, stream)
@@ -208,7 +226,7 @@ func TestStreamGenerateContent_ToolResultResumesGeneration(t *testing.T) {
 			{Kind: "finish"},
 		},
 	}
-	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, slog.Default())
+	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, nil, slog.Default())
 
 	org := testOrg()
 	uid := "user1"
@@ -224,7 +242,7 @@ func TestStreamGenerateContent_ToolResultResumesGeneration(t *testing.T) {
 	q.On("IncrementConversationMessageCount", mock.Anything, conv.ID).Return(nil)
 	q.On("ListMessagesNewestFirst", mock.Anything, mock.Anything).Return([]db.AiMessage{}, nil)
 
-	req := toolResultRequest("organizations/acme/conversations/conv1", "call-123", `{"ok":true}`)
+	req := toolResultRequest(testConvPath("acme", "conv1"), "call-123", `{"ok":true}`)
 	stream := &mockServerStream{ctx: ctx}
 
 	err := srv.StreamGenerateContent(req, stream)
@@ -264,28 +282,30 @@ func TestStreamGenerateContent_ToolResultResumesGeneration(t *testing.T) {
 func TestStreamGenerateContent_WrongOwner(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, nil, nil, slog.Default())
+	srv := NewServer(nil, q, llm, nil, nil, nil, slog.Default())
 
 	org := testOrg()
+	// Conversation owned by a different user-uuid than the path-bound
+	// caller. resolveConversation must surface NotFound (path-vs-row
+	// creator_id mismatch) rather than leak ownership.
 	conv := testConversation(org.ID, "other-user")
+	conv.CreatorID = uuid.MustParse("0192a000-0099-7000-8000-000000000099")
 	ctx := authenticatedCtx("user1")
 
 	q.On("GetOrganizationByName", mock.Anything, "acme").Return(org, nil)
 	q.On("GetConversationByName", mock.Anything, mock.Anything).Return(conv, nil)
 
 	stream := &mockServerStream{ctx: ctx}
-	err := srv.StreamGenerateContent(userTextRequest("organizations/acme/conversations/conv1", "Hi"), stream)
+	err := srv.StreamGenerateContent(userTextRequest(testConvPath("acme", "conv1"), "Hi"), stream)
 	require.Error(t, err)
 	st, _ := status.FromError(err)
-	// resolveConversation returns NotFound rather than PermissionDenied on
-	// wrong-owner access so we don't leak existence of other users' chats.
 	assert.Equal(t, codes.NotFound, st.Code())
 }
 
 func TestStreamGenerateContent_ModelError(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{err: io.ErrUnexpectedEOF}
-	srv := NewServer(nil, q, llm, nil, nil, slog.Default())
+	srv := NewServer(nil, q, llm, nil, nil, nil, slog.Default())
 
 	org := testOrg()
 	uid := "user1"
@@ -300,7 +320,7 @@ func TestStreamGenerateContent_ModelError(t *testing.T) {
 	q.On("ListMessagesNewestFirst", mock.Anything, mock.Anything).Return([]db.AiMessage{}, nil)
 
 	stream := &mockServerStream{ctx: ctx}
-	err := srv.StreamGenerateContent(userTextRequest("organizations/acme/conversations/conv1", "Hi"), stream)
+	err := srv.StreamGenerateContent(userTextRequest(testConvPath("acme", "conv1"), "Hi"), stream)
 	require.Error(t, err)
 	// Verify a StreamError event was sent before the error return.
 	var gotStreamError bool
@@ -325,7 +345,7 @@ func TestGenerateContent_UnaryAccumulatesText(t *testing.T) {
 			{Kind: "finish"},
 		},
 	}
-	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, slog.Default())
+	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, nil, slog.Default())
 
 	org := testOrg()
 	uid := "user1"
@@ -339,7 +359,7 @@ func TestGenerateContent_UnaryAccumulatesText(t *testing.T) {
 	q.On("IncrementConversationMessageCount", mock.Anything, conv.ID).Return(nil)
 	q.On("ListMessagesNewestFirst", mock.Anything, mock.Anything).Return([]db.AiMessage{}, nil)
 
-	resp, err := srv.GenerateContent(ctx, userTextRequest("organizations/acme/conversations/conv1", "Hi"))
+	resp, err := srv.GenerateContent(ctx, userTextRequest(testConvPath("acme", "conv1"), "Hi"))
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	require.NotNil(t, resp.GetMessage())
@@ -368,7 +388,7 @@ func TestGenerateContent_StatelessSkipsPersistence(t *testing.T) {
 			{Kind: "finish"},
 		},
 	}
-	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, slog.Default())
+	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, nil, slog.Default())
 
 	org := testOrg()
 	ctx := authenticatedCtx("user1")
@@ -416,7 +436,7 @@ func TestGenerateContent_StatelessSkipsPersistence(t *testing.T) {
 func TestStreamGenerateContent_ConversationOrgMismatchRejected(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, nil, nil, slog.Default())
+	srv := NewServer(nil, q, llm, nil, nil, nil, slog.Default())
 
 	org := testOrg()
 	ctx := authenticatedCtx("user1")
@@ -451,7 +471,7 @@ func TestExtractText(t *testing.T) {
 
 func TestLoadModelHistory_BudgetTruncation(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	srv := NewServer(nil, q, nil, nil, nil, slog.Default())
+	srv := NewServer(nil, q, nil, nil, nil, nil, slog.Default())
 
 	convID := uuid.New()
 	partsJSON, _ := marshalParts([]*aiv1.MessagePart{
@@ -514,7 +534,7 @@ func TestDbMessageToModel(t *testing.T) {
 func TestStreamGenerateContent_InvalidConversationReturnsNotFound(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, nil, nil, slog.Default())
+	srv := NewServer(nil, q, llm, nil, nil, nil, slog.Default())
 
 	org := testOrg()
 	ctx := authenticatedCtx("user1")
@@ -524,7 +544,7 @@ func TestStreamGenerateContent_InvalidConversationReturnsNotFound(t *testing.T) 
 		db.AiConversation{}, pgx.ErrNoRows)
 
 	stream := &mockServerStream{ctx: ctx}
-	err := srv.StreamGenerateContent(userTextRequest("organizations/acme/conversations/nonexistent", "Hi"), stream)
+	err := srv.StreamGenerateContent(userTextRequest(testConvPath("acme", "nonexistent"), "Hi"), stream)
 	require.Error(t, err)
 	st, _ := status.FromError(err)
 	assert.Equal(t, codes.NotFound, st.Code())
@@ -533,7 +553,7 @@ func TestStreamGenerateContent_InvalidConversationReturnsNotFound(t *testing.T) 
 func TestStreamGenerateContent_InvalidConversationNameReturnsInvalidArgument(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, nil, nil, slog.Default())
+	srv := NewServer(nil, q, llm, nil, nil, nil, slog.Default())
 
 	org := testOrg()
 	ctx := authenticatedCtx("user1")

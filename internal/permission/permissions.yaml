@@ -310,23 +310,36 @@ permissions:
     display_name: Fulfill Line Item
     description: Upload deliverable for line item
     roles: [owner, admin, editor]
+  # AI chat conversations are personal: every member of an org can
+  # CRUD their OWN conversations, and the handler enforces creator
+  # ownership on top of these org-level grants. Editor/viewer
+  # CANNOT read/update/delete other users' conversations — the
+  # `*All` audit perms below cover that and are owner/admin-only.
   - id: ai.conversations.read
-    display_name: Read Conversations
-    description: View and list conversations, messages, artifacts, and artifact versions
+    display_name: Read Own Conversations
+    description: View and list the caller's own conversations, messages, artifacts, and artifact versions
     roles: [owner, admin, editor, viewer]
   - id: ai.conversations.create
     display_name: Create Conversation
-    description: Create conversations
-    roles: [owner, admin, editor]
+    description: Create conversations under the caller's own user-uuid
+    roles: [owner, admin, editor, viewer]
   - id: ai.conversations.update
-    display_name: Update Conversation
-    description: Modify conversations and their artifacts
-    roles: [owner, admin, editor]
+    display_name: Update Own Conversation
+    description: Modify the caller's own conversations and their artifacts
+    roles: [owner, admin, editor, viewer]
   - id: ai.conversations.delete
-    display_name: Delete Conversation
-    description: Delete conversations and their artifacts
-    roles: [owner, admin, editor]
+    display_name: Delete Own Conversation
+    description: Delete the caller's own conversations and their artifacts
+    roles: [owner, admin, editor, viewer]
+  - id: ai.conversations.readAll
+    display_name: Read All Conversations
+    description: Read any user's conversations in the organization (audit/compliance)
+    roles: [owner, admin]
+  - id: ai.conversations.deleteAll
+    display_name: Delete All Conversations
+    description: Delete any user's conversations in the organization (departed-employee cleanup)
+    roles: [owner]
   - id: ai.chat.stream
     display_name: Stream Chat
     description: Use AI chat streaming
-    roles: [owner, admin, editor]
+    roles: [owner, admin, editor, viewer]

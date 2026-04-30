@@ -819,15 +819,16 @@ func TestPermissionStreamInterceptor_FirstMsgGateAllows(t *testing.T) {
 }
 
 func TestPermissionStreamInterceptor_FirstMsgGateDenies(t *testing.T) {
-	// Viewer role lacks ai.chat.stream → first RecvMsg surfaces
-	// PermissionDenied; handler propagates it to the client.
+	// Viewer role lacks ai.conversations.readAll (audit perm,
+	// owner+admin-only) → first RecvMsg surfaces PermissionDenied;
+	// handler propagates it to the client.
 	q := new(mocks.MockQuerier)
 	q.On("GetOrganizationByNameForGate", mock.Anything, testPermOrgSlug).Return(testPermOrgRow, nil)
 	q.On("GetEffectiveOrgRoles", mock.Anything, mock.Anything).Return([]string{permission.RoleViewer}, nil)
 
 	registry := Registry{
 		"/svc/Stream": {
-			Permission: permission.AiChatStream,
+			Permission: permission.AiConversationsReadAll,
 			Extract:    func(any) (ScopeRef, error) { return OrgScope(testPermOrgSlug), nil },
 		},
 	}

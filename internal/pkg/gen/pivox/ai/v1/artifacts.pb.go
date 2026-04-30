@@ -44,7 +44,7 @@ const (
 type Artifact struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The resource name of the artifact.
-	// Format: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}`
+	// Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}`
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Output only. The type of artifact content (e.g. "code", "markdown", "svg", "image").
 	Type string `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
@@ -53,7 +53,7 @@ type Artifact struct {
 	// Output only. An optional description of the artifact.
 	Description string `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
 	// Output only. The resource name of the latest version.
-	// Format: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
+	// Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
 	LatestVersion string `protobuf:"bytes,5,opt,name=latest_version,json=latestVersion,proto3" json:"latest_version,omitempty"`
 	// Output only. When the artifact was created.
 	CreateTime *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
@@ -148,7 +148,7 @@ func (x *Artifact) GetUpdateTime() *timestamppb.Timestamp {
 type ArtifactVersion struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The resource name of the artifact version.
-	// Format: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
+	// Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// The content storage mode. Either inline bytes or an asset system pointer.
 	//
@@ -320,7 +320,7 @@ func (x *InlineContent) GetSizeBytes() int64 {
 type GetArtifactRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The resource name of the artifact to retrieve.
-	// Format: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}`
+	// Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}`
 	Name          string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -367,7 +367,7 @@ func (x *GetArtifactRequest) GetName() string {
 type ListArtifactsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The parent conversation.
-	// Format: `organizations/{organization}/conversations/{conversation}`
+	// Format: `organizations/{organization}/users/{user}/conversations/{conversation}`
 	Parent string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
 	// Optional. Maximum number of artifacts to return.
 	PageSize int32 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
@@ -505,7 +505,7 @@ func (x *ListArtifactsResponse) GetNextPageToken() string {
 type DeleteArtifactRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The resource name of the artifact to delete.
-	// Format: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}`
+	// Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}`
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Optional. If true, delete the artifact even if it has versions.
 	// If false or unset, the request fails if versions exist.
@@ -562,7 +562,7 @@ func (x *DeleteArtifactRequest) GetForce() bool {
 type GetArtifactVersionRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The resource name of the artifact version to retrieve.
-	// Format: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
+	// Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
 	Name          string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -609,7 +609,7 @@ func (x *GetArtifactVersionRequest) GetName() string {
 type ListArtifactVersionsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The parent artifact.
-	// Format: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}`
+	// Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}`
 	Parent string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
 	// Optional. Maximum number of versions to return.
 	PageSize int32 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
@@ -750,7 +750,7 @@ func (x *ListArtifactVersionsResponse) GetNextPageToken() string {
 type DeleteArtifactVersionRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The resource name of the artifact version to delete.
-	// Format: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
+	// Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
 	Name          string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -797,7 +797,7 @@ var File_pivox_ai_v1_artifacts_proto protoreflect.FileDescriptor
 
 const file_pivox_ai_v1_artifacts_proto_rawDesc = "" +
 	"\n" +
-	"\x1bpivox/ai/v1/artifacts.proto\x12\vpivox.ai.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xc8\x03\n" +
+	"\x1bpivox/ai/v1/artifacts.proto\x12\vpivox.ai.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xd7\x03\n" +
 	"\bArtifact\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12\x17\n" +
 	"\x04type\x18\x02 \x01(\tB\x03\xe0A\x03R\x04type\x12\x19\n" +
@@ -808,15 +808,15 @@ const file_pivox_ai_v1_artifacts_proto_rawDesc = "" +
 	"\vcreate_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"createTime\x12@\n" +
 	"\vupdate_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"updateTime:{\xeaAx\n" +
-	"\x11pivox.ai/Artifact\x12Norganizations/{organization}/conversations/{conversation}/artifacts/{artifact}*\tartifacts2\bartifact\"\xf3\x02\n" +
+	"updateTime:\x89\x01\xeaA\x85\x01\n" +
+	"\x11pivox.ai/Artifact\x12[organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}*\tartifacts2\bartifact\"\x80\x03\n" +
 	"\x0fArtifactVersion\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x124\n" +
 	"\x06inline\x18\x02 \x01(\v2\x1a.pivox.ai.v1.InlineContentH\x00R\x06inline\x12%\n" +
 	"\rasset_version\x18\x03 \x01(\tH\x00R\fassetVersion\x12@\n" +
 	"\vcreate_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"createTime:\x9c\x01\xeaA\x98\x01\n" +
-	"\x18pivox.ai/ArtifactVersion\x12aorganizations/{organization}/conversations/{conversation}/artifacts/{artifact}/versions/{version}*\bversions2\x0fartifactVersionB\t\n" +
+	"createTime:\xa9\x01\xeaA\xa5\x01\n" +
+	"\x18pivox.ai/ArtifactVersion\x12norganizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}/versions/{version}*\bversions2\x0fartifactVersionB\t\n" +
 	"\acontent\"_\n" +
 	"\rInlineContent\x12\x12\n" +
 	"\x04data\x18\x01 \x01(\fR\x04data\x12\x1b\n" +

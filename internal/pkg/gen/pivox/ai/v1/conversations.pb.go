@@ -43,7 +43,7 @@ const (
 type Conversation struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The resource name of the conversation.
-	// Format: `organizations/{organization}/conversations/{conversation}`
+	// Format: `organizations/{organization}/users/{user}/conversations/{conversation}`
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Output only. The user who created this conversation.
 	// Format: `organizations/{organization}/users/{user}`
@@ -203,7 +203,7 @@ func (x *Conversation) GetEtag() string {
 type GetConversationRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The resource name of the conversation to retrieve.
-	// Format: `organizations/{organization}/conversations/{conversation}`
+	// Format: `organizations/{organization}/users/{user}/conversations/{conversation}`
 	Name          string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -249,8 +249,11 @@ func (x *GetConversationRequest) GetName() string {
 // Request message for `ListConversations`.
 type ListConversationsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Required. The parent organization.
-	// Format: `organizations/{organization}`
+	// Required. The parent user. Conversations are listed per-user;
+	// callers list their own with their own user-uuid in the path,
+	// and admins/owners with `ai.conversations.readAll` may list
+	// any user's.
+	// Format: `organizations/{organization}/users/{user}`
 	Parent string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
 	// Optional. Maximum number of conversations to return.
 	PageSize int32 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
@@ -410,8 +413,10 @@ func (x *ListConversationsResponse) GetNextPageToken() string {
 // Request message for `CreateConversation`.
 type CreateConversationRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Required. The parent organization.
-	// Format: `organizations/{organization}`
+	// Required. The parent user. Must be the caller's own per-Pivox
+	// user-uuid (read from the `pivox_user_id` token claim);
+	// conversations cannot be created on another user's behalf.
+	// Format: `organizations/{organization}/users/{user}`
 	Parent string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
 	// Required. The conversation to create.
 	Conversation  *Conversation `protobuf:"bytes,2,opt,name=conversation,proto3" json:"conversation,omitempty"`
@@ -522,7 +527,7 @@ func (x *UpdateConversationRequest) GetUpdateMask() *fieldmaskpb.FieldMask {
 type DeleteConversationRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The resource name of the conversation to delete.
-	// Format: `organizations/{organization}/conversations/{conversation}`
+	// Format: `organizations/{organization}/users/{user}/conversations/{conversation}`
 	Name          string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -569,7 +574,7 @@ var File_pivox_ai_v1_conversations_proto protoreflect.FileDescriptor
 
 const file_pivox_ai_v1_conversations_proto_rawDesc = "" +
 	"\n" +
-	"\x1fpivox/ai/v1/conversations.proto\x12\vpivox.ai.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xf9\x04\n" +
+	"\x1fpivox/ai/v1/conversations.proto\x12\vpivox.ai.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x86\x05\n" +
 	"\fConversation\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12\x1d\n" +
 	"\acreator\x18\x02 \x01(\tB\x03\xe0A\x03R\acreator\x12\x19\n" +
@@ -585,8 +590,8 @@ const file_pivox_ai_v1_conversations_proto_rawDesc = "" +
 	"\vupdate_time\x18\n" +
 	" \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"updateTime\x12\x17\n" +
-	"\x04etag\x18\v \x01(\tB\x03\xe0A\x03R\x04etag:r\xeaAo\n" +
-	"\x15pivox.ai/Conversation\x129organizations/{organization}/conversations/{conversation}*\rconversations2\fconversation\"Q\n" +
+	"\x04etag\x18\v \x01(\tB\x03\xe0A\x03R\x04etag:\x7f\xeaA|\n" +
+	"\x15pivox.ai/Conversation\x12Forganizations/{organization}/users/{user}/conversations/{conversation}*\rconversations2\fconversation\"Q\n" +
 	"\x16GetConversationRequest\x127\n" +
 	"\x04name\x18\x01 \x01(\tB#\xe0A\x02\xfaA\x17\n" +
 	"\x15pivox.ai/Conversation\xbaH\x03\xc8\x01\x01R\x04name\"\xe4\x01\n" +

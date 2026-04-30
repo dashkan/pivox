@@ -218,6 +218,12 @@ type Querier interface {
 	GetAssetVersion(ctx context.Context, id uuid.UUID) (AssetVersion, error)
 	GetAssetVersionByNumber(ctx context.Context, arg GetAssetVersionByNumberParams) (AssetVersion, error)
 	GetConversationByID(ctx context.Context, id uuid.UUID) (AiConversation, error)
+	// GetConversationByName looks up a conversation by (org, name)
+	// without an ownership filter. The handler enforces creator-only or
+	// `*All`-permission access on top of this. Used by the read/update/
+	// delete handlers as the row-fetch step; they then compare
+	// `creator_id` against the path's user-uuid AND the caller's
+	// `pivox_user_id` claim before returning.
 	GetConversationByName(ctx context.Context, arg GetConversationByNameParams) (AiConversation, error)
 	// Returns the state of a session without mutating it. Used by pollers to
 	// distinguish "still pending" from "expired/unknown" after a failed consume.

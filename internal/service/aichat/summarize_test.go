@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -23,7 +24,7 @@ import (
 func TestSummarizeConversation_NoOpWhenTitleUserSet(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, slog.Default())
+	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, nil, slog.Default())
 
 	org := testOrg()
 	uid := "user1"
@@ -36,7 +37,7 @@ func TestSummarizeConversation_NoOpWhenTitleUserSet(t *testing.T) {
 	q.On("GetConversationByName", mock.Anything, mock.Anything).Return(conv, nil)
 
 	resp, err := srv.SummarizeConversation(ctx, &aiv1.SummarizeConversationRequest{
-		Name: "organizations/acme/conversations/conv1",
+		Name: testConvPath("acme", "conv1"),
 	})
 	require.NoError(t, err)
 	require.NotNil(t, resp)
@@ -53,7 +54,7 @@ func TestSummarizeConversation_NoOpWhenTitleUserSet(t *testing.T) {
 func TestSummarizeConversation_NoOpWhenTranscriptEmpty(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, slog.Default())
+	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, nil, slog.Default())
 
 	org := testOrg()
 	uid := "user1"
@@ -66,7 +67,7 @@ func TestSummarizeConversation_NoOpWhenTranscriptEmpty(t *testing.T) {
 	q.On("ListMessagesNewestFirst", mock.Anything, mock.Anything).Return([]db.AiMessage{}, nil)
 
 	resp, err := srv.SummarizeConversation(ctx, &aiv1.SummarizeConversationRequest{
-		Name: "organizations/acme/conversations/conv1",
+		Name: testConvPath("acme", "conv1"),
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "stub", resp.GetTitle(),
@@ -85,7 +86,7 @@ func TestSummarizeConversation_HappyPathWritesViaSetAutoTitle(t *testing.T) {
 			{Kind: "finish"},
 		},
 	}
-	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, slog.Default())
+	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, nil, slog.Default())
 
 	org := testOrg()
 	uid := "user1"
@@ -113,7 +114,7 @@ func TestSummarizeConversation_HappyPathWritesViaSetAutoTitle(t *testing.T) {
 	})).Return(updated, nil)
 
 	resp, err := srv.SummarizeConversation(ctx, &aiv1.SummarizeConversationRequest{
-		Name: "organizations/acme/conversations/conv1",
+		Name: testConvPath("acme", "conv1"),
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "Bug Fix Discussion", resp.GetTitle())
@@ -136,29 +137,31 @@ func TestSummarizeConversation_HappyPathWritesViaSetAutoTitle(t *testing.T) {
 func TestSummarizeConversation_RejectsNonOwner(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, slog.Default())
+	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, nil, slog.Default())
 
 	org := testOrg()
+	// Conversation owned by a different user-uuid than the path's
+	// caller — resolveConversation must surface NotFound (path-vs-row
+	// creator_id mismatch).
 	conv := testConversation(org.ID, "other-user")
-	ctx := authenticatedCtx("user1") // different user
+	conv.CreatorID = uuid.MustParse("0192a000-0099-7000-8000-000000000099")
+	ctx := authenticatedCtx("user1")
 
 	q.On("GetOrganizationByName", mock.Anything, "acme").Return(org, nil)
 	q.On("GetConversationByName", mock.Anything, mock.Anything).Return(conv, nil)
 
 	_, err := srv.SummarizeConversation(ctx, &aiv1.SummarizeConversationRequest{
-		Name: "organizations/acme/conversations/conv1",
+		Name: testConvPath("acme", "conv1"),
 	})
 	require.Error(t, err)
 	st, _ := status.FromError(err)
-	// Mirrors resolveConversation's behavior: return NotFound (not
-	// PermissionDenied) so we don't leak existence of peers' chats.
 	assert.Equal(t, codes.NotFound, st.Code())
 }
 
 func TestSummarizeConversation_NotFound(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, slog.Default())
+	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, nil, slog.Default())
 
 	org := testOrg()
 	ctx := authenticatedCtx("user1")
@@ -167,7 +170,7 @@ func TestSummarizeConversation_NotFound(t *testing.T) {
 		db.AiConversation{}, pgx.ErrNoRows)
 
 	_, err := srv.SummarizeConversation(ctx, &aiv1.SummarizeConversationRequest{
-		Name: "organizations/acme/conversations/missing",
+		Name: testConvPath("acme", "missing"),
 	})
 	require.Error(t, err)
 	st, _ := status.FromError(err)
@@ -216,7 +219,7 @@ func TestSanitizeTitle(t *testing.T) {
 // trigger — destroying auto-summarize forever for that conversation.
 func TestUpdateConversation_RejectsMissingMask(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	srv := NewServer(nil, q, nil, nil, nil, slog.Default())
+	srv := NewServer(nil, q, nil, nil, nil, nil, slog.Default())
 
 	org := testOrg()
 	uid := "user1"
@@ -228,7 +231,7 @@ func TestUpdateConversation_RejectsMissingMask(t *testing.T) {
 
 	_, err := srv.UpdateConversation(ctx, &aiv1.UpdateConversationRequest{
 		Conversation: &aiv1.Conversation{
-			Name:     "organizations/acme/conversations/conv1",
+			Name:     testConvPath("acme", "conv1"),
 			Archived: true,
 		},
 		// No update_mask.
@@ -264,7 +267,7 @@ func TestRunGenerate_OrgMembershipCheckRejectsPhantomOrg(t *testing.T) {
 	llm := &mockLanguageModel{
 		events: []model.ModelEvent{{Kind: "text_delta", Text: "should not run"}},
 	}
-	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, slog.Default())
+	srv := NewServer(nil, q, llm, tools.NewRegistry(), nil, nil, slog.Default())
 
 	ctx := authenticatedCtx("user1")
 	q.On("GetOrganizationByName", mock.Anything, "phantom").Return(

@@ -4,26 +4,23 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/filter"
+	"github.com/dashkan/pivox/internal/permission"
 	aiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1"
-	"github.com/dashkan/pivox/internal/server"
 )
 
 func (s *Server) GetArtifact(ctx context.Context, req *aiv1.GetArtifactRequest) (*aiv1.Artifact, error) {
-	orgName, convName, artName, err := parseArtifactName(req.GetName())
+	orgName, pathUser, convName, artName, err := parseArtifactName(req.GetName())
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Artifact", req.GetName())
 	}
 
-	uid := server.MustAuthenticatedUID(ctx)
-
-	conv, err := s.resolveConversation(ctx, orgName, convName, uid)
+	conv, err := s.resolveConversation(ctx, orgName, pathUser, convName, permission.AiConversationsReadAll)
 	if err != nil {
 		return nil, err
 	}
@@ -36,19 +33,17 @@ func (s *Server) GetArtifact(ctx context.Context, req *aiv1.GetArtifactRequest) 
 		return nil, apierr.HandleResourceError(err, "Artifact", req.GetName())
 	}
 
-	convFullName := buildConversationName(orgName, convName)
+	convFullName := buildConversationName(orgName, pathUser, convName)
 	return convert.ArtifactToProto(row, convFullName), nil
 }
 
 func (s *Server) ListArtifacts(ctx context.Context, req *aiv1.ListArtifactsRequest) (*aiv1.ListArtifactsResponse, error) {
-	orgName, convName, err := parseArtifactParent(req.GetParent())
+	orgName, pathUser, convName, err := parseArtifactParent(req.GetParent())
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Conversation", req.GetParent())
 	}
 
-	uid := server.MustAuthenticatedUID(ctx)
-
-	conv, err := s.resolveConversation(ctx, orgName, convName, uid)
+	conv, err := s.resolveConversation(ctx, orgName, pathUser, convName, permission.AiConversationsReadAll)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +82,7 @@ func (s *Server) ListArtifacts(ctx context.Context, req *aiv1.ListArtifactsReque
 		results = results[:pageSize]
 	}
 
-	convFullName := buildConversationName(orgName, convName)
+	convFullName := buildConversationName(orgName, pathUser, convName)
 	artifacts := make([]*aiv1.Artifact, 0, len(results))
 	for _, r := range results {
 		artifacts = append(artifacts, convert.ArtifactToProto(r, convFullName))
@@ -100,14 +95,14 @@ func (s *Server) ListArtifacts(ctx context.Context, req *aiv1.ListArtifactsReque
 }
 
 func (s *Server) DeleteArtifact(ctx context.Context, req *aiv1.DeleteArtifactRequest) (*emptypb.Empty, error) {
-	orgName, convName, artName, err := parseArtifactName(req.GetName())
+	orgName, pathUser, convName, artName, err := parseArtifactName(req.GetName())
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Artifact", req.GetName())
 	}
 
-	uid := server.MustAuthenticatedUID(ctx)
-
-	conv, err := s.resolveConversation(ctx, orgName, convName, uid)
+	// Artifact mutation is creator-only — admins don't edit
+	// artifacts they don't own.
+	conv, err := s.resolveConversation(ctx, orgName, pathUser, convName, "")
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +115,6 @@ func (s *Server) DeleteArtifact(ctx context.Context, req *aiv1.DeleteArtifactReq
 		return nil, apierr.HandleResourceError(err, "Artifact", req.GetName())
 	}
 
-	// Check for children if force is not set.
 	if !req.GetForce() {
 		count, err := s.queries.CountArtifactVersionsByArtifact(ctx, row.ID)
 		if err != nil {
@@ -136,28 +130,4 @@ func (s *Server) DeleteArtifact(ctx context.Context, req *aiv1.DeleteArtifactReq
 	}
 
 	return &emptypb.Empty{}, nil
-}
-
-// resolveConversation resolves (orgName, convName) to the DB row and verifies
-// the authenticated user owns it. All code paths that load a conversation
-// should go through this helper so ownership is enforced identically.
-func (s *Server) resolveConversation(ctx context.Context, orgName, convName, uid string) (db.AiConversation, error) {
-	orgID, err := s.resolveOrg(ctx, orgName)
-	if err != nil {
-		return db.AiConversation{}, err
-	}
-
-	conv, err := s.queries.GetConversationByName(ctx, db.GetConversationByNameParams{
-		OrgID: orgID,
-		Name:  convName,
-	})
-	if err != nil {
-		return db.AiConversation{}, apierr.HandleResourceError(err, "Conversation", buildConversationName(orgName, convName))
-	}
-	if conv.CreatedBy != uid {
-		// Don't leak existence of other users' conversations — surface as
-		// NotFound (same result HandleResourceError produces for missing rows).
-		return db.AiConversation{}, apierr.HandleResourceError(pgx.ErrNoRows, "Conversation", buildConversationName(orgName, convName))
-	}
-	return conv, nil
 }

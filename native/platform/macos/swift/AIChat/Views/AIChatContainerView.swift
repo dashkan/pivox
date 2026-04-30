@@ -308,8 +308,11 @@ struct NewChatView: View {
 
         Task {
             do {
+                let userID = await AIChatService.shared.pivoxUserID()
                 let request = Pivox_Ai_V1_CreateConversationRequest.with {
-                    $0.parent = "organizations/\(orgName)"
+                    // Per-user parent post-Phase-7. The user-uuid
+                    // comes from the `pivox_user_id` ID-token claim.
+                    $0.parent = "organizations/\(orgName)/users/\(userID)"
                     $0.conversation = Pivox_Ai_V1_Conversation.with {
                         $0.title = String(text.prefix(50))
                     }

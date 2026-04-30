@@ -41,7 +41,7 @@ public struct Pivox_Ai_V1_Conversation: Sendable {
   // methods supported on all messages.
 
   /// The resource name of the conversation.
-  /// Format: `organizations/{organization}/conversations/{conversation}`
+  /// Format: `organizations/{organization}/users/{user}/conversations/{conversation}`
   public var name: String = String()
 
   /// Output only. The user who created this conversation.
@@ -128,7 +128,7 @@ public struct Pivox_Ai_V1_GetConversationRequest: Sendable {
   // methods supported on all messages.
 
   /// Required. The resource name of the conversation to retrieve.
-  /// Format: `organizations/{organization}/conversations/{conversation}`
+  /// Format: `organizations/{organization}/users/{user}/conversations/{conversation}`
   public var name: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -142,8 +142,11 @@ public struct Pivox_Ai_V1_ListConversationsRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Required. The parent organization.
-  /// Format: `organizations/{organization}`
+  /// Required. The parent user. Conversations are listed per-user;
+  /// callers list their own with their own user-uuid in the path,
+  /// and admins/owners with `ai.conversations.readAll` may list
+  /// any user's.
+  /// Format: `organizations/{organization}/users/{user}`
   public var parent: String = String()
 
   /// Optional. Maximum number of conversations to return.
@@ -209,8 +212,10 @@ public struct Pivox_Ai_V1_CreateConversationRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Required. The parent organization.
-  /// Format: `organizations/{organization}`
+  /// Required. The parent user. Must be the caller's own per-Pivox
+  /// user-uuid (read from the `pivox_user_id` token claim);
+  /// conversations cannot be created on another user's behalf.
+  /// Format: `organizations/{organization}/users/{user}`
   public var parent: String = String()
 
   /// Required. The conversation to create.
@@ -271,7 +276,7 @@ public struct Pivox_Ai_V1_DeleteConversationRequest: Sendable {
   // methods supported on all messages.
 
   /// Required. The resource name of the conversation to delete.
-  /// Format: `organizations/{organization}/conversations/{conversation}`
+  /// Format: `organizations/{organization}/users/{user}/conversations/{conversation}`
   public var name: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()

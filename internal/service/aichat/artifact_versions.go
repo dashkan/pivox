@@ -2,6 +2,8 @@ package aichat
 
 import (
 	"context"
+
+	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -9,19 +11,17 @@ import (
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/filter"
+	"github.com/dashkan/pivox/internal/permission"
 	aiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1"
-	"github.com/dashkan/pivox/internal/server"
 )
 
 func (s *Server) GetArtifactVersion(ctx context.Context, req *aiv1.GetArtifactVersionRequest) (*aiv1.ArtifactVersion, error) {
-	orgName, convName, artName, verName, err := parseArtifactVersionName(req.GetName())
+	orgName, pathUser, convName, artName, verName, err := parseArtifactVersionName(req.GetName())
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "ArtifactVersion", req.GetName())
 	}
 
-	uid := server.MustAuthenticatedUID(ctx)
-
-	art, err := s.resolveArtifact(ctx, orgName, convName, artName, uid)
+	art, err := s.resolveArtifact(ctx, orgName, pathUser, convName, artName, permission.AiConversationsReadAll)
 	if err != nil {
 		return nil, err
 	}
@@ -34,19 +34,17 @@ func (s *Server) GetArtifactVersion(ctx context.Context, req *aiv1.GetArtifactVe
 		return nil, apierr.HandleResourceError(err, "ArtifactVersion", req.GetName())
 	}
 
-	artFullName := buildArtifactName(orgName, convName, artName)
+	artFullName := buildArtifactName(orgName, pathUser, convName, artName)
 	return convert.ArtifactVersionToProtoAi(row, artFullName), nil
 }
 
 func (s *Server) ListArtifactVersions(ctx context.Context, req *aiv1.ListArtifactVersionsRequest) (*aiv1.ListArtifactVersionsResponse, error) {
-	orgName, convName, artName, err := parseArtifactVersionParent(req.GetParent())
+	orgName, pathUser, convName, artName, err := parseArtifactVersionParent(req.GetParent())
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Artifact", req.GetParent())
 	}
 
-	uid := server.MustAuthenticatedUID(ctx)
-
-	art, err := s.resolveArtifact(ctx, orgName, convName, artName, uid)
+	art, err := s.resolveArtifact(ctx, orgName, pathUser, convName, artName, permission.AiConversationsReadAll)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +86,7 @@ func (s *Server) ListArtifactVersions(ctx context.Context, req *aiv1.ListArtifac
 	versions := make([]*aiv1.ArtifactVersion, 0, len(results))
 	for _, r := range results {
 		pb := &aiv1.ArtifactVersion{
-			Name:       buildArtifactVersionName(orgName, convName, artName, r.Name),
+			Name:       buildArtifactVersionName(orgName, pathUser, convName, artName, r.Name),
 			CreateTime: timestamppb.New(r.CreateTime),
 		}
 		if r.InlineContentType.Valid {
@@ -96,7 +94,6 @@ func (s *Server) ListArtifactVersions(ctx context.Context, req *aiv1.ListArtifac
 				Inline: &aiv1.InlineContent{
 					MimeType:  r.InlineContentType.String,
 					SizeBytes: r.InlineSizeBytes.Int64,
-					// Data intentionally omitted in list responses.
 				},
 			}
 		} else if r.AssetVersionName.Valid {
@@ -114,14 +111,12 @@ func (s *Server) ListArtifactVersions(ctx context.Context, req *aiv1.ListArtifac
 }
 
 func (s *Server) DeleteArtifactVersion(ctx context.Context, req *aiv1.DeleteArtifactVersionRequest) (*emptypb.Empty, error) {
-	orgName, convName, artName, verName, err := parseArtifactVersionName(req.GetName())
+	orgName, pathUser, convName, artName, verName, err := parseArtifactVersionName(req.GetName())
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "ArtifactVersion", req.GetName())
 	}
 
-	uid := server.MustAuthenticatedUID(ctx)
-
-	art, err := s.resolveArtifact(ctx, orgName, convName, artName, uid)
+	art, err := s.resolveArtifact(ctx, orgName, pathUser, convName, artName, "")
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +129,6 @@ func (s *Server) DeleteArtifactVersion(ctx context.Context, req *aiv1.DeleteArti
 		return nil, apierr.HandleResourceError(err, "ArtifactVersion", req.GetName())
 	}
 
-	// If this is the last version, delete the parent artifact too.
 	isOnly, err := s.queries.IsOnlyArtifactVersion(ctx, art.ID)
 	if err != nil {
 		return nil, apierr.Internal("database error")
@@ -147,7 +141,7 @@ func (s *Server) DeleteArtifactVersion(ctx context.Context, req *aiv1.DeleteArti
 	if isOnly {
 		if err := s.queries.DeleteArtifact(ctx, art.ID); err != nil {
 			s.logger.Warn("failed to cascade delete parent artifact",
-				"artifact", buildArtifactName(orgName, convName, artName),
+				"artifact", buildArtifactName(orgName, pathUser, convName, artName),
 				"error", err)
 		}
 	}
@@ -155,10 +149,11 @@ func (s *Server) DeleteArtifactVersion(ctx context.Context, req *aiv1.DeleteArti
 	return &emptypb.Empty{}, nil
 }
 
-// resolveArtifact resolves org + conversation + artifact names to the DB row,
-// verifying the authenticated user owns the parent conversation.
-func (s *Server) resolveArtifact(ctx context.Context, orgName, convName, artName, uid string) (db.AiArtifact, error) {
-	conv, err := s.resolveConversation(ctx, orgName, convName, uid)
+// resolveArtifact resolves org + conversation + artifact names to
+// the DB row, verifying ownership through resolveConversation.
+// Pass `allPerm = ""` for creator-only operations.
+func (s *Server) resolveArtifact(ctx context.Context, orgName string, pathUser uuid.UUID, convName, artName, allPerm string) (db.AiArtifact, error) {
+	conv, err := s.resolveConversation(ctx, orgName, pathUser, convName, allPerm)
 	if err != nil {
 		return db.AiArtifact{}, err
 	}
@@ -168,7 +163,7 @@ func (s *Server) resolveArtifact(ctx context.Context, orgName, convName, artName
 		Name:           artName,
 	})
 	if err != nil {
-		return db.AiArtifact{}, apierr.HandleResourceError(err, "Artifact", buildArtifactName(orgName, convName, artName))
+		return db.AiArtifact{}, apierr.HandleResourceError(err, "Artifact", buildArtifactName(orgName, pathUser, convName, artName))
 	}
 	return art, nil
 }

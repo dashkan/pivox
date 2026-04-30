@@ -28,13 +28,13 @@ option go_package = "pivox/ai/v1;aiv1";
 message Conversation {
   option (google.api.resource) = {
     type: "pivox.ai/Conversation"
-    pattern: "organizations/{organization}/conversations/{conversation}"
+    pattern: "organizations/{organization}/users/{user}/conversations/{conversation}"
     plural: "conversations"
     singular: "conversation"
   };
 
   // The resource name of the conversation.
-  // Format: `organizations/{organization}/conversations/{conversation}`
+  // Format: `organizations/{organization}/users/{user}/conversations/{conversation}`
   string name = 1 [(google.api.field_behavior) = IDENTIFIER];
 
   // Output only. The user who created this conversation.
@@ -88,7 +88,7 @@ message Conversation {
 // Request message for `GetConversation`.
 message GetConversationRequest {
   // Required. The resource name of the conversation to retrieve.
-  // Format: `organizations/{organization}/conversations/{conversation}`
+  // Format: `organizations/{organization}/users/{user}/conversations/{conversation}`
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.ai/Conversation"},
@@ -98,8 +98,11 @@ message GetConversationRequest {
 
 // Request message for `ListConversations`.
 message ListConversationsRequest {
-  // Required. The parent organization.
-  // Format: `organizations/{organization}`
+  // Required. The parent user. Conversations are listed per-user;
+  // callers list their own with their own user-uuid in the path,
+  // and admins/owners with `ai.conversations.readAll` may list
+  // any user's.
+  // Format: `organizations/{organization}/users/{user}`
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {child_type: "pivox.ai/Conversation"},
@@ -159,8 +162,10 @@ message ListConversationsResponse {
 
 // Request message for `CreateConversation`.
 message CreateConversationRequest {
-  // Required. The parent organization.
-  // Format: `organizations/{organization}`
+  // Required. The parent user. Must be the caller's own per-Pivox
+  // user-uuid (read from the `pivox_user_id` token claim);
+  // conversations cannot be created on another user's behalf.
+  // Format: `organizations/{organization}/users/{user}`
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {child_type: "pivox.ai/Conversation"},
@@ -183,7 +188,7 @@ message UpdateConversationRequest {
 // Request message for `DeleteConversation`.
 message DeleteConversationRequest {
   // Required. The resource name of the conversation to delete.
-  // Format: `organizations/{organization}/conversations/{conversation}`
+  // Format: `organizations/{organization}/users/{user}/conversations/{conversation}`
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.ai/Conversation"},

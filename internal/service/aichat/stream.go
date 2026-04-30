@@ -84,15 +84,15 @@ func (s *Server) runGenerate(
 	// InputMessage.role not in {ASSISTANT, SYSTEM}, tool-role has a
 	// tool_result with tool_call_id) is enforced by the protovalidate
 	// interceptor — by the time this runs, the request is well-formed.
-	uid := server.MustAuthenticatedUID(ctx)
+	_ = server.MustAuthenticatedUID(ctx) // surfaces the unauth error early
 
 	// Validate the parent org regardless of stateful/stateless —
 	// without this the stateless path would happily run inference
 	// for any org name a caller invents, including ones they don't
-	// belong to. resolveOrg returns NotFound for unknown names and
-	// is the closest membership signal this service has today
-	// (per-user org-membership IAM is a future addition).
-	orgName, err := parseConversationParent(req.GetParent())
+	// belong to. parseOrgScope accepts any path that starts with
+	// `organizations/{org}/...` so this same parent shape works for
+	// both Phase-7 user-rooted paths and the bare org parent.
+	orgName, err := parseOrgScope(req.GetParent())
 	if err != nil {
 		return nil, nil, "", apierr.InvalidArgument(apierr.FieldViolation("parent", err.Error()))
 	}
@@ -102,22 +102,24 @@ func (s *Server) runGenerate(
 
 	// Stateful when conversation is set; stateless otherwise.
 	var conv *db.AiConversation
+	var convPathUser uuid.UUID
 	if convRef := req.GetConversation(); convRef != "" {
-		convOrgName, convName, err := parseConversationName(convRef)
+		convOrgName, pathUser, convName, err := parseConversationName(convRef)
 		if err != nil {
 			return nil, nil, "", apierr.InvalidArgument(apierr.FieldViolation("conversation", err.Error()))
 		}
-		// Cross-check: conversation's org must match the request's
-		// parent. Without this a caller could pass parent=A and
-		// conversation under org B and write into B.
 		if convOrgName != orgName {
 			return nil, nil, "", apierr.BadRequest("conversation's organization does not match request parent")
 		}
-		row, err := s.resolveConversation(ctx, convOrgName, convName, uid)
+		// Generation is creator-only — no `*All` bypass. An admin
+		// auditing another user's chats does not generate new turns
+		// on their behalf.
+		row, err := s.resolveConversation(ctx, convOrgName, pathUser, convName, "")
 		if err != nil {
 			return nil, nil, "", err
 		}
 		conv = &row
+		convPathUser = pathUser
 
 		// Persist each inbound message in order. The most common
 		// case is a single user turn, but the request shape allows
@@ -274,7 +276,7 @@ func (s *Server) runGenerate(
 
 		// Full AIP-122 resource name. We have orgName resolved
 		// upstream from `req.GetParent()`.
-		assistantMsg.Name = buildMessageName(orgName, conv.Name, assistantMsgID)
+		assistantMsg.Name = buildMessageName(orgName, convPathUser, conv.Name, assistantMsgID)
 	}
 
 	usage := &aiv1.TokenUsage{

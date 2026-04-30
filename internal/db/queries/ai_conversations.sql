@@ -1,8 +1,14 @@
 -- name: CreateConversation :one
-INSERT INTO ai_conversations (org_id, name, title, description, created_by, updated_by)
-VALUES ($1, $2, $3, $4, $5, $5)
+INSERT INTO ai_conversations (org_id, creator_id, name, title, description, created_by, updated_by)
+VALUES ($1, $2, $3, $4, $5, $6, $6)
 RETURNING *;
 
+-- GetConversationByName looks up a conversation by (org, name)
+-- without an ownership filter. The handler enforces creator-only or
+-- `*All`-permission access on top of this. Used by the read/update/
+-- delete handlers as the row-fetch step; they then compare
+-- `creator_id` against the path's user-uuid AND the caller's
+-- `pivox_user_id` claim before returning.
 -- name: GetConversationByName :one
 SELECT * FROM ai_conversations WHERE org_id = $1 AND name = $2;
 

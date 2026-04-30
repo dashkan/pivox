@@ -16,7 +16,7 @@
     "application/json"
   ],
   "paths": {
-    "/v1/organizations/{organization}/conversations": {
+    "/v1/organizations/{organization}/users/{user}/conversations": {
       "get": {
         "summary": "Lists conversations in an organization.",
         "operationId": "AiChat_ListConversations",
@@ -37,6 +37,12 @@
         "parameters": [
           {
             "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "user",
             "in": "path",
             "required": true,
             "type": "string"
@@ -100,6 +106,12 @@
             "type": "string"
           },
           {
+            "name": "user",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
             "name": "conversation",
             "description": "Required. The conversation to create.",
             "in": "body",
@@ -114,7 +126,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/conversations/{conversation}": {
+    "/v1/organizations/{organization}/users/{user}/conversations/{conversation}": {
       "get": {
         "summary": "Gets a conversation by resource name.",
         "operationId": "AiChat_GetConversation",
@@ -135,6 +147,12 @@
         "parameters": [
           {
             "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "user",
             "in": "path",
             "required": true,
             "type": "string"
@@ -176,6 +194,12 @@
             "type": "string"
           },
           {
+            "name": "user",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
             "name": "conversation",
             "in": "path",
             "required": true,
@@ -206,6 +230,12 @@
         "parameters": [
           {
             "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "user",
             "in": "path",
             "required": true,
             "type": "string"
@@ -289,7 +319,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/conversations/{conversation}/artifacts": {
+    "/v1/organizations/{organization}/users/{user}/conversations/{conversation}/artifacts": {
       "get": {
         "summary": "Lists artifacts in a conversation.",
         "operationId": "AiChat_ListArtifacts",
@@ -310,6 +340,12 @@
         "parameters": [
           {
             "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "user",
             "in": "path",
             "required": true,
             "type": "string"
@@ -355,7 +391,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/conversations/{conversation}/artifacts/{artifact}": {
+    "/v1/organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}": {
       "get": {
         "summary": "Gets an artifact by resource name.",
         "operationId": "AiChat_GetArtifact",
@@ -376,6 +412,12 @@
         "parameters": [
           {
             "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "user",
             "in": "path",
             "required": true,
             "type": "string"
@@ -423,6 +465,12 @@
             "type": "string"
           },
           {
+            "name": "user",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
             "name": "conversation",
             "in": "path",
             "required": true,
@@ -447,7 +495,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/conversations/{conversation}/artifacts/{artifact}/versions": {
+    "/v1/organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}/versions": {
       "get": {
         "summary": "Lists versions of an artifact.",
         "operationId": "AiChat_ListArtifactVersions",
@@ -468,6 +516,12 @@
         "parameters": [
           {
             "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "user",
             "in": "path",
             "required": true,
             "type": "string"
@@ -519,7 +573,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/conversations/{conversation}/artifacts/{artifact}/versions/{version}": {
+    "/v1/organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}/versions/{version}": {
       "get": {
         "summary": "Gets an artifact version by resource name.",
         "operationId": "AiChat_GetArtifactVersion",
@@ -540,6 +594,12 @@
         "parameters": [
           {
             "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "user",
             "in": "path",
             "required": true,
             "type": "string"
@@ -593,6 +653,12 @@
             "type": "string"
           },
           {
+            "name": "user",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
             "name": "conversation",
             "in": "path",
             "required": true,
@@ -616,7 +682,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/conversations/{conversation}/messages": {
+    "/v1/organizations/{organization}/users/{user}/conversations/{conversation}/messages": {
       "get": {
         "summary": "Lists messages in a conversation.",
         "operationId": "AiChat_ListMessages",
@@ -637,6 +703,12 @@
         "parameters": [
           {
             "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "user",
             "in": "path",
             "required": true,
             "type": "string"
@@ -682,7 +754,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/conversations/{conversation}/messages/{message}": {
+    "/v1/organizations/{organization}/users/{user}/conversations/{conversation}/messages/{message}": {
       "get": {
         "summary": "Gets a message by resource name.",
         "operationId": "AiChat_GetMessage",
@@ -708,6 +780,12 @@
             "type": "string"
           },
           {
+            "name": "user",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
             "name": "conversation",
             "in": "path",
             "required": true,
@@ -725,7 +803,7 @@
         ]
       }
     },
-    "/v1/organizations/{organization}/conversations/{conversation}:summarize": {
+    "/v1/organizations/{organization}/users/{user}/conversations/{conversation}:summarize": {
       "post": {
         "summary": "Generates a short title for the conversation by summarizing its\ncurrent contents, persists the result to `Conversation.title`,\nand returns the updated `Conversation`.",
         "description": "No-ops (returns the conversation unchanged) when\n`title_set_by_user` is true — never overwrites a user-curated\ntitle. Idempotent in spirit: re-running on the same conversation\nproduces a (possibly updated) title from the latest contents.\n\nTypical callers: clients fire this after the first turn of a\nbrand-new conversation, or as a \"Regenerate title\" action.",
@@ -747,6 +825,12 @@
         "parameters": [
           {
             "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "user",
             "in": "path",
             "required": true,
             "type": "string"
@@ -866,7 +950,7 @@
       "properties": {
         "conversation": {
           "type": "string",
-          "title": "Optional. The conversation to attach this turn to. When set, the\nserver hydrates history from the conversation and persists the\nnew turn(s) on success. When unset, the call is stateless.\nFormat: `organizations/{organization}/conversations/{conversation}`"
+          "title": "Optional. The conversation to attach this turn to. When set, the\nserver hydrates history from the conversation and persists the\nnew turn(s) on success. When unset, the call is stateless.\nFormat: `organizations/{organization}/users/{user}/conversations/{conversation}`"
         },
         "messages": {
           "type": "array",
@@ -909,7 +993,7 @@
       "properties": {
         "conversation": {
           "type": "string",
-          "title": "Optional. The conversation to attach this turn to. When set, the\nserver hydrates history from the conversation and persists the\nnew turn(s) on success. When unset, the call is stateless.\nFormat: `organizations/{organization}/conversations/{conversation}`"
+          "title": "Optional. The conversation to attach this turn to. When set, the\nserver hydrates history from the conversation and persists the\nnew turn(s) on success. When unset, the call is stateless.\nFormat: `organizations/{organization}/users/{user}/conversations/{conversation}`"
         },
         "messages": {
           "type": "array",
@@ -990,7 +1074,7 @@
       "properties": {
         "name": {
           "type": "string",
-          "title": "The resource name of the artifact.\nFormat: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}`"
+          "title": "The resource name of the artifact.\nFormat: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}`"
         },
         "type": {
           "type": "string",
@@ -1009,7 +1093,7 @@
         },
         "latestVersion": {
           "type": "string",
-          "title": "Output only. The resource name of the latest version.\nFormat: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`",
+          "title": "Output only. The resource name of the latest version.\nFormat: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`",
           "readOnly": true
         },
         "createTime": {
@@ -1050,7 +1134,7 @@
         },
         "artifactVersion": {
           "type": "string",
-          "title": "The persisted artifact version.\nFormat: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`"
+          "title": "The persisted artifact version.\nFormat: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`"
         },
         "mimeType": {
           "type": "string",
@@ -1101,7 +1185,7 @@
       "properties": {
         "name": {
           "type": "string",
-          "title": "The resource name of the artifact version.\nFormat: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`"
+          "title": "The resource name of the artifact version.\nFormat: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`"
         },
         "inline": {
           "$ref": "#/definitions/v1InlineContent",
@@ -1125,7 +1209,7 @@
       "properties": {
         "name": {
           "type": "string",
-          "title": "The resource name of the conversation.\nFormat: `organizations/{organization}/conversations/{conversation}`"
+          "title": "The resource name of the conversation.\nFormat: `organizations/{organization}/users/{user}/conversations/{conversation}`"
         },
         "creator": {
           "type": "string",
@@ -1356,7 +1440,7 @@
       "properties": {
         "name": {
           "type": "string",
-          "title": "The resource name of the message.\nFormat: `organizations/{organization}/conversations/{conversation}/messages/{message}`"
+          "title": "The resource name of the message.\nFormat: `organizations/{organization}/users/{user}/conversations/{conversation}/messages/{message}`"
         },
         "role": {
           "$ref": "#/definitions/v1Role",

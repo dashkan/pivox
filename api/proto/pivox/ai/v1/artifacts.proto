@@ -29,13 +29,13 @@ option go_package = "pivox/ai/v1;aiv1";
 message Artifact {
   option (google.api.resource) = {
     type: "pivox.ai/Artifact"
-    pattern: "organizations/{organization}/conversations/{conversation}/artifacts/{artifact}"
+    pattern: "organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}"
     plural: "artifacts"
     singular: "artifact"
   };
 
   // The resource name of the artifact.
-  // Format: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}`
+  // Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}`
   string name = 1 [(google.api.field_behavior) = IDENTIFIER];
 
   // Output only. The type of artifact content (e.g. "code", "markdown", "svg", "image").
@@ -48,7 +48,7 @@ message Artifact {
   string description = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. The resource name of the latest version.
-  // Format: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
+  // Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
   string latest_version = 5 [
     (google.api.field_behavior) = OUTPUT_ONLY,
     (google.api.resource_reference) = {type: "pivox.ai/ArtifactVersion"}
@@ -67,13 +67,13 @@ message Artifact {
 message ArtifactVersion {
   option (google.api.resource) = {
     type: "pivox.ai/ArtifactVersion"
-    pattern: "organizations/{organization}/conversations/{conversation}/artifacts/{artifact}/versions/{version}"
+    pattern: "organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}/versions/{version}"
     plural: "versions"
     singular: "artifactVersion"
   };
 
   // The resource name of the artifact version.
-  // Format: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
+  // Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
   string name = 1 [(google.api.field_behavior) = IDENTIFIER];
 
   // The content storage mode. Either inline bytes or an asset system pointer.
@@ -106,7 +106,7 @@ message InlineContent {
 // Request message for `GetArtifact`.
 message GetArtifactRequest {
   // Required. The resource name of the artifact to retrieve.
-  // Format: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}`
+  // Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}`
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.ai/Artifact"},
@@ -117,7 +117,7 @@ message GetArtifactRequest {
 // Request message for `ListArtifacts`.
 message ListArtifactsRequest {
   // Required. The parent conversation.
-  // Format: `organizations/{organization}/conversations/{conversation}`
+  // Format: `organizations/{organization}/users/{user}/conversations/{conversation}`
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {child_type: "pivox.ai/Artifact"},
@@ -155,7 +155,7 @@ message ListArtifactsResponse {
 // Request message for `DeleteArtifact`.
 message DeleteArtifactRequest {
   // Required. The resource name of the artifact to delete.
-  // Format: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}`
+  // Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}`
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.ai/Artifact"},
@@ -170,7 +170,7 @@ message DeleteArtifactRequest {
 // Request message for `GetArtifactVersion`.
 message GetArtifactVersionRequest {
   // Required. The resource name of the artifact version to retrieve.
-  // Format: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
+  // Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.ai/ArtifactVersion"},
@@ -181,7 +181,7 @@ message GetArtifactVersionRequest {
 // Request message for `ListArtifactVersions`.
 message ListArtifactVersionsRequest {
   // Required. The parent artifact.
-  // Format: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}`
+  // Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}`
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {child_type: "pivox.ai/ArtifactVersion"},
@@ -221,7 +221,7 @@ message ListArtifactVersionsResponse {
 // Request message for `DeleteArtifactVersion`.
 message DeleteArtifactVersionRequest {
   // Required. The resource name of the artifact version to delete.
-  // Format: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
+  // Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.ai/ArtifactVersion"},

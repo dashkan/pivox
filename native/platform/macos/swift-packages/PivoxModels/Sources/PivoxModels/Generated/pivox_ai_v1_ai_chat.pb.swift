@@ -59,7 +59,7 @@ public struct Pivox_Ai_V1_GenerateContentRequest: Sendable {
   /// Optional. The conversation to attach this turn to. When set, the
   /// server hydrates history from the conversation and persists the
   /// new turn(s) on success. When unset, the call is stateless.
-  /// Format: `organizations/{organization}/conversations/{conversation}`
+  /// Format: `organizations/{organization}/users/{user}/conversations/{conversation}`
   public var conversation: String = String()
 
   /// Required. The new turn(s) the caller wants the model to act on.
@@ -207,7 +207,7 @@ public struct Pivox_Ai_V1_SummarizeConversationRequest: Sendable {
   // methods supported on all messages.
 
   /// Required. The conversation to summarize.
-  /// Format: `organizations/{organization}/conversations/{conversation}`
+  /// Format: `organizations/{organization}/users/{user}/conversations/{conversation}`
   public var name: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -688,7 +688,7 @@ public struct Pivox_Ai_V1_ArtifactEnd: Sendable {
   public var artifactID: String = String()
 
   /// The persisted artifact version.
-  /// Format: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
+  /// Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
   public var artifactVersion: String = String()
 
   /// The MIME type of the artifact.

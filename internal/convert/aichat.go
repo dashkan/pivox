@@ -12,11 +12,14 @@ import (
 )
 
 // ConversationToProto converts a DB conversation to proto.
-// orgName is the organization segment (e.g. "acme").
+// orgName is the organization segment (e.g. "acme"). The resource
+// name encodes ownership via the creator's `firebase_identities.id`
+// in the `users/{user}` segment — same uuid the handler enforces
+// path-vs-caller against.
 func ConversationToProto(row db.AiConversation, orgName string) *aiv1.Conversation {
 	pb := &aiv1.Conversation{
-		Name:         fmt.Sprintf("organizations/%s/conversations/%s", orgName, row.Name),
-		Creator:      fmt.Sprintf("organizations/%s/users/%s", orgName, row.CreatedBy),
+		Name:         fmt.Sprintf("organizations/%s/users/%s/conversations/%s", orgName, row.CreatorID, row.Name),
+		Creator:      fmt.Sprintf("organizations/%s/users/%s", orgName, row.CreatorID),
 		Title:        row.Title,
 		TitleUserSet: row.TitleUserSet,
 		Description:  row.Description,

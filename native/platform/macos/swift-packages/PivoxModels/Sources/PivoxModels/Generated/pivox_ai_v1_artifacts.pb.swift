@@ -48,7 +48,7 @@ public struct Pivox_Ai_V1_Artifact: Sendable {
   // methods supported on all messages.
 
   /// The resource name of the artifact.
-  /// Format: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}`
+  /// Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}`
   public var name: String = String()
 
   /// Output only. The type of artifact content (e.g. "code", "markdown", "svg", "image").
@@ -61,7 +61,7 @@ public struct Pivox_Ai_V1_Artifact: Sendable {
   public var description_p: String = String()
 
   /// Output only. The resource name of the latest version.
-  /// Format: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
+  /// Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
   public var latestVersion: String = String()
 
   /// Output only. When the artifact was created.
@@ -101,7 +101,7 @@ public struct Pivox_Ai_V1_ArtifactVersion: Sendable {
   // methods supported on all messages.
 
   /// The resource name of the artifact version.
-  /// Format: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
+  /// Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
   public var name: String = String()
 
   /// The content storage mode. Either inline bytes or an asset system pointer.
@@ -181,7 +181,7 @@ public struct Pivox_Ai_V1_GetArtifactRequest: Sendable {
   // methods supported on all messages.
 
   /// Required. The resource name of the artifact to retrieve.
-  /// Format: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}`
+  /// Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}`
   public var name: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -196,7 +196,7 @@ public struct Pivox_Ai_V1_ListArtifactsRequest: Sendable {
   // methods supported on all messages.
 
   /// Required. The parent conversation.
-  /// Format: `organizations/{organization}/conversations/{conversation}`
+  /// Format: `organizations/{organization}/users/{user}/conversations/{conversation}`
   public var parent: String = String()
 
   /// Optional. Maximum number of artifacts to return.
@@ -240,7 +240,7 @@ public struct Pivox_Ai_V1_DeleteArtifactRequest: Sendable {
   // methods supported on all messages.
 
   /// Required. The resource name of the artifact to delete.
-  /// Format: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}`
+  /// Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}`
   public var name: String = String()
 
   /// Optional. If true, delete the artifact even if it has versions.
@@ -259,7 +259,7 @@ public struct Pivox_Ai_V1_GetArtifactVersionRequest: Sendable {
   // methods supported on all messages.
 
   /// Required. The resource name of the artifact version to retrieve.
-  /// Format: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
+  /// Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
   public var name: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -274,7 +274,7 @@ public struct Pivox_Ai_V1_ListArtifactVersionsRequest: Sendable {
   // methods supported on all messages.
 
   /// Required. The parent artifact.
-  /// Format: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}`
+  /// Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}`
   public var parent: String = String()
 
   /// Optional. Maximum number of versions to return.
@@ -320,7 +320,7 @@ public struct Pivox_Ai_V1_DeleteArtifactVersionRequest: Sendable {
   // methods supported on all messages.
 
   /// Required. The resource name of the artifact version to delete.
-  /// Format: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
+  /// Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
   public var name: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()

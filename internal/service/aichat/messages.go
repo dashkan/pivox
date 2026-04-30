@@ -7,19 +7,17 @@ import (
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/filter"
+	"github.com/dashkan/pivox/internal/permission"
 	aiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1"
-	"github.com/dashkan/pivox/internal/server"
 )
 
 func (s *Server) GetMessage(ctx context.Context, req *aiv1.GetMessageRequest) (*aiv1.Message, error) {
-	orgName, convName, msgName, err := parseMessageName(req.GetName())
+	orgName, pathUser, convName, msgName, err := parseMessageName(req.GetName())
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Message", req.GetName())
 	}
 
-	uid := server.MustAuthenticatedUID(ctx)
-
-	conv, err := s.resolveConversation(ctx, orgName, convName, uid)
+	conv, err := s.resolveConversation(ctx, orgName, pathUser, convName, permission.AiConversationsReadAll)
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +30,7 @@ func (s *Server) GetMessage(ctx context.Context, req *aiv1.GetMessageRequest) (*
 		return nil, apierr.HandleResourceError(err, "Message", req.GetName())
 	}
 
-	convFullName := buildConversationName(orgName, convName)
+	convFullName := buildConversationName(orgName, pathUser, convName)
 	pb, err := convert.MessageToProto(row, convFullName)
 	if err != nil {
 		return nil, apierr.Internal("failed to convert message")
@@ -41,14 +39,12 @@ func (s *Server) GetMessage(ctx context.Context, req *aiv1.GetMessageRequest) (*
 }
 
 func (s *Server) ListMessages(ctx context.Context, req *aiv1.ListMessagesRequest) (*aiv1.ListMessagesResponse, error) {
-	orgName, convName, err := parseMessageParent(req.GetParent())
+	orgName, pathUser, convName, err := parseMessageParent(req.GetParent())
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "Conversation", req.GetParent())
 	}
 
-	uid := server.MustAuthenticatedUID(ctx)
-
-	conv, err := s.resolveConversation(ctx, orgName, convName, uid)
+	conv, err := s.resolveConversation(ctx, orgName, pathUser, convName, permission.AiConversationsReadAll)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +83,7 @@ func (s *Server) ListMessages(ctx context.Context, req *aiv1.ListMessagesRequest
 		results = results[:pageSize]
 	}
 
-	convFullName := buildConversationName(orgName, convName)
+	convFullName := buildConversationName(orgName, pathUser, convName)
 	msgs := make([]*aiv1.Message, 0, len(results))
 	for _, r := range results {
 		pb, err := convert.MessageToProto(r, convFullName)

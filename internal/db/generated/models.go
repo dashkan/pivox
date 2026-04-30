@@ -796,6 +796,7 @@ type AiArtifactVersion struct {
 type AiConversation struct {
 	ID              uuid.UUID          `json:"id"`
 	OrgID           uuid.UUID          `json:"org_id"`
+	CreatorID       uuid.UUID          `json:"creator_id"`
 	Name            string             `json:"name"`
 	Title           string             `json:"title"`
 	TitleUserSet    bool               `json:"title_user_set"`

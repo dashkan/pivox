@@ -320,7 +320,7 @@ func serve(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("initialize Ollama adapter: %w", err)
 	}
 	toolRegistry := tools.NewRegistry()
-	aiChatServer := aichat.NewServer(pool, queries, llm, toolRegistry, appCodec, logger)
+	aiChatServer := aichat.NewServer(pool, queries, llm, toolRegistry, appCodec, permResolver, logger)
 	aiv1.RegisterAiChatServer(grpcServer, aiChatServer)
 
 	reflection.Register(grpcServer)

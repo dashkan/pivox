@@ -25,13 +25,38 @@ final class AIChatService {
     /// the container view in place of the chat panel.
     private(set) var initError: String?
 
-    /// Org slug used as the parent when scoping AI Chat resources
-    /// (e.g. `organizations/<orgName>/conversations/...`). Resolved
-    /// from `OrgService.shared.current` — guaranteed non-nil because
-    /// the chat surface only mounts inside `mainAppView`, which is
-    /// only routed to once `OrgService.state == .ready`.
+    /// Org slug used as the parent prefix when scoping AI Chat
+    /// resources. Resolved from `OrgService.shared.current` —
+    /// guaranteed non-nil because the chat surface only mounts inside
+    /// `mainAppView`, which is only routed to once
+    /// `OrgService.state == .ready`.
     var orgName: String {
         OrgService.shared.current?.id ?? ""
+    }
+
+    /// The caller's per-Pivox user UUID, read from the
+    /// `pivox_user_id` Firebase ID-token custom claim. Cached after
+    /// the first successful read since the value is stable for the
+    /// life of the firebase_identity. Returns empty string if the
+    /// claim is missing (e.g. token was issued before the blocking
+    /// function was deployed) — handlers will surface
+    /// PermissionDenied which the panel reports as an error.
+    private var cachedPivoxUserID: String = ""
+    func pivoxUserID() async -> String {
+        if !cachedPivoxUserID.isEmpty { return cachedPivoxUserID }
+        guard let user = AuthService.shared.currentUser else { return "" }
+        do {
+            let result = try await user.getIDTokenResult()
+            if let uid = result.claims["pivox_user_id"] as? String, !uid.isEmpty {
+                cachedPivoxUserID = uid
+                return uid
+            }
+        } catch {
+            // Token fetch failed — let callers proceed with empty
+            // string; the server will reject and the user can
+            // re-auth.
+        }
+        return ""
     }
 
     /// Single-slot `ConversationViewModel` cache for the

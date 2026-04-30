@@ -44,14 +44,14 @@ service AiChat {
 
   // Gets a conversation by resource name.
   rpc GetConversation(GetConversationRequest) returns (Conversation) {
-    option (google.api.http) = {get: "/v1/{name=organizations/*/conversations/*}"};
+    option (google.api.http) = {get: "/v1/{name=organizations/*/users/*/conversations/*}"};
     option (google.api.method_signature) = "name";
     option (pivox.permission.v1.required_permission) = "ai.conversations.read";
   }
 
   // Lists conversations in an organization.
   rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse) {
-    option (google.api.http) = {get: "/v1/{parent=organizations/*}/conversations"};
+    option (google.api.http) = {get: "/v1/{parent=organizations/*/users/*}/conversations"};
     option (google.api.method_signature) = "parent";
     option (pivox.permission.v1.required_permission) = "ai.conversations.read";
   }
@@ -59,7 +59,7 @@ service AiChat {
   // Creates a new conversation.
   rpc CreateConversation(CreateConversationRequest) returns (Conversation) {
     option (google.api.http) = {
-      post: "/v1/{parent=organizations/*}/conversations"
+      post: "/v1/{parent=organizations/*/users/*}/conversations"
       body: "conversation"
     };
     option (google.api.method_signature) = "parent,conversation";
@@ -69,7 +69,7 @@ service AiChat {
   // Updates a conversation's mutable fields.
   rpc UpdateConversation(UpdateConversationRequest) returns (Conversation) {
     option (google.api.http) = {
-      patch: "/v1/{conversation.name=organizations/*/conversations/*}"
+      patch: "/v1/{conversation.name=organizations/*/users/*/conversations/*}"
       body: "conversation"
     };
     option (google.api.method_signature) = "conversation,update_mask";
@@ -79,42 +79,42 @@ service AiChat {
 
   // Soft-deletes a conversation.
   rpc DeleteConversation(DeleteConversationRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {delete: "/v1/{name=organizations/*/conversations/*}"};
+    option (google.api.http) = {delete: "/v1/{name=organizations/*/users/*/conversations/*}"};
     option (google.api.method_signature) = "name";
     option (pivox.permission.v1.required_permission) = "ai.conversations.delete";
   }
 
   // Gets a message by resource name.
   rpc GetMessage(GetMessageRequest) returns (Message) {
-    option (google.api.http) = {get: "/v1/{name=organizations/*/conversations/*/messages/*}"};
+    option (google.api.http) = {get: "/v1/{name=organizations/*/users/*/conversations/*/messages/*}"};
     option (google.api.method_signature) = "name";
     option (pivox.permission.v1.required_permission) = "ai.conversations.read";
   }
 
   // Lists messages in a conversation.
   rpc ListMessages(ListMessagesRequest) returns (ListMessagesResponse) {
-    option (google.api.http) = {get: "/v1/{parent=organizations/*/conversations/*}/messages"};
+    option (google.api.http) = {get: "/v1/{parent=organizations/*/users/*/conversations/*}/messages"};
     option (google.api.method_signature) = "parent";
     option (pivox.permission.v1.required_permission) = "ai.conversations.read";
   }
 
   // Gets an artifact by resource name.
   rpc GetArtifact(GetArtifactRequest) returns (Artifact) {
-    option (google.api.http) = {get: "/v1/{name=organizations/*/conversations/*/artifacts/*}"};
+    option (google.api.http) = {get: "/v1/{name=organizations/*/users/*/conversations/*/artifacts/*}"};
     option (google.api.method_signature) = "name";
     option (pivox.permission.v1.required_permission) = "ai.conversations.read";
   }
 
   // Lists artifacts in a conversation.
   rpc ListArtifacts(ListArtifactsRequest) returns (ListArtifactsResponse) {
-    option (google.api.http) = {get: "/v1/{parent=organizations/*/conversations/*}/artifacts"};
+    option (google.api.http) = {get: "/v1/{parent=organizations/*/users/*/conversations/*}/artifacts"};
     option (google.api.method_signature) = "parent";
     option (pivox.permission.v1.required_permission) = "ai.conversations.read";
   }
 
   // Deletes an artifact and all its versions.
   rpc DeleteArtifact(DeleteArtifactRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {delete: "/v1/{name=organizations/*/conversations/*/artifacts/*}"};
+    option (google.api.http) = {delete: "/v1/{name=organizations/*/users/*/conversations/*/artifacts/*}"};
     option (google.api.method_signature) = "name";
     // Per YAML rollup: ai.conversations.update covers artifact mutations.
     option (pivox.permission.v1.required_permission) = "ai.conversations.update";
@@ -122,14 +122,14 @@ service AiChat {
 
   // Gets an artifact version by resource name.
   rpc GetArtifactVersion(GetArtifactVersionRequest) returns (ArtifactVersion) {
-    option (google.api.http) = {get: "/v1/{name=organizations/*/conversations/*/artifacts/*/versions/*}"};
+    option (google.api.http) = {get: "/v1/{name=organizations/*/users/*/conversations/*/artifacts/*/versions/*}"};
     option (google.api.method_signature) = "name";
     option (pivox.permission.v1.required_permission) = "ai.conversations.read";
   }
 
   // Lists versions of an artifact.
   rpc ListArtifactVersions(ListArtifactVersionsRequest) returns (ListArtifactVersionsResponse) {
-    option (google.api.http) = {get: "/v1/{parent=organizations/*/conversations/*/artifacts/*}/versions"};
+    option (google.api.http) = {get: "/v1/{parent=organizations/*/users/*/conversations/*/artifacts/*}/versions"};
     option (google.api.method_signature) = "parent";
     option (pivox.permission.v1.required_permission) = "ai.conversations.read";
   }
@@ -137,7 +137,7 @@ service AiChat {
   // Deletes an artifact version. If the last version is deleted, the parent
   // artifact is also deleted.
   rpc DeleteArtifactVersion(DeleteArtifactVersionRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {delete: "/v1/{name=organizations/*/conversations/*/artifacts/*/versions/*}"};
+    option (google.api.http) = {delete: "/v1/{name=organizations/*/users/*/conversations/*/artifacts/*/versions/*}"};
     option (google.api.method_signature) = "name";
     option (pivox.permission.v1.required_permission) = "ai.conversations.update";
   }
@@ -197,7 +197,7 @@ service AiChat {
   // brand-new conversation, or as a "Regenerate title" action.
   rpc SummarizeConversation(SummarizeConversationRequest) returns (Conversation) {
     option (google.api.http) = {
-      post: "/v1/{name=organizations/*/conversations/*}:summarize"
+      post: "/v1/{name=organizations/*/users/*/conversations/*}:summarize"
       body: "*"
     };
     option (google.api.method_signature) = "name";
@@ -230,7 +230,7 @@ message GenerateContentRequest {
   // Optional. The conversation to attach this turn to. When set, the
   // server hydrates history from the conversation and persists the
   // new turn(s) on success. When unset, the call is stateless.
-  // Format: `organizations/{organization}/conversations/{conversation}`
+  // Format: `organizations/{organization}/users/{user}/conversations/{conversation}`
   string conversation = 2 [
     (google.api.field_behavior) = OPTIONAL,
     (google.api.resource_reference) = {type: "pivox.ai/Conversation"}
@@ -345,7 +345,7 @@ message TokenUsage {
 // Request message for `SummarizeConversation`.
 message SummarizeConversationRequest {
   // Required. The conversation to summarize.
-  // Format: `organizations/{organization}/conversations/{conversation}`
+  // Format: `organizations/{organization}/users/{user}/conversations/{conversation}`
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.ai/Conversation"},
@@ -538,7 +538,7 @@ message ArtifactEnd {
   string artifact_id = 1;
 
   // The persisted artifact version.
-  // Format: `organizations/{organization}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
+  // Format: `organizations/{organization}/users/{user}/conversations/{conversation}/artifacts/{artifact}/versions/{version}`
   string artifact_version = 2 [(google.api.resource_reference) = {type: "pivox.ai/ArtifactVersion"}];
 
   // The MIME type of the artifact.

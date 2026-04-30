@@ -84,6 +84,8 @@ const (
 	AiConversationsCreate          = "ai.conversations.create"
 	AiConversationsUpdate          = "ai.conversations.update"
 	AiConversationsDelete          = "ai.conversations.delete"
+	AiConversationsReadAll         = "ai.conversations.readAll"
+	AiConversationsDeleteAll       = "ai.conversations.deleteAll"
 	AiChatStream                   = "ai.chat.stream"
 )
 
@@ -170,6 +172,8 @@ var All = []string{
 	AiConversationsCreate,
 	AiConversationsUpdate,
 	AiConversationsDelete,
+	AiConversationsReadAll,
+	AiConversationsDeleteAll,
 	AiChatStream,
 }
 
@@ -181,7 +185,9 @@ var matrix = map[string]map[string]bool{
 		AiChatStream:                   true,
 		AiConversationsCreate:          true,
 		AiConversationsDelete:          true,
+		AiConversationsDeleteAll:       true,
 		AiConversationsRead:            true,
+		AiConversationsReadAll:         true,
 		AiConversationsUpdate:          true,
 		ApiKeysCreate:                  true,
 		ApiKeysDelete:                  true,
@@ -264,6 +270,7 @@ var matrix = map[string]map[string]bool{
 		AiConversationsCreate:      true,
 		AiConversationsDelete:      true,
 		AiConversationsRead:        true,
+		AiConversationsReadAll:     true,
 		AiConversationsUpdate:      true,
 		ApiKeysCreate:              true,
 		ApiKeysDelete:              true,
@@ -372,17 +379,21 @@ var matrix = map[string]map[string]bool{
 		UsersRead:              true,
 	},
 	RoleViewer: {
-		AiConversationsRead:  true,
-		AssetsAssetsRead:     true,
-		AssetsLineItemsRead:  true,
-		AssetsRequestsRead:   true,
-		GroupsRead:           true,
-		OrganizationsRead:    true,
-		RolesRead:            true,
-		SpacesRead:           true,
-		StorageAgentsRead:    true,
-		StorageEndpointsRead: true,
-		TagsRead:             true,
-		UsersRead:            true,
+		AiChatStream:          true,
+		AiConversationsCreate: true,
+		AiConversationsDelete: true,
+		AiConversationsRead:   true,
+		AiConversationsUpdate: true,
+		AssetsAssetsRead:      true,
+		AssetsLineItemsRead:   true,
+		AssetsRequestsRead:    true,
+		GroupsRead:            true,
+		OrganizationsRead:     true,
+		RolesRead:             true,
+		SpacesRead:            true,
+		StorageAgentsRead:     true,
+		StorageEndpointsRead:  true,
+		TagsRead:              true,
+		UsersRead:             true,
 	},
 }

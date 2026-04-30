@@ -55,9 +55,13 @@ public final class ConversationListViewModel: ObservableObject {
     }
 
     private func fetchNextPage(replace: Bool) async {
+        let userID = await AIChatService.shared.pivoxUserID()
         do {
             let request = Pivox_Ai_V1_ListConversationsRequest.with {
-                $0.parent = "organizations/\(orgName)"
+                // Per-user listing post-Phase-7. The user-uuid comes
+                // from the `pivox_user_id` ID-token claim cached on
+                // AIChatService.
+                $0.parent = "organizations/\(orgName)/users/\(userID)"
                 $0.pageSize = 50
                 if !nextPageToken.isEmpty { $0.pageToken = nextPageToken }
             }
@@ -76,8 +80,9 @@ public final class ConversationListViewModel: ObservableObject {
     }
 
     public func create(title: String = "") async throws -> Pivox_Ai_V1_Conversation {
+        let userID = await AIChatService.shared.pivoxUserID()
         let request = Pivox_Ai_V1_CreateConversationRequest.with {
-            $0.parent = "organizations/\(orgName)"
+            $0.parent = "organizations/\(orgName)/users/\(userID)"
             $0.conversation = Pivox_Ai_V1_Conversation.with {
                 $0.title = title
             }

@@ -139,7 +139,14 @@ func TestMatrix_ViewerIsReadOnly(t *testing.T) {
 		AssetsAssetsCreate,
 		AssetsAssetsUpdate,
 		AssetsAssetsDelete,
-		AiConversationsCreate,
+		// `ai.conversations.create/update/delete` are NOT in cantDo
+		// post-Phase-7: AI chat is personal (path-bound by user-uuid;
+		// handler enforces creator-only). A viewer still gets a
+		// personal AI chat experience for THEIR OWN conversations.
+		// The `*All` audit perms below ARE in cantDo — viewers
+		// cannot reach peers' chats.
+		AiConversationsReadAll,
+		AiConversationsDeleteAll,
 	}
 	for _, p := range canDo {
 		t.Run("can/"+p, func(t *testing.T) {

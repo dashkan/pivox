@@ -38,7 +38,7 @@ func setupIntegration(t *testing.T) (aiv1.AiChatClient, *db.Queries, func()) {
 
 	// Mock model that returns a fixed response.
 	llm := &fixedModel{text: "Hello from integration test!"}
-	srv := aichat.NewServer(pool, queries, llm, tools.NewRegistry(), nil, slog.Default())
+	srv := aichat.NewServer(pool, queries, llm, tools.NewRegistry(), nil, nil, slog.Default())
 
 	// gRPC server with a fake auth interceptor that injects testUID.
 	lis := bufconn.Listen(1024 * 1024)
@@ -310,7 +310,7 @@ func TestIntegration_StreamWrongOwner(t *testing.T) {
 	require.NoError(t, err)
 
 	llm := &fixedModel{text: "should not reach here"}
-	srv := aichat.NewServer(nil, queries, llm, tools.NewRegistry(), nil, slog.Default())
+	srv := aichat.NewServer(nil, queries, llm, tools.NewRegistry(), nil, nil, slog.Default())
 
 	lis := bufconn.Listen(1024 * 1024)
 	grpcServer := grpc.NewServer(

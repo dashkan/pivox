@@ -145,9 +145,13 @@ func TagBindingFilter() *ResourceFilter {
 	}
 }
 
-// ConversationFilter returns the filter config for AI chat conversations.
-// Access-controlled by (org_id, created_by) — conversations are private to
-// their creator.
+// ConversationFilter returns the filter config for AI chat
+// conversations. Access-controlled by (org_id, creator_id) —
+// conversations are private to their creator
+// (`firebase_identities.id` post-Phase-7). The handler decides
+// whether to filter by the caller's own user-uuid (regular path) or
+// by an arbitrary user-uuid (admin/`*All` path) before calling
+// filter.Query.
 func ConversationFilter() *ResourceFilter {
 	return &ResourceFilter{
 		Filterable: map[string]FilterableField{
@@ -169,7 +173,7 @@ func ConversationFilter() *ResourceFilter {
 		CursorDirection: "DESC",
 		DefaultFields:   []string{"title"},
 		ParentColumn:    "org_id",
-		UserColumn:      "created_by",
+		UserColumn:      "creator_id",
 	}
 }
 

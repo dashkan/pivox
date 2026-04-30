@@ -28,13 +28,13 @@ option go_package = "pivox/ai/v1;aiv1";
 message Message {
   option (google.api.resource) = {
     type: "pivox.ai/Message"
-    pattern: "organizations/{organization}/conversations/{conversation}/messages/{message}"
+    pattern: "organizations/{organization}/users/{user}/conversations/{conversation}/messages/{message}"
     plural: "messages"
     singular: "message"
   };
 
   // The resource name of the message.
-  // Format: `organizations/{organization}/conversations/{conversation}/messages/{message}`
+  // Format: `organizations/{organization}/users/{user}/conversations/{conversation}/messages/{message}`
   string name = 1 [(google.api.field_behavior) = IDENTIFIER];
 
   // Output only. The role of the message author.
@@ -121,7 +121,7 @@ message FilePart {
 // Request message for `GetMessage`.
 message GetMessageRequest {
   // Required. The resource name of the message to retrieve.
-  // Format: `organizations/{organization}/conversations/{conversation}/messages/{message}`
+  // Format: `organizations/{organization}/users/{user}/conversations/{conversation}/messages/{message}`
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "pivox.ai/Message"},
@@ -132,7 +132,7 @@ message GetMessageRequest {
 // Request message for `ListMessages`.
 message ListMessagesRequest {
   // Required. The parent conversation.
-  // Format: `organizations/{organization}/conversations/{conversation}`
+  // Format: `organizations/{organization}/users/{user}/conversations/{conversation}`
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {child_type: "pivox.ai/Message"},
