@@ -3,26 +3,28 @@
 -- whether or not the founder identity exists yet, then binds the
 -- founder as owner the moment they're present.
 --
--- Chicken/egg: the SSO sign-in flow needs the SsoConfig row in
--- place before `auth:resolveProvider` can return a provider id;
--- but the founder's `firebase_identities` row only exists *after*
--- their first sign-in. So:
+-- Single-pass-safe: bootstraps the SSO discovery surface AND the
+-- founder identity in one apply, so a fresh `make db-up` + this
+-- seed leaves ashkan@acme.com bound as owner of acme without
+-- requiring an interactive sign-in first.
 --
---   Pass 1 (run before any sign-in attempt):
---     - org `acme`, 4 system roles, verified domain, SsoConfig.
---     - No owner binding (identity doesn't exist yet).
---     - NOTICE prints "no owner bound — sign in with SSO, then
---       re-run".
+-- The identity row is pre-seeded with the founder's actual Firebase
+-- localId (`firebase auth:export ... | jq '.users[] | select(.email
+-- == "ashkan@acme.com") | .localId'`). On first sign-in the
+-- `syncIdentityOnSignIn` blocking fn upserts on (firebase_uid) —
+-- the conflict path leaves id stable and just refreshes
+-- email_verified / display_name / last_login_time, so the owner
+-- binding survives.
 --
---   First SSO sign-in via the macOS app:
---     - Blocking fn creates `firebase_identities` row for
---       ashkan@acme.com.
---     - App lands in a "no orgs" state (membership not yet bound).
---
---   Pass 2 (run again after first sign-in):
---     - Picks up the new identity, binds as owner of acme,
---       backfills `organizations.created_by_firebase_identity_id`.
---     - User's next RPC succeeds.
+-- If the founder's Firebase user is recreated with a different UID
+-- (e.g. you deleted + re-added them in the Firebase console), this
+-- seed's pre-baked UID will go stale: the next sign-in will create
+-- a NEW identity row, the email-uniqueness partial index will
+-- block it, and SSO will surface as "Couldn't complete sign-in".
+-- Fix: update `_ashkan_firebase_uid` below to match the new
+-- localId, then re-run the seed (the existing identity row is
+-- ON CONFLICT (firebase_uid) so the stale row survives — manually
+-- delete it if you want a clean state).
 --
 -- Idempotent. Re-runnable. Safe to schedule.
 --
@@ -50,18 +52,30 @@ DECLARE
     ashkan_id UUID;
     acme_id   UUID;
     owner_id  UUID;
+    -- Founder's Firebase localId. Must match the live Firebase Auth
+    -- user record so the next sign-in's blocking-fn upsert hits ON
+    -- CONFLICT (firebase_uid) and preserves the seeded row + owner
+    -- binding. Sourced from `firebase auth:export` (see file header).
+    _ashkan_firebase_uid CONSTANT TEXT := '2YCxpX5nmQXT5fmjri30SA3ra8t2';
 BEGIN
-    -- May be NULL on pass 1 (identity not yet created).
-    SELECT id INTO ashkan_id FROM firebase_identities WHERE email = 'ashkan@acme.com';
+    -- 0) Founder identity. Pre-seeded so the seed is single-pass —
+    --    no need to interactively sign in before owner binding can
+    --    land. ON CONFLICT (firebase_uid) means re-running the seed
+    --    after a real sign-in won't clobber the live email_verified
+    --    / display_name / last_login_time the blocking fn populated.
+    INSERT INTO identities (id, firebase_uid, email, email_verified)
+    VALUES (uuidv7(), _ashkan_firebase_uid, 'ashkan@acme.com', true)
+    ON CONFLICT (firebase_uid) DO NOTHING;
+
+    SELECT id INTO ashkan_id FROM identities
+        WHERE firebase_uid = _ashkan_firebase_uid;
 
     -- 1) acme organization (idempotent). created_by is NULL on
     --    pass 1; back-filled on pass 2 once we know the identity.
-    INSERT INTO organizations (id, name, display_name, created_by_firebase_identity_id)
+    INSERT INTO organizations (id, name, display_name, created_by)
     VALUES (uuidv7(), 'acme', 'Acme Inc.', ashkan_id)
     ON CONFLICT (name) DO UPDATE SET
-        created_by_firebase_identity_id = COALESCE(
-            organizations.created_by_firebase_identity_id,
-            EXCLUDED.created_by_firebase_identity_id);
+        created_by = COALESCE(organizations.created_by, EXCLUDED.created_by);
 
     SELECT id INTO acme_id FROM organizations WHERE name = 'acme';
 
@@ -119,13 +133,10 @@ BEGIN
         oidc_config              = EXCLUDED.oidc_config,
         update_time              = now();
 
-    -- 5) Bind ashkan as owner — only on pass 2 (identity exists).
-    --    Pass 1 prints a NOTICE telling the user what to do next.
-    IF ashkan_id IS NULL THEN
-        RAISE NOTICE 'Pass 1: bootstrapped acme SSO without owner binding (org=%). Sign in via SSO with ashkan@acme.com, then re-run this seed to bind ownership.', acme_id;
-        RETURN;
-    END IF;
-
+    -- 5) Bind ashkan as owner of acme. The WHERE NOT EXISTS guard
+    --    (rather than a UNIQUE-violation ON CONFLICT) is what makes
+    --    this idempotent — re-running the seed after the row exists
+    --    is a no-op rather than a constraint error.
     INSERT INTO org_members (id, org_id, role_id, user_id, created_by)
     SELECT uuidv7(), acme_id, owner_id, ashkan_id, ashkan_id
     WHERE NOT EXISTS (
@@ -135,7 +146,7 @@ BEGIN
           AND role_id = owner_id
     );
 
-    RAISE NOTICE 'Pass 2: bound ashkan as owner of acme (org=%, ashkan=%).', acme_id, ashkan_id;
+    RAISE NOTICE 'Seeded acme SSO + bound ashkan as owner (org=%, ashkan=%).', acme_id, ashkan_id;
 END $$;
 
 COMMIT;
