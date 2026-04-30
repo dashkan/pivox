@@ -177,6 +177,11 @@ func (m *MockQuerier) DeleteSpaceMembersForIdentity(ctx context.Context, firebas
 	return args.Error(0)
 }
 
+func (m *MockQuerier) SoftDeleteIdentity(ctx context.Context, id uuid.UUID) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
 func (m *MockQuerier) HardDeleteIdentity(ctx context.Context, id uuid.UUID) error {
 	args := m.Called(ctx, id)
 	return args.Error(0)

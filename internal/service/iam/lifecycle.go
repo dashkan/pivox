@@ -245,32 +245,32 @@ func (s *IamServer) runDeleteAccount(
 		return nil, apierr.Internal("revoke space memberships")
 	}
 
-	// DELETING_PIVOX_RECORDS: capture the Firebase UID before the
-	// row is gone (next phase needs it for auth.DeleteUser), then
-	// hard-delete. FK cascade removes per-org users +
-	// group_members.
+	// DELETING_PIVOX_RECORDS: capture the Firebase UID before
+	// soft-deleting the identity row, so the next phase can call
+	// auth.DeleteUser(uid). The identity row is preserved
+	// (soft-deleted) so historical *_by audit references still
+	// resolve — only the user-visible PII is blanked.
 	updatePhase(iampb.DeleteAccountMetadata_DELETING_PIVOX_RECORDS)
 	identity, err := s.queries.GetIdentityByID(ctx, firebaseIdentityID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			// Pivox-side row already gone but auth.DeleteUser
-			// hasn't run for this LRO — likely a partial earlier
-			// run that died mid-cascade. We've lost the
-			// firebase_uid and can't complete the cascade. Loud
-			// log + Internal so operators reconcile by hand.
-			slog.ErrorContext(ctx, "delete account: firebase_identity already gone but uid unknown — Firebase Auth account likely orphaned, manual cleanup required",
+			// Should not happen now that delete is soft —
+			// GetIdentityByID returns soft-deleted rows too. Only
+			// fires if an operator manually purged the row outside
+			// of the LRO. Loud log + Internal so they reconcile.
+			slog.ErrorContext(ctx, "delete account: identity row already purged outside the LRO — Firebase Auth account likely orphaned, manual cleanup required",
 				"identity_id", firebaseIdentityID)
 			return nil, apierr.Internal(
-				"firebase identity already removed from Pivox but its Firebase Auth UID is unknown; operator must reconcile manually")
+				"identity already removed from Pivox but its Firebase Auth UID is unknown; operator must reconcile manually")
 		}
-		slog.ErrorContext(ctx, "delete account: lookup firebase_identity failed",
+		slog.ErrorContext(ctx, "delete account: lookup identity failed",
 			"id", firebaseIdentityID, "error", err)
-		return nil, apierr.Internal("lookup firebase identity")
+		return nil, apierr.Internal("lookup identity")
 	}
-	if err := s.queries.HardDeleteIdentity(ctx, firebaseIdentityID); err != nil {
-		slog.ErrorContext(ctx, "delete account: hard-delete firebase_identity failed",
+	if err := s.queries.SoftDeleteIdentity(ctx, firebaseIdentityID); err != nil {
+		slog.ErrorContext(ctx, "delete account: soft-delete identity failed",
 			"id", firebaseIdentityID, "error", err)
-		return nil, apierr.Internal("delete firebase identity")
+		return nil, apierr.Internal("soft-delete identity")
 	}
 
 	// DELETING_FIREBASE_IDENTITY: last so a failure leaves Pivox

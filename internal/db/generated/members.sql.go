@@ -293,7 +293,7 @@ func (q *Queries) GetGroupByID(ctx context.Context, arg GetGroupByIDParams) (Gro
 }
 
 const getIdentityForMember = `-- name: GetIdentityForMember :one
-SELECT id, firebase_uid, email, email_verified, display_name, photo_url, disabled, create_time, update_time, last_login_time FROM identities WHERE id = $1
+SELECT id, firebase_uid, email, email_verified, display_name, photo_url, disabled, is_deleted, create_time, update_time, last_login_time, delete_time FROM identities WHERE id = $1
 `
 
 // Verifies that a identity row exists for the given uuid.
@@ -316,9 +316,11 @@ func (q *Queries) GetIdentityForMember(ctx context.Context, id uuid.UUID) (Ident
 		&i.DisplayName,
 		&i.PhotoUrl,
 		&i.Disabled,
+		&i.IsDeleted,
 		&i.CreateTime,
 		&i.UpdateTime,
 		&i.LastLoginTime,
+		&i.DeleteTime,
 	)
 	return i, err
 }

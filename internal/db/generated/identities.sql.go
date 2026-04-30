@@ -13,13 +13,15 @@ import (
 )
 
 const getIdentitiesByIDs = `-- name: GetIdentitiesByIDs :many
-SELECT id, firebase_uid, email, email_verified, display_name, photo_url, disabled, create_time, update_time, last_login_time FROM identities WHERE id = ANY($1::uuid[])
+SELECT id, firebase_uid, email, email_verified, display_name, photo_url, disabled, is_deleted, create_time, update_time, last_login_time, delete_time FROM identities WHERE id = ANY($1::uuid[])
 `
 
 // GetIdentitiesByIDs is the batched lookup used by the audit
 // resolver to inflate Actor messages on resource reads. The IDs are
 // typically a deduped slice of cache misses; row order is not
-// guaranteed and the caller should index results by id.
+// guaranteed and the caller should index results by id. Returns
+// soft-deleted rows so the resolver can flag is_deleted on the
+// returned Actor and blank PII.
 func (q *Queries) GetIdentitiesByIDs(ctx context.Context, ids []uuid.UUID) ([]Identity, error) {
 	rows, err := q.db.Query(ctx, getIdentitiesByIDs, ids)
 	if err != nil {
@@ -37,9 +39,11 @@ func (q *Queries) GetIdentitiesByIDs(ctx context.Context, ids []uuid.UUID) ([]Id
 			&i.DisplayName,
 			&i.PhotoUrl,
 			&i.Disabled,
+			&i.IsDeleted,
 			&i.CreateTime,
 			&i.UpdateTime,
 			&i.LastLoginTime,
+			&i.DeleteTime,
 		); err != nil {
 			return nil, err
 		}
@@ -52,9 +56,12 @@ func (q *Queries) GetIdentitiesByIDs(ctx context.Context, ids []uuid.UUID) ([]Id
 }
 
 const getIdentityByFirebaseUID = `-- name: GetIdentityByFirebaseUID :one
-SELECT id, firebase_uid, email, email_verified, display_name, photo_url, disabled, create_time, update_time, last_login_time FROM identities WHERE firebase_uid = $1
+SELECT id, firebase_uid, email, email_verified, display_name, photo_url, disabled, is_deleted, create_time, update_time, last_login_time, delete_time FROM identities WHERE firebase_uid = $1 AND is_deleted = false
 `
 
+// GetIdentityByFirebaseUID is the active-sign-in lookup — soft-deleted
+// rows are excluded so a recycled Firebase UID can't accidentally
+// resolve to a tombstoned identity.
 func (q *Queries) GetIdentityByFirebaseUID(ctx context.Context, firebaseUid string) (Identity, error) {
 	row := q.db.QueryRow(ctx, getIdentityByFirebaseUID, firebaseUid)
 	var i Identity
@@ -66,21 +73,25 @@ func (q *Queries) GetIdentityByFirebaseUID(ctx context.Context, firebaseUid stri
 		&i.DisplayName,
 		&i.PhotoUrl,
 		&i.Disabled,
+		&i.IsDeleted,
 		&i.CreateTime,
 		&i.UpdateTime,
 		&i.LastLoginTime,
+		&i.DeleteTime,
 	)
 	return i, err
 }
 
 const getIdentityByID = `-- name: GetIdentityByID :one
-SELECT id, firebase_uid, email, email_verified, display_name, photo_url, disabled, create_time, update_time, last_login_time FROM identities WHERE id = $1
+SELECT id, firebase_uid, email, email_verified, display_name, photo_url, disabled, is_deleted, create_time, update_time, last_login_time, delete_time FROM identities WHERE id = $1
 `
 
-// GetIdentityByID looks up by primary key. Used by
-// DeleteUser's DELETING_PIVOX_RECORDS phase to capture the
-// firebase_uid before the row is hard-deleted, so the subsequent
+// GetIdentityByID looks up by primary key. Used by DeleteUser's
+// DELETING_PIVOX_RECORDS phase to capture the firebase_uid before
+// the row is soft-deleted, so the subsequent
 // DELETING_FIREBASE_IDENTITY phase can call auth.DeleteUser(uid).
+// Returns soft-deleted rows too (callers like the resolver need them
+// to render is_deleted=true Actor placeholders).
 func (q *Queries) GetIdentityByID(ctx context.Context, id uuid.UUID) (Identity, error) {
 	row := q.db.QueryRow(ctx, getIdentityByID, id)
 	var i Identity
@@ -92,11 +103,34 @@ func (q *Queries) GetIdentityByID(ctx context.Context, id uuid.UUID) (Identity, 
 		&i.DisplayName,
 		&i.PhotoUrl,
 		&i.Disabled,
+		&i.IsDeleted,
 		&i.CreateTime,
 		&i.UpdateTime,
 		&i.LastLoginTime,
+		&i.DeleteTime,
 	)
 	return i, err
+}
+
+const softDeleteIdentity = `-- name: SoftDeleteIdentity :exec
+UPDATE identities SET
+    is_deleted     = true,
+    email          = '',
+    display_name   = '',
+    photo_url      = '',
+    delete_time    = now(),
+    update_time    = now()
+WHERE id = $1 AND is_deleted = false
+`
+
+// SoftDeleteIdentity tombstones an identity: blanks PII, flips
+// is_deleted, stamps delete_time. The row is preserved so any
+// *_by audit field that points at this identity continues to
+// resolve (the audit resolver renders is_deleted=true with empty
+// PII rather than dropping the reference). Idempotent.
+func (q *Queries) SoftDeleteIdentity(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, softDeleteIdentity, id)
+	return err
 }
 
 const upsertIdentity = `-- name: UpsertIdentity :one
@@ -117,7 +151,7 @@ ON CONFLICT (firebase_uid) DO UPDATE SET
     disabled       = EXCLUDED.disabled,
     last_login_time = COALESCE(EXCLUDED.last_login_time, identities.last_login_time),
     update_time    = now()
-RETURNING id, firebase_uid, email, email_verified, display_name, photo_url, disabled, create_time, update_time, last_login_time
+RETURNING id, firebase_uid, email, email_verified, display_name, photo_url, disabled, is_deleted, create_time, update_time, last_login_time, delete_time
 `
 
 type UpsertIdentityParams struct {
@@ -155,9 +189,11 @@ func (q *Queries) UpsertIdentity(ctx context.Context, arg UpsertIdentityParams) 
 		&i.DisplayName,
 		&i.PhotoUrl,
 		&i.Disabled,
+		&i.IsDeleted,
 		&i.CreateTime,
 		&i.UpdateTime,
 		&i.LastLoginTime,
+		&i.DeleteTime,
 	)
 	return i, err
 }

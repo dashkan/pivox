@@ -26,10 +26,16 @@ func NewResolver(queries db.Querier) *Resolver {
 }
 
 // Resolve looks up the given identity IDs and returns a map keyed by
-// id. Zero UUIDs are skipped before the DB call. IDs that resolve to
-// no row are still returned in the map as `is_deleted=true`
-// placeholders so callers can render audit fields without losing the
-// reference.
+// id. Zero UUIDs are skipped before the DB call.
+//
+// Three resolution outcomes:
+//
+//  1. Live identity row → Actor with id + display_name + email.
+//  2. Soft-deleted identity row (is_deleted=true) → Actor with only
+//     id and is_deleted=true; PII is already blanked at the DB layer.
+//  3. Missing row (id was never persisted, or hard-purged) → Actor
+//     with id and is_deleted=true placeholder so callers don't
+//     silently drop the audit reference.
 func (r *Resolver) Resolve(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]*typespb.Actor, error) {
 	out := make(map[uuid.UUID]*typespb.Actor, len(ids))
 
@@ -48,6 +54,7 @@ func (r *Resolver) Resolve(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]
 			Id:          row.ID.String(),
 			DisplayName: row.DisplayName,
 			Email:       row.Email,
+			IsDeleted:   row.IsDeleted,
 		}
 	}
 

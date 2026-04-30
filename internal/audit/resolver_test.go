@@ -124,6 +124,31 @@ func TestResolver_Resolve_MissingIDsReturnPlaceholder(t *testing.T) {
 	assert.Equal(t, &typespb.Actor{Id: idB.String(), IsDeleted: true}, got[idB])
 }
 
+func TestResolver_Resolve_SoftDeletedIdentity(t *testing.T) {
+	// Soft-deleted identity rows are returned by GetIdentitiesByIDs
+	// with PII already blanked. The resolver propagates is_deleted
+	// onto the Actor so consumers know the audit reference points
+	// at a tombstoned identity. Distinct from the missing-row case
+	// (covered by TestResolver_Resolve_MissingIDsReturnPlaceholder)
+	// — here the row exists, just deleted.
+	q := new(mocks.MockQuerier)
+	q.On("GetIdentitiesByIDs", mock.Anything, mock.Anything).
+		Return([]db.Identity{
+			{ID: idA, Email: "", DisplayName: "", IsDeleted: true},
+			{ID: idB, Email: "b@example.com", DisplayName: "Bob"},
+		}, nil)
+
+	r := NewResolver(q)
+	got, err := r.Resolve(context.Background(), []uuid.UUID{idA, idB})
+	require.NoError(t, err)
+
+	require.Len(t, got, 2)
+	// Soft-deleted: id preserved, PII blank, is_deleted=true.
+	assert.Equal(t, &typespb.Actor{Id: idA.String(), IsDeleted: true}, got[idA])
+	// Live: full Actor.
+	assert.Equal(t, &typespb.Actor{Id: idB.String(), DisplayName: "Bob", Email: "b@example.com"}, got[idB])
+}
+
 func TestResolver_Resolve_DBError(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	q.On("GetIdentitiesByIDs", mock.Anything, mock.Anything).

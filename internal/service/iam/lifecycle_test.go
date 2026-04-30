@@ -249,7 +249,7 @@ func TestRunDeleteAccount_FullCascade(t *testing.T) {
 	q.On("DeleteSpaceMembersForIdentity", mock.Anything, identityID).Return(nil)
 	q.On("GetIdentityByID", mock.Anything, identityID).
 		Return(db.Identity{ID: identityID, FirebaseUid: "fb-abc"}, nil)
-	q.On("HardDeleteIdentity", mock.Anything, identityID).Return(nil)
+	q.On("SoftDeleteIdentity", mock.Anything, identityID).Return(nil)
 
 	auth := new(mockAuthService)
 	auth.On("DeleteUser", mock.Anything, "fb-abc").Return(nil)
@@ -288,7 +288,7 @@ func TestRunDeleteAccount_AlreadyGoneSurfacesInternal(t *testing.T) {
 	_, err := srv.runDeleteAccount(context.Background(), &fakeAccountProgress{}, identityID)
 	require.Error(t, err)
 	assert.Equal(t, codes.Internal, status.Code(err))
-	q.AssertNotCalled(t, "HardDeleteIdentity", mock.Anything, mock.Anything)
+	q.AssertNotCalled(t, "SoftDeleteIdentity", mock.Anything, mock.Anything)
 }
 
 func TestRunDeleteAccount_AuthFailureSurfaces(t *testing.T) {
@@ -299,7 +299,7 @@ func TestRunDeleteAccount_AuthFailureSurfaces(t *testing.T) {
 	q.On("DeleteSpaceMembersForIdentity", mock.Anything, identityID).Return(nil)
 	q.On("GetIdentityByID", mock.Anything, identityID).
 		Return(db.Identity{ID: identityID, FirebaseUid: "fb-abc"}, nil)
-	q.On("HardDeleteIdentity", mock.Anything, identityID).Return(nil)
+	q.On("SoftDeleteIdentity", mock.Anything, identityID).Return(nil)
 
 	auth := new(mockAuthService)
 	auth.On("DeleteUser", mock.Anything, "fb-abc").Return(errors.New("firebase down"))

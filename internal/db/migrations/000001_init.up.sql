@@ -384,20 +384,39 @@ CREATE INDEX idx_api_keys_key_string ON api_keys (key_string) WHERE delete_time 
 -- ============================================================================
 CREATE TABLE identities (
     id              UUID PRIMARY KEY DEFAULT uuidv7(),
-    -- identity (Firebase)
+    -- identity (Firebase, for now — column name kept because it
+    -- specifically holds the Firebase UID; future non-Firebase
+    -- principal sources will get their own typed column).
     firebase_uid    TEXT NOT NULL UNIQUE,
-    -- domain (synced from Firebase)
+    -- domain (synced from Firebase). Soft-delete blanks these out;
+    -- only `id` is durably preserved so historical *_by audit
+    -- references remain stable.
     email           TEXT NOT NULL DEFAULT '',
     email_verified  BOOLEAN NOT NULL DEFAULT false,
     display_name    TEXT NOT NULL DEFAULT '',
     photo_url       TEXT NOT NULL DEFAULT '',
     disabled        BOOLEAN NOT NULL DEFAULT false,
+    -- soft-delete. is_deleted=true means the identity has been
+    -- deleted by the user (or by an admin); the row is preserved
+    -- so audit *_by references continue to resolve, but PII is
+    -- blanked and the row is excluded from active sign-in lookups.
+    -- Hard-delete is intentionally not exposed — terminal purge
+    -- is a separate, manually-invoked operation.
+    is_deleted      BOOLEAN NOT NULL DEFAULT false,
     -- timestamps
     create_time     TIMESTAMPTZ NOT NULL DEFAULT now(),
     update_time     TIMESTAMPTZ NOT NULL DEFAULT now(),
-    last_login_time TIMESTAMPTZ
+    last_login_time TIMESTAMPTZ,
+    delete_time     TIMESTAMPTZ
 );
-CREATE INDEX idx_identities_email ON identities (email);
+-- Email lookup index excludes soft-deleted (whose email is blanked
+-- anyway) so the index stays small and active.
+CREATE INDEX idx_identities_email ON identities (email) WHERE is_deleted = false;
+-- Enforce one-active-identity-per-email. Soft-deleted rows blank
+-- email at delete time, but the partial predicate is the durable
+-- guard against re-introduction.
+CREATE UNIQUE INDEX idx_identities_email_unique ON identities (email)
+  WHERE is_deleted = false AND email <> '';
 
 -- ============================================================================
 -- Per-org user identity has been unified with `identities`

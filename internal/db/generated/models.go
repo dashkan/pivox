@@ -1000,9 +1000,11 @@ type Identity struct {
 	DisplayName   string             `json:"display_name"`
 	PhotoUrl      string             `json:"photo_url"`
 	Disabled      bool               `json:"disabled"`
+	IsDeleted     bool               `json:"is_deleted"`
 	CreateTime    time.Time          `json:"create_time"`
 	UpdateTime    time.Time          `json:"update_time"`
 	LastLoginTime pgtype.Timestamptz `json:"last_login_time"`
+	DeleteTime    pgtype.Timestamptz `json:"delete_time"`
 }
 
 type Invitation struct {
