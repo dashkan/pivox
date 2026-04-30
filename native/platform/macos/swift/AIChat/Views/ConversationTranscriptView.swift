@@ -391,13 +391,26 @@ struct ConversationTranscriptView: NSViewRepresentable {
                new.count == messages.count,
                lastNew.name == lastOld.name,
                Self.textOf(lastNew) != Self.textOf(lastOld) {
-                // Capture BEFORE the row grows. After
-                // `noteHeightOfRows` the document is taller while
-                // the clip view's origin hasn't moved, so a
-                // post-mutation `isAtBottom()` would always read
-                // false — exactly the wrong answer when the user
-                // was sitting at the bottom watching the stream.
-                let wasAtBottom = isAtBottom()
+                // Streaming delta: the placeholder's text grew. Gate
+                // auto-scroll on `viewModel.stickToBottom` (user-intent
+                // flag), NOT a position-based `isAtBottom()` read.
+                // Reason: each delta marks heights dirty via
+                // `noteHeightOfRows` but doesn't synchronously commit
+                // layout. Multiple deltas queue inside a single
+                // runloop tick — by delta 2, `visible.maxY` is still
+                // pre-delta-1 while `docHeight` reflects delta-1's
+                // pending growth, so a position check reads "user
+                // moved away" and aborts the scroll for every delta
+                // after the first. Result: viewport falls progressively
+                // behind the streaming cursor, exactly the symptom
+                // observed in the chat-not-scrolling-during-stream
+                // bug.
+                //
+                // `stickToBottom` is set true on send and only flips
+                // false when the user actively scrolls past the
+                // one-viewport pill threshold (see updatePillVisibility),
+                // so it correctly survives cross-delta layout flicker.
+                // Same gate the tail-append branch below uses.
                 messages = new
                 rebuildRowsKeepingPages()
                 if let lastRowIdx = rows.indices.last {
@@ -409,16 +422,16 @@ struct ConversationTranscriptView: NSViewRepresentable {
                     tableView?.reloadData(forRowIndexes: last,
                                           columnIndexes: IndexSet(integer: 0))
                 }
-                if wasAtBottom {
+                if viewModel.stickToBottom {
                     DispatchQueue.main.async { [weak self] in
                         self?.scrollToBottom()
                     }
                 } else {
-                    // No auto-scroll: the doc grew but the user is
-                    // off the bottom. Distance-from-bottom just
-                    // increased, which can cross the pill threshold.
-                    // Bounds-change won't fire (clip view didn't
-                    // move), so we have to recheck explicitly.
+                    // User has scrolled away. Doc grew but clip
+                    // origin didn't move, so the bounds-change
+                    // observer won't fire — recheck pill visibility
+                    // explicitly so the distance-from-bottom can
+                    // cross the pill threshold.
                     DispatchQueue.main.async { [weak self] in
                         self?.updatePillVisibility()
                     }
