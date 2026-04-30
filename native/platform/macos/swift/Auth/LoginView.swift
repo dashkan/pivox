@@ -205,16 +205,31 @@ struct LoginView: View {
           }
         }
 
-        // Primary button label tracks state: Continue (step 1) →
-        // Sign In (step 2). Single action handler branches on
-        // `didResolveAsPassword`.
-        AuthPrimaryButton(
-          didResolveAsPassword ? "Sign In" : "Continue",
-          isLoading: isLoading,
-          action: submit
-        )
-        .disabled(primaryDisabled)
-        .accessibilityIdentifier("login-sign-in")
+        // Primary button morphs through three states:
+        //   - idle/step 1   → "Continue"  (resolve SSO vs password)
+        //   - idle/step 2   → "Sign In"   (submit password)
+        //   - OAuth in flight → "Cancel sign-in" (tear down session)
+        //
+        // Morphing in place rather than placing the cancel as a
+        // secondary link below the form: the user's eye is already
+        // on the primary button after they clicked it, and a
+        // peripheral cancel link is hard to find when they want it.
+        // ASWebAuthenticationSession's own sheet has a Close button,
+        // but the sheet is often buried behind windows or off-focus
+        // — the in-app primary-button cancel covers all those cases
+        // without making the user hunt.
+        if auth.isOAuthInProgress {
+          AuthPrimaryButton("Cancel sign-in", action: auth.cancelOAuth)
+            .accessibilityIdentifier("login-cancel-oauth")
+        } else {
+          AuthPrimaryButton(
+            didResolveAsPassword ? "Sign In" : "Continue",
+            isLoading: isLoading,
+            action: submit
+          )
+          .disabled(primaryDisabled)
+          .accessibilityIdentifier("login-sign-in")
+        }
 
         // Error message — pre-allocated space to prevent layout shift.
         Text(auth.errorMessage ?? " ")
@@ -284,28 +299,16 @@ struct LoginView: View {
         .disabled(isLoading)
       }
 
-      // Footer: switch to register, OR — while an ASWebAuthentication
-      // session is open — a Cancel link that hands control back to
-      // the user without making them hunt for the system sheet's
-      // close button. Shown for any OAuth round-trip (Google, GitHub,
-      // SSO); covers wrong-email recovery and any future flow where
-      // the user wants to bail mid-redirect.
-      if auth.isOAuthInProgress {
-        Button("Cancel sign-in") { auth.cancelOAuth() }
+      // Footer
+      HStack(spacing: 4) {
+        Text("Don't have an account?")
+          .font(theme.bodyFont)
+          .foregroundStyle(.secondary)
+        Button("Create one", action: onSwitchToRegister)
           .buttonStyle(.link)
           .font(theme.bodyFont)
-          .accessibilityIdentifier("login-cancel-oauth")
-      } else {
-        HStack(spacing: 4) {
-          Text("Don't have an account?")
-            .font(theme.bodyFont)
-            .foregroundStyle(.secondary)
-          Button("Create one", action: onSwitchToRegister)
-            .buttonStyle(.link)
-            .font(theme.bodyFont)
-            .disabled(isLoading)
-            .accessibilityIdentifier("login-switch-register")
-        }
+          .disabled(isLoading)
+          .accessibilityIdentifier("login-switch-register")
       }
     }
     .padding(32)
