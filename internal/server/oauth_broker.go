@@ -410,6 +410,17 @@ func (b *OAuthBroker) start(w http.ResponseWriter, r *http.Request) {
 	if cfg.kind == kindOIDCIDToken {
 		sum := sha256.Sum256([]byte(payload.N))
 		q.Set("nonce", hex.EncodeToString(sum[:]))
+		// Force re-authentication at the IdP. Without this an already-
+		// signed-in IdP session lets the user through immediately,
+		// which is the wrong default for an explicit "Sign in"
+		// click — the user pressed sign-in to assert "this is me,
+		// right now," not to silently re-use whatever session their
+		// browser happens to have. RFC 6749 §3.1.2.1 / OIDC Core
+		// §3.1.2.1 — `prompt=login` is the standard verb every
+		// compliant IdP (Keycloak, Okta, Auth0, Google, Apple, etc.)
+		// honors. Use `prompt=select_account` instead when "switch
+		// account" semantics are wanted.
+		q.Set("prompt", "login")
 	}
 	authURL.RawQuery = q.Encode()
 

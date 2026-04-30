@@ -162,6 +162,21 @@ struct LoginView: View {
           .disabled(email.isEmpty || password.isEmpty || isLoading)
           .accessibilityIdentifier("login-sign-in")
 
+        // SSO sits as a peer of the primary Sign In button — same
+        // shape and width, accent-tinted outline instead of filled
+        // so the password flow remains the visual default. The
+        // dedicated SsoLoginView owns the email entry +
+        // provider-resolution flow; clicking here just navigates,
+        // it doesn't probe (silent probe would enumerate which
+        // domains have SSO configured).
+        AuthSecondaryButton(
+          "Sign in with SSO",
+          systemImage: "key.shield",
+          action: onSwitchToSSO
+        )
+        .disabled(isLoading)
+        .accessibilityIdentifier("login-sso")
+
         // Error message — pre-allocated space to prevent layout shift.
         Text(auth.errorMessage ?? " ")
           .font(theme.bodyFont)
@@ -227,26 +242,6 @@ struct LoginView: View {
         .buttonStyle(.bordered)
         .controlSize(.large)
         .disabled(isLoading)
-
-        // SSO is intentionally a separate explicit screen — auto-
-        // probing the resolver as the user types would enumerate
-        // which domains have SSO configured. The button hands off
-        // to a dedicated SSO view that owns its own email field
-        // and provider-resolution flow.
-        Button(action: onSwitchToSSO) {
-          HStack {
-            Image(systemName: "key.shield")
-              .resizable()
-              .aspectRatio(contentMode: .fit)
-              .frame(width: 16, height: 16)
-            Text("Sign in with SSO")
-          }
-          .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.bordered)
-        .controlSize(.large)
-        .disabled(isLoading)
-        .accessibilityIdentifier("login-sso")
       }
 
       // Footer
