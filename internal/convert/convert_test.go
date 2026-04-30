@@ -1438,7 +1438,7 @@ func TestTagKeyToProto(t *testing.T) {
 	}
 
 	t.Run("all fields mapped", func(t *testing.T) {
-		proto := TagKeyToProto(tk)
+		proto := TagKeyToProto(tk, nil)
 		assert.Equal(t, "tagKeys/0192a000-0004-7000-8000-000000410001", proto.Name)
 		assert.Equal(t, "Environment tag", proto.Description)
 		assert.Equal(t, "etag-tk", proto.Etag)
@@ -1464,7 +1464,7 @@ func TestTagValueToProto(t *testing.T) {
 	}
 
 	t.Run("all fields mapped", func(t *testing.T) {
-		proto := TagValueToProto(tv)
+		proto := TagValueToProto(tv, nil)
 		assert.Equal(t, "tagKeys/0192a000-0004-7000-8000-000000410001/tagValues/0192a000-0005-7000-8000-000000510001", proto.Name)
 		assert.Equal(t, "Production environment", proto.Description)
 	})
@@ -1490,7 +1490,7 @@ func TestTagBindingToProto(t *testing.T) {
 	}
 
 	t.Run("resource names formed correctly", func(t *testing.T) {
-		proto := TagBindingToProto(tb, tv)
+		proto := TagBindingToProto(tb, tv, nil)
 		assert.Equal(t, "tagBindings/0192a000-0006-7000-8000-000000610001", proto.Name)
 		assert.Equal(t, "tagKeys/0192a000-0004-7000-8000-000000410001/tagValues/0192a000-0005-7000-8000-000000510001", proto.TagValue)
 	})

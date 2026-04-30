@@ -41,9 +41,9 @@ func TestIntegration_Tags_FullLifecycle(t *testing.T) {
 	defer cleanup()
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		apiv1.RegisterTagKeysServer(s, tags.NewTagKeysServer(pool, queries, nil))
-		apiv1.RegisterTagValuesServer(s, tags.NewTagValuesServer(pool, queries, nil))
-		apiv1.RegisterTagBindingsServer(s, tags.NewTagBindingsServer(pool, queries, nil))
+		apiv1.RegisterTagKeysServer(s, tags.NewTagKeysServer(pool, queries, nil, nil))
+		apiv1.RegisterTagValuesServer(s, tags.NewTagValuesServer(pool, queries, nil, nil))
+		apiv1.RegisterTagBindingsServer(s, tags.NewTagBindingsServer(pool, queries, nil, nil))
 	})
 
 	keysClient := apiv1.NewTagKeysClient(conn)

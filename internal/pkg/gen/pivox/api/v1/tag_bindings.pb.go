@@ -24,6 +24,7 @@ import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
 	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/permission/v1"
+	types "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -110,6 +111,8 @@ type TagBinding struct {
 	// Immutable. The TagValue of the TagBinding.
 	// Must be of the form `organizations/{org}/tagKeys/{key}/tagValues/{value}`.
 	TagValue string `protobuf:"bytes,3,opt,name=tag_value,json=tagValue,proto3" json:"tag_value,omitempty"`
+	// Output only. The identity that created this tag binding.
+	CreatedBy *types.Actor `protobuf:"bytes,5,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
 	// Output only. Creation time.
 	CreateTime *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
 	// Output only. Update time.
@@ -169,6 +172,13 @@ func (x *TagBinding) GetTagValue() string {
 		return x.TagValue
 	}
 	return ""
+}
+
+func (x *TagBinding) GetCreatedBy() *types.Actor {
+	if x != nil {
+		return x.CreatedBy
+	}
+	return nil
 }
 
 func (x *TagBinding) GetCreateTime() *timestamppb.Timestamp {
@@ -856,12 +866,14 @@ var File_pivox_api_v1_tag_bindings_proto protoreflect.FileDescriptor
 
 const file_pivox_api_v1_tag_bindings_proto_rawDesc = "" +
 	"\n" +
-	"\x1fpivox/api/v1/tag_bindings.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!pivox/permission/v1/options.proto\"\x9c\x06\n" +
+	"\x1fpivox/api/v1/tag_bindings.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!pivox/permission/v1/options.proto\x1a\x17pivox/types/actor.proto\"\xd4\x06\n" +
 	"\n" +
 	"TagBinding\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12=\n" +
 	"\ttag_value\x18\x03 \x01(\tB \xe0A\x05\xfaA\x14\n" +
-	"\x12pivox.api/TagValue\xbaH\x03\xc8\x01\x01R\btagValue\x12@\n" +
+	"\x12pivox.api/TagValue\xbaH\x03\xc8\x01\x01R\btagValue\x126\n" +
+	"\n" +
+	"created_by\x18\x05 \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tcreatedBy\x12@\n" +
 	"\vcreate_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"createTime\x12@\n" +
 	"\vupdate_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
@@ -961,32 +973,34 @@ var file_pivox_api_v1_tag_bindings_proto_goTypes = []any{
 	(*CreateTagBindingMetadata)(nil),  // 10: pivox.api.v1.CreateTagBindingMetadata
 	(*DeleteTagBindingMetadata)(nil),  // 11: pivox.api.v1.DeleteTagBindingMetadata
 	nil,                               // 12: pivox.api.v1.TagBinding.AnnotationsEntry
-	(*timestamppb.Timestamp)(nil),     // 13: google.protobuf.Timestamp
-	(*longrunningpb.Operation)(nil),   // 14: google.longrunning.Operation
+	(*types.Actor)(nil),               // 13: pivox.types.Actor
+	(*timestamppb.Timestamp)(nil),     // 14: google.protobuf.Timestamp
+	(*longrunningpb.Operation)(nil),   // 15: google.longrunning.Operation
 }
 var file_pivox_api_v1_tag_bindings_proto_depIdxs = []int32{
-	13, // 0: pivox.api.v1.TagBinding.create_time:type_name -> google.protobuf.Timestamp
-	13, // 1: pivox.api.v1.TagBinding.update_time:type_name -> google.protobuf.Timestamp
-	0,  // 2: pivox.api.v1.TagBinding.origin:type_name -> pivox.api.v1.TagBinding.Origin
-	12, // 3: pivox.api.v1.TagBinding.annotations:type_name -> pivox.api.v1.TagBinding.AnnotationsEntry
-	1,  // 4: pivox.api.v1.CreateTagBindingRequest.tag_binding:type_name -> pivox.api.v1.TagBinding
-	1,  // 5: pivox.api.v1.ListTagBindingsResponse.tag_bindings:type_name -> pivox.api.v1.TagBinding
-	9,  // 6: pivox.api.v1.ListEffectiveTagsResponse.effective_tags:type_name -> pivox.api.v1.EffectiveTag
-	5,  // 7: pivox.api.v1.TagBindings.ListTagBindings:input_type -> pivox.api.v1.ListTagBindingsRequest
-	2,  // 8: pivox.api.v1.TagBindings.GetTagBinding:input_type -> pivox.api.v1.GetTagBindingRequest
-	3,  // 9: pivox.api.v1.TagBindings.CreateTagBinding:input_type -> pivox.api.v1.CreateTagBindingRequest
-	4,  // 10: pivox.api.v1.TagBindings.DeleteTagBinding:input_type -> pivox.api.v1.DeleteTagBindingRequest
-	7,  // 11: pivox.api.v1.TagBindings.ListEffectiveTags:input_type -> pivox.api.v1.ListEffectiveTagsRequest
-	6,  // 12: pivox.api.v1.TagBindings.ListTagBindings:output_type -> pivox.api.v1.ListTagBindingsResponse
-	1,  // 13: pivox.api.v1.TagBindings.GetTagBinding:output_type -> pivox.api.v1.TagBinding
-	14, // 14: pivox.api.v1.TagBindings.CreateTagBinding:output_type -> google.longrunning.Operation
-	14, // 15: pivox.api.v1.TagBindings.DeleteTagBinding:output_type -> google.longrunning.Operation
-	8,  // 16: pivox.api.v1.TagBindings.ListEffectiveTags:output_type -> pivox.api.v1.ListEffectiveTagsResponse
-	12, // [12:17] is the sub-list for method output_type
-	7,  // [7:12] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	13, // 0: pivox.api.v1.TagBinding.created_by:type_name -> pivox.types.Actor
+	14, // 1: pivox.api.v1.TagBinding.create_time:type_name -> google.protobuf.Timestamp
+	14, // 2: pivox.api.v1.TagBinding.update_time:type_name -> google.protobuf.Timestamp
+	0,  // 3: pivox.api.v1.TagBinding.origin:type_name -> pivox.api.v1.TagBinding.Origin
+	12, // 4: pivox.api.v1.TagBinding.annotations:type_name -> pivox.api.v1.TagBinding.AnnotationsEntry
+	1,  // 5: pivox.api.v1.CreateTagBindingRequest.tag_binding:type_name -> pivox.api.v1.TagBinding
+	1,  // 6: pivox.api.v1.ListTagBindingsResponse.tag_bindings:type_name -> pivox.api.v1.TagBinding
+	9,  // 7: pivox.api.v1.ListEffectiveTagsResponse.effective_tags:type_name -> pivox.api.v1.EffectiveTag
+	5,  // 8: pivox.api.v1.TagBindings.ListTagBindings:input_type -> pivox.api.v1.ListTagBindingsRequest
+	2,  // 9: pivox.api.v1.TagBindings.GetTagBinding:input_type -> pivox.api.v1.GetTagBindingRequest
+	3,  // 10: pivox.api.v1.TagBindings.CreateTagBinding:input_type -> pivox.api.v1.CreateTagBindingRequest
+	4,  // 11: pivox.api.v1.TagBindings.DeleteTagBinding:input_type -> pivox.api.v1.DeleteTagBindingRequest
+	7,  // 12: pivox.api.v1.TagBindings.ListEffectiveTags:input_type -> pivox.api.v1.ListEffectiveTagsRequest
+	6,  // 13: pivox.api.v1.TagBindings.ListTagBindings:output_type -> pivox.api.v1.ListTagBindingsResponse
+	1,  // 14: pivox.api.v1.TagBindings.GetTagBinding:output_type -> pivox.api.v1.TagBinding
+	15, // 15: pivox.api.v1.TagBindings.CreateTagBinding:output_type -> google.longrunning.Operation
+	15, // 16: pivox.api.v1.TagBindings.DeleteTagBinding:output_type -> google.longrunning.Operation
+	8,  // 17: pivox.api.v1.TagBindings.ListEffectiveTags:output_type -> pivox.api.v1.ListEffectiveTagsResponse
+	13, // [13:18] is the sub-list for method output_type
+	8,  // [8:13] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_pivox_api_v1_tag_bindings_proto_init() }

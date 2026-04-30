@@ -2,19 +2,22 @@ package tags
 
 import (
 	"context"
+	"log/slog"
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/appkey"
+	"github.com/dashkan/pivox/internal/audit"
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/filter"
 	"github.com/dashkan/pivox/internal/lro"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
+	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 	"github.com/dashkan/pivox/internal/resource"
+	"github.com/dashkan/pivox/internal/server"
 )
 
 type TagBindingsServer struct {
@@ -23,15 +26,40 @@ type TagBindingsServer struct {
 	queries db.Querier
 	filter  *filter.ResourceFilter
 	codec   *appkey.Codec
+	audit   *audit.Resolver
 }
 
-func NewTagBindingsServer(pool db.DBTX, queries db.Querier, codec *appkey.Codec) *TagBindingsServer {
+// NewTagBindingsServer constructs the server. `auditResolver`
+// inflates audit-field UUIDs into Actor protos; nil leaves Actor
+// fields unset.
+func NewTagBindingsServer(pool db.DBTX, queries db.Querier, codec *appkey.Codec, auditResolver *audit.Resolver) *TagBindingsServer {
 	return &TagBindingsServer{
 		db:      pool,
 		queries: queries,
 		filter:  filter.TagBindingFilter(),
 		codec:   codec,
+		audit:   auditResolver,
 	}
+}
+
+// resolveTagBindingActors gathers created_by UUIDs (bindings have no
+// updated_by) across the page and resolves them in one batched call.
+func (s *TagBindingsServer) resolveTagBindingActors(ctx context.Context, rows []db.TagBinding) (map[uuid.UUID]*typespb.Actor, error) {
+	if s.audit == nil {
+		return nil, nil
+	}
+	ids := make([]uuid.UUID, 0, len(rows))
+	for _, r := range rows {
+		if r.CreatedBy.Valid {
+			ids = append(ids, r.CreatedBy.Bytes)
+		}
+	}
+	actors, err := s.audit.Resolve(ctx, ids)
+	if err != nil {
+		slog.ErrorContext(ctx, "resolve tag binding actors failed", "error", err)
+		return nil, apierr.Internal("resolve actors")
+	}
+	return actors, nil
 }
 
 func (s *TagBindingsServer) ListTagBindings(ctx context.Context, req *apiv1.ListTagBindingsRequest) (*apiv1.ListTagBindingsResponse, error) {
@@ -69,13 +97,17 @@ func (s *TagBindingsServer) ListTagBindings(ctx context.Context, req *apiv1.List
 		results = results[:pageSize]
 	}
 
+	actors, err := s.resolveTagBindingActors(ctx, results)
+	if err != nil {
+		return nil, err
+	}
 	tagBindings := make([]*apiv1.TagBinding, 0, len(results))
 	for _, tb := range results {
 		tv, err := s.queries.GetTagValue(ctx, tb.TagValueID)
 		if err != nil {
 			continue
 		}
-		tagBindings = append(tagBindings, convert.TagBindingToProto(tb, tv))
+		tagBindings = append(tagBindings, convert.TagBindingToProto(tb, tv, actors))
 	}
 
 	return &apiv1.ListTagBindingsResponse{
@@ -101,7 +133,11 @@ func (s *TagBindingsServer) GetTagBinding(ctx context.Context, req *apiv1.GetTag
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "TagValue", "")
 	}
-	return convert.TagBindingToProto(tb, tv), nil
+	actors, err := s.resolveTagBindingActors(ctx, []db.TagBinding{tb})
+	if err != nil {
+		return nil, err
+	}
+	return convert.TagBindingToProto(tb, tv, actors), nil
 }
 
 func (s *TagBindingsServer) CreateTagBinding(ctx context.Context, req *apiv1.CreateTagBindingRequest) (*longrunningpb.Operation, error) {
@@ -121,12 +157,18 @@ func (s *TagBindingsServer) CreateTagBinding(ctx context.Context, req *apiv1.Cre
 		ID:             uuid.New(),
 		ParentResource: req.GetParent(),
 		TagValueID:     tagValue.ID,
-		CreatedBy:      pgtype.UUID{},
+		CreatedBy:      convert.PgUUID(server.MustPivoxUserID(ctx)),
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "TagBinding", "")
 	}
-	return lro.DoneOperation(convert.TagBindingToProto(created, tagValue))
+	actors, resolveErr := s.resolveTagBindingActors(ctx, []db.TagBinding{created})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "create tag binding: actor resolution failed; returning proto without audit actors",
+			"tag_binding_id", created.ID, "error", resolveErr)
+		actors = nil
+	}
+	return lro.DoneOperation(convert.TagBindingToProto(created, tagValue, actors))
 }
 
 func (s *TagBindingsServer) DeleteTagBinding(ctx context.Context, req *apiv1.DeleteTagBindingRequest) (*longrunningpb.Operation, error) {

@@ -51,6 +51,16 @@ public struct Pivox_Api_V1_TagValue: Sendable {
   /// Read-write.
   public var description_p: String = String()
 
+  /// Output only. The identity that created this tag value.
+  public var createdBy: Pivox_Types_Actor {
+    get {_createdBy ?? Pivox_Types_Actor()}
+    set {_createdBy = newValue}
+  }
+  /// Returns true if `createdBy` has been explicitly set.
+  public var hasCreatedBy: Bool {self._createdBy != nil}
+  /// Clears the value of `createdBy`. Subsequent reads from it will return its default value.
+  public mutating func clearCreatedBy() {self._createdBy = nil}
+
   /// Output only. Creation time.
   public var createTime: SwiftProtobuf.Google_Protobuf_Timestamp {
     get {_createTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
@@ -60,6 +70,16 @@ public struct Pivox_Api_V1_TagValue: Sendable {
   public var hasCreateTime: Bool {self._createTime != nil}
   /// Clears the value of `createTime`. Subsequent reads from it will return its default value.
   public mutating func clearCreateTime() {self._createTime = nil}
+
+  /// Output only. The identity that last modified this tag value.
+  public var updatedBy: Pivox_Types_Actor {
+    get {_updatedBy ?? Pivox_Types_Actor()}
+    set {_updatedBy = newValue}
+  }
+  /// Returns true if `updatedBy` has been explicitly set.
+  public var hasUpdatedBy: Bool {self._updatedBy != nil}
+  /// Clears the value of `updatedBy`. Subsequent reads from it will return its default value.
+  public mutating func clearUpdatedBy() {self._updatedBy = nil}
 
   /// Output only. Update time.
   public var updateTime: SwiftProtobuf.Google_Protobuf_Timestamp {
@@ -84,7 +104,9 @@ public struct Pivox_Api_V1_TagValue: Sendable {
 
   public init() {}
 
+  fileprivate var _createdBy: Pivox_Types_Actor? = nil
   fileprivate var _createTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+  fileprivate var _updatedBy: Pivox_Types_Actor? = nil
   fileprivate var _updateTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
 
@@ -175,7 +197,7 @@ public struct Pivox_Api_V1_GetTagValueRequest: Sendable {
 }
 
 /// The request message for creating a TagValue.
-public struct Pivox_Api_V1_CreateTagValueRequest: Sendable {
+public struct Pivox_Api_V1_CreateTagValueRequest: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -183,36 +205,45 @@ public struct Pivox_Api_V1_CreateTagValueRequest: Sendable {
   /// Required. The resource name of the parent TagKey.
   /// Must be of the form `organizations/{org_id}/tagKeys/{tag_key}` or
   /// `organizations/{org_id}/spaces/{space}/tagKeys/{tag_key}`.
-  public var parent: String = String()
+  public var parent: String {
+    get {_storage._parent}
+    set {_uniqueStorage()._parent = newValue}
+  }
 
   /// Required. The TagValue to be created. Only fields `description`
   /// are considered during the creation request.
   public var tagValue: Pivox_Api_V1_TagValue {
-    get {_tagValue ?? Pivox_Api_V1_TagValue()}
-    set {_tagValue = newValue}
+    get {_storage._tagValue ?? Pivox_Api_V1_TagValue()}
+    set {_uniqueStorage()._tagValue = newValue}
   }
   /// Returns true if `tagValue` has been explicitly set.
-  public var hasTagValue: Bool {self._tagValue != nil}
+  public var hasTagValue: Bool {_storage._tagValue != nil}
   /// Clears the value of `tagValue`. Subsequent reads from it will return its default value.
-  public mutating func clearTagValue() {self._tagValue = nil}
+  public mutating func clearTagValue() {_uniqueStorage()._tagValue = nil}
 
   /// Required. The user-assigned short name for the TagValue.
   /// Must be unique for TagValues within the same parent TagKey.
-  public var tagValueID: String = String()
+  public var tagValueID: String {
+    get {_storage._tagValueID}
+    set {_uniqueStorage()._tagValueID = newValue}
+  }
 
   /// Optional. Set as true to perform the validations necessary for creating the
   /// resource, but not actually perform the action.
-  public var validateOnly: Bool = false
+  public var validateOnly: Bool {
+    get {_storage._validateOnly}
+    set {_uniqueStorage()._validateOnly = newValue}
+  }
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _tagValue: Pivox_Api_V1_TagValue? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 /// The request message for updating a TagValue.
-public struct Pivox_Api_V1_UpdateTagValueRequest: Sendable {
+public struct Pivox_Api_V1_UpdateTagValueRequest: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -222,38 +253,43 @@ public struct Pivox_Api_V1_UpdateTagValueRequest: Sendable {
   /// nonempty, it must match the `etag` field of the existing ControlGroup.
   /// Otherwise, `ABORTED` will be returned.
   public var tagValue: Pivox_Api_V1_TagValue {
-    get {_tagValue ?? Pivox_Api_V1_TagValue()}
-    set {_tagValue = newValue}
+    get {_storage._tagValue ?? Pivox_Api_V1_TagValue()}
+    set {_uniqueStorage()._tagValue = newValue}
   }
   /// Returns true if `tagValue` has been explicitly set.
-  public var hasTagValue: Bool {self._tagValue != nil}
+  public var hasTagValue: Bool {_storage._tagValue != nil}
   /// Clears the value of `tagValue`. Subsequent reads from it will return its default value.
-  public mutating func clearTagValue() {self._tagValue = nil}
+  public mutating func clearTagValue() {_uniqueStorage()._tagValue = nil}
 
   /// Optional. Fields to be updated.
   public var updateMask: SwiftProtobuf.Google_Protobuf_FieldMask {
-    get {_updateMask ?? SwiftProtobuf.Google_Protobuf_FieldMask()}
-    set {_updateMask = newValue}
+    get {_storage._updateMask ?? SwiftProtobuf.Google_Protobuf_FieldMask()}
+    set {_uniqueStorage()._updateMask = newValue}
   }
   /// Returns true if `updateMask` has been explicitly set.
-  public var hasUpdateMask: Bool {self._updateMask != nil}
+  public var hasUpdateMask: Bool {_storage._updateMask != nil}
   /// Clears the value of `updateMask`. Subsequent reads from it will return its default value.
-  public mutating func clearUpdateMask() {self._updateMask = nil}
+  public mutating func clearUpdateMask() {_uniqueStorage()._updateMask = nil}
 
   /// Optional. If set to true, and the tag value is not found, a new tag value will be created.
   /// In this situation, update_mask is ignored.
-  public var allowMissing: Bool = false
+  public var allowMissing: Bool {
+    get {_storage._allowMissing}
+    set {_uniqueStorage()._allowMissing = newValue}
+  }
 
   /// Optional. True to perform validations necessary for updating the resource,
   /// but not actually perform the action.
-  public var validateOnly: Bool = false
+  public var validateOnly: Bool {
+    get {_storage._validateOnly}
+    set {_uniqueStorage()._validateOnly = newValue}
+  }
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _tagValue: Pivox_Api_V1_TagValue? = nil
-  fileprivate var _updateMask: SwiftProtobuf.Google_Protobuf_FieldMask? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 /// The request message for deleting a TagValue.
@@ -321,7 +357,7 @@ fileprivate let _protobuf_package = "pivox.api.v1"
 
 extension Pivox_Api_V1_TagValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TagValue"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{2}\u{4}description\0\u{3}create_time\0\u{3}update_time\0\u{1}etag\0\u{2}\u{3}annotations\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{2}\u{4}description\0\u{3}created_by\0\u{3}create_time\0\u{3}updated_by\0\u{3}update_time\0\u{1}etag\0\u{1}annotations\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -331,9 +367,11 @@ extension Pivox_Api_V1_TagValue: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.name) }()
       case 5: try { try decoder.decodeSingularStringField(value: &self.description_p) }()
-      case 6: try { try decoder.decodeSingularMessageField(value: &self._createTime) }()
-      case 7: try { try decoder.decodeSingularMessageField(value: &self._updateTime) }()
-      case 8: try { try decoder.decodeSingularStringField(value: &self.etag) }()
+      case 6: try { try decoder.decodeSingularMessageField(value: &self._createdBy) }()
+      case 7: try { try decoder.decodeSingularMessageField(value: &self._createTime) }()
+      case 8: try { try decoder.decodeSingularMessageField(value: &self._updatedBy) }()
+      case 9: try { try decoder.decodeSingularMessageField(value: &self._updateTime) }()
+      case 10: try { try decoder.decodeSingularStringField(value: &self.etag) }()
       case 11: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.annotations) }()
       default: break
       }
@@ -351,14 +389,20 @@ extension Pivox_Api_V1_TagValue: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
     if !self.description_p.isEmpty {
       try visitor.visitSingularStringField(value: self.description_p, fieldNumber: 5)
     }
-    try { if let v = self._createTime {
+    try { if let v = self._createdBy {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
     } }()
-    try { if let v = self._updateTime {
+    try { if let v = self._createTime {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
     } }()
+    try { if let v = self._updatedBy {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+    } }()
+    try { if let v = self._updateTime {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+    } }()
     if !self.etag.isEmpty {
-      try visitor.visitSingularStringField(value: self.etag, fieldNumber: 8)
+      try visitor.visitSingularStringField(value: self.etag, fieldNumber: 10)
     }
     if !self.annotations.isEmpty {
       try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.annotations, fieldNumber: 11)
@@ -369,7 +413,9 @@ extension Pivox_Api_V1_TagValue: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
   public static func ==(lhs: Pivox_Api_V1_TagValue, rhs: Pivox_Api_V1_TagValue) -> Bool {
     if lhs.name != rhs.name {return false}
     if lhs.description_p != rhs.description_p {return false}
+    if lhs._createdBy != rhs._createdBy {return false}
     if lhs._createTime != rhs._createTime {return false}
+    if lhs._updatedBy != rhs._updatedBy {return false}
     if lhs._updateTime != rhs._updateTime {return false}
     if lhs.etag != rhs.etag {return false}
     if lhs.annotations != rhs.annotations {return false}
@@ -497,46 +543,88 @@ extension Pivox_Api_V1_CreateTagValueRequest: SwiftProtobuf.Message, SwiftProtob
   public static let protoMessageName: String = _protobuf_package + ".CreateTagValueRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}tag_value\0\u{3}validate_only\0\u{3}tag_value_id\0\u{1}parent\0")
 
+  fileprivate class _StorageClass {
+    var _parent: String = String()
+    var _tagValue: Pivox_Api_V1_TagValue? = nil
+    var _tagValueID: String = String()
+    var _validateOnly: Bool = false
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _parent = source._parent
+      _tagValue = source._tagValue
+      _tagValueID = source._tagValueID
+      _validateOnly = source._validateOnly
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._tagValue) }()
-      case 2: try { try decoder.decodeSingularBoolField(value: &self.validateOnly) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.tagValueID) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self.parent) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._tagValue) }()
+        case 2: try { try decoder.decodeSingularBoolField(value: &_storage._validateOnly) }()
+        case 3: try { try decoder.decodeSingularStringField(value: &_storage._tagValueID) }()
+        case 4: try { try decoder.decodeSingularStringField(value: &_storage._parent) }()
+        default: break
+        }
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._tagValue {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
-    if self.validateOnly != false {
-      try visitor.visitSingularBoolField(value: self.validateOnly, fieldNumber: 2)
-    }
-    if !self.tagValueID.isEmpty {
-      try visitor.visitSingularStringField(value: self.tagValueID, fieldNumber: 3)
-    }
-    if !self.parent.isEmpty {
-      try visitor.visitSingularStringField(value: self.parent, fieldNumber: 4)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      try { if let v = _storage._tagValue {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+      } }()
+      if _storage._validateOnly != false {
+        try visitor.visitSingularBoolField(value: _storage._validateOnly, fieldNumber: 2)
+      }
+      if !_storage._tagValueID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._tagValueID, fieldNumber: 3)
+      }
+      if !_storage._parent.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._parent, fieldNumber: 4)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Pivox_Api_V1_CreateTagValueRequest, rhs: Pivox_Api_V1_CreateTagValueRequest) -> Bool {
-    if lhs.parent != rhs.parent {return false}
-    if lhs._tagValue != rhs._tagValue {return false}
-    if lhs.tagValueID != rhs.tagValueID {return false}
-    if lhs.validateOnly != rhs.validateOnly {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._parent != rhs_storage._parent {return false}
+        if _storage._tagValue != rhs_storage._tagValue {return false}
+        if _storage._tagValueID != rhs_storage._tagValueID {return false}
+        if _storage._validateOnly != rhs_storage._validateOnly {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -546,46 +634,88 @@ extension Pivox_Api_V1_UpdateTagValueRequest: SwiftProtobuf.Message, SwiftProtob
   public static let protoMessageName: String = _protobuf_package + ".UpdateTagValueRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}tag_value\0\u{3}update_mask\0\u{3}allow_missing\0\u{3}validate_only\0")
 
+  fileprivate class _StorageClass {
+    var _tagValue: Pivox_Api_V1_TagValue? = nil
+    var _updateMask: SwiftProtobuf.Google_Protobuf_FieldMask? = nil
+    var _allowMissing: Bool = false
+    var _validateOnly: Bool = false
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _tagValue = source._tagValue
+      _updateMask = source._updateMask
+      _allowMissing = source._allowMissing
+      _validateOnly = source._validateOnly
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._tagValue) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._updateMask) }()
-      case 3: try { try decoder.decodeSingularBoolField(value: &self.allowMissing) }()
-      case 4: try { try decoder.decodeSingularBoolField(value: &self.validateOnly) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._tagValue) }()
+        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._updateMask) }()
+        case 3: try { try decoder.decodeSingularBoolField(value: &_storage._allowMissing) }()
+        case 4: try { try decoder.decodeSingularBoolField(value: &_storage._validateOnly) }()
+        default: break
+        }
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._tagValue {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._updateMask {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
-    if self.allowMissing != false {
-      try visitor.visitSingularBoolField(value: self.allowMissing, fieldNumber: 3)
-    }
-    if self.validateOnly != false {
-      try visitor.visitSingularBoolField(value: self.validateOnly, fieldNumber: 4)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      try { if let v = _storage._tagValue {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+      } }()
+      try { if let v = _storage._updateMask {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+      } }()
+      if _storage._allowMissing != false {
+        try visitor.visitSingularBoolField(value: _storage._allowMissing, fieldNumber: 3)
+      }
+      if _storage._validateOnly != false {
+        try visitor.visitSingularBoolField(value: _storage._validateOnly, fieldNumber: 4)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Pivox_Api_V1_UpdateTagValueRequest, rhs: Pivox_Api_V1_UpdateTagValueRequest) -> Bool {
-    if lhs._tagValue != rhs._tagValue {return false}
-    if lhs._updateMask != rhs._updateMask {return false}
-    if lhs.allowMissing != rhs.allowMissing {return false}
-    if lhs.validateOnly != rhs.validateOnly {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._tagValue != rhs_storage._tagValue {return false}
+        if _storage._updateMask != rhs_storage._updateMask {return false}
+        if _storage._allowMissing != rhs_storage._allowMissing {return false}
+        if _storage._validateOnly != rhs_storage._validateOnly {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

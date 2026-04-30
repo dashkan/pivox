@@ -24,6 +24,7 @@ import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
 	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/permission/v1"
+	types "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -53,14 +54,18 @@ type TagValue struct {
 	//
 	// Read-write.
 	Description string `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
+	// Output only. The identity that created this tag value.
+	CreatedBy *types.Actor `protobuf:"bytes,6,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
 	// Output only. Creation time.
-	CreateTime *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	CreateTime *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	// Output only. The identity that last modified this tag value.
+	UpdatedBy *types.Actor `protobuf:"bytes,8,opt,name=updated_by,json=updatedBy,proto3" json:"updated_by,omitempty"`
 	// Output only. Update time.
-	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
 	// Optional. Entity tag which users can pass to prevent race conditions. This
 	// field is always set in server responses. See UpdateTagValueRequest for
 	// details.
-	Etag string `protobuf:"bytes,8,opt,name=etag,proto3" json:"etag,omitempty"`
+	Etag string `protobuf:"bytes,10,opt,name=etag,proto3" json:"etag,omitempty"`
 	// Optional. Labels associated with this tag value.
 	// Labels are key-value pairs that can be used to organize and track resources.
 	Annotations   map[string]string `protobuf:"bytes,11,rep,name=annotations,proto3" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
@@ -112,9 +117,23 @@ func (x *TagValue) GetDescription() string {
 	return ""
 }
 
+func (x *TagValue) GetCreatedBy() *types.Actor {
+	if x != nil {
+		return x.CreatedBy
+	}
+	return nil
+}
+
 func (x *TagValue) GetCreateTime() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreateTime
+	}
+	return nil
+}
+
+func (x *TagValue) GetUpdatedBy() *types.Actor {
+	if x != nil {
+		return x.UpdatedBy
 	}
 	return nil
 }
@@ -693,15 +712,20 @@ var File_pivox_api_v1_tag_values_proto protoreflect.FileDescriptor
 
 const file_pivox_api_v1_tag_values_proto_rawDesc = "" +
 	"\n" +
-	"\x1dpivox/api/v1/tag_values.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!pivox/permission/v1/options.proto\"\xca\x04\n" +
+	"\x1dpivox/api/v1/tag_values.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a#google/longrunning/operations.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!pivox/permission/v1/options.proto\x1a\x17pivox/types/actor.proto\"\xba\x05\n" +
 	"\bTagValue\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12-\n" +
-	"\vdescription\x18\x05 \x01(\tB\v\xe0A\x01\xbaH\x05r\x03\x18\x80\x02R\vdescription\x12@\n" +
-	"\vcreate_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"createTime\x12@\n" +
-	"\vupdate_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"\vdescription\x18\x05 \x01(\tB\v\xe0A\x01\xbaH\x05r\x03\x18\x80\x02R\vdescription\x126\n" +
+	"\n" +
+	"created_by\x18\x06 \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tcreatedBy\x12@\n" +
+	"\vcreate_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"createTime\x126\n" +
+	"\n" +
+	"updated_by\x18\b \x01(\v2\x12.pivox.types.ActorB\x03\xe0A\x03R\tupdatedBy\x12@\n" +
+	"\vupdate_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"updateTime\x12\x17\n" +
-	"\x04etag\x18\b \x01(\tB\x03\xe0A\x01R\x04etag\x12N\n" +
+	"\x04etag\x18\n" +
+	" \x01(\tB\x03\xe0A\x01R\x04etag\x12N\n" +
 	"\vannotations\x18\v \x03(\v2'.pivox.api.v1.TagValue.AnnotationsEntryB\x03\xe0A\x01R\vannotations\x1a>\n" +
 	"\x10AnnotationsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
@@ -778,33 +802,36 @@ var file_pivox_api_v1_tag_values_proto_goTypes = []any{
 	(*UpdateTagValueMetadata)(nil),  // 8: pivox.api.v1.UpdateTagValueMetadata
 	(*DeleteTagValueMetadata)(nil),  // 9: pivox.api.v1.DeleteTagValueMetadata
 	nil,                             // 10: pivox.api.v1.TagValue.AnnotationsEntry
-	(*timestamppb.Timestamp)(nil),   // 11: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),   // 12: google.protobuf.FieldMask
-	(*longrunningpb.Operation)(nil), // 13: google.longrunning.Operation
+	(*types.Actor)(nil),             // 11: pivox.types.Actor
+	(*timestamppb.Timestamp)(nil),   // 12: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),   // 13: google.protobuf.FieldMask
+	(*longrunningpb.Operation)(nil), // 14: google.longrunning.Operation
 }
 var file_pivox_api_v1_tag_values_proto_depIdxs = []int32{
-	11, // 0: pivox.api.v1.TagValue.create_time:type_name -> google.protobuf.Timestamp
-	11, // 1: pivox.api.v1.TagValue.update_time:type_name -> google.protobuf.Timestamp
-	10, // 2: pivox.api.v1.TagValue.annotations:type_name -> pivox.api.v1.TagValue.AnnotationsEntry
-	0,  // 3: pivox.api.v1.ListTagValuesResponse.tag_values:type_name -> pivox.api.v1.TagValue
-	0,  // 4: pivox.api.v1.CreateTagValueRequest.tag_value:type_name -> pivox.api.v1.TagValue
-	0,  // 5: pivox.api.v1.UpdateTagValueRequest.tag_value:type_name -> pivox.api.v1.TagValue
-	12, // 6: pivox.api.v1.UpdateTagValueRequest.update_mask:type_name -> google.protobuf.FieldMask
-	1,  // 7: pivox.api.v1.TagValues.ListTagValues:input_type -> pivox.api.v1.ListTagValuesRequest
-	3,  // 8: pivox.api.v1.TagValues.GetTagValue:input_type -> pivox.api.v1.GetTagValueRequest
-	4,  // 9: pivox.api.v1.TagValues.CreateTagValue:input_type -> pivox.api.v1.CreateTagValueRequest
-	5,  // 10: pivox.api.v1.TagValues.UpdateTagValue:input_type -> pivox.api.v1.UpdateTagValueRequest
-	6,  // 11: pivox.api.v1.TagValues.DeleteTagValue:input_type -> pivox.api.v1.DeleteTagValueRequest
-	2,  // 12: pivox.api.v1.TagValues.ListTagValues:output_type -> pivox.api.v1.ListTagValuesResponse
-	0,  // 13: pivox.api.v1.TagValues.GetTagValue:output_type -> pivox.api.v1.TagValue
-	13, // 14: pivox.api.v1.TagValues.CreateTagValue:output_type -> google.longrunning.Operation
-	13, // 15: pivox.api.v1.TagValues.UpdateTagValue:output_type -> google.longrunning.Operation
-	13, // 16: pivox.api.v1.TagValues.DeleteTagValue:output_type -> google.longrunning.Operation
-	12, // [12:17] is the sub-list for method output_type
-	7,  // [7:12] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	11, // 0: pivox.api.v1.TagValue.created_by:type_name -> pivox.types.Actor
+	12, // 1: pivox.api.v1.TagValue.create_time:type_name -> google.protobuf.Timestamp
+	11, // 2: pivox.api.v1.TagValue.updated_by:type_name -> pivox.types.Actor
+	12, // 3: pivox.api.v1.TagValue.update_time:type_name -> google.protobuf.Timestamp
+	10, // 4: pivox.api.v1.TagValue.annotations:type_name -> pivox.api.v1.TagValue.AnnotationsEntry
+	0,  // 5: pivox.api.v1.ListTagValuesResponse.tag_values:type_name -> pivox.api.v1.TagValue
+	0,  // 6: pivox.api.v1.CreateTagValueRequest.tag_value:type_name -> pivox.api.v1.TagValue
+	0,  // 7: pivox.api.v1.UpdateTagValueRequest.tag_value:type_name -> pivox.api.v1.TagValue
+	13, // 8: pivox.api.v1.UpdateTagValueRequest.update_mask:type_name -> google.protobuf.FieldMask
+	1,  // 9: pivox.api.v1.TagValues.ListTagValues:input_type -> pivox.api.v1.ListTagValuesRequest
+	3,  // 10: pivox.api.v1.TagValues.GetTagValue:input_type -> pivox.api.v1.GetTagValueRequest
+	4,  // 11: pivox.api.v1.TagValues.CreateTagValue:input_type -> pivox.api.v1.CreateTagValueRequest
+	5,  // 12: pivox.api.v1.TagValues.UpdateTagValue:input_type -> pivox.api.v1.UpdateTagValueRequest
+	6,  // 13: pivox.api.v1.TagValues.DeleteTagValue:input_type -> pivox.api.v1.DeleteTagValueRequest
+	2,  // 14: pivox.api.v1.TagValues.ListTagValues:output_type -> pivox.api.v1.ListTagValuesResponse
+	0,  // 15: pivox.api.v1.TagValues.GetTagValue:output_type -> pivox.api.v1.TagValue
+	14, // 16: pivox.api.v1.TagValues.CreateTagValue:output_type -> google.longrunning.Operation
+	14, // 17: pivox.api.v1.TagValues.UpdateTagValue:output_type -> google.longrunning.Operation
+	14, // 18: pivox.api.v1.TagValues.DeleteTagValue:output_type -> google.longrunning.Operation
+	14, // [14:19] is the sub-list for method output_type
+	9,  // [9:14] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_pivox_api_v1_tag_values_proto_init() }

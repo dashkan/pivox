@@ -2,6 +2,7 @@ package tags
 
 import (
 	"context"
+	"log/slog"
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/uuid"
@@ -9,12 +10,15 @@ import (
 
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/appkey"
+	"github.com/dashkan/pivox/internal/audit"
 	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/filter"
 	"github.com/dashkan/pivox/internal/lro"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
+	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 	"github.com/dashkan/pivox/internal/resource"
+	"github.com/dashkan/pivox/internal/server"
 )
 
 type TagKeysServer struct {
@@ -23,15 +27,42 @@ type TagKeysServer struct {
 	queries db.Querier
 	filter  *filter.ResourceFilter
 	codec   *appkey.Codec
+	audit   *audit.Resolver
 }
 
-func NewTagKeysServer(pool db.DBTX, queries db.Querier, codec *appkey.Codec) *TagKeysServer {
+// NewTagKeysServer constructs the server. `auditResolver` inflates
+// audit-field UUIDs into Actor protos; nil leaves Actor fields unset.
+func NewTagKeysServer(pool db.DBTX, queries db.Querier, codec *appkey.Codec, auditResolver *audit.Resolver) *TagKeysServer {
 	return &TagKeysServer{
 		db:      pool,
 		queries: queries,
 		filter:  filter.TagKeyFilter(),
 		codec:   codec,
+		audit:   auditResolver,
 	}
+}
+
+// resolveTagKeyActors gathers created_by/updated_by UUIDs across the
+// page and resolves them in a single batched call.
+func (s *TagKeysServer) resolveTagKeyActors(ctx context.Context, rows []db.TagKey) (map[uuid.UUID]*typespb.Actor, error) {
+	if s.audit == nil {
+		return nil, nil
+	}
+	ids := make([]uuid.UUID, 0, len(rows)*2)
+	for _, r := range rows {
+		if r.CreatedBy.Valid {
+			ids = append(ids, r.CreatedBy.Bytes)
+		}
+		if r.UpdatedBy.Valid {
+			ids = append(ids, r.UpdatedBy.Bytes)
+		}
+	}
+	actors, err := s.audit.Resolve(ctx, ids)
+	if err != nil {
+		slog.ErrorContext(ctx, "resolve tag key actors failed", "error", err)
+		return nil, apierr.Internal("resolve actors")
+	}
+	return actors, nil
 }
 
 func (s *TagKeysServer) ListTagKeys(ctx context.Context, req *apiv1.ListTagKeysRequest) (*apiv1.ListTagKeysResponse, error) {
@@ -74,9 +105,13 @@ func (s *TagKeysServer) ListTagKeys(ctx context.Context, req *apiv1.ListTagKeysR
 		results = results[:pageSize]
 	}
 
+	actors, err := s.resolveTagKeyActors(ctx, results)
+	if err != nil {
+		return nil, err
+	}
 	tagKeys := make([]*apiv1.TagKey, 0, len(results))
 	for _, r := range results {
-		tagKeys = append(tagKeys, convert.TagKeyToProto(r))
+		tagKeys = append(tagKeys, convert.TagKeyToProto(r, actors))
 	}
 
 	return &apiv1.ListTagKeysResponse{
@@ -98,7 +133,11 @@ func (s *TagKeysServer) GetTagKey(ctx context.Context, req *apiv1.GetTagKeyReque
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "TagKey", req.GetName())
 	}
-	return convert.TagKeyToProto(tagKey), nil
+	actors, err := s.resolveTagKeyActors(ctx, []db.TagKey{tagKey})
+	if err != nil {
+		return nil, err
+	}
+	return convert.TagKeyToProto(tagKey, actors), nil
 }
 
 func (s *TagKeysServer) CreateTagKey(ctx context.Context, req *apiv1.CreateTagKeyRequest) (*longrunningpb.Operation, error) {
@@ -120,13 +159,19 @@ func (s *TagKeysServer) CreateTagKey(ctx context.Context, req *apiv1.CreateTagKe
 		ShortName:      tagKeyID,
 		NamespacedName: orgID.String() + "/" + tagKeyID,
 		Description:    tagKey.GetDescription(),
-		CreatedBy:      pgtype.UUID{},
+		CreatedBy:      convert.PgUUID(server.MustPivoxUserID(ctx)),
 	})
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "TagKey", "")
 	}
 
-	return lro.DoneOperation(convert.TagKeyToProto(result))
+	actors, resolveErr := s.resolveTagKeyActors(ctx, []db.TagKey{result})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "create tag key: actor resolution failed; returning proto without audit actors",
+			"tag_key_id", result.ID, "error", resolveErr)
+		actors = nil
+	}
+	return lro.DoneOperation(convert.TagKeyToProto(result, actors))
 }
 
 func (s *TagKeysServer) UpdateTagKey(ctx context.Context, req *apiv1.UpdateTagKeyRequest) (*longrunningpb.Operation, error) {
@@ -147,7 +192,7 @@ func (s *TagKeysServer) UpdateTagKey(ctx context.Context, req *apiv1.UpdateTagKe
 
 	updateParams := db.UpdateTagKeyParams{
 		ID:        existing.ID,
-		UpdatedBy: pgtype.UUID{},
+		UpdatedBy: convert.PgUUID(server.MustPivoxUserID(ctx)),
 	}
 
 	mask := req.GetUpdateMask()
@@ -167,7 +212,13 @@ func (s *TagKeysServer) UpdateTagKey(ctx context.Context, req *apiv1.UpdateTagKe
 		return nil, apierr.HandleResourceError(err, "TagKey", tagKey.GetName())
 	}
 
-	return lro.DoneOperation(convert.TagKeyToProto(result))
+	actors, resolveErr := s.resolveTagKeyActors(ctx, []db.TagKey{result})
+	if resolveErr != nil {
+		slog.WarnContext(ctx, "update tag key: actor resolution failed; returning proto without audit actors",
+			"tag_key_id", result.ID, "error", resolveErr)
+		actors = nil
+	}
+	return lro.DoneOperation(convert.TagKeyToProto(result, actors))
 }
 
 func (s *TagKeysServer) DeleteTagKey(ctx context.Context, req *apiv1.DeleteTagKeyRequest) (*longrunningpb.Operation, error) {

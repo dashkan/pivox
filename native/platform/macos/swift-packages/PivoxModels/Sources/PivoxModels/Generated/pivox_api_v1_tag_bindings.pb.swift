@@ -51,6 +51,16 @@ public struct Pivox_Api_V1_TagBinding: Sendable {
   /// Must be of the form `organizations/{org}/tagKeys/{key}/tagValues/{value}`.
   public var tagValue: String = String()
 
+  /// Output only. The identity that created this tag binding.
+  public var createdBy: Pivox_Types_Actor {
+    get {_createdBy ?? Pivox_Types_Actor()}
+    set {_createdBy = newValue}
+  }
+  /// Returns true if `createdBy` has been explicitly set.
+  public var hasCreatedBy: Bool {self._createdBy != nil}
+  /// Clears the value of `createdBy`. Subsequent reads from it will return its default value.
+  public mutating func clearCreatedBy() {self._createdBy = nil}
+
   /// Output only. Creation time.
   public var createTime: SwiftProtobuf.Google_Protobuf_Timestamp {
     get {_createTime ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
@@ -138,6 +148,7 @@ public struct Pivox_Api_V1_TagBinding: Sendable {
 
   public init() {}
 
+  fileprivate var _createdBy: Pivox_Types_Actor? = nil
   fileprivate var _createTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
   fileprivate var _updateTime: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
@@ -405,7 +416,7 @@ fileprivate let _protobuf_package = "pivox.api.v1"
 
 extension Pivox_Api_V1_TagBinding: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TagBinding"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{4}\u{2}tag_value\0\u{4}\u{3}create_time\0\u{3}update_time\0\u{1}etag\0\u{1}origin\0\u{1}annotations\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{4}\u{2}tag_value\0\u{4}\u{2}created_by\0\u{3}create_time\0\u{3}update_time\0\u{1}etag\0\u{1}origin\0\u{1}annotations\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -415,6 +426,7 @@ extension Pivox_Api_V1_TagBinding: SwiftProtobuf.Message, SwiftProtobuf._Message
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.name) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.tagValue) }()
+      case 5: try { try decoder.decodeSingularMessageField(value: &self._createdBy) }()
       case 6: try { try decoder.decodeSingularMessageField(value: &self._createTime) }()
       case 7: try { try decoder.decodeSingularMessageField(value: &self._updateTime) }()
       case 8: try { try decoder.decodeSingularStringField(value: &self.etag) }()
@@ -436,6 +448,9 @@ extension Pivox_Api_V1_TagBinding: SwiftProtobuf.Message, SwiftProtobuf._Message
     if !self.tagValue.isEmpty {
       try visitor.visitSingularStringField(value: self.tagValue, fieldNumber: 3)
     }
+    try { if let v = self._createdBy {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+    } }()
     try { if let v = self._createTime {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
     } }()
@@ -457,6 +472,7 @@ extension Pivox_Api_V1_TagBinding: SwiftProtobuf.Message, SwiftProtobuf._Message
   public static func ==(lhs: Pivox_Api_V1_TagBinding, rhs: Pivox_Api_V1_TagBinding) -> Bool {
     if lhs.name != rhs.name {return false}
     if lhs.tagValue != rhs.tagValue {return false}
+    if lhs._createdBy != rhs._createdBy {return false}
     if lhs._createTime != rhs._createTime {return false}
     if lhs._updateTime != rhs._updateTime {return false}
     if lhs.etag != rhs.etag {return false}
