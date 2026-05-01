@@ -19,6 +19,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/test/bufconn"
 
 	"github.com/dashkan/pivox/internal/agentstream"
 	"github.com/dashkan/pivox/internal/appkey"
@@ -397,6 +398,22 @@ func serve(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("listen on gRPC port %s: %w", cfg.GRPCPort, err)
 	}
 
+	// In-process bufconn listener for self-dialing clients (the REST
+	// gateway translation layer and the SSE handler that wraps the
+	// AiChat streaming RPC). The same grpc.Server serves both
+	// listeners — interceptors run identically on either transport,
+	// so AuthInterceptor still validates Firebase bearer tokens on
+	// in-process calls. Avoids TCP loopback for self-dial without
+	// changing the auth boundary. External clients (Native app) keep
+	// using the TCP listener above.
+	bufLis := bufconn.Listen(1024 * 1024)
+	go func() {
+		logger.Info("gRPC server bufconn listener ready (in-process self-dial)")
+		if err := grpcServer.Serve(bufLis); err != nil {
+			logger.Error("gRPC bufconn server stopped", "error", err)
+		}
+	}()
+
 	go func() {
 		logger.Info("gRPC server listening", "addr", cfg.GRPCPort)
 		if err := grpcServer.Serve(grpcLis); err != nil {
@@ -441,8 +458,20 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	// REST gateway
 	gwMux := runtime.NewServeMux()
-	dialOpts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-	grpcEndpoint := fmt.Sprintf("localhost%s", cfg.GRPCPort)
+
+	// In-process clients (gateway translation + SSE) dial the gRPC
+	// server via bufconn — bypasses TCP loopback while keeping the
+	// gRPC machinery (interceptors, codecs, reflection) intact. The
+	// "passthrough:///bufnet" target is opaque to the gRPC name
+	// resolver; routing happens through grpc.WithContextDialer.
+	bufDialer := func(ctx context.Context, _ string) (net.Conn, error) {
+		return bufLis.DialContext(ctx)
+	}
+	dialOpts := []grpc.DialOption{
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithContextDialer(bufDialer),
+	}
+	const grpcEndpoint = "passthrough:///bufnet"
 
 	for _, reg := range []func(context.Context, *runtime.ServeMux, string, []grpc.DialOption) error{
 		apiv1.RegisterSpacesHandlerFromEndpoint,
@@ -483,15 +512,6 @@ func serve(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("dial local gRPC for SSE handler: %w", err)
 	}
 	sseHandler := aichat.NewSSEHandler(aichat.SSEHandlerConfig{Client: aiv1.NewAiChatClient(grpcConn), Logger: logger})
-	if err := gwMux.HandlePath(
-		"POST",
-		"/v1/ai:streamGenerateContent",
-		func(w http.ResponseWriter, r *http.Request, _ map[string]string) {
-			sseHandler.ServeHTTP(w, r)
-		},
-	); err != nil {
-		return fmt.Errorf("register SSE stream handler: %w", err)
-	}
 
 	// HTTP mux: internal hooks + gRPC gateway (fallback)
 	httpMux := http.NewServeMux()
@@ -520,7 +540,26 @@ func serve(cmd *cobra.Command, args []string) error {
 	})
 	oauthBroker.Register(httpMux)
 
-	httpMux.Handle("/", gwMux)
+	// HTTP auth middleware. Wraps the grpc-gateway mux so every
+	// custom HTTP route mounted on gwMux (today: artifact :content)
+	// gets Firebase bearer verification + ctx augmentation before the
+	// handler runs. grpc-gateway-translated routes also pass through
+	// this middleware; they pay a redundant verification (gateway
+	// forwards the bearer to the gRPC backend, where AuthInterceptor
+	// re-verifies) but Firebase verify is local + key-cached, so the
+	// cost is ~1ms and worth the "set and forget" simplicity.
+	authMW := server.RequireAuth(authSvc, logger)
+	httpMux.Handle("/", authMW(gwMux))
+
+	// SSE bypasses HTTP auth on purpose. The handler is a thin proxy
+	// to AiChat.StreamGenerateContent over the in-process bufconn
+	// dial; the gRPC AuthInterceptor on that call validates the
+	// bearer token forwarded as gRPC metadata. Wrapping with HTTP
+	// auth would double-verify. Registered on httpMux directly (not
+	// gwMux) so the middleware above does not see it. Method routing
+	// uses Go 1.22+ method patterns: GET / etc. fall through to
+	// gatedGwMux, returning 405 for the wrong method on this path.
+	httpMux.HandleFunc("POST /v1/ai:streamGenerateContent", sseHandler.ServeHTTP)
 
 	restServer := &http.Server{
 		Addr:    cfg.RESTPort,

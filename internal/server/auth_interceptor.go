@@ -89,24 +89,23 @@ func MustPivoxUserID(ctx context.Context) uuid.UUID {
 	return id
 }
 
-// authenticate is the shared body for both unary and stream auth
-// interceptors. Returns the augmented context (with the verified UID)
-// or an apierr.Unauthenticated error. Single source of truth for
-// "Firebase bearer auth" — unary/stream chains can't drift.
-func authenticate(ctx context.Context, auth authn.Service) (context.Context, error) {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return nil, apierr.Unauthenticated(errMissingMetadata)
-	}
-	authHeaders := md.Get("authorization")
-	if len(authHeaders) == 0 {
+// authenticateBearer is the transport-agnostic core of Firebase bearer
+// authentication. Caller passes the bearer header value already
+// extracted from its transport (gRPC metadata, HTTP Authorization
+// header). Returns the context augmented with authContextKey and
+// pivoxUserIDKey, or an apierr.Unauthenticated error.
+//
+// This is the single source of truth for "Firebase bearer auth"
+// across the codebase — gRPC unary/stream interceptors and the HTTP
+// middleware in http_auth.go all converge here so they cannot drift.
+func authenticateBearer(ctx context.Context, auth authn.Service, bearerHeader string) (context.Context, error) {
+	if bearerHeader == "" {
 		return nil, apierr.Unauthenticated(errMissingAuthHeader)
 	}
-	bearer := authHeaders[0]
-	if !strings.HasPrefix(bearer, "Bearer ") {
+	if !strings.HasPrefix(bearerHeader, "Bearer ") {
 		return nil, apierr.Unauthenticated(errInvalidAuthFormat)
 	}
-	idToken := strings.TrimPrefix(bearer, "Bearer ")
+	idToken := strings.TrimPrefix(bearerHeader, "Bearer ")
 
 	identity, err := auth.VerifyToken(ctx, idToken)
 	if err != nil {
@@ -131,6 +130,21 @@ func authenticate(ctx context.Context, auth authn.Service) (context.Context, err
 	}
 	ctx = context.WithValue(ctx, pivoxUserIDKey{}, uid)
 	return ctx, nil
+}
+
+// authenticate is the gRPC adapter for authenticateBearer. Pulls the
+// bearer header out of incoming gRPC metadata and delegates to the
+// transport-agnostic core.
+func authenticate(ctx context.Context, auth authn.Service) (context.Context, error) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, apierr.Unauthenticated(errMissingMetadata)
+	}
+	authHeaders := md.Get("authorization")
+	if len(authHeaders) == 0 {
+		return nil, apierr.Unauthenticated(errMissingAuthHeader)
+	}
+	return authenticateBearer(ctx, auth, authHeaders[0])
 }
 
 // AuthInterceptor returns a gRPC unary server interceptor that verifies
