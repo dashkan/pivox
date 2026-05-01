@@ -489,6 +489,13 @@ func (s *RequestsServer) SubmitRequest(ctx context.Context, req *assetsv1.Submit
 }
 
 // AssignRequest sets the assignee and transitions OPEN → IN_PROGRESS.
+//
+// Tx-wrapped: the precondition (state ∈ {OPEN, IN_PROGRESS}) is too
+// disjunctive for a single conditional WHERE clause, so we lock the
+// row inside a tx via GetRequestByNameForUpdate. Concurrent
+// AssignRequest / ClaimRequest / Cancel calls on the same row
+// queue on the lock and each evaluates the precondition against the
+// post-prior-commit state.
 func (s *RequestsServer) AssignRequest(ctx context.Context, req *assetsv1.AssignRequestRequest) (*assetsv1.Request, error) {
 	orgName, spaceName, requestName, err := parseRequestName(req.GetName())
 	if err != nil {
@@ -499,23 +506,29 @@ func (s *RequestsServer) AssignRequest(ctx context.Context, req *assetsv1.Assign
 		return nil, err
 	}
 
-	existing, err := s.queries.GetRequestByName(ctx, db.GetRequestByNameParams{SpaceID: spaceID, Name: requestName})
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Request", req.GetName())
-	}
-
-	if existing.State != db.RequestStateOPEN && existing.State != db.RequestStateINPROGRESS {
-		return nil, apierr.FailedPrecondition(fmt.Sprintf("request must be OPEN or IN_PROGRESS to assign, got %s", existing.State))
-	}
-
-	result, err := s.queries.UpdateRequestAssignee(ctx, db.UpdateRequestAssigneeParams{
-		ID:        existing.ID,
-		Assignee:  req.GetAssignee(),
-		State:     db.RequestStateINPROGRESS,
-		UpdatedBy: pgtype.UUID{},
+	result, err := db.RunInTx(ctx, s.txer, func(qtx db.Querier) (db.AssetRequest, error) {
+		existing, err := qtx.GetRequestByNameForUpdate(ctx, db.GetRequestByNameForUpdateParams{
+			SpaceID: spaceID, Name: requestName,
+		})
+		if err != nil {
+			return db.AssetRequest{}, apierr.HandleResourceError(err, "Request", req.GetName())
+		}
+		if existing.State != db.RequestStateOPEN && existing.State != db.RequestStateINPROGRESS {
+			return db.AssetRequest{}, apierr.FailedPrecondition(fmt.Sprintf("request must be OPEN or IN_PROGRESS to assign, got %s", existing.State))
+		}
+		updated, err := qtx.UpdateRequestAssignee(ctx, db.UpdateRequestAssigneeParams{
+			ID:        existing.ID,
+			Assignee:  req.GetAssignee(),
+			State:     db.RequestStateINPROGRESS,
+			UpdatedBy: pgtype.UUID{},
+		})
+		if err != nil {
+			return db.AssetRequest{}, apierr.HandleResourceError(err, "Request", req.GetName())
+		}
+		return updated, nil
 	})
 	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Request", req.GetName())
+		return nil, err
 	}
 
 	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
@@ -527,7 +540,12 @@ func (s *RequestsServer) AssignRequest(ctx context.Context, req *assetsv1.Assign
 	return convert.RequestToProto(result, parentName, actors), nil
 }
 
-// ClaimRequest self-assigns the caller.
+// ClaimRequest self-assigns the caller. OPEN → IN_PROGRESS.
+//
+// Tx-wrapped: same shape as AssignRequest. Two concurrent claims
+// could both observe state=OPEN under the previous read-then-update
+// pattern; the row lock makes the second one see IN_PROGRESS and
+// surface a clear FailedPrecondition.
 func (s *RequestsServer) ClaimRequest(ctx context.Context, req *assetsv1.ClaimRequestRequest) (*assetsv1.Request, error) {
 	orgName, spaceName, requestName, err := parseRequestName(req.GetName())
 	if err != nil {
@@ -538,30 +556,41 @@ func (s *RequestsServer) ClaimRequest(ctx context.Context, req *assetsv1.ClaimRe
 		return nil, err
 	}
 
-	existing, err := s.queries.GetRequestByName(ctx, db.GetRequestByNameParams{SpaceID: spaceID, Name: requestName})
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Request", req.GetName())
-	}
-
-	if existing.State != db.RequestStateOPEN {
-		return nil, apierr.FailedPrecondition(fmt.Sprintf("can only claim OPEN requests, got %s", existing.State))
-	}
-
-	// TODO: pass the caller's pivox_user_id through to the
-	// `assignee` column once that column also moves to UUID FK
-	// (it's currently TEXT and stores the firebase_uid). For now,
-	// only the audit `updated_by` is populated with the caller's
-	// UUID; `assignee` is left empty until the broader UUID
-	// migration covers it.
-	caller := convert.PgUUID(server.MustPivoxUserID(ctx))
-	result, err := s.queries.UpdateRequestAssignee(ctx, db.UpdateRequestAssigneeParams{
-		ID:        existing.ID,
-		Assignee:  "",
-		State:     db.RequestStateINPROGRESS,
-		UpdatedBy: caller,
+	result, err := db.RunInTx(ctx, s.txer, func(qtx db.Querier) (db.AssetRequest, error) {
+		existing, err := qtx.GetRequestByNameForUpdate(ctx, db.GetRequestByNameForUpdateParams{
+			SpaceID: spaceID, Name: requestName,
+		})
+		if err != nil {
+			return db.AssetRequest{}, apierr.HandleResourceError(err, "Request", req.GetName())
+		}
+		if existing.State != db.RequestStateOPEN {
+			return db.AssetRequest{}, apierr.FailedPrecondition(fmt.Sprintf("can only claim OPEN requests, got %s", existing.State))
+		}
+		// TODO: pass the caller's pivox_user_id through to the
+		// `assignee` column once that column also moves to UUID FK
+		// (it's currently TEXT and stores the firebase_uid). For now,
+		// only the audit `updated_by` is populated with the caller's
+		// UUID; `assignee` is left empty until the broader UUID
+		// migration covers it.
+		//
+		// Resolved inside the closure (after the precondition check)
+		// so handler-level state-mismatch returns don't trip
+		// MustPivoxUserID's panic in unit tests that exercise the
+		// FailedPrecondition path without a caller claim.
+		caller := convert.PgUUID(server.MustPivoxUserID(ctx))
+		updated, err := qtx.UpdateRequestAssignee(ctx, db.UpdateRequestAssigneeParams{
+			ID:        existing.ID,
+			Assignee:  "",
+			State:     db.RequestStateINPROGRESS,
+			UpdatedBy: caller,
+		})
+		if err != nil {
+			return db.AssetRequest{}, apierr.HandleResourceError(err, "Request", req.GetName())
+		}
+		return updated, nil
 	})
 	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Request", req.GetName())
+		return nil, err
 	}
 
 	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)

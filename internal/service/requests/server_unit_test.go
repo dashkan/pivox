@@ -251,7 +251,7 @@ func TestAssignRequest_FromOpen(t *testing.T) {
 	f.mockResolveSpace()
 
 	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateOPEN)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
+	f.mockQ.On("GetRequestByNameForUpdate", mock.Anything, db.GetRequestByNameForUpdateParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	assigned := existing
@@ -281,7 +281,7 @@ func TestAssignRequest_FromInProgress(t *testing.T) {
 
 	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateINPROGRESS)
 	existing.Assignee = "users/jane"
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
+	f.mockQ.On("GetRequestByNameForUpdate", mock.Anything, db.GetRequestByNameForUpdateParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	reassigned := existing
@@ -309,7 +309,7 @@ func TestAssignRequest_InvalidState(t *testing.T) {
 	f.mockResolveSpace()
 
 	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateDRAFT)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
+	f.mockQ.On("GetRequestByNameForUpdate", mock.Anything, db.GetRequestByNameForUpdateParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	_, err := f.server.AssignRequest(context.Background(), &assetsv1.AssignRequestRequest{
@@ -329,7 +329,7 @@ func TestClaimRequest_Success(t *testing.T) {
 	f.mockResolveSpace()
 
 	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateOPEN)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
+	f.mockQ.On("GetRequestByNameForUpdate", mock.Anything, db.GetRequestByNameForUpdateParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	claimed := existing
@@ -356,7 +356,7 @@ func TestClaimRequest_InvalidState(t *testing.T) {
 	f.mockResolveSpace()
 
 	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateINPROGRESS)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
+	f.mockQ.On("GetRequestByNameForUpdate", mock.Anything, db.GetRequestByNameForUpdateParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	_, err := f.server.ClaimRequest(context.Background(), &assetsv1.ClaimRequestRequest{
@@ -1050,7 +1050,7 @@ func TestAssignRequest_NotFound(t *testing.T) {
 	f := setupRequestFixture(t)
 	f.mockResolveSpace()
 
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
+	f.mockQ.On("GetRequestByNameForUpdate", mock.Anything, db.GetRequestByNameForUpdateParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(db.AssetRequest{}, pgx.ErrNoRows)
 
 	_, err := f.server.AssignRequest(context.Background(), &assetsv1.AssignRequestRequest{
@@ -1069,7 +1069,7 @@ func TestAssignRequest_UpdateAssigneeDBError(t *testing.T) {
 	f.mockResolveSpace()
 
 	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateOPEN)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
+	f.mockQ.On("GetRequestByNameForUpdate", mock.Anything, db.GetRequestByNameForUpdateParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	f.mockQ.On("UpdateRequestAssignee", mock.Anything, mock.Anything).
@@ -1104,7 +1104,7 @@ func TestClaimRequest_NotFound(t *testing.T) {
 	f := setupRequestFixture(t)
 	f.mockResolveSpace()
 
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
+	f.mockQ.On("GetRequestByNameForUpdate", mock.Anything, db.GetRequestByNameForUpdateParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(db.AssetRequest{}, pgx.ErrNoRows)
 
 	_, err := f.server.ClaimRequest(context.Background(), &assetsv1.ClaimRequestRequest{
@@ -1122,7 +1122,7 @@ func TestClaimRequest_UpdateAssigneeDBError(t *testing.T) {
 	f.mockResolveSpace()
 
 	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateOPEN)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
+	f.mockQ.On("GetRequestByNameForUpdate", mock.Anything, db.GetRequestByNameForUpdateParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	f.mockQ.On("UpdateRequestAssignee", mock.Anything, mock.Anything).
