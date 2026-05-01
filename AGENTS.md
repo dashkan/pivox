@@ -237,6 +237,120 @@ make firebase-emu                       # local emulator suite
 make firebase-deploy                    # production deploy
 ```
 
+## Skills (`.agents/skills/golang-*`)
+
+The repo carries a standardized set of Go skills under
+`.agents/skills/`. **Skills are not optional reference material —
+applicable skills MUST be invoked on the first pass.** The cost of
+skipping an applicable skill is paid in cleanup commits, audit
+findings, and re-review cycles. Don't make the user clean up what
+the skill would have caught.
+
+For every skill in the table below:
+
+- **Applies?** = Yes / No, based on what the codebase actually uses
+  today (libraries imported, patterns in use, surface area). When
+  the answer changes (we adopt or drop a library, add or remove a
+  feature), update this table **in the same commit** that triggered
+  the change.
+- **Use on review?** = ALWAYS / SOMETIMES / NEVER. ALWAYS = invoke
+  on every change that touches the relevant code path; SOMETIMES =
+  invoke when the trigger column matches the change; NEVER = the
+  skill exists but the codebase doesn't use the underlying tech.
+- **Trigger** = the concrete signal that says "use this now." Be
+  literal. "When writing a new DB query" beats "as needed."
+
+When in doubt, invoke the skill. The skill itself decides whether
+its guidance applies; the cost of a no-op skill load is far smaller
+than the cost of missing guidance that would have caught the bug.
+
+### Skill-loading mechanics
+
+Skills live at `.agents/skills/<name>/` and are symlinked into
+`.claude/skills/<name>/` so any AI tool that reads the `.claude/`
+directory picks them up. The symlinks are a one-time setup; verify
+with `ls -la .claude/skills/ | grep golang- | wc -l` (should match
+the count of golang-* directories in `.agents/skills/`).
+
+**The skill registry is computed at session start.** Adding a new
+skill mid-session (or symlinking a previously-untracked one) means
+the current session won't see it via the Skill tool — you'll get
+"Unknown skill: <name>" even though the file exists on disk.
+Subagents inherit the parent's registry, so the same caching applies
+to them. Workarounds:
+
+- For a fresh skill addition: restart the Claude Code session.
+- For a one-shot review where restarting isn't worth it: load the
+  skill content directly with `Read .agents/skills/<name>/SKILL.md`
+  in the subagent prompt and ask it to apply that guidance.
+- When invoking a subagent for code review, **explicitly enumerate
+  the skills to load** in the prompt. Subagents don't auto-invoke
+  skills based on AGENTS.md context alone; the table is reference
+  material, not a dispatcher. Pass the list of skill names and the
+  reason each applies, and tell the subagent to report skill loads
+  that fail (so silent fallback is detectable).
+
+| Skill | Applies? | Use on review? | Trigger |
+|---|---|---|---|
+| `golang-benchmark` | Yes | SOMETIMES | Adding a benchmark; investigating a measured perf regression; before optimizing a hot path. |
+| `golang-cli` | Yes | SOMETIMES | Touching anything in `cmd/` (cobra/viper config, flags, exit codes, signal handling, completion). |
+| `golang-code-style` | Yes | ALWAYS | Any Go change. Names, comments, package layout, gofmt-equivalent decisions. |
+| `golang-concurrency` | Yes | ALWAYS for any goroutine/channel/lock/sync code | Touching `internal/audit/` (LRU + atomics), `internal/lro/` (workers + cancellation), `internal/storageagent/`, agent stream code, anything spawning goroutines, anything with `sync.*`, channels, or `errgroup`. |
+| `golang-context` | Yes | ALWAYS | Any handler, any RPC, any goroutine — i.e. nearly every Go change. Cancellation, deadlines, value propagation. |
+| `golang-continuous-integration` | Sometimes | SOMETIMES | Editing GitHub Actions workflows, adding linters/scanners to CI, release pipeline changes. Not for code-only changes. |
+| `golang-data-structures` | Yes | SOMETIMES | Choosing slice vs map vs container; preallocating capacity; using `unsafe.Pointer` / `weak.Pointer`; building a generic container. |
+| `golang-database` | Yes | **ALWAYS** for any DB-touching change | Writing/editing a sqlc query in `internal/db/queries/`; touching any handler that calls `s.queries.*`; transactions; isolation levels; SELECT FOR UPDATE; pgx pool config; migration. **This is the skill that catches the bugs that drove issue #13.** |
+| `golang-dependency-injection` | No | NEVER | Pivox uses Config-struct + panic-on-required constructors deliberately. We do not run a DI container. Don't introduce one. |
+| `golang-dependency-management` | Yes | SOMETIMES | Adding/upgrading a dep in `go.mod` or `tools/go.mod`; security advisory; resolving a version conflict. |
+| `golang-design-patterns` | Yes | SOMETIMES | Designing a new constructor, choosing functional options vs builder, setting up graceful shutdown, picking a resilience pattern. |
+| `golang-documentation` | Yes | ALWAYS for new exported APIs | Writing godoc on exported types/funcs; touching example tests; updating package-level comments. |
+| `golang-error-handling` | Yes | **ALWAYS** | Any new error path. We use `internal/apierr` — never `status.Error` directly. Wrap with `%w`, use `errors.Is/As`, surface structured details. |
+| `golang-graphql` | No | NEVER | No GraphQL surface. We're gRPC + grpc-gateway. |
+| `golang-grpc` | Yes | **ALWAYS** for service handlers | Any change in `internal/service/*/`; proto changes; interceptor work in `internal/server/`; status code mapping; streaming RPCs; bufconn tests. |
+| `golang-lint` | Yes | SOMETIMES | Editing `.golangci.yml`; suppressing a warning with nolint; new linter rollouts. |
+| `golang-modernize` | Yes | ALWAYS | Trigger on any Go change. Catches old-style patterns (e.g. `interface{}` → `any`, manual loops → `slices`/`maps`/`cmp`). Cheaper to fix on first write than in a sweep later. |
+| `golang-naming` | Yes | ALWAYS for new types/funcs | Naming a new package, type, constructor, error, boolean, receiver, test. Catches `utils`/`helpers`-style anti-patterns. |
+| `golang-observability` | Yes | ALWAYS for any logging/metrics | We use `log/slog` everywhere; future Prometheus/OTel work lands here. Apply when adding logs, picking log levels, structuring fields, or instrumenting a new feature. |
+| `golang-performance` | Yes | SOMETIMES | After a benchmark or profile identifies a bottleneck. Not for speculative optimization. |
+| `golang-popular-libraries` | Yes | SOMETIMES | Picking a new library; comparing alternatives. Always check if the codebase already standardizes on something before pulling a new dep. |
+| `golang-project-layout` | Yes | NEVER (the layout is settled) | Only on a structural reorg of `cmd/` or `internal/`. The current layout is documented above and should not drift. |
+| `golang-safety` | Yes | **ALWAYS** | Nil safety, append aliasing, map concurrent access, `defer` in loops, numeric conversions, zero-value design. Catches a class of bugs that don't surface in tests. |
+| `golang-samber-do` | No | NEVER | Not adopted. Don't add it. |
+| `golang-samber-hot` | No | NEVER | We have a hand-written LRU in `internal/audit/`. Don't replace without explicit ask. |
+| `golang-samber-lo` | No | NEVER | Not imported. Use stdlib `slices`/`maps` or write the loop. |
+| `golang-samber-mo` | No | NEVER | Not imported. Pivox uses `(T, error)` returns. |
+| `golang-samber-oops` | No | NEVER | We use `internal/apierr`. Don't replace. |
+| `golang-samber-ro` | No | NEVER | No reactive-streams surface. |
+| `golang-samber-slog` | No | NEVER | We use plain `log/slog`. Don't add a samber slog handler without explicit ask. |
+| `golang-security` | Yes | **ALWAYS** for auth/crypto/I/O/secrets/user-input | Anything in `internal/authn/`, `internal/crypto/`, `internal/server/oauth_broker.go`, `internal/firebase/`, password/token paths, KMS, secret management, file-path handling. Also any new public-internet-facing input. |
+| `golang-stay-updated` | No | NEVER | Resource list, not a code-review skill. |
+| `golang-stretchr-testify` | Yes | **ALWAYS** for new tests | testify is the test library. `assert` vs `require`, mock argument matchers, `Eventually`, `JSONEq`. The mock package is what `internal/testutil/mocks/querier_mock.go` extends. |
+| `golang-structs-interfaces` | Yes | ALWAYS for new types | Designing a struct/interface; pointer vs value receivers; embedding; composition; `accept interfaces, return structs`. |
+| `golang-swagger` | No | NEVER | We use proto + grpc-gateway. No swaggo annotations. |
+| `golang-testing` | Yes | **ALWAYS** for new code | TDD is the rule (see § Testing). Table-driven tests, parallel tests, fixtures, goleak, fuzzing, coverage. Pair with `golang-stretchr-testify`. |
+| `golang-troubleshooting` | Yes | SOMETIMES | Debugging a bug, deadlock, race, or "something is wrong." Not for routine reviews. |
+| `golang-uber-dig` | No | NEVER | DI container, not adopted. |
+| `golang-uber-fx` | No | NEVER | DI framework, not adopted. |
+
+### Maintenance rule
+
+This table is not a snapshot — it's a contract. Whenever a change
+to the codebase shifts an answer in any column, the same commit
+must update this row. Concretely:
+
+- Adopting `samber/lo` (or any Not-Applicable library above)? Flip
+  `Applies?` to Yes, set `Use on review?` to ALWAYS or SOMETIMES,
+  fill in the Trigger.
+- Removing the last user of a library? Flip back to No / NEVER.
+- Adding a new feature category (e.g. background jobs, GraphQL,
+  CLI subcommand)? Re-evaluate every SOMETIMES row that could now
+  apply ALWAYS.
+- Stripping a feature out? Same, in reverse.
+
+If you find yourself reaching for a skill not in this table, add a
+row for it instead of invoking it ad-hoc. Treat the table as the
+single index of "what we run on this codebase."
+
 ## Code quality bar
 
 The bar is "would a senior Google engineer ship this." Concretely:

@@ -194,13 +194,21 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 			result = updated
 		}
 
-		// Gateway becomes ACTIVE on every successful handshake unless
-		// it's already ACTIVE. Covers PROVISIONING (first-ever
-		// agent) and OFFLINE (last agent had disconnected; this is a
-		// fresh reconnect). UPDATE is a no-op on already-ACTIVE rows
-		// at the application level, but we skip the write to avoid
-		// gratuitous etag churn on every handshake.
-		if gateway.State != db.StorageGatewayStateACTIVE {
+		// Gateway becomes ACTIVE on a successful handshake from the
+		// two states where a healthy agent should bring it back online:
+		//
+		//   PROVISIONING — first-ever agent on a freshly-created gateway.
+		//   OFFLINE      — last agent had disconnected; this is a reconnect.
+		//
+		// Allowlist intentionally excludes DEGRADED. DEGRADED is a state
+		// other components (operator action, future health worker) set
+		// deliberately to mark a partial-failure mode; a reconnecting
+		// agent's handshake should NOT silently overwrite that. Today
+		// nothing writes DEGRADED, but the moment something does, a
+		// denylist (`!= ACTIVE`) here would clobber it on every
+		// reconnect. Allowlist is the safer shape.
+		if gateway.State == db.StorageGatewayStatePROVISIONING ||
+			gateway.State == db.StorageGatewayStateOFFLINE {
 			if err := qtx.UpdateStorageGatewayState(ctx, db.UpdateStorageGatewayStateParams{
 				ID:    gateway.ID,
 				State: db.StorageGatewayStateACTIVE,
