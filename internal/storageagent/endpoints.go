@@ -143,7 +143,7 @@ func (s *EndpointStore) serveS3(w http.ResponseWriter, r *http.Request, ep *endp
 
 	// For cacheable objects, read into buffer, cache, and serve via
 	// ServeContent (handles Range, If-None-Match, If-Modified-Since).
-	if ep.cacheEnabled && s.cache != nil && info.Size <= maxCacheableSize {
+	if ep.cacheEnabled && s.cache != nil && info.Size <= int64(s.cache.MaxItemSize()) {
 		buf, err := io.ReadAll(obj)
 		if err == nil {
 			s.cache.Put(cacheKey, buf, info.ContentType, info.ETag, info.LastModified)

@@ -284,14 +284,16 @@ func TestServeS3_LargeObject_NoCache(t *testing.T) {
 	err := s3Client.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{})
 	require.NoError(t, err)
 
-	// Create an object larger than maxCacheableSize (10MB).
-	largeContent := strings.Repeat("x", maxCacheableSize+1)
+	// Cache configured with a small per-item cap; the test object exceeds it
+	// and must be served directly without going through the cache.
+	const itemCap = 1 * 1024 * 1024
+	largeContent := strings.Repeat("x", itemCap+1)
 	_, err = s3Client.PutObject(ctx, bucketName, "large-key.bin",
 		strings.NewReader(largeContent), int64(len(largeContent)),
 		minio.PutObjectOptions{ContentType: "application/octet-stream"})
 	require.NoError(t, err)
 
-	cache := NewMemoryCache(100, int64(maxCacheableSize*3))
+	cache := NewMemoryCache(100, itemCap)
 	store := NewEndpointStore(cache)
 	err = store.Update([]*agentv1.EndpointConfig{
 		{
