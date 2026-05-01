@@ -35,6 +35,20 @@ type TxBeginner interface {
 	Begin(ctx context.Context) (pgx.Tx, error)
 }
 
+// RWPool unifies the DBTX surface (pgx connection-pool exec/query
+// methods, used by raw filter.Query and similar non-sqlc reads) with
+// TxBeginner (begins a transaction). *pgxpool.Pool implements both,
+// so a single Pool field on a server Config can stand in for both
+// roles — callers don't have to pass the same pool reference twice.
+//
+// Use this on Configs whose handlers need raw DBTX access AND
+// transactional writes (tags, aichat, assets, organizations). Configs
+// that only need one of the two should keep the narrower type.
+type RWPool interface {
+	DBTX
+	TxBeginner
+}
+
 // Txer runs a closure inside a database transaction. Two
 // implementations:
 //

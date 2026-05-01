@@ -36,12 +36,9 @@ type TagValuesServer struct {
 
 // TagValuesConfig is the constructor input for TagValuesServer.
 type TagValuesConfig struct {
-	// Pool is the database pool used for filter reads. Required.
-	Pool db.DBTX
-	// TxPool begins transactions for handlers that opt into tx
-	// scoping (DeleteTagValue's lock-then-count-then-delete).
-	// Required. See TagKeysConfig.TxPool for the dual-field rationale.
-	TxPool db.TxBeginner
+	// Pool is the database pool — DBTX for filter reads + TxBeginner
+	// for tx-wrapped delete paths. Required.
+	Pool db.RWPool
 	// Queries is the sqlc query interface. Required.
 	Queries db.Querier
 	// Codec opaque-encodes resource names. Required.
@@ -57,9 +54,6 @@ func NewTagValuesServer(cfg TagValuesConfig) *TagValuesServer {
 	if cfg.Pool == nil {
 		panic("tags: TagValuesConfig.Pool is required")
 	}
-	if cfg.TxPool == nil {
-		panic("tags: TagValuesConfig.TxPool is required")
-	}
 	if cfg.Queries == nil {
 		panic("tags: TagValuesConfig.Queries is required")
 	}
@@ -68,7 +62,7 @@ func NewTagValuesServer(cfg TagValuesConfig) *TagValuesServer {
 	}
 	return &TagValuesServer{
 		db:      cfg.Pool,
-		txer:    &db.PoolTxer{Pool: cfg.TxPool},
+		txer:    &db.PoolTxer{Pool: cfg.Pool},
 		queries: cfg.Queries,
 		filter:  filter.TagValueFilter(),
 		codec:   cfg.Codec,

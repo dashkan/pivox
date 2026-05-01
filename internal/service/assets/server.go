@@ -31,12 +31,9 @@ type AssetsServer struct {
 
 // Config is the constructor input for AssetsServer.
 type Config struct {
-	// Pool is the database pool used for reads. Required.
-	Pool db.DBTX
-	// TxPool begins transactions for handlers that opt into tx
-	// scoping (CreateAsset's create-then-flip-state pair).
-	// Required. Production wires the same *pgxpool.Pool to both.
-	TxPool db.TxBeginner
+	// Pool is the database pool — DBTX for reads + TxBeginner for
+	// tx-wrapped writes. Required.
+	Pool db.RWPool
 	// Queries is the sqlc query interface. Required.
 	Queries db.Querier
 	// AuditResolver inflates audit-field UUIDs into Actor protos.
@@ -50,15 +47,12 @@ func NewAssetsServer(cfg Config) *AssetsServer {
 	if cfg.Pool == nil {
 		panic("assets: Config.Pool is required")
 	}
-	if cfg.TxPool == nil {
-		panic("assets: Config.TxPool is required")
-	}
 	if cfg.Queries == nil {
 		panic("assets: Config.Queries is required")
 	}
 	return &AssetsServer{
 		db:      cfg.Pool,
-		txer:    &db.PoolTxer{Pool: cfg.TxPool},
+		txer:    &db.PoolTxer{Pool: cfg.Pool},
 		queries: cfg.Queries,
 		audit:   cfg.AuditResolver,
 	}

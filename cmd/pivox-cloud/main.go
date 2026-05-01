@@ -343,10 +343,10 @@ func serve(cmd *cobra.Command, args []string) error {
 		Encryptor:     enc,
 	}))
 	apiv1.RegisterTagKeysServer(grpcServer, tags.NewTagKeysServer(tags.TagKeysConfig{
-		Pool: pool, TxPool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
+		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
 	}))
 	apiv1.RegisterTagValuesServer(grpcServer, tags.NewTagValuesServer(tags.TagValuesConfig{
-		Pool: pool, TxPool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
+		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
 	}))
 	apiv1.RegisterTagBindingsServer(grpcServer, tags.NewTagBindingsServer(tags.TagBindingsConfig{
 		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
@@ -376,7 +376,7 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	// Asset and request services
 	assetsv1.RegisterAssetsServer(grpcServer, assets.NewAssetsServer(assets.Config{
-		Pool: pool, TxPool: pool, Queries: queries, AuditResolver: auditResolver,
+		Pool: pool, Queries: queries, AuditResolver: auditResolver,
 	}))
 	assetsv1.RegisterRequestsServer(grpcServer, requests.NewRequestsServer(requests.Config{
 		Pool: pool, Queries: queries, AuditResolver: auditResolver,
@@ -392,7 +392,6 @@ func serve(cmd *cobra.Command, args []string) error {
 	toolRegistry := tools.NewRegistry()
 	aiChatServer := aichat.NewServer(aichat.Config{
 		Pool:          pool,
-		TxPool:        pool,
 		Queries:       queries,
 		Model:         llm,
 		Tools:         toolRegistry,

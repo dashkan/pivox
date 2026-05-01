@@ -33,14 +33,10 @@ type TagKeysServer struct {
 
 // TagKeysConfig is the constructor input for TagKeysServer.
 type TagKeysConfig struct {
-	// Pool is the database pool used for filter reads. Required.
-	Pool db.DBTX
-	// TxPool begins transactions for handlers that opt into tx
-	// scoping (DeleteTagKey's lock-then-count-then-delete). Required.
-	// In production this is the same *pgxpool.Pool wired into Pool;
-	// the second field captures the TxBeginner surface explicitly so
-	// the constructor accepts a narrower DBTX in tests.
-	TxPool db.TxBeginner
+	// Pool is the database pool — used as a DBTX for filter reads
+	// and as a TxBeginner for tx-wrapped delete paths. *pgxpool.Pool
+	// satisfies db.RWPool directly. Required.
+	Pool db.RWPool
 	// Queries is the sqlc query interface. Required.
 	Queries db.Querier
 	// Codec opaque-encodes resource names. Required.
@@ -56,9 +52,6 @@ func NewTagKeysServer(cfg TagKeysConfig) *TagKeysServer {
 	if cfg.Pool == nil {
 		panic("tags: TagKeysConfig.Pool is required")
 	}
-	if cfg.TxPool == nil {
-		panic("tags: TagKeysConfig.TxPool is required")
-	}
 	if cfg.Queries == nil {
 		panic("tags: TagKeysConfig.Queries is required")
 	}
@@ -67,7 +60,7 @@ func NewTagKeysServer(cfg TagKeysConfig) *TagKeysServer {
 	}
 	return &TagKeysServer{
 		db:      cfg.Pool,
-		txer:    &db.PoolTxer{Pool: cfg.TxPool},
+		txer:    &db.PoolTxer{Pool: cfg.Pool},
 		queries: cfg.Queries,
 		filter:  filter.TagKeyFilter(),
 		codec:   cfg.Codec,
