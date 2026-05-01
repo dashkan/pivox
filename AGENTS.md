@@ -25,6 +25,25 @@ in build docs / architecture decisions where the technology is the
 point. Avoid them in user-facing copy and in conversation about
 features.
 
+## Rate limiting
+
+Cloud Controller does **not** implement app-level per-IP rate limiting.
+Rate limiting is the edge proxy's responsibility (Cloudflare, GCLB,
+nginx — whatever sits in front of pivox-cloud in production). App-level
+abuse defenses live in:
+
+- Single-use codes with short TTLs (`auth_token_codes`,
+  `delegated_auth_sessions`)
+- Auth on every endpoint that can be authenticated
+- Response-shape uniformity on pre-auth endpoints (e.g.,
+  `:resolveProvider` collapses "domain not configured", "domain not
+  verified", and "SsoConfig disabled" into the same 404)
+- The HMAC-signed OAuth state token + (pending) PKCE on the broker
+
+If pivox-cloud is ever deployed without an edge proxy (small
+self-hosted, dev), put `nginx` / `caddy` in front for volumetric
+defense — there is no `--rate-limit-enabled` flag.
+
 ## Repository layout
 
 Top-level directories you'll touch most:

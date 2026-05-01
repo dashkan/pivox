@@ -6,9 +6,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
-	"time"
 
-	"golang.org/x/time/rate"
 	"google.golang.org/api/idtoken"
 )
 
@@ -37,31 +35,12 @@ func NewInternalHooks(cfg InternalHooksConfig) (*InternalHooks, error) {
 		allowed[sa] = struct{}{}
 	}
 
-	prefixes, err := parseTrustedProxies(cfg.TrustedProxies)
-	if err != nil {
-		return nil, err
-	}
-
 	h := &InternalHooks{
-		queries:          cfg.Queries,
-		logger:           cfg.Logger,
-		auth:             cfg.Auth,
-		delegatedAuth:    cfg.DelegatedAuth,
-		audit:            cfg.AuditResolver,
-		rateLimitEnabled: cfg.RateLimitEnabled,
-		trustedProxies:   prefixes,
-		exchangeLimiter:  newIPRateLimiter(rate.Every(6*time.Second), 10),
-		// Aggressive for create — user-initiated, one per flow, cheap to reject.
-		delegatedCreateLimiter: newIPRateLimiter(rate.Every(10*time.Second), 3),
-		// Parity with exchangeLimiter — complete is authenticated and low volume.
-		delegatedCompleteLimiter: newIPRateLimiter(rate.Every(6*time.Second), 10),
-		// Must sustain the configured poll cadence — refill faster than pollInterval
-		// so a well-behaved client never 429s on normal use.
-		delegatedPollLimiter: newIPRateLimiter(rate.Every(3*time.Second), 5),
-		// resolveProvider is called once per sign-in attempt per user.
-		// Per-IP cap protects against credential-stuffing-style enumeration
-		// while leaving normal sign-in traffic unaffected.
-		resolveProviderLimiter: newIPRateLimiter(rate.Every(2*time.Second), 10),
+		queries:       cfg.Queries,
+		logger:        cfg.Logger,
+		auth:          cfg.Auth,
+		delegatedAuth: cfg.DelegatedAuth,
+		audit:         cfg.AuditResolver,
 	}
 	h.syncAuth = h.requireGoogleIdentity(validator, allowed, cfg.SyncAuth.Audience)
 	return h, nil

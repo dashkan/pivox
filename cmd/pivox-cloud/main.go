@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
@@ -85,7 +84,6 @@ func main() {
 	// credential flag — operators set the standard env var.
 	f.Duration("delegated-auth-session-ttl", envOrDuration("PIVOX_DELEGATED_AUTH_SESSION_TTL", 5*time.Minute), "How long a delegated auth session code remains valid")
 	f.Duration("delegated-auth-poll-interval", envOrDuration("PIVOX_DELEGATED_AUTH_POLL_INTERVAL", 5*time.Second), "Poll interval returned to delegated auth clients")
-	f.Bool("rate-limit-enabled", envOrBool("PIVOX_RATE_LIMIT_ENABLED", true), "Enable in-process per-IP rate limiting on internal endpoints (disable when a reverse proxy handles it)")
 	f.String("ollama-url", envOrDefault("PIVOX_OLLAMA_URL", "http://localhost:11434"), "Ollama API base URL")
 	f.String("ollama-model", envOrDefault("PIVOX_OLLAMA_MODEL", "qwen3-vl"), "Ollama model to use for AI chat")
 
@@ -120,31 +118,20 @@ func envOrDuration(key string, defaultVal time.Duration) time.Duration {
 	return defaultVal
 }
 
-func envOrBool(key string, defaultVal bool) bool {
-	if v := os.Getenv(key); v != "" {
-		if b, err := strconv.ParseBool(v); err == nil {
-			return b
-		}
-	}
-	return defaultVal
-}
-
 func must(s string, _ error) string { return s }
 
 func serve(cmd *cobra.Command, args []string) error {
 	f := cmd.Flags()
 	sessionTTL, _ := f.GetDuration("delegated-auth-session-ttl")
 	pollInterval, _ := f.GetDuration("delegated-auth-poll-interval")
-	rateLimitEnabled, _ := f.GetBool("rate-limit-enabled")
 	cfg := &config.Config{
-		DatabaseURL:      must(f.GetString("database-url")),
-		GRPCPort:         must(f.GetString("grpc-port")),
-		ServiceGRPCPort:  must(f.GetString("service-grpc-port")),
-		RESTPort:         must(f.GetString("rest-port")),
-		DebugPort:        must(f.GetString("debug-port")),
-		LogLevel:         must(f.GetString("log-level")),
-		RateLimitEnabled: rateLimitEnabled,
-		SyncAuth:         loadSyncAuthConfig(cmd),
+		DatabaseURL:     must(f.GetString("database-url")),
+		GRPCPort:        must(f.GetString("grpc-port")),
+		ServiceGRPCPort: must(f.GetString("service-grpc-port")),
+		RESTPort:        must(f.GetString("rest-port")),
+		DebugPort:       must(f.GetString("debug-port")),
+		LogLevel:        must(f.GetString("log-level")),
+		SyncAuth:        loadSyncAuthConfig(cmd),
 		DelegatedAuth: config.DelegatedAuthConfig{
 			SessionTTL:   sessionTTL,
 			PollInterval: pollInterval,
@@ -509,14 +496,12 @@ func serve(cmd *cobra.Command, args []string) error {
 	// HTTP mux: internal hooks + gRPC gateway (fallback)
 	httpMux := http.NewServeMux()
 	hooks, err := server.NewInternalHooks(server.InternalHooksConfig{
-		Queries:          queries,
-		SyncAuth:         cfg.SyncAuth,
-		DelegatedAuth:    cfg.DelegatedAuth,
-		RateLimitEnabled: cfg.RateLimitEnabled,
-		TrustedProxies:   cfg.TrustedProxies,
-		Logger:           logger,
-		Auth:             authSvc,
-		AuditResolver:    auditResolver,
+		Queries:       queries,
+		SyncAuth:      cfg.SyncAuth,
+		DelegatedAuth: cfg.DelegatedAuth,
+		Logger:        logger,
+		Auth:          authSvc,
+		AuditResolver: auditResolver,
 	})
 	if err != nil {
 		return fmt.Errorf("initialize internal hooks: %w", err)

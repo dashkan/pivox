@@ -107,7 +107,12 @@ Polled by the plugin until the session is completed. Returns the custom token fo
 |---|---|---|---|
 | `delegated_auth_session_ttl` | `PIVOX_DELEGATED_AUTH_SESSION_TTL` | 5 min | How long a session code is valid |
 | `delegated_auth_poll_interval` | `PIVOX_DELEGATED_AUTH_POLL_INTERVAL` | 5 sec | Returned to clients, advisory |
-| `rate_limit_enabled` | `PIVOX_RATE_LIMIT_ENABLED` | true | Toggle app-level rate limiting |
+
+Rate limiting is the responsibility of the edge proxy / load balancer in
+front of pivox-cloud. Abuse defenses on this flow live in the single-use
+session code, the 5-minute TTL, and the atomic
+`DELETE ... RETURNING custom_token` consume — not in app-level per-IP
+limits.
 
 ### Database
 
