@@ -24,6 +24,7 @@ import (
 type TagKeysServer struct {
 	apiv1.UnimplementedTagKeysServer
 	db      db.DBTX
+	txer    db.Txer
 	queries db.Querier
 	filter  *filter.ResourceFilter
 	codec   *appkey.Codec
@@ -34,6 +35,12 @@ type TagKeysServer struct {
 type TagKeysConfig struct {
 	// Pool is the database pool used for filter reads. Required.
 	Pool db.DBTX
+	// TxPool begins transactions for handlers that opt into tx
+	// scoping (DeleteTagKey's lock-then-count-then-delete). Required.
+	// In production this is the same *pgxpool.Pool wired into Pool;
+	// the second field captures the TxBeginner surface explicitly so
+	// the constructor accepts a narrower DBTX in tests.
+	TxPool db.TxBeginner
 	// Queries is the sqlc query interface. Required.
 	Queries db.Querier
 	// Codec opaque-encodes resource names. Required.
@@ -49,6 +56,9 @@ func NewTagKeysServer(cfg TagKeysConfig) *TagKeysServer {
 	if cfg.Pool == nil {
 		panic("tags: TagKeysConfig.Pool is required")
 	}
+	if cfg.TxPool == nil {
+		panic("tags: TagKeysConfig.TxPool is required")
+	}
 	if cfg.Queries == nil {
 		panic("tags: TagKeysConfig.Queries is required")
 	}
@@ -57,6 +67,7 @@ func NewTagKeysServer(cfg TagKeysConfig) *TagKeysServer {
 	}
 	return &TagKeysServer{
 		db:      cfg.Pool,
+		txer:    &db.PoolTxer{Pool: cfg.TxPool},
 		queries: cfg.Queries,
 		filter:  filter.TagKeyFilter(),
 		codec:   cfg.Codec,
@@ -243,6 +254,18 @@ func (s *TagKeysServer) UpdateTagKey(ctx context.Context, req *apiv1.UpdateTagKe
 	return lro.DoneOperation(convert.TagKeyToProto(result, actors))
 }
 
+// DeleteTagKey removes an empty tag key. Refuses with
+// FailedPrecondition if any TagValues still reference this key.
+//
+// Tx scope: lock the parent row FOR UPDATE, count children inside
+// the same tx, DELETE on empty. Without the row lock, a concurrent
+// CreateTagValue could land between our count and our DELETE,
+// leaving us deleting a parent whose FK targets are still being
+// referenced — depending on the FK action, either the DELETE fails
+// late (RESTRICT) or the new child gets cascaded away (CASCADE).
+// FOR UPDATE on the parent conflicts with the FK SHARE lock that a
+// child INSERT takes, so concurrent inserts queue until our tx
+// resolves.
 func (s *TagKeysServer) DeleteTagKey(ctx context.Context, req *apiv1.DeleteTagKeyRequest) (*longrunningpb.Operation, error) {
 	segment, err := resource.ParseSegment(req.GetName())
 	if err != nil {
@@ -253,22 +276,24 @@ func (s *TagKeysServer) DeleteTagKey(ctx context.Context, req *apiv1.DeleteTagKe
 		return nil, apierr.HandleResourceError(err, "TagKey", req.GetName())
 	}
 
-	existing, err := s.queries.GetTagKey(ctx, id)
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "TagKey", req.GetName())
-	}
-
-	count, err := s.queries.CountTagValuesByTagKey(ctx, existing.ID)
-	if err != nil {
-		return nil, apierr.Internal("failed to check tag values")
-	}
-	if count > 0 {
-		return nil, apierr.FailedPrecondition("cannot delete tag key with existing tag values")
-	}
-
-	err = s.queries.DeleteTagKey(ctx, existing.ID)
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "TagKey", req.GetName())
+	if err := db.RunInTxVoid(ctx, s.txer, func(qtx db.Querier) error {
+		existing, err := qtx.GetTagKeyForUpdate(ctx, id)
+		if err != nil {
+			return apierr.HandleResourceError(err, "TagKey", req.GetName())
+		}
+		count, err := qtx.CountTagValuesByTagKey(ctx, existing.ID)
+		if err != nil {
+			return apierr.Internal("failed to check tag values")
+		}
+		if count > 0 {
+			return apierr.FailedPrecondition("cannot delete tag key with existing tag values")
+		}
+		if err := qtx.DeleteTagKey(ctx, existing.ID); err != nil {
+			return apierr.HandleResourceError(err, "TagKey", req.GetName())
+		}
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 
 	return lro.DoneOperation(&apiv1.TagKey{})

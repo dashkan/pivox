@@ -122,6 +122,37 @@ func (q *Queries) GetTagKeyByNamespacedName(ctx context.Context, namespacedName 
 	return i, err
 }
 
+const getTagKeyForUpdate = `-- name: GetTagKeyForUpdate :one
+SELECT id, org_id, short_name, namespaced_name, description, annotations, etag, revision, created_by, updated_by, create_time, update_time FROM tag_keys WHERE id = $1 FOR UPDATE
+`
+
+// GetTagKeyForUpdate is the locking variant used by DeleteTagKey
+// inside its tx to serialize the empty-check + DELETE against
+// concurrent CreateTagValue inserts. The FOR UPDATE row lock
+// conflicts with the FK SHARE lock that a child INSERT takes on
+// this row — so a concurrent CreateTagValue blocks until our tx
+// commits or rolls back, eliminating the TOCTOU window between
+// "no children" and "delete parent".
+func (q *Queries) GetTagKeyForUpdate(ctx context.Context, id uuid.UUID) (TagKey, error) {
+	row := q.db.QueryRow(ctx, getTagKeyForUpdate, id)
+	var i TagKey
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.ShortName,
+		&i.NamespacedName,
+		&i.Description,
+		&i.Annotations,
+		&i.Etag,
+		&i.Revision,
+		&i.CreatedBy,
+		&i.UpdatedBy,
+		&i.CreateTime,
+		&i.UpdateTime,
+	)
+	return i, err
+}
+
 const updateTagKey = `-- name: UpdateTagKey :one
 UPDATE tag_keys
 SET description = COALESCE($3, description),

@@ -446,6 +446,11 @@ func (m *MockQuerier) GetTagKey(ctx context.Context, id uuid.UUID) (db.TagKey, e
 	return args.Get(0).(db.TagKey), args.Error(1)
 }
 
+func (m *MockQuerier) GetTagKeyForUpdate(ctx context.Context, id uuid.UUID) (db.TagKey, error) {
+	args := m.Called(ctx, id)
+	return args.Get(0).(db.TagKey), args.Error(1)
+}
+
 func (m *MockQuerier) GetTagKeyByNamespacedName(ctx context.Context, namespacedName string) (db.TagKey, error) {
 	args := m.Called(ctx, namespacedName)
 	return args.Get(0).(db.TagKey), args.Error(1)
@@ -472,6 +477,11 @@ func (m *MockQuerier) CreateTagValue(ctx context.Context, arg db.CreateTagValueP
 }
 
 func (m *MockQuerier) GetTagValue(ctx context.Context, id uuid.UUID) (db.TagValue, error) {
+	args := m.Called(ctx, id)
+	return args.Get(0).(db.TagValue), args.Error(1)
+}
+
+func (m *MockQuerier) GetTagValueForUpdate(ctx context.Context, id uuid.UUID) (db.TagValue, error) {
 	args := m.Called(ctx, id)
 	return args.Get(0).(db.TagValue), args.Error(1)
 }

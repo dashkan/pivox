@@ -130,7 +130,7 @@ var (
 
 func TestUnit_CreateTagKey_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := &TagKeysServer{queries: mockQ, filter: filter.TagKeyFilter()}
+	srv := &TagKeysServer{txer: &db.PassthroughTxer{Q: mockQ}, queries: mockQ, filter: filter.TagKeyFilter()}
 	ctx := callerCtx()
 
 	mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
@@ -157,7 +157,7 @@ func TestUnit_CreateTagKey_Success(t *testing.T) {
 
 func TestUnit_GetTagKey_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := &TagKeysServer{queries: mockQ, filter: filter.TagKeyFilter()}
+	srv := &TagKeysServer{txer: &db.PassthroughTxer{Q: mockQ}, queries: mockQ, filter: filter.TagKeyFilter()}
 	ctx := callerCtx()
 
 	mockQ.On("GetTagKey", mock.Anything, testTagKeyID).Return(testTagKey, nil)
@@ -174,7 +174,7 @@ func TestUnit_GetTagKey_Success(t *testing.T) {
 
 func TestUnit_UpdateTagKey_WithMask(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := &TagKeysServer{queries: mockQ, filter: filter.TagKeyFilter()}
+	srv := &TagKeysServer{txer: &db.PassthroughTxer{Q: mockQ}, queries: mockQ, filter: filter.TagKeyFilter()}
 	ctx := callerCtx()
 
 	updatedKey := testTagKey
@@ -200,7 +200,7 @@ func TestUnit_UpdateTagKey_WithMask(t *testing.T) {
 
 func TestUnit_UpdateTagKey_NoMask(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := &TagKeysServer{queries: mockQ, filter: filter.TagKeyFilter()}
+	srv := &TagKeysServer{txer: &db.PassthroughTxer{Q: mockQ}, queries: mockQ, filter: filter.TagKeyFilter()}
 	ctx := callerCtx()
 
 	updatedKey := testTagKey
@@ -226,10 +226,10 @@ func TestUnit_UpdateTagKey_NoMask(t *testing.T) {
 
 func TestUnit_DeleteTagKey_WithValues(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := &TagKeysServer{queries: mockQ, filter: filter.TagKeyFilter()}
+	srv := &TagKeysServer{txer: &db.PassthroughTxer{Q: mockQ}, queries: mockQ, filter: filter.TagKeyFilter()}
 	ctx := callerCtx()
 
-	mockQ.On("GetTagKey", mock.Anything, testTagKeyID).Return(testTagKey, nil)
+	mockQ.On("GetTagKeyForUpdate", mock.Anything, testTagKeyID).Return(testTagKey, nil)
 	mockQ.On("CountTagValuesByTagKey", mock.Anything, testTagKeyID).Return(int64(3), nil)
 
 	_, err := srv.DeleteTagKey(ctx, &apiv1.DeleteTagKeyRequest{
@@ -246,10 +246,10 @@ func TestUnit_DeleteTagKey_WithValues(t *testing.T) {
 
 func TestUnit_DeleteTagKey_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := &TagKeysServer{queries: mockQ, filter: filter.TagKeyFilter()}
+	srv := &TagKeysServer{txer: &db.PassthroughTxer{Q: mockQ}, queries: mockQ, filter: filter.TagKeyFilter()}
 	ctx := callerCtx()
 
-	mockQ.On("GetTagKey", mock.Anything, testTagKeyID).Return(testTagKey, nil)
+	mockQ.On("GetTagKeyForUpdate", mock.Anything, testTagKeyID).Return(testTagKey, nil)
 	mockQ.On("CountTagValuesByTagKey", mock.Anything, testTagKeyID).Return(int64(0), nil)
 	mockQ.On("DeleteTagKey", mock.Anything, testTagKeyID).Return(nil)
 
@@ -268,7 +268,7 @@ func TestUnit_DeleteTagKey_Success(t *testing.T) {
 
 func TestUnit_GetTagKey_NotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := &TagKeysServer{queries: mockQ, filter: filter.TagKeyFilter()}
+	srv := &TagKeysServer{txer: &db.PassthroughTxer{Q: mockQ}, queries: mockQ, filter: filter.TagKeyFilter()}
 	ctx := callerCtx()
 
 	mockQ.On("GetTagKey", mock.Anything, testTagKeyID).Return(db.TagKey{}, pgx.ErrNoRows)
@@ -286,7 +286,7 @@ func TestUnit_GetTagKey_NotFound(t *testing.T) {
 
 func TestUnit_CreateTagValue_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := &TagValuesServer{queries: mockQ, filter: filter.TagValueFilter()}
+	srv := &TagValuesServer{txer: &db.PassthroughTxer{Q: mockQ}, queries: mockQ, filter: filter.TagValueFilter()}
 	ctx := callerCtx()
 
 	mockQ.On("GetTagKey", mock.Anything, testTagKeyID).Return(testTagKey, nil)
@@ -311,7 +311,7 @@ func TestUnit_CreateTagValue_Success(t *testing.T) {
 
 func TestUnit_CreateTagValue_ParentNotFound(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := &TagValuesServer{queries: mockQ, filter: filter.TagValueFilter()}
+	srv := &TagValuesServer{txer: &db.PassthroughTxer{Q: mockQ}, queries: mockQ, filter: filter.TagValueFilter()}
 	ctx := callerCtx()
 
 	bogusKeyID := uuid.MustParse("0192a000-9999-7000-8000-000000000001")
@@ -332,7 +332,7 @@ func TestUnit_CreateTagValue_ParentNotFound(t *testing.T) {
 
 func TestUnit_GetTagValue_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := &TagValuesServer{queries: mockQ, filter: filter.TagValueFilter()}
+	srv := &TagValuesServer{txer: &db.PassthroughTxer{Q: mockQ}, queries: mockQ, filter: filter.TagValueFilter()}
 	ctx := callerCtx()
 
 	tvName := "tagKeys/" + testTagKeyID.String() + "/tagValues/" + testTagValID.String()
@@ -350,7 +350,7 @@ func TestUnit_GetTagValue_Success(t *testing.T) {
 
 func TestUnit_UpdateTagValue_WithMask(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := &TagValuesServer{queries: mockQ, filter: filter.TagValueFilter()}
+	srv := &TagValuesServer{txer: &db.PassthroughTxer{Q: mockQ}, queries: mockQ, filter: filter.TagValueFilter()}
 	ctx := callerCtx()
 
 	tvName := "tagKeys/" + testTagKeyID.String() + "/tagValues/" + testTagValID.String()
@@ -378,7 +378,7 @@ func TestUnit_UpdateTagValue_WithMask(t *testing.T) {
 
 func TestUnit_UpdateTagValue_NoMask(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := &TagValuesServer{queries: mockQ, filter: filter.TagValueFilter()}
+	srv := &TagValuesServer{txer: &db.PassthroughTxer{Q: mockQ}, queries: mockQ, filter: filter.TagValueFilter()}
 	ctx := callerCtx()
 
 	tvName := "tagKeys/" + testTagKeyID.String() + "/tagValues/" + testTagValID.String()
@@ -406,11 +406,11 @@ func TestUnit_UpdateTagValue_NoMask(t *testing.T) {
 
 func TestUnit_DeleteTagValue_WithBindings(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := &TagValuesServer{queries: mockQ, filter: filter.TagValueFilter()}
+	srv := &TagValuesServer{txer: &db.PassthroughTxer{Q: mockQ}, queries: mockQ, filter: filter.TagValueFilter()}
 	ctx := callerCtx()
 
 	tvName := "tagKeys/" + testTagKeyID.String() + "/tagValues/" + testTagValID.String()
-	mockQ.On("GetTagValue", mock.Anything, testTagValID).Return(testTagValue, nil)
+	mockQ.On("GetTagValueForUpdate", mock.Anything, testTagValID).Return(testTagValue, nil)
 	mockQ.On("CountTagBindingsByTagValue", mock.Anything, testTagValID).Return(int64(5), nil)
 
 	_, err := srv.DeleteTagValue(ctx, &apiv1.DeleteTagValueRequest{
@@ -427,11 +427,11 @@ func TestUnit_DeleteTagValue_WithBindings(t *testing.T) {
 
 func TestUnit_DeleteTagValue_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := &TagValuesServer{queries: mockQ, filter: filter.TagValueFilter()}
+	srv := &TagValuesServer{txer: &db.PassthroughTxer{Q: mockQ}, queries: mockQ, filter: filter.TagValueFilter()}
 	ctx := callerCtx()
 
 	tvName := "tagKeys/" + testTagKeyID.String() + "/tagValues/" + testTagValID.String()
-	mockQ.On("GetTagValue", mock.Anything, testTagValID).Return(testTagValue, nil)
+	mockQ.On("GetTagValueForUpdate", mock.Anything, testTagValID).Return(testTagValue, nil)
 	mockQ.On("CountTagBindingsByTagValue", mock.Anything, testTagValID).Return(int64(0), nil)
 	mockQ.On("DeleteTagValue", mock.Anything, testTagValID).Return(nil)
 
@@ -562,7 +562,7 @@ func TestUnit_GetTagKey_InvalidName(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
-			srv := &TagKeysServer{queries: mockQ, filter: filter.TagKeyFilter()}
+			srv := &TagKeysServer{txer: &db.PassthroughTxer{Q: mockQ}, queries: mockQ, filter: filter.TagKeyFilter()}
 			ctx := callerCtx()
 
 			_, err := srv.GetTagKey(ctx, &apiv1.GetTagKeyRequest{Name: tc.reqName})
@@ -601,7 +601,7 @@ func TestUnit_CreateTagKey_InvalidParent(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
-			srv := &TagKeysServer{queries: mockQ, filter: filter.TagKeyFilter()}
+			srv := &TagKeysServer{txer: &db.PassthroughTxer{Q: mockQ}, queries: mockQ, filter: filter.TagKeyFilter()}
 			ctx := callerCtx()
 
 			switch tc.name {
@@ -646,7 +646,7 @@ func TestUnit_CreateTagKey_DBError(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
-			srv := &TagKeysServer{queries: mockQ, filter: filter.TagKeyFilter()}
+			srv := &TagKeysServer{txer: &db.PassthroughTxer{Q: mockQ}, queries: mockQ, filter: filter.TagKeyFilter()}
 			ctx := callerCtx()
 
 			mockQ.On("GetOrganizationByName", mock.Anything, "acme").Return(testOrg, nil)
@@ -707,7 +707,7 @@ func TestUnit_UpdateTagKey_ErrorPaths(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
-			srv := &TagKeysServer{queries: mockQ, filter: filter.TagKeyFilter()}
+			srv := &TagKeysServer{txer: &db.PassthroughTxer{Q: mockQ}, queries: mockQ, filter: filter.TagKeyFilter()}
 			ctx := callerCtx()
 
 			tc.setup(mockQ)
@@ -748,7 +748,7 @@ func TestUnit_DeleteTagKey_ErrorPaths(t *testing.T) {
 			name:    "not found",
 			reqName: "tagKeys/" + testTagKeyID.String(),
 			setup: func(mockQ *mocks.MockQuerier) {
-				mockQ.On("GetTagKey", mock.Anything, testTagKeyID).Return(db.TagKey{}, pgx.ErrNoRows)
+				mockQ.On("GetTagKeyForUpdate", mock.Anything, testTagKeyID).Return(db.TagKey{}, pgx.ErrNoRows)
 			},
 			wantCode: codes.NotFound,
 		},
@@ -756,7 +756,7 @@ func TestUnit_DeleteTagKey_ErrorPaths(t *testing.T) {
 			name:    "count error",
 			reqName: "tagKeys/" + testTagKeyID.String(),
 			setup: func(mockQ *mocks.MockQuerier) {
-				mockQ.On("GetTagKey", mock.Anything, testTagKeyID).Return(testTagKey, nil)
+				mockQ.On("GetTagKeyForUpdate", mock.Anything, testTagKeyID).Return(testTagKey, nil)
 				mockQ.On("CountTagValuesByTagKey", mock.Anything, testTagKeyID).Return(int64(0), fmt.Errorf("db error"))
 			},
 			wantCode: codes.Internal,
@@ -765,7 +765,7 @@ func TestUnit_DeleteTagKey_ErrorPaths(t *testing.T) {
 			name:    "delete db error",
 			reqName: "tagKeys/" + testTagKeyID.String(),
 			setup: func(mockQ *mocks.MockQuerier) {
-				mockQ.On("GetTagKey", mock.Anything, testTagKeyID).Return(testTagKey, nil)
+				mockQ.On("GetTagKeyForUpdate", mock.Anything, testTagKeyID).Return(testTagKey, nil)
 				mockQ.On("CountTagValuesByTagKey", mock.Anything, testTagKeyID).Return(int64(0), nil)
 				mockQ.On("DeleteTagKey", mock.Anything, testTagKeyID).Return(fmt.Errorf("connection reset"))
 			},
@@ -775,7 +775,7 @@ func TestUnit_DeleteTagKey_ErrorPaths(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
-			srv := &TagKeysServer{queries: mockQ, filter: filter.TagKeyFilter()}
+			srv := &TagKeysServer{txer: &db.PassthroughTxer{Q: mockQ}, queries: mockQ, filter: filter.TagKeyFilter()}
 			ctx := callerCtx()
 
 			tc.setup(mockQ)
@@ -833,7 +833,7 @@ func TestUnit_ListTagKeys_ScanError(t *testing.T) {
 
 func TestUnit_ListTagKeys_InvalidParent(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
-	srv := &TagKeysServer{queries: mockQ, filter: filter.TagKeyFilter()}
+	srv := &TagKeysServer{txer: &db.PassthroughTxer{Q: mockQ}, queries: mockQ, filter: filter.TagKeyFilter()}
 	ctx := callerCtx()
 
 	_, err := srv.ListTagKeys(ctx, &apiv1.ListTagKeysRequest{
@@ -882,7 +882,7 @@ func TestUnit_GetTagValue_ErrorPaths(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
-			srv := &TagValuesServer{queries: mockQ, filter: filter.TagValueFilter()}
+			srv := &TagValuesServer{txer: &db.PassthroughTxer{Q: mockQ}, queries: mockQ, filter: filter.TagValueFilter()}
 			ctx := callerCtx()
 
 			tc.setup(mockQ)
@@ -941,7 +941,7 @@ func TestUnit_CreateTagValue_ErrorPaths(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
-			srv := &TagValuesServer{queries: mockQ, filter: filter.TagValueFilter()}
+			srv := &TagValuesServer{txer: &db.PassthroughTxer{Q: mockQ}, queries: mockQ, filter: filter.TagValueFilter()}
 			ctx := callerCtx()
 
 			tc.setup(mockQ)
@@ -1002,7 +1002,7 @@ func TestUnit_UpdateTagValue_ErrorPaths(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
-			srv := &TagValuesServer{queries: mockQ, filter: filter.TagValueFilter()}
+			srv := &TagValuesServer{txer: &db.PassthroughTxer{Q: mockQ}, queries: mockQ, filter: filter.TagValueFilter()}
 			ctx := callerCtx()
 
 			tc.setup(mockQ)
@@ -1044,7 +1044,7 @@ func TestUnit_DeleteTagValue_ErrorPaths(t *testing.T) {
 			name:    "tag value not found",
 			reqName: tvName,
 			setup: func(mockQ *mocks.MockQuerier) {
-				mockQ.On("GetTagValue", mock.Anything, testTagValID).Return(db.TagValue{}, pgx.ErrNoRows)
+				mockQ.On("GetTagValueForUpdate", mock.Anything, testTagValID).Return(db.TagValue{}, pgx.ErrNoRows)
 			},
 			wantCode: codes.NotFound,
 		},
@@ -1052,7 +1052,7 @@ func TestUnit_DeleteTagValue_ErrorPaths(t *testing.T) {
 			name:    "count bindings db error",
 			reqName: tvName,
 			setup: func(mockQ *mocks.MockQuerier) {
-				mockQ.On("GetTagValue", mock.Anything, testTagValID).Return(testTagValue, nil)
+				mockQ.On("GetTagValueForUpdate", mock.Anything, testTagValID).Return(testTagValue, nil)
 				mockQ.On("CountTagBindingsByTagValue", mock.Anything, testTagValID).Return(int64(0), fmt.Errorf("db error"))
 			},
 			wantCode: codes.Internal,
@@ -1061,7 +1061,7 @@ func TestUnit_DeleteTagValue_ErrorPaths(t *testing.T) {
 			name:    "delete db error",
 			reqName: tvName,
 			setup: func(mockQ *mocks.MockQuerier) {
-				mockQ.On("GetTagValue", mock.Anything, testTagValID).Return(testTagValue, nil)
+				mockQ.On("GetTagValueForUpdate", mock.Anything, testTagValID).Return(testTagValue, nil)
 				mockQ.On("CountTagBindingsByTagValue", mock.Anything, testTagValID).Return(int64(0), nil)
 				mockQ.On("DeleteTagValue", mock.Anything, testTagValID).Return(fmt.Errorf("connection reset"))
 			},
@@ -1071,7 +1071,7 @@ func TestUnit_DeleteTagValue_ErrorPaths(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockQ := new(mocks.MockQuerier)
-			srv := &TagValuesServer{queries: mockQ, filter: filter.TagValueFilter()}
+			srv := &TagValuesServer{txer: &db.PassthroughTxer{Q: mockQ}, queries: mockQ, filter: filter.TagValueFilter()}
 			ctx := callerCtx()
 
 			tc.setup(mockQ)
@@ -1090,7 +1090,7 @@ func TestUnit_DeleteTagValue_ErrorPaths(t *testing.T) {
 func TestUnit_ListTagValues_ErrorPaths(t *testing.T) {
 	t.Run("invalid parent format", func(t *testing.T) {
 		mockQ := new(mocks.MockQuerier)
-		srv := &TagValuesServer{queries: mockQ, filter: filter.TagValueFilter()}
+		srv := &TagValuesServer{txer: &db.PassthroughTxer{Q: mockQ}, queries: mockQ, filter: filter.TagValueFilter()}
 		ctx := callerCtx()
 
 		_, err := srv.ListTagValues(ctx, &apiv1.ListTagValuesRequest{
@@ -1106,7 +1106,7 @@ func TestUnit_ListTagValues_ErrorPaths(t *testing.T) {
 
 	t.Run("parent tag key not found", func(t *testing.T) {
 		mockQ := new(mocks.MockQuerier)
-		srv := &TagValuesServer{queries: mockQ, filter: filter.TagValueFilter()}
+		srv := &TagValuesServer{txer: &db.PassthroughTxer{Q: mockQ}, queries: mockQ, filter: filter.TagValueFilter()}
 		ctx := callerCtx()
 
 		mockQ.On("GetTagKey", mock.Anything, testTagKeyID).Return(db.TagKey{}, pgx.ErrNoRows)

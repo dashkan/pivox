@@ -6,6 +6,16 @@ RETURNING *;
 -- name: GetTagValue :one
 SELECT * FROM tag_values WHERE id = $1;
 
+-- GetTagValueForUpdate is the locking variant used by DeleteTagValue
+-- inside its tx to serialize the empty-check + DELETE against
+-- concurrent CreateTagBinding inserts. The FOR UPDATE row lock
+-- conflicts with the FK SHARE lock that a binding INSERT takes on
+-- this row, so a concurrent CreateTagBinding blocks until our tx
+-- commits — eliminating the TOCTOU window between "no bindings"
+-- and "delete value".
+-- name: GetTagValueForUpdate :one
+SELECT * FROM tag_values WHERE id = $1 FOR UPDATE;
+
 -- name: GetTagValueByNamespacedName :one
 SELECT * FROM tag_values WHERE namespaced_name = $1;
 

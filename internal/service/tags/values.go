@@ -27,6 +27,7 @@ import (
 type TagValuesServer struct {
 	apiv1.UnimplementedTagValuesServer
 	db      db.DBTX
+	txer    db.Txer
 	queries db.Querier
 	filter  *filter.ResourceFilter
 	codec   *appkey.Codec
@@ -37,6 +38,10 @@ type TagValuesServer struct {
 type TagValuesConfig struct {
 	// Pool is the database pool used for filter reads. Required.
 	Pool db.DBTX
+	// TxPool begins transactions for handlers that opt into tx
+	// scoping (DeleteTagValue's lock-then-count-then-delete).
+	// Required. See TagKeysConfig.TxPool for the dual-field rationale.
+	TxPool db.TxBeginner
 	// Queries is the sqlc query interface. Required.
 	Queries db.Querier
 	// Codec opaque-encodes resource names. Required.
@@ -52,6 +57,9 @@ func NewTagValuesServer(cfg TagValuesConfig) *TagValuesServer {
 	if cfg.Pool == nil {
 		panic("tags: TagValuesConfig.Pool is required")
 	}
+	if cfg.TxPool == nil {
+		panic("tags: TagValuesConfig.TxPool is required")
+	}
 	if cfg.Queries == nil {
 		panic("tags: TagValuesConfig.Queries is required")
 	}
@@ -60,6 +68,7 @@ func NewTagValuesServer(cfg TagValuesConfig) *TagValuesServer {
 	}
 	return &TagValuesServer{
 		db:      cfg.Pool,
+		txer:    &db.PoolTxer{Pool: cfg.TxPool},
 		queries: cfg.Queries,
 		filter:  filter.TagValueFilter(),
 		codec:   cfg.Codec,
@@ -270,28 +279,38 @@ func (s *TagValuesServer) UpdateTagValue(ctx context.Context, req *apiv1.UpdateT
 	return lro.DoneOperation(convert.TagValueToProto(result, actors))
 }
 
+// DeleteTagValue removes an unbound tag value. Refuses with
+// FailedPrecondition if any TagBindings still reference it.
+//
+// Tx scope: lock the parent row FOR UPDATE, count bindings inside
+// the same tx, DELETE on empty. The FK SHARE lock that a binding
+// INSERT takes on this row conflicts with our FOR UPDATE, so a
+// concurrent CreateTagBinding queues until our tx resolves —
+// closing the TOCTOU between "no bindings" and "delete value".
 func (s *TagValuesServer) DeleteTagValue(ctx context.Context, req *apiv1.DeleteTagValueRequest) (*longrunningpb.Operation, error) {
 	id, err := parseTagValueName(req.GetName())
 	if err != nil {
 		return nil, apierr.HandleResourceError(err, "TagValue", req.GetName())
 	}
 
-	existing, err := s.queries.GetTagValue(ctx, id)
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "TagValue", req.GetName())
-	}
-
-	bindingCount, err := s.queries.CountTagBindingsByTagValue(ctx, existing.ID)
-	if err != nil {
-		return nil, apierr.Internal("failed to check tag bindings")
-	}
-	if bindingCount > 0 {
-		return nil, apierr.FailedPrecondition("cannot delete tag value with existing tag bindings")
-	}
-
-	err = s.queries.DeleteTagValue(ctx, existing.ID)
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "TagValue", req.GetName())
+	if err := db.RunInTxVoid(ctx, s.txer, func(qtx db.Querier) error {
+		existing, err := qtx.GetTagValueForUpdate(ctx, id)
+		if err != nil {
+			return apierr.HandleResourceError(err, "TagValue", req.GetName())
+		}
+		bindingCount, err := qtx.CountTagBindingsByTagValue(ctx, existing.ID)
+		if err != nil {
+			return apierr.Internal("failed to check tag bindings")
+		}
+		if bindingCount > 0 {
+			return apierr.FailedPrecondition("cannot delete tag value with existing tag bindings")
+		}
+		if err := qtx.DeleteTagValue(ctx, existing.ID); err != nil {
+			return apierr.HandleResourceError(err, "TagValue", req.GetName())
+		}
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 
 	return lro.DoneOperation(&apiv1.TagValue{})

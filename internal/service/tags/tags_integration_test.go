@@ -48,10 +48,10 @@ func TestIntegration_Tags_FullLifecycle(t *testing.T) {
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
 		apiv1.RegisterTagKeysServer(s, tags.NewTagKeysServer(tags.TagKeysConfig{
-			Pool: pool, Queries: queries, Codec: codec,
+			Pool: pool, TxPool: pool, Queries: queries, Codec: codec,
 		}))
 		apiv1.RegisterTagValuesServer(s, tags.NewTagValuesServer(tags.TagValuesConfig{
-			Pool: pool, Queries: queries, Codec: codec,
+			Pool: pool, TxPool: pool, Queries: queries, Codec: codec,
 		}))
 		apiv1.RegisterTagBindingsServer(s, tags.NewTagBindingsServer(tags.TagBindingsConfig{
 			Pool: pool, Queries: queries, Codec: codec,

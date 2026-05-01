@@ -382,8 +382,24 @@ type Querier interface {
 	GetTagBinding(ctx context.Context, id uuid.UUID) (TagBinding, error)
 	GetTagKey(ctx context.Context, id uuid.UUID) (TagKey, error)
 	GetTagKeyByNamespacedName(ctx context.Context, namespacedName string) (TagKey, error)
+	// GetTagKeyForUpdate is the locking variant used by DeleteTagKey
+	// inside its tx to serialize the empty-check + DELETE against
+	// concurrent CreateTagValue inserts. The FOR UPDATE row lock
+	// conflicts with the FK SHARE lock that a child INSERT takes on
+	// this row — so a concurrent CreateTagValue blocks until our tx
+	// commits or rolls back, eliminating the TOCTOU window between
+	// "no children" and "delete parent".
+	GetTagKeyForUpdate(ctx context.Context, id uuid.UUID) (TagKey, error)
 	GetTagValue(ctx context.Context, id uuid.UUID) (TagValue, error)
 	GetTagValueByNamespacedName(ctx context.Context, namespacedName string) (TagValue, error)
+	// GetTagValueForUpdate is the locking variant used by DeleteTagValue
+	// inside its tx to serialize the empty-check + DELETE against
+	// concurrent CreateTagBinding inserts. The FOR UPDATE row lock
+	// conflicts with the FK SHARE lock that a binding INSERT takes on
+	// this row, so a concurrent CreateTagBinding blocks until our tx
+	// commits — eliminating the TOCTOU window between "no bindings"
+	// and "delete value".
+	GetTagValueForUpdate(ctx context.Context, id uuid.UUID) (TagValue, error)
 	// HardDeleteIdentity removes the identity row entirely. Operator-only
 	// — the public DeleteAccount LRO uses SoftDeleteIdentity (which
 	// preserves the row so historical *_by audit references continue to

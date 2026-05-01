@@ -343,10 +343,10 @@ func serve(cmd *cobra.Command, args []string) error {
 		Encryptor:     enc,
 	}))
 	apiv1.RegisterTagKeysServer(grpcServer, tags.NewTagKeysServer(tags.TagKeysConfig{
-		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
+		Pool: pool, TxPool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
 	}))
 	apiv1.RegisterTagValuesServer(grpcServer, tags.NewTagValuesServer(tags.TagValuesConfig{
-		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
+		Pool: pool, TxPool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
 	}))
 	apiv1.RegisterTagBindingsServer(grpcServer, tags.NewTagBindingsServer(tags.TagBindingsConfig{
 		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,

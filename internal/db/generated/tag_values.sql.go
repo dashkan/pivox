@@ -122,6 +122,37 @@ func (q *Queries) GetTagValueByNamespacedName(ctx context.Context, namespacedNam
 	return i, err
 }
 
+const getTagValueForUpdate = `-- name: GetTagValueForUpdate :one
+SELECT id, tag_key_id, short_name, namespaced_name, description, annotations, etag, revision, created_by, updated_by, create_time, update_time FROM tag_values WHERE id = $1 FOR UPDATE
+`
+
+// GetTagValueForUpdate is the locking variant used by DeleteTagValue
+// inside its tx to serialize the empty-check + DELETE against
+// concurrent CreateTagBinding inserts. The FOR UPDATE row lock
+// conflicts with the FK SHARE lock that a binding INSERT takes on
+// this row, so a concurrent CreateTagBinding blocks until our tx
+// commits — eliminating the TOCTOU window between "no bindings"
+// and "delete value".
+func (q *Queries) GetTagValueForUpdate(ctx context.Context, id uuid.UUID) (TagValue, error) {
+	row := q.db.QueryRow(ctx, getTagValueForUpdate, id)
+	var i TagValue
+	err := row.Scan(
+		&i.ID,
+		&i.TagKeyID,
+		&i.ShortName,
+		&i.NamespacedName,
+		&i.Description,
+		&i.Annotations,
+		&i.Etag,
+		&i.Revision,
+		&i.CreatedBy,
+		&i.UpdatedBy,
+		&i.CreateTime,
+		&i.UpdateTime,
+	)
+	return i, err
+}
+
 const updateTagValue = `-- name: UpdateTagValue :one
 UPDATE tag_values
 SET description = COALESCE($3, description),
