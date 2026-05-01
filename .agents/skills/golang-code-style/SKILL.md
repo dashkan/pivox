@@ -1,12 +1,12 @@
 ---
 name: golang-code-style
-description: "Golang code style, formatting and conventions. Use when writing code, reviewing style, configuring linters, writing comments, or establishing project standards."
-user-invocable: false
+description: "Golang code style, formatting and conventions. Use when writing Go code, reviewing style, configuring linters, writing comments, or establishing project standards."
+user-invocable: true
 license: MIT
 compatibility: Designed for Claude Code or similar AI coding agents, and for projects using Golang.
 metadata:
   author: samber
-  version: "1.1.1"
+  version: "1.1.2"
   openclaw:
     emoji: "🎨"
     homepage: https://github.com/samber/cc-skills-golang
@@ -225,11 +225,12 @@ When reviewing code style across a large codebase, use up to 5 parallel sub-agen
 
 ## Enforce with Linters
 
-Many rules are enforced automatically: `gofmt`, `gofumpt`, `goimports`, `gocritic`, `revive`, `wsl_v5`. → See the `samber/cc-skills-golang@golang-linter` skill.
+Many rules are enforced automatically: `gofmt`, `gofumpt`, `goimports`, `gocritic`, `revive`, `wsl_v5`. → See the `samber/cc-skills-golang@golang-lint` skill.
 
 ## Cross-References
 
 - → See the `samber/cc-skills-golang@golang-naming` skill for identifier naming conventions
 - → See the `samber/cc-skills-golang@golang-structs-interfaces` skill for pointer vs value receivers, interface design
 - → See the `samber/cc-skills-golang@golang-design-patterns` skill for functional options, builders, constructors
-- → See the `samber/cc-skills-golang@golang-linter` skill for automated formatting enforcement
+- → See the `samber/cc-skills-golang@golang-lint` skill for automated formatting enforcement
+- → See `samber/cc-skills-golang@golang-continuous-integration` skill for automated AI-driven code review in CI using these guidelines

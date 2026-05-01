@@ -1,12 +1,12 @@
 ---
 name: golang-concurrency
 description: "Golang concurrency patterns. Use when writing or reviewing concurrent Go code involving goroutines, channels, select, locks, sync primitives, errgroup, singleflight, worker pools, or fan-out/fan-in pipelines. Also triggers when you detect goroutine leaks, race conditions, channel ownership issues, or need to choose between channels and mutexes."
-user-invocable: false
+user-invocable: true
 license: MIT
 compatibility: Designed for Claude Code or similar AI coding agents, and for projects using Golang.
 metadata:
   author: samber
-  version: "1.1.2"
+  version: "1.1.3"
   openclaw:
     emoji: "⚡"
     homepage: https://github.com/samber/cc-skills-golang
@@ -126,6 +126,7 @@ When auditing concurrency across a large codebase, use up to 5 parallel sub-agen
 - -> See `samber/cc-skills-golang@golang-safety` skill for concurrent map access and race condition prevention
 - -> See `samber/cc-skills-golang@golang-troubleshooting` skill for debugging goroutine leaks and deadlocks
 - -> See `samber/cc-skills-golang@golang-design-patterns` skill for graceful shutdown patterns
+- -> See `samber/cc-skills-golang@golang-continuous-integration` skill for automated AI-driven code review in CI using these guidelines
 
 ## References
 

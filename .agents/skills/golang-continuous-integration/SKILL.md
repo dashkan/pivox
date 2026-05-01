@@ -6,7 +6,7 @@ license: MIT
 compatibility: Designed for Claude Code or similar AI coding agents, and for projects using Golang.
 metadata:
   author: samber
-  version: "1.1.2"
+  version: "1.2.0"
   openclaw:
     emoji: "🚀"
     homepage: https://github.com/samber/cc-skills-golang
@@ -29,7 +29,7 @@ allowed-tools: Read Edit Write Glob Grep Bash(go:*) Bash(golangci-lint:*) Bash(g
 
 **Modes:**
 
-- **Setup** — adding CI to a project for the first time: start with the Quick Reference table, then generate workflows in this order: test → lint → security → release. Always check latest action versions before writing YAML.
+- **Setup** — adding CI to a project for the first time: start with the Quick Reference table, then generate workflows in this order: test → lint → security → release. Prefer the latest stable major version for each GitHub Action.
 - **Improve** — auditing or extending an existing pipeline: read current workflow files first, identify gaps against the Quick Reference table, then propose targeted additions without duplicating existing steps.
 
 # Go Continuous Integration
@@ -38,7 +38,7 @@ Set up production-grade CI/CD pipelines for Go projects using GitHub Actions.
 
 ## Action Versions
 
-The versions shown in the examples below are reference versions that may be outdated. Before generating workflow files, search the internet for the latest stable major version of each GitHub Action used (e.g., `actions/checkout`, `actions/setup-go`, `golangci/golangci-lint-action`, `codecov/codecov-action`, `goreleaser/goreleaser-action`, etc.). Use the latest version you find, not the one hardcoded in the examples.
+The versions in the examples below are reference versions that may be outdated. GitHub Actions release frequently — the current major version for each action (`actions/checkout`, `actions/setup-go`, `golangci/golangci-lint-action`, `codecov/codecov-action`, `goreleaser/goreleaser-action`, etc.) may differ from what is shown here.
 
 ## Quick Reference
 
@@ -53,6 +53,7 @@ The versions shown in the examples below are reference versions that may be outd
 | **Docker**    | `docker/build-push-action`  | Multi-platform image builds   |
 | **Deps**      | Dependabot / Renovate       | Automated dependency updates  |
 | **Release**   | GoReleaser                  | Automated binary releases     |
+| **AI Review** | Claude Code / Copilot       | AI-powered PR review          |
 
 ---
 
@@ -98,7 +99,7 @@ Use `-count=1` to disable test caching — cached results can hide flaky service
 
 ### golangci-lint Configuration
 
-Create `.golangci.yml` at the root of the project. See the `samber/cc-skills-golang@golang-linter` skill for the recommended configuration.
+Create `.golangci.yml` at the root of the project. See the `samber/cc-skills-golang@golang-lint` skill for the recommended configuration.
 
 ---
 
@@ -210,6 +211,40 @@ After creating workflow files, ALWAYS tell the developer to configure GitHub rep
 
 ---
 
+## AI-Driven Code Review
+
+Add AI agents as PR reviewers alongside traditional static analysis. When loaded with this skill plugin, the agent applies the relevant Go skills per review area — catching architectural drift, logic bugs, missing error context, and concurrency hazards that linters cannot detect.
+
+> **Cost note:** AI review agents run concurrently per PR. For cost control, remove jobs you don't need or raise the PR trigger filter to specific branches only.
+
+### Claude Code
+
+`.github/workflows/ai-review.yml` — see [claude-code-review.yml](./assets/claude-code-review.yml)
+
+The workflow runs parallel jobs, each scoped to a set of review areas and priority level:
+
+| Job | Areas | Priority |
+| --- | --- | --- |
+| `quality` | Code style, Naming, Documentation, Design patterns | Suggestion-first |
+| `correctness` | Error handling, Code safety, Concurrency | Blocking-first |
+| `security` | Security, Dependencies | Blocking-first |
+| `quality-depth` | Tests, Performance, Observability, Modernize | Mixed |
+
+Depending on your project, also load: `golang-cli`, `golang-context`, `golang-data-structures`, `golang-database`, `golang-dependency-injection`, or any library-specific skill.
+
+Run `/install-github-app` in Claude Code to connect to the Claude API and configure the required secrets.
+
+### GitHub Copilot
+
+Copy skills into your repo, then append [copilot-review-instructions.md](./assets/copilot-review-instructions.md) to `.github/copilot-instructions.md`:
+
+```bash
+npx skills add https://github.com/samber/cc-skills-golang --agent github-copilot --skill '*' -y --copy
+ln -s .agents .copilot
+```
+
+---
+
 ## Common Mistakes
 
 | Mistake | Fix |
@@ -222,7 +257,8 @@ After creating workflow files, ALWAYS tell the developer to configure GitHub rep
 | Not pinning action versions | GitHub Actions MUST use pinned major versions (e.g. `@vN`, not `@master`) |
 | No `permissions` block | Follow least-privilege per job |
 | Ignoring govulncheck findings | Fix or suppress with justification |
+| No AI review in CI | Add Claude Code or Copilot review — catches logic, security, and architectural issues that static analysis misses |
 
 ## Related Skills
 
-See `samber/cc-skills-golang@golang-linter`, `samber/cc-skills-golang@golang-security`, `samber/cc-skills-golang@golang-testing`, `samber/cc-skills-golang@golang-dependency-management` skills.
+See `samber/cc-skills-golang@golang-lint`, `samber/cc-skills-golang@golang-security`, `samber/cc-skills-golang@golang-testing`, `samber/cc-skills-golang@golang-dependency-management`, `samber/cc-skills-golang@golang-modernize` skills.

@@ -6,7 +6,7 @@ license: MIT
 compatibility: Designed for Claude Code or similar AI coding agents, and for projects using Golang.
 metadata:
   author: samber
-  version: "1.1.2"
+  version: "1.1.3"
   openclaw:
     emoji: "🧪"
     homepage: https://github.com/samber/cc-skills-golang
@@ -369,7 +369,7 @@ For mock patterns, test fixtures, and time mocking, see [Mocking](./references/m
 
 ## Enforce with Linters
 
-Many test best practices are enforced automatically by linters: `thelper`, `paralleltest`, `testifylint`. See the `samber/cc-skills-golang@golang-linter` skill for configuration and usage.
+Many test best practices are enforced automatically by linters: `thelper`, `paralleltest`, `testifylint`. See the `samber/cc-skills-golang@golang-lint` skill for configuration and usage.
 
 ## Cross-References
 
@@ -377,7 +377,8 @@ Many test best practices are enforced automatically by linters: `thelper`, `para
 - -> See `samber/cc-skills-golang@golang-database` skill (testing.md) for database integration test patterns
 - -> See `samber/cc-skills-golang@golang-concurrency` skill for goroutine leak detection with goleak
 - -> See `samber/cc-skills-golang@golang-continuous-integration` skill for CI test configuration and GitHub Actions workflows
-- -> See `samber/cc-skills-golang@golang-linter` skill for testifylint and paralleltest configuration
+- -> See `samber/cc-skills-golang@golang-lint` skill for testifylint and paralleltest configuration
+- -> See `samber/cc-skills-golang@golang-continuous-integration` skill for automated AI-driven code review in CI using these guidelines
 
 ## Quick Reference
 
