@@ -276,8 +276,10 @@ func (s *SpacesServer) CreateMember(ctx context.Context, req *iampb.CreateMember
 			CreatedBy: convert.PgUUID(caller),
 		})
 		if err != nil {
-			// FK-violation on the principal column (post-issue-#10
-			// HandleResourceError maps 23503 → NotFound).
+			// See organizations/members.go for the FK reasoning —
+			// only the principal FK can realistically violate, so
+			// HandleResourceError's 23503→NotFound mapping is correct
+			// without constraint-name gating.
 			return nil, apierr.HandleResourceError(err, principalResourceType, principalID.String())
 		}
 		memberID, etag, createTime, updateTime = row.ID, row.Etag, row.CreateTime, row.UpdateTime
@@ -290,8 +292,6 @@ func (s *SpacesServer) CreateMember(ctx context.Context, req *iampb.CreateMember
 			CreatedBy: convert.PgUUID(caller),
 		})
 		if err != nil {
-			// FK-violation on the principal column (post-issue-#10
-			// HandleResourceError maps 23503 → NotFound).
 			return nil, apierr.HandleResourceError(err, principalResourceType, principalID.String())
 		}
 		memberID, etag, createTime, updateTime = row.ID, row.Etag, row.CreateTime, row.UpdateTime

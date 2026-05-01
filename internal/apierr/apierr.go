@@ -153,9 +153,16 @@ func QuotaExceeded(subject, description string, retryDelay time.Duration) error 
 // race cleanly to the client instead of an opaque Internal.
 //
 // Caller passes `resourceType`/`resourceName` we attribute the
-// NotFound to. Extracting which referenced table from
-// `pgErr.ConstraintName` (e.g. `org_members_user_id_fkey` → `User`)
-// would be brittle — caller knows the semantic context, we don't.
+// NotFound to. The mapping is correct in practice because every
+// well-formed handler pre-validates its non-target FKs (caller via
+// AuthInterceptor, role/org via the membership/permission
+// interceptor, etc.) — so a 23503 reaching this function is on the
+// FK the caller named.
+//
+// CREATE handlers where there's NO meaningful FK→NotFound mapping
+// (every FK is pre-validated and any 23503 is a transient race
+// that should surface as Internal) should bypass this function for
+// the FK case and use `IsUniqueViolation` directly.
 //
 // The SQLSTATE checks use `errors.As` against `pgconn.PgError`
 // + structured code constants, NOT substring matches on the error

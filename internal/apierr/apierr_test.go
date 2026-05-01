@@ -212,12 +212,12 @@ func TestHandleResourceError(t *testing.T) {
 			wantCode: codes.AlreadyExists,
 		},
 		{
-			name:     "pgconn FK violation (23503) maps to NotFound",
+			name:     "pgconn FK violation (23503) maps to NotFound when no constraint gating",
 			err:      fkViolation,
 			wantCode: codes.NotFound,
 		},
 		{
-			name:     "wrapped pgconn FK violation maps to NotFound",
+			name:     "wrapped pgconn FK violation maps to NotFound when no constraint gating",
 			err:      fmt.Errorf("insert failed: %w", fkViolation),
 			wantCode: codes.NotFound,
 		},

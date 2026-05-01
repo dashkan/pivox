@@ -261,9 +261,15 @@ func (s *OrganizationsServer) CreateMember(ctx context.Context, req *iampb.Creat
 			CreatedBy: convert.PgUUID(caller),
 		})
 		if err != nil {
-			// Attribute FK violations to the principal resource
-			// (User/Group), not "Member" — the row didn't exist
-			// because the referenced principal didn't exist.
+			// 23503 on this INSERT is reachable only when the user
+			// supplied a non-existent principal UUID (legit case);
+			// every other FK on the row is pre-validated upstream
+			// (caller via AuthInterceptor, role via GetSystemRole,
+			// org via the membership interceptor) and identities/
+			// groups are soft-delete-only at the SQL level, so the
+			// non-principal FKs can't realistically violate.
+			// HandleResourceError maps both pgx.ErrNoRows and 23503
+			// to NotFound on the named resource — correct here.
 			return nil, apierr.HandleResourceError(err, principalResourceType, principalID.String())
 		}
 		memberID, etag, createTime, updateTime = row.ID, row.Etag, row.CreateTime, row.UpdateTime

@@ -107,6 +107,19 @@ func NewOAuthBroker(cfg OAuthBrokerConfig) *OAuthBroker {
 	if cfg.Logger == nil {
 		panic("server: OAuthBrokerConfig.Logger is required")
 	}
+	// Broker is a struct (not a pointer/interface) so a forgotten
+	// caller-side init is invisible to a `nil` panic. Validate the
+	// load-bearing fields directly. AppKey is the most consequential —
+	// an empty AppKey makes signOAuthState/verifyOAuthState HMAC over
+	// a zero-byte key, which would make broker `state` tokens
+	// trivially forgeable. Fail loud on boot rather than ship a
+	// silently-misconfigured broker.
+	if cfg.Broker.AppKey == "" {
+		panic("server: OAuthBrokerConfig.Broker.AppKey is required (forgeable state tokens otherwise)")
+	}
+	if cfg.Broker.BaseURL == "" {
+		panic("server: OAuthBrokerConfig.Broker.BaseURL is required")
+	}
 	return &OAuthBroker{
 		queries:   cfg.Queries,
 		logger:    cfg.Logger,
