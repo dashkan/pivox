@@ -24,6 +24,7 @@ import (
 type AssetsServer struct {
 	assetsv1.UnimplementedAssetsServer
 	db      db.DBTX
+	txer    db.Txer
 	queries db.Querier
 	audit   *audit.Resolver
 }
@@ -32,6 +33,10 @@ type AssetsServer struct {
 type Config struct {
 	// Pool is the database pool used for reads. Required.
 	Pool db.DBTX
+	// TxPool begins transactions for handlers that opt into tx
+	// scoping (CreateAsset's create-then-flip-state pair).
+	// Required. Production wires the same *pgxpool.Pool to both.
+	TxPool db.TxBeginner
 	// Queries is the sqlc query interface. Required.
 	Queries db.Querier
 	// AuditResolver inflates audit-field UUIDs into Actor protos.
@@ -45,11 +50,15 @@ func NewAssetsServer(cfg Config) *AssetsServer {
 	if cfg.Pool == nil {
 		panic("assets: Config.Pool is required")
 	}
+	if cfg.TxPool == nil {
+		panic("assets: Config.TxPool is required")
+	}
 	if cfg.Queries == nil {
 		panic("assets: Config.Queries is required")
 	}
 	return &AssetsServer{
 		db:      cfg.Pool,
+		txer:    &db.PoolTxer{Pool: cfg.TxPool},
 		queries: cfg.Queries,
 		audit:   cfg.AuditResolver,
 	}
@@ -268,25 +277,27 @@ func (s *AssetsServer) CreateAsset(ctx context.Context, req *assetsv1.CreateAsse
 		annotationsJSON = json.RawMessage("{}")
 	}
 
-	result, err := s.queries.CreateAsset(ctx, db.CreateAssetParams{
-		ID:          uuid.New(),
-		SpaceID:     spaceID,
-		EndpointID:  endpointID,
-		Name:        assetName,
-		DisplayName: asset.GetDisplayName(),
-		ImportPath:  "",
-		Filename:    req.GetFilename(),
-		State:       state,
-		Annotations: annotationsJSON,
-		CreatedBy:   pgtype.UUID{},
-	})
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Asset", "")
-	}
-
 	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
 
 	if isPlaceholder {
+		// Single-statement INSERT — autocommit handles atomicity, no
+		// tx needed. Caller controls subsequent state transitions
+		// once the upload pipeline lands.
+		result, err := s.queries.CreateAsset(ctx, db.CreateAssetParams{
+			ID:          uuid.New(),
+			SpaceID:     spaceID,
+			EndpointID:  endpointID,
+			Name:        assetName,
+			DisplayName: asset.GetDisplayName(),
+			ImportPath:  "",
+			Filename:    req.GetFilename(),
+			State:       state,
+			Annotations: annotationsJSON,
+			CreatedBy:   pgtype.UUID{},
+		})
+		if err != nil {
+			return nil, apierr.HandleResourceError(err, "Asset", "")
+		}
 		actors, resolveErr := s.resolveAssetActors(ctx, []db.Asset{result})
 		if resolveErr != nil {
 			slog.WarnContext(ctx, "create asset: actor resolution failed; returning proto without audit actors",
@@ -296,12 +307,42 @@ func (s *AssetsServer) CreateAsset(ctx context.Context, req *assetsv1.CreateAsse
 		return lro.DoneOperation(convert.AssetToProto(result, parentName, actors))
 	}
 
-	// Non-placeholder: for now just mark as ACTIVE (real pipeline later).
-	_ = s.queries.UpdateAssetState(ctx, db.UpdateAssetStateParams{
-		ID:    result.ID,
-		State: db.AssetStateACTIVE,
+	// Non-placeholder synchronous path: INSERT then immediately flip
+	// the row to ACTIVE. The flip is shim code standing in for the
+	// real upload pipeline — track separately. Until that lands, the
+	// two writes need atomicity: a partial failure between INSERT and
+	// UPDATE would leave a row stuck in PROCESSING state with the
+	// caller already returned an error and unable to find the asset
+	// it just created (no name was returned). The tx makes both
+	// writes land or neither.
+	result, err := db.RunInTx(ctx, s.txer, func(qtx db.Querier) (db.Asset, error) {
+		row, err := qtx.CreateAsset(ctx, db.CreateAssetParams{
+			ID:          uuid.New(),
+			SpaceID:     spaceID,
+			EndpointID:  endpointID,
+			Name:        assetName,
+			DisplayName: asset.GetDisplayName(),
+			ImportPath:  "",
+			Filename:    req.GetFilename(),
+			State:       state,
+			Annotations: annotationsJSON,
+			CreatedBy:   pgtype.UUID{},
+		})
+		if err != nil {
+			return db.Asset{}, apierr.HandleResourceError(err, "Asset", "")
+		}
+		if err := qtx.UpdateAssetState(ctx, db.UpdateAssetStateParams{
+			ID:    row.ID,
+			State: db.AssetStateACTIVE,
+		}); err != nil {
+			return db.Asset{}, apierr.Internal("flip asset to ACTIVE")
+		}
+		row.State = db.AssetStateACTIVE
+		return row, nil
 	})
-	result.State = db.AssetStateACTIVE
+	if err != nil {
+		return nil, err
+	}
 	actors, resolveErr := s.resolveAssetActors(ctx, []db.Asset{result})
 	if resolveErr != nil {
 		slog.WarnContext(ctx, "create asset: actor resolution failed; returning proto without audit actors",

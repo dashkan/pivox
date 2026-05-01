@@ -55,7 +55,7 @@ func TestIntegration_Assets_PlaceholderLifecycle(t *testing.T) {
 	defer cleanup()
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		assetsv1.RegisterAssetsServer(s, assets.NewAssetsServer(assets.Config{Pool: pool, Queries: queries}))
+		assetsv1.RegisterAssetsServer(s, assets.NewAssetsServer(assets.Config{Pool: pool, TxPool: pool, Queries: queries}))
 	})
 
 	client := assetsv1.NewAssetsClient(conn)
@@ -145,7 +145,7 @@ func TestIntegration_Assets_ListAssets(t *testing.T) {
 	defer cleanup()
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		assetsv1.RegisterAssetsServer(s, assets.NewAssetsServer(assets.Config{Pool: pool, Queries: queries}))
+		assetsv1.RegisterAssetsServer(s, assets.NewAssetsServer(assets.Config{Pool: pool, TxPool: pool, Queries: queries}))
 	})
 
 	client := assetsv1.NewAssetsClient(conn)
@@ -221,7 +221,7 @@ func TestIntegration_Assets_WithFile(t *testing.T) {
 	defer cleanup()
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		assetsv1.RegisterAssetsServer(s, assets.NewAssetsServer(assets.Config{Pool: pool, Queries: queries}))
+		assetsv1.RegisterAssetsServer(s, assets.NewAssetsServer(assets.Config{Pool: pool, TxPool: pool, Queries: queries}))
 	})
 
 	client := assetsv1.NewAssetsClient(conn)

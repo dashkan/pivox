@@ -376,7 +376,7 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	// Asset and request services
 	assetsv1.RegisterAssetsServer(grpcServer, assets.NewAssetsServer(assets.Config{
-		Pool: pool, Queries: queries, AuditResolver: auditResolver,
+		Pool: pool, TxPool: pool, Queries: queries, AuditResolver: auditResolver,
 	}))
 	assetsv1.RegisterRequestsServer(grpcServer, requests.NewRequestsServer(requests.Config{
 		Pool: pool, Queries: queries, AuditResolver: auditResolver,
