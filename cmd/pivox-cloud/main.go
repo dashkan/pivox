@@ -437,7 +437,7 @@ func serve(cmd *cobra.Command, args []string) error {
 		),
 	)
 	agentv1.RegisterAgentServiceServer(serviceGRPCServer, storage.NewAgentServiceServer(storage.AgentServiceConfig{
-		Queries: queries, Logger: logger, Conns: connMgr,
+		Pool: pool, Queries: queries, Logger: logger, Conns: connMgr,
 	}))
 	reflection.Register(serviceGRPCServer)
 

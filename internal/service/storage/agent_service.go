@@ -24,6 +24,7 @@ import (
 // storage gateway agents connecting to the control plane.
 type AgentServiceServer struct {
 	agentv1.UnimplementedAgentServiceServer
+	txer    db.Txer
 	queries db.Querier
 	logger  *slog.Logger
 	conns   *agentstream.ConnectionManager
@@ -31,7 +32,14 @@ type AgentServiceServer struct {
 
 // AgentServiceConfig is the constructor input for AgentServiceServer.
 type AgentServiceConfig struct {
-	// Queries is the sqlc query interface. Required.
+	// Pool is the database pool used for transactional bootstrap +
+	// disconnect blocks (handshake agent-create/update; disconnect
+	// state flip + connected-count check + gateway state flip).
+	// Required.
+	Pool db.TxBeginner
+	// Queries is the sqlc query interface for non-transactional
+	// reads (auditMessage, single-write paths during the stream
+	// loop). Required.
 	Queries db.Querier
 	// Logger is the structured logger. Required.
 	Logger *slog.Logger
@@ -43,6 +51,9 @@ type AgentServiceConfig struct {
 // NewAgentServiceServer constructs the server from cfg. Panics on a
 // missing required field.
 func NewAgentServiceServer(cfg AgentServiceConfig) *AgentServiceServer {
+	if cfg.Pool == nil {
+		panic("storage: AgentServiceConfig.Pool is required")
+	}
 	if cfg.Queries == nil {
 		panic("storage: AgentServiceConfig.Queries is required")
 	}
@@ -53,9 +64,30 @@ func NewAgentServiceServer(cfg AgentServiceConfig) *AgentServiceServer {
 		panic("storage: AgentServiceConfig.Conns is required")
 	}
 	return &AgentServiceServer{
+		txer:    &db.PoolTxer{Pool: cfg.Pool},
 		queries: cfg.Queries,
 		logger:  cfg.Logger,
 		conns:   cfg.Conns,
+	}
+}
+
+// NewAgentServiceServerForTesting builds an AgentServiceServer wired
+// with a no-tx PassthroughTxer over the supplied Querier. **Test-only.**
+// Callers from tests in other packages (e.g. internal/storageagent)
+// use this to avoid standing up a real pgxpool when the test only
+// needs handshake-shape behavior on a mock Querier.
+//
+// Production code MUST go through NewAgentServiceServer with a real
+// *pgxpool.Pool — PassthroughTxer's no-tx semantics defeat the
+// atomicity that the handshake bootstrap and disconnect cleanup rely
+// on. Code review should reject any production call to this
+// constructor.
+func NewAgentServiceServerForTesting(q db.Querier, logger *slog.Logger, conns *agentstream.ConnectionManager) *AgentServiceServer {
+	return &AgentServiceServer{
+		txer:    &db.PassthroughTxer{Q: q},
+		queries: q,
+		logger:  logger,
+		conns:   conns,
 	}
 }
 
@@ -95,41 +127,53 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 
 	// -----------------------------------------------------------------------
 	// 3. Create or update agent record.
+	//
+	// Tx-wrapped: lookup-then-create-or-update is a classic
+	// read-then-write race. Two concurrent connections from the same
+	// (gateway, ip) — typically a fast reconnect — could both see
+	// pgx.ErrNoRows on the lookup and both try to CreateStorageAgent,
+	// producing duplicate-key violations. The tx serializes the
+	// lookup against the write so the second connection sees the
+	// row written by the first and takes the UPDATE path.
 	// -----------------------------------------------------------------------
-	var agent db.StorageAgent
-
-	existing, lookupErr := s.queries.GetStorageAgentByGatewayAndIP(ctx, db.GetStorageAgentByGatewayAndIPParams{
-		GatewayID: gateway.ID,
-		IpAddress: hs.GetIpAddress(),
-	})
-	if lookupErr != nil && !errors.Is(lookupErr, pgx.ErrNoRows) {
-		s.logger.ErrorContext(ctx, "failed to look up existing agent", "error", lookupErr)
-		return apierr.Internal("failed to look up agent")
-	}
-
-	if errors.Is(lookupErr, pgx.ErrNoRows) {
-		// Create new agent record.
-		agent, err = s.queries.CreateStorageAgent(ctx, db.CreateStorageAgentParams{
-			ID:        uuid.New(),
+	agent, err := db.RunInTx(ctx, s.txer, func(qtx db.Querier) (db.StorageAgent, error) {
+		existing, lookupErr := qtx.GetStorageAgentByGatewayAndIP(ctx, db.GetStorageAgentByGatewayAndIPParams{
 			GatewayID: gateway.ID,
 			IpAddress: hs.GetIpAddress(),
-			Hostname:  hs.GetHostname(),
-			Version:   hs.GetAgentVersion(),
 		})
-		if err != nil {
-			s.logger.ErrorContext(ctx, "failed to create agent", "error", err)
-			return apierr.Internal("failed to create agent record")
+		if lookupErr != nil && !errors.Is(lookupErr, pgx.ErrNoRows) {
+			s.logger.ErrorContext(ctx, "failed to look up existing agent", "error", lookupErr)
+			return db.StorageAgent{}, apierr.Internal("failed to look up agent")
 		}
-	} else {
+
+		if errors.Is(lookupErr, pgx.ErrNoRows) {
+			// Create new agent record.
+			created, err := qtx.CreateStorageAgent(ctx, db.CreateStorageAgentParams{
+				ID:        uuid.New(),
+				GatewayID: gateway.ID,
+				IpAddress: hs.GetIpAddress(),
+				Hostname:  hs.GetHostname(),
+				Version:   hs.GetAgentVersion(),
+			})
+			if err != nil {
+				s.logger.ErrorContext(ctx, "failed to create agent", "error", err)
+				return db.StorageAgent{}, apierr.Internal("failed to create agent record")
+			}
+			return created, nil
+		}
 		// Reconnecting agent -- update state to CONNECTED.
-		agent, err = s.queries.UpdateStorageAgentState(ctx, db.UpdateStorageAgentStateParams{
+		updated, err := qtx.UpdateStorageAgentState(ctx, db.UpdateStorageAgentStateParams{
 			ID:    existing.ID,
 			State: db.AgentStateCONNECTED,
 		})
 		if err != nil {
 			s.logger.ErrorContext(ctx, "failed to update agent state", "error", err)
-			return apierr.Internal("failed to update agent state")
+			return db.StorageAgent{}, apierr.Internal("failed to update agent state")
 		}
+		return updated, nil
+	})
+	if err != nil {
+		return err
 	}
 
 	// -----------------------------------------------------------------------
@@ -261,25 +305,49 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 
 	// -----------------------------------------------------------------------
 	// 12. Stream ended -- handle disconnect.
+	//
+	// Tx-wrapped: the disconnect is a write-then-count-then-conditional-
+	// write sequence. Without the tx, a second agent connecting to
+	// this gateway between our count and our gateway-state UPDATE
+	// would let us flip the gateway to OFFLINE while it's actually
+	// in use. Inside a single tx the count sees a consistent
+	// snapshot post-our-UPDATE, and any concurrent connect/disconnect
+	// serializes around the row locks.
+	//
+	// Errors inside the tx still log + return from the closure;
+	// RunInTx rolls back. We don't surface the error to the gRPC
+	// client (the stream is already ending) but we do want the
+	// log + structured cleanup.
 	// -----------------------------------------------------------------------
-	if _, err := s.queries.UpdateStorageAgentState(ctx, db.UpdateStorageAgentStateParams{
-		ID:    agent.ID,
-		State: db.AgentStateDISCONNECTED,
-	}); err != nil {
-		s.logger.ErrorContext(ctx, "failed to set agent state to DISCONNECTED", "error", err)
-	}
-
-	// Check if all agents for this gateway are now disconnected.
-	connectedCount, err := s.queries.CountConnectedStorageAgentsByGateway(ctx, gateway.ID)
-	if err != nil {
-		s.logger.ErrorContext(ctx, "failed to count connected agents", "error", err)
-	} else if connectedCount == 0 {
-		if err := s.queries.UpdateStorageGatewayState(ctx, db.UpdateStorageGatewayStateParams{
-			ID:    gateway.ID,
-			State: db.StorageGatewayStateOFFLINE,
+	if err := db.RunInTxVoid(ctx, s.txer, func(qtx db.Querier) error {
+		if _, err := qtx.UpdateStorageAgentState(ctx, db.UpdateStorageAgentStateParams{
+			ID:    agent.ID,
+			State: db.AgentStateDISCONNECTED,
 		}); err != nil {
-			s.logger.ErrorContext(ctx, "failed to update gateway state to OFFLINE", "error", err)
+			s.logger.ErrorContext(ctx, "failed to set agent state to DISCONNECTED", "error", err)
+			return err
 		}
+
+		// Check if all agents for this gateway are now disconnected.
+		connectedCount, err := qtx.CountConnectedStorageAgentsByGateway(ctx, gateway.ID)
+		if err != nil {
+			s.logger.ErrorContext(ctx, "failed to count connected agents", "error", err)
+			return err
+		}
+		if connectedCount == 0 {
+			if err := qtx.UpdateStorageGatewayState(ctx, db.UpdateStorageGatewayStateParams{
+				ID:    gateway.ID,
+				State: db.StorageGatewayStateOFFLINE,
+			}); err != nil {
+				s.logger.ErrorContext(ctx, "failed to update gateway state to OFFLINE", "error", err)
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		// Logged inside the closure; tx rolled back. Don't fail the
+		// outer Connect — the client stream is already ending.
+		_ = err
 	}
 
 	s.logger.InfoContext(ctx, "agent disconnected",
