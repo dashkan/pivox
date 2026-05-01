@@ -94,6 +94,38 @@ func (q *Queries) GetArtifactByID(ctx context.Context, id uuid.UUID) (AiArtifact
 	return i, err
 }
 
+const getArtifactByIDForUpdate = `-- name: GetArtifactByIDForUpdate :one
+SELECT id, conversation_id, name, type, title, description, latest_version_id, created_by, updated_by, create_time, update_time FROM ai_artifacts WHERE id = $1 FOR UPDATE
+`
+
+// GetArtifactByIDForUpdate is the locking variant used by
+// DeleteArtifactVersion inside its tx. We already know the parent
+// artifact id from resolveArtifact; take the FOR UPDATE lock on it
+// inside the tx so a concurrent CreateArtifactVersion can't land a
+// new sibling version between our IsOnlyArtifactVersion check and
+// our DELETE — without the lock, we could observe "this is the only
+// version", let a concurrent insert land, then delete our version
+// AND cascade-delete the parent (orphaning the just-inserted
+// sibling, depending on FK semantics).
+func (q *Queries) GetArtifactByIDForUpdate(ctx context.Context, id uuid.UUID) (AiArtifact, error) {
+	row := q.db.QueryRow(ctx, getArtifactByIDForUpdate, id)
+	var i AiArtifact
+	err := row.Scan(
+		&i.ID,
+		&i.ConversationID,
+		&i.Name,
+		&i.Type,
+		&i.Title,
+		&i.Description,
+		&i.LatestVersionID,
+		&i.CreatedBy,
+		&i.UpdatedBy,
+		&i.CreateTime,
+		&i.UpdateTime,
+	)
+	return i, err
+}
+
 const getArtifactByName = `-- name: GetArtifactByName :one
 SELECT id, conversation_id, name, type, title, description, latest_version_id, created_by, updated_by, create_time, update_time FROM ai_artifacts WHERE conversation_id = $1 AND name = $2
 `
@@ -105,6 +137,40 @@ type GetArtifactByNameParams struct {
 
 func (q *Queries) GetArtifactByName(ctx context.Context, arg GetArtifactByNameParams) (AiArtifact, error) {
 	row := q.db.QueryRow(ctx, getArtifactByName, arg.ConversationID, arg.Name)
+	var i AiArtifact
+	err := row.Scan(
+		&i.ID,
+		&i.ConversationID,
+		&i.Name,
+		&i.Type,
+		&i.Title,
+		&i.Description,
+		&i.LatestVersionID,
+		&i.CreatedBy,
+		&i.UpdatedBy,
+		&i.CreateTime,
+		&i.UpdateTime,
+	)
+	return i, err
+}
+
+const getArtifactByNameForUpdate = `-- name: GetArtifactByNameForUpdate :one
+SELECT id, conversation_id, name, type, title, description, latest_version_id, created_by, updated_by, create_time, update_time FROM ai_artifacts WHERE conversation_id = $1 AND name = $2 FOR UPDATE
+`
+
+type GetArtifactByNameForUpdateParams struct {
+	ConversationID uuid.UUID `json:"conversation_id"`
+	Name           string    `json:"name"`
+}
+
+// GetArtifactByNameForUpdate is the locking variant used by
+// DeleteArtifact (force=false) inside its tx. The FOR UPDATE row
+// lock conflicts with the FK SHARE lock that a concurrent
+// CreateArtifactVersion takes on this artifact, so a concurrent
+// version-create blocks until our tx resolves — eliminating the
+// TOCTOU window between "no versions" and "delete artifact".
+func (q *Queries) GetArtifactByNameForUpdate(ctx context.Context, arg GetArtifactByNameForUpdateParams) (AiArtifact, error) {
+	row := q.db.QueryRow(ctx, getArtifactByNameForUpdate, arg.ConversationID, arg.Name)
 	var i AiArtifact
 	err := row.Scan(
 		&i.ID,

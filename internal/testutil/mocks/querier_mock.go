@@ -1037,7 +1037,17 @@ func (m *MockQuerier) GetArtifactByID(ctx context.Context, id uuid.UUID) (db.AiA
 	return args.Get(0).(db.AiArtifact), args.Error(1)
 }
 
+func (m *MockQuerier) GetArtifactByIDForUpdate(ctx context.Context, id uuid.UUID) (db.AiArtifact, error) {
+	args := m.Called(ctx, id)
+	return args.Get(0).(db.AiArtifact), args.Error(1)
+}
+
 func (m *MockQuerier) GetArtifactByName(ctx context.Context, arg db.GetArtifactByNameParams) (db.AiArtifact, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.AiArtifact), args.Error(1)
+}
+
+func (m *MockQuerier) GetArtifactByNameForUpdate(ctx context.Context, arg db.GetArtifactByNameForUpdateParams) (db.AiArtifact, error) {
 	args := m.Called(ctx, arg)
 	return args.Get(0).(db.AiArtifact), args.Error(1)
 }

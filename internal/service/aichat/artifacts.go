@@ -102,6 +102,18 @@ func (s *Server) ListArtifacts(ctx context.Context, req *aiv1.ListArtifactsReque
 	}, nil
 }
 
+// DeleteArtifact removes an artifact. Two paths:
+//
+//   - force=false: refuse if any versions exist; otherwise DELETE.
+//   - force=true: skip the precondition; FK ON DELETE CASCADE on
+//     ai_artifact_versions handles the rest.
+//
+// Tx scope (force=false only): lock the artifact row FOR UPDATE
+// inside the tx, count children inside the same tx, DELETE on
+// empty. Without the lock a concurrent CreateArtifactVersion could
+// land between count and DELETE. force=true takes no lock — the
+// cascade is unconditional, so the precondition window doesn't
+// matter.
 func (s *Server) DeleteArtifact(ctx context.Context, req *aiv1.DeleteArtifactRequest) (*emptypb.Empty, error) {
 	orgName, pathUser, convName, artName, err := parseArtifactName(req.GetName())
 	if err != nil {
@@ -115,26 +127,41 @@ func (s *Server) DeleteArtifact(ctx context.Context, req *aiv1.DeleteArtifactReq
 		return nil, err
 	}
 
-	row, err := s.queries.GetArtifactByName(ctx, db.GetArtifactByNameParams{
-		ConversationID: conv.ID,
-		Name:           artName,
-	})
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Artifact", req.GetName())
+	if req.GetForce() {
+		row, err := s.queries.GetArtifactByName(ctx, db.GetArtifactByNameParams{
+			ConversationID: conv.ID,
+			Name:           artName,
+		})
+		if err != nil {
+			return nil, apierr.HandleResourceError(err, "Artifact", req.GetName())
+		}
+		if err := s.queries.DeleteArtifact(ctx, row.ID); err != nil {
+			return nil, apierr.HandleResourceError(err, "Artifact", req.GetName())
+		}
+		return &emptypb.Empty{}, nil
 	}
 
-	if !req.GetForce() {
-		count, err := s.queries.CountArtifactVersionsByArtifact(ctx, row.ID)
+	if err := db.RunInTxVoid(ctx, s.txer, func(qtx db.Querier) error {
+		row, err := qtx.GetArtifactByNameForUpdate(ctx, db.GetArtifactByNameForUpdateParams{
+			ConversationID: conv.ID,
+			Name:           artName,
+		})
 		if err != nil {
-			return nil, apierr.Internal("database error")
+			return apierr.HandleResourceError(err, "Artifact", req.GetName())
+		}
+		count, err := qtx.CountArtifactVersionsByArtifact(ctx, row.ID)
+		if err != nil {
+			return apierr.Internal("database error")
 		}
 		if count > 0 {
-			return nil, apierr.FailedPrecondition(fmt.Sprintf("artifact has %d version(s); set force=true to delete", count))
+			return apierr.FailedPrecondition(fmt.Sprintf("artifact has %d version(s); set force=true to delete", count))
 		}
-	}
-
-	if err := s.queries.DeleteArtifact(ctx, row.ID); err != nil {
-		return nil, apierr.HandleResourceError(err, "Artifact", req.GetName())
+		if err := qtx.DeleteArtifact(ctx, row.ID); err != nil {
+			return apierr.HandleResourceError(err, "Artifact", req.GetName())
+		}
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 
 	return &emptypb.Empty{}, nil

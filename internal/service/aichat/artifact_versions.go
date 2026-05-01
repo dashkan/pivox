@@ -110,6 +110,21 @@ func (s *Server) ListArtifactVersions(ctx context.Context, req *aiv1.ListArtifac
 	}, nil
 }
 
+// DeleteArtifactVersion removes a single version. If the deleted
+// version was the artifact's only version, the parent artifact is
+// cascade-deleted too.
+//
+// Tx scope: lock the parent artifact FOR UPDATE inside the tx,
+// then look up the version, check IsOnlyArtifactVersion, delete
+// the version, and (if it was the only one) delete the parent.
+// Without the parent lock, a concurrent CreateArtifactVersion
+// could land between IsOnlyArtifactVersion and our two DELETEs —
+// leading us to observe "this is the only version", then delete
+// our version AND cascade-delete the parent, orphaning (or
+// CASCADE-removing) the just-inserted sibling. Holding FOR UPDATE
+// on the parent conflicts with the FK SHARE lock that a concurrent
+// version-INSERT takes, so the insert queues until our tx
+// resolves.
 func (s *Server) DeleteArtifactVersion(ctx context.Context, req *aiv1.DeleteArtifactVersionRequest) (*emptypb.Empty, error) {
 	orgName, pathUser, convName, artName, verName, err := parseArtifactVersionName(req.GetName())
 	if err != nil {
@@ -121,29 +136,48 @@ func (s *Server) DeleteArtifactVersion(ctx context.Context, req *aiv1.DeleteArti
 		return nil, err
 	}
 
-	ver, err := s.queries.GetArtifactVersionByName(ctx, db.GetArtifactVersionByNameParams{
-		ArtifactID: art.ID,
-		Name:       verName,
-	})
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "ArtifactVersion", req.GetName())
-	}
-
-	isOnly, err := s.queries.IsOnlyArtifactVersion(ctx, art.ID)
-	if err != nil {
-		return nil, apierr.Internal("database error")
-	}
-
-	if err := s.queries.DeleteArtifactVersion(ctx, ver.ID); err != nil {
-		return nil, apierr.HandleResourceError(err, "ArtifactVersion", req.GetName())
-	}
-
-	if isOnly {
-		if err := s.queries.DeleteArtifact(ctx, art.ID); err != nil {
-			s.logger.Warn("failed to cascade delete parent artifact",
-				"artifact", buildArtifactName(orgName, pathUser, convName, artName),
-				"error", err)
+	cascaded := false
+	if err := db.RunInTxVoid(ctx, s.txer, func(qtx db.Querier) error {
+		// Re-read parent under FOR UPDATE inside the tx so concurrent
+		// CreateArtifactVersion blocks until we're done. We don't use
+		// the row beyond confirming it still exists; resolveArtifact
+		// already fed us the id we need.
+		if _, err := qtx.GetArtifactByIDForUpdate(ctx, art.ID); err != nil {
+			return apierr.HandleResourceError(err, "Artifact", buildArtifactName(orgName, pathUser, convName, artName))
 		}
+		ver, err := qtx.GetArtifactVersionByName(ctx, db.GetArtifactVersionByNameParams{
+			ArtifactID: art.ID,
+			Name:       verName,
+		})
+		if err != nil {
+			return apierr.HandleResourceError(err, "ArtifactVersion", req.GetName())
+		}
+		isOnly, err := qtx.IsOnlyArtifactVersion(ctx, art.ID)
+		if err != nil {
+			return apierr.Internal("database error")
+		}
+		if err := qtx.DeleteArtifactVersion(ctx, ver.ID); err != nil {
+			return apierr.HandleResourceError(err, "ArtifactVersion", req.GetName())
+		}
+		if isOnly {
+			if err := qtx.DeleteArtifact(ctx, art.ID); err != nil {
+				// Inside the tx: a failure to cascade is now fatal.
+				// Previously this only logged a warning because the
+				// version was already gone — but with the parent lock
+				// held the cascade is the same atomic step as the
+				// version delete, so a partial failure leaves an
+				// inconsistent state we should surface (and roll back).
+				return apierr.Internal("cascade delete parent artifact")
+			}
+			cascaded = true
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	if cascaded {
+		s.logger.Info("cascaded parent artifact deletion",
+			"artifact", buildArtifactName(orgName, pathUser, convName, artName))
 	}
 
 	return &emptypb.Empty{}, nil

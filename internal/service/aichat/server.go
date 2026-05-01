@@ -22,6 +22,7 @@ import (
 type Server struct {
 	aiv1.UnimplementedAiChatServer
 	db                    db.DBTX
+	txer                  db.Txer
 	queries               db.Querier
 	model                 model.LanguageModel
 	tools                 *tools.Registry
@@ -119,8 +120,14 @@ func (s *Server) getArtifactVersionForContent(ctx context.Context, params db.Get
 // can only act on their own conversations; an admin/owner can
 // audit/clean up any user's.
 type Config struct {
-	// Pool is the database pool used for reads. Required.
+	// Pool is the database pool used for reads (filter.Query +
+	// non-tx query paths). Required.
 	Pool db.DBTX
+	// TxPool begins transactions for handlers that opt into tx
+	// scoping (DeleteArtifact non-force path; DeleteArtifactVersion
+	// IsOnlyArtifactVersion + cascade). Required. Production wires
+	// the same *pgxpool.Pool to both Pool and TxPool.
+	TxPool db.TxBeginner
 	// Queries is the sqlc query interface. Required.
 	Queries db.Querier
 	// Model is the LLM backing the chat handlers. Required.
@@ -147,6 +154,9 @@ func NewServer(cfg Config) *Server {
 	if cfg.Pool == nil {
 		panic("aichat: Config.Pool is required")
 	}
+	if cfg.TxPool == nil {
+		panic("aichat: Config.TxPool is required")
+	}
 	if cfg.Queries == nil {
 		panic("aichat: Config.Queries is required")
 	}
@@ -165,6 +175,7 @@ func NewServer(cfg Config) *Server {
 	}
 	return &Server{
 		db:                    cfg.Pool,
+		txer:                  &db.PoolTxer{Pool: cfg.TxPool},
 		queries:               cfg.Queries,
 		model:                 cfg.Model,
 		tools:                 toolRegistry,

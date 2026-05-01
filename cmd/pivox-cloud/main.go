@@ -392,6 +392,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	toolRegistry := tools.NewRegistry()
 	aiChatServer := aichat.NewServer(aichat.Config{
 		Pool:          pool,
+		TxPool:        pool,
 		Queries:       queries,
 		Model:         llm,
 		Tools:         toolRegistry,
