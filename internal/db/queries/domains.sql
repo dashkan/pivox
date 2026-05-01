@@ -19,6 +19,18 @@ SELECT * FROM domains WHERE id = $1 AND org_id = $2;
 -- name: GetDomainByName :one
 SELECT * FROM domains WHERE domain = $1 AND org_id = $2;
 
+-- GetDomainByNameForUpdate is the locking variant used by
+-- DeleteDomain inside its tx. The verify-domain worker mutates
+-- domains.state without taking any application-level lock, so a
+-- concurrent MarkDomainVerified can flip a row from PENDING to
+-- VERIFIED between our SELECT and our DELETE — and the caller's
+-- last-verified-domain precondition only fires on rows we observed
+-- as VERIFIED at SELECT time. Locking the row FOR UPDATE forces
+-- the worker's UPDATE to block until our tx resolves, so we always
+-- evaluate the precondition against the row's actual current state.
+-- name: GetDomainByNameForUpdate :one
+SELECT * FROM domains WHERE domain = $1 AND org_id = $2 FOR UPDATE;
+
 -- ListDomainsByOrg returns all domains for an org, oldest-first.
 -- 100-row LIMIT is a defensive backstop; the typical org has a
 -- handful of claimed domains.

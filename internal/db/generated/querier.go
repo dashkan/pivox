@@ -280,6 +280,16 @@ type Querier interface {
 	// segment (the domain string) to a row, scoped to org. Used by
 	// GetDomain handler.
 	GetDomainByName(ctx context.Context, arg GetDomainByNameParams) (Domain, error)
+	// GetDomainByNameForUpdate is the locking variant used by
+	// DeleteDomain inside its tx. The verify-domain worker mutates
+	// domains.state without taking any application-level lock, so a
+	// concurrent MarkDomainVerified can flip a row from PENDING to
+	// VERIFIED between our SELECT and our DELETE — and the caller's
+	// last-verified-domain precondition only fires on rows we observed
+	// as VERIFIED at SELECT time. Locking the row FOR UPDATE forces
+	// the worker's UPDATE to block until our tx resolves, so we always
+	// evaluate the precondition against the row's actual current state.
+	GetDomainByNameForUpdate(ctx context.Context, arg GetDomainByNameForUpdateParams) (Domain, error)
 	// Returns the system-role names an identity has at the given org,
 	// considering both direct user bindings (org_members.user_id) and
 	// group-derived bindings (org_members.group_id matching a group the

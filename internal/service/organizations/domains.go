@@ -320,7 +320,12 @@ func (s *OrganizationsServer) DeleteDomain(ctx context.Context, req *apiv1.Delet
 		cancelledIDs []uuid.UUID
 	}
 	res, err := db.RunInTx(ctx, s.txer, func(qtx db.Querier) (result, error) {
-		row, err := qtx.GetDomainByName(ctx, db.GetDomainByNameParams{
+		// FOR UPDATE: the verify-domain worker mutates domains.state
+		// without taking an application-level lock, so reading without
+		// the row lock would let MarkDomainVerified flip PENDING to
+		// VERIFIED between our SELECT and our DELETE — bypassing the
+		// VERIFIED-only branch of the precondition below.
+		row, err := qtx.GetDomainByNameForUpdate(ctx, db.GetDomainByNameForUpdateParams{
 			Domain: domainStr, OrgID: resolvedOrg.ID,
 		})
 		if err != nil {

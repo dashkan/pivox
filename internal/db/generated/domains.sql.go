@@ -201,6 +201,44 @@ func (q *Queries) GetDomainByName(ctx context.Context, arg GetDomainByNameParams
 	return i, err
 }
 
+const getDomainByNameForUpdate = `-- name: GetDomainByNameForUpdate :one
+SELECT id, org_id, domain, verification_token, state, etag, revision, created_by, updated_by, create_time, update_time, verified_time FROM domains WHERE domain = $1 AND org_id = $2 FOR UPDATE
+`
+
+type GetDomainByNameForUpdateParams struct {
+	Domain string    `json:"domain"`
+	OrgID  uuid.UUID `json:"org_id"`
+}
+
+// GetDomainByNameForUpdate is the locking variant used by
+// DeleteDomain inside its tx. The verify-domain worker mutates
+// domains.state without taking any application-level lock, so a
+// concurrent MarkDomainVerified can flip a row from PENDING to
+// VERIFIED between our SELECT and our DELETE — and the caller's
+// last-verified-domain precondition only fires on rows we observed
+// as VERIFIED at SELECT time. Locking the row FOR UPDATE forces
+// the worker's UPDATE to block until our tx resolves, so we always
+// evaluate the precondition against the row's actual current state.
+func (q *Queries) GetDomainByNameForUpdate(ctx context.Context, arg GetDomainByNameForUpdateParams) (Domain, error) {
+	row := q.db.QueryRow(ctx, getDomainByNameForUpdate, arg.Domain, arg.OrgID)
+	var i Domain
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.Domain,
+		&i.VerificationToken,
+		&i.State,
+		&i.Etag,
+		&i.Revision,
+		&i.CreatedBy,
+		&i.UpdatedBy,
+		&i.CreateTime,
+		&i.UpdateTime,
+		&i.VerifiedTime,
+	)
+	return i, err
+}
+
 const listDomainsByOrg = `-- name: ListDomainsByOrg :many
 SELECT id, org_id, domain, verification_token, state, etag, revision, created_by, updated_by, create_time, update_time, verified_time FROM domains WHERE org_id = $1 ORDER BY create_time ASC LIMIT 100
 `

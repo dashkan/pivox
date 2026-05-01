@@ -237,6 +237,11 @@ func (m *MockQuerier) GetDomainByName(ctx context.Context, arg db.GetDomainByNam
 	return args.Get(0).(db.Domain), args.Error(1)
 }
 
+func (m *MockQuerier) GetDomainByNameForUpdate(ctx context.Context, arg db.GetDomainByNameForUpdateParams) (db.Domain, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.Domain), args.Error(1)
+}
+
 func (m *MockQuerier) ListDomainsByOrg(ctx context.Context, orgID uuid.UUID) ([]db.Domain, error) {
 	args := m.Called(ctx, orgID)
 	return args.Get(0).([]db.Domain), args.Error(1)

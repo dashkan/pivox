@@ -149,7 +149,7 @@ func TestCreateDomain_AlreadyExistsHidesHoldingOrg(t *testing.T) {
 
 func TestDeleteDomain_NotFound(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	q.On("GetDomainByName", mock.Anything, mock.Anything).Return(db.Domain{}, pgx.ErrNoRows)
+	q.On("GetDomainByNameForUpdate", mock.Anything, mock.Anything).Return(db.Domain{}, pgx.ErrNoRows)
 	srv := &OrganizationsServer{txer: &db.PassthroughTxer{Q: q}, queries: q}
 	ctx := server.WithResolvedOrgForTest(context.Background(), &server.ResolvedOrg{
 		ID: uuid.MustParse("0192a000-aaaa-7000-8000-000000000001"), Slug: "acme",
@@ -161,7 +161,7 @@ func TestDeleteDomain_NotFound(t *testing.T) {
 
 func TestDeleteDomain_EtagMismatch(t *testing.T) {
 	q := new(mocks.MockQuerier)
-	q.On("GetDomainByName", mock.Anything, mock.Anything).Return(db.Domain{
+	q.On("GetDomainByNameForUpdate", mock.Anything, mock.Anything).Return(db.Domain{
 		Domain: "x.com", Etag: "actual",
 	}, nil)
 	srv := &OrganizationsServer{txer: &db.PassthroughTxer{Q: q}, queries: q}
@@ -179,7 +179,7 @@ func TestDeleteDomain_EtagMismatch(t *testing.T) {
 func TestDeleteDomain_LastVerifiedOnEnabledSSORefuses(t *testing.T) {
 	orgID := uuid.MustParse("0192a000-aaaa-7000-8000-000000000001")
 	q := new(mocks.MockQuerier)
-	q.On("GetDomainByName", mock.Anything, mock.Anything).Return(db.Domain{
+	q.On("GetDomainByNameForUpdate", mock.Anything, mock.Anything).Return(db.Domain{
 		ID:     uuid.MustParse("0192a000-bbbb-7000-8000-000000000002"),
 		Domain: "x.com", State: db.DomainStateVERIFIED,
 	}, nil)
@@ -202,7 +202,7 @@ func TestDeleteDomain_VerifiedWithExtraVerifiedAllowed(t *testing.T) {
 	orgID := uuid.MustParse("0192a000-aaaa-7000-8000-000000000001")
 	domainID := uuid.MustParse("0192a000-bbbb-7000-8000-000000000002")
 	q := new(mocks.MockQuerier)
-	q.On("GetDomainByName", mock.Anything, mock.Anything).Return(db.Domain{
+	q.On("GetDomainByNameForUpdate", mock.Anything, mock.Anything).Return(db.Domain{
 		ID: domainID, Domain: "x.com", State: db.DomainStateVERIFIED, Etag: "v1",
 	}, nil)
 	q.On("GetSsoConfigByOrgIDForUpdate", mock.Anything, orgID).Return(db.SsoConfig{Enabled: true}, nil)
@@ -228,7 +228,7 @@ func TestDeleteDomain_NoSsoConfigSkipsGuard(t *testing.T) {
 	orgID := uuid.MustParse("0192a000-aaaa-7000-8000-000000000001")
 	domainID := uuid.MustParse("0192a000-bbbb-7000-8000-000000000002")
 	q := new(mocks.MockQuerier)
-	q.On("GetDomainByName", mock.Anything, mock.Anything).Return(db.Domain{
+	q.On("GetDomainByNameForUpdate", mock.Anything, mock.Anything).Return(db.Domain{
 		ID: domainID, Domain: "x.com", State: db.DomainStateVERIFIED,
 	}, nil)
 	q.On("GetSsoConfigByOrgIDForUpdate", mock.Anything, orgID).Return(db.SsoConfig{}, pgx.ErrNoRows)
@@ -251,7 +251,7 @@ func TestDeleteDomain_PendingRowSkipsSSO(t *testing.T) {
 	orgID := uuid.MustParse("0192a000-aaaa-7000-8000-000000000001")
 	domainID := uuid.MustParse("0192a000-bbbb-7000-8000-000000000002")
 	q := new(mocks.MockQuerier)
-	q.On("GetDomainByName", mock.Anything, mock.Anything).Return(db.Domain{
+	q.On("GetDomainByNameForUpdate", mock.Anything, mock.Anything).Return(db.Domain{
 		ID: domainID, Domain: "x.com", State: db.DomainStatePENDING,
 	}, nil)
 	q.On("CancelDomainOpsForDomain", mock.Anything, mock.Anything).Return([]uuid.UUID{}, nil)
@@ -272,7 +272,7 @@ func TestDeleteDomain_CancelOpsFailureSurfacesInternal(t *testing.T) {
 	// running against a deleted row.
 	orgID := uuid.MustParse("0192a000-aaaa-7000-8000-000000000001")
 	q := new(mocks.MockQuerier)
-	q.On("GetDomainByName", mock.Anything, mock.Anything).Return(db.Domain{
+	q.On("GetDomainByNameForUpdate", mock.Anything, mock.Anything).Return(db.Domain{
 		Domain: "x.com", State: db.DomainStatePENDING,
 	}, nil)
 	q.On("CancelDomainOpsForDomain", mock.Anything, mock.Anything).Return([]uuid.UUID{}, errors.New("db down"))
