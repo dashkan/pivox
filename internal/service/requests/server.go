@@ -24,13 +24,21 @@ import (
 
 type RequestsServer struct {
 	assetsv1.UnimplementedRequestsServer
+	txer    db.Txer
 	queries db.Querier
 	audit   *audit.Resolver
 }
 
 // Config is the constructor input for RequestsServer.
 type Config struct {
-	// Queries is the sqlc query interface. Required.
+	// Pool is the database pool used to begin transactions for
+	// multi-step write paths (CreateRequest fans out to
+	// CreateRequest + CreateAsset + CreateLineItem per line item).
+	// Required. Wrapped in a *db.PoolTxer internally; unit tests
+	// that need mock-Querier-level control should construct the
+	// server struct literal directly with a *db.PassthroughTxer.
+	Pool db.TxBeginner
+	// Queries is the sqlc query interface for read paths. Required.
 	Queries db.Querier
 	// AuditResolver inflates audit-field UUIDs into Actor protos.
 	// Optional; nil leaves Actor fields unset.
@@ -40,10 +48,14 @@ type Config struct {
 // NewRequestsServer constructs the server from cfg. Panics on a
 // missing required field.
 func NewRequestsServer(cfg Config) *RequestsServer {
+	if cfg.Pool == nil {
+		panic("requests: Config.Pool is required")
+	}
 	if cfg.Queries == nil {
 		panic("requests: Config.Queries is required")
 	}
 	return &RequestsServer{
+		txer:    &db.PoolTxer{Pool: cfg.Pool},
 		queries: cfg.Queries,
 		audit:   cfg.AuditResolver,
 	}
@@ -286,74 +298,89 @@ func (s *RequestsServer) CreateRequest(ctx context.Context, req *assetsv1.Create
 	}
 
 	caller := convert.PgUUID(server.MustPivoxUserID(ctx))
-	result, err := s.queries.CreateRequest(ctx, db.CreateRequestParams{
-		ID:          uuid.New(),
-		SpaceID:     spaceID,
-		Name:        requestName,
-		DisplayName: request.GetDisplayName(),
-		Description: request.GetDescription(),
-		State:       db.RequestStateDRAFT,
-		Priority:    priority,
-		Assignee:    request.GetAssignee(),
-		DueTime:     dueTime,
-		CreatedBy:   caller,
+
+	// Tx-wrapped: a single CreateRequest fans out to (1) the request
+	// row, (2) one CreateAsset per line item, and (3) one
+	// CreateLineItem per line item. Without the tx, a failure in
+	// iteration k would leave k assets + k-1 line items + the request
+	// row committed individually — a half-built request the client
+	// is told doesn't exist. RunInTx rolls everything back as a
+	// single unit on any failure inside the closure.
+	result, err := db.RunInTx(ctx, s.txer, func(qtx db.Querier) (db.AssetRequest, error) {
+		req, err := qtx.CreateRequest(ctx, db.CreateRequestParams{
+			ID:          uuid.New(),
+			SpaceID:     spaceID,
+			Name:        requestName,
+			DisplayName: request.GetDisplayName(),
+			Description: request.GetDescription(),
+			State:       db.RequestStateDRAFT,
+			Priority:    priority,
+			Assignee:    request.GetAssignee(),
+			DueTime:     dueTime,
+			CreatedBy:   caller,
+		})
+		if err != nil {
+			return db.AssetRequest{}, apierr.HandleResourceError(err, "Request", "")
+		}
+
+		// Create line items and placeholder assets for each.
+		for _, li := range request.GetLineItems() {
+			lineItemName := uuid.New().String()[:12]
+			assetName := uuid.New().String()[:12]
+
+			// Create placeholder asset.
+			asset, err := qtx.CreateAsset(ctx, db.CreateAssetParams{
+				ID:          uuid.New(),
+				SpaceID:     spaceID,
+				Name:        assetName,
+				DisplayName: li.GetDisplayName(),
+				State:       db.AssetStatePLACEHOLDER,
+				Annotations: json.RawMessage("{}"),
+				CreatedBy:   caller,
+			})
+			if err != nil {
+				return db.AssetRequest{}, apierr.HandleResourceError(err, "Asset", "")
+			}
+
+			var mediaType db.NullAssetMediaType
+			if li.GetMediaType() != assetsv1.Asset_MEDIA_TYPE_UNSPECIFIED {
+				mediaType = db.NullAssetMediaType{
+					AssetMediaType: db.AssetMediaType(li.GetMediaType().String()),
+					Valid:          true,
+				}
+			}
+
+			var liAnnotations json.RawMessage
+			if ann := li.GetAnnotations(); ann != nil {
+				liAnnotations, _ = json.Marshal(ann)
+			} else {
+				liAnnotations = json.RawMessage("{}")
+			}
+
+			if _, err := qtx.CreateLineItem(ctx, db.CreateLineItemParams{
+				ID:          uuid.New(),
+				RequestID:   req.ID,
+				AssetID:     pgtype.UUID{Bytes: asset.ID, Valid: true},
+				Name:        lineItemName,
+				DisplayName: li.GetDisplayName(),
+				Description: li.GetDescription(),
+				MediaType:   mediaType,
+				Annotations: liAnnotations,
+				CreatedBy:   caller,
+			}); err != nil {
+				return db.AssetRequest{}, apierr.HandleResourceError(err, "LineItem", "")
+			}
+		}
+		return req, nil
 	})
 	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Request", "")
+		return nil, err
 	}
 
 	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
 
-	// Create line items and placeholder assets for each.
-	for _, li := range request.GetLineItems() {
-		lineItemName := uuid.New().String()[:12]
-		assetName := uuid.New().String()[:12]
-
-		// Create placeholder asset.
-		asset, err := s.queries.CreateAsset(ctx, db.CreateAssetParams{
-			ID:          uuid.New(),
-			SpaceID:     spaceID,
-			Name:        assetName,
-			DisplayName: li.GetDisplayName(),
-			State:       db.AssetStatePLACEHOLDER,
-			Annotations: json.RawMessage("{}"),
-			CreatedBy:   caller,
-		})
-		if err != nil {
-			return nil, apierr.HandleResourceError(err, "Asset", "")
-		}
-
-		var mediaType db.NullAssetMediaType
-		if li.GetMediaType() != assetsv1.Asset_MEDIA_TYPE_UNSPECIFIED {
-			mediaType = db.NullAssetMediaType{
-				AssetMediaType: db.AssetMediaType(li.GetMediaType().String()),
-				Valid:          true,
-			}
-		}
-
-		var liAnnotations json.RawMessage
-		if ann := li.GetAnnotations(); ann != nil {
-			liAnnotations, _ = json.Marshal(ann)
-		} else {
-			liAnnotations = json.RawMessage("{}")
-		}
-
-		_, err = s.queries.CreateLineItem(ctx, db.CreateLineItemParams{
-			ID:          uuid.New(),
-			RequestID:   result.ID,
-			AssetID:     pgtype.UUID{Bytes: asset.ID, Valid: true},
-			Name:        lineItemName,
-			DisplayName: li.GetDisplayName(),
-			Description: li.GetDescription(),
-			MediaType:   mediaType,
-			Annotations: liAnnotations,
-			CreatedBy:   caller,
-		})
-		if err != nil {
-			return nil, apierr.HandleResourceError(err, "LineItem", "")
-		}
-	}
-
+	// Post-commit enrichment — Actor resolution lives outside the tx
+	// per RunInTx's contract; treat as best-effort.
 	actors, resolveErr := s.resolveRequestActors(ctx, []db.AssetRequest{result})
 	if resolveErr != nil {
 		slog.WarnContext(ctx, "request: actor resolution failed; returning proto without audit actors", "request_id", result.ID, "error", resolveErr)

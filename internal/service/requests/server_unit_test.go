@@ -61,7 +61,14 @@ func setupRequestFixture(t *testing.T) requestFixture {
 		requestID: uuid.New(),
 		mockQ:     new(mocks.MockQuerier),
 	}
-	f.server = &RequestsServer{queries: f.mockQ}
+	// PassthroughTxer runs RunInTx closures against the mock querier
+	// directly, no real pgx tx involved. Lets unit tests assert on
+	// individual q.On(...) expectations without faking the whole
+	// pgx.Tx surface. NEVER use this in production wiring.
+	f.server = &RequestsServer{
+		txer:    &db.PassthroughTxer{Q: f.mockQ},
+		queries: f.mockQ,
+	}
 	return f
 }
 

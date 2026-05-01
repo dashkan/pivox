@@ -1,12 +1,12 @@
 // Hand-written, NOT sqlc-generated. Lives in this package so the
-// transaction helper is co-located with the Querier interface it
-// produces. sqlc only writes files it generates, so this file is
+// transaction abstraction is co-located with the Querier interface
+// it produces. sqlc only writes files it generates, so this file is
 // preserved across `sqlc generate` runs — but if you ever see a
 // generation step claim to delete it, that's a bug; don't `git rm`
 // this in confusion.
 //
 // See `internal/AGENTS.md` for the project-wide rule on when to use
-// RunInTx.
+// transactions.
 
 package db
 
@@ -18,76 +18,76 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// SlowTxThreshold is the duration above which RunInTx emits a
+// SlowTxThreshold is the duration above which PoolTxer.Run emits a
 // `slog.Warn` so operators can spot transactions that hold locks too
-// long. 250ms is a balance: fast enough to surface real outliers
-// (cold-cache reads + a write are typically ~10–50ms locally; a
-// well-indexed handler on a warm pool should never approach this),
-// slow enough that we don't drown logs in cold-start noise.
+// long. 250ms balances "fast enough to surface real outliers" against
+// "slow enough to ignore cold-start noise."
 //
-// If a handler legitimately runs slower (bulk import, big LRO step),
-// it should run outside RunInTx — long-held DB locks are the bug
-// this threshold is meant to detect.
+// Handlers that legitimately run slower (bulk import, big LRO step)
+// should run outside a tx — long-held DB locks are the bug this
+// threshold is meant to detect, not legitimate batch work.
 const SlowTxThreshold = 250 * time.Millisecond
 
-// TxBeginner is the minimal subset of *pgxpool.Pool that RunInTx
+// TxBeginner is the minimal subset of *pgxpool.Pool that PoolTxer
 // needs. *pgxpool.Pool implements this directly. Tests can satisfy
-// it with a tx-mock instead of standing up a real pool.
+// it with a tx-mock without standing up a real pool.
 type TxBeginner interface {
 	Begin(ctx context.Context) (pgx.Tx, error)
 }
 
-// RunInTx runs fn inside a Postgres transaction.
+// Txer runs a closure inside a database transaction. Two
+// implementations:
 //
-// The fn closure receives a transaction-bound `Querier` (`qtx`).
-// **All DB operations inside the closure MUST use this qtx.** Mixing
-// it with the connection-pool-bound *Queries (`s.queries`) is a
-// bug — they run on different connections and therefore different
-// transactions, defeating atomicity and creating TOCTOU windows
-// between scope checks and writes.
+//   - *PoolTxer: production. Begins a real pgx tx, runs fn against a
+//     transaction-bound Querier, commits on success / rolls back on
+//     error or panic.
+//   - *PassthroughTxer: tests. Runs fn against a fixed (typically
+//     mock) Querier with no actual transaction. Lets unit tests
+//     mock query-level behavior without faking the whole pgx.Tx
+//     surface.
 //
-// Lifecycle:
-//
-//   - Begin a tx on entry.
-//   - Defer a Rollback (no-op if Commit already ran successfully —
-//     pgx returns ErrTxClosed which we silence).
-//   - Call fn(qtx).
-//   - On non-nil error from fn, return early. Defer fires Rollback.
-//   - On nil error, Commit. If Commit fails, return that error
-//     (defer's Rollback is a no-op against a failed-commit tx).
-//   - Emit a slog.Warn when total elapsed time exceeds
-//     SlowTxThreshold.
-//
-// Generic over T so handlers return whatever their natural shape is
-// (proto, internal struct, slice, etc.) without an `interface{}`
-// dance.
-//
-// Logging is deliberately minimal: just the slow-tx warning.
-// Per-tx tracing belongs at the handler / interceptor layer, not
-// here — wrapping every commit in span overhead would add latency
-// to every write path. If we need richer telemetry later, add it as
-// a Config option (e.g. `RunInTxConfig{Threshold, Logger,
-// MetricsHook}`) — don't add fields to `RunInTx` itself.
-func RunInTx[T any](ctx context.Context, pool TxBeginner, fn func(qtx Querier) (T, error)) (T, error) {
-	start := time.Now()
-	var zero T
+// Servers that need transactional writes hold a Txer in their config
+// rather than a TxBeginner directly. The constructor wraps the
+// production *pgxpool.Pool in &PoolTxer{Pool: pool}; unit tests
+// inject a &PassthroughTxer{Q: mockQuerier}.
+type Txer interface {
+	// Run executes fn inside a transaction. fn MUST use the
+	// supplied qtx for ALL DB operations within scope — mixing it
+	// with any connection-pool-bound Queries instance defeats the
+	// atomicity (different connections, different transactions).
+	//
+	// fn returning a non-nil error rolls back; nil commits.
+	Run(ctx context.Context, fn func(qtx Querier) error) error
+}
 
-	tx, err := pool.Begin(ctx)
-	if err != nil {
-		return zero, err
+// PoolTxer is the production Txer — wraps a *pgxpool.Pool (or any
+// TxBeginner) and runs fn inside a real Postgres transaction.
+type PoolTxer struct {
+	Pool TxBeginner
+}
+
+// Run begins a tx, calls fn against a tx-bound Querier, commits on
+// nil error / rolls back otherwise. Always defers Rollback — after a
+// successful Commit the tx is closed, making Rollback a no-op
+// (returns ErrTxClosed which we silence). Standard pgx idiom.
+//
+// Emits a slog.Warn if total elapsed exceeds SlowTxThreshold.
+func (p *PoolTxer) Run(ctx context.Context, fn func(qtx Querier) error) error {
+	if p == nil || p.Pool == nil {
+		return errNilPool
 	}
-	// Always defer Rollback. After a successful Commit the tx is
-	// already closed, so this becomes a no-op-with-ErrTxClosed which
-	// we silence. After fn returns an error or panics, this is the
-	// rollback path. Standard pgx idiom.
+	start := time.Now()
+	tx, err := p.Pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	result, err := fn(New(tx))
-	if err != nil {
-		return zero, err
+	if err := fn(New(tx)); err != nil {
+		return err
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return zero, err
+		return err
 	}
 
 	if elapsed := time.Since(start); elapsed > SlowTxThreshold {
@@ -96,16 +96,71 @@ func RunInTx[T any](ctx context.Context, pool TxBeginner, fn func(qtx Querier) (
 			"threshold_ms", SlowTxThreshold.Milliseconds(),
 		)
 	}
-	return result, nil
+	return nil
+}
+
+// PassthroughTxer is a Txer that runs fn against a fixed Querier
+// with no actual transaction. **Test-only.** Use only in unit tests
+// where mocking the Querier is the goal and exercising the real tx
+// machinery would just require faking the whole pgx.Tx surface for
+// no testing value.
+//
+// PassthroughTxer must NEVER be wired into production paths — its
+// no-tx semantics defeat the whole reason for using a Txer. Reviews
+// should reject any production constructor that takes a Txer
+// directly without going through a *pgxpool.Pool.
+type PassthroughTxer struct {
+	Q Querier
+}
+
+// Run calls fn(q) with the fixed Querier. No tx involved.
+func (p *PassthroughTxer) Run(ctx context.Context, fn func(qtx Querier) error) error {
+	return fn(p.Q)
+}
+
+// RunInTx runs fn inside a transaction owned by txer and returns
+// the closure's result. Generic over T so handlers return whatever
+// natural shape they produce (proto rows, internal structs, slices)
+// without an `interface{}` dance.
+//
+// Lifecycle is owned by txer.Run; this helper just adapts a typed
+// (T, error) closure into Txer's untyped error closure shape.
+//
+// Pattern at the call site:
+//
+//	result, err := db.RunInTx(ctx, s.txer, func(qtx db.Querier) (db.Foo, error) {
+//	    row, err := qtx.Lookup(ctx, ...)
+//	    if err != nil { return db.Foo{}, err }
+//	    return qtx.Mutate(ctx, ...)
+//	})
+//
+// Mixing the tx-bound qtx with a connection-pool-bound *Queries
+// (`s.queries`) inside the closure is a bug — they run on different
+// connections, defeating atomicity and creating TOCTOU windows
+// between scope checks and writes.
+func RunInTx[T any](ctx context.Context, txer Txer, fn func(qtx Querier) (T, error)) (T, error) {
+	var result T
+	err := txer.Run(ctx, func(qtx Querier) error {
+		var fnErr error
+		result, fnErr = fn(qtx)
+		return fnErr
+	})
+	return result, err
 }
 
 // RunInTxVoid is the side-effect-only variant for handlers that
 // don't return a value beyond ok/err. Spelling RunInTx[T] with
-// T = struct{} works but is awkward at every call site; this
-// helper hides the empty-result dance.
-func RunInTxVoid(ctx context.Context, pool TxBeginner, fn func(qtx Querier) error) error {
-	_, err := RunInTx(ctx, pool, func(qtx Querier) (struct{}, error) {
-		return struct{}{}, fn(qtx)
-	})
-	return err
+// T=struct{} works but is awkward at every call site.
+func RunInTxVoid(ctx context.Context, txer Txer, fn func(qtx Querier) error) error {
+	return txer.Run(ctx, fn)
 }
+
+// errNilPool is the sentinel returned when PoolTxer is constructed
+// without a Pool. Production constructors panic on missing Config
+// fields, so this should be unreachable in normal operation; it
+// exists as a defense for direct &PoolTxer{} construction in tests.
+var errNilPool = errPoolUnset{}
+
+type errPoolUnset struct{}
+
+func (errPoolUnset) Error() string { return "db: PoolTxer constructed without Pool" }

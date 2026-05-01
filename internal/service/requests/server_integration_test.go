@@ -51,11 +51,11 @@ func TestIntegration_Requests_ApproveWorkflow(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	_, queries, cleanup := testutil.SetupTestDB(t)
+	pool, queries, cleanup := testutil.SetupTestDB(t)
 	defer cleanup()
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(requests.Config{Queries: queries}))
+		assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(requests.Config{Pool: pool, Queries: queries}))
 	})
 
 	client := assetsv1.NewRequestsClient(conn)
@@ -141,11 +141,11 @@ func TestIntegration_Requests_ListRequests(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	_, queries, cleanup := testutil.SetupTestDB(t)
+	pool, queries, cleanup := testutil.SetupTestDB(t)
 	defer cleanup()
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(requests.Config{Queries: queries}))
+		assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(requests.Config{Pool: pool, Queries: queries}))
 	})
 
 	client := assetsv1.NewRequestsClient(conn)
@@ -214,11 +214,11 @@ func TestIntegration_Requests_RejectWorkflow(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	_, queries, cleanup := testutil.SetupTestDB(t)
+	pool, queries, cleanup := testutil.SetupTestDB(t)
 	defer cleanup()
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(requests.Config{Queries: queries}))
+		assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(requests.Config{Pool: pool, Queries: queries}))
 	})
 
 	client := assetsv1.NewRequestsClient(conn)
@@ -259,11 +259,11 @@ func TestIntegration_Requests_CancelWorkflow(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	_, queries, cleanup := testutil.SetupTestDB(t)
+	pool, queries, cleanup := testutil.SetupTestDB(t)
 	defer cleanup()
 
 	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(requests.Config{Queries: queries}))
+		assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(requests.Config{Pool: pool, Queries: queries}))
 	})
 
 	client := assetsv1.NewRequestsClient(conn)

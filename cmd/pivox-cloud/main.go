@@ -379,7 +379,7 @@ func serve(cmd *cobra.Command, args []string) error {
 		Pool: pool, Queries: queries, AuditResolver: auditResolver,
 	}))
 	assetsv1.RegisterRequestsServer(grpcServer, requests.NewRequestsServer(requests.Config{
-		Queries: queries, AuditResolver: auditResolver,
+		Pool: pool, Queries: queries, AuditResolver: auditResolver,
 	}))
 
 	// AI Chat service
