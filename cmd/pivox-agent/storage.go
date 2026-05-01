@@ -33,7 +33,9 @@ the cloud.`,
 	f := cmd.Flags()
 	f.String("token", envOrDefault("PIVOX_TOKEN", ""), "Registration token from the storage gateway")
 	f.String("cache-dir", envOrDefault("PIVOX_CACHE_DIR", "/var/lib/pivox/cache"), "Cache directory path")
-	f.Int("cache-size", envOrDefaultInt("PIVOX_CACHE_SIZE", 0), "Cache size in GB (0 = auto-detect, 80% of available disk)")
+	f.Int("cache-size", envOrDefaultInt("PIVOX_CACHE_SIZE", 0), "Disk cache size in GB (0 = auto-detect, 80% of available disk)")
+	f.Int("memcache-max-items", envOrDefaultInt("PIVOX_MEMCACHE_MAX_ITEMS", 0), "In-memory cache: max items (0=default 100, hard max 100000)")
+	f.Int("memcache-max-item-mb", envOrDefaultInt("PIVOX_MEMCACHE_MAX_ITEM_MB", 0), "In-memory cache: max size of a single item in MB (0=default 8, hard max 64)")
 	f.Int("port", envOrDefaultInt("PIVOX_PORT", defaultPort), "HTTPS listen port")
 	f.String("bind", envOrDefault("PIVOX_BIND", "0.0.0.0"), "Bind address")
 	addControlPlaneFlag(f)
@@ -88,7 +90,10 @@ func runStorage(cmd *cobra.Command, args []string) error {
 	sessions := agent.NewSessionStore()
 	go sessions.StartCleanup(ctx, 1*time.Minute)
 
-	cache := agent.NewMemoryCache(0, 0) // defaults: 1000 entries, 256MB
+	memcacheMaxItems, _ := f.GetInt("memcache-max-items")
+	memcacheMaxItemMB, _ := f.GetInt("memcache-max-item-mb")
+	memcacheMaxItemBytes := memcacheMaxItemMB * 1024 * 1024 // 0 → constructor uses default (8 MB)
+	cache := agent.NewMemoryCache(memcacheMaxItems, memcacheMaxItemBytes)
 	endpoints := agent.NewEndpointStore(cache)
 	denied := agent.NewDeniedPatterns()
 
