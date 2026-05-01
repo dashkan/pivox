@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"testing"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -80,9 +81,16 @@ func NewAgentServiceServer(cfg AgentServiceConfig) *AgentServiceServer {
 // Production code MUST go through NewAgentServiceServer with a real
 // *pgxpool.Pool — PassthroughTxer's no-tx semantics defeat the
 // atomicity that the handshake bootstrap and disconnect cleanup rely
-// on. Code review should reject any production call to this
-// constructor.
-func NewAgentServiceServerForTesting(q db.Querier, logger *slog.Logger, conns *agentstream.ConnectionManager) *AgentServiceServer {
+// on.
+//
+// The `testing.TB` first argument is the structural barrier that
+// keeps this from being called by production code: importing the
+// `testing` package outside a `_test.go` file is a screaming-loud
+// signal in code review (and pulls a noticeable amount of test-only
+// runtime into the binary). The argument itself is not used at
+// runtime — its only purpose is to require the caller to have a
+// `*testing.T` or `*testing.B` in scope.
+func NewAgentServiceServerForTesting(_ testing.TB, q db.Querier, logger *slog.Logger, conns *agentstream.ConnectionManager) *AgentServiceServer {
 	return &AgentServiceServer{
 		txer:    &db.PassthroughTxer{Q: q},
 		queries: q,
@@ -126,15 +134,28 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 	}
 
 	// -----------------------------------------------------------------------
-	// 3. Create or update agent record.
+	// 3. Create or update agent record AND flip gateway to ACTIVE.
 	//
-	// Tx-wrapped: lookup-then-create-or-update is a classic
-	// read-then-write race. Two concurrent connections from the same
-	// (gateway, ip) — typically a fast reconnect — could both see
-	// pgx.ErrNoRows on the lookup and both try to CreateStorageAgent,
-	// producing duplicate-key violations. The tx serializes the
-	// lookup against the write so the second connection sees the
-	// row written by the first and takes the UPDATE path.
+	// Tx-wrapped:
+	//   - Agent lookup-then-create-or-update is a classic
+	//     read-then-write race; two concurrent connections from the
+	//     same (gateway, ip) could each see pgx.ErrNoRows and both
+	//     try CreateStorageAgent, producing a duplicate-key violation.
+	//   - Gateway state flip joins the same tx so the gateway becomes
+	//     operational atomically with the agent registration. Three
+	//     wins from pulling it in:
+	//     (a) reconnect from OFFLINE now flips back to ACTIVE (the
+	//         old condition only fired on PROVISIONING — a gateway
+	//         that hit OFFLINE because all its agents disconnected
+	//         would stay OFFLINE forever even after a fresh agent
+	//         connects).
+	//     (b) errors on the gateway-state UPDATE are no longer
+	//         silently dropped; they roll back the agent record,
+	//         which surfaces as a stream error so the agent retries.
+	//     (c) any concurrent disconnect-tx that's about to flip the
+	//         gateway to OFFLINE will block on the row lock our
+	//         UPDATE takes here — preventing the "gateway flips
+	//         OFFLINE while a fresh agent is mid-handshake" race.
 	// -----------------------------------------------------------------------
 	agent, err := db.RunInTx(ctx, s.txer, func(qtx db.Querier) (db.StorageAgent, error) {
 		existing, lookupErr := qtx.GetStorageAgentByGatewayAndIP(ctx, db.GetStorageAgentByGatewayAndIPParams{
@@ -146,8 +167,8 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 			return db.StorageAgent{}, apierr.Internal("failed to look up agent")
 		}
 
+		var result db.StorageAgent
 		if errors.Is(lookupErr, pgx.ErrNoRows) {
-			// Create new agent record.
 			created, err := qtx.CreateStorageAgent(ctx, db.CreateStorageAgentParams{
 				ID:        uuid.New(),
 				GatewayID: gateway.ID,
@@ -159,18 +180,36 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 				s.logger.ErrorContext(ctx, "failed to create agent", "error", err)
 				return db.StorageAgent{}, apierr.Internal("failed to create agent record")
 			}
-			return created, nil
+			result = created
+		} else {
+			// Reconnecting agent -- update state to CONNECTED.
+			updated, err := qtx.UpdateStorageAgentState(ctx, db.UpdateStorageAgentStateParams{
+				ID:    existing.ID,
+				State: db.AgentStateCONNECTED,
+			})
+			if err != nil {
+				s.logger.ErrorContext(ctx, "failed to update agent state", "error", err)
+				return db.StorageAgent{}, apierr.Internal("failed to update agent state")
+			}
+			result = updated
 		}
-		// Reconnecting agent -- update state to CONNECTED.
-		updated, err := qtx.UpdateStorageAgentState(ctx, db.UpdateStorageAgentStateParams{
-			ID:    existing.ID,
-			State: db.AgentStateCONNECTED,
-		})
-		if err != nil {
-			s.logger.ErrorContext(ctx, "failed to update agent state", "error", err)
-			return db.StorageAgent{}, apierr.Internal("failed to update agent state")
+
+		// Gateway becomes ACTIVE on every successful handshake unless
+		// it's already ACTIVE. Covers PROVISIONING (first-ever
+		// agent) and OFFLINE (last agent had disconnected; this is a
+		// fresh reconnect). UPDATE is a no-op on already-ACTIVE rows
+		// at the application level, but we skip the write to avoid
+		// gratuitous etag churn on every handshake.
+		if gateway.State != db.StorageGatewayStateACTIVE {
+			if err := qtx.UpdateStorageGatewayState(ctx, db.UpdateStorageGatewayStateParams{
+				ID:    gateway.ID,
+				State: db.StorageGatewayStateACTIVE,
+			}); err != nil {
+				s.logger.ErrorContext(ctx, "failed to update gateway state to ACTIVE", "error", err)
+				return db.StorageAgent{}, apierr.Internal("failed to update gateway state")
+			}
 		}
-		return updated, nil
+		return result, nil
 	})
 	if err != nil {
 		return err
@@ -220,19 +259,7 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 	s.auditMessage(ctx, gateway.ID, agent.ID, firstMsg.GetId(), "outbound", "handshake_ack", ack)
 
 	// -----------------------------------------------------------------------
-	// 8. Update gateway state to ACTIVE if it was PROVISIONING.
-	// -----------------------------------------------------------------------
-	if gateway.State == db.StorageGatewayStatePROVISIONING {
-		if err := s.queries.UpdateStorageGatewayState(ctx, db.UpdateStorageGatewayStateParams{
-			ID:    gateway.ID,
-			State: db.StorageGatewayStateACTIVE,
-		}); err != nil {
-			s.logger.ErrorContext(ctx, "failed to update gateway state to ACTIVE", "error", err)
-		}
-	}
-
-	// -----------------------------------------------------------------------
-	// 9. Register connection and defer unregister on disconnect.
+	// 8. Register connection and defer unregister on disconnect.
 	// -----------------------------------------------------------------------
 	s.conns.Register(&agentstream.AgentConnection{AgentID: agent.ID, GatewayID: gateway.ID, Stream: stream})
 	defer s.conns.Unregister(agent.ID)
@@ -345,9 +372,17 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 		}
 		return nil
 	}); err != nil {
-		// Logged inside the closure; tx rolled back. Don't fail the
-		// outer Connect — the client stream is already ending.
-		_ = err
+		// Per-query failures already logged inside the closure; the
+		// tx rolled back. Add a summary line for telemetry — the
+		// closure's per-step logs identify which query failed, this
+		// summary makes the rolled-back-tx outcome searchable. We
+		// don't surface to the gRPC client because the stream is
+		// already ending; nothing to do with the error.
+		s.logger.WarnContext(ctx, "disconnect cleanup tx rolled back",
+			"gateway", gateway.Name,
+			"agent_id", agent.ID,
+			"error", err,
+		)
 	}
 
 	s.logger.InfoContext(ctx, "agent disconnected",

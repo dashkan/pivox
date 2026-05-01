@@ -1285,7 +1285,11 @@ func TestConnect_InitialRecvError(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Connect — PROVISIONING→ACTIVE state update error (logged, not fatal)
+// Connect — PROVISIONING→ACTIVE state update error rolls back the
+// handshake tx. The agent record never lands; the RPC returns
+// Internal. This was previously logged-and-swallowed (the gateway
+// would stay PROVISIONING with a connected agent, an internally
+// inconsistent state), now the agent retries and we converge.
 // ---------------------------------------------------------------------------
 
 func TestConnect_GatewayActivationError(t *testing.T) {
@@ -1294,41 +1298,27 @@ func TestConnect_GatewayActivationError(t *testing.T) {
 	srv := newTestAgentServer(mockQ, conns)
 
 	gatewayID := uuid.New()
-	agentIDact := uuid.New()
+	_ = uuid.New() // agentIDact unused under the new tx semantics
 	// Gateway starts in PROVISIONING state
 	gateway := db.StorageGateway{
 		ID:    gatewayID,
 		Name:  "gw-act-err",
 		State: db.StorageGatewayStatePROVISIONING,
 	}
-	agent := db.StorageAgent{
-		ID:        agentIDact,
+
+	mockQ.On("GetStorageAgentByGatewayAndIP", mock.Anything, mock.Anything).Return(db.StorageAgent{}, pgx.ErrNoRows)
+	mockQ.On("CreateStorageAgent", mock.Anything, mock.Anything).Return(db.StorageAgent{
 		GatewayID: gatewayID,
 		IpAddress: "10.0.0.15",
 		State:     db.AgentStateCONNECTED,
-	}
+	}, nil)
 
-	mockQ.On("GetStorageAgentByGatewayAndIP", mock.Anything, mock.Anything).Return(db.StorageAgent{}, pgx.ErrNoRows)
-	mockQ.On("CreateStorageAgent", mock.Anything, mock.Anything).Return(agent, nil)
-	mockQ.On("CreateStorageAgentAudit", mock.Anything, mock.Anything).Return(nil)
-	mockQ.On("ListStorageEndpointsByGateway", mock.Anything, gatewayID).Return([]db.StorageEndpoint{}, nil)
-
-	// ACTIVE state update fails — logged only
+	// ACTIVE state update fails — rolls back the tx, no audit /
+	// endpoints / disconnect mocks should be reached.
 	mockQ.On("UpdateStorageGatewayState", mock.Anything, db.UpdateStorageGatewayStateParams{
 		ID:    gatewayID,
 		State: db.StorageGatewayStateACTIVE,
 	}).Return(errors.New("db error"))
-
-	// Disconnect flow
-	mockQ.On("UpdateStorageAgentState", mock.Anything, db.UpdateStorageAgentStateParams{
-		ID:    agentIDact,
-		State: db.AgentStateDISCONNECTED,
-	}).Return(agent, nil)
-	mockQ.On("CountConnectedStorageAgentsByGateway", mock.Anything, gatewayID).Return(int64(0), nil)
-	mockQ.On("UpdateStorageGatewayState", mock.Anything, db.UpdateStorageGatewayStateParams{
-		ID:    gatewayID,
-		State: db.StorageGatewayStateOFFLINE,
-	}).Return(nil)
 
 	stream := &mockConnectStream{
 		ctx: server.WithAuthenticatedGateway(context.Background(), gateway),
@@ -1344,8 +1334,11 @@ func TestConnect_GatewayActivationError(t *testing.T) {
 		},
 	}
 
-	// Should not error — activation failure is logged only
 	err := srv.Connect(stream)
-	require.NoError(t, err)
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.Internal, st.Code())
 	mockQ.AssertExpectations(t)
+	mockQ.AssertNotCalled(t, "ListStorageEndpointsByGateway", mock.Anything, mock.Anything)
 }

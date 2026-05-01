@@ -203,10 +203,11 @@ func TestSubmitRequest_ValidTransition(t *testing.T) {
 
 	transitioned := existing
 	transitioned.State = db.RequestStateOPEN
-	f.mockQ.On("UpdateRequestState", mock.Anything, db.UpdateRequestStateParams{
+	f.mockQ.On("UpdateRequestStateIfFrom", mock.Anything, db.UpdateRequestStateIfFromParams{
 		ID:        f.requestID,
 		State:     db.RequestStateOPEN,
 		UpdatedBy: pgtype.UUID{},
+		State_2:   db.RequestStateDRAFT,
 	}).Return(transitioned, nil)
 
 	resp, err := f.server.SubmitRequest(context.Background(), &assetsv1.SubmitRequestRequest{
@@ -222,9 +223,17 @@ func TestSubmitRequest_InvalidState(t *testing.T) {
 	f := setupRequestFixture(t)
 	f.mockResolveSpace()
 
+	// New shape: transitionRequest uses an atomic conditional UPDATE.
+	// On state mismatch the UPDATE returns 0 rows (ErrNoRows), and the
+	// handler re-reads the row to disambiguate row-missing from
+	// state-mismatch in the error message — so the mock has to handle
+	// two GetRequestByName calls plus the conditional update returning
+	// ErrNoRows.
 	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateINPROGRESS)
 	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
+	f.mockQ.On("UpdateRequestStateIfFrom", mock.Anything, mock.Anything).
+		Return(db.AssetRequest{}, pgx.ErrNoRows)
 
 	_, err := f.server.SubmitRequest(context.Background(), &assetsv1.SubmitRequestRequest{
 		Name: testFull,
@@ -371,10 +380,11 @@ func TestDeliverRequest_Success(t *testing.T) {
 
 	delivered := existing
 	delivered.State = db.RequestStateDELIVERED
-	f.mockQ.On("UpdateRequestState", mock.Anything, db.UpdateRequestStateParams{
+	f.mockQ.On("UpdateRequestStateIfFrom", mock.Anything, db.UpdateRequestStateIfFromParams{
 		ID:        f.requestID,
 		State:     db.RequestStateDELIVERED,
 		UpdatedBy: pgtype.UUID{},
+		State_2:   db.RequestStateINPROGRESS,
 	}).Return(delivered, nil)
 
 	resp, err := f.server.DeliverRequest(context.Background(), &assetsv1.DeliverRequestRequest{
@@ -393,6 +403,8 @@ func TestDeliverRequest_InvalidState(t *testing.T) {
 	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateOPEN)
 	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
+	f.mockQ.On("UpdateRequestStateIfFrom", mock.Anything, mock.Anything).
+		Return(db.AssetRequest{}, pgx.ErrNoRows)
 
 	_, err := f.server.DeliverRequest(context.Background(), &assetsv1.DeliverRequestRequest{
 		Name: testFull,
@@ -415,10 +427,11 @@ func TestApproveRequest_Success(t *testing.T) {
 
 	approved := existing
 	approved.State = db.RequestStateAPPROVED
-	f.mockQ.On("UpdateRequestState", mock.Anything, db.UpdateRequestStateParams{
+	f.mockQ.On("UpdateRequestStateIfFrom", mock.Anything, db.UpdateRequestStateIfFromParams{
 		ID:        f.requestID,
 		State:     db.RequestStateAPPROVED,
 		UpdatedBy: pgtype.UUID{},
+		State_2:   db.RequestStateDELIVERED,
 	}).Return(approved, nil)
 
 	resp, err := f.server.ApproveRequest(context.Background(), &assetsv1.ApproveRequestRequest{
@@ -437,6 +450,8 @@ func TestApproveRequest_InvalidState(t *testing.T) {
 	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateINPROGRESS)
 	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
+	f.mockQ.On("UpdateRequestStateIfFrom", mock.Anything, mock.Anything).
+		Return(db.AssetRequest{}, pgx.ErrNoRows)
 
 	_, err := f.server.ApproveRequest(context.Background(), &assetsv1.ApproveRequestRequest{
 		Name: testFull,
@@ -459,10 +474,11 @@ func TestRequestRevision_Success(t *testing.T) {
 
 	revised := existing
 	revised.State = db.RequestStateREVISIONREQUESTED
-	f.mockQ.On("UpdateRequestState", mock.Anything, db.UpdateRequestStateParams{
+	f.mockQ.On("UpdateRequestStateIfFrom", mock.Anything, db.UpdateRequestStateIfFromParams{
 		ID:        f.requestID,
 		State:     db.RequestStateREVISIONREQUESTED,
 		UpdatedBy: pgtype.UUID{},
+		State_2:   db.RequestStateDELIVERED,
 	}).Return(revised, nil)
 
 	resp, err := f.server.RequestRevision(context.Background(), &assetsv1.RequestRevisionRequest{
@@ -486,10 +502,11 @@ func TestRejectRequest_Success(t *testing.T) {
 
 	rejected := existing
 	rejected.State = db.RequestStateREJECTED
-	f.mockQ.On("UpdateRequestState", mock.Anything, db.UpdateRequestStateParams{
+	f.mockQ.On("UpdateRequestStateIfFrom", mock.Anything, db.UpdateRequestStateIfFromParams{
 		ID:        f.requestID,
 		State:     db.RequestStateREJECTED,
 		UpdatedBy: pgtype.UUID{},
+		State_2:   db.RequestStateDELIVERED,
 	}).Return(rejected, nil)
 
 	resp, err := f.server.RejectRequest(context.Background(), &assetsv1.RejectRequestRequest{
@@ -508,7 +525,7 @@ func TestCancelRequest_FromDraft(t *testing.T) {
 	f.mockResolveSpace()
 
 	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateDRAFT)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
+	f.mockQ.On("GetRequestByNameForUpdate", mock.Anything, db.GetRequestByNameForUpdateParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	cancelled := existing
@@ -533,7 +550,7 @@ func TestCancelRequest_FromOpen(t *testing.T) {
 	f.mockResolveSpace()
 
 	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateOPEN)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
+	f.mockQ.On("GetRequestByNameForUpdate", mock.Anything, db.GetRequestByNameForUpdateParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	cancelled := existing
@@ -558,7 +575,7 @@ func TestCancelRequest_FromInProgress(t *testing.T) {
 	f.mockResolveSpace()
 
 	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateINPROGRESS)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
+	f.mockQ.On("GetRequestByNameForUpdate", mock.Anything, db.GetRequestByNameForUpdateParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	cancelled := existing
@@ -583,7 +600,7 @@ func TestCancelRequest_InvalidState_Approved(t *testing.T) {
 	f.mockResolveSpace()
 
 	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateAPPROVED)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
+	f.mockQ.On("GetRequestByNameForUpdate", mock.Anything, db.GetRequestByNameForUpdateParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	_, err := f.server.CancelRequest(context.Background(), &assetsv1.CancelRequestRequest{
@@ -600,7 +617,7 @@ func TestCancelRequest_InvalidState_Cancelled(t *testing.T) {
 	f.mockResolveSpace()
 
 	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateCANCELLED)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
+	f.mockQ.On("GetRequestByNameForUpdate", mock.Anything, db.GetRequestByNameForUpdateParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	_, err := f.server.CancelRequest(context.Background(), &assetsv1.CancelRequestRequest{
@@ -1140,7 +1157,7 @@ func TestCancelRequest_NotFound(t *testing.T) {
 	f := setupRequestFixture(t)
 	f.mockResolveSpace()
 
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
+	f.mockQ.On("GetRequestByNameForUpdate", mock.Anything, db.GetRequestByNameForUpdateParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(db.AssetRequest{}, pgx.ErrNoRows)
 
 	_, err := f.server.CancelRequest(context.Background(), &assetsv1.CancelRequestRequest{
@@ -1158,7 +1175,7 @@ func TestCancelRequest_UpdateStateDBError(t *testing.T) {
 	f.mockResolveSpace()
 
 	existing := makeRequest(f.requestID, f.spaceID, testReqName, db.RequestStateOPEN)
-	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
+	f.mockQ.On("GetRequestByNameForUpdate", mock.Anything, db.GetRequestByNameForUpdateParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
 	f.mockQ.On("UpdateRequestState", mock.Anything, mock.Anything).
@@ -1213,7 +1230,7 @@ func TestSubmitRequest_UpdateStateDBError(t *testing.T) {
 	f.mockQ.On("GetRequestByName", mock.Anything, db.GetRequestByNameParams{SpaceID: f.spaceID, Name: testReqName}).
 		Return(existing, nil)
 
-	f.mockQ.On("UpdateRequestState", mock.Anything, mock.Anything).
+	f.mockQ.On("UpdateRequestStateIfFrom", mock.Anything, mock.Anything).
 		Return(db.AssetRequest{}, errors.New("db failure"))
 
 	_, err := f.server.SubmitRequest(context.Background(), &assetsv1.SubmitRequestRequest{

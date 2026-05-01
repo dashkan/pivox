@@ -40,13 +40,15 @@ type TxBeginner = db.TxBeginner
 
 type OrganizationsServer struct {
 	apiv1.UnimplementedOrganizationsServer
-	db   db.DBTX
+	db db.DBTX
+	// pool is retained only for legacy handlers (CreateOrganization,
+	// member CRUD, TransferOwnership) that still call pool.Begin
+	// directly. Deprecated: prefer txer.Run for new handlers — it
+	// adds slow-tx instrumentation and matches the cross-package
+	// db.Txer convention. See the tx sweep landed for issue #13.
 	pool TxBeginner
 	// txer is the transaction abstraction used by handlers that have
-	// migrated to db.RunInTx. New tx-wrapped paths (DeleteDomain)
-	// use txer; legacy manual pool.Begin call sites (CreateOrganization,
-	// member CRUD, TransferOwnership) still use pool directly and
-	// will be migrated incrementally.
+	// migrated to db.RunInTx (DeleteDomain). New code uses txer.
 	txer     db.Txer
 	queries  db.Querier
 	auth     authn.Service

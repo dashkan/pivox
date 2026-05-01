@@ -9,6 +9,17 @@ SELECT * FROM asset_requests WHERE id = $1;
 -- name: GetRequestByName :one
 SELECT * FROM asset_requests WHERE space_id = $1 AND name = $2;
 
+-- GetRequestByNameForUpdate is the locking variant used by
+-- CancelRequest inside its tx. CancelRequest accepts any state
+-- except APPROVED/CANCELLED, so the precondition can't be folded
+-- into a WHERE clause as cleanly as the simple from→to transitions
+-- (which use UpdateRequestStateIfFrom). The lock instead serializes
+-- concurrent transitions on the same row, so a concurrent
+-- ApproveRequest blocks until our tx resolves and we read the
+-- post-Approve state.
+-- name: GetRequestByNameForUpdate :one
+SELECT * FROM asset_requests WHERE space_id = $1 AND name = $2 FOR UPDATE;
+
 -- name: ListRequestsBySpace :many
 SELECT * FROM asset_requests
 WHERE space_id = $1
@@ -40,6 +51,25 @@ SET state = $2,
     update_time = now(),
     etag = md5(now()::text)
 WHERE id = $1
+RETURNING *;
+
+-- UpdateRequestStateIfFrom is the precondition-guarded variant used
+-- by the per-state transition handlers (Submit, Approve, Reject,
+-- RequestRevision, Cancel, Claim, Deliver). The application-layer
+-- read-then-check-then-update pattern is racy: two callers could
+-- both observe state=$from and both try to transition; the WHERE
+-- clause here makes the precondition atomic with the write, so only
+-- one tx commits and the other returns ErrNoRows. The handler maps
+-- ErrNoRows to FailedPrecondition (or NotFound after a re-read to
+-- disambiguate row-missing vs state-mismatch).
+-- name: UpdateRequestStateIfFrom :one
+UPDATE asset_requests
+SET state = $2,
+    revision = revision + 1,
+    updated_by = $3,
+    update_time = now(),
+    etag = md5(now()::text)
+WHERE id = $1 AND state = $4
 RETURNING *;
 
 -- name: UpdateRequestAssignee :one

@@ -709,6 +709,16 @@ func (m *MockQuerier) UpdateRequestState(ctx context.Context, arg db.UpdateReque
 	return args.Get(0).(db.AssetRequest), args.Error(1)
 }
 
+func (m *MockQuerier) UpdateRequestStateIfFrom(ctx context.Context, arg db.UpdateRequestStateIfFromParams) (db.AssetRequest, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.AssetRequest), args.Error(1)
+}
+
+func (m *MockQuerier) GetRequestByNameForUpdate(ctx context.Context, arg db.GetRequestByNameForUpdateParams) (db.AssetRequest, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.AssetRequest), args.Error(1)
+}
+
 func (m *MockQuerier) DeleteRequest(ctx context.Context, id uuid.UUID) error {
 	args := m.Called(ctx, id)
 	return args.Error(0)

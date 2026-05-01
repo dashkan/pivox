@@ -99,7 +99,7 @@ func setupAgentGRPC(t *testing.T, mockQ *mocks.MockQuerier) string {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	srv := grpc.NewServer()
-	agentv1.RegisterAgentServiceServer(srv, storage.NewAgentServiceServerForTesting(mockQ, logger, connMgr))
+	agentv1.RegisterAgentServiceServer(srv, storage.NewAgentServiceServerForTesting(t, mockQ, logger, connMgr))
 
 	go func() { _ = srv.Serve(lis) }()
 	t.Cleanup(func() { srv.Stop() })
@@ -341,7 +341,7 @@ func TestConnect_TLS(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	srv := grpc.NewServer()
-	agentv1.RegisterAgentServiceServer(srv, storage.NewAgentServiceServerForTesting(mockQ, logger, connMgr))
+	agentv1.RegisterAgentServiceServer(srv, storage.NewAgentServiceServerForTesting(t, mockQ, logger, connMgr))
 	go func() { _ = srv.Serve(lis) }()
 	t.Cleanup(func() { srv.Stop() })
 

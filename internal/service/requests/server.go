@@ -3,6 +3,7 @@ package requests
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -10,6 +11,7 @@ import (
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/dashkan/pivox/internal/apierr"
@@ -591,7 +593,16 @@ func (s *RequestsServer) RejectRequest(ctx context.Context, req *assetsv1.Reject
 	return s.transitionRequest(ctx, req.GetName(), db.RequestStateDELIVERED, db.RequestStateREJECTED)
 }
 
-// CancelRequest transitions any state → CANCELLED.
+// CancelRequest transitions any state → CANCELLED unless the
+// request is already APPROVED or CANCELLED.
+//
+// Tx-wrapped: the precondition is "state is anything but
+// APPROVED/CANCELLED", which is too disjunctive to fold cleanly
+// into a single WHERE clause the way UpdateRequestStateIfFrom does
+// for fixed from→to transitions. Instead we lock the row inside a
+// tx so concurrent transitions (e.g. an ApproveRequest racing this
+// CancelRequest) serialize — the second tx reads the post-first-
+// commit state and the precondition fires accurately.
 func (s *RequestsServer) CancelRequest(ctx context.Context, req *assetsv1.CancelRequestRequest) (*assetsv1.Request, error) {
 	orgName, spaceName, requestName, err := parseRequestName(req.GetName())
 	if err != nil {
@@ -602,22 +613,28 @@ func (s *RequestsServer) CancelRequest(ctx context.Context, req *assetsv1.Cancel
 		return nil, err
 	}
 
-	existing, err := s.queries.GetRequestByName(ctx, db.GetRequestByNameParams{SpaceID: spaceID, Name: requestName})
-	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Request", req.GetName())
-	}
-
-	if existing.State == db.RequestStateAPPROVED || existing.State == db.RequestStateCANCELLED {
-		return nil, apierr.FailedPrecondition(fmt.Sprintf("cannot cancel a request in state %s", existing.State))
-	}
-
-	result, err := s.queries.UpdateRequestState(ctx, db.UpdateRequestStateParams{
-		ID:        existing.ID,
-		State:     db.RequestStateCANCELLED,
-		UpdatedBy: pgtype.UUID{},
+	result, err := db.RunInTx(ctx, s.txer, func(qtx db.Querier) (db.AssetRequest, error) {
+		existing, err := qtx.GetRequestByNameForUpdate(ctx, db.GetRequestByNameForUpdateParams{
+			SpaceID: spaceID, Name: requestName,
+		})
+		if err != nil {
+			return db.AssetRequest{}, apierr.HandleResourceError(err, "Request", req.GetName())
+		}
+		if existing.State == db.RequestStateAPPROVED || existing.State == db.RequestStateCANCELLED {
+			return db.AssetRequest{}, apierr.FailedPrecondition(fmt.Sprintf("cannot cancel a request in state %s", existing.State))
+		}
+		updated, err := qtx.UpdateRequestState(ctx, db.UpdateRequestStateParams{
+			ID:        existing.ID,
+			State:     db.RequestStateCANCELLED,
+			UpdatedBy: pgtype.UUID{},
+		})
+		if err != nil {
+			return db.AssetRequest{}, apierr.HandleResourceError(err, "Request", req.GetName())
+		}
+		return updated, nil
 	})
 	if err != nil {
-		return nil, apierr.HandleResourceError(err, "Request", req.GetName())
+		return nil, err
 	}
 
 	parentName := fmt.Sprintf("organizations/%s/spaces/%s", orgName, spaceName)
@@ -630,6 +647,19 @@ func (s *RequestsServer) CancelRequest(ctx context.Context, req *assetsv1.Cancel
 }
 
 // transitionRequest is a helper for simple state transitions.
+//
+// Race protection: the previous shape was
+//
+//	GetRequestByName → check state → UpdateRequestState
+//
+// — three statements, no atomicity. Two concurrent transition calls
+// (e.g. simultaneous Approve and Reject from DELIVERED) could both
+// pass the precondition and both run UpdateRequestState; last writer
+// wins. UpdateRequestStateIfFrom collapses the check + write into a
+// single atomic UPDATE with `WHERE state = $from`, so only one tx
+// commits. Zero rows returned (pgx.ErrNoRows) means either the row
+// is missing OR the precondition failed; one cheap re-read
+// disambiguates so the error message stays specific.
 func (s *RequestsServer) transitionRequest(ctx context.Context, name string, fromState, toState db.RequestState) (*assetsv1.Request, error) {
 	orgName, spaceName, requestName, err := parseRequestName(name)
 	if err != nil {
@@ -645,16 +675,28 @@ func (s *RequestsServer) transitionRequest(ctx context.Context, name string, fro
 		return nil, apierr.HandleResourceError(err, "Request", name)
 	}
 
-	if existing.State != fromState {
-		return nil, apierr.FailedPrecondition(fmt.Sprintf("request must be in state %s, got %s", fromState, existing.State))
-	}
-
-	result, err := s.queries.UpdateRequestState(ctx, db.UpdateRequestStateParams{
+	result, err := s.queries.UpdateRequestStateIfFrom(ctx, db.UpdateRequestStateIfFromParams{
 		ID:        existing.ID,
 		State:     toState,
 		UpdatedBy: pgtype.UUID{},
+		State_2:   fromState,
 	})
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			// Either the row was deleted between our GetRequestByName
+			// above and our conditional update (unlikely but possible),
+			// or another transition committed first and flipped the
+			// state away from fromState. Re-read to make the error
+			// message reflect the actual current state.
+			current, lookupErr := s.queries.GetRequestByName(ctx, db.GetRequestByNameParams{SpaceID: spaceID, Name: requestName})
+			if errors.Is(lookupErr, pgx.ErrNoRows) {
+				return nil, apierr.NotFound("Request", name)
+			}
+			if lookupErr != nil {
+				return nil, apierr.HandleResourceError(lookupErr, "Request", name)
+			}
+			return nil, apierr.FailedPrecondition(fmt.Sprintf("request must be in state %s, got %s", fromState, current.State))
+		}
 		return nil, apierr.HandleResourceError(err, "Request", name)
 	}
 

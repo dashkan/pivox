@@ -356,6 +356,15 @@ type Querier interface {
 	GetPermission(ctx context.Context, permissionID string) (Permission, error)
 	GetRequest(ctx context.Context, id uuid.UUID) (AssetRequest, error)
 	GetRequestByName(ctx context.Context, arg GetRequestByNameParams) (AssetRequest, error)
+	// GetRequestByNameForUpdate is the locking variant used by
+	// CancelRequest inside its tx. CancelRequest accepts any state
+	// except APPROVED/CANCELLED, so the precondition can't be folded
+	// into a WHERE clause as cleanly as the simple from→to transitions
+	// (which use UpdateRequestStateIfFrom). The lock instead serializes
+	// concurrent transitions on the same row, so a concurrent
+	// ApproveRequest blocks until our tx resolves and we read the
+	// post-Approve state.
+	GetRequestByNameForUpdate(ctx context.Context, arg GetRequestByNameForUpdateParams) (AssetRequest, error)
 	GetRoleByID(ctx context.Context, id uuid.UUID) (Role, error)
 	GetSpace(ctx context.Context, id uuid.UUID) (Space, error)
 	GetSpaceByName(ctx context.Context, arg GetSpaceByNameParams) (Space, error)
@@ -651,6 +660,16 @@ type Querier interface {
 	UpdateRequestAssignee(ctx context.Context, arg UpdateRequestAssigneeParams) (AssetRequest, error)
 	UpdateRequestDelivered(ctx context.Context, arg UpdateRequestDeliveredParams) (AssetRequest, error)
 	UpdateRequestState(ctx context.Context, arg UpdateRequestStateParams) (AssetRequest, error)
+	// UpdateRequestStateIfFrom is the precondition-guarded variant used
+	// by the per-state transition handlers (Submit, Approve, Reject,
+	// RequestRevision, Cancel, Claim, Deliver). The application-layer
+	// read-then-check-then-update pattern is racy: two callers could
+	// both observe state=$from and both try to transition; the WHERE
+	// clause here makes the precondition atomic with the write, so only
+	// one tx commits and the other returns ErrNoRows. The handler maps
+	// ErrNoRows to FailedPrecondition (or NotFound after a re-read to
+	// disambiguate row-missing vs state-mismatch).
+	UpdateRequestStateIfFrom(ctx context.Context, arg UpdateRequestStateIfFromParams) (AssetRequest, error)
 	UpdateSpace(ctx context.Context, arg UpdateSpaceParams) (Space, error)
 	UpdateSpaceGroupMemberRole(ctx context.Context, arg UpdateSpaceGroupMemberRoleParams) (UpdateSpaceGroupMemberRoleRow, error)
 	UpdateSpaceUserMemberRole(ctx context.Context, arg UpdateSpaceUserMemberRoleParams) (UpdateSpaceUserMemberRoleRow, error)

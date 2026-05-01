@@ -153,6 +153,49 @@ func (q *Queries) GetRequestByName(ctx context.Context, arg GetRequestByNamePara
 	return i, err
 }
 
+const getRequestByNameForUpdate = `-- name: GetRequestByNameForUpdate :one
+SELECT id, space_id, name, display_name, description, priority, assignee, annotations, state, etag, revision, created_by, updated_by, create_time, update_time, due_time, delivered_time, approved_time FROM asset_requests WHERE space_id = $1 AND name = $2 FOR UPDATE
+`
+
+type GetRequestByNameForUpdateParams struct {
+	SpaceID uuid.UUID `json:"space_id"`
+	Name    string    `json:"name"`
+}
+
+// GetRequestByNameForUpdate is the locking variant used by
+// CancelRequest inside its tx. CancelRequest accepts any state
+// except APPROVED/CANCELLED, so the precondition can't be folded
+// into a WHERE clause as cleanly as the simple from→to transitions
+// (which use UpdateRequestStateIfFrom). The lock instead serializes
+// concurrent transitions on the same row, so a concurrent
+// ApproveRequest blocks until our tx resolves and we read the
+// post-Approve state.
+func (q *Queries) GetRequestByNameForUpdate(ctx context.Context, arg GetRequestByNameForUpdateParams) (AssetRequest, error) {
+	row := q.db.QueryRow(ctx, getRequestByNameForUpdate, arg.SpaceID, arg.Name)
+	var i AssetRequest
+	err := row.Scan(
+		&i.ID,
+		&i.SpaceID,
+		&i.Name,
+		&i.DisplayName,
+		&i.Description,
+		&i.Priority,
+		&i.Assignee,
+		&i.Annotations,
+		&i.State,
+		&i.Etag,
+		&i.Revision,
+		&i.CreatedBy,
+		&i.UpdatedBy,
+		&i.CreateTime,
+		&i.UpdateTime,
+		&i.DueTime,
+		&i.DeliveredTime,
+		&i.ApprovedTime,
+	)
+	return i, err
+}
+
 const listRequestsBySpace = `-- name: ListRequestsBySpace :many
 SELECT id, space_id, name, display_name, description, priority, assignee, annotations, state, etag, revision, created_by, updated_by, create_time, update_time, due_time, delivered_time, approved_time FROM asset_requests
 WHERE space_id = $1
@@ -419,6 +462,64 @@ type UpdateRequestStateParams struct {
 
 func (q *Queries) UpdateRequestState(ctx context.Context, arg UpdateRequestStateParams) (AssetRequest, error) {
 	row := q.db.QueryRow(ctx, updateRequestState, arg.ID, arg.State, arg.UpdatedBy)
+	var i AssetRequest
+	err := row.Scan(
+		&i.ID,
+		&i.SpaceID,
+		&i.Name,
+		&i.DisplayName,
+		&i.Description,
+		&i.Priority,
+		&i.Assignee,
+		&i.Annotations,
+		&i.State,
+		&i.Etag,
+		&i.Revision,
+		&i.CreatedBy,
+		&i.UpdatedBy,
+		&i.CreateTime,
+		&i.UpdateTime,
+		&i.DueTime,
+		&i.DeliveredTime,
+		&i.ApprovedTime,
+	)
+	return i, err
+}
+
+const updateRequestStateIfFrom = `-- name: UpdateRequestStateIfFrom :one
+UPDATE asset_requests
+SET state = $2,
+    revision = revision + 1,
+    updated_by = $3,
+    update_time = now(),
+    etag = md5(now()::text)
+WHERE id = $1 AND state = $4
+RETURNING id, space_id, name, display_name, description, priority, assignee, annotations, state, etag, revision, created_by, updated_by, create_time, update_time, due_time, delivered_time, approved_time
+`
+
+type UpdateRequestStateIfFromParams struct {
+	ID        uuid.UUID    `json:"id"`
+	State     RequestState `json:"state"`
+	UpdatedBy pgtype.UUID  `json:"updated_by"`
+	State_2   RequestState `json:"state_2"`
+}
+
+// UpdateRequestStateIfFrom is the precondition-guarded variant used
+// by the per-state transition handlers (Submit, Approve, Reject,
+// RequestRevision, Cancel, Claim, Deliver). The application-layer
+// read-then-check-then-update pattern is racy: two callers could
+// both observe state=$from and both try to transition; the WHERE
+// clause here makes the precondition atomic with the write, so only
+// one tx commits and the other returns ErrNoRows. The handler maps
+// ErrNoRows to FailedPrecondition (or NotFound after a re-read to
+// disambiguate row-missing vs state-mismatch).
+func (q *Queries) UpdateRequestStateIfFrom(ctx context.Context, arg UpdateRequestStateIfFromParams) (AssetRequest, error) {
+	row := q.db.QueryRow(ctx, updateRequestStateIfFrom,
+		arg.ID,
+		arg.State,
+		arg.UpdatedBy,
+		arg.State_2,
+	)
 	var i AssetRequest
 	err := row.Scan(
 		&i.ID,

@@ -160,8 +160,12 @@ func parseUserUUID(name, expectedOrg string) (uuid.UUID, error) {
 //     space_members row whose principal is a per-org users row
 //     owned by this firebase_identity. Cross-org.
 //  3. DELETING_PIVOX_RECORDS — capture the Firebase UID, then
-//     hard-delete the identities row. ON DELETE CASCADE
-//     removes per-org users + their group_members.
+//     soft-delete the identities row (PII blanked, is_deleted=true).
+//     The row itself stays so created_by/updated_by/deleted_by
+//     references on other tables still resolve to an Actor proto;
+//     org_members and space_members for this identity were already
+//     removed in Phase 2 (REVOKING_MEMBERSHIPS), and group_members
+//     ride on those (FK + same-tx).
 //  4. DELETING_FIREBASE_IDENTITY — Firebase Admin SDK DeleteUser.
 //     Idempotent on already-deleted UIDs so retry-from-this-phase
 //     is safe.
