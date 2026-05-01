@@ -174,7 +174,7 @@ func TestStreamGenerateContent_HappyPath(t *testing.T) {
 			{Kind: "finish"},
 		},
 	}
-	srv := &Server{queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
+	srv := &Server{txer: &db.PassthroughTxer{Q: q}, queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	uid := "user1"
@@ -185,6 +185,7 @@ func TestStreamGenerateContent_HappyPath(t *testing.T) {
 	q.On("GetConversationByName", mock.Anything, db.GetConversationByNameParams{
 		OrgID: org.ID, Name: "conv1",
 	}).Return(conv, nil)
+	q.On("GetConversationByIDForUpdate", mock.Anything, conv.ID).Return(conv, nil)
 	q.On("GetNextSequenceForConversation", mock.Anything, conv.ID).Return(int32(1), nil)
 	q.On("CreateMessage", mock.Anything, mock.Anything).Return(db.AiMessage{}, nil)
 	q.On("IncrementConversationMessageCount", mock.Anything, conv.ID).Return(nil)
@@ -231,7 +232,7 @@ func TestStreamGenerateContent_ToolResultResumesGeneration(t *testing.T) {
 			{Kind: "finish"},
 		},
 	}
-	srv := &Server{queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
+	srv := &Server{txer: &db.PassthroughTxer{Q: q}, queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	uid := "user1"
@@ -242,6 +243,7 @@ func TestStreamGenerateContent_ToolResultResumesGeneration(t *testing.T) {
 	q.On("GetConversationByName", mock.Anything, db.GetConversationByNameParams{
 		OrgID: org.ID, Name: "conv1",
 	}).Return(conv, nil)
+	q.On("GetConversationByIDForUpdate", mock.Anything, conv.ID).Return(conv, nil)
 	q.On("GetNextSequenceForConversation", mock.Anything, conv.ID).Return(int32(3), nil)
 	q.On("CreateMessage", mock.Anything, mock.Anything).Return(db.AiMessage{}, nil)
 	q.On("IncrementConversationMessageCount", mock.Anything, conv.ID).Return(nil)
@@ -287,7 +289,7 @@ func TestStreamGenerateContent_ToolResultResumesGeneration(t *testing.T) {
 func TestStreamGenerateContent_WrongOwner(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := &Server{queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
+	srv := &Server{txer: &db.PassthroughTxer{Q: q}, queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	// Conversation owned by a different user-uuid than the path-bound
@@ -310,7 +312,7 @@ func TestStreamGenerateContent_WrongOwner(t *testing.T) {
 func TestStreamGenerateContent_ModelError(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{err: io.ErrUnexpectedEOF}
-	srv := &Server{queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
+	srv := &Server{txer: &db.PassthroughTxer{Q: q}, queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	uid := "user1"
@@ -319,6 +321,7 @@ func TestStreamGenerateContent_ModelError(t *testing.T) {
 
 	q.On("GetOrganizationByName", mock.Anything, "acme").Return(org, nil)
 	q.On("GetConversationByName", mock.Anything, mock.Anything).Return(conv, nil)
+	q.On("GetConversationByIDForUpdate", mock.Anything, conv.ID).Return(conv, nil)
 	q.On("GetNextSequenceForConversation", mock.Anything, conv.ID).Return(int32(1), nil)
 	q.On("CreateMessage", mock.Anything, mock.Anything).Return(db.AiMessage{}, nil)
 	q.On("IncrementConversationMessageCount", mock.Anything, conv.ID).Return(nil)
@@ -350,7 +353,7 @@ func TestGenerateContent_UnaryAccumulatesText(t *testing.T) {
 			{Kind: "finish"},
 		},
 	}
-	srv := &Server{queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
+	srv := &Server{txer: &db.PassthroughTxer{Q: q}, queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	uid := "user1"
@@ -359,6 +362,7 @@ func TestGenerateContent_UnaryAccumulatesText(t *testing.T) {
 
 	q.On("GetOrganizationByName", mock.Anything, "acme").Return(org, nil)
 	q.On("GetConversationByName", mock.Anything, mock.Anything).Return(conv, nil)
+	q.On("GetConversationByIDForUpdate", mock.Anything, conv.ID).Return(conv, nil)
 	q.On("GetNextSequenceForConversation", mock.Anything, conv.ID).Return(int32(1), nil)
 	q.On("CreateMessage", mock.Anything, mock.Anything).Return(db.AiMessage{}, nil)
 	q.On("IncrementConversationMessageCount", mock.Anything, conv.ID).Return(nil)
@@ -393,7 +397,7 @@ func TestGenerateContent_StatelessSkipsPersistence(t *testing.T) {
 			{Kind: "finish"},
 		},
 	}
-	srv := &Server{queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
+	srv := &Server{txer: &db.PassthroughTxer{Q: q}, queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	ctx := authenticatedCtx("user1")
@@ -441,7 +445,7 @@ func TestGenerateContent_StatelessSkipsPersistence(t *testing.T) {
 func TestStreamGenerateContent_ConversationOrgMismatchRejected(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := &Server{queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
+	srv := &Server{txer: &db.PassthroughTxer{Q: q}, queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	ctx := authenticatedCtx("user1")
@@ -539,7 +543,7 @@ func TestDbMessageToModel(t *testing.T) {
 func TestStreamGenerateContent_InvalidConversationReturnsNotFound(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := &Server{queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
+	srv := &Server{txer: &db.PassthroughTxer{Q: q}, queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	ctx := authenticatedCtx("user1")
@@ -558,7 +562,7 @@ func TestStreamGenerateContent_InvalidConversationReturnsNotFound(t *testing.T) 
 func TestStreamGenerateContent_InvalidConversationNameReturnsInvalidArgument(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	llm := &mockLanguageModel{}
-	srv := &Server{queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
+	srv := &Server{txer: &db.PassthroughTxer{Q: q}, queries: q, model: llm, tools: tools.NewRegistry(), logger: slog.Default(), conversationFilter: filter.ConversationFilter(), messageFilter: filter.MessageFilter(), artifactFilter: filter.ArtifactFilter(), artifactVersionFilter: filter.ArtifactVersionFilter()}
 
 	org := testOrg()
 	ctx := authenticatedCtx("user1")

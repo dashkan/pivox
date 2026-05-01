@@ -254,27 +254,22 @@ func (s *Server) runGenerate(
 		Parts: assistantParts,
 	}
 
-	// Persist assistant response when stateful.
+	// Persist assistant response when stateful. Tx-wrapped via
+	// persistMessageInTx so the (sequence, create, increment) trio
+	// is atomic — same race + count-drift fix that persistInputMessage
+	// uses.
 	if conv != nil {
-		nextSeq, err := s.queries.GetNextSequenceForConversation(ctx, conv.ID)
-		if err != nil {
-			slog.ErrorContext(ctx, "get sequence failed", "conversation_id", conv.ID, "error", err)
-			return nil, nil, "", apierr.Internal("get sequence")
-		}
 		assistantPartsJSON, _ := marshalParts(assistantParts)
-		_, err = s.queries.CreateMessage(ctx, db.CreateMessageParams{
+		if err := s.persistMessageInTx(ctx, conv.ID, db.CreateMessageParams{
 			ConversationID: conv.ID,
 			Name:           assistantMsgID,
 			Role:           "assistant",
 			Parts:          assistantPartsJSON,
-			Sequence:       int64(nextSeq),
 			TokenCount:     int32(estimateTokens(assistantText.String())),
-		})
-		if err != nil {
+		}); err != nil {
 			slog.ErrorContext(ctx, "persist assistant message failed", "conversation_id", conv.ID, "error", err)
 			return nil, nil, "", apierr.Internal("persist assistant message")
 		}
-		_ = s.queries.IncrementConversationMessageCount(ctx, conv.ID)
 
 		// Full AIP-122 resource name. We have orgName resolved
 		// upstream from `req.GetParent()`.
@@ -293,16 +288,13 @@ func (s *Server) runGenerate(
 // validation interceptor has already enforced the message-shape
 // invariants (non-nil, non-empty parts, role is USER/TOOL, tool-role
 // has a tool_result part with tool_call_id) by the time this runs.
+//
+// Tx-wrapped via persistMessageInTx — see that helper's comment for
+// why the (sequence, create, increment) trio needs atomicity.
 func (s *Server) persistInputMessage(ctx context.Context, convID uuid.UUID, in *aiv1.InputMessage) error {
 	role := dbRoleForInputMessage(in.GetRole())
 	parts := in.GetParts()
 	logText := extractText(parts)
-
-	nextSeq, err := s.queries.GetNextSequenceForConversation(ctx, convID)
-	if err != nil {
-		slog.ErrorContext(ctx, "get sequence failed", "conversation_id", convID, "error", err)
-		return apierr.Internal("failed to get sequence")
-	}
 
 	partsJSON, err := marshalParts(parts)
 	if err != nil {
@@ -310,20 +302,55 @@ func (s *Server) persistInputMessage(ctx context.Context, convID uuid.UUID, in *
 		return apierr.Internal("failed to marshal parts")
 	}
 
-	_, err = s.queries.CreateMessage(ctx, db.CreateMessageParams{
+	return s.persistMessageInTx(ctx, convID, db.CreateMessageParams{
 		ConversationID: convID,
 		Name:           uuid.New().String()[:12],
 		Role:           role,
 		Parts:          partsJSON,
-		Sequence:       int64(nextSeq),
 		TokenCount:     int32(estimateTokens(logText)),
 	})
-	if err != nil {
-		slog.ErrorContext(ctx, "persist message failed", "conversation_id", convID, "error", err)
-		return apierr.Internal("failed to persist message")
-	}
-	_ = s.queries.IncrementConversationMessageCount(ctx, convID)
-	return nil
+}
+
+// persistMessageInTx runs the (lock-conversation, get-sequence,
+// create-message, bump-count) sequence atomically.
+//
+// Without the tx, two concurrent persists on the same conversation
+// could each read MAX(sequence)+1 = N before either committed,
+// then both insert with sequence=N — violating the
+// UNIQUE(conversation_id, sequence) constraint and surfacing as a
+// 23505 to whichever loses the race. Locking the conversation row
+// FOR UPDATE at the start of the tx forces concurrent persists to
+// queue, so each computes a fresh sequence under the lock.
+//
+// This also surfaces IncrementConversationMessageCount errors
+// (previously dropped via `_ = ...`) — inside the tx a failed
+// increment rolls back the message create, so the caller can't
+// observe a created message paired with a stale message_count.
+//
+// Sequence field is ignored on the params arg (we set it inside
+// the tx); the caller pre-fills the rest.
+func (s *Server) persistMessageInTx(ctx context.Context, convID uuid.UUID, params db.CreateMessageParams) error {
+	return db.RunInTxVoid(ctx, s.txer, func(qtx db.Querier) error {
+		if _, err := qtx.GetConversationByIDForUpdate(ctx, convID); err != nil {
+			slog.ErrorContext(ctx, "lock conversation failed", "conversation_id", convID, "error", err)
+			return apierr.Internal("lock conversation")
+		}
+		nextSeq, err := qtx.GetNextSequenceForConversation(ctx, convID)
+		if err != nil {
+			slog.ErrorContext(ctx, "get sequence failed", "conversation_id", convID, "error", err)
+			return apierr.Internal("failed to get sequence")
+		}
+		params.Sequence = int64(nextSeq)
+		if _, err := qtx.CreateMessage(ctx, params); err != nil {
+			slog.ErrorContext(ctx, "persist message failed", "conversation_id", convID, "error", err)
+			return apierr.Internal("failed to persist message")
+		}
+		if err := qtx.IncrementConversationMessageCount(ctx, convID); err != nil {
+			slog.ErrorContext(ctx, "increment message count failed", "conversation_id", convID, "error", err)
+			return apierr.Internal("increment message count")
+		}
+		return nil
+	})
 }
 
 // dbRoleForInputMessage maps a proto Role to the string the DB layer

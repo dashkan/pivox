@@ -250,6 +250,18 @@ type Querier interface {
 	GetAssetVersion(ctx context.Context, id uuid.UUID) (AssetVersion, error)
 	GetAssetVersionByNumber(ctx context.Context, arg GetAssetVersionByNumberParams) (AssetVersion, error)
 	GetConversationByID(ctx context.Context, id uuid.UUID) (AiConversation, error)
+	// GetConversationByIDForUpdate is the locking variant used by
+	// runGenerate / persistInputMessage inside their per-message
+	// transactions. The persistence sequence is
+	// GetNextSequenceForConversation → CreateMessage →
+	// IncrementConversationMessageCount; without a serializing lock on
+	// the conversation row, two concurrent persists could read the
+	// same MAX(sequence)+1 and both try to insert with that value,
+	// producing a unique-constraint violation on
+	// (conversation_id, sequence). Locking the conversation row
+	// FOR UPDATE at the start of the tx forces concurrent persists
+	// to queue, so each computes a fresh sequence under the lock.
+	GetConversationByIDForUpdate(ctx context.Context, id uuid.UUID) (AiConversation, error)
 	// GetConversationByName looks up a conversation by (org, name)
 	// without an ownership filter. The handler enforces creator-only or
 	// `*All`-permission access on top of this. Used by the read/update/

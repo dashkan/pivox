@@ -96,6 +96,45 @@ func (q *Queries) GetConversationByID(ctx context.Context, id uuid.UUID) (AiConv
 	return i, err
 }
 
+const getConversationByIDForUpdate = `-- name: GetConversationByIDForUpdate :one
+SELECT id, org_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time FROM ai_conversations WHERE id = $1 FOR UPDATE
+`
+
+// GetConversationByIDForUpdate is the locking variant used by
+// runGenerate / persistInputMessage inside their per-message
+// transactions. The persistence sequence is
+// GetNextSequenceForConversation → CreateMessage →
+// IncrementConversationMessageCount; without a serializing lock on
+// the conversation row, two concurrent persists could read the
+// same MAX(sequence)+1 and both try to insert with that value,
+// producing a unique-constraint violation on
+// (conversation_id, sequence). Locking the conversation row
+// FOR UPDATE at the start of the tx forces concurrent persists
+// to queue, so each computes a fresh sequence under the lock.
+func (q *Queries) GetConversationByIDForUpdate(ctx context.Context, id uuid.UUID) (AiConversation, error) {
+	row := q.db.QueryRow(ctx, getConversationByIDForUpdate, id)
+	var i AiConversation
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.Name,
+		&i.Title,
+		&i.TitleUserSet,
+		&i.Description,
+		&i.Archived,
+		&i.Pinned,
+		&i.MessageCount,
+		&i.LastMessageTime,
+		&i.Etag,
+		&i.Revision,
+		&i.CreatedBy,
+		&i.UpdatedBy,
+		&i.CreateTime,
+		&i.UpdateTime,
+	)
+	return i, err
+}
+
 const getConversationByName = `-- name: GetConversationByName :one
 SELECT id, org_id, name, title, title_user_set, description, archived, pinned, message_count, last_message_time, etag, revision, created_by, updated_by, create_time, update_time FROM ai_conversations WHERE org_id = $1 AND name = $2
 `

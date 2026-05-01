@@ -18,6 +18,20 @@ SELECT * FROM ai_conversations WHERE org_id = $1 AND name = $2;
 -- name: GetConversationByID :one
 SELECT * FROM ai_conversations WHERE id = $1;
 
+-- GetConversationByIDForUpdate is the locking variant used by
+-- runGenerate / persistInputMessage inside their per-message
+-- transactions. The persistence sequence is
+-- GetNextSequenceForConversation → CreateMessage →
+-- IncrementConversationMessageCount; without a serializing lock on
+-- the conversation row, two concurrent persists could read the
+-- same MAX(sequence)+1 and both try to insert with that value,
+-- producing a unique-constraint violation on
+-- (conversation_id, sequence). Locking the conversation row
+-- FOR UPDATE at the start of the tx forces concurrent persists
+-- to queue, so each computes a fresh sequence under the lock.
+-- name: GetConversationByIDForUpdate :one
+SELECT * FROM ai_conversations WHERE id = $1 FOR UPDATE;
+
 -- ListConversations/CountConversations replaced by filter.Query in the
 -- service layer — see internal/filter/declarations.go ConversationFilter.
 

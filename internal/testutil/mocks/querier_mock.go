@@ -963,6 +963,11 @@ func (m *MockQuerier) GetConversationByID(ctx context.Context, id uuid.UUID) (db
 	return args.Get(0).(db.AiConversation), args.Error(1)
 }
 
+func (m *MockQuerier) GetConversationByIDForUpdate(ctx context.Context, id uuid.UUID) (db.AiConversation, error) {
+	args := m.Called(ctx, id)
+	return args.Get(0).(db.AiConversation), args.Error(1)
+}
+
 func (m *MockQuerier) GetConversationByName(ctx context.Context, arg db.GetConversationByNameParams) (db.AiConversation, error) {
 	args := m.Called(ctx, arg)
 	return args.Get(0).(db.AiConversation), args.Error(1)
