@@ -280,6 +280,7 @@ func newIamHarness(t *testing.T) *grpcharness.Harness {
 			Encryptor:  h.Encryptor,
 		}))
 		iampb.RegisterIamServer(s, iam.NewIamServer(iam.Config{
+			Pool:       h.Pool,
 			Queries:    h.Queries,
 			Auth:       h.Auth,
 			Caller:     callerIdentity,

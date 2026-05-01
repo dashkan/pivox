@@ -148,7 +148,7 @@ func TestDeleteUser_BlocksWhenLastOwner(t *testing.T) {
 		OrgID: testHandlerOrgID, UserID: convert.PgUUID(testTargetUserID),
 	}).Return(int64(0), nil)
 
-	srv := &IamServer{queries: q}
+	srv := &IamServer{txer: &db.PassthroughTxer{Q: q}, queries: q}
 	_, err := srv.DeleteUser(resolvedOrgCtx(), &iampb.DeleteUserRequest{
 		Name: "organizations/acme/users/" + testTargetUserID.String(),
 	})
@@ -173,7 +173,7 @@ func TestDeleteUser_FullCascade(t *testing.T) {
 		OrgID: testHandlerOrgID, UserID: testTargetUserID,
 	}).Return(nil)
 
-	srv := &IamServer{queries: q}
+	srv := &IamServer{txer: &db.PassthroughTxer{Q: q}, queries: q}
 	resp, err := srv.DeleteUser(resolvedOrgCtx(), &iampb.DeleteUserRequest{
 		Name: "organizations/acme/users/" + testTargetUserID.String(),
 	})
@@ -255,7 +255,7 @@ func TestRunDeleteAccount_FullCascade(t *testing.T) {
 	auth := new(mockAuthService)
 	auth.On("DeleteUser", mock.Anything, "fb-abc").Return(nil)
 
-	srv := &IamServer{queries: q, auth: auth}
+	srv := &IamServer{txer: &db.PassthroughTxer{Q: q}, queries: q, auth: auth}
 	progress := &fakeAccountProgress{}
 	_, err := srv.runDeleteAccount(context.Background(), progress, identityID)
 	require.NoError(t, err)
@@ -285,7 +285,7 @@ func TestRunDeleteAccount_AlreadyGoneSurfacesInternal(t *testing.T) {
 	q.On("GetIdentityByID", mock.Anything, identityID).
 		Return(db.Identity{}, pgx.ErrNoRows)
 
-	srv := &IamServer{queries: q}
+	srv := &IamServer{txer: &db.PassthroughTxer{Q: q}, queries: q}
 	_, err := srv.runDeleteAccount(context.Background(), &fakeAccountProgress{}, identityID)
 	require.Error(t, err)
 	assert.Equal(t, codes.Internal, status.Code(err))
@@ -305,7 +305,7 @@ func TestRunDeleteAccount_AuthFailureSurfaces(t *testing.T) {
 	auth := new(mockAuthService)
 	auth.On("DeleteUser", mock.Anything, "fb-abc").Return(errors.New("firebase down"))
 
-	srv := &IamServer{queries: q, auth: auth}
+	srv := &IamServer{txer: &db.PassthroughTxer{Q: q}, queries: q, auth: auth}
 	_, err := srv.runDeleteAccount(context.Background(), &fakeAccountProgress{}, identityID)
 	require.Error(t, err)
 	assert.Equal(t, codes.Internal, status.Code(err))

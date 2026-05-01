@@ -32,6 +32,7 @@ import (
 // `Unimplemented`.
 type IamServer struct {
 	iampb.UnimplementedIamServer
+	txer       db.Txer
 	queries    db.Querier
 	auth       authn.Service
 	caller     server.CallerIdentityResolver
@@ -48,6 +49,10 @@ type IamServer struct {
 // GetRole, ListRoles) ignore them. Unit tests that exercise only
 // reads build an IamServer struct literal directly.
 type Config struct {
+	// Pool is the database pool used for transactional handlers
+	// (DeleteUser sole-owner check + cascade; DeleteAccount per-phase
+	// read-then-write atomicity). Required.
+	Pool db.TxBeginner
 	// Queries is the sqlc query interface. Required.
 	Queries db.Querier
 	// Auth is the authn service. Required.
@@ -67,6 +72,9 @@ type Config struct {
 // NewIamServer constructs the server from cfg. Panics on a missing
 // required field.
 func NewIamServer(cfg Config) *IamServer {
+	if cfg.Pool == nil {
+		panic("iam: Config.Pool is required")
+	}
 	if cfg.Queries == nil {
 		panic("iam: Config.Queries is required")
 	}
@@ -80,6 +88,7 @@ func NewIamServer(cfg Config) *IamServer {
 		panic("iam: Config.LROManager is required")
 	}
 	return &IamServer{
+		txer:       &db.PoolTxer{Pool: cfg.Pool},
 		queries:    cfg.Queries,
 		auth:       cfg.Auth,
 		caller:     cfg.Caller,

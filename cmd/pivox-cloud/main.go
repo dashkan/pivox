@@ -360,7 +360,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	// ops (Member CRUD, TransferOwnership, TestIamPermissions) live
 	// on the scope-owning Organizations / Spaces services above.
 	iamv1.RegisterIamServer(grpcServer, iam.NewIamServer(iam.Config{
-		Queries: queries, Auth: authSvc, Caller: callerIdentity,
+		Pool: pool, Queries: queries, Auth: authSvc, Caller: callerIdentity,
 		LROManager: lroManager, AuditResolver: auditResolver,
 	}))
 

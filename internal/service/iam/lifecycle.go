@@ -55,54 +55,60 @@ func (s *IamServer) DeleteUser(ctx context.Context, req *iampb.DeleteUserRequest
 		return nil, err
 	}
 
-	// Confirm the principal is actually a member of this org —
-	// otherwise hard-delete is a no-op (no rows match) which would
-	// silently succeed for a non-member uuid. Fail loud with NotFound
-	// so a malformed delete surfaces as such.
-	remainingOwners, err := s.queries.CountOrgOwnersExcludingUser(ctx,
-		db.CountOrgOwnersExcludingUserParams{OrgID: resolvedOrg.ID, UserID: convert.PgUUID(userID)})
-	if err != nil {
-		slog.ErrorContext(ctx, "delete user: sole-owner check failed",
-			"org_id", resolvedOrg.ID, "user_id", userID, "error", err)
-		return nil, apierr.Internal("sole-owner check")
-	}
-	if remainingOwners == 0 {
-		// Two cases: either the user IS the sole owner (refuse) or
-		// the org has zero owners period (server-invariant violation
-		// — surface as Internal). The latter shouldn't happen for an
-		// active org since CreateOrganization establishes ≥1 owner.
-		// Differentiating cleanly would need an extra query; for v1
-		// we surface the more common case and keep the message
-		// actionable.
-		return nil, apierr.FailedPrecondition(
-			"cannot delete user: would leave the organization with no owners; transfer ownership first")
-	}
+	// Sole-owner check + hard-delete cascade run inside a single tx.
+	//
+	// The check + cascade need atomicity: outside a tx, two
+	// concurrent DeleteUser calls against different sibling owners
+	// could both observe "remaining owners > 0" before either
+	// commits, then both proceed and leave the org with zero
+	// owners — directly defeating the precondition. Inside a tx
+	// the row locks acquired by the DELETEs serialize concurrent
+	// drops, and the count sees a consistent snapshot.
+	//
+	// The DELETE-cascade idempotency that the previous comment
+	// relied on still holds; the tx is added for the read-then-
+	// write invariant, not for the cascade itself.
+	if err := db.RunInTxVoid(ctx, s.txer, func(qtx db.Querier) error {
+		remainingOwners, err := qtx.CountOrgOwnersExcludingUser(ctx,
+			db.CountOrgOwnersExcludingUserParams{OrgID: resolvedOrg.ID, UserID: convert.PgUUID(userID)})
+		if err != nil {
+			slog.ErrorContext(ctx, "delete user: sole-owner check failed",
+				"org_id", resolvedOrg.ID, "user_id", userID, "error", err)
+			return apierr.Internal("sole-owner check")
+		}
+		if remainingOwners == 0 {
+			// Two cases: either the user IS the sole owner (refuse) or
+			// the org has zero owners period (server-invariant violation
+			// — surface as Internal). The latter shouldn't happen for an
+			// active org since CreateOrganization establishes ≥1 owner.
+			// Differentiating cleanly would need an extra query; for v1
+			// we surface the more common case and keep the message
+			// actionable.
+			return apierr.FailedPrecondition(
+				"cannot delete user: would leave the organization with no owners; transfer ownership first")
+		}
 
-	// Hard-delete cascade. Each query is bounded to (org, principal)
-	// — no risk of touching rows outside this org. Order doesn't
-	// matter for correctness; group_members must reference live
-	// groups so deleting it before org_members is fine. We don't
-	// wrap in a transaction because each delete is independently
-	// idempotent (DELETE … WHERE … is a no-op on no-match) and the
-	// failure mode of a partial cascade is benign — a retry
-	// completes the rest.
-	if err := s.queries.DeleteOrgMembersForUserInOrg(ctx,
-		db.DeleteOrgMembersForUserInOrgParams{OrgID: resolvedOrg.ID, UserID: convert.PgUUID(userID)}); err != nil {
-		slog.ErrorContext(ctx, "delete user: revoke org members failed",
-			"org_id", resolvedOrg.ID, "user_id", userID, "error", err)
-		return nil, apierr.Internal("revoke org memberships")
-	}
-	if err := s.queries.DeleteSpaceMembersForUserInOrg(ctx,
-		db.DeleteSpaceMembersForUserInOrgParams{OrgID: resolvedOrg.ID, UserID: convert.PgUUID(userID)}); err != nil {
-		slog.ErrorContext(ctx, "delete user: revoke space members failed",
-			"org_id", resolvedOrg.ID, "user_id", userID, "error", err)
-		return nil, apierr.Internal("revoke space memberships")
-	}
-	if err := s.queries.DeleteGroupMembersForUserInOrg(ctx,
-		db.DeleteGroupMembersForUserInOrgParams{OrgID: resolvedOrg.ID, UserID: userID}); err != nil {
-		slog.ErrorContext(ctx, "delete user: revoke group memberships failed",
-			"org_id", resolvedOrg.ID, "user_id", userID, "error", err)
-		return nil, apierr.Internal("revoke group memberships")
+		if err := qtx.DeleteOrgMembersForUserInOrg(ctx,
+			db.DeleteOrgMembersForUserInOrgParams{OrgID: resolvedOrg.ID, UserID: convert.PgUUID(userID)}); err != nil {
+			slog.ErrorContext(ctx, "delete user: revoke org members failed",
+				"org_id", resolvedOrg.ID, "user_id", userID, "error", err)
+			return apierr.Internal("revoke org memberships")
+		}
+		if err := qtx.DeleteSpaceMembersForUserInOrg(ctx,
+			db.DeleteSpaceMembersForUserInOrgParams{OrgID: resolvedOrg.ID, UserID: convert.PgUUID(userID)}); err != nil {
+			slog.ErrorContext(ctx, "delete user: revoke space members failed",
+				"org_id", resolvedOrg.ID, "user_id", userID, "error", err)
+			return apierr.Internal("revoke space memberships")
+		}
+		if err := qtx.DeleteGroupMembersForUserInOrg(ctx,
+			db.DeleteGroupMembersForUserInOrgParams{OrgID: resolvedOrg.ID, UserID: userID}); err != nil {
+			slog.ErrorContext(ctx, "delete user: revoke group memberships failed",
+				"org_id", resolvedOrg.ID, "user_id", userID, "error", err)
+			return apierr.Internal("revoke group memberships")
+		}
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 
 	return &emptypb.Empty{}, nil
@@ -232,18 +238,29 @@ func (s *IamServer) runDeleteAccount(
 	}
 
 	// REVOKING_MEMBERSHIPS: cross-org drop. Bounded by
-	// identity_id at the SQL level so the DELETE can't
-	// reach rows that aren't this user's.
+	// identity_id at the SQL level so the DELETE can't reach rows
+	// that aren't this user's. Tx-wrapped so the org + space
+	// revocations land atomically — without a tx, a partial failure
+	// (e.g. session loss between the two DELETEs) leaves the
+	// caller with no org_members but lingering space_members,
+	// which is a confusing intermediate state for any retry
+	// (the LRO resumes from the phase but a failed Phase 2 isn't
+	// scoped narrower than "do all the revokes").
 	updatePhase(iampb.DeleteAccountMetadata_REVOKING_MEMBERSHIPS)
-	if err := s.queries.DeleteOrgMembersForIdentity(ctx, convert.PgUUID(firebaseIdentityID)); err != nil {
-		slog.ErrorContext(ctx, "delete account: revoke org members failed",
-			"identity_id", firebaseIdentityID, "error", err)
-		return nil, apierr.Internal("revoke org memberships")
-	}
-	if err := s.queries.DeleteSpaceMembersForIdentity(ctx, convert.PgUUID(firebaseIdentityID)); err != nil {
-		slog.ErrorContext(ctx, "delete account: revoke space members failed",
-			"identity_id", firebaseIdentityID, "error", err)
-		return nil, apierr.Internal("revoke space memberships")
+	if err := db.RunInTxVoid(ctx, s.txer, func(qtx db.Querier) error {
+		if err := qtx.DeleteOrgMembersForIdentity(ctx, convert.PgUUID(firebaseIdentityID)); err != nil {
+			slog.ErrorContext(ctx, "delete account: revoke org members failed",
+				"identity_id", firebaseIdentityID, "error", err)
+			return apierr.Internal("revoke org memberships")
+		}
+		if err := qtx.DeleteSpaceMembersForIdentity(ctx, convert.PgUUID(firebaseIdentityID)); err != nil {
+			slog.ErrorContext(ctx, "delete account: revoke space members failed",
+				"identity_id", firebaseIdentityID, "error", err)
+			return apierr.Internal("revoke space memberships")
+		}
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 
 	// DELETING_PIVOX_RECORDS: capture the Firebase UID before
@@ -251,38 +268,54 @@ func (s *IamServer) runDeleteAccount(
 	// auth.DeleteUser(uid). The identity row is preserved
 	// (soft-deleted) so historical *_by audit references still
 	// resolve — only the user-visible PII is blanked.
+	//
+	// Tx-wrapped: the lookup-then-soft-delete is a classic TOCTOU
+	// pair. Without the tx, a sync-identity webhook (or a parallel
+	// DeleteAccount retry) could soft-delete between our Get and
+	// our SoftDelete; the SoftDelete then no-ops, our captured
+	// firebase_uid is stale, and the next phase calls Firebase
+	// DeleteUser on a possibly-mismatched uid. Inside the tx the
+	// Get's row lock blocks concurrent mutations until our
+	// SoftDelete commits.
 	updatePhase(iampb.DeleteAccountMetadata_DELETING_PIVOX_RECORDS)
-	identity, err := s.queries.GetIdentityByID(ctx, firebaseIdentityID)
+	identity, err := db.RunInTx(ctx, s.txer, func(qtx db.Querier) (db.Identity, error) {
+		identity, err := qtx.GetIdentityByID(ctx, firebaseIdentityID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				// Should not happen now that delete is soft —
+				// GetIdentityByID returns soft-deleted rows too. Only
+				// fires if an operator manually purged the row outside
+				// of the LRO. Loud log + Internal so they reconcile.
+				slog.ErrorContext(ctx, "delete account: identity row already purged outside the LRO — Firebase Auth account likely orphaned, manual cleanup required",
+					"identity_id", firebaseIdentityID)
+				return db.Identity{}, apierr.Internal(
+					"identity already removed from Pivox but its Firebase Auth UID is unknown; operator must reconcile manually")
+			}
+			slog.ErrorContext(ctx, "delete account: lookup identity failed",
+				"id", firebaseIdentityID, "error", err)
+			return db.Identity{}, apierr.Internal("lookup identity")
+		}
+		// SoftDeleteIdentity returns the row's id when the UPDATE
+		// actually landed; ErrNoRows means the row was already
+		// soft-deleted (or the id doesn't exist — but GetIdentityByID
+		// just succeeded above so concurrent purge is the only
+		// realistic cause). We treat that as fatal rather than
+		// silently advancing to auth.DeleteUser with a possibly-stale
+		// firebase_uid.
+		if _, err := qtx.SoftDeleteIdentity(ctx, firebaseIdentityID); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				slog.ErrorContext(ctx, "delete account: soft-delete identity touched zero rows; row already tombstoned or concurrently purged",
+					"id", firebaseIdentityID)
+				return db.Identity{}, apierr.Internal("soft-delete identity: row already tombstoned")
+			}
+			slog.ErrorContext(ctx, "delete account: soft-delete identity failed",
+				"id", firebaseIdentityID, "error", err)
+			return db.Identity{}, apierr.Internal("soft-delete identity")
+		}
+		return identity, nil
+	})
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			// Should not happen now that delete is soft —
-			// GetIdentityByID returns soft-deleted rows too. Only
-			// fires if an operator manually purged the row outside
-			// of the LRO. Loud log + Internal so they reconcile.
-			slog.ErrorContext(ctx, "delete account: identity row already purged outside the LRO — Firebase Auth account likely orphaned, manual cleanup required",
-				"identity_id", firebaseIdentityID)
-			return nil, apierr.Internal(
-				"identity already removed from Pivox but its Firebase Auth UID is unknown; operator must reconcile manually")
-		}
-		slog.ErrorContext(ctx, "delete account: lookup identity failed",
-			"id", firebaseIdentityID, "error", err)
-		return nil, apierr.Internal("lookup identity")
-	}
-	// SoftDeleteIdentity returns the row's id when the UPDATE actually
-	// landed; ErrNoRows means the row was already soft-deleted (or
-	// the id doesn't exist — but GetIdentityByID just succeeded above
-	// so concurrent purge is the only realistic cause). We treat that
-	// as fatal rather than silently advancing to auth.DeleteUser with
-	// a possibly-stale firebase_uid.
-	if _, err := s.queries.SoftDeleteIdentity(ctx, firebaseIdentityID); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			slog.ErrorContext(ctx, "delete account: soft-delete identity touched zero rows; row already tombstoned or concurrently purged",
-				"id", firebaseIdentityID)
-			return nil, apierr.Internal("soft-delete identity: row already tombstoned")
-		}
-		slog.ErrorContext(ctx, "delete account: soft-delete identity failed",
-			"id", firebaseIdentityID, "error", err)
-		return nil, apierr.Internal("soft-delete identity")
+		return nil, err
 	}
 	// PII just got blanked; drop any cached Actor for this id so the
 	// next read on this instance sees the soft-deleted state

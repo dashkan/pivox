@@ -291,6 +291,7 @@ func newPermissionHarness(t *testing.T) *grpcharness.Harness {
 			LROManager: h.LROManager,
 		}))
 		iampb.RegisterIamServer(s, iam.NewIamServer(iam.Config{
+			Pool:       h.Pool,
 			Queries:    h.Queries,
 			Auth:       h.Auth,
 			Caller:     callerIdentity,
