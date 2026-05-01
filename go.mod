@@ -16,6 +16,7 @@ require (
 	github.com/minio/minio-go/v7 v7.1.0
 	github.com/ollama/ollama v0.22.1
 	github.com/pgvector/pgvector-go v0.3.0
+	github.com/samber/slog-http v1.12.1
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1

@@ -15,6 +15,7 @@ import (
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/jackc/pgx/v5/pgxpool"
+	sloghttp "github.com/samber/slog-http"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -561,9 +562,27 @@ func serve(cmd *cobra.Command, args []string) error {
 	// gatedGwMux, returning 405 for the wrong method on this path.
 	httpMux.HandleFunc("POST /v1/ai:streamGenerateContent", sseHandler.ServeHTTP)
 
+	// Request logging — slog-native middleware that emits one structured
+	// log line per HTTP request at completion (method, path, status,
+	// latency, response size, client IP). Auth-class headers
+	// (Authorization, Cookie, Set-Cookie, X-Auth-Token, etc.) are
+	// redacted by default. Wraps the ENTIRE REST mux so it captures
+	// gateway routes + internal hooks + OAuth broker + SSE uniformly.
+	// For SSE this fires when the stream closes — a few seconds for
+	// normal completions, longer for hung clients (which is itself
+	// the diagnostic). Trace-ID/Span-ID propagation is off until we
+	// land OpenTelemetry; toggle via WithTraceID/WithSpanID then.
+	requestLogMW := sloghttp.NewWithConfig(logger, sloghttp.Config{
+		DefaultLevel:     slog.LevelInfo,
+		ClientErrorLevel: slog.LevelWarn,
+		ServerErrorLevel: slog.LevelError,
+		WithRequestID:    true,
+		WithClientIP:     true,
+	})
+
 	restServer := &http.Server{
 		Addr:    cfg.RESTPort,
-		Handler: httpMux,
+		Handler: requestLogMW(httpMux),
 	}
 	go func() {
 		logger.Info("REST gateway listening", "addr", cfg.RESTPort)
