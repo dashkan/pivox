@@ -4,20 +4,15 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
-	"net"
 	"net/http"
-	"net/netip"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"golang.org/x/time/rate"
 
 	"github.com/dashkan/pivox/internal/audit"
 	"github.com/dashkan/pivox/internal/authn"
@@ -39,13 +34,6 @@ type InternalHooksConfig struct {
 	SyncAuth config.SyncAuthConfig
 	// DelegatedAuth governs the delegated-auth endpoints.
 	DelegatedAuth config.DelegatedAuthConfig
-	// RateLimitEnabled gates every per-IP rate limiter. False is
-	// fine for deployments where a reverse proxy owns rate limiting.
-	RateLimitEnabled bool
-	// TrustedProxies is the list of CIDR blocks whose connections
-	// may set X-Forwarded-For. Empty ⇒ never trust the header
-	// (fail-closed). See clientIP.
-	TrustedProxies []string
 	// Logger is the slog.Logger used for warning/error events.
 	// Required.
 	Logger *slog.Logger
@@ -72,57 +60,28 @@ type InternalHooks struct {
 	// catches up via TTL.
 	audit *audit.Resolver
 
-	// rateLimitEnabled gates every rateLimitWith middleware. When false the
-	// limiter instances are still kept (so toggling back on does not require
-	// a restart) but allow() is never called. Intended for deployments where
-	// a reverse proxy owns rate limiting.
-	rateLimitEnabled bool
-
 	// syncAuth protects the auth:syncIdentity endpoint. The
 	// implementation is selected at compile time via build tags:
 	//   - Production (default): Google Cloud OIDC identity token verification
 	//   - Dev (go build -tags dev): static shared secret
 	syncAuth func(http.HandlerFunc) http.HandlerFunc
-
-	// Per-IP rate limiter for the token exchange endpoint (AUTHN-06).
-	exchangeLimiter *ipRateLimiter
-
-	// Per-IP rate limiters for the delegated-auth endpoints (AUTHN-07).
-	// Split per endpoint because the access patterns differ sharply:
-	//   - Create: user-initiated, aggressive cap is fine.
-	//   - Complete: called once per flow from the authenticated app.
-	//   - Poll: called every pollInterval seconds by the plugin; its refill
-	//     rate must be faster than the poll cadence or normal use 429s.
-	delegatedCreateLimiter   *ipRateLimiter
-	delegatedCompleteLimiter *ipRateLimiter
-	delegatedPollLimiter     *ipRateLimiter
-
-	// Per-IP rate limiter for the SSO provider resolution endpoint.
-	// Called by Firebase blocking functions on every sign-in attempt;
-	// its traffic pattern is independent of token exchange so it gets
-	// its own bucket to avoid cross-endpoint pollution.
-	resolveProviderLimiter *ipRateLimiter
-
-	// trustedProxies are CIDR blocks whose connections are allowed
-	// to set X-Forwarded-For. Empty means "never trust the header"
-	// (default fail-closed). See clientIP.
-	trustedProxies []netip.Prefix
 }
 
 // Register mounts the internal endpoints on the given mux.
+//
+// No app-level rate limiting is applied: pivox-cloud runs behind an edge
+// proxy / load balancer in production, which owns volumetric IP-class
+// abuse defense. App-level abuse defense lives in single-use codes,
+// short TTLs, the auth chain, and response-shape uniformity.
 func (h *InternalHooks) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /internal/v1/auth:syncIdentity", h.syncAuth(h.syncIdentity))
-	mux.HandleFunc("POST /internal/v1/auth:exchangeToken", h.rateLimit(h.exchangeToken))
+	mux.HandleFunc("POST /internal/v1/auth:exchangeToken", h.exchangeToken)
 	mux.HandleFunc("POST /internal/v1/auth:depositToken", h.depositToken)
 	mux.HandleFunc("POST /internal/v1/auth:consumeToken", h.consumeToken)
-	mux.HandleFunc("POST /internal/v1/auth:createDelegatedAuthSession",
-		h.rateLimitWith(h.delegatedCreateLimiter, h.createDelegatedAuthSession))
-	mux.HandleFunc("POST /internal/v1/auth:completeDelegatedAuthSession",
-		h.rateLimitWith(h.delegatedCompleteLimiter, h.completeDelegatedAuthSession))
-	mux.HandleFunc("POST /internal/v1/auth:pollDelegatedAuthSession",
-		h.rateLimitWith(h.delegatedPollLimiter, h.pollDelegatedAuthSession))
-	mux.HandleFunc("POST /internal/v1/auth:resolveProvider",
-		h.rateLimitWith(h.resolveProviderLimiter, h.resolveProvider))
+	mux.HandleFunc("POST /internal/v1/auth:createDelegatedAuthSession", h.createDelegatedAuthSession)
+	mux.HandleFunc("POST /internal/v1/auth:completeDelegatedAuthSession", h.completeDelegatedAuthSession)
+	mux.HandleFunc("POST /internal/v1/auth:pollDelegatedAuthSession", h.pollDelegatedAuthSession)
+	mux.HandleFunc("POST /internal/v1/auth:resolveProvider", h.resolveProvider)
 }
 
 // syncIdentityRequest is the payload sent by the Firebase
@@ -556,163 +515,4 @@ func emailDomain(email string) string {
 		return ""
 	}
 	return strings.ToLower(email[at+1:])
-}
-
-// rateLimit wraps a handler with per-IP rate limiting using the exchange limiter.
-func (h *InternalHooks) rateLimit(next http.HandlerFunc) http.HandlerFunc {
-	return h.rateLimitWith(h.exchangeLimiter, next)
-}
-
-func (h *InternalHooks) rateLimitWith(limiter *ipRateLimiter, next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if !h.rateLimitEnabled {
-			next(w, r)
-			return
-		}
-		ip := h.clientIP(r)
-		if !limiter.allow(ip) {
-			h.logger.Warn("rate limit exceeded", "ip", ip, "path", r.URL.Path)
-			http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
-			return
-		}
-		next(w, r)
-	}
-}
-
-// clientIP extracts the rate-limit identity from a request. The
-// algorithm:
-//
-//  1. Always start with r.RemoteAddr (the IP that opened the TCP
-//     connection). Strip the port.
-//  2. If RemoteAddr does not parse as an IP, return the raw value —
-//     the rate limiter treats it as an opaque key. This keeps tests
-//     and odd transports working without crashing.
-//  3. If RemoteAddr is NOT inside any configured trusted-proxies
-//     CIDR, return RemoteAddr. The X-Forwarded-For header is
-//     ignored — anyone could have set it.
-//  4. If RemoteAddr IS in a trusted-proxies CIDR, walk the
-//     X-Forwarded-For list right-to-left and return the first entry
-//     that is NOT itself in a trusted CIDR. (Trusted entries are
-//     proxy hops; we want the original client.) If every entry is
-//     trusted, fall back to RemoteAddr.
-//
-// trustedProxies defaulting to empty means "fail closed" — the header
-// is never honored and every request keys on RemoteAddr. Operators
-// who deploy behind a load balancer must explicitly configure the
-// LB's CIDR via the TrustedProxies config field.
-func (h *InternalHooks) clientIP(r *http.Request) string {
-	hostStr, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		hostStr = r.RemoteAddr
-	}
-	remoteIP, err := netip.ParseAddr(hostStr)
-	if err != nil {
-		return hostStr
-	}
-	if !ipInTrustedProxies(remoteIP, h.trustedProxies) {
-		return remoteIP.String()
-	}
-	xff := r.Header.Get("X-Forwarded-For")
-	if xff == "" {
-		return remoteIP.String()
-	}
-	parts := strings.Split(xff, ",")
-	for i := len(parts) - 1; i >= 0; i-- {
-		candidate, err := netip.ParseAddr(strings.TrimSpace(parts[i]))
-		if err != nil {
-			continue
-		}
-		if !ipInTrustedProxies(candidate, h.trustedProxies) {
-			return candidate.String()
-		}
-	}
-	return remoteIP.String()
-}
-
-// ipInTrustedProxies reports whether ip falls inside any of the
-// configured prefixes. An empty prefix list is a no-match — the
-// caller falls back to RemoteAddr.
-func ipInTrustedProxies(ip netip.Addr, prefixes []netip.Prefix) bool {
-	for _, p := range prefixes {
-		if p.Contains(ip) {
-			return true
-		}
-	}
-	return false
-}
-
-// parseTrustedProxies converts the string CIDR list from config into
-// netip.Prefix values. Returns an error on any malformed entry so
-// startup fails loudly rather than silently falling back to "trust
-// nothing" — a misconfigured proxy list is more dangerous than no
-// proxy list, since the operator thinks the header is being honored.
-func parseTrustedProxies(cidrs []string) ([]netip.Prefix, error) {
-	if len(cidrs) == 0 {
-		return nil, nil
-	}
-	prefixes := make([]netip.Prefix, 0, len(cidrs))
-	for _, c := range cidrs {
-		p, err := netip.ParsePrefix(strings.TrimSpace(c))
-		if err != nil {
-			return nil, fmt.Errorf("trusted_proxies: %q is not a valid CIDR: %w", c, err)
-		}
-		prefixes = append(prefixes, p)
-	}
-	return prefixes, nil
-}
-
-// ipStaleAfter is how long an IP's limiter may sit unused before it is
-// evicted from the map. Prevents unbounded map growth from transient IPs.
-const ipStaleAfter = 10 * time.Minute
-
-// ipRateLimiter provides per-key token bucket rate limiting with opportunistic
-// eviction of stale entries. Cleanup runs on each allow() call rather than on
-// a timer to keep the type self-contained; at current request rates the
-// overhead is negligible.
-type ipRateLimiter struct {
-	mu       sync.Mutex
-	limiters map[string]*ipLimiterEntry
-	r        rate.Limit
-	burst    int
-	// now is injected in tests; production uses time.Now.
-	now func() time.Time
-}
-
-type ipLimiterEntry struct {
-	limiter  *rate.Limiter
-	lastSeen time.Time
-}
-
-func newIPRateLimiter(r rate.Limit, burst int) *ipRateLimiter {
-	return &ipRateLimiter{
-		limiters: make(map[string]*ipLimiterEntry),
-		r:        r,
-		burst:    burst,
-		now:      time.Now,
-	}
-}
-
-func (l *ipRateLimiter) allow(key string) bool {
-	l.mu.Lock()
-	now := l.now()
-	l.evictStaleLocked(now)
-	entry, exists := l.limiters[key]
-	if !exists {
-		entry = &ipLimiterEntry{limiter: rate.NewLimiter(l.r, l.burst)}
-		l.limiters[key] = entry
-	}
-	entry.lastSeen = now
-	lim := entry.limiter
-	l.mu.Unlock()
-	return lim.Allow()
-}
-
-// evictStaleLocked removes entries whose last activity was longer than
-// ipStaleAfter ago. Caller must hold l.mu.
-func (l *ipRateLimiter) evictStaleLocked(now time.Time) {
-	for k, entry := range l.limiters {
-		if now.Sub(entry.lastSeen) > ipStaleAfter {
-			delete(l.limiters, k)
-		}
-	}
 }

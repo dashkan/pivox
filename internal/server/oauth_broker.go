@@ -20,7 +20,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"golang.org/x/time/rate"
 
 	"github.com/dashkan/pivox/internal/config"
 	"github.com/dashkan/pivox/internal/crypto"
@@ -47,7 +46,6 @@ type OAuthBroker struct {
 	logger    *slog.Logger
 	encryptor crypto.Encryptor
 	cfg       config.OAuthBrokerConfig
-	limiter   *ipRateLimiter
 
 	// httpClient is reused across token-exchange and OIDC discovery
 	// fetches. Has a tight 10s timeout — IdPs are remote and slow
@@ -121,14 +119,10 @@ func NewOAuthBroker(cfg OAuthBrokerConfig) *OAuthBroker {
 		panic("server: OAuthBrokerConfig.Broker.BaseURL is required")
 	}
 	return &OAuthBroker{
-		queries:   cfg.Queries,
-		logger:    cfg.Logger,
-		encryptor: cfg.Encryptor,
-		cfg:       cfg.Broker,
-		// Same shape as exchangeLimiter — start/callback are
-		// browser-redirect-driven so traffic per-IP is naturally
-		// low. 6s refill / 10 burst keeps a reasonable upper bound.
-		limiter:        newIPRateLimiter(rate.Every(6*time.Second), 10),
+		queries:        cfg.Queries,
+		logger:         cfg.Logger,
+		encryptor:      cfg.Encryptor,
+		cfg:            cfg.Broker,
 		httpClient:     &http.Client{Timeout: 10 * time.Second},
 		discoveryCache: make(map[string]discoveryCacheEntry),
 	}
@@ -147,20 +141,14 @@ func NewOAuthBroker(cfg OAuthBrokerConfig) *OAuthBroker {
 // are public-facing for browser redirects; the prefix tracks
 // "Pivox-server-implemented" vs the gRPC-gateway-generated `/v1/...`
 // routes.
+// Register mounts the broker handlers. No app-level rate limiting:
+// pivox-cloud runs behind an edge proxy / load balancer that owns
+// volumetric per-IP defense. Auth-flow abuse defenses live in the
+// HMAC-signed state token, single-use codes, and the IdP's own
+// brute-force protections on `/authorize`.
 func (b *OAuthBroker) Register(mux *http.ServeMux) {
-	mux.HandleFunc("GET /internal/v1/auth/{provider}/start", b.rateLimited(b.start))
-	mux.HandleFunc("GET /internal/v1/auth/{provider}/callback", b.rateLimited(b.callback))
-}
-
-func (b *OAuthBroker) rateLimited(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ip := remoteIPForRateLimit(r)
-		if !b.limiter.allow(ip) {
-			http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
-			return
-		}
-		next(w, r)
-	}
+	mux.HandleFunc("GET /internal/v1/auth/{provider}/start", b.start)
+	mux.HandleFunc("GET /internal/v1/auth/{provider}/callback", b.callback)
 }
 
 // providerConfig describes everything the broker needs to drive an
@@ -768,18 +756,4 @@ func isLocalhostHost(host string) bool {
 		return false
 	}
 	return addr.IsLoopback()
-}
-
-// remoteIPForRateLimit pulls the bare host from RemoteAddr. The
-// broker doesn't unwrap X-Forwarded-For — its rate-limiting is
-// best-effort and a proxied caller will fall back to the proxy's
-// IP rather than disclosing trust assumptions to a public-facing
-// route. Internal-only routes that need proxy-aware IP use
-// `InternalHooks.clientIP` instead.
-func remoteIPForRateLimit(r *http.Request) string {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
 }

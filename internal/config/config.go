@@ -11,28 +11,20 @@ import "time"
 // gcloud user identity). Operators do not configure GCP knobs in
 // Pivox-named env vars.
 type Config struct {
-	DatabaseURL      string
-	GRPCPort         string
-	ServiceGRPCPort  string // service-to-service gRPC listener (AgentService et al.)
-	RESTPort         string
-	DebugPort        string
-	LogLevel         string
-	RateLimitEnabled bool
-	// TrustedProxies is the set of CIDR blocks whose connections are
-	// trusted to set X-Forwarded-For. When the connection's
-	// RemoteAddr falls in this set, the leftmost X-Forwarded-For
-	// entry that is NOT itself a trusted-proxy IP is used as the
-	// rate-limit identity. When RemoteAddr is NOT in this set, the
-	// header is ignored and RemoteAddr alone is used.
-	//
-	// Default empty list = "fail closed" — never trust the header,
-	// always key on RemoteAddr. Dev configs typically set this to
-	// ["0.0.0.0/0", "::/0"] (trust everyone — same machine, no
-	// adversaries). Prod configs set it to the load balancer's CIDR.
-	TrustedProxies []string
-	SyncAuth       SyncAuthConfig
-	DelegatedAuth  DelegatedAuthConfig
-	OAuthBroker    OAuthBrokerConfig
+	DatabaseURL     string
+	GRPCPort        string
+	ServiceGRPCPort string // service-to-service gRPC listener (AgentService et al.)
+	RESTPort        string
+	DebugPort       string
+	LogLevel        string
+	// Rate limiting is the responsibility of the edge proxy / load
+	// balancer in front of pivox-cloud (Cloudflare, GCLB, nginx). The
+	// Cloud Controller does not implement app-level per-IP limits;
+	// abuse defenses live in single-use codes, TTLs, response-shape
+	// uniformity, and the auth chain.
+	SyncAuth      SyncAuthConfig
+	DelegatedAuth DelegatedAuthConfig
+	OAuthBroker   OAuthBrokerConfig
 }
 
 // OAuthBrokerConfig controls the server-side OAuth/OIDC broker that
