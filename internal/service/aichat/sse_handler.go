@@ -8,10 +8,15 @@ import (
 	"net/http"
 
 	aiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/ai/v1"
-	"github.com/dashkan/pivox/internal/server"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
+
+// sseRequestBodyMaxBytes caps the size of an incoming SSE request
+// body. The body is just a JSON envelope with a few fields and an
+// array of conversation messages — 1 MiB is generous and bounds
+// memory while still leaving room for a long-context resumed thread.
+const sseRequestBodyMaxBytes = 1 << 20
 
 // SSEHandler serves the POST /v1/ai:streamGenerateContent endpoint
 // using Server-Sent Events. It self-dials the local gRPC
@@ -62,12 +67,17 @@ type sseInputMessage struct {
 	Parts json.RawMessage `json:"parts"`
 }
 
+// ServeHTTP is registered on the top-level httpMux directly (not on
+// the auth-wrapped grpc-gateway mux), so the HTTP RequireAuth
+// middleware does not run for this route. The handler is a thin
+// proxy to AiChat.StreamGenerateContent over an in-process bufconn
+// dial; the gRPC AuthInterceptor on that call validates the bearer
+// token forwarded as gRPC metadata below. Wrapping this route with
+// HTTP auth would double-verify the same token without changing the
+// auth boundary. See cmd/pivox-cloud/main.go for the registration
+// site comment that pairs with this one.
 func (h *SSEHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	uid, ok := server.AuthenticatedUID(r.Context())
-	if !ok || uid == "" {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
+	r.Body = http.MaxBytesReader(w, r.Body, sseRequestBodyMaxBytes)
 
 	var req sseStreamRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
