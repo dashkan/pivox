@@ -186,8 +186,8 @@ func TestTranspile_SelectExpression(t *testing.T) {
 	// labels.env (select expression as an ident in traversal).
 	wc, err := Transpile(rf, `labels.env = "prod"`, 1)
 	require.NoError(t, err)
-	assert.Equal(t, `labels->>'env' = $1`, wc.SQL)
-	assert.Equal(t, []any{"prod"}, wc.Args)
+	assert.Equal(t, `labels->>$1 = $2`, wc.SQL)
+	assert.Equal(t, []any{"env", "prod"}, wc.Args)
 }
 
 func TestTranspile_SelectOnNonJSONB_Error(t *testing.T) {
@@ -343,13 +343,15 @@ func TestTranspile_SelectStandalone(t *testing.T) {
 		name        string
 		filter      string
 		wantSQL     string
+		wantArgs    []any
 		wantErr     bool
 		errContains string
 	}{
 		{
-			name:    "labels.env as standalone expression",
-			filter:  `labels.env`,
-			wantSQL: `labels->>'env'`,
+			name:     "labels.env as standalone expression",
+			filter:   `labels.env`,
+			wantSQL:  `labels->>$1`,
+			wantArgs: []any{"env"},
 		},
 		{
 			name:        "non-JSONB field traversal error",
@@ -369,7 +371,7 @@ func TestTranspile_SelectStandalone(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantSQL, wc.SQL)
-			assert.Empty(t, wc.Args)
+			assert.Equal(t, tt.wantArgs, wc.Args)
 		})
 	}
 }

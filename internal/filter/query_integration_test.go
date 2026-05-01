@@ -220,6 +220,35 @@ func TestQueryIntegration_Spaces_NoFilter(t *testing.T) {
 	assert.True(t, ids[p2.ID])
 }
 
+// Regression for github.com/dashkan/pivox/issues/23: a quoted JSONB key
+// crafted to inject a tautology must not bypass org scoping. With the
+// transpiler fix the filter is rejected at parse-build time before any
+// SQL touches the pool — so the smuggled `OR '1'='1'` never widens the
+// WHERE. The other-org row stays invisible regardless of which scope
+// the caller is permitted to see.
+func TestQueryIntegration_Spaces_JSONBKeyInjection_Blocked(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	pool, queries, cleanup := testutil.SetupTestDB(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	orgA := createTestOrg(t, queries, uuid.New().String()[:8])
+	orgB := createTestOrg(t, queries, uuid.New().String()[:8])
+	createTestSpace(t, queries, orgA.ID, "Space A")
+	createTestSpace(t, queries, orgB.ID, "Space B (other org)")
+
+	rf := SpaceFilter()
+	_, err := Query(ctx, pool, rf, QueryParams{
+		ParentID: orgA.ID.String(),
+		Filter:   `labels."x' OR '1'='1":foo`,
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid jsonb key")
+}
+
 func TestQueryIntegration_Spaces_SoftDelete(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")

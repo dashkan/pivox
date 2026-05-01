@@ -2,12 +2,32 @@ package filter
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
 	"go.einride.tech/aip/filtering"
 	expr "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
+
+// jsonbKeyPattern restricts JSONB field names accepted via dot-traversal
+// (e.g. `labels.env`) to plain identifiers. The einride filter parser
+// accepts arbitrary STRING tokens after a DOT, so without this gate a
+// quoted key like `labels."x' OR '1'='1"` would parse cleanly. Keys are
+// also passed as bind parameters (see jsonbKeyParam) — this regex is the
+// defense-in-depth gate that produces a clean parse-time rejection
+// before the value reaches the driver.
+var jsonbKeyPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+// jsonbKeyParam validates a JSONB field name and returns a $N placeholder
+// bound to it. Callers must interpolate the returned placeholder into SQL
+// (e.g. fmt.Sprintf("%s->>%s", col, ph)), never the raw key.
+func (t *Transpiler) jsonbKeyParam(key string) (string, error) {
+	if !jsonbKeyPattern.MatchString(key) {
+		return "", fmt.Errorf("invalid jsonb key %q", key)
+	}
+	return t.nextParam(key), nil
+}
 
 // WhereClause is the output of the transpiler.
 type WhereClause struct {
@@ -221,16 +241,19 @@ func (t *Transpiler) transpileHasSelect(sel *expr.Expr_Select, rhs *expr.Expr) (
 		return "", fmt.Errorf("%s does not support traversal", sel.GetField())
 	}
 
-	key := sel.GetField()
+	keyParam, err := t.jsonbKeyParam(sel.GetField())
+	if err != nil {
+		return "", err
+	}
 	value, err := t.resolveValue(rhs)
 	if err != nil {
 		return "", err
 	}
 
-	// labels->>'key' ILIKE '%value%'
+	// labels->>$N ILIKE $N+1
 	strVal := fmt.Sprintf("%%%v%%", value)
-	param := t.nextParam(strVal)
-	return fmt.Sprintf("%s->>'%s' ILIKE %s", fm.Column, key, param), nil
+	valParam := t.nextParam(strVal)
+	return fmt.Sprintf("%s->>%s ILIKE %s", fm.Column, keyParam, valParam), nil
 }
 
 func (t *Transpiler) transpileTimestamp(call *expr.Expr_Call) (string, error) {
@@ -285,8 +308,12 @@ func (t *Transpiler) transpileSelect(sel *expr.Expr_Select) (string, error) {
 	if !fm.JSONB {
 		return "", fmt.Errorf("%s does not support traversal", sel.GetField())
 	}
-	// e.g. labels->>'env'
-	return fmt.Sprintf("%s->>'%s'", fm.Column, sel.GetField()), nil
+	keyParam, err := t.jsonbKeyParam(sel.GetField())
+	if err != nil {
+		return "", err
+	}
+	// e.g. labels->>$N
+	return fmt.Sprintf("%s->>%s", fm.Column, keyParam), nil
 }
 
 // resolveField extracts the column name and FilterableField from an expression.
@@ -300,7 +327,7 @@ func (t *Transpiler) resolveField(e *expr.Expr) (string, FilterableField, error)
 		}
 		return fm.Column, fm, nil
 	case *expr.Expr_SelectExpr:
-		// Dot-traversal, e.g. labels.key → labels->>'key'
+		// Dot-traversal, e.g. labels.key → labels->>$N
 		_, fm, err := t.resolveField(v.SelectExpr.GetOperand())
 		if err != nil {
 			return "", FilterableField{}, err
@@ -308,7 +335,11 @@ func (t *Transpiler) resolveField(e *expr.Expr) (string, FilterableField, error)
 		if !fm.JSONB {
 			return "", FilterableField{}, fmt.Errorf("%s does not support traversal", v.SelectExpr.GetOperand().GetIdentExpr().GetName())
 		}
-		col := fmt.Sprintf("%s->>'%s'", fm.Column, v.SelectExpr.GetField())
+		keyParam, err := t.jsonbKeyParam(v.SelectExpr.GetField())
+		if err != nil {
+			return "", FilterableField{}, err
+		}
+		col := fmt.Sprintf("%s->>%s", fm.Column, keyParam)
 		return col, FilterableField{Column: col, Type: filtering.TypeString}, nil
 	default:
 		return "", FilterableField{}, fmt.Errorf("expected field identifier, got %T", v)

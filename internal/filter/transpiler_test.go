@@ -144,16 +144,56 @@ func TestTranspile_JSONB_DotTraversal_Equals(t *testing.T) {
 	rf := SpaceFilter()
 	wc, err := Transpile(rf, `labels.env = "production"`, 1)
 	require.NoError(t, err)
-	assert.Equal(t, `labels->>'env' = $1`, wc.SQL)
-	assert.Equal(t, []any{"production"}, wc.Args)
+	assert.Equal(t, `labels->>$1 = $2`, wc.SQL)
+	assert.Equal(t, []any{"env", "production"}, wc.Args)
 }
 
 func TestTranspile_JSONB_DotTraversal_Has(t *testing.T) {
 	rf := SpaceFilter()
 	wc, err := Transpile(rf, `labels.env : "prod"`, 1)
 	require.NoError(t, err)
-	assert.Equal(t, `labels->>'env' ILIKE $1`, wc.SQL)
-	assert.Equal(t, []any{"%prod%"}, wc.Args)
+	assert.Equal(t, `labels->>$1 ILIKE $2`, wc.SQL)
+	assert.Equal(t, []any{"env", "%prod%"}, wc.Args)
+}
+
+// JSONB key injection guard — see github.com/dashkan/pivox/issues/23.
+// The einride parser accepts STRING tokens after DOT, so a quoted key
+// like `labels."x' OR '1'='1"` previously interpolated raw into SQL.
+// All three transpiler sites now validate + parameterize JSONB keys.
+func TestTranspile_JSONBKey_RejectsSQLInjection(t *testing.T) {
+	rf := SpaceFilter()
+	cases := []string{
+		`labels."x' OR '1'='1":foo`,                // transpileHasSelect path
+		`labels."x' OR '1'='1" = "foo"`,            // resolveField (comparison) path
+		"labels.\"x'); DROP TABLE spaces;--\":foo", // statement terminator
+		`labels."x->>'y" = "z"`,                    // operator smuggling
+		`labels."" = "z"`,                          // empty key
+		`labels."1leading" = "z"`,                  // non-identifier start
+		`labels."has space" = "z"`,                 // whitespace
+	}
+	for _, f := range cases {
+		t.Run(f, func(t *testing.T) {
+			_, err := Transpile(rf, f, 1)
+			require.Error(t, err, "filter %q must be rejected", f)
+			assert.Contains(t, err.Error(), "invalid jsonb key")
+		})
+	}
+}
+
+func TestTranspile_JSONBKey_AcceptsValidIdentifiers(t *testing.T) {
+	rf := SpaceFilter()
+	cases := []string{
+		`labels.env = "prod"`,
+		`labels._private = "x"`,
+		`labels.env_2 = "x"`,
+		`labels.ENV = "x"`,
+	}
+	for _, f := range cases {
+		t.Run(f, func(t *testing.T) {
+			_, err := Transpile(rf, f, 1)
+			require.NoError(t, err)
+		})
+	}
 }
 
 func TestTranspile_Complex(t *testing.T) {
@@ -233,8 +273,8 @@ func TestTranspile_BareLiteralMixedWithStructured(t *testing.T) {
 	rf := SpaceFilter()
 	wc, err := Transpile(rf, `myproject AND labels.env = production`, 1)
 	require.NoError(t, err)
-	assert.Equal(t, `(display_name ILIKE $1 AND labels->>'env' = $2)`, wc.SQL)
-	assert.Equal(t, []any{"%myproject%", "production"}, wc.Args)
+	assert.Equal(t, `(display_name ILIKE $1 AND labels->>$2 = $3)`, wc.SQL)
+	assert.Equal(t, []any{"%myproject%", "env", "production"}, wc.Args)
 }
 
 func TestTranspile_OrganizationFilter(t *testing.T) {
