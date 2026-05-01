@@ -297,6 +297,16 @@ func (s *OrganizationsServer) ListDomains(ctx context.Context, req *apiv1.ListDo
 // Returns the deleted Domain (AIP-135) — clients see the final
 // state of the row before deletion.
 //
+// Tx scope: when removing a VERIFIED row, the precondition + cancel
+// + delete run inside a single tx with the SSO config row locked
+// FOR UPDATE. Without that lock, two concurrent DeleteDomain calls
+// against sibling verified domains could both observe count >= 2
+// (passing the precondition), then both delete, leaving the org
+// with zero verified domains under enabled SSO. Locking the SSO
+// config row serializes the precondition so the second tx sees the
+// post-first-commit state and refuses. PENDING/FAILED removals
+// don't touch SSO posture and skip the lock entirely.
+//
 // Permission: domains.delete on the parent org (interceptor-gated).
 func (s *OrganizationsServer) DeleteDomain(ctx context.Context, req *apiv1.DeleteDomainRequest) (*apiv1.Domain, error) {
 	resolvedOrg := server.MustResolvedOrgFromContext(ctx)
@@ -304,64 +314,79 @@ func (s *OrganizationsServer) DeleteDomain(ctx context.Context, req *apiv1.Delet
 	if err != nil {
 		return nil, err
 	}
-	row, err := s.queries.GetDomainByName(ctx, db.GetDomainByNameParams{
-		Domain: domainStr, OrgID: resolvedOrg.ID,
+
+	type result struct {
+		row          db.Domain
+		cancelledIDs []uuid.UUID
+	}
+	res, err := db.RunInTx(ctx, s.txer, func(qtx db.Querier) (result, error) {
+		row, err := qtx.GetDomainByName(ctx, db.GetDomainByNameParams{
+			Domain: domainStr, OrgID: resolvedOrg.ID,
+		})
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return result{}, apierr.NotFound("Domain", req.GetName())
+			}
+			slog.ErrorContext(ctx, "delete domain: lookup failed", "name", req.GetName(), "error", err)
+			return result{}, apierr.Internal("lookup domain")
+		}
+		if req.GetEtag() != "" && req.GetEtag() != row.Etag {
+			return result{}, apierr.FailedPrecondition("etag mismatch; refresh the domain and retry")
+		}
+
+		// Last-VERIFIED-domain-on-enabled-SSO precondition. Only fires
+		// for VERIFIED removals — PENDING/FAILED never affected SSO.
+		// Lock the SSO config row FOR UPDATE so concurrent verified-
+		// domain deletes serialize on the same lock and the count
+		// reflects the truth at our delete-time, not a stale snapshot.
+		if row.State == db.DomainStateVERIFIED {
+			if err := guardLastVerifiedDomainTx(ctx, qtx, resolvedOrg.ID); err != nil {
+				return result{}, err
+			}
+		}
+
+		cancelledIDs, err := qtx.CancelDomainOpsForDomain(ctx, db.CancelDomainOpsForDomainParams{
+			OrgID:      pgtype.UUID{Bytes: resolvedOrg.ID, Valid: true},
+			DomainName: "organizations/" + resolvedOrg.Slug + "/domains/" + domainStr,
+		})
+		if err != nil {
+			slog.ErrorContext(ctx, "delete domain: cancel in-flight LROs failed", "domain", domainStr, "error", err)
+			return result{}, apierr.Internal("cancel in-flight verification operations")
+		}
+
+		if err := qtx.DeleteDomain(ctx, db.DeleteDomainParams{ID: row.ID, OrgID: resolvedOrg.ID}); err != nil {
+			slog.ErrorContext(ctx, "delete domain: delete failed", "id", row.ID, "error", err)
+			return result{}, apierr.Internal("delete domain")
+		}
+		return result{row: row, cancelledIDs: cancelledIDs}, nil
 	})
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, apierr.NotFound("Domain", req.GetName())
-		}
-		slog.ErrorContext(ctx, "delete domain: lookup failed", "name", req.GetName(), "error", err)
-		return nil, apierr.Internal("lookup domain")
-	}
-	if req.GetEtag() != "" && req.GetEtag() != row.Etag {
-		return nil, apierr.FailedPrecondition("etag mismatch; refresh the domain and retry")
+		return nil, err
 	}
 
-	// Last-VERIFIED-domain-on-enabled-SSO check: only relevant when
-	// removing a row that's currently VERIFIED. PENDING/FAILED
-	// removals never affect SSO posture.
-	if row.State == db.DomainStateVERIFIED {
-		if err := s.guardLastVerifiedDomain(ctx, resolvedOrg.ID); err != nil {
-			return nil, err
-		}
+	// Fire local cancel funcs after the tx commits so the verify
+	// goroutine on this replica observes ctx.Done() instead of
+	// running until its next poll returns ErrNoRows. Doing this
+	// outside the tx is safe — the row is gone post-commit, so a
+	// late MarkDomainVerified write would no-op (UPDATE 0 rows).
+	if s.lroManager != nil && len(res.cancelledIDs) > 0 {
+		s.lroManager.CancelLocal(res.cancelledIDs...)
 	}
 
-	// Cancel any in-flight CreateDomain LRO. Best-effort: if no
-	// LRO is running, this is a no-op (UPDATE 0 rows). DB errors
-	// here surface as Internal — we don't want to delete the row
-	// while a verification goroutine still runs.
-	cancelledIDs, err := s.queries.CancelDomainOpsForDomain(ctx, db.CancelDomainOpsForDomainParams{
-		OrgID:      pgtype.UUID{Bytes: resolvedOrg.ID, Valid: true},
-		DomainName: "organizations/" + resolvedOrg.Slug + "/domains/" + domainStr,
-	})
-	if err != nil {
-		slog.ErrorContext(ctx, "delete domain: cancel in-flight LROs failed", "domain", domainStr, "error", err)
-		return nil, apierr.Internal("cancel in-flight verification operations")
-	}
-	// Fire local cancel funcs so the verify goroutine on this replica
-	// observes ctx.Done() instead of running until its next poll
-	// returns ErrNoRows. Without this the goroutine could land a
-	// MarkDomainVerified write between this point and the DELETE
-	// below, briefly flipping the row to VERIFIED before it's gone.
-	if s.lroManager != nil && len(cancelledIDs) > 0 {
-		s.lroManager.CancelLocal(cancelledIDs...)
-	}
-
-	if err := s.queries.DeleteDomain(ctx, db.DeleteDomainParams{ID: row.ID, OrgID: resolvedOrg.ID}); err != nil {
-		slog.ErrorContext(ctx, "delete domain: delete failed", "id", row.ID, "error", err)
-		return nil, apierr.Internal("delete domain")
-	}
-	return convert.DomainToProto(row, resolvedOrg.Slug, nil), nil
+	return convert.DomainToProto(res.row, resolvedOrg.Slug, nil), nil
 }
 
-// guardLastVerifiedDomain returns FAILED_PRECONDITION when
-// deleting a verified domain would leave an enabled SSO config
-// without any verified domain. If the org has no SSO config row
-// at all, or the row exists but is enabled=false, the precondition
-// is satisfied.
-func (s *OrganizationsServer) guardLastVerifiedDomain(ctx context.Context, orgID uuid.UUID) error {
-	sso, err := s.queries.GetSsoConfigByOrgID(ctx, orgID)
+// guardLastVerifiedDomainTx is the tx-bound variant of the
+// last-verified-domain precondition. The qtx-bound
+// GetSsoConfigByOrgIDForUpdate locks the SSO config row so concurrent
+// transactions queue on the same row; the count then reflects a
+// consistent snapshot under that lock.
+//
+// Returns nil when the precondition is satisfied (no SSO config,
+// disabled SSO, or count > 1). Returns FAILED_PRECONDITION when the
+// delete would leave enabled SSO without any verified domain.
+func guardLastVerifiedDomainTx(ctx context.Context, qtx db.Querier, orgID uuid.UUID) error {
+	sso, err := qtx.GetSsoConfigByOrgIDForUpdate(ctx, orgID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil // no SSO config — nothing to guard
@@ -372,7 +397,7 @@ func (s *OrganizationsServer) guardLastVerifiedDomain(ctx context.Context, orgID
 	if !sso.Enabled {
 		return nil
 	}
-	count, err := s.queries.CountVerifiedDomainsByOrg(ctx, orgID)
+	count, err := qtx.CountVerifiedDomainsByOrg(ctx, orgID)
 	if err != nil {
 		slog.ErrorContext(ctx, "delete domain: count verified domains failed", "org_id", orgID, "error", err)
 		return apierr.Internal("count verified domains")

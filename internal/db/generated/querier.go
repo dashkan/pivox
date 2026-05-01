@@ -351,10 +351,22 @@ type Querier interface {
 	GetSsoConfigByFirebaseProviderID(ctx context.Context, firebaseProviderID string) (GetSsoConfigByFirebaseProviderIDRow, error)
 	// GetSsoConfigByOrgID looks up the SSO config row for an org, if
 	// one exists. UNIQUE(org_id) ensures at most one row. Used by
-	// DeleteDomain to enforce the "last verified domain on an enabled
-	// SSO config" precondition, and by GetSsoConfig to surface the
-	// current config to the caller.
+	// GetSsoConfig to surface the current config to the caller.
 	GetSsoConfigByOrgID(ctx context.Context, orgID uuid.UUID) (SsoConfig, error)
+	// GetSsoConfigByOrgIDForUpdate is the locking variant used by
+	// DeleteDomain inside its transaction to serialize the
+	// "last verified domain on an enabled SSO config" precondition
+	// against concurrent verified-domain deletes. Without the row
+	// lock, two concurrent DeleteDomain calls against sibling
+	// verified domains can both observe count >= 2 (acceptable),
+	// both delete, and leave the org with zero verified domains
+	// under enabled SSO. Locking the SSO config row FOR UPDATE
+	// forces concurrent transactions to queue on the same row,
+	// so the second tx's count sees the post-first-commit state
+	// and refuses with FAILED_PRECONDITION. Returns no rows when
+	// the org has no SSO config — DeleteDomain treats that as "no
+	// precondition to enforce" and skips the count entirely.
+	GetSsoConfigByOrgIDForUpdate(ctx context.Context, orgID uuid.UUID) (SsoConfig, error)
 	GetStorageAgent(ctx context.Context, id uuid.UUID) (StorageAgent, error)
 	GetStorageAgentByGatewayAndIP(ctx context.Context, arg GetStorageAgentByGatewayAndIPParams) (StorageAgent, error)
 	GetStorageEndpoint(ctx context.Context, id uuid.UUID) (StorageEndpoint, error)

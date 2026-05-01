@@ -263,6 +263,11 @@ func (m *MockQuerier) GetSsoConfigByOrgID(ctx context.Context, orgID uuid.UUID) 
 	return args.Get(0).(db.SsoConfig), args.Error(1)
 }
 
+func (m *MockQuerier) GetSsoConfigByOrgIDForUpdate(ctx context.Context, orgID uuid.UUID) (db.SsoConfig, error) {
+	args := m.Called(ctx, orgID)
+	return args.Get(0).(db.SsoConfig), args.Error(1)
+}
+
 func (m *MockQuerier) UpsertSsoConfig(ctx context.Context, arg db.UpsertSsoConfigParams) (db.SsoConfig, error) {
 	args := m.Called(ctx, arg)
 	return args.Get(0).(db.SsoConfig), args.Error(1)

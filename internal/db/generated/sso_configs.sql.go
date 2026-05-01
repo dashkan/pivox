@@ -65,11 +65,48 @@ SELECT id, org_id, firebase_provider_id, display_name, enabled, oidc_config, sam
 
 // GetSsoConfigByOrgID looks up the SSO config row for an org, if
 // one exists. UNIQUE(org_id) ensures at most one row. Used by
-// DeleteDomain to enforce the "last verified domain on an enabled
-// SSO config" precondition, and by GetSsoConfig to surface the
-// current config to the caller.
+// GetSsoConfig to surface the current config to the caller.
 func (q *Queries) GetSsoConfigByOrgID(ctx context.Context, orgID uuid.UUID) (SsoConfig, error) {
 	row := q.db.QueryRow(ctx, getSsoConfigByOrgID, orgID)
+	var i SsoConfig
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.FirebaseProviderID,
+		&i.DisplayName,
+		&i.Enabled,
+		&i.OidcConfig,
+		&i.SamlConfig,
+		&i.ClientSecretCiphertext,
+		&i.Etag,
+		&i.Revision,
+		&i.CreatedBy,
+		&i.UpdatedBy,
+		&i.CreateTime,
+		&i.UpdateTime,
+	)
+	return i, err
+}
+
+const getSsoConfigByOrgIDForUpdate = `-- name: GetSsoConfigByOrgIDForUpdate :one
+SELECT id, org_id, firebase_provider_id, display_name, enabled, oidc_config, saml_config, client_secret_ciphertext, etag, revision, created_by, updated_by, create_time, update_time FROM sso_configs WHERE org_id = $1 FOR UPDATE
+`
+
+// GetSsoConfigByOrgIDForUpdate is the locking variant used by
+// DeleteDomain inside its transaction to serialize the
+// "last verified domain on an enabled SSO config" precondition
+// against concurrent verified-domain deletes. Without the row
+// lock, two concurrent DeleteDomain calls against sibling
+// verified domains can both observe count >= 2 (acceptable),
+// both delete, and leave the org with zero verified domains
+// under enabled SSO. Locking the SSO config row FOR UPDATE
+// forces concurrent transactions to queue on the same row,
+// so the second tx's count sees the post-first-commit state
+// and refuses with FAILED_PRECONDITION. Returns no rows when
+// the org has no SSO config — DeleteDomain treats that as "no
+// precondition to enforce" and skips the count entirely.
+func (q *Queries) GetSsoConfigByOrgIDForUpdate(ctx context.Context, orgID uuid.UUID) (SsoConfig, error) {
+	row := q.db.QueryRow(ctx, getSsoConfigByOrgIDForUpdate, orgID)
 	var i SsoConfig
 	err := row.Scan(
 		&i.ID,

@@ -33,15 +33,21 @@ import (
 type AuthContextReader func(ctx context.Context) (uid string, ok bool)
 
 // TxBeginner abstracts transaction creation for testability.
-// *pgxpool.Pool satisfies this interface.
-type TxBeginner interface {
-	Begin(ctx context.Context) (pgx.Tx, error)
-}
+// *pgxpool.Pool satisfies this interface. Aliased to db.TxBeginner
+// so existing call sites and unit-test mocks keep compiling while
+// we migrate handlers to db.Txer / db.RunInTx.
+type TxBeginner = db.TxBeginner
 
 type OrganizationsServer struct {
 	apiv1.UnimplementedOrganizationsServer
-	db       db.DBTX
-	pool     TxBeginner
+	db   db.DBTX
+	pool TxBeginner
+	// txer is the transaction abstraction used by handlers that have
+	// migrated to db.RunInTx. New tx-wrapped paths (DeleteDomain)
+	// use txer; legacy manual pool.Begin call sites (CreateOrganization,
+	// member CRUD, TransferOwnership) still use pool directly and
+	// will be migrated incrementally.
+	txer     db.Txer
 	queries  db.Querier
 	auth     authn.Service
 	filter   *filter.ResourceFilter
@@ -124,6 +130,7 @@ func NewOrganizationsServer(cfg Config) *OrganizationsServer {
 	return &OrganizationsServer{
 		db:         cfg.Pool,
 		pool:       cfg.Pool,
+		txer:       &db.PoolTxer{Pool: cfg.Pool},
 		queries:    cfg.Queries,
 		auth:       cfg.Auth,
 		filter:     filter.OrganizationFilter(),

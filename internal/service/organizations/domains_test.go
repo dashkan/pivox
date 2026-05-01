@@ -71,7 +71,7 @@ func TestGenerateVerificationToken_Unique(t *testing.T) {
 func TestGetDomain_NotFound(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	q.On("GetDomainByName", mock.Anything, mock.Anything).Return(db.Domain{}, pgx.ErrNoRows)
-	srv := &OrganizationsServer{queries: q}
+	srv := &OrganizationsServer{txer: &db.PassthroughTxer{Q: q}, queries: q}
 	ctx := server.WithResolvedOrgForTest(context.Background(), &server.ResolvedOrg{
 		ID: uuid.MustParse("0192a000-aaaa-7000-8000-000000000001"), Slug: "acme",
 	})
@@ -85,7 +85,7 @@ func TestGetDomain_ReturnsRow(t *testing.T) {
 	q.On("GetDomainByName", mock.Anything, mock.Anything).Return(db.Domain{
 		Domain: "x.com", State: db.DomainStatePENDING,
 	}, nil)
-	srv := &OrganizationsServer{queries: q}
+	srv := &OrganizationsServer{txer: &db.PassthroughTxer{Q: q}, queries: q}
 	ctx := server.WithResolvedOrgForTest(context.Background(), &server.ResolvedOrg{
 		ID: uuid.MustParse("0192a000-aaaa-7000-8000-000000000001"), Slug: "acme",
 	})
@@ -150,7 +150,7 @@ func TestCreateDomain_AlreadyExistsHidesHoldingOrg(t *testing.T) {
 func TestDeleteDomain_NotFound(t *testing.T) {
 	q := new(mocks.MockQuerier)
 	q.On("GetDomainByName", mock.Anything, mock.Anything).Return(db.Domain{}, pgx.ErrNoRows)
-	srv := &OrganizationsServer{queries: q}
+	srv := &OrganizationsServer{txer: &db.PassthroughTxer{Q: q}, queries: q}
 	ctx := server.WithResolvedOrgForTest(context.Background(), &server.ResolvedOrg{
 		ID: uuid.MustParse("0192a000-aaaa-7000-8000-000000000001"), Slug: "acme",
 	})
@@ -164,7 +164,7 @@ func TestDeleteDomain_EtagMismatch(t *testing.T) {
 	q.On("GetDomainByName", mock.Anything, mock.Anything).Return(db.Domain{
 		Domain: "x.com", Etag: "actual",
 	}, nil)
-	srv := &OrganizationsServer{queries: q}
+	srv := &OrganizationsServer{txer: &db.PassthroughTxer{Q: q}, queries: q}
 	ctx := server.WithResolvedOrgForTest(context.Background(), &server.ResolvedOrg{
 		ID: uuid.MustParse("0192a000-aaaa-7000-8000-000000000001"), Slug: "acme",
 	})
@@ -183,10 +183,10 @@ func TestDeleteDomain_LastVerifiedOnEnabledSSORefuses(t *testing.T) {
 		ID:     uuid.MustParse("0192a000-bbbb-7000-8000-000000000002"),
 		Domain: "x.com", State: db.DomainStateVERIFIED,
 	}, nil)
-	q.On("GetSsoConfigByOrgID", mock.Anything, orgID).Return(db.SsoConfig{Enabled: true}, nil)
+	q.On("GetSsoConfigByOrgIDForUpdate", mock.Anything, orgID).Return(db.SsoConfig{Enabled: true}, nil)
 	q.On("CountVerifiedDomainsByOrg", mock.Anything, orgID).Return(int64(1), nil)
 
-	srv := &OrganizationsServer{queries: q}
+	srv := &OrganizationsServer{txer: &db.PassthroughTxer{Q: q}, queries: q}
 	ctx := server.WithResolvedOrgForTest(context.Background(), &server.ResolvedOrg{
 		ID: orgID, Slug: "acme",
 	})
@@ -205,7 +205,7 @@ func TestDeleteDomain_VerifiedWithExtraVerifiedAllowed(t *testing.T) {
 	q.On("GetDomainByName", mock.Anything, mock.Anything).Return(db.Domain{
 		ID: domainID, Domain: "x.com", State: db.DomainStateVERIFIED, Etag: "v1",
 	}, nil)
-	q.On("GetSsoConfigByOrgID", mock.Anything, orgID).Return(db.SsoConfig{Enabled: true}, nil)
+	q.On("GetSsoConfigByOrgIDForUpdate", mock.Anything, orgID).Return(db.SsoConfig{Enabled: true}, nil)
 	q.On("CountVerifiedDomainsByOrg", mock.Anything, orgID).Return(int64(3), nil)
 	q.On("CancelDomainOpsForDomain", mock.Anything, db.CancelDomainOpsForDomainParams{
 		OrgID:      pgtype.UUID{Bytes: orgID, Valid: true},
@@ -213,7 +213,7 @@ func TestDeleteDomain_VerifiedWithExtraVerifiedAllowed(t *testing.T) {
 	}).Return([]uuid.UUID{}, nil)
 	q.On("DeleteDomain", mock.Anything, db.DeleteDomainParams{ID: domainID, OrgID: orgID}).Return(nil)
 
-	srv := &OrganizationsServer{queries: q}
+	srv := &OrganizationsServer{txer: &db.PassthroughTxer{Q: q}, queries: q}
 	ctx := server.WithResolvedOrgForTest(context.Background(), &server.ResolvedOrg{
 		ID: orgID, Slug: "acme",
 	})
@@ -231,11 +231,11 @@ func TestDeleteDomain_NoSsoConfigSkipsGuard(t *testing.T) {
 	q.On("GetDomainByName", mock.Anything, mock.Anything).Return(db.Domain{
 		ID: domainID, Domain: "x.com", State: db.DomainStateVERIFIED,
 	}, nil)
-	q.On("GetSsoConfigByOrgID", mock.Anything, orgID).Return(db.SsoConfig{}, pgx.ErrNoRows)
+	q.On("GetSsoConfigByOrgIDForUpdate", mock.Anything, orgID).Return(db.SsoConfig{}, pgx.ErrNoRows)
 	q.On("CancelDomainOpsForDomain", mock.Anything, mock.Anything).Return([]uuid.UUID{}, nil)
 	q.On("DeleteDomain", mock.Anything, db.DeleteDomainParams{ID: domainID, OrgID: orgID}).Return(nil)
 
-	srv := &OrganizationsServer{queries: q}
+	srv := &OrganizationsServer{txer: &db.PassthroughTxer{Q: q}, queries: q}
 	ctx := server.WithResolvedOrgForTest(context.Background(), &server.ResolvedOrg{
 		ID: orgID, Slug: "acme",
 	})
@@ -257,13 +257,13 @@ func TestDeleteDomain_PendingRowSkipsSSO(t *testing.T) {
 	q.On("CancelDomainOpsForDomain", mock.Anything, mock.Anything).Return([]uuid.UUID{}, nil)
 	q.On("DeleteDomain", mock.Anything, db.DeleteDomainParams{ID: domainID, OrgID: orgID}).Return(nil)
 
-	srv := &OrganizationsServer{queries: q}
+	srv := &OrganizationsServer{txer: &db.PassthroughTxer{Q: q}, queries: q}
 	ctx := server.WithResolvedOrgForTest(context.Background(), &server.ResolvedOrg{
 		ID: orgID, Slug: "acme",
 	})
 	_, err := srv.DeleteDomain(ctx, &apiv1.DeleteDomainRequest{Name: "organizations/acme/domains/x.com"})
 	require.NoError(t, err)
-	q.AssertNotCalled(t, "GetSsoConfigByOrgID", mock.Anything, mock.Anything)
+	q.AssertNotCalled(t, "GetSsoConfigByOrgIDForUpdate", mock.Anything, mock.Anything)
 }
 
 func TestDeleteDomain_CancelOpsFailureSurfacesInternal(t *testing.T) {
@@ -277,7 +277,7 @@ func TestDeleteDomain_CancelOpsFailureSurfacesInternal(t *testing.T) {
 	}, nil)
 	q.On("CancelDomainOpsForDomain", mock.Anything, mock.Anything).Return([]uuid.UUID{}, errors.New("db down"))
 
-	srv := &OrganizationsServer{queries: q}
+	srv := &OrganizationsServer{txer: &db.PassthroughTxer{Q: q}, queries: q}
 	ctx := server.WithResolvedOrgForTest(context.Background(), &server.ResolvedOrg{
 		ID: orgID, Slug: "acme",
 	})
@@ -314,7 +314,7 @@ func TestRunVerifyDomain_VerifiedOnFirstCheck(t *testing.T) {
 	q.On("GetDomainByID", mock.Anything, db.GetDomainByIDParams{ID: domainID, OrgID: orgID}).
 		Return(db.Domain{ID: domainID, Domain: "x.com", State: db.DomainStateVERIFIED}, nil)
 
-	srv := &OrganizationsServer{queries: q}
+	srv := &OrganizationsServer{txer: &db.PassthroughTxer{Q: q}, queries: q}
 	progress := &captureProgress{}
 	result, err := srv.runVerifyDomain(context.Background(), progress, domainID, orgID, "acme",
 		"organizations/acme/domains/x.com", time.Now().Add(time.Hour))
@@ -336,7 +336,7 @@ func TestRunVerifyDomain_FailedSurfacesFailedPrecondition(t *testing.T) {
 	q.On("GetDomainByID", mock.Anything, mock.Anything).
 		Return(db.Domain{ID: domainID, Domain: "x.com", State: db.DomainStateFAILED}, nil)
 
-	srv := &OrganizationsServer{queries: q}
+	srv := &OrganizationsServer{txer: &db.PassthroughTxer{Q: q}, queries: q}
 	progress := &captureProgress{}
 	_, err := srv.runVerifyDomain(context.Background(), progress, domainID, orgID, "acme",
 		"organizations/acme/domains/x.com", time.Now().Add(time.Hour))
@@ -359,7 +359,7 @@ func TestRunVerifyDomain_DeadlineElapsedMarksFailed(t *testing.T) {
 	q.On("MarkDomainFailed", mock.Anything, domainID).
 		Return(db.Domain{ID: domainID, Domain: "x.com", State: db.DomainStateFAILED}, nil)
 
-	srv := &OrganizationsServer{queries: q}
+	srv := &OrganizationsServer{txer: &db.PassthroughTxer{Q: q}, queries: q}
 	progress := &captureProgress{}
 	_, err := srv.runVerifyDomain(context.Background(), progress, domainID, orgID, "acme",
 		"organizations/acme/domains/x.com", time.Now().Add(-time.Hour) /* already past */)
@@ -379,7 +379,7 @@ func TestRunVerifyDomain_RowDeletedSurfacesFailedPrecondition(t *testing.T) {
 	q.On("GetDomainByID", mock.Anything, mock.Anything).
 		Return(db.Domain{}, pgx.ErrNoRows)
 
-	srv := &OrganizationsServer{queries: q}
+	srv := &OrganizationsServer{txer: &db.PassthroughTxer{Q: q}, queries: q}
 	_, err := srv.runVerifyDomain(context.Background(), &captureProgress{},
 		uuid.New(), uuid.New(), "acme", "organizations/acme/domains/x.com",
 		time.Now().Add(time.Hour))
@@ -398,7 +398,7 @@ func TestRunVerifyDomain_CtxCancelExitsCleanly(t *testing.T) {
 	q.On("GetDomainByID", mock.Anything, mock.Anything).
 		Return(db.Domain{Domain: "x.com", State: db.DomainStatePENDING}, nil).Maybe()
 
-	srv := &OrganizationsServer{queries: q}
+	srv := &OrganizationsServer{txer: &db.PassthroughTxer{Q: q}, queries: q}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // pre-cancel so ctx.Done() fires before the first ticker tick
 
@@ -418,7 +418,7 @@ func TestListDomains_ReturnsRows(t *testing.T) {
 		{Domain: "a.com", State: db.DomainStateVERIFIED, VerifiedTime: pgtype.Timestamptz{Valid: false}},
 		{Domain: "b.com", State: db.DomainStatePENDING},
 	}, nil)
-	srv := &OrganizationsServer{queries: q}
+	srv := &OrganizationsServer{txer: &db.PassthroughTxer{Q: q}, queries: q}
 	ctx := server.WithResolvedOrgForTest(context.Background(), &server.ResolvedOrg{
 		ID: orgID, Slug: "acme",
 	})
