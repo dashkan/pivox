@@ -20,12 +20,6 @@ import (
 	"github.com/dashkan/pivox/internal/server"
 )
 
-// accountLifecyclePrefix covers the global DeleteAccount LRO. The
-// previous `userLifecyclePrefix` was retired when DeleteUser became
-// sync (Phase 7) — there's no LRO orchestrator for org-scoped user
-// removal any more.
-const accountLifecyclePrefix = "accounts"
-
 // ===========================================================================
 // DeleteUser — org-scoped removal of a user from one org. Sync;
 // hard-delete. Recovery from a mistake is just re-creating the
@@ -197,7 +191,7 @@ func (s *IamServer) DeleteAccount(ctx context.Context, req *iampb.DeleteAccountR
 		Account: req.GetName(),
 	}
 
-	return s.lroManager.CreateAndRun(ctx, accountLifecyclePrefix, initialMeta,
+	return s.lroManager.CreateAndRun(ctx, req.GetName(), initialMeta,
 		func(workCtx context.Context, progress lro.Progress) (proto.Message, error) {
 			return s.runDeleteAccount(workCtx, progress, firebaseIdentityID)
 		})

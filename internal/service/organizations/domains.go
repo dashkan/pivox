@@ -14,7 +14,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgtype"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -27,10 +26,6 @@ import (
 )
 
 const (
-	// domainLifecyclePrefix tags every CreateDomain LRO so the
-	// CancelDomainOpsForDomain query can find them.
-	domainLifecyclePrefix = "domains"
-
 	// domainVerificationTokenBytes is the entropy budget for the
 	// per-domain TXT-record value the admin must publish. 32 bytes
 	// of CSPRNG → 43 chars of unpadded base64url; collision-
@@ -148,7 +143,7 @@ func (s *OrganizationsServer) CreateDomain(ctx context.Context, req *apiv1.Creat
 	orgID := resolvedOrg.ID
 	orgSlug := resolvedOrg.Slug
 
-	return s.lroManager.CreateAndRunForOrg(ctx, domainLifecyclePrefix, orgID, initialMeta,
+	return s.lroManager.CreateAndRunForOrg(ctx, domainResource, orgID, initialMeta,
 		func(workCtx context.Context, progress lro.Progress) (proto.Message, error) {
 			return s.runVerifyDomain(workCtx, progress, domainID, orgID, orgSlug, domainResource, deadline)
 		})
@@ -350,10 +345,8 @@ func (s *OrganizationsServer) DeleteDomain(ctx context.Context, req *apiv1.Delet
 			}
 		}
 
-		cancelledIDs, err := qtx.CancelDomainOpsForDomain(ctx, db.CancelDomainOpsForDomainParams{
-			OrgID:      pgtype.UUID{Bytes: resolvedOrg.ID, Valid: true},
-			DomainName: "organizations/" + resolvedOrg.Slug + "/domains/" + domainStr,
-		})
+		cancelledIDs, err := qtx.CancelDomainOpsForDomain(ctx,
+			"organizations/"+resolvedOrg.Slug+"/domains/"+domainStr)
 		if err != nil {
 			slog.ErrorContext(ctx, "delete domain: cancel in-flight LROs failed", "domain", domainStr, "error", err)
 			return result{}, apierr.Internal("cancel in-flight verification operations")

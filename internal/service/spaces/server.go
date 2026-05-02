@@ -136,11 +136,6 @@ func (s *SpacesServer) resolveSpaceActors(ctx context.Context, spaces []db.Space
 	return actors, nil
 }
 
-// spaceLifecyclePrefix is the operation-name prefix for the
-// DeleteSpace / UndeleteSpace LROs. Mirrors orgLifecyclePrefix in
-// the organizations service.
-const spaceLifecyclePrefix = "spaces"
-
 // parseSpaceName parses "organizations/{org}/spaces/{space}" and returns (orgName, spaceName).
 func parseSpaceName(name string) (string, string, error) {
 	parts := strings.Split(name, "/")
@@ -469,7 +464,7 @@ func (s *SpacesServer) DeleteSpace(ctx context.Context, req *apiv1.DeleteSpaceRe
 		Space: spaceRsrc,
 	}
 
-	return s.lroManager.CreateAndRun(ctx, spaceLifecyclePrefix, initialMeta,
+	return s.lroManager.CreateAndRun(ctx, spaceRsrc, initialMeta,
 		func(workCtx context.Context, progress lro.Progress) (proto.Message, error) {
 			return s.runDeleteSpace(workCtx, progress, resolvedSpace.ID, resolvedOrg.Slug, spaceRsrc, deletedBy, force, expectedEtag)
 		})
@@ -582,7 +577,7 @@ func (s *SpacesServer) UndeleteSpace(ctx context.Context, req *apiv1.UndeleteSpa
 	spaceRsrc := "organizations/" + orgSlug + "/spaces/" + resolvedSpace.Slug
 	initialMeta := &apiv1.UndeleteSpaceMetadata{Space: spaceRsrc}
 
-	return s.lroManager.CreateAndRun(ctx, spaceLifecyclePrefix, initialMeta,
+	return s.lroManager.CreateAndRun(ctx, spaceRsrc, initialMeta,
 		func(workCtx context.Context, _ lro.Progress) (proto.Message, error) {
 			updated, err := s.queries.UndeleteSpace(workCtx, db.UndeleteSpaceParams{
 				ID:        spaceID,

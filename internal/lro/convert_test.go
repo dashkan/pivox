@@ -14,12 +14,15 @@ import (
 	db "github.com/dashkan/pivox/internal/db/generated"
 )
 
+// TestDbToProto_Pending pins the AIP-151 operation-name shape:
+// `{parent}/operations/{uuid}` when parent is set; falls back to
+// `operations/{uuid}` when parent is empty (root-scoped LROs).
 func TestDbToProto_Pending(t *testing.T) {
 	now := time.Now()
 	opID := uuid.New()
 	dbOp := db.Operation{
 		ID:           opID,
-		Prefix:       "folders",
+		Parent:       "organizations/acme",
 		Done:         false,
 		Metadata:     nil,
 		Result:       nil,
@@ -33,13 +36,13 @@ func TestDbToProto_Pending(t *testing.T) {
 	op, err := dbToProto(dbOp)
 	require.NoError(t, err)
 
-	assert.Equal(t, "operations/folders/"+opID.String(), op.Name)
+	assert.Equal(t, "organizations/acme/operations/"+opID.String(), op.Name)
 	assert.False(t, op.Done)
 	assert.Nil(t, op.GetResponse())
 	assert.Nil(t, op.GetError())
 }
 
-func TestDbToProto_CompletedWithResult(t *testing.T) {
+func TestDbToProto_CompletedWithResult_NestedParent(t *testing.T) {
 	now := time.Now()
 	opID := uuid.New()
 
@@ -53,7 +56,7 @@ func TestDbToProto_CompletedWithResult(t *testing.T) {
 
 	dbOp := db.Operation{
 		ID:           opID,
-		Prefix:       "spaces",
+		Parent:       "organizations/acme/spaces/dev",
 		Done:         true,
 		Metadata:     nil,
 		Result:       resultBytes,
@@ -67,22 +70,23 @@ func TestDbToProto_CompletedWithResult(t *testing.T) {
 	op, err := dbToProto(dbOp)
 	require.NoError(t, err)
 
-	assert.Equal(t, "operations/spaces/"+opID.String(), op.Name)
+	assert.Equal(t, "organizations/acme/spaces/dev/operations/"+opID.String(), op.Name)
 	assert.True(t, op.Done)
 	assert.NotNil(t, op.GetResponse())
 	assert.Nil(t, op.GetError())
 }
 
-func TestDbToProto_Failed(t *testing.T) {
+// TestDbToProto_EmptyParent: AIP-151 also allows the unparented form
+// `operations/{unique_id}` for root-scoped LROs. dbToProto falls
+// back to that when Parent is empty.
+func TestDbToProto_EmptyParent(t *testing.T) {
 	now := time.Now()
 	opID := uuid.New()
 
 	dbOp := db.Operation{
 		ID:           opID,
-		Prefix:       "apikeys",
+		Parent:       "",
 		Done:         true,
-		Metadata:     nil,
-		Result:       nil,
 		ErrorCode:    pgtype.Int4{Int32: 5, Valid: true},
 		ErrorMessage: pgtype.Text{String: "not found", Valid: true},
 		ExpireTime:   now.Add(1 * time.Hour),
@@ -93,7 +97,7 @@ func TestDbToProto_Failed(t *testing.T) {
 	op, err := dbToProto(dbOp)
 	require.NoError(t, err)
 
-	assert.Equal(t, "operations/apikeys/"+opID.String(), op.Name)
+	assert.Equal(t, "operations/"+opID.String(), op.Name)
 	assert.True(t, op.Done)
 	assert.Nil(t, op.GetResponse())
 

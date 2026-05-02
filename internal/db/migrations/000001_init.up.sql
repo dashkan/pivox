@@ -57,7 +57,13 @@ CREATE TYPE endpoint_state AS ENUM ('ACTIVE', 'INACTIVE', 'UNREACHABLE');
 -- ============================================================================
 CREATE TABLE operations (
     id          UUID PRIMARY KEY DEFAULT uuidv7(),
-    prefix      TEXT NOT NULL DEFAULT '',
+    -- AIP-151 parent resource: the full resource name the LRO
+    -- operates against (e.g., "organizations/acme/spaces/dev").
+    -- Empty string for unscoped operations. The public Operation
+    -- proto's `name` field is constructed as `{parent}/operations/{id}`
+    -- (or `operations/{id}` if parent is empty), per AIP-151's
+    -- requirement that the name "ends with operations/{unique_id}."
+    parent      TEXT NOT NULL DEFAULT '',
     done        BOOLEAN NOT NULL DEFAULT false,
     metadata    JSONB,
     result      JSONB,

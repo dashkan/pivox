@@ -54,8 +54,17 @@ func DoneOperation(response proto.Message) (*longrunningpb.Operation, error) {
 }
 
 func dbToProto(op db.Operation) (*longrunningpb.Operation, error) {
-	// Construct operation name: "operations/{prefix}/{uuid}"
-	name := fmt.Sprintf("operations/%s/%s", op.Prefix, op.ID.String())
+	// AIP-151: name must end with "operations/{unique_id}".
+	// When parent is set, prefix it (e.g.,
+	// "organizations/acme/spaces/dev/operations/{uuid}"). When parent
+	// is empty (root-scoped LROs), fall back to the unparented form
+	// "operations/{uuid}".
+	var name string
+	if op.Parent == "" {
+		name = "operations/" + op.ID.String()
+	} else {
+		name = op.Parent + "/operations/" + op.ID.String()
+	}
 
 	pbOp := &longrunningpb.Operation{
 		Name: name,

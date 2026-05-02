@@ -19,11 +19,6 @@ import (
 	"github.com/dashkan/pivox/internal/server"
 )
 
-// orgLifecyclePrefix is the longrunningpb operation-name prefix for
-// org lifecycle LROs (Delete/Undelete). Reflected in the operation
-// resource name so polling clients can filter by category.
-const orgLifecyclePrefix = "organizations"
-
 // DeleteOrganization soft-deletes (or, with `force=true`,
 // synchronously purges) an organization. Returns an LRO whose
 // metadata progresses through DeleteOrganizationMetadata.Phase as
@@ -104,7 +99,7 @@ func (s *OrganizationsServer) DeleteOrganization(ctx context.Context, req *apiv1
 	// check above passes).
 	expectedEtag := org.Etag
 
-	return s.lroManager.CreateAndRun(ctx, orgLifecyclePrefix, initialMeta,
+	return s.lroManager.CreateAndRun(ctx, orgName, initialMeta,
 		func(workCtx context.Context, progress lro.Progress) (proto.Message, error) {
 			return s.runDeleteOrganization(workCtx, progress, org.ID, orgName, deletedBy, force, expectedEtag)
 		})
@@ -234,7 +229,7 @@ func (s *OrganizationsServer) UndeleteOrganization(ctx context.Context, req *api
 	orgName := "organizations/" + resolved.Slug
 	initialMeta := &apiv1.UndeleteOrganizationMetadata{Organization: orgName}
 
-	return s.lroManager.CreateAndRun(ctx, orgLifecyclePrefix, initialMeta,
+	return s.lroManager.CreateAndRun(ctx, orgName, initialMeta,
 		func(workCtx context.Context, _ lro.Progress) (proto.Message, error) {
 			updated, err := s.queries.UndeleteOrganization(workCtx, org.ID)
 			if err != nil {

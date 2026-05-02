@@ -42,6 +42,10 @@ func TestNewManager(t *testing.T) {
 	assert.NotNil(t, m.listeners)
 }
 
+// TestParseOperationName pins the AIP-151 contract: every valid
+// operation name "ends with `operations/{unique_id}`". The parent
+// resource (anything before the trailing `operations/<id>`) is
+// optional and may be empty.
 func TestParseOperationName(t *testing.T) {
 	validID := uuid.New()
 
@@ -52,19 +56,39 @@ func TestParseOperationName(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:   "operations/prefix/uuid",
-			input:  fmt.Sprintf("operations/assets/%s", validID),
-			wantID: validID,
-		},
-		{
-			name:   "operations/uuid (no prefix)",
+			name:   "root-scoped: operations/{uuid}",
 			input:  fmt.Sprintf("operations/%s", validID),
 			wantID: validID,
 		},
 		{
-			name:   "operations/nested/prefix/uuid",
-			input:  fmt.Sprintf("operations/some/nested/%s", validID),
+			name:   "org-parented: organizations/{slug}/operations/{uuid}",
+			input:  fmt.Sprintf("organizations/acme/operations/%s", validID),
 			wantID: validID,
+		},
+		{
+			name:   "space-parented: organizations/{slug}/spaces/{slug}/operations/{uuid}",
+			input:  fmt.Sprintf("organizations/acme/spaces/dev/operations/%s", validID),
+			wantID: validID,
+		},
+		{
+			name:   "domain-parented: organizations/{slug}/domains/{slug}/operations/{uuid}",
+			input:  fmt.Sprintf("organizations/acme/domains/example.com/operations/%s", validID),
+			wantID: validID,
+		},
+		{
+			name:   "account-parented: accounts/me/operations/{uuid}",
+			input:  fmt.Sprintf("accounts/me/operations/%s", validID),
+			wantID: validID,
+		},
+		{
+			name:    "missing operations segment",
+			input:   fmt.Sprintf("organizations/acme/%s", validID),
+			wantErr: true,
+		},
+		{
+			name:    "operations not second-to-last (legacy operations/{prefix}/{uuid})",
+			input:   fmt.Sprintf("operations/assets/%s", validID),
+			wantErr: true,
 		},
 		{
 			name:    "single segment",
@@ -104,15 +128,15 @@ func TestGetOperation_Found(t *testing.T) {
 	opID := uuid.New()
 	dbOp := db.Operation{
 		ID:     opID,
-		Prefix: "assets",
+		Parent: "assets",
 		Done:   false,
 	}
 	mockQ.On("GetOperation", ctx, opID).Return(dbOp, nil)
 
-	op, err := m.GetOperation(ctx, fmt.Sprintf("operations/assets/%s", opID))
+	op, err := m.GetOperation(ctx, fmt.Sprintf("assets/operations/%s", opID))
 	require.NoError(t, err)
 	require.NotNil(t, op)
-	assert.Equal(t, fmt.Sprintf("operations/assets/%s", opID), op.Name)
+	assert.Equal(t, fmt.Sprintf("assets/operations/%s", opID), op.Name)
 	assert.False(t, op.Done)
 	mockQ.AssertExpectations(t)
 }
@@ -125,7 +149,7 @@ func TestGetOperation_NotFound(t *testing.T) {
 	opID := uuid.New()
 	mockQ.On("GetOperation", ctx, opID).Return(db.Operation{}, pgx.ErrNoRows)
 
-	_, err := m.GetOperation(ctx, fmt.Sprintf("operations/assets/%s", opID))
+	_, err := m.GetOperation(ctx, fmt.Sprintf("assets/operations/%s", opID))
 	require.Error(t, err)
 	st := status.Convert(err)
 	assert.Equal(t, codes.NotFound, st.Code())
@@ -148,12 +172,12 @@ func TestListOperations_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
-	op1 := db.Operation{ID: uuid.New(), Prefix: "assets", Done: false}
-	op2 := db.Operation{ID: uuid.New(), Prefix: "assets", Done: true}
+	op1 := db.Operation{ID: uuid.New(), Parent: "assets", Done: false}
+	op2 := db.Operation{ID: uuid.New(), Parent: "assets", Done: true}
 
 	mockQ.On("ListOperations", ctx, db.ListOperationsParams{
 		Limit:        int32(50),
-		PrefixFilter: pgtype.Text{String: "assets", Valid: true},
+		ParentFilter: pgtype.Text{String: "assets", Valid: true},
 	}).Return([]db.Operation{op1, op2}, nil)
 
 	ops, err := m.ListOperations(ctx, "assets", 50)
@@ -169,7 +193,7 @@ func TestListOperations_Empty(t *testing.T) {
 
 	mockQ.On("ListOperations", ctx, db.ListOperationsParams{
 		Limit:        int32(100),
-		PrefixFilter: pgtype.Text{},
+		ParentFilter: pgtype.Text{},
 	}).Return([]db.Operation{}, nil)
 
 	ops, err := m.ListOperations(ctx, "", 0)
@@ -199,7 +223,7 @@ func TestListOperations_PageSize(t *testing.T) {
 
 			mockQ.On("ListOperations", ctx, db.ListOperationsParams{
 				Limit:        tt.want,
-				PrefixFilter: pgtype.Text{},
+				ParentFilter: pgtype.Text{},
 			}).Return([]db.Operation{}, nil)
 
 			_, err := m.ListOperations(ctx, "", tt.pageSize)
@@ -221,7 +245,7 @@ func TestDeleteOperation_Done(t *testing.T) {
 	}, nil)
 	mockQ.On("DeleteOperation", ctx, opID).Return(nil)
 
-	err := m.DeleteOperation(ctx, fmt.Sprintf("operations/assets/%s", opID))
+	err := m.DeleteOperation(ctx, fmt.Sprintf("assets/operations/%s", opID))
 	require.NoError(t, err)
 	mockQ.AssertExpectations(t)
 }
@@ -237,7 +261,7 @@ func TestDeleteOperation_Running(t *testing.T) {
 		Done: false,
 	}, nil)
 
-	err := m.DeleteOperation(ctx, fmt.Sprintf("operations/assets/%s", opID))
+	err := m.DeleteOperation(ctx, fmt.Sprintf("assets/operations/%s", opID))
 	require.Error(t, err)
 	st := status.Convert(err)
 	assert.Equal(t, codes.FailedPrecondition, st.Code())
@@ -252,7 +276,7 @@ func TestDeleteOperation_NotFound(t *testing.T) {
 	opID := uuid.New()
 	mockQ.On("GetOperation", ctx, opID).Return(db.Operation{}, pgx.ErrNoRows)
 
-	err := m.DeleteOperation(ctx, fmt.Sprintf("operations/assets/%s", opID))
+	err := m.DeleteOperation(ctx, fmt.Sprintf("assets/operations/%s", opID))
 	require.Error(t, err)
 	st := status.Convert(err)
 	assert.Equal(t, codes.NotFound, st.Code())
@@ -270,7 +294,7 @@ func TestCancelOperation_Success(t *testing.T) {
 		Done: true,
 	}, nil)
 
-	err := m.CancelOperation(ctx, fmt.Sprintf("operations/assets/%s", opID))
+	err := m.CancelOperation(ctx, fmt.Sprintf("assets/operations/%s", opID))
 	require.NoError(t, err)
 	mockQ.AssertExpectations(t)
 }
@@ -289,7 +313,7 @@ func TestCancelOperation_AlreadyDone(t *testing.T) {
 		Done: true,
 	}, nil)
 
-	err := m.CancelOperation(ctx, fmt.Sprintf("operations/assets/%s", opID))
+	err := m.CancelOperation(ctx, fmt.Sprintf("assets/operations/%s", opID))
 	require.NoError(t, err, "cancelling an already-done op should return nil")
 	mockQ.AssertExpectations(t)
 }
@@ -303,7 +327,7 @@ func TestCancelOperation_NotFound(t *testing.T) {
 	mockQ.On("CancelOperation", ctx, opID).Return(db.Operation{}, pgx.ErrNoRows)
 	mockQ.On("GetOperation", ctx, opID).Return(db.Operation{}, pgx.ErrNoRows)
 
-	err := m.CancelOperation(ctx, fmt.Sprintf("operations/assets/%s", opID))
+	err := m.CancelOperation(ctx, fmt.Sprintf("assets/operations/%s", opID))
 	require.Error(t, err)
 	st := status.Convert(err)
 	assert.Equal(t, codes.NotFound, st.Code())
@@ -332,8 +356,8 @@ func TestCancelOperation_CancelsInFlightGoroutine(t *testing.T) {
 		opMu.Lock()
 		opID = p.ID
 		opMu.Unlock()
-		return p.Prefix == "assets"
-	})).Return(db.Operation{Prefix: "assets"}, nil).Run(func(args mock.Arguments) {
+		return p.Parent == "assets"
+	})).Return(db.Operation{Parent: "assets"}, nil).Run(func(args mock.Arguments) {
 		// noop — capture happens in MatchedBy.
 	})
 
@@ -380,7 +404,7 @@ func TestCancelOperation_CancelsInFlightGoroutine(t *testing.T) {
 	m.mu.Unlock()
 	require.True(t, registered, "cancel fn not registered before CancelOperation called")
 
-	require.NoError(t, m.CancelOperation(ctx, fmt.Sprintf("operations/assets/%s", capturedID)))
+	require.NoError(t, m.CancelOperation(ctx, fmt.Sprintf("assets/operations/%s", capturedID)))
 
 	select {
 	case err := <-workCtxObserved:
@@ -410,8 +434,8 @@ func TestCancelLocal_FiresCancelForRunningOpIDs(t *testing.T) {
 	var capturedIDs []uuid.UUID
 	mockQ.On("CreateOperation", ctx, mock.MatchedBy(func(p db.CreateOperationParams) bool {
 		capturedIDs = append(capturedIDs, p.ID)
-		return p.Prefix == "test"
-	})).Return(db.Operation{Prefix: "test"}, nil).Times(2)
+		return p.Parent == "test"
+	})).Return(db.Operation{Parent: "test"}, nil).Times(2)
 	mockQ.On("FailOperation", mock.Anything, mock.Anything).Return(db.Operation{}, nil).Times(2)
 
 	started := make(chan struct{}, 2)
@@ -471,8 +495,8 @@ func TestRunWork_DBFailureDoesNotNotifyListeners(t *testing.T) {
 	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	mockQ.On("CreateOperation", ctx, mock.MatchedBy(func(p db.CreateOperationParams) bool {
-		return p.Prefix == "test"
-	})).Return(db.Operation{Prefix: "test"}, nil)
+		return p.Parent == "test"
+	})).Return(db.Operation{Parent: "test"}, nil)
 
 	// CompleteOperation fails AND signals when it has fired so the test
 	// knows runWork has finished its post-work bookkeeping. Without
@@ -528,8 +552,8 @@ func TestRecoverPending_Success(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
-	op1 := db.Operation{ID: uuid.New(), Prefix: "a"}
-	op2 := db.Operation{ID: uuid.New(), Prefix: "b"}
+	op1 := db.Operation{ID: uuid.New(), Parent: "a"}
+	op2 := db.Operation{ID: uuid.New(), Parent: "b"}
 
 	mockQ.On("ListPendingOperations", ctx).Return([]db.Operation{op1, op2}, nil)
 	mockQ.On("FailOperation", ctx, mock.MatchedBy(func(p db.FailOperationParams) bool {
@@ -563,10 +587,10 @@ func TestCreateAndRun(t *testing.T) {
 	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	mockQ.On("CreateOperation", ctx, mock.MatchedBy(func(p db.CreateOperationParams) bool {
-		return p.Prefix == "assets"
+		return p.Parent == "assets"
 	})).Return(db.Operation{
 		ID:     uuid.New(),
-		Prefix: "assets",
+		Parent: "assets",
 		Done:   false,
 	}, nil)
 
@@ -587,7 +611,7 @@ func TestCreateAndRun(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, op)
 	assert.False(t, op.Done)
-	assert.Contains(t, op.Name, "operations/assets/")
+	assert.Contains(t, op.Name, "assets/operations/")
 
 	select {
 	case <-done:
@@ -602,7 +626,7 @@ func TestRunWork_Failure(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
-	mockQ.On("CreateOperation", ctx, mock.Anything).Return(db.Operation{Prefix: "assets", Done: false}, nil)
+	mockQ.On("CreateOperation", ctx, mock.Anything).Return(db.Operation{Parent: "assets", Done: false}, nil)
 
 	failCalled := make(chan db.FailOperationParams, 1)
 	mockQ.On("FailOperation", mock.Anything, mock.Anything).Return(db.Operation{}, nil).Run(func(args mock.Arguments) {
@@ -628,7 +652,7 @@ func TestRunWork_GRPCStatusError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
-	mockQ.On("CreateOperation", ctx, mock.Anything).Return(db.Operation{Prefix: "assets", Done: false}, nil)
+	mockQ.On("CreateOperation", ctx, mock.Anything).Return(db.Operation{Parent: "assets", Done: false}, nil)
 
 	failCalled := make(chan db.FailOperationParams, 1)
 	mockQ.On("FailOperation", mock.Anything, mock.Anything).Return(db.Operation{}, nil).Run(func(args mock.Arguments) {
@@ -654,7 +678,7 @@ func TestRunWork_SuccessWithNilResult(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
-	mockQ.On("CreateOperation", ctx, mock.Anything).Return(db.Operation{Prefix: "assets", Done: false}, nil)
+	mockQ.On("CreateOperation", ctx, mock.Anything).Return(db.Operation{Parent: "assets", Done: false}, nil)
 
 	completeCalled := make(chan db.CompleteOperationParams, 1)
 	mockQ.On("CompleteOperation", mock.Anything, mock.Anything).Return(db.Operation{}, nil).Run(func(args mock.Arguments) {
@@ -731,7 +755,7 @@ func TestDbToProto(t *testing.T) {
 			name: "pending operation",
 			op: db.Operation{
 				ID:     uuid.New(),
-				Prefix: "assets",
+				Parent: "assets",
 				Done:   false,
 			},
 			checkFunc: func(t *testing.T, opRaw interface{}, err error) {
@@ -743,7 +767,7 @@ func TestDbToProto(t *testing.T) {
 			name: "done with error",
 			op: db.Operation{
 				ID:           uuid.New(),
-				Prefix:       "assets",
+				Parent:       "assets",
 				Done:         true,
 				ErrorCode:    pgtype.Int4{Int32: int32(codes.NotFound), Valid: true},
 				ErrorMessage: pgtype.Text{String: "resource not found", Valid: true},
@@ -759,7 +783,7 @@ func TestDbToProto(t *testing.T) {
 				data, _ := marshalAny(s)
 				return db.Operation{
 					ID:     uuid.New(),
-					Prefix: "assets",
+					Parent: "assets",
 					Done:   true,
 					Result: data,
 				}
@@ -775,7 +799,7 @@ func TestDbToProto(t *testing.T) {
 				data, _ := marshalAny(s)
 				return db.Operation{
 					ID:       uuid.New(),
-					Prefix:   "assets",
+					Parent:   "assets",
 					Done:     false,
 					Metadata: data,
 				}
@@ -794,7 +818,7 @@ func TestDbToProto(t *testing.T) {
 			}
 			if err == nil {
 				require.NotNil(t, op)
-				assert.Equal(t, fmt.Sprintf("operations/%s/%s", tt.op.Prefix, tt.op.ID), op.Name)
+				assert.Equal(t, fmt.Sprintf("%s/operations/%s", tt.op.Parent, tt.op.ID), op.Name)
 				assert.Equal(t, tt.op.Done, op.Done)
 
 				if tt.op.Done && tt.op.ErrorCode.Valid && tt.op.ErrorCode.Int32 != 0 {
@@ -820,11 +844,11 @@ func TestWaitOperation_AlreadyDone(t *testing.T) {
 	opID := uuid.New()
 	mockQ.On("GetOperation", ctx, opID).Return(db.Operation{
 		ID:     opID,
-		Prefix: "assets",
+		Parent: "assets",
 		Done:   true,
 	}, nil)
 
-	op, err := m.WaitOperation(ctx, fmt.Sprintf("operations/assets/%s", opID))
+	op, err := m.WaitOperation(ctx, fmt.Sprintf("assets/operations/%s", opID))
 	require.NoError(t, err)
 	assert.True(t, op.Done)
 	mockQ.AssertExpectations(t)
@@ -835,16 +859,16 @@ func TestWaitOperation_WaitsForCompletion(t *testing.T) {
 	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	opID := uuid.New()
-	opName := fmt.Sprintf("operations/assets/%s", opID)
+	opName := fmt.Sprintf("assets/operations/%s", opID)
 
 	// First GetOperation call (in WaitOperation): not done.
 	// After notification, second GetOperation call: done.
 	firstCall := mockQ.On("GetOperation", mock.Anything, opID).Return(
-		db.Operation{ID: opID, Prefix: "assets", Done: false}, nil,
+		db.Operation{ID: opID, Parent: "assets", Done: false}, nil,
 	).Once()
 
 	mockQ.On("GetOperation", mock.Anything, opID).Return(
-		db.Operation{ID: opID, Prefix: "assets", Done: true}, nil,
+		db.Operation{ID: opID, Parent: "assets", Done: true}, nil,
 	).NotBefore(firstCall)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -878,11 +902,11 @@ func TestWaitOperation_ContextCancelled(t *testing.T) {
 	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
 	opID := uuid.New()
-	opName := fmt.Sprintf("operations/assets/%s", opID)
+	opName := fmt.Sprintf("assets/operations/%s", opID)
 
 	mockQ.On("GetOperation", mock.Anything, opID).Return(db.Operation{
 		ID:     opID,
-		Prefix: "assets",
+		Parent: "assets",
 		Done:   false,
 	}, nil)
 
@@ -919,10 +943,10 @@ func TestCreateAndRun_WithMetadata(t *testing.T) {
 	require.NoError(t, err)
 
 	mockQ.On("CreateOperation", ctx, mock.MatchedBy(func(p db.CreateOperationParams) bool {
-		return p.Prefix == "assets" && len(p.Metadata) > 0
+		return p.Parent == "assets" && len(p.Metadata) > 0
 	})).Return(db.Operation{
 		ID:     uuid.New(),
-		Prefix: "assets",
+		Parent: "assets",
 		Done:   false,
 	}, nil)
 
@@ -1013,7 +1037,7 @@ func TestDeleteOperation_DBError(t *testing.T) {
 	opID := uuid.New()
 	mockQ.On("GetOperation", ctx, opID).Return(db.Operation{}, fmt.Errorf("connection refused"))
 
-	err := m.DeleteOperation(ctx, fmt.Sprintf("operations/assets/%s", opID))
+	err := m.DeleteOperation(ctx, fmt.Sprintf("assets/operations/%s", opID))
 	require.Error(t, err)
 	st := status.Convert(err)
 	assert.Equal(t, codes.Internal, st.Code())
@@ -1028,7 +1052,7 @@ func TestDeleteOperation_DeleteDBError(t *testing.T) {
 	mockQ.On("GetOperation", ctx, opID).Return(db.Operation{ID: opID, Done: true}, nil)
 	mockQ.On("DeleteOperation", ctx, opID).Return(fmt.Errorf("disk full"))
 
-	err := m.DeleteOperation(ctx, fmt.Sprintf("operations/assets/%s", opID))
+	err := m.DeleteOperation(ctx, fmt.Sprintf("assets/operations/%s", opID))
 	require.Error(t, err)
 	st := status.Convert(err)
 	assert.Equal(t, codes.Internal, st.Code())
@@ -1054,7 +1078,7 @@ func TestCancelOperation_DBError(t *testing.T) {
 	opID := uuid.New()
 	mockQ.On("CancelOperation", ctx, opID).Return(db.Operation{}, fmt.Errorf("connection refused"))
 
-	err := m.CancelOperation(ctx, fmt.Sprintf("operations/assets/%s", opID))
+	err := m.CancelOperation(ctx, fmt.Sprintf("assets/operations/%s", opID))
 	require.Error(t, err)
 	st := status.Convert(err)
 	assert.Equal(t, codes.Internal, st.Code())
@@ -1079,7 +1103,7 @@ func TestRecoverPending_FailOperationError(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
-	op := db.Operation{ID: uuid.New(), Prefix: "a"}
+	op := db.Operation{ID: uuid.New(), Parent: "a"}
 	mockQ.On("ListPendingOperations", ctx).Return([]db.Operation{op}, nil)
 	mockQ.On("FailOperation", ctx, mock.MatchedBy(func(p db.FailOperationParams) bool {
 		return p.ID == op.ID
@@ -1099,7 +1123,7 @@ func TestGetOperation_DBError(t *testing.T) {
 	opID := uuid.New()
 	mockQ.On("GetOperation", ctx, opID).Return(db.Operation{}, fmt.Errorf("connection refused"))
 
-	_, err := m.GetOperation(ctx, fmt.Sprintf("operations/assets/%s", opID))
+	_, err := m.GetOperation(ctx, fmt.Sprintf("assets/operations/%s", opID))
 	require.Error(t, err)
 	st := status.Convert(err)
 	assert.Equal(t, codes.Internal, st.Code())
@@ -1125,11 +1149,11 @@ func TestListOperations_SkipsBadConversion(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
-	good := db.Operation{ID: uuid.New(), Prefix: "assets", Done: false}
+	good := db.Operation{ID: uuid.New(), Parent: "assets", Done: false}
 	// Bad operation: Done=true with invalid metadata JSON that will cause unmarshalAny to fail
 	bad := db.Operation{
 		ID:       uuid.New(),
-		Prefix:   "assets",
+		Parent:   "assets",
 		Done:     false,
 		Metadata: json.RawMessage(`{invalid json`),
 	}
@@ -1158,7 +1182,7 @@ func TestUnmarshalAny_InvalidJSON(t *testing.T) {
 func TestDbToProto_InvalidMetadata(t *testing.T) {
 	op := db.Operation{
 		ID:       uuid.New(),
-		Prefix:   "assets",
+		Parent:   "assets",
 		Done:     false,
 		Metadata: json.RawMessage(`{bad json`),
 	}
@@ -1169,7 +1193,7 @@ func TestDbToProto_InvalidMetadata(t *testing.T) {
 func TestDbToProto_InvalidResult(t *testing.T) {
 	op := db.Operation{
 		ID:     uuid.New(),
-		Prefix: "assets",
+		Parent: "assets",
 		Done:   true,
 		Result: json.RawMessage(`{bad json`),
 	}
@@ -1181,7 +1205,7 @@ func TestDbToProto_DoneNoErrorNoResult(t *testing.T) {
 	// Done with no error and no result -- covers the fall-through path
 	op := db.Operation{
 		ID:     uuid.New(),
-		Prefix: "assets",
+		Parent: "assets",
 		Done:   true,
 	}
 	pbOp, err := dbToProto(op)
@@ -1195,7 +1219,7 @@ func TestDbToProto_ErrorWithInvalidMessage(t *testing.T) {
 	// Error code set but ErrorMessage not valid -- covers the msg="" branch
 	op := db.Operation{
 		ID:           uuid.New(),
-		Prefix:       "assets",
+		Parent:       "assets",
 		Done:         true,
 		ErrorCode:    pgtype.Int4{Int32: int32(codes.Internal), Valid: true},
 		ErrorMessage: pgtype.Text{Valid: false},
@@ -1215,7 +1239,7 @@ func TestRunWork_FailOperationDBError(t *testing.T) {
 
 	mockQ.On("CreateOperation", ctx, mock.Anything).Return(db.Operation{
 		ID:     uuid.New(),
-		Prefix: "assets",
+		Parent: "assets",
 		Done:   false,
 	}, nil)
 
@@ -1245,7 +1269,7 @@ func TestRunWork_CompleteOperationDBError(t *testing.T) {
 
 	mockQ.On("CreateOperation", ctx, mock.Anything).Return(db.Operation{
 		ID:     uuid.New(),
-		Prefix: "assets",
+		Parent: "assets",
 		Done:   false,
 	}, nil)
 
@@ -1352,7 +1376,7 @@ func TestRunWork_PanicRecovery(t *testing.T) {
 	cap := &captureLogger{}
 	m := NewManager(ManagerConfig{Queries: mockQ, Logger: slog.New(cap)})
 
-	mockQ.On("CreateOperation", ctx, mock.Anything).Return(db.Operation{Prefix: "panicker"}, nil)
+	mockQ.On("CreateOperation", ctx, mock.Anything).Return(db.Operation{Parent: "panicker"}, nil)
 	failParams := make(chan db.FailOperationParams, 1)
 	mockQ.On("FailOperation", mock.Anything, mock.Anything).
 		Return(db.Operation{}, nil).
@@ -1396,7 +1420,7 @@ func TestRunWork_PreservesParentContextValues(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
-	mockQ.On("CreateOperation", mock.Anything, mock.Anything).Return(db.Operation{Prefix: "valued"}, nil)
+	mockQ.On("CreateOperation", mock.Anything, mock.Anything).Return(db.Operation{Parent: "valued"}, nil)
 	completeFired := make(chan struct{})
 	mockQ.On("CompleteOperation", mock.Anything, mock.Anything).
 		Return(db.Operation{}, nil).
@@ -1453,7 +1477,7 @@ func TestShutdown_DrainsInFlightWork(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
-	mockQ.On("CreateOperation", ctx, mock.Anything).Return(db.Operation{Prefix: "drain"}, nil)
+	mockQ.On("CreateOperation", ctx, mock.Anything).Return(db.Operation{Parent: "drain"}, nil)
 	failFired := make(chan db.FailOperationParams, 1)
 	mockQ.On("FailOperation", mock.Anything, mock.Anything).
 		Return(db.Operation{}, nil).
@@ -1496,7 +1520,7 @@ func TestShutdown_ReturnsDeadlineExceededOnSlowWork(t *testing.T) {
 	mockQ := new(mocks.MockQuerier)
 	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
 
-	mockQ.On("CreateOperation", ctx, mock.Anything).Return(db.Operation{Prefix: "slow"}, nil)
+	mockQ.On("CreateOperation", ctx, mock.Anything).Return(db.Operation{Parent: "slow"}, nil)
 	// Best-effort mocks for whatever the slow WorkFunc eventually
 	// triggers — the test only cares about Shutdown's return value.
 	mockQ.On("FailOperation", mock.Anything, mock.Anything).Return(db.Operation{}, nil).Maybe()

@@ -207,10 +207,8 @@ func TestDeleteDomain_VerifiedWithExtraVerifiedAllowed(t *testing.T) {
 	}, nil)
 	q.On("GetSsoConfigByOrgIDForUpdate", mock.Anything, orgID).Return(db.SsoConfig{Enabled: true}, nil)
 	q.On("CountVerifiedDomainsByOrg", mock.Anything, orgID).Return(int64(3), nil)
-	q.On("CancelDomainOpsForDomain", mock.Anything, db.CancelDomainOpsForDomainParams{
-		OrgID:      pgtype.UUID{Bytes: orgID, Valid: true},
-		DomainName: "organizations/acme/domains/x.com",
-	}).Return([]uuid.UUID{}, nil)
+	q.On("CancelDomainOpsForDomain", mock.Anything, "organizations/acme/domains/x.com").
+		Return([]uuid.UUID{}, nil)
 	q.On("DeleteDomain", mock.Anything, db.DeleteDomainParams{ID: domainID, OrgID: orgID}).Return(nil)
 
 	srv := &OrganizationsServer{txer: &db.PassthroughTxer{Q: q}, queries: q}

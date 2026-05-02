@@ -257,8 +257,8 @@ func (m *MockQuerier) CountVerifiedDomainsByOrg(ctx context.Context, orgID uuid.
 	return args.Get(0).(int64), args.Error(1)
 }
 
-func (m *MockQuerier) CancelDomainOpsForDomain(ctx context.Context, arg db.CancelDomainOpsForDomainParams) ([]uuid.UUID, error) {
-	args := m.Called(ctx, arg)
+func (m *MockQuerier) CancelDomainOpsForDomain(ctx context.Context, domainResource string) ([]uuid.UUID, error) {
+	args := m.Called(ctx, domainResource)
 	out, _ := args.Get(0).([]uuid.UUID)
 	return out, args.Error(1)
 }

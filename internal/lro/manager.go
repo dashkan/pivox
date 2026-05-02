@@ -131,13 +131,19 @@ func (m *Manager) UpdateMetadata(ctx context.Context, opID uuid.UUID, metadata p
 }
 
 // CreateAndRun creates a new operation and runs the work function
-// asynchronously. The operation is unscoped — operations.org_id is
-// NULL — so it isn't cancellable via DeleteOrganization's
-// CANCELLING_OPERATIONS phase. Use CreateAndRunForOrg when the LRO
-// targets an organization and should be cancelled if the org is
-// soft-deleted.
-func (m *Manager) CreateAndRun(ctx context.Context, prefix string, metadata proto.Message, work WorkFunc) (*longrunningpb.Operation, error) {
-	return m.createAndRun(ctx, prefix, pgtype.UUID{}, metadata, work)
+// asynchronously. `parent` is the AIP-151 parent resource the LRO
+// operates against (e.g., "organizations/acme/spaces/dev"); the
+// public Operation.name is constructed as
+// `{parent}/operations/{uuid}`. Pass an empty string for unscoped
+// LROs (root-level operations), in which case the name falls back
+// to the unparented `operations/{uuid}` form.
+//
+// The operation is unscoped — operations.org_id is NULL — so it
+// isn't cancellable via DeleteOrganization's CANCELLING_OPERATIONS
+// phase. Use CreateAndRunForOrg when the LRO targets an
+// organization and should be cancelled if the org is soft-deleted.
+func (m *Manager) CreateAndRun(ctx context.Context, parent string, metadata proto.Message, work WorkFunc) (*longrunningpb.Operation, error) {
+	return m.createAndRun(ctx, parent, pgtype.UUID{}, metadata, work)
 }
 
 // CreateAndRunForOrg is the org-scoped variant: the operation row's
@@ -148,11 +154,11 @@ func (m *Manager) CreateAndRun(ctx context.Context, prefix string, metadata prot
 // verifications, gateway upgrades). DO NOT use it for the
 // DeleteOrganization LRO itself — a self-pointing org_id would
 // cause the cancellation phase to cancel its own work.
-func (m *Manager) CreateAndRunForOrg(ctx context.Context, prefix string, orgID uuid.UUID, metadata proto.Message, work WorkFunc) (*longrunningpb.Operation, error) {
-	return m.createAndRun(ctx, prefix, pgtype.UUID{Bytes: orgID, Valid: true}, metadata, work)
+func (m *Manager) CreateAndRunForOrg(ctx context.Context, parent string, orgID uuid.UUID, metadata proto.Message, work WorkFunc) (*longrunningpb.Operation, error) {
+	return m.createAndRun(ctx, parent, pgtype.UUID{Bytes: orgID, Valid: true}, metadata, work)
 }
 
-func (m *Manager) createAndRun(ctx context.Context, prefix string, orgID pgtype.UUID, metadata proto.Message, work WorkFunc) (*longrunningpb.Operation, error) {
+func (m *Manager) createAndRun(ctx context.Context, parent string, orgID pgtype.UUID, metadata proto.Message, work WorkFunc) (*longrunningpb.Operation, error) {
 	opID := uuid.New()
 
 	var metaJSON json.RawMessage
@@ -177,7 +183,7 @@ func (m *Manager) createAndRun(ctx context.Context, prefix string, orgID pgtype.
 
 	dbOp, err := m.queries.CreateOperation(ctx, db.CreateOperationParams{
 		ID:       opID,
-		Prefix:   prefix,
+		Parent:   parent,
 		Metadata: metaJSON,
 		OrgID:    orgID,
 	})
@@ -364,13 +370,20 @@ func (m *Manager) Shutdown(ctx context.Context) error {
 	}
 }
 
-// parseOperationName extracts the UUID from "operations/{prefix}/{uuid}" or "operations/{uuid}".
+// parseOperationName extracts the UUID from an AIP-151 operation
+// name. Per the spec the name "ends with `operations/{unique_id}`",
+// so we accept any path whose last two segments are
+// `operations/<uuid>`. Anything before is the parent resource (an
+// AIP path like `organizations/acme/spaces/dev`) and is allowed to
+// be empty for root-scoped operations.
 func parseOperationName(name string) (uuid.UUID, error) {
 	parts := strings.Split(name, "/")
 	if len(parts) < 2 {
-		return uuid.Nil, fmt.Errorf("invalid operation name %q", name)
+		return uuid.Nil, fmt.Errorf("invalid operation name %q: must end with operations/{id}", name)
 	}
-	// The UUID is always the last segment
+	if parts[len(parts)-2] != "operations" {
+		return uuid.Nil, fmt.Errorf("invalid operation name %q: must end with operations/{id}", name)
+	}
 	id, err := uuid.Parse(parts[len(parts)-1])
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("invalid operation ID in %q: %w", name, err)
@@ -394,20 +407,23 @@ func (m *Manager) GetOperation(ctx context.Context, name string) (*longrunningpb
 	return dbToProto(dbOp)
 }
 
-// ListOperations lists operations with optional filtering by prefix.
-func (m *Manager) ListOperations(ctx context.Context, prefix string, pageSize int32) ([]*longrunningpb.Operation, error) {
+// ListOperations lists operations with optional filtering by parent.
+// `parent` is the AIP-151 parent resource (e.g.,
+// "organizations/acme/spaces/dev"); empty string lists all
+// operations regardless of parent.
+func (m *Manager) ListOperations(ctx context.Context, parent string, pageSize int32) ([]*longrunningpb.Operation, error) {
 	if pageSize <= 0 || pageSize > 1000 {
 		pageSize = 100
 	}
 
-	var prefixFilter pgtype.Text
-	if prefix != "" {
-		prefixFilter = pgtype.Text{String: prefix, Valid: true}
+	var parentFilter pgtype.Text
+	if parent != "" {
+		parentFilter = pgtype.Text{String: parent, Valid: true}
 	}
 
 	dbOps, err := m.queries.ListOperations(ctx, db.ListOperationsParams{
 		Limit:        pageSize,
-		PrefixFilter: prefixFilter,
+		ParentFilter: parentFilter,
 	})
 	if err != nil {
 		return nil, apierr.Internal("failed to list operations")

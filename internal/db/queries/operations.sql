@@ -4,7 +4,7 @@
 -- known at create time, including DeleteOrganization which must
 -- not self-cancel).
 -- name: CreateOperation :one
-INSERT INTO operations (id, prefix, metadata, created_by, org_id)
+INSERT INTO operations (id, parent, metadata, created_by, org_id)
 VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 
@@ -13,7 +13,7 @@ SELECT * FROM operations WHERE id = $1;
 
 -- name: ListOperations :many
 SELECT * FROM operations
-WHERE (sqlc.narg('prefix_filter')::text IS NULL OR prefix = sqlc.narg('prefix_filter'))
+WHERE (sqlc.narg('parent_filter')::text IS NULL OR parent = sqlc.narg('parent_filter'))
 ORDER BY create_time DESC
 LIMIT $1;
 

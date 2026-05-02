@@ -70,9 +70,7 @@ SET done          = true,
     error_message = 'cancelled by DeleteDomain',
     update_time   = now()
 WHERE done = false
-  AND prefix = 'domains'
-  AND org_id = @org_id
-  AND metadata->>'domain' = @domain_name::text
+  AND parent = @domain_resource::text
 RETURNING id;
 
 -- ListPendingDomains returns all domains in PENDING state, ordered
