@@ -60,6 +60,12 @@ air:
 dev-air:
 	air -c configs/air.dev.toml
 
+air-worker:
+	air -c configs/air.worker.toml
+
+dev-air-worker:
+	air -c configs/air.worker.dev.toml
+
 test:
 	go test ./...
 

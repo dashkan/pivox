@@ -15,12 +15,15 @@ import (
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	sloghttp "github.com/samber/slog-http"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/test/bufconn"
+	"riverqueue.com/riverui"
 
 	"github.com/dashkan/pivox/internal/agentstream"
 	"github.com/dashkan/pivox/internal/appkey"
@@ -198,6 +201,25 @@ func serve(cmd *cobra.Command, args []string) error {
 	// non-trivial deployment — see cmd/pivox-worker. River's leader
 	// election handles multi-replica coordination across worker
 	// replicas; pivox-cloud is pure RPC.
+	//
+	// pivox-cloud holds a River client for two reasons:
+	//   1. Future LRO enqueue path (Phase 5+ of #69 will replace
+	//      runWork goroutines with Insert/InsertTx into River).
+	//   2. River UI mounted at /river — the UI needs a Client to
+	//      query job state (no Workers config; we never *execute*
+	//      jobs from this process).
+	// The Client is constructed without Workers + without Start so
+	// it's a query/insert-only handle. Migrations are owned by
+	// pivox-worker; pivox-cloud assumes the river schema exists.
+	riverDriver := riverpgxv5.New(pool)
+	riverClient, err := river.NewClient(riverDriver, &river.Config{
+		Logger: logger,
+		Schema: "river",
+	})
+	if err != nil {
+		return fmt.Errorf("river client: %w", err)
+	}
+	_ = riverClient // wired in below; reference here keeps the var live across the auth/firebase block.
 
 	// Firebase
 	authSvc, err := firebase.NewAuthService(ctx)
@@ -489,6 +511,31 @@ func serve(cmd *cobra.Command, args []string) error {
 		Logger:    logger,
 	})
 	oauthBroker.Register(httpMux)
+
+	// River UI — admin web UI for inspecting/cancelling/retrying
+	// background jobs in the river schema. Prefix "/river" must
+	// match the mount path "/river/".
+	//
+	// **Pre-prod posture: NO AUTH.** Mounted without auth wrapping
+	// so an operator can click around in a browser without
+	// Firebase-token plumbing. This is a deliberate dev choice —
+	// before any production deploy this MUST be gated (HTTP basic
+	// auth via env-var creds is the recommended next step; see
+	// CLAUDE.md "Pre-prod freedom"). Leaving /river open on a
+	// public origin leaks job names, args, and error details.
+	riverUIEndpoints := riverui.NewEndpoints(riverClient, nil)
+	riverUIHandler, err := riverui.NewHandler(&riverui.HandlerOpts{
+		Endpoints: riverUIEndpoints,
+		Logger:    logger,
+		Prefix:    "/river",
+	})
+	if err != nil {
+		return fmt.Errorf("river UI handler: %w", err)
+	}
+	if err := riverUIHandler.Start(ctx); err != nil {
+		return fmt.Errorf("river UI start: %w", err)
+	}
+	httpMux.Handle("/river/", riverUIHandler)
 
 	// HTTP auth middleware. Wraps the grpc-gateway mux so every
 	// custom HTTP route mounted on gwMux (today: artifact :content)
