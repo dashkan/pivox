@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"runtime/debug"
 	"strings"
 	"sync"
 
@@ -58,6 +59,26 @@ type Manager struct {
 	// completion, overwriting the cancel state on success. The map
 	// is populated when runWork starts and cleared when it returns.
 	running map[uuid.UUID]context.CancelFunc
+
+	// shuttingDown gates new starts. Flipped by Shutdown under mu so
+	// CreateAndRun's "is shutdown in flight?" check and its wg.Add are
+	// atomic with Shutdown's "stop accepting work, then Wait." Without
+	// the lock, an Add could land after Wait returns — undefined
+	// behavior on sync.WaitGroup.
+	shuttingDown bool
+	// shutdownCtx is cancelled by Shutdown. Each runWork forwards its
+	// cancellation into that op's workCtx via context.AfterFunc, so a
+	// shutdown signal aborts every in-flight WorkFunc. This is the
+	// graceful-stop counterpart to CancelOperation's per-op cancel.
+	shutdownCtx    context.Context
+	shutdownCancel context.CancelFunc
+	// wg tracks in-flight runWork goroutines so Shutdown can wait for
+	// them to finish their bookkeeping (FailOperation/CompleteOperation)
+	// before the caller closes the DB pool.
+	wg sync.WaitGroup
+	// shutdownOnce makes Shutdown idempotent — repeat callers from
+	// duplicated signal handlers don't double-cancel or re-flip flags.
+	shutdownOnce sync.Once
 }
 
 // ManagerConfig is the constructor input for Manager.
@@ -78,11 +99,14 @@ func NewManager(cfg ManagerConfig) *Manager {
 	if cfg.Logger == nil {
 		panic("lro: ManagerConfig.Logger is required")
 	}
+	shutdownCtx, shutdownCancel := context.WithCancel(context.Background())
 	return &Manager{
-		queries:   cfg.Queries,
-		logger:    cfg.Logger,
-		listeners: make(map[uuid.UUID][]chan struct{}),
-		running:   make(map[uuid.UUID]context.CancelFunc),
+		queries:        cfg.Queries,
+		logger:         cfg.Logger,
+		listeners:      make(map[uuid.UUID][]chan struct{}),
+		running:        make(map[uuid.UUID]context.CancelFunc),
+		shutdownCtx:    shutdownCtx,
+		shutdownCancel: shutdownCancel,
 	}
 }
 
@@ -140,6 +164,17 @@ func (m *Manager) createAndRun(ctx context.Context, prefix string, orgID pgtype.
 		}
 	}
 
+	// Reserve a wg slot under mu so Shutdown's "flip the flag, then
+	// Wait" sequence can't observe Add() after Wait() has returned.
+	// If shutdown is already in flight, refuse the new operation.
+	m.mu.Lock()
+	if m.shuttingDown {
+		m.mu.Unlock()
+		return nil, apierr.Unavailable("server is shutting down; no new operations accepted")
+	}
+	m.wg.Add(1)
+	m.mu.Unlock()
+
 	dbOp, err := m.queries.CreateOperation(ctx, db.CreateOperationParams{
 		ID:       opID,
 		Prefix:   prefix,
@@ -147,27 +182,47 @@ func (m *Manager) createAndRun(ctx context.Context, prefix string, orgID pgtype.
 		OrgID:    orgID,
 	})
 	if err != nil {
+		m.wg.Done()
 		return nil, apierr.Internal("failed to create operation")
 	}
 
-	go m.runWork(opID, work)
+	go m.runWork(ctx, opID, work)
 
 	return dbToProto(dbOp)
 }
 
-func (m *Manager) runWork(opID uuid.UUID, work WorkFunc) {
-	// Two contexts:
-	//  - workCtx: cancellable, passed to the WorkFunc. CancelOperation
-	//    invokes the registered cancel fn so the work observes
-	//    ctx.Done() and aborts. Without this hook, CancelOperation
-	//    only marks the DB row and the goroutine runs to completion,
-	//    silently overwriting the cancel state on success.
-	//  - cleanupCtx: a separate Background context used for the final
-	//    Complete/Fail DB write. Cancellation must not block the
-	//    bookkeeping that records why the work stopped.
-	workCtx, cancel := context.WithCancel(context.Background())
+func (m *Manager) runWork(parent context.Context, opID uuid.UUID, work WorkFunc) {
+	defer m.wg.Done()
+
+	// Detach from the originating RPC's cancellation while keeping its
+	// values (trace IDs, slog attrs, span context). LROs must outlive
+	// the request that started them — `WithoutCancel` is precisely the
+	// "values without lifetime" primitive.
+	//
+	// Two derived contexts:
+	//  - workCtx: cancellable, passed to the WorkFunc. Three triggers
+	//    cancel it: CancelOperation (per-op, via the registered cancel
+	//    fn), CancelLocal (bulk, same map), and Shutdown (manager-wide,
+	//    via the AfterFunc below). The WorkFunc observes ctx.Done()
+	//    regardless of which fired.
+	//  - cleanupCtx: derived from `detached` but not from workCtx, so
+	//    the final FailOperation/CompleteOperation write inherits
+	//    request-scoped values for log correlation but is not aborted
+	//    by the same cancellation that ended the work. Shutdown's
+	//    wg.Wait gives this bookkeeping its drain budget.
+	detached := context.WithoutCancel(parent)
+	workCtx, cancel := context.WithCancel(detached)
 	defer cancel()
-	cleanupCtx := context.Background()
+	cleanupCtx := detached
+
+	// Forward shutdown into workCtx without spawning a watcher
+	// goroutine. AfterFunc fires `cancel` if shutdownCtx is or becomes
+	// done; `stop()` deregisters when work completes. If shutdownCtx
+	// is already cancelled at registration time, AfterFunc invokes
+	// the callback immediately in its own goroutine — covering the
+	// Shutdown-fires-between-CreateAndRun-and-here race.
+	stop := context.AfterFunc(m.shutdownCtx, cancel)
+	defer stop()
 
 	m.mu.Lock()
 	m.running[opID] = cancel
@@ -178,8 +233,36 @@ func (m *Manager) runWork(opID uuid.UUID, work WorkFunc) {
 		m.mu.Unlock()
 	}()
 
-	progress := &managerProgress{m: m, opID: opID}
-	result, err := work(workCtx, progress)
+	var (
+		result proto.Message
+		err    error
+	)
+	// Recover panics from user-supplied WorkFunc so a single bad LRO
+	// can't take down pivox-cloud. The synchronous RPC path is covered
+	// by gRPC's recovery interceptor; this goroutine is detached and
+	// outside that chain. The closure scope keeps the bookkeeping
+	// defers above untouched — they always run.
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				m.logger.ErrorContext(cleanupCtx, "lro: WorkFunc panicked",
+					"op", opID, "panic", r, "stack", string(debug.Stack()))
+				err = grpcstatus.Errorf(codes.Internal, "operation panicked: %v", r)
+			}
+		}()
+		progress := &managerProgress{m: m, opID: opID}
+		result, err = work(workCtx, progress)
+	}()
+
+	// Distinguish shutdown-induced cancellation in the recorded
+	// failure so RecoverPending isn't the only way to tell what
+	// happened. Plain CancelOperation already sets the DB row done via
+	// its own SQL path — this branch only reshapes the message that
+	// FailOperation will record below.
+	if errors.Is(err, context.Canceled) && m.shutdownCtx.Err() != nil {
+		err = grpcstatus.Error(codes.Aborted, "operation aborted by server shutdown")
+	}
+
 	ctx := cleanupCtx
 	// dbDone tracks whether the bookkeeping row has been written
 	// (done=true). Listeners are only notified when this is true —
@@ -200,7 +283,7 @@ func (m *Manager) runWork(opID uuid.UUID, work WorkFunc) {
 			ErrorCode:    pgtype.Int4{Int32: errCode, Valid: true},
 			ErrorMessage: pgtype.Text{String: errMsg, Valid: true},
 		}); dbErr != nil {
-			m.logger.Error("lro: FailOperation DB write failed; row stuck done=false until RecoverPending",
+			m.logger.ErrorContext(ctx, "lro: FailOperation DB write failed; row stuck done=false until RecoverPending",
 				"op", opID, "error", dbErr)
 		} else {
 			dbDone = true
@@ -211,13 +294,13 @@ func (m *Manager) runWork(opID uuid.UUID, work WorkFunc) {
 			var marshalErr error
 			resultJSON, marshalErr = marshalAny(result)
 			if marshalErr != nil {
-				m.logger.Error("lro: marshal operation result failed", "op", opID, "error", marshalErr)
+				m.logger.ErrorContext(ctx, "lro: marshal operation result failed", "op", opID, "error", marshalErr)
 				if _, dbErr := m.queries.FailOperation(ctx, db.FailOperationParams{
 					ID:           opID,
 					ErrorCode:    pgtype.Int4{Int32: int32(codes.Internal), Valid: true},
 					ErrorMessage: pgtype.Text{String: "marshal result: " + marshalErr.Error(), Valid: true},
 				}); dbErr != nil {
-					m.logger.Error("lro: FailOperation (marshal-error path) DB write failed; row stuck done=false until RecoverPending",
+					m.logger.ErrorContext(ctx, "lro: FailOperation (marshal-error path) DB write failed; row stuck done=false until RecoverPending",
 						"op", opID, "error", dbErr)
 				} else {
 					dbDone = true
@@ -230,7 +313,7 @@ func (m *Manager) runWork(opID uuid.UUID, work WorkFunc) {
 			ID:     opID,
 			Result: resultJSON,
 		}); dbErr != nil {
-			m.logger.Error("lro: CompleteOperation DB write failed; row stuck done=false until RecoverPending",
+			m.logger.ErrorContext(ctx, "lro: CompleteOperation DB write failed; row stuck done=false until RecoverPending",
 				"op", opID, "error", dbErr)
 		} else {
 			dbDone = true
@@ -239,6 +322,45 @@ func (m *Manager) runWork(opID uuid.UUID, work WorkFunc) {
 
 	if dbDone {
 		m.notifyListeners(opID)
+	}
+}
+
+// Shutdown stops accepting new operations, signals every in-flight
+// WorkFunc via shutdownCtx, and blocks until all runWork goroutines
+// have finished their bookkeeping (FailOperation/CompleteOperation)
+// or until ctx expires. After Shutdown returns, CreateAndRun /
+// CreateAndRunForOrg return Unavailable. Idempotent — duplicate
+// signal handlers calling it twice is safe.
+//
+// Caller (main.go) supplies the drain budget. Anything not finished
+// when ctx expires is left for RecoverPending on the next start —
+// rows stuck done=false get marked Aborted("operation abandoned
+// during server restart").
+//
+// Order in main.go: GracefulStop the gRPC server first (so no new
+// CreateAndRun calls land), then Manager.Shutdown(ctx), then close
+// the DB pool. Closing the pool before Shutdown returns can produce
+// "use of closed connection" log noise from the bookkeeping writes.
+func (m *Manager) Shutdown(ctx context.Context) error {
+	m.shutdownOnce.Do(func() {
+		m.mu.Lock()
+		m.shuttingDown = true
+		m.mu.Unlock()
+		m.shutdownCancel()
+	})
+
+	done := make(chan struct{})
+	go func() {
+		m.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		m.logger.Warn("lro: shutdown drain deadline exceeded; abandoned ops will be marked failed by RecoverPending on next start")
+		return ctx.Err()
 	}
 }
 

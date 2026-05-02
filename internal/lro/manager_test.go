@@ -980,7 +980,8 @@ func TestRunWork_MarshalResultError(t *testing.T) {
 	// anypb.New() will fail when the message type is not resolvable.
 	badMsg := &anypb.Any{TypeUrl: "type.googleapis.com/nonexistent.Type", Value: []byte("bad")}
 
-	go m.runWork(opID, func(ctx context.Context, _ Progress) (proto.Message, error) {
+	m.wg.Add(1) // direct runWork call bypasses CreateAndRun's Add
+	go m.runWork(context.Background(), opID, func(ctx context.Context, _ Progress) (proto.Message, error) {
 		return badMsg, nil
 	})
 
@@ -1283,7 +1284,8 @@ func TestRunWork_MarshalResultError_FailOperationAlsoFails(t *testing.T) {
 
 	badMsg := &anypb.Any{TypeUrl: "type.googleapis.com/nonexistent.Type", Value: []byte("bad")}
 
-	go m.runWork(opID, func(ctx context.Context, _ Progress) (proto.Message, error) {
+	m.wg.Add(1) // direct runWork call bypasses CreateAndRun's Add
+	go m.runWork(context.Background(), opID, func(ctx context.Context, _ Progress) (proto.Message, error) {
 		return badMsg, nil
 	})
 
@@ -1293,6 +1295,257 @@ func TestRunWork_MarshalResultError_FailOperationAlsoFails(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("timed out")
 	}
+}
+
+// captureLogger is a slog handler that records every Record into a
+// slice under a mutex. Used by panic-recovery and shutdown-drain
+// tests to assert exact attrs (op, panic, stack) instead of grepping
+// a text buffer.
+type captureLogger struct {
+	mu      sync.Mutex
+	records []slog.Record
+}
+
+func (c *captureLogger) Enabled(context.Context, slog.Level) bool { return true }
+func (c *captureLogger) Handle(_ context.Context, r slog.Record) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.records = append(c.records, r.Clone())
+	return nil
+}
+func (c *captureLogger) WithAttrs([]slog.Attr) slog.Handler { return c }
+func (c *captureLogger) WithGroup(string) slog.Handler      { return c }
+
+func (c *captureLogger) findMessage(msg string) (slog.Record, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, r := range c.records {
+		if r.Message == msg {
+			return r, true
+		}
+	}
+	return slog.Record{}, false
+}
+
+func attrValue(r slog.Record, key string) (any, bool) {
+	var got any
+	var found bool
+	r.Attrs(func(a slog.Attr) bool {
+		if a.Key == key {
+			got = a.Value.Any()
+			found = true
+			return false
+		}
+		return true
+	})
+	return got, found
+}
+
+// TestRunWork_PanicRecovery (issue #21) pins that a WorkFunc panic
+// (a) does not crash the process — the test wouldn't return
+// otherwise, (b) is translated into FailOperation with codes.Internal
+// and a message that names the recovered value, (c) is logged with a
+// stack trace so the cause is investigable post-mortem.
+func TestRunWork_PanicRecovery(t *testing.T) {
+	ctx := context.Background()
+	mockQ := new(mocks.MockQuerier)
+	cap := &captureLogger{}
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: slog.New(cap)})
+
+	mockQ.On("CreateOperation", ctx, mock.Anything).Return(db.Operation{Prefix: "panicker"}, nil)
+	failParams := make(chan db.FailOperationParams, 1)
+	mockQ.On("FailOperation", mock.Anything, mock.Anything).
+		Return(db.Operation{}, nil).
+		Run(func(args mock.Arguments) {
+			failParams <- args.Get(1).(db.FailOperationParams)
+		})
+
+	_, err := m.CreateAndRun(ctx, "panicker", nil, func(_ context.Context, _ Progress) (proto.Message, error) {
+		panic("synthetic test panic")
+	})
+	require.NoError(t, err)
+
+	select {
+	case p := <-failParams:
+		assert.Equal(t, int32(codes.Internal), p.ErrorCode.Int32)
+		assert.Contains(t, p.ErrorMessage.String, "panicked")
+	case <-time.After(2 * time.Second):
+		t.Fatal("FailOperation never called — panic likely crashed the goroutine without recovery")
+	}
+
+	rec, ok := cap.findMessage("lro: WorkFunc panicked")
+	require.True(t, ok, "panic log line not found")
+	panicVal, _ := attrValue(rec, "panic")
+	assert.NotNil(t, panicVal, "panic attr missing")
+	stackVal, _ := attrValue(rec, "stack")
+	stackStr, _ := stackVal.(string)
+	require.NotEmpty(t, stackStr, "stack attr missing or not a string")
+	assert.Contains(t, stackStr, "lro.TestRunWork_PanicRecovery", "stack must point to the panicking call site")
+}
+
+// ctxKey is a private key type so the test's value can't collide with
+// real ctx keys. Required by the lint rule that ctx-value keys be
+// unexported types — see golang-context skill.
+type ctxKey struct{}
+
+// TestRunWork_PreservesParentContextValues (issue #42) confirms that
+// values on the originating ctx (trace IDs, slog attrs, span context)
+// flow into the WorkFunc via context.WithoutCancel — without
+// inheriting cancellation, which would defeat the point of LRO.
+func TestRunWork_PreservesParentContextValues(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
+
+	mockQ.On("CreateOperation", mock.Anything, mock.Anything).Return(db.Operation{Prefix: "valued"}, nil)
+	completeFired := make(chan struct{})
+	mockQ.On("CompleteOperation", mock.Anything, mock.Anything).
+		Return(db.Operation{}, nil).
+		Run(func(args mock.Arguments) { close(completeFired) })
+
+	parent, parentCancel := context.WithCancel(context.WithValue(context.Background(), ctxKey{}, "trace-abc"))
+	defer parentCancel()
+
+	observed := make(chan any, 1)
+	stillRunning := make(chan struct{})
+	releaseWork := make(chan struct{})
+	_, err := m.CreateAndRun(parent, "valued", nil, func(workCtx context.Context, _ Progress) (proto.Message, error) {
+		observed <- workCtx.Value(ctxKey{})
+		// Park the goroutine so we can cancel the parent and observe
+		// that workCtx is unaffected.
+		close(stillRunning)
+		<-releaseWork
+		return nil, nil
+	})
+	require.NoError(t, err)
+
+	select {
+	case got := <-observed:
+		assert.Equal(t, "trace-abc", got, "ctx value did not propagate through WithoutCancel")
+	case <-time.After(2 * time.Second):
+		t.Fatal("WorkFunc never started")
+	}
+
+	// Cancel parent. WorkFunc must keep running — that is the
+	// LRO-outlives-request contract.
+	<-stillRunning
+	parentCancel()
+	select {
+	case <-completeFired:
+		t.Fatal("CompleteOperation fired after parent cancellation — workCtx wrongly observed parent's cancel")
+	case <-time.After(100 * time.Millisecond):
+		// good: work is still running, blocked on releaseWork
+	}
+
+	close(releaseWork)
+	select {
+	case <-completeFired:
+		// good: work finished naturally after release
+	case <-time.After(2 * time.Second):
+		t.Fatal("WorkFunc didn't complete after release")
+	}
+}
+
+// TestShutdown_DrainsInFlightWork: a running WorkFunc that observes
+// ctx.Done() sees Cancelled when Shutdown fires; Shutdown waits for
+// the bookkeeping FailOperation to land before returning nil.
+func TestShutdown_DrainsInFlightWork(t *testing.T) {
+	ctx := context.Background()
+	mockQ := new(mocks.MockQuerier)
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
+
+	mockQ.On("CreateOperation", ctx, mock.Anything).Return(db.Operation{Prefix: "drain"}, nil)
+	failFired := make(chan db.FailOperationParams, 1)
+	mockQ.On("FailOperation", mock.Anything, mock.Anything).
+		Return(db.Operation{}, nil).
+		Run(func(args mock.Arguments) {
+			failFired <- args.Get(1).(db.FailOperationParams)
+		})
+
+	started := make(chan struct{})
+	_, err := m.CreateAndRun(ctx, "drain", nil, func(workCtx context.Context, _ Progress) (proto.Message, error) {
+		close(started)
+		<-workCtx.Done()
+		return nil, workCtx.Err()
+	})
+	require.NoError(t, err)
+	<-started
+
+	drainCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	require.NoError(t, m.Shutdown(drainCtx))
+
+	select {
+	case p := <-failFired:
+		// Shutdown-induced cancel surfaces as Aborted, not Cancelled —
+		// runWork remaps the ctx error so audit logs distinguish
+		// "user cancelled" from "server stopped."
+		assert.Equal(t, int32(codes.Aborted), p.ErrorCode.Int32)
+		assert.Contains(t, p.ErrorMessage.String, "shutdown")
+	default:
+		t.Fatal("Shutdown returned before FailOperation landed — wg.Wait didn't actually wait")
+	}
+}
+
+// TestShutdown_ReturnsDeadlineExceededOnSlowWork: a WorkFunc that
+// ignores ctx.Done() (a bad citizen, or one in the middle of an
+// uninterruptible operation) blows the drain deadline. Shutdown
+// returns DeadlineExceeded so the caller can log it and proceed to
+// pool.Close(); RecoverPending picks up the row on next start.
+func TestShutdown_ReturnsDeadlineExceededOnSlowWork(t *testing.T) {
+	ctx := context.Background()
+	mockQ := new(mocks.MockQuerier)
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
+
+	mockQ.On("CreateOperation", ctx, mock.Anything).Return(db.Operation{Prefix: "slow"}, nil)
+	// Best-effort mocks for whatever the slow WorkFunc eventually
+	// triggers — the test only cares about Shutdown's return value.
+	mockQ.On("FailOperation", mock.Anything, mock.Anything).Return(db.Operation{}, nil).Maybe()
+	mockQ.On("CompleteOperation", mock.Anything, mock.Anything).Return(db.Operation{}, nil).Maybe()
+
+	release := make(chan struct{})
+	defer close(release) // let the goroutine exit at end of test
+	started := make(chan struct{})
+	_, err := m.CreateAndRun(ctx, "slow", nil, func(_ context.Context, _ Progress) (proto.Message, error) {
+		close(started)
+		<-release // ignore ctx.Done — simulate uninterruptible work
+		return nil, nil
+	})
+	require.NoError(t, err)
+	<-started
+
+	drainCtx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	err = m.Shutdown(drainCtx)
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+}
+
+// TestShutdown_RejectsNewWork: after Shutdown begins, CreateAndRun
+// must return Unavailable instead of starting more work that would
+// race with the drain.
+func TestShutdown_RejectsNewWork(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
+
+	// Drain immediately — no in-flight work.
+	require.NoError(t, m.Shutdown(context.Background()))
+
+	_, err := m.CreateAndRun(context.Background(), "after-shutdown", nil,
+		func(_ context.Context, _ Progress) (proto.Message, error) { return nil, nil })
+	require.Error(t, err)
+	st := status.Convert(err)
+	assert.Equal(t, codes.Unavailable, st.Code(), "post-shutdown CreateAndRun must return Unavailable")
+	mockQ.AssertNotCalled(t, "CreateOperation", mock.Anything, mock.Anything)
+}
+
+// TestShutdown_Idempotent: signal handlers can fire twice (e.g.
+// SIGTERM after SIGINT). The second Shutdown must not double-cancel,
+// double-flip, or panic.
+func TestShutdown_Idempotent(t *testing.T) {
+	mockQ := new(mocks.MockQuerier)
+	m := NewManager(ManagerConfig{Queries: mockQ, Logger: newTestLogger()})
+
+	require.NoError(t, m.Shutdown(context.Background()))
+	require.NoError(t, m.Shutdown(context.Background()))
 }
 
 func TestReaper_Run_DeleteError(t *testing.T) {

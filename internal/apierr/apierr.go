@@ -112,6 +112,15 @@ func Unimplemented(msg string) error {
 	return status.Error(codes.Unimplemented, msg)
 }
 
+// Unavailable returns codes.Unavailable for transient conditions that
+// the caller may safely retry — most often "server is shutting down,
+// not accepting new work." gRPC clients treat Unavailable as
+// retryable by default, so reserve it for cases where retry is
+// genuinely the right caller behavior.
+func Unavailable(msg string) error {
+	return status.Error(codes.Unavailable, msg)
+}
+
 // BadRequest returns codes.InvalidArgument with a free-form message,
 // for cases where the failure isn't tied to a specific field (and
 // thus a typed FieldViolation isn't a natural fit). For field-level

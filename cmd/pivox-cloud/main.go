@@ -631,6 +631,16 @@ func serve(cmd *cobra.Command, args []string) error {
 	_ = restServer.Shutdown(shutdownCtx)
 	_ = debugServer.Shutdown(shutdownCtx)
 
+	// Drain in-flight LRO goroutines before pool.Close runs in the
+	// outer defer. GracefulStop above ensures no new RPCs land
+	// (CreateAndRun would also self-reject post-Shutdown), but
+	// already-running WorkFuncs need their bookkeeping write to
+	// complete on a live pool. Anything past the deadline is left for
+	// RecoverPending on next start.
+	if err := lroManager.Shutdown(shutdownCtx); err != nil {
+		logger.Warn("lro shutdown drain timed out", "error", err)
+	}
+
 	logger.Info("server stopped")
 	return nil
 }
