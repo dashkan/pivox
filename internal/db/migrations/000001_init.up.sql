@@ -96,7 +96,7 @@ CREATE TABLE operations (
 );
 CREATE INDEX idx_operations_pending ON operations (create_time) WHERE done = false;
 CREATE INDEX idx_operations_expire ON operations (expire_time) WHERE done = true;
-CREATE INDEX idx_operations_prefix ON operations (prefix, create_time DESC);
+CREATE INDEX idx_operations_parent ON operations (parent, create_time DESC);
 -- Partial index supports CancelRunningOpsForOrg: only the running
 -- subset is queried, and only for ops with a populated org_id.
 CREATE INDEX idx_operations_org_pending ON operations (org_id) WHERE done = false AND org_id IS NOT NULL;

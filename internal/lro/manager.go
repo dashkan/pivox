@@ -14,6 +14,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/riverqueue/river"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -49,6 +51,16 @@ func (p *managerProgress) Update(ctx context.Context, metadata proto.Message) {
 type Manager struct {
 	queries db.Querier
 	logger  *slog.Logger
+
+	// pool + river are required by NewLro and only by NewLro. The
+	// rest of Manager (CreateAndRun, runWork, RecoverPending, etc.)
+	// uses queries directly. They're kept optional for now so the
+	// transition off the legacy path is incremental — handlers
+	// migrate one at a time, tests that don't touch NewLro don't
+	// need to wire either field. Once every LRO is on the new path
+	// these become required and CreateAndRun/runWork get deleted.
+	pool  *pgxpool.Pool
+	river *river.Client[pgx.Tx]
 
 	mu        sync.Mutex
 	listeners map[uuid.UUID][]chan struct{}
@@ -88,6 +100,18 @@ type ManagerConfig struct {
 	// Logger is the slog logger used for failure / progress lines.
 	// Required.
 	Logger *slog.Logger
+	// Pool is the pgxpool.Pool used by NewLro to begin a transaction
+	// that wraps the operations row insert + the River job insert.
+	// Optional during the transition off legacy CreateAndRun; required
+	// for NewLro. Production wires the same pool used by the REST/gRPC
+	// surface.
+	Pool *pgxpool.Pool
+	// River is the river.Client used by NewLro to enqueue jobs in the
+	// same tx as the operations row insert. Optional during transition;
+	// required for NewLro. Production constructs a query/insert-only
+	// client (no Workers, no Start) — work execution lives in
+	// pivox-worker, not pivox-cloud.
+	River *river.Client[pgx.Tx]
 }
 
 // NewManager constructs a Manager from cfg. Panics on a missing
@@ -103,6 +127,8 @@ func NewManager(cfg ManagerConfig) *Manager {
 	return &Manager{
 		queries:        cfg.Queries,
 		logger:         cfg.Logger,
+		pool:           cfg.Pool,
+		river:          cfg.River,
 		listeners:      make(map[uuid.UUID][]chan struct{}),
 		running:        make(map[uuid.UUID]context.CancelFunc),
 		shutdownCtx:    shutdownCtx,
@@ -128,6 +154,111 @@ func (m *Manager) UpdateMetadata(ctx context.Context, opID uuid.UUID, metadata p
 	}); err != nil {
 		m.logger.Error("lro: update operation metadata", "op", opID, "error", err)
 	}
+}
+
+// NewLroOpts is the input bundle for Manager.NewLro. Required fields
+// are JobArgs; everything else is optional. Mirrors the codebase's
+// Config-struct convention for multi-arg constructors.
+type NewLroOpts struct {
+	// JobArgs is the River job to enqueue. Required.
+	JobArgs river.JobArgs
+	// JobOpts is forwarded to river.InsertTx (priority, scheduledAt,
+	// queue, tags, metadata, uniqueness). Optional.
+	JobOpts *river.InsertOpts
+	// Metadata is the initial AIP-151 Operation.metadata payload —
+	// typically a typed protobuf describing the operation's phase /
+	// target resource. Optional.
+	Metadata proto.Message
+	// OrgID is the reverse pointer to the org this LRO operates
+	// against. Set for org-scoped operations so
+	// CancelRunningOpsForOrg can interrupt them when the org enters
+	// DELETE_REQUESTED. Leave zero for unscoped LROs and for
+	// DeleteOrganization itself (self-pointing org_id would make
+	// the LRO cancel its own work).
+	OrgID pgtype.UUID
+	// CreatedBy is the identity-uuid of the caller that originated
+	// the LRO. Optional; populated by handlers via
+	// server.MustPivoxUserID(ctx) when known.
+	CreatedBy pgtype.UUID
+}
+
+// NewLro creates a new operation row AND enqueues a River job for it,
+// atomically in a single Postgres transaction. This is the post-River
+// replacement for CreateAndRun: instead of spawning a goroutine in
+// pivox-cloud, work is enqueued and pivox-worker picks it up.
+//
+// `parent` is the AIP-151 parent resource (e.g.,
+// "organizations/acme/spaces/dev"); the public Operation.name is
+// constructed as `{parent}/operations/{uuid}`. Empty parent yields the
+// unparented `operations/{uuid}` form.
+//
+// Atomicity: the operations row INSERT and River's job INSERT both
+// run inside the same pgx.Tx. River's tables live in the `river`
+// schema, our operations table in `public` — both writes commit (or
+// roll back) together. No "row exists but no job" or vice versa.
+//
+// Requires Pool + River set on the Manager. Errors at call time if
+// either is nil; this allows the legacy CreateAndRun path to keep
+// working in tests/wiring that hasn't migrated.
+func (m *Manager) NewLro(ctx context.Context, parent string, opts NewLroOpts) (*longrunningpb.Operation, error) {
+	if m.pool == nil {
+		return nil, apierr.Internal("lro: NewLro requires Manager.Pool")
+	}
+	if m.river == nil {
+		return nil, apierr.Internal("lro: NewLro requires Manager.River")
+	}
+	if opts.JobArgs == nil {
+		return nil, apierr.Internal("lro: NewLro requires JobArgs")
+	}
+
+	var metaJSON json.RawMessage
+	if opts.Metadata != nil {
+		var err error
+		metaJSON, err = marshalAny(opts.Metadata)
+		if err != nil {
+			return nil, apierr.Internal("failed to marshal operation metadata")
+		}
+	}
+
+	// Refuse new operations once Shutdown has begun. Matches the
+	// CreateAndRun gate; cheap insurance even though pivox-worker
+	// processes jobs independently of pivox-cloud's lifecycle.
+	m.mu.Lock()
+	if m.shuttingDown {
+		m.mu.Unlock()
+		return nil, apierr.Unavailable("server is shutting down; no new operations accepted")
+	}
+	m.mu.Unlock()
+
+	tx, err := m.pool.Begin(ctx)
+	if err != nil {
+		return nil, apierr.Internal("failed to begin tx")
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // Rollback after Commit is a no-op (ErrTxClosed); intentional.
+
+	qtx := db.New(tx)
+
+	opID := uuid.New()
+	dbOp, err := qtx.CreateOperation(ctx, db.CreateOperationParams{
+		ID:        opID,
+		Parent:    parent,
+		Metadata:  metaJSON,
+		OrgID:     opts.OrgID,
+		CreatedBy: opts.CreatedBy,
+	})
+	if err != nil {
+		return nil, apierr.Internal("failed to create operation")
+	}
+
+	if _, err := m.river.InsertTx(ctx, tx, opts.JobArgs, opts.JobOpts); err != nil {
+		return nil, apierr.Internal("failed to enqueue river job")
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, apierr.Internal("failed to commit tx")
+	}
+
+	return dbToProto(dbOp)
 }
 
 // CreateAndRun creates a new operation and runs the work function

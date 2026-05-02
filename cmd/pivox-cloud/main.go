@@ -188,13 +188,6 @@ func serve(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("initialize app key: %w", err)
 	}
-	lroManager := lro.NewManager(lro.ManagerConfig{Queries: queries, Logger: logger})
-
-	// Recover any pending operations from previous run
-	if err := lroManager.RecoverPending(ctx); err != nil {
-		logger.Error("failed to recover pending operations", "error", err)
-	}
-
 	// Background work (org/space purge, domain verification, LRO
 	// reaper, auth-artifact cleanup) lives in the pivox-worker
 	// process now. Run pivox-worker alongside pivox-cloud for any
@@ -202,15 +195,17 @@ func serve(cmd *cobra.Command, args []string) error {
 	// election handles multi-replica coordination across worker
 	// replicas; pivox-cloud is pure RPC.
 	//
-	// pivox-cloud holds a River client for two reasons:
-	//   1. Future LRO enqueue path (Phase 5+ of #69 will replace
-	//      runWork goroutines with Insert/InsertTx into River).
+	// pivox-cloud holds a River client for three reasons:
+	//   1. lro.Manager.NewLro: enqueues LROs into River atomically
+	//      with the operations row insert in a single tx.
 	//   2. River UI mounted at /river — the UI needs a Client to
-	//      query job state (no Workers config; we never *execute*
-	//      jobs from this process).
-	// The Client is constructed without Workers + without Start so
-	// it's a query/insert-only handle. Migrations are owned by
-	// pivox-worker; pivox-cloud assumes the river schema exists.
+	//      query job state.
+	//   3. Future-proofing: as LRO handlers migrate off the legacy
+	//      CreateAndRun + runWork path (#69 Phase 5+), they all
+	//      flow through this Client.
+	// Constructed without Workers + without Start so it's a
+	// query/insert-only handle. Migrations are owned by pivox-worker;
+	// pivox-cloud assumes the river schema exists.
 	riverDriver := riverpgxv5.New(pool)
 	riverClient, err := river.NewClient(riverDriver, &river.Config{
 		Logger: logger,
@@ -219,7 +214,18 @@ func serve(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("river client: %w", err)
 	}
-	_ = riverClient // wired in below; reference here keeps the var live across the auth/firebase block.
+
+	lroManager := lro.NewManager(lro.ManagerConfig{
+		Queries: queries,
+		Logger:  logger,
+		Pool:    pool,
+		River:   riverClient,
+	})
+
+	// Recover any pending operations from previous run
+	if err := lroManager.RecoverPending(ctx); err != nil {
+		logger.Error("failed to recover pending operations", "error", err)
+	}
 
 	// Firebase
 	authSvc, err := firebase.NewAuthService(ctx)
