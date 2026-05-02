@@ -39,11 +39,15 @@ const (
 	// schemas-we-don't-own."
 	riverSchema = "river"
 
-	// purgeOrgsInterval mirrors the pre-River PurgeWorker cadence.
-	// Steady-state load is at most a handful of orgs per tick;
-	// bumping this won't materially help and would just spread the
-	// cascade work across more wakeups.
-	purgeOrgsInterval = 5 * time.Minute
+	// Periodic-job cadences. Mirror the pre-River tick intervals so
+	// behavior matches the old workers exactly — only the scheduler
+	// changed, not the work rate. Tune individually if real-world
+	// load motivates it.
+	purgeOrgsInterval      = 5 * time.Minute
+	purgeSpacesInterval    = 5 * time.Minute
+	verifyDomainsInterval  = 2 * time.Minute
+	reapOperationsInterval = 5 * time.Minute
+	cleanupAuthInterval    = 1 * time.Minute
 )
 
 var version = "dev"
@@ -125,17 +129,46 @@ func serve(cmd *cobra.Command, _ []string) error {
 
 	// Worker registry. Each tick worker we used to host inline in
 	// pivox-cloud becomes a river.Worker registered here; River's
-	// scheduler drives invocation via the periodic-job table.
+	// scheduler drives invocation via the periodic-job table. The
+	// pre-River workers package's hand-rolled tick loop + advisory
+	// lock + Worker interface are gone — leader election is River's
+	// job, scheduling is the periodic-job table.
+	dnsResolver := workers.NewStubDNSResolver(logger)
 	riverWorkers := river.NewWorkers()
 	river.AddWorker(riverWorkers, &workers.PurgeOrgsWorker{Queries: queries, Logger: logger})
+	river.AddWorker(riverWorkers, &workers.PurgeSpacesWorker{Queries: queries, Logger: logger})
+	river.AddWorker(riverWorkers, &workers.VerifyDomainsWorker{Queries: queries, Resolver: dnsResolver, Logger: logger})
+	river.AddWorker(riverWorkers, &workers.ReapOperationsWorker{Queries: queries, Logger: logger})
+	river.AddWorker(riverWorkers, &workers.CleanupAuthWorker{Queries: queries, Logger: logger})
 
 	// Periodic job registrations. RunOnStart=true so a freshly-booted
 	// replica does useful work immediately rather than waiting one
-	// interval before the first tick.
+	// interval before the first tick. Cadences mirror the pre-River
+	// tick intervals exactly.
 	periodic := []*river.PeriodicJob{
 		river.NewPeriodicJob(
 			river.PeriodicInterval(purgeOrgsInterval),
 			func() (river.JobArgs, *river.InsertOpts) { return workers.PurgeOrgsArgs{}, nil },
+			&river.PeriodicJobOpts{RunOnStart: true},
+		),
+		river.NewPeriodicJob(
+			river.PeriodicInterval(purgeSpacesInterval),
+			func() (river.JobArgs, *river.InsertOpts) { return workers.PurgeSpacesArgs{}, nil },
+			&river.PeriodicJobOpts{RunOnStart: true},
+		),
+		river.NewPeriodicJob(
+			river.PeriodicInterval(verifyDomainsInterval),
+			func() (river.JobArgs, *river.InsertOpts) { return workers.VerifyDomainsArgs{}, nil },
+			&river.PeriodicJobOpts{RunOnStart: true},
+		),
+		river.NewPeriodicJob(
+			river.PeriodicInterval(reapOperationsInterval),
+			func() (river.JobArgs, *river.InsertOpts) { return workers.ReapOperationsArgs{}, nil },
+			&river.PeriodicJobOpts{RunOnStart: true},
+		),
+		river.NewPeriodicJob(
+			river.PeriodicInterval(cleanupAuthInterval),
+			func() (river.JobArgs, *river.InsertOpts) { return workers.CleanupAuthArgs{}, nil },
 			&river.PeriodicJobOpts{RunOnStart: true},
 		),
 	}
