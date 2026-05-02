@@ -18,6 +18,16 @@
 --   Soft delete: delete_time (nullable), purge_time (nullable)
 
 -- ============================================================================
+-- Schemas
+-- ============================================================================
+-- River queue lives in its own schema so its tables (river_job,
+-- river_queue, river_leader, etc.) are visually separated from the
+-- application schema. River runs its own migrations programmatically
+-- via rivermigrate at pivox-worker boot — this just creates the
+-- namespace they land in.
+CREATE SCHEMA IF NOT EXISTS river;
+
+-- ============================================================================
 -- Enum types
 -- ============================================================================
 CREATE TYPE resource_state AS ENUM ('ACTIVE', 'DELETE_REQUESTED');

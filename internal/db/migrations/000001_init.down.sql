@@ -61,3 +61,7 @@ DROP TYPE IF EXISTS invitation_state;
 DROP TYPE IF EXISTS domain_state;
 DROP TYPE IF EXISTS principal_kind;
 DROP TYPE IF EXISTS resource_state;
+
+-- River schema (CASCADE drops all river_* tables created by River's
+-- own migrations).
+DROP SCHEMA IF EXISTS river CASCADE;

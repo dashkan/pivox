@@ -17,6 +17,7 @@ TOOL = go tool -modfile=./tools/go.mod
 dev-build:
 	go build -tags dev -o bin/pivox-cloud ./cmd/pivox-cloud
 	go build -tags dev -o bin/pivox-agent ./cmd/pivox-agent
+	go build -tags dev -o bin/pivox-worker ./cmd/pivox-worker
 
 dev-server:
 	go run -tags dev ./cmd/pivox-cloud serve
@@ -24,15 +25,22 @@ dev-server:
 dev-agent:
 	go run -tags dev ./cmd/pivox-agent storage --token dev-token-local
 
+dev-worker:
+	go run -tags dev ./cmd/pivox-worker
+
 build:
 	go build -o bin/pivox-cloud ./cmd/pivox-cloud
 	go build -o bin/pivox-agent ./cmd/pivox-agent
+	go build -o bin/pivox-worker ./cmd/pivox-worker
 
 run-server:
 	go run ./cmd/pivox-cloud serve
 
 run-agent:
 	go run ./cmd/pivox-agent storage --token dev-token-local
+
+run-worker:
+	go run ./cmd/pivox-worker
 
 # Hot reload via air (https://github.com/air-verse/air). Install
 # air separately (`go install github.com/air-verse/air@latest` or
