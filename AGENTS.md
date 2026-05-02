@@ -399,7 +399,47 @@ The bar is "would a senior Google engineer ship this." Concretely:
 
 ## Testing
 
-All new code uses TDD. Write tests first, then implementation.
+**TDD is required for every feature, bug fix, and behavior change.
+No exceptions.** Tests come first — production code only after a test
+exists that fails for the right reason.
+
+The cycle:
+
+1. **Red.** Write a failing test that captures the intended behavior.
+   Run it. Confirm it fails, and that the failure message points at
+   the missing behavior — not at a typo, missing import, or unrelated
+   compile error.
+2. **Green.** Write the smallest production-code change that makes
+   the test pass. Resist the urge to add nearby "while-I'm-here"
+   improvements.
+3. **Refactor.** With the test green, clean up the implementation
+   AND the test. Re-run; both stay green.
+
+Applies equally to:
+- New Go handlers, services, packages
+- Bug fixes (write the test that reproduces the bug first; watch it
+  fail; then fix)
+- Schema migrations (the integration test that exercises the new
+  shape comes before the migration)
+- Native (XCTest / XCUITest / gtest), Cloud Functions, and any
+  other stack — same rule, different framework
+
+Narrow exceptions, used sparingly:
+- Pure renames, formatting, and gofmt-equivalent mechanical changes
+- Doc-only edits
+- Build-tooling / Makefile / CI config that has no behavioral
+  surface to test
+- Generated code (sqlc output, proto code) — the *generator* is
+  tested, not the output
+
+If you're an AI assistant and you find yourself writing production
+code without a failing test in hand, **stop**. Either write the test
+first, or surface to the user that you're about to deviate and why.
+"It's a small change" is not a reason. "There's no clean way to
+test this layer" is a design smell — surface it; don't bypass TDD.
+
+Run tests before committing. Commits that introduce new behavior
+must include the test in the same commit, not a follow-up.
 
 | Language | Framework | Run |
 |---|---|---|
@@ -409,8 +449,7 @@ All new code uses TDD. Write tests first, then implementation.
 | Swift / Obj-C | XCTest, XCUITest | `xcodebuild test -scheme PivoxTests` |
 | WinUI 3 / C++/WinRT | MSTest, WinAppDriver, gtest | `vstest.console.exe` |
 
-Run tests before committing. See `docs/dev/testing.md` for framework
-patterns and CI integration.
+See `docs/dev/testing.md` for framework patterns and CI integration.
 
 ## Documentation
 
