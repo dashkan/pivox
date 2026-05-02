@@ -39,7 +39,6 @@ import (
 	"github.com/dashkan/pivox/internal/service/spaces"
 	"github.com/dashkan/pivox/internal/service/storage"
 	"github.com/dashkan/pivox/internal/service/tags"
-	"github.com/dashkan/pivox/internal/workers"
 
 	"github.com/dashkan/pivox/internal/service/aichat"
 	"github.com/dashkan/pivox/internal/service/aichat/model"
@@ -193,62 +192,12 @@ func serve(cmd *cobra.Command, args []string) error {
 		logger.Error("failed to recover pending operations", "error", err)
 	}
 
-	// Start the operation reaper
-	reaper := lro.NewReaper(lro.ReaperConfig{Queries: queries, Interval: 5 * time.Minute, Logger: logger})
-	go func() {
-		if err := reaper.Run(ctx); err != nil && ctx.Err() == nil {
-			logger.Error("reaper stopped", "error", err)
-		}
-	}()
-
-	// Background workers: org/user purge cascade and domain
-	// verification. Both use Postgres advisory locks so multi-replica
-	// deploys leave at most one active worker per type at a time.
-	// DNS verification is mocked via StubDNSResolver per the locked
-	// IAM-roadmap decision; the real net.Resolver-backed impl wires
-	// in before pre-prod SSO go-live.
-	purgeWorker := workers.NewPurgeWorker(workers.PurgeConfig{
-		Pool:     pool,
-		Queries:  queries,
-		Logger:   logger,
-		Interval: 5 * time.Minute,
-	})
-	spacePurgeWorker := workers.NewSpacePurgeWorker(workers.SpacePurgeConfig{
-		Pool:     pool,
-		Queries:  queries,
-		Logger:   logger,
-		Interval: 5 * time.Minute,
-	})
-	verifyDomainWorker := workers.NewVerifyDomainWorker(workers.VerifyDomainConfig{
-		Pool:     pool,
-		Queries:  queries,
-		Resolver: workers.NewStubDNSResolver(logger),
-		Logger:   logger,
-		Interval: 2 * time.Minute,
-	})
-	workersWG := workers.RunAll(ctx, logger, purgeWorker, spacePurgeWorker, verifyDomainWorker)
-	defer workersWG.Wait()
-
-	// Cleanup loop for short-lived auth artifacts (deposit codes + delegated
-	// auth sessions). Runs inline rather than in its own package because the
-	// queries are trivial and the interval is short.
-	go func() {
-		ticker := time.NewTicker(1 * time.Minute)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				if err := queries.DeleteExpiredAuthTokenCodes(ctx); err != nil {
-					logger.Error("failed to delete expired auth token codes", "error", err)
-				}
-				if err := queries.DeleteExpiredDelegatedAuthSessions(ctx); err != nil {
-					logger.Error("failed to delete expired delegated auth sessions", "error", err)
-				}
-			}
-		}
-	}()
+	// Background work (org/space purge, domain verification, LRO
+	// reaper, auth-artifact cleanup) lives in the pivox-worker
+	// process now. Run pivox-worker alongside pivox-cloud for any
+	// non-trivial deployment — see cmd/pivox-worker. River's leader
+	// election handles multi-replica coordination across worker
+	// replicas; pivox-cloud is pure RPC.
 
 	// Firebase
 	authSvc, err := firebase.NewAuthService(ctx)

@@ -1547,28 +1547,3 @@ func TestShutdown_Idempotent(t *testing.T) {
 	require.NoError(t, m.Shutdown(context.Background()))
 	require.NoError(t, m.Shutdown(context.Background()))
 }
-
-func TestReaper_Run_DeleteError(t *testing.T) {
-	mockQ := new(mocks.MockQuerier)
-	logger := newTestLogger()
-
-	r := NewReaper(ReaperConfig{Queries: mockQ, Interval: 10 * time.Millisecond, Logger: logger})
-
-	called := make(chan struct{}, 10)
-	mockQ.On("DeleteExpiredOperations", mock.Anything).Return(fmt.Errorf("db error")).Run(func(_ mock.Arguments) {
-		select {
-		case called <- struct{}{}:
-		default:
-		}
-	})
-
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
-	defer cancel()
-
-	err := r.Run(ctx)
-	require.Error(t, err)
-	assert.ErrorIs(t, err, context.DeadlineExceeded)
-
-	// Verify it was called at least once despite the error
-	assert.NotEmpty(t, called)
-}

@@ -9,7 +9,13 @@ Refer to components by their canonical names, not their tech stack:
 
 - **Cloud Controller** — SaaS management layer. Source of truth.
   Hosts the public gRPC API + REST gateway, owns Postgres
-  persistence, integrates Firebase Auth.
+  persistence, integrates Firebase Auth. Pure RPC — no background
+  workers (those run in the Worker Process).
+- **Worker Process** — background work runner paired with Cloud
+  Controller. Hosts every periodic job (org/space purge, domain
+  verification, LRO reaping, auth-artifact cleanup) via River
+  queue. Multi-replica safe via River's leader election; scales
+  independently of Cloud Controller.
 - **Native App** — operator application. SwiftUI on macOS, WinUI 3
   on Windows, shared C++ core.
 - **Engine** — playout engine. Compositor, plugins (CEF, Rive,
@@ -50,7 +56,9 @@ Top-level directories you'll touch most:
 
 ```
 cmd/                  Go binary entrypoints
-  pivox-cloud/        Cloud Controller server (gRPC + REST + workers)
+  pivox-cloud/        Cloud Controller server (gRPC + REST, pure RPC)
+  pivox-worker/       Worker Process — River-backed periodic jobs +
+                      future on-demand LRO handlers (no gRPC)
   pivox-agent/        Storage Agent binary
   encrypt-sso-secret/ One-shot operator tool: KMS-encrypt SsoConfig client_secret
   gen-permissions/    Codegen: regenerates permission catalog Go
@@ -138,7 +146,7 @@ Other stacks:
 
 ## Build + run + test
 
-### Go (Cloud Controller + Storage Agent)
+### Go (Cloud Controller + Worker Process + Storage Agent)
 
 Two build modes — production and `-tags dev`. The `dev` tag swaps a
 handful of files for dev-friendlier alternatives at compile time
@@ -146,13 +154,15 @@ handful of files for dev-friendlier alternatives at compile time
 
 ```sh
 # Production-mode build/run
-make build                              # bin/pivox-cloud + bin/pivox-agent
+make build                              # bin/pivox-cloud + bin/pivox-worker + bin/pivox-agent
 make run-server                         # go run ./cmd/pivox-cloud serve
+make run-worker                         # go run ./cmd/pivox-worker
 make run-agent                          # go run ./cmd/pivox-agent storage
 
 # Dev-mode build/run (-tags dev)
 make dev-build                          # same outputs, dev variants
 make dev-server                         # go run -tags dev ./cmd/pivox-cloud serve
+make dev-worker                         # go run -tags dev ./cmd/pivox-worker
 make dev-agent                          # go run -tags dev ./cmd/pivox-agent storage
 
 # Hot reload (install `air` separately — not pinned in tools/go.mod
