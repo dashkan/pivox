@@ -22,6 +22,7 @@ import (
 	"github.com/dashkan/pivox/internal/agentstream"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	agentv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/agent/v1"
+	"github.com/dashkan/pivox/internal/server"
 	storage "github.com/dashkan/pivox/internal/service/storage"
 	"github.com/dashkan/pivox/internal/testutil/mocks"
 )
@@ -98,7 +99,12 @@ func setupAgentGRPC(t *testing.T, mockQ *mocks.MockQuerier) string {
 	connMgr := agentstream.NewConnectionManager()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	srv := grpc.NewServer()
+	// AgentService handlers expect the gateway in context (populated
+	// by AgentAuthStreamInterceptor on production). Wire the same
+	// interceptor here — without it the stream closes immediately
+	// with "agent gateway context missing" on the first Recv, before
+	// any of the mock expectations fire.
+	srv := grpc.NewServer(grpc.StreamInterceptor(server.AgentAuthStreamInterceptor(mockQ)))
 	agentv1.RegisterAgentServiceServer(srv, storage.NewAgentServiceServerForTesting(t, mockQ, logger, connMgr))
 
 	go func() { _ = srv.Serve(lis) }()
@@ -340,7 +346,12 @@ func TestConnect_TLS(t *testing.T) {
 	connMgr := agentstream.NewConnectionManager()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	srv := grpc.NewServer()
+	// AgentService handlers expect the gateway in context (populated
+	// by AgentAuthStreamInterceptor on production). Wire the same
+	// interceptor here — without it the stream closes immediately
+	// with "agent gateway context missing" on the first Recv, before
+	// any of the mock expectations fire.
+	srv := grpc.NewServer(grpc.StreamInterceptor(server.AgentAuthStreamInterceptor(mockQ)))
 	agentv1.RegisterAgentServiceServer(srv, storage.NewAgentServiceServerForTesting(t, mockQ, logger, connMgr))
 	go func() { _ = srv.Serve(lis) }()
 	t.Cleanup(func() { srv.Stop() })
