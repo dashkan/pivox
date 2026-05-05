@@ -4,46 +4,39 @@ package requests_test
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"testing"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
-	db "github.com/dashkan/pivox/internal/db/generated"
 	assetsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1"
 	"github.com/dashkan/pivox/internal/service/requests"
-	"github.com/dashkan/pivox/internal/testutil"
+	"github.com/dashkan/pivox/internal/testutil/grpcharness"
 )
 
-func createTestOrg(t *testing.T, queries *db.Queries, name string) db.Organization {
+// newRequestsHarness wires the harness with Organizations + Spaces +
+// Requests servers, seeds an owned org+space, and returns the
+// harness ready for request-level subtests.
+//
+// Each top-level test gets its own harness (and its own DB) — the
+// alternative would be sharing one harness across tests, but
+// per-test isolation matches the rest of the integration suite and
+// keeps subtest-level retry/parallelism simple.
+func newRequestsHarness(t *testing.T, orgSlug, spaceSlug string) (*grpcharness.Harness, string) {
 	t.Helper()
-	org, err := queries.CreateOrganization(context.Background(), db.CreateOrganizationParams{
-		ID:          uuid.New(),
-		Name:        name,
-		DisplayName: "Test Org " + name,
-		CreatedBy:   pgtype.UUID{},
-	})
-	require.NoError(t, err)
-	return org
-}
-
-func createTestSpace(t *testing.T, queries *db.Queries, orgID uuid.UUID, name string) db.Space {
-	t.Helper()
-	space, err := queries.CreateSpace(context.Background(), db.CreateSpaceParams{
-		ID:          uuid.New(),
-		OrgID:       orgID,
-		Name:        name,
-		DisplayName: "Test Space " + name,
-		Labels:      json.RawMessage("{}"),
-		CreatedBy:   pgtype.UUID{},
-	})
-	require.NoError(t, err)
-	return space
+	h := grpcharness.New(t,
+		grpcharness.WithOrganizationsServer(),
+		grpcharness.WithSpacesServer(),
+		grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
+			assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(requests.Config{
+				Pool: h.Pool, Queries: h.Queries,
+			}))
+		}))
+	h.SeedOwnedOrg(t, orgSlug, "Acme", "requests")
+	h.SeedOwnedSpace(t, orgSlug, spaceSlug, "Project")
+	return h, "organizations/" + orgSlug + "/spaces/" + spaceSlug
 }
 
 func TestIntegration_Requests_ApproveWorkflow(t *testing.T) {
@@ -51,21 +44,10 @@ func TestIntegration_Requests_ApproveWorkflow(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
-
-	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(requests.Config{Pool: pool, Queries: queries}))
-	})
-
-	client := assetsv1.NewRequestsClient(conn)
+	h, parent := newRequestsHarness(t, "acme", "proj1")
+	client := assetsv1.NewRequestsClient(h.Conn())
 	ctx := context.Background()
 
-	// Prerequisite: create org and space directly via DB.
-	org := createTestOrg(t, queries, "acme")
-	createTestSpace(t, queries, org.ID, "proj1")
-
-	parent := "organizations/acme/spaces/proj1"
 	var requestName string
 
 	t.Run("Create", func(t *testing.T) {
@@ -141,19 +123,9 @@ func TestIntegration_Requests_ListRequests(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
-
-	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(requests.Config{Pool: pool, Queries: queries}))
-	})
-
-	client := assetsv1.NewRequestsClient(conn)
+	h, parent := newRequestsHarness(t, "acme", "proj1")
+	client := assetsv1.NewRequestsClient(h.Conn())
 	ctx := context.Background()
-
-	org := createTestOrg(t, queries, "acme")
-	createTestSpace(t, queries, org.ID, "proj1")
-	parent := "organizations/acme/spaces/proj1"
 
 	// Create multiple requests.
 	for i := range 3 {
@@ -176,7 +148,9 @@ func TestIntegration_Requests_ListRequests(t *testing.T) {
 	})
 
 	t.Run("list_with_show_deleted", func(t *testing.T) {
-		// Delete one request via cancel workflow.
+		// Cancel one request — cancelled requests are NOT
+		// soft-deleted, but the show_deleted code path uses a
+		// different query so we still exercise it here.
 		listResp, err := client.ListRequests(ctx, &assetsv1.ListRequestsRequest{
 			Parent: parent,
 		})
@@ -188,8 +162,6 @@ func TestIntegration_Requests_ListRequests(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		// Without show_deleted — cancelled requests are NOT soft-deleted, they still show up.
-		// But the code path with show_deleted uses a different query.
 		withDeleted, err := client.ListRequests(ctx, &assetsv1.ListRequestsRequest{
 			Parent:      parent,
 			ShowDeleted: true,
@@ -214,20 +186,9 @@ func TestIntegration_Requests_RejectWorkflow(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
-
-	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(requests.Config{Pool: pool, Queries: queries}))
-	})
-
-	client := assetsv1.NewRequestsClient(conn)
+	h, parent := newRequestsHarness(t, "acme", "proj1")
+	client := assetsv1.NewRequestsClient(h.Conn())
 	ctx := context.Background()
-
-	org := createTestOrg(t, queries, "acme")
-	createTestSpace(t, queries, org.ID, "proj1")
-
-	parent := "organizations/acme/spaces/proj1"
 
 	// Create and drive to DELIVERED, then reject.
 	op, err := client.CreateRequest(ctx, &assetsv1.CreateRequestRequest{
@@ -259,20 +220,9 @@ func TestIntegration_Requests_CancelWorkflow(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
-
-	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		assetsv1.RegisterRequestsServer(s, requests.NewRequestsServer(requests.Config{Pool: pool, Queries: queries}))
-	})
-
-	client := assetsv1.NewRequestsClient(conn)
+	h, parent := newRequestsHarness(t, "acme", "proj1")
+	client := assetsv1.NewRequestsClient(h.Conn())
 	ctx := context.Background()
-
-	org := createTestOrg(t, queries, "acme")
-	createTestSpace(t, queries, org.ID, "proj1")
-
-	parent := "organizations/acme/spaces/proj1"
 
 	op, err := client.CreateRequest(ctx, &assetsv1.CreateRequestRequest{
 		Parent: parent,
