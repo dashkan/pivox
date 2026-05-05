@@ -261,10 +261,11 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 		return nil, apierr.HandleResourceError(err, "Identity", uid)
 	}
 
+	// organization_id is required at the wire boundary —
+	// protovalidate enforces ^[a-z][a-z0-9-]{3,19}$ which rejects
+	// the empty string. Handler-side auto-generation is therefore
+	// unreachable; clients always supply a slug.
 	orgSlug := req.GetOrganizationId()
-	if orgSlug == "" {
-		orgSlug = uuid.New().String()[:8]
-	}
 
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {

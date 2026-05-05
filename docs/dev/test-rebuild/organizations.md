@@ -28,8 +28,8 @@ or extends the existing `*_e2e_test.go` files. No new MockQuerier code.
 - [x] Rejects duplicate slug with `AlreadyExists`
 - ~~Auto-generates slug when `OrganizationId` is empty~~ —
   unreachable through the public RPC: protovalidate rejects empty
-  organization_id with the AIP-122 regex. Filed as #77; the
-  handler's auto-gen branch is dead code.
+  organization_id with the AIP-122 regex. Dead code removed
+  (#77).
 - [x] Seeds owner-binding atomically with org row
   (`TestIntegration_CreateOrganization_SeedsFounderBinding`)
 - [x] Seeds the four system roles (owner/admin/editor/viewer)
