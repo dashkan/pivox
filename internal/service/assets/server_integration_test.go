@@ -4,46 +4,34 @@ package assets_test
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"testing"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
-	db "github.com/dashkan/pivox/internal/db/generated"
 	assetsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1"
 	"github.com/dashkan/pivox/internal/service/assets"
-	"github.com/dashkan/pivox/internal/testutil"
+	"github.com/dashkan/pivox/internal/testutil/grpcharness"
 )
 
-func createIntegrationOrg(t *testing.T, queries *db.Queries, name string) db.Organization {
+// newAssetsHarness wires Organizations + Spaces + Assets and seeds
+// an owned org+space. Each top-level test gets its own harness for
+// isolation — same shape used by requests_integration_test.
+func newAssetsHarness(t *testing.T, orgSlug, spaceSlug string) (*grpcharness.Harness, string) {
 	t.Helper()
-	org, err := queries.CreateOrganization(context.Background(), db.CreateOrganizationParams{
-		ID:          uuid.New(),
-		Name:        name,
-		DisplayName: "Test Org " + name,
-		CreatedBy:   pgtype.UUID{},
-	})
-	require.NoError(t, err)
-	return org
-}
-
-func createIntegrationSpace(t *testing.T, queries *db.Queries, orgID uuid.UUID, name string) db.Space {
-	t.Helper()
-	space, err := queries.CreateSpace(context.Background(), db.CreateSpaceParams{
-		ID:          uuid.New(),
-		OrgID:       orgID,
-		Name:        name,
-		DisplayName: "Test Space " + name,
-		Labels:      json.RawMessage("{}"),
-		CreatedBy:   pgtype.UUID{},
-	})
-	require.NoError(t, err)
-	return space
+	h := grpcharness.New(t,
+		grpcharness.WithOrganizationsServer(),
+		grpcharness.WithSpacesServer(),
+		grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
+			assetsv1.RegisterAssetsServer(s, assets.NewAssetsServer(assets.Config{
+				Pool: h.Pool, Queries: h.Queries,
+			}))
+		}))
+	h.SeedOwnedOrg(t, orgSlug, "Acme", "assets")
+	h.SeedOwnedSpace(t, orgSlug, spaceSlug, "Project")
+	return h, "organizations/" + orgSlug + "/spaces/" + spaceSlug
 }
 
 func TestIntegration_Assets_PlaceholderLifecycle(t *testing.T) {
@@ -51,21 +39,10 @@ func TestIntegration_Assets_PlaceholderLifecycle(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
-
-	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		assetsv1.RegisterAssetsServer(s, assets.NewAssetsServer(assets.Config{Pool: pool, Queries: queries}))
-	})
-
-	client := assetsv1.NewAssetsClient(conn)
+	h, parent := newAssetsHarness(t, "acme", "proj1")
+	client := assetsv1.NewAssetsClient(h.Conn())
 	ctx := context.Background()
 
-	// Prerequisite: create org and space.
-	org := createIntegrationOrg(t, queries, "acme")
-	createIntegrationSpace(t, queries, org.ID, "proj1")
-
-	parent := "organizations/acme/spaces/proj1"
 	var assetName string
 
 	t.Run("CreatePlaceholder", func(t *testing.T) {
@@ -141,19 +118,9 @@ func TestIntegration_Assets_ListAssets(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
-
-	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		assetsv1.RegisterAssetsServer(s, assets.NewAssetsServer(assets.Config{Pool: pool, Queries: queries}))
-	})
-
-	client := assetsv1.NewAssetsClient(conn)
+	h, parent := newAssetsHarness(t, "acme", "proj1")
+	client := assetsv1.NewAssetsClient(h.Conn())
 	ctx := context.Background()
-
-	org := createIntegrationOrg(t, queries, "acme")
-	createIntegrationSpace(t, queries, org.ID, "proj1")
-	parent := "organizations/acme/spaces/proj1"
 
 	// Create multiple assets.
 	var assetNames []string
@@ -217,20 +184,9 @@ func TestIntegration_Assets_WithFile(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
-
-	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		assetsv1.RegisterAssetsServer(s, assets.NewAssetsServer(assets.Config{Pool: pool, Queries: queries}))
-	})
-
-	client := assetsv1.NewAssetsClient(conn)
+	h, parent := newAssetsHarness(t, "acme", "proj1")
+	client := assetsv1.NewAssetsClient(h.Conn())
 	ctx := context.Background()
-
-	org := createIntegrationOrg(t, queries, "acme")
-	createIntegrationSpace(t, queries, org.ID, "proj1")
-
-	parent := "organizations/acme/spaces/proj1"
 
 	t.Run("CreateWithFile_ProcessingToActive", func(t *testing.T) {
 		op, err := client.CreateAsset(ctx, &assetsv1.CreateAssetRequest{

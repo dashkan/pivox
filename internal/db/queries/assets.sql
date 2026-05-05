@@ -86,7 +86,7 @@ UPDATE assets
 SET state = CASE WHEN endpoint_id IS NULL THEN 'PLACEHOLDER'::asset_state ELSE 'ACTIVE'::asset_state END,
     delete_time = NULL,
     purge_time = NULL,
-    deleted_by = '',
+    deleted_by = NULL,
     update_time = now(),
     etag = md5(now()::text)
 WHERE id = $1;
