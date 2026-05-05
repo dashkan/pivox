@@ -160,6 +160,12 @@ func (m *Manager) UpdateMetadata(ctx context.Context, opID uuid.UUID, metadata p
 // are JobArgs; everything else is optional. Mirrors the codebase's
 // Config-struct convention for multi-arg constructors.
 type NewLroOpts struct {
+	// OperationID is the UUID for the operations row (and the
+	// caller-side reference the worker uses to call CompleteOperation
+	// / FailOperation). Optional — if zero, NewLro generates one.
+	// Most callers pre-generate this so they can also embed it in
+	// JobArgs (the worker needs it to mark the operation done).
+	OperationID uuid.UUID
 	// JobArgs is the River job to enqueue. Required.
 	JobArgs river.JobArgs
 	// JobOpts is forwarded to river.InsertTx (priority, scheduledAt,
@@ -238,7 +244,10 @@ func (m *Manager) NewLro(ctx context.Context, parent string, opts NewLroOpts) (*
 
 	qtx := db.New(tx)
 
-	opID := uuid.New()
+	opID := opts.OperationID
+	if opID == uuid.Nil {
+		opID = uuid.New()
+	}
 	dbOp, err := qtx.CreateOperation(ctx, db.CreateOperationParams{
 		ID:        opID,
 		Parent:    parent,

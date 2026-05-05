@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -20,6 +22,7 @@ import (
 	"github.com/dashkan/pivox/internal/server"
 	"github.com/dashkan/pivox/internal/service/organizations"
 	"github.com/dashkan/pivox/internal/testutil/grpcharness"
+	"github.com/dashkan/pivox/internal/workers"
 )
 
 // TestE2E_OrgSoftDeleteRevive exercises the full DeleteOrganization
@@ -124,13 +127,15 @@ func TestE2E_OrgSoftDeleteRevive(t *testing.T) {
 }
 
 // newLifecycleHarness wires up a harness with the Organizations
-// service + LRO manager. Lifecycle tests reuse this across all
-// e2e cases in this file. Wiring matches cmd/pivox-cloud/main.go's
-// production OrganizationsServer construction — anything passed
-// as nil here means the test doesn't exercise that path (e.g.,
+// service + LRO manager + an in-process River client running every
+// org-lifecycle worker that's been ported off the legacy goroutine
+// path (#69 Phase 5+). Lifecycle tests reuse this across all e2e
+// cases in this file. Wiring matches cmd/pivox-cloud/main.go's
+// production OrganizationsServer construction — anything passed as
+// nil here means the test doesn't exercise that path (e.g.,
 // resolver/codec are unused without space-scoped or appkey paths).
 func newLifecycleHarness(t *testing.T) *grpcharness.Harness {
-	return grpcharness.New(t, grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
+	h := grpcharness.New(t, grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
 		callerIdentity := server.NewCallerIdentityResolver(h.Queries)
 		permResolver := permission.NewResolver(h.Queries)
 		codec, err := appkey.NewFromHex(strings.Repeat("ab", 32))
@@ -147,22 +152,57 @@ func newLifecycleHarness(t *testing.T) *grpcharness.Harness {
 			Encryptor:  h.Encryptor,
 		}))
 	}))
+	startOrgLifecycleWorkers(t, h)
+	return h
 }
 
-// waitOp blocks until the LRO is done. The lifecycle LROs are
-// effectively sync (the work fn fires synchronously inside
-// runWork), so polling the in-memory manager once is enough — but
-// the test layers a small timeout on top to avoid hanging the suite
-// if a future change accidentally introduces real async work.
+// startOrgLifecycleWorkers spins up an in-process River client with
+// the post-Phase-5 org-lifecycle workers registered. Mirrors
+// cmd/pivox-worker/main.go's wiring (same Schema, same driver),
+// scoped to the test. Add new workers here as more LROs port off
+// the legacy goroutine path (#69 Phase 6).
+func startOrgLifecycleWorkers(t *testing.T, h *grpcharness.Harness) {
+	t.Helper()
+	rw := river.NewWorkers()
+	river.AddWorker(rw, &workers.UndeleteOrgWorker{
+		Pool:   h.Pool,
+		Logger: silentDomainLogger(),
+	})
+	c, err := river.NewClient(riverpgxv5.New(h.Pool), &river.Config{
+		Logger:  silentDomainLogger(),
+		Queues:  map[string]river.QueueConfig{river.QueueDefault: {MaxWorkers: 2}},
+		Schema:  "river",
+		Workers: rw,
+	})
+	require.NoError(t, err)
+	require.NoError(t, c.Start(context.Background()))
+	t.Cleanup(func() {
+		stopCtx, stopCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer stopCancel()
+		_ = c.Stop(stopCtx)
+	})
+}
+
+// waitOp blocks until the LRO is done. Polls the operations row
+// because LROs split between the legacy in-process goroutine path
+// (DeleteOrganization, etc.) and the River-driven path
+// (UndeleteOrganization, post-Phase-5). Manager.WaitOperation's
+// listener channel only fires for the legacy path; polling covers
+// both uniformly.
 func waitOp(t *testing.T, h *grpcharness.Harness, op interface{ GetName() string }, label string) {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	final, err := h.LROManager.WaitOperation(ctx, op.GetName())
-	require.NoError(t, err, "WaitOperation(%s) failed", label)
-	require.True(t, final.GetDone(), "%s should be done", label)
-	if final.GetError() != nil {
-		t.Fatalf("%s LRO failed: code=%d msg=%s",
-			label, final.GetError().GetCode(), final.GetError().GetMessage())
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		got, err := h.LROManager.GetOperation(context.Background(), op.GetName())
+		require.NoError(t, err, "%s: GetOperation failed", label)
+		if got.GetDone() {
+			if got.GetError() != nil {
+				t.Fatalf("%s LRO failed: code=%d msg=%s",
+					label, got.GetError().GetCode(), got.GetError().GetMessage())
+			}
+			return
+		}
+		time.Sleep(25 * time.Millisecond)
 	}
+	t.Fatalf("%s LRO not done within deadline", label)
 }

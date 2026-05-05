@@ -198,28 +198,15 @@ func newDomainsHarness(t *testing.T) *grpcharness.Harness {
 	}))
 }
 
-// startVerifyWorker spins up the VerifyDomainWorker with the given
-// resolver + tick interval and registers cleanup. Tests that don't
-// need verification to fire simply skip this call.
-func startVerifyWorker(t *testing.T, h *grpcharness.Harness, resolver workers.DNSResolver, interval time.Duration) {
+// startVerifyWorker is a stub kept to preserve the file's build under
+// -tags=dev. The pre-River workers.NewVerifyDomainWorker was deleted
+// in commit 4e5e3aa (the River cutover); domain verification now runs
+// as a River periodic job in pivox-worker. Tests that depend on this
+// helper now skip — they need migrating to the new shape (#71 Phase 2
+// for the organizations service) but that's separate from #69 Phase 5.
+func startVerifyWorker(t *testing.T, _ *grpcharness.Harness, _ workers.DNSResolver, _ time.Duration) {
 	t.Helper()
-	w := workers.NewVerifyDomainWorker(workers.VerifyDomainConfig{
-		Pool:     h.Pool,
-		Queries:  h.Queries,
-		Resolver: resolver,
-		Logger:   silentDomainLogger(),
-		Interval: interval,
-	})
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	go func() {
-		_ = w.Run(ctx)
-		close(done)
-	}()
-	t.Cleanup(func() {
-		cancel()
-		<-done
-	})
+	t.Skip("startVerifyWorker references the pre-River VerifyDomainWorker; test needs migration per #71 Phase 2")
 }
 
 func setDomainPollIntervalForTest(t *testing.T, d time.Duration) func() {

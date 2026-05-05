@@ -17,6 +17,7 @@ import (
 	"github.com/dashkan/pivox/internal/lro"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	"github.com/dashkan/pivox/internal/server"
+	"github.com/dashkan/pivox/internal/workers"
 )
 
 // DeleteOrganization soft-deletes (or, with `force=true`,
@@ -229,28 +230,15 @@ func (s *OrganizationsServer) UndeleteOrganization(ctx context.Context, req *api
 	orgName := "organizations/" + resolved.Slug
 	initialMeta := &apiv1.UndeleteOrganizationMetadata{Organization: orgName}
 
-	return s.lroManager.CreateAndRun(ctx, orgName, initialMeta,
-		func(workCtx context.Context, _ lro.Progress) (proto.Message, error) {
-			updated, err := s.queries.UndeleteOrganization(workCtx, org.ID)
-			if err != nil {
-				if errors.Is(err, pgx.ErrNoRows) {
-					// Either the org left DELETE_REQUESTED in a race
-					// (e.g. force-delete completed) or its purge_time
-					// elapsed before the worker fired.
-					return nil, apierr.FailedPrecondition(
-						"organization is no longer eligible for undelete (purge window may have elapsed)")
-				}
-				slog.ErrorContext(workCtx, "undelete org: query failed", "org", orgName, "error", err)
-				return nil, apierr.Internal("undelete organization")
-			}
-			// Best-effort enrichment: state has committed, don't fail
-			// the LRO on a transient identity lookup error.
-			actors, resolveErr := s.resolveOrgActors(workCtx, []db.Organization{updated})
-			if resolveErr != nil {
-				slog.WarnContext(workCtx, "undelete org: actor resolution failed; returning proto without audit actors",
-					"org", orgName, "error", resolveErr)
-				actors = nil
-			}
-			return convert.OrganizationToProto(updated, actors), nil
-		})
+	// First handler ported off the legacy CreateAndRun + runWork
+	// goroutine path onto River (#69 Phase 5). The actual SQL action
+	// runs in pivox-worker's UndeleteOrgWorker; pivox-cloud just
+	// enqueues + returns the Operation row immediately. NewLro inserts
+	// the operations row and the river_job row in one tx — atomic.
+	opID := uuid.New()
+	return s.lroManager.NewLro(ctx, orgName, lro.NewLroOpts{
+		OperationID: opID,
+		JobArgs:     workers.UndeleteOrgArgs{OperationID: opID, OrgID: org.ID},
+		Metadata:    initialMeta,
+	})
 }

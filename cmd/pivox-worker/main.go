@@ -27,6 +27,7 @@ import (
 	"github.com/riverqueue/river/rivermigrate"
 	"github.com/spf13/cobra"
 
+	"github.com/dashkan/pivox/internal/audit"
 	"github.com/dashkan/pivox/internal/workers"
 
 	db "github.com/dashkan/pivox/internal/db/generated"
@@ -127,6 +128,13 @@ func serve(cmd *cobra.Command, _ []string) error {
 
 	queries := db.New(pool)
 
+	// Audit resolver — shared across LRO workers that need to inflate
+	// audit-field UUIDs (created_by/updated_by/deleted_by) into Actor
+	// protos for operations.result blobs. Same resolver shape as
+	// pivox-cloud uses for live RPCs; LRU + TTL cache shared across
+	// jobs in this process.
+	auditResolver := audit.NewResolver(audit.Config{Queries: queries})
+
 	// Worker registry. Each tick worker we used to host inline in
 	// pivox-cloud becomes a river.Worker registered here; River's
 	// scheduler drives invocation via the periodic-job table. The
@@ -135,11 +143,17 @@ func serve(cmd *cobra.Command, _ []string) error {
 	// job, scheduling is the periodic-job table.
 	dnsResolver := workers.NewStubDNSResolver(logger)
 	riverWorkers := river.NewWorkers()
+	// Periodic (tick) workers:
 	river.AddWorker(riverWorkers, &workers.PurgeOrgsWorker{Queries: queries, Logger: logger})
 	river.AddWorker(riverWorkers, &workers.PurgeSpacesWorker{Queries: queries, Logger: logger})
 	river.AddWorker(riverWorkers, &workers.VerifyDomainsWorker{Queries: queries, Resolver: dnsResolver, Logger: logger})
 	river.AddWorker(riverWorkers, &workers.ReapOperationsWorker{Queries: queries, Logger: logger})
 	river.AddWorker(riverWorkers, &workers.CleanupAuthWorker{Queries: queries, Logger: logger})
+	// LRO (on-demand) workers — invoked by lro.Manager.NewLro from
+	// pivox-cloud's RPC handlers. Each handles one logical step;
+	// multi-step LROs (DeleteOrganization, etc.) are single workers
+	// today and migrate to River Pro Workflows + Activities later.
+	river.AddWorker(riverWorkers, &workers.UndeleteOrgWorker{Pool: pool, Audit: auditResolver, Logger: logger})
 
 	// Periodic job registrations. RunOnStart=true so a freshly-booted
 	// replica does useful work immediately rather than waiting one

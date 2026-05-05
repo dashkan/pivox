@@ -9,7 +9,10 @@ import (
 	"testing"
 
 	"buf.build/go/protovalidate"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -39,8 +42,15 @@ type Harness struct {
 
 	// LROManager is shared with the test gRPC server so async LROs
 	// run end-to-end. Tests can also use it directly to wait on or
-	// cancel operations.
+	// cancel operations. Constructed with Pool + River so handlers
+	// that call NewLro work in tests the same as in production.
 	LROManager *lro.Manager
+
+	// River is the query/insert-only client the LROManager wraps.
+	// Exposed for tests that want to invoke River workers directly
+	// via rivertest.NewWorker, or assert against river_job state
+	// via rivertest.RequireInsertedTx.
+	River *river.Client[pgx.Tx]
 
 	// Auth is the authn.Service the test gRPC server's
 	// AuthInterceptor calls into. Tests that need to assert specific
@@ -105,13 +115,30 @@ func New(t *testing.T, opts ...Option) *Harness {
 	enc, err := crypto.NewEncryptor()
 	require.NoError(t, err)
 
-	lroManager := lro.NewManager(lro.ManagerConfig{Queries: queries, Logger: testLogger()})
+	// River client backing the LROManager. Query/insert-only (no
+	// Workers, no Start) — same shape as pivox-cloud's production
+	// client. Tests that want to actually run workers do so via
+	// rivertest.NewWorker, not through this client.
+	riverDriver := riverpgxv5.New(pool)
+	riverClient, err := river.NewClient(riverDriver, &river.Config{
+		Logger: testLogger(),
+		Schema: "river",
+	})
+	require.NoError(t, err)
+
+	lroManager := lro.NewManager(lro.ManagerConfig{
+		Queries: queries,
+		Logger:  testLogger(),
+		Pool:    pool,
+		River:   riverClient,
+	})
 
 	h := &Harness{
 		Pool:       pool,
 		Queries:    queries,
 		Encryptor:  enc,
 		LROManager: lroManager,
+		River:      riverClient,
 		Auth:       cfg.auth,
 	}
 

@@ -3,6 +3,8 @@ package testutil
 import (
 	"context"
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -13,6 +15,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	pgxvector "github.com/pgvector/pgvector-go/pgx"
+	"github.com/riverqueue/river/riverdriver/riverpgxv5"
+	"github.com/riverqueue/river/rivermigrate"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -77,6 +81,13 @@ func SetupTestDB(t *testing.T) (pool *pgxpool.Pool, queries *db.Queries, cleanup
 		_ = container.Terminate(ctx)
 		t.Fatalf("failed to parse pool config: %v", err)
 	}
+	// search_path includes river so test queries against
+	// `river.river_job` resolve via short name when needed (rivertest
+	// helpers reach into the driver's default executor without
+	// applying river.Config.Schema templating). Test-only — production
+	// uses a dedicated river-schema'd pool for Client construction
+	// (see cmd/pivox-cloud/main.go) and keeps the app pool clean.
+	poolCfg.ConnConfig.RuntimeParams["search_path"] = "public, river"
 	poolCfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
 		return pgxvector.RegisterTypes(ctx, conn)
 	}
@@ -84,6 +95,18 @@ func SetupTestDB(t *testing.T) (pool *pgxpool.Pool, queries *db.Queries, cleanup
 	if err != nil {
 		_ = container.Terminate(ctx)
 		t.Fatalf("failed to create pool: %v", err)
+	}
+
+	// Run River's own migrations into the `river` schema so any test
+	// that exercises River-backed paths (LRO enqueue, periodic jobs,
+	// integration tests via grpcharness) has the river_job /
+	// river_queue / river_leader tables ready. Idempotent on
+	// already-migrated DBs; cheap (~10ms) on fresh ones. The init
+	// migration above creates the `river` schema; this populates it.
+	if err := runRiverMigrations(ctx, pool); err != nil {
+		pool.Close()
+		_ = container.Terminate(ctx)
+		t.Fatalf("failed to run river migrations: %v", err)
 	}
 
 	queries = db.New(pool)
@@ -125,6 +148,24 @@ func runMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 		if _, err := pool.Exec(ctx, string(sql)); err != nil {
 			return fmt.Errorf("execute migration %s: %w", name, err)
 		}
+	}
+	return nil
+}
+
+// runRiverMigrations runs River's internal migrations into the
+// `river` schema. Used by SetupTestDB so every integration test has
+// the queue tables available without each test re-running migrations.
+func runRiverMigrations(ctx context.Context, pool *pgxpool.Pool) error {
+	driver := riverpgxv5.New(pool)
+	migrator, err := rivermigrate.New(driver, &rivermigrate.Config{
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Schema: "river",
+	})
+	if err != nil {
+		return fmt.Errorf("river migrator: %w", err)
+	}
+	if _, err := migrator.Migrate(ctx, rivermigrate.DirectionUp, nil); err != nil {
+		return fmt.Errorf("river migrate up: %w", err)
 	}
 	return nil
 }
