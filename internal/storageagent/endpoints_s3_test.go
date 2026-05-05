@@ -15,19 +15,6 @@ import (
 	"github.com/dashkan/pivox/internal/testutil"
 )
 
-// sanitizeBucket converts a test name into a valid S3 bucket name
-// (lowercase, no slashes or underscores, max 63 chars).
-func sanitizeBucket(t *testing.T) string {
-	t.Helper()
-	name := "test-" + t.Name()
-	name = strings.ToLower(name)
-	name = strings.NewReplacer("/", "-", "_", "-").Replace(name)
-	if len(name) > 63 {
-		name = name[:63]
-	}
-	return name
-}
-
 // ---------------------------------------------------------------------------
 // newS3Client
 // ---------------------------------------------------------------------------
@@ -37,13 +24,8 @@ func TestNewS3Client_Success(t *testing.T) {
 		t.Skip("skipping S3 integration test in short mode")
 	}
 
-	s3Client, endpoint, cleanup := testutil.SetupTestS3(t)
+	_, endpoint, bucketName, cleanup := testutil.SetupTestS3(t)
 	t.Cleanup(cleanup)
-
-	ctx := context.Background()
-	bucketName := sanitizeBucket(t)
-	err := s3Client.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{})
-	require.NoError(t, err)
 
 	client, err := newS3Client(&agentv1.S3EndpointConfig{
 		EndpointUri:     "http://" + endpoint,
@@ -60,7 +42,7 @@ func TestNewS3Client_BucketNotFound(t *testing.T) {
 		t.Skip("skipping S3 integration test in short mode")
 	}
 
-	_, endpoint, cleanup := testutil.SetupTestS3(t)
+	_, endpoint, _, cleanup := testutil.SetupTestS3(t)
 	t.Cleanup(cleanup)
 
 	_, err := newS3Client(&agentv1.S3EndpointConfig{
@@ -96,16 +78,11 @@ func TestEndpointStore_Update_S3(t *testing.T) {
 		t.Skip("skipping S3 integration test in short mode")
 	}
 
-	s3Client, endpoint, cleanup := testutil.SetupTestS3(t)
+	_, endpoint, bucketName, cleanup := testutil.SetupTestS3(t)
 	t.Cleanup(cleanup)
 
-	ctx := context.Background()
-	bucketName := sanitizeBucket(t)
-	err := s3Client.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{})
-	require.NoError(t, err)
-
 	store := NewEndpointStore(NewMemoryCache(10, 1024*1024))
-	err = store.Update([]*agentv1.EndpointConfig{
+	err := store.Update([]*agentv1.EndpointConfig{
 		{
 			Name: "organizations/acme/storageGateways/gw1/endpoints/s3ep",
 			Configuration: &agentv1.EndpointConfig_S3{
@@ -137,16 +114,12 @@ func TestServeS3_Success(t *testing.T) {
 		t.Skip("skipping S3 integration test in short mode")
 	}
 
-	s3Client, endpoint, cleanup := testutil.SetupTestS3(t)
+	s3Client, endpoint, bucketName, cleanup := testutil.SetupTestS3(t)
 	t.Cleanup(cleanup)
 
 	ctx := context.Background()
-	bucketName := sanitizeBucket(t)
-	err := s3Client.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{})
-	require.NoError(t, err)
-
 	content := "hello world"
-	_, err = s3Client.PutObject(ctx, bucketName, "test-key.txt",
+	_, err := s3Client.PutObject(ctx, bucketName, "test-key.txt",
 		strings.NewReader(content), int64(len(content)),
 		minio.PutObjectOptions{ContentType: "text/plain"})
 	require.NoError(t, err)
@@ -184,16 +157,11 @@ func TestServeS3_NotFound(t *testing.T) {
 		t.Skip("skipping S3 integration test in short mode")
 	}
 
-	s3Client, endpoint, cleanup := testutil.SetupTestS3(t)
+	_, endpoint, bucketName, cleanup := testutil.SetupTestS3(t)
 	t.Cleanup(cleanup)
 
-	ctx := context.Background()
-	bucketName := sanitizeBucket(t)
-	err := s3Client.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{})
-	require.NoError(t, err)
-
 	store := NewEndpointStore(NewMemoryCache(10, 1024*1024))
-	err = store.Update([]*agentv1.EndpointConfig{
+	err := store.Update([]*agentv1.EndpointConfig{
 		{
 			Name: "organizations/acme/storageGateways/gw1/endpoints/s3ep",
 			Configuration: &agentv1.EndpointConfig_S3{
@@ -220,16 +188,12 @@ func TestServeS3_WithCache(t *testing.T) {
 		t.Skip("skipping S3 integration test in short mode")
 	}
 
-	s3Client, endpoint, cleanup := testutil.SetupTestS3(t)
+	s3Client, endpoint, bucketName, cleanup := testutil.SetupTestS3(t)
 	t.Cleanup(cleanup)
 
 	ctx := context.Background()
-	bucketName := sanitizeBucket(t)
-	err := s3Client.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{})
-	require.NoError(t, err)
-
 	content := "cached hello"
-	_, err = s3Client.PutObject(ctx, bucketName, "cached-key.txt",
+	_, err := s3Client.PutObject(ctx, bucketName, "cached-key.txt",
 		strings.NewReader(content), int64(len(content)),
 		minio.PutObjectOptions{ContentType: "text/plain"})
 	require.NoError(t, err)
@@ -276,19 +240,16 @@ func TestServeS3_LargeObject_NoCache(t *testing.T) {
 		t.Skip("skipping S3 integration test in short mode")
 	}
 
-	s3Client, endpoint, cleanup := testutil.SetupTestS3(t)
+	s3Client, endpoint, bucketName, cleanup := testutil.SetupTestS3(t)
 	t.Cleanup(cleanup)
 
 	ctx := context.Background()
-	bucketName := sanitizeBucket(t)
-	err := s3Client.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{})
-	require.NoError(t, err)
 
 	// Cache configured with a small per-item cap; the test object exceeds it
 	// and must be served directly without going through the cache.
 	const itemCap = 1 * 1024 * 1024
 	largeContent := strings.Repeat("x", itemCap+1)
-	_, err = s3Client.PutObject(ctx, bucketName, "large-key.bin",
+	_, err := s3Client.PutObject(ctx, bucketName, "large-key.bin",
 		strings.NewReader(largeContent), int64(len(largeContent)),
 		minio.PutObjectOptions{ContentType: "application/octet-stream"})
 	require.NoError(t, err)
