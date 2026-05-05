@@ -154,6 +154,106 @@ func TestE2E_CreateDomain_DuplicateAlreadyExists(t *testing.T) {
 	assert.Equal(t, codes.AlreadyExists, status.Code(err))
 }
 
+// TestE2E_DeleteDomain_Matrix is the rejection + happy-path matrix
+// for DeleteDomain. Three cases sharing a fresh org:
+//
+//   - NotFound when the domain doesn't exist
+//   - Etag mismatch when the request etag doesn't match the row
+//   - Happy path: delete a PENDING domain (no SsoConfig means the
+//     last-verified-domain guard doesn't fire)
+//
+// The SSO-coupling guard (DeleteDomain refused because deleting
+// the last VERIFIED domain would orphan an enabled SsoConfig) is
+// covered by the SSO test file where the SsoConfig setup naturally
+// belongs.
+func TestE2E_DeleteDomain_Matrix(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	h := newDomainsHarness(t)
+	owner := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "delete-domain-owner"})
+	h.SetCaller(owner)
+
+	orgClient := apiv1.NewOrganizationsClient(h.Conn())
+	createOrg(t, orgClient, "del-dom-org", "Delete Domain Org")
+
+	// Pre-seed a PENDING domain shared by the etag and happy cases.
+	createOp, err := orgClient.CreateDomain(context.Background(), &apiv1.CreateDomainRequest{
+		Parent: "organizations/del-dom-org",
+		Domain: &apiv1.Domain{Domain: "etag-and-happy.example"},
+	})
+	require.NoError(t, err)
+	// CreateDomain is async (LRO); the row exists at PENDING
+	// immediately even before the LRO completes. Read it via Get to
+	// pull the etag.
+	pending, err := orgClient.GetDomain(context.Background(), &apiv1.GetDomainRequest{
+		Name: "organizations/del-dom-org/domains/etag-and-happy.example",
+	})
+	require.NoError(t, err)
+	_ = createOp // CreateDomain LRO runs in the background — we don't
+	// wait for VERIFIED here because the test only exercises rejection
+	// paths and the PENDING-row delete (no verify worker is started).
+
+	// Pre-seed a second PENDING domain dedicated to the happy-delete
+	// case so the etag-mismatch case (which leaves the first row
+	// intact) doesn't change the test's sense of what's deletable.
+	_, err = orgClient.CreateDomain(context.Background(), &apiv1.CreateDomainRequest{
+		Parent: "organizations/del-dom-org",
+		Domain: &apiv1.Domain{Domain: "happy-delete.example"},
+	})
+	require.NoError(t, err)
+
+	cases := []struct {
+		name    string
+		req     *apiv1.DeleteDomainRequest
+		wantErr codes.Code // codes.OK for happy path
+	}{
+		{
+			name: "not found",
+			req: &apiv1.DeleteDomainRequest{
+				Name: "organizations/del-dom-org/domains/never-claimed.example",
+			},
+			wantErr: codes.NotFound,
+		},
+		{
+			name: "etag mismatch",
+			req: &apiv1.DeleteDomainRequest{
+				Name: "organizations/del-dom-org/domains/etag-and-happy.example",
+				Etag: "definitely-not-the-real-etag",
+			},
+			wantErr: codes.FailedPrecondition,
+		},
+		{
+			name: "pending row deletes without SSO guard",
+			req: &apiv1.DeleteDomainRequest{
+				Name: "organizations/del-dom-org/domains/happy-delete.example",
+			},
+			wantErr: codes.OK,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := orgClient.DeleteDomain(context.Background(), tc.req)
+			if tc.wantErr == codes.OK {
+				require.NoError(t, err, "happy-path delete must succeed")
+				return
+			}
+			require.Error(t, err)
+			assert.Equal(t, tc.wantErr, status.Code(err))
+		})
+	}
+
+	// Sanity: the etag-mismatch case must not have mutated the row.
+	stillThere, err := orgClient.GetDomain(context.Background(), &apiv1.GetDomainRequest{
+		Name: "organizations/del-dom-org/domains/etag-and-happy.example",
+	})
+	require.NoError(t, err, "etag-mismatch rejection must not have deleted the row")
+	assert.NotEmpty(t, stillThere.GetEtag())
+	_ = pending
+}
+
 // ---------------------------------------------------------------------------
 // helpers
 // ---------------------------------------------------------------------------

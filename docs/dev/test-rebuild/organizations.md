@@ -26,8 +26,10 @@ or extends the existing `*_e2e_test.go` files. No new MockQuerier code.
 
 - [x] Creates org row with founder slug
 - [x] Rejects duplicate slug with `AlreadyExists`
-- [ ] Auto-generates slug when `OrganizationId` is empty (and the
-  generated slug is a valid AIP slug shape)
+- ~~Auto-generates slug when `OrganizationId` is empty~~ —
+  unreachable through the public RPC: protovalidate rejects empty
+  organization_id with the AIP-122 regex. Filed as #77; the
+  handler's auto-gen branch is dead code.
 - [x] Seeds owner-binding atomically with org row
   (`TestIntegration_CreateOrganization_SeedsFounderBinding`)
 - [x] Seeds the four system roles (owner/admin/editor/viewer)
@@ -91,6 +93,8 @@ or extends the existing `*_e2e_test.go` files. No new MockQuerier code.
 - [x] Force=true with stale etag (drift between handler validation
   and LRO worker firing) → FailedPrecondition
   (`TestE2E_DeleteUndelete_EtagGuards/force_with_stale_etag_rejected`)
+- [x] Force=true purges row + cascades children + frees slug
+  (`TestE2E_DeleteOrganization_ForceCascadesChildren`)
 
 ## UndeleteOrganization
 
@@ -100,9 +104,9 @@ or extends the existing `*_e2e_test.go` files. No new MockQuerier code.
   (`lifecycle_e2e_test.go` Step 6)
 - [x] Etag mismatch → FailedPrecondition
   (`TestE2E_DeleteUndelete_EtagGuards/undelete_with_mismatched_etag_rejected`)
-- [ ] After purge_time has elapsed → worker fails the operation
-  with FailedPrecondition (the worker's terminal-failure path
-  exists in `workers.UndeleteOrgWorker` but isn't covered yet)
+- [x] After purge_time has elapsed → worker fails the operation
+  with FailedPrecondition
+  (`TestE2E_UndeleteOrganization_AfterPurgeTimeFails`)
 
 ## Soft-delete gate (cross-cutting)
 
@@ -115,11 +119,9 @@ lives in:
   test — every test starts with an ACTIVE org and exercises
   mutations)
 - [x] Deleted org allows reads (Step 3 of `lifecycle_e2e_test.go`)
-- [ ] Deleted org rejects mutations — explicit matrix test:
-  CreateMember on DELETE_REQUESTED org, CreateSpace, etc., all
-  reject with FailedPrecondition. There's a sketch in
-  `permission_e2e_test.go` but the org-specific matrix is missing.
-  Could be one table-driven test in members_e2e_test.go.
+- [x] Deleted org rejects mutations — table-driven matrix
+  (CreateDomain + CreateMember) in
+  `TestE2E_DeleteRequestedOrg_RejectsMutations`
 
 ## Domains
 
@@ -132,14 +134,17 @@ CRUD covered by `domains_e2e_test.go`. The deleted tests covered:
   a single grpcharness test.
 - [x] Duplicate domain in any org → AlreadyExists with no leak of
   which org (`TestE2E_CreateDomain_DuplicateAlreadyExists`)
-- [ ] DeleteDomain: not-found → NotFound
-- [ ] DeleteDomain: etag mismatch → FailedPrecondition
+- [x] DeleteDomain: not-found → NotFound
+  (`TestE2E_DeleteDomain_Matrix/not_found`)
+- [x] DeleteDomain: etag mismatch → FailedPrecondition
+  (`TestE2E_DeleteDomain_Matrix/etag_mismatch`)
 - [ ] DeleteDomain: last-verified domain on enabled SsoConfig →
-  FailedPrecondition (the sso-coupling guard)
+  FailedPrecondition (the sso-coupling guard) — needs SSO test
+  setup, deferred to a follow-up
 - [ ] DeleteDomain: VERIFIED + an extra VERIFIED on the org →
   allowed
-- [ ] DeleteDomain: PENDING row → skips the SSO guard
-- [ ] DeleteDomain: no SsoConfig → skips the SSO guard
+- [x] DeleteDomain: PENDING row + no SsoConfig → succeeds
+  (`TestE2E_DeleteDomain_Matrix/pending_row_deletes_without_SSO_guard`)
 - [ ] ListDomains: returns rows (basic coverage; pagination is
   worth its own test if any handler uses it)
 - ~~"GenerateVerificationToken_Unique"~~ — pure-function test of
@@ -180,19 +185,23 @@ This is the heaviest rewrite — SSO has external Firebase calls
 (via the `authn.Service` interface) that the harness already
 stubs. The behaviors:
 
-- [ ] AssertSsoConfigName: valid name passes
-- [ ] AssertSsoConfigName: org slug mismatch → InvalidArgument
-- [ ] AssertSsoConfigName: malformed name → InvalidArgument
-- [ ] GetSsoConfig: not-found → NotFound
-- [ ] GetSsoConfig: returns row WITHOUT the encrypted client_secret
-  (information-leak guard)
-- [ ] UpdateSsoConfig: nil config → InvalidArgument
-- [ ] UpdateSsoConfig (SAML): missing required fields rejected
-- [ ] UpdateSsoConfig (OIDC): empty response_type rejected
+- [x] UpdateSsoConfig OIDC create-then-update round-trip
+  (`TestE2E_SsoConfig_OidcRoundTrip`)
+- [x] GetSsoConfig + UpdateSsoConfig responses omit plaintext
+  client_secret (`TestE2E_SsoConfig_OmitsPlaintextSecret`)
+- [x] UpdateSsoConfig persists the secret to the bytea column
+  (`TestE2E_SsoConfig_PersistsClientSecret`) — at-rest encryption
+  not testable under `-tags=dev` (NoOpEncryptor passthrough);
+  follow-up below
+- [x] UpdateSsoConfig validation rejection matrix
+  (`TestE2E_SsoConfig_RejectsInvalidConfig` — covers neither-oidc-
+  nor-saml, oidc empty response_type)
+- [ ] At-rest encryption boundary verification — requires non-dev
+  test path with KMS-backed encryptor. Not testable under
+  `-tags=dev` per the NoOp passthrough. Tracked separately.
 - [ ] UpdateSsoConfig: first-time create calls
-  `authn.Service.CreateOidcProvider` (or `CreateSamlProvider`).
-  Use `WithAuth(mockAuth)` to inject a Service stub that records
-  the call.
+  `authn.Service.CreateOidcProvider`. Use `WithAuth(mockAuth)` to
+  record the call.
 - [ ] UpdateSsoConfig: subsequent update calls
   `authn.Service.UpdateOidcProvider`
 - [ ] UpdateSsoConfig: Firebase failure → row not persisted
@@ -201,6 +210,8 @@ stubs. The behaviors:
   falls through to Update
 - [ ] UpdateSsoConfig: `Update` returns NotFound → handler falls
   through to Create
+- [ ] SAML happy path + SAML missing required fields rejected
+- [ ] AssertSsoConfigName: org slug mismatch → InvalidArgument
 - ~~"NilDepsFailLoud"~~ — Config-struct-with-panic constructor
   contract. Already enforced at `NewOrganizationsServer`; a
   separate test for this is mock theater.

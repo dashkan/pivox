@@ -17,8 +17,10 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/dashkan/pivox/internal/appkey"
+	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/permission"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
+	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	"github.com/dashkan/pivox/internal/server"
 	"github.com/dashkan/pivox/internal/service/organizations"
 	"github.com/dashkan/pivox/internal/testutil/grpcharness"
@@ -223,6 +225,217 @@ func TestE2E_DeleteUndelete_EtagGuards(t *testing.T) {
 				"etag-guard rejections surface as FailedPrecondition")
 			assert.Contains(t, status.Convert(err).Message(), "etag",
 				"error message should mention etag")
+		})
+	}
+}
+
+// TestE2E_DeleteOrganization_ForceCascadesChildren pins the
+// destructive-op semantics: force=true hard-deletes the org row
+// and FK CASCADE removes children. Post-conditions:
+//
+//   - Org row gone (Get returns NotFound or PermissionDenied —
+//     the layered interceptor chain may catch it before reaching
+//     the handler)
+//   - Child rows gone (org_members for this org row is empty —
+//     the founder binding seeded by CreateOrganization is the
+//     canary, but we add an extra member to make the cascade
+//     visible beyond the founder)
+//   - Slug is reusable (creating an org with the same slug
+//     succeeds — proves no orphan child holds the slug via FK)
+func TestE2E_DeleteOrganization_ForceCascadesChildren(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	h := newLifecycleHarness(t)
+	client := apiv1.NewOrganizationsClient(h.Conn())
+	ctx := context.Background()
+
+	owner := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "force-owner"})
+	h.SetCaller(owner)
+	created := createOrg(t, client, "force-cascade", "Force Cascade")
+
+	// Add a second member so the cascade is visible beyond the
+	// founder's auto-seeded owner binding.
+	teammate := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "teammate"})
+	orgID := h.LookupOrgID(t, "force-cascade")
+	h.SeedMembership(t, orgID, teammate, grpcharness.RoleEditor)
+
+	// Sanity: two members exist before the purge.
+	before, err := h.Queries.ListOrgMembers(ctx, db.ListOrgMembersParams{
+		OrgID: orgID, Offset: 0, Limit: 100,
+	})
+	require.NoError(t, err)
+	require.Len(t, before, 2, "setup: founder + teammate must be members")
+
+	// Force-purge with the correct etag.
+	deleteOp, err := client.DeleteOrganization(ctx, &apiv1.DeleteOrganizationRequest{
+		Name:  "organizations/force-cascade",
+		Force: true,
+		Etag:  created.GetEtag(),
+	})
+	require.NoError(t, err)
+	waitOp(t, h, deleteOp, "DeleteOrganization force")
+
+	// Org row gone.
+	_, err = client.GetOrganization(ctx, &apiv1.GetOrganizationRequest{
+		Name: "organizations/force-cascade",
+	})
+	require.Error(t, err, "purged org must not be readable")
+	st, _ := status.FromError(err)
+	assert.Contains(t, []codes.Code{codes.NotFound, codes.PermissionDenied}, st.Code(),
+		"unknown org surfaces as NotFound or PermissionDenied "+
+			"depending on which interceptor fires first")
+
+	// Children gone — query directly via Queries to avoid
+	// coupling this assertion to the Members RPC.
+	after, err := h.Queries.ListOrgMembers(ctx, db.ListOrgMembersParams{
+		OrgID: orgID, Offset: 0, Limit: 100,
+	})
+	require.NoError(t, err)
+	assert.Empty(t, after, "FK CASCADE must remove all org_members rows")
+
+	// Slug is reusable.
+	_ = createOrg(t, client, "force-cascade", "Force Cascade v2")
+}
+
+// TestE2E_UndeleteOrganization_AfterPurgeTimeFails pins the
+// worker terminal-fail path. The UndeleteOrganization SQL has
+// `WHERE state = 'DELETE_REQUESTED' AND purge_time > now()`; if
+// purge_time has elapsed, the UPDATE returns no rows. The worker
+// maps the resulting pgx.ErrNoRows to FailedPrecondition via
+// FailOperation, and the LRO completes with that error rather
+// than succeeding.
+//
+// The handler accepts the request (no synchronous validation of
+// purge_time happens at the handler — it's owned by the worker's
+// SQL action), so the failure surfaces via the LRO error field,
+// not as an RPC error on the Undelete call itself.
+func TestE2E_UndeleteOrganization_AfterPurgeTimeFails(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	h := newLifecycleHarness(t)
+	client := apiv1.NewOrganizationsClient(h.Conn())
+	ctx := context.Background()
+
+	owner := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "purge-owner"})
+	h.SetCaller(owner)
+	_ = createOrg(t, client, "purge-elapsed", "Purge Elapsed")
+
+	deleteOp, err := client.DeleteOrganization(ctx, &apiv1.DeleteOrganizationRequest{
+		Name: "organizations/purge-elapsed",
+	})
+	require.NoError(t, err)
+	waitOp(t, h, deleteOp, "soft-delete setup")
+
+	// Backdate purge_time so the worker's SQL guard treats the
+	// grace window as elapsed. In production the 30-day window
+	// elapses naturally; tests don't have that luxury.
+	_, err = h.Pool.Exec(ctx,
+		`UPDATE organizations SET purge_time = now() - INTERVAL '1 second' WHERE name = $1`,
+		"purge-elapsed")
+	require.NoError(t, err, "setup: backdate purge_time")
+
+	undeleteOp, err := client.UndeleteOrganization(ctx, &apiv1.UndeleteOrganizationRequest{
+		Name: "organizations/purge-elapsed",
+	})
+	require.NoError(t, err, "handler accepts the request — failure surfaces via the LRO")
+
+	final := waitOpUntilDone(t, h, undeleteOp, 5*time.Second, "UndeleteOrganization post-purge")
+	require.True(t, final.GetDone(), "LRO must reach a terminal state")
+	require.NotNil(t, final.GetError(),
+		"worker must terminal-fail the LRO when purge_time has elapsed")
+	assert.Equal(t, int32(codes.FailedPrecondition), final.GetError().GetCode(),
+		"post-purge undelete failure surfaces as FailedPrecondition")
+}
+
+// TestE2E_DeleteRequestedOrg_RejectsMutations is the soft-delete
+// gate matrix: a DELETE_REQUESTED org accepts reads + Undelete
+// but rejects mutations across the OrganizationsServer surface.
+//
+// Coverage spans two distinct mutation RPCs to demonstrate the
+// gate fires generically (not just for one handler):
+//
+//   - CreateDomain — a child-resource creation
+//   - CreateMember — a child-resource creation in the iam domain
+//
+// Reads remaining allowed during the grace window is covered by
+// TestE2E_OrgSoftDeleteRevive Step 3; not duplicated here.
+//
+// Each rejection surfaces as FailedPrecondition (handler state
+// guard) or PermissionDenied (interceptor-level soft-delete gate)
+// depending on which check fires first; both satisfy the contract.
+func TestE2E_DeleteRequestedOrg_RejectsMutations(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	h := newLifecycleHarness(t)
+	client := apiv1.NewOrganizationsClient(h.Conn())
+	ctx := context.Background()
+
+	// Setup: shared DELETE_REQUESTED org used by every case.
+	owner := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "gate-owner"})
+	h.SetCaller(owner)
+	_ = createOrg(t, client, "gate-test", "Gate Test")
+	orgID := h.LookupOrgID(t, "gate-test")
+
+	// Pre-seed a target identity for the CreateMember case so its
+	// failure mode is "the gate said no" rather than "principal
+	// doesn't exist."
+	target := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "gate-target"})
+	targetUserID := h.SeedUserMembershipOnly(t, orgID, target)
+
+	deleteOp, err := client.DeleteOrganization(ctx, &apiv1.DeleteOrganizationRequest{
+		Name: "organizations/gate-test",
+	})
+	require.NoError(t, err)
+	waitOp(t, h, deleteOp, "soft-delete setup")
+
+	// Each case attempts one mutation against the DELETE_REQUESTED
+	// org and returns the gRPC error.
+	cases := []struct {
+		name string
+		mut  func() error
+	}{
+		{
+			name: "CreateDomain rejected",
+			mut: func() error {
+				_, err := client.CreateDomain(ctx, &apiv1.CreateDomainRequest{
+					Parent: "organizations/gate-test",
+					Domain: &apiv1.Domain{Domain: "example.com"},
+				})
+				return err
+			},
+		},
+		{
+			name: "CreateMember rejected",
+			mut: func() error {
+				_, err := client.CreateMember(ctx, &iampb.CreateMemberRequest{
+					Parent: "organizations/gate-test",
+					Member: &iampb.Member{
+						Principal: &iampb.Member_User{
+							User: "organizations/gate-test/users/" + targetUserID.String(),
+						},
+						Role: "organizations/gate-test/roles/editor",
+					},
+				})
+				return err
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.mut()
+			require.Error(t, err, "mutation must be rejected on DELETE_REQUESTED org")
+			st, _ := status.FromError(err)
+			assert.Contains(t,
+				[]codes.Code{codes.FailedPrecondition, codes.PermissionDenied},
+				st.Code(),
+				"soft-delete gate rejects mutations as FailedPrecondition or PermissionDenied")
 		})
 	}
 }
