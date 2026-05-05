@@ -1,0 +1,28 @@
+# Mockery v3 config — generates testify-style mocks for interfaces
+# we mock at *external* boundaries (Firebase auth, etc.).
+#
+# Internal interfaces (Querier, etc.) are NOT mocked per #71 —
+# service-layer tests use grpcharness against a real DB. Adding a
+# new package here implies "this is an external boundary worth
+# mocking at the interface level"; if that's not true, don't add
+# it.
+#
+# Regenerate with `make mocks` after editing the source interface.
+
+template: testify
+all: false
+formatter: goimports
+force-file-write: true
+generate: true
+include-auto-generated: false
+log-level: info
+
+packages:
+  github.com/dashkan/pivox/internal/authn:
+    config:
+      dir: internal/testutil/authnmock
+      filename: service_mock.go
+      pkgname: authnmock
+      structname: MockService
+    interfaces:
+      Service:

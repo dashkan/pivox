@@ -4,16 +4,52 @@ package organizations_test
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/dashkan/pivox/internal/appkey"
+	"github.com/dashkan/pivox/internal/authn"
+	"github.com/dashkan/pivox/internal/permission"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
+	"github.com/dashkan/pivox/internal/server"
+	"github.com/dashkan/pivox/internal/service/organizations"
 	"github.com/dashkan/pivox/internal/testutil/grpcharness"
 )
+
+// newSsoHarnessWithMockedFirebase builds a harness wired with a
+// MockedFirebaseAuth so SSO tests can assert Firebase provider
+// calls. Returns (harness, mock-handle). VerifyToken passes through
+// to the queries-backed lookup so the auth chain still works.
+func newSsoHarnessWithMockedFirebase(t *testing.T) (*grpcharness.Harness, *grpcharness.MockedFirebaseAuth) {
+	auth := grpcharness.NewMockedFirebaseAuth(t)
+	h := grpcharness.New(t,
+		grpcharness.WithAuth(auth),
+		grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
+			codec, err := appkey.NewFromHex(strings.Repeat("ab", 32))
+			require.NoError(t, err)
+			apiv1.RegisterOrganizationsServer(s, organizations.NewOrganizationsServer(organizations.Config{
+				Pool:       h.Pool,
+				Queries:    h.Queries,
+				Auth:       auth,
+				Codec:      codec,
+				ReadUID:    server.AuthenticatedUID,
+				Resolver:   permission.NewResolver(h.Queries),
+				Caller:     server.NewCallerIdentityResolver(h.Queries),
+				LROManager: h.LROManager,
+				Encryptor:  h.Encryptor,
+			}))
+		}))
+	auth.SetQueries(h.Queries)
+	return h, auth
+}
 
 // TestE2E_SsoConfig_OidcRoundTrip pins the canonical OIDC happy
 // path: a fresh org's SsoConfig doesn't exist, the first
@@ -247,4 +283,142 @@ func TestE2E_SsoConfig_RejectsInvalidConfig(t *testing.T) {
 				"validation rejections surface as InvalidArgument")
 		})
 	}
+}
+
+// TestE2E_SsoConfig_FirebaseCreateOnFirstUpdate pins that the
+// first UpdateSsoConfig on a fresh org calls Firebase's
+// CreateOidcProvider with the expected provider id and config.
+// Mockery's typed expecter lets us match args exactly without
+// stringly-typed `On("CreateOidcProvider", ...)` plumbing.
+func TestE2E_SsoConfig_FirebaseCreateOnFirstUpdate(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	h, auth := newSsoHarnessWithMockedFirebase(t)
+	client := apiv1.NewOrganizationsClient(h.Conn())
+	ctx := context.Background()
+
+	owner := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "sso-fb-create-owner"})
+	h.SetCaller(owner)
+	createOrg(t, client, "sso-fb-create", "FB Create")
+
+	auth.Mock.EXPECT().
+		CreateOidcProvider(mock.Anything, mock.MatchedBy(func(cfg authn.OidcProviderConfig) bool {
+			return cfg.ProviderID == "oidc.sso-fb-create" &&
+				cfg.Issuer == "https://idp.example.com" &&
+				cfg.ClientID == "the-client-id" &&
+				cfg.CodeFlow
+		})).
+		Return(nil).
+		Once()
+
+	_, err := client.UpdateSsoConfig(ctx, &apiv1.UpdateSsoConfigRequest{
+		SsoConfig: &apiv1.SsoConfig{
+			Name:        "organizations/sso-fb-create/ssoConfig",
+			DisplayName: "First Create",
+			Enabled:     true,
+			Config: &apiv1.SsoConfig_Oidc{
+				Oidc: &apiv1.OidcConfig{
+					Issuer:       "https://idp.example.com",
+					ClientId:     "the-client-id",
+					ClientSecret: "secret",
+					ResponseType: &apiv1.OidcConfig_ResponseType{Code: true},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+}
+
+// TestE2E_SsoConfig_FirebaseAlreadyExistsFallsThroughToUpdate
+// pins the create→update fallback: when CreateOidcProvider
+// returns the AlreadyExists sentinel (concurrent first-create
+// race or stale state in Firebase), the handler retries via
+// UpdateOidcProvider rather than failing the caller.
+func TestE2E_SsoConfig_FirebaseAlreadyExistsFallsThroughToUpdate(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	h, auth := newSsoHarnessWithMockedFirebase(t)
+	client := apiv1.NewOrganizationsClient(h.Conn())
+	ctx := context.Background()
+
+	owner := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "sso-fb-fallback-owner"})
+	h.SetCaller(owner)
+	createOrg(t, client, "sso-fallback", "FB Fallback")
+
+	auth.Mock.EXPECT().
+		CreateOidcProvider(mock.Anything, mock.Anything).
+		Return(authn.ErrAlreadyExists).
+		Once()
+	auth.Mock.EXPECT().
+		UpdateOidcProvider(mock.Anything, mock.Anything).
+		Return(nil).
+		Once()
+
+	_, err := client.UpdateSsoConfig(ctx, &apiv1.UpdateSsoConfigRequest{
+		SsoConfig: &apiv1.SsoConfig{
+			Name:        "organizations/sso-fallback/ssoConfig",
+			DisplayName: "Fallback",
+			Enabled:     true,
+			Config: &apiv1.SsoConfig_Oidc{
+				Oidc: &apiv1.OidcConfig{
+					Issuer:       "https://idp.example.com",
+					ClientId:     "client",
+					ResponseType: &apiv1.OidcConfig_ResponseType{Code: true},
+				},
+			},
+		},
+	})
+	require.NoError(t, err, "AlreadyExists from Create must fall through to Update")
+}
+
+// TestE2E_SsoConfig_FirebaseFailureLeavesNoRow pins atomicity:
+// when Firebase returns a non-fallback error, the handler aborts
+// before the SsoConfig upsert, so the row is not persisted.
+// Subsequent Get returns NotFound (or PermissionDenied —
+// permission interceptor may catch the missing row first).
+func TestE2E_SsoConfig_FirebaseFailureLeavesNoRow(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	h, auth := newSsoHarnessWithMockedFirebase(t)
+	client := apiv1.NewOrganizationsClient(h.Conn())
+	ctx := context.Background()
+
+	owner := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "sso-fb-fail-owner"})
+	h.SetCaller(owner)
+	createOrg(t, client, "sso-fb-fail", "FB Fail")
+
+	auth.Mock.EXPECT().
+		CreateOidcProvider(mock.Anything, mock.Anything).
+		Return(errors.New("firebase down")).
+		Once()
+
+	_, err := client.UpdateSsoConfig(ctx, &apiv1.UpdateSsoConfigRequest{
+		SsoConfig: &apiv1.SsoConfig{
+			Name:        "organizations/sso-fb-fail/ssoConfig",
+			DisplayName: "Fail",
+			Enabled:     true,
+			Config: &apiv1.SsoConfig_Oidc{
+				Oidc: &apiv1.OidcConfig{
+					Issuer:       "https://idp.example.com",
+					ClientId:     "client",
+					ResponseType: &apiv1.OidcConfig_ResponseType{Code: true},
+				},
+			},
+		},
+	})
+	require.Error(t, err, "Firebase failure must surface to the caller")
+
+	// No row was persisted — Get returns NotFound.
+	_, err = client.GetSsoConfig(ctx, &apiv1.GetSsoConfigRequest{
+		Name: "organizations/sso-fb-fail/ssoConfig",
+	})
+	require.Error(t, err, "no SsoConfig row should exist after Firebase failure")
+	assert.Equal(t, codes.NotFound, status.Code(err),
+		"failed Update must not have persisted the SsoConfig row")
 }

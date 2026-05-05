@@ -199,15 +199,16 @@ stubs. The behaviors:
 - [ ] At-rest encryption boundary verification — requires non-dev
   test path with KMS-backed encryptor. Not testable under
   `-tags=dev` per the NoOp passthrough. Tracked separately.
-- [ ] UpdateSsoConfig: first-time create calls
-  `authn.Service.CreateOidcProvider`. Use `WithAuth(mockAuth)` to
-  record the call.
+- [x] UpdateSsoConfig: first-time create calls
+  `authn.Service.CreateOidcProvider` with the right config
+  (`TestE2E_SsoConfig_FirebaseCreateOnFirstUpdate`)
 - [ ] UpdateSsoConfig: subsequent update calls
   `authn.Service.UpdateOidcProvider`
-- [ ] UpdateSsoConfig: Firebase failure → row not persisted
-  (atomicity)
-- [ ] UpdateSsoConfig: `Create` returns AlreadyExists → handler
+- [x] UpdateSsoConfig: Firebase failure → row not persisted
+  (atomicity) (`TestE2E_SsoConfig_FirebaseFailureLeavesNoRow`)
+- [x] UpdateSsoConfig: `Create` returns AlreadyExists → handler
   falls through to Update
+  (`TestE2E_SsoConfig_FirebaseAlreadyExistsFallsThroughToUpdate`)
 - [ ] UpdateSsoConfig: `Update` returns NotFound → handler falls
   through to Create
 - [ ] SAML happy path + SAML missing required fields rejected

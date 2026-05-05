@@ -1,5 +1,5 @@
 .PHONY: build run test tidy lint lint-fix fmt generate \
-       air dev-air \
+       air dev-air mocks \
        lint-proto proto-format proto-breaking proto-generate \
        proto-generate-go proto-generate-native build-grpc-swift-2-plugin api-lint \
        db-up db-down db-migrate db-force db-seed db-clear db-drop db-create \
@@ -80,6 +80,12 @@ lint-fix:
 
 fmt:
 	gofmt -w .
+
+# Regenerate testify-style mocks for *external* boundaries listed in
+# .mockery.yml. Internal interfaces (Querier, etc.) are NOT mocked
+# per #71 — service-layer tests use grpcharness against a real DB.
+mocks:
+	$(TOOL) mockery
 
 # Proto
 
