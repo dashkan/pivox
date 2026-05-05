@@ -9,31 +9,130 @@
 
 ## Framework Reference
 
-### Go (Cloud Controller, Playout Agent)
+### Go (Cloud Controller, Worker Process, Storage Agent)
 
-**Framework:** `go test` (standard library)
-**Style:** Table-driven tests
-**Mocking:** Interfaces + test doubles (no mocking framework needed for most cases)
-**Run:** `go test ./...`
+**Framework:** `go test` (standard library) + `testify/require` for assertions. **No** mocking framework for new code unless explicitly called for below.
+
+**Run:** `go test ./...` (default suite). `go test -tags=dev ./...` for the integration suite. `go test -race ./...` for any change in concurrency-relevant code.
+
+#### Choose the right layer
+
+Decide what bug the test is meant to catch *before* writing it. The wrong layer means tests pass while bugs ship. The migration in [#71](https://github.com/dashkan/pivox/issues/71) is moving the codebase off `MockQuerier`-at-call-shape and onto integration-first.
+
+| Layer | When to use | Cost | Catches |
+|---|---|---|---|
+| **Integration via `grpcharness`** | Service-layer / handler tests | ~50-100ms each | Real RPC flow including auth/membership/permission/audit interceptors; SQL correctness; FK violations; River enqueue atomicity |
+| **DB integration via `testutil.SetupTestDB`** | DB queries, migrations, raw SQL paths | ~50ms each | SQL correctness, schema drift, FK behavior, transaction semantics |
+| **Pure-function unit** | Validators, parsers, transformers, error mappers, anything without DB/RPC/network | sub-ms | Algorithm correctness, edge cases in pure logic |
+| **`pgxmock` connection-level mock** | Hard-to-induce DB errors only (`ErrTxClosed` mid-tx, deadlock retry, pool exhaustion) | ~ms | Specific failure modes integration can't reproduce |
+| **`rivertest.RequireInsertedTx`** | Asserting handler enqueued a River job | included with integration | Job enqueue + atomicity with `operations` row |
+
+**Default for service-layer behavior is integration via `grpcharness`.** It runs the real gRPC server with the real interceptor chain (auth, membership, permission, audit) — only the Firebase token verifier is stubbed via `testAuthService`. Tests assert RPC outcomes against the real DB and can pin caller identity via `Harness.SetCaller`.
+
+#### Examples
+
+**Integration test (the canonical shape):**
 
 ```go
-func TestPlayoutController_ResolveElement(t *testing.T) {
-    tests := []struct {
-        name    string
-        element string
-        wantCh  int
-        wantLy  int
+func TestCreateOrganization_Success(t *testing.T) {
+    h := grpcharness.New(t)
+    defer h.Close()
+
+    h.SeedIdentity(t, "alice")
+    h.SetCaller(grpcharness.CallerFromUID("alice"))
+
+    op, err := h.OrganizationsClient().CreateOrganization(t.Context(),
+        &apiv1.CreateOrganizationRequest{
+            Organization: &apiv1.Organization{Name: "organizations/acme", DisplayName: "Acme"},
+        })
+    require.NoError(t, err)
+
+    // Real DB assertion:
+    org, err := h.Queries().GetOrganizationByName(t.Context(), "organizations/acme")
+    require.NoError(t, err)
+    assert.Equal(t, "Acme", org.DisplayName)
+
+    // Real River assertion (if the handler enqueues a job):
+    rivertest.RequireInsertedTx[*riverpgxv5.Driver](t.Context(), t, h.Tx(),
+        CreateOrgArgs{OrgID: org.ID}, nil)
+
+    // Caller identity threaded through audit:
+    assert.Equal(t, "alice", op.Metadata.CreatedBy)
+}
+```
+
+This single test exercises auth → membership → permission → audit → handler logic → SQL → River enqueue, plus their composition. It replaces ~5-10 mock tests' worth of partial assertions with one real test of the production path.
+
+**Pure-function test (validators, parsers, transformers):**
+
+```go
+func TestParseOperationName(t *testing.T) {
+    cases := []struct{
+        name, input string
+        wantID uuid.UUID
+        wantErr bool
     }{
-        {"lower third", "lower-third", 0, 2},
-        {"bug", "bug", 0, 1},
+        {"root-scoped", "operations/01abc...", uuidFromStr("01abc..."), false},
+        {"org-parented", "organizations/acme/operations/01abc...", uuidFromStr("01abc..."), false},
+        {"missing operations segment", "organizations/acme/01abc...", uuid.Nil, true},
     }
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            // ...
+    for _, tc := range cases {
+        t.Run(tc.name, func(t *testing.T) {
+            got, err := parseOperationName(tc.input)
+            if tc.wantErr {
+                require.Error(t, err)
+                return
+            }
+            require.NoError(t, err)
+            assert.Equal(t, tc.wantID, got)
         })
     }
 }
 ```
+
+No mock library, no DB. Just call the function and assert. Most useful for `internal/filter/`, `internal/resource/`, ID parsers, and similar.
+
+**`pgxmock` for narrow error simulation:**
+
+```go
+func TestRetryOnErrTxClosed(t *testing.T) {
+    mock, _ := pgxmock.NewPool()
+    defer mock.Close()
+    mock.ExpectBegin().WillReturnError(pgx.ErrTxClosed)
+    // ... test the retry path
+}
+```
+
+Use sparingly. If you can reproduce the error against a real DB, do that instead.
+
+#### Anti-patterns
+
+These get **refused** in code review and CLAUDE.md, regardless of what existing tests do:
+
+- **`internal/testutil/mocks/MockQuerier`-based tests** for new code. Hand-maintained 153-method mock; tests assert call shape, not behavior. Being phased out per #71. New code goes through `grpcharness` or integration. If you're tempted to "match the existing pattern" in a service that uses `MockQuerier`, write the new test in the new shape instead and surface that the package's tests are due for migration.
+- **`mockgen` / `mockery` for gRPC service interfaces.** Use `grpcharness` to dial the real server via bufconn. The full interceptor chain runs; tests assert real outcomes.
+- **Stubbed interceptors.** The interceptor chain is the security boundary. Tests that stub it lie about coverage — "test passes" no longer means "production path passes."
+- **"Did we call `qtx.GetOrg(orgID)` with the right ID" as the sole assertion.** Testing call shape duplicates what integration tests catch via the RPC response. Acceptable when nested inside a richer test; not acceptable as the only point.
+- **Auto-generating `MockQuerier`** (mockery / sqlc-emit-interface tooling). Doesn't fix the testing-implementation problem; just makes the misfit cheaper to maintain. The migration plan is to delete the mock, not automate it.
+
+#### Helpers and fixtures
+
+The migration creates these packages (#71 Phase 1):
+
+- **`internal/testutil/mocksetup/`** — shared mock-setup helpers (`ExpectGetOrg`, `ExpectGetOrgNotFound`, etc.) for the surviving narrow-mock tests.
+- **`internal/testutil/fixtures/`** — shared test-data factories (`fixtures.Org()`, `fixtures.OrgInState(...)`).
+- **`internal/testutil/grpcharness/`** — gRPC test harness (already exists; underused).
+- **`internal/testutil.SetupTestDB`** — testcontainers-go pg setup (already exists).
+
+**Rule of three.** Two copies of an inline test pattern is acceptable; the third triggers helper extraction. "But the existing tests do it inline" is not a reason to add the (N+1)th copy.
+
+#### Migration in progress (#71)
+
+The codebase is migrating off `MockQuerier`-based unit tests toward integration via `grpcharness` + `rivertest`.
+
+- **New code:** integration / pure-function / narrow `pgxmock`. Don't add to the legacy `MockQuerier` pattern.
+- **Existing tests:** untouched until the corresponding service is refactored. When you touch a service for any reason (new feature, bug fix, the #69 LRO migration), migrate that service's tests in the same PR.
+- **Test removal:** the bulk of legacy mock-based tests are pass-through happy-path coverage that gets deleted (their integration replacements cover the same surface). Roughly 25-30% have real value (error branching, argument transformation, permission checks); those get either kept (and migrated to use `mocksetup` helpers) or rewritten as integration tests.
 
 ### Rust (Engine)
 

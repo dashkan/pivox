@@ -461,6 +461,98 @@ must include the test in the same commit, not a follow-up.
 
 See `docs/dev/testing.md` for framework patterns and CI integration.
 
+### How to write Go tests
+
+The TDD rule above says **when**. This section says **what shape**.
+New agents: read this before reaching for `MockQuerier` or generating
+any mock package.
+
+**Default to integration tests for service-layer behavior.**
+
+The codebase has dedicated test infrastructure — use it:
+
+- **`internal/testutil/grpcharness`** — runs the real gRPC server with
+  the real interceptor chain (auth, membership, permission, audit).
+  Stub `authn.Service` lets tests control which user is authenticated
+  via `SetCaller`. This is the right granularity for testing handlers
+  end-to-end. Most existing handler tests bypass this and mock at the
+  Querier level instead — that's the wrong layer and is being phased
+  out (see #71).
+- **`internal/testutil.SetupTestDB`** — testcontainers-go Postgres,
+  real schema, per-test cleanup. For raw DB tests that don't need the
+  full gRPC stack.
+- **`rivertest.RequireInsertedTx[*riverpgxv5.Driver]`** — assert River
+  jobs were enqueued by a handler. Checks the real `river.river_job`
+  table inside the test's tx. No mocks.
+- **`riverdbtest.TestSchema` / `TestTxPgx`** — auto-rolling tx +
+  auto-cleanup schemas for test isolation without per-test DB
+  recreate.
+- **`internal/testutil/mocksetup` + `internal/testutil/fixtures`** —
+  shared helpers/fixtures for the surviving mock-based tests during
+  the migration (#71 Phase 1 lands these). New helpers go here; don't
+  inline mock setup that matches an existing pattern.
+
+**Narrow uses for mocks.**
+
+- **`pgxmock`** — only for simulating connection-level errors that are
+  hard to induce in integration (`ErrTxClosed` mid-tx, deadlock retry,
+  connection pool exhaustion). Don't use it for happy-path coverage.
+- **Pure-function tests** — for code that doesn't touch DB/RPC/network
+  (validators, parsers, transformers, marshallers, error mappers). No
+  mock library needed; call the function and assert output.
+
+**Anti-patterns. Refuse these even if existing tests do them.**
+
+- New tests using `internal/testutil/mocks/MockQuerier`. The mock is
+  hand-maintained, tests assert call shape rather than behavior, and
+  is being phased out per #71. Use `grpcharness` or integration tests
+  for service-layer logic; pure-function tests for the rest. If the
+  package's existing tests are `MockQuerier`-based, the new test
+  should be the FIRST one in the new shape — don't add the (N+1)th
+  copy of the broken pattern.
+- Generating gRPC service mocks (`mockgen` for `OrganizationsServer`,
+  etc.). Use `grpcharness` to dial the real server via bufconn.
+- Stubbing the interceptor chain. The interceptors ARE the security
+  boundary; tests that bypass them produce false confidence ("the
+  test passed" doesn't mean "the production path passed" when
+  production includes interceptors the test stubbed out).
+- "Did we call `qtx.GetOrg(orgID)` with the right ID" as the sole
+  assertion. Testing call shape duplicates what integration tests
+  catch via the response. Acceptable when nested inside a richer
+  test; not acceptable as the only point.
+- Auto-generating `MockQuerier` (mockery / equivalent). Doesn't fix
+  the testing-implementation problem; just makes the misfit cheaper
+  to maintain. The migration plan is to delete the mock, not
+  automate it.
+
+**When you reach for copy-paste.**
+
+If you're copying a test setup that already exists in another test,
+extract a helper to `internal/testutil/mocksetup` (or a fixture to
+`internal/testutil/fixtures`) **before** adding the third copy. Two
+copies might be acceptable; three triggers consolidation. "But the
+existing tests do it inline" is not a reason to add the (N+1)th
+copy — the cumulative cost is what motivated #71.
+
+**For AI agents specifically.**
+
+Before writing a Go test that constructs a `MockQuerier`, stop and
+ask:
+
+1. Could this be an integration test against a real DB via
+   `grpcharness` or `testutil.SetupTestDB`? **Default yes** for
+   service-layer behavior.
+2. Could this be a pure-function test with no mocks? Often yes for
+   validators, parsers, transformers.
+3. Is the mocked call shape the actual behavior I'm asserting, or
+   am I imitating an existing test's shape because it's familiar?
+
+If (1) or (2) is yes, write it that way. If you find yourself
+adding to `MockQuerier`-based tests because "that's how the others
+are written," surface to the user and ask whether to follow the
+pattern or start the integration-test path. The pattern is on the
+way out; don't add to it.
+
 ## Documentation
 
 - Architecture docs live in `docs/`. Read the relevant ones before
