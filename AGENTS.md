@@ -467,9 +467,39 @@ The TDD rule above says **when**. This section says **what shape**.
 New agents: read this before reaching for `MockQuerier` or generating
 any mock package.
 
-**Default to integration tests for service-layer behavior.**
+**The shared test infrastructure is mandatory. No shortcuts.**
 
-The codebase has dedicated test infrastructure — use it:
+For every new or migrated Go test, you MUST:
+
+1. Use **`internal/testutil/grpcharness`** for any test that touches a
+   gRPC service. Constructing a service server directly + calling
+   handler methods bypasses the interceptor chain (auth, membership,
+   permission) and produces false-positive coverage. The handler will
+   `panic: MustPivoxUserID called without pivox_user_id claim` the
+   first time something sweeps the codebase looking for un-authed
+   tests; don't be that test.
+2. Use **`internal/testutil/fixtures`** for resource creation
+   (organizations, spaces, operations, storage gateways, etc.). Do
+   NOT inline a `createTestOrg` / `createTestSpace` helper — every
+   inline copy is a future drift point when the schema changes.
+   Missing a fixture you need? Add it to the fixtures package, then
+   use it; don't inline.
+3. Use **`internal/testutil/mocksetup`** for any helper that wraps
+   testify mocks (`Expect*`-style helpers around the surviving
+   `MockQuerier`-based tests during the migration). Same rule: add
+   to the package, don't inline.
+4. Use **`internal/testutil.SetupTestDB`** only when you need raw DB
+   access without the gRPC stack. If you're calling SetupTestDB and
+   then constructing a service server, you've taken a wrong turn —
+   go back to grpcharness.
+
+These aren't aspirations. They're the bar. "But the existing tests
+in this package do it inline" is **not** a reason to add the
+(N+1)th copy — that's exactly the cumulative-cost problem #71
+exists to fix. New tests use the shared infrastructure from line 1;
+tests being migrated as part of touching a package use it too.
+
+The codebase's dedicated test infrastructure:
 
 - **`internal/testutil/grpcharness`** — runs the real gRPC server with
   the real interceptor chain (auth, membership, permission, audit).
