@@ -28,15 +28,10 @@ or extends the existing `*_e2e_test.go` files. No new MockQuerier code.
 - [x] Rejects duplicate slug with `AlreadyExists`
 - [ ] Auto-generates slug when `OrganizationId` is empty (and the
   generated slug is a valid AIP slug shape)
-- [ ] Seeds owner-binding atomically with org row — failure to bind
-  rolls back the org row (no orphan org). The deleted unit test
-  asserted this via mock call ordering; the rewrite should test it by
-  observing post-conditions: `GetOrganization` returns the row AND
-  `ListMembers` returns the founder, in the same call sequence
-- [ ] Seeds the four system roles (owner/admin/editor/viewer)
-  atomically — already implicit in the grpcharness flow because
-  every member-add depends on a role existing, but worth one explicit
-  assertion that all four show up in `ListRoles` after CreateOrganization
+- [x] Seeds owner-binding atomically with org row
+  (`TestIntegration_CreateOrganization_SeedsFounderBinding`)
+- [x] Seeds the four system roles (owner/admin/editor/viewer)
+  (`TestIntegration_CreateOrganization_SeedsSystemRoles`)
 - [x] Permission gate: handler requires authenticated caller (the
   interceptor chain enforces this; bypassing it produced the
   `MustPivoxUserID` panic that started this whole sweep)
@@ -48,7 +43,8 @@ or extends the existing `*_e2e_test.go` files. No new MockQuerier code.
 ## GetOrganization
 
 - [x] Happy path returns the row (`server_integration_test.go`)
-- [ ] `NotFound` for unknown slug
+- [x] `NotFound`/`PermissionDenied` for unknown slug
+  (`TestIntegration_GetOrganization_NotFound`)
 - [ ] Slug-mismatch in resource name returns `InvalidArgument`
   (was `TestUnit_GetOrganization_SlugMismatch`)
 - [ ] Malformed name (`organizations/`, no slug) returns
@@ -56,9 +52,10 @@ or extends the existing `*_e2e_test.go` files. No new MockQuerier code.
 
 ## ListOrganizations
 
-- [ ] Returns only orgs the caller is a member of — seed two orgs,
-  caller belongs to one, list returns just that one
-- [ ] Caller with no orgs returns empty list (not an error)
+- [x] Returns only orgs the caller is a member of
+  (`TestIntegration_ListOrganizations_OnlyCallerOrgs`)
+- [x] Caller with no orgs returns empty list (not an error)
+  (`TestIntegration_ListOrganizations_EmptyForUnaffiliatedCaller`)
 - [ ] Unauthenticated caller rejected (covered by interceptor; one
   test confirming the surface)
 - ~~"PaginationFieldsIgnored"~~ — old test asserted that
