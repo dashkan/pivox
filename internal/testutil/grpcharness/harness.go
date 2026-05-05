@@ -70,16 +70,19 @@ type Harness struct {
 type Option func(*config)
 
 type config struct {
-	registerServices func(*Harness, *grpc.Server)
+	registerServices []func(*Harness, *grpc.Server)
 	auth             authn.Service
 }
 
 // WithServices registers gRPC services on the test server. The
 // callback receives the harness so it can pass Pool, Queries,
-// LROManager, etc., to service constructors. Required for any test
-// that exercises the gRPC surface (most of them).
+// LROManager, etc., to service constructors. Multiple WithServices
+// calls compose — each callback runs in order on the same gRPC
+// server, so a test that needs both an OrganizationsServer (for
+// org-creation setup) and its system-under-test can pass both via
+// separate options instead of inlining the two registrations.
 func WithServices(fn func(*Harness, *grpc.Server)) Option {
-	return func(c *config) { c.registerServices = fn }
+	return func(c *config) { c.registerServices = append(c.registerServices, fn) }
 }
 
 // WithAuth overrides the harness's default test authn.Service.
@@ -169,8 +172,8 @@ func New(t *testing.T, opts ...Option) *Harness {
 		),
 	)
 
-	if cfg.registerServices != nil {
-		cfg.registerServices(h, grpcServer)
+	for _, register := range cfg.registerServices {
+		register(h, grpcServer)
 	}
 
 	const bufSize = 1024 * 1024

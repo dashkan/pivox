@@ -7,52 +7,41 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
 	"github.com/dashkan/pivox/internal/appkey"
-	db "github.com/dashkan/pivox/internal/db/generated"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	"github.com/dashkan/pivox/internal/service/apikeys"
-	"github.com/dashkan/pivox/internal/testutil"
+	"github.com/dashkan/pivox/internal/testutil/grpcharness"
 )
 
-func createTestOrg(t *testing.T, queries *db.Queries, name string) db.Organization {
-	t.Helper()
-	org, err := queries.CreateOrganization(context.Background(), db.CreateOrganizationParams{
-		ID:          uuid.New(),
-		Name:        name,
-		DisplayName: "Test Org " + name,
-		CreatedBy:   pgtype.UUID{},
-	})
-	require.NoError(t, err)
-	return org
-}
-
+// TestIntegration_ApiKeys exercises the full ApiKeys CRUD surface
+// end-to-end through the production interceptor chain. Org setup
+// goes through CreateOrganization via the harness so the founder
+// owner binding + system roles are seeded the same way they are
+// in production — which is what allows subsequent ApiKeys calls
+// to satisfy the membership/permission interceptors.
 func TestIntegration_ApiKeys(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
-
-	codec, err := appkey.NewFromHex(strings.Repeat("ab", 32))
-	require.NoError(t, err)
-	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		apiv1.RegisterApiKeysServer(s, apikeys.NewApiKeysServer(apikeys.Config{
-			Pool: pool, Queries: queries, Codec: codec,
+	h := grpcharness.New(t,
+		grpcharness.WithOrganizationsServer(),
+		grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
+			codec, err := appkey.NewFromHex(strings.Repeat("ab", 32))
+			require.NoError(t, err)
+			apiv1.RegisterApiKeysServer(s, apikeys.NewApiKeysServer(apikeys.Config{
+				Pool: h.Pool, Queries: h.Queries, Codec: codec,
+			}))
 		}))
-	})
 
-	client := apiv1.NewApiKeysClient(conn)
+	h.SeedOwnedOrg(t, "acme", "Acme", "apikeys")
+
+	client := apiv1.NewApiKeysClient(h.Conn())
 	ctx := context.Background()
-
-	// Prerequisite: create an org directly via DB.
-	createTestOrg(t, queries, "acme")
 
 	var createdKeyName string
 	var keyString string
