@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
+	"github.com/riverqueue/river"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -363,16 +364,17 @@ func TestE2E_SpacePurgeWorker_CascadesPastGrace(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	// Run a single processBatch tick directly (bypassing the
-	// advisory-lock dance the full Run loop adds — the lock is a
-	// multi-replica coordination token, not needed in-process).
-	worker := workers.NewSpacePurgeWorker(workers.SpacePurgeConfig{
-		Pool:     h.Pool,
-		Queries:  h.Queries,
-		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Interval: time.Minute,
-	})
-	require.NoError(t, worker.ProcessBatchForTest(ctx))
+	// Drive one purge tick by calling the River worker's Work
+	// method directly. River's leader election + advisory-lock
+	// dance live in pivox-worker (cmd/pivox-worker/main.go); the
+	// per-tick body is what we want to exercise here.
+	purgeWorker := &workers.PurgeSpacesWorker{
+		Queries: h.Queries,
+		Logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+	require.NoError(t, purgeWorker.Work(ctx, &river.Job[workers.PurgeSpacesArgs]{
+		Args: workers.PurgeSpacesArgs{},
+	}))
 
 	// Slug is now free; recreating the space with the same id must
 	// succeed (proves the row is genuinely gone, not just hidden).
