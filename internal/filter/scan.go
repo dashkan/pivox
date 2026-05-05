@@ -93,14 +93,13 @@ func ScanConversations(rows pgx.Rows) ([]db.AiConversation, error) {
 	for rows.Next() {
 		var c db.AiConversation
 		// Order MUST match the `ai_conversations` column order from the
-		// init migration: id, org_id, creator_id, name, title,
-		// title_user_set, description, archived, pinned,
-		// message_count, last_message_time, etag, revision,
-		// created_by, updated_by, create_time, update_time.
+		// init migration: id, org_id, name, title, title_user_set,
+		// description, archived, pinned, message_count,
+		// last_message_time, etag, revision, created_by, updated_by,
+		// create_time, update_time.
 		if err := rows.Scan(
 			&c.ID,
 			&c.OrgID,
-			&c.CreatedBy,
 			&c.Name,
 			&c.Title,
 			&c.TitleUserSet,
@@ -164,7 +163,6 @@ func ScanOrganizations(rows pgx.Rows) ([]db.Organization, error) {
 			&o.Name,
 			&o.DisplayName,
 			&o.Annotations,
-			&o.CreatedBy,
 			&o.State,
 			&o.Etag,
 			&o.Revision,
