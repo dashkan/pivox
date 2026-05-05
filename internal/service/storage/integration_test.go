@@ -6,59 +6,37 @@ import (
 	"context"
 	"testing"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
 	"github.com/dashkan/pivox/internal/agentstream"
-	"github.com/dashkan/pivox/internal/crypto"
-	db "github.com/dashkan/pivox/internal/db/generated"
 	storagev1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"
 	"github.com/dashkan/pivox/internal/service/storage"
-	"github.com/dashkan/pivox/internal/testutil"
+	"github.com/dashkan/pivox/internal/testutil/grpcharness"
 )
-
-func createStorageTestOrg(t *testing.T, queries *db.Queries, name string) db.Organization {
-	t.Helper()
-	org, err := queries.CreateOrganization(context.Background(), db.CreateOrganizationParams{
-		ID:          uuid.New(),
-		Name:        name,
-		DisplayName: "Test Org " + name,
-		CreatedBy:   pgtype.UUID{},
-	})
-	require.NoError(t, err)
-	return org
-}
 
 func TestIntegration_Storage_GatewayLifecycle(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	_, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
-
-	enc, err := crypto.NewEncryptor()
-	require.NoError(t, err)
 	conns := agentstream.NewConnectionManager()
-
-	conn := testutil.SetupGRPCServer(t, func(s *grpc.Server) {
-		storagev1.RegisterStorageGatewaysServer(s, storage.NewStorageGatewaysServer(storage.StorageGatewaysConfig{
-			Queries: queries, Encryptor: enc, Conns: conns,
+	h := grpcharness.New(t,
+		grpcharness.WithOrganizationsServer(),
+		grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
+			storagev1.RegisterStorageGatewaysServer(s, storage.NewStorageGatewaysServer(storage.StorageGatewaysConfig{
+				Queries: h.Queries, Encryptor: h.Encryptor, Conns: conns,
+			}))
+			storagev1.RegisterEndpointsServer(s, storage.NewEndpointsServer(storage.EndpointsConfig{
+				Queries: h.Queries, Encryptor: h.Encryptor,
+			}))
 		}))
-		storagev1.RegisterEndpointsServer(s, storage.NewEndpointsServer(storage.EndpointsConfig{
-			Queries: queries, Encryptor: enc,
-		}))
-	})
+	h.SeedOwnedOrg(t, "acme", "Acme", "storage")
 
-	gwClient := storagev1.NewStorageGatewaysClient(conn)
-	epClient := storagev1.NewEndpointsClient(conn)
+	gwClient := storagev1.NewStorageGatewaysClient(h.Conn())
+	epClient := storagev1.NewEndpointsClient(h.Conn())
 	ctx := context.Background()
-
-	// Prerequisite: create org.
-	createStorageTestOrg(t, queries, "acme")
 
 	var gatewayName string
 	var endpointName string
@@ -94,9 +72,18 @@ func TestIntegration_Storage_GatewayLifecycle(t *testing.T) {
 	})
 
 	t.Run("GetInstallScript", func(t *testing.T) {
+		// port + bind_address are marked OPTIONAL in the proto but
+		// have validation rules (gte:1, string.ip) that reject the
+		// proto3 default-zero values — see storage_gateway.proto.
+		// Pass valid values explicitly so the request clears
+		// protovalidate. (Underlying proto inconsistency tracked
+		// separately; test migration shouldn't fix unrelated proto
+		// rules.)
 		resp, err := gwClient.GetInstallScript(ctx, &storagev1.GetInstallScriptRequest{
 			Name:        gatewayName,
 			CacheSizeGb: 100,
+			Port:        8080,
+			BindAddress: "0.0.0.0",
 		})
 		require.NoError(t, err)
 		assert.Contains(t, resp.GetScript(), "curl -sSL https://get.pivox.app/agent")
