@@ -83,12 +83,14 @@ or extends the existing `*_e2e_test.go` files. No new MockQuerier code.
 
 ## DeleteOrganization (force path)
 
-- [ ] Force=true requires non-empty etag → FailedPrecondition without
+- [x] Force=true requires non-empty etag → FailedPrecondition
+  (`TestE2E_DeleteUndelete_EtagGuards/force_without_etag_rejected`)
 - [ ] Force=true purges row + cascades children. Seed an org with a
   space + member + api key, force-delete, assert all gone via
   GetOrganization NotFound + ListSpaces empty
-- [ ] Force=true with stale etag (drift between handler validation
+- [x] Force=true with stale etag (drift between handler validation
   and LRO worker firing) → FailedPrecondition
+  (`TestE2E_DeleteUndelete_EtagGuards/force_with_stale_etag_rejected`)
 
 ## UndeleteOrganization
 
@@ -96,7 +98,8 @@ or extends the existing `*_e2e_test.go` files. No new MockQuerier code.
   (`lifecycle_undelete_river_e2e_test.go`)
 - [x] On non-DELETE_REQUESTED row → FailedPrecondition
   (`lifecycle_e2e_test.go` Step 6)
-- [ ] Etag mismatch → FailedPrecondition
+- [x] Etag mismatch → FailedPrecondition
+  (`TestE2E_DeleteUndelete_EtagGuards/undelete_with_mismatched_etag_rejected`)
 - [ ] After purge_time has elapsed → worker fails the operation
   with FailedPrecondition (the worker's terminal-failure path
   exists in `workers.UndeleteOrgWorker` but isn't covered yet)

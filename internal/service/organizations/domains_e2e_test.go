@@ -169,8 +169,10 @@ func (emptyDNSResolver) LookupTXT(_ context.Context, _ string) ([]string, error)
 
 // createOrg is the test-setup helper for tests that need an org.
 // CreateOrganization is sync (returns done=true immediately) so no
-// LRO wait is needed.
-func createOrg(t *testing.T, c apiv1.OrganizationsClient, slug, displayName string) {
+// LRO wait is needed. Returns the org proto so callers that need
+// the etag/revision can use it; callers that only need the org to
+// exist can call it as a statement and discard.
+func createOrg(t *testing.T, c apiv1.OrganizationsClient, slug, displayName string) *apiv1.Organization {
 	t.Helper()
 	op, err := c.CreateOrganization(context.Background(), &apiv1.CreateOrganizationRequest{
 		OrganizationId: slug,
@@ -178,6 +180,9 @@ func createOrg(t *testing.T, c apiv1.OrganizationsClient, slug, displayName stri
 	})
 	require.NoError(t, err)
 	require.True(t, op.GetDone())
+	var org apiv1.Organization
+	require.NoError(t, op.GetResponse().UnmarshalTo(&org))
+	return &org
 }
 
 func newDomainsHarness(t *testing.T) *grpcharness.Harness {

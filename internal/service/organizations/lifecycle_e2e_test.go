@@ -126,6 +126,107 @@ func TestE2E_OrgSoftDeleteRevive(t *testing.T) {
 	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
 }
 
+// TestE2E_DeleteUndelete_EtagGuards is the etag-guard rejection
+// matrix for org lifecycle. Each case fresh-creates an org via
+// the standard createOrg helper, drives it to its precondition
+// state, calls Delete or Undelete with a bad etag, and asserts
+// FailedPrecondition + an error message that mentions etag.
+//
+// Behaviors pinned:
+//
+//   - force=true without etag rejected (destructive ops bypass
+//     the 30-day grace window, must pin row revision)
+//   - force=true with stale etag rejected (concurrent revision
+//     bump invalidates the caller's read)
+//   - Undelete with non-matching etag rejected (optional etag,
+//     but if supplied must match)
+func TestE2E_DeleteUndelete_EtagGuards(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	h := newLifecycleHarness(t)
+	client := apiv1.NewOrganizationsClient(h.Conn())
+	ctx := context.Background()
+
+	owner := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "etag-guard-owner"})
+	h.SetCaller(owner)
+
+	// Each case is self-contained: it produces the bad-etag operation
+	// to invoke and the request that should be rejected. Sharing the
+	// outer harness/owner is fine — cases use distinct slugs so they
+	// don't collide.
+	cases := []struct {
+		name string
+		slug string // valid AIP slug per ^[a-z][a-z0-9-]{3,19}$
+		op   func(t *testing.T, slug string, original *apiv1.Organization) error
+	}{
+		{
+			name: "force without etag rejected",
+			slug: "etag-noforce",
+			op: func(t *testing.T, slug string, _ *apiv1.Organization) error {
+				_, err := client.DeleteOrganization(ctx, &apiv1.DeleteOrganizationRequest{
+					Name:  "organizations/" + slug,
+					Force: true,
+				})
+				return err
+			},
+		},
+		{
+			name: "force with stale etag rejected",
+			slug: "etag-stale",
+			op: func(t *testing.T, slug string, original *apiv1.Organization) error {
+				// Bump revision behind the handler's back so the
+				// original etag is stale by validation time.
+				_, err := h.Pool.Exec(ctx, `
+					UPDATE organizations
+					   SET etag = md5(now()::text || revision::text || 'drift'),
+					       revision = revision + 1
+					 WHERE name = $1`, slug)
+				require.NoError(t, err, "setup: bump revision")
+
+				_, err = client.DeleteOrganization(ctx, &apiv1.DeleteOrganizationRequest{
+					Name:  "organizations/" + slug,
+					Force: true,
+					Etag:  original.GetEtag(),
+				})
+				return err
+			},
+		},
+		{
+			name: "undelete with mismatched etag rejected",
+			slug: "etag-undelete",
+			op: func(t *testing.T, slug string, _ *apiv1.Organization) error {
+				deleteOp, err := client.DeleteOrganization(ctx, &apiv1.DeleteOrganizationRequest{
+					Name: "organizations/" + slug,
+				})
+				require.NoError(t, err, "setup: soft-delete")
+				waitOp(t, h, deleteOp, "soft-delete setup")
+
+				_, err = client.UndeleteOrganization(ctx, &apiv1.UndeleteOrganizationRequest{
+					Name: "organizations/" + slug,
+					Etag: "definitely-not-the-real-etag",
+				})
+				return err
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			org := createOrg(t, client, tc.slug, tc.name)
+
+			err := tc.op(t, tc.slug, org)
+
+			require.Error(t, err, "operation must be rejected")
+			assert.Equal(t, codes.FailedPrecondition, status.Code(err),
+				"etag-guard rejections surface as FailedPrecondition")
+			assert.Contains(t, status.Convert(err).Message(), "etag",
+				"error message should mention etag")
+		})
+	}
+}
+
 // newLifecycleHarness wires up a harness with the Organizations
 // service + LRO manager + an in-process River client running every
 // org-lifecycle worker that's been ported off the legacy goroutine
