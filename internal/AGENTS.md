@@ -87,6 +87,34 @@ primitive-input factories (`NewFromHex(hex string)`) keep their
 positional shape — no positional ambiguity, Config adds noise without
 information.
 
+## Never dodge an import
+
+If a function takes `*pgxpool.Pool`, declare `*pgxpool.Pool` and
+import `pgxpool`. Same for `pgconn.CommandTag`, `pgx.Tx`, every
+other type from a real package.
+
+**Forbidden:**
+
+- Made-up type aliases like `type pgconnTag any` to avoid `import
+  "github.com/jackc/pgx/v5/pgconn"`.
+- Structural interfaces with `any` returns invented to dodge the
+  real return type (`interface{ Exec(...) (someAlias, error) }`).
+- `interface{}` / `any` parameters when the real type is known and
+  imported elsewhere in the codebase.
+
+**Why:** these are dialects of the same anti-pattern that
+motivated #71 — using fake types to make code "easier" to write
+hides the actual types under test, breaks IDE navigation, dodges
+type-system safety, and accumulates technical debt that surfaces
+later as bugs the type system would have caught. We just spent a
+session deleting 2,591 lines of MockQuerier code that ran on
+exactly this principle. Don't reintroduce it.
+
+**The rule:** if you find yourself reaching for a structural
+shim or alias to avoid an import, **just import the package**.
+The cost of the import line is zero. The cost of the made-up
+type is "find this in audit six months later."
+
 ## Error handling
 
 Always go through `internal/apierr`. The two main entry points:
