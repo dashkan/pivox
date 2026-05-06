@@ -2,14 +2,11 @@ package iam
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"strings"
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/dashkan/pivox/internal/apierr"
@@ -18,6 +15,7 @@ import (
 	"github.com/dashkan/pivox/internal/lro"
 	iampb "github.com/dashkan/pivox/internal/pkg/gen/pivox/iam/v1"
 	"github.com/dashkan/pivox/internal/server"
+	"github.com/dashkan/pivox/internal/workers"
 )
 
 // ===========================================================================
@@ -174,11 +172,13 @@ func (s *IamServer) DeleteAccount(ctx context.Context, req *iampb.DeleteAccountR
 		return nil, apierr.InvalidArgument(apierr.FieldViolation("name",
 			"expected accounts/me; the caller is implicit from authentication context"))
 	}
-	if s.lroManager == nil || s.auth == nil || s.caller == nil {
+	if s.lroManager == nil || s.caller == nil {
 		// Read-only deployments construct IamServer with nil deps;
 		// fail loudly here rather than null-deref'ing inside the
-		// work fn.
-		return nil, apierr.Internal("DeleteAccount is not configured on this server (auth/caller/lroManager deps missing)")
+		// work fn. Note: s.auth is no longer required on pivox-cloud
+		// (the worker holds the Firebase auth dep) but caller +
+		// lroManager are still mandatory for the entry point.
+		return nil, apierr.Internal("DeleteAccount is not configured on this server (caller/lroManager deps missing)")
 	}
 
 	firebaseIdentityID, err := s.caller(ctx)
@@ -191,165 +191,17 @@ func (s *IamServer) DeleteAccount(ctx context.Context, req *iampb.DeleteAccountR
 		Account: req.GetName(),
 	}
 
-	return s.lroManager.CreateAndRun(ctx, req.GetName(), initialMeta,
-		func(workCtx context.Context, progress lro.Progress) (proto.Message, error) {
-			return s.runDeleteAccount(workCtx, progress, firebaseIdentityID)
-		})
-}
-
-// runDeleteAccount executes the cross-org cascade. The
-// identities row is hard-deleted second-to-last so a
-// partial failure leaves a recoverable Firebase identity rather
-// than orphaned Pivox state.
-func (s *IamServer) runDeleteAccount(
-	ctx context.Context,
-	progress lro.Progress,
-	firebaseIdentityID uuid.UUID,
-) (proto.Message, error) {
-	updatePhase := func(phase iampb.DeleteAccountMetadata_Phase) {
-		progress.Update(ctx, &iampb.DeleteAccountMetadata{
-			Phase:   phase,
-			Account: "accounts/me",
-		})
-	}
-
-	// VALIDATING: sole-owner check across every active org the
-	// caller is in. The query also excludes orgs with active
-	// group-owners (a group-owner keeps the org covered even when
-	// this user is the sole user-owner — see the query's NOT
-	// EXISTS clause).
-	updatePhase(iampb.DeleteAccountMetadata_VALIDATING)
-	soleOwnerOrgs, err := s.queries.ListSoleOwnerOrgsForIdentity(ctx, convert.PgUUID(firebaseIdentityID))
-	if err != nil {
-		slog.ErrorContext(ctx, "delete account: sole-owner check failed",
-			"identity_id", firebaseIdentityID, "error", err)
-		return nil, apierr.Internal("sole-owner check")
-	}
-	if len(soleOwnerOrgs) > 0 {
-		names := make([]string, len(soleOwnerOrgs))
-		for i, o := range soleOwnerOrgs {
-			names[i] = "organizations/" + o.Name
-		}
-		return nil, apierr.FailedPrecondition(
-			"cannot delete account: caller is the sole owner of " + strings.Join(names, ", ") +
-				"; transfer ownership or delete those orgs first")
-	}
-
-	// REVOKING_MEMBERSHIPS: cross-org drop. Bounded by
-	// identity_id at the SQL level so the DELETE can't reach rows
-	// that aren't this user's. Tx-wrapped so the org + space
-	// revocations land atomically — without a tx, a partial failure
-	// (e.g. session loss between the two DELETEs) leaves the
-	// caller with no org_members but lingering space_members,
-	// which is a confusing intermediate state for any retry
-	// (the LRO resumes from the phase but a failed Phase 2 isn't
-	// scoped narrower than "do all the revokes").
-	updatePhase(iampb.DeleteAccountMetadata_REVOKING_MEMBERSHIPS)
-	if err := db.RunInTxVoid(ctx, s.pool, func(qtx db.Querier) error {
-		if err := qtx.DeleteOrgMembersForIdentity(ctx, convert.PgUUID(firebaseIdentityID)); err != nil {
-			slog.ErrorContext(ctx, "delete account: revoke org members failed",
-				"identity_id", firebaseIdentityID, "error", err)
-			return apierr.Internal("revoke org memberships")
-		}
-		if err := qtx.DeleteSpaceMembersForIdentity(ctx, convert.PgUUID(firebaseIdentityID)); err != nil {
-			slog.ErrorContext(ctx, "delete account: revoke space members failed",
-				"identity_id", firebaseIdentityID, "error", err)
-			return apierr.Internal("revoke space memberships")
-		}
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-
-	// DELETING_PIVOX_RECORDS: capture the Firebase UID before
-	// soft-deleting the identity row, so the next phase can call
-	// auth.DeleteUser(uid). The identity row is preserved
-	// (soft-deleted) so historical *_by audit references still
-	// resolve — only the user-visible PII is blanked.
-	//
-	// Tx-wrapped: the lookup-then-soft-delete is a classic TOCTOU
-	// pair. Without the tx, a sync-identity webhook (or a parallel
-	// DeleteAccount retry) could soft-delete between our Get and
-	// our SoftDelete; the SoftDelete then no-ops, our captured
-	// firebase_uid is stale, and the next phase calls Firebase
-	// DeleteUser on a possibly-mismatched uid. Inside the tx the
-	// Get's row lock blocks concurrent mutations until our
-	// SoftDelete commits.
-	//
-	// Resumption: if the LRO crashes between this tx commit and the
-	// auth.DeleteUser call below, the persisted phase is still
-	// DELETING_PIVOX_RECORDS and the next resume re-enters this
-	// block. The identity row is already is_deleted=true; we detect
-	// that on the GetIdentityByID and skip SoftDeleteIdentity. The
-	// captured firebase_uid is still correct (soft delete blanks PII
-	// but preserves firebase_uid), so the next phase can proceed.
-	updatePhase(iampb.DeleteAccountMetadata_DELETING_PIVOX_RECORDS)
-	identity, err := db.RunInTx(ctx, s.pool, func(qtx db.Querier) (db.Identity, error) {
-		identity, err := qtx.GetIdentityByID(ctx, firebaseIdentityID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				// Should not happen now that delete is soft —
-				// GetIdentityByID returns soft-deleted rows too. Only
-				// fires if an operator manually purged the row outside
-				// of the LRO. Loud log + Internal so they reconcile.
-				slog.ErrorContext(ctx, "delete account: identity row already purged outside the LRO — Firebase Auth account likely orphaned, manual cleanup required",
-					"identity_id", firebaseIdentityID)
-				return db.Identity{}, apierr.Internal(
-					"identity already removed from Pivox but its Firebase Auth UID is unknown; operator must reconcile manually")
-			}
-			slog.ErrorContext(ctx, "delete account: lookup identity failed",
-				"id", firebaseIdentityID, "error", err)
-			return db.Identity{}, apierr.Internal("lookup identity")
-		}
-		if identity.IsDeleted {
-			// LRO resumption: the previous attempt soft-deleted the
-			// row but crashed before completing the Firebase phase.
-			// firebase_uid is preserved through soft delete, so we
-			// have what we need; skip the redundant UPDATE.
-			slog.InfoContext(ctx, "delete account: identity already soft-deleted, resuming",
-				"id", firebaseIdentityID)
-			return identity, nil
-		}
-		// SoftDeleteIdentity returns the row's id when the UPDATE
-		// actually landed; ErrNoRows means the row was soft-deleted
-		// between our Get (which sees soft-deleted rows) and our
-		// UPDATE (which excludes them). Inside this tx the Get took
-		// a row lock so that's effectively impossible — but we still
-		// surface it loudly rather than racing into auth.DeleteUser
-		// with possibly-stale state.
-		if _, err := qtx.SoftDeleteIdentity(ctx, firebaseIdentityID); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				slog.ErrorContext(ctx, "delete account: soft-delete identity touched zero rows under tx — should be unreachable",
-					"id", firebaseIdentityID)
-				return db.Identity{}, apierr.Internal("soft-delete identity: race detected")
-			}
-			slog.ErrorContext(ctx, "delete account: soft-delete identity failed",
-				"id", firebaseIdentityID, "error", err)
-			return db.Identity{}, apierr.Internal("soft-delete identity")
-		}
-		return identity, nil
+	// River-backed: pivox-cloud enqueues + creates the operations
+	// row in one tx; pivox-worker's DeleteAccountWorker runs the
+	// 4-phase cascade. The Firebase Auth dep moves to the worker
+	// process — pivox-cloud no longer needs it for this LRO.
+	opID := uuid.New()
+	return s.lroManager.NewLro(ctx, req.GetName(), lro.NewLroOpts{
+		OperationID: opID,
+		JobArgs: workers.DeleteAccountArgs{
+			OperationID:        opID,
+			FirebaseIdentityID: firebaseIdentityID,
+		},
+		Metadata: initialMeta,
 	})
-	if err != nil {
-		return nil, err
-	}
-	// PII just got blanked; drop any cached Actor for this id so the
-	// next read on this instance sees the soft-deleted state
-	// immediately. Other instances catch up via TTL expiry.
-	if s.audit != nil {
-		s.audit.Invalidate(firebaseIdentityID)
-	}
-
-	// DELETING_FIREBASE_IDENTITY: last so a failure leaves Pivox
-	// state already cleaned up while the Firebase identity remains
-	// recoverable. Implementation is idempotent on already-deleted
-	// UIDs so a retry-from-this-phase is safe.
-	updatePhase(iampb.DeleteAccountMetadata_DELETING_FIREBASE_IDENTITY)
-	if err := s.auth.DeleteUser(ctx, identity.FirebaseUid); err != nil {
-		slog.ErrorContext(ctx, "delete account: firebase auth deletion failed",
-			"uid", identity.FirebaseUid, "error", err)
-		return nil, apierr.Internal("delete firebase auth user")
-	}
-
-	updatePhase(iampb.DeleteAccountMetadata_COMPLETED)
-	return &emptypb.Empty{}, nil
 }
