@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/riverqueue/river"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -24,6 +25,7 @@ import (
 	"github.com/dashkan/pivox/internal/service/organizations"
 	"github.com/dashkan/pivox/internal/service/spaces"
 	"github.com/dashkan/pivox/internal/testutil/grpcharness"
+	"github.com/dashkan/pivox/internal/workers"
 )
 
 // Permission interceptor end-to-end tests. Pin the full
@@ -264,7 +266,7 @@ func TestE2E_Permission_SoftDeleteGateBlocksMutations(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func newPermissionHarness(t *testing.T) *grpcharness.Harness {
-	return grpcharness.New(t, grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
+	h := grpcharness.New(t, grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
 		callerIdentity := server.NewCallerIdentityResolver(h.Queries)
 		permResolver := permission.NewResolver(h.Queries)
 		codec, err := appkey.NewFromHex(strings.Repeat("ab", 32))
@@ -296,6 +298,16 @@ func newPermissionHarness(t *testing.T) *grpcharness.Harness {
 			LROManager: h.LROManager,
 		}))
 	}))
+	// Soft-delete-gate tests drive DeleteOrganization to set up the
+	// DELETE_REQUESTED state. That LRO runs as a River job post-#69
+	// Phase 6, so the harness must register the lifecycle workers
+	// or the WaitOperation will block until ctx timeout with the
+	// job sitting unprocessed in the queue.
+	h.StartRiverWorkers(t, func(rw *river.Workers) {
+		river.AddWorker(rw, &workers.DeleteOrgWorker{Pool: h.Pool, Logger: grpcharness.SilentLogger()})
+		river.AddWorker(rw, &workers.UndeleteOrgWorker{Pool: h.Pool, Logger: grpcharness.SilentLogger()})
+	})
+	return h
 }
 
 func createOrgForPerm(t *testing.T, c apiv1.OrganizationsClient, slug, displayName string) {

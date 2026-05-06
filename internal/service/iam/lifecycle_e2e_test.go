@@ -2,15 +2,12 @@ package iam_test
 
 import (
 	"context"
-	"io"
-	"log/slog"
 	"strings"
 	"testing"
 	"time"
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -294,37 +291,17 @@ func newIamHarness(t *testing.T) *grpcharness.Harness {
 	return h
 }
 
-// startIamLifecycleWorkers spins up an in-process River client
-// with the iam-lifecycle workers. Mirrors the org-lifecycle and
-// space-lifecycle harness helpers — same Schema/driver/queue
-// config, scoped to the test.
+// startIamLifecycleWorkers registers the iam-lifecycle workers via
+// grpcharness.StartRiverWorkers. The iam tests also cover cross-org
+// cascade flows (sole-owner blocked, transfer-then-delete) that
+// exercise DeleteOrganization, so DeleteOrgWorker + UndeleteOrgWorker
+// register here too — anything an iam test could reach.
 func startIamLifecycleWorkers(t *testing.T, h *grpcharness.Harness) {
 	t.Helper()
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	rw := river.NewWorkers()
-	river.AddWorker(rw, &workers.DeleteAccountWorker{
-		Pool:   h.Pool,
-		Auth:   h.Auth,
-		Logger: logger,
-	})
-	// iam tests cover cross-org cascade flows that exercise
-	// DeleteOrganization (sole-owner blocked, transfer-then-delete,
-	// etc.) — both now run on River, so the harness must register
-	// every lifecycle worker an iam test could reach.
-	river.AddWorker(rw, &workers.DeleteOrgWorker{Pool: h.Pool, Logger: logger})
-	river.AddWorker(rw, &workers.UndeleteOrgWorker{Pool: h.Pool, Logger: logger})
-	c, err := river.NewClient(riverpgxv5.New(h.Pool), &river.Config{
-		Logger:  logger,
-		Queues:  map[string]river.QueueConfig{river.QueueDefault: {MaxWorkers: 2}},
-		Schema:  "river",
-		Workers: rw,
-	})
-	require.NoError(t, err)
-	require.NoError(t, c.Start(context.Background()))
-	t.Cleanup(func() {
-		stopCtx, stopCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer stopCancel()
-		_ = c.Stop(stopCtx)
+	h.StartRiverWorkers(t, func(rw *river.Workers) {
+		river.AddWorker(rw, &workers.DeleteAccountWorker{Pool: h.Pool, Auth: h.Auth, Logger: grpcharness.SilentLogger()})
+		river.AddWorker(rw, &workers.DeleteOrgWorker{Pool: h.Pool, Logger: grpcharness.SilentLogger()})
+		river.AddWorker(rw, &workers.UndeleteOrgWorker{Pool: h.Pool, Logger: grpcharness.SilentLogger()})
 	})
 }
 

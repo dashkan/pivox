@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -468,34 +467,17 @@ func newLifecycleHarness(t *testing.T) *grpcharness.Harness {
 	return h
 }
 
-// startOrgLifecycleWorkers spins up an in-process River client with
-// the post-Phase-5 org-lifecycle workers registered. Mirrors
-// cmd/pivox-worker/main.go's wiring (same Schema, same driver),
-// scoped to the test. Add new workers here as more LROs port off
-// the legacy goroutine path (#69 Phase 6).
+// startOrgLifecycleWorkers registers the post-Phase-5 org-lifecycle
+// workers on an in-process River client. Wraps
+// grpcharness.StartRiverWorkers so the boilerplate
+// (river.NewClient + Start + t.Cleanup(Stop)) lives in one place.
+// Add new workers here as more org-scoped LROs port off the legacy
+// goroutine path.
 func startOrgLifecycleWorkers(t *testing.T, h *grpcharness.Harness) {
 	t.Helper()
-	rw := river.NewWorkers()
-	river.AddWorker(rw, &workers.UndeleteOrgWorker{
-		Pool:   h.Pool,
-		Logger: silentDomainLogger(),
-	})
-	river.AddWorker(rw, &workers.DeleteOrgWorker{
-		Pool:   h.Pool,
-		Logger: silentDomainLogger(),
-	})
-	c, err := river.NewClient(riverpgxv5.New(h.Pool), &river.Config{
-		Logger:  silentDomainLogger(),
-		Queues:  map[string]river.QueueConfig{river.QueueDefault: {MaxWorkers: 2}},
-		Schema:  "river",
-		Workers: rw,
-	})
-	require.NoError(t, err)
-	require.NoError(t, c.Start(context.Background()))
-	t.Cleanup(func() {
-		stopCtx, stopCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer stopCancel()
-		_ = c.Stop(stopCtx)
+	h.StartRiverWorkers(t, func(rw *river.Workers) {
+		river.AddWorker(rw, &workers.UndeleteOrgWorker{Pool: h.Pool, Logger: grpcharness.SilentLogger()})
+		river.AddWorker(rw, &workers.DeleteOrgWorker{Pool: h.Pool, Logger: grpcharness.SilentLogger()})
 	})
 }
 

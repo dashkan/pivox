@@ -126,14 +126,14 @@ func New(t *testing.T, opts ...Option) *Harness {
 	// rivertest.NewWorker, not through this client.
 	riverDriver := riverpgxv5.New(pool)
 	riverClient, err := river.NewClient(riverDriver, &river.Config{
-		Logger: testLogger(),
+		Logger: SilentLogger(),
 		Schema: "river",
 	})
 	require.NoError(t, err)
 
 	lroManager := lro.NewManager(lro.ManagerConfig{
 		Queries: queries,
-		Logger:  testLogger(),
+		Logger:  SilentLogger(),
 		Pool:    pool,
 		River:   riverClient,
 	})

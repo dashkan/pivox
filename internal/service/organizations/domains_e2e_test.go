@@ -3,8 +3,6 @@ package organizations_test
 import (
 	"context"
 	"errors"
-	"io"
-	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -48,7 +46,7 @@ func TestE2E_CreateDomain_StubResolverDrivesVerified(t *testing.T) {
 	defer resetGrace()
 
 	h := newDomainsHarness(t)
-	startVerifyWorker(t, h, workers.NewStubDNSResolver(silentDomainLogger()), 50*time.Millisecond)
+	startVerifyWorker(t, h, workers.NewStubDNSResolver(grpcharness.SilentLogger()), 50*time.Millisecond)
 
 	owner := h.SeedIdentity(t, grpcharness.SeedIdentityOpts{UID: "owner"})
 	h.SetCaller(owner)
@@ -322,10 +320,6 @@ func setDomainGraceForTest(t *testing.T, d time.Duration) func() {
 	t.Helper()
 	organizations.SetDomainVerificationGraceForTest(d)
 	return func() { organizations.SetDomainVerificationGraceForTest(0) }
-}
-
-func silentDomainLogger() *slog.Logger {
-	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
 // waitOpUntilDone polls the LRO until it's done or the timeout
