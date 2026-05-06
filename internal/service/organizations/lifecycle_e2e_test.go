@@ -480,6 +480,10 @@ func startOrgLifecycleWorkers(t *testing.T, h *grpcharness.Harness) {
 		Pool:   h.Pool,
 		Logger: silentDomainLogger(),
 	})
+	river.AddWorker(rw, &workers.DeleteOrgWorker{
+		Pool:   h.Pool,
+		Logger: silentDomainLogger(),
+	})
 	c, err := river.NewClient(riverpgxv5.New(h.Pool), &river.Config{
 		Logger:  silentDomainLogger(),
 		Queues:  map[string]river.QueueConfig{river.QueueDefault: {MaxWorkers: 2}},

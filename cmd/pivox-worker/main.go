@@ -156,6 +156,7 @@ func serve(cmd *cobra.Command, _ []string) error {
 	river.AddWorker(riverWorkers, &workers.UndeleteOrgWorker{Pool: pool, Audit: auditResolver, Logger: logger})
 	river.AddWorker(riverWorkers, &workers.UndeleteSpaceWorker{Pool: pool, Audit: auditResolver, Logger: logger})
 	river.AddWorker(riverWorkers, &workers.DeleteSpaceWorker{Pool: pool, Audit: auditResolver, Logger: logger})
+	river.AddWorker(riverWorkers, &workers.DeleteOrgWorker{Pool: pool, Audit: auditResolver, Logger: logger})
 	river.AddWorker(riverWorkers, &workers.VerifyDomainWorker{Pool: pool, Logger: logger})
 
 	// Periodic job registrations. RunOnStart=true so a freshly-booted

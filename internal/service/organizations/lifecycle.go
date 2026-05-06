@@ -2,17 +2,11 @@ package organizations
 
 import (
 	"context"
-	"errors"
-	"log/slog"
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/dashkan/pivox/internal/apierr"
-	"github.com/dashkan/pivox/internal/convert"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/lro"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
@@ -83,7 +77,6 @@ func (s *OrganizationsServer) DeleteOrganization(ctx context.Context, req *apiv1
 	}
 
 	orgName := "organizations/" + resolved.Slug
-	deletedBy := convert.PgUUID(caller)
 	force := req.GetForce()
 
 	initialMeta := &apiv1.DeleteOrganizationMetadata{
@@ -100,113 +93,27 @@ func (s *OrganizationsServer) DeleteOrganization(ctx context.Context, req *apiv1
 	// check above passes).
 	expectedEtag := org.Etag
 
-	return s.lroManager.CreateAndRun(ctx, orgName, initialMeta,
-		func(workCtx context.Context, progress lro.Progress) (proto.Message, error) {
-			return s.runDeleteOrganization(workCtx, progress, org.ID, orgName, deletedBy, force, expectedEtag)
-		})
-}
-
-// runDeleteOrganization is the LRO orchestrator. Each phase
-// transition reports progress via `progress` so polling clients
-// observe the cascade. DB errors map to gRPC codes via apierr —
-// the LRO Manager translates them to the operation's error field.
-func (s *OrganizationsServer) runDeleteOrganization(
-	ctx context.Context,
-	progress lro.Progress,
-	orgID uuid.UUID,
-	orgName string, deletedBy pgtype.UUID,
-	force bool,
-	expectedEtag string,
-) (proto.Message, error) {
-	updatePhase := func(phase apiv1.DeleteOrganizationMetadata_Phase) {
-		progress.Update(ctx, &apiv1.DeleteOrganizationMetadata{
-			Phase:        phase,
-			Organization: orgName,
-		})
-	}
-
-	// CANCELLING_OPERATIONS: interrupt any in-flight org-scoped LROs
-	// (asset imports, domain verifications, gateway upgrades, etc.)
-	// so they don't try to mutate child rows we're about to
-	// cascade-delete or orphan-soft-delete. Cancellation matches
-	// rows where operations.org_id equals this org. LROs that didn't
-	// opt in (org_id NULL — including this LRO and other
-	// DeleteOrganization invocations) are unaffected; for the
-	// force path the FK cascade still cleans them up. Future LROs
-	// populate org_id when they're implemented.
-	updatePhase(apiv1.DeleteOrganizationMetadata_CANCELLING_OPERATIONS)
-	cancelledIDs, err := s.queries.CancelRunningOpsForOrg(ctx, pgtype.UUID{Bytes: orgID, Valid: true})
-	if err != nil {
-		slog.ErrorContext(ctx, "delete org: cancel in-flight ops failed", "org", orgName, "error", err)
-		return nil, apierr.Internal("cancel in-flight operations")
-	}
-	// Fire local cancel funcs for any of the cancelled ops that are
-	// running on this replica. The SQL update marks them done for
-	// cross-replica observers; this stops the in-replica goroutines
-	// from running to completion before noticing.
-	if s.lroManager != nil && len(cancelledIDs) > 0 {
-		s.lroManager.CancelLocal(cancelledIDs...)
-	}
-
-	if force {
-		// PURGING: hard-delete the org. FK cascades handle children.
-		// The slug is freed once the row is gone. Etag-guarded so a
-		// concurrent state mutation between handler validation and
-		// LRO worker execution refuses to purge a row the caller
-		// didn't actually approve.
-		updatePhase(apiv1.DeleteOrganizationMetadata_PURGING)
-		if _, err := s.queries.PurgeOrganization(ctx, db.PurgeOrganizationParams{
-			ID:   orgID,
-			Etag: expectedEtag,
-		}); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return nil, apierr.FailedPrecondition(
-					"organization revision changed since delete was requested; refresh and retry")
-			}
-			slog.ErrorContext(ctx, "delete org: purge failed", "org", orgName, "error", err)
-			return nil, apierr.Internal("purge organization")
-		}
-		updatePhase(apiv1.DeleteOrganizationMetadata_COMPLETED)
-		// Force path: the row is gone. AIP-151 LROs return the
-		// resource as the result; with no row to return we surface
-		// just the resource name. State is left at its zero value
-		// (STATE_UNSPECIFIED) rather than synthesizing
-		// DELETE_REQUESTED — there's no row to be in any state.
-		return &apiv1.Organization{Name: orgName}, nil
-	}
-
-	// MARKING_DELETED: soft-delete path. Sets state +
-	// delete_time/purge_time atomically. The query refuses to fire
-	// on a non-ACTIVE row, so a race with a concurrent delete
-	// surfaces as a no-rows-affected error.
-	updatePhase(apiv1.DeleteOrganizationMetadata_MARKING_DELETED)
-	updated, err := s.queries.SoftDeleteOrganization(ctx, db.SoftDeleteOrganizationParams{
-		ID:        orgID,
-		DeletedBy: deletedBy,
+	// River-backed: pivox-cloud enqueues + creates the operations
+	// row in one tx; pivox-worker's DeleteOrgWorker does CancelOps +
+	// (Purge|Soft) + CompleteOperation atomically.
+	//
+	// Note: org_id is intentionally NOT set on the operations row
+	// (NewLroOpts.OrgID left zero) — DeleteOrganization itself MUST
+	// NOT self-cancel via CancelRunningOpsForOrg. Other LROs link
+	// to the org via OrgID; this one doesn't.
+	opID := uuid.New()
+	return s.lroManager.NewLro(ctx, orgName, lro.NewLroOpts{
+		OperationID: opID,
+		JobArgs: workers.DeleteOrgArgs{
+			OperationID:  opID,
+			OrgID:        org.ID,
+			Resource:     orgName,
+			DeletedBy:    caller,
+			Force:        force,
+			ExpectedEtag: expectedEtag,
+		},
+		Metadata: initialMeta,
 	})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			// State changed between handler-time validation and the
-			// LRO worker firing (e.g. another worker raced us).
-			return nil, apierr.FailedPrecondition(
-				"organization state changed; cannot soft-delete (was it already deleted?)")
-		}
-		slog.ErrorContext(ctx, "delete org: soft-delete failed", "org", orgName, "error", err)
-		return nil, apierr.Internal("soft-delete organization")
-	}
-
-	updatePhase(apiv1.DeleteOrganizationMetadata_COMPLETED)
-	// State transition has committed. Treat actor resolution as a
-	// best-effort enrichment so a transient identity-lookup failure
-	// doesn't poison the LRO and force the client to retry an
-	// operation that has already taken effect.
-	actors, resolveErr := s.resolveOrgActors(ctx, []db.Organization{updated})
-	if resolveErr != nil {
-		slog.WarnContext(ctx, "delete org: actor resolution failed; returning proto without audit actors",
-			"org", orgName, "error", resolveErr)
-		actors = nil
-	}
-	return convert.OrganizationToProto(updated, actors), nil
 }
 
 // UndeleteOrganization restores a soft-deleted organization back to

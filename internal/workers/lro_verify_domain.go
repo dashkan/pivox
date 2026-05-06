@@ -88,6 +88,21 @@ func (w *VerifyDomainWorker) Work(ctx context.Context, job *river.Job[VerifyDoma
 	var attempts int32
 	check := func() (terminal bool, err error) {
 		attempts++
+		// Cross-replica cancellation: DeleteOrganization's
+		// CANCELLING_OPERATIONS phase marks org-scoped operations
+		// done in the DB. Self-check on every tick so we exit
+		// cleanly rather than running until grace expiry.
+		op, opErr := queries.GetOperation(ctx, args.OperationID)
+		if opErr != nil {
+			// Transient DB error; let River retry the job.
+			return false, opErr
+		}
+		if op.Done {
+			// Operation already marked done by an outside actor
+			// (CancelRunningOpsForOrg, CancelOperation, or similar).
+			// Nothing more to do — the terminal state is on the row.
+			return true, nil
+		}
 		d, err := queries.GetDomainByID(ctx, db.GetDomainByIDParams{ID: args.DomainID, OrgID: args.OrgID})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
