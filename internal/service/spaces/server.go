@@ -29,17 +29,9 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// TxBeginner abstracts transaction creation for testability.
-// *pgxpool.Pool satisfies this interface. Same shape as the
-// organizations service's local TxBeginner.
-type TxBeginner interface {
-	Begin(ctx context.Context) (pgx.Tx, error)
-}
-
 type SpacesServer struct {
 	apiv1.UnimplementedSpacesServer
-	db         db.DBTX
-	pool       TxBeginner
+	pool       db.RWPool
 	queries    db.Querier
 	filter     *filter.ResourceFilter
 	codec      *appkey.Codec
@@ -97,7 +89,6 @@ func NewSpacesServer(cfg Config) *SpacesServer {
 		panic("spaces: Config.Caller is required")
 	}
 	return &SpacesServer{
-		db:         cfg.Pool,
 		pool:       cfg.Pool,
 		queries:    cfg.Queries,
 		filter:     filter.SpaceFilter(),
@@ -191,7 +182,7 @@ func (s *SpacesServer) ListSpaces(ctx context.Context, req *apiv1.ListSpacesRequ
 			"org slug in parent does not match resolved scope"))
 	}
 
-	rows, err := filter.Query(ctx, s.db, s.filter, filter.QueryParams{
+	rows, err := filter.Query(ctx, s.pool, s.filter, filter.QueryParams{
 		Filter:      req.GetFilter(),
 		ParentID:    resolvedOrg.ID.String(),
 		OrderBy:     req.GetOrderBy(),
@@ -283,7 +274,7 @@ func (s *SpacesServer) CreateSpace(ctx context.Context, req *apiv1.CreateSpaceRe
 		labelsJSON = json.RawMessage("{}")
 	}
 
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		slog.ErrorContext(ctx, "create space: begin tx failed", "error", err)
 		return nil, apierr.Internal("begin transaction")

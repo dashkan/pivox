@@ -22,7 +22,7 @@ import (
 
 type TagBindingsServer struct {
 	apiv1.UnimplementedTagBindingsServer
-	db      db.DBTX
+	pool    db.RWPool
 	queries db.Querier
 	filter  *filter.ResourceFilter
 	codec   *appkey.Codec
@@ -31,8 +31,9 @@ type TagBindingsServer struct {
 
 // TagBindingsConfig is the constructor input for TagBindingsServer.
 type TagBindingsConfig struct {
-	// Pool is the database pool used for filter reads. Required.
-	Pool db.DBTX
+	// Pool is the database pool — DBTX for filter reads + TxBeginner
+	// for any future tx-wrapped paths. Required.
+	Pool db.RWPool
 	// Queries is the sqlc query interface. Required.
 	Queries db.Querier
 	// Codec opaque-encodes resource names. Required.
@@ -55,7 +56,7 @@ func NewTagBindingsServer(cfg TagBindingsConfig) *TagBindingsServer {
 		panic("tags: TagBindingsConfig.Codec is required")
 	}
 	return &TagBindingsServer{
-		db:      cfg.Pool,
+		pool:    cfg.Pool,
 		queries: cfg.Queries,
 		filter:  filter.TagBindingFilter(),
 		codec:   cfg.Codec,
@@ -84,7 +85,7 @@ func (s *TagBindingsServer) resolveTagBindingActors(ctx context.Context, rows []
 }
 
 func (s *TagBindingsServer) ListTagBindings(ctx context.Context, req *apiv1.ListTagBindingsRequest) (*apiv1.ListTagBindingsResponse, error) {
-	rows, err := filter.Query(ctx, s.db, s.filter, filter.QueryParams{
+	rows, err := filter.Query(ctx, s.pool, s.filter, filter.QueryParams{
 		Filter:   req.GetFilter(),
 		ParentID: req.GetParent(),
 		OrderBy:  req.GetOrderBy(),

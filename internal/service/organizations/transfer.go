@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/convert"
@@ -40,7 +41,7 @@ func (s *OrganizationsServer) TransferOwnership(ctx context.Context, req *apiv1.
 		return nil, apierr.HandleResourceError(err, "Organization", req.GetName())
 	}
 
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return nil, apierr.Internal("begin transaction")
 	}

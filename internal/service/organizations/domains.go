@@ -314,7 +314,7 @@ func (s *OrganizationsServer) DeleteDomain(ctx context.Context, req *apiv1.Delet
 		row          db.Domain
 		cancelledIDs []uuid.UUID
 	}
-	res, err := db.RunInTx(ctx, s.txer, func(qtx db.Querier) (result, error) {
+	res, err := db.RunInTx(ctx, s.pool, func(qtx db.Querier) (result, error) {
 		// FOR UPDATE: the verify-domain worker mutates domains.state
 		// without taking an application-level lock, so reading without
 		// the row lock would let MarkDomainVerified flip PENDING to

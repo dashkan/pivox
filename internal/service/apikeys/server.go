@@ -26,7 +26,7 @@ import (
 
 type ApiKeysServer struct {
 	apiv1.UnimplementedApiKeysServer
-	db      db.DBTX
+	pool    db.RWPool
 	queries db.Querier
 	filter  *filter.ResourceFilter
 	codec   *appkey.Codec
@@ -35,8 +35,9 @@ type ApiKeysServer struct {
 
 // Config is the constructor input for ApiKeysServer.
 type Config struct {
-	// Pool is the database pool used for reads. Required.
-	Pool db.DBTX
+	// Pool is the database pool — DBTX for filter reads + TxBeginner
+	// for any future tx-wrapped paths. Required.
+	Pool db.RWPool
 	// Queries is the sqlc query interface. Required.
 	Queries db.Querier
 	// Codec opaque-encodes resource names. Required.
@@ -61,7 +62,7 @@ func NewApiKeysServer(cfg Config) *ApiKeysServer {
 		panic("apikeys: Config.Codec is required")
 	}
 	return &ApiKeysServer{
-		db:      cfg.Pool,
+		pool:    cfg.Pool,
 		queries: cfg.Queries,
 		filter:  filter.ApiKeyFilter(),
 		codec:   cfg.Codec,
@@ -158,7 +159,7 @@ func (s *ApiKeysServer) ListKeys(ctx context.Context, req *apiv1.ListKeysRequest
 		return nil, apierr.HandleResourceError(err, "Organization", req.GetParent())
 	}
 
-	rows, err := filter.Query(ctx, s.db, s.filter, filter.QueryParams{
+	rows, err := filter.Query(ctx, s.pool, s.filter, filter.QueryParams{
 		Filter:      req.GetFilter(),
 		ParentID:    org.ID.String(),
 		OrderBy:     req.GetOrderBy(),

@@ -32,7 +32,7 @@ import (
 // `Unimplemented`.
 type IamServer struct {
 	iampb.UnimplementedIamServer
-	txer       db.Txer
+	pool       db.TxBeginner
 	queries    db.Querier
 	auth       authn.Service
 	caller     server.CallerIdentityResolver
@@ -88,7 +88,7 @@ func NewIamServer(cfg Config) *IamServer {
 		panic("iam: Config.LROManager is required")
 	}
 	return &IamServer{
-		txer:       &db.PoolTxer{Pool: cfg.Pool},
+		pool:       cfg.Pool,
 		queries:    cfg.Queries,
 		auth:       cfg.Auth,
 		caller:     cfg.Caller,

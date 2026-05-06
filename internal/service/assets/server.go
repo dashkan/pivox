@@ -23,8 +23,7 @@ import (
 
 type AssetsServer struct {
 	assetsv1.UnimplementedAssetsServer
-	db      db.DBTX
-	txer    db.Txer
+	pool    db.RWPool
 	queries db.Querier
 	audit   *audit.Resolver
 }
@@ -51,8 +50,7 @@ func NewAssetsServer(cfg Config) *AssetsServer {
 		panic("assets: Config.Queries is required")
 	}
 	return &AssetsServer{
-		db:      cfg.Pool,
-		txer:    &db.PoolTxer{Pool: cfg.Pool},
+		pool:    cfg.Pool,
 		queries: cfg.Queries,
 		audit:   cfg.AuditResolver,
 	}
@@ -309,7 +307,7 @@ func (s *AssetsServer) CreateAsset(ctx context.Context, req *assetsv1.CreateAsse
 	// caller already returned an error and unable to find the asset
 	// it just created (no name was returned). The tx makes both
 	// writes land or neither.
-	result, err := db.RunInTx(ctx, s.txer, func(qtx db.Querier) (db.Asset, error) {
+	result, err := db.RunInTx(ctx, s.pool, func(qtx db.Querier) (db.Asset, error) {
 		row, err := qtx.CreateAsset(ctx, db.CreateAssetParams{
 			ID:          uuid.New(),
 			SpaceID:     spaceID,

@@ -21,8 +21,7 @@ import (
 // Server implements the AiChat gRPC service.
 type Server struct {
 	aiv1.UnimplementedAiChatServer
-	db                    db.DBTX
-	txer                  db.Txer
+	pool                  db.RWPool
 	queries               db.Querier
 	model                 model.LanguageModel
 	tools                 *tools.Registry
@@ -166,8 +165,7 @@ func NewServer(cfg Config) *Server {
 		toolRegistry = tools.NewRegistry()
 	}
 	return &Server{
-		db:                    cfg.Pool,
-		txer:                  &db.PoolTxer{Pool: cfg.Pool},
+		pool:                  cfg.Pool,
 		queries:               cfg.Queries,
 		model:                 cfg.Model,
 		tools:                 toolRegistry,

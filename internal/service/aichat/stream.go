@@ -134,7 +134,7 @@ func (s *Server) runGenerate(
 		// rows the client has no name to retry against. Lock the
 		// conversation row once at the start so concurrent persists
 		// (e.g. another tool round-trip racing this one) queue.
-		if err := db.RunInTxVoid(ctx, s.txer, func(qtx db.Querier) error {
+		if err := db.RunInTxVoid(ctx, s.pool, func(qtx db.Querier) error {
 			if _, err := qtx.GetConversationByIDForUpdate(ctx, conv.ID); err != nil {
 				slog.ErrorContext(ctx, "lock conversation failed", "conversation_id", conv.ID, "error", err)
 				return apierr.Internal("lock conversation")
@@ -281,7 +281,7 @@ func (s *Server) runGenerate(
 	// persist once.
 	if conv != nil {
 		assistantPartsJSON, _ := marshalParts(assistantParts)
-		if err := db.RunInTxVoid(ctx, s.txer, func(qtx db.Querier) error {
+		if err := db.RunInTxVoid(ctx, s.pool, func(qtx db.Querier) error {
 			if _, err := qtx.GetConversationByIDForUpdate(ctx, conv.ID); err != nil {
 				slog.ErrorContext(ctx, "lock conversation failed", "conversation_id", conv.ID, "error", err)
 				return apierr.Internal("lock conversation")

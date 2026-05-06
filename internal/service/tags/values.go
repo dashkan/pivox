@@ -26,8 +26,7 @@ import (
 
 type TagValuesServer struct {
 	apiv1.UnimplementedTagValuesServer
-	db      db.DBTX
-	txer    db.Txer
+	pool    db.RWPool
 	queries db.Querier
 	filter  *filter.ResourceFilter
 	codec   *appkey.Codec
@@ -61,8 +60,7 @@ func NewTagValuesServer(cfg TagValuesConfig) *TagValuesServer {
 		panic("tags: TagValuesConfig.Codec is required")
 	}
 	return &TagValuesServer{
-		db:      cfg.Pool,
-		txer:    &db.PoolTxer{Pool: cfg.Pool},
+		pool:    cfg.Pool,
 		queries: cfg.Queries,
 		filter:  filter.TagValueFilter(),
 		codec:   cfg.Codec,
@@ -121,7 +119,7 @@ func (s *TagValuesServer) ListTagValues(ctx context.Context, req *apiv1.ListTagV
 		return nil, apierr.HandleResourceError(err, "TagKey", req.GetParent())
 	}
 
-	rows, err := filter.Query(ctx, s.db, s.filter, filter.QueryParams{
+	rows, err := filter.Query(ctx, s.pool, s.filter, filter.QueryParams{
 		Filter:   req.GetFilter(),
 		ParentID: tagKeyID.String(),
 		OrderBy:  req.GetOrderBy(),
@@ -287,7 +285,7 @@ func (s *TagValuesServer) DeleteTagValue(ctx context.Context, req *apiv1.DeleteT
 		return nil, apierr.HandleResourceError(err, "TagValue", req.GetName())
 	}
 
-	if err := db.RunInTxVoid(ctx, s.txer, func(qtx db.Querier) error {
+	if err := db.RunInTxVoid(ctx, s.pool, func(qtx db.Querier) error {
 		existing, err := qtx.GetTagValueForUpdate(ctx, id)
 		if err != nil {
 			return apierr.HandleResourceError(err, "TagValue", req.GetName())

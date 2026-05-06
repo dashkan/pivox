@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/dashkan/pivox/internal/apierr"
@@ -234,7 +235,7 @@ func (s *SpacesServer) CreateMember(ctx context.Context, req *iampb.CreateMember
 
 	// Tx-wrapped: role lookup + principal-existence check + insert run
 	// atomically. Mirrors the org-scope CreateMember pattern.
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return nil, apierr.Internal("begin transaction")
 	}
@@ -338,7 +339,7 @@ func (s *SpacesServer) UpdateMember(ctx context.Context, req *iampb.UpdateMember
 	// minus the ≥1-owner boundary check (spaces have no sole-owner
 	// invariant — inherited org-admin keeps a space reachable even
 	// without a direct space-owner binding).
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return nil, apierr.Internal("begin transaction")
 	}

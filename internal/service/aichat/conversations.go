@@ -55,7 +55,7 @@ func (s *Server) ListConversations(ctx context.Context, req *aiv1.ListConversati
 		return nil, err
 	}
 
-	rows, err := filter.Query(ctx, s.db, s.conversationFilter, filter.QueryParams{
+	rows, err := filter.Query(ctx, s.pool, s.conversationFilter, filter.QueryParams{
 		Filter:   req.GetFilter(),
 		ParentID: orgID.String(),
 		UserID:   pathUser.String(),

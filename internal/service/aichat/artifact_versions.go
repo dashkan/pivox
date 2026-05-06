@@ -52,7 +52,7 @@ func (s *Server) ListArtifactVersions(ctx context.Context, req *aiv1.ListArtifac
 		return nil, err
 	}
 
-	rows, err := filter.Query(ctx, s.db, s.artifactVersionFilter, filter.QueryParams{
+	rows, err := filter.Query(ctx, s.pool, s.artifactVersionFilter, filter.QueryParams{
 		Filter:   req.GetFilter(),
 		ParentID: art.ID.String(),
 		OrderBy:  req.GetOrderBy(),
@@ -137,7 +137,7 @@ func (s *Server) DeleteArtifactVersion(ctx context.Context, req *aiv1.DeleteArti
 	}
 
 	cascaded := false
-	if err := db.RunInTxVoid(ctx, s.txer, func(qtx db.Querier) error {
+	if err := db.RunInTxVoid(ctx, s.pool, func(qtx db.Querier) error {
 		// Re-read parent under FOR UPDATE inside the tx so concurrent
 		// CreateArtifactVersion blocks until we're done. We don't use
 		// the row beyond confirming it still exists; resolveArtifact

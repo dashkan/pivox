@@ -219,7 +219,7 @@ func (s *OrganizationsServer) CreateMember(ctx context.Context, req *iampb.Creat
 
 	// Tx-wrapped: role lookup + principal-existence check + insert
 	// run atomically.
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return nil, apierr.Internal("begin transaction")
 	}
@@ -320,7 +320,7 @@ func (s *OrganizationsServer) UpdateMember(ctx context.Context, req *iampb.Updat
 		return nil, err
 	}
 
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return nil, apierr.Internal("begin transaction")
 	}
@@ -402,7 +402,7 @@ func (s *OrganizationsServer) DeleteMember(ctx context.Context, req *iampb.Delet
 			"org slug in member path does not match resolved scope"))
 	}
 
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return nil, apierr.Internal("begin transaction")
 	}

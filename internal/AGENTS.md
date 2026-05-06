@@ -59,6 +59,47 @@ inside a function that also calls any other `<*Querier>` method MUST
 be inside `RunInTx` (or have a `//nolint:tx <reason>` annotation
 documenting why a tx isn't needed).
 
+### Tx closures must be DB-only
+
+`RunInTx` retries the closure on Postgres-aborted-the-tx errors
+(40001 serialization_failure, 40P01 deadlock_detected). Postgres
+guarantees nothing committed before returning these — they're
+safe to retry — and `RunInTx` does so up to 3 times with
+exponential backoff + jitter.
+
+This makes the closure a **replay boundary**: anything inside it
+may run more than once. Inside the closure, ONLY make DB calls
+through the supplied `qtx`. Move every other side effect outside.
+
+```go
+// ✗ DANGEROUS — non-DB side effects inside the closure
+result, err := db.RunInTx(ctx, s.pool, func(qtx db.Querier) (Foo, error) {
+    if err := qtx.UpdateAsset(ctx, ...); err != nil { return zero, err }
+    s.cache.Set(key, value)              // doubled on retry
+    s.river.Insert(ctx, jobArgs)         // job enqueued twice
+    s.firebase.DeleteUser(uid)           // possibly non-idempotent
+    return qtx.GetAsset(ctx, ...)
+})
+
+// ✓ Correct — closure is DB-only; non-DB effects after commit
+result, err := db.RunInTx(ctx, s.pool, func(qtx db.Querier) (Foo, error) {
+    if err := qtx.UpdateAsset(ctx, ...); err != nil { return zero, err }
+    return qtx.GetAsset(ctx, ...)
+})
+if err != nil { return err }
+s.cache.Set(key, result)
+s.river.Insert(ctx, jobArgs)
+```
+
+This rule is load-bearing the moment a handler runs at SERIALIZABLE
+isolation, where 40001 retries become routine. At today's default
+(read-committed) it bites only on 40P01 deadlocks — rare, but real.
+
+For handlers that need raw `pgx.Tx` access (advisory locks,
+`SET LOCAL`, `LISTEN/NOTIFY`, raw COPY) use `db.RunInTxRaw` —
+same retry/panic/slow-tx semantics as `RunInTx`, plus the
+underlying `pgx.Tx` alongside `qtx`.
+
 ## Constructor pattern
 
 Every multi-arg constructor takes a single `Config` struct (or

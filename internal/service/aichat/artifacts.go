@@ -52,7 +52,7 @@ func (s *Server) ListArtifacts(ctx context.Context, req *aiv1.ListArtifactsReque
 		return nil, err
 	}
 
-	rows, err := filter.Query(ctx, s.db, s.artifactFilter, filter.QueryParams{
+	rows, err := filter.Query(ctx, s.pool, s.artifactFilter, filter.QueryParams{
 		Filter:   req.GetFilter(),
 		ParentID: conv.ID.String(),
 		OrderBy:  req.GetOrderBy(),
@@ -141,7 +141,7 @@ func (s *Server) DeleteArtifact(ctx context.Context, req *aiv1.DeleteArtifactReq
 		return &emptypb.Empty{}, nil
 	}
 
-	if err := db.RunInTxVoid(ctx, s.txer, func(qtx db.Querier) error {
+	if err := db.RunInTxVoid(ctx, s.pool, func(qtx db.Querier) error {
 		row, err := qtx.GetArtifactByNameForUpdate(ctx, db.GetArtifactByNameForUpdateParams{
 			ConversationID: conv.ID,
 			Name:           artName,

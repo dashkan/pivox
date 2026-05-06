@@ -23,8 +23,7 @@ import (
 
 type TagKeysServer struct {
 	apiv1.UnimplementedTagKeysServer
-	db      db.DBTX
-	txer    db.Txer
+	pool    db.RWPool
 	queries db.Querier
 	filter  *filter.ResourceFilter
 	codec   *appkey.Codec
@@ -59,8 +58,7 @@ func NewTagKeysServer(cfg TagKeysConfig) *TagKeysServer {
 		panic("tags: TagKeysConfig.Codec is required")
 	}
 	return &TagKeysServer{
-		db:      cfg.Pool,
-		txer:    &db.PoolTxer{Pool: cfg.Pool},
+		pool:    cfg.Pool,
 		queries: cfg.Queries,
 		filter:  filter.TagKeyFilter(),
 		codec:   cfg.Codec,
@@ -97,7 +95,7 @@ func (s *TagKeysServer) ListTagKeys(ctx context.Context, req *apiv1.ListTagKeysR
 		return nil, err
 	}
 
-	rows, err := filter.Query(ctx, s.db, s.filter, filter.QueryParams{
+	rows, err := filter.Query(ctx, s.pool, s.filter, filter.QueryParams{
 		Filter:   req.GetFilter(),
 		ParentID: orgID.String(),
 		OrderBy:  req.GetOrderBy(),
@@ -269,7 +267,7 @@ func (s *TagKeysServer) DeleteTagKey(ctx context.Context, req *apiv1.DeleteTagKe
 		return nil, apierr.HandleResourceError(err, "TagKey", req.GetName())
 	}
 
-	if err := db.RunInTxVoid(ctx, s.txer, func(qtx db.Querier) error {
+	if err := db.RunInTxVoid(ctx, s.pool, func(qtx db.Querier) error {
 		existing, err := qtx.GetTagKeyForUpdate(ctx, id)
 		if err != nil {
 			return apierr.HandleResourceError(err, "TagKey", req.GetName())

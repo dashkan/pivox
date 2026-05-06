@@ -26,7 +26,7 @@ import (
 
 type RequestsServer struct {
 	assetsv1.UnimplementedRequestsServer
-	txer    db.Txer
+	pool    db.TxBeginner
 	queries db.Querier
 	audit   *audit.Resolver
 }
@@ -57,7 +57,7 @@ func NewRequestsServer(cfg Config) *RequestsServer {
 		panic("requests: Config.Queries is required")
 	}
 	return &RequestsServer{
-		txer:    &db.PoolTxer{Pool: cfg.Pool},
+		pool:    cfg.Pool,
 		queries: cfg.Queries,
 		audit:   cfg.AuditResolver,
 	}
@@ -308,7 +308,7 @@ func (s *RequestsServer) CreateRequest(ctx context.Context, req *assetsv1.Create
 	// row committed individually — a half-built request the client
 	// is told doesn't exist. RunInTx rolls everything back as a
 	// single unit on any failure inside the closure.
-	result, err := db.RunInTx(ctx, s.txer, func(qtx db.Querier) (db.AssetRequest, error) {
+	result, err := db.RunInTx(ctx, s.pool, func(qtx db.Querier) (db.AssetRequest, error) {
 		req, err := qtx.CreateRequest(ctx, db.CreateRequestParams{
 			ID:          uuid.New(),
 			SpaceID:     spaceID,
@@ -506,7 +506,7 @@ func (s *RequestsServer) AssignRequest(ctx context.Context, req *assetsv1.Assign
 		return nil, err
 	}
 
-	result, err := db.RunInTx(ctx, s.txer, func(qtx db.Querier) (db.AssetRequest, error) {
+	result, err := db.RunInTx(ctx, s.pool, func(qtx db.Querier) (db.AssetRequest, error) {
 		existing, err := qtx.GetRequestByNameForUpdate(ctx, db.GetRequestByNameForUpdateParams{
 			SpaceID: spaceID, Name: requestName,
 		})
@@ -556,7 +556,7 @@ func (s *RequestsServer) ClaimRequest(ctx context.Context, req *assetsv1.ClaimRe
 		return nil, err
 	}
 
-	result, err := db.RunInTx(ctx, s.txer, func(qtx db.Querier) (db.AssetRequest, error) {
+	result, err := db.RunInTx(ctx, s.pool, func(qtx db.Querier) (db.AssetRequest, error) {
 		existing, err := qtx.GetRequestByNameForUpdate(ctx, db.GetRequestByNameForUpdateParams{
 			SpaceID: spaceID, Name: requestName,
 		})
@@ -642,7 +642,7 @@ func (s *RequestsServer) CancelRequest(ctx context.Context, req *assetsv1.Cancel
 		return nil, err
 	}
 
-	result, err := db.RunInTx(ctx, s.txer, func(qtx db.Querier) (db.AssetRequest, error) {
+	result, err := db.RunInTx(ctx, s.pool, func(qtx db.Querier) (db.AssetRequest, error) {
 		existing, err := qtx.GetRequestByNameForUpdate(ctx, db.GetRequestByNameForUpdateParams{
 			SpaceID: spaceID, Name: requestName,
 		})
@@ -705,7 +705,7 @@ func (s *RequestsServer) transitionRequest(ctx context.Context, name string, fro
 		return nil, err
 	}
 
-	result, err := db.RunInTx(ctx, s.txer, func(qtx db.Querier) (db.AssetRequest, error) {
+	result, err := db.RunInTx(ctx, s.pool, func(qtx db.Querier) (db.AssetRequest, error) {
 		existing, err := qtx.GetRequestByName(ctx, db.GetRequestByNameParams{SpaceID: spaceID, Name: requestName})
 		if err != nil {
 			return db.AssetRequest{}, apierr.HandleResourceError(err, "Request", name)

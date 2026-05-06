@@ -62,7 +62,7 @@ func (s *IamServer) DeleteUser(ctx context.Context, req *iampb.DeleteUserRequest
 	// The DELETE-cascade idempotency that the previous comment
 	// relied on still holds; the tx is added for the read-then-
 	// write invariant, not for the cascade itself.
-	if err := db.RunInTxVoid(ctx, s.txer, func(qtx db.Querier) error {
+	if err := db.RunInTxVoid(ctx, s.pool, func(qtx db.Querier) error {
 		remainingOwners, err := qtx.CountOrgOwnersExcludingUser(ctx,
 			db.CountOrgOwnersExcludingUserParams{OrgID: resolvedOrg.ID, UserID: convert.PgUUID(userID)})
 		if err != nil {
@@ -245,7 +245,7 @@ func (s *IamServer) runDeleteAccount(
 	// (the LRO resumes from the phase but a failed Phase 2 isn't
 	// scoped narrower than "do all the revokes").
 	updatePhase(iampb.DeleteAccountMetadata_REVOKING_MEMBERSHIPS)
-	if err := db.RunInTxVoid(ctx, s.txer, func(qtx db.Querier) error {
+	if err := db.RunInTxVoid(ctx, s.pool, func(qtx db.Querier) error {
 		if err := qtx.DeleteOrgMembersForIdentity(ctx, convert.PgUUID(firebaseIdentityID)); err != nil {
 			slog.ErrorContext(ctx, "delete account: revoke org members failed",
 				"identity_id", firebaseIdentityID, "error", err)
@@ -275,8 +275,16 @@ func (s *IamServer) runDeleteAccount(
 	// DeleteUser on a possibly-mismatched uid. Inside the tx the
 	// Get's row lock blocks concurrent mutations until our
 	// SoftDelete commits.
+	//
+	// Resumption: if the LRO crashes between this tx commit and the
+	// auth.DeleteUser call below, the persisted phase is still
+	// DELETING_PIVOX_RECORDS and the next resume re-enters this
+	// block. The identity row is already is_deleted=true; we detect
+	// that on the GetIdentityByID and skip SoftDeleteIdentity. The
+	// captured firebase_uid is still correct (soft delete blanks PII
+	// but preserves firebase_uid), so the next phase can proceed.
 	updatePhase(iampb.DeleteAccountMetadata_DELETING_PIVOX_RECORDS)
-	identity, err := db.RunInTx(ctx, s.txer, func(qtx db.Querier) (db.Identity, error) {
+	identity, err := db.RunInTx(ctx, s.pool, func(qtx db.Querier) (db.Identity, error) {
 		identity, err := qtx.GetIdentityByID(ctx, firebaseIdentityID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -293,18 +301,27 @@ func (s *IamServer) runDeleteAccount(
 				"id", firebaseIdentityID, "error", err)
 			return db.Identity{}, apierr.Internal("lookup identity")
 		}
+		if identity.IsDeleted {
+			// LRO resumption: the previous attempt soft-deleted the
+			// row but crashed before completing the Firebase phase.
+			// firebase_uid is preserved through soft delete, so we
+			// have what we need; skip the redundant UPDATE.
+			slog.InfoContext(ctx, "delete account: identity already soft-deleted, resuming",
+				"id", firebaseIdentityID)
+			return identity, nil
+		}
 		// SoftDeleteIdentity returns the row's id when the UPDATE
-		// actually landed; ErrNoRows means the row was already
-		// soft-deleted (or the id doesn't exist — but GetIdentityByID
-		// just succeeded above so concurrent purge is the only
-		// realistic cause). We treat that as fatal rather than
-		// silently advancing to auth.DeleteUser with a possibly-stale
-		// firebase_uid.
+		// actually landed; ErrNoRows means the row was soft-deleted
+		// between our Get (which sees soft-deleted rows) and our
+		// UPDATE (which excludes them). Inside this tx the Get took
+		// a row lock so that's effectively impossible — but we still
+		// surface it loudly rather than racing into auth.DeleteUser
+		// with possibly-stale state.
 		if _, err := qtx.SoftDeleteIdentity(ctx, firebaseIdentityID); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				slog.ErrorContext(ctx, "delete account: soft-delete identity touched zero rows; row already tombstoned or concurrently purged",
+				slog.ErrorContext(ctx, "delete account: soft-delete identity touched zero rows under tx — should be unreachable",
 					"id", firebaseIdentityID)
-				return db.Identity{}, apierr.Internal("soft-delete identity: row already tombstoned")
+				return db.Identity{}, apierr.Internal("soft-delete identity: race detected")
 			}
 			slog.ErrorContext(ctx, "delete account: soft-delete identity failed",
 				"id", firebaseIdentityID, "error", err)

@@ -49,7 +49,7 @@ func (s *Server) ListMessages(ctx context.Context, req *aiv1.ListMessagesRequest
 		return nil, err
 	}
 
-	rows, err := filter.Query(ctx, s.db, s.messageFilter, filter.QueryParams{
+	rows, err := filter.Query(ctx, s.pool, s.messageFilter, filter.QueryParams{
 		Filter:   req.GetFilter(),
 		ParentID: conv.ID.String(),
 		OrderBy:  req.GetOrderBy(),

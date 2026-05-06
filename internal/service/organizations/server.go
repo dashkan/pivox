@@ -32,24 +32,9 @@ import (
 // `server.AuthenticatedUID` (set by AuthInterceptor).
 type AuthContextReader func(ctx context.Context) (uid string, ok bool)
 
-// TxBeginner abstracts transaction creation for testability.
-// *pgxpool.Pool satisfies this interface. Aliased to db.TxBeginner
-// so existing call sites and unit-test mocks keep compiling while
-// we migrate handlers to db.Txer / db.RunInTx.
-type TxBeginner = db.TxBeginner
-
 type OrganizationsServer struct {
 	apiv1.UnimplementedOrganizationsServer
-	db db.DBTX
-	// pool is retained only for legacy handlers (CreateOrganization,
-	// member CRUD, TransferOwnership) that still call pool.Begin
-	// directly. Deprecated: prefer txer.Run for new handlers — it
-	// adds slow-tx instrumentation and matches the cross-package
-	// db.Txer convention. See the tx sweep landed for issue #13.
-	pool TxBeginner
-	// txer is the transaction abstraction used by handlers that have
-	// migrated to db.RunInTx (DeleteDomain). New code uses txer.
-	txer     db.Txer
+	pool     db.RWPool
 	queries  db.Querier
 	auth     authn.Service
 	filter   *filter.ResourceFilter
@@ -130,9 +115,7 @@ func NewOrganizationsServer(cfg Config) *OrganizationsServer {
 		panic("organizations: Config.Caller is required")
 	}
 	return &OrganizationsServer{
-		db:         cfg.Pool,
 		pool:       cfg.Pool,
-		txer:       &db.PoolTxer{Pool: cfg.Pool},
 		queries:    cfg.Queries,
 		auth:       cfg.Auth,
 		filter:     filter.OrganizationFilter(),
@@ -267,7 +250,7 @@ func (s *OrganizationsServer) CreateOrganization(ctx context.Context, req *apiv1
 	// unreachable; clients always supply a slug.
 	orgSlug := req.GetOrganizationId()
 
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		slog.ErrorContext(ctx, "begin transaction failed", "error", err)
 		return nil, apierr.Internal("begin transaction")

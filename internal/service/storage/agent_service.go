@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"testing"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -25,7 +24,7 @@ import (
 // storage gateway agents connecting to the control plane.
 type AgentServiceServer struct {
 	agentv1.UnimplementedAgentServiceServer
-	txer    db.Txer
+	pool    db.TxBeginner
 	queries db.Querier
 	logger  *slog.Logger
 	conns   *agentstream.ConnectionManager
@@ -65,37 +64,10 @@ func NewAgentServiceServer(cfg AgentServiceConfig) *AgentServiceServer {
 		panic("storage: AgentServiceConfig.Conns is required")
 	}
 	return &AgentServiceServer{
-		txer:    &db.PoolTxer{Pool: cfg.Pool},
+		pool:    cfg.Pool,
 		queries: cfg.Queries,
 		logger:  cfg.Logger,
 		conns:   cfg.Conns,
-	}
-}
-
-// NewAgentServiceServerForTesting builds an AgentServiceServer wired
-// with a no-tx PassthroughTxer over the supplied Querier. **Test-only.**
-// Callers from tests in other packages (e.g. internal/storageagent)
-// use this to avoid standing up a real pgxpool when the test only
-// needs handshake-shape behavior on a mock Querier.
-//
-// Production code MUST go through NewAgentServiceServer with a real
-// *pgxpool.Pool — PassthroughTxer's no-tx semantics defeat the
-// atomicity that the handshake bootstrap and disconnect cleanup rely
-// on.
-//
-// The `testing.TB` first argument is the structural barrier that
-// keeps this from being called by production code: importing the
-// `testing` package outside a `_test.go` file is a screaming-loud
-// signal in code review (and pulls a noticeable amount of test-only
-// runtime into the binary). The argument itself is not used at
-// runtime — its only purpose is to require the caller to have a
-// `*testing.T` or `*testing.B` in scope.
-func NewAgentServiceServerForTesting(_ testing.TB, q db.Querier, logger *slog.Logger, conns *agentstream.ConnectionManager) *AgentServiceServer {
-	return &AgentServiceServer{
-		txer:    &db.PassthroughTxer{Q: q},
-		queries: q,
-		logger:  logger,
-		conns:   conns,
 	}
 }
 
@@ -157,7 +129,7 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 	//         UPDATE takes here — preventing the "gateway flips
 	//         OFFLINE while a fresh agent is mid-handshake" race.
 	// -----------------------------------------------------------------------
-	agent, err := db.RunInTx(ctx, s.txer, func(qtx db.Querier) (db.StorageAgent, error) {
+	agent, err := db.RunInTx(ctx, s.pool, func(qtx db.Querier) (db.StorageAgent, error) {
 		existing, lookupErr := qtx.GetStorageAgentByGatewayAndIP(ctx, db.GetStorageAgentByGatewayAndIPParams{
 			GatewayID: gateway.ID,
 			IpAddress: hs.GetIpAddress(),
@@ -354,7 +326,7 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 	// client (the stream is already ending) but we do want the
 	// log + structured cleanup.
 	// -----------------------------------------------------------------------
-	if err := db.RunInTxVoid(ctx, s.txer, func(qtx db.Querier) error {
+	if err := db.RunInTxVoid(ctx, s.pool, func(qtx db.Querier) error {
 		if _, err := qtx.UpdateStorageAgentState(ctx, db.UpdateStorageAgentStateParams{
 			ID:    agent.ID,
 			State: db.AgentStateDISCONNECTED,
