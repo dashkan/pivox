@@ -169,13 +169,10 @@ func TestE2E_SsoConfig_OmitsPlaintextSecret(t *testing.T) {
 // TestE2E_SsoConfig_PersistsClientSecret pins that the secret
 // reaches the bytea column at all (UpdateSsoConfig actually
 // persists it, doesn't drop it on the floor). It does NOT verify
-// at-rest encryption — that requires the KMS-backed encryptor,
-// not the NoOpEncryptor that `-tags=dev` ships per CLAUDE.md
-// "Don't ship a -tags dev binary to a real environment — the
-// encryptor passthrough alone is a security hole." Encryption
-// boundary verification is a production-mode concern; logged in
-// the test-rebuild spec as a follow-up that needs a non-dev
-// harness path to land.
+// at-rest encryption against real KMS — tests run through
+// cryptotest.Encryptor, not the production GoogleCloudKMSEncryptor.
+// Verifying the live KMS boundary needs GCP creds and is tracked
+// separately.
 func TestE2E_SsoConfig_PersistsClientSecret(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")

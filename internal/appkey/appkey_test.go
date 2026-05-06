@@ -152,9 +152,11 @@ func TestNewFromEnv_WithKey(t *testing.T) {
 	require.NotNil(t, c)
 }
 
-// In dev builds we fall back to a random per-process key and expect a log
-// warning. In prod builds we fatal. The build-tagged behaviors are tested
-// in dedicated files (appkey_dev_test.go / appkey_prod_test.go).
+func TestNewFromEnv_MissingKey(t *testing.T) {
+	t.Setenv("PIVOX_APP_KEY", "")
+	_, err := NewFromEnv()
+	require.Error(t, err)
+}
 
 func TestHex_RoundTripSanity(t *testing.T) {
 	// Sanity: testKey() is 32 bytes when hex-decoded.

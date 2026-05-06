@@ -301,12 +301,12 @@ func newDomainsHarness(t *testing.T) *grpcharness.Harness {
 	}))
 }
 
-// startVerifyWorker is a stub kept to preserve the file's build under
-// -tags=dev. The pre-River workers.NewVerifyDomainWorker was deleted
-// in commit 4e5e3aa (the River cutover); domain verification now runs
-// as a River periodic job in pivox-worker. Tests that depend on this
-// helper now skip — they need migrating to the new shape (#71 Phase 2
-// for the organizations service) but that's separate from #69 Phase 5.
+// startVerifyWorker is a stub kept to preserve the file's build.
+// The pre-River workers.NewVerifyDomainWorker was deleted in
+// commit 4e5e3aa (the River cutover); domain verification now
+// runs as a River periodic job in pivox-worker. Tests that depend
+// on this helper now skip — they need migrating to the new shape
+// (#71 Phase 2 for the organizations service).
 func startVerifyWorker(t *testing.T, _ *grpcharness.Harness, _ workers.DNSResolver, _ time.Duration) {
 	t.Helper()
 	t.Skip("startVerifyWorker references the pre-River VerifyDomainWorker; test needs migration per #71 Phase 2")

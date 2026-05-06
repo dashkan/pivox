@@ -1,9 +1,7 @@
-# air config — hot reload for `pivox-worker` (prod build).
-# Used by `make air-worker`. The dev-mode equivalent (build with
-# `-tags dev`) lives in `.air.worker.dev.toml`, used by
-# `make dev-air-worker`. Sibling layout to air.toml/air.dev.toml so
-# the two binaries can be air-reloaded side-by-side without
-# stomping each other (separate tmp/ filenames per mode).
+# air config — hot reload for `pivox-worker`. Used by `make
+# air-worker`. Sibling layout to air.toml so pivox-cloud and
+# pivox-worker can be air-reloaded side-by-side without stomping
+# each other (separate tmp/ filenames).
 
 root = "."
 testdata_dir = "testdata"
