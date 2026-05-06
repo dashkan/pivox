@@ -450,6 +450,10 @@ func startSpacesLifecycleWorkers(t *testing.T, h *grpcharness.Harness) {
 		Pool:   h.Pool,
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
+	river.AddWorker(rw, &workers.DeleteSpaceWorker{
+		Pool:   h.Pool,
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	})
 	c, err := river.NewClient(riverpgxv5.New(h.Pool), &river.Config{
 		Logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Queues:  map[string]river.QueueConfig{river.QueueDefault: {MaxWorkers: 2}},

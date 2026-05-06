@@ -3,7 +3,6 @@ package spaces
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -26,8 +25,6 @@ import (
 	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 	"github.com/dashkan/pivox/internal/server"
 	"github.com/dashkan/pivox/internal/workers"
-
-	"google.golang.org/protobuf/proto"
 )
 
 type SpacesServer struct {
@@ -447,7 +444,6 @@ func (s *SpacesServer) DeleteSpace(ctx context.Context, req *apiv1.DeleteSpaceRe
 	}
 
 	spaceRsrc := "organizations/" + resolvedOrg.Slug + "/spaces/" + resolvedSpace.Slug
-	deletedBy := convert.PgUUID(caller)
 	force := req.GetForce()
 	expectedEtag := resolvedSpace.Row.Etag
 
@@ -456,81 +452,23 @@ func (s *SpacesServer) DeleteSpace(ctx context.Context, req *apiv1.DeleteSpaceRe
 		Space: spaceRsrc,
 	}
 
-	return s.lroManager.CreateAndRun(ctx, spaceRsrc, initialMeta,
-		func(workCtx context.Context, progress lro.Progress) (proto.Message, error) {
-			return s.runDeleteSpace(workCtx, progress, resolvedSpace.ID, resolvedOrg.Slug, spaceRsrc, deletedBy, force, expectedEtag)
-		})
-}
-
-// runDeleteSpace orchestrates the DeleteSpace LRO. force=false drives
-// MARKING_DELETED → COMPLETED; force=true drives PURGING → COMPLETED.
-// The proto enum reserves CANCELLING_OPERATIONS for a future
-// space-scoped-LRO cancellation phase, but no such LROs exist today
-// so this orchestrator does not emit it.
-func (s *SpacesServer) runDeleteSpace(
-	ctx context.Context,
-	progress lro.Progress,
-	spaceID uuid.UUID,
-	orgSlug, spaceRsrc string, deletedBy pgtype.UUID,
-	force bool,
-	expectedEtag string,
-) (proto.Message, error) {
-	updatePhase := func(phase apiv1.DeleteSpaceMetadata_Phase) {
-		progress.Update(ctx, &apiv1.DeleteSpaceMetadata{
-			Phase: phase,
-			Space: spaceRsrc,
-		})
-	}
-
-	if force {
-		// PURGING: hard-delete the space. FK ON DELETE CASCADE
-		// removes space_members, assets, and asset_requests
-		// transitively. Etag-guarded so a concurrent state mutation
-		// between handler validation and LRO worker execution
-		// refuses to purge a row the caller didn't approve.
-		updatePhase(apiv1.DeleteSpaceMetadata_PURGING)
-		if _, err := s.queries.PurgeSpace(ctx, db.PurgeSpaceParams{
-			ID:   spaceID,
-			Etag: expectedEtag,
-		}); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return nil, apierr.FailedPrecondition(
-					"space revision changed since delete was requested; refresh and retry")
-			}
-			slog.ErrorContext(ctx, "delete space: purge failed", "space", spaceRsrc, "error", err)
-			return nil, apierr.Internal("purge space")
-		}
-		updatePhase(apiv1.DeleteSpaceMetadata_COMPLETED)
-		// Force path: row is gone. Surface the resource name only
-		// (no row to return).
-		return &apiv1.Space{Name: spaceRsrc}, nil
-	}
-
-	// MARKING_DELETED: soft-delete path. SoftDeleteSpace refuses to
-	// fire on a non-ACTIVE row (delete_time IS NULL guard), so a
-	// race with a concurrent delete surfaces no-rows.
-	updatePhase(apiv1.DeleteSpaceMetadata_MARKING_DELETED)
-	updated, err := s.queries.SoftDeleteSpace(ctx, db.SoftDeleteSpaceParams{
-		ID:        spaceID,
-		DeletedBy: deletedBy,
+	// River-backed: pivox-cloud enqueues the job + creates the
+	// operations row in one tx; pivox-worker's DeleteSpaceWorker
+	// runs the SQL action and marks the operation done atomically.
+	opID := uuid.New()
+	return s.lroManager.NewLro(ctx, spaceRsrc, lro.NewLroOpts{
+		OperationID: opID,
+		JobArgs: workers.DeleteSpaceArgs{
+			OperationID:  opID,
+			SpaceID:      resolvedSpace.ID,
+			OrgSlug:      resolvedOrg.Slug,
+			Resource:     spaceRsrc,
+			DeletedBy:    caller,
+			Force:        force,
+			ExpectedEtag: expectedEtag,
+		},
+		Metadata: initialMeta,
 	})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, apierr.FailedPrecondition(
-				"space state changed; cannot soft-delete (was it already deleted?)")
-		}
-		slog.ErrorContext(ctx, "delete space: soft-delete failed", "space", spaceRsrc, "error", err)
-		return nil, apierr.Internal("soft-delete space")
-	}
-	updatePhase(apiv1.DeleteSpaceMetadata_COMPLETED)
-	// Best-effort enrichment after commit.
-	actors, resolveErr := s.resolveSpaceActors(ctx, []db.Space{updated})
-	if resolveErr != nil {
-		slog.WarnContext(ctx, "delete space: actor resolution failed; returning proto without audit actors",
-			"space", spaceRsrc, "error", resolveErr)
-		actors = nil
-	}
-	return convert.SpaceToProto(updated, orgSlug, actors), nil
 }
 
 // UndeleteSpace restores a soft-deleted space back to ACTIVE. Only
