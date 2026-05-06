@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -14,8 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/dashkan/pivox/internal/apierr"
 	"github.com/dashkan/pivox/internal/convert"
@@ -23,6 +21,7 @@ import (
 	"github.com/dashkan/pivox/internal/lro"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	"github.com/dashkan/pivox/internal/server"
+	"github.com/dashkan/pivox/internal/workers"
 )
 
 const (
@@ -139,103 +138,27 @@ func (s *OrganizationsServer) CreateDomain(ctx context.Context, req *apiv1.Creat
 		Domain:            domainResource,
 	}
 	deadline := time.Now().Add(effectiveDomainVerificationGrace())
-	domainID := domain.ID
-	orgID := resolvedOrg.ID
-	orgSlug := resolvedOrg.Slug
 
-	return s.lroManager.CreateAndRunForOrg(ctx, domainResource, orgID, initialMeta,
-		func(workCtx context.Context, progress lro.Progress) (proto.Message, error) {
-			return s.runVerifyDomain(workCtx, progress, domainID, orgID, orgSlug, domainResource, deadline)
-		})
-}
-
-// runVerifyDomain is the LRO work fn. It long-polls the domains
-// row for state transitions; the verify-domain worker drives the
-// PENDING → VERIFIED transition independently. The work fn
-// completes the LRO when the worker has done its job, or marks the
-// row FAILED if the grace window elapses.
-//
-// Cancellation: ctx.Done() is observed from DeleteDomain (which
-// flips the operation to cancelled) and from server shutdown.
-func (s *OrganizationsServer) runVerifyDomain(
-	ctx context.Context,
-	progress lro.Progress,
-	domainID, orgID uuid.UUID,
-	orgSlug, domainResource string,
-	deadline time.Time,
-) (proto.Message, error) {
-	t := time.NewTicker(effectiveDomainPollInterval())
-	defer t.Stop()
-
-	attempts := int32(0)
-	check := func() (proto.Message, bool, error) {
-		attempts++
-		d, err := s.queries.GetDomainByID(ctx, db.GetDomainByIDParams{ID: domainID, OrgID: orgID})
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				// DeleteDomain ran while we were polling. Treat the
-				// row's disappearance as a normal cancellation.
-				return nil, true, apierr.FailedPrecondition("domain row was deleted; verification cancelled")
-			}
-			return nil, true, apierr.Internal("poll domain state")
-		}
-		switch d.State {
-		case db.DomainStateVERIFIED:
-			progress.Update(ctx, &apiv1.CreateDomainMetadata{
-				Phase:         apiv1.CreateDomainMetadata_VERIFIED,
-				Domain:        domainResource,
-				LastCheckTime: timestamppb.Now(),
-				AttemptCount:  attempts,
-			})
-			return convert.DomainToProto(d, orgSlug, nil), true, nil
-		case db.DomainStateFAILED:
-			progress.Update(ctx, &apiv1.CreateDomainMetadata{
-				Phase:         apiv1.CreateDomainMetadata_FAILED,
-				Domain:        domainResource,
-				LastCheckTime: timestamppb.Now(),
-				AttemptCount:  attempts,
-			})
-			return nil, true, apierr.FailedPrecondition(fmt.Sprintf("domain %q verification failed", d.Domain))
-		}
-		// Still PENDING. Check for grace expiry; if elapsed, mark
-		// the row FAILED and complete the LRO with EXPIRED phase.
-		if time.Now().After(deadline) {
-			if _, err := s.queries.MarkDomainFailed(ctx, domainID); err != nil {
-				slog.ErrorContext(ctx, "create domain: mark failed on expiry", "id", domainID, "error", err)
-			}
-			progress.Update(ctx, &apiv1.CreateDomainMetadata{
-				Phase:         apiv1.CreateDomainMetadata_EXPIRED,
-				Domain:        domainResource,
-				LastCheckTime: timestamppb.Now(),
-				AttemptCount:  attempts,
-			})
-			return nil, true, apierr.FailedPrecondition("domain verification window elapsed without successful DNS check")
-		}
-		// Update progress so polling clients can observe attempts.
-		progress.Update(ctx, &apiv1.CreateDomainMetadata{
-			Phase:         apiv1.CreateDomainMetadata_AWAITING_DNS,
-			Domain:        domainResource,
-			LastCheckTime: timestamppb.Now(),
-			AttemptCount:  attempts,
-		})
-		return nil, false, nil
-	}
-
-	// First check fires immediately so a freshly-deployed worker
-	// that already verified the row sees the LRO complete on creation.
-	if result, done, err := check(); done || err != nil {
-		return result, err
-	}
-	for {
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-t.C:
-			if result, done, err := check(); done || err != nil {
-				return result, err
-			}
-		}
-	}
+	// River-backed: pivox-cloud enqueues the job + creates the
+	// operations row in one tx; pivox-worker's VerifyDomainWorker
+	// runs the long-poll loop. OrgID populated so
+	// CancelRunningOpsForOrg picks it up if the org enters
+	// DELETE_REQUESTED.
+	opID := uuid.New()
+	return s.lroManager.NewLro(ctx, domainResource, lro.NewLroOpts{
+		OperationID: opID,
+		OrgID:       pgtype.UUID{Bytes: resolvedOrg.ID, Valid: true},
+		JobArgs: workers.VerifyDomainArgs{
+			OperationID:  opID,
+			DomainID:     domain.ID,
+			OrgID:        resolvedOrg.ID,
+			OrgSlug:      resolvedOrg.Slug,
+			Resource:     domainResource,
+			Deadline:     deadline,
+			PollInterval: int64(effectiveDomainPollInterval()),
+		},
+		Metadata: initialMeta,
+	})
 }
 
 // GetDomain fetches a domain by resource name. Permission:
