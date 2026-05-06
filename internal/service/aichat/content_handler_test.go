@@ -65,7 +65,7 @@ func contentPath(user uuid.UUID) string {
 }
 
 func TestContentHandler_InlineHappyPath(t *testing.T) {
-	user := fixedUserID
+	user := uuid.New()
 	artID := uuid.New()
 	stub := &stubResolver{
 		conv: db.AiConversation{ID: uuid.New(), CreatedBy: user, Name: "conv1"},
@@ -102,7 +102,7 @@ func TestContentHandler_InlineHappyPath(t *testing.T) {
 }
 
 func TestContentHandler_AssetBacked(t *testing.T) {
-	user := fixedUserID
+	user := uuid.New()
 	stub := &stubResolver{
 		conv: db.AiConversation{ID: uuid.New(), CreatedBy: user},
 		art:  db.AiArtifact{ID: uuid.New(), CreateTime: time.Now(), UpdateTime: time.Now()},
@@ -149,7 +149,7 @@ func TestContentHandler_PermissionDeniedAs403(t *testing.T) {
 }
 
 func TestContentHandler_IfNoneMatch(t *testing.T) {
-	user := fixedUserID
+	user := uuid.New()
 	artID := uuid.New()
 	stub := &stubResolver{
 		conv: db.AiConversation{ID: uuid.New(), CreatedBy: user},

@@ -1,0 +1,51 @@
+# Shared test services. Started once via `make test-up`, reused
+# across every `go test ./...` invocation. Tests connect to the
+# fixed ports below; per-test isolation is via per-test databases
+# (Postgres) and per-test buckets (rustfs).
+#
+# Ports use 55432 / 59000 (5-digit, namespace-safe) so they can't
+# collide with anything a developer runs locally — including the
+# pivox dev stack itself, which uses the conventional dev ports.
+#
+# Both services use tmpfs for storage — tests don't need
+# durability and tmpfs is dramatically faster than the default
+# overlay FS, especially on macOS Docker Desktop.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg18
+    container_name: pivox-test-postgres
+    environment:
+      POSTGRES_USER: pivox
+      POSTGRES_PASSWORD: pivox
+      POSTGRES_DB: pivox
+    ports:
+      - "55432:5432"
+    # PG18 uses major-version subdirs; mount the parent.
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pivox"]
+      interval: 1s
+      timeout: 1s
+      retries: 30
+      start_period: 5s
+
+  rustfs:
+    image: rustfs/rustfs:latest
+    container_name: pivox-test-rustfs
+    environment:
+      RUSTFS_ROOT_USER: testaccess
+      RUSTFS_ROOT_PASSWORD: testsecret
+    command: ["server", "/data"]
+    ports:
+      - "59000:9000"
+    # No volume / tmpfs — rustfs writes to the container's overlay
+    # FS. Test data is ephemeral; container restart wipes it,
+    # which is what we want.
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "-m", "2", "http://localhost:9000/health"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+      start_period: 5s

@@ -66,8 +66,27 @@ air-worker:
 dev-air-worker:
 	air -c configs/air.worker.dev.toml
 
-test:
+# test depends on test-up so the shared Postgres + rustfs are
+# running. Compose is idempotent — re-runs are no-ops if services
+# are already up. Tear down with `make test-down`.
+test: test-up
 	go test ./...
+
+# test-dev runs the integration suite under -tags=dev. Same compose
+# dependency; the build tag selects dev-mode variants of a handful
+# of files (see CLAUDE.md "The dev build tag").
+test-dev: test-up
+	go test -tags=dev ./...
+
+# test-up brings up the docker-compose test stack (Postgres +
+# rustfs) and waits for the healthchecks to pass. Idempotent.
+test-up:
+	docker compose -p pivox-test -f docker-compose.test.yml up -d --wait
+
+# test-down stops + removes the test stack. Use to free ports or
+# reset state between sessions.
+test-down:
+	docker compose -p pivox-test -f docker-compose.test.yml down -v
 
 tidy:
 	go mod tidy && cd tools && go mod tidy
