@@ -72,7 +72,7 @@ internal/             Go application code (Cloud Controller + Storage Agent)
   authn/              Firebase Auth verification, identity tokens.
   config/             Server config structs (CLI flags hydrate these).
   convert/            Proto ↔ DB row conversion helpers.
-  crypto/             Pluggable encryptor (KMS prod, NoOp dev).
+  crypto/             Encryptor interface, KMS implementation, NoOp passthrough for tests.
   db/                 Postgres data access
     queries/          Hand-written sqlc queries (*.sql)
     migrations/       golang-migrate files (000001_init.up.sql is THE source)
@@ -148,31 +148,29 @@ Other stacks:
 
 ### Go (Cloud Controller + Worker Process + Storage Agent)
 
-Two build modes — production and `-tags dev`. The `dev` tag swaps a
-handful of files for dev-friendlier alternatives at compile time
-(see "The `dev` build tag" below).
+Single build mode — there is no `-tags dev` variant. Local
+development uses production binaries pointed at a local Postgres
+and (optionally) an ngrok tunnel for Firebase Functions to reach
+the API. Tests run against the shared docker-compose stack defined
+in `docker-compose.test.yml`.
 
 ```sh
-# Production-mode build/run
+# Build / run
 make build                              # bin/pivox-cloud + bin/pivox-worker + bin/pivox-agent
 make run-server                         # go run ./cmd/pivox-cloud serve
 make run-worker                         # go run ./cmd/pivox-worker
 make run-agent                          # go run ./cmd/pivox-agent storage
 
-# Dev-mode build/run (-tags dev)
-make dev-build                          # same outputs, dev variants
-make dev-server                         # go run -tags dev ./cmd/pivox-cloud serve
-make dev-worker                         # go run -tags dev ./cmd/pivox-worker
-make dev-agent                          # go run -tags dev ./cmd/pivox-agent storage
-
 # Hot reload (install `air` separately — not pinned in tools/go.mod
 # due to a transitive dep conflict with api-linter)
-make air                                # configs/air.toml — prod-mode reload
-make dev-air                            # configs/air.dev.toml — dev-mode reload
+make air                                # configs/air.toml
+make air-worker                         # configs/air.worker.toml
 
-# Tests
-make test                               # go test ./... (default suite)
-go test -tags=dev ./...                 # integration suite (real PG required)
+# Tests — `make test` brings up the docker-compose stack and runs
+# the suite. Real Postgres + rustfs; per-test isolation via
+# template-clone DBs and per-test buckets.
+make test                               # go test against shared stack
+make test-up / test-down                # manage compose stack manually
 go test -race ./internal/<pkg>/...      # race-detector for concurrency code
 
 # Lint / format
@@ -201,8 +199,7 @@ make proto-format                       # buf format -w
 make docker-up / docker-down
 
 # Firebase
-make firebase-emu                       # local emulator suite
-make firebase-deploy                    # deploy functions
+make firebase-deploy                    # deploy blocking functions
 make clean-fn-revisions                 # prune old Cloud Run revisions
 ```
 
@@ -216,32 +213,6 @@ get added by editing `tools/go.mod`'s `tool (...)` block + running
 Go binaries always go to `bin/`. **Never** bare `go build`
 (deposits a binary in repo root). Use `make build` or
 `go build -o bin/<name> ./cmd/<name>`.
-
-### The `dev` build tag
-
-A small set of files have `dev` and non-`dev` variants. Building
-with `-tags dev` selects the dev variant; default builds get the
-production variant. Concretely what gets swapped:
-
-| Component | Production (default) | `-tags dev` |
-|---|---|---|
-| `crypto.NewEncryptor` | KMS-backed `GoogleCloudKMSEncryptor` | `NoOpEncryptor` (passthrough) |
-| `appkey.NewFromEnv` | requires `PIVOX_APP_KEY` env to be set | generates a random per-process key on missing env, warns |
-| `server.NewInternalHooks` syncIdentity auth | OIDC identity-token verification | static shared-secret bearer |
-| `storageagent` HTTP auth | enforces session auth | skips session auth |
-| `config.SyncAuthConfig` shape | OIDC fields | shared-secret field |
-
-The `dev` tag is for local-loop development against the Firebase
-emulator (which can't mint OIDC tokens) and quick `air`-driven
-iteration. **Don't ship a `-tags dev` binary to a real environment**
-— the encryptor passthrough alone is a security hole.
-
-Test files also use the `dev` tag: integration tests that need real
-Postgres (`-tags=dev` runs them; default suite skips). Some
-dev-tagged tests have known pre-existing issues (`-tags=dev` is not
-fully green today — track separately, don't claim a change is green
-based on `-tags=dev` runs unless you specifically validated the
-affected packages).
 
 ### Native
 
@@ -262,9 +233,15 @@ make test-native-ui                                    # UI tests (XCUITest)
 ```sh
 cd deployments/firebase
 # Build/deploy is wrapped at repo root:
-make firebase-emu                       # local emulator suite
 make firebase-deploy                    # production deploy
 ```
+
+The Firebase Auth emulator is intentionally not wired into our
+local loop — Firebase Functions blocking triggers don't fire under
+the emulator anyway, and our auth path needs real OIDC tokens.
+Develop against a real Firebase project; expose the local
+pivox-cloud via ngrok (or equivalent) and point the Cloud Function
+at it via the `PIVOX_API_URL` parameter.
 
 ## Skills (`.agents/skills/golang-*`)
 

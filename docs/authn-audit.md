@@ -1,5 +1,13 @@
 # Authentication Security Audit
 
+> **Status note (post-audit cleanup).** Findings here referencing
+> the `SHARED_SECRET` shared-secret middleware and `//go:build dev`
+> were addressed by deleting the `dev` build tag and the
+> shared-secret code path entirely. Firebase Functions → Pivox now
+> only authenticates via Google Cloud OIDC identity tokens. This
+> document is preserved as the audit-of-record; do not treat its
+> "current state" descriptions as current.
+
 **Date**: 2026-03-18
 **Scope**: All authentication flows — Firebase Auth (web + Electron), server-side token verification, internal APIs, account sync, 2FA/TOTP, OAuth, password management
 **Methodology**: Manual secure code review against OWASP Top 10, CWE Top 25, and Firebase Auth best practices

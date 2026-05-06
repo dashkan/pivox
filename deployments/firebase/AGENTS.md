@@ -25,9 +25,10 @@ functions` (or `make firebase-deploy` from repo root).
 
 ## Authentication for the Pivox callback
 
-- Production: Firebase Function calls Pivox via Google Cloud OIDC
-  identity token, validated server-side by `internal/server/internal_hooks_sync_auth.go`.
-- Dev: shared-secret bearer token (see `internal/server/internal_hooks_sync_auth_dev.go`).
+- The Firebase Function calls Pivox via a Google Cloud OIDC
+  identity token minted from the function's runtime service
+  account; the Go server validates it against Google's JWKS in
+  `internal/server/internal_hooks_sync_auth.go`.
 - The function code lives in `src/index.ts`; the Authorization
   header is built in `getAuthorizationHeader`.
 

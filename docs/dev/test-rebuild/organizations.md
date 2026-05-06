@@ -190,15 +190,18 @@ stubs. The behaviors:
 - [x] GetSsoConfig + UpdateSsoConfig responses omit plaintext
   client_secret (`TestE2E_SsoConfig_OmitsPlaintextSecret`)
 - [x] UpdateSsoConfig persists the secret to the bytea column
-  (`TestE2E_SsoConfig_PersistsClientSecret`) — at-rest encryption
-  not testable under `-tags=dev` (NoOpEncryptor passthrough);
-  follow-up below
+  (`TestE2E_SsoConfig_PersistsClientSecret`). Tests run against
+  `cryptotest.Encryptor`, which round-trips ciphertext that is
+  distinguishable from plaintext; the real KMS round-trip is not
+  exercised in tests (would require live GCP creds). Follow-up
+  below.
 - [x] UpdateSsoConfig validation rejection matrix
   (`TestE2E_SsoConfig_RejectsInvalidConfig` — covers neither-oidc-
   nor-saml, oidc empty response_type)
-- [ ] At-rest encryption boundary verification — requires non-dev
-  test path with KMS-backed encryptor. Not testable under
-  `-tags=dev` per the NoOp passthrough. Tracked separately.
+- [ ] At-rest encryption boundary verification with a real KMS
+  encryptor. Tests today run through `cryptotest.Encryptor`; a
+  real-KMS path would need live GCP creds and a project setup —
+  tracked separately.
 - [x] UpdateSsoConfig: first-time create calls
   `authn.Service.CreateOidcProvider` with the right config
   (`TestE2E_SsoConfig_FirebaseCreateOnFirstUpdate`)

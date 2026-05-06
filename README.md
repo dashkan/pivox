@@ -91,9 +91,6 @@ docker compose up -d              # Postgres + rustfs
 make db-up                        # Run migrations
 make db-seed                      # Seed dev data
 
-# Firebase emulator
-make firebase-emu                 # Auth emulator on :9099
-
 # Server (terminal 1)
 make run-server                   # gRPC :50051, REST :8080
 

@@ -1,5 +1,14 @@
 # Test Coverage Plan — Go Codebase
 
+> **Status: historical.** This plan was written when the codebase
+> still carried `-tags dev`, the hand-written `MockQuerier`, and a
+> testcontainers-per-package shape. The actual landed state is:
+> `make test` against the docker-compose stack, no dev tag, no
+> querier mock, service tests through `internal/testutil/grpcharness`.
+> The phase-by-phase notes below remain useful as a record of what
+> was migrated — but commands and file paths must be cross-checked
+> against the current tree before anyone re-runs them.
+
 ## Goal
 
 90%+ coverage for every hand-written Go package. Generated code (`internal/db/generated/`, `internal/pkg/gen/`) and external SDK wrappers (`internal/firebase/`) are excluded — they're exercised indirectly through integration tests.
@@ -260,20 +269,19 @@ For every function below 90%, write a targeted test hitting the uncovered branch
 ## Run Commands
 
 ```bash
-# Unit tests only (fast, no Docker)
-go test -tags dev ./internal/... -short -count=1 -race
+# Bring up the docker-compose Postgres + rustfs stack (idempotent).
+make test-up
 
-# Full suite including integration tests (needs Docker)
-go test -tags dev ./internal/... -count=1 -race -timeout 300s
+# Full suite (the canonical entry point).
+make test
 
-# Coverage report (unit tests only)
-go test -tags dev ./internal/... -short -coverprofile=coverage.out -count=1
+# Race detector against a single package.
+go test -race ./internal/<pkg>/...
+
+# Coverage report.
+go test ./internal/... -coverprofile=coverage.out -count=1
 go tool cover -func=coverage.out | grep -v 'pkg/gen/' | grep -v 'db/generated' | grep -v 'testutil'
 
-# Coverage report (full with integration)
-go test -tags dev ./internal/... -coverprofile=coverage.out -count=1 -timeout 300s
-go tool cover -func=coverage.out | grep -v 'pkg/gen/' | grep -v 'db/generated' | grep -v 'testutil'
-
-# HTML coverage report
+# HTML coverage report.
 go tool cover -html=coverage.out -o coverage.html
 ```

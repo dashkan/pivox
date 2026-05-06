@@ -190,17 +190,18 @@ their stable slug name.
   the sqlc step).
 - Generated code lives in `internal/db/generated/`. Don't edit by
   hand — regenerate.
-- Mock querier is `internal/testutil/mocks/querier_mock.go`.
-  Auto-generated stub; if a query is added/removed, the mock must
-  be regenerated.
+- The `db.Querier` interface is **not** mocked. Service-layer tests
+  go through the real `internal/testutil/grpcharness` against a
+  real Postgres (cloned from a per-process template). External
+  boundaries we don't control — currently only `authn.Service` —
+  are mocked via `mockery` per `.mockery.yml` into
+  `internal/testutil/authnmock/`.
 
 ## Tests
 
-- Default suite: `go test ./...`. All packages must pass.
-- Integration suite: `go test -tags=dev ./...`. Some packages have
-  pre-existing tech debt under `-tags=dev` — known, tracked
-  separately. Don't claim a change is green if you only ran the
-  default suite for a change that touches dev-tagged code.
+- Run the suite via `make test` (brings up the docker-compose
+  Postgres + rustfs stack, then runs the tests). All packages must
+  pass.
 - Race detector: `go test -race ./...` for any concurrency-relevant
   change (cache invalidation, locks, atomic counters).
 - For unit tests that need a stub server, build a struct literal

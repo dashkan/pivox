@@ -47,7 +47,7 @@ make db-seed
 ### Run
 
 ```sh
-make run-server     # go run -tags dev ./cmd/pivox-cloud serve
+make run-server     # go run ./cmd/pivox-cloud serve
 ```
 
 Default ports: gRPC `:50051`, REST `:8080`, debug `:9090`.
@@ -74,8 +74,9 @@ make api-lint       # Google AIP compliance
 ### Tests
 
 ```sh
-make test                           # all Go unit tests
-go test -tags dev ./...             # includes integration tests (needs Docker for testcontainers)
+make test       # brings up the docker-compose Postgres + rustfs stack
+                # (docker-compose.test.yml) and runs the suite. Idempotent.
+make test-down  # tear the compose stack down
 ```
 
 ## Native App — macOS

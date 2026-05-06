@@ -13,11 +13,11 @@
 
 **Framework:** `go test` (standard library) + `testify/require` for assertions. **No** mocking framework for new code unless explicitly called for below.
 
-**Run:** `go test ./...` (default suite). `go test -tags=dev ./...` for the integration suite. `go test -race ./...` for any change in concurrency-relevant code.
+**Run:** `make test` (brings up the docker-compose Postgres + rustfs stack, then runs the suite). `go test -race ./...` for any change in concurrency-relevant code.
 
 #### Choose the right layer
 
-Decide what bug the test is meant to catch *before* writing it. The wrong layer means tests pass while bugs ship. The migration in [#71](https://github.com/dashkan/pivox/issues/71) is moving the codebase off `MockQuerier`-at-call-shape and onto integration-first.
+Decide what bug the test is meant to catch *before* writing it. The wrong layer means tests pass while bugs ship.
 
 | Layer | When to use | Cost | Catches |
 |---|---|---|---|
@@ -107,32 +107,46 @@ Use sparingly. If you can reproduce the error against a real DB, do that instead
 
 #### Anti-patterns
 
-These get **refused** in code review and CLAUDE.md, regardless of what existing tests do:
+These get **refused** in code review:
 
-- **`internal/testutil/mocks/MockQuerier`-based tests** for new code. Hand-maintained 153-method mock; tests assert call shape, not behavior. Being phased out per #71. New code goes through `grpcharness` or integration. If you're tempted to "match the existing pattern" in a service that uses `MockQuerier`, write the new test in the new shape instead and surface that the package's tests are due for migration.
-- **`mockgen` / `mockery` for gRPC service interfaces.** Use `grpcharness` to dial the real server via bufconn. The full interceptor chain runs; tests assert real outcomes.
-- **Stubbed interceptors.** The interceptor chain is the security boundary. Tests that stub it lie about coverage — "test passes" no longer means "production path passes."
-- **"Did we call `qtx.GetOrg(orgID)` with the right ID" as the sole assertion.** Testing call shape duplicates what integration tests catch via the RPC response. Acceptable when nested inside a richer test; not acceptable as the only point.
-- **Auto-generating `MockQuerier`** (mockery / sqlc-emit-interface tooling). Doesn't fix the testing-implementation problem; just makes the misfit cheaper to maintain. The migration plan is to delete the mock, not automate it.
+- **Mocking `db.Querier`.** The querier mock was deleted in #71;
+  service-layer tests go through `grpcharness` against a real DB
+  (cloned from a per-process template, ~50ms per test).
+- **`mockgen` / `mockery` for gRPC service interfaces.** Use
+  `grpcharness` to dial the real server via bufconn. The full
+  interceptor chain runs; tests assert real outcomes.
+- **Stubbed interceptors.** The interceptor chain is the security
+  boundary. Tests that stub it lie about coverage — "test passes"
+  no longer means "production path passes."
+- **Hand-rolled mocks for interfaces we already mockery-generate.**
+  `authn.Service` is the only externally-controlled boundary; use
+  `internal/testutil/authnmock.NewMockService(t)` (auto-registers
+  `AssertExpectations` in `t.Cleanup`).
+- **Call-shape assertions as the sole assertion.** "We called
+  `qtx.GetOrg(orgID)`" duplicates what an integration test catches
+  via the RPC response. Acceptable as one assertion in a richer
+  test; not acceptable as the only point.
 
 #### Helpers and fixtures
 
-The migration creates these packages (#71 Phase 1):
+- **`internal/testutil/grpcharness/`** — bufconn gRPC server with
+  the production interceptor chain. Canonical home for service-
+  layer integration tests.
+- **`internal/testutil/fixtures/`** — typed `db.X` row factories
+  with deterministic defaults (`fixtures.Org()`, etc.) for tests
+  that work directly against the DB.
+- **`internal/testutil/authnmock/`** — mockery-generated
+  `authn.Service` mock (regenerate via `make mocks`).
+- **`internal/testutil/cryptotest/`** — round-tripping
+  `crypto.Encryptor` for tests that need encryption to *happen*
+  without the KMS round-trip. Distinguishes plaintext from
+  ciphertext so accidental plaintext storage shows up.
+- **`internal/testutil.SetupTestDB`** / **`SetupTestS3`** —
+  per-test Postgres database (cloned from a shared template) and
+  per-test S3 bucket. Cleanup auto-registers via `t.Cleanup`.
 
-- **`internal/testutil/mocksetup/`** — shared mock-setup helpers (`ExpectGetOrg`, `ExpectGetOrgNotFound`, etc.) for the surviving narrow-mock tests.
-- **`internal/testutil/fixtures/`** — shared test-data factories (`fixtures.Org()`, `fixtures.OrgInState(...)`).
-- **`internal/testutil/grpcharness/`** — gRPC test harness (already exists; underused).
-- **`internal/testutil.SetupTestDB`** — testcontainers-go pg setup (already exists).
-
-**Rule of three.** Two copies of an inline test pattern is acceptable; the third triggers helper extraction. "But the existing tests do it inline" is not a reason to add the (N+1)th copy.
-
-#### Migration in progress (#71)
-
-The codebase is migrating off `MockQuerier`-based unit tests toward integration via `grpcharness` + `rivertest`.
-
-- **New code:** integration / pure-function / narrow `pgxmock`. Don't add to the legacy `MockQuerier` pattern.
-- **Existing tests:** untouched until the corresponding service is refactored. When you touch a service for any reason (new feature, bug fix, the #69 LRO migration), migrate that service's tests in the same PR.
-- **Test removal:** the bulk of legacy mock-based tests are pass-through happy-path coverage that gets deleted (their integration replacements cover the same surface). Roughly 25-30% have real value (error branching, argument transformation, permission checks); those get either kept (and migrated to use `mocksetup` helpers) or rewritten as integration tests.
+**Rule of three.** Two copies of an inline test pattern is
+acceptable; the third triggers helper extraction.
 
 ### Rust (Engine)
 
