@@ -62,6 +62,7 @@ func TestNewLro_AtomicallyInsertsOperationAndJob(t *testing.T) {
 		Pool:    pool,
 		River:   riverClient,
 	})
+	t.Cleanup(func() { _ = m.Shutdown(context.Background()) })
 
 	parent := "organizations/acme/spaces/dev"
 	meta, err := structpb.NewStruct(map[string]any{"phase": "VALIDATING"})
@@ -130,6 +131,7 @@ func TestNewLro_RollsBackOnTxFailure(t *testing.T) {
 		Pool:    pool,
 		River:   riverClient,
 	})
+	t.Cleanup(func() { _ = m.Shutdown(context.Background()) })
 
 	cancelledCtx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -168,7 +170,8 @@ func TestNewLro_RequiresPoolAndRiver(t *testing.T) {
 	pool, queries := testutil.SetupTestDB(t)
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	// No Pool, no River.
+	// No Pool, no River. No listen goroutine — pool is nil, so no
+	// Shutdown is needed.
 	m := NewManager(ManagerConfig{Queries: queries, Logger: logger})
 	_, err := m.NewLro(context.Background(), "organizations/acme", NewLroOpts{
 		JobArgs: testJobArgs{},
@@ -176,8 +179,11 @@ func TestNewLro_RequiresPoolAndRiver(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Pool")
 
-	// Pool set, River nil.
+	// Pool set, River nil. The listener goroutine is live; tear it
+	// down via Shutdown so the t.Cleanup pool-close doesn't race
+	// with WaitForNotification.
 	m = NewManager(ManagerConfig{Queries: queries, Logger: logger, Pool: pool})
+	t.Cleanup(func() { _ = m.Shutdown(context.Background()) })
 	_, err = m.NewLro(context.Background(), "organizations/acme", NewLroOpts{
 		JobArgs: testJobArgs{},
 	})

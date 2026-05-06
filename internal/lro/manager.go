@@ -9,6 +9,7 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
+	"time"
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/google/uuid"
@@ -23,6 +24,12 @@ import (
 	"github.com/dashkan/pivox/internal/apierr"
 	db "github.com/dashkan/pivox/internal/db/generated"
 )
+
+// notifyChannel is the Postgres NOTIFY channel the operations
+// trigger fires on; the LISTEN goroutine subscribes to it. Exported
+// only as a const for symmetry with the trigger SQL — there's no
+// other consumer.
+const notifyChannel = "pivox_lro_done"
 
 // WorkFunc performs the actual work for an operation. The supplied
 // `progress` reports phase transitions back to the operation
@@ -91,6 +98,10 @@ type Manager struct {
 	// shutdownOnce makes Shutdown idempotent — repeat callers from
 	// duplicated signal handlers don't double-cancel or re-flip flags.
 	shutdownOnce sync.Once
+	// listenWG tracks the LISTEN goroutine so Shutdown can wait for
+	// it to release its pool connection before the caller closes the
+	// pool. One goroutine when pool is set; zero otherwise.
+	listenWG sync.WaitGroup
 }
 
 // ManagerConfig is the constructor input for Manager.
@@ -124,7 +135,7 @@ func NewManager(cfg ManagerConfig) *Manager {
 		panic("lro: ManagerConfig.Logger is required")
 	}
 	shutdownCtx, shutdownCancel := context.WithCancel(context.Background())
-	return &Manager{
+	m := &Manager{
 		queries:        cfg.Queries,
 		logger:         cfg.Logger,
 		pool:           cfg.Pool,
@@ -133,6 +144,90 @@ func NewManager(cfg ManagerConfig) *Manager {
 		running:        make(map[uuid.UUID]context.CancelFunc),
 		shutdownCtx:    shutdownCtx,
 		shutdownCancel: shutdownCancel,
+	}
+	// LISTEN bridges DB-side completion (workers commit done=true and
+	// the operations trigger fires pg_notify) to in-process
+	// WaitOperation listeners. Without this loop, WaitOperation has
+	// no way to learn that a River-backed LRO has finished except
+	// ctx-timeout-then-DB-read. Skipped when pool is nil so legacy
+	// pool-less callers (none in production today; some tests) don't
+	// fail to construct.
+	if cfg.Pool != nil {
+		m.listenWG.Add(1)
+		go m.listenForCompletions()
+	}
+	return m
+}
+
+// listenForCompletions runs the pg LISTEN loop. Reconnects on error
+// with capped exponential backoff. Exits when shutdownCtx is
+// cancelled (i.e. Shutdown is called).
+func (m *Manager) listenForCompletions() {
+	defer m.listenWG.Done()
+	const (
+		minBackoff = 100 * time.Millisecond
+		maxBackoff = 5 * time.Second
+	)
+	backoff := minBackoff
+	for {
+		if m.shutdownCtx.Err() != nil {
+			return
+		}
+		err := m.listenOnce(m.shutdownCtx)
+		if err == nil || errors.Is(err, context.Canceled) {
+			return
+		}
+		m.logger.Warn("lro: notification listener error; reconnecting",
+			"error", err, "backoff", backoff)
+		select {
+		case <-time.After(backoff):
+		case <-m.shutdownCtx.Done():
+			return
+		}
+		if backoff < maxBackoff {
+			backoff *= 2
+			if backoff > maxBackoff {
+				backoff = maxBackoff
+			}
+		}
+	}
+}
+
+// listenOnce holds a single pgx connection, issues LISTEN, and
+// dispatches each notification to in-process listeners until the
+// context is cancelled or a connection error surfaces. The caller
+// (listenForCompletions) decides whether to retry.
+//
+// One pool slot is occupied for the lifetime of the connection.
+// Default pool sizes (4–10) leave plenty for query traffic; if
+// pool sizing ever becomes tight this can switch to a dedicated
+// pgx.Connect using pool.Config().ConnConfig.
+func (m *Manager) listenOnce(ctx context.Context) error {
+	conn, err := m.pool.Acquire(ctx)
+	if err != nil {
+		return fmt.Errorf("acquire conn for LISTEN: %w", err)
+	}
+	defer conn.Release()
+
+	if _, err := conn.Exec(ctx, "LISTEN "+notifyChannel); err != nil {
+		return fmt.Errorf("LISTEN %s: %w", notifyChannel, err)
+	}
+
+	for {
+		n, err := conn.Conn().WaitForNotification(ctx)
+		if err != nil {
+			return err
+		}
+		opID, parseErr := uuid.Parse(n.Payload)
+		if parseErr != nil {
+			// A malformed payload is a bug in the trigger or a
+			// rogue NOTIFY from outside the schema; log and keep
+			// going so one bad row doesn't kill the listener.
+			m.logger.Warn("lro: invalid notification payload",
+				"payload", n.Payload, "error", parseErr)
+			continue
+		}
+		m.notifyListeners(opID)
 	}
 }
 
@@ -498,6 +593,12 @@ func (m *Manager) Shutdown(ctx context.Context) error {
 	done := make(chan struct{})
 	go func() {
 		m.wg.Wait()
+		// Wait for the LISTEN goroutine to release its pool conn
+		// before returning, so the caller can close the pool
+		// without a "use of closed connection" race. listenWG is
+		// zero when pool was unset (no listener was started); Wait
+		// is a no-op in that case.
+		m.listenWG.Wait()
 		close(done)
 	}()
 

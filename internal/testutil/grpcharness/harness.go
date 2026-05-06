@@ -5,6 +5,7 @@ import (
 	"net"
 	"sync"
 	"testing"
+	"time"
 
 	"buf.build/go/protovalidate"
 	"github.com/jackc/pgx/v5"
@@ -200,6 +201,13 @@ func New(t *testing.T, opts ...Option) *Harness {
 	t.Cleanup(func() {
 		_ = conn.Close()
 		grpcServer.GracefulStop()
+		// Drain the LROManager — releases the LISTEN pool conn so
+		// SetupTestDB's per-test pool.Close (registered earlier via
+		// t.Cleanup) doesn't race with an in-flight WaitForNotification.
+		// 5s ceiling matches the rest of the harness's cleanup budgets.
+		shutCtx, shutCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer shutCancel()
+		_ = lroManager.Shutdown(shutCtx)
 	})
 
 	return h

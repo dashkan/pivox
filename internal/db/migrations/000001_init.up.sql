@@ -101,6 +101,35 @@ CREATE INDEX idx_operations_parent ON operations (parent, create_time DESC);
 -- subset is queried, and only for ops with a populated org_id.
 CREATE INDEX idx_operations_org_pending ON operations (org_id) WHERE done = false AND org_id IS NOT NULL;
 
+-- LRO completion notification: fires pg_notify on every
+-- false→true transition of `done`. Receivers (LROManager.listen)
+-- LISTEN on the `pivox_lro_done` channel and dispatch to in-process
+-- WaitOperation listeners.
+--
+-- Why a trigger instead of inline pg_notify in each query: the
+-- writers split across many call sites (CompleteOperation,
+-- FailOperation, CancelOperation, CancelRunningOpsForOrg, the
+-- LRO worker bookkeeping commits) and live in different processes
+-- (pivox-cloud, pivox-worker). One trigger captures every commit
+-- atomically with the row update — receivers only see the
+-- notification after the row is visible to subsequent reads.
+--
+-- Payload is the operation UUID as text. Truncated to fit Postgres'
+-- 8000-byte NOTIFY limit, but UUIDs are well under that.
+CREATE OR REPLACE FUNCTION notify_lro_done() RETURNS trigger AS $$
+BEGIN
+    IF NEW.done = TRUE AND OLD.done = FALSE THEN
+        PERFORM pg_notify('pivox_lro_done', NEW.id::text);
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER operations_notify_done
+    AFTER UPDATE OF done ON operations
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_lro_done();
+
 -- ============================================================================
 -- organizations
 -- ============================================================================
