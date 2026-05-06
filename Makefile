@@ -69,18 +69,27 @@ dev-air-worker:
 # test depends on test-up so the shared Postgres + rustfs are
 # running. Compose is idempotent — re-runs are no-ops if services
 # are already up. Tear down with `make test-down`.
+# Only run packages that actually have tests. `go test ./...`
+# walks generated proto packages, cmd/ entrypoints, etc. — none
+# of which have tests — and prints noisy `?` lines for each.
+# Filtering via `go list -f` keeps both the runtime and the
+# output focused on packages that earn their cycles.
+#
 # 30s is a hang ceiling, not a runtime budget. Real suite runs in
 # under 10s against the shared compose stack; if a single package
 # starts taking longer, that's a regression worth catching, not
 # accommodating.
+TEST_PACKAGES = $(shell go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./...)
+TEST_PACKAGES_DEV = $(shell go list -tags=dev -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./...)
+
 test: test-up
-	go test -timeout 30s ./...
+	go test -timeout 30s $(TEST_PACKAGES)
 
 # test-dev runs the integration suite under -tags=dev. Same compose
 # dependency; the build tag selects dev-mode variants of a handful
 # of files (see CLAUDE.md "The dev build tag").
 test-dev: test-up
-	go test -tags=dev -timeout 30s ./...
+	go test -tags=dev -timeout 30s $(TEST_PACKAGES_DEV)
 
 # test-up brings up the docker-compose test stack (Postgres +
 # rustfs) and waits for the healthchecks to pass. Idempotent.
