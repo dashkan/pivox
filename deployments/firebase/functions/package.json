@@ -1,15 +1,11 @@
 {
   "name": "functions",
   "scripts": {
-    "build": "DEV=false vite build",
-    "build:dev": "vite build",
+    "build": "vite build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "serve": "pnpm build:dev && firebase emulators:start --only functions",
-    "shell": "pnpm build:dev && firebase functions:shell",
-    "start": "pnpm shell",
     "deploy": "pnpm build && firebase deploy --only functions",
     "logs": "firebase functions:log"
   },

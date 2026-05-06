@@ -2,6 +2,8 @@ package testutil
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"sync"
@@ -11,20 +13,22 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
-// Test rustfs lives in docker-compose.test.yml. `make test-up`
-// starts it; tests connect to a fixed port. Per-test isolation is
-// via per-test buckets.
-//
-// Why docker-compose instead of testcontainers-go: testcontainers
-// starts a fresh container per package by default, which sums to
-// ~10s × N packages of pure container plumbing. The compose stack
-// is up-once-and-reused — every test connects to a running
-// service in milliseconds.
+// Test rustfs lives in docker-compose.test.yml. `make test-up` starts it;
+// tests connect to a fixed port. Per-test isolation is via per-test
+// buckets — bucketFromTestName generates a name that is unique per
+// invocation by appending a random suffix.
 
 const (
 	composeS3Endpoint = "localhost:59000"
 	composeS3User     = "testaccess"
 	composeS3Password = "testsecret"
+
+	// s3MaxBucketName is the S3 ceiling for a bucket label.
+	s3MaxBucketName = 63
+	// s3SuffixHexLen reserves room for a 4-byte random suffix
+	// (8 hex chars + 1 dash separator) so the per-test name never
+	// collides after truncation.
+	s3SuffixHexLen = 8
 )
 
 var (
@@ -33,11 +37,10 @@ var (
 	s3InitErr  error
 )
 
-// SetupTestS3 returns a minio client + endpoint + freshly-created
-// per-test bucket name and a cleanup that drops the bucket. The
-// bucket name is derived from t.Name() so concurrent subtests
-// don't collide.
-func SetupTestS3(t *testing.T) (client *minio.Client, endpoint, bucketName string, cleanup func()) {
+// SetupTestS3 returns a minio client, the compose endpoint, and a
+// freshly-created per-test bucket name. The bucket and its objects
+// are torn down via t.Cleanup, so callers don't manage cleanup.
+func SetupTestS3(t *testing.T) (client *minio.Client, endpoint, bucketName string) {
 	t.Helper()
 	s3InitOnce.Do(initSharedS3Client)
 	if s3InitErr != nil {
@@ -47,28 +50,32 @@ func SetupTestS3(t *testing.T) (client *minio.Client, endpoint, bucketName strin
 	bucketName = bucketFromTestName(t)
 	ctx := context.Background()
 	if err := s3Client.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{}); err != nil {
-		t.Fatalf("failed to create test bucket %q: %v", bucketName, err)
+		t.Fatalf("create test bucket %q: %v", bucketName, err)
 	}
 
-	cleanup = func() {
-		ctx := context.Background()
-		objCh := s3Client.ListObjects(ctx, bucketName, minio.ListObjectsOptions{Recursive: true})
-		for obj := range objCh {
-			if obj.Err != nil {
-				continue
-			}
-			_ = s3Client.RemoveObject(ctx, bucketName, obj.Key, minio.RemoveObjectOptions{})
+	t.Cleanup(func() { teardownBucket(s3Client, bucketName) })
+
+	return s3Client, composeS3Endpoint, bucketName
+}
+
+// teardownBucket removes every object in the bucket and then the
+// bucket itself. Errors are intentionally swallowed — the test has
+// already finished, so a cleanup failure can't affect its result;
+// best-effort is the right shape here.
+func teardownBucket(c *minio.Client, name string) {
+	ctx := context.Background()
+	for obj := range c.ListObjects(ctx, name, minio.ListObjectsOptions{Recursive: true}) {
+		if obj.Err != nil {
+			continue
 		}
-		_ = s3Client.RemoveBucket(ctx, bucketName)
+		_ = c.RemoveObject(ctx, name, obj.Key, minio.RemoveObjectOptions{})
 	}
-
-	return s3Client, composeS3Endpoint, bucketName, cleanup
+	_ = c.RemoveBucket(ctx, name)
 }
 
 // initSharedS3Client connects to the docker-compose rustfs once
-// per test process. Any health check (is rustfs actually up?) is
-// the caller's responsibility — typically `make test-up` waits
-// for the compose healthcheck to pass before returning.
+// per test process. The compose healthcheck guarantees the service
+// is up before tests run; this is purely a client construction.
 func initSharedS3Client() {
 	c, err := minio.New(composeS3Endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(composeS3User, composeS3Password, ""),
@@ -81,14 +88,28 @@ func initSharedS3Client() {
 	s3Client = c
 }
 
-// bucketFromTestName derives a valid S3 bucket name from t.Name().
-// Buckets are lowercase, no slashes/underscores, max 63 chars.
+// bucketFromTestName derives a unique S3-valid bucket name from
+// t.Name(). S3 bucket labels are lowercase, max 63 chars, and may
+// not contain underscores or slashes. We sanitize the test name,
+// truncate to leave room for a random suffix, then append the
+// suffix so concurrent subtests with similar names cannot collide
+// after truncation.
 func bucketFromTestName(t *testing.T) string {
-	name := "test-" + t.Name()
-	name = strings.ToLower(name)
-	name = strings.NewReplacer("/", "-", "_", "-").Replace(name)
-	if len(name) > 63 {
-		name = name[:63]
+	t.Helper()
+
+	const prefix = "test-"
+	maxBase := s3MaxBucketName - len(prefix) - 1 - s3SuffixHexLen // -1 for the dash before the suffix
+
+	base := strings.ToLower(t.Name())
+	base = strings.NewReplacer("/", "-", "_", "-").Replace(base)
+	if len(base) > maxBase {
+		base = base[:maxBase]
 	}
-	return name
+
+	var rnd [s3SuffixHexLen / 2]byte
+	if _, err := rand.Read(rnd[:]); err != nil {
+		// crypto/rand failures are fatal; tests can't proceed.
+		t.Fatalf("generate bucket suffix: %v", err)
+	}
+	return prefix + base + "-" + hex.EncodeToString(rnd[:])
 }

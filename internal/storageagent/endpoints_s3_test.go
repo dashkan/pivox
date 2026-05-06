@@ -24,8 +24,7 @@ func TestNewS3Client_Success(t *testing.T) {
 		t.Skip("skipping S3 integration test in short mode")
 	}
 
-	_, endpoint, bucketName, cleanup := testutil.SetupTestS3(t)
-	t.Cleanup(cleanup)
+	_, endpoint, bucketName := testutil.SetupTestS3(t)
 
 	client, err := newS3Client(&agentv1.S3EndpointConfig{
 		EndpointUri:     "http://" + endpoint,
@@ -42,8 +41,7 @@ func TestNewS3Client_BucketNotFound(t *testing.T) {
 		t.Skip("skipping S3 integration test in short mode")
 	}
 
-	_, endpoint, _, cleanup := testutil.SetupTestS3(t)
-	t.Cleanup(cleanup)
+	_, endpoint, _ := testutil.SetupTestS3(t)
 
 	_, err := newS3Client(&agentv1.S3EndpointConfig{
 		EndpointUri:     "http://" + endpoint,
@@ -78,8 +76,7 @@ func TestEndpointStore_Update_S3(t *testing.T) {
 		t.Skip("skipping S3 integration test in short mode")
 	}
 
-	_, endpoint, bucketName, cleanup := testutil.SetupTestS3(t)
-	t.Cleanup(cleanup)
+	_, endpoint, bucketName := testutil.SetupTestS3(t)
 
 	store := NewEndpointStore(NewMemoryCache(10, 1024*1024))
 	err := store.Update([]*agentv1.EndpointConfig{
@@ -114,8 +111,7 @@ func TestServeS3_Success(t *testing.T) {
 		t.Skip("skipping S3 integration test in short mode")
 	}
 
-	s3Client, endpoint, bucketName, cleanup := testutil.SetupTestS3(t)
-	t.Cleanup(cleanup)
+	s3Client, endpoint, bucketName := testutil.SetupTestS3(t)
 
 	ctx := context.Background()
 	content := "hello world"
@@ -157,8 +153,7 @@ func TestServeS3_NotFound(t *testing.T) {
 		t.Skip("skipping S3 integration test in short mode")
 	}
 
-	_, endpoint, bucketName, cleanup := testutil.SetupTestS3(t)
-	t.Cleanup(cleanup)
+	_, endpoint, bucketName := testutil.SetupTestS3(t)
 
 	store := NewEndpointStore(NewMemoryCache(10, 1024*1024))
 	err := store.Update([]*agentv1.EndpointConfig{
@@ -188,8 +183,7 @@ func TestServeS3_WithCache(t *testing.T) {
 		t.Skip("skipping S3 integration test in short mode")
 	}
 
-	s3Client, endpoint, bucketName, cleanup := testutil.SetupTestS3(t)
-	t.Cleanup(cleanup)
+	s3Client, endpoint, bucketName := testutil.SetupTestS3(t)
 
 	ctx := context.Background()
 	content := "cached hello"
@@ -240,8 +234,7 @@ func TestServeS3_LargeObject_NoCache(t *testing.T) {
 		t.Skip("skipping S3 integration test in short mode")
 	}
 
-	s3Client, endpoint, bucketName, cleanup := testutil.SetupTestS3(t)
-	t.Cleanup(cleanup)
+	s3Client, endpoint, bucketName := testutil.SetupTestS3(t)
 
 	ctx := context.Background()
 

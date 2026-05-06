@@ -1,5 +1,3 @@
-//go:build dev
-
 package grpcharness
 
 import (
@@ -26,6 +24,7 @@ import (
 	"github.com/dashkan/pivox/internal/permission"
 	"github.com/dashkan/pivox/internal/server"
 	"github.com/dashkan/pivox/internal/testutil"
+	"github.com/dashkan/pivox/internal/testutil/cryptotest"
 )
 
 // Harness is the canonical end-to-end test scaffold. It owns a
@@ -105,8 +104,7 @@ func New(t *testing.T, opts ...Option) *Harness {
 		o(cfg)
 	}
 
-	pool, queries, dbCleanup := testutil.SetupTestDB(t)
-	t.Cleanup(dbCleanup)
+	pool, queries := testutil.SetupTestDB(t)
 
 	if cfg.auth == nil {
 		// Default authn looks identities up via queries to populate the
@@ -115,8 +113,12 @@ func New(t *testing.T, opts ...Option) *Harness {
 		cfg.auth = testAuthService{queries: queries}
 	}
 
-	enc, err := crypto.NewEncryptor()
-	require.NoError(t, err)
+	// Tests use a deterministic round-tripping encryptor. KMS would
+	// require live GCP creds per test for no real security signal,
+	// and the recording variant gives every test a stable Encrypt /
+	// Decrypt contract while keeping plaintext distinguishable from
+	// ciphertext (so accidental plaintext storage shows up).
+	enc := cryptotest.New()
 
 	// River client backing the LROManager. Query/insert-only (no
 	// Workers, no Start) — same shape as pivox-cloud's production

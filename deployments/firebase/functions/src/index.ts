@@ -7,8 +7,6 @@ import {
 import { logger } from "firebase-functions/v2";
 import { defineString } from "firebase-functions/params";
 
-declare const __DEV__: boolean;
-
 setGlobalOptions({ maxInstances: 10 });
 
 const pivoxApiUrl = defineString("PIVOX_API_URL", {
@@ -20,30 +18,20 @@ const pivoxApiUrl = defineString("PIVOX_API_URL", {
 /**
  * Returns an Authorization header for calling the Pivox API.
  *
- * Dev mode: returns "Bearer <SHARED_SECRET>" from the environment, matching
- * the Go backend's dev-mode `requireSecret` middleware.
- *
- * Prod mode: mints an OIDC identity token via the Cloud Function's service
- * account, verified by the Go backend against Google's JWKS.
+ * Mints an OIDC identity token via the Cloud Function's service
+ * account; the Go backend validates it against Google's JWKS in
+ * internal_hooks_sync_auth.go.
  */
 async function getAuthorizationHeader(targetAudience: string): Promise<string> {
-  if (__DEV__) {
-    const secret = process.env.SHARED_SECRET;
-    if (!secret) {
-      throw new Error("SHARED_SECRET env var is required in dev mode");
-    }
-    return `Bearer ${secret}`;
-  } else {
-    const { GoogleAuth } = await import("google-auth-library");
-    const auth = new GoogleAuth();
-    const client = await auth.getIdTokenClient(targetAudience);
-    const headers = await client.getRequestHeaders();
-    const bearer = headers.get("Authorization");
-    if (!bearer) {
-      throw new Error("Failed to obtain OIDC identity token");
-    }
-    return bearer;
+  const { GoogleAuth } = await import("google-auth-library");
+  const auth = new GoogleAuth();
+  const client = await auth.getIdTokenClient(targetAudience);
+  const headers = await client.getRequestHeaders();
+  const bearer = headers.get("Authorization");
+  if (!bearer) {
+    throw new Error("Failed to obtain OIDC identity token");
   }
+  return bearer;
 }
 
 /**

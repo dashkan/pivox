@@ -1,7 +1,4 @@
-# air config — hot reload for `pivox-cloud serve` (prod build).
-# Used by `make air`. The dev-mode equivalent (build with `-tags dev`)
-# lives in `.air.dev.toml`, used by `make dev-air`. Two files instead
-# of toggling via env so each mode's `bin` path doesn't collide.
+# air config — hot reload for `pivox-cloud serve`. Used by `make air`.
 #
 # Watching: cmd/, internal/, api/proto/ (regenerated Go), Makefile.
 # Excluding: build-xcode/, native/, web/, deployments/, .docker/,

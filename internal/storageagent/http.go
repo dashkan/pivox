@@ -96,33 +96,27 @@ func (s *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !devSkipAuth {
-		// Read pivox_session cookie.
-		cookie, err := r.Cookie("pivox_session")
-		if err != nil {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-
-		// Parse and validate JWT.
-		claims, err := s.validateJWT(cookie.Value)
-		if err != nil {
-			s.logger.Debug("JWT validation failed", "error", err)
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-
-		// Extract opaque token and authorize path.
-		token, ok := claims["token"].(string)
-		if !ok || token == "" {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-
-		if !s.sessions.Authorize(token, r.URL.Path) {
-			http.Error(w, "Forbidden", http.StatusForbidden)
-			return
-		}
+	// Authenticate via the pivox_session cookie. Every non-OPTIONS
+	// request must carry a valid JWT bound to a granted session.
+	cookie, err := r.Cookie("pivox_session")
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	claims, err := s.validateJWT(cookie.Value)
+	if err != nil {
+		s.logger.Debug("JWT validation failed", "error", err)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	token, ok := claims["token"].(string)
+	if !ok || token == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if !s.sessions.Authorize(token, r.URL.Path) {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
 	}
 
 	// Check denied patterns before serving.

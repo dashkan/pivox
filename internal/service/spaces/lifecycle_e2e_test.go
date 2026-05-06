@@ -1,5 +1,3 @@
-//go:build dev
-
 package spaces_test
 
 import (

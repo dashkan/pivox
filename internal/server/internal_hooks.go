@@ -21,16 +21,11 @@ import (
 )
 
 // InternalHooksConfig is the constructor input for NewInternalHooks.
-// Both the prod (`!dev`) and dev variants of NewInternalHooks take
-// the same Config — the only difference between them is which auth
-// strategy gets bound to the syncIdentity endpoint (OIDC vs.
-// shared-secret).
 type InternalHooksConfig struct {
 	// Queries is the sqlc query interface. Required.
 	Queries db.Querier
-	// SyncAuth carries OIDC validation settings (prod) or the shared
-	// secret (dev). The active fields differ per build tag, but the
-	// struct itself is shared.
+	// SyncAuth carries OIDC validation settings for the
+	// auth:syncIdentity endpoint.
 	SyncAuth config.SyncAuthConfig
 	// DelegatedAuth governs the delegated-auth endpoints.
 	DelegatedAuth config.DelegatedAuthConfig
@@ -60,10 +55,9 @@ type InternalHooks struct {
 	// catches up via TTL.
 	audit *audit.Resolver
 
-	// syncAuth protects the auth:syncIdentity endpoint. The
-	// implementation is selected at compile time via build tags:
-	//   - Production (default): Google Cloud OIDC identity token verification
-	//   - Dev (go build -tags dev): static shared secret
+	// syncAuth protects the auth:syncIdentity endpoint via Google Cloud
+	// OIDC identity token verification. Set during NewInternalHooks
+	// from cfg.SyncAuth.AllowedServiceAccounts and cfg.SyncAuth.Audience.
 	syncAuth func(http.HandlerFunc) http.HandlerFunc
 }
 

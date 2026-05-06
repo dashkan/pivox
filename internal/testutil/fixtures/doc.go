@@ -18,7 +18,9 @@
 //   - UUID default: well-known per-type, prefix 00000000-0000-7000-8000.
 //
 // See `internal/testutil/AGENTS.md` for the broader policy. Fixtures
-// are a transitional helper for legacy `MockQuerier`-based tests
-// during the #71 migration; new service-layer tests should use
-// `grpcharness` instead.
+// are typed row factories for tests that work directly against the
+// DB (filter, lro, anywhere a raw `db.X` is the system under test).
+// Service-layer tests go through `grpcharness` and seed via
+// harness-level helpers (`SeedOwnedOrg`, `SeedOwnedSpace`, etc.) —
+// fixtures are not the right shape there.
 package fixtures

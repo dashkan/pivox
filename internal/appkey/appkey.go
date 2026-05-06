@@ -134,8 +134,18 @@ func decodeToken(s string) ([]byte, error) {
 	return base64.RawURLEncoding.DecodeString(s)
 }
 
-// NewFromEnv loads PIVOX_APP_KEY and builds a Codec. Absence/behavior when
-// unset is build-tag specific — see appkey_dev.go / appkey_prod.go.
+// NewFromEnv loads PIVOX_APP_KEY and builds a Codec. The key MUST be
+// stable across instances behind a load balancer and across restarts —
+// a per-process key would silently break opaque tokens (page cursors,
+// signed redirect URLs) issued by one instance and decrypted on
+// another. We treat an unset env var as a fatal misconfiguration.
+//
+// Tests should construct codecs via NewFromHex with a fixed test key
+// rather than calling NewFromEnv.
 func NewFromEnv() (*Codec, error) {
-	return newFromEnvImpl(os.Getenv("PIVOX_APP_KEY"))
+	keyHex := os.Getenv("PIVOX_APP_KEY")
+	if keyHex == "" {
+		return nil, fmt.Errorf("appkey: PIVOX_APP_KEY is required")
+	}
+	return NewFromHex(keyHex)
 }

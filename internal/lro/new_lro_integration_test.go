@@ -1,5 +1,3 @@
-//go:build dev
-
 package lro
 
 import (
@@ -33,8 +31,7 @@ func (testJobArgs) Kind() string { return "test_lro_enqueue" }
 // a river_job row, in the same transaction. Visible to both queries
 // after the call returns.
 func TestNewLro_AtomicallyInsertsOperationAndJob(t *testing.T) {
-	pool, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
+	pool, queries := testutil.SetupTestDB(t)
 	ctx := context.Background()
 
 	// River's tables live in the `river` schema. SetupTestDB only
@@ -107,8 +104,7 @@ func TestNewLro_AtomicallyInsertsOperationAndJob(t *testing.T) {
 // cancelled before InsertTx — pgx returns ctx.Err() and the deferred
 // Rollback fires.)
 func TestNewLro_RollsBackOnTxFailure(t *testing.T) {
-	pool, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
+	pool, queries := testutil.SetupTestDB(t)
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	driver := riverpgxv5.New(pool)
@@ -169,8 +165,7 @@ func TestNewLro_RollsBackOnTxFailure(t *testing.T) {
 // CreateAndRun path to keep working in test wiring that hasn't
 // migrated.
 func TestNewLro_RequiresPoolAndRiver(t *testing.T) {
-	pool, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
+	pool, queries := testutil.SetupTestDB(t)
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	// No Pool, no River.

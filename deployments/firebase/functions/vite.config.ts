@@ -15,7 +15,4 @@ export default defineConfig({
     sourcemap: true,
     minify: false,
   },
-  define: {
-    __DEV__: JSON.stringify(process.env.DEV !== "false"),
-  },
 });

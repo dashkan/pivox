@@ -1,5 +1,3 @@
-//go:build dev
-
 package storage_test
 
 import (

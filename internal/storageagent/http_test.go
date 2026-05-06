@@ -10,24 +10,21 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
-	agentv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/agent/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func skipIfProdAuth(t *testing.T) {
-	t.Helper()
-	if !devSkipAuth {
-		t.Skip("test requires dev mode (devSkipAuth=true) to bypass auth")
-	}
-}
-
+// testSigningKey is the HS256 secret shared across http test files.
+// 32 bytes — enough entropy for HMAC test fixtures.
 var testSigningKey = []byte("test-secret-key-for-jwt-signing!")
 
+// newTestHTTPServer wires an HTTPServer with the standard test
+// fixtures: in-memory session store, small cache, fresh endpoint
+// store, fresh denied-pattern table, and a stderr-only error logger.
+// Shared across http_test.go and http_auth_test.go.
 func newTestHTTPServer(t *testing.T) (*HTTPServer, *SessionStore, *EndpointStore, *DeniedPatterns) {
 	t.Helper()
 	sessions := NewSessionStore()
@@ -46,17 +43,16 @@ func newTestHTTPServer(t *testing.T) (*HTTPServer, *SessionStore, *EndpointStore
 	return srv, sessions, endpoints, denied
 }
 
-// makeJWT creates a valid HS256 JWT for testing.
-func makeJWT(claims map[string]interface{}, key []byte) string {
+// makeJWT builds a valid HS256 JWT around the given claims signed
+// with key. Used by every test that needs a session cookie.
+func makeJWT(claims map[string]any, key []byte) string {
 	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`))
 	payloadJSON, _ := json.Marshal(claims)
 	payload := base64.RawURLEncoding.EncodeToString(payloadJSON)
-
 	headerPayload := header + "." + payload
 	mac := hmac.New(sha256.New, key)
 	mac.Write([]byte(headerPayload))
 	sig := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
-
 	return headerPayload + "." + sig
 }
 
@@ -74,7 +70,7 @@ func TestNewHTTPServer(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// CORS
+// CORS — runs before auth so OPTIONS doesn't need a session cookie.
 // ---------------------------------------------------------------------------
 
 func TestHTTP_CORSPreflight(t *testing.T) {
@@ -94,6 +90,8 @@ func TestHTTP_CORSPreflight(t *testing.T) {
 func TestHTTP_CORSHeaders_OnGetRequest(t *testing.T) {
 	srv, _, _, _ := newTestHTTPServer(t)
 
+	// CORS headers are set before auth, so an unauthenticated GET
+	// still leaks the CORS metadata browsers need.
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/ep/file.txt", nil)
 	srv.ServeHTTP(w, r)
@@ -112,60 +110,7 @@ func TestHTTP_SetCORSOrigin(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Dev mode skips auth — test denied patterns + endpoint routing
-// ---------------------------------------------------------------------------
-
-func TestHTTP_DeniedPattern(t *testing.T) {
-	skipIfProdAuth(t)
-	srv, _, _, denied := newTestHTTPServer(t)
-	denied.Update([]string{"/secret/*"})
-
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodGet, "/secret/data", nil)
-	srv.ServeHTTP(w, r)
-
-	assert.Equal(t, http.StatusNotFound, w.Code)
-}
-
-func TestHTTP_NoEndpoint(t *testing.T) {
-	skipIfProdAuth(t)
-	srv, _, _, _ := newTestHTTPServer(t)
-
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodGet, "/media/image.png", nil)
-	srv.ServeHTTP(w, r)
-
-	assert.Equal(t, http.StatusNotFound, w.Code)
-}
-
-func TestHTTP_ServeFileRouting(t *testing.T) {
-	skipIfProdAuth(t)
-	srv, _, endpoints, _ := newTestHTTPServer(t)
-
-	dir := t.TempDir()
-	err := os.WriteFile(filepath.Join(dir, "video.mp4"), []byte("video data"), 0o644)
-	require.NoError(t, err)
-
-	err = endpoints.Update([]*agentv1.EndpointConfig{
-		{
-			Name: "organizations/acme/storageGateways/gw1/endpoints/media",
-			Configuration: &agentv1.EndpointConfig_Filesystem{
-				Filesystem: &agentv1.FileSystemEndpointConfig{Path: dir},
-			},
-		},
-	})
-	require.NoError(t, err)
-
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodGet, "/media/video.mp4", nil)
-	srv.ServeHTTP(w, r)
-
-	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Equal(t, "video data", w.Body.String())
-}
-
-// ---------------------------------------------------------------------------
-// SetSigningKey
+// SetSigningKey — verifies that subsequent JWTs validate with the new key.
 // ---------------------------------------------------------------------------
 
 func TestHTTP_SetSigningKey(t *testing.T) {
@@ -173,8 +118,7 @@ func TestHTTP_SetSigningKey(t *testing.T) {
 	newKey := []byte("new-signing-key-1234567890!!!!!!")
 	srv.SetSigningKey(newKey)
 
-	// Build a JWT with the new key and verify it works.
-	token := makeJWT(map[string]interface{}{
+	token := makeJWT(map[string]any{
 		"sub": "user",
 		"exp": float64(time.Now().Add(time.Hour).Unix()),
 	}, newKey)
@@ -185,13 +129,13 @@ func TestHTTP_SetSigningKey(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// JWT validation
+// validateJWT — table-driven malformed-input + happy path.
 // ---------------------------------------------------------------------------
 
 func TestValidateJWT_Valid(t *testing.T) {
 	srv, _, _, _ := newTestHTTPServer(t)
 
-	token := makeJWT(map[string]interface{}{
+	token := makeJWT(map[string]any{
 		"sub":   "user-123",
 		"token": "opaque-abc",
 		"exp":   float64(time.Now().Add(time.Hour).Unix()),
@@ -206,7 +150,7 @@ func TestValidateJWT_Valid(t *testing.T) {
 func TestValidateJWT_Expired(t *testing.T) {
 	srv, _, _, _ := newTestHTTPServer(t)
 
-	token := makeJWT(map[string]interface{}{
+	token := makeJWT(map[string]any{
 		"sub": "user-123",
 		"exp": float64(time.Now().Add(-time.Hour).Unix()),
 	}, testSigningKey)
@@ -219,7 +163,7 @@ func TestValidateJWT_Expired(t *testing.T) {
 func TestValidateJWT_InvalidSignature(t *testing.T) {
 	srv, _, _, _ := newTestHTTPServer(t)
 
-	token := makeJWT(map[string]interface{}{
+	token := makeJWT(map[string]any{
 		"sub": "user-123",
 		"exp": float64(time.Now().Add(time.Hour).Unix()),
 	}, []byte("wrong-key-for-signing-12345678!"))
@@ -232,7 +176,7 @@ func TestValidateJWT_InvalidSignature(t *testing.T) {
 func TestValidateJWT_MalformedToken(t *testing.T) {
 	srv, _, _, _ := newTestHTTPServer(t)
 
-	tests := []struct {
+	cases := []struct {
 		name  string
 		token string
 	}{
@@ -242,9 +186,9 @@ func TestValidateJWT_MalformedToken(t *testing.T) {
 		{"malformed", "not-a-jwt"},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := srv.validateJWT(tt.token)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := srv.validateJWT(tc.token)
 			require.Error(t, err)
 		})
 	}
@@ -253,10 +197,7 @@ func TestValidateJWT_MalformedToken(t *testing.T) {
 func TestValidateJWT_MissingExp(t *testing.T) {
 	srv, _, _, _ := newTestHTTPServer(t)
 
-	token := makeJWT(map[string]interface{}{
-		"sub": "user-123",
-		// no "exp" claim
-	}, testSigningKey)
+	token := makeJWT(map[string]any{"sub": "user-123"}, testSigningKey) // no exp
 
 	_, err := srv.validateJWT(token)
 	require.Error(t, err)
@@ -277,80 +218,4 @@ func TestValidateJWT_InvalidPayload(t *testing.T) {
 	_, err := srv.validateJWT(token)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unmarshal")
-}
-
-// ---------------------------------------------------------------------------
-// ServeHTTP: nil denied patterns (s.denied == nil path)
-// ---------------------------------------------------------------------------
-
-func TestHTTP_NilDeniedPatterns_SkipsDeniedCheck(t *testing.T) {
-	skipIfProdAuth(t)
-	// Build a server with nil denied patterns to exercise the
-	// s.denied != nil guard in ServeHTTP.
-	sessions := NewSessionStore()
-	cache := NewMemoryCache(100, 1024*1024)
-	endpoints := NewEndpointStore(cache)
-	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-
-	srv := NewHTTPServer(Config{
-		Sessions:   sessions,
-		Endpoints:  endpoints,
-		SigningKey: testSigningKey,
-		CORSOrigin: "https://example.com",
-		Logger:     logger,
-	})
-
-	dir := t.TempDir()
-	err := os.WriteFile(filepath.Join(dir, "file.txt"), []byte("content"), 0o644)
-	require.NoError(t, err)
-
-	err = endpoints.Update([]*agentv1.EndpointConfig{
-		{
-			Name: "organizations/acme/storageGateways/gw1/endpoints/ep",
-			Configuration: &agentv1.EndpointConfig_Filesystem{
-				Filesystem: &agentv1.FileSystemEndpointConfig{Path: dir},
-			},
-		},
-	})
-	require.NoError(t, err)
-
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodGet, "/ep/file.txt", nil)
-	srv.ServeHTTP(w, r)
-
-	assert.Equal(t, http.StatusOK, w.Code,
-		"with nil denied patterns, request should proceed to endpoint")
-	assert.Equal(t, "content", w.Body.String())
-}
-
-// ---------------------------------------------------------------------------
-// ServeHTTP: denied pattern does NOT match (falls through to endpoint)
-// ---------------------------------------------------------------------------
-
-func TestHTTP_DeniedPattern_NoMatch_FallsThrough(t *testing.T) {
-	skipIfProdAuth(t)
-	srv, _, endpoints, denied := newTestHTTPServer(t)
-	denied.Update([]string{"/secret/*"})
-
-	dir := t.TempDir()
-	err := os.WriteFile(filepath.Join(dir, "public.txt"), []byte("ok"), 0o644)
-	require.NoError(t, err)
-
-	err = endpoints.Update([]*agentv1.EndpointConfig{
-		{
-			Name: "organizations/acme/storageGateways/gw1/endpoints/media",
-			Configuration: &agentv1.EndpointConfig_Filesystem{
-				Filesystem: &agentv1.FileSystemEndpointConfig{Path: dir},
-			},
-		},
-	})
-	require.NoError(t, err)
-
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodGet, "/media/public.txt", nil)
-	srv.ServeHTTP(w, r)
-
-	assert.Equal(t, http.StatusOK, w.Code,
-		"non-denied path should be served from endpoint")
-	assert.Equal(t, "ok", w.Body.String())
 }

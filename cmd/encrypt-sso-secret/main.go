@@ -1,14 +1,11 @@
 // encrypt-sso-secret encrypts a SsoConfig client_secret with the
 // configured encryptor and writes it to sso_configs.client_secret_ciphertext.
 //
-// Why this exists: the dev SSO seed (scripts/seeds/dev_acme_sso.sql)
-// writes the IdP client_secret as plaintext bytes — fine under
-// dev-mode NoOpEncryptor (passthrough), broken under prod-mode KMS.
-// Re-running the seed against a prod-mode-targeted DB would
-// silently re-poison the column. This tool encrypts using whatever
-// Encryptor is wired (NoOpEncryptor in dev builds, GoogleCloudKMSEncryptor
-// in prod) so the row's bytes match what the running broker can
-// decrypt.
+// Why this exists: SSO seeds historically wrote the IdP
+// client_secret as plaintext bytes, which the running broker
+// can't decrypt. This tool re-encrypts a known plaintext through
+// the production Encryptor (KMS) so the row matches what the
+// broker expects.
 //
 // Production secret rotation should NOT use this tool — go through
 // `Organizations.UpdateSsoConfig` instead, which bumps revision/etag,

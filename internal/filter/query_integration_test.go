@@ -1,5 +1,3 @@
-//go:build dev
-
 package filter
 
 import (
@@ -118,8 +116,7 @@ func TestQueryIntegration_Organizations_NoFilter(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
+	pool, queries := testutil.SetupTestDB(t)
 	ctx := context.Background()
 
 	org1 := createTestOrg(t, queries, uuid.New().String()[:8])
@@ -145,8 +142,7 @@ func TestQueryIntegration_Organizations_WithFilter(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
+	pool, queries := testutil.SetupTestDB(t)
 	ctx := context.Background()
 
 	tag := uuid.New().String()[:8]
@@ -171,8 +167,7 @@ func TestQueryIntegration_Organizations_Pagination(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
+	pool, queries := testutil.SetupTestDB(t)
 	ctx := context.Background()
 
 	createTestOrg(t, queries, uuid.New().String()[:8])
@@ -199,8 +194,7 @@ func TestQueryIntegration_Spaces_NoFilter(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
+	pool, queries := testutil.SetupTestDB(t)
 	ctx := context.Background()
 
 	org := createTestOrg(t, queries, uuid.New().String()[:8])
@@ -231,8 +225,7 @@ func TestQueryIntegration_Spaces_JSONBKeyInjection_Blocked(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
+	pool, queries := testutil.SetupTestDB(t)
 	ctx := context.Background()
 
 	orgA := createTestOrg(t, queries, uuid.New().String()[:8])
@@ -254,8 +247,7 @@ func TestQueryIntegration_Spaces_SoftDelete(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
+	pool, queries := testutil.SetupTestDB(t)
 	ctx := context.Background()
 
 	org := createTestOrg(t, queries, uuid.New().String()[:8])
@@ -290,8 +282,7 @@ func TestQueryIntegration_Spaces_OrderBy(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
+	pool, queries := testutil.SetupTestDB(t)
 	ctx := context.Background()
 
 	org := createTestOrg(t, queries, uuid.New().String()[:8])
@@ -322,8 +313,7 @@ func TestQueryIntegration_TagKeys(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
+	pool, queries := testutil.SetupTestDB(t)
 	ctx := context.Background()
 
 	org := createTestOrg(t, queries, uuid.New().String()[:8])
@@ -352,8 +342,7 @@ func TestQueryIntegration_TagValues(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
+	pool, queries := testutil.SetupTestDB(t)
 	ctx := context.Background()
 
 	org := createTestOrg(t, queries, uuid.New().String()[:8])
@@ -384,8 +373,7 @@ func TestQueryIntegration_TagBindings(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
+	pool, queries := testutil.SetupTestDB(t)
 	ctx := context.Background()
 
 	org := createTestOrg(t, queries, uuid.New().String()[:8])
@@ -419,8 +407,7 @@ func TestQueryIntegration_ApiKeys(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
+	pool, queries := testutil.SetupTestDB(t)
 	ctx := context.Background()
 
 	org := createTestOrg(t, queries, uuid.New().String()[:8])
@@ -445,8 +432,7 @@ func TestQueryIntegration_ApiKeys_SoftDelete(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
+	pool, queries := testutil.SetupTestDB(t)
 	ctx := context.Background()
 
 	org := createTestOrg(t, queries, uuid.New().String()[:8])
@@ -485,8 +471,7 @@ func TestQueryIntegration_InvalidFilter(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, _, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
+	pool, _ := testutil.SetupTestDB(t)
 	ctx := context.Background()
 
 	rf := SpaceFilter()
@@ -501,8 +486,7 @@ func TestQueryIntegration_InvalidOrderBy(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, _, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
+	pool, _ := testutil.SetupTestDB(t)
 	ctx := context.Background()
 
 	rf := SpaceFilter()
@@ -517,8 +501,7 @@ func TestQueryIntegration_CursorPagination(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
+	pool, queries := testutil.SetupTestDB(t)
 	ctx := context.Background()
 
 	org := createTestOrg(t, queries, uuid.New().String()[:8])
@@ -563,8 +546,7 @@ func TestQueryIntegration_PageSizeClamping(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	pool, queries, cleanup := testutil.SetupTestDB(t)
-	defer cleanup()
+	pool, queries := testutil.SetupTestDB(t)
 	ctx := context.Background()
 
 	org := createTestOrg(t, queries, uuid.New().String()[:8])

@@ -1,5 +1,3 @@
-//go:build dev
-
 package apikeys_test
 
 import (

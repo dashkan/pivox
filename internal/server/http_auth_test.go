@@ -14,15 +14,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dashkan/pivox/internal/authn"
+	"github.com/dashkan/pivox/internal/testutil/authnmock"
 )
 
-// silentLogger discards all log output so test runs stay quiet.
+// silentLogger discards log output so test runs stay quiet.
 func silentLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
 func TestRequireAuth_MissingAuthHeader_Returns401(t *testing.T) {
-	auth := new(mockAuthService)
+	auth := authnmock.NewMockService(t)
 	mw := RequireAuth(auth, silentLogger())
 
 	called := false
@@ -37,11 +38,10 @@ func TestRequireAuth_MissingAuthHeader_Returns401(t *testing.T) {
 
 	assert.Equal(t, http.StatusUnauthorized, rr.Code)
 	assert.False(t, called, "handler must not run when auth fails")
-	auth.AssertExpectations(t)
 }
 
 func TestRequireAuth_MalformedBearer_Returns401(t *testing.T) {
-	auth := new(mockAuthService)
+	auth := authnmock.NewMockService(t)
 	mw := RequireAuth(auth, silentLogger())
 
 	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -58,9 +58,9 @@ func TestRequireAuth_MalformedBearer_Returns401(t *testing.T) {
 }
 
 func TestRequireAuth_InvalidToken_Returns401(t *testing.T) {
-	auth := new(mockAuthService)
-	auth.On("VerifyToken", mock.Anything, "bad-token").
-		Return((*authn.Identity)(nil), fmt.Errorf("invalid signature"))
+	auth := authnmock.NewMockService(t)
+	auth.EXPECT().VerifyToken(mock.Anything, "bad-token").
+		Return(nil, fmt.Errorf("invalid signature"))
 
 	mw := RequireAuth(auth, silentLogger())
 	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -73,12 +73,11 @@ func TestRequireAuth_InvalidToken_Returns401(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusUnauthorized, rr.Code)
-	auth.AssertExpectations(t)
 }
 
 func TestRequireAuth_TokenWithoutPivoxClaim_Returns401(t *testing.T) {
-	auth := new(mockAuthService)
-	auth.On("VerifyToken", mock.Anything, "no-claim-token").
+	auth := authnmock.NewMockService(t)
+	auth.EXPECT().VerifyToken(mock.Anything, "no-claim-token").
 		Return(&authn.Identity{
 			UID:    "fb-uid",
 			Claims: map[string]any{}, // no pivox_user_id claim
@@ -95,34 +94,30 @@ func TestRequireAuth_TokenWithoutPivoxClaim_Returns401(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusUnauthorized, rr.Code)
-	auth.AssertExpectations(t)
 }
 
 func TestRequireAuth_ValidToken_AugmentsContext(t *testing.T) {
 	uid := uuid.New()
-	auth := new(mockAuthService)
-	auth.On("VerifyToken", mock.Anything, "good-token").
+	auth := authnmock.NewMockService(t)
+	auth.EXPECT().VerifyToken(mock.Anything, "good-token").
 		Return(&authn.Identity{
-			UID: "fb-uid",
-			Claims: map[string]any{
-				"pivox_user_id": uid.String(),
-			},
+			UID:    "fb-uid",
+			Claims: map[string]any{"pivox_user_id": uid.String()},
 		}, nil)
 
 	mw := RequireAuth(auth, silentLogger())
 
 	var (
-		gotUID    string
-		gotPivox  uuid.UUID
-		gotUIDOK  bool
-		gotPivOK  bool
-		bodySeen  string
-		bodyCheck = "ok-body"
+		gotUID   string
+		gotPivox uuid.UUID
+		gotUIDOK bool
+		gotPivOK bool
+		bodyRan  bool
 	)
 	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotUID, gotUIDOK = AuthenticatedUID(r.Context())
 		gotPivox, gotPivOK = PivoxUserID(r.Context())
-		bodySeen = bodyCheck
+		bodyRan = true
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -132,10 +127,9 @@ func TestRequireAuth_ValidToken_AugmentsContext(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusOK, rr.Code)
+	assert.True(t, bodyRan, "downstream handler must run on success")
 	assert.True(t, gotUIDOK, "AuthenticatedUID must be populated for downstream handler")
 	assert.Equal(t, "fb-uid", gotUID)
 	assert.True(t, gotPivOK, "PivoxUserID must be populated for downstream handler")
 	assert.Equal(t, uid, gotPivox)
-	assert.Equal(t, bodyCheck, bodySeen, "downstream handler must run on success")
-	auth.AssertExpectations(t)
 }

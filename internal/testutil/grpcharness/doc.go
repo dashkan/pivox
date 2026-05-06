@@ -5,11 +5,6 @@
 // the canonical end-to-end test scaffold for any service that
 // participates in the IAM model.
 //
-// Build tag: this package depends on internal/crypto's NoOpEncryptor
-// which is gated behind `//go:build dev`. Tests that import
-// grpcharness must therefore be `//go:build dev` themselves and run
-// with `go test -tags dev ./...`.
-//
 // # Why a shared package
 //
 // Each service's _integration_test.go used to spin up a plain

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/dashkan/pivox/internal/apierr"
@@ -523,10 +522,4 @@ func buildSpaceMemberProto(orgSlug, spaceSlug, roleName string, kind permission.
 		row.GroupID = convert.PgUUID(principalID)
 	}
 	return convert.SpaceMemberToProto(row, orgSlug, spaceSlug, nil)
-}
-
-// isNotFound returns true if err is pgx.ErrNoRows. Defined here as a
-// convenience so handler call sites stay readable.
-func isNotFound(err error) bool {
-	return err == pgx.ErrNoRows
 }

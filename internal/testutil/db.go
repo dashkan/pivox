@@ -64,10 +64,11 @@ var (
 )
 
 // SetupTestDB returns a pool + queries pointing at a fresh per-test
-// database cloned from the package-shared template. cleanup() drops
-// the database. Each call gets a unique DB so concurrent subtests
-// don't see each other's writes.
-func SetupTestDB(t *testing.T) (pool *pgxpool.Pool, queries *db.Queries, cleanup func()) {
+// database cloned from the package-shared template. The database is
+// dropped via t.Cleanup, so callers don't manage cleanup. Each call
+// gets a unique DB so concurrent subtests don't see each other's
+// writes.
+func SetupTestDB(t *testing.T) (pool *pgxpool.Pool, queries *db.Queries) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -87,11 +88,11 @@ func SetupTestDB(t *testing.T) (pool *pgxpool.Pool, queries *db.Queries, cleanup
 		t.Fatalf("open per-test pool: %v", err)
 	}
 
-	cleanup = func() {
+	t.Cleanup(func() {
 		pool.Close()
 		_ = dropDatabase(context.Background(), dbName)
-	}
-	return pool, db.New(pool), cleanup
+	})
+	return pool, db.New(pool)
 }
 
 // initTemplateDB runs once per test process. Cross-process
@@ -119,7 +120,7 @@ func initTemplateDB() {
 		templateInitErr = fmt.Errorf("admin connect for lock: %w", err)
 		return
 	}
-	defer lockConn.Close(ctx)
+	defer func() { _ = lockConn.Close(ctx) }()
 	if _, err := lockConn.Exec(ctx, `SELECT pg_advisory_lock(hashtext($1))`, templateDBName); err != nil {
 		templateInitErr = fmt.Errorf("acquire template lock: %w", err)
 		return
@@ -201,7 +202,7 @@ func templateIsReady(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("admin connect: %w", err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	var exists bool
 	if err := conn.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname = $1)`, templateDBName).Scan(&exists); err != nil {
@@ -216,7 +217,7 @@ func templateIsReady(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("template connect: %w", err)
 	}
-	defer tmplConn.Close(ctx)
+	defer func() { _ = tmplConn.Close(ctx) }()
 
 	var hasMarker bool
 	if err := tmplConn.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = '__pivox_test_template_ready')`).Scan(&hasMarker); err != nil {
@@ -234,7 +235,7 @@ func cloneTemplateInto(ctx context.Context, dbName string) error {
 	if err != nil {
 		return fmt.Errorf("admin connect: %w", err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	// Database identifiers can't be parameterized; the names are
 	// generated from a fixed alphabet (letters/digits) so they're
@@ -279,7 +280,7 @@ func createDatabase(ctx context.Context, name string) error {
 	if err != nil {
 		return fmt.Errorf("admin connect: %w", err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 	if _, err := conn.Exec(ctx, fmt.Sprintf(`CREATE DATABASE %q`, name)); err != nil {
 		return fmt.Errorf("create database %s: %w", name, err)
 	}
@@ -297,7 +298,7 @@ func dropDatabase(ctx context.Context, name string) error {
 	if err != nil {
 		return fmt.Errorf("admin connect: %w", err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 	// Terminate any straggler backends so DROP doesn't fail on
 	// "database is being accessed by other users."
 	_, _ = conn.Exec(ctx, `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = $1 AND pid <> pg_backend_pid()`, name)

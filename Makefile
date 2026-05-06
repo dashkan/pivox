@@ -1,11 +1,11 @@
-.PHONY: build run test tidy lint lint-fix fmt generate \
-       air dev-air mocks \
-       lint-proto proto-format proto-breaking proto-generate \
-       proto-generate-go proto-generate-native build-grpc-swift-2-plugin api-lint \
-       db-up db-down db-migrate db-force db-seed db-clear db-drop db-create \
-       docker-up docker-down firebase-emu firebase-deploy clean-fn-revisions \
-       proxy-nginx proxy-nginx-stop proxy-ngrok \
-       test-native-ui
+.PHONY: build run test test-up test-down tidy lint lint-fix fmt generate \
+	air air-worker mocks \
+	lint-proto proto-format proto-breaking proto-generate \
+	proto-generate-go proto-generate-native build-grpc-swift-2-plugin api-lint \
+	db-up db-down db-migrate db-force db-seed db-clear db-drop db-create \
+	docker-up docker-down firebase-deploy clean-fn-revisions \
+	proxy-nginx proxy-nginx-stop proxy-ngrok \
+	test-native-ui
 
 DATABASE_URL ?= postgresql://localhost:5432/pivox?sslmode=disable
 DATABASE_NAME ?= pivox
@@ -13,20 +13,6 @@ DATABASE_NAME ?= pivox
 TOOL = go tool -modfile=./tools/go.mod
 
 # Build
-
-dev-build:
-	go build -tags dev -o bin/pivox-cloud ./cmd/pivox-cloud
-	go build -tags dev -o bin/pivox-agent ./cmd/pivox-agent
-	go build -tags dev -o bin/pivox-worker ./cmd/pivox-worker
-
-dev-server:
-	go run -tags dev ./cmd/pivox-cloud serve
-
-dev-agent:
-	go run -tags dev ./cmd/pivox-agent storage --token dev-token-local
-
-dev-worker:
-	go run -tags dev ./cmd/pivox-worker
 
 build:
 	go build -o bin/pivox-cloud ./cmd/pivox-cloud
@@ -47,52 +33,32 @@ run-worker:
 # `brew install air`) — it's not bundled in tools/go.mod because
 # its transitive tablewriter v1.x conflicts with api-linter's v0.x
 # requirement.
-#
-# Two targets so the build-tag mode is explicit at the command line —
-# configs/air.toml builds without `-tags dev`, configs/air.dev.toml
-# builds with it. Both write their binary into ./tmp/ under
-# different names so the two modes can run side-by-side without
-# stomping each other.
 
 air:
 	air -c configs/air.toml
 
-dev-air:
-	air -c configs/air.dev.toml
-
 air-worker:
 	air -c configs/air.worker.toml
 
-dev-air-worker:
-	air -c configs/air.worker.dev.toml
-
-# test depends on test-up so the shared Postgres + rustfs are
-# running. Compose is idempotent — re-runs are no-ops if services
-# are already up. Tear down with `make test-down`.
-# Only run packages that actually have tests. `go test ./...`
-# walks generated proto packages, cmd/ entrypoints, etc. — none
-# of which have tests — and prints noisy `?` lines for each.
-# Filtering via `go list -f` keeps both the runtime and the
-# output focused on packages that earn their cycles.
+# Tests run against the shared docker-compose stack (Postgres +
+# rustfs, see docker-compose.test.yml). `make test` brings the stack
+# up first; compose is idempotent so re-runs are no-ops if it's
+# already running. Tear down with `make test-down`.
+#
+# We list only packages that actually have tests so `?  no test
+# files` lines for generated proto packages and cmd entrypoints
+# don't drown out the signal.
 #
 # 30s is a hang ceiling, not a runtime budget. Real suite runs in
-# under 10s against the shared compose stack; if a single package
-# starts taking longer, that's a regression worth catching, not
-# accommodating.
+# under 10s; if a single package starts taking longer, that's a
+# regression worth catching, not accommodating.
 TEST_PACKAGES = $(shell go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./...)
-TEST_PACKAGES_DEV = $(shell go list -tags=dev -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./...)
 
 test: test-up
 	go test -timeout 30s $(TEST_PACKAGES)
 
-# test-dev runs the integration suite under -tags=dev. Same compose
-# dependency; the build tag selects dev-mode variants of a handful
-# of files (see CLAUDE.md "The dev build tag").
-test-dev: test-up
-	go test -tags=dev -timeout 30s $(TEST_PACKAGES_DEV)
-
-# test-up brings up the docker-compose test stack (Postgres +
-# rustfs) and waits for the healthchecks to pass. Idempotent.
+# test-up brings up the docker-compose test stack and waits for
+# healthchecks. Idempotent.
 test-up:
 	docker compose -p pivox-test -f docker-compose.test.yml up -d --wait
 
@@ -204,9 +170,6 @@ docker-down:
 
 # Firebase
 
-firebase-emu:
-	firebase emulators:start --import=.firebase-data --export-on-exit=.firebase-data --inspect-functions
-
 firebase-deploy:
 	pnpm --dir ./deployments/firebase/functions run deploy
 
@@ -217,10 +180,11 @@ firebase-deploy:
 clean-fn-revisions:
 	@scripts/clean-fn-revisions.sh
 
-# Native UI Tests (macOS)
-
+# Native UI Tests (macOS) — image editor only. The auth UI tests
+# previously depended on the Firebase Auth emulator; they are
+# excluded from this target until they're rewritten to run against
+# real Firebase Auth or a hermetic stub.
 test-native-ui:
-	@echo "=== Image editor tests (DebugUITest, no emulator) ==="
 	@xcodebuild test \
 		-project native/build-xcode/Pivox.xcodeproj \
 		-scheme PivoxUITests \
@@ -228,18 +192,6 @@ test-native-ui:
 		-destination 'platform=macOS' \
 		-only-testing:PivoxUITests/ImageEditorUITests \
 		2>&1 | grep -E "Test Case|passed|failed|skipped|Suite" || true
-	@echo "=== Auth tests (Debug + emulator) ==="
-	@firebase emulators:start --only auth --project pivox-cloud &
-	@sleep 3
-	@xcodebuild test \
-		-project native/build-xcode/Pivox.xcodeproj \
-		-scheme PivoxUITests \
-		-configuration Debug \
-		-destination 'platform=macOS' \
-		-only-testing:PivoxUITests/AuthUITests \
-		2>&1 | grep -E "Test Case|passed|failed|skipped|Suite" || true
-	@-pkill -f "firebase.*emulators" 2>/dev/null
-	@echo "Done."
 
 # Proxy
 
