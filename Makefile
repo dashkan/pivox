@@ -69,14 +69,18 @@ dev-air-worker:
 # test depends on test-up so the shared Postgres + rustfs are
 # running. Compose is idempotent — re-runs are no-ops if services
 # are already up. Tear down with `make test-down`.
+# 30s is a hang ceiling, not a runtime budget. Real suite runs in
+# under 10s against the shared compose stack; if a single package
+# starts taking longer, that's a regression worth catching, not
+# accommodating.
 test: test-up
-	go test ./...
+	go test -timeout 30s ./...
 
 # test-dev runs the integration suite under -tags=dev. Same compose
 # dependency; the build tag selects dev-mode variants of a handful
 # of files (see CLAUDE.md "The dev build tag").
 test-dev: test-up
-	go test -tags=dev ./...
+	go test -tags=dev -timeout 30s ./...
 
 # test-up brings up the docker-compose test stack (Postgres +
 # rustfs) and waits for the healthchecks to pass. Idempotent.
