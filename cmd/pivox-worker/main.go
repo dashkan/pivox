@@ -154,6 +154,7 @@ func serve(cmd *cobra.Command, _ []string) error {
 	// multi-step LROs (DeleteOrganization, etc.) are single workers
 	// today and migrate to River Pro Workflows + Activities later.
 	river.AddWorker(riverWorkers, &workers.UndeleteOrgWorker{Pool: pool, Audit: auditResolver, Logger: logger})
+	river.AddWorker(riverWorkers, &workers.UndeleteSpaceWorker{Pool: pool, Audit: auditResolver, Logger: logger})
 
 	// Periodic job registrations. RunOnStart=true so a freshly-booted
 	// replica does useful work immediately rather than waiting one

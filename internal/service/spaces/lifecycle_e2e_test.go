@@ -10,6 +10,7 @@ import (
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -408,7 +409,7 @@ func waitSpaceOp(t *testing.T, h *grpcharness.Harness, op *longrunningpb.Operati
 }
 
 func newSpacesHarness(t *testing.T) *grpcharness.Harness {
-	return grpcharness.New(t, grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
+	h := grpcharness.New(t, grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
 		callerIdentity := server.NewCallerIdentityResolver(h.Queries)
 		permResolver := permission.NewResolver(h.Queries)
 		codec, err := appkey.NewFromHex(strings.Repeat("ab", 32))
@@ -433,4 +434,33 @@ func newSpacesHarness(t *testing.T) *grpcharness.Harness {
 			LROManager: h.LROManager,
 		}))
 	}))
+	startSpacesLifecycleWorkers(t, h)
+	return h
+}
+
+// startSpacesLifecycleWorkers spins up an in-process River client
+// with the post-Phase-5 space-lifecycle workers registered. Mirrors
+// cmd/pivox-worker/main.go's wiring (same Schema, same driver),
+// scoped to the test. Add new workers here as more LROs port off
+// the legacy goroutine path.
+func startSpacesLifecycleWorkers(t *testing.T, h *grpcharness.Harness) {
+	t.Helper()
+	rw := river.NewWorkers()
+	river.AddWorker(rw, &workers.UndeleteSpaceWorker{
+		Pool:   h.Pool,
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	})
+	c, err := river.NewClient(riverpgxv5.New(h.Pool), &river.Config{
+		Logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Queues:  map[string]river.QueueConfig{river.QueueDefault: {MaxWorkers: 2}},
+		Schema:  "river",
+		Workers: rw,
+	})
+	require.NoError(t, err)
+	require.NoError(t, c.Start(context.Background()))
+	t.Cleanup(func() {
+		stopCtx, stopCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer stopCancel()
+		_ = c.Stop(stopCtx)
+	})
 }

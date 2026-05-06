@@ -25,6 +25,7 @@ import (
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
 	"github.com/dashkan/pivox/internal/server"
+	"github.com/dashkan/pivox/internal/workers"
 
 	"google.golang.org/protobuf/proto"
 )
@@ -564,33 +565,21 @@ func (s *SpacesServer) UndeleteSpace(ctx context.Context, req *apiv1.UndeleteSpa
 
 	spaceID := resolvedSpace.ID
 	orgSlug := resolvedOrg.Slug
-	updatedBy := convert.PgUUID(caller)
 	spaceRsrc := "organizations/" + orgSlug + "/spaces/" + resolvedSpace.Slug
 	initialMeta := &apiv1.UndeleteSpaceMetadata{Space: spaceRsrc}
 
-	return s.lroManager.CreateAndRun(ctx, spaceRsrc, initialMeta,
-		func(workCtx context.Context, _ lro.Progress) (proto.Message, error) {
-			updated, err := s.queries.UndeleteSpace(workCtx, db.UndeleteSpaceParams{
-				ID:        spaceID,
-				UpdatedBy: updatedBy,
-			})
-			if err != nil {
-				if errors.Is(err, pgx.ErrNoRows) {
-					// Either left DELETE_REQUESTED in a race or
-					// purge_time elapsed before the worker fired.
-					return nil, apierr.FailedPrecondition(
-						"space is no longer in DELETE_REQUESTED state (was it purged or restored concurrently?)")
-				}
-				slog.ErrorContext(workCtx, "undelete space failed", "space", spaceRsrc, "error", err)
-				return nil, apierr.Internal("undelete space")
-			}
-			// Best-effort enrichment after commit.
-			actors, resolveErr := s.resolveSpaceActors(workCtx, []db.Space{updated})
-			if resolveErr != nil {
-				slog.WarnContext(workCtx, "undelete space: actor resolution failed; returning proto without audit actors",
-					"space", spaceRsrc, "error", resolveErr)
-				actors = nil
-			}
-			return convert.SpaceToProto(updated, orgSlug, actors), nil
-		})
+	// River-backed: pivox-cloud enqueues the job + creates the
+	// operations row in one tx; pivox-worker's UndeleteSpaceWorker
+	// runs the SQL action and marks the operation done.
+	opID := uuid.New()
+	return s.lroManager.NewLro(ctx, spaceRsrc, lro.NewLroOpts{
+		OperationID: opID,
+		JobArgs: workers.UndeleteSpaceArgs{
+			OperationID: opID,
+			SpaceID:     spaceID,
+			OrgSlug:     orgSlug,
+			UpdatedBy:   caller,
+		},
+		Metadata: initialMeta,
+	})
 }
