@@ -1207,17 +1207,19 @@ class AuthService: NSObject {
         appState.deleteSecure(forKey: "firebase_id_token")
         appState.deleteSecure(forKey: "firebase_refresh_token")
       }
-      // Tear down auth-bound singletons. The chat client's gRPC channel
-      // is bound to the previous user's ID token and must not survive
-      // across user identities — leaving it up would let in-flight
-      // streams keep running and any newly-signed-in user reuse the
-      // channel with their token attached to the prior user's
-      // long-lived connection.
+      // Broadcast to auth-bound singletons that the previous user's
+      // session is gone — they tear down their own state on receipt.
+      // The chat client's gRPC channel is bound to the previous
+      // user's ID token and must not survive across user identities;
+      // OrgService caches per-user memberships that are invalid for
+      // the next sign-in. Both observe `.userDidSignOut` (declared
+      // in `Core/Foundation/Notifications.swift`) and reset
+      // themselves — this keeps Auth from reaching across feature
+      // boundaries to name AIChat / Org types directly (see #78).
       //
-      // signOut is @MainActor so this call is statically guaranteed
-      // to be on the main actor — no runtime assertion needed.
-      AIChatService.shared.reset()
-      OrgService.shared.reset()
+      // signOut is @MainActor so the post happens on main; observers
+      // re-isolate to their own actor before calling reset().
+      NotificationCenter.default.post(name: .userDidSignOut, object: nil)
     } catch {
       errorMessage = "Failed to sign out: \(error.localizedDescription)"
     }

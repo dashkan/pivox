@@ -51,7 +51,20 @@ final class OrgService {
     private let appState = AppStateBridge.shared()
     private static let selectedOrgKey = "selected_org_id"
 
-    private init() {}
+    private init() {
+        // Drop cached memberships on sign-out — the next sign-in's
+        // user has their own org list. AuthService posts
+        // `.userDidSignOut`; we observe and `reset()`.
+        NotificationCenter.default.addObserver(
+            forName: .userDidSignOut, object: nil, queue: .main
+        ) { [weak self] _ in
+            // Observer closure isn't @MainActor-isolated by default;
+            // hop into the actor before touching state.
+            Task { @MainActor [weak self] in
+                self?.reset()
+            }
+        }
+    }
 
     /// Call after a successful sign-in. Fetches memberships and
     /// promotes the persisted (or first) org to `current`. Idempotent

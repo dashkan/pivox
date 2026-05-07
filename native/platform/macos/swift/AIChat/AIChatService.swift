@@ -76,7 +76,25 @@ final class AIChatService {
     /// you were away. Re-selecting the SAME conversation is a no-op.
     private var current: (name: String, vm: ConversationViewModel)?
 
-    private init() {}
+    private init() {
+        // Tear down the per-user gRPC channel on sign-out — the
+        // chat client is bound to the previous user's ID token and
+        // can't safely survive across user identities. AuthService
+        // posts `.userDidSignOut`; we observe and `reset()`. This
+        // is the inverse of having Auth name AIChatService directly,
+        // which would violate the layer-direction rule (#78).
+        NotificationCenter.default.addObserver(
+            forName: .userDidSignOut, object: nil, queue: .main
+        ) { [weak self] _ in
+            // The notification posts on the main thread, but the
+            // observer closure isn't @MainActor-isolated by default.
+            // Hop to MainActor explicitly so we can call into
+            // `@MainActor`-isolated `reset()` cleanly.
+            Task { @MainActor [weak self] in
+                self?.reset()
+            }
+        }
+    }
 
     /// Idempotent connect — returns immediately if already
     /// connected. Called from the container view's `.task` so the
