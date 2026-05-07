@@ -4,7 +4,7 @@
 	proto-generate-go proto-generate-native build-grpc-swift-2-plugin api-lint \
 	db-up db-down db-migrate db-force db-seed db-clear db-drop db-create \
 	docker-up docker-down firebase-deploy clean-fn-revisions \
-	proxy-nginx proxy-nginx-stop proxy-ngrok \
+	proxy-nginx proxy-nginx-stop proxy-nginx-reload proxy-ngrok \
 	test-native-ui
 
 DATABASE_URL ?= postgresql://localhost:5432/pivox?sslmode=disable
@@ -200,6 +200,12 @@ proxy-nginx:
 
 proxy-nginx-stop:
 	nginx -c $(PWD)/configs/nginx.conf -s stop
+
+# Re-read configs/nginx.conf without dropping in-flight connections.
+# Use after editing locations/upstreams; the running master forks
+# new workers with the fresh config and gracefully drains the old.
+proxy-nginx-reload:
+	nginx -c $(PWD)/configs/nginx.conf -s reload
 
 proxy-ngrok:
 	ngrok start --config configs/ngrok.yml --all
