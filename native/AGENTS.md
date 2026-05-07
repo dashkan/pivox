@@ -30,7 +30,13 @@ AIElements/          Vercel AI Elements 1:1 layer — depends on Core
   Components/        the elements themselves: Message/, future
                      Reasoning/, Tool/, etc.
 AIChat/              feature — depends on Core, AIElements
-  Window/, Transcript/, History/
+  AIChatService.swift, AIChatState.swift   (feature-root: app-lifetime
+                                            singletons + observable state)
+  Client/              ChatClient.swift    (gRPC client wrapper)
+  Window/              window/panel chrome (AIChatWindow, InlineAIChatPanel,
+                       AIChatContainerView, ChatResizeHandle)
+  Transcript/          conversation rendering + composer
+  History/             conversation list + popover
 Auth/                feature — depends on Core
 ImageEditor/         feature — depends on Core
 Settings/            feature — depends on Core

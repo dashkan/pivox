@@ -49,16 +49,20 @@ struct SurfaceModifier: ViewModifier {
         }
     }
 
+    // Helpers below are only consulted from the `default:` branch of
+    // `body(content:)`. `.floating` is routed separately to support
+    // `glassEffect` on macOS 26+; its cases here are listed solely
+    // for switch-exhaustiveness and document the fallback the
+    // outer `#available(macOS 26, *) else` branch produces — keeping
+    // them aligned means a future routing change won't silently drop
+    // the floating-card visual contract.
     private var backgroundForLevel: some ShapeStyle {
         switch level {
         case .base:
             return AnyShapeStyle(theme.background)
         case .raised:
             return AnyShapeStyle(theme.backgroundRaised)
-        case .elevated:
-            return AnyShapeStyle(.ultraThinMaterial)
-        case .floating:
-            // Handled above with `#available` to support Liquid Glass.
+        case .elevated, .floating:
             return AnyShapeStyle(.ultraThinMaterial)
         }
     }
