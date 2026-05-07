@@ -356,6 +356,39 @@ private extension Pivox_Ai_V1_Message {
     .frame(width: 360)
 }
 
+/// Exercises the full `Message → MarkdownView → CodeBlockView`
+/// rendering path — prose + a fenced code block in one assistant
+/// turn, the most common shape of a real chat response. The
+/// standalone `CodeBlockView` previews in `MarkdownView.swift`
+/// only cover the code-block in isolation; this one catches
+/// integration regressions (spacing between prose and the code
+/// block, action-row placement under variable content height,
+/// fade-mask interaction with the surrounding bubble).
+#Preview("Assistant — prose + code block") {
+    Message(
+        message: .sampleAssistant("""
+        Here's a small Swift helper that resolves the auth token,
+        refreshing if expired:
+
+        ```swift
+        func resolveToken(refresh: Bool = false) async throws -> String {
+            if let cached = tokenCache.current, !refresh {
+                return cached
+            }
+            let fresh = try await session.refresh()
+            tokenCache.store(fresh, ttl: .minutes(30))
+            return fresh
+        }
+        ```
+
+        Call `resolveToken(refresh: true)` to force a refresh.
+        """),
+        actionsVisibility: .pinned
+    )
+    .padding()
+    .frame(width: 360)
+}
+
 #Preview("Assistant — markdown stress test") {
     Message(
         message: .sampleAssistant("""
