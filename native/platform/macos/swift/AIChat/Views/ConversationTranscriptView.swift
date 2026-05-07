@@ -1071,12 +1071,30 @@ struct ConversationTranscriptView: NSViewRepresentable {
         /// closure identity or NSHostingView will re-render every
         /// row on every mutation. Deferred to a later phase.
         private func makeMessageCell(message: Pivox_Ai_V1_Message, pinActions: Bool) -> NSView {
-            let hosting = NSHostingView(rootView: Message(
+            let hosting = NSHostingView(rootView: messageBody(message, pinActions: pinActions))
+            return wrapInCell(hosting)
+        }
+
+        /// Single source of truth for the SwiftUI cell content.
+        /// Both the cell-construction path (`makeMessageCell`) and
+        /// the measurement path (`measureMessageHeight`) route
+        /// through here, so they cannot drift on init args. The
+        /// pinActions-vs-render bug that bit before — measurement
+        /// hardcoded `pinActions: false` while the cell rendered
+        /// with `true` — was structurally possible only because
+        /// the two sites independently spelled out the Message
+        /// initializer. Adding a new height-affecting parameter to
+        /// `Message` now becomes a compile error in this one
+        /// function instead of a silent measurement under-count.
+        private func messageBody(
+            _ message: Pivox_Ai_V1_Message,
+            pinActions: Bool
+        ) -> some View {
+            Message(
                 message: message,
                 pinActions: pinActions,
                 onEditSubmit: nil,
-                onRegenerate: nil))
-            return wrapInCell(hosting)
+                onRegenerate: nil)
         }
 
         private func makeBoundaryCell(pageNumber: Int) -> NSView {
@@ -1164,12 +1182,8 @@ struct ConversationTranscriptView: NSViewRepresentable {
         /// frame without dropping frames.
         private func measureMessageHeight(_ message: Pivox_Ai_V1_Message, pinActions: Bool, width: CGFloat) -> CGFloat {
             sizingHost.rootView = AnyView(
-                Message(
-                    message: message,
-                    pinActions: pinActions,
-                    onEditSubmit: nil,
-                    onRegenerate: nil)
-                .frame(width: width, alignment: .leading)
+                messageBody(message, pinActions: pinActions)
+                    .frame(width: width, alignment: .leading)
             )
             sizingHost.view.layoutSubtreeIfNeeded()
             let fitting = sizingHost.sizeThatFits(in: NSSize(width: width, height: .greatestFiniteMagnitude))
