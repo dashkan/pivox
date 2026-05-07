@@ -233,17 +233,49 @@ private struct CaretlessOTPInput: NSViewRepresentable {
     }
 }
 
-/// `NSTextField` subclass that clears the caret when it becomes
-/// the first responder. The field editor that draws the caret only
-/// exists while the field is focused, so the override has to live
-/// in `becomeFirstResponder` rather than init / awakeFromNib.
+/// `NSTextField` subclass that hides every visual artifact a user
+/// could see from the underlying input — caret, selection highlight,
+/// selected-text rendering — and pins the cursor to end-of-text so
+/// new digits always append rather than inserting mid-string.
+///
+/// The field editor (an `NSTextView`) only exists while the field is
+/// focused, so the visual configuration lives in
+/// `becomeFirstResponder` rather than init. `mouseDown` is overridden
+/// to snap the cursor back to end-of-text after AppKit's default
+/// click handling — without it, a click mid-field places the cursor
+/// between digits and a subsequent keystroke would insert there
+/// (visually fine since the cells re-derive from the binding, but
+/// surprising for a UX where "type appends at end" is the contract).
 private final class CaretlessTextField: NSTextField {
     override func becomeFirstResponder() -> Bool {
         let didBecome = super.becomeFirstResponder()
         if didBecome, let editor = currentEditor() as? NSTextView {
             editor.insertionPointColor = .clear
+            // `textColor = .clear` on the field handles the
+            // unselected-text case; selection draws through a
+            // SEPARATE attribute dictionary on the field editor,
+            // so we have to clear both keys explicitly. Without
+            // this, clicking + selecting all (or triple-click)
+            // surfaces a purple highlight + the otherwise-hidden
+            // digit string drawn in the selection foreground.
+            editor.selectedTextAttributes = [
+                .foregroundColor: NSColor.clear,
+                .backgroundColor: NSColor.clear,
+            ]
         }
         return didBecome
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        super.mouseDown(with: event)
+        // AppKit's default placed the cursor at the click point —
+        // override and pin to end-of-text. NSTextField's stringValue
+        // is what the parent's `value` binding mirrors, so end-of
+        // -text is "after the last entered digit", which is the
+        // OTP-correct cursor position.
+        guard let editor = currentEditor() else { return }
+        let end = NSRange(location: stringValue.utf16.count, length: 0)
+        editor.selectedRange = end
     }
 }
 
