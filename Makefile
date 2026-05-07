@@ -1,5 +1,5 @@
 .PHONY: build run test test-up test-down tidy lint lint-fix fmt generate \
-	air air-worker mocks dev log-pivox-app-macos run-app-macos ollama-serve \
+	air air-worker mocks dev log-pivox-app-macos run-app-macos build-app-macos ollama-serve \
 	lint-proto proto-format proto-breaking proto-generate \
 	proto-generate-go proto-generate-native build-grpc-swift-2-plugin api-lint \
 	db-up db-down db-migrate db-force db-seed db-clear db-drop db-create \
@@ -180,12 +180,29 @@ firebase-deploy:
 clean-fn-revisions:
 	@scripts/clean-fn-revisions.sh
 
+# build-app-macos builds the macOS app in Debug. No
+# -derivedDataPath flag — this is a CMake-generated Xcode project
+# whose default build location is `native/build-xcode/Debug/Pivox.app`
+# (in-tree, not under Xcode IDE's DerivedData cache), and that's
+# where Xcode IDE Run and `make run-app-macos` both launch from.
+# Splitting the build location with -derivedDataPath produces a
+# .app that nothing else launches from, leaving stale binaries in
+# play.
+build-app-macos:
+	@xcodebuild build \
+		-project native/build-xcode/Pivox.xcodeproj \
+		-scheme Pivox \
+		-configuration Debug \
+		-allowProvisioningUpdates \
+		> /tmp/pivox-xcodebuild.log 2>&1 \
+		|| (echo "build failed; tail of /tmp/pivox-xcodebuild.log:"; tail -30 /tmp/pivox-xcodebuild.log; exit 1)
+
 # run-app-macos opens the most recently built Debug Pivox.app.
-# Assumes the app has already been built (via Xcode IDE or
-# xcodebuild). The .app path is resolved from the project's own
-# build settings so this works regardless of whether the build
-# went to Xcode IDE's default DerivedData or a custom
-# derivedDataPath — no need to hard-code a location.
+# Assumes the app has already been built (Xcode IDE Run, `make
+# build-app-macos`, or any other xcodebuild invocation that lands
+# in the project's default BUILT_PRODUCTS_DIR). The .app path is
+# resolved dynamically so the launch tracks whatever Xcode says
+# the build target is.
 run-app-macos:
 	@APP_DIR=$$(xcodebuild \
 		-project native/build-xcode/Pivox.xcodeproj \
