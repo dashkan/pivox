@@ -265,6 +265,15 @@ struct ConversationTranscriptView: NSViewRepresentable {
         /// resets where it should.
         private var docHasEverOverflowed = false
 
+        /// Last-seen value of `viewModel.state == .streaming`. Used
+        /// in `sync()` to detect streaming-→-idle transitions so we
+        /// can invalidate the last assistant row's cached height
+        /// (its pin-actions visibility just flipped from hidden to
+        /// shown — see `isPinnedActionsRow`). Initialized false so
+        /// the first sync against a streaming-state VM correctly
+        /// fires the "we just entered streaming" branch.
+        private var lastSeenStreaming = false
+
         /// Latches between "fired loadOlder" and "prepend applied or
         /// end-of-history detected". Critical because:
         ///   (a) `viewModel.isLoadingOlder` flips back to false
@@ -407,9 +416,41 @@ struct ConversationTranscriptView: NSViewRepresentable {
             // bottom-pin without this guard.
             if self.viewModel !== viewModel {
                 docHasEverOverflowed = false
+                lastSeenStreaming = false
             }
             self.viewModel = viewModel
             let new = viewModel.messages
+
+            // Detect streaming-→-idle transition. While
+            // `state == .streaming`, the last assistant row hides
+            // its pin-actions row (see `isPinnedActionsRow`); when
+            // streaming finishes the row's cached height — measured
+            // without pin actions — is now stale. Invalidate both
+            // pin-state cache keys for that row so the next
+            // `heightOfRow` re-measures with `pinActions: true`,
+            // then note + reload it so the cell view refreshes
+            // with the icons visible. `viewModel.stickToBottom`
+            // gates the follow-on scroll so the icon row's
+            // height-bump pushes the scroll target if the user is
+            // still pinned to the bottom.
+            let nowStreaming = viewModel.state == .streaming
+            if !nowStreaming, lastSeenStreaming, let lastIdx = lastAssistantRowIndex {
+                let row = rows[lastIdx]
+                heightCache.removeValue(forKey: cacheKey(for: row, pinned: true))
+                heightCache.removeValue(forKey: cacheKey(for: row, pinned: false))
+                lastNotedWidth.removeValue(forKey: cacheKey(for: row, pinned: true))
+                lastNotedWidth.removeValue(forKey: cacheKey(for: row, pinned: false))
+                let last = IndexSet(integer: lastIdx)
+                tableView?.noteHeightOfRows(withIndexesChanged: last)
+                tableView?.reloadData(forRowIndexes: last,
+                                      columnIndexes: IndexSet(integer: 0))
+                if viewModel.stickToBottom {
+                    DispatchQueue.main.async { [weak self] in
+                        self?.scrollToBottom()
+                    }
+                }
+            }
+            lastSeenStreaming = nowStreaming
 
             // Streaming text update: same count, same names, but
             // the last message's text grew. The placeholder
@@ -1164,14 +1205,37 @@ struct ConversationTranscriptView: NSViewRepresentable {
         /// recent assistant message). Mirrors the pin selection
         /// logic in `tableView(_:viewFor:row:)` so measurement and
         /// rendering stay in lockstep.
+        ///
+        /// Hidden while a stream is in flight: the icons are
+        /// interaction targets (copy / regenerate / feedback) and
+        /// there's nothing actionable about a half-rendered
+        /// response yet. They surface the moment streaming
+        /// completes — `sync()` detects the streaming-→-idle
+        /// transition, invalidates the last assistant row's cache
+        /// under both pin-state keys, and notes the row so
+        /// heightOfRow re-measures with the icons included.
         private func isPinnedActionsRow(at index: Int) -> Bool {
             guard index >= 0, index < rows.count else { return false }
+            guard viewModel.state != .streaming else { return false }
             if case .message(let m) = rows[index],
                m.role == .assistant,
                m.name == lastAssistantName {
                 return true
             }
             return false
+        }
+
+        /// Index of the last assistant row, or nil if none.
+        /// Sibling to `lastAssistantName` — same scan, returns the
+        /// row position so we can target it for cache invalidation
+        /// on streaming transitions.
+        private var lastAssistantRowIndex: Int? {
+            for idx in rows.indices.reversed() {
+                if case .message(let m) = rows[idx], m.role == .assistant {
+                    return idx
+                }
+            }
+            return nil
         }
 
         /// Current column width, or a best-effort fallback. The
