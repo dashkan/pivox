@@ -21,10 +21,14 @@ import SwiftUI
 ///
 /// ## Other features
 ///  * Client-side filter by title (case-insensitive substring).
-///  * Pull-to-refresh + infinite scroll: the two gestures live at
-///    opposite edges of the list and don't conflict — pull-down at
-///    the top reloads from the first page; scroll-past-last loads
-///    older.
+///  * Refresh: small chrome icon next to the search field, ⌘R
+///    keyboard shortcut. `.refreshable` was tried and abandoned —
+///    macOS list-in-popover doesn't surface the overscroll-pull
+///    gesture reliably (Mail / Spotlight / Notes don't even use
+///    it), so a visible chrome target plus the conventional
+///    ⌘R is the load-bearing path.
+///  * Infinite scroll on bottom edge — last row entering viewport
+///    fires loadMore.
 ///  * Inline rename (hover row → pencil → in-place TextField,
 ///    Return/Esc commits/cancels).
 ///  * Inline delete with optimistic UI + scale/fade transition. No
@@ -91,23 +95,40 @@ public struct ConversationHistoryPopover: View {
     // MARK: - Filter bar
 
     private var searchField: some View {
-        NativeSearchField(
-            text: $searchText,
-            placeholder: "Filter by title",
-            onArrowDown: {
-                guard let first = filtered.first else { return }
-                selection = first.name
-                focus = .list
-            },
-            onCancel: {
-                if !searchText.isEmpty {
-                    searchText = ""
-                } else {
-                    dismiss()
+        HStack(spacing: 6) {
+            NativeSearchField(
+                text: $searchText,
+                placeholder: "Filter by title",
+                onArrowDown: {
+                    guard let first = filtered.first else { return }
+                    selection = first.name
+                    focus = .list
+                },
+                onCancel: {
+                    if !searchText.isEmpty {
+                        searchText = ""
+                    } else {
+                        dismiss()
+                    }
                 }
+            )
+            .focused($focus, equals: .search)
+
+            // Refresh affordance. macOS's `.refreshable` overscroll
+            // gesture is unreliable on lists-in-popovers (no native
+            // analog in Apple's own apps), and ⌘R alone is too
+            // discoverable-only. A small chrome icon adjacent to
+            // the search field gives mouse users a visible target
+            // while keyboard users still hit ⌘R.
+            IconButton(
+                systemName: "arrow.clockwise",
+                label: "Refresh",
+                help: "Refresh"
+            ) {
+                Task { await viewModel.load() }
             }
-        )
-        .focused($focus, equals: .search)
+            .disabled(viewModel.state == .loading)
+        }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
     }
@@ -193,9 +214,6 @@ public struct ConversationHistoryPopover: View {
         }
         .listStyle(.sidebar)
         .focused($focus, equals: .list)
-        .refreshable {
-            await viewModel.load()
-        }
         // ⌘Delete on a focused/selected row deletes it. macOS-native
         // alternative for the hover-reveal trash button — same
         // shortcut Mail uses. Selection drives which row dies.
