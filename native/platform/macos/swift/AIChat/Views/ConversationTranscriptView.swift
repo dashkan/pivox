@@ -266,12 +266,14 @@ struct ConversationTranscriptView: NSViewRepresentable {
         private var docHasEverOverflowed = false
 
         /// Last-seen value of `viewModel.state == .streaming`. Used
-        /// in `sync()` to detect streaming-→-idle transitions so we
-        /// can invalidate the last assistant row's cached height
-        /// (its pin-actions visibility just flipped from hidden to
-        /// shown — see `isPinnedActionsRow`). Initialized false so
-        /// the first sync against a streaming-state VM correctly
-        /// fires the "we just entered streaming" branch.
+        /// in `sync()` to detect streaming transitions in either
+        /// direction so we can invalidate the last assistant row's
+        /// cached height — its `MessageActionsVisibility` flips
+        /// between `.suppressed` (no action row in layout) and
+        /// `.pinned` (action row reserves height) on every state
+        /// change. See `actionsVisibility(forRow:)`. Initialized
+        /// false so the first sync against an already-streaming VM
+        /// fires the "entered streaming" branch.
         private var lastSeenStreaming = false
 
         /// Latches between "fired loadOlder" and "prepend applied or
@@ -384,23 +386,77 @@ struct ConversationTranscriptView: NSViewRepresentable {
             scrollView.reflectScrolledClipView(scrollView.contentView)
         }
 
-        /// Routes a scroll wheel event: if it's inside our scroll
-        /// view and predominantly vertical, we deliver it directly
-        /// to our scroll view and consume it (return nil). If it's
-        /// predominantly horizontal, we let it continue down the
-        /// normal dispatch path so code blocks' inner horizontal
-        /// scrolling still works. Events outside our scroll view or
-        /// from other windows pass through unchanged.
+        /// Direction-locked axis for the current trackpad scroll
+        /// session. Picked once at `.began`, held until `.ended` /
+        /// momentum ends, then reset. Mirrors NSScrollView's
+        /// internal direction-lock so a "mostly vertical" swipe
+        /// with a few pixels of X jitter doesn't toggle between
+        /// the transcript's vertical scroll and a code block's
+        /// inner horizontal scroll mid-gesture.
+        private enum LockedAxis { case undecided, vertical, horizontal }
+        private var lockedAxis: LockedAxis = .undecided
+
+        /// Routes a scroll wheel event using the session-locked
+        /// axis. The previous shape classified per-event by
+        /// comparing |deltaX| vs |deltaY|, which loses to natural
+        /// trackpad noise — a vertical swipe ticks where
+        /// |deltaX| > |deltaY| momentarily would fall through to
+        /// the inner horizontal scroller, producing the "fighting
+        /// the scroll" feel.
+        ///
+        /// Lock the axis at `.began` based on whichever delta
+        /// dominates that first tick, hold the decision for the
+        /// rest of the session, and reset on `.ended` / momentum
+        /// ended. Events outside our scroll view, from other
+        /// windows, or scrollbar-drag events (no `.began` phase)
+        /// pass through unchanged.
         private func routeScrollEvent(_ event: NSEvent) -> NSEvent? {
             guard let scrollView, let window = scrollView.window,
                   event.window === window else { return event }
             let pointInScroll = scrollView.convert(event.locationInWindow, from: nil)
             guard scrollView.bounds.contains(pointInScroll) else { return event }
-            if abs(event.scrollingDeltaY) >= abs(event.scrollingDeltaX) {
+
+            // Mouse-wheel events (no phase data) — treat each tick
+            // independently with the previous heuristic. Trackpad
+            // events carry phase; lock-and-hold below.
+            if event.phase == [] && event.momentumPhase == [] {
+                if abs(event.scrollingDeltaY) >= abs(event.scrollingDeltaX) {
+                    scrollView.scrollWheel(with: event)
+                    return nil
+                }
+                return event
+            }
+
+            // Pick axis at the start of a scroll gesture.
+            if event.phase.contains(.began) {
+                lockedAxis = abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY)
+                    ? .horizontal
+                    : .vertical
+            }
+            // Reset at the end of the gesture (incl. momentum).
+            if event.phase.contains(.ended) || event.phase.contains(.cancelled) ||
+               event.momentumPhase.contains(.ended) || event.momentumPhase.contains(.cancelled) {
+                let decision = lockedAxis
+                lockedAxis = .undecided
+                return decision == .vertical ? nil : event
+            }
+
+            switch lockedAxis {
+            case .vertical:
                 scrollView.scrollWheel(with: event)
                 return nil
+            case .horizontal:
+                return event
+            case .undecided:
+                // Momentum ticks past a missed `.began` — fall
+                // back to the per-event heuristic so we don't
+                // strand inputs when a session never opened cleanly.
+                if abs(event.scrollingDeltaY) >= abs(event.scrollingDeltaX) {
+                    scrollView.scrollWheel(with: event)
+                    return nil
+                }
+                return event
             }
-            return event
         }
 
         // MARK: - Sync
@@ -421,25 +477,30 @@ struct ConversationTranscriptView: NSViewRepresentable {
             self.viewModel = viewModel
             let new = viewModel.messages
 
-            // Detect streaming-→-idle transition. While
-            // `state == .streaming`, the last assistant row hides
-            // its pin-actions row (see `isPinnedActionsRow`); when
-            // streaming finishes the row's cached height — measured
-            // without pin actions — is now stale. Invalidate both
-            // pin-state cache keys for that row so the next
-            // `heightOfRow` re-measures with `pinActions: true`,
-            // then note + reload it so the cell view refreshes
-            // with the icons visible. `viewModel.stickToBottom`
-            // gates the follow-on scroll so the icon row's
-            // height-bump pushes the scroll target if the user is
-            // still pinned to the bottom.
+            // Detect any change in streaming state — both directions
+            // matter:
+            //
+            //   - idle → streaming: the last assistant row's
+            //     visibility flips from .pinned (or .hoverReveal)
+            //     to .suppressed. The action row leaves the layout,
+            //     so the row's measured height shrinks. The cache
+            //     entry from before streaming is now stale.
+            //   - streaming → idle: visibility flips back to
+            //     .pinned. Row's measured height grows by the
+            //     action row's space.
+            //
+            // Either direction → invalidate both cache buckets
+            // (in-layout and not-in-layout) for the last assistant
+            // row, note + reload so heightOfRow re-runs against
+            // the new visibility, and follow scroll if the user is
+            // sticky-bottom.
             let nowStreaming = viewModel.state == .streaming
-            if !nowStreaming, lastSeenStreaming, let lastIdx = lastAssistantRowIndex {
+            if nowStreaming != lastSeenStreaming, let lastIdx = lastAssistantRowIndex {
                 let row = rows[lastIdx]
-                heightCache.removeValue(forKey: cacheKey(for: row, pinned: true))
-                heightCache.removeValue(forKey: cacheKey(for: row, pinned: false))
-                lastNotedWidth.removeValue(forKey: cacheKey(for: row, pinned: true))
-                lastNotedWidth.removeValue(forKey: cacheKey(for: row, pinned: false))
+                heightCache.removeValue(forKey: cacheKey(for: row, actionsInLayout: true))
+                heightCache.removeValue(forKey: cacheKey(for: row, actionsInLayout: false))
+                lastNotedWidth.removeValue(forKey: cacheKey(for: row, actionsInLayout: true))
+                lastNotedWidth.removeValue(forKey: cacheKey(for: row, actionsInLayout: false))
                 let last = IndexSet(integer: lastIdx)
                 tableView?.noteHeightOfRows(withIndexesChanged: last)
                 tableView?.reloadData(forRowIndexes: last,
@@ -492,8 +553,8 @@ struct ConversationTranscriptView: NSViewRepresentable {
                     // filled). Invalidate the pinned key so the
                     // next heightOfRow re-measures with the icons
                     // included.
-                    let pinned = isPinnedActionsRow(at: lastRowIdx)
-                    let key = cacheKey(for: rows[lastRowIdx], pinned: pinned)
+                    let key = cacheKey(for: rows[lastRowIdx],
+                                       actionsInLayout: actionsInLayout(forRow: lastRowIdx))
                     heightCache.removeValue(forKey: key)
                     lastNotedWidth.removeValue(forKey: key)
                     let last = IndexSet(integer: lastRowIdx)
@@ -708,8 +769,13 @@ struct ConversationTranscriptView: NSViewRepresentable {
                 let msg = newMessages[i]
                 // Prepended rows are older than every existing row,
                 // so they're never the last assistant — pinned=false.
-                let h = measureMessageHeight(msg, pinActions: false, width: width)
-                let key = cacheKey(for: .message(msg), pinned: false)
+                // Prepended rows are older than every existing
+                // row, so they're never the streaming placeholder
+                // and never the pinned last assistant — hover-reveal
+                // is the right shape, and the action row IS in
+                // their layout (so actionsInLayout is true).
+                let h = measureMessageHeight(msg, actionsVisibility: .hoverReveal, width: width)
+                let key = cacheKey(for: .message(msg), actionsInLayout: true)
                 heightCache[key] = h
                 lastNotedWidth[key] = width
                 insertedHeight += h
@@ -1047,7 +1113,8 @@ struct ConversationTranscriptView: NSViewRepresentable {
             var toNote = IndexSet()
             let range = visible.location..<(visible.location + visible.length)
             for row in range where row >= 0 && row < rows.count {
-                let key = cacheKey(for: rows[row], pinned: isPinnedActionsRow(at: row))
+                let key = cacheKey(for: rows[row],
+                                   actionsInLayout: actionsInLayout(forRow: row))
                 if lastNotedWidth[key] != width {
                     lastNotedWidth[key] = width
                     heightCache.removeValue(forKey: key)
@@ -1073,15 +1140,15 @@ struct ConversationTranscriptView: NSViewRepresentable {
         /// `lastNotedWidth`).
         func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
             let width = effectiveWidth(tableView: tableView)
-            let pinned = isPinnedActionsRow(at: row)
-            let key = cacheKey(for: rows[row], pinned: pinned)
+            let visibility = actionsVisibility(forRow: row)
+            let key = cacheKey(for: rows[row], actionsInLayout: visibility != .suppressed)
             if lastNotedWidth[key] == width, let cached = heightCache[key] {
                 return cached
             }
             let measured: CGFloat
             switch rows[row] {
             case .message(let msg):
-                measured = measureMessageHeight(msg, pinActions: pinned, width: width)
+                measured = measureMessageHeight(msg, actionsVisibility: visibility, width: width)
             case .boundary:
                 measured = measureBoundaryHeight(width: width)
             }
@@ -1093,7 +1160,16 @@ struct ConversationTranscriptView: NSViewRepresentable {
         func tableView(_ tableView: NSTableView, viewFor column: NSTableColumn?, row: Int) -> NSView? {
             switch rows[row] {
             case .message(let msg):
-                return makeMessageCell(message: msg, pinActions: msg.name == lastAssistantName)
+                // Render-side actions decision MUST go through the
+                // same `actionsVisibility` helper that measurement
+                // uses. The two sides have to stay in lockstep — if
+                // measurement says "no action row" while rendering
+                // includes one (or vice versa), the cell's intrinsic
+                // size disagrees with the row's frame, NSHostingView
+                // overflows or under-fills, and the icons either
+                // flicker, leave a gap, or clip behind the input box.
+                return makeMessageCell(message: msg,
+                                       actionsVisibility: actionsVisibility(forRow: row))
             case .boundary(let page):
                 return makeBoundaryCell(pageNumber: page)
             }
@@ -1130,8 +1206,9 @@ struct ConversationTranscriptView: NSViewRepresentable {
         /// now. When we wire them, we'll need to stabilize the
         /// closure identity or NSHostingView will re-render every
         /// row on every mutation. Deferred to a later phase.
-        private func makeMessageCell(message: Pivox_Ai_V1_Message, pinActions: Bool) -> NSView {
-            let hosting = NSHostingView(rootView: messageBody(message, pinActions: pinActions))
+        private func makeMessageCell(message: Pivox_Ai_V1_Message,
+                                     actionsVisibility: MessageActionsVisibility) -> NSView {
+            let hosting = NSHostingView(rootView: messageBody(message, actionsVisibility: actionsVisibility))
             return wrapInCell(hosting)
         }
 
@@ -1139,20 +1216,20 @@ struct ConversationTranscriptView: NSViewRepresentable {
         /// Both the cell-construction path (`makeMessageCell`) and
         /// the measurement path (`measureMessageHeight`) route
         /// through here, so they cannot drift on init args. The
-        /// pinActions-vs-render bug that bit before — measurement
-        /// hardcoded `pinActions: false` while the cell rendered
-        /// with `true` — was structurally possible only because
-        /// the two sites independently spelled out the Message
-        /// initializer. Adding a new height-affecting parameter to
-        /// `Message` now becomes a compile error in this one
-        /// function instead of a silent measurement under-count.
+        /// measurement-vs-render bug that bit before — the two
+        /// sites passing different action-visibility values —
+        /// was structurally possible only because they
+        /// independently spelled out the Message initializer.
+        /// Adding a new height-affecting parameter to `Message`
+        /// now becomes a compile error in this one function
+        /// instead of a silent measurement under-count.
         private func messageBody(
             _ message: Pivox_Ai_V1_Message,
-            pinActions: Bool
+            actionsVisibility: MessageActionsVisibility
         ) -> some View {
             Message(
                 message: message,
-                pinActions: pinActions,
+                actionsVisibility: actionsVisibility,
                 onEditSubmit: nil,
                 onRegenerate: nil)
         }
@@ -1182,47 +1259,56 @@ struct ConversationTranscriptView: NSViewRepresentable {
 
         // MARK: - Measurement
 
-        /// Cache key for a row. For messages, the `pinned` flag is
-        /// part of the key because the rendered cell's height depends
-        /// on it: the most-recent assistant message renders with a
-        /// pinned action row (thumbs/copy icons) that adds visible
-        /// vertical space. Same message resource at different pin
-        /// states is legitimately a different row height — caching
-        /// by name alone caches the WRONG height for whichever state
-        /// wasn't measured first.
+        /// Cache key for a row.
         ///
-        /// Boundaries don't depend on pin state; the parameter is
-        /// ignored for them.
-        private func cacheKey(for row: Row, pinned: Bool = false) -> String {
+        /// For messages, `actionsInLayout` is part of the key because
+        /// it determines the cell's measured height: when the action
+        /// row is in the layout it reserves its height regardless
+        /// of whether icons are visible (pinned) or hidden behind
+        /// hover; when it's suppressed the row is omitted from the
+        /// layout entirely. `.pinned` and `.hoverReveal` measure
+        /// identically, so we collapse those two states into the
+        /// same key — the cache only needs to distinguish
+        /// "actions present in layout" from "actions absent."
+        ///
+        /// Boundaries don't depend on actions state; the parameter
+        /// is ignored for them.
+        private func cacheKey(for row: Row, actionsInLayout: Bool = true) -> String {
             switch row {
-            case .message(let m): return "m:\(m.name):p=\(pinned ? 1 : 0)"
+            case .message(let m): return "m:\(m.name):a=\(actionsInLayout ? 1 : 0)"
             case .boundary(let p): return "b:\(p)"
             }
         }
 
-        /// Whether the row at `index` should render with pinned
-        /// actions (the action-row icons that appear under the most
-        /// recent assistant message). Mirrors the pin selection
-        /// logic in `tableView(_:viewFor:row:)` so measurement and
-        /// rendering stay in lockstep.
+        /// How the action row should be presented for the row at
+        /// `index`. Single source of truth shared by measurement
+        /// and rendering; both must read the same value so the
+        /// row's measured height matches the rendered cell's
+        /// intrinsic size.
         ///
-        /// Hidden while a stream is in flight: the icons are
-        /// interaction targets (copy / regenerate / feedback) and
-        /// there's nothing actionable about a half-rendered
-        /// response yet. They surface the moment streaming
-        /// completes — `sync()` detects the streaming-→-idle
-        /// transition, invalidates the last assistant row's cache
-        /// under both pin-state keys, and notes the row so
-        /// heightOfRow re-measures with the icons included.
-        private func isPinnedActionsRow(at index: Int) -> Bool {
-            guard index >= 0, index < rows.count else { return false }
-            guard viewModel.state != .streaming else { return false }
+        /// - Last assistant + streaming → `.suppressed` (no
+        ///   actionable target on a half-rendered response, and
+        ///   no reserved layout gap below the streaming text).
+        /// - Last assistant + idle → `.pinned` (always-visible
+        ///   icons on the latest reply, Gemini-style).
+        /// - Any other message → `.hoverReveal` (icons appear on
+        ///   row hover only; layout space is reserved so hover
+        ///   doesn't reflow the cell).
+        private func actionsVisibility(forRow index: Int) -> MessageActionsVisibility {
+            guard index >= 0, index < rows.count else { return .hoverReveal }
             if case .message(let m) = rows[index],
                m.role == .assistant,
                m.name == lastAssistantName {
-                return true
+                return viewModel.state == .streaming ? .suppressed : .pinned
             }
-            return false
+            return .hoverReveal
+        }
+
+        /// True when the action row reserves layout space — i.e.
+        /// any visibility other than `.suppressed`. Drives the
+        /// cache-key bucket.
+        private func actionsInLayout(forRow index: Int) -> Bool {
+            actionsVisibility(forRow: index) != .suppressed
         }
 
         /// Index of the last assistant row, or nil if none.
@@ -1263,9 +1349,11 @@ struct ConversationTranscriptView: NSViewRepresentable {
         /// rendering is main-actor-isolated). The reused `sizingHost`
         /// keeps this cheap enough that we can measure 10+ rows per
         /// frame without dropping frames.
-        private func measureMessageHeight(_ message: Pivox_Ai_V1_Message, pinActions: Bool, width: CGFloat) -> CGFloat {
+        private func measureMessageHeight(_ message: Pivox_Ai_V1_Message,
+                                          actionsVisibility: MessageActionsVisibility,
+                                          width: CGFloat) -> CGFloat {
             sizingHost.rootView = AnyView(
-                messageBody(message, pinActions: pinActions)
+                messageBody(message, actionsVisibility: actionsVisibility)
                     .frame(width: width, alignment: .leading)
             )
             sizingHost.view.layoutSubtreeIfNeeded()

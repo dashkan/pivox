@@ -140,6 +140,14 @@ struct MarkdownView: View {
 /// Header: language chip on the left, copy button on the right.
 /// Content: monospaced attributed string, gray-filled background,
 /// horizontally scrollable for long lines.
+///
+/// We tried wrap (with and without hanging-indent paragraph
+/// styles via NSTextView) — both looked worse than horizontal
+/// scroll for typical chat-scale code. Trade-off accepted: long
+/// lines clip on the right; trackpad swipe-left or the visible
+/// scroll indicator (system "Show scroll bars" preference)
+/// reveals the rest. Verbatim copy is preserved via the copy
+/// button.
 private struct CodeBlockView: View {
     let language: String
     let code: String
@@ -151,13 +159,36 @@ private struct CodeBlockView: View {
             if !language.isEmpty {
                 header
             }
-            ScrollView(.horizontal, showsIndicators: false) {
+            ScrollView(.horizontal) {
                 Text(CodeHighlighter.shared.highlight(code, language: language))
                     .font(.system(.callout, design: .monospaced))
                     .textSelection(.enabled)
                     .padding(.horizontal, 10)
                     .padding(.vertical, language.isEmpty ? 8 : 6)
             }
+            // Trailing fade-mask as a content-overflow hint.
+            // macOS's overlay scroller hides itself for trackpad
+            // users unless actively scrolling, and SwiftUI's
+            // `.scrollIndicators(.visible)` doesn't override that
+            // (system "Show scroll bars" preference wins). The
+            // mask fades the rightmost ~5% of the ScrollView
+            // frame; for short code that fits in the cell the
+            // fade lands on empty space (no visible effect), for
+            // long code that overflows it fades the trailing
+            // characters into transparency — same overflow
+            // affordance ChatGPT and most newsfeed-style readers
+            // use. No AppKit, no introspection, can't desync.
+            .mask(
+                LinearGradient(
+                    stops: [
+                        .init(color: .black, location: 0),
+                        .init(color: .black, location: 0.88),
+                        .init(color: .black.opacity(0), location: 1.0),
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.secondary.opacity(0.12))
@@ -232,3 +263,4 @@ private struct TableBlockView: View {
         .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 }
+

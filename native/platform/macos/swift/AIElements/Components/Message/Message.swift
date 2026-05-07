@@ -12,12 +12,35 @@ import SwiftUI
 /// Feedback buttons are UI-only in v1 (no BE wiring yet). Redo fires the
 /// `onRegenerate` callback which the view resolves by resending the last
 /// user message that preceded this assistant reply.
+/// How the assistant's (and user's) action row participates in
+/// the row's layout.
+///
+/// The distinction matters because the previous boolean
+/// `pinActions` only toggled the row's *opacity* — the row was
+/// always present in the layout and reserved its height. That's
+/// fine for the hover-reveal and pinned cases, but breaks the
+/// "we don't want this row at all right now" case (streaming
+/// placeholder): the row reserved its space, the icons were
+/// invisible due to opacity, and the user saw an empty gap below
+/// the streaming text. Tri-state keeps "pinned" and "hidden"
+/// from being expressible together.
+enum MessageActionsVisibility {
+    /// Action row is always visible. Layout includes it.
+    case pinned
+    /// Action row is in the layout but hidden until row hover.
+    case hoverReveal
+    /// Action row is omitted from the layout entirely. No
+    /// reserved height, no hover affordance. Used for the
+    /// streaming-placeholder case where there's nothing
+    /// actionable about a half-rendered response.
+    case suppressed
+}
+
 struct Message: View {
     let message: Pivox_Ai_V1_Message
-    /// When true, the assistant action row is pinned visible (used for
-    /// the latest assistant turn). When false, the row appears on hover
-    /// only. User actions are always hover-revealed regardless.
-    let pinActions: Bool
+    /// How the action row participates in this message's layout.
+    /// See `MessageActionsVisibility` for the three cases.
+    let actionsVisibility: MessageActionsVisibility
     /// Called when the user confirms an edit on a user message. Receives
     /// the edited text. `nil` disables the edit affordance.
     let onEditSubmit: ((String) -> Void)?
@@ -36,11 +59,11 @@ struct Message: View {
     @State private var thumbsDown = false
 
     init(message: Pivox_Ai_V1_Message,
-         pinActions: Bool = false,
+         actionsVisibility: MessageActionsVisibility = .hoverReveal,
          onEditSubmit: ((String) -> Void)? = nil,
          onRegenerate: (() -> Void)? = nil) {
         self.message = message
-        self.pinActions = pinActions
+        self.actionsVisibility = actionsVisibility
         self.onEditSubmit = onEditSubmit
         self.onRegenerate = onRegenerate
     }
@@ -63,7 +86,7 @@ struct Message: View {
     private var userRow: some View {
         HStack(alignment: .top, spacing: 6) {
             Spacer(minLength: 0)
-            if !editing {
+            if !editing, actionsVisibility != .suppressed {
                 HStack(spacing: 2) {
                     IconButton(systemName: "doc.on.doc",
                                label: "Copy prompt") { copy() }
@@ -76,8 +99,10 @@ struct Message: View {
                 // this offsets the icon center to roughly that baseline).
                 .padding(.top, 5)
                 // Always hit-testable so macOS tooltips can fire during
-                // hover. Opacity alone controls visual reveal.
-                .opacity(isHovered ? 1 : 0)
+                // hover. Opacity alone controls visual reveal — the
+                // icons sit at width 0 of the bubble's leading edge
+                // when hidden, so reflow on hover is invisible.
+                .opacity(actionsVisibility == .pinned || isHovered ? 1 : 0)
                 .animation(.easeInOut(duration: 0.12), value: isHovered)
             }
             // Bubble sizes to content. SwiftUI's .frame(maxWidth:)
@@ -97,16 +122,24 @@ struct Message: View {
     /// Assistant turn: full-width markdown body with an action row below
     /// (thumbs up / down / redo / copy). Last assistant message pins the
     /// row; earlier ones reveal on hover so old turns stay visually
-    /// quiet. Layout order matches Gemini's bubble.
+    /// quiet. Streaming placeholders suppress the row entirely so the
+    /// half-rendered response doesn't sit above an empty action-strip
+    /// gap. Layout order matches Gemini's bubble.
     private var assistantColumn: some View {
         VStack(alignment: .leading, spacing: 6) {
             MarkdownView(textContent)
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            assistantActions
-                .padding(.leading, -4)
-                .opacity(pinActions || isHovered ? 1 : 0)
-                .animation(.easeInOut(duration: 0.12), value: isHovered)
+            // Suppressed → action row is omitted from the layout so
+            // its height isn't reserved. Pinned/hoverReveal → row
+            // is in the layout; opacity drives visual reveal so
+            // hover doesn't reflow the cell.
+            if actionsVisibility != .suppressed {
+                assistantActions
+                    .padding(.leading, -4)
+                    .opacity(actionsVisibility == .pinned || isHovered ? 1 : 0)
+                    .animation(.easeInOut(duration: 0.12), value: isHovered)
+            }
         }
         .contentShape(Rectangle())
         .onHover { isHovered = $0 }
