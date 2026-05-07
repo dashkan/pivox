@@ -10,10 +10,135 @@ Scope: `native/` — Pivox operator application. Stack:
 - Generated proto: SwiftProtobuf + grpc-swift-2 (see
   `native/platform/macos/swift-packages/PivoxModels/`).
 
-This doc is a stub. Full conventions are still being written — until
-they are, defer to the Go backend's `AGENTS.md` for cross-cutting
-rules (component naming, code-quality bar, etc.) and to the patterns
-established in the existing Swift code in `platform/macos/swift/`.
+Defer to the Go backend's `AGENTS.md` for cross-cutting rules
+(component naming, code-quality bar, etc.) that aren't restated here.
+
+## Source layout
+
+Top-level folders under `platform/macos/swift/` are layers, not
+arbitrary categories. Each layer has a defined dependency surface,
+enforced on review (one Xcode target, no compiler enforcement).
+
+```
+App/                 composition root — depends on anything
+Core/                app-wide layer — depends on nothing in the app
+  Foundation/        primitives: Theme, Buttons, Tooltip, Layout,
+                     Avatar, Inputs, Effects, Logging
+AIElements/          Vercel AI Elements 1:1 layer — depends on Core
+  Foundation/        AI-Elements-specific primitives:
+                     Markdown, Highlight, Tooltip
+  Components/        the elements themselves: Message/, future
+                     Reasoning/, Tool/, etc.
+AIChat/              feature — depends on Core, AIElements
+  Window/, Transcript/, History/
+Auth/                feature — depends on Core
+ImageEditor/         feature — depends on Core
+Settings/            feature — depends on Core
+```
+
+### Dependency-direction rule
+
+Code may depend **downward**, never **upward**, never **sideways**.
+
+- `App/` may depend on anything (it composes the app).
+- `AIChat/` may depend on `Core/` and `AIElements/`.
+- `AIElements/` may depend on `Core/` only.
+- Other features (`Auth/`, `ImageEditor/`, `Settings/`) may depend on
+  `Core/` only.
+- `Core/` depends on nothing in the project.
+- **No feature depends on another feature.** AIChat doesn't import
+  from Auth, Auth doesn't import from Settings, etc.
+
+Cross-cutting types that two features need to share belong in `Core/`,
+not duplicated and not stuffed into one feature folder for the other
+to reach into. If `Core/` looks like the wrong home for the shared
+type, the answer is usually that the shared type should be a value
+passed by `App/` rather than imported globally.
+
+### Multi-foundation pattern
+
+Both `Core/Foundation/` and `AIElements/Foundation/` exist. The split
+is intentional, not a duplication:
+
+- **`Core/Foundation/`** — primitives that any feature might need.
+  Theme, generic buttons, tooltips, logging, layout containers, input
+  fields. App-wide.
+- **`AIElements/Foundation/`** — primitives that exclusively serve
+  the AI Elements layer. Markdown rendering, syntax highlighting, the
+  rich hover tooltip used by chat. If a non-chat consumer needs one
+  of these later, promote it to `Core/Foundation/` at that time
+  (`git mv` plus a few imports — cheap).
+
+The pattern generalizes: any layer in the dependency graph may have
+its own internal `Foundation/` for primitives scoped to that layer.
+This is logical modularization without paying SwiftPM's cost.
+
+### When a file's home isn't obvious
+
+Decision tree:
+
+1. Is it a primitive used by ≥2 features across feature boundaries?
+   → `Core/Foundation/<category>/`
+2. Does it exclusively serve AIElements?
+   → `AIElements/Foundation/<category>/` or `AIElements/Components/<element>/`
+3. Is it specific to a single feature?
+   → That feature's folder.
+4. Is it composing the app shell (window mgmt, top-level lifecycle)?
+   → `App/`
+
+If the file naturally pulls in dependencies from multiple features,
+that's a sign you're conflating things — split the file.
+
+### SwiftPM modules
+
+We do **not** split into SwiftPM modules at current scale (~14k LOC,
+single Xcode target). The folder boundaries above ARE the
+modularization. Promoting a layer to a SwiftPM package costs CMake
+plumbing, modulemap fragility, and the loss of `internal` access; the
+benefits (faster preview rebuild, hard team boundaries, public-API
+discipline) don't apply at this size.
+
+If preview rebuilds become slow enough to break flow, OR an
+extraction target appears (e.g., open-sourcing AIElements as a
+package), revisit. Until then: folders.
+
+### Cross-platform intent
+
+The macOS app is the MVP. iOS/iPadOS port is planned (selective —
+not every feature). Windows port is planned via WinUI 3 + .NET, with
+shared C++ logic exposed as WinRT components consumed via C#/WinRT
+projection (P/Invoke only for stateless C-ABI helpers).
+
+For Swift code today, this means:
+
+- **Theme tokens are stored as SwiftUI `Color`** (universal type).
+  AppKit consumers convert at their boundary: `NSColor(theme.foo)`.
+  iOS port flips that to `UIColor(theme.foo)` and the rest of the
+  Swift stack doesn't move.
+- **Avoid incidental `Color(nsColor: .somethingColor)` in pure SwiftUI
+  views.** Use a theme token instead. NSColor is appropriate at
+  AppKit-component boundaries (NSTableView, CGContext drawing,
+  dynamic-color providers), not in SwiftUI views that have no AppKit
+  hunger.
+- **Files in `Foundation/` aspire to universal SwiftUI APIs.** When
+  AppKit bridging is needed (e.g., `NSViewRepresentable` wrapping an
+  AppKit primitive that has a UIKit analog), the public API stays
+  SwiftUI-facing; the bridge implementation can be conditional-
+  compiled (`#if canImport(AppKit)` / `#if canImport(UIKit)`) within
+  the same file for short bridges, or split into platform-suffixed
+  pairs (`Foo+macOS.swift`, `Foo+iOS.swift`) when implementations
+  diverge enough that `#if` blocks become unreadable.
+- **Files with no clean iOS analog** (e.g., things that depend on
+  `NSWindow`'s detached-panel semantics, `NSCursor`, `NSEvent`'s
+  AppKit-specific tracking modes) belong in feature folders, not in
+  `Foundation/`. iOS port for those is a redesign, not a port.
+- **Don't write iOS branches today.** Code that's never been
+  compiled rots. Mark the slot with intent; fill at port time.
+
+`Theme.swift` is the iOS port's first surgery — it sources values
+from AppKit semantic colors (`NSColor.labelColor`, etc.) that lack
+universal SwiftUI cross-platform names. At port time, conditionalize
+the constructor with `#if canImport(AppKit) / canImport(UIKit)`.
 
 ## Build
 
@@ -71,7 +196,7 @@ folder — non-CMake-managed dylibs there are cruft and can be deleted;
 
 ## Logging
 
-- Use `PivoxLog` (`platform/macos/swift/Logging/PivoxLog.swift`) —
+- Use `PivoxLog` (`Core/Foundation/Logging/PivoxLog.swift`) —
   category-scoped `os.Logger` instances. `PivoxLog.chat`, `.auth`,
   `.sso`, `.transcript`, etc.
 - `debugSensitive(_:)` for payloads that may contain tokens or PII.
