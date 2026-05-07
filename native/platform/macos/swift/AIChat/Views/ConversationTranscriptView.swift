@@ -329,25 +329,44 @@ struct ConversationTranscriptView: NSViewRepresentable {
         }
 
         /// Scrolls the clip view origin to the bottom of the
-        /// document. Reads `tableView.frame.height` after a forced
-        /// layout pass — once `heightOfRow` is honest about
-        /// pin-actions content (see `measureMessageHeight`'s
-        /// `pinActions` parameter and `cacheKey`'s pin keying),
-        /// NSTableView's tile produces a frame height that includes
-        /// the last assistant's icon row.
+        /// document.
         ///
-        /// The earlier symptom — last response cut off behind the
-        /// input box — looked like a stale-frame.height bug but was
-        /// actually the height-cache lying: measurement passed
-        /// `pinActions: false` while rendering used `true`, so the
-        /// last row's measured height excluded the icon row's space.
-        /// `frame.height` was right per its inputs; the inputs were
-        /// wrong. Fixing measurement is the load-bearing change;
-        /// this function is just a thin wrapper around the now-honest
-        /// frame.
+        /// Two forces have to align for this to land at the visible
+        /// bottom every time:
+        ///
+        ///  1. Measurement honesty — `heightOfRow` must return the
+        ///     same height the cell actually renders at, including
+        ///     pin-actions overhead for the last assistant.
+        ///     Handled by the `pinActions` parameter on
+        ///     `measureMessageHeight` + pin state in `cacheKey`.
+        ///
+        ///  2. Tile freshness — NSTableView's tile (the pass that
+        ///     turns a sequence of `heightOfRow` answers into the
+        ///     document-view frame) is scheduled lazily by
+        ///     `noteHeightOfRows(withIndexesChanged:)`. The streaming
+        ///     branch in `sync()` invalidates the last row's cache,
+        ///     calls noteHeightOfRows, then dispatches scrollToBottom
+        ///     async. `layoutSubtreeIfNeeded()` runs autolayout but
+        ///     does NOT drive the tile; if a delta arrives while
+        ///     tile is still pending, `frame.height` reads the
+        ///     previous delta's value and the scroll lands one
+        ///     delta's growth short. Across many fast deltas the
+        ///     viewport drifts behind the streaming cursor — the
+        ///     "last response cut off behind the input box" bug we
+        ///     keep paying for.
+        ///
+        /// `tableView.tile()` forces the pending tile to commit
+        /// synchronously. Apple's docs discourage direct invocation
+        /// ("you shouldn't have to call this") but that guidance
+        /// assumes lazy commit is acceptable for the caller — for
+        /// synchronous scroll-after-note it's exactly the right
+        /// primitive. After `tile()`, `frame.height` reflects every
+        /// noted height-of-row change, regardless of how many
+        /// deltas queued up since the last display cycle.
         private func scrollToBottom() {
             guard let scrollView, let tableView, !rows.isEmpty else { return }
             tableView.layoutSubtreeIfNeeded()
+            tableView.tile()
             let docHeight = tableView.frame.height
             let clipHeight = scrollView.contentView.bounds.height
             guard docHeight > clipHeight else { return }
