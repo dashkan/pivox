@@ -146,6 +146,15 @@ if(APPLE)
         "${CMAKE_SOURCE_DIR}/${SWIFT_DIR}/*.swift"
     )
 
+    # Mirror the on-disk Swift layer hierarchy
+    # (App/, Core/Foundation/..., AIElements/..., AIChat/..., Auth/, etc.
+    # as documented in AGENTS.md) inside Xcode's project navigator.
+    # Without this, every .swift file lands at the target root as a
+    # flat alphabetical pile — readable in `find` but not in Xcode.
+    source_group(TREE "${CMAKE_SOURCE_DIR}/${SWIFT_DIR}"
+        PREFIX "Sources"
+        FILES ${APP_SWIFT_SOURCES})
+
     add_executable(${APP_TARGET} MACOSX_BUNDLE
         ${APP_SWIFT_SOURCES}
         ${ASSET_CATALOG}
