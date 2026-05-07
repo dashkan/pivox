@@ -329,18 +329,49 @@ struct ConversationTranscriptView: NSViewRepresentable {
         }
 
         /// Scrolls the clip view origin to the bottom of the
-        /// document. Requires a valid layout pass — call after the
-        /// table has had a chance to measure its rows (next runloop
-        /// tick after `reloadData`).
+        /// document. Authoritatively measures the document via
+        /// `computedDocHeight()` rather than reading
+        /// `tableView.frame.height` — the latter is stale across
+        /// streaming-delta ticks because `noteHeightOfRows` only
+        /// schedules NSTableView's tile pass, and `layoutSubtreeIfNeeded`
+        /// runs autolayout (not the tile system). Reading the frame
+        /// before the tile commits returns the previous delta's
+        /// height, so the scroll target lands short by exactly the
+        /// growth of the last delta. Each subsequent delta misses by
+        /// one more, and the viewport falls progressively behind the
+        /// streaming cursor — the chat-not-scrolling-on-stream bug
+        /// that keeps regressing whenever something nearby touches
+        /// the path.
+        ///
+        /// `applyBottomPin` already takes the same precaution for the
+        /// same reason (line ~810); keep the two functions consistent.
         private func scrollToBottom() {
             guard let scrollView, let tableView, !rows.isEmpty else { return }
             tableView.layoutSubtreeIfNeeded()
-            let docHeight = tableView.frame.height
+            let docHeight = computedDocHeight()
             let clipHeight = scrollView.contentView.bounds.height
             guard docHeight > clipHeight else { return }
             let origin = NSPoint(x: 0, y: docHeight - clipHeight)
             scrollView.contentView.scroll(to: origin)
             scrollView.reflectScrolledClipView(scrollView.contentView)
+        }
+
+        /// Sum of every row's height plus intercell spacing —
+        /// authoritative document extent. Reads from the height
+        /// cache (populated by `tableView(_:heightOfRow:)`) so this
+        /// is O(rows) of dictionary lookups, fast enough to call
+        /// per-delta. Independent of NSTableView's internal tile
+        /// state, which is what makes it reliable post-`noteHeightOfRows`.
+        private func computedDocHeight() -> CGFloat {
+            guard let tableView else { return 0 }
+            var total: CGFloat = 0
+            for r in rows.indices {
+                total += self.tableView(tableView, heightOfRow: r)
+            }
+            if rows.count > 1 {
+                total += CGFloat(rows.count - 1) * tableView.intercellSpacing.height
+            }
+            return total
         }
 
         /// Routes a scroll wheel event: if it's inside our scroll
