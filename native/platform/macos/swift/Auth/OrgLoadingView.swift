@@ -112,3 +112,37 @@ struct OrgLoadErrorView: View {
     }
   }
 }
+
+#if DEBUG
+
+/// Visual continuity between auth -> loading -> app is the whole
+/// reason this view exists; the previews stand it up against
+/// realistic copy so the brand title + spinner + caption all read
+/// at the same scale they will in production.
+
+#Preview("Loading - splash") {
+    OrgLoadingView()
+        .frame(width: 800, height: 600)
+}
+
+#Preview("Error - short message") {
+    OrgLoadErrorView(
+        message: "We couldn't load your organizations.",
+        retry: {}
+    )
+    .frame(width: 800, height: 600)
+}
+
+#Preview("Error - long technical message") {
+    OrgLoadErrorView(
+        message: """
+        Failed to reach the Pivox cloud - the network may be down, \
+        or the server is briefly unavailable. The app will retry \
+        automatically when you click below.
+        """,
+        retry: {}
+    )
+    .frame(width: 800, height: 600)
+}
+
+#endif

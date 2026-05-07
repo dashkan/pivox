@@ -206,3 +206,20 @@ struct RegisterView: View {
     .surfaceIfEnabled(.floating, when: useGlassCard)
   }
 }
+
+#if DEBUG
+
+/// Empty-state preview only — RegisterView's form fields are
+/// `@State` private to the struct, so seeding "filled" or "loading"
+/// states would require either a host wrapper or an init that
+/// accepts initial values. Neither is justified for what the
+/// canvas needs to show: the form layout, header copy, button
+/// affordance, and floating-card surface treatment. Submit-flow
+/// validation needs the running app.
+
+#Preview("Empty form") {
+    RegisterView(onSwitchToLogin: {})
+        .frame(width: 800, height: 700)
+}
+
+#endif

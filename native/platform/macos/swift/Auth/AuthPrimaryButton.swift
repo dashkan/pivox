@@ -51,3 +51,30 @@ struct AuthPrimaryButton: View {
         .controlSize(.large)
     }
 }
+
+#if DEBUG
+
+/// Idle and loading side-by-side covers the two states the auth
+/// flows flip between. Multiple titles confirm the foreground-
+/// color placement survives across copy.
+
+#Preview("Idle — common titles") {
+    VStack(spacing: 12) {
+        AuthPrimaryButton("Sign In", action: {})
+        AuthPrimaryButton("Create Account", action: {})
+        AuthPrimaryButton("Continue", action: {})
+    }
+    .padding()
+    .frame(width: 320)
+}
+
+#Preview("Loading — spinner replaces label") {
+    VStack(spacing: 12) {
+        AuthPrimaryButton("Sign In", isLoading: true, action: {})
+        AuthPrimaryButton("Create Account", isLoading: true, action: {})
+    }
+    .padding()
+    .frame(width: 320)
+}
+
+#endif

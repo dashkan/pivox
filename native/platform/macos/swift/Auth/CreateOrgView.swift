@@ -219,3 +219,19 @@ struct CreateOrgView: View {
     }
   }
 }
+
+#if DEBUG
+
+/// Same empty-state-only treatment as RegisterView — the form
+/// fields are private `@State` and seeding filled/loading states
+/// from a preview would need either a host wrapper or an
+/// initializer that accepts seeds. The canvas value here is the
+/// layout + the slug auto-derive UX hint copy + the floating-card
+/// surface, all of which render fine without any field text.
+
+#Preview("Empty form") {
+    CreateOrgView()
+        .frame(width: 800, height: 700)
+}
+
+#endif
