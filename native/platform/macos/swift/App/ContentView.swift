@@ -47,6 +47,8 @@ struct ContentView: View {
   private var orgs = OrgService.shared
   private let appState = AppStateBridge.shared()
 
+  @Environment(\.pivoxTheme) private var theme
+
   /// Clamp range for the persisted sidebar width. Matches the
   /// `navigationSplitViewColumnWidth(min:ideal:max:)` bounds.
   private static let sidebarMinWidth: CGFloat = 180
@@ -254,7 +256,7 @@ struct ContentView: View {
           .frame(minWidth: Self.chatMinWidth,
                  idealWidth: chatPanelWidth,
                  maxWidth: Self.chatMaxWidth)
-          .background(Color(nsColor: .windowBackgroundColor))
+          .background(theme.background)
           .background(
             GeometryReader { proxy in
               Color.clear.onChange(of: proxy.size.width) { _, newWidth in
@@ -406,7 +408,7 @@ struct ContentView: View {
     // AppDelegate level to let NavigationSplitView's sidebar
     // material bleed through; detail needs its own fill because
     // it's not a sidebar material view.
-    .background(Color(nsColor: .windowBackgroundColor))
+    .background(theme.background)
   }
 }
 

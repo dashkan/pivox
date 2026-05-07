@@ -26,6 +26,7 @@ struct OTPSegmentedField: View {
     var length: Int = 6
     var onComplete: (() -> Void)? = nil
 
+    @Environment(\.pivoxTheme) private var theme
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -97,7 +98,7 @@ struct OTPSegmentedField: View {
         let isFocusedCell = focused && index == cursorAt
         ZStack {
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color(nsColor: .controlBackgroundColor))
+                .fill(theme.backgroundRaised)
             RoundedRectangle(cornerRadius: 8)
                 .strokeBorder(
                     isFocusedCell ? Color.accentColor : Color.secondary.opacity(0.35),

@@ -5,9 +5,9 @@ import SwiftUI
 /// responsibility, not this view's:
 ///
 ///   - Push layout (`ContentView.pushLayout`) wraps us with an
-///     opaque `Color(nsColor: .windowBackgroundColor)` so the
-///     wallpaper bleed (which the main window enables for the
-///     sidebar) stops at the panel edge.
+///     opaque `theme.background` so the wallpaper bleed (which
+///     the main window enables for the sidebar) stops at the
+///     panel edge.
 ///   - Float layout (`ContentView.floatLayout`) wraps us with
 ///     `.thinMaterial` so canvas content bleeds through.
 ///

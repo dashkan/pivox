@@ -8,12 +8,13 @@ struct ImageEditCanvasContainer: View {
   let model: ImageEditModel
   let image: NSImage
 
+  @Environment(\.pivoxTheme) private var theme
   @State private var flipHAngle: Double = 0
   @State private var flipVAngle: Double = 0
 
   var body: some View {
     ZStack {
-      Color(nsColor: .windowBackgroundColor).ignoresSafeArea()
+      theme.background.ignoresSafeArea()
       ImageEditCanvasView(model: model, image: image)
         .rotation3DEffect(.degrees(flipHAngle), axis: (x: 0, y: 1, z: 0), perspective: 0)
         .rotation3DEffect(.degrees(flipVAngle), axis: (x: 1, y: 0, z: 0), perspective: 0)
