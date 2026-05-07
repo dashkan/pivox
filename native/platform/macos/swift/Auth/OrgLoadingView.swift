@@ -30,7 +30,7 @@ struct OrgLoadingView: View {
     }
     .padding(48)
     .frame(maxWidth: 400)
-    .glassCardIfEnabled(useGlassCard)
+    .surfaceIfEnabled(.floating, when: useGlassCard)
   }
 
   private var authBackdrop: some View {
@@ -93,7 +93,7 @@ struct OrgLoadErrorView: View {
     }
     .padding(32)
     .frame(maxWidth: 400)
-    .glassCardIfEnabled(useGlassCard)
+    .surfaceIfEnabled(.floating, when: useGlassCard)
   }
 
   private var authBackdrop: some View {

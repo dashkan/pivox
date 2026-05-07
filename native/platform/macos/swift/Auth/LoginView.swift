@@ -83,7 +83,7 @@ struct LoginView: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     // Liquid Glass refracts and distorts content behind it. An
     // opaque uniform background gives the glass nothing to react to,
-    // which is why `.glassCard()` looks identical to the fallback
+    // which is why `.surface(.floating)` looks identical to the fallback
     // material on a plain window. Providing a subtle colored
     // gradient behind the auth area gives the glass visible
     // refraction — accent-tinted light that the card distorts and
@@ -334,7 +334,7 @@ struct LoginView: View {
     }
     .padding(32)
     .frame(maxWidth: 400)
-    .glassCardIfEnabled(useGlassCard)
+    .surfaceIfEnabled(.floating, when: useGlassCard)
   }
 
   /// Primary button is disabled when the visible-field invariants
@@ -462,7 +462,7 @@ private struct MFAChallengeView: View {
     }
     .padding(32)
     .frame(maxWidth: 400)
-    .glassCardIfEnabled(useGlassCard)
+    .surfaceIfEnabled(.floating, when: useGlassCard)
   }
 
   private func verify() {

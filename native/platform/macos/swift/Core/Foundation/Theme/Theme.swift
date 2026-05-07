@@ -62,6 +62,10 @@ public struct PivoxTheme: Sendable {
     public let radiusSM: CGFloat
     public let radiusMD: CGFloat
     public let radiusLG: CGFloat
+    /// Floating-card radius — used by `.surface(.floating)` for auth
+    /// forms, popovers, and other elevated surfaces where the rounded
+    /// corner reads as a deliberate boundary rather than soft chrome.
+    public let radiusXL: CGFloat
 
     // MARK: Colors — semantic
 
@@ -144,6 +148,7 @@ public struct PivoxTheme: Sendable {
         radiusSM: 4,
         radiusMD: 8,
         radiusLG: 12,
+        radiusXL: 16,
 
         textPrimary: Color(nsColor: .labelColor),
         textSecondary: Color(nsColor: .secondaryLabelColor),

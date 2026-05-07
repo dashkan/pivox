@@ -154,7 +154,7 @@ struct CreateOrgView: View {
     }
     .padding(32)
     .frame(maxWidth: 400)
-    .glassCardIfEnabled(useGlassCard)
+    .surfaceIfEnabled(.floating, when: useGlassCard)
   }
 
   private var isFormValid: Bool {

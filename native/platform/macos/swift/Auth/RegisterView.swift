@@ -203,6 +203,6 @@ struct RegisterView: View {
     }
     .padding(32)
     .frame(maxWidth: 400)
-    .glassCardIfEnabled(useGlassCard)
+    .surfaceIfEnabled(.floating, when: useGlassCard)
   }
 }
