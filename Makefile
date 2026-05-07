@@ -1,5 +1,5 @@
 .PHONY: build run test test-up test-down tidy lint lint-fix fmt generate \
-	air air-worker mocks dev log-pivox-app-macos \
+	air air-worker mocks dev log-pivox-app-macos run-app-macos \
 	lint-proto proto-format proto-breaking proto-generate \
 	proto-generate-go proto-generate-native build-grpc-swift-2-plugin api-lint \
 	db-up db-down db-migrate db-force db-seed db-clear db-drop db-create \
@@ -179,6 +179,23 @@ firebase-deploy:
 # Dry-run by default; set FORCE=1 to actually delete.
 clean-fn-revisions:
 	@scripts/clean-fn-revisions.sh
+
+# run-app-macos builds the macOS app in Debug and launches it.
+# Uses a project-local derivedDataPath so the .app path is
+# predictable and so this loop stays independent of the Xcode
+# IDE's DerivedData cache (the IDE keeps its own). On build
+# failure the last 30 lines of the log surface so the failure is
+# diagnosable without searching for the file.
+run-app-macos:
+	@xcodebuild build \
+		-project native/build-xcode/Pivox.xcodeproj \
+		-scheme Pivox \
+		-configuration Debug \
+		-derivedDataPath native/build-xcode/derived \
+		-allowProvisioningUpdates \
+		> /tmp/pivox-xcodebuild.log 2>&1 \
+		|| (echo "build failed; tail of /tmp/pivox-xcodebuild.log:"; tail -30 /tmp/pivox-xcodebuild.log; exit 1)
+	@open native/build-xcode/derived/Build/Products/Debug/Pivox.app
 
 # Native UI Tests (macOS) — image editor only. The auth UI tests
 # previously depended on the Firebase Auth emulator; they are
