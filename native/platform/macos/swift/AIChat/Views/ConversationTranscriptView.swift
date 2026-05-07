@@ -329,49 +329,31 @@ struct ConversationTranscriptView: NSViewRepresentable {
         }
 
         /// Scrolls the clip view origin to the bottom of the
-        /// document. Authoritatively measures the document via
-        /// `computedDocHeight()` rather than reading
-        /// `tableView.frame.height` — the latter is stale across
-        /// streaming-delta ticks because `noteHeightOfRows` only
-        /// schedules NSTableView's tile pass, and `layoutSubtreeIfNeeded`
-        /// runs autolayout (not the tile system). Reading the frame
-        /// before the tile commits returns the previous delta's
-        /// height, so the scroll target lands short by exactly the
-        /// growth of the last delta. Each subsequent delta misses by
-        /// one more, and the viewport falls progressively behind the
-        /// streaming cursor — the chat-not-scrolling-on-stream bug
-        /// that keeps regressing whenever something nearby touches
-        /// the path.
+        /// document. Reads `tableView.frame.height` after a forced
+        /// layout pass — once `heightOfRow` is honest about
+        /// pin-actions content (see `measureMessageHeight`'s
+        /// `pinActions` parameter and `cacheKey`'s pin keying),
+        /// NSTableView's tile produces a frame height that includes
+        /// the last assistant's icon row.
         ///
-        /// `applyBottomPin` already takes the same precaution for the
-        /// same reason (line ~810); keep the two functions consistent.
+        /// The earlier symptom — last response cut off behind the
+        /// input box — looked like a stale-frame.height bug but was
+        /// actually the height-cache lying: measurement passed
+        /// `pinActions: false` while rendering used `true`, so the
+        /// last row's measured height excluded the icon row's space.
+        /// `frame.height` was right per its inputs; the inputs were
+        /// wrong. Fixing measurement is the load-bearing change;
+        /// this function is just a thin wrapper around the now-honest
+        /// frame.
         private func scrollToBottom() {
             guard let scrollView, let tableView, !rows.isEmpty else { return }
             tableView.layoutSubtreeIfNeeded()
-            let docHeight = computedDocHeight()
+            let docHeight = tableView.frame.height
             let clipHeight = scrollView.contentView.bounds.height
             guard docHeight > clipHeight else { return }
             let origin = NSPoint(x: 0, y: docHeight - clipHeight)
             scrollView.contentView.scroll(to: origin)
             scrollView.reflectScrolledClipView(scrollView.contentView)
-        }
-
-        /// Sum of every row's height plus intercell spacing —
-        /// authoritative document extent. Reads from the height
-        /// cache (populated by `tableView(_:heightOfRow:)`) so this
-        /// is O(rows) of dictionary lookups, fast enough to call
-        /// per-delta. Independent of NSTableView's internal tile
-        /// state, which is what makes it reliable post-`noteHeightOfRows`.
-        private func computedDocHeight() -> CGFloat {
-            guard let tableView else { return 0 }
-            var total: CGFloat = 0
-            for r in rows.indices {
-                total += self.tableView(tableView, heightOfRow: r)
-            }
-            if rows.count > 1 {
-                total += CGFloat(rows.count - 1) * tableView.intercellSpacing.height
-            }
-            return total
         }
 
         /// Routes a scroll wheel event: if it's inside our scroll
@@ -445,7 +427,13 @@ struct ConversationTranscriptView: NSViewRepresentable {
                 messages = new
                 rebuildRowsKeepingPages()
                 if let lastRowIdx = rows.indices.last {
-                    let key = cacheKey(for: rows[lastRowIdx])
+                    // Streaming row IS the last assistant by
+                    // construction (it's the placeholder being
+                    // filled). Invalidate the pinned key so the
+                    // next heightOfRow re-measures with the icons
+                    // included.
+                    let pinned = isPinnedActionsRow(at: lastRowIdx)
+                    let key = cacheKey(for: rows[lastRowIdx], pinned: pinned)
                     heightCache.removeValue(forKey: key)
                     lastNotedWidth.removeValue(forKey: key)
                     let last = IndexSet(integer: lastRowIdx)
@@ -658,8 +646,10 @@ struct ConversationTranscriptView: NSViewRepresentable {
             var insertedRowCount = prependCount
             for i in 0..<prependCount {
                 let msg = newMessages[i]
-                let h = measureMessageHeight(msg, width: width)
-                let key = "m:\(msg.name)"
+                // Prepended rows are older than every existing row,
+                // so they're never the last assistant — pinned=false.
+                let h = measureMessageHeight(msg, pinActions: false, width: width)
+                let key = cacheKey(for: .message(msg), pinned: false)
                 heightCache[key] = h
                 lastNotedWidth[key] = width
                 insertedHeight += h
@@ -671,7 +661,7 @@ struct ConversationTranscriptView: NSViewRepresentable {
             // spacing contribution.
             let newPageNumber = pageSizes.count + 1
             let boundaryH = measureBoundaryHeight(width: width)
-            let boundaryKey = "b:\(newPageNumber)"
+            let boundaryKey = cacheKey(for: .boundary(page: newPageNumber))
             heightCache[boundaryKey] = boundaryH
             lastNotedWidth[boundaryKey] = width
             insertedHeight += boundaryH
@@ -997,7 +987,7 @@ struct ConversationTranscriptView: NSViewRepresentable {
             var toNote = IndexSet()
             let range = visible.location..<(visible.location + visible.length)
             for row in range where row >= 0 && row < rows.count {
-                let key = cacheKey(for: rows[row])
+                let key = cacheKey(for: rows[row], pinned: isPinnedActionsRow(at: row))
                 if lastNotedWidth[key] != width {
                     lastNotedWidth[key] = width
                     heightCache.removeValue(forKey: key)
@@ -1023,14 +1013,15 @@ struct ConversationTranscriptView: NSViewRepresentable {
         /// `lastNotedWidth`).
         func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
             let width = effectiveWidth(tableView: tableView)
-            let key = cacheKey(for: rows[row])
+            let pinned = isPinnedActionsRow(at: row)
+            let key = cacheKey(for: rows[row], pinned: pinned)
             if lastNotedWidth[key] == width, let cached = heightCache[key] {
                 return cached
             }
             let measured: CGFloat
             switch rows[row] {
             case .message(let msg):
-                measured = measureMessageHeight(msg, width: width)
+                measured = measureMessageHeight(msg, pinActions: pinned, width: width)
             case .boundary:
                 measured = measureBoundaryHeight(width: width)
             }
@@ -1113,11 +1104,37 @@ struct ConversationTranscriptView: NSViewRepresentable {
 
         // MARK: - Measurement
 
-        private func cacheKey(for row: Row) -> String {
+        /// Cache key for a row. For messages, the `pinned` flag is
+        /// part of the key because the rendered cell's height depends
+        /// on it: the most-recent assistant message renders with a
+        /// pinned action row (thumbs/copy icons) that adds visible
+        /// vertical space. Same message resource at different pin
+        /// states is legitimately a different row height — caching
+        /// by name alone caches the WRONG height for whichever state
+        /// wasn't measured first.
+        ///
+        /// Boundaries don't depend on pin state; the parameter is
+        /// ignored for them.
+        private func cacheKey(for row: Row, pinned: Bool = false) -> String {
             switch row {
-            case .message(let m): return "m:\(m.name)"
+            case .message(let m): return "m:\(m.name):p=\(pinned ? 1 : 0)"
             case .boundary(let p): return "b:\(p)"
             }
+        }
+
+        /// Whether the row at `index` should render with pinned
+        /// actions (the action-row icons that appear under the most
+        /// recent assistant message). Mirrors the pin selection
+        /// logic in `tableView(_:viewFor:row:)` so measurement and
+        /// rendering stay in lockstep.
+        private func isPinnedActionsRow(at index: Int) -> Bool {
+            guard index >= 0, index < rows.count else { return false }
+            if case .message(let m) = rows[index],
+               m.role == .assistant,
+               m.name == lastAssistantName {
+                return true
+            }
+            return false
         }
 
         /// Current column width, or a best-effort fallback. The
@@ -1145,11 +1162,11 @@ struct ConversationTranscriptView: NSViewRepresentable {
         /// rendering is main-actor-isolated). The reused `sizingHost`
         /// keeps this cheap enough that we can measure 10+ rows per
         /// frame without dropping frames.
-        private func measureMessageHeight(_ message: Pivox_Ai_V1_Message, width: CGFloat) -> CGFloat {
+        private func measureMessageHeight(_ message: Pivox_Ai_V1_Message, pinActions: Bool, width: CGFloat) -> CGFloat {
             sizingHost.rootView = AnyView(
                 Message(
                     message: message,
-                    pinActions: false,
+                    pinActions: pinActions,
                     onEditSubmit: nil,
                     onRegenerate: nil)
                 .frame(width: width, alignment: .leading)
