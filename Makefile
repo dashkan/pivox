@@ -1,5 +1,5 @@
 .PHONY: build run test test-up test-down tidy lint lint-fix fmt generate \
-	air air-worker mocks \
+	air air-worker mocks dev log-pivox-app-macos \
 	lint-proto proto-format proto-breaking proto-generate \
 	proto-generate-go proto-generate-native build-grpc-swift-2-plugin api-lint \
 	db-up db-down db-migrate db-force db-seed db-clear db-drop db-create \
@@ -203,3 +203,30 @@ proxy-nginx-stop:
 
 proxy-ngrok:
 	ngrok start --config configs/ngrok.yml --all
+
+# Dev loop
+
+# log-pivox-app-macos streams the macOS app's unified-log output
+# at debug level, scoped to the native app's subsystem so we don't
+# drown in unrelated system messages. `--style=compact` drops the
+# verbose timestamp prefix so each line is short enough to read in
+# a multiplexed terminal.
+log-pivox-app-macos:
+	log stream --predicate 'subsystem == "app.pivox.native"' --level=debug --style=compact
+
+# dev runs every component of the local loop in one terminal: the
+# pivox-cloud + pivox-worker air watchers, the nginx + ngrok ingress
+# proxies, and the native-app log stream. `concurrently` color-codes
+# each prefix and `--kill-others` tears the rest down the moment any
+# one process exits — so a crashed binary or Ctrl-C cleans up cleanly
+# instead of leaving zombies.
+dev:
+	pnpx concurrently \
+		--kill-others \
+		--names "air,worker,nginx,ngrok,log" \
+		--prefix-colors "yellow,green,cyan,magenta,blue" \
+		"$(MAKE) air" \
+		"$(MAKE) air-worker" \
+		"$(MAKE) proxy-nginx" \
+		"$(MAKE) proxy-ngrok" \
+		"$(MAKE) log-pivox-app-macos"
