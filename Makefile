@@ -1,5 +1,5 @@
 .PHONY: build run test test-up test-down tidy lint lint-fix fmt generate \
-	air air-worker mocks dev log-pivox-app-macos run-app-macos \
+	air air-worker mocks dev log-pivox-app-macos run-app-macos ollama-serve \
 	lint-proto proto-format proto-breaking proto-generate \
 	proto-generate-go proto-generate-native build-grpc-swift-2-plugin api-lint \
 	db-up db-down db-migrate db-force db-seed db-clear db-drop db-create \
@@ -237,6 +237,15 @@ proxy-ngrok:
 log-pivox-app-macos:
 	log stream --predicate 'subsystem == "app.pivox.native"' --level=debug --style=compact
 
+# ollama-serve runs the Ollama daemon in the foreground. Pivox's
+# AiChat handler dials it at http://localhost:11434 (overridable via
+# --ollama-url / PIVOX_OLLAMA_URL); without it, StreamGenerateContent
+# fails with `connection refused`. Foreground form pairs cleanly
+# with `make dev` — Ctrl-C / sibling-failure tears it down with the
+# rest of the loop.
+ollama-serve:
+	ollama serve
+
 # dev runs every component of the local loop in one terminal: the
 # pivox-cloud + pivox-worker air watchers, the nginx + ngrok ingress
 # proxies, and the native-app log stream. `concurrently` color-codes
@@ -246,10 +255,11 @@ log-pivox-app-macos:
 dev:
 	pnpx concurrently \
 		--kill-others \
-		--names "air,worker,nginx,ngrok,log" \
-		--prefix-colors "yellow,green,cyan,magenta,blue" \
+		--names "air,worker,ollama,nginx,ngrok,log" \
+		--prefix-colors "yellow,green,red,cyan,magenta,blue" \
 		"$(MAKE) air" \
 		"$(MAKE) air-worker" \
+		"$(MAKE) ollama-serve" \
 		"$(MAKE) proxy-nginx" \
 		"$(MAKE) proxy-ngrok" \
 		"$(MAKE) log-pivox-app-macos"
