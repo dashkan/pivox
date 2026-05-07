@@ -66,6 +66,12 @@ struct OTPSegmentedField: View {
                 isFocused: $focused,
                 onCommit: { onComplete?() }
             )
+            // NSTextField sizes to its text by default — for an
+            // empty string that's a ~10×20 hit target floating
+            // centered in the ZStack, leaving most of the cell row
+            // unable to receive clicks. Stretch the wrap to fill so
+            // taps anywhere across the OTP area land on the field.
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onChange(of: value) { oldValue, newValue in
                 // Paste vs. single keystroke. `count` jump > 1
                 // means the user pasted (or did a bulk input);
@@ -162,6 +168,12 @@ private struct CaretlessOTPInput: NSViewRepresentable {
         // iCloud Keychain) don't offer to fill the code.
         field.contentType = .oneTimeCode
         field.delegate = context.coordinator
+        // NSTextField's default intrinsic size is text-driven —
+        // empty string = small. Lower hugging so SwiftUI's
+        // `.frame(maxWidth: .infinity)` actually stretches the
+        // hit target across the cell row.
+        field.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        field.setContentHuggingPriority(.defaultLow, for: .vertical)
         return field
     }
 
