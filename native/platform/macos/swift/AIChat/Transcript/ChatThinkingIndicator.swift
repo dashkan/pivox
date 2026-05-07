@@ -77,3 +77,20 @@ struct ChatThinkingIndicator: View {
         }
     }
 }
+
+#if DEBUG
+
+/// Both animations (shimmer text gradient + symbol effect pulse)
+/// run in Previews same as production via `TimelineView` / SwiftUI's
+/// animation engine. Phrase escalation kicks in at 8s/16s/24s — to
+/// see "Hang tight, this one's a tough one…" leave the canvas open
+/// for ~25s, OR run the app where the indicator stays mounted while
+/// the assistant streams.
+
+#Preview("Default") {
+    ChatThinkingIndicator()
+        .frame(width: 360)
+        .padding()
+}
+
+#endif

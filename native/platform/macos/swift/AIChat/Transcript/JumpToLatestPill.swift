@@ -62,3 +62,29 @@ struct JumpToLatestPill: View {
         }
     }
 }
+
+#if DEBUG
+
+/// The faded-by-default state is what users see most of the time
+/// (hover-to-prominent only when reaching for it). Canvas previews
+/// don't simulate hover; if you want to see the prominent variant,
+/// run the app and scroll the transcript away from the bottom.
+
+#Preview("Default (faded)") {
+    JumpToLatestPill()
+        .padding(40)
+}
+
+#Preview("Over a transcript backdrop") {
+    ZStack {
+        Color.secondary.opacity(0.06)
+        VStack {
+            Spacer()
+            JumpToLatestPill()
+                .padding(.bottom, 24)
+        }
+    }
+    .frame(width: 420, height: 200)
+}
+
+#endif

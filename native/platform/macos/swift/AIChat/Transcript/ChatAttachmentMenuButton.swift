@@ -51,3 +51,25 @@ struct ChatAttachmentMenuButton: View {
         .help("Add attachment")
     }
 }
+
+#if DEBUG
+
+/// The trigger button only — the popup menu doesn't render in the
+/// preview canvas (Menu's popup needs a window-level event loop).
+/// The trigger's visual sizing and matching to its IconButton
+/// siblings is what design iteration here cares about; menu
+/// content is verified in the running app.
+
+#Preview("Trigger button") {
+    HStack(spacing: 4) {
+        ChatAttachmentMenuButton()
+        // Sibling visual reference — confirms 32pt sizing matches.
+        Image(systemName: "ellipsis")
+            .font(.system(size: 17, weight: .medium))
+            .foregroundStyle(.secondary)
+            .frame(width: 32, height: 32)
+    }
+    .padding()
+}
+
+#endif

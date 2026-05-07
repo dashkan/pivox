@@ -27,3 +27,48 @@ enum MessagePasteboard {
         pb.setString(text, forType: .string)
     }
 }
+
+#if DEBUG
+
+/// The wrapper itself is trivial; the value is showing the row in
+/// realistic context — IconButtons styled for inline-row use
+/// (`showsHoverBackground: false`) so the spacing reads correctly.
+
+#Preview("Assistant message row") {
+    MessageActions {
+        IconButton(systemName: "doc.on.doc",
+                   label: "Copy",
+                   showsHoverBackground: false,
+                   action: {})
+        IconButton(systemName: "arrow.clockwise",
+                   label: "Regenerate",
+                   showsHoverBackground: false,
+                   action: {})
+        IconButton(systemName: "hand.thumbsup",
+                   label: "Helpful",
+                   showsHoverBackground: false,
+                   action: {})
+        IconButton(systemName: "hand.thumbsdown",
+                   label: "Not helpful",
+                   showsHoverBackground: false,
+                   action: {})
+    }
+    .padding()
+}
+
+#Preview("Latched feedback (helpful)") {
+    MessageActions {
+        IconButton(systemName: "doc.on.doc",
+                   label: "Copy",
+                   showsHoverBackground: false,
+                   action: {})
+        IconButton(systemName: "hand.thumbsup.fill",
+                   label: "Helpful",
+                   isOn: true,
+                   showsHoverBackground: false,
+                   action: {})
+    }
+    .padding()
+}
+
+#endif

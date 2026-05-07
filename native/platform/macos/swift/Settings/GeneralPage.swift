@@ -38,3 +38,17 @@ private extension Bundle {
         (infoDictionary?["CFBundleVersion"] as? String) ?? "—"
     }
 }
+
+#if DEBUG
+
+/// In Previews, `Bundle.main` is the previewing process bundle,
+/// not Pivox.app — so version + build display the placeholder dash.
+/// That's still useful: it confirms the placeholder flows through
+/// the LabeledContent + textSelection chain. To see real values,
+/// run the app and open Settings > General.
+
+#Preview("Default") {
+    GeneralPage()
+}
+
+#endif

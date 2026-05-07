@@ -69,3 +69,41 @@ extension View {
         ))
     }
 }
+
+#if DEBUG
+
+/// Tooltip rendering needs hover; Previews don't simulate hover.
+/// What's previewable is the wrapping pattern — the API surface
+/// callers see when adopting the modifier. To verify the rendered
+/// popover appearance, run the app and hover the targeted control.
+
+#Preview("API shapes — text + with-shortcut + custom content") {
+    VStack(alignment: .leading, spacing: 16) {
+        Text("Hover the buttons in the running app to see the tooltips:")
+            .font(.callout)
+            .foregroundStyle(.secondary)
+
+        Button("Plain text tooltip") {}
+            .aiTooltip("This action does the thing.")
+
+        Button("With keyboard shortcut") {}
+            .aiTooltip("Open quick search", shortcut: "⌘K")
+
+        Button("Custom content") {}
+            .aiTooltip(
+                content: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Toggle AI chat panel")
+                            .font(.caption.weight(.semibold))
+                        Text("Floating panel layout")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                },
+                shortcut: "⌘⇧A")
+    }
+    .padding()
+    .frame(width: 320)
+}
+
+#endif
