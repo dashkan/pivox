@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// Fixed-length numeric OTP entry rendered as a row of glyph cells —
@@ -6,13 +7,18 @@ import SwiftUI
 /// 6-digit string fills all cells at once.
 ///
 /// ## Architecture
-/// One hidden `TextField` owns the entire input and text focus; the
-/// visible cells are pure render over `value`. An earlier attempt
-/// gave each cell its own `TextField` and synced them, which
-/// created a feedback loop — updating one cell's text triggered
-/// every cell's `onChange`, which re-triggered the input handler,
-/// which moved focus somewhere unexpected. A single source of
-/// truth sidesteps all of that.
+/// One hidden `NSTextField` (wrapped as `CaretlessOTPInput` below)
+/// owns the entire input and text focus; the visible cells are pure
+/// render over `value`. An earlier attempt gave each cell its own
+/// `TextField` and synced them, which created a feedback loop —
+/// updating one cell's text triggered every cell's `onChange`,
+/// which re-triggered the input handler, which moved focus
+/// somewhere unexpected. A single source of truth sidesteps that.
+///
+/// The field has to be AppKit-backed (vs SwiftUI's TextField) so
+/// the blinking insertion caret can be cleared. SwiftUI's
+/// `.tint(.clear)` does NOT suppress the caret on macOS for plain-
+/// styled TextFields — see `CaretlessTextField` below.
 ///
 /// ## Callbacks
 /// `onComplete` fires as soon as `value` reaches `length`. The
@@ -42,45 +48,49 @@ struct OTPSegmentedField: View {
             .allowsHitTesting(false)
 
             // Invisible input field — captures typing, paste, and
-            // backspace. Styled transparent so only the glyph row
-            // shows. `.textContentType(.oneTimeCode)` is what
-            // makes password managers (1Password, iCloud Keychain)
-            // offer to fill the code on focus — without it the
-            // field reads as a generic text input and no autofill
-            // is offered.
-            TextField("", text: $value)
-                .textFieldStyle(.plain)
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.clear)
-                .tint(.clear)
-                .textContentType(.oneTimeCode)
-                .focused($focused)
-                .onChange(of: value) { oldValue, newValue in
-                    // Paste vs. single keystroke. `count` jump > 1
-                    // means the user pasted (or did a bulk input);
-                    // we take the *last* `length` digits so a
-                    // pasted code wins even if the field already
-                    // had partial input — matches Apple's own 2FA
-                    // prompt behavior. For single-character changes
-                    // (typing or deletion) we take the *first*
-                    // `length` digits so typing past the end is
-                    // discarded rather than rotating previous
-                    // digits out of the field.
-                    let all = newValue.filter(\.isNumber)
-                    let digits: String
-                    if newValue.count > oldValue.count + 1 {
-                        digits = String(all.suffix(length))
-                    } else {
-                        digits = String(all.prefix(length))
-                    }
-                    if digits != newValue {
-                        value = digits
-                    }
-                    if digits.count == length {
-                        onComplete?()
-                    }
+            // backspace. The cells are the visible state; this
+            // field is purely the keyboard / autofill target.
+            //
+            // Why a custom NSTextField wrap (vs SwiftUI's TextField
+            // with `.foregroundStyle(.clear) + .tint(.clear)`):
+            // SwiftUI's `.tint(.clear)` does NOT suppress the
+            // blinking insertion caret on macOS for `.plain`-styled
+            // TextFields — the caret is drawn by NSTextField's
+            // field editor in a layer SwiftUI's tint doesn't reach.
+            // Setting `insertionPointColor = .clear` directly on
+            // the field editor (in `becomeFirstResponder`) is the
+            // reliable path. `.oneTimeCode` autofill is preserved
+            // via NSTextField's `contentType` property.
+            CaretlessOTPInput(
+                text: $value,
+                isFocused: $focused,
+                onCommit: { onComplete?() }
+            )
+            .onChange(of: value) { oldValue, newValue in
+                // Paste vs. single keystroke. `count` jump > 1
+                // means the user pasted (or did a bulk input);
+                // we take the *last* `length` digits so a
+                // pasted code wins even if the field already
+                // had partial input — matches Apple's own 2FA
+                // prompt behavior. For single-character changes
+                // (typing or deletion) we take the *first*
+                // `length` digits so typing past the end is
+                // discarded rather than rotating previous
+                // digits out of the field.
+                let all = newValue.filter(\.isNumber)
+                let digits: String
+                if newValue.count > oldValue.count + 1 {
+                    digits = String(all.suffix(length))
+                } else {
+                    digits = String(all.prefix(length))
                 }
-                .onSubmit { onComplete?() }
+                if digits != newValue {
+                    value = digits
+                }
+                if digits.count == length {
+                    onComplete?()
+                }
+            }
         }
         .frame(height: 52)
         .contentShape(Rectangle())
@@ -114,6 +124,126 @@ struct OTPSegmentedField: View {
     private func character(at index: Int) -> Character? {
         guard index < value.count else { return nil }
         return value[value.index(value.startIndex, offsetBy: index)]
+    }
+}
+
+// MARK: - AppKit-backed invisible input
+
+/// Hidden text input that captures typing + paste + password-manager
+/// autofill for `OTPSegmentedField` without rendering visible
+/// characters or a blinking insertion caret.
+///
+/// SwiftUI's `TextField(...).foregroundStyle(.clear).tint(.clear)`
+/// almost works — the typed text goes invisible, but the caret
+/// keeps blinking because NSTextField's field editor draws the
+/// caret in a layer SwiftUI's `.tint` doesn't reach. Patching
+/// `insertionPointColor = .clear` on the field editor itself, at
+/// the AppKit boundary, is the reliable fix.
+private struct CaretlessOTPInput: NSViewRepresentable {
+    @Binding var text: String
+    var isFocused: FocusState<Bool>.Binding
+    let onCommit: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
+
+    func makeNSView(context: Context) -> NSTextField {
+        let field = CaretlessTextField(string: "")
+        field.isBordered = false
+        field.drawsBackground = false
+        field.focusRingType = .none
+        field.alignment = .center
+        // Type-clear keeps autofilled values invisible until the
+        // SwiftUI binding propagates them into the visible cells.
+        field.textColor = .clear
+        // The autofill hook — without this NSTextField reads as a
+        // generic text input and password managers (1Password,
+        // iCloud Keychain) don't offer to fill the code.
+        field.contentType = .oneTimeCode
+        field.delegate = context.coordinator
+        return field
+    }
+
+    func updateNSView(_ field: NSTextField, context: Context) {
+        // String-binding sync. Compare to avoid clobbering the
+        // field's selection / cursor position when the upstream
+        // binding emits the same value back to us.
+        if field.stringValue != text {
+            field.stringValue = text
+        }
+        // FocusState bridge: when SwiftUI says we should be
+        // focused, become first responder. When SwiftUI says
+        // we shouldn't, resign — but only if we're currently the
+        // first responder, otherwise we'd clobber another view's
+        // focus on every update tick.
+        DispatchQueue.main.async {
+            guard let window = field.window else { return }
+            let isFirstResponder = (window.firstResponder == field)
+                || (window.firstResponder == field.currentEditor())
+            if isFocused.wrappedValue, !isFirstResponder {
+                window.makeFirstResponder(field)
+            } else if !isFocused.wrappedValue, isFirstResponder {
+                window.makeFirstResponder(nil)
+            }
+        }
+    }
+
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        let parent: CaretlessOTPInput
+
+        init(parent: CaretlessOTPInput) {
+            self.parent = parent
+        }
+
+        override func controlTextDidChange(_ notification: Notification) {
+            guard let field = notification.object as? NSTextField else { return }
+            parent.text = field.stringValue
+        }
+
+        override func controlTextDidBeginEditing(_ notification: Notification) {
+            // Mirror responder state into FocusState so consumers
+            // observing `@FocusState` see the focus arrive even when
+            // it was triggered by a click rather than programmatic
+            // makeFirstResponder.
+            DispatchQueue.main.async { [weak self] in
+                self?.parent.isFocused.wrappedValue = true
+            }
+        }
+
+        override func controlTextDidEndEditing(_ notification: Notification) {
+            DispatchQueue.main.async { [weak self] in
+                self?.parent.isFocused.wrappedValue = false
+            }
+        }
+
+        func control(_ control: NSControl,
+                     textView: NSTextView,
+                     doCommandBy selector: Selector) -> Bool {
+            // Return → submit. AppKit's default for NSTextField
+            // Return is `insertNewline:`; we intercept and route to
+            // the SwiftUI `onCommit` so the parent can auto-submit
+            // (matches Apple's own 2FA prompt behavior).
+            if selector == #selector(NSResponder.insertNewline(_:)) {
+                parent.onCommit()
+                return true
+            }
+            return false
+        }
+    }
+}
+
+/// `NSTextField` subclass that clears the caret when it becomes
+/// the first responder. The field editor that draws the caret only
+/// exists while the field is focused, so the override has to live
+/// in `becomeFirstResponder` rather than init / awakeFromNib.
+private final class CaretlessTextField: NSTextField {
+    override func becomeFirstResponder() -> Bool {
+        let didBecome = super.becomeFirstResponder()
+        if didBecome, let editor = currentEditor() as? NSTextView {
+            editor.insertionPointColor = .clear
+        }
+        return didBecome
     }
 }
 
