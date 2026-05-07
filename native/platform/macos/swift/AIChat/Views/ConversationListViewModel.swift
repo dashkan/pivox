@@ -95,16 +95,30 @@ public final class ConversationListViewModel: ObservableObject {
     /// Optimistic delete: removes the row from `conversations`
     /// before the server request fires so the row's removal
     /// animation plays immediately. Restores the row on failure.
+    ///
+    /// Also broadcasts `.aiChatConversationGone` for `name`. The
+    /// panel listens for that notification to reset to a fresh
+    /// New Chat surface when the user deletes the conversation
+    /// they're currently viewing — same path the server-side
+    /// "conversation no longer exists" signal feeds. Reusing the
+    /// existing channel keeps reset logic in one place.
     public func delete(name: String) async throws {
         let snapshot = conversations
         conversations.removeAll { $0.name == name }
+        NotificationCenter.default.post(
+            name: .aiChatConversationGone,
+            object: nil,
+            userInfo: ["conversation": name])
         let request = Pivox_Ai_V1_DeleteConversationRequest.with {
             $0.name = name
         }
         do {
             try await client.deleteConversation(request)
         } catch {
-            // Server rejected — put the row back.
+            // Server rejected — put the row back. The panel's
+            // already-fired reset stands; the user will see the
+            // restored conversation in the popover but land on
+            // New Chat. They can re-select it from the list.
             conversations = snapshot
             throw error
         }
