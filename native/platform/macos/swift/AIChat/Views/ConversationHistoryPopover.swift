@@ -1,3 +1,4 @@
+import AppKit
 import PivoxModels
 import SwiftProtobuf
 import SwiftUI
@@ -13,21 +14,31 @@ import SwiftUI
 ///  * `↓` from search → focus first list row; `↑/↓` arrow-nav rows.
 ///  * `↑` from first row → bounce back to search (keeps filter editable).
 ///  * `Return` on a focused row → open that conversation.
+///  * `⌘R` anywhere → refresh.
+///  * `⌘Delete` on a focused row → delete that conversation.
 ///  * `Esc`: clears the filter if non-empty, otherwise dismisses the
 ///    popover.
 ///
 /// ## Other features
 ///  * Client-side filter by title (case-insensitive substring).
-///  * Infinite scroll via page token (last-row-visible triggers loadMore).
-///  * Inline rename (pencil → in-place TextField, Return/Esc commits/cancels).
-///  * Inline delete confirm (trash → row morphs to "Delete? [Yes] [Cancel]").
+///  * Pull-to-refresh + infinite scroll: the two gestures live at
+///    opposite edges of the list and don't conflict — pull-down at
+///    the top reloads from the first page; scroll-past-last loads
+///    older.
+///  * Inline rename (hover row → pencil → in-place TextField,
+///    Return/Esc commits/cancels).
+///  * Inline delete with optimistic UI + scale/fade transition. No
+///    confirmation dialog (the row's own optimistic disappearance
+///    plus the hover-reveal targeting is already a high enough bar
+///    against accidents; if we ever want a safety net we'll add an
+///    undo banner).
 ///
-/// ## Why `List(selection:)`
-/// The row layout is a pure SwiftUI `ScrollView + LazyVStack` no more —
-/// `List(selection:)` bridges to AppKit's responder chain and gives us
-/// arrow-key nav, selection highlight, and VoiceOver row semantics for
-/// free. Reinventing those with `.onKeyPress` on a VStack was considered
-/// and rejected — too much HIG surface to re-create by hand.
+/// ## Why `List(selection:)` and `.listStyle(.sidebar)`
+/// `List(selection:)` bridges to AppKit's responder chain and gives
+/// us arrow-key nav, selection highlight, and VoiceOver row
+/// semantics for free. `.sidebar` style picks up the system's
+/// vibrancy + selection treatment that matches Mail / Notes /
+/// Music popovers — solid system look without per-control styling.
 public struct ConversationHistoryPopover: View {
     @ObservedObject var viewModel: ConversationListViewModel
     let onSelect: (Pivox_Ai_V1_Conversation) -> Void
@@ -51,57 +62,52 @@ public struct ConversationHistoryPopover: View {
             Divider()
             list
         }
+        // System popover material — picks up the surrounding window
+        // tint instead of rendering as a flat dark slab. Matches the
+        // vibrancy of Mail / Notes / Spotlight.
+        .background(.regularMaterial)
         .task {
             if viewModel.conversations.isEmpty && viewModel.state == .idle {
                 await viewModel.load()
             }
             focus = .search
         }
+        // Hidden keyboard shortcut: ⌘R reloads from the top.
+        // Background-attached so the popover-rooted view participates
+        // in the responder chain. The button is not visible; users
+        // discover via macOS convention (Safari, Mail, Finder all
+        // reload with ⌘R).
+        .background {
+            Button("Refresh") {
+                Task { await viewModel.load() }
+            }
+            .keyboardShortcut("r", modifiers: .command)
+            .accessibilityHidden(true)
+            .opacity(0)
+            .frame(width: 0, height: 0)
+        }
     }
 
     // MARK: - Filter bar
 
     private var searchField: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-            TextField("Filter by title", text: $searchText)
-                .textFieldStyle(.plain)
-                .focused($focus, equals: .search)
-                .accessibilityLabel("Filter conversations by title")
-                // ↓ moves focus into the list on the first row. If
-                // filtered is empty, let the event pass through so
-                // the system beep signals nothing to navigate to.
-                .onKeyPress(.downArrow) {
-                    guard let first = filtered.first else { return .ignored }
-                    selection = first.name
-                    focus = .list
-                    return .handled
-                }
-                // Esc: clear filter first, then dismiss on a second
-                // Esc when the filter is already empty.
-                .onExitCommand {
-                    if !searchText.isEmpty {
-                        searchText = ""
-                    } else {
-                        dismiss()
-                    }
-                }
-            if !searchText.isEmpty {
-                IconButton(systemName: "xmark.circle.fill", label: "Clear filter") {
+        NativeSearchField(
+            text: $searchText,
+            placeholder: "Filter by title",
+            onArrowDown: {
+                guard let first = filtered.first else { return }
+                selection = first.name
+                focus = .list
+            },
+            onCancel: {
+                if !searchText.isEmpty {
                     searchText = ""
+                } else {
+                    dismiss()
                 }
             }
-            IconButton(
-                systemName: "arrow.clockwise",
-                label: "Refresh",
-                help: "Refresh"
-            ) {
-                Task { await viewModel.load() }
-            }
-            .disabled(viewModel.state == .loading)
-        }
+        )
+        .focused($focus, equals: .search)
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
     }
@@ -128,11 +134,6 @@ public struct ConversationHistoryPopover: View {
                 .foregroundStyle(.red)
                 .font(.footnote)
                 .padding(16)
-                // `maxHeight: .infinity` so the error fills the
-                // popover's reserved area and pins to top — without
-                // it the VStack collapses to intrinsic height and
-                // SwiftUI vertically centers everything in the
-                // popover's `minHeight: 280` frame.
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         default:
             rows
@@ -149,14 +150,31 @@ public struct ConversationHistoryPopover: View {
                         Task { try? await viewModel.rename(name: conv.name, newTitle: newTitle) }
                     },
                     onDelete: {
-                        Task { try? await viewModel.delete(name: conv.name) }
+                        // Optimistic delete — the row is removed
+                        // from `conversations` synchronously inside
+                        // `viewModel.delete`, so wrapping in
+                        // `withAnimation` plays the row's transition
+                        // immediately. The async network call
+                        // continues and restores the row on failure.
+                        Task {
+                            withAnimation(.easeOut(duration: 0.22)) {
+                                Task { try? await viewModel.delete(name: conv.name) }
+                            }
+                        }
                     }
                 )
                 .tag(conv.name)
-                // Infinite scroll: kick off the next page when the
-                // last row enters the viewport. Replaces the old
-                // GeometryReader-in-background trick which doesn't
-                // work cleanly inside a List.
+                // Scale + fade out on removal — soft "poof" that
+                // reads as deliberate without crossing into iOS
+                // territory. Insertion stays subtle (opacity only)
+                // so refresh doesn't feel jumpy.
+                .transition(.asymmetric(
+                    insertion: .opacity,
+                    removal: .scale(scale: 0.85).combined(with: .opacity)
+                ))
+                // Infinite scroll: load older when the last row
+                // enters the viewport. Pull-to-refresh handles the
+                // opposite edge via .refreshable below.
                 .onAppear {
                     if conv.name == filtered.last?.name {
                         Task { await viewModel.loadMore() }
@@ -173,10 +191,25 @@ public struct ConversationHistoryPopover: View {
                 .listRowSeparator(.hidden)
             }
         }
-        .listStyle(.plain)
+        .listStyle(.sidebar)
         .focused($focus, equals: .list)
+        .refreshable {
+            await viewModel.load()
+        }
+        // ⌘Delete on a focused/selected row deletes it. macOS-native
+        // alternative for the hover-reveal trash button — same
+        // shortcut Mail uses. Selection drives which row dies.
+        .onDeleteCommand {
+            guard let name = selection,
+                  let conv = filtered.first(where: { $0.name == name })
+            else { return }
+            Task {
+                withAnimation(.easeOut(duration: 0.22)) {
+                    Task { try? await viewModel.delete(name: conv.name) }
+                }
+            }
+        }
         // Return on a focused/selected row opens that conversation.
-        // Enter on macOS is treated identically.
         .onKeyPress(.return) {
             openSelection()
             return .handled
@@ -217,8 +250,7 @@ public struct ConversationHistoryPopover: View {
 // MARK: - Row
 
 /// Every row is sized to `rowHeight` regardless of mode so mode transitions
-/// don't reflow the list. All three modes (display, renaming, confirming
-/// delete) fit within a single line of content aligned with the title row.
+/// don't reflow the list.
 private let rowHeight: CGFloat = 44
 
 private struct HistoryRow: View {
@@ -230,10 +262,10 @@ private struct HistoryRow: View {
     private enum RowMode: Equatable {
         case display
         case renaming(draft: String)
-        case confirmingDelete
     }
 
     @State private var mode: RowMode = .display
+    @State private var isHovered: Bool = false
     @FocusState private var renameFocused: Bool
 
     var body: some View {
@@ -243,14 +275,22 @@ private struct HistoryRow: View {
                 displayContent
             case .renaming(let draft):
                 renamingContent(draft: draft)
-            case .confirmingDelete:
-                deleteConfirmContent
             }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 4)
         .frame(height: rowHeight)
         .contentShape(Rectangle())
+        // Hover state drives the show/hide of the secondary
+        // action icons. Apple lists do this in Mail / Notes /
+        // Music — affordances live in the chrome at rest, surface
+        // on hover. The animation is short so the icons appear
+        // alongside the cursor rather than chasing it.
+        .onHover { hovered in
+            withAnimation(.easeInOut(duration: 0.12)) {
+                isHovered = hovered
+            }
+        }
         // Click-to-open still works alongside List's own row
         // selection — the tap gesture and List's selection handler
         // run in parallel, so a single click both selects AND opens.
@@ -278,16 +318,31 @@ private struct HistoryRow: View {
             .accessibilityLabel("\(displayTitle), \(relativeAge(of: conversation.createTime.date))")
             .accessibilityHint("Double-tap to open")
 
-            IconButton(systemName: "pencil", label: "Rename \(displayTitle)", help: "Rename") {
-                mode = .renaming(draft: conversation.title)
-                // Dispatch after the mode transition so the TextField is in the
-                // responder chain before we ask for focus. Setting focus in the
-                // TextField's own .onAppear is unreliable on this code path.
-                DispatchQueue.main.async { renameFocused = true }
+            // Hover-reveal action icons. Same component as before
+            // (consistent shape, sizing, focus ring) — only the
+            // visibility is gated. Both icons get the secondary
+            // foreground (no destructive red): macOS lists put
+            // destructive role into menu/confirmation buttons, not
+            // resting icons — Mail's trash button sits in the
+            // toolbar at default tint, the red only shows up in
+            // the alert that fires after.
+            HStack(spacing: 4) {
+                IconButton(systemName: "pencil", label: "Rename \(displayTitle)", help: "Rename") {
+                    mode = .renaming(draft: conversation.title)
+                    // Dispatch after the mode transition so the TextField is in the
+                    // responder chain before we ask for focus. Setting focus in the
+                    // TextField's own .onAppear is unreliable on this code path.
+                    DispatchQueue.main.async { renameFocused = true }
+                }
+                IconButton(systemName: "trash", label: "Delete \(displayTitle)", help: "Delete") {
+                    onDelete()
+                }
             }
-            IconButton(systemName: "trash", label: "Delete \(displayTitle)", help: "Delete", role: .destructive) {
-                mode = .confirmingDelete
-            }
+            .opacity(isHovered ? 1 : 0)
+            // Don't shift layout when the icons hide — the title
+            // column owns the leading region via `maxWidth: .infinity`,
+            // so the trailing icons just fade in/out in the same
+            // reserved trailing strip.
         }
     }
 
@@ -323,24 +378,76 @@ private struct HistoryRow: View {
         }
         mode = .display
     }
+}
 
-    private var deleteConfirmContent: some View {
-        HStack(spacing: 6) {
-            Text("Delete \"\(displayTitle)\"?")
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .frame(maxWidth: .infinity, alignment: .leading)
+// MARK: - NativeSearchField
 
-            IconButton(
-                systemName: "trash.fill",
-                label: "Confirm delete \(displayTitle)",
-                help: "Delete",
-                role: .destructive
-            ) {
-                onDelete()
-            }
-            IconButton(systemName: "xmark.circle", label: "Cancel", help: "Cancel") {
-                mode = .display
+/// SwiftUI wrapper around `NSSearchField` so the popover's filter
+/// bar reads as a real macOS search widget. NSSearchField provides
+/// the system magnifying-glass icon, the built-in clear-x button on
+/// non-empty content, the focus ring, and accessibility role
+/// "search field" — all of which the previous TextField + manual
+/// HStack reimplemented inconsistently.
+private struct NativeSearchField: NSViewRepresentable {
+    @Binding var text: String
+    var placeholder: String
+    var onArrowDown: () -> Void = {}
+    var onCancel: () -> Void = {}
+
+    func makeNSView(context: Context) -> NSSearchField {
+        let field = NSSearchField()
+        field.placeholderString = placeholder
+        field.delegate = context.coordinator
+        field.bezelStyle = .roundedBezel
+        field.focusRingType = .default
+        return field
+    }
+
+    func updateNSView(_ nsView: NSSearchField, context: Context) {
+        if nsView.stringValue != text {
+            nsView.stringValue = text
+        }
+        nsView.placeholderString = placeholder
+        // Keep delegate's parent reference current — SwiftUI may
+        // re-create this struct on every state change while the
+        // NSView lives across updates.
+        context.coordinator.parent = self
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    final class Coordinator: NSObject, NSSearchFieldDelegate {
+        var parent: NativeSearchField
+
+        init(_ parent: NativeSearchField) { self.parent = parent }
+
+        override func controlTextDidChange(_ notification: Notification) {
+            guard let field = notification.object as? NSSearchField else { return }
+            // Setting the binding can trigger a re-entrant SwiftUI
+            // update; that's why updateNSView guards with the
+            // `stringValue != text` check.
+            parent.text = field.stringValue
+        }
+
+        // Forward a small set of commands to the SwiftUI host so the
+        // popover-level keyboard model (↓ moves focus to the list,
+        // Esc clears or dismisses) keeps working. Anything else
+        // returns `false` so NSSearchField handles it natively
+        // (typing, ⌘A, paste, the built-in clear button, etc.).
+        func control(
+            _ control: NSControl,
+            textView: NSTextView,
+            doCommandBy commandSelector: Selector
+        ) -> Bool {
+            switch commandSelector {
+            case #selector(NSResponder.moveDown(_:)):
+                parent.onArrowDown()
+                return true
+            case #selector(NSResponder.cancelOperation(_:)):
+                parent.onCancel()
+                return true
+            default:
+                return false
             }
         }
     }

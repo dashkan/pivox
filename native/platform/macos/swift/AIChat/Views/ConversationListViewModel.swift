@@ -92,12 +92,22 @@ public final class ConversationListViewModel: ObservableObject {
         return conv
     }
 
+    /// Optimistic delete: removes the row from `conversations`
+    /// before the server request fires so the row's removal
+    /// animation plays immediately. Restores the row on failure.
     public func delete(name: String) async throws {
+        let snapshot = conversations
+        conversations.removeAll { $0.name == name }
         let request = Pivox_Ai_V1_DeleteConversationRequest.with {
             $0.name = name
         }
-        try await client.deleteConversation(request)
-        conversations.removeAll { $0.name == name }
+        do {
+            try await client.deleteConversation(request)
+        } catch {
+            // Server rejected — put the row back.
+            conversations = snapshot
+            throw error
+        }
     }
 
     /// Renames a conversation (title only). Server sets update_time and etag.
