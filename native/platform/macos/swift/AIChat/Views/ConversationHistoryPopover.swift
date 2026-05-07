@@ -76,20 +76,6 @@ public struct ConversationHistoryPopover: View {
             }
             focus = .search
         }
-        // Hidden keyboard shortcut: ⌘R reloads from the top.
-        // Background-attached so the popover-rooted view participates
-        // in the responder chain. The button is not visible; users
-        // discover via macOS convention (Safari, Mail, Finder all
-        // reload with ⌘R).
-        .background {
-            Button("Refresh") {
-                Task { await viewModel.load() }
-            }
-            .keyboardShortcut("r", modifiers: .command)
-            .accessibilityHidden(true)
-            .opacity(0)
-            .frame(width: 0, height: 0)
-        }
     }
 
     // MARK: - Filter bar
@@ -114,19 +100,22 @@ public struct ConversationHistoryPopover: View {
             )
             .focused($focus, equals: .search)
 
-            // Refresh affordance. macOS's `.refreshable` overscroll
-            // gesture is unreliable on lists-in-popovers (no native
-            // analog in Apple's own apps), and ⌘R alone is too
-            // discoverable-only. A small chrome icon adjacent to
-            // the search field gives mouse users a visible target
-            // while keyboard users still hit ⌘R.
+            // Refresh affordance. SwiftUI's `.refreshable` modifier
+            // has no native macOS UI surface — confirmed: it
+            // provides the action to the environment but doesn't
+            // wire any gesture, spinner, or shortcut. So we bridge
+            // both ends of the affordance ourselves: a visible
+            // chrome icon for mouse users plus ⌘R as the
+            // conventional keyboard shortcut on the same button so
+            // the two paths can never drift.
             IconButton(
                 systemName: "arrow.clockwise",
                 label: "Refresh",
-                help: "Refresh"
+                help: "Refresh (⌘R)"
             ) {
                 Task { await viewModel.load() }
             }
+            .keyboardShortcut("r", modifiers: .command)
             .disabled(viewModel.state == .loading)
         }
         .padding(.horizontal, 10)
