@@ -36,6 +36,39 @@ cmake -G Xcode -B build-xcode -S .
 Run tests with `xcodebuild test -scheme PivoxTests` — `ctest` is
 latently broken.
 
+### SwiftUI Previews
+
+CMake-generated Xcode projects do not populate `SWIFT_OPTIMIZATION_LEVEL`
+or `SWIFT_COMPILATION_MODE` by default. SwiftUI Previews read those
+build settings directly (not `OTHER_SWIFT_FLAGS`), and treat unset ==
+`-O` — Previews then refuse with *"needs an unoptimized build … current
+setting is '-O'"* even when `OTHER_SWIFT_FLAGS = -Onone` is in effect.
+`CMakeLists.txt` pins both per variant:
+
+```cmake
+set(CMAKE_XCODE_ATTRIBUTE_SWIFT_OPTIMIZATION_LEVEL[variant=Debug]   "-Onone")
+set(CMAKE_XCODE_ATTRIBUTE_SWIFT_OPTIMIZATION_LEVEL[variant=Release] "-O")
+set(CMAKE_XCODE_ATTRIBUTE_SWIFT_COMPILATION_MODE[variant=Debug]     "singlefile")
+set(CMAKE_XCODE_ATTRIBUTE_SWIFT_COMPILATION_MODE[variant=Release]   "wholemodule")
+```
+
+Don't try to fix Previews via `OTHER_SWIFT_FLAGS`; the Preview engine
+doesn't look there. `wholemodule` (`-wmo`) in Debug also breaks
+Previews independent of optimization level — keep Debug on `singlefile`.
+
+The Preview engine also rejects the build if any embedded dylib in the
+app bundle was compiled with `-O`. Every dylib reachable from a
+previewed view must be the debug variant. PivoxModels is built in both
+configs (`debug/` + `release/`) at configure time and the active Xcode
+configuration picks one via `$<CONFIG>` generator expressions — see
+the `PIVOX_MODELS_BUILD_DIR` block in `CMakeLists.txt`.
+
+Stale `xcodebuild test` runs can leave Apple's XCTest support
+frameworks in `Pivox.app/Contents/Frameworks/` (they're precompiled
+with `-O`). If Previews fail and the diagnosis is unclear, check that
+folder — non-CMake-managed dylibs there are cruft and can be deleted;
+`xcodebuild build` won't recreate them.
+
 ## Logging
 
 - Use `PivoxLog` (`platform/macos/swift/Logging/PivoxLog.swift`) —

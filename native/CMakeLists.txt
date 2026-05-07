@@ -74,6 +74,21 @@ if(CMAKE_GENERATOR MATCHES "Xcode")
     # UITEST only in DebugUITest — gates SKIP_AUTH and test-only bypass code.
     set(CMAKE_XCODE_ATTRIBUTE_SWIFT_ACTIVE_COMPILATION_CONDITIONS[variant=Debug] "DEBUG")
     set(CMAKE_XCODE_ATTRIBUTE_SWIFT_ACTIVE_COMPILATION_CONDITIONS[variant=DebugUITest] "DEBUG UITEST")
+
+    # Xcode SwiftUI Previews diagnose the project unbuildable for preview
+    # if SWIFT_OPTIMIZATION_LEVEL is anything other than "-Onone" on the
+    # config it's previewing. The CMake Xcode generator does not populate
+    # this setting by default, and `OTHER_SWIFT_FLAGS = -Onone` is not
+    # what the Preview engine inspects. Set it explicitly per variant so
+    # the generated project's build settings carry the expected values
+    # everywhere (xcodebuild -showBuildSettings, Previews, Asset
+    # Inspector, etc.).
+    set(CMAKE_XCODE_ATTRIBUTE_SWIFT_OPTIMIZATION_LEVEL[variant=Debug] "-Onone")
+    set(CMAKE_XCODE_ATTRIBUTE_SWIFT_OPTIMIZATION_LEVEL[variant=DebugUITest] "-Onone")
+    set(CMAKE_XCODE_ATTRIBUTE_SWIFT_OPTIMIZATION_LEVEL[variant=Release] "-O")
+    set(CMAKE_XCODE_ATTRIBUTE_SWIFT_COMPILATION_MODE[variant=Debug] "singlefile")
+    set(CMAKE_XCODE_ATTRIBUTE_SWIFT_COMPILATION_MODE[variant=DebugUITest] "singlefile")
+    set(CMAKE_XCODE_ATTRIBUTE_SWIFT_COMPILATION_MODE[variant=Release] "wholemodule")
 endif()
 
 
@@ -149,29 +164,57 @@ if(APPLE)
     # and embeds it under Contents/Frameworks/ at build time. Static
     # linking would require each transitive dep as its own .a, which
     # SwiftPM doesn't expose.
+    #
+    # Two SwiftPM configs (debug / release) are built in parallel and
+    # the active Xcode configuration picks one at compile/link/embed
+    # time via `$<CONFIG>` generator expressions. This matches the
+    # invariant SwiftUI Previews enforce: the entire bundle reachable
+    # from a previewed view must be -Onone in Debug. Earlier shapes
+    # that hardcoded release made Previews fail with
+    # "Pivox.app needs an unoptimized build"; hardcoding debug
+    # would silently strip optimization from Release shipments.
+    # Per-config builds are the only correct answer.
+    #
+    # Both configs build at configure time so that the .swiftmodule
+    # files + dylibs exist for either Xcode config — Xcode can switch
+    # mid-session and we don't want a stale build to fail link with
+    # a missing artifact. SwiftPM is incremental, so subsequent
+    # configure runs that don't touch PivoxModels sources no-op fast.
     set(PIVOX_MODELS_PKG "${CMAKE_SOURCE_DIR}/platform/macos/swift-packages/PivoxModels")
-    set(PIVOX_MODELS_BUILD_DIR "${PIVOX_MODELS_PKG}/.build/arm64-apple-macosx/release")
+    set(PIVOX_MODELS_DEBUG_DIR   "${PIVOX_MODELS_PKG}/.build/arm64-apple-macosx/debug")
+    set(PIVOX_MODELS_RELEASE_DIR "${PIVOX_MODELS_PKG}/.build/arm64-apple-macosx/release")
+
+    # `$<CONFIG>`-resolved paths. Used everywhere PivoxModels appears
+    # downstream (link, embed, -I flag, modulemap flags). Xcode picks
+    # the right side at compile time per active configuration.
+    set(PIVOX_MODELS_BUILD_DIR
+        "$<IF:$<CONFIG:Release>,${PIVOX_MODELS_RELEASE_DIR},${PIVOX_MODELS_DEBUG_DIR}>")
     set(PIVOX_MODELS_MODULES_DIR "${PIVOX_MODELS_BUILD_DIR}/Modules")
-    set(PIVOX_MODELS_DYLIB "${PIVOX_MODELS_BUILD_DIR}/libPivoxModels.dylib")
+    set(PIVOX_MODELS_DYLIB       "${PIVOX_MODELS_BUILD_DIR}/libPivoxModels.dylib")
 
-    # Build at configure time so the dylib + .swiftmodule files exist
-    # before CMake's -I/-L paths get evaluated.
-    execute_process(
-        COMMAND swift build -c release
-        WORKING_DIRECTORY "${PIVOX_MODELS_PKG}"
-        RESULT_VARIABLE PIVOX_MODELS_BUILD_RESULT
-    )
-    if(NOT PIVOX_MODELS_BUILD_RESULT EQUAL 0)
-        message(FATAL_ERROR "swift build of PivoxModels failed")
-    endif()
+    # Build both configs at configure time so subsequent link/embed
+    # steps find their artifacts regardless of which config Xcode
+    # picks at build time.
+    foreach(_pivox_models_cfg debug release)
+        execute_process(
+            COMMAND swift build -c ${_pivox_models_cfg}
+            WORKING_DIRECTORY "${PIVOX_MODELS_PKG}"
+            RESULT_VARIABLE _pivox_models_rc
+        )
+        if(NOT _pivox_models_rc EQUAL 0)
+            message(FATAL_ERROR
+                "swift build of PivoxModels (${_pivox_models_cfg}) failed")
+        endif()
+    endforeach()
 
-    # Custom target so build-time changes to PivoxModels sources (e.g.
-    # after `make proto-generate-native`) propagate via xcodebuild too.
+    # Custom target so build-time source changes (e.g. after
+    # `make proto-generate-native`) propagate via xcodebuild. Selects
+    # the active Xcode config at build time.
     add_custom_target(PivoxModelsSwiftBuild
-        COMMAND swift build -c release
+        COMMAND swift build -c $<IF:$<CONFIG:Release>,release,debug>
         WORKING_DIRECTORY "${PIVOX_MODELS_PKG}"
         USES_TERMINAL
-        COMMENT "Building PivoxModels (SwiftPM)"
+        COMMENT "Building PivoxModels (SwiftPM, $<CONFIG>)"
     )
 
     target_link_libraries(${APP_TARGET} PRIVATE
@@ -197,20 +240,20 @@ if(APPLE)
     target_link_options(${APP_TARGET} PRIVATE "LINKER:-ObjC")
 
     # SwiftPM emits a `module.modulemap` per C module under
-    # .build/<arch>/release/<Module>.build/. The Swift compiler needs
+    # .build/<arch>/debug/<Module>.build/. The Swift compiler needs
     # one `-Xcc -fmodule-map-file=<path>` per modulemap so it can
     # resolve transitive `@import CNIOAtomics`-style imports embedded
     # in NIO's binary swiftmodule files. SHELL: keeps each pair on the
     # same command line as Xcode passes them through.
     # SwiftPM emits/locates module.modulemap files in two places: it
-    # generates them under .build/<arch>/release/<Module>.build/ for C
+    # generates them under .build/<arch>/debug/<Module>.build/ for C
     # modules whose package didn't ship one, and it consumes the
     # original modulemap from the checkout for packages that did
     # (swift-atomics, swift-nio-ssl). We need both on the swiftc
     # search path; deduplicate by module name to avoid "redefinition"
     # errors from `<X>-tool.build/` plugin variants.
     file(GLOB_RECURSE PIVOX_MODELS_C_MODULEMAPS_RAW
-        "${PIVOX_MODELS_PKG}/.build/arm64-apple-macosx/release/*.build/module.modulemap"
+        "${PIVOX_MODELS_PKG}/.build/arm64-apple-macosx/debug/*.build/module.modulemap"
         "${PIVOX_MODELS_PKG}/.build/checkouts/*/Sources/*/include/module.modulemap"
     )
     set(PIVOX_MODELS_MODULEMAP_FLAGS "")
