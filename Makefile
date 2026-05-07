@@ -180,22 +180,22 @@ firebase-deploy:
 clean-fn-revisions:
 	@scripts/clean-fn-revisions.sh
 
-# run-app-macos builds the macOS app in Debug and launches it.
-# Uses a project-local derivedDataPath so the .app path is
-# predictable and so this loop stays independent of the Xcode
-# IDE's DerivedData cache (the IDE keeps its own). On build
-# failure the last 30 lines of the log surface so the failure is
-# diagnosable without searching for the file.
+# run-app-macos opens the most recently built Debug Pivox.app.
+# Assumes the app has already been built (via Xcode IDE or
+# xcodebuild). The .app path is resolved from the project's own
+# build settings so this works regardless of whether the build
+# went to Xcode IDE's default DerivedData or a custom
+# derivedDataPath — no need to hard-code a location.
 run-app-macos:
-	@xcodebuild build \
+	@APP_DIR=$$(xcodebuild \
 		-project native/build-xcode/Pivox.xcodeproj \
 		-scheme Pivox \
 		-configuration Debug \
-		-derivedDataPath native/build-xcode/derived \
-		-allowProvisioningUpdates \
-		> /tmp/pivox-xcodebuild.log 2>&1 \
-		|| (echo "build failed; tail of /tmp/pivox-xcodebuild.log:"; tail -30 /tmp/pivox-xcodebuild.log; exit 1)
-	@open native/build-xcode/derived/Build/Products/Debug/Pivox.app
+		-showBuildSettings 2>/dev/null \
+		| awk '/^[[:space:]]*BUILT_PRODUCTS_DIR =/ {print $$3; exit}'); \
+	test -d "$$APP_DIR/Pivox.app" \
+		|| (echo "Pivox.app not found at $$APP_DIR — build it first (Xcode IDE or xcodebuild)"; exit 1); \
+	open "$$APP_DIR/Pivox.app"
 
 # Native UI Tests (macOS) — image editor only. The auth UI tests
 # previously depended on the Firebase Auth emulator; they are
