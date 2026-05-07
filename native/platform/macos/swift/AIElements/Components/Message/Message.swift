@@ -278,3 +278,102 @@ struct InFlightAssistantMessage: View {
         }
     }
 }
+
+// MARK: - Previews
+
+#if DEBUG
+
+/// Preview helpers — minimal `Pivox_Ai_V1_Message` builders so the
+/// canvas doesn't need a live conversation to render. Keep these
+/// constrained to DEBUG so release builds don't carry preview-only
+/// scaffolding.
+private extension Pivox_Ai_V1_Message {
+    static func sampleUser(_ text: String) -> Pivox_Ai_V1_Message {
+        Pivox_Ai_V1_Message.with {
+            $0.name = "preview/user/\(UUID().uuidString)"
+            $0.role = .user
+            $0.parts = [
+                Pivox_Ai_V1_MessagePart.with {
+                    $0.text = Pivox_Ai_V1_TextPart.with { $0.text = text }
+                },
+            ]
+        }
+    }
+
+    static func sampleAssistant(_ markdown: String) -> Pivox_Ai_V1_Message {
+        Pivox_Ai_V1_Message.with {
+            $0.name = "preview/assistant/\(UUID().uuidString)"
+            $0.role = .assistant
+            $0.parts = [
+                Pivox_Ai_V1_MessagePart.with {
+                    $0.text = Pivox_Ai_V1_TextPart.with { $0.text = markdown }
+                },
+            ]
+        }
+    }
+}
+
+#Preview("User — short prompt") {
+    Message(
+        message: .sampleUser("What's the difference between an actor and a class in Swift 6?"),
+        actionsVisibility: .hoverReveal
+    )
+    .padding()
+    .frame(width: 360)
+}
+
+#Preview("Assistant — pinned (latest reply)") {
+    Message(
+        message: .sampleAssistant("""
+        The key difference: **actors** isolate their state to one task at a time.
+
+        - Classes share state freely; you must lock manually.
+        - Actors serialize access through the actor's mailbox.
+        - Crossing an actor boundary requires `await`.
+        """),
+        actionsVisibility: .pinned,
+        onRegenerate: {}
+    )
+    .padding()
+    .frame(width: 360)
+}
+
+#Preview("Assistant — hover-reveal (older reply)") {
+    Message(
+        message: .sampleAssistant("Earlier in the conversation. Hover to see actions."),
+        actionsVisibility: .hoverReveal
+    )
+    .padding()
+    .frame(width: 360)
+}
+
+#Preview("Assistant — suppressed (streaming)") {
+    Message(
+        message: .sampleAssistant("Mid-stream — the action row is omitted from the layout, so there's no reserved gap below the partial response."),
+        actionsVisibility: .suppressed
+    )
+    .padding()
+    .frame(width: 360)
+}
+
+#Preview("Assistant — markdown stress test") {
+    Message(
+        message: .sampleAssistant("""
+        ## Header
+        Body with **bold** and *italic* and `inline code`.
+
+        - Bullet
+        - Another bullet
+          - Nested
+
+        > A blockquote.
+
+        Closing paragraph with [a link](https://example.com).
+        """),
+        actionsVisibility: .pinned
+    )
+    .padding()
+    .frame(width: 360)
+}
+
+#endif

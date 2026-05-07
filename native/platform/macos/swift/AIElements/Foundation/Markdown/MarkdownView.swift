@@ -264,3 +264,102 @@ private struct TableBlockView: View {
     }
 }
 
+// MARK: - Previews
+
+#if DEBUG
+
+/// Three scenarios chosen to exercise the cases that have driven
+/// regressions in this component:
+///
+///  - **fits**: short snippet that doesn't overflow; the trailing
+///    fade-mask should land on empty space and produce no visible
+///    artifact on the rendered text.
+///  - **overflows**: long single line that exceeds the panel
+///    width; the trailing fade should appear over the rightmost
+///    characters as the content-overflow hint.
+///  - **no language**: code block without a fence info string;
+///    header is omitted, vertical padding compensates.
+///
+/// Width 360pt mirrors the AI chat panel's working width so the
+/// fade lands where it does in production.
+
+#Preview("Code — fits in panel") {
+    CodeBlockView(
+        language: "swift",
+        code: "let answer = 42"
+    )
+    .padding()
+    .frame(width: 360)
+}
+
+#Preview("Code — overflows (fade visible)") {
+    CodeBlockView(
+        language: "swift",
+        code: """
+        func generateRandomString(ofLength length: Int, fromCharacters characters: String) -> String {
+            return String((0..<length).compactMap { _ in characters.randomElement() })
+        }
+        """
+    )
+    .padding()
+    .frame(width: 360)
+}
+
+#Preview("Code — no language label") {
+    CodeBlockView(
+        language: "",
+        code: "$ ls -la /var/log | head -20"
+    )
+    .padding()
+    .frame(width: 360)
+}
+
+/// Realistic chat-response shape: 5–10 lines of one language with
+/// keywords, string literals, comments, and a return — exercises the
+/// tree-sitter highlighter on the kinds of token classes that
+/// dominate production output (vs. the one-liners above which only
+/// touch one or two highlight groups).
+#Preview("Code — multi-line Swift function") {
+    CodeBlockView(
+        language: "swift",
+        code: """
+        // Resolves the auth token, refreshing if expired.
+        func resolveToken(refresh: Bool = false) async throws -> String {
+            if let cached = tokenCache.current, !refresh {
+                return cached
+            }
+            let fresh = try await session.refresh()
+            tokenCache.store(fresh, ttl: .minutes(30))
+            return fresh
+        }
+        """
+    )
+    .padding()
+    .frame(width: 360)
+}
+
+#Preview("Code — multi-language stress") {
+    VStack(alignment: .leading, spacing: 8) {
+        CodeBlockView(
+            language: "python",
+            code: "def add(a, b):\n    return a + b"
+        )
+        CodeBlockView(
+            language: "json",
+            code: """
+            {
+              "id": 42,
+              "name": "preview"
+            }
+            """
+        )
+        CodeBlockView(
+            language: "bash",
+            code: "git log --oneline -5 | grep -i 'fix' || echo none"
+        )
+    }
+    .padding()
+    .frame(width: 360)
+}
+
+#endif
