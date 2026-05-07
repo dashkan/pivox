@@ -146,7 +146,7 @@ func TagBindingFilter() *ResourceFilter {
 }
 
 // ConversationFilter returns the filter config for AI chat
-// conversations. Access-controlled by (org_id, creator_id) —
+// conversations. Access-controlled by (org_id, created_by) —
 // conversations are private to their creator
 // (`identities.id` post-Phase-7). The handler decides
 // whether to filter by the caller's own user-uuid (regular path) or
@@ -173,7 +173,7 @@ func ConversationFilter() *ResourceFilter {
 		CursorDirection: "DESC",
 		DefaultFields:   []string{"title"},
 		ParentColumn:    "org_id",
-		UserColumn:      "creator_id",
+		UserColumn:      "created_by",
 	}
 }
 

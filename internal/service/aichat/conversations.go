@@ -402,7 +402,7 @@ func (s *Server) DeleteConversation(ctx context.Context, req *aiv1.DeleteConvers
 // resolveConversation loads a conversation, enforcing path-bound
 // ownership semantics:
 //
-//  1. Path's user-uuid must match the row's `creator_id` — a
+//  1. Path's user-uuid must match the row's `created_by` — a
 //     fabricated path with a wrong user segment surfaces NotFound,
 //     not a misleading "wrong owner" leak.
 //  2. The caller's `pivox_user_id` claim must equal the path's

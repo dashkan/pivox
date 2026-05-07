@@ -474,7 +474,7 @@ CREATE UNIQUE INDEX idx_identities_email_unique ON identities (email)
 --   - `space_members.principal_id` (when principal_kind='user') →
 --     same
 --   - `group_members.user_id` → references `identities.id`
---   - `ai_conversations.creator_id` → same (added in the AI chat
+--   - `ai_conversations.created_by` → same (added in the AI chat
 --     re-parent commit that ships alongside this one)
 --
 -- Membership in an org = the existence of at least one `org_members`
