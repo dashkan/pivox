@@ -220,3 +220,69 @@ extension ShimmerPromptField where ToolItems == EmptyView {
             toolItems: { EmptyView() })
     }
 }
+
+#if DEBUG
+
+/// Host wrapper that owns the @FocusState binding and seeds the
+/// text @State so each `#Preview` can declare a different starting
+/// state. The shimmer animates in Previews same as production
+/// (TimelineView-driven, not @State).
+private struct PreviewShimmerHost: View {
+    @State var text: String
+    @FocusState var focused: Bool
+    let isStreaming: Bool
+    let isEnabled: Bool
+
+    init(text: String = "",
+         isStreaming: Bool = false,
+         isEnabled: Bool = true) {
+        self._text = State(initialValue: text)
+        self.isStreaming = isStreaming
+        self.isEnabled = isEnabled
+    }
+
+    var body: some View {
+        ShimmerPromptField(
+            text: $text,
+            placeholder: "Ask anything…",
+            isEnabled: isEnabled,
+            isStreaming: isStreaming,
+            onSubmit: {},
+            onCancel: {},
+            focused: $focused
+        )
+        .padding()
+        .frame(width: 480)
+    }
+}
+
+#Preview("Empty — placeholder visible") {
+    PreviewShimmerHost()
+}
+
+#Preview("Filled — single line") {
+    PreviewShimmerHost(text: "Help me draft a release announcement.")
+}
+
+#Preview("Filled — multi-line, near auto-grow ceiling") {
+    PreviewShimmerHost(text: """
+    Lorem ipsum dolor sit amet, consectetur adipiscing elit. \
+    Sed do eiusmod tempor incididunt ut labore et dolore magna \
+    aliqua. Ut enim ad minim veniam, quis nostrud exercitation \
+    ullamco laboris nisi ut aliquip ex ea commodo consequat.
+    """)
+}
+
+#Preview("Streaming — stop button") {
+    PreviewShimmerHost(
+        text: "Generating a long response right now…",
+        isStreaming: true)
+}
+
+#Preview("Disabled — offline / mid-disconnect") {
+    PreviewShimmerHost(
+        text: "Type here when you reconnect",
+        isEnabled: false)
+}
+
+#endif

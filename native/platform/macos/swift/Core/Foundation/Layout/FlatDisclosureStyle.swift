@@ -44,3 +44,40 @@ extension DisclosureGroupStyle where Self == FlatDisclosureStyle {
     /// The AIElements flat disclosure style with chevron rotation.
     public static var flat: FlatDisclosureStyle { FlatDisclosureStyle() }
 }
+
+#if DEBUG
+
+/// Both states adjacent so the chevron rotation + content reveal
+/// can be eyeballed against each other. The animation is
+/// canvas-suppressed; flip in Xcode's running app to see the
+/// 0.2s easeInOut transition between them.
+
+#Preview("Collapsed + expanded") {
+    VStack(alignment: .leading, spacing: 0) {
+        DisclosureGroup(isExpanded: .constant(false)) {
+            Text("Hidden when collapsed.")
+        } label: {
+            Text("Reasoning")
+        }
+        .disclosureGroupStyle(.flat)
+
+        Divider()
+
+        DisclosureGroup(isExpanded: .constant(true)) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Step 1: parse the request.")
+                Text("Step 2: identify constraints.")
+                Text("Step 3: synthesize the answer.")
+            }
+            .font(.callout)
+            .foregroundStyle(.secondary)
+        } label: {
+            Text("Reasoning")
+        }
+        .disclosureGroupStyle(.flat)
+    }
+    .padding()
+    .frame(width: 360)
+}
+
+#endif

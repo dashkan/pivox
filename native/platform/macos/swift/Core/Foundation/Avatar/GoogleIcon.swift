@@ -11,3 +11,15 @@ struct GoogleIcon: View {
       .frame(width: size, height: size)
   }
 }
+
+#if DEBUG
+#Preview("Sizes") {
+    HStack(alignment: .center, spacing: 16) {
+        GoogleIcon(size: 16)
+        GoogleIcon(size: 24)
+        GoogleIcon(size: 32)
+        GoogleIcon(size: 48)
+    }
+    .padding()
+}
+#endif

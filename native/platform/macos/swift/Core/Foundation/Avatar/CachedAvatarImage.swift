@@ -87,3 +87,41 @@ struct CachedAvatarImage<Placeholder: View>: View {
         }
     }
 }
+
+#if DEBUG
+
+/// Previews show the placeholder branch only — Previews don't run
+/// `URLSession.shared.data(from:)` against real avatars and any
+/// stub URL would fail-and-fall-back-to-placeholder anyway. The
+/// placeholder is what new viewers see for ~50ms in production
+/// (or longer on slow networks), so iterating on it visually is
+/// the case that matters for design.
+
+#Preview("Placeholder — circle") {
+    CachedAvatarImage(url: nil) {
+        Circle()
+            .fill(Color.secondary.opacity(0.25))
+            .overlay(
+                Image(systemName: "person.fill")
+                    .foregroundStyle(.secondary))
+    }
+    .frame(width: 32, height: 32)
+    .clipShape(Circle())
+    .padding()
+}
+
+#Preview("Placeholder — initials") {
+    CachedAvatarImage(url: nil) {
+        Circle()
+            .fill(Color.accentColor.opacity(0.2))
+            .overlay(
+                Text("AD")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.accentColor))
+    }
+    .frame(width: 32, height: 32)
+    .clipShape(Circle())
+    .padding()
+}
+
+#endif

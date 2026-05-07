@@ -116,3 +116,32 @@ struct OTPSegmentedField: View {
         return value[value.index(value.startIndex, offsetBy: index)]
     }
 }
+
+#if DEBUG
+
+/// Each preview pins `value` to a different fill state so the visual
+/// language of empty / partial / full reads at a glance. Focus and
+/// auto-advance behavior need a running app to validate (Previews
+/// don't simulate keystrokes).
+
+#Preview("Empty") {
+    OTPSegmentedField(value: .constant(""))
+        .padding()
+}
+
+#Preview("Partial — 3 of 6") {
+    OTPSegmentedField(value: .constant("123"))
+        .padding()
+}
+
+#Preview("Full") {
+    OTPSegmentedField(value: .constant("123456"))
+        .padding()
+}
+
+#Preview("Custom length — 4") {
+    OTPSegmentedField(value: .constant("42"), length: 4)
+        .padding()
+}
+
+#endif

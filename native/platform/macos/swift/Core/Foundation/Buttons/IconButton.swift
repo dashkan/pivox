@@ -126,3 +126,76 @@ extension View {
         modifier(PointingHandCursorModifier())
     }
 }
+
+// MARK: - Previews
+
+#if DEBUG
+
+/// Visual canvas for `IconButton`. Each preview targets a state
+/// transition or visual variant — hover and cursor affordances
+/// don't surface in the canvas (Previews don't simulate hover),
+/// so those are validated in the running app.
+
+#Preview("Default") {
+    IconButton(
+        systemName: "paperplane.fill",
+        label: "Send",
+        action: {}
+    )
+    .padding()
+}
+
+#Preview("Latched (isOn) — feedback toggles") {
+    HStack(spacing: 12) {
+        IconButton(systemName: "hand.thumbsup",
+                   label: "Helpful",
+                   isOn: false,
+                   action: {})
+        IconButton(systemName: "hand.thumbsup.fill",
+                   label: "Helpful",
+                   isOn: true,
+                   action: {})
+        IconButton(systemName: "hand.thumbsdown",
+                   label: "Not helpful",
+                   isOn: false,
+                   action: {})
+    }
+    .padding()
+}
+
+#Preview("No hover background — tight rows") {
+    HStack(spacing: 4) {
+        IconButton(systemName: "doc.on.doc",
+                   label: "Copy",
+                   showsHoverBackground: false,
+                   action: {})
+        IconButton(systemName: "arrow.up",
+                   label: "Send",
+                   showsHoverBackground: false,
+                   action: {})
+        IconButton(systemName: "ellipsis",
+                   label: "More",
+                   showsHoverBackground: false,
+                   action: {})
+    }
+    .padding()
+}
+
+#Preview("Variants — common toolbar glyphs") {
+    HStack(spacing: 12) {
+        IconButton(systemName: "plus", label: "New", action: {})
+        IconButton(systemName: "magnifyingglass",
+                   label: "Search", action: {})
+        IconButton(systemName: "gear",
+                   label: "Settings", action: {})
+        IconButton(systemName: "arrow.up.arrow.down",
+                   label: "Sort", action: {})
+        IconButton(systemName: "trash",
+                   label: "Delete",
+                   role: .destructive,
+                   action: {})
+    }
+    .padding()
+}
+
+#endif

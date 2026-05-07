@@ -131,3 +131,71 @@ enum AIShimmerPalette {
         Color(red: 1.00, green: 0.50, blue: 0.70),   // pink (seamless wrap)
     ]
 }
+
+#if DEBUG
+
+/// The shimmer rotates via `TimelineView(.animation)` so it animates
+/// in Xcode Previews same as production. Two intensities side-by-side
+/// give the design-system "ambient vs prominent" comparison;
+/// different shapes show how the gradient adapts to non-rect strokes.
+
+#Preview("Border — intensity scale") {
+    VStack(alignment: .leading, spacing: 24) {
+        intensityRow(0.3, label: "0.3 — ambient")
+        intensityRow(0.6, label: "0.6 — focused")
+        intensityRow(1.0, label: "1.0 — streaming / prominent")
+    }
+    .padding(20)
+    .frame(width: 400)
+}
+
+#Preview("Border — different shapes") {
+    HStack(spacing: 16) {
+        Color.secondary.opacity(0.05)
+            .frame(width: 100, height: 60)
+            .aiShimmer(shape: RoundedRectangle(cornerRadius: 12))
+
+        Color.secondary.opacity(0.05)
+            .frame(width: 80, height: 80)
+            .clipShape(Circle())
+            .aiShimmer(shape: Circle())
+
+        Color.secondary.opacity(0.05)
+            .frame(width: 140, height: 36)
+            .clipShape(Capsule())
+            .aiShimmer(shape: Capsule())
+    }
+    .padding(20)
+}
+
+#Preview("Symbol shimmer — active") {
+    HStack(spacing: 24) {
+        Image(systemName: "sparkles")
+            .font(.system(size: 36))
+            .aiShimmerSymbol(isActive: true)
+        Image(systemName: "wand.and.stars")
+            .font(.system(size: 36))
+            .aiShimmerSymbol(isActive: true)
+        Image(systemName: "brain")
+            .font(.system(size: 36))
+            .aiShimmerSymbol(isActive: true)
+    }
+    .padding(20)
+}
+
+@ViewBuilder
+private func intensityRow(_ intensity: Double, label: String) -> some View {
+    VStack(alignment: .leading, spacing: 6) {
+        Text(label)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        Color.secondary.opacity(0.05)
+            .frame(height: 56)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .aiShimmer(
+                shape: RoundedRectangle(cornerRadius: 14),
+                intensity: intensity)
+    }
+}
+
+#endif

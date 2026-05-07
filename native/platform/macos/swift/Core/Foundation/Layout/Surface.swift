@@ -98,3 +98,33 @@ extension View {
         }
     }
 }
+
+#if DEBUG
+
+/// All elevation levels in a single canvas so visual contrast is
+/// obvious at a glance. `.floating` shows the material fallback
+/// in Previews — Liquid Glass refraction needs a textured backdrop
+/// to be visible (see LoginView's `authBackdrop`), which a flat
+/// Preview canvas doesn't provide.
+#Preview("All elevation levels") {
+    VStack(spacing: 16) {
+        sample("base — page background", .base)
+        sample("raised — inline container", .raised)
+        sample("elevated — callout / sheet", .elevated)
+        sample("floating — auth card / popover", .floating)
+    }
+    .padding(20)
+    .frame(width: 360)
+}
+
+@ViewBuilder
+private func sample(_ label: String, _ level: SurfaceLevel) -> some View {
+    Text(label)
+        .font(.system(.body, design: .default))
+        .foregroundStyle(.primary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .surface(level)
+}
+
+#endif

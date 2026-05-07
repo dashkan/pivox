@@ -264,3 +264,145 @@ extension LabelStyle where Self == PivoxIconLabelStyle {
     /// IconButtons on text+icon buttons elsewhere in the app.
     public static var pivoxIcon: PivoxIconLabelStyle { PivoxIconLabelStyle() }
 }
+
+#if DEBUG
+
+/// Design-system canvas — every token in one place so visual
+/// tweaks (a color shift, a radius bump, a font-weight call)
+/// can be evaluated in context without grepping for usage sites.
+/// Open in Light + Dark via Xcode's preview appearance switcher
+/// to verify both modes adapt cleanly.
+#Preview("Theme tokens — design-system canvas") {
+    let theme = PivoxTheme.default
+    return ScrollView {
+        VStack(alignment: .leading, spacing: 24) {
+            section("Colors — semantic") {
+                colorRow("textPrimary", theme.textPrimary)
+                colorRow("textSecondary", theme.textSecondary)
+                colorRow("textTertiary", theme.textTertiary)
+                colorRow("background", theme.background)
+                colorRow("backgroundRaised", theme.backgroundRaised)
+                colorRow("backgroundElevated", theme.backgroundElevated)
+                colorRow("border", theme.border)
+                colorRow("borderSubtle", theme.borderSubtle)
+                colorRow("accent", theme.accent)
+                colorRow("accentSubtle", theme.accentSubtle)
+                colorRow("hoverFill", theme.hoverFill)
+                colorRow("destructive", theme.destructive)
+                colorRow("success", theme.success)
+                colorRow("warning", theme.warning)
+            }
+
+            section("Colors — chat") {
+                colorRow("userBubble", theme.userBubble)
+                colorRow("assistantBubble", theme.assistantBubble)
+                colorRow("codeSurface", theme.codeSurface)
+                colorRow("inlineCodeBackground", theme.inlineCodeBackground)
+            }
+
+            section("Typography") {
+                Group {
+                    Text("brandTitleFont — splash / sign-in")
+                        .font(theme.brandTitleFont)
+                    Text("pageTitleFont — dialog headers")
+                        .font(theme.pageTitleFont)
+                    Text("sectionHeadingFont — Profile, Email, …")
+                        .font(theme.sectionHeadingFont)
+                    Text("rowTitleFont — row labels")
+                        .font(theme.rowTitleFont)
+                    Text("bodyFont — standard text")
+                        .font(theme.bodyFont)
+                    Text("bodySmallFont — secondary text")
+                        .font(theme.bodySmallFont)
+                    Text("fieldLabelFont — Display name, Email, …")
+                        .font(theme.fieldLabelFont)
+                    Text("captionFont — captions")
+                        .font(theme.captionFont)
+                    Text("statusBadgeFont — Verified / Unverified")
+                        .font(theme.statusBadgeFont)
+                    Text("codeFont — monospaced")
+                        .font(theme.codeFont)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            section("Spacing") {
+                spacingRow("XS", theme.spacingXS)
+                spacingRow("SM", theme.spacingSM)
+                spacingRow("MD", theme.spacingMD)
+                spacingRow("LG", theme.spacingLG)
+                spacingRow("XL", theme.spacingXL)
+            }
+
+            section("Radius") {
+                radiusRow("SM", theme.radiusSM)
+                radiusRow("MD", theme.radiusMD)
+                radiusRow("LG", theme.radiusLG)
+                radiusRow("XL", theme.radiusXL)
+            }
+        }
+        .padding(24)
+        .frame(width: 540, alignment: .leading)
+    }
+}
+
+@ViewBuilder
+private func section<Content: View>(
+    _ title: String,
+    @ViewBuilder content: () -> Content
+) -> some View {
+    VStack(alignment: .leading, spacing: 10) {
+        Text(title)
+            .font(.system(.title3).weight(.semibold))
+            .foregroundStyle(.primary)
+        content()
+    }
+}
+
+@ViewBuilder
+private func colorRow(_ name: String, _ color: Color) -> some View {
+    HStack(spacing: 12) {
+        RoundedRectangle(cornerRadius: 4)
+            .fill(color)
+            .frame(width: 36, height: 24)
+            .overlay(
+                RoundedRectangle(cornerRadius: 4)
+                    .strokeBorder(Color.secondary.opacity(0.2)))
+        Text(name)
+            .font(.system(.body, design: .monospaced))
+            .foregroundStyle(.primary)
+    }
+}
+
+@ViewBuilder
+private func spacingRow(_ name: String, _ value: CGFloat) -> some View {
+    HStack(spacing: 12) {
+        Text("spacing\(name)")
+            .font(.system(.callout, design: .monospaced))
+            .frame(width: 110, alignment: .leading)
+        Rectangle()
+            .fill(Color.accentColor.opacity(0.6))
+            .frame(width: value, height: 16)
+        Text("\(Int(value))pt")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+}
+
+@ViewBuilder
+private func radiusRow(_ name: String, _ value: CGFloat) -> some View {
+    HStack(spacing: 12) {
+        Text("radius\(name)")
+            .font(.system(.callout, design: .monospaced))
+            .frame(width: 110, alignment: .leading)
+        RoundedRectangle(cornerRadius: value)
+            .fill(Color.accentColor.opacity(0.2))
+            .strokeBorder(Color.accentColor.opacity(0.6), lineWidth: 1)
+            .frame(width: 80, height: 40)
+        Text("\(Int(value))pt")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+}
+
+#endif
