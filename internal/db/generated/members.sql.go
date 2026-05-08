@@ -749,6 +749,71 @@ func (q *Queries) ListSpaceMembers(ctx context.Context, arg ListSpaceMembersPara
 	return items, nil
 }
 
+const listSpaceMembershipsForIdentityInOrg = `-- name: ListSpaceMembershipsForIdentityInOrg :many
+SELECT DISTINCT s.id, s.org_id, s.name
+  FROM spaces s
+  JOIN space_members sm ON sm.space_id = s.id
+ WHERE s.org_id = $1
+   AND s.delete_time IS NULL
+   AND (
+     sm.user_id = $2
+     OR
+     sm.group_id IN (
+       SELECT gm.group_id
+         FROM group_members gm
+        WHERE gm.user_id = $2
+     )
+   )
+ ORDER BY s.name
+`
+
+type ListSpaceMembershipsForIdentityInOrgParams struct {
+	OrgID      uuid.UUID   `json:"org_id"`
+	IdentityID pgtype.UUID `json:"identity_id"`
+}
+
+type ListSpaceMembershipsForIdentityInOrgRow struct {
+	ID    uuid.UUID `json:"id"`
+	OrgID uuid.UUID `json:"org_id"`
+	Name  string    `json:"name"`
+}
+
+// Returns the spaces in `org_id` that `identity_id` is a member of —
+// via direct user binding (space_members.user_id) OR group-derived
+// binding (space_members.group_id where the user is in that group).
+// Mirrors GetEffectiveSpaceRoles' resolution shape but inverts the
+// direction: instead of "for this (user, space), what roles?" it
+// asks "for this (user, org), which spaces?".
+//
+// Used by CreateStorageSession (#27 phase 2) to derive the per-space
+// prefix patterns the storage agent will glob-match against incoming
+// request URLs. Excludes soft-deleted spaces (a session that
+// authorizes paths under a deleted space would be a bug).
+//
+// NOTE: this query does NOT honor org-role inheritance — an
+// org-owner with no direct space_members row gets zero results here.
+// That's the intentional #27-phase-2 scope; org-role inheritance is
+// a follow-up.
+func (q *Queries) ListSpaceMembershipsForIdentityInOrg(ctx context.Context, arg ListSpaceMembershipsForIdentityInOrgParams) ([]ListSpaceMembershipsForIdentityInOrgRow, error) {
+	rows, err := q.db.Query(ctx, listSpaceMembershipsForIdentityInOrg, arg.OrgID, arg.IdentityID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSpaceMembershipsForIdentityInOrgRow{}
+	for rows.Next() {
+		var i ListSpaceMembershipsForIdentityInOrgRow
+		if err := rows.Scan(&i.ID, &i.OrgID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateOrgGroupMemberRole = `-- name: UpdateOrgGroupMemberRole :one
 UPDATE org_members
    SET role_id = $3,

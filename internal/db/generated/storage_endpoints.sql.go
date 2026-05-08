@@ -142,6 +142,48 @@ func (q *Queries) GetStorageEndpointByName(ctx context.Context, arg GetStorageEn
 	return i, err
 }
 
+const listStorageEndpointShortNamesByOrg = `-- name: ListStorageEndpointShortNamesByOrg :many
+SELECT DISTINCT se.name
+  FROM storage_endpoints se
+  JOIN storage_gateways sg ON sg.id = se.gateway_id
+ WHERE sg.org_id = $1
+ ORDER BY se.name
+`
+
+// Returns the DISTINCT endpoint short names across every gateway in
+// an org. Used by CreateStorageSession (#27 phase 2) to enumerate
+// the prefix-pattern endpoint segments — patterns are glob-matched
+// against `/{endpoint-short-name}/{rest}` URL paths at
+// internal/storageagent/http.go, so the controller has to know the
+// same set of short names the agent will route under.
+//
+// NOTE: returns the full endpoint resource name's trailing path
+// component conceptually; in this schema `storage_endpoints.name`
+// already IS the short name (the trailing segment of the AIP
+// resource name). Distinct because different gateways in the same
+// org may register endpoints with the same short name (intentional
+// — each gateway has its own routing keyspace; identical short
+// names across gateways collapse to one pattern).
+func (q *Queries) ListStorageEndpointShortNamesByOrg(ctx context.Context, orgID uuid.UUID) ([]string, error) {
+	rows, err := q.db.Query(ctx, listStorageEndpointShortNamesByOrg, orgID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		items = append(items, name)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listStorageEndpointsByGateway = `-- name: ListStorageEndpointsByGateway :many
 SELECT id, gateway_id, name, display_name, configuration, cache_enabled, cache_max_size_gb, cache_eviction, cache_ttl_hours, annotations, state, etag, revision, created_by, updated_by, create_time, update_time FROM storage_endpoints WHERE gateway_id = $1 ORDER BY create_time
 `

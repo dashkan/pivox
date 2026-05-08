@@ -33,3 +33,24 @@ DELETE FROM storage_endpoints WHERE id = $1;
 
 -- name: UpdateStorageEndpointState :exec
 UPDATE storage_endpoints SET state = $2, update_time = now(), etag = md5(now()::text) WHERE id = $1;
+
+-- name: ListStorageEndpointShortNamesByOrg :many
+-- Returns the DISTINCT endpoint short names across every gateway in
+-- an org. Used by CreateStorageSession (#27 phase 2) to enumerate
+-- the prefix-pattern endpoint segments — patterns are glob-matched
+-- against `/{endpoint-short-name}/{rest}` URL paths at
+-- internal/storageagent/http.go, so the controller has to know the
+-- same set of short names the agent will route under.
+--
+-- NOTE: returns the full endpoint resource name's trailing path
+-- component conceptually; in this schema `storage_endpoints.name`
+-- already IS the short name (the trailing segment of the AIP
+-- resource name). Distinct because different gateways in the same
+-- org may register endpoints with the same short name (intentional
+-- — each gateway has its own routing keyspace; identical short
+-- names across gateways collapse to one pattern).
+SELECT DISTINCT se.name
+  FROM storage_endpoints se
+  JOIN storage_gateways sg ON sg.id = se.gateway_id
+ WHERE sg.org_id = $1
+ ORDER BY se.name;

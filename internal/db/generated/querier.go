@@ -536,6 +536,23 @@ type Querier interface {
 	//   - zero ACTIVE-group-owner bindings exist.
 	ListSoleOwnerOrgsForIdentity(ctx context.Context, userID pgtype.UUID) ([]Organization, error)
 	ListSpaceMembers(ctx context.Context, arg ListSpaceMembersParams) ([]ListSpaceMembersRow, error)
+	// Returns the spaces in `org_id` that `identity_id` is a member of —
+	// via direct user binding (space_members.user_id) OR group-derived
+	// binding (space_members.group_id where the user is in that group).
+	// Mirrors GetEffectiveSpaceRoles' resolution shape but inverts the
+	// direction: instead of "for this (user, space), what roles?" it
+	// asks "for this (user, org), which spaces?".
+	//
+	// Used by CreateStorageSession (#27 phase 2) to derive the per-space
+	// prefix patterns the storage agent will glob-match against incoming
+	// request URLs. Excludes soft-deleted spaces (a session that
+	// authorizes paths under a deleted space would be a bug).
+	//
+	// NOTE: this query does NOT honor org-role inheritance — an
+	// org-owner with no direct space_members row gets zero results here.
+	// That's the intentional #27-phase-2 scope; org-role inheritance is
+	// a follow-up.
+	ListSpaceMembershipsForIdentityInOrg(ctx context.Context, arg ListSpaceMembershipsForIdentityInOrgParams) ([]ListSpaceMembershipsForIdentityInOrgRow, error)
 	// ListSpacesPastPurgeTime returns soft-deleted spaces whose
 	// purge_time has elapsed. Used by SpacePurgeWorker to drive the
 	// final cascade for spaces that finished their 30-day grace window
@@ -546,6 +563,21 @@ type Querier interface {
 	ListStorageAgentAuditByAgent(ctx context.Context, arg ListStorageAgentAuditByAgentParams) ([]StorageAgentAudit, error)
 	ListStorageAgentAuditByGateway(ctx context.Context, arg ListStorageAgentAuditByGatewayParams) ([]StorageAgentAudit, error)
 	ListStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageAgent, error)
+	// Returns the DISTINCT endpoint short names across every gateway in
+	// an org. Used by CreateStorageSession (#27 phase 2) to enumerate
+	// the prefix-pattern endpoint segments — patterns are glob-matched
+	// against `/{endpoint-short-name}/{rest}` URL paths at
+	// internal/storageagent/http.go, so the controller has to know the
+	// same set of short names the agent will route under.
+	//
+	// NOTE: returns the full endpoint resource name's trailing path
+	// component conceptually; in this schema `storage_endpoints.name`
+	// already IS the short name (the trailing segment of the AIP
+	// resource name). Distinct because different gateways in the same
+	// org may register endpoints with the same short name (intentional
+	// — each gateway has its own routing keyspace; identical short
+	// names across gateways collapse to one pattern).
+	ListStorageEndpointShortNamesByOrg(ctx context.Context, orgID uuid.UUID) ([]string, error)
 	ListStorageEndpointsByGateway(ctx context.Context, gatewayID uuid.UUID) ([]StorageEndpoint, error)
 	LookupApiKeyByKeyString(ctx context.Context, keyString string) (ApiKey, error)
 	// MarkDomainFailed flips a PENDING domain to FAILED. Same race-

@@ -218,3 +218,36 @@ SELECT om.id, om.org_id, om.role_id, om.user_id, om.group_id,
 -- window). Filtering on delete_time would break those flows by
 -- returning ErrNoRows after the gate has already admitted the row.
 SELECT org_id FROM spaces WHERE id = $1;
+
+-- name: ListSpaceMembershipsForIdentityInOrg :many
+-- Returns the spaces in `org_id` that `identity_id` is a member of —
+-- via direct user binding (space_members.user_id) OR group-derived
+-- binding (space_members.group_id where the user is in that group).
+-- Mirrors GetEffectiveSpaceRoles' resolution shape but inverts the
+-- direction: instead of "for this (user, space), what roles?" it
+-- asks "for this (user, org), which spaces?".
+--
+-- Used by CreateStorageSession (#27 phase 2) to derive the per-space
+-- prefix patterns the storage agent will glob-match against incoming
+-- request URLs. Excludes soft-deleted spaces (a session that
+-- authorizes paths under a deleted space would be a bug).
+--
+-- NOTE: this query does NOT honor org-role inheritance — an
+-- org-owner with no direct space_members row gets zero results here.
+-- That's the intentional #27-phase-2 scope; org-role inheritance is
+-- a follow-up.
+SELECT DISTINCT s.id, s.org_id, s.name
+  FROM spaces s
+  JOIN space_members sm ON sm.space_id = s.id
+ WHERE s.org_id = sqlc.arg(org_id)
+   AND s.delete_time IS NULL
+   AND (
+     sm.user_id = sqlc.arg(identity_id)
+     OR
+     sm.group_id IN (
+       SELECT gm.group_id
+         FROM group_members gm
+        WHERE gm.user_id = sqlc.arg(identity_id)
+     )
+   )
+ ORDER BY s.name;

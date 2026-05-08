@@ -26,6 +26,7 @@ import (
 	"github.com/dashkan/pivox/internal/crypto"
 	db "github.com/dashkan/pivox/internal/db/generated"
 	"github.com/dashkan/pivox/internal/lro"
+	"github.com/dashkan/pivox/internal/permission"
 	agentv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/agent/v1"
 	storagev1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1"
 	typespb "github.com/dashkan/pivox/internal/pkg/gen/pivox/types"
@@ -405,6 +406,133 @@ func (s *StorageGatewaysServer) UpgradeGateway(_ context.Context, _ *storagev1.U
 }
 
 func (s *StorageGatewaysServer) CreateStorageSession(ctx context.Context, req *storagev1.CreateStorageSessionRequest) (*storagev1.CreateStorageSessionResponse, error) {
+	// Resolve parent → orgID. Returns NotFound for an unknown
+	// organization slug; the caller can't probe org existence beyond
+	// what GetOrganization already exposes (membership-gated).
+	orgID, err := resource.ResolveOrgParent(ctx, s.queries, req.GetParent())
+	if err != nil {
+		return nil, err
+	}
+	orgSlug, err := resource.ParseSegment(req.GetParent())
+	if err != nil {
+		return nil, apierr.HandleResourceError(err, "Organization", req.GetParent())
+	}
+
+	// Determine the caller's effective access level at `parent`.
+	//
+	// The pattern shape branches on whether the caller has
+	// org-wide storage read access via an org-role binding, or
+	// only per-space access:
+	//
+	//   - Org-wide: any org-role at `parent` that the permission
+	//     catalog says grants `assets.assets.read`. Emits a single
+	//     `/{endpoint}/{org-slug}/*` per endpoint (O(endpoints)
+	//     wire weight, dynamically covers spaces added during
+	//     the session's TTL, matches the org-role semantic).
+	//
+	//   - Per-space: caller has no qualifying org-role but does
+	//     have direct or group-mediated `space_members` rows in
+	//     `parent`. Emits the cross-product
+	//     `/{endpoint}/{org-slug}/{space-slug}/*` per (endpoint,
+	//     space) pair.
+	//
+	//   - Neither: PermissionDenied. Covers both "caller is not in
+	//     the org at all" and "caller is in the org under no role
+	//     that grants storage read AND has no per-space binding."
+	//
+	// The trigger is catalog-driven (read from
+	// `permission.matrix`, not enumerated by role name), so a
+	// future role added without storage-read won't accidentally
+	// trigger the org-wide branch. Citations:
+	// `internal/permission/permissions_gen.go:381` (RoleViewer's
+	// AssetsAssetsRead grant; equivalent rows in the Owner / Admin
+	// / Editor blocks). All four current system roles include
+	// storage read, so any org-member today gets org-wide patterns.
+	identityID := server.MustPivoxUserID(ctx)
+	orgRoles, err := s.queries.GetEffectiveOrgRoles(ctx, db.GetEffectiveOrgRolesParams{
+		OrgID:      orgID,
+		IdentityID: convert.PgUUID(identityID),
+	})
+	if err != nil {
+		slog.ErrorContext(ctx, "get effective org roles for storage session", "error", err, "org_id", orgID)
+		return nil, apierr.Internal("get effective org roles")
+	}
+	hasOrgWideRead := false
+	for _, role := range orgRoles {
+		if permission.Has(role, permission.AssetsAssetsRead) {
+			hasOrgWideRead = true
+			break
+		}
+	}
+
+	// If the caller has no qualifying org-role, fall back to direct
+	// per-space membership — DB query, mirrors GetEffectiveSpaceRoles'
+	// resolution shape but inverted to "for this user, which spaces?"
+	var spaces []db.ListSpaceMembershipsForIdentityInOrgRow
+	if !hasOrgWideRead {
+		spaces, err = s.queries.ListSpaceMembershipsForIdentityInOrg(ctx, db.ListSpaceMembershipsForIdentityInOrgParams{
+			OrgID:      orgID,
+			IdentityID: convert.PgUUID(identityID),
+		})
+		if err != nil {
+			slog.ErrorContext(ctx, "list space memberships for storage session", "error", err, "org_id", orgID)
+			return nil, apierr.Internal("list space memberships")
+		}
+		if len(spaces) == 0 {
+			return nil, apierr.PermissionDenied("caller has no storage access in the requested organization; storage session cannot be minted")
+		}
+	}
+
+	// Enumerate the org's endpoint short names. Patterns multiply
+	// across (endpoint × space): the agent's HTTP router keys on
+	// the leading path segment (the endpoint short name) before
+	// session.Authorize sees `r.URL.Path`, so patterns must include
+	// the endpoint segment.
+	//
+	// Atomicity: this read is NOT in the same transaction as the
+	// membership query above. A space added or endpoint added
+	// between the two reads produces a session that's missing the
+	// new (space, endpoint) pair until the next session mint. TTL
+	// is 1h default, so self-correction is bounded. Acceptable today;
+	// not worth a transaction (both queries are read-only).
+	endpointNames, err := s.queries.ListStorageEndpointShortNamesByOrg(ctx, orgID)
+	if err != nil {
+		slog.ErrorContext(ctx, "list endpoint short names for storage session", "error", err, "org_id", orgID)
+		return nil, apierr.Internal("list endpoint short names")
+	}
+	if len(endpointNames) == 0 {
+		// Symmetric to the no-spaces rejection above: minting a
+		// session with zero patterns produces a token that
+		// authorizes nothing — confusing UX. Surface as
+		// FailedPrecondition so the operator's response is "create
+		// an endpoint" rather than "fix the user's permissions."
+		return nil, apierr.FailedPrecondition("organization has no storage endpoints; storage session cannot be minted")
+	}
+
+	// Defensive validation on the path segments that get
+	// interpolated into pattern strings. Today there is NO proto-
+	// level buf.validate constraint on the endpoint / space / org
+	// name fields (no string.pattern in any api/proto/* file as of
+	// this commit), so a `*`, `/`, or `..` in any of these segments
+	// would silently produce a malformed pattern. Reject up front
+	// rather than mint a token whose pattern shape is undefined.
+	// The proto-level gap is the better fix and is filed as the
+	// follow-up to #27 phase 2; this defense is the in-scope
+	// mitigation.
+	if err := validatePathSegment(orgSlug, "organization slug"); err != nil {
+		return nil, apierr.Internal(err.Error())
+	}
+	for _, ep := range endpointNames {
+		if err := validatePathSegment(ep, "endpoint name"); err != nil {
+			return nil, apierr.Internal(err.Error())
+		}
+	}
+	for _, sp := range spaces {
+		if err := validatePathSegment(sp.Name, "space name"); err != nil {
+			return nil, apierr.Internal(err.Error())
+		}
+	}
+
 	// Generate opaque token.
 	token := uuid.New().String()
 
@@ -415,8 +543,34 @@ func (s *StorageGatewaysServer) CreateStorageSession(ctx context.Context, req *s
 	}
 	expiry := time.Now().Add(ttl)
 
-	// Build patterns (placeholder: wildcard access for now).
-	patterns := []string{"/*"}
+	// Build patterns. Branches on hasOrgWideRead — never OR'd with
+	// per-space because the org-wide pattern subsumes the per-space
+	// ones (a future refactor accidentally OR'ing them would
+	// silently double the wire weight without changing semantics).
+	//
+	// Org-wide:  `/{endpoint}/{org-slug}/*`
+	// Per-space: `/{endpoint}/{org-slug}/{space-slug}/*`
+	//
+	// Both shapes use session.Authorize's `/*`-suffix prefix-match
+	// (internal/storageagent/session.go:233). See docs/storage.md
+	// and #83 for the storage_key alignment that makes the assets
+	// pipeline produce paths matching either shape.
+	var patterns []string
+	if hasOrgWideRead {
+		patterns = make([]string, 0, len(endpointNames))
+		for _, ep := range endpointNames {
+			patterns = append(patterns,
+				fmt.Sprintf("/%s/%s/*", ep, orgSlug))
+		}
+	} else {
+		patterns = make([]string, 0, len(endpointNames)*len(spaces))
+		for _, ep := range endpointNames {
+			for _, sp := range spaces {
+				patterns = append(patterns,
+					fmt.Sprintf("/%s/%s/%s/*", ep, orgSlug, sp.Name))
+			}
+		}
+	}
 
 	// Push SessionGrant to all connected gateways.
 	//
@@ -441,13 +595,38 @@ func (s *StorageGatewaysServer) CreateStorageSession(ctx context.Context, req *s
 	// Mint JWT.
 	jwt := mintSessionJWT(token, expiry, s.sessionSigningKey)
 
-	// Set cookie via gRPC metadata.
+	// Set cookie via gRPC metadata for browser flows.
 	cookie := fmt.Sprintf("pivox_session=%s; Domain=.pivox.app; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=%d", jwt, int(ttl.Seconds()))
 	_ = grpc.SetHeader(ctx, metadata.Pairs("set-cookie", cookie))
 
+	// Native clients (macOS, future WinUI) read the JWT from the
+	// response body and attach it as Authorization: Bearer on
+	// subsequent storage requests. The token is the same value as
+	// the cookie's pivox_session= attribute; only the transport
+	// differs.
 	return &storagev1.CreateStorageSessionResponse{
 		Expiry: timestamppb.New(expiry),
+		Token:  jwt,
 	}, nil
+}
+
+// validatePathSegment rejects strings that would produce a malformed
+// or attacker-controllable URL pattern when interpolated into
+// /{endpoint}/{org}/{space}/* shapes. Defensive — proto-level
+// validation is the better long-term fix (filed as a follow-up to
+// #27 phase 2). Rejected: empty, contains '/', contains '*', equals
+// '.' or '..', leading '.'.
+func validatePathSegment(s, kind string) error {
+	if s == "" {
+		return fmt.Errorf("%s is empty; pattern shape would be malformed", kind)
+	}
+	if strings.ContainsAny(s, "/*") {
+		return fmt.Errorf("%s %q contains illegal character ('/' or '*')", kind, s)
+	}
+	if s == "." || s == ".." || strings.HasPrefix(s, ".") {
+		return fmt.Errorf("%s %q has illegal leading-dot shape", kind, s)
+	}
+	return nil
 }
 
 func mintSessionJWT(token string, expiry time.Time, signingKey []byte) string {
