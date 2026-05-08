@@ -12,7 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package assets
+// Package dashtemplate registers the default dashboard widget for
+// pivox.assets/Asset into the templates registry. It is a leaf
+// sibling of the assets gRPC service (not the service itself) so
+// the dashboard layer can pull in the registration without dragging
+// in the full AssetsServer dependency graph (apierr, audit, db,
+// lro, …). System dashboards (e.g. internal/dashboard/system/library)
+// blank-import this package; the heavy AssetsServer is wired
+// separately in the binary.
+package dashtemplate
 
 import (
 	"github.com/dashkan/pivox/internal/dashboard/templates"
@@ -20,15 +28,11 @@ import (
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 )
 
-// dashboardResourceType is the canonical AIP resource type for an
-// asset, declared at api/proto/pivox/assets/v1/asset.proto:191.
-//
-// Note: every other reference in the codebase uses the bare string
-// rather than reaching for a generated constant — proto resource
-// type strings are not exported as Go symbols today. If that
-// changes, this constant + the equivalent in the dashboard tests
-// can switch to the generated value in one place.
-const dashboardResourceType = "pivox.assets/Asset"
+// ResourceType is the canonical AIP resource type for an asset,
+// declared at api/proto/pivox/assets/v1/asset.proto:191. Exported
+// so callers (system dashboards, tests) can reference the same
+// constant rather than restating the literal.
+const ResourceType = "pivox.assets/Asset"
 
 // init registers the default Widget template for assets so the
 // "add widget" picker can hand back a fully-populated CollectionWidget
@@ -49,7 +53,7 @@ const dashboardResourceType = "pivox.assets/Asset"
 //     static ICON_DOCUMENT fallback.
 //   - EmptyState: prompts the user to upload assets.
 func init() {
-	templates.Register(dashboardResourceType, templates.Template{
+	templates.Register(ResourceType, templates.Template{
 		Widget:         buildAssetWidget(),
 		ListPermission: permission.AssetsAssetsRead,
 	})
@@ -63,7 +67,7 @@ func buildAssetWidget() *apiv1.Widget {
 				DataSource: &apiv1.DataSource{
 					Source: &apiv1.DataSource_ResourceQuery{
 						ResourceQuery: &apiv1.ResourceQuery{
-							ResourceType: dashboardResourceType,
+							ResourceType: ResourceType,
 						},
 					},
 				},

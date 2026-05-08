@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package assets_test
+package dashtemplate_test
 
 import (
 	"slices"
@@ -24,28 +24,20 @@ import (
 	"github.com/dashkan/pivox/internal/dashboard/templates"
 	"github.com/dashkan/pivox/internal/permission"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
-
-	// The asset package's init() registers the Asset dashboard
-	// template. The blank import pulls it in even though this test
-	// file does not reference any exported symbol from the package.
-	_ "github.com/dashkan/pivox/internal/service/assets"
+	"github.com/dashkan/pivox/internal/service/assets/dashtemplate"
 )
 
-// assetResourceType is the canonical AIP resource type for assets.
-// Source: api/proto/pivox/assets/v1/asset.proto:191.
-const assetResourceType = "pivox.assets/Asset"
-
 func TestAssetDashboardTemplate_Registered(t *testing.T) {
-	tmpl, ok := templates.Get(assetResourceType)
-	require.True(t, ok, "Asset template must be registered at init() under %q", assetResourceType)
+	tmpl, ok := templates.Get(dashtemplate.ResourceType)
+	require.True(t, ok, "Asset template must be registered at init() under %q", dashtemplate.ResourceType)
 
 	require.NotNil(t, tmpl.Widget, "Template.Widget must be populated")
 	require.NotNil(t, tmpl.Widget.GetCollection(),
-		"Asset template must use a CollectionWidget (TABLE/CARD/LIST modes), not a Statistic/Chart/etc.")
+		"Asset template must use a CollectionWidget (TABLE/CARD modes), not a Statistic/Chart/etc.")
 }
 
 func TestAssetDashboardTemplate_ListPermissionIsCanonical(t *testing.T) {
-	tmpl, ok := templates.Get(assetResourceType)
+	tmpl, ok := templates.Get(dashtemplate.ResourceType)
 	require.True(t, ok)
 
 	require.Equal(t, permission.AssetsAssetsRead, tmpl.ListPermission,
@@ -58,7 +50,7 @@ func TestAssetDashboardTemplate_ListPermissionIsCanonical(t *testing.T) {
 }
 
 func TestAssetDashboardTemplate_DisplayModesMatchLockedDesign(t *testing.T) {
-	tmpl, _ := templates.Get(assetResourceType)
+	tmpl, _ := templates.Get(dashtemplate.ResourceType)
 	coll := tmpl.Widget.GetCollection()
 	require.NotNil(t, coll)
 
@@ -74,17 +66,17 @@ func TestAssetDashboardTemplate_DisplayModesMatchLockedDesign(t *testing.T) {
 }
 
 func TestAssetDashboardTemplate_DataSourceTargetsAsset(t *testing.T) {
-	tmpl, _ := templates.Get(assetResourceType)
+	tmpl, _ := templates.Get(dashtemplate.ResourceType)
 	coll := tmpl.Widget.GetCollection()
 
 	rq := coll.GetDataSource().GetResourceQuery()
 	require.NotNil(t, rq, "Asset library must use a ResourceQuery data source")
-	assert.Equal(t, assetResourceType, rq.GetResourceType(),
+	assert.Equal(t, dashtemplate.ResourceType, rq.GetResourceType(),
 		"ResourceQuery.resource_type must match the registry key")
 }
 
 func TestAssetDashboardTemplate_RequiredColumnsPresent(t *testing.T) {
-	tmpl, _ := templates.Get(assetResourceType)
+	tmpl, _ := templates.Get(dashtemplate.ResourceType)
 	coll := tmpl.Widget.GetCollection()
 
 	require.NotEmpty(t, coll.GetColumns(), "default columns must be defined")
@@ -101,7 +93,7 @@ func TestAssetDashboardTemplate_RequiredColumnsPresent(t *testing.T) {
 }
 
 func TestAssetDashboardTemplate_RowActionKeysAreSnakeCase(t *testing.T) {
-	tmpl, _ := templates.Get(assetResourceType)
+	tmpl, _ := templates.Get(dashtemplate.ResourceType)
 	coll := tmpl.Widget.GetCollection()
 
 	require.NotEmpty(t, coll.GetRowActions(), "default row actions must be defined")
@@ -117,7 +109,7 @@ func TestAssetDashboardTemplate_RowActionKeysAreSnakeCase(t *testing.T) {
 }
 
 func TestAssetDashboardTemplate_IconConfigPopulated(t *testing.T) {
-	tmpl, _ := templates.Get(assetResourceType)
+	tmpl, _ := templates.Get(dashtemplate.ResourceType)
 	coll := tmpl.Widget.GetCollection()
 
 	icon := coll.GetIconConfig()
@@ -132,7 +124,7 @@ func TestAssetDashboardTemplate_IconConfigPopulated(t *testing.T) {
 }
 
 func TestAssetDashboardTemplate_EmptyStatePopulated(t *testing.T) {
-	tmpl, _ := templates.Get(assetResourceType)
+	tmpl, _ := templates.Get(dashtemplate.ResourceType)
 	coll := tmpl.Widget.GetCollection()
 
 	es := coll.GetEmptyState()
