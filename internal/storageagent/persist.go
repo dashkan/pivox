@@ -19,12 +19,20 @@ import (
 )
 
 // schemaVersion identifies the on-disk shape of the agent local store.
-// Bump in lockstep with any DDL change in `schema`. OpenStore fails fast
-// if it encounters an existing DB at a different version — operators
-// recover by deleting the DB file (the controller re-delivers state on
-// the next handshake). When this hits production, this becomes numbered
-// migrations; pre-prod freedom (per root CLAUDE.md) lets us evolve the
-// schema directly for now.
+// Bump in lockstep with any change to `schema` that is NOT additive —
+// column type changes, column removals, table renames, constraint
+// changes. Additive changes (new TABLE inside the same CREATE-IF-NOT-
+// EXISTS block, new INDEX) are safe across the version gate without a
+// bump because the existing shape is unchanged; an older binary
+// reading a newer DB just doesn't query the new tables, and a newer
+// binary reading an older DB picks up the new tables on its first
+// Open. Non-additive changes break that contract and require the
+// fail-fast mismatch path to recover (delete the DB; the controller
+// re-delivers state on the next handshake).
+//
+// When this hits production, this becomes numbered migrations;
+// pre-prod freedom (per root CLAUDE.md) lets us evolve the schema
+// directly for now.
 const schemaVersion = 1
 
 // schema is the agent local store DDL. Applied on every Open via

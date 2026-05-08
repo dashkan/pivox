@@ -97,7 +97,7 @@ func (s *EndpointStore) LoadFromStore(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("load endpoints: %w", err)
 	}
-	resolved, err := s.resolveEndpoints(configs)
+	resolved, err := s.resolveEndpoints(ctx, configs)
 	if err != nil {
 		return fmt.Errorf("resolve endpoints from store: %w", err)
 	}
@@ -128,7 +128,7 @@ func (s *EndpointStore) LoadFromStore(ctx context.Context) error {
 // reloads the persisted state. Acceptable because Update is a
 // full-set replacement, not a delta.
 func (s *EndpointStore) Update(ctx context.Context, configs []*agentv1.EndpointConfig) error {
-	resolved, err := s.resolveEndpoints(configs)
+	resolved, err := s.resolveEndpoints(ctx, configs)
 	if err != nil {
 		return err
 	}
@@ -148,8 +148,10 @@ func (s *EndpointStore) Update(ctx context.Context, configs []*agentv1.EndpointC
 // resolveEndpoints builds the in-memory routing map from a slice of
 // configs, constructing S3 clients per endpoint. Returns an error
 // immediately on the first failure so the caller can leave existing
-// state untouched.
-func (s *EndpointStore) resolveEndpoints(configs []*agentv1.EndpointConfig) (map[string]*endpoint, error) {
+// state untouched. ctx is propagated through to BucketExists so a
+// hung S3 backend respects the caller's deadline (notably the 30s
+// boot timeout in cmd/pivox-agent/storage.go).
+func (s *EndpointStore) resolveEndpoints(ctx context.Context, configs []*agentv1.EndpointConfig) (map[string]*endpoint, error) {
 	out := make(map[string]*endpoint, len(configs))
 	for _, cfg := range configs {
 		ep := &endpoint{
@@ -157,7 +159,7 @@ func (s *EndpointStore) resolveEndpoints(configs []*agentv1.EndpointConfig) (map
 			cacheEnabled: cfg.GetCacheConfig() != nil && cfg.GetCacheConfig().GetEnabled(),
 		}
 		if s3Cfg := cfg.GetS3(); s3Cfg != nil {
-			client, err := newS3Client(s3Cfg)
+			client, err := newS3Client(ctx, s3Cfg)
 			if err != nil {
 				return nil, fmt.Errorf("endpoint %s: create S3 client: %w", cfg.GetName(), err)
 			}
@@ -301,7 +303,11 @@ func (s *EndpointStore) serveFilesystem(w http.ResponseWriter, r *http.Request, 
 }
 
 // newS3Client creates a minio client from an S3 endpoint config.
-func newS3Client(cfg *agentv1.S3EndpointConfig) (*minio.Client, error) {
+// ctx bounds the bucket-existence verification probe; a hung S3
+// backend therefore honors the caller's deadline rather than blocking
+// indefinitely (relevant during agent boot, where the 30s bootCtx
+// must be respected so a misconfigured endpoint can't stall startup).
+func newS3Client(ctx context.Context, cfg *agentv1.S3EndpointConfig) (*minio.Client, error) {
 	u, err := url.Parse(cfg.GetEndpointUri())
 	if err != nil {
 		return nil, fmt.Errorf("parse endpoint URI %q: %w", cfg.GetEndpointUri(), err)
@@ -324,8 +330,11 @@ func newS3Client(cfg *agentv1.S3EndpointConfig) (*minio.Client, error) {
 		return nil, fmt.Errorf("create client: %w", err)
 	}
 
-	// Verify bucket exists.
-	exists, err := client.BucketExists(context.Background(), cfg.GetBucket())
+	// Verify bucket exists. ctx is the caller's; respects bootCtx
+	// timeout / signal cancellation rather than the previous
+	// context.Background() which could block past the agent's
+	// shutdown deadline.
+	exists, err := client.BucketExists(ctx, cfg.GetBucket())
 	if err != nil {
 		return nil, fmt.Errorf("check bucket %q: %w", cfg.GetBucket(), err)
 	}

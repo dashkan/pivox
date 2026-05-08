@@ -26,7 +26,7 @@ func TestNewS3Client_Success(t *testing.T) {
 
 	_, endpoint, bucketName := testutil.SetupTestS3(t)
 
-	client, err := newS3Client(&agentv1.S3EndpointConfig{
+	client, err := newS3Client(t.Context(), &agentv1.S3EndpointConfig{
 		EndpointUri:     "http://" + endpoint,
 		Bucket:          bucketName,
 		AccessKeyId:     "testaccess",
@@ -43,7 +43,7 @@ func TestNewS3Client_BucketNotFound(t *testing.T) {
 
 	_, endpoint, _ := testutil.SetupTestS3(t)
 
-	_, err := newS3Client(&agentv1.S3EndpointConfig{
+	_, err := newS3Client(t.Context(), &agentv1.S3EndpointConfig{
 		EndpointUri:     "http://" + endpoint,
 		Bucket:          "nonexistent-bucket",
 		AccessKeyId:     "testaccess",
@@ -58,7 +58,7 @@ func TestNewS3Client_BadEndpoint(t *testing.T) {
 		t.Skip("skipping S3 integration test in short mode")
 	}
 
-	_, err := newS3Client(&agentv1.S3EndpointConfig{
+	_, err := newS3Client(t.Context(), &agentv1.S3EndpointConfig{
 		EndpointUri:     "http://127.0.0.1:1",
 		Bucket:          "some-bucket",
 		AccessKeyId:     "testaccess",
