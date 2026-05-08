@@ -87,7 +87,7 @@ func runStorage(cmd *cobra.Command, args []string) error {
 	defer cancel()
 
 	// Create stores.
-	sessions := agent.NewSessionStore()
+	sessions := agent.NewSessionStore(agent.SessionStoreConfig{})
 	go sessions.StartCleanup(ctx, 1*time.Minute)
 
 	memcacheMaxItems, _ := f.GetInt("memcache-max-items")

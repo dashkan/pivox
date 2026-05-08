@@ -16,6 +16,30 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+func TestTokenPrefix(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name  string
+		token string
+		want  string
+	}{
+		{"empty", "", "..."},
+		{"shorter than prefix", "abc", "abc..."},
+		{"exactly prefix length", "abcdefgh", "abcdefgh..."},
+		{"longer than prefix", "abcdefghijklmnop", "abcdefgh..."},
+		// Load-bearing: must not panic on tokens shorter than 8 chars.
+		// This was a real bug at stream.go before the helper landed —
+		// `grant.Token[:8]` panicked on short tokens.
+		{"single char does not panic", "x", "x..."},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, tokenPrefix(tc.token))
+		})
+	}
+}
+
 // mockBidiStream implements grpc.BidiStreamingClient[AgentMessage, ControlMessage]
 // for testing the Stream type.
 type mockBidiStream struct {
@@ -83,7 +107,7 @@ func newTestStream(bidi *mockBidiStream) *Stream {
 	return NewStream(StreamConfig{
 		Stream:    bidi,
 		Timeout:   2 * time.Second,
-		Sessions:  NewSessionStore(),
+		Sessions:  NewSessionStore(SessionStoreConfig{}),
 		Endpoints: NewEndpointStore(NewMemoryCache(10, 1024)),
 		Denied:    NewDeniedPatterns(),
 		Logger:    slog.Default(),
@@ -220,7 +244,7 @@ func TestHandshake_Timeout(t *testing.T) {
 	s := NewStream(StreamConfig{
 		Stream:    bidi,
 		Timeout:   50 * time.Millisecond,
-		Sessions:  NewSessionStore(),
+		Sessions:  NewSessionStore(SessionStoreConfig{}),
 		Endpoints: NewEndpointStore(NewMemoryCache(10, 1024)),
 		Denied:    NewDeniedPatterns(),
 		Logger:    slog.Default(),
@@ -318,7 +342,7 @@ func TestReceiveLoop_ClosePendingChannels(t *testing.T) {
 
 func TestHandleServerMessage_SessionGrant(t *testing.T) {
 	bidi := newMockBidiStream()
-	sessions := NewSessionStore()
+	sessions := NewSessionStore(SessionStoreConfig{})
 	s := NewStream(StreamConfig{
 		Stream:    bidi,
 		Timeout:   time.Second,
@@ -329,7 +353,7 @@ func TestHandleServerMessage_SessionGrant(t *testing.T) {
 	})
 
 	expiry := time.Now().Add(time.Hour)
-	s.handleServerMessage(&agentv1.ControlMessage{
+	s.handleServerMessage(context.Background(), &agentv1.ControlMessage{
 		Message: &agentv1.ControlMessage_SessionGrant{
 			SessionGrant: &agentv1.SessionGrant{
 				Token:    "abcdefghijklmnop",
@@ -344,8 +368,8 @@ func TestHandleServerMessage_SessionGrant(t *testing.T) {
 
 func TestHandleServerMessage_SessionRevoke(t *testing.T) {
 	bidi := newMockBidiStream()
-	sessions := NewSessionStore()
-	sessions.Grant("revoke-me-token1", []string{"/data/*"}, time.Now().Add(time.Hour))
+	sessions := NewSessionStore(SessionStoreConfig{})
+	require.NoError(t, sessions.Grant(context.Background(), "revoke-me-token1", []string{"/data/*"}, time.Now().Add(time.Hour)))
 	s := NewStream(StreamConfig{
 		Stream:    bidi,
 		Timeout:   time.Second,
@@ -355,7 +379,7 @@ func TestHandleServerMessage_SessionRevoke(t *testing.T) {
 		Logger:    slog.Default(),
 	})
 
-	s.handleServerMessage(&agentv1.ControlMessage{
+	s.handleServerMessage(context.Background(), &agentv1.ControlMessage{
 		Message: &agentv1.ControlMessage_SessionRevoke{
 			SessionRevoke: &agentv1.SessionRevoke{
 				Token: "revoke-me-token1",
@@ -372,13 +396,13 @@ func TestHandleServerMessage_ConfigUpdate_DeniedPatterns(t *testing.T) {
 	s := NewStream(StreamConfig{
 		Stream:    bidi,
 		Timeout:   time.Second,
-		Sessions:  NewSessionStore(),
+		Sessions:  NewSessionStore(SessionStoreConfig{}),
 		Endpoints: NewEndpointStore(NewMemoryCache(10, 1024)),
 		Denied:    denied,
 		Logger:    slog.Default(),
 	})
 
-	s.handleServerMessage(&agentv1.ControlMessage{
+	s.handleServerMessage(context.Background(), &agentv1.ControlMessage{
 		Message: &agentv1.ControlMessage_ConfigUpdate{
 			ConfigUpdate: &agentv1.ConfigUpdate{
 				DeniedPatterns: []string{"*.tmp", "secret.*"},
@@ -397,13 +421,13 @@ func TestHandleServerMessage_ConfigUpdate_Endpoints(t *testing.T) {
 	s := NewStream(StreamConfig{
 		Stream:    bidi,
 		Timeout:   time.Second,
-		Sessions:  NewSessionStore(),
+		Sessions:  NewSessionStore(SessionStoreConfig{}),
 		Endpoints: endpoints,
 		Denied:    NewDeniedPatterns(),
 		Logger:    slog.Default(),
 	})
 
-	s.handleServerMessage(&agentv1.ControlMessage{
+	s.handleServerMessage(context.Background(), &agentv1.ControlMessage{
 		Message: &agentv1.ControlMessage_ConfigUpdate{
 			ConfigUpdate: &agentv1.ConfigUpdate{
 				Endpoints: []*agentv1.EndpointConfig{
@@ -431,7 +455,7 @@ func TestHandleServerMessage_UnknownType(t *testing.T) {
 	s := newTestStream(bidi)
 
 	// Should not panic on unknown message type.
-	s.handleServerMessage(&agentv1.ControlMessage{})
+	s.handleServerMessage(context.Background(), &agentv1.ControlMessage{})
 }
 
 func TestHandleServerMessage_DrainRequest(t *testing.T) {
@@ -439,7 +463,7 @@ func TestHandleServerMessage_DrainRequest(t *testing.T) {
 	s := newTestStream(bidi)
 
 	// Should not panic — just logs.
-	s.handleServerMessage(&agentv1.ControlMessage{
+	s.handleServerMessage(context.Background(), &agentv1.ControlMessage{
 		Message: &agentv1.ControlMessage_DrainRequest{
 			DrainRequest: &agentv1.DrainRequest{Reason: "maintenance"},
 		},
@@ -451,7 +475,7 @@ func TestHandleServerMessage_CertDelivery(t *testing.T) {
 	s := newTestStream(bidi)
 
 	// Should not panic — just logs.
-	s.handleServerMessage(&agentv1.ControlMessage{
+	s.handleServerMessage(context.Background(), &agentv1.ControlMessage{
 		Message: &agentv1.ControlMessage_CertDelivery{
 			CertDelivery: &agentv1.CertDelivery{},
 		},
@@ -463,7 +487,7 @@ func TestHandleServerMessage_UpgradeRequest(t *testing.T) {
 	s := newTestStream(bidi)
 
 	// Should not panic — just logs.
-	s.handleServerMessage(&agentv1.ControlMessage{
+	s.handleServerMessage(context.Background(), &agentv1.ControlMessage{
 		Message: &agentv1.ControlMessage_UpgradeRequest{
 			UpgradeRequest: &agentv1.UpgradeRequest{
 				TargetVersion: "1.2.3",
@@ -477,7 +501,7 @@ func TestHandleServerMessage_ServerHeartbeat(t *testing.T) {
 	s := newTestStream(bidi)
 
 	// Should not panic — just logs.
-	s.handleServerMessage(&agentv1.ControlMessage{
+	s.handleServerMessage(context.Background(), &agentv1.ControlMessage{
 		Message: &agentv1.ControlMessage_ServerHeartbeat{
 			ServerHeartbeat: &agentv1.ServerHeartbeat{},
 		},

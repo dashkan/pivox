@@ -11,10 +11,13 @@ import (
 )
 
 func TestGrant_And_Authorize(t *testing.T) {
-	store := NewSessionStore()
+	t.Parallel()
+	ctx := context.Background()
+	store := NewSessionStore(SessionStoreConfig{})
 	expiry := time.Now().Add(1 * time.Hour)
 
-	store.Grant("tok1", []string{"/media/video.mp4", "/media/audio.mp3"}, expiry)
+	require.NoError(t, store.Grant(ctx, "tok1",
+		[]string{"/media/video.mp4", "/media/audio.mp3"}, expiry))
 
 	assert.True(t, store.Authorize("tok1", "/media/video.mp4"))
 	assert.True(t, store.Authorize("tok1", "/media/audio.mp3"))
@@ -23,44 +26,56 @@ func TestGrant_And_Authorize(t *testing.T) {
 }
 
 func TestAuthorize_NotFound(t *testing.T) {
-	store := NewSessionStore()
+	t.Parallel()
+	store := NewSessionStore(SessionStoreConfig{})
 
 	assert.False(t, store.Authorize("unknown-token", "/any/path"),
 		"unknown token should not be authorized")
 }
 
 func TestAuthorize_Expired(t *testing.T) {
-	store := NewSessionStore()
+	t.Parallel()
+	ctx := context.Background()
+	store := NewSessionStore(SessionStoreConfig{})
 	// Grant with a past expiry.
-	store.Grant("expired-tok", []string{"/media/*"}, time.Now().Add(-1*time.Second))
+	require.NoError(t, store.Grant(ctx, "expired-tok",
+		[]string{"/media/*"}, time.Now().Add(-1*time.Second)))
 
 	assert.False(t, store.Authorize("expired-tok", "/media/file.mp4"),
 		"expired session should not authorize")
 }
 
 func TestRevoke(t *testing.T) {
-	store := NewSessionStore()
+	t.Parallel()
+	ctx := context.Background()
+	store := NewSessionStore(SessionStoreConfig{})
 	expiry := time.Now().Add(1 * time.Hour)
 
-	store.Grant("tok-revoke", []string{"/data/*"}, expiry)
+	require.NoError(t, store.Grant(ctx, "tok-revoke",
+		[]string{"/data/*"}, expiry))
 	require.True(t, store.Authorize("tok-revoke", "/data/file.csv"))
 
-	store.Revoke("tok-revoke")
+	require.NoError(t, store.Revoke(ctx, "tok-revoke"))
 	assert.False(t, store.Authorize("tok-revoke", "/data/file.csv"),
 		"revoked token should not be authorized")
 }
 
 func TestFlushExpired(t *testing.T) {
-	store := NewSessionStore()
+	t.Parallel()
+	ctx := context.Background()
+	store := NewSessionStore(SessionStoreConfig{})
 
 	// Two expired sessions.
-	store.Grant("expired1", []string{"/a"}, time.Now().Add(-1*time.Minute))
-	store.Grant("expired2", []string{"/b"}, time.Now().Add(-2*time.Minute))
+	require.NoError(t, store.Grant(ctx, "expired1",
+		[]string{"/a"}, time.Now().Add(-1*time.Minute)))
+	require.NoError(t, store.Grant(ctx, "expired2",
+		[]string{"/b"}, time.Now().Add(-2*time.Minute)))
 
 	// One valid session.
-	store.Grant("valid1", []string{"/c"}, time.Now().Add(1*time.Hour))
+	require.NoError(t, store.Grant(ctx, "valid1",
+		[]string{"/c"}, time.Now().Add(1*time.Hour)))
 
-	store.FlushExpired()
+	require.NoError(t, store.FlushExpired(ctx))
 
 	assert.False(t, store.Authorize("expired1", "/a"), "expired1 should have been flushed")
 	assert.False(t, store.Authorize("expired2", "/b"), "expired2 should have been flushed")
@@ -68,11 +83,13 @@ func TestFlushExpired(t *testing.T) {
 }
 
 func TestMatchPattern_ExactMatch(t *testing.T) {
+	t.Parallel()
 	assert.True(t, matchPattern("/media/video.mp4", "/media/video.mp4"))
 	assert.False(t, matchPattern("/media/video.mp4", "/media/audio.mp3"))
 }
 
 func TestMatchPattern_GlobMatch(t *testing.T) {
+	t.Parallel()
 	// Single-segment glob: *.jpg matches any single segment ending in .jpg.
 	assert.True(t, matchPattern("/media/*.jpg", "/media/photo.jpg"))
 	assert.False(t, matchPattern("/media/*.jpg", "/media/photo.png"),
@@ -82,6 +99,7 @@ func TestMatchPattern_GlobMatch(t *testing.T) {
 }
 
 func TestMatchPattern_RecursiveWildcard(t *testing.T) {
+	t.Parallel()
 	// Pattern ending in /* does a prefix match.
 	assert.True(t, matchPattern("/archive/*", "/archive/2024/file.txt"),
 		"recursive wildcard should match nested paths")
@@ -94,14 +112,18 @@ func TestMatchPattern_RecursiveWildcard(t *testing.T) {
 }
 
 func TestGrant_Overwrite(t *testing.T) {
-	store := NewSessionStore()
+	t.Parallel()
+	ctx := context.Background()
+	store := NewSessionStore(SessionStoreConfig{})
 	expiry := time.Now().Add(1 * time.Hour)
 
-	store.Grant("tok-ow", []string{"/old/path"}, expiry)
+	require.NoError(t, store.Grant(ctx, "tok-ow",
+		[]string{"/old/path"}, expiry))
 	require.True(t, store.Authorize("tok-ow", "/old/path"))
 
 	// Overwrite with new patterns.
-	store.Grant("tok-ow", []string{"/new/path"}, expiry)
+	require.NoError(t, store.Grant(ctx, "tok-ow",
+		[]string{"/new/path"}, expiry))
 
 	assert.False(t, store.Authorize("tok-ow", "/old/path"),
 		"old pattern should no longer match after overwrite")
@@ -110,39 +132,38 @@ func TestGrant_Overwrite(t *testing.T) {
 }
 
 func TestSessionConcurrentAccess(t *testing.T) {
-	store := NewSessionStore()
+	t.Parallel()
+	ctx := context.Background()
+	store := NewSessionStore(SessionStoreConfig{})
 	expiry := time.Now().Add(1 * time.Hour)
 
 	var wg sync.WaitGroup
 	const goroutines = 50
 
-	// Concurrent Grant.
+	// Concurrent Grant. Errors are discarded because no Store is
+	// attached — the only failure path (persistence) cannot fire here.
+	// If a Store is ever attached to this fixture, swap discards for
+	// require.NoError so silent persistence failures show up.
 	for i := range goroutines {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			tok := "tok-" + string(rune('A'+i%26))
-			store.Grant(tok, []string{"/path/*"}, expiry)
-		}(i)
+			_ = store.Grant(ctx, tok, []string{"/path/*"}, expiry)
+		})
 	}
 
 	// Concurrent Authorize.
 	for range goroutines {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			store.Authorize("tok-A", "/path/file.txt")
-		}()
+		})
 	}
 
-	// Concurrent Revoke.
+	// Concurrent Revoke. Same discard rationale as Grant above.
 	for i := range goroutines / 2 {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			tok := "tok-" + string(rune('A'+i%26))
-			store.Revoke(tok)
-		}(i)
+			_ = store.Revoke(ctx, tok)
+		})
 	}
 
 	wg.Wait()
@@ -150,18 +171,22 @@ func TestSessionConcurrentAccess(t *testing.T) {
 }
 
 func TestStartCleanup_FlushesExpiredSessions(t *testing.T) {
-	store := NewSessionStore()
+	t.Parallel()
+	bgCtx := context.Background()
+	store := NewSessionStore(SessionStoreConfig{})
 
 	// Grant one expired session and one valid session.
-	store.Grant("expired", []string{"/a"}, time.Now().Add(-1*time.Second))
-	store.Grant("valid", []string{"/b"}, time.Now().Add(1*time.Hour))
+	require.NoError(t, store.Grant(bgCtx, "expired",
+		[]string{"/a"}, time.Now().Add(-1*time.Second)))
+	require.NoError(t, store.Grant(bgCtx, "valid",
+		[]string{"/b"}, time.Now().Add(1*time.Hour)))
 
 	// Verify the expired session is still in the map before cleanup runs
 	// (Authorize returns false due to expiry check, but the entry exists).
 	require.False(t, store.Authorize("expired", "/a"))
 	require.True(t, store.Authorize("valid", "/b"))
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(bgCtx)
 	done := make(chan struct{})
 
 	go func() {
@@ -183,7 +208,8 @@ func TestStartCleanup_FlushesExpiredSessions(t *testing.T) {
 	// The expired session should have been flushed from the map entirely.
 	// Verify by granting the same token again and checking it works --
 	// if FlushExpired ran, the old entry is gone.
-	store.Grant("expired", []string{"/c"}, time.Now().Add(1*time.Hour))
+	require.NoError(t, store.Grant(bgCtx, "expired",
+		[]string{"/c"}, time.Now().Add(1*time.Hour)))
 	assert.True(t, store.Authorize("expired", "/c"),
 		"re-granted token should authorize after cleanup flushed the old entry")
 	assert.True(t, store.Authorize("valid", "/b"),
@@ -191,7 +217,8 @@ func TestStartCleanup_FlushesExpiredSessions(t *testing.T) {
 }
 
 func TestStartCleanup_StopsOnContextCancel(t *testing.T) {
-	store := NewSessionStore()
+	t.Parallel()
+	store := NewSessionStore(SessionStoreConfig{})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})

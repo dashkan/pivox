@@ -1,6 +1,7 @@
 package storageagent
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -141,7 +142,7 @@ func TestHTTPAuth_ValidJWT_SessionNotFound_Forbidden(t *testing.T) {
 func TestHTTPAuth_ValidJWT_AuthorizedSession_Success(t *testing.T) {
 	srv, sessions, endpoints, _ := newTestHTTPServer(t)
 	setupEndpoint(t, endpoints, "media")
-	sessions.Grant("session-xyz", []string{"/media/*"}, time.Now().Add(time.Hour))
+	require.NoError(t, sessions.Grant(context.Background(), "session-xyz", []string{"/media/*"}, time.Now().Add(time.Hour)))
 
 	w := httptest.NewRecorder()
 	srv.ServeHTTP(w, validSessionRequest(http.MethodGet, "/media/file.txt", "session-xyz"))
@@ -152,7 +153,7 @@ func TestHTTPAuth_ValidJWT_AuthorizedSession_Success(t *testing.T) {
 
 func TestHTTPAuth_ValidJWT_NoEndpoint_NotFound(t *testing.T) {
 	srv, sessions, _, _ := newTestHTTPServer(t)
-	sessions.Grant("session-xyz", []string{"/missing/*"}, time.Now().Add(time.Hour))
+	require.NoError(t, sessions.Grant(context.Background(), "session-xyz", []string{"/missing/*"}, time.Now().Add(time.Hour)))
 
 	w := httptest.NewRecorder()
 	srv.ServeHTTP(w, validSessionRequest(http.MethodGet, "/missing/file.txt", "session-xyz"))
@@ -164,7 +165,7 @@ func TestHTTPAuth_ValidJWT_DeniedPattern_NotFound(t *testing.T) {
 	srv, sessions, endpoints, denied := newTestHTTPServer(t)
 	setupEndpoint(t, endpoints, "media")
 	denied.Update([]string{"/media/file.txt"})
-	sessions.Grant("session-xyz", []string{"/media/*"}, time.Now().Add(time.Hour))
+	require.NoError(t, sessions.Grant(context.Background(), "session-xyz", []string{"/media/*"}, time.Now().Add(time.Hour)))
 
 	w := httptest.NewRecorder()
 	srv.ServeHTTP(w, validSessionRequest(http.MethodGet, "/media/file.txt", "session-xyz"))
@@ -176,7 +177,7 @@ func TestHTTPAuth_ValidJWT_DeniedNoMatch_FallsThrough(t *testing.T) {
 	srv, sessions, endpoints, denied := newTestHTTPServer(t)
 	setupEndpoint(t, endpoints, "media")
 	denied.Update([]string{"/secret/*"}) // doesn't match /media/*
-	sessions.Grant("session-xyz", []string{"/media/*"}, time.Now().Add(time.Hour))
+	require.NoError(t, sessions.Grant(context.Background(), "session-xyz", []string{"/media/*"}, time.Now().Add(time.Hour)))
 
 	w := httptest.NewRecorder()
 	srv.ServeHTTP(w, validSessionRequest(http.MethodGet, "/media/file.txt", "session-xyz"))
@@ -190,7 +191,7 @@ func TestHTTPAuth_ValidJWT_DeniedNoMatch_FallsThrough(t *testing.T) {
 // denied check entirely. Reproduces a server constructed without a
 // DeniedPatterns instance.
 func TestHTTPAuth_ValidJWT_NilDeniedPatterns(t *testing.T) {
-	sessions := NewSessionStore()
+	sessions := NewSessionStore(SessionStoreConfig{})
 	cache := NewMemoryCache(100, 1024*1024)
 	endpoints := NewEndpointStore(cache)
 	logger := newSilentLogger()
@@ -203,7 +204,7 @@ func TestHTTPAuth_ValidJWT_NilDeniedPatterns(t *testing.T) {
 	})
 
 	setupEndpoint(t, endpoints, "ep")
-	sessions.Grant("session-xyz", []string{"/ep/*"}, time.Now().Add(time.Hour))
+	require.NoError(t, sessions.Grant(context.Background(), "session-xyz", []string{"/ep/*"}, time.Now().Add(time.Hour)))
 
 	w := httptest.NewRecorder()
 	srv.ServeHTTP(w, validSessionRequest(http.MethodGet, "/ep/file.txt", "session-xyz"))

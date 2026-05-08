@@ -27,7 +27,7 @@ var testSigningKey = []byte("test-secret-key-for-jwt-signing!")
 // Shared across http_test.go and http_auth_test.go.
 func newTestHTTPServer(t *testing.T) (*HTTPServer, *SessionStore, *EndpointStore, *DeniedPatterns) {
 	t.Helper()
-	sessions := NewSessionStore()
+	sessions := NewSessionStore(SessionStoreConfig{})
 	cache := NewMemoryCache(100, 1024*1024)
 	endpoints := NewEndpointStore(cache)
 	denied := NewDeniedPatterns()

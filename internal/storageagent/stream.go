@@ -215,13 +215,15 @@ func (s *Stream) ReceiveLoop(ctx context.Context) error {
 		}
 
 		// Server-initiated message (not a response to a pending request).
-		s.handleServerMessage(resp)
+		s.handleServerMessage(ctx, resp)
 	}
 }
 
-// handleServerMessage processes server-initiated control messages. For now
-// it logs them; handler callbacks can be added later.
-func (s *Stream) handleServerMessage(msg *agentv1.ControlMessage) {
+// handleServerMessage processes server-initiated control messages.
+// ctx is the receive-loop context, used to propagate cancellation
+// through any persistent writes (Grant/Revoke against the SQLite
+// store).
+func (s *Stream) handleServerMessage(ctx context.Context, msg *agentv1.ControlMessage) {
 	switch m := msg.GetMessage().(type) {
 	case *agentv1.ControlMessage_ConfigUpdate:
 		update := m.ConfigUpdate
@@ -247,14 +249,42 @@ func (s *Stream) handleServerMessage(msg *agentv1.ControlMessage) {
 		)
 	case *agentv1.ControlMessage_SessionGrant:
 		grant := m.SessionGrant
-		s.sessions.Grant(grant.Token, grant.Patterns, grant.Expiry.AsTime())
-		s.logger.Info("session granted", "token", grant.Token[:8]+"...", "patterns", len(grant.Patterns))
+		if err := s.sessions.Grant(ctx, grant.Token, grant.Patterns, grant.Expiry.AsTime()); err != nil {
+			// Persistence (or future controller-mandated atomic check)
+			// failed. Drop the grant rather than leaving in-memory and
+			// disk diverged; the controller can re-deliver.
+			//
+			// TODO: when SessionGrantAck (or equivalent) is added to
+			// the control protocol, NACK back to the controller here
+			// so it knows the agent rejected the grant rather than
+			// silently logging.
+			s.logger.Error("failed to apply session grant",
+				"token", tokenPrefix(grant.Token), "error", err)
+			break
+		}
+		s.logger.Info("session granted", "token", tokenPrefix(grant.Token), "patterns", len(grant.Patterns))
 	case *agentv1.ControlMessage_SessionRevoke:
-		s.sessions.Revoke(m.SessionRevoke.Token)
-		s.logger.Info("session revoked", "token", m.SessionRevoke.Token[:8]+"...")
+		if err := s.sessions.Revoke(ctx, m.SessionRevoke.Token); err != nil {
+			s.logger.Error("failed to apply session revoke",
+				"token", tokenPrefix(m.SessionRevoke.Token), "error", err)
+			break
+		}
+		s.logger.Info("session revoked", "token", tokenPrefix(m.SessionRevoke.Token))
 	case *agentv1.ControlMessage_ServerHeartbeat:
 		s.logger.Debug("received server heartbeat")
 	default:
 		s.logger.Warn("received unknown server message", "type", fmt.Sprintf("%T", m))
 	}
+}
+
+// tokenPrefix returns the first up-to-8 bytes of token followed by
+// "...". Bounded by len(token) so a short or empty token doesn't panic
+// the slice. Used for log lines where the full opaque token must not
+// be emitted but a debugging prefix is useful.
+func tokenPrefix(token string) string {
+	const n = 8
+	if len(token) <= n {
+		return token + "..."
+	}
+	return token[:n] + "..."
 }
