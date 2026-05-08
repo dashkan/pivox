@@ -13,5 +13,7 @@ BEGIN;
 \i scripts/seeds/09_tag_bindings.sql
 \i scripts/seeds/10_storage_gateways.sql
 \i scripts/seeds/11_local_corp.sql
+\i scripts/seeds/12_meridian_roles.sql
+\i scripts/seeds/13_assets.sql
 
 COMMIT;
