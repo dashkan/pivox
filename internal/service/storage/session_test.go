@@ -5,13 +5,16 @@ import (
 	"sort"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/dashkan/pivox/internal/agentstream"
@@ -67,15 +70,32 @@ type sessionTestEnv struct {
 	stream   *recordingStream
 }
 
-func newSessionTestEnv(t *testing.T) *sessionTestEnv {
+// sessionTestOpts lets phase-4+ tests override the
+// StorageGatewaysConfig fields that affect handler behavior. Each
+// field is applied on top of the required Queries/Encryptor/Conns
+// the harness already supplies.
+type sessionTestOpts struct {
+	MaxSessionTTL time.Duration
+	CookieDomain  string
+}
+
+func newSessionTestEnv(t *testing.T, opts ...sessionTestOpts) *sessionTestEnv {
 	t.Helper()
+	var o sessionTestOpts
+	if len(opts) > 0 {
+		o = opts[0]
+	}
 	conns := agentstream.NewConnectionManager()
 	h := grpcharness.New(t,
 		grpcharness.WithOrganizationsServer(),
 		grpcharness.WithSpacesServer(),
 		grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
 			storagev1.RegisterStorageGatewaysServer(s, storage.NewStorageGatewaysServer(storage.StorageGatewaysConfig{
-				Queries: h.Queries, Encryptor: h.Encryptor, Conns: conns,
+				Queries:       h.Queries,
+				Encryptor:     h.Encryptor,
+				Conns:         conns,
+				MaxSessionTTL: o.MaxSessionTTL,
+				CookieDomain:  o.CookieDomain,
 			}))
 			storagev1.RegisterEndpointsServer(s, storage.NewEndpointsServer(storage.EndpointsConfig{
 				Queries: h.Queries, Encryptor: h.Encryptor,
@@ -432,6 +452,179 @@ func TestIntegration_CreateStorageSession_ParentRequired(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, codes.InvalidArgument, status.Code(err),
 		"empty parent must be rejected by buf.validate before the handler runs")
+}
+
+// ---------------------------------------------------------------------------
+// #27 phase 4 — TTL cap + cookie domain config
+// ---------------------------------------------------------------------------
+
+// captureSetCookie returns a grpc.CallOption that captures the
+// response Set-Cookie header(s) into the given metadata.MD pointer.
+// Used by the cookie-domain phase-4 tests.
+func captureSetCookie(md *metadata.MD) grpc.CallOption {
+	return grpc.Header(md)
+}
+
+// seedAcmeAndAgentForTTLTest stands up acme + a single mock-connected
+// agent registered against acme. Returns the env so the test can
+// drive the session-create call.
+func seedAcmeAndAgentForTTLTest(t *testing.T, env *sessionTestEnv) {
+	t.Helper()
+	ctx := context.Background()
+	_ = env.h.SeedOwnedOrg(t, "acme", "Acme", "owner-ttl")
+	acmeID := env.h.LookupOrgID(t, "acme")
+	gwID := env.seedGatewayWithFilesystemEndpoint(t, ctx, "acme", "gw", "media")
+	env.conns.Register(&agentstream.AgentConnection{
+		AgentID: uuid.New(), GatewayID: gwID, OrgID: acmeID, Stream: env.stream,
+	})
+}
+
+// TestIntegration_CreateStorageSession_TTLClampedToCap verifies the
+// silent-clamp contract: a caller-requested TTL above
+// MaxSessionTTL is clamped down to the cap. Per AIP, the call still
+// succeeds (no error); the response.Expiry reflects the clamped
+// value rather than what the caller asked for.
+func TestIntegration_CreateStorageSession_TTLClampedToCap(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test")
+	}
+	ctx := context.Background()
+	env := newSessionTestEnv(t, sessionTestOpts{MaxSessionTTL: 8 * time.Hour})
+	seedAcmeAndAgentForTTLTest(t, env)
+
+	requested := 24 * time.Hour
+	before := time.Now()
+	resp, err := env.gwClient.CreateStorageSession(ctx, &storagev1.CreateStorageSessionRequest{
+		Parent: "organizations/acme",
+		Ttl:    durationpb.New(requested),
+	})
+	require.NoError(t, err)
+
+	expiry := resp.GetExpiry().AsTime()
+	wantUpper := before.Add(8 * time.Hour).Add(5 * time.Second) // small slack for handler latency
+	assert.True(t, expiry.Before(wantUpper),
+		"expiry %v must be clamped to <= now+8h (cap), not honor the requested 24h", expiry)
+	assert.True(t, expiry.After(before.Add(8*time.Hour-1*time.Minute)),
+		"expiry must be near the cap, not significantly less")
+}
+
+// TestIntegration_CreateStorageSession_TTLWithinCapHonored verifies
+// that a caller-requested TTL below the cap is used as-is (no
+// silent narrowing).
+func TestIntegration_CreateStorageSession_TTLWithinCapHonored(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test")
+	}
+	ctx := context.Background()
+	env := newSessionTestEnv(t, sessionTestOpts{MaxSessionTTL: 8 * time.Hour})
+	seedAcmeAndAgentForTTLTest(t, env)
+
+	requested := 4 * time.Hour
+	before := time.Now()
+	resp, err := env.gwClient.CreateStorageSession(ctx, &storagev1.CreateStorageSessionRequest{
+		Parent: "organizations/acme",
+		Ttl:    durationpb.New(requested),
+	})
+	require.NoError(t, err)
+
+	expiry := resp.GetExpiry().AsTime()
+	want := before.Add(requested)
+	assert.True(t, expiry.After(want.Add(-1*time.Minute)) && expiry.Before(want.Add(1*time.Minute)),
+		"expiry %v must be ~ now+4h (within cap, honored as-is)", expiry)
+}
+
+// TestIntegration_CreateStorageSession_TTLDefaultOneHour verifies
+// the unset-TTL path: no Ttl in the request → 1h default.
+func TestIntegration_CreateStorageSession_TTLDefaultOneHour(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test")
+	}
+	ctx := context.Background()
+	env := newSessionTestEnv(t, sessionTestOpts{MaxSessionTTL: 8 * time.Hour})
+	seedAcmeAndAgentForTTLTest(t, env)
+
+	before := time.Now()
+	resp, err := env.gwClient.CreateStorageSession(ctx, &storagev1.CreateStorageSessionRequest{
+		Parent: "organizations/acme",
+		// Ttl unset
+	})
+	require.NoError(t, err)
+
+	expiry := resp.GetExpiry().AsTime()
+	want := before.Add(1 * time.Hour)
+	assert.True(t, expiry.After(want.Add(-1*time.Minute)) && expiry.Before(want.Add(1*time.Minute)),
+		"unset TTL must default to 1h; got expiry %v", expiry)
+}
+
+// TestIntegration_CreateStorageSession_CookieDomainPresentWhenConfigured
+// verifies that StorageGatewaysConfig.CookieDomain emits the
+// `Domain=` attribute on the Set-Cookie response header.
+func TestIntegration_CreateStorageSession_CookieDomainPresentWhenConfigured(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test")
+	}
+	ctx := context.Background()
+	env := newSessionTestEnv(t, sessionTestOpts{CookieDomain: ".pivox.app"})
+	seedAcmeAndAgentForTTLTest(t, env)
+
+	var md metadata.MD
+	_, err := env.gwClient.CreateStorageSession(ctx,
+		&storagev1.CreateStorageSessionRequest{Parent: "organizations/acme"},
+		captureSetCookie(&md))
+	require.NoError(t, err)
+
+	cookies := md.Get("set-cookie")
+	require.Len(t, cookies, 1, "exactly one Set-Cookie header must be emitted")
+	assert.Contains(t, cookies[0], "Domain=.pivox.app",
+		"Domain attribute must reflect CookieDomain when configured")
+}
+
+// TestIntegration_CreateStorageSession_TTLZeroRejected verifies that
+// a non-nil but non-positive Ttl is rejected with InvalidArgument
+// rather than silently defaulted to 1h. Silent fallback would invert
+// the caller's intent — a client sending Ttl=0 to revoke fast must
+// not instead receive an hour-long session.
+func TestIntegration_CreateStorageSession_TTLZeroRejected(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test")
+	}
+	ctx := context.Background()
+	env := newSessionTestEnv(t, sessionTestOpts{MaxSessionTTL: 8 * time.Hour})
+	seedAcmeAndAgentForTTLTest(t, env)
+
+	_, err := env.gwClient.CreateStorageSession(ctx, &storagev1.CreateStorageSessionRequest{
+		Parent: "organizations/acme",
+		Ttl:    durationpb.New(0),
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err),
+		"non-positive Ttl must be rejected with InvalidArgument; "+
+			"silent fallback to 1h would invert caller intent")
+}
+
+// TestIntegration_CreateStorageSession_CookieDomainAbsentWhenUnset
+// verifies that an empty CookieDomain produces a cookie without a
+// Domain= attribute (right default for self-hosted: cookie scopes
+// to the response origin only).
+func TestIntegration_CreateStorageSession_CookieDomainAbsentWhenUnset(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test")
+	}
+	ctx := context.Background()
+	env := newSessionTestEnv(t, sessionTestOpts{ /* CookieDomain unset */ })
+	seedAcmeAndAgentForTTLTest(t, env)
+
+	var md metadata.MD
+	_, err := env.gwClient.CreateStorageSession(ctx,
+		&storagev1.CreateStorageSessionRequest{Parent: "organizations/acme"},
+		captureSetCookie(&md))
+	require.NoError(t, err)
+
+	cookies := md.Get("set-cookie")
+	require.NotEmpty(t, cookies, "Set-Cookie header must still be present (only the Domain attribute is conditional)")
+	assert.NotContains(t, cookies[0], "Domain=",
+		"Domain attribute MUST be omitted when CookieDomain is unset; "+
+			"cookie scopes to the response origin only (right default for self-hosted)")
 }
 
 // silenceUnusedTimestamp keeps the timestamppb import required for

@@ -41,7 +41,20 @@ type StorageGatewaysServer struct {
 	conns             *agentstream.ConnectionManager
 	audit             *audit.Resolver
 	sessionSigningKey []byte
+	maxSessionTTL     time.Duration
+	cookieDomain      string
 }
+
+// defaultMaxSessionTTL is the cap applied when StorageGatewaysConfig
+// .MaxSessionTTL is the zero value. Chosen to cover a typical
+// workday without forcing mid-day refresh, while keeping the
+// post-revocation window bounded. Tracked in #27.
+const defaultMaxSessionTTL = 8 * time.Hour
+
+// defaultSessionTTL is the TTL applied when CreateStorageSession's
+// caller does not supply one. Matches the implicit "hourly" cadence
+// documented at internal/storageagent/session.go.
+const defaultSessionTTL = 1 * time.Hour
 
 // StorageGatewaysConfig is the constructor input for
 // StorageGatewaysServer.
@@ -57,6 +70,18 @@ type StorageGatewaysConfig struct {
 	// AuditResolver inflates audit-field UUIDs into Actor protos.
 	// Optional; nil leaves Actor fields unset.
 	AuditResolver *audit.Resolver
+	// MaxSessionTTL caps the lifetime of a CreateStorageSession-
+	// minted session. A caller-supplied TTL above this is silently
+	// clamped (per AIP — best-effort honor of caller intent).
+	// Optional; zero-value falls back to defaultMaxSessionTTL (8h).
+	MaxSessionTTL time.Duration
+	// CookieDomain is the value emitted in the Set-Cookie response
+	// header's `Domain=` attribute for browser session cookies.
+	// Optional; zero-value omits the Domain attribute entirely so
+	// the cookie scopes to the response origin only (right default
+	// for self-hosted; SaaS deployments configure ".pivox.app" or
+	// equivalent).
+	CookieDomain string
 }
 
 // NewStorageGatewaysServer constructs the server from cfg. Panics on
@@ -68,12 +93,18 @@ func NewStorageGatewaysServer(cfg StorageGatewaysConfig) *StorageGatewaysServer 
 	if cfg.Conns == nil {
 		panic("storage: StorageGatewaysConfig.Conns is required")
 	}
+	maxTTL := cfg.MaxSessionTTL
+	if maxTTL <= 0 {
+		maxTTL = defaultMaxSessionTTL
+	}
 	return &StorageGatewaysServer{
 		queries:           cfg.Queries,
 		encryptor:         cfg.Encryptor,
 		conns:             cfg.Conns,
 		audit:             cfg.AuditResolver,
 		sessionSigningKey: []byte("pivox-dev-session-signing-key-do-not-use-in-prod"), // TODO: load from key management system in prod
+		maxSessionTTL:     maxTTL,
+		cookieDomain:      cfg.CookieDomain,
 	}
 }
 
@@ -536,11 +567,24 @@ func (s *StorageGatewaysServer) CreateStorageSession(ctx context.Context, req *s
 	// Generate opaque token.
 	token := uuid.New().String()
 
-	// Compute expiry (default 1 hour).
-	ttl := time.Hour
+	// Compute expiry. Default is defaultSessionTTL (1h) when the
+	// caller omits Ttl entirely. A caller-supplied positive TTL is
+	// honored up to s.maxSessionTTL (clamped silently above, per
+	// AIP — best-effort honor). A non-nil but non-positive Ttl is
+	// rejected with InvalidArgument: silently coercing zero or
+	// negative to a default would invert the caller's explicit
+	// intent (e.g., a client that sends Ttl=0 to revoke fast
+	// would instead receive an hour-long session).
+	ttl := defaultSessionTTL
 	if req.GetTtl() != nil {
-		ttl = req.GetTtl().AsDuration()
+		d := req.GetTtl().AsDuration()
+		if d <= 0 {
+			return nil, apierr.InvalidArgument(apierr.FieldViolation("ttl",
+				"ttl must be positive when set"))
+		}
+		ttl = d
 	}
+	ttl = min(ttl, s.maxSessionTTL)
 	expiry := time.Now().Add(ttl)
 
 	// Build patterns. Branches on hasOrgWideRead — never OR'd with
@@ -594,8 +638,17 @@ func (s *StorageGatewaysServer) CreateStorageSession(ctx context.Context, req *s
 	// Mint JWT.
 	jwt := mintSessionJWT(token, expiry, s.sessionSigningKey)
 
-	// Set cookie via gRPC metadata for browser flows.
-	cookie := fmt.Sprintf("pivox_session=%s; Domain=.pivox.app; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=%d", jwt, int(ttl.Seconds()))
+	// Set cookie via gRPC metadata for browser flows. The Domain
+	// attribute is conditional on s.cookieDomain being non-empty;
+	// when unset, the cookie scopes to the response origin only
+	// (right default for self-hosted deployments). Per-org
+	// subdomains in SaaS deployments configure CookieDomain
+	// accordingly.
+	cookie := fmt.Sprintf("pivox_session=%s; ", jwt)
+	if s.cookieDomain != "" {
+		cookie += fmt.Sprintf("Domain=%s; ", s.cookieDomain)
+	}
+	cookie += fmt.Sprintf("Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=%d", int(ttl.Seconds()))
 	_ = grpc.SetHeader(ctx, metadata.Pairs("set-cookie", cookie))
 
 	// Native clients (macOS, future WinUI) read the JWT from the

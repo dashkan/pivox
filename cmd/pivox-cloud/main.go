@@ -88,6 +88,8 @@ func main() {
 	// credential flag — operators set the standard env var.
 	f.Duration("delegated-auth-session-ttl", envOrDuration("PIVOX_DELEGATED_AUTH_SESSION_TTL", 5*time.Minute), "How long a delegated auth session code remains valid")
 	f.Duration("delegated-auth-poll-interval", envOrDuration("PIVOX_DELEGATED_AUTH_POLL_INTERVAL", 5*time.Second), "Poll interval returned to delegated auth clients")
+	f.Duration("storage-session-max-ttl", envOrDuration("PIVOX_STORAGE_SESSION_MAX_TTL", 8*time.Hour), "Cap on CreateStorageSession TTL; caller-requested values above this are silently clamped")
+	f.String("storage-session-cookie-domain", envOrDefault("PIVOX_STORAGE_SESSION_COOKIE_DOMAIN", ""), "Domain attribute for the storage-session Set-Cookie header (e.g. \".pivox.app\"). Empty omits Domain= so the cookie scopes to the response origin only — right default for self-hosted; SaaS deployments configure per-tenant subdomain.")
 	f.String("ollama-url", envOrDefault("PIVOX_OLLAMA_URL", "http://localhost:11434"), "Ollama API base URL")
 	f.String("ollama-model", envOrDefault("PIVOX_OLLAMA_MODEL", "qwen3-vl"), "Ollama model to use for AI chat")
 
@@ -332,8 +334,12 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	// Storage services
 	connMgr := agentstream.NewConnectionManager()
+	storageSessionMaxTTL, _ := f.GetDuration("storage-session-max-ttl")
+	storageSessionCookieDomain, _ := f.GetString("storage-session-cookie-domain")
 	storagev1.RegisterStorageGatewaysServer(grpcServer, storage.NewStorageGatewaysServer(storage.StorageGatewaysConfig{
 		Queries: queries, Encryptor: enc, Conns: connMgr, AuditResolver: auditResolver,
+		MaxSessionTTL: storageSessionMaxTTL,
+		CookieDomain:  storageSessionCookieDomain,
 	}))
 	storagev1.RegisterAgentsServer(grpcServer, storage.NewAgentsServer(storage.AgentsConfig{Queries: queries}))
 	storagev1.RegisterEndpointsServer(grpcServer, storage.NewEndpointsServer(storage.EndpointsConfig{
