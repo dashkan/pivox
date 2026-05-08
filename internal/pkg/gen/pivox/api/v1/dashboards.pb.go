@@ -818,13 +818,13 @@ const file_pivox_api_v1_dashboards_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tB!\xe0A\x02\xfaA\x15\n" +
 	"\x13pivox.api/Dashboard\xbaH\x03\xc8\x01\x01R\x04name\x12(\n" +
 	"\rvalidate_only\x18\x02 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\x12\x17\n" +
-	"\x04etag\x18\x03 \x01(\tB\x03\xe0A\x01R\x04etag2\x8d\b\n" +
+	"\x04etag\x18\x03 \x01(\tB\x03\xe0A\x01R\x04etag2\xa0\b\n" +
 	"\n" +
 	"Dashboards\x12\xdc\x01\n" +
 	"\x0eListDashboards\x12#.pivox.api.v1.ListDashboardsRequest\x1a$.pivox.api.v1.ListDashboardsResponse\"\x7f\xdaA\x06parent\x8a\xb5\x18\x0fdashboards.read\x82\xd3\xe4\x93\x02]Z2\x120/v1/{parent=organizations/*/spaces/*}/dashboards\x12'/v1/{parent=organizations/*}/dashboards\x12\xc9\x01\n" +
 	"\fGetDashboard\x12!.pivox.api.v1.GetDashboardRequest\x1a\x17.pivox.api.v1.Dashboard\"}\xdaA\x04name\x8a\xb5\x18\x0fdashboards.read\x82\xd3\xe4\x93\x02]Z2\x120/v1/{name=organizations/*/spaces/*/dashboards/*}\x12'/v1/{name=organizations/*/dashboards/*}\x12\xca\x01\n" +
-	"\x0fCreateDashboard\x12$.pivox.api.v1.CreateDashboardRequest\x1a\x17.pivox.api.v1.Dashboard\"x\xdaA\x1dparent,dashboard,dashboard_id\x8a\xb5\x18\x11dashboards.create\x82\xd3\xe4\x93\x02=:\tdashboard\"0/v1/{parent=organizations/*/spaces/*}/dashboards\x12\xcc\x01\n" +
-	"\x0fUpdateDashboard\x12$.pivox.api.v1.UpdateDashboardRequest\x1a\x17.pivox.api.v1.Dashboard\"z\xdaA\x15dashboard,update_mask\x8a\xb5\x18\x11dashboards.update\x82\xd3\xe4\x93\x02G:\tdashboard2:/v1/{dashboard.name=organizations/*/spaces/*/dashboards/*}\x12\xa6\x01\n" +
+	"\x0fCreateDashboard\x12$.pivox.api.v1.CreateDashboardRequest\x1a\x17.pivox.api.v1.Dashboard\"x\xdaA\x1dparent,dashboard,dashboard_id\x8a\xb5\x18\x11dashboards.create\x82\xd3\xe4\x93\x02=:\tdashboard\"0/v1/{parent=organizations/*/spaces/*}/dashboards\x12\xdf\x01\n" +
+	"\x0fUpdateDashboard\x12$.pivox.api.v1.UpdateDashboardRequest\x1a\x17.pivox.api.v1.Dashboard\"\x8c\x01\xdaA\x15dashboard,update_mask\x8a\xb5\x18\x11dashboards.update\x9a\xb5\x18\x0edashboard.name\x82\xd3\xe4\x93\x02G:\tdashboard2:/v1/{dashboard.name=organizations/*/spaces/*/dashboards/*}\x12\xa6\x01\n" +
 	"\x0fDeleteDashboard\x12$.pivox.api.v1.DeleteDashboardRequest\x1a\x17.pivox.api.v1.Dashboard\"T\xdaA\x04name\x8a\xb5\x18\x11dashboards.delete\x82\xd3\xe4\x93\x022*0/v1/{name=organizations/*/spaces/*/dashboards/*}\x1a\x0f\xcaA\fapi.pivox.ioB\xb3\x01\n" +
 	"\x10com.pivox.api.v1B\x0fDashboardsProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
 

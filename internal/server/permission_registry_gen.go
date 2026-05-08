@@ -156,6 +156,36 @@ var GeneratedRegistry = Registry{
 			return ScopeFromPath("key.name", req.(*apiv1.UpdateKeyRequest).GetKey().GetName())
 		},
 	},
+	"/pivox.api.v1.Dashboards/CreateDashboard": {
+		Permission: permission.DashboardsCreate,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("parent", req.(*apiv1.CreateDashboardRequest).GetParent())
+		},
+	},
+	"/pivox.api.v1.Dashboards/DeleteDashboard": {
+		Permission: permission.DashboardsDelete,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("name", req.(*apiv1.DeleteDashboardRequest).GetName())
+		},
+	},
+	"/pivox.api.v1.Dashboards/GetDashboard": {
+		Permission: permission.DashboardsRead,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("name", req.(*apiv1.GetDashboardRequest).GetName())
+		},
+	},
+	"/pivox.api.v1.Dashboards/ListDashboards": {
+		Permission: permission.DashboardsRead,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("parent", req.(*apiv1.ListDashboardsRequest).GetParent())
+		},
+	},
+	"/pivox.api.v1.Dashboards/UpdateDashboard": {
+		Permission: permission.DashboardsUpdate,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("dashboard.name", req.(*apiv1.UpdateDashboardRequest).GetDashboard().GetName())
+		},
+	},
 	"/pivox.api.v1.Organizations/CreateDomain": {
 		Permission: permission.DomainsCreate,
 		Extract: func(req any) (ScopeRef, error) {

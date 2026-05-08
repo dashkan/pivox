@@ -88,6 +88,7 @@ service Dashboards {
     };
     option (google.api.method_signature) = "dashboard,update_mask";
     option (pivox.permission.v1.required_permission) = "dashboards.update";
+    option (pivox.permission.v1.scope_field) = "dashboard.name";
   }
 
   // Deletes a dashboard.

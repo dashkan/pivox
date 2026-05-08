@@ -36,6 +36,7 @@ import (
 	"github.com/dashkan/pivox/internal/permission"
 	"github.com/dashkan/pivox/internal/server"
 	"github.com/dashkan/pivox/internal/service/apikeys"
+	"github.com/dashkan/pivox/internal/service/dashboards"
 	"github.com/dashkan/pivox/internal/service/iam"
 	"github.com/dashkan/pivox/internal/service/operations"
 	"github.com/dashkan/pivox/internal/service/organizations"
@@ -321,6 +322,15 @@ func serve(cmd *cobra.Command, args []string) error {
 		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
 	}))
 
+	// Dashboards: org-scoped SYSTEM_MANAGED reads via the in-memory
+	// system catalog (Phase 4a). Space-scoped USER_MANAGED CRUD
+	// lands in Phase 4b. NewServer panics on a registry/catalog
+	// regression, so this line doubles as a boot-time invariant
+	// check.
+	apiv1.RegisterDashboardsServer(grpcServer, dashboards.NewServer(dashboards.Config{
+		Pool: pool, Queries: queries, AuditResolver: auditResolver,
+	}))
+
 	// Iam service: cross-cutting IAM (role reads, permission catalog,
 	// user reads, group CRUD, DeleteUser LRO). Scope-divergent IAM
 	// ops (Member CRUD, TransferOwnership, TestIamPermissions) live
@@ -458,6 +468,7 @@ func serve(cmd *cobra.Command, args []string) error {
 		apiv1.RegisterTagValuesHandlerFromEndpoint,
 		apiv1.RegisterTagBindingsHandlerFromEndpoint,
 		apiv1.RegisterApiKeysHandlerFromEndpoint,
+		apiv1.RegisterDashboardsHandlerFromEndpoint,
 		storagev1.RegisterStorageGatewaysHandlerFromEndpoint,
 		storagev1.RegisterAgentsHandlerFromEndpoint,
 		storagev1.RegisterEndpointsHandlerFromEndpoint,
