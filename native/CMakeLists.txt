@@ -388,7 +388,9 @@ if(APPLE)
         tests/macos/AuthServiceTests.swift
         tests/macos/AuthViewModelTests.swift
         tests/macos/CoreTests.swift
+        tests/macos/DashboardViewModelTests.swift
         tests/macos/DelegatedAuthTests.swift
+        tests/macos/IconConfigResolverTests.swift
         tests/macos/ImageEditorBridgeTests.swift
     )
     # Copy conversation fixture into the test bundle's Resources so

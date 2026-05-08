@@ -41,6 +41,10 @@ enum PivoxLog {
 
   /// Transcript pagination, scroll behavior, message rendering.
   static let transcript = Logger(subsystem: subsystem, category: "transcript")
+
+  /// Dashboards: client lifecycle, dashboard load failures,
+  /// per-tile data-query errors, in-renderer action invocations.
+  static let dashboards = Logger(subsystem: subsystem, category: "dashboards")
 }
 
 extension Logger {

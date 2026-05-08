@@ -1,5 +1,6 @@
 .PHONY: build run test test-up test-down tidy lint lint-fix fmt generate \
-	air air-worker mocks dev log-pivox-app-macos run-app-macos build-app-macos ollama-serve \
+	air air-worker mocks dev log-pivox-app-macos run-app-macos build-app-macos \
+	configure-app-macos ollama-serve \
 	lint-proto proto-format proto-breaking proto-generate \
 	proto-generate-go proto-generate-native build-grpc-swift-2-plugin api-lint \
 	lint-icons \
@@ -12,6 +13,12 @@ DATABASE_URL ?= postgresql://localhost:5432/pivox?sslmode=disable
 DATABASE_NAME ?= pivox
 
 TOOL = go tool -modfile=./tools/go.mod
+
+# Native-build env. Both vars `?=` so a caller with direnv-loaded
+# values overrides; otherwise the Makefile bakes its own. Avoids
+# making subprocess shell state load-bearing for `make build-app-macos`.
+MACOSX_SDK ?= $(shell xcrun --show-sdk-path --sdk macosx)
+VCPKG_ROOT ?= $(HOME)/.vcpkg
 
 # Build
 
@@ -198,7 +205,20 @@ clean-fn-revisions:
 # Splitting the build location with -derivedDataPath produces a
 # .app that nothing else launches from, leaving stale binaries in
 # play.
+# configure-app-macos regenerates the Xcode project from CMakeLists.txt.
+# Required after CMakeLists.txt changes; safe to re-run idempotently.
+# CMAKE_TOOLCHAIN_FILE points at vcpkg so find_package(cmark-gfm)
+# resolves; CMAKE_OSX_SYSROOT is the active Xcode SDK so XCTest bundle
+# generation succeeds without depending on the caller's shell having
+# Xcode env loaded.
+configure-app-macos:
+	@cd native && cmake -G Xcode -B build-xcode -S . \
+		-DCMAKE_TOOLCHAIN_FILE=$(VCPKG_ROOT)/scripts/buildsystems/vcpkg.cmake \
+		-DCMAKE_OSX_SYSROOT=$(MACOSX_SDK)
+
 build-app-macos:
+	@test -f native/build-xcode/Pivox.xcodeproj/project.pbxproj \
+		|| $(MAKE) configure-app-macos
 	@xcodebuild build \
 		-project native/build-xcode/Pivox.xcodeproj \
 		-scheme Pivox \
