@@ -393,6 +393,54 @@ CREATE INDEX idx_tag_bindings_tag_value ON tag_bindings (tag_value_id);
 CREATE INDEX idx_tag_bindings_origin ON tag_bindings (parent_resource, origin);
 
 -- ============================================================================
+-- dashboards (USER_MANAGED, space-scoped). SYSTEM_MANAGED dashboards
+-- (the org-level Library catalog) are virtual — generated from
+-- internal/dashboard/system at request time and have no DB row. The
+-- management_mode column carries forward as a guard for the day a
+-- SYSTEM_MANAGED row needs to be importable; for v1 every row this
+-- table holds is USER_MANAGED.
+--
+-- Storage shape: the full Dashboard proto is marshaled into the
+-- payload JSONB column on every write. display_name and description
+-- are mirrored as scalar columns for AIP-160 filter / index use
+-- (filterable fields per dashboards.proto are displayName and
+-- createTime). Read paths reconstruct the proto from payload and
+-- overlay the column-mirrored audit + timestamp fields.
+-- ============================================================================
+CREATE TABLE dashboards (
+    id              UUID PRIMARY KEY DEFAULT uuidv7(),
+    -- relationships
+    space_id        UUID NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
+    -- identity
+    name            TEXT NOT NULL, -- AIP slug, scoped per (space_id, name)
+    -- domain mirrors (filterable / indexable surface of the proto)
+    display_name    TEXT NOT NULL DEFAULT '',
+    description     TEXT NOT NULL DEFAULT '',
+    -- governance
+    management_mode TEXT NOT NULL DEFAULT 'USER_MANAGED'
+        CHECK (management_mode IN ('USER_MANAGED', 'SYSTEM_MANAGED')),
+    -- payload (full Dashboard proto marshaled)
+    payload         JSONB NOT NULL,
+    -- versioning
+    etag            TEXT NOT NULL DEFAULT md5(now()::text),
+    revision        INTEGER NOT NULL DEFAULT 1,
+    -- audit (FKs added below in the ALTER TABLE block — matches
+    -- the codebase convention so this table can be created before
+    -- the identities table)
+    created_by      UUID,
+    updated_by      UUID,
+    deleted_by      UUID,
+    -- timestamps
+    create_time     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    update_time     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    delete_time     TIMESTAMPTZ,
+    purge_time      TIMESTAMPTZ,
+    -- constraints
+    UNIQUE(space_id, name)
+);
+CREATE INDEX idx_dashboards_space ON dashboards (space_id, create_time DESC) WHERE delete_time IS NULL;
+
+-- ============================================================================
 -- api_keys
 -- ============================================================================
 CREATE TABLE api_keys (
@@ -524,6 +572,10 @@ ALTER TABLE api_keys
   ADD CONSTRAINT fk_api_keys_created_by FOREIGN KEY (created_by) REFERENCES identities(id),
   ADD CONSTRAINT fk_api_keys_updated_by FOREIGN KEY (updated_by) REFERENCES identities(id),
   ADD CONSTRAINT fk_api_keys_deleted_by FOREIGN KEY (deleted_by) REFERENCES identities(id);
+ALTER TABLE dashboards
+  ADD CONSTRAINT fk_dashboards_created_by FOREIGN KEY (created_by) REFERENCES identities(id),
+  ADD CONSTRAINT fk_dashboards_updated_by FOREIGN KEY (updated_by) REFERENCES identities(id),
+  ADD CONSTRAINT fk_dashboards_deleted_by FOREIGN KEY (deleted_by) REFERENCES identities(id);
 
 -- FK from operations.org_id → organizations(id), deferred for the
 -- same reason: `operations` is declared above `organizations` (so the

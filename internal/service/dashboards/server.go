@@ -19,9 +19,12 @@
 //   - Org-scoped, SYSTEM_MANAGED dashboards (e.g. the org-level
 //     Library) are read out of internal/dashboard/system at request
 //     time. No DB rows.
-//   - Space-scoped, USER_MANAGED dashboards live in the database
-//     and support full CRUD. (Implemented in Phase 4b — Phase 4a
-//     stubs every space-scoped RPC with Unimplemented.)
+//   - Space-scoped, USER_MANAGED dashboards live in the dashboards
+//     table and support full CRUD with a SYSTEM_MANAGED-mutation
+//     guard for forward compatibility. The guard is data-driven —
+//     it reads the row's management_mode column and rejects with
+//     FailedPrecondition if SYSTEM_MANAGED, regardless of which URL
+//     the request came in on.
 //
 // At construction time NewServer iterates the templates registry
 // and the system catalog through validateRegistries; any wiring
@@ -41,9 +44,6 @@ import (
 type Server struct {
 	apiv1.UnimplementedDashboardsServer
 
-	// pool / queries are reserved for Phase 4b's space-scoped
-	// USER_MANAGED CRUD. They are unused by Phase 4a's org-scoped
-	// read-only surface.
 	pool    db.RWPool
 	queries db.Querier
 	audit   *audit.Resolver
@@ -51,17 +51,19 @@ type Server struct {
 
 // Config is the constructor input for Server.
 type Config struct {
-	// Pool is reserved for Phase 4b. May be nil while only the
-	// org-scoped read surface is in use.
+	// Pool is the database pool. Required: space-scoped CRUD wraps
+	// each mutation in a transaction so the SYSTEM_MANAGED-mutation
+	// guard's read-then-write window can't be raced by a concurrent
+	// update.
 	Pool db.RWPool
 
-	// Queries is reserved for Phase 4b. May be nil while only the
-	// org-scoped read surface is in use.
+	// Queries is the sqlc query interface. Required.
 	Queries db.Querier
 
 	// AuditResolver inflates audit-field UUIDs into Actor protos.
 	// Optional; nil leaves Actor fields unset on USER_MANAGED
-	// dashboards. SYSTEM_MANAGED dashboards have no audit fields.
+	// dashboards. SYSTEM_MANAGED dashboards have no audit fields
+	// today.
 	AuditResolver *audit.Resolver
 }
 
@@ -72,9 +74,14 @@ type Config struct {
 // Build is broken, etc.) panics so operators see a loud startup
 // failure rather than a silently broken service.
 //
-// Required Config fields: none in Phase 4a (Pool / Queries gain
-// required-status when Phase 4b adds the space-scoped CRUD path).
+// Required Config fields: Pool, Queries. AuditResolver is optional.
 func NewServer(cfg Config) *Server {
+	if cfg.Pool == nil {
+		panic("dashboards: Config.Pool is required")
+	}
+	if cfg.Queries == nil {
+		panic("dashboards: Config.Queries is required")
+	}
 	if err := validateRegistries(templates.All(), system.All()); err != nil {
 		panic("dashboards: " + err.Error())
 	}

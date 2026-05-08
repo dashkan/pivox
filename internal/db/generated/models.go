@@ -904,6 +904,25 @@ type AuthTokenCode struct {
 	ExpireTime time.Time `json:"expire_time"`
 }
 
+type Dashboard struct {
+	ID             uuid.UUID          `json:"id"`
+	SpaceID        uuid.UUID          `json:"space_id"`
+	Name           string             `json:"name"`
+	DisplayName    string             `json:"display_name"`
+	Description    string             `json:"description"`
+	ManagementMode string             `json:"management_mode"`
+	Payload        json.RawMessage    `json:"payload"`
+	Etag           string             `json:"etag"`
+	Revision       int32              `json:"revision"`
+	CreatedBy      pgtype.UUID        `json:"created_by"`
+	UpdatedBy      pgtype.UUID        `json:"updated_by"`
+	DeletedBy      pgtype.UUID        `json:"deleted_by"`
+	CreateTime     time.Time          `json:"create_time"`
+	UpdateTime     time.Time          `json:"update_time"`
+	DeleteTime     pgtype.Timestamptz `json:"delete_time"`
+	PurgeTime      pgtype.Timestamptz `json:"purge_time"`
+}
+
 type DelegatedAuthSession struct {
 	Code        uuid.UUID                 `json:"code"`
 	State       DelegatedAuthSessionState `json:"state"`
