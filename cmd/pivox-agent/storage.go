@@ -86,9 +86,18 @@ func runStorage(cmd *cobra.Command, args []string) error {
 		"telemetry", telemetry,
 	)
 
-	// Open the agent's local state DB (sessions + denied patterns in
-	// this phase; endpoints in #79 phase 5) and reload any persisted
-	// state before the HTTP listener starts.
+	// Construct the in-memory blob cache used by S3-backed endpoints.
+	// Done before OpenAgentState because OpenAgentState passes it
+	// through to the constructed EndpointStore (which needs the cache
+	// at construction time, not just at first request).
+	memcacheMaxItems, _ := f.GetInt("memcache-max-items")
+	memcacheMaxItemMB, _ := f.GetInt("memcache-max-item-mb")
+	memcacheMaxItemBytes := memcacheMaxItemMB * 1024 * 1024 // 0 → constructor uses default (8 MB)
+	cache := agent.NewMemoryCache(memcacheMaxItems, memcacheMaxItemBytes)
+
+	// Open the agent's local state DB (sessions, denied patterns, and
+	// endpoints) and reload any persisted state before the HTTP
+	// listener starts.
 	//
 	// Boot uses a bounded, NOT signal-cancellable, context. A SIGTERM
 	// during boot must not cancel a LoadFromStore mid-iteration —
@@ -101,12 +110,14 @@ func runStorage(cmd *cobra.Command, args []string) error {
 	// Failure mode: log-and-continue. OpenAgentState falls back to
 	// in-memory-only stores on any state-dir / DB / load error,
 	// having logged at slog.Error. The controller is the source of
-	// truth and re-delivers active sessions and denied patterns on
-	// reconnect handshake — refusing to start would be strictly
-	// worse for availability than serving with empty initial state.
+	// truth and re-delivers active sessions, denied patterns, and
+	// endpoints on the reconnect handshake — refusing to start would
+	// be strictly worse for availability than serving with empty
+	// initial state.
 	bootCtx, bootCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	state := agent.OpenAgentState(bootCtx, agent.OpenAgentStateConfig{
 		StateDir: stateDir,
+		Cache:    cache,
 		Logger:   logger,
 	})
 	bootCancel()
@@ -125,16 +136,10 @@ func runStorage(cmd *cobra.Command, args []string) error {
 	defer cancel()
 	go state.Sessions.StartCleanup(ctx, 1*time.Minute)
 
-	memcacheMaxItems, _ := f.GetInt("memcache-max-items")
-	memcacheMaxItemMB, _ := f.GetInt("memcache-max-item-mb")
-	memcacheMaxItemBytes := memcacheMaxItemMB * 1024 * 1024 // 0 → constructor uses default (8 MB)
-	cache := agent.NewMemoryCache(memcacheMaxItems, memcacheMaxItemBytes)
-	endpoints := agent.NewEndpointStore(cache)
-
 	// Start the HTTP file server alongside the bidi connection.
 	httpServer := agent.NewHTTPServer(agent.Config{
 		Sessions:   state.Sessions,
-		Endpoints:  endpoints,
+		Endpoints:  state.Endpoints,
 		Denied:     state.Denied,
 		CORSOrigin: "*",
 		Logger:     logger,
@@ -150,7 +155,7 @@ func runStorage(cmd *cobra.Command, args []string) error {
 
 	connectCfg := &agent.ConnectConfig{
 		Sessions:  state.Sessions,
-		Endpoints: endpoints,
+		Endpoints: state.Endpoints,
 		Denied:    state.Denied,
 		HTTP:      httpServer,
 	}

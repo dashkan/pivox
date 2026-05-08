@@ -26,7 +26,7 @@ func setupEndpoint(t *testing.T, endpoints *EndpointStore, name string) string {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "file.txt"), []byte("content"), 0o644))
 
-	err := endpoints.Update([]*agentv1.EndpointConfig{
+	err := endpoints.Update(t.Context(), []*agentv1.EndpointConfig{
 		{
 			Name: fmt.Sprintf("organizations/acme/storageGateways/gw1/endpoints/%s", name),
 			Configuration: &agentv1.EndpointConfig_Filesystem{
@@ -193,7 +193,7 @@ func TestHTTPAuth_ValidJWT_DeniedNoMatch_FallsThrough(t *testing.T) {
 func TestHTTPAuth_ValidJWT_NilDeniedPatterns(t *testing.T) {
 	sessions := NewSessionStore(SessionStoreConfig{})
 	cache := NewMemoryCache(100, 1024*1024)
-	endpoints := NewEndpointStore(cache)
+	endpoints := NewEndpointStore(EndpointStoreConfig{Cache: cache})
 	logger := newSilentLogger()
 	srv := NewHTTPServer(Config{
 		Sessions:   sessions,

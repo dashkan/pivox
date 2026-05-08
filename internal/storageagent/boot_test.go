@@ -12,6 +12,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	agentv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/agent/v1"
 )
 
 // silentLogger returns a slog logger that discards everything. Used by
@@ -31,6 +33,11 @@ func captureLogger(t *testing.T) (*slog.Logger, *bytes.Buffer) {
 	})), &buf
 }
 
+// testCache returns a small MemoryCache for tests that don't care
+// about cache behavior, just need a non-nil instance to satisfy
+// OpenAgentStateConfig.Cache / EndpointStoreConfig.Cache.
+func testCache() *MemoryCache { return NewMemoryCache(10, 1024) }
+
 func TestOpenAgentState_RequiresStateDir(t *testing.T) {
 	t.Parallel()
 	assert.PanicsWithValue(t,
@@ -38,6 +45,19 @@ func TestOpenAgentState_RequiresStateDir(t *testing.T) {
 		func() {
 			_ = OpenAgentState(context.Background(), OpenAgentStateConfig{
 				Logger: silentLogger(),
+				Cache:  testCache(),
+			})
+		})
+}
+
+func TestOpenAgentState_RequiresCache(t *testing.T) {
+	t.Parallel()
+	assert.PanicsWithValue(t,
+		"storageagent: OpenAgentStateConfig.Cache is required",
+		func() {
+			_ = OpenAgentState(context.Background(), OpenAgentStateConfig{
+				StateDir: t.TempDir(),
+				Logger:   silentLogger(),
 			})
 		})
 }
@@ -49,6 +69,7 @@ func TestOpenAgentState_RequiresLogger(t *testing.T) {
 		func() {
 			_ = OpenAgentState(context.Background(), OpenAgentStateConfig{
 				StateDir: t.TempDir(),
+				Cache:    testCache(),
 			})
 		})
 }
@@ -62,6 +83,7 @@ func TestOpenAgentState_FreshDir_OK(t *testing.T) {
 	dir := t.TempDir()
 	state := OpenAgentState(context.Background(), OpenAgentStateConfig{
 		StateDir: dir,
+		Cache:    testCache(),
 		Logger:   silentLogger(),
 	})
 	require.NotNil(t, state.Sessions)
@@ -82,6 +104,7 @@ func TestOpenAgentState_CreatesMissingDir(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "nested", "state")
 	state := OpenAgentState(context.Background(), OpenAgentStateConfig{
 		StateDir: missing,
+		Cache:    testCache(),
 		Logger:   silentLogger(),
 	})
 	require.NotNil(t, state.Store)
@@ -92,19 +115,22 @@ func TestOpenAgentState_CreatesMissingDir(t *testing.T) {
 	require.True(t, st.IsDir())
 }
 
-// TestOpenAgentState_RestartPreservesGrantsAndDenied is the
-// load-bearing #79 acceptance test for phase 4: persist a session AND
-// a denied set, restart, both must be effective without controller
-// round-trip.
-func TestOpenAgentState_RestartPreservesGrantsAndDenied(t *testing.T) {
+// TestOpenAgentState_RestartPreservesAllStores is the load-bearing
+// #79 phase-5 acceptance test: persist a session, a denied pattern,
+// AND an endpoint configuration; restart; all three must be effective
+// from the local DB without controller round-trip.
+func TestOpenAgentState_RestartPreservesAllStores(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	dir := t.TempDir()
+	mediaDir := t.TempDir()
+	const endpointName = "organizations/acme/storageGateways/gw/endpoints/media"
 
-	// First boot — grant a session, set a denied pattern, close.
+	// First boot — write to all three stores, close.
 	{
 		state := OpenAgentState(ctx, OpenAgentStateConfig{
 			StateDir: dir,
+			Cache:    testCache(),
 			Logger:   silentLogger(),
 		})
 		require.NotNil(t, state.Store)
@@ -114,14 +140,17 @@ func TestOpenAgentState_RestartPreservesGrantsAndDenied(t *testing.T) {
 			time.Now().Add(2*time.Hour)))
 		require.NoError(t, state.Denied.Update(ctx,
 			[]string{"/spaces/dead/*"}))
+		require.NoError(t, state.Endpoints.Update(ctx,
+			[]*agentv1.EndpointConfig{fsEndpoint(endpointName, mediaDir)}))
 
 		require.NoError(t, state.Store.Close())
 	}
 
-	// Second boot — same dir, no controller touch. Both stores must
-	// be effective from the local DB.
+	// Second boot — same dir, no controller touch. All three stores
+	// must be effective from the local DB.
 	state := OpenAgentState(ctx, OpenAgentStateConfig{
 		StateDir: dir,
+		Cache:    testCache(),
 		Logger:   silentLogger(),
 	})
 	require.NotNil(t, state.Store)
@@ -133,6 +162,68 @@ func TestOpenAgentState_RestartPreservesGrantsAndDenied(t *testing.T) {
 		"denied pattern set before restart must reject on second boot")
 	assert.False(t, state.Denied.IsDenied("/spaces/alive/file.mp4"),
 		"unrelated path must not be rejected")
+
+	// The endpoint short-name "media" must route from the in-memory
+	// map without any controller round-trip.
+	state.Endpoints.mu.RLock()
+	defer state.Endpoints.mu.RUnlock()
+	require.Contains(t, state.Endpoints.endpoints, "media",
+		"persisted endpoint must reload after restart "+
+			"(no controller round-trip required)")
+	assert.Equal(t, mediaDir,
+		state.Endpoints.endpoints["media"].config.GetFilesystem().GetPath())
+}
+
+// TestOpenAgentState_LoadEndpointsFails_KeepsStoreAttached covers the
+// boot branch where OpenStore succeeds but EndpointStore.LoadFromStore
+// fails. Symmetric to the Sessions and Denied versions: Store stays
+// attached so subsequent Update calls can re-establish state from the
+// controller's HandshakeAck/ConfigUpdate; the failure is logged at
+// Error level.
+func TestOpenAgentState_LoadEndpointsFails_KeepsStoreAttached(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	dir := t.TempDir()
+
+	// Seed: open Store, write a row whose proto bytes are garbage so
+	// that LoadEndpoints fails at proto.Unmarshal. Re-Open's
+	// CREATE TABLE IF NOT EXISTS is a no-op (table already exists),
+	// so the bad row survives.
+	{
+		seed, err := OpenStore(StoreConfig{Path: filepath.Join(dir, agentDBFilename)})
+		require.NoError(t, err)
+		_, err = seed.db.ExecContext(ctx,
+			`INSERT INTO endpoints (name, config_proto) VALUES (?, ?)`,
+			"corrupt-endpoint", []byte{0xff, 0xff, 0xff})
+		require.NoError(t, err)
+		require.NoError(t, seed.Close())
+	}
+
+	logger, buf := captureLogger(t)
+	state := OpenAgentState(ctx, OpenAgentStateConfig{
+		StateDir: dir,
+		Cache:    testCache(),
+		Logger:   logger,
+	})
+	require.NotNil(t, state.Endpoints)
+	require.NotNil(t, state.Store,
+		"Store must stay attached on Endpoints LoadFromStore failure")
+	t.Cleanup(func() { _ = state.Store.Close() })
+
+	out := buf.String()
+	assert.Contains(t, out, "level=ERROR",
+		"endpoints-load failure must log at Error level")
+	assert.Contains(t, out, "reload endpoints",
+		"log message must surface that the endpoints reload failed")
+
+	// A fresh Update against the same Store must still succeed —
+	// ReplaceEndpoints DELETEs every row before INSERTing the new
+	// set, which clears the corrupt row that broke the reload.
+	// Symmetric to TestOpenAgentState_LoadSessionsFails_KeepsStoreAttached's
+	// closing Grant assertion.
+	require.NoError(t, state.Endpoints.Update(ctx, []*agentv1.EndpointConfig{
+		fsEndpoint("organizations/acme/storageGateways/gw/endpoints/fresh", t.TempDir()),
+	}), "Update must work against an attached Store after LoadFromStore failed")
 }
 
 // TestOpenAgentState_LoadDeniedFails_KeepsStoreAttached covers the
@@ -167,6 +258,7 @@ func TestOpenAgentState_LoadDeniedFails_KeepsStoreAttached(t *testing.T) {
 	logger, buf := captureLogger(t)
 	state := OpenAgentState(ctx, OpenAgentStateConfig{
 		StateDir: dir,
+		Cache:    testCache(),
 		Logger:   logger,
 	})
 	require.NotNil(t, state.Denied)
@@ -204,6 +296,7 @@ func TestOpenAgentState_LoadSessionsFails_KeepsStoreAttached(t *testing.T) {
 	logger, buf := captureLogger(t)
 	state := OpenAgentState(ctx, OpenAgentStateConfig{
 		StateDir: dir,
+		Cache:    testCache(),
 		Logger:   logger,
 	})
 	require.NotNil(t, state.Sessions)
@@ -238,6 +331,7 @@ func TestOpenAgentState_BadDir_FallsBackToInMemory(t *testing.T) {
 	logger, buf := captureLogger(t)
 	state := OpenAgentState(ctx, OpenAgentStateConfig{
 		StateDir: stateDir,
+		Cache:    testCache(),
 		Logger:   logger,
 	})
 	require.NotNil(t, state.Sessions, "must return a usable in-memory SessionStore")

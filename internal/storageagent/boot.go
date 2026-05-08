@@ -15,8 +15,8 @@ const agentDBFilename = "agent.db"
 // OpenAgentStateConfig is the constructor input for OpenAgentState.
 type OpenAgentStateConfig struct {
 	// StateDir is the filesystem path that holds the agent's local
-	// state DB (sessions, denied patterns, and — once #79 phase 5
-	// lands — endpoints). Created if it does not exist. Required.
+	// state DB (sessions, denied patterns, and endpoints). Created if
+	// it does not exist. Required.
 	//
 	// IMPORTANT: this should NOT be the cache directory. Operators
 	// commonly run cache-cleanup scripts (`rm -rf <cache-dir>/*`),
@@ -25,6 +25,10 @@ type OpenAgentStateConfig struct {
 	// defaults state-dir = /var/lib/pivox/state, sibling of the cache).
 	StateDir string
 
+	// Cache is the in-memory blob cache used by S3-backed endpoints.
+	// Required — passed through to the constructed EndpointStore.
+	Cache *MemoryCache
+
 	// Logger receives boot-time errors. Required.
 	Logger *slog.Logger
 }
@@ -32,10 +36,10 @@ type OpenAgentStateConfig struct {
 // AgentState bundles the agent's in-memory stores along with the
 // underlying *Store handle that all writes flow through.
 //
-// Sessions and Denied are always non-nil — they are constructed in
-// every code path, including the in-memory fallback. Store is nil
-// only on the log-and-continue failure path (state-dir or OpenStore
-// failure); Close on the nil Store is a no-op.
+// Sessions, Denied, and Endpoints are always non-nil — they are
+// constructed in every code path, including the in-memory fallback.
+// Store is nil only on the log-and-continue failure path (state-dir
+// or OpenStore failure); Close on the nil Store is a no-op.
 type AgentState struct {
 	// Sessions is the agent's session store, wired through Store
 	// when non-nil. Always non-nil.
@@ -44,6 +48,10 @@ type AgentState struct {
 	// Denied is the agent's denied-patterns set, wired through Store
 	// when non-nil. Always non-nil.
 	Denied *DeniedPatterns
+
+	// Endpoints is the agent's endpoint routing map, wired through
+	// Store when non-nil. Always non-nil.
+	Endpoints *EndpointStore
 
 	// Store is the underlying SQLite handle. May be nil if the state
 	// DB could not be opened — the caller's `defer state.Store.Close()`
@@ -80,18 +88,26 @@ func OpenAgentState(ctx context.Context, cfg OpenAgentStateConfig) AgentState {
 	if cfg.StateDir == "" {
 		panic("storageagent: OpenAgentStateConfig.StateDir is required")
 	}
+	if cfg.Cache == nil {
+		panic("storageagent: OpenAgentStateConfig.Cache is required")
+	}
 	if cfg.Logger == nil {
 		panic("storageagent: OpenAgentStateConfig.Logger is required")
+	}
+
+	inMemoryFallback := func() AgentState {
+		return AgentState{
+			Sessions:  NewSessionStore(SessionStoreConfig{}),
+			Denied:    NewDeniedPatterns(DeniedPatternsConfig{}),
+			Endpoints: NewEndpointStore(EndpointStoreConfig{Cache: cfg.Cache}),
+		}
 	}
 
 	if err := os.MkdirAll(cfg.StateDir, 0o755); err != nil {
 		cfg.Logger.Error(
 			"create agent state dir; falling back to in-memory only (no crash resilience)",
 			"dir", cfg.StateDir, "error", err)
-		return AgentState{
-			Sessions: NewSessionStore(SessionStoreConfig{}),
-			Denied:   NewDeniedPatterns(DeniedPatternsConfig{}),
-		}
+		return inMemoryFallback()
 	}
 
 	dbPath := filepath.Join(cfg.StateDir, agentDBFilename)
@@ -100,10 +116,7 @@ func OpenAgentState(ctx context.Context, cfg OpenAgentStateConfig) AgentState {
 		cfg.Logger.Error(
 			"open agent state DB; falling back to in-memory only (no crash resilience)",
 			"path", dbPath, "error", err)
-		return AgentState{
-			Sessions: NewSessionStore(SessionStoreConfig{}),
-			Denied:   NewDeniedPatterns(DeniedPatternsConfig{}),
-		}
+		return inMemoryFallback()
 	}
 
 	sessions := NewSessionStore(SessionStoreConfig{Store: store})
@@ -125,9 +138,26 @@ func OpenAgentState(ctx context.Context, cfg OpenAgentStateConfig) AgentState {
 			"path", dbPath, "error", err)
 	}
 
+	endpoints := NewEndpointStore(EndpointStoreConfig{
+		Cache: cfg.Cache,
+		Store: store,
+	})
+	if err := endpoints.LoadFromStore(ctx); err != nil {
+		// Same shape as sessions/denied: keep Store attached, log
+		// loud. EndpointStore.LoadFromStore can also fail mid-load
+		// on per-endpoint S3 client construction (unreachable
+		// backend), in which case the agent boots with no endpoints
+		// in memory and the controller's HandshakeAck/ConfigUpdate
+		// re-delivers a fresh set.
+		cfg.Logger.Error(
+			"reload endpoints from agent state DB; serving with empty in-memory endpoints",
+			"path", dbPath, "error", err)
+	}
+
 	return AgentState{
-		Sessions: sessions,
-		Denied:   denied,
-		Store:    store,
+		Sessions:  sessions,
+		Denied:    denied,
+		Endpoints: endpoints,
+		Store:     store,
 	}
 }

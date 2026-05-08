@@ -20,10 +20,38 @@ import (
 
 // EndpointStore holds the active endpoint configurations and S3 clients.
 // Thread-safe for concurrent reads (HTTP requests) and writes (bidi updates).
+//
+// When constructed with a non-nil EndpointStoreConfig.Store, every
+// successful Update mirrors to the SQLite store atomically with the
+// in-memory swap. Boot-time reload is the caller's responsibility via
+// LoadFromStore — see #79 for the broader crash-resilience flow. The
+// package only exposes the contract; the boot wiring lives in
+// cmd/pivox-agent/.
+//
+// Persistence semantics: writes are atomic with the in-memory update.
+// The new in-memory map is built first (including S3 client
+// construction; per-endpoint failure short-circuits the whole batch);
+// then the persist call writes the proto bytes for every config in a
+// single SQLite transaction; only on success does the in-memory map
+// swap. If either step fails the existing in-memory map and the
+// existing on-disk set are both untouched.
 type EndpointStore struct {
 	mu        sync.RWMutex
-	endpoints map[string]*endpoint // keyed by endpoint name
+	endpoints map[string]*endpoint // keyed by endpoint short name
 	cache     *MemoryCache
+	persist   *Store
+}
+
+// EndpointStoreConfig is the constructor input for EndpointStore.
+type EndpointStoreConfig struct {
+	// Cache is the in-memory blob cache used by S3-backed endpoints.
+	// Required.
+	Cache *MemoryCache
+
+	// Store, if non-nil, mirrors every successful Update to SQLite
+	// atomically with the in-memory replacement. Optional.
+	// Zero-value (nil) Store = in-memory only.
+	Store *Store
 }
 
 // endpoint is a resolved endpoint with a ready-to-use client.
@@ -33,45 +61,116 @@ type endpoint struct {
 	cacheEnabled bool
 }
 
-// NewEndpointStore creates an empty EndpointStore with a memory cache.
-func NewEndpointStore(cache *MemoryCache) *EndpointStore {
+// NewEndpointStore constructs an EndpointStore from cfg. Panics if
+// cfg.Cache is nil.
+func NewEndpointStore(cfg EndpointStoreConfig) *EndpointStore {
+	if cfg.Cache == nil {
+		panic("storageagent: EndpointStoreConfig.Cache is required")
+	}
 	return &EndpointStore{
 		endpoints: make(map[string]*endpoint),
-		cache:     cache,
+		cache:     cfg.Cache,
+		persist:   cfg.Store,
 	}
+}
+
+// LoadFromStore reads the persisted endpoint set into memory,
+// reconstructing S3 clients along the way. Called once at agent boot,
+// before the HTTP listener starts. No-op without an attached store.
+//
+// MUST be called exactly once, before any Update. Concurrent
+// Update/LoadFromStore is not supported — Load unconditionally
+// replaces the in-memory map, so a Load racing an Update would
+// clobber live state. The agent boot sequence enforces this ordering;
+// future admin "reload" endpoints would need a different mechanism.
+//
+// A per-endpoint S3 client construction failure aborts the whole load
+// and returns an error — the agent will then serve no endpoints from
+// disk and wait for the controller's HandshakeAck/ConfigUpdate to
+// re-deliver a working set. This matches the "all-or-nothing" shape
+// of Update.
+func (s *EndpointStore) LoadFromStore(ctx context.Context) error {
+	if s.persist == nil {
+		return nil
+	}
+	configs, err := s.persist.LoadEndpoints(ctx)
+	if err != nil {
+		return fmt.Errorf("load endpoints: %w", err)
+	}
+	resolved, err := s.resolveEndpoints(configs)
+	if err != nil {
+		return fmt.Errorf("resolve endpoints from store: %w", err)
+	}
+	s.mu.Lock()
+	s.endpoints = resolved
+	s.mu.Unlock()
+	return nil
 }
 
 // Update replaces all endpoints with the provided configs. Existing S3
 // clients are discarded and new ones are created.
-func (s *EndpointStore) Update(configs []*agentv1.EndpointConfig) error {
-	endpoints := make(map[string]*endpoint, len(configs))
+//
+// Atomic: builds the new in-memory map first (including S3 client
+// construction; any per-endpoint failure aborts before either
+// in-memory or on-disk state is mutated), then persists the configs
+// in a single SQLite transaction, then swaps in-memory. Failure at
+// any step leaves both layers untouched.
+//
+// Lock-holding shape (DIFFERENT from SessionStore.Grant /
+// DeniedPatterns.Update): mu.Lock is held ONLY around the in-memory
+// map swap, NOT across S3 client construction or the SQLite write.
+// This decouples HTTP read tail latency from controller-driven push
+// latency — `ServeFile` (RLock) is never blocked on a slow
+// `BucketExists` round-trip or an fsync stall. Trade-off: a reader
+// between the SQLite commit and the in-memory swap briefly sees
+// pre-Update state while disk is current. The window is bounded to a
+// single map assignment; if the agent crashes within it, restart
+// reloads the persisted state. Acceptable because Update is a
+// full-set replacement, not a delta.
+func (s *EndpointStore) Update(ctx context.Context, configs []*agentv1.EndpointConfig) error {
+	resolved, err := s.resolveEndpoints(configs)
+	if err != nil {
+		return err
+	}
 
+	if s.persist != nil {
+		if err := s.persist.ReplaceEndpoints(ctx, configs); err != nil {
+			return fmt.Errorf("update endpoints: %w", err)
+		}
+	}
+
+	s.mu.Lock()
+	s.endpoints = resolved
+	s.mu.Unlock()
+	return nil
+}
+
+// resolveEndpoints builds the in-memory routing map from a slice of
+// configs, constructing S3 clients per endpoint. Returns an error
+// immediately on the first failure so the caller can leave existing
+// state untouched.
+func (s *EndpointStore) resolveEndpoints(configs []*agentv1.EndpointConfig) (map[string]*endpoint, error) {
+	out := make(map[string]*endpoint, len(configs))
 	for _, cfg := range configs {
 		ep := &endpoint{
 			config:       cfg,
 			cacheEnabled: cfg.GetCacheConfig() != nil && cfg.GetCacheConfig().GetEnabled(),
 		}
-
 		if s3Cfg := cfg.GetS3(); s3Cfg != nil {
 			client, err := newS3Client(s3Cfg)
 			if err != nil {
-				return fmt.Errorf("endpoint %s: create S3 client: %w", cfg.GetName(), err)
+				return nil, fmt.Errorf("endpoint %s: create S3 client: %w", cfg.GetName(), err)
 			}
 			ep.s3 = client
 		}
-
 		// Extract the short name from the resource name for routing.
 		// e.g. "organizations/acme/storageGateways/gw1/endpoints/media" → "media"
 		name := cfg.GetName()
 		parts := strings.Split(name, "/")
 		shortName := parts[len(parts)-1]
-		endpoints[shortName] = ep
+		out[shortName] = ep
 	}
-
-	s.mu.Lock()
-	s.endpoints = endpoints
-	s.mu.Unlock()
-	return nil
+	return out, nil
 }
 
 // ServeFile handles an HTTP request by routing to the correct endpoint

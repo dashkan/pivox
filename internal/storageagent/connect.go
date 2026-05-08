@@ -102,7 +102,7 @@ func Connect(ctx context.Context, addr string, useTLS bool, token string, cfg *C
 
 	// Apply initial config from handshake.
 	if endpoints := ack.GetEndpoints(); len(endpoints) > 0 {
-		if err := cfg.Endpoints.Update(endpoints); err != nil {
+		if err := cfg.Endpoints.Update(ctx, endpoints); err != nil {
 			logger.Error("failed to apply initial endpoints", "error", err)
 		} else {
 			logger.Info("loaded endpoints", "count", len(endpoints))

@@ -227,7 +227,7 @@ func (s *Stream) handleServerMessage(ctx context.Context, msg *agentv1.ControlMe
 	switch m := msg.GetMessage().(type) {
 	case *agentv1.ControlMessage_ConfigUpdate:
 		update := m.ConfigUpdate
-		if err := s.endpoints.Update(update.GetEndpoints()); err != nil {
+		if err := s.endpoints.Update(ctx, update.GetEndpoints()); err != nil {
 			s.logger.Error("failed to apply config update", "error", err)
 		} else {
 			s.logger.Info("applied config update", "endpoints", len(update.GetEndpoints()))

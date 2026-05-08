@@ -108,7 +108,7 @@ func newTestStream(bidi *mockBidiStream) *Stream {
 		Stream:    bidi,
 		Timeout:   2 * time.Second,
 		Sessions:  NewSessionStore(SessionStoreConfig{}),
-		Endpoints: NewEndpointStore(NewMemoryCache(10, 1024)),
+		Endpoints: NewEndpointStore(EndpointStoreConfig{Cache: NewMemoryCache(10, 1024)}),
 		Denied:    NewDeniedPatterns(DeniedPatternsConfig{}),
 		Logger:    slog.Default(),
 	})
@@ -245,7 +245,7 @@ func TestHandshake_Timeout(t *testing.T) {
 		Stream:    bidi,
 		Timeout:   50 * time.Millisecond,
 		Sessions:  NewSessionStore(SessionStoreConfig{}),
-		Endpoints: NewEndpointStore(NewMemoryCache(10, 1024)),
+		Endpoints: NewEndpointStore(EndpointStoreConfig{Cache: NewMemoryCache(10, 1024)}),
 		Denied:    NewDeniedPatterns(DeniedPatternsConfig{}),
 		Logger:    slog.Default(),
 	})
@@ -347,7 +347,7 @@ func TestHandleServerMessage_SessionGrant(t *testing.T) {
 		Stream:    bidi,
 		Timeout:   time.Second,
 		Sessions:  sessions,
-		Endpoints: NewEndpointStore(NewMemoryCache(10, 1024)),
+		Endpoints: NewEndpointStore(EndpointStoreConfig{Cache: NewMemoryCache(10, 1024)}),
 		Denied:    NewDeniedPatterns(DeniedPatternsConfig{}),
 		Logger:    slog.Default(),
 	})
@@ -374,7 +374,7 @@ func TestHandleServerMessage_SessionRevoke(t *testing.T) {
 		Stream:    bidi,
 		Timeout:   time.Second,
 		Sessions:  sessions,
-		Endpoints: NewEndpointStore(NewMemoryCache(10, 1024)),
+		Endpoints: NewEndpointStore(EndpointStoreConfig{Cache: NewMemoryCache(10, 1024)}),
 		Denied:    NewDeniedPatterns(DeniedPatternsConfig{}),
 		Logger:    slog.Default(),
 	})
@@ -397,7 +397,7 @@ func TestHandleServerMessage_ConfigUpdate_DeniedPatterns(t *testing.T) {
 		Stream:    bidi,
 		Timeout:   time.Second,
 		Sessions:  NewSessionStore(SessionStoreConfig{}),
-		Endpoints: NewEndpointStore(NewMemoryCache(10, 1024)),
+		Endpoints: NewEndpointStore(EndpointStoreConfig{Cache: NewMemoryCache(10, 1024)}),
 		Denied:    denied,
 		Logger:    slog.Default(),
 	})
@@ -417,7 +417,7 @@ func TestHandleServerMessage_ConfigUpdate_DeniedPatterns(t *testing.T) {
 
 func TestHandleServerMessage_ConfigUpdate_Endpoints(t *testing.T) {
 	bidi := newMockBidiStream()
-	endpoints := NewEndpointStore(NewMemoryCache(10, 1024))
+	endpoints := NewEndpointStore(EndpointStoreConfig{Cache: NewMemoryCache(10, 1024)})
 	s := NewStream(StreamConfig{
 		Stream:    bidi,
 		Timeout:   time.Second,

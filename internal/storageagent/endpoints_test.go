@@ -18,9 +18,9 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestEndpointStore_Update_Filesystem(t *testing.T) {
-	store := NewEndpointStore(NewMemoryCache(10, 1024))
+	store := NewEndpointStore(EndpointStoreConfig{Cache: NewMemoryCache(10, 1024)})
 
-	err := store.Update([]*agentv1.EndpointConfig{
+	err := store.Update(t.Context(), []*agentv1.EndpointConfig{
 		{
 			Name: "organizations/acme/storageGateways/gw1/endpoints/media",
 			Configuration: &agentv1.EndpointConfig_Filesystem{
@@ -42,9 +42,9 @@ func TestEndpointStore_Update_Filesystem(t *testing.T) {
 }
 
 func TestEndpointStore_Update_Replace(t *testing.T) {
-	store := NewEndpointStore(NewMemoryCache(10, 1024))
+	store := NewEndpointStore(EndpointStoreConfig{Cache: NewMemoryCache(10, 1024)})
 
-	err := store.Update([]*agentv1.EndpointConfig{
+	err := store.Update(t.Context(), []*agentv1.EndpointConfig{
 		{
 			Name: "organizations/acme/storageGateways/gw1/endpoints/old",
 			Configuration: &agentv1.EndpointConfig_Filesystem{
@@ -55,7 +55,7 @@ func TestEndpointStore_Update_Replace(t *testing.T) {
 	require.NoError(t, err)
 
 	// Replace with new config.
-	err = store.Update([]*agentv1.EndpointConfig{
+	err = store.Update(t.Context(), []*agentv1.EndpointConfig{
 		{
 			Name: "organizations/acme/storageGateways/gw1/endpoints/new",
 			Configuration: &agentv1.EndpointConfig_Filesystem{
@@ -75,9 +75,9 @@ func TestEndpointStore_Update_Replace(t *testing.T) {
 }
 
 func TestEndpointStore_Update_CacheEnabled(t *testing.T) {
-	store := NewEndpointStore(NewMemoryCache(10, 1024))
+	store := NewEndpointStore(EndpointStoreConfig{Cache: NewMemoryCache(10, 1024)})
 
-	err := store.Update([]*agentv1.EndpointConfig{
+	err := store.Update(t.Context(), []*agentv1.EndpointConfig{
 		{
 			Name: "organizations/acme/storageGateways/gw1/endpoints/cached",
 			Configuration: &agentv1.EndpointConfig_Filesystem{
@@ -100,7 +100,7 @@ func TestEndpointStore_Update_CacheEnabled(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestServeFile_NotFound_NoEndpoint(t *testing.T) {
-	store := NewEndpointStore(NewMemoryCache(10, 1024))
+	store := NewEndpointStore(EndpointStoreConfig{Cache: NewMemoryCache(10, 1024)})
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/nonexistent/file.txt", nil)
@@ -110,7 +110,7 @@ func TestServeFile_NotFound_NoEndpoint(t *testing.T) {
 }
 
 func TestServeFile_NotFound_EmptyPath(t *testing.T) {
-	store := NewEndpointStore(NewMemoryCache(10, 1024))
+	store := NewEndpointStore(EndpointStoreConfig{Cache: NewMemoryCache(10, 1024)})
 
 	tests := []struct {
 		name string
@@ -132,7 +132,7 @@ func TestServeFile_NotFound_EmptyPath(t *testing.T) {
 }
 
 func TestServeFile_NoConfig(t *testing.T) {
-	store := NewEndpointStore(NewMemoryCache(10, 1024))
+	store := NewEndpointStore(EndpointStoreConfig{Cache: NewMemoryCache(10, 1024)})
 
 	// Register an endpoint with no S3 or filesystem config.
 	store.mu.Lock()
@@ -157,8 +157,8 @@ func TestServeFilesystem_Success(t *testing.T) {
 	err := os.WriteFile(filepath.Join(dir, "test.txt"), content, 0o644)
 	require.NoError(t, err)
 
-	store := NewEndpointStore(NewMemoryCache(10, 1024))
-	err = store.Update([]*agentv1.EndpointConfig{
+	store := NewEndpointStore(EndpointStoreConfig{Cache: NewMemoryCache(10, 1024)})
+	err = store.Update(t.Context(), []*agentv1.EndpointConfig{
 		{
 			Name: "organizations/acme/storageGateways/gw1/endpoints/local",
 			Configuration: &agentv1.EndpointConfig_Filesystem{
@@ -180,8 +180,8 @@ func TestServeFilesystem_Success(t *testing.T) {
 func TestServeFilesystem_NotFound(t *testing.T) {
 	dir := t.TempDir()
 
-	store := NewEndpointStore(NewMemoryCache(10, 1024))
-	err := store.Update([]*agentv1.EndpointConfig{
+	store := NewEndpointStore(EndpointStoreConfig{Cache: NewMemoryCache(10, 1024)})
+	err := store.Update(t.Context(), []*agentv1.EndpointConfig{
 		{
 			Name: "organizations/acme/storageGateways/gw1/endpoints/local",
 			Configuration: &agentv1.EndpointConfig_Filesystem{
@@ -201,8 +201,8 @@ func TestServeFilesystem_NotFound(t *testing.T) {
 func TestServeFilesystem_PathTraversal(t *testing.T) {
 	dir := t.TempDir()
 
-	store := NewEndpointStore(NewMemoryCache(10, 1024))
-	err := store.Update([]*agentv1.EndpointConfig{
+	store := NewEndpointStore(EndpointStoreConfig{Cache: NewMemoryCache(10, 1024)})
+	err := store.Update(t.Context(), []*agentv1.EndpointConfig{
 		{
 			Name: "organizations/acme/storageGateways/gw1/endpoints/local",
 			Configuration: &agentv1.EndpointConfig_Filesystem{
@@ -236,8 +236,8 @@ func TestServeFilesystem_Directory(t *testing.T) {
 	err := os.MkdirAll(filepath.Join(dir, "subdir"), 0o755)
 	require.NoError(t, err)
 
-	store := NewEndpointStore(NewMemoryCache(10, 1024))
-	err = store.Update([]*agentv1.EndpointConfig{
+	store := NewEndpointStore(EndpointStoreConfig{Cache: NewMemoryCache(10, 1024)})
+	err = store.Update(t.Context(), []*agentv1.EndpointConfig{
 		{
 			Name: "organizations/acme/storageGateways/gw1/endpoints/local",
 			Configuration: &agentv1.EndpointConfig_Filesystem{
@@ -260,14 +260,14 @@ func TestServeFilesystem_Directory(t *testing.T) {
 
 func TestServeFile_CacheHit(t *testing.T) {
 	cache := NewMemoryCache(100, 1024*1024)
-	store := NewEndpointStore(cache)
+	store := NewEndpointStore(EndpointStoreConfig{Cache: cache})
 
 	dir := t.TempDir()
 	content := []byte("cached content")
 	err := os.WriteFile(filepath.Join(dir, "asset.bin"), content, 0o644)
 	require.NoError(t, err)
 
-	err = store.Update([]*agentv1.EndpointConfig{
+	err = store.Update(t.Context(), []*agentv1.EndpointConfig{
 		{
 			Name: "organizations/acme/storageGateways/gw1/endpoints/ep",
 			Configuration: &agentv1.EndpointConfig_Filesystem{

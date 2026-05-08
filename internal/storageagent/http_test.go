@@ -29,7 +29,7 @@ func newTestHTTPServer(t *testing.T) (*HTTPServer, *SessionStore, *EndpointStore
 	t.Helper()
 	sessions := NewSessionStore(SessionStoreConfig{})
 	cache := NewMemoryCache(100, 1024*1024)
-	endpoints := NewEndpointStore(cache)
+	endpoints := NewEndpointStore(EndpointStoreConfig{Cache: cache})
 	denied := NewDeniedPatterns(DeniedPatternsConfig{})
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 	srv := NewHTTPServer(Config{

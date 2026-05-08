@@ -78,8 +78,8 @@ func TestEndpointStore_Update_S3(t *testing.T) {
 
 	_, endpoint, bucketName := testutil.SetupTestS3(t)
 
-	store := NewEndpointStore(NewMemoryCache(10, 1024*1024))
-	err := store.Update([]*agentv1.EndpointConfig{
+	store := NewEndpointStore(EndpointStoreConfig{Cache: NewMemoryCache(10, 1024*1024)})
+	err := store.Update(t.Context(), []*agentv1.EndpointConfig{
 		{
 			Name: "organizations/acme/storageGateways/gw1/endpoints/s3ep",
 			Configuration: &agentv1.EndpointConfig_S3{
@@ -120,8 +120,8 @@ func TestServeS3_Success(t *testing.T) {
 		minio.PutObjectOptions{ContentType: "text/plain"})
 	require.NoError(t, err)
 
-	store := NewEndpointStore(NewMemoryCache(10, 1024*1024))
-	err = store.Update([]*agentv1.EndpointConfig{
+	store := NewEndpointStore(EndpointStoreConfig{Cache: NewMemoryCache(10, 1024*1024)})
+	err = store.Update(t.Context(), []*agentv1.EndpointConfig{
 		{
 			Name: "organizations/acme/storageGateways/gw1/endpoints/s3ep",
 			Configuration: &agentv1.EndpointConfig_S3{
@@ -155,8 +155,8 @@ func TestServeS3_NotFound(t *testing.T) {
 
 	_, endpoint, bucketName := testutil.SetupTestS3(t)
 
-	store := NewEndpointStore(NewMemoryCache(10, 1024*1024))
-	err := store.Update([]*agentv1.EndpointConfig{
+	store := NewEndpointStore(EndpointStoreConfig{Cache: NewMemoryCache(10, 1024*1024)})
+	err := store.Update(t.Context(), []*agentv1.EndpointConfig{
 		{
 			Name: "organizations/acme/storageGateways/gw1/endpoints/s3ep",
 			Configuration: &agentv1.EndpointConfig_S3{
@@ -193,8 +193,8 @@ func TestServeS3_WithCache(t *testing.T) {
 	require.NoError(t, err)
 
 	cache := NewMemoryCache(100, 1024*1024)
-	store := NewEndpointStore(cache)
-	err = store.Update([]*agentv1.EndpointConfig{
+	store := NewEndpointStore(EndpointStoreConfig{Cache: cache})
+	err = store.Update(t.Context(), []*agentv1.EndpointConfig{
 		{
 			Name: "organizations/acme/storageGateways/gw1/endpoints/s3ep",
 			Configuration: &agentv1.EndpointConfig_S3{
@@ -248,8 +248,8 @@ func TestServeS3_LargeObject_NoCache(t *testing.T) {
 	require.NoError(t, err)
 
 	cache := NewMemoryCache(100, itemCap)
-	store := NewEndpointStore(cache)
-	err = store.Update([]*agentv1.EndpointConfig{
+	store := NewEndpointStore(EndpointStoreConfig{Cache: cache})
+	err = store.Update(t.Context(), []*agentv1.EndpointConfig{
 		{
 			Name: "organizations/acme/storageGateways/gw1/endpoints/s3ep",
 			Configuration: &agentv1.EndpointConfig_S3{
