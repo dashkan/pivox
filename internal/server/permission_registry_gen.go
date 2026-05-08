@@ -180,6 +180,12 @@ var GeneratedRegistry = Registry{
 			return ScopeFromPath("parent", req.(*apiv1.ListDashboardsRequest).GetParent())
 		},
 	},
+	"/pivox.api.v1.Dashboards/QueryDashboardData": {
+		Permission: permission.DashboardsRead,
+		Extract: func(req any) (ScopeRef, error) {
+			return ScopeFromPath("parent", req.(*apiv1.QueryDashboardDataRequest).GetParent())
+		},
+	},
 	"/pivox.api.v1.Dashboards/UpdateDashboard": {
 		Permission: permission.DashboardsUpdate,
 		Extract: func(req any) (ScopeRef, error) {

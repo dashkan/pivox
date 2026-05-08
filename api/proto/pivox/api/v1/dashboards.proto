@@ -22,7 +22,9 @@ import "google/api/client.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
 import "google/protobuf/field_mask.proto";
+import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
+import "pivox/api/v1/data_sources.proto";
 import "pivox/api/v1/widgets.proto";
 import "pivox/permission/v1/options.proto";
 
@@ -96,6 +98,34 @@ service Dashboards {
     option (google.api.http) = {delete: "/v1/{name=organizations/*/spaces/*/dashboards/*}"};
     option (google.api.method_signature) = "name";
     option (pivox.permission.v1.required_permission) = "dashboards.delete";
+  }
+
+  // Resolves a `ResourceQuery` into rows of data for rendering inside
+  // a CollectionWidget. The handler dispatches per query.resource_type;
+  // v1 supports `pivox.assets/Asset` only.
+  //
+  // Each row is a `google.protobuf.Struct` whose fields mirror the
+  // CollectionWidget.columns / IconConfig contract documented on the
+  // widget itself: `name`, `display_name`, `media_type`, `state`,
+  // `size_bytes`, `create_time`, plus server-synthesized `icon` (the
+  // numeric `Icon` enum value derived from the asset's content type)
+  // and `thumbnail_url` (empty in v1; the per-row URL composition
+  // lands when the storage-gateway session work merges).
+  //
+  // Permission: dashboards.read gates the verb. Per-resource ListPermission
+  // (e.g. assets.assets.read) is checked at the handler layer once the
+  // role hierarchy diverges enough that the two permissions can be
+  // granted independently.
+  rpc QueryDashboardData(QueryDashboardDataRequest) returns (QueryDashboardDataResponse) {
+    option (google.api.http) = {
+      post: "/v1/{parent=organizations/*}:queryDashboardData"
+      body: "*"
+      additional_bindings: {
+        post: "/v1/{parent=organizations/*/spaces/*}:queryDashboardData"
+        body: "*"
+      }
+    };
+    option (pivox.permission.v1.required_permission) = "dashboards.read";
   }
 }
 
@@ -321,4 +351,49 @@ message DeleteDashboardRequest {
 
   // Optional. The etag for optimistic concurrency control.
   string etag = 3 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// Request message for QueryDashboardData.
+message QueryDashboardDataRequest {
+  // Required. The parent scope under which to resolve the query.
+  // Format: `organizations/{organization}` (org-scoped) or
+  //         `organizations/{organization}/spaces/{space}` (space-scoped).
+  string parent = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true
+  ];
+
+  // Required. The query to resolve. v1 supports
+  // `query.resource_type = "pivox.assets/Asset"` only; other resource
+  // types return Unimplemented until per-type handlers land.
+  ResourceQuery query = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. Maximum number of rows to return per page.
+  int32 page_size = 3 [
+    (google.api.field_behavior) = OPTIONAL,
+    (buf.validate.field).int32 = {
+      gte: 0
+      lte: 1000
+    }
+  ];
+
+  // Optional. Page token from a previous QueryDashboardData call.
+  string page_token = 4 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// Response message for QueryDashboardData.
+message QueryDashboardDataResponse {
+  // The rows resolved by the query. Each row is a
+  // `google.protobuf.Struct` whose fields correspond to the
+  // resource's column-level data plus server-synthesized derived
+  // fields (e.g. `icon` as the numeric `Icon` enum value, computed
+  // per-row from the resource's content).
+  repeated google.protobuf.Struct rows = 1;
+
+  // Token for the next page of rows. Empty when the response is
+  // the last page.
+  string next_page_token = 2;
 }

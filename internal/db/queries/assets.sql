@@ -22,19 +22,49 @@ SELECT * FROM assets WHERE space_id = $1 AND name = $2;
 SELECT * FROM assets WHERE space_id = $1 AND checksum_sha256 = $2 AND delete_time IS NULL;
 
 -- name: ListAssetsBySpace :many
+-- Tiebreaker on id DESC keeps pagination stable when multiple assets
+-- share a create_time (concurrent ingest can collide on µs precision):
+-- without it, offset-based pagination can drop or duplicate rows.
 SELECT * FROM assets
 WHERE space_id = $1 AND delete_time IS NULL
-ORDER BY create_time DESC
+ORDER BY create_time DESC, id DESC
 LIMIT $2 OFFSET $3;
 
 -- name: ListAssetsBySpaceWithDeleted :many
 SELECT * FROM assets
 WHERE space_id = $1
-ORDER BY create_time DESC
+ORDER BY create_time DESC, id DESC
 LIMIT $2 OFFSET $3;
 
 -- name: CountAssetsBySpace :one
 SELECT count(*) FROM assets WHERE space_id = $1 AND delete_time IS NULL;
+
+-- name: ListAssetsByOrg :many
+-- Lists every active asset across every space in an organization,
+-- with the space's slug attached so the caller can compose AIP
+-- resource names without an N+1 lookup. Used by
+-- Dashboards.QueryDashboardData at org-scoped parent so the system
+-- Library dashboard can render assets across spaces in one round
+-- trip. Soft-deleted spaces are skipped (their assets aren't
+-- surfaced) — same effect as `assets.space_id` referencing a row
+-- with a non-null `spaces.delete_time`.
+SELECT
+  assets.*,
+  spaces.name AS space_slug
+FROM assets
+JOIN spaces ON assets.space_id = spaces.id
+WHERE spaces.org_id = $1
+  AND assets.delete_time IS NULL
+  AND spaces.delete_time IS NULL
+ORDER BY assets.create_time DESC, assets.id DESC
+LIMIT $2 OFFSET $3;
+
+-- name: CountAssetsByOrg :one
+SELECT count(*) FROM assets
+JOIN spaces ON assets.space_id = spaces.id
+WHERE spaces.org_id = $1
+  AND assets.delete_time IS NULL
+  AND spaces.delete_time IS NULL;
 
 -- name: UpdateAsset :one
 UPDATE assets

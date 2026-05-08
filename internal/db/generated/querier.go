@@ -63,6 +63,7 @@ type Querier interface {
 	CountArtifactVersionsByArtifact(ctx context.Context, artifactID uuid.UUID) (int64, error)
 	CountArtifactsByConversation(ctx context.Context, conversationID uuid.UUID) (int64, error)
 	CountAssetVersions(ctx context.Context, assetID uuid.UUID) (int64, error)
+	CountAssetsByOrg(ctx context.Context, orgID uuid.UUID) (int64, error)
 	CountAssetsBySpace(ctx context.Context, spaceID uuid.UUID) (int64, error)
 	CountConnectedStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) (int64, error)
 	// Companion to ListDashboardsBySpace for next_page_token computation:
@@ -477,6 +478,18 @@ type Querier interface {
 	IsOnlyArtifactVersion(ctx context.Context, artifactID uuid.UUID) (bool, error)
 	ListAssetRenditions(ctx context.Context, versionID uuid.UUID) ([]AssetRendition, error)
 	ListAssetVersions(ctx context.Context, arg ListAssetVersionsParams) ([]AssetVersion, error)
+	// Lists every active asset across every space in an organization,
+	// with the space's slug attached so the caller can compose AIP
+	// resource names without an N+1 lookup. Used by
+	// Dashboards.QueryDashboardData at org-scoped parent so the system
+	// Library dashboard can render assets across spaces in one round
+	// trip. Soft-deleted spaces are skipped (their assets aren't
+	// surfaced) — same effect as `assets.space_id` referencing a row
+	// with a non-null `spaces.delete_time`.
+	ListAssetsByOrg(ctx context.Context, arg ListAssetsByOrgParams) ([]ListAssetsByOrgRow, error)
+	// Tiebreaker on id DESC keeps pagination stable when multiple assets
+	// share a create_time (concurrent ingest can collide on µs precision):
+	// without it, offset-based pagination can drop or duplicate rows.
 	ListAssetsBySpace(ctx context.Context, arg ListAssetsBySpaceParams) ([]Asset, error)
 	ListAssetsBySpaceWithDeleted(ctx context.Context, arg ListAssetsBySpaceWithDeletedParams) ([]Asset, error)
 	// Live dashboards in a space, newest-first. Pagination is offset-

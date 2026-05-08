@@ -8,10 +8,27 @@ package db
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/pgvector/pgvector-go"
 )
+
+const countAssetsByOrg = `-- name: CountAssetsByOrg :one
+SELECT count(*) FROM assets
+JOIN spaces ON assets.space_id = spaces.id
+WHERE spaces.org_id = $1
+  AND assets.delete_time IS NULL
+  AND spaces.delete_time IS NULL
+`
+
+func (q *Queries) CountAssetsByOrg(ctx context.Context, orgID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countAssetsByOrg, orgID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
 
 const countAssetsBySpace = `-- name: CountAssetsBySpace :one
 SELECT count(*) FROM assets WHERE space_id = $1 AND delete_time IS NULL
@@ -267,10 +284,125 @@ func (q *Queries) GetAssetNamesByIDs(ctx context.Context, ids []uuid.UUID) ([]Ge
 	return items, nil
 }
 
+const listAssetsByOrg = `-- name: ListAssetsByOrg :many
+SELECT
+  assets.id, assets.space_id, assets.endpoint_id, assets.name, assets.display_name, assets.import_path, assets.filename, assets.media_type, assets.content_type, assets.checksum_sha256, assets.size_bytes, assets.technical_metadata, assets.ai_description, assets.transcription, assets.duration_seconds, assets.width, assets.height, assets.annotations, assets.search_vector, assets.embedding, assets.state, assets.etag, assets.revision, assets.created_by, assets.updated_by, assets.deleted_by, assets.create_time, assets.update_time, assets.delete_time, assets.purge_time, assets.expire_time,
+  spaces.name AS space_slug
+FROM assets
+JOIN spaces ON assets.space_id = spaces.id
+WHERE spaces.org_id = $1
+  AND assets.delete_time IS NULL
+  AND spaces.delete_time IS NULL
+ORDER BY assets.create_time DESC, assets.id DESC
+LIMIT $2 OFFSET $3
+`
+
+type ListAssetsByOrgParams struct {
+	OrgID  uuid.UUID `json:"org_id"`
+	Limit  int32     `json:"limit"`
+	Offset int32     `json:"offset"`
+}
+
+type ListAssetsByOrgRow struct {
+	ID                uuid.UUID          `json:"id"`
+	SpaceID           uuid.UUID          `json:"space_id"`
+	EndpointID        pgtype.UUID        `json:"endpoint_id"`
+	Name              string             `json:"name"`
+	DisplayName       string             `json:"display_name"`
+	ImportPath        string             `json:"import_path"`
+	Filename          string             `json:"filename"`
+	MediaType         NullAssetMediaType `json:"media_type"`
+	ContentType       string             `json:"content_type"`
+	ChecksumSha256    string             `json:"checksum_sha256"`
+	SizeBytes         int64              `json:"size_bytes"`
+	TechnicalMetadata json.RawMessage    `json:"technical_metadata"`
+	AiDescription     string             `json:"ai_description"`
+	Transcription     string             `json:"transcription"`
+	DurationSeconds   pgtype.Float8      `json:"duration_seconds"`
+	Width             pgtype.Int4        `json:"width"`
+	Height            pgtype.Int4        `json:"height"`
+	Annotations       json.RawMessage    `json:"annotations"`
+	SearchVector      interface{}        `json:"search_vector"`
+	Embedding         pgvector.Vector    `json:"embedding"`
+	State             AssetState         `json:"state"`
+	Etag              string             `json:"etag"`
+	Revision          int32              `json:"revision"`
+	CreatedBy         pgtype.UUID        `json:"created_by"`
+	UpdatedBy         pgtype.UUID        `json:"updated_by"`
+	DeletedBy         pgtype.UUID        `json:"deleted_by"`
+	CreateTime        time.Time          `json:"create_time"`
+	UpdateTime        time.Time          `json:"update_time"`
+	DeleteTime        pgtype.Timestamptz `json:"delete_time"`
+	PurgeTime         pgtype.Timestamptz `json:"purge_time"`
+	ExpireTime        pgtype.Timestamptz `json:"expire_time"`
+	SpaceSlug         string             `json:"space_slug"`
+}
+
+// Lists every active asset across every space in an organization,
+// with the space's slug attached so the caller can compose AIP
+// resource names without an N+1 lookup. Used by
+// Dashboards.QueryDashboardData at org-scoped parent so the system
+// Library dashboard can render assets across spaces in one round
+// trip. Soft-deleted spaces are skipped (their assets aren't
+// surfaced) — same effect as `assets.space_id` referencing a row
+// with a non-null `spaces.delete_time`.
+func (q *Queries) ListAssetsByOrg(ctx context.Context, arg ListAssetsByOrgParams) ([]ListAssetsByOrgRow, error) {
+	rows, err := q.db.Query(ctx, listAssetsByOrg, arg.OrgID, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAssetsByOrgRow{}
+	for rows.Next() {
+		var i ListAssetsByOrgRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.SpaceID,
+			&i.EndpointID,
+			&i.Name,
+			&i.DisplayName,
+			&i.ImportPath,
+			&i.Filename,
+			&i.MediaType,
+			&i.ContentType,
+			&i.ChecksumSha256,
+			&i.SizeBytes,
+			&i.TechnicalMetadata,
+			&i.AiDescription,
+			&i.Transcription,
+			&i.DurationSeconds,
+			&i.Width,
+			&i.Height,
+			&i.Annotations,
+			&i.SearchVector,
+			&i.Embedding,
+			&i.State,
+			&i.Etag,
+			&i.Revision,
+			&i.CreatedBy,
+			&i.UpdatedBy,
+			&i.DeletedBy,
+			&i.CreateTime,
+			&i.UpdateTime,
+			&i.DeleteTime,
+			&i.PurgeTime,
+			&i.ExpireTime,
+			&i.SpaceSlug,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAssetsBySpace = `-- name: ListAssetsBySpace :many
 SELECT id, space_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets
 WHERE space_id = $1 AND delete_time IS NULL
-ORDER BY create_time DESC
+ORDER BY create_time DESC, id DESC
 LIMIT $2 OFFSET $3
 `
 
@@ -280,6 +412,9 @@ type ListAssetsBySpaceParams struct {
 	Offset  int32     `json:"offset"`
 }
 
+// Tiebreaker on id DESC keeps pagination stable when multiple assets
+// share a create_time (concurrent ingest can collide on µs precision):
+// without it, offset-based pagination can drop or duplicate rows.
 func (q *Queries) ListAssetsBySpace(ctx context.Context, arg ListAssetsBySpaceParams) ([]Asset, error) {
 	rows, err := q.db.Query(ctx, listAssetsBySpace, arg.SpaceID, arg.Limit, arg.Offset)
 	if err != nil {
@@ -335,7 +470,7 @@ func (q *Queries) ListAssetsBySpace(ctx context.Context, arg ListAssetsBySpacePa
 const listAssetsBySpaceWithDeleted = `-- name: ListAssetsBySpaceWithDeleted :many
 SELECT id, space_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets
 WHERE space_id = $1
-ORDER BY create_time DESC
+ORDER BY create_time DESC, id DESC
 LIMIT $2 OFFSET $3
 `
 

@@ -99,13 +99,27 @@ public enum Pivox_Api_V1_Dashboards: Sendable {
                 type: .unary
             )
         }
+        /// Namespace for "QueryDashboardData" metadata.
+        public enum QueryDashboardData: Sendable {
+            /// Request type for "QueryDashboardData".
+            public typealias Input = Pivox_Api_V1_QueryDashboardDataRequest
+            /// Response type for "QueryDashboardData".
+            public typealias Output = Pivox_Api_V1_QueryDashboardDataResponse
+            /// Descriptor for "QueryDashboardData".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "pivox.api.v1.Dashboards"),
+                method: "QueryDashboardData",
+                type: .unary
+            )
+        }
         /// Descriptors for all methods in the "pivox.api.v1.Dashboards" service.
         public static let descriptors: [GRPCCore.MethodDescriptor] = [
             ListDashboards.descriptor,
             GetDashboard.descriptor,
             CreateDashboard.descriptor,
             UpdateDashboard.descriptor,
-            DeleteDashboard.descriptor
+            DeleteDashboard.descriptor,
+            QueryDashboardData.descriptor
         ]
     }
 }
@@ -260,6 +274,44 @@ extension Pivox_Api_V1_Dashboards {
             deserializer: some GRPCCore.MessageDeserializer<Pivox_Api_V1_Dashboard>,
             options: GRPCCore.CallOptions,
             onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_Dashboard>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "QueryDashboardData" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Resolves a `ResourceQuery` into rows of data for rendering inside
+        /// > a CollectionWidget. The handler dispatches per query.resource_type;
+        /// > v1 supports `pivox.assets/Asset` only.
+        /// > 
+        /// > Each row is a `google.protobuf.Struct` whose fields mirror the
+        /// > CollectionWidget.columns / IconConfig contract documented on the
+        /// > widget itself: `name`, `display_name`, `media_type`, `state`,
+        /// > `size_bytes`, `create_time`, plus server-synthesized `icon` (the
+        /// > numeric `Icon` enum value derived from the asset's content type)
+        /// > and `thumbnail_url` (empty in v1; the per-row URL composition
+        /// > lands when the storage-gateway session work merges).
+        /// > 
+        /// > Permission: dashboards.read gates the verb. Per-resource ListPermission
+        /// > (e.g. assets.assets.read) is checked at the handler layer once the
+        /// > role hierarchy diverges enough that the two permissions can be
+        /// > granted independently.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Pivox_Api_V1_QueryDashboardDataRequest` message.
+        ///   - serializer: A serializer for `Pivox_Api_V1_QueryDashboardDataRequest` messages.
+        ///   - deserializer: A deserializer for `Pivox_Api_V1_QueryDashboardDataResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func queryDashboardData<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Api_V1_QueryDashboardDataRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Api_V1_QueryDashboardDataRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Pivox_Api_V1_QueryDashboardDataResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_QueryDashboardDataResponse>) async throws -> Result
         ) async throws -> Result where Result: Sendable
     }
 
@@ -470,6 +522,55 @@ extension Pivox_Api_V1_Dashboards {
                 onResponse: handleResponse
             )
         }
+
+        /// Call the "QueryDashboardData" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Resolves a `ResourceQuery` into rows of data for rendering inside
+        /// > a CollectionWidget. The handler dispatches per query.resource_type;
+        /// > v1 supports `pivox.assets/Asset` only.
+        /// > 
+        /// > Each row is a `google.protobuf.Struct` whose fields mirror the
+        /// > CollectionWidget.columns / IconConfig contract documented on the
+        /// > widget itself: `name`, `display_name`, `media_type`, `state`,
+        /// > `size_bytes`, `create_time`, plus server-synthesized `icon` (the
+        /// > numeric `Icon` enum value derived from the asset's content type)
+        /// > and `thumbnail_url` (empty in v1; the per-row URL composition
+        /// > lands when the storage-gateway session work merges).
+        /// > 
+        /// > Permission: dashboards.read gates the verb. Per-resource ListPermission
+        /// > (e.g. assets.assets.read) is checked at the handler layer once the
+        /// > role hierarchy diverges enough that the two permissions can be
+        /// > granted independently.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Pivox_Api_V1_QueryDashboardDataRequest` message.
+        ///   - serializer: A serializer for `Pivox_Api_V1_QueryDashboardDataRequest` messages.
+        ///   - deserializer: A deserializer for `Pivox_Api_V1_QueryDashboardDataResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func queryDashboardData<Result>(
+            request: GRPCCore.ClientRequest<Pivox_Api_V1_QueryDashboardDataRequest>,
+            serializer: some GRPCCore.MessageSerializer<Pivox_Api_V1_QueryDashboardDataRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Pivox_Api_V1_QueryDashboardDataResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_QueryDashboardDataResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Pivox_Api_V1_Dashboards.Method.QueryDashboardData.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
     }
 }
 
@@ -622,6 +723,50 @@ extension Pivox_Api_V1_Dashboards.ClientProtocol {
             request: request,
             serializer: GRPCProtobuf.ProtobufSerializer<Pivox_Api_V1_DeleteDashboardRequest>(),
             deserializer: GRPCProtobuf.ProtobufDeserializer<Pivox_Api_V1_Dashboard>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "QueryDashboardData" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Resolves a `ResourceQuery` into rows of data for rendering inside
+    /// > a CollectionWidget. The handler dispatches per query.resource_type;
+    /// > v1 supports `pivox.assets/Asset` only.
+    /// > 
+    /// > Each row is a `google.protobuf.Struct` whose fields mirror the
+    /// > CollectionWidget.columns / IconConfig contract documented on the
+    /// > widget itself: `name`, `display_name`, `media_type`, `state`,
+    /// > `size_bytes`, `create_time`, plus server-synthesized `icon` (the
+    /// > numeric `Icon` enum value derived from the asset's content type)
+    /// > and `thumbnail_url` (empty in v1; the per-row URL composition
+    /// > lands when the storage-gateway session work merges).
+    /// > 
+    /// > Permission: dashboards.read gates the verb. Per-resource ListPermission
+    /// > (e.g. assets.assets.read) is checked at the handler layer once the
+    /// > role hierarchy diverges enough that the two permissions can be
+    /// > granted independently.
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Pivox_Api_V1_QueryDashboardDataRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func queryDashboardData<Result>(
+        request: GRPCCore.ClientRequest<Pivox_Api_V1_QueryDashboardDataRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_QueryDashboardDataResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.queryDashboardData(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Pivox_Api_V1_QueryDashboardDataRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Pivox_Api_V1_QueryDashboardDataResponse>(),
             options: options,
             onResponse: handleResponse
         )
@@ -796,6 +941,54 @@ extension Pivox_Api_V1_Dashboards.ClientProtocol {
             metadata: metadata
         )
         return try await self.deleteDashboard(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "QueryDashboardData" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Resolves a `ResourceQuery` into rows of data for rendering inside
+    /// > a CollectionWidget. The handler dispatches per query.resource_type;
+    /// > v1 supports `pivox.assets/Asset` only.
+    /// > 
+    /// > Each row is a `google.protobuf.Struct` whose fields mirror the
+    /// > CollectionWidget.columns / IconConfig contract documented on the
+    /// > widget itself: `name`, `display_name`, `media_type`, `state`,
+    /// > `size_bytes`, `create_time`, plus server-synthesized `icon` (the
+    /// > numeric `Icon` enum value derived from the asset's content type)
+    /// > and `thumbnail_url` (empty in v1; the per-row URL composition
+    /// > lands when the storage-gateway session work merges).
+    /// > 
+    /// > Permission: dashboards.read gates the verb. Per-resource ListPermission
+    /// > (e.g. assets.assets.read) is checked at the handler layer once the
+    /// > role hierarchy diverges enough that the two permissions can be
+    /// > granted independently.
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func queryDashboardData<Result>(
+        _ message: Pivox_Api_V1_QueryDashboardDataRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Pivox_Api_V1_QueryDashboardDataResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Pivox_Api_V1_QueryDashboardDataRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.queryDashboardData(
             request: request,
             options: options,
             onResponse: handleResponse
