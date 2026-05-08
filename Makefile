@@ -2,6 +2,7 @@
 	air air-worker mocks dev log-pivox-app-macos run-app-macos build-app-macos ollama-serve \
 	lint-proto proto-format proto-breaking proto-generate \
 	proto-generate-go proto-generate-native build-grpc-swift-2-plugin api-lint \
+	lint-icons \
 	db-up db-down db-migrate db-force db-seed db-clear db-drop db-create \
 	docker-up docker-down firebase-deploy clean-fn-revisions \
 	proxy-nginx proxy-nginx-stop proxy-nginx-reload proxy-ngrok \
@@ -131,6 +132,15 @@ build-grpc-swift-2-plugin:
 
 api-lint:
 	$(TOOL) api-linter --proto-path=api/proto --config=api/proto/api-linter.yaml --set-exit-status api/proto/pivox/**/**/*.proto
+
+# lint-icons enforces the Icon-enum ↔ platform-map contract: every
+# value in api/proto/pivox/api/v1/icons.proto must have a matching
+# `case .X:` in each platform's icon map (today only the macOS SF
+# Symbol map at native/.../Dashboards/Icons/IconSymbol.swift; Windows
+# joins when that surface lands). Catches drift before it ships as a
+# silent UX gap (empty thumbnail, missing symbol, force-unwrap crash).
+lint-icons:
+	go run ./cmd/lint-icon-maps
 
 # Database
 
