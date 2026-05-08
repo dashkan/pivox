@@ -572,14 +572,13 @@ func (s *StorageGatewaysServer) CreateStorageSession(ctx context.Context, req *s
 		}
 	}
 
-	// Push SessionGrant to all connected gateways.
-	//
-	// TODO(#27 phase 3): the proto contract says "pushes to gateways
-	// in the target organization (NOT all gateways)." Today this still
-	// uses SendToAll because ConnectionManager has no SendToOrg yet.
-	// Phase 3 lands SendToOrg + the routing fix; until then,
-	// cross-org leakage of session tokens is the known gap that
-	// motivates the issue.
+	// Push SessionGrant scoped to the target org. Replaces the
+	// cross-org SendToAll broadcast that was the original gap #27
+	// motivates: a session minted for org A is now invisible to
+	// agents in any other org. ConnectionManager.SendToOrg uses the
+	// per-connection OrgID populated at handshake-registration time
+	// (`agent_service.go` Connect handler), so this is a constant-
+	// time filter — no DB lookup at send time.
 	grant := &agentv1.ControlMessage{
 		Id: uuid.New().String(),
 		Message: &agentv1.ControlMessage_SessionGrant{
@@ -590,7 +589,7 @@ func (s *StorageGatewaysServer) CreateStorageSession(ctx context.Context, req *s
 			},
 		},
 	}
-	s.conns.SendToAll(grant)
+	s.conns.SendToOrg(orgID, grant)
 
 	// Mint JWT.
 	jwt := mintSessionJWT(token, expiry, s.sessionSigningKey)

@@ -179,10 +179,14 @@ func TestIntegration_CreateStorageSession_OrgMemberGetsOrgWidePatterns(t *testin
 	gwWestID := env.seedGatewayWithFilesystemEndpoint(t, ctx, "acme", "gw-west", "archive")
 
 	env.conns.Register(&agentstream.AgentConnection{
-		AgentID: uuid.New(), GatewayID: gwEastID, Stream: env.stream,
+		AgentID: uuid.New(), GatewayID: gwEastID,
+		OrgID:  env.h.LookupOrgID(t, "acme"),
+		Stream: env.stream,
 	})
 	env.conns.Register(&agentstream.AgentConnection{
-		AgentID: uuid.New(), GatewayID: gwWestID, Stream: env.stream,
+		AgentID: uuid.New(), GatewayID: gwWestID,
+		OrgID:  env.h.LookupOrgID(t, "acme"),
+		Stream: env.stream,
 	})
 
 	// Owner is already the harness caller from SeedOwnedOrg.
@@ -228,7 +232,9 @@ func TestIntegration_CreateStorageSession_OrgMemberWithSpaceMembershipGetsOnlyOr
 
 	gwID := env.seedGatewayWithFilesystemEndpoint(t, ctx, "acme", "gw", "media")
 	env.conns.Register(&agentstream.AgentConnection{
-		AgentID: uuid.New(), GatewayID: gwID, Stream: env.stream,
+		AgentID: uuid.New(), GatewayID: gwID,
+		OrgID:  env.h.LookupOrgID(t, "acme"),
+		Stream: env.stream,
 	})
 
 	resp, err := env.gwClient.CreateStorageSession(ctx, &storagev1.CreateStorageSessionRequest{
@@ -275,7 +281,9 @@ func TestIntegration_CreateStorageSession_SpaceOnlyMemberGetsPerSpacePatterns(t 
 	beta := env.h.SeedOwnedSpace(t, "acme", "beta", "Beta")
 	gwID := env.seedGatewayWithFilesystemEndpoint(t, ctx, "acme", "gw", "media")
 	env.conns.Register(&agentstream.AgentConnection{
-		AgentID: uuid.New(), GatewayID: gwID, Stream: env.stream,
+		AgentID: uuid.New(), GatewayID: gwID,
+		OrgID:  acmeID,
+		Stream: env.stream,
 	})
 	_ = acmeOwned // acme setup done as acme's owner
 
@@ -341,6 +349,69 @@ func TestIntegration_CreateStorageSession_NoMembershipInParent(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, codes.PermissionDenied, status.Code(err),
 		"caller with no org_members AND no space_members in parent must be rejected")
+}
+
+// TestIntegration_CreateStorageSession_DoesNotLeakAcrossOrgs is the
+// load-bearing #27 phase 3 acceptance test: a SessionGrant minted
+// for org A must be visible ONLY to agents whose connection is
+// scoped to org A. An agent connected for an unrelated org B must
+// NOT see the grant — that's the cross-org broadcast leak the
+// original ticket motivates.
+//
+// Setup: two orgs, each with one gateway and one mock-connected
+// agent. The two agents register with their respective OrgIDs.
+// Caller is owner of `acme` (re-set explicitly because SeedOwnedOrg
+// of `other` flips the harness caller). The session-create call for
+// `acme` must produce a SessionGrant on the acme stream and NOT on
+// the other stream.
+func TestIntegration_CreateStorageSession_DoesNotLeakAcrossOrgs(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test")
+	}
+	ctx := context.Background()
+	env := newSessionTestEnv(t)
+
+	acmeStream := &recordingStream{}
+	otherStream := &recordingStream{}
+
+	// acme — owner becomes harness caller; agent registered.
+	acmeOwned := env.h.SeedOwnedOrg(t, "acme", "Acme Inc", "owner-noleak-acme")
+	acmeID := env.h.LookupOrgID(t, "acme")
+	acmeGwID := env.seedGatewayWithFilesystemEndpoint(t, ctx, "acme", "gw-acme", "media")
+	env.conns.Register(&agentstream.AgentConnection{
+		AgentID: uuid.New(), GatewayID: acmeGwID, OrgID: acmeID, Stream: acmeStream,
+	})
+
+	// other-org — owner becomes harness caller temporarily; agent
+	// registered for routing isolation.
+	_ = env.h.SeedOwnedOrg(t, "other", "Other", "owner-noleak-other")
+	otherID := env.h.LookupOrgID(t, "other")
+	otherGwID := env.seedGatewayWithFilesystemEndpoint(t, ctx, "other", "gw-other", "media")
+	env.conns.Register(&agentstream.AgentConnection{
+		AgentID: uuid.New(), GatewayID: otherGwID, OrgID: otherID, Stream: otherStream,
+	})
+
+	// Flip the harness caller back to acme's owner so the session
+	// creation succeeds (the bystander can't mint sessions for
+	// acme — they'd hit PermissionDenied, which is a different
+	// test path).
+	env.h.SetCaller(acmeOwned.Owner)
+
+	resp, err := env.gwClient.CreateStorageSession(ctx, &storagev1.CreateStorageSessionRequest{
+		Parent: "organizations/acme",
+	})
+	require.NoError(t, err)
+	assert.NotEmpty(t, resp.GetToken())
+
+	// The acme-scoped agent must have received the grant.
+	require.NotEmpty(t, acmeStream.sentSessionGrants(),
+		"agent in target org must receive the SessionGrant")
+
+	// The other-org agent must have received NOTHING. This is the
+	// load-bearing assertion: cross-org broadcast leakage closed.
+	assert.Empty(t, otherStream.sentSessionGrants(),
+		"agent in unrelated org must NOT receive the SessionGrant — "+
+			"cross-org broadcast leak (the original #27 motivator) is closed")
 }
 
 // TestIntegration_CreateStorageSession_ParentRequired confirms that

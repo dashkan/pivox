@@ -8,7 +8,6 @@ import (
 	agentv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/agent/v1"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 )
 
@@ -59,16 +58,16 @@ func TestRegisterAndUnregister(t *testing.T) {
 	// Register the agent.
 	mgr.Register(conn)
 
-	// Verify agent is tracked by sending a message to all.
+	// Verify agent is tracked by sending a message to its gateway.
 	msg := &agentv1.ControlMessage{Id: "test-1"}
-	sent := mgr.SendToAll(msg)
+	sent := mgr.SendToGateway(gatewayID, msg)
 	assert.Equal(t, 1, sent, "expected 1 agent to receive message after register")
 
 	// Unregister the agent.
 	mgr.Unregister(agentID)
 
 	// Verify agent is removed.
-	sent = mgr.SendToAll(msg)
+	sent = mgr.SendToGateway(gatewayID, msg)
 	assert.Equal(t, 0, sent, "expected 0 agents after unregister")
 }
 
@@ -120,35 +119,56 @@ func TestSendToGateway_ErrorStream(t *testing.T) {
 	assert.Len(t, healthy.sentMessages(), 1)
 }
 
-func TestSendToAll(t *testing.T) {
+// TestSendToOrg verifies that SendToOrg routes a ControlMessage only
+// to agents whose AgentConnection.OrgID matches, isolating cross-org
+// session grants. Load-bearing for #27 phase 3 — replaces the
+// previously-broadcast cross-org SessionGrant in CreateStorageSession.
+func TestSendToOrg(t *testing.T) {
 	mgr := NewConnectionManager()
 
-	const n = 5
-	streams := make([]*mockStream, n)
-	for i := range streams {
-		streams[i] = &mockStream{}
-		mgr.Register(&AgentConnection{
-			AgentID:   uuid.New(),
-			GatewayID: uuid.New(),
-			Stream:    streams[i],
-		})
-	}
+	orgA := uuid.New()
+	orgB := uuid.New()
 
-	msg := &agentv1.ControlMessage{Id: "broadcast"}
-	sent := mgr.SendToAll(msg)
-	require.Equal(t, n, sent, "expected all agents to receive message")
+	// Two agents in orgA (across two gateways), one agent in orgB.
+	streamA1 := &mockStream{}
+	streamA2 := &mockStream{}
+	streamB := &mockStream{}
 
-	for i, s := range streams {
-		msgs := s.sentMessages()
-		require.Len(t, msgs, 1, "stream %d should have 1 message", i)
-		assert.Equal(t, "broadcast", msgs[0].GetId())
-	}
+	mgr.Register(&AgentConnection{AgentID: uuid.New(), GatewayID: uuid.New(), OrgID: orgA, Stream: streamA1})
+	mgr.Register(&AgentConnection{AgentID: uuid.New(), GatewayID: uuid.New(), OrgID: orgA, Stream: streamA2})
+	mgr.Register(&AgentConnection{AgentID: uuid.New(), GatewayID: uuid.New(), OrgID: orgB, Stream: streamB})
+
+	msg := &agentv1.ControlMessage{Id: "org-a-grant"}
+	sent := mgr.SendToOrg(orgA, msg)
+	assert.Equal(t, 2, sent, "exactly the two orgA agents must have received the message")
+
+	assert.Len(t, streamA1.sentMessages(), 1)
+	assert.Len(t, streamA2.sentMessages(), 1)
+	assert.Empty(t, streamB.sentMessages(),
+		"orgB agent must NOT receive an orgA-scoped message — cross-org leakage closed")
 }
 
-func TestSendToAll_Empty(t *testing.T) {
+func TestSendToOrg_NoAgentsForOrg(t *testing.T) {
 	mgr := NewConnectionManager()
-	sent := mgr.SendToAll(&agentv1.ControlMessage{Id: "nobody"})
-	assert.Equal(t, 0, sent, "no agents registered, should send to 0")
+	mgr.Register(&AgentConnection{AgentID: uuid.New(), GatewayID: uuid.New(), OrgID: uuid.New(), Stream: &mockStream{}})
+
+	sent := mgr.SendToOrg(uuid.New(), &agentv1.ControlMessage{Id: "nobody-in-this-org"})
+	assert.Equal(t, 0, sent, "no agents in target org → 0 sent (not an error)")
+}
+
+func TestSendToOrg_ErrorStream(t *testing.T) {
+	mgr := NewConnectionManager()
+	org := uuid.New()
+
+	healthy := &mockStream{}
+	broken := &mockStream{err: errors.New("stream broken")}
+
+	mgr.Register(&AgentConnection{AgentID: uuid.New(), GatewayID: uuid.New(), OrgID: org, Stream: healthy})
+	mgr.Register(&AgentConnection{AgentID: uuid.New(), GatewayID: uuid.New(), OrgID: org, Stream: broken})
+
+	sent := mgr.SendToOrg(org, &agentv1.ControlMessage{Id: "err-msg"})
+	assert.Equal(t, 1, sent, "broken stream should not count as sent")
+	assert.Len(t, healthy.sentMessages(), 1)
 }
 
 func TestConcurrentAccess(t *testing.T) {
@@ -181,7 +201,7 @@ func TestConcurrentAccess(t *testing.T) {
 					mgr.SendToGateway(gw, &agentv1.ControlMessage{Id: "concurrent"})
 				}
 				if i%5 == 0 {
-					mgr.SendToAll(&agentv1.ControlMessage{Id: "all"})
+					mgr.SendToOrg(uuid.New(), &agentv1.ControlMessage{Id: "org-scoped"})
 				}
 
 				// Unregister half to exercise deletion under contention.
@@ -195,7 +215,8 @@ func TestConcurrentAccess(t *testing.T) {
 	wg.Wait()
 
 	// If we get here without a race detector complaint, the test passes.
-	// Verify the manager is in a consistent state: SendToAll should not panic.
-	sent := mgr.SendToAll(&agentv1.ControlMessage{Id: "final"})
+	// Verify the manager is in a consistent state: SendToGateway should
+	// not panic against the post-test state.
+	sent := mgr.SendToGateway(gw, &agentv1.ControlMessage{Id: "final"})
 	assert.GreaterOrEqual(t, sent, 0, "sent count should be non-negative")
 }

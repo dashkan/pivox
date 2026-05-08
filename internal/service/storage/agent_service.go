@@ -241,7 +241,12 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 	// -----------------------------------------------------------------------
 	// 8. Register connection and defer unregister on disconnect.
 	// -----------------------------------------------------------------------
-	s.conns.Register(&agentstream.AgentConnection{AgentID: agent.ID, GatewayID: gateway.ID, Stream: stream})
+	s.conns.Register(&agentstream.AgentConnection{
+		AgentID:   agent.ID,
+		GatewayID: gateway.ID,
+		OrgID:     gateway.OrgID,
+		Stream:    stream,
+	})
 	defer s.conns.Unregister(agent.ID)
 
 	// -----------------------------------------------------------------------
