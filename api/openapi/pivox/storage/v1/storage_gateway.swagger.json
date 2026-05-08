@@ -761,7 +761,7 @@
         },
         "token": {
           "type": "string",
-          "description": "The session JWT, also delivered as a Set-Cookie response header\nfor browser flows. Native clients (macOS, Windows) read this\nvalue from the response body and attach it as\n`Authorization: Bearer \u003ctoken\u003e` on subsequent storage requests."
+          "description": "The session JWT, also delivered as a Set-Cookie response header\nfor browser flows. Native clients (macOS, Windows) read this\nvalue from the response body and attach it as\n`Authorization: Bearer \u003ctoken\u003e` on subsequent storage requests.\n\nThe JWT is HS256-signed and carries the following claims:\n  - `token`: opaque session id (UUID); the storage agent looks\n    up the session's pattern grants by this value.\n  - `sub`: the caller's Pivox identity UUID. Lets gateway-side\n    audit logs attribute requests without a directory lookup.\n  - `org`: the target organization's slug; matches the SessionGrant\n    routing scope.\n  - `exp`: Unix-second expiry timestamp."
         }
       },
       "description": "The response returned from the\n[CreateStorageSession][pivox.storage.v1.StorageGateways.CreateStorageSession]\nmethod."

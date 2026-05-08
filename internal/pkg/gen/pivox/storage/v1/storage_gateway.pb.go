@@ -1526,6 +1526,15 @@ type CreateStorageSessionResponse struct {
 	// for browser flows. Native clients (macOS, Windows) read this
 	// value from the response body and attach it as
 	// `Authorization: Bearer <token>` on subsequent storage requests.
+	//
+	// The JWT is HS256-signed and carries the following claims:
+	//   - `token`: opaque session id (UUID); the storage agent looks
+	//     up the session's pattern grants by this value.
+	//   - `sub`: the caller's Pivox identity UUID. Lets gateway-side
+	//     audit logs attribute requests without a directory lookup.
+	//   - `org`: the target organization's slug; matches the SessionGrant
+	//     routing scope.
+	//   - `exp`: Unix-second expiry timestamp.
 	Token         string `protobuf:"bytes,2,opt,name=token,proto3" json:"token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

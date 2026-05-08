@@ -635,8 +635,11 @@ func (s *StorageGatewaysServer) CreateStorageSession(ctx context.Context, req *s
 	}
 	s.conns.SendToOrg(orgID, grant)
 
-	// Mint JWT.
-	jwt := mintSessionJWT(token, expiry, s.sessionSigningKey)
+	// Mint JWT. Claims include the caller's Pivox identity UUID
+	// (sub) and the target org's slug (org) so gateway-side audit
+	// logs can attribute requests without a directory lookup —
+	// see #27 phase 5.
+	jwt := mintSessionJWT(token, identityID.String(), orgSlug, expiry, s.sessionSigningKey)
 
 	// Set cookie via gRPC metadata for browser flows. The Domain
 	// attribute is conditional on s.cookieDomain being non-empty;
@@ -681,10 +684,39 @@ func validatePathSegment(s, kind string) error {
 	return nil
 }
 
-func mintSessionJWT(token string, expiry time.Time, signingKey []byte) string {
+// mintSessionJWT produces an HS256-signed JWT carrying the session
+// claims a Pivox storage session needs:
+//
+//   - token: the opaque session UUID. Agents look up granted access
+//     patterns by this value (the SessionGrant push carried the
+//     same string); cookie-based authorization on the agent's HTTP
+//     server splits on this claim.
+//   - sub: the caller's Pivox identity UUID. Lets gateway-side audit
+//     logs attribute requests without a directory lookup. Added in
+//     #27 phase 5. (RFC 7519 Subject claim — preferred over the
+//     issue's literal "user_id" so JWT-aware tooling sees the
+//     standard name.)
+//   - org: the target organization's slug. Same audit-attribution
+//     purpose as sub; also documents which org's pattern set the
+//     session is scoped to (matches the SessionGrant routing from
+//     #27 phase 3). Added in #27 phase 5.
+//   - exp: Unix-second expiry timestamp.
+//
+// Claims are emitted via json.Marshal of an explicit map rather
+// than fmt.Sprintf'd JSON: the inputs are safe today (UUIDs +
+// validated slugs), but Marshal is defense-in-depth against any
+// future caller passing strings that need JSON-escaping.
+func mintSessionJWT(token, identitySubject, orgSlug string, expiry time.Time, signingKey []byte) string {
 	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`))
-	claims := fmt.Sprintf(`{"token":"%s","exp":%d}`, token, expiry.Unix())
-	payload := base64.RawURLEncoding.EncodeToString([]byte(claims))
+
+	claims := map[string]any{
+		"token": token,
+		"sub":   identitySubject,
+		"org":   orgSlug,
+		"exp":   expiry.Unix(),
+	}
+	claimsBytes, _ := json.Marshal(claims) // map[string]any of UUIDs + slug + int64 cannot fail
+	payload := base64.RawURLEncoding.EncodeToString(claimsBytes)
 
 	mac := hmac.New(sha256.New, signingKey)
 	mac.Write([]byte(header + "." + payload))

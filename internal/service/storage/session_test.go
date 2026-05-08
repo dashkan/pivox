@@ -2,7 +2,10 @@ package storage_test
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -625,6 +628,62 @@ func TestIntegration_CreateStorageSession_CookieDomainAbsentWhenUnset(t *testing
 	assert.NotContains(t, cookies[0], "Domain=",
 		"Domain attribute MUST be omitted when CookieDomain is unset; "+
 			"cookie scopes to the response origin only (right default for self-hosted)")
+}
+
+// ---------------------------------------------------------------------------
+// #27 phase 5 — JWT identity claims
+// ---------------------------------------------------------------------------
+
+// decodeJWTClaims pulls the unverified payload out of a Pivox session
+// JWT and returns its claims map. The signature is NOT validated —
+// these tests are checking what the controller emits, not whether the
+// agent accepts it (that's phase 6's path). Mirrors the parsing shape
+// at internal/storageagent/http.go:validateJWT.
+func decodeJWTClaims(t *testing.T, jwt string) map[string]any {
+	t.Helper()
+	parts := strings.SplitN(jwt, ".", 3)
+	require.Len(t, parts, 3, "JWT must have 3 dot-separated parts")
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	require.NoError(t, err)
+	var claims map[string]any
+	require.NoError(t, json.Unmarshal(payload, &claims))
+	return claims
+}
+
+// TestIntegration_CreateStorageSession_JWTIncludesIdentityAndOrg is
+// the load-bearing #27 phase 5 acceptance test: the issued JWT
+// carries the caller's identity (`sub` claim) and the target org's
+// slug (`org` claim) so gateway-side audit logs can attribute
+// requests without a directory lookup. Existing claims (`token`,
+// `exp`) remain.
+func TestIntegration_CreateStorageSession_JWTIncludesIdentityAndOrg(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test")
+	}
+	ctx := context.Background()
+	env := newSessionTestEnv(t)
+	seedAcmeAndAgentForTTLTest(t, env)
+
+	// Capture the caller identity ID for the assertion.
+	callerIdentityID := env.h.CurrentCaller().IdentityID.String()
+
+	resp, err := env.gwClient.CreateStorageSession(ctx, &storagev1.CreateStorageSessionRequest{
+		Parent: "organizations/acme",
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, resp.GetToken())
+
+	claims := decodeJWTClaims(t, resp.GetToken())
+
+	// Existing claims preserved.
+	assert.NotEmpty(t, claims["token"], "opaque session token claim must remain — agents look up patterns by it")
+	assert.NotEmpty(t, claims["exp"], "expiry claim must remain")
+
+	// New phase-5 claims.
+	assert.Equal(t, callerIdentityID, claims["sub"],
+		"sub claim must carry the Pivox identity UUID of the caller — no directory lookup at the gateway")
+	assert.Equal(t, "acme", claims["org"],
+		"org claim must carry the target org's slug")
 }
 
 // silenceUnusedTimestamp keeps the timestamppb import required for
