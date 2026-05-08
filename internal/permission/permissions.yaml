@@ -146,6 +146,28 @@ permissions:
     display_name: Delete API Key
     description: Delete API keys
     roles: [owner, admin]
+  # Dashboards: org-level (SYSTEM_MANAGED) and space-level (USER_MANAGED)
+  # share a single permission set. Scope is enforced by the membership
+  # interceptor (org-members at org parent, space-members at space
+  # parent), not by separate permission names. Mutations on
+  # SYSTEM_MANAGED dashboards are rejected by the handler regardless
+  # of role — the data-driven guard, not IAM, is the lock.
+  - id: dashboards.read
+    display_name: Read Dashboards
+    description: View and list dashboards (covers both org-level system catalog and space-level user dashboards)
+    roles: [owner, admin, editor, viewer]
+  - id: dashboards.create
+    display_name: Create Dashboard
+    description: Create user-managed dashboards in a space. Owner/admin only — dashboards are workspace structure, not day-to-day content (matches spaces.create tier).
+    roles: [owner, admin]
+  - id: dashboards.update
+    display_name: Update Dashboard
+    description: Modify a user-managed dashboard. SYSTEM_MANAGED dashboards reject mutation regardless of role.
+    roles: [owner, admin]
+  - id: dashboards.delete
+    display_name: Delete Dashboard
+    description: Delete a user-managed dashboard. SYSTEM_MANAGED dashboards reject deletion regardless of role.
+    roles: [owner, admin]
   - id: domains.create
     display_name: Create Domain
     description: Claim a DNS domain for the organization

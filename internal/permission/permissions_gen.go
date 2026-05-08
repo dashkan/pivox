@@ -39,6 +39,10 @@ const (
 	ApiKeysRead                    = "apiKeys.read"
 	ApiKeysUpdate                  = "apiKeys.update"
 	ApiKeysDelete                  = "apiKeys.delete"
+	DashboardsRead                 = "dashboards.read"
+	DashboardsCreate               = "dashboards.create"
+	DashboardsUpdate               = "dashboards.update"
+	DashboardsDelete               = "dashboards.delete"
 	DomainsCreate                  = "domains.create"
 	DomainsRead                    = "domains.read"
 	DomainsDelete                  = "domains.delete"
@@ -127,6 +131,10 @@ var All = []string{
 	ApiKeysRead,
 	ApiKeysUpdate,
 	ApiKeysDelete,
+	DashboardsRead,
+	DashboardsCreate,
+	DashboardsUpdate,
+	DashboardsDelete,
 	DomainsCreate,
 	DomainsRead,
 	DomainsDelete,
@@ -215,6 +223,10 @@ var matrix = map[string]map[string]bool{
 		AssetsRequestsReject:           true,
 		AssetsRequestsSubmit:           true,
 		AssetsRequestsUpdate:           true,
+		DashboardsCreate:               true,
+		DashboardsDelete:               true,
+		DashboardsRead:                 true,
+		DashboardsUpdate:               true,
 		DomainsCreate:                  true,
 		DomainsDelete:                  true,
 		DomainsRead:                    true,
@@ -298,6 +310,10 @@ var matrix = map[string]map[string]bool{
 		AssetsRequestsReject:       true,
 		AssetsRequestsSubmit:       true,
 		AssetsRequestsUpdate:       true,
+		DashboardsCreate:           true,
+		DashboardsDelete:           true,
+		DashboardsRead:             true,
+		DashboardsUpdate:           true,
 		DomainsCreate:              true,
 		DomainsDelete:              true,
 		DomainsRead:                true,
@@ -368,6 +384,7 @@ var matrix = map[string]map[string]bool{
 		AssetsRequestsRead:     true,
 		AssetsRequestsSubmit:   true,
 		AssetsRequestsUpdate:   true,
+		DashboardsRead:         true,
 		GroupsRead:             true,
 		OrganizationsRead:      true,
 		RolesRead:              true,
@@ -387,6 +404,7 @@ var matrix = map[string]map[string]bool{
 		AssetsAssetsRead:      true,
 		AssetsLineItemsRead:   true,
 		AssetsRequestsRead:    true,
+		DashboardsRead:        true,
 		GroupsRead:            true,
 		OrganizationsRead:     true,
 		RolesRead:             true,

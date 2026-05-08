@@ -16,10 +16,109 @@
     "application/json"
   ],
   "paths": {
+    "/v1/organizations/{organization}/dashboards": {
+      "get": {
+        "summary": "Lists dashboards under a parent. The parent may be an organization\n(returns the system-curated catalog) or a space (returns\nuser-managed dashboards).",
+        "description": "The `dashboards.read` permission gates the verb regardless of\nparent scope; the membership interceptor ahead of it enforces\norg-membership at org parent and space-membership at space parent.",
+        "operationId": "Dashboards_ListDashboards",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListDashboardsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Optional. Maximum number of dashboards to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Optional. Page token from a previous ListDashboards call.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "filter",
+            "description": "Optional. An expression for filtering the results of the request.\nFilter rules are case insensitive. Filterable fields:\n\n+ `displayName`\n+ `createTime` (supports comparison operators)\n\nExamples:\n\n+ `displayName = \"Overview\"` — exact match on display name.\n+ `createTime \u003e \"2025-01-01T00:00:00Z\"` — created after date.\n\nFor more information, see [AIP-160](https://aip.dev/160).",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "description": "Optional. A comma-separated list of fields to order by. The default\norder is ascending. Use \"desc\" after a field name for descending.\nSupported fields:\n\n+ `displayName`\n+ `createTime`\n\nExample: `createTime desc, displayName`\n\nIf not specified, the results are ordered by `createTime` descending.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Dashboards"
+        ]
+      }
+    },
+    "/v1/organizations/{organization}/dashboards/{dashboard}": {
+      "get": {
+        "summary": "Retrieves a dashboard by name.",
+        "operationId": "Dashboards_GetDashboard",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Dashboard"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "dashboard",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Dashboards"
+        ]
+      }
+    },
     "/v1/organizations/{organization}/spaces/{space}/dashboards": {
       "get": {
-        "summary": "Lists dashboards in a space.",
-        "operationId": "Dashboards_ListDashboards",
+        "summary": "Lists dashboards under a parent. The parent may be an organization\n(returns the system-curated catalog) or a space (returns\nuser-managed dashboards).",
+        "description": "The `dashboards.read` permission gates the verb regardless of\nparent scope; the membership interceptor ahead of it enforces\norg-membership at org parent and space-membership at space parent.",
+        "operationId": "Dashboards_ListDashboards2",
         "responses": {
           "200": {
             "description": "A successful response.",
@@ -143,7 +242,7 @@
     "/v1/organizations/{organization}/spaces/{space}/dashboards/{dashboard}": {
       "get": {
         "summary": "Retrieves a dashboard by name.",
-        "operationId": "Dashboards_GetDashboard",
+        "operationId": "Dashboards_GetDashboard2",
         "responses": {
           "200": {
             "description": "A successful response.",
@@ -324,6 +423,11 @@
                     "type": "string"
                   },
                   "description": "Optional. Free-form annotations for the dashboard."
+                },
+                "managementMode": {
+                  "$ref": "#/definitions/DashboardManagementMode",
+                  "description": "Output only. Identifies whether this dashboard is server-curated\n(SYSTEM_MANAGED) or customer-owned (USER_MANAGED). Mutations of\nSYSTEM_MANAGED dashboards are rejected with FAILED_PRECONDITION\nregardless of URL path.\n\nMAINTAINER: `OUTPUT_ONLY` is documentation, not enforcement. The\nUpdateDashboard handler MUST reject any FieldMask path that names\nthis field with `INVALID_ARGUMENT`, otherwise a customer can flip\nthe management_mode and escape the SYSTEM_MANAGED mutation guard.",
+                  "readOnly": true
                 }
               },
               "title": "Required. The dashboard with updated fields.",
@@ -377,6 +481,38 @@
       ],
       "default": "CHART_TYPE_UNSPECIFIED",
       "description": "Chart visualization types.\n\n - CHART_TYPE_UNSPECIFIED: Unspecified chart type; defaults to LINE.\n - LINE: Line chart.\n - BAR: Bar chart.\n - AREA: Area chart.\n - STACKED_BAR: Stacked bar chart.\n - STACKED_AREA: Stacked area chart.\n - SCATTER: Scatter plot."
+    },
+    "CollectionWidgetDisplayMode": {
+      "type": "string",
+      "enum": [
+        "DISPLAY_MODE_UNSPECIFIED",
+        "TABLE",
+        "CARD"
+      ],
+      "default": "DISPLAY_MODE_UNSPECIFIED",
+      "description": "How the rows are visually arranged. The renderer picks layout\nprimitives per mode (e.g. `Table` for TABLE, a card grid for CARD).\n\n - DISPLAY_MODE_UNSPECIFIED: Default; the renderer picks based on `supported_modes` (first\nentry) or falls back to TABLE.\n - TABLE: Classic tabular rendering with sortable columns.\n - CARD: Card-grid rendering — each row becomes a card with thumbnail."
+    },
+    "DashboardManagementMode": {
+      "type": "string",
+      "enum": [
+        "MANAGEMENT_MODE_UNSPECIFIED",
+        "USER_MANAGED",
+        "SYSTEM_MANAGED"
+      ],
+      "default": "MANAGEMENT_MODE_UNSPECIFIED",
+      "description": "Identifies who owns the lifecycle of a dashboard. SYSTEM_MANAGED\ndashboards are server-curated and reject all mutations; USER_MANAGED\ndashboards are owned by the customer and support full CRUD.\n\n - MANAGEMENT_MODE_UNSPECIFIED: Default. Server handlers always populate this field on read,\nso UNSPECIFIED on the wire indicates a server bug, not a\nlegitimate state.\n - USER_MANAGED: Customer-owned. Full CRUD applies.\n - SYSTEM_MANAGED: Server-curated. Mutations are rejected with FAILED_PRECONDITION."
+    },
+    "IconConfigIconSize": {
+      "type": "string",
+      "enum": [
+        "ICON_SIZE_UNSPECIFIED",
+        "SMALL",
+        "MEDIUM",
+        "LARGE",
+        "EXTRA_LARGE"
+      ],
+      "default": "ICON_SIZE_UNSPECIFIED",
+      "description": "Display size hint for the leading icon. The renderer maps each\nbucket to a platform-appropriate point size.\n\n - ICON_SIZE_UNSPECIFIED: Default; renderer picks a context-appropriate size.\n - SMALL: Compact size — typical for inline list rows.\n - MEDIUM: Default mid-size — typical for card thumbnails.\n - LARGE: Larger thumbnail emphasis.\n - EXTRA_LARGE: Hero-size thumbnail; used for empty-state and primary tiles."
     },
     "PieChartWidgetPieChartType": {
       "type": "string",
@@ -441,6 +577,33 @@
         }
       },
       "description": "The `Status` type defines a logical error model that is suitable for\ndifferent programming environments, including REST APIs and RPC APIs. It is\nused by [gRPC](https://github.com/grpc). Each `Status` message contains\nthree pieces of data: error code, error message, and error details.\n\nYou can find out more about this error model and how to work with it in the\n[API Design Guide](https://cloud.google.com/apis/design/errors)."
+    },
+    "typeColor": {
+      "type": "object",
+      "properties": {
+        "red": {
+          "type": "number",
+          "format": "float",
+          "description": "The amount of red in the color as a value in the interval [0, 1]."
+        },
+        "green": {
+          "type": "number",
+          "format": "float",
+          "description": "The amount of green in the color as a value in the interval [0, 1]."
+        },
+        "blue": {
+          "type": "number",
+          "format": "float",
+          "description": "The amount of blue in the color as a value in the interval [0, 1]."
+        },
+        "alpha": {
+          "type": "number",
+          "format": "float",
+          "description": "`pixel color = alpha * (this color) + (1.0 - alpha) * (background color)`\n\nThis means that a value of 1.0 corresponds to a solid color, whereas\na value of 0.0 corresponds to a completely transparent color. This\nuses a wrapper message rather than a simple float scalar so that it is\npossible to distinguish between a default value and the value being unset.\nIf omitted, this color object is rendered as a solid color\n(as if the alpha value had been explicitly given a value of 1.0).",
+          "title": "The fraction of this color that should be applied to the pixel. That is,\nthe final pixel color is defined by the equation:"
+        }
+      },
+      "description": "Represents a color in the RGBA color space. This representation is designed\nfor simplicity of conversion to/from color representations in various\nlanguages over compactness. For example, the fields of this representation\ncan be trivially provided to the constructor of `java.awt.Color` in Java; it\ncan also be trivially provided to UIColor's `+colorWithRed:green:blue:alpha`\nmethod in iOS; and, with just a little work, it can be easily formatted into\na CSS `rgba()` string in JavaScript.\n\nThis reference page doesn't carry information about the absolute color\nspace\nthat should be used to interpret the RGB value (e.g. sRGB, Adobe RGB,\nDCI-P3, BT.2020, etc.). By default, applications should assume the sRGB color\nspace.\n\nWhen color equality needs to be decided, implementations, unless\ndocumented otherwise, treat two colors as equal if all their red,\ngreen, blue, and alpha values each differ by at most 1e-5.\n\nExample (Java):\n\n     import com.google.type.Color;\n\n     // ...\n     public static java.awt.Color fromProto(Color protocolor) {\n       float alpha = protocolor.hasAlpha()\n           ? protocolor.getAlpha().getValue()\n           : 1.0;\n\n       return new java.awt.Color(\n           protocolor.getRed(),\n           protocolor.getGreen(),\n           protocolor.getBlue(),\n           alpha);\n     }\n\n     public static Color toProto(java.awt.Color color) {\n       float red = (float) color.getRed();\n       float green = (float) color.getGreen();\n       float blue = (float) color.getBlue();\n       float denominator = 255.0;\n       Color.Builder resultBuilder =\n           Color\n               .newBuilder()\n               .setRed(red / denominator)\n               .setGreen(green / denominator)\n               .setBlue(blue / denominator);\n       int alpha = color.getAlpha();\n       if (alpha != 255) {\n         result.setAlpha(\n             FloatValue\n                 .newBuilder()\n                 .setValue(((float) alpha) / denominator)\n                 .build());\n       }\n       return resultBuilder.build();\n     }\n     // ...\n\nExample (iOS / Obj-C):\n\n     // ...\n     static UIColor* fromProto(Color* protocolor) {\n        float red = [protocolor red];\n        float green = [protocolor green];\n        float blue = [protocolor blue];\n        FloatValue* alpha_wrapper = [protocolor alpha];\n        float alpha = 1.0;\n        if (alpha_wrapper != nil) {\n          alpha = [alpha_wrapper value];\n        }\n        return [UIColor colorWithRed:red green:green blue:blue alpha:alpha];\n     }\n\n     static Color* toProto(UIColor* color) {\n         CGFloat red, green, blue, alpha;\n         if (![color getRed:\u0026red green:\u0026green blue:\u0026blue alpha:\u0026alpha]) {\n           return nil;\n         }\n         Color* result = [[Color alloc] init];\n         [result setRed:red];\n         [result setGreen:green];\n         [result setBlue:blue];\n         if (alpha \u003c= 0.9999) {\n           [result setAlpha:floatWrapperWithValue(alpha)];\n         }\n         [result autorelease];\n         return result;\n    }\n    // ...\n\n Example (JavaScript):\n\n    // ...\n\n    var protoToCssColor = function(rgb_color) {\n       var redFrac = rgb_color.red || 0.0;\n       var greenFrac = rgb_color.green || 0.0;\n       var blueFrac = rgb_color.blue || 0.0;\n       var red = Math.floor(redFrac * 255);\n       var green = Math.floor(greenFrac * 255);\n       var blue = Math.floor(blueFrac * 255);\n\n       if (!('alpha' in rgb_color)) {\n          return rgbToCssColor(red, green, blue);\n       }\n\n       var alphaFrac = rgb_color.alpha.value || 0.0;\n       var rgbParams = [red, green, blue].join(',');\n       return ['rgba(', rgbParams, ',', alphaFrac, ')'].join('');\n    };\n\n    var rgbToCssColor = function(red, green, blue) {\n      var rgbNumber = new Number((red \u003c\u003c 16) | (green \u003c\u003c 8) | blue);\n      var hexString = rgbNumber.toString(16);\n      var missingZeros = 6 - hexString.length;\n      var resultBuilder = ['#'];\n      for (var i = 0; i \u003c missingZeros; i++) {\n         resultBuilder.push('0');\n      }\n      resultBuilder.push(hexString);\n      return resultBuilder.join('');\n    };\n\n    // ..."
     },
     "v1AbsoluteTimeRange": {
       "type": "object",
@@ -511,8 +674,8 @@
           "description": "Optional. The display label for this series."
         },
         "color": {
-          "type": "string",
-          "description": "Optional. The color for this series (CSS color)."
+          "$ref": "#/definitions/typeColor",
+          "description": "Optional. The color for this series."
         }
       },
       "description": "ChartDataSet is a single data series within a ChartWidget.",
@@ -557,12 +720,94 @@
         "dataSets"
       ]
     },
+    "v1CollectionWidget": {
+      "type": "object",
+      "properties": {
+        "dataSource": {
+          "$ref": "#/definitions/v1DataSource",
+          "description": "Required. The data source for collection rows."
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Column"
+          },
+          "description": "Optional. Column definitions. If empty, columns are auto-detected."
+        },
+        "rowsPerPage": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Optional. Number of rows per page. Defaults to server-chosen value."
+        },
+        "displayMode": {
+          "$ref": "#/definitions/CollectionWidgetDisplayMode",
+          "description": "Optional. The current display mode for the widget. If unset, the\nrenderer treats this as DISPLAY_MODE_UNSPECIFIED and picks based\non `supported_modes`."
+        },
+        "supportedModes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CollectionWidgetDisplayMode"
+          },
+          "description": "Optional. Modes the customer can switch between via the safe-edit\nUI. If empty, the widget is locked to `display_mode`. Modes not\nlisted are not user-selectable even if the renderer can render\nthem.\n\nMode-selection matrix (worked examples):\n\n  display_mode=UNSPECIFIED, supported_modes=[]\n    → renderer picks TABLE (single mode, no toggle UI).\n\n  display_mode=UNSPECIFIED, supported_modes=[CARD, TABLE]\n    → renderer picks CARD (first listed); user can toggle to TABLE.\n\n  display_mode=CARD, supported_modes=[]\n    → locked to CARD; user cannot toggle.\n\n  display_mode=TABLE, supported_modes=[CARD, TABLE]\n    → starts at TABLE; user can toggle between TABLE and CARD."
+        },
+        "rowActions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1RowAction"
+          },
+          "description": "Optional. Per-row actions exposed by the renderer (e.g. \"open\",\n\"share\", \"archive\"). Populated by the server template per resource\ntype."
+        },
+        "iconConfig": {
+          "$ref": "#/definitions/v1IconConfig",
+          "description": "Optional. How to derive each row's leading icon / thumbnail."
+        },
+        "emptyState": {
+          "$ref": "#/definitions/v1EmptyState",
+          "description": "Optional. Content displayed when the data source returns no rows."
+        }
+      },
+      "description": "CollectionWidget displays a collection of rows in one of several\ndisplay modes (table, card grid). The same data source feeds every\nmode; switching modes is a presentation concern handled by the\nclient renderer.\n\nNaming note: the widget is mode-agnostic by design. New display\nmodes (e.g. a vertical list with leading icon and trailing detail)\nget added to `DisplayMode` only when a concrete consumer plus a\nrenderer implementation land in the same change. Shipping an enum\nvalue the renderer can't handle creates a silent downgrade; don't.",
+      "required": [
+        "dataSource"
+      ]
+    },
+    "v1Column": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "type": "string",
+          "description": "Required. The field name from the data source."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Optional. The display name for the column header."
+        },
+        "visible": {
+          "type": "boolean",
+          "description": "Optional. Whether this column is visible. Defaults to true."
+        },
+        "sortable": {
+          "type": "boolean",
+          "description": "Optional. Whether the customer can sort by this column."
+        },
+        "filterable": {
+          "type": "boolean",
+          "description": "Optional. Whether the customer can filter on this column. May be\ncombined with `visible = false` to expose a filterable-but-hidden\nfield."
+        }
+      },
+      "description": "Column defines a column in a CollectionWidget. The same column set\ndescribes the data shape across every display mode (TABLE, CARD,\n…) — TABLE renders columns as headers, CARD picks the marked\ncolumns to surface on the card face, and so on.\n\nA column may participate in user-driven sorting and filtering even\nif it is not visually rendered: a column with `visible = false,\nfilterable = true` exposes a filterable field that the customer can\nquery without the column ever appearing in TABLE mode.",
+      "required": [
+        "field"
+      ]
+    },
     "v1Dashboard": {
       "type": "object",
       "properties": {
         "name": {
           "type": "string",
-          "title": "Immutable. The resource name of the dashboard.\nFormat: `organizations/{organization}/spaces/{space}/dashboards/{dashboard}`"
+          "description": "Immutable. The resource name of the dashboard.\nFormat: `organizations/{organization}/dashboards/{dashboard}` or\n        `organizations/{organization}/spaces/{space}/dashboards/{dashboard}`."
         },
         "displayName": {
           "type": "string",
@@ -607,9 +852,14 @@
             "type": "string"
           },
           "description": "Optional. Free-form annotations for the dashboard."
+        },
+        "managementMode": {
+          "$ref": "#/definitions/DashboardManagementMode",
+          "description": "Output only. Identifies whether this dashboard is server-curated\n(SYSTEM_MANAGED) or customer-owned (USER_MANAGED). Mutations of\nSYSTEM_MANAGED dashboards are rejected with FAILED_PRECONDITION\nregardless of URL path.\n\nMAINTAINER: `OUTPUT_ONLY` is documentation, not enforcement. The\nUpdateDashboard handler MUST reject any FieldMask path that names\nthis field with `INVALID_ARGUMENT`, otherwise a customer can flip\nthe management_mode and escape the SYSTEM_MANAGED mutation guard.",
+          "readOnly": true
         }
       },
-      "description": "A custom dashboard belonging to a space.",
+      "description": "A dashboard at the organization or space scope.",
       "required": [
         "displayName"
       ]
@@ -656,6 +906,28 @@
       },
       "description": "DataSource defines where a widget gets its data. Extensible via the `source`\noneof — new source types (SQL, external APIs) can be added later."
     },
+    "v1EmptyState": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Optional. Headline shown above the subtitle."
+        },
+        "subtitle": {
+          "type": "string",
+          "description": "Optional. Secondary line of explanatory copy."
+        },
+        "icon": {
+          "$ref": "#/definitions/v1Icon",
+          "description": "Optional. Cross-platform semantic icon shown above the title."
+        },
+        "primaryAction": {
+          "$ref": "#/definitions/v1RowAction",
+          "description": "Optional. The primary call-to-action presented in the empty state\n(e.g. an \"Upload\" or \"Invite\" button)."
+        }
+      },
+      "description": "EmptyState is shown when a CollectionWidget's data source returns\nzero rows. It is purely presentational — the renderer composes the\ntitle, subtitle, icon, and primary action."
+    },
     "v1GridLayout": {
       "type": "object",
       "properties": {
@@ -674,6 +946,74 @@
         }
       },
       "description": "GridLayout positions tiles on a column-based grid. Maps to react-grid-layout."
+    },
+    "v1Icon": {
+      "type": "string",
+      "enum": [
+        "ICON_UNSPECIFIED",
+        "ICON_DOCUMENT",
+        "ICON_FOLDER",
+        "ICON_PHOTO",
+        "ICON_VIDEO",
+        "ICON_AUDIO",
+        "ICON_CODE",
+        "ICON_ARCHIVE",
+        "ICON_PERSON",
+        "ICON_PEOPLE",
+        "ICON_ORGANIZATION",
+        "ICON_SHARE",
+        "ICON_TRASH",
+        "ICON_TAG",
+        "ICON_PIN",
+        "ICON_STAR",
+        "ICON_DOWNLOAD",
+        "ICON_UPLOAD",
+        "ICON_COPY",
+        "ICON_EDIT",
+        "ICON_CHECK",
+        "ICON_X_MARK",
+        "ICON_WARNING",
+        "ICON_INFO",
+        "ICON_LOCK",
+        "ICON_UNLOCKED",
+        "ICON_ELLIPSIS",
+        "ICON_PLUS",
+        "ICON_MINUS",
+        "ICON_SETTINGS",
+        "ICON_SEARCH"
+      ],
+      "default": "ICON_UNSPECIFIED",
+      "description": "Icon is a curated cross-platform semantic icon catalog. Renderers map\neach value to a platform-native icon (SF Symbols on macOS, Fluent\nSystem Icons on Windows, equivalent on the web). The enum is purely\nsemantic — variants like filled vs. outlined are chosen by the\nrenderer based on context.\n\nNumeric values are partitioned into thousand-blocks per category.\nWithin a category, values are sequential: enum numbers are wire\nidentifiers, not display order, so middle-of-category alphabetical\ninsertion isn't an invariant. Pre-prod freedom permits reordering\nthe source list (and renumbering) until the first paying customer\npersists a row that references one of these values.\n\nNew icons must be added in three places at once: this enum, the\nmacOS SF Symbol map, and the WinUI Fluent map. CI lint catches\ndrift.\n\nCategories (thousand-block ranges):\n\n  * File / content types   — 1xxx\n  * Identity               — 2xxx\n  * Actions                — 3xxx\n  * Status                 — 4xxx\n  * Navigation             — 5xxx\n\n - ICON_UNSPECIFIED: Default value when no icon is specified. Renderers may pick an\nappropriate fallback.\n - ICON_DOCUMENT: Generic document. (File / content types.)\n - ICON_FOLDER: A folder or container.\n - ICON_PHOTO: A photograph or raster image.\n - ICON_VIDEO: A video clip.\n - ICON_AUDIO: An audio clip.\n - ICON_CODE: Source code or a code snippet.\n - ICON_ARCHIVE: An archive (zip, tar, etc.).\n - ICON_PERSON: A single person / individual user. (Identity.)\n - ICON_PEOPLE: A group of people.\n - ICON_ORGANIZATION: An organization, company, or team.\n - ICON_SHARE: Share an item. (Actions.)\n - ICON_TRASH: Move to trash / delete.\n - ICON_TAG: A tag / label.\n - ICON_PIN: Pin an item to a position.\n - ICON_STAR: Mark an item as starred / favorite.\n - ICON_DOWNLOAD: Download an item.\n - ICON_UPLOAD: Upload an item.\n - ICON_COPY: Copy / duplicate an item.\n - ICON_EDIT: Edit / modify an item.\n - ICON_CHECK: Success / completed indicator. (Status.)\n - ICON_X_MARK: Close / dismiss / failure indicator.\n - ICON_WARNING: Warning indicator.\n - ICON_INFO: Informational indicator.\n - ICON_LOCK: Locked state.\n - ICON_UNLOCKED: Unlocked state.\n - ICON_ELLIPSIS: Overflow / \"more options\" indicator (typically `…`). (Navigation.)\n - ICON_PLUS: Add / create.\n - ICON_MINUS: Remove / subtract.\n - ICON_SETTINGS: Settings / configuration.\n - ICON_SEARCH: Search."
+    },
+    "v1IconConfig": {
+      "type": "object",
+      "properties": {
+        "sourceField": {
+          "type": "string",
+          "description": "Optional. Name of the row field whose value is a thumbnail URL.\nWhen set and non-empty, the renderer fetches the image (subject to\ngateway-host bearer-token attachment)."
+        },
+        "iconField": {
+          "type": "string",
+          "description": "Optional. Name of the row field whose value is the numeric\n`Icon` enum value (e.g. `1002` for `ICON_PHOTO`). Encoded as the\nwire integer rather than the symbolic name so renaming an `Icon`\nvalue never silently breaks persisted dashboards. Server handlers\nsynthesize this per row."
+        },
+        "initialsField": {
+          "type": "string",
+          "description": "Optional. Name of the row field whose value is used to derive\ninitials when no thumbnail or semantic icon is available\n(typically \"display_name\" or \"name\")."
+        },
+        "fallbackIcon": {
+          "$ref": "#/definitions/v1Icon",
+          "description": "Optional. The static fallback icon used when none of\n`source_field` / `icon_field` / `initials_field` produces a value."
+        },
+        "size": {
+          "$ref": "#/definitions/IconConfigIconSize",
+          "description": "Optional. The size hint for the leading icon — applies to whichever\nderivation path resolved."
+        },
+        "fallbackColor": {
+          "$ref": "#/definitions/typeColor",
+          "description": "Optional. Background color for the icon backplate. Renderer-honored\nwhen icon or initials are shown without a thumbnail."
+        }
+      },
+      "description": "IconConfig describes how to derive the leading icon / thumbnail for\neach row in a CollectionWidget. The four derivation paths\n(`source_field` → `icon_field` → `initials_field` → `fallback_icon`)\nare tried in order: the first one that produces a value wins.\n`size` and `fallback_color` are presentation knobs that apply to\nwhichever derivation path resolves."
     },
     "v1ListDashboardsResponse": {
       "type": "object",
@@ -780,6 +1120,31 @@
         "resourceType"
       ]
     },
+    "v1RowAction": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "Required. Well-known action key. Maps client-side to the actual\nbehavior. Examples: \"open_detail\", \"share\", \"archive\", \"delete\".\n\nThe pattern constraint keeps keys safe to use as renderer\ndispatch-table keys and prevents typos like \"Open Detail\" leaking\ninto wire data."
+        },
+        "label": {
+          "type": "string",
+          "description": "Optional. The display label shown in menus / buttons."
+        },
+        "icon": {
+          "$ref": "#/definitions/v1Icon",
+          "description": "Optional. Cross-platform semantic icon for this action."
+        },
+        "requiresConfirmation": {
+          "type": "boolean",
+          "description": "Optional. If true, the renderer presents a confirmation prompt\nbefore executing this action."
+        }
+      },
+      "description": "RowAction describes an action exposed on each row of a\nCollectionWidget. The `key` is a well-known string the renderer\nmaps to a platform UI behavior (e.g. \"open_detail\" → push detail\nsheet, \"share\" → present share dialog). The renderer owns the\ndispatch table; the server only declares which actions are\navailable.",
+      "required": [
+        "key"
+      ]
+    },
     "v1SectionHeader": {
       "type": "object",
       "properties": {
@@ -856,53 +1221,6 @@
         "dataSource"
       ]
     },
-    "v1TableColumn": {
-      "type": "object",
-      "properties": {
-        "field": {
-          "type": "string",
-          "description": "Required. The field name from the data source."
-        },
-        "displayName": {
-          "type": "string",
-          "description": "Optional. The display name for the column header."
-        },
-        "visible": {
-          "type": "boolean",
-          "description": "Optional. Whether this column is visible. Defaults to true."
-        }
-      },
-      "description": "TableColumn defines a column in a TableWidget.",
-      "required": [
-        "field"
-      ]
-    },
-    "v1TableWidget": {
-      "type": "object",
-      "properties": {
-        "dataSource": {
-          "$ref": "#/definitions/v1DataSource",
-          "description": "Required. The data source for table rows."
-        },
-        "columns": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/v1TableColumn"
-          },
-          "description": "Optional. Column definitions. If empty, columns are auto-detected."
-        },
-        "rowsPerPage": {
-          "type": "integer",
-          "format": "int32",
-          "description": "Optional. Number of rows per page. Defaults to server-chosen value."
-        }
-      },
-      "description": "TableWidget displays data in a tabular format.",
-      "required": [
-        "dataSource"
-      ]
-    },
     "v1TextWidget": {
       "type": "object",
       "properties": {
@@ -929,8 +1247,8 @@
           "description": "Required. The threshold value."
         },
         "color": {
-          "type": "string",
-          "description": "Optional. The color to use when the threshold is triggered (CSS color)."
+          "$ref": "#/definitions/typeColor",
+          "description": "Optional. The color to use when the threshold is triggered."
         },
         "direction": {
           "$ref": "#/definitions/ThresholdDirection",
@@ -1016,9 +1334,9 @@
           "$ref": "#/definitions/v1ChartWidget",
           "description": "An XY chart (line, bar, area, etc.)."
         },
-        "table": {
-          "$ref": "#/definitions/v1TableWidget",
-          "description": "A data table."
+        "collection": {
+          "$ref": "#/definitions/v1CollectionWidget",
+          "description": "A collection of resources rendered in one of several display\nmodes (table, card grid, …)."
         },
         "pieChart": {
           "$ref": "#/definitions/v1PieChartWidget",

@@ -127,13 +127,31 @@ extension Pivox_Api_V1_Dashboards {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Manages custom dashboards within a space.
+    /// > Manages dashboards at the organization and space scopes.
+    /// > 
+    /// > Dashboards come in two flavors, distinguished by `Dashboard.management_mode`:
+    /// > 
+    /// > * SYSTEM_MANAGED — server-curated dashboards (e.g. the org-level
+    /// >   Library, Activity, Members views). Listed and read by all flows;
+    /// >   mutations are rejected.
+    /// > * USER_MANAGED — customer-owned dashboards. Full CRUD applies.
+    /// > 
+    /// > In v1 every org-level dashboard is SYSTEM_MANAGED; every space-level
+    /// > dashboard is USER_MANAGED. The mutation guard is data-driven, not
+    /// > path-driven — Create/Update/Delete refuse a SYSTEM_MANAGED target
+    /// > regardless of which URL the request came in on.
     public protocol ClientProtocol: Sendable {
         /// Call the "ListDashboards" method.
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Lists dashboards in a space.
+        /// > Lists dashboards under a parent. The parent may be an organization
+        /// > (returns the system-curated catalog) or a space (returns
+        /// > user-managed dashboards).
+        /// > 
+        /// > The `dashboards.read` permission gates the verb regardless of
+        /// > parent scope; the membership interceptor ahead of it enforces
+        /// > org-membership at org parent and space-membership at space parent.
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Pivox_Api_V1_ListDashboardsRequest` message.
@@ -253,7 +271,19 @@ extension Pivox_Api_V1_Dashboards {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Manages custom dashboards within a space.
+    /// > Manages dashboards at the organization and space scopes.
+    /// > 
+    /// > Dashboards come in two flavors, distinguished by `Dashboard.management_mode`:
+    /// > 
+    /// > * SYSTEM_MANAGED — server-curated dashboards (e.g. the org-level
+    /// >   Library, Activity, Members views). Listed and read by all flows;
+    /// >   mutations are rejected.
+    /// > * USER_MANAGED — customer-owned dashboards. Full CRUD applies.
+    /// > 
+    /// > In v1 every org-level dashboard is SYSTEM_MANAGED; every space-level
+    /// > dashboard is USER_MANAGED. The mutation guard is data-driven, not
+    /// > path-driven — Create/Update/Delete refuse a SYSTEM_MANAGED target
+    /// > regardless of which URL the request came in on.
     public struct Client<Transport>: ClientProtocol where Transport: GRPCCore.ClientTransport {
         private let client: GRPCCore.GRPCClient<Transport>
 
@@ -269,7 +299,13 @@ extension Pivox_Api_V1_Dashboards {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Lists dashboards in a space.
+        /// > Lists dashboards under a parent. The parent may be an organization
+        /// > (returns the system-curated catalog) or a space (returns
+        /// > user-managed dashboards).
+        /// > 
+        /// > The `dashboards.read` permission gates the verb regardless of
+        /// > parent scope; the membership interceptor ahead of it enforces
+        /// > org-membership at org parent and space-membership at space parent.
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Pivox_Api_V1_ListDashboardsRequest` message.
@@ -444,7 +480,13 @@ extension Pivox_Api_V1_Dashboards.ClientProtocol {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Lists dashboards in a space.
+    /// > Lists dashboards under a parent. The parent may be an organization
+    /// > (returns the system-curated catalog) or a space (returns
+    /// > user-managed dashboards).
+    /// > 
+    /// > The `dashboards.read` permission gates the verb regardless of
+    /// > parent scope; the membership interceptor ahead of it enforces
+    /// > org-membership at org parent and space-membership at space parent.
     ///
     /// - Parameters:
     ///   - request: A request containing a single `Pivox_Api_V1_ListDashboardsRequest` message.
@@ -593,7 +635,13 @@ extension Pivox_Api_V1_Dashboards.ClientProtocol {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Lists dashboards in a space.
+    /// > Lists dashboards under a parent. The parent may be an organization
+    /// > (returns the system-curated catalog) or a space (returns
+    /// > user-managed dashboards).
+    /// > 
+    /// > The `dashboards.read` permission gates the verb regardless of
+    /// > parent scope; the membership interceptor ahead of it enforces
+    /// > org-membership at org parent and space-membership at space parent.
     ///
     /// - Parameters:
     ///   - message: request message to send.

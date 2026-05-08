@@ -129,13 +129,14 @@ public struct Pivox_Api_V1_Widget: @unchecked Sendable {
     set {_uniqueStorage()._content = .chart(newValue)}
   }
 
-  /// A data table.
-  public var table: Pivox_Api_V1_TableWidget {
+  /// A collection of resources rendered in one of several display
+  /// modes (table, card grid, …).
+  public var collection: Pivox_Api_V1_CollectionWidget {
     get {
-      if case .table(let v)? = _storage._content {return v}
-      return Pivox_Api_V1_TableWidget()
+      if case .collection(let v)? = _storage._content {return v}
+      return Pivox_Api_V1_CollectionWidget()
     }
-    set {_uniqueStorage()._content = .table(newValue)}
+    set {_uniqueStorage()._content = .collection(newValue)}
   }
 
   /// A pie or donut chart.
@@ -174,8 +175,9 @@ public struct Pivox_Api_V1_Widget: @unchecked Sendable {
     case statistic(Pivox_Api_V1_StatisticWidget)
     /// An XY chart (line, bar, area, etc.).
     case chart(Pivox_Api_V1_ChartWidget)
-    /// A data table.
-    case table(Pivox_Api_V1_TableWidget)
+    /// A collection of resources rendered in one of several display
+    /// modes (table, card grid, …).
+    case collection(Pivox_Api_V1_CollectionWidget)
     /// A pie or donut chart.
     case pieChart(Pivox_Api_V1_PieChartWidget)
     /// Rich text or markdown content.
@@ -334,33 +336,154 @@ public struct Pivox_Api_V1_ChartWidget: Sendable {
   fileprivate var _yAxis: Pivox_Api_V1_AxisConfig? = nil
 }
 
-/// TableWidget displays data in a tabular format.
-public struct Pivox_Api_V1_TableWidget: Sendable {
+/// CollectionWidget displays a collection of rows in one of several
+/// display modes (table, card grid). The same data source feeds every
+/// mode; switching modes is a presentation concern handled by the
+/// client renderer.
+///
+/// Naming note: the widget is mode-agnostic by design. New display
+/// modes (e.g. a vertical list with leading icon and trailing detail)
+/// get added to `DisplayMode` only when a concrete consumer plus a
+/// renderer implementation land in the same change. Shipping an enum
+/// value the renderer can't handle creates a silent downgrade; don't.
+public struct Pivox_Api_V1_CollectionWidget: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Required. The data source for table rows.
+  /// Required. The data source for collection rows.
   public var dataSource: Pivox_Api_V1_DataSource {
-    get {_dataSource ?? Pivox_Api_V1_DataSource()}
-    set {_dataSource = newValue}
+    get {_storage._dataSource ?? Pivox_Api_V1_DataSource()}
+    set {_uniqueStorage()._dataSource = newValue}
   }
   /// Returns true if `dataSource` has been explicitly set.
-  public var hasDataSource: Bool {self._dataSource != nil}
+  public var hasDataSource: Bool {_storage._dataSource != nil}
   /// Clears the value of `dataSource`. Subsequent reads from it will return its default value.
-  public mutating func clearDataSource() {self._dataSource = nil}
+  public mutating func clearDataSource() {_uniqueStorage()._dataSource = nil}
 
   /// Optional. Column definitions. If empty, columns are auto-detected.
-  public var columns: [Pivox_Api_V1_TableColumn] = []
+  public var columns: [Pivox_Api_V1_Column] {
+    get {_storage._columns}
+    set {_uniqueStorage()._columns = newValue}
+  }
 
   /// Optional. Number of rows per page. Defaults to server-chosen value.
-  public var rowsPerPage: Int32 = 0
+  public var rowsPerPage: Int32 {
+    get {_storage._rowsPerPage}
+    set {_uniqueStorage()._rowsPerPage = newValue}
+  }
+
+  /// Optional. The current display mode for the widget. If unset, the
+  /// renderer treats this as DISPLAY_MODE_UNSPECIFIED and picks based
+  /// on `supported_modes`.
+  public var displayMode: Pivox_Api_V1_CollectionWidget.DisplayMode {
+    get {_storage._displayMode}
+    set {_uniqueStorage()._displayMode = newValue}
+  }
+
+  /// Optional. Modes the customer can switch between via the safe-edit
+  /// UI. If empty, the widget is locked to `display_mode`. Modes not
+  /// listed are not user-selectable even if the renderer can render
+  /// them.
+  ///
+  /// Mode-selection matrix (worked examples):
+  ///
+  ///   display_mode=UNSPECIFIED, supported_modes=[]
+  ///     → renderer picks TABLE (single mode, no toggle UI).
+  ///
+  ///   display_mode=UNSPECIFIED, supported_modes=[CARD, TABLE]
+  ///     → renderer picks CARD (first listed); user can toggle to TABLE.
+  ///
+  ///   display_mode=CARD, supported_modes=[]
+  ///     → locked to CARD; user cannot toggle.
+  ///
+  ///   display_mode=TABLE, supported_modes=[CARD, TABLE]
+  ///     → starts at TABLE; user can toggle between TABLE and CARD.
+  public var supportedModes: [Pivox_Api_V1_CollectionWidget.DisplayMode] {
+    get {_storage._supportedModes}
+    set {_uniqueStorage()._supportedModes = newValue}
+  }
+
+  /// Optional. Per-row actions exposed by the renderer (e.g. "open",
+  /// "share", "archive"). Populated by the server template per resource
+  /// type.
+  public var rowActions: [Pivox_Api_V1_RowAction] {
+    get {_storage._rowActions}
+    set {_uniqueStorage()._rowActions = newValue}
+  }
+
+  /// Optional. How to derive each row's leading icon / thumbnail.
+  public var iconConfig: Pivox_Api_V1_IconConfig {
+    get {_storage._iconConfig ?? Pivox_Api_V1_IconConfig()}
+    set {_uniqueStorage()._iconConfig = newValue}
+  }
+  /// Returns true if `iconConfig` has been explicitly set.
+  public var hasIconConfig: Bool {_storage._iconConfig != nil}
+  /// Clears the value of `iconConfig`. Subsequent reads from it will return its default value.
+  public mutating func clearIconConfig() {_uniqueStorage()._iconConfig = nil}
+
+  /// Optional. Content displayed when the data source returns no rows.
+  public var emptyState: Pivox_Api_V1_EmptyState {
+    get {_storage._emptyState ?? Pivox_Api_V1_EmptyState()}
+    set {_uniqueStorage()._emptyState = newValue}
+  }
+  /// Returns true if `emptyState` has been explicitly set.
+  public var hasEmptyState: Bool {_storage._emptyState != nil}
+  /// Clears the value of `emptyState`. Subsequent reads from it will return its default value.
+  public mutating func clearEmptyState() {_uniqueStorage()._emptyState = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
+  /// How the rows are visually arranged. The renderer picks layout
+  /// primitives per mode (e.g. `Table` for TABLE, a card grid for CARD).
+  public enum DisplayMode: SwiftProtobuf.Enum, Swift.CaseIterable {
+    public typealias RawValue = Int
+
+    /// Default; the renderer picks based on `supported_modes` (first
+    /// entry) or falls back to TABLE.
+    case unspecified // = 0
+
+    /// Classic tabular rendering with sortable columns.
+    case table // = 1
+
+    /// Card-grid rendering — each row becomes a card with thumbnail.
+    case card // = 2
+    case UNRECOGNIZED(Int)
+
+    public init() {
+      self = .unspecified
+    }
+
+    public init?(rawValue: Int) {
+      switch rawValue {
+      case 0: self = .unspecified
+      case 1: self = .table
+      case 2: self = .card
+      default: self = .UNRECOGNIZED(rawValue)
+      }
+    }
+
+    public var rawValue: Int {
+      switch self {
+      case .unspecified: return 0
+      case .table: return 1
+      case .card: return 2
+      case .UNRECOGNIZED(let i): return i
+      }
+    }
+
+    // The compiler won't synthesize support with the UNRECOGNIZED case.
+    public static let allCases: [Pivox_Api_V1_CollectionWidget.DisplayMode] = [
+      .unspecified,
+      .table,
+      .card,
+    ]
+
+  }
+
   public init() {}
 
-  fileprivate var _dataSource: Pivox_Api_V1_DataSource? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 /// PieChartWidget displays data as a pie or donut chart.
@@ -528,8 +651,15 @@ public struct Pivox_Api_V1_Threshold: Sendable {
   /// Required. The threshold value.
   public var value: Double = 0
 
-  /// Optional. The color to use when the threshold is triggered (CSS color).
-  public var color: String = String()
+  /// Optional. The color to use when the threshold is triggered.
+  public var color: Google_Type_Color {
+    get {_color ?? Google_Type_Color()}
+    set {_color = newValue}
+  }
+  /// Returns true if `color` has been explicitly set.
+  public var hasColor: Bool {self._color != nil}
+  /// Clears the value of `color`. Subsequent reads from it will return its default value.
+  public mutating func clearColor() {self._color = nil}
 
   /// Optional. The direction relative to the threshold value.
   public var direction: Pivox_Api_V1_Threshold.Direction = .unspecified
@@ -585,35 +715,47 @@ public struct Pivox_Api_V1_Threshold: Sendable {
   }
 
   public init() {}
+
+  fileprivate var _color: Google_Type_Color? = nil
 }
 
 /// ChartDataSet is a single data series within a ChartWidget.
-public struct Pivox_Api_V1_ChartDataSet: Sendable {
+public struct Pivox_Api_V1_ChartDataSet: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Required. The data source for this series.
   public var dataSource: Pivox_Api_V1_DataSource {
-    get {_dataSource ?? Pivox_Api_V1_DataSource()}
-    set {_dataSource = newValue}
+    get {_storage._dataSource ?? Pivox_Api_V1_DataSource()}
+    set {_uniqueStorage()._dataSource = newValue}
   }
   /// Returns true if `dataSource` has been explicitly set.
-  public var hasDataSource: Bool {self._dataSource != nil}
+  public var hasDataSource: Bool {_storage._dataSource != nil}
   /// Clears the value of `dataSource`. Subsequent reads from it will return its default value.
-  public mutating func clearDataSource() {self._dataSource = nil}
+  public mutating func clearDataSource() {_uniqueStorage()._dataSource = nil}
 
   /// Optional. The display label for this series.
-  public var label: String = String()
+  public var label: String {
+    get {_storage._label}
+    set {_uniqueStorage()._label = newValue}
+  }
 
-  /// Optional. The color for this series (CSS color).
-  public var color: String = String()
+  /// Optional. The color for this series.
+  public var color: Google_Type_Color {
+    get {_storage._color ?? Google_Type_Color()}
+    set {_uniqueStorage()._color = newValue}
+  }
+  /// Returns true if `color` has been explicitly set.
+  public var hasColor: Bool {_storage._color != nil}
+  /// Clears the value of `color`. Subsequent reads from it will return its default value.
+  public mutating func clearColor() {_uniqueStorage()._color = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _dataSource: Pivox_Api_V1_DataSource? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 /// AxisConfig defines display properties for a chart axis.
@@ -684,8 +826,16 @@ public struct Pivox_Api_V1_AxisConfig: Sendable {
   public init() {}
 }
 
-/// TableColumn defines a column in a TableWidget.
-public struct Pivox_Api_V1_TableColumn: Sendable {
+/// Column defines a column in a CollectionWidget. The same column set
+/// describes the data shape across every display mode (TABLE, CARD,
+/// …) — TABLE renders columns as headers, CARD picks the marked
+/// columns to surface on the card face, and so on.
+///
+/// A column may participate in user-driven sorting and filtering even
+/// if it is not visually rendered: a column with `visible = false,
+/// filterable = true` exposes a filterable field that the customer can
+/// query without the column ever appearing in TABLE mode.
+public struct Pivox_Api_V1_Column: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -699,9 +849,198 @@ public struct Pivox_Api_V1_TableColumn: Sendable {
   /// Optional. Whether this column is visible. Defaults to true.
   public var visible: Bool = false
 
+  /// Optional. Whether the customer can sort by this column.
+  public var sortable: Bool = false
+
+  /// Optional. Whether the customer can filter on this column. May be
+  /// combined with `visible = false` to expose a filterable-but-hidden
+  /// field.
+  public var filterable: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+}
+
+/// RowAction describes an action exposed on each row of a
+/// CollectionWidget. The `key` is a well-known string the renderer
+/// maps to a platform UI behavior (e.g. "open_detail" → push detail
+/// sheet, "share" → present share dialog). The renderer owns the
+/// dispatch table; the server only declares which actions are
+/// available.
+public struct Pivox_Api_V1_RowAction: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Required. Well-known action key. Maps client-side to the actual
+  /// behavior. Examples: "open_detail", "share", "archive", "delete".
+  ///
+  /// The pattern constraint keeps keys safe to use as renderer
+  /// dispatch-table keys and prevents typos like "Open Detail" leaking
+  /// into wire data.
+  public var key: String = String()
+
+  /// Optional. The display label shown in menus / buttons.
+  public var label: String = String()
+
+  /// Optional. Cross-platform semantic icon for this action.
+  public var icon: Pivox_Api_V1_Icon = .unspecified
+
+  /// Optional. If true, the renderer presents a confirmation prompt
+  /// before executing this action.
+  public var requiresConfirmation: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+/// IconConfig describes how to derive the leading icon / thumbnail for
+/// each row in a CollectionWidget. The four derivation paths
+/// (`source_field` → `icon_field` → `initials_field` → `fallback_icon`)
+/// are tried in order: the first one that produces a value wins.
+/// `size` and `fallback_color` are presentation knobs that apply to
+/// whichever derivation path resolves.
+public struct Pivox_Api_V1_IconConfig: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Optional. Name of the row field whose value is a thumbnail URL.
+  /// When set and non-empty, the renderer fetches the image (subject to
+  /// gateway-host bearer-token attachment).
+  public var sourceField: String = String()
+
+  /// Optional. Name of the row field whose value is the numeric
+  /// `Icon` enum value (e.g. `1002` for `ICON_PHOTO`). Encoded as the
+  /// wire integer rather than the symbolic name so renaming an `Icon`
+  /// value never silently breaks persisted dashboards. Server handlers
+  /// synthesize this per row.
+  public var iconField: String = String()
+
+  /// Optional. Name of the row field whose value is used to derive
+  /// initials when no thumbnail or semantic icon is available
+  /// (typically "display_name" or "name").
+  public var initialsField: String = String()
+
+  /// Optional. The static fallback icon used when none of
+  /// `source_field` / `icon_field` / `initials_field` produces a value.
+  public var fallbackIcon: Pivox_Api_V1_Icon = .unspecified
+
+  /// Optional. The size hint for the leading icon — applies to whichever
+  /// derivation path resolved.
+  public var size: Pivox_Api_V1_IconConfig.IconSize = .unspecified
+
+  /// Optional. Background color for the icon backplate. Renderer-honored
+  /// when icon or initials are shown without a thumbnail.
+  public var fallbackColor: Google_Type_Color {
+    get {_fallbackColor ?? Google_Type_Color()}
+    set {_fallbackColor = newValue}
+  }
+  /// Returns true if `fallbackColor` has been explicitly set.
+  public var hasFallbackColor: Bool {self._fallbackColor != nil}
+  /// Clears the value of `fallbackColor`. Subsequent reads from it will return its default value.
+  public mutating func clearFallbackColor() {self._fallbackColor = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  /// Display size hint for the leading icon. The renderer maps each
+  /// bucket to a platform-appropriate point size.
+  public enum IconSize: SwiftProtobuf.Enum, Swift.CaseIterable {
+    public typealias RawValue = Int
+
+    /// Default; renderer picks a context-appropriate size.
+    case unspecified // = 0
+
+    /// Compact size — typical for inline list rows.
+    case small // = 1
+
+    /// Default mid-size — typical for card thumbnails.
+    case medium // = 2
+
+    /// Larger thumbnail emphasis.
+    case large // = 3
+
+    /// Hero-size thumbnail; used for empty-state and primary tiles.
+    case extraLarge // = 4
+    case UNRECOGNIZED(Int)
+
+    public init() {
+      self = .unspecified
+    }
+
+    public init?(rawValue: Int) {
+      switch rawValue {
+      case 0: self = .unspecified
+      case 1: self = .small
+      case 2: self = .medium
+      case 3: self = .large
+      case 4: self = .extraLarge
+      default: self = .UNRECOGNIZED(rawValue)
+      }
+    }
+
+    public var rawValue: Int {
+      switch self {
+      case .unspecified: return 0
+      case .small: return 1
+      case .medium: return 2
+      case .large: return 3
+      case .extraLarge: return 4
+      case .UNRECOGNIZED(let i): return i
+      }
+    }
+
+    // The compiler won't synthesize support with the UNRECOGNIZED case.
+    public static let allCases: [Pivox_Api_V1_IconConfig.IconSize] = [
+      .unspecified,
+      .small,
+      .medium,
+      .large,
+      .extraLarge,
+    ]
+
+  }
+
+  public init() {}
+
+  fileprivate var _fallbackColor: Google_Type_Color? = nil
+}
+
+/// EmptyState is shown when a CollectionWidget's data source returns
+/// zero rows. It is purely presentational — the renderer composes the
+/// title, subtitle, icon, and primary action.
+public struct Pivox_Api_V1_EmptyState: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Optional. Headline shown above the subtitle.
+  public var title: String = String()
+
+  /// Optional. Secondary line of explanatory copy.
+  public var subtitle: String = String()
+
+  /// Optional. Cross-platform semantic icon shown above the title.
+  public var icon: Pivox_Api_V1_Icon = .unspecified
+
+  /// Optional. The primary call-to-action presented in the empty state
+  /// (e.g. an "Upload" or "Invite" button).
+  public var primaryAction: Pivox_Api_V1_RowAction {
+    get {_primaryAction ?? Pivox_Api_V1_RowAction()}
+    set {_primaryAction = newValue}
+  }
+  /// Returns true if `primaryAction` has been explicitly set.
+  public var hasPrimaryAction: Bool {self._primaryAction != nil}
+  /// Clears the value of `primaryAction`. Subsequent reads from it will return its default value.
+  public mutating func clearPrimaryAction() {self._primaryAction = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _primaryAction: Pivox_Api_V1_RowAction? = nil
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -799,7 +1138,7 @@ extension Pivox_Api_V1_Tile: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
 
 extension Pivox_Api_V1_Widget: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".Widget"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}title\0\u{1}statistic\0\u{1}chart\0\u{1}table\0\u{3}pie_chart\0\u{1}text\0\u{3}section_header\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}title\0\u{1}statistic\0\u{1}chart\0\u{1}collection\0\u{3}pie_chart\0\u{1}text\0\u{3}section_header\0")
 
   fileprivate class _StorageClass {
     var _id: String = String()
@@ -865,16 +1204,16 @@ extension Pivox_Api_V1_Widget: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
           }
         }()
         case 5: try {
-          var v: Pivox_Api_V1_TableWidget?
+          var v: Pivox_Api_V1_CollectionWidget?
           var hadOneofValue = false
           if let current = _storage._content {
             hadOneofValue = true
-            if case .table(let m) = current {v = m}
+            if case .collection(let m) = current {v = m}
           }
           try decoder.decodeSingularMessageField(value: &v)
           if let v = v {
             if hadOneofValue {try decoder.handleConflictingOneOf()}
-            _storage._content = .table(v)
+            _storage._content = .collection(v)
           }
         }()
         case 6: try {
@@ -943,8 +1282,8 @@ extension Pivox_Api_V1_Widget: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
         guard case .chart(let v)? = _storage._content else { preconditionFailure() }
         try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
       }()
-      case .table?: try {
-        guard case .table(let v)? = _storage._content else { preconditionFailure() }
+      case .collection?: try {
+        guard case .collection(let v)? = _storage._content else { preconditionFailure() }
         try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
       }()
       case .pieChart?: try {
@@ -1089,48 +1428,127 @@ extension Pivox_Api_V1_ChartWidget.ChartType: SwiftProtobuf._ProtoNameProviding 
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0CHART_TYPE_UNSPECIFIED\0\u{1}LINE\0\u{1}BAR\0\u{1}AREA\0\u{1}STACKED_BAR\0\u{1}STACKED_AREA\0\u{1}SCATTER\0")
 }
 
-extension Pivox_Api_V1_TableWidget: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".TableWidget"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}data_source\0\u{1}columns\0\u{3}rows_per_page\0")
+extension Pivox_Api_V1_CollectionWidget: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CollectionWidget"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}data_source\0\u{1}columns\0\u{3}rows_per_page\0\u{3}display_mode\0\u{3}supported_modes\0\u{3}row_actions\0\u{3}icon_config\0\u{3}empty_state\0")
+
+  fileprivate class _StorageClass {
+    var _dataSource: Pivox_Api_V1_DataSource? = nil
+    var _columns: [Pivox_Api_V1_Column] = []
+    var _rowsPerPage: Int32 = 0
+    var _displayMode: Pivox_Api_V1_CollectionWidget.DisplayMode = .unspecified
+    var _supportedModes: [Pivox_Api_V1_CollectionWidget.DisplayMode] = []
+    var _rowActions: [Pivox_Api_V1_RowAction] = []
+    var _iconConfig: Pivox_Api_V1_IconConfig? = nil
+    var _emptyState: Pivox_Api_V1_EmptyState? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _dataSource = source._dataSource
+      _columns = source._columns
+      _rowsPerPage = source._rowsPerPage
+      _displayMode = source._displayMode
+      _supportedModes = source._supportedModes
+      _rowActions = source._rowActions
+      _iconConfig = source._iconConfig
+      _emptyState = source._emptyState
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._dataSource) }()
-      case 2: try { try decoder.decodeRepeatedMessageField(value: &self.columns) }()
-      case 3: try { try decoder.decodeSingularInt32Field(value: &self.rowsPerPage) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._dataSource) }()
+        case 2: try { try decoder.decodeRepeatedMessageField(value: &_storage._columns) }()
+        case 3: try { try decoder.decodeSingularInt32Field(value: &_storage._rowsPerPage) }()
+        case 4: try { try decoder.decodeSingularEnumField(value: &_storage._displayMode) }()
+        case 5: try { try decoder.decodeRepeatedEnumField(value: &_storage._supportedModes) }()
+        case 6: try { try decoder.decodeRepeatedMessageField(value: &_storage._rowActions) }()
+        case 7: try { try decoder.decodeSingularMessageField(value: &_storage._iconConfig) }()
+        case 8: try { try decoder.decodeSingularMessageField(value: &_storage._emptyState) }()
+        default: break
+        }
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._dataSource {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
-    if !self.columns.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.columns, fieldNumber: 2)
-    }
-    if self.rowsPerPage != 0 {
-      try visitor.visitSingularInt32Field(value: self.rowsPerPage, fieldNumber: 3)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      try { if let v = _storage._dataSource {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+      } }()
+      if !_storage._columns.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._columns, fieldNumber: 2)
+      }
+      if _storage._rowsPerPage != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._rowsPerPage, fieldNumber: 3)
+      }
+      if _storage._displayMode != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._displayMode, fieldNumber: 4)
+      }
+      if !_storage._supportedModes.isEmpty {
+        try visitor.visitPackedEnumField(value: _storage._supportedModes, fieldNumber: 5)
+      }
+      if !_storage._rowActions.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._rowActions, fieldNumber: 6)
+      }
+      try { if let v = _storage._iconConfig {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
+      } }()
+      try { if let v = _storage._emptyState {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Pivox_Api_V1_TableWidget, rhs: Pivox_Api_V1_TableWidget) -> Bool {
-    if lhs._dataSource != rhs._dataSource {return false}
-    if lhs.columns != rhs.columns {return false}
-    if lhs.rowsPerPage != rhs.rowsPerPage {return false}
+  public static func ==(lhs: Pivox_Api_V1_CollectionWidget, rhs: Pivox_Api_V1_CollectionWidget) -> Bool {
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._dataSource != rhs_storage._dataSource {return false}
+        if _storage._columns != rhs_storage._columns {return false}
+        if _storage._rowsPerPage != rhs_storage._rowsPerPage {return false}
+        if _storage._displayMode != rhs_storage._displayMode {return false}
+        if _storage._supportedModes != rhs_storage._supportedModes {return false}
+        if _storage._rowActions != rhs_storage._rowActions {return false}
+        if _storage._iconConfig != rhs_storage._iconConfig {return false}
+        if _storage._emptyState != rhs_storage._emptyState {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
+}
+
+extension Pivox_Api_V1_CollectionWidget.DisplayMode: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DISPLAY_MODE_UNSPECIFIED\0\u{1}TABLE\0\u{1}CARD\0")
 }
 
 extension Pivox_Api_V1_PieChartWidget: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -1271,7 +1689,7 @@ extension Pivox_Api_V1_Threshold: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularDoubleField(value: &self.value) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.color) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._color) }()
       case 3: try { try decoder.decodeSingularEnumField(value: &self.direction) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self.label) }()
       default: break
@@ -1280,12 +1698,16 @@ extension Pivox_Api_V1_Threshold: SwiftProtobuf.Message, SwiftProtobuf._MessageI
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if self.value.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.value, fieldNumber: 1)
     }
-    if !self.color.isEmpty {
-      try visitor.visitSingularStringField(value: self.color, fieldNumber: 2)
-    }
+    try { if let v = self._color {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
     if self.direction != .unspecified {
       try visitor.visitSingularEnumField(value: self.direction, fieldNumber: 3)
     }
@@ -1297,7 +1719,7 @@ extension Pivox_Api_V1_Threshold: SwiftProtobuf.Message, SwiftProtobuf._MessageI
 
   public static func ==(lhs: Pivox_Api_V1_Threshold, rhs: Pivox_Api_V1_Threshold) -> Bool {
     if lhs.value != rhs.value {return false}
-    if lhs.color != rhs.color {return false}
+    if lhs._color != rhs._color {return false}
     if lhs.direction != rhs.direction {return false}
     if lhs.label != rhs.label {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -1313,41 +1735,81 @@ extension Pivox_Api_V1_ChartDataSet: SwiftProtobuf.Message, SwiftProtobuf._Messa
   public static let protoMessageName: String = _protobuf_package + ".ChartDataSet"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}data_source\0\u{1}label\0\u{1}color\0")
 
+  fileprivate class _StorageClass {
+    var _dataSource: Pivox_Api_V1_DataSource? = nil
+    var _label: String = String()
+    var _color: Google_Type_Color? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _dataSource = source._dataSource
+      _label = source._label
+      _color = source._color
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._dataSource) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.label) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.color) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._dataSource) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._label) }()
+        case 3: try { try decoder.decodeSingularMessageField(value: &_storage._color) }()
+        default: break
+        }
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._dataSource {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
-    if !self.label.isEmpty {
-      try visitor.visitSingularStringField(value: self.label, fieldNumber: 2)
-    }
-    if !self.color.isEmpty {
-      try visitor.visitSingularStringField(value: self.color, fieldNumber: 3)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      try { if let v = _storage._dataSource {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+      } }()
+      if !_storage._label.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._label, fieldNumber: 2)
+      }
+      try { if let v = _storage._color {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Pivox_Api_V1_ChartDataSet, rhs: Pivox_Api_V1_ChartDataSet) -> Bool {
-    if lhs._dataSource != rhs._dataSource {return false}
-    if lhs.label != rhs.label {return false}
-    if lhs.color != rhs.color {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._dataSource != rhs_storage._dataSource {return false}
+        if _storage._label != rhs_storage._label {return false}
+        if _storage._color != rhs_storage._color {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1402,9 +1864,9 @@ extension Pivox_Api_V1_AxisConfig.Scale: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SCALE_UNSPECIFIED\0\u{1}LINEAR\0\u{1}LOG10\0")
 }
 
-extension Pivox_Api_V1_TableColumn: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".TableColumn"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}field\0\u{3}display_name\0\u{1}visible\0")
+extension Pivox_Api_V1_Column: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".Column"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}field\0\u{3}display_name\0\u{1}visible\0\u{1}sortable\0\u{1}filterable\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1415,6 +1877,8 @@ extension Pivox_Api_V1_TableColumn: SwiftProtobuf.Message, SwiftProtobuf._Messag
       case 1: try { try decoder.decodeSingularStringField(value: &self.field) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.displayName) }()
       case 3: try { try decoder.decodeSingularBoolField(value: &self.visible) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.sortable) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.filterable) }()
       default: break
       }
     }
@@ -1430,13 +1894,178 @@ extension Pivox_Api_V1_TableColumn: SwiftProtobuf.Message, SwiftProtobuf._Messag
     if self.visible != false {
       try visitor.visitSingularBoolField(value: self.visible, fieldNumber: 3)
     }
+    if self.sortable != false {
+      try visitor.visitSingularBoolField(value: self.sortable, fieldNumber: 4)
+    }
+    if self.filterable != false {
+      try visitor.visitSingularBoolField(value: self.filterable, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Pivox_Api_V1_TableColumn, rhs: Pivox_Api_V1_TableColumn) -> Bool {
+  public static func ==(lhs: Pivox_Api_V1_Column, rhs: Pivox_Api_V1_Column) -> Bool {
     if lhs.field != rhs.field {return false}
     if lhs.displayName != rhs.displayName {return false}
     if lhs.visible != rhs.visible {return false}
+    if lhs.sortable != rhs.sortable {return false}
+    if lhs.filterable != rhs.filterable {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Pivox_Api_V1_RowAction: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RowAction"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}key\0\u{1}label\0\u{1}icon\0\u{3}requires_confirmation\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.key) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.label) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self.icon) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.requiresConfirmation) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.key.isEmpty {
+      try visitor.visitSingularStringField(value: self.key, fieldNumber: 1)
+    }
+    if !self.label.isEmpty {
+      try visitor.visitSingularStringField(value: self.label, fieldNumber: 2)
+    }
+    if self.icon != .unspecified {
+      try visitor.visitSingularEnumField(value: self.icon, fieldNumber: 3)
+    }
+    if self.requiresConfirmation != false {
+      try visitor.visitSingularBoolField(value: self.requiresConfirmation, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Pivox_Api_V1_RowAction, rhs: Pivox_Api_V1_RowAction) -> Bool {
+    if lhs.key != rhs.key {return false}
+    if lhs.label != rhs.label {return false}
+    if lhs.icon != rhs.icon {return false}
+    if lhs.requiresConfirmation != rhs.requiresConfirmation {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Pivox_Api_V1_IconConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".IconConfig"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}source_field\0\u{3}icon_field\0\u{3}initials_field\0\u{3}fallback_icon\0\u{1}size\0\u{3}fallback_color\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.sourceField) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.iconField) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.initialsField) }()
+      case 4: try { try decoder.decodeSingularEnumField(value: &self.fallbackIcon) }()
+      case 5: try { try decoder.decodeSingularEnumField(value: &self.size) }()
+      case 6: try { try decoder.decodeSingularMessageField(value: &self._fallbackColor) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.sourceField.isEmpty {
+      try visitor.visitSingularStringField(value: self.sourceField, fieldNumber: 1)
+    }
+    if !self.iconField.isEmpty {
+      try visitor.visitSingularStringField(value: self.iconField, fieldNumber: 2)
+    }
+    if !self.initialsField.isEmpty {
+      try visitor.visitSingularStringField(value: self.initialsField, fieldNumber: 3)
+    }
+    if self.fallbackIcon != .unspecified {
+      try visitor.visitSingularEnumField(value: self.fallbackIcon, fieldNumber: 4)
+    }
+    if self.size != .unspecified {
+      try visitor.visitSingularEnumField(value: self.size, fieldNumber: 5)
+    }
+    try { if let v = self._fallbackColor {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Pivox_Api_V1_IconConfig, rhs: Pivox_Api_V1_IconConfig) -> Bool {
+    if lhs.sourceField != rhs.sourceField {return false}
+    if lhs.iconField != rhs.iconField {return false}
+    if lhs.initialsField != rhs.initialsField {return false}
+    if lhs.fallbackIcon != rhs.fallbackIcon {return false}
+    if lhs.size != rhs.size {return false}
+    if lhs._fallbackColor != rhs._fallbackColor {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Pivox_Api_V1_IconConfig.IconSize: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ICON_SIZE_UNSPECIFIED\0\u{1}SMALL\0\u{1}MEDIUM\0\u{1}LARGE\0\u{1}EXTRA_LARGE\0")
+}
+
+extension Pivox_Api_V1_EmptyState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".EmptyState"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}title\0\u{1}subtitle\0\u{1}icon\0\u{3}primary_action\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.title) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.subtitle) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self.icon) }()
+      case 4: try { try decoder.decodeSingularMessageField(value: &self._primaryAction) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.title.isEmpty {
+      try visitor.visitSingularStringField(value: self.title, fieldNumber: 1)
+    }
+    if !self.subtitle.isEmpty {
+      try visitor.visitSingularStringField(value: self.subtitle, fieldNumber: 2)
+    }
+    if self.icon != .unspecified {
+      try visitor.visitSingularEnumField(value: self.icon, fieldNumber: 3)
+    }
+    try { if let v = self._primaryAction {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Pivox_Api_V1_EmptyState, rhs: Pivox_Api_V1_EmptyState) -> Bool {
+    if lhs.title != rhs.title {return false}
+    if lhs.subtitle != rhs.subtitle {return false}
+    if lhs.icon != rhs.icon {return false}
+    if lhs._primaryAction != rhs._primaryAction {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

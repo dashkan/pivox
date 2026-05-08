@@ -22,6 +22,7 @@ package apiv1
 
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
+	_ "github.com/dashkan/pivox/internal/pkg/gen/pivox/permission/v1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -39,11 +40,70 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// A custom dashboard belonging to a space.
+// Identifies who owns the lifecycle of a dashboard. SYSTEM_MANAGED
+// dashboards are server-curated and reject all mutations; USER_MANAGED
+// dashboards are owned by the customer and support full CRUD.
+type Dashboard_ManagementMode int32
+
+const (
+	// Default. Server handlers always populate this field on read,
+	// so UNSPECIFIED on the wire indicates a server bug, not a
+	// legitimate state.
+	Dashboard_MANAGEMENT_MODE_UNSPECIFIED Dashboard_ManagementMode = 0
+	// Customer-owned. Full CRUD applies.
+	Dashboard_USER_MANAGED Dashboard_ManagementMode = 1
+	// Server-curated. Mutations are rejected with FAILED_PRECONDITION.
+	Dashboard_SYSTEM_MANAGED Dashboard_ManagementMode = 2
+)
+
+// Enum value maps for Dashboard_ManagementMode.
+var (
+	Dashboard_ManagementMode_name = map[int32]string{
+		0: "MANAGEMENT_MODE_UNSPECIFIED",
+		1: "USER_MANAGED",
+		2: "SYSTEM_MANAGED",
+	}
+	Dashboard_ManagementMode_value = map[string]int32{
+		"MANAGEMENT_MODE_UNSPECIFIED": 0,
+		"USER_MANAGED":                1,
+		"SYSTEM_MANAGED":              2,
+	}
+)
+
+func (x Dashboard_ManagementMode) Enum() *Dashboard_ManagementMode {
+	p := new(Dashboard_ManagementMode)
+	*p = x
+	return p
+}
+
+func (x Dashboard_ManagementMode) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (Dashboard_ManagementMode) Descriptor() protoreflect.EnumDescriptor {
+	return file_pivox_api_v1_dashboards_proto_enumTypes[0].Descriptor()
+}
+
+func (Dashboard_ManagementMode) Type() protoreflect.EnumType {
+	return &file_pivox_api_v1_dashboards_proto_enumTypes[0]
+}
+
+func (x Dashboard_ManagementMode) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use Dashboard_ManagementMode.Descriptor instead.
+func (Dashboard_ManagementMode) EnumDescriptor() ([]byte, []int) {
+	return file_pivox_api_v1_dashboards_proto_rawDescGZIP(), []int{0, 0}
+}
+
+// A dashboard at the organization or space scope.
 type Dashboard struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Immutable. The resource name of the dashboard.
-	// Format: `organizations/{organization}/spaces/{space}/dashboards/{dashboard}`
+	// Format: `organizations/{organization}/dashboards/{dashboard}` or
+	//
+	//	`organizations/{organization}/spaces/{space}/dashboards/{dashboard}`.
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Required. A human-readable name for the dashboard.
 	DisplayName string `protobuf:"bytes,3,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
@@ -65,9 +125,19 @@ type Dashboard struct {
 	// Output only. Entity tag for optimistic concurrency control.
 	Etag string `protobuf:"bytes,9,opt,name=etag,proto3" json:"etag,omitempty"`
 	// Optional. Free-form annotations for the dashboard.
-	Annotations   map[string]string `protobuf:"bytes,10,rep,name=annotations,proto3" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Annotations map[string]string `protobuf:"bytes,10,rep,name=annotations,proto3" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// Output only. Identifies whether this dashboard is server-curated
+	// (SYSTEM_MANAGED) or customer-owned (USER_MANAGED). Mutations of
+	// SYSTEM_MANAGED dashboards are rejected with FAILED_PRECONDITION
+	// regardless of URL path.
+	//
+	// MAINTAINER: `OUTPUT_ONLY` is documentation, not enforcement. The
+	// UpdateDashboard handler MUST reject any FieldMask path that names
+	// this field with `INVALID_ARGUMENT`, otherwise a customer can flip
+	// the management_mode and escape the SYSTEM_MANAGED mutation guard.
+	ManagementMode Dashboard_ManagementMode `protobuf:"varint,11,opt,name=management_mode,json=managementMode,proto3,enum=pivox.api.v1.Dashboard_ManagementMode" json:"management_mode,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Dashboard) Reset() {
@@ -172,6 +242,13 @@ func (x *Dashboard) GetAnnotations() map[string]string {
 	return nil
 }
 
+func (x *Dashboard) GetManagementMode() Dashboard_ManagementMode {
+	if x != nil {
+		return x.ManagementMode
+	}
+	return Dashboard_MANAGEMENT_MODE_UNSPECIFIED
+}
+
 type isDashboard_Layout interface {
 	isDashboard_Layout()
 }
@@ -259,8 +336,10 @@ func (x *DashboardVariable) GetAllowedValues() []string {
 // Request message for ListDashboards.
 type ListDashboardsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Required. The parent space.
-	// Format: `organizations/{organization}/spaces/{space}`
+	// Required. The parent organization or space.
+	// Format: `organizations/{organization}` or
+	//
+	//	`organizations/{organization}/spaces/{space}`.
 	Parent string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
 	// Optional. Maximum number of dashboards to return.
 	PageSize int32 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
@@ -677,7 +756,7 @@ var File_pivox_api_v1_dashboards_proto protoreflect.FileDescriptor
 
 const file_pivox_api_v1_dashboards_proto_rawDesc = "" +
 	"\n" +
-	"\x1dpivox/api/v1/dashboards.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1apivox/api/v1/widgets.proto\"\xb3\x05\n" +
+	"\x1dpivox/api/v1/dashboards.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1apivox/api/v1/widgets.proto\x1a!pivox/permission/v1/options.proto\"\x99\a\n" +
 	"\tDashboard\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x120\n" +
 	"\fdisplay_name\x18\x03 \x01(\tB\r\xe0A\x02\xbaH\ar\x05\x10\x01\x18\x80\x01R\vdisplayName\x12-\n" +
@@ -691,11 +770,16 @@ const file_pivox_api_v1_dashboards_proto_rawDesc = "" +
 	"updateTime\x12\x17\n" +
 	"\x04etag\x18\t \x01(\tB\x03\xe0A\x03R\x04etag\x12O\n" +
 	"\vannotations\x18\n" +
-	" \x03(\v2(.pivox.api.v1.Dashboard.AnnotationsEntryB\x03\xe0A\x01R\vannotations\x1a>\n" +
+	" \x03(\v2(.pivox.api.v1.Dashboard.AnnotationsEntryB\x03\xe0A\x01R\vannotations\x12T\n" +
+	"\x0fmanagement_mode\x18\v \x01(\x0e2&.pivox.api.v1.Dashboard.ManagementModeB\x03\xe0A\x03R\x0emanagementMode\x1a>\n" +
 	"\x10AnnotationsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01:s\xeaAp\n" +
-	"\x13pivox.api/Dashboard\x12Borganizations/{organization}/spaces/{space}/dashboards/{dashboard}*\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"W\n" +
+	"\x0eManagementMode\x12\x1f\n" +
+	"\x1bMANAGEMENT_MODE_UNSPECIFIED\x10\x00\x12\x10\n" +
+	"\fUSER_MANAGED\x10\x01\x12\x12\n" +
+	"\x0eSYSTEM_MANAGED\x10\x02:\xa9\x01\xeaA\xa5\x01\n" +
+	"\x13pivox.api/Dashboard\x123organizations/{organization}/dashboards/{dashboard}\x12Borganizations/{organization}/spaces/{space}/dashboards/{dashboard}*\n" +
 	"dashboards2\tdashboardB\b\n" +
 	"\x06layout\"\xaf\x01\n" +
 	"\x11DashboardVariable\x12\x1c\n" +
@@ -734,14 +818,14 @@ const file_pivox_api_v1_dashboards_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tB!\xe0A\x02\xfaA\x15\n" +
 	"\x13pivox.api/Dashboard\xbaH\x03\xc8\x01\x01R\x04name\x12(\n" +
 	"\rvalidate_only\x18\x02 \x01(\bB\x03\xe0A\x01R\fvalidateOnly\x12\x17\n" +
-	"\x04etag\x18\x03 \x01(\tB\x03\xe0A\x01R\x04etag2\xd2\x06\n" +
+	"\x04etag\x18\x03 \x01(\tB\x03\xe0A\x01R\x04etag2\x8d\b\n" +
 	"\n" +
-	"Dashboards\x12\x9e\x01\n" +
-	"\x0eListDashboards\x12#.pivox.api.v1.ListDashboardsRequest\x1a$.pivox.api.v1.ListDashboardsResponse\"A\xdaA\x06parent\x82\xd3\xe4\x93\x022\x120/v1/{parent=organizations/*/spaces/*}/dashboards\x12\x8b\x01\n" +
-	"\fGetDashboard\x12!.pivox.api.v1.GetDashboardRequest\x1a\x17.pivox.api.v1.Dashboard\"?\xdaA\x04name\x82\xd3\xe4\x93\x022\x120/v1/{name=organizations/*/spaces/*/dashboards/*}\x12\xb5\x01\n" +
-	"\x0fCreateDashboard\x12$.pivox.api.v1.CreateDashboardRequest\x1a\x17.pivox.api.v1.Dashboard\"c\xdaA\x1dparent,dashboard,dashboard_id\x82\xd3\xe4\x93\x02=:\tdashboard\"0/v1/{parent=organizations/*/spaces/*}/dashboards\x12\xb7\x01\n" +
-	"\x0fUpdateDashboard\x12$.pivox.api.v1.UpdateDashboardRequest\x1a\x17.pivox.api.v1.Dashboard\"e\xdaA\x15dashboard,update_mask\x82\xd3\xe4\x93\x02G:\tdashboard2:/v1/{dashboard.name=organizations/*/spaces/*/dashboards/*}\x12\x91\x01\n" +
-	"\x0fDeleteDashboard\x12$.pivox.api.v1.DeleteDashboardRequest\x1a\x17.pivox.api.v1.Dashboard\"?\xdaA\x04name\x82\xd3\xe4\x93\x022*0/v1/{name=organizations/*/spaces/*/dashboards/*}\x1a\x0f\xcaA\fapi.pivox.ioB\xb3\x01\n" +
+	"Dashboards\x12\xdc\x01\n" +
+	"\x0eListDashboards\x12#.pivox.api.v1.ListDashboardsRequest\x1a$.pivox.api.v1.ListDashboardsResponse\"\x7f\xdaA\x06parent\x8a\xb5\x18\x0fdashboards.read\x82\xd3\xe4\x93\x02]Z2\x120/v1/{parent=organizations/*/spaces/*}/dashboards\x12'/v1/{parent=organizations/*}/dashboards\x12\xc9\x01\n" +
+	"\fGetDashboard\x12!.pivox.api.v1.GetDashboardRequest\x1a\x17.pivox.api.v1.Dashboard\"}\xdaA\x04name\x8a\xb5\x18\x0fdashboards.read\x82\xd3\xe4\x93\x02]Z2\x120/v1/{name=organizations/*/spaces/*/dashboards/*}\x12'/v1/{name=organizations/*/dashboards/*}\x12\xca\x01\n" +
+	"\x0fCreateDashboard\x12$.pivox.api.v1.CreateDashboardRequest\x1a\x17.pivox.api.v1.Dashboard\"x\xdaA\x1dparent,dashboard,dashboard_id\x8a\xb5\x18\x11dashboards.create\x82\xd3\xe4\x93\x02=:\tdashboard\"0/v1/{parent=organizations/*/spaces/*}/dashboards\x12\xcc\x01\n" +
+	"\x0fUpdateDashboard\x12$.pivox.api.v1.UpdateDashboardRequest\x1a\x17.pivox.api.v1.Dashboard\"z\xdaA\x15dashboard,update_mask\x8a\xb5\x18\x11dashboards.update\x82\xd3\xe4\x93\x02G:\tdashboard2:/v1/{dashboard.name=organizations/*/spaces/*/dashboards/*}\x12\xa6\x01\n" +
+	"\x0fDeleteDashboard\x12$.pivox.api.v1.DeleteDashboardRequest\x1a\x17.pivox.api.v1.Dashboard\"T\xdaA\x04name\x8a\xb5\x18\x11dashboards.delete\x82\xd3\xe4\x93\x022*0/v1/{name=organizations/*/spaces/*/dashboards/*}\x1a\x0f\xcaA\fapi.pivox.ioB\xb3\x01\n" +
 	"\x10com.pivox.api.v1B\x0fDashboardsProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
 
 var (
@@ -756,46 +840,49 @@ func file_pivox_api_v1_dashboards_proto_rawDescGZIP() []byte {
 	return file_pivox_api_v1_dashboards_proto_rawDescData
 }
 
+var file_pivox_api_v1_dashboards_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_pivox_api_v1_dashboards_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_pivox_api_v1_dashboards_proto_goTypes = []any{
-	(*Dashboard)(nil),              // 0: pivox.api.v1.Dashboard
-	(*DashboardVariable)(nil),      // 1: pivox.api.v1.DashboardVariable
-	(*ListDashboardsRequest)(nil),  // 2: pivox.api.v1.ListDashboardsRequest
-	(*ListDashboardsResponse)(nil), // 3: pivox.api.v1.ListDashboardsResponse
-	(*GetDashboardRequest)(nil),    // 4: pivox.api.v1.GetDashboardRequest
-	(*CreateDashboardRequest)(nil), // 5: pivox.api.v1.CreateDashboardRequest
-	(*UpdateDashboardRequest)(nil), // 6: pivox.api.v1.UpdateDashboardRequest
-	(*DeleteDashboardRequest)(nil), // 7: pivox.api.v1.DeleteDashboardRequest
-	nil,                            // 8: pivox.api.v1.Dashboard.AnnotationsEntry
-	(*GridLayout)(nil),             // 9: pivox.api.v1.GridLayout
-	(*timestamppb.Timestamp)(nil),  // 10: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),  // 11: google.protobuf.FieldMask
+	(Dashboard_ManagementMode)(0),  // 0: pivox.api.v1.Dashboard.ManagementMode
+	(*Dashboard)(nil),              // 1: pivox.api.v1.Dashboard
+	(*DashboardVariable)(nil),      // 2: pivox.api.v1.DashboardVariable
+	(*ListDashboardsRequest)(nil),  // 3: pivox.api.v1.ListDashboardsRequest
+	(*ListDashboardsResponse)(nil), // 4: pivox.api.v1.ListDashboardsResponse
+	(*GetDashboardRequest)(nil),    // 5: pivox.api.v1.GetDashboardRequest
+	(*CreateDashboardRequest)(nil), // 6: pivox.api.v1.CreateDashboardRequest
+	(*UpdateDashboardRequest)(nil), // 7: pivox.api.v1.UpdateDashboardRequest
+	(*DeleteDashboardRequest)(nil), // 8: pivox.api.v1.DeleteDashboardRequest
+	nil,                            // 9: pivox.api.v1.Dashboard.AnnotationsEntry
+	(*GridLayout)(nil),             // 10: pivox.api.v1.GridLayout
+	(*timestamppb.Timestamp)(nil),  // 11: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),  // 12: google.protobuf.FieldMask
 }
 var file_pivox_api_v1_dashboards_proto_depIdxs = []int32{
-	9,  // 0: pivox.api.v1.Dashboard.grid_layout:type_name -> pivox.api.v1.GridLayout
-	1,  // 1: pivox.api.v1.Dashboard.variables:type_name -> pivox.api.v1.DashboardVariable
-	10, // 2: pivox.api.v1.Dashboard.create_time:type_name -> google.protobuf.Timestamp
-	10, // 3: pivox.api.v1.Dashboard.update_time:type_name -> google.protobuf.Timestamp
-	8,  // 4: pivox.api.v1.Dashboard.annotations:type_name -> pivox.api.v1.Dashboard.AnnotationsEntry
-	0,  // 5: pivox.api.v1.ListDashboardsResponse.dashboards:type_name -> pivox.api.v1.Dashboard
-	0,  // 6: pivox.api.v1.CreateDashboardRequest.dashboard:type_name -> pivox.api.v1.Dashboard
-	0,  // 7: pivox.api.v1.UpdateDashboardRequest.dashboard:type_name -> pivox.api.v1.Dashboard
-	11, // 8: pivox.api.v1.UpdateDashboardRequest.update_mask:type_name -> google.protobuf.FieldMask
-	2,  // 9: pivox.api.v1.Dashboards.ListDashboards:input_type -> pivox.api.v1.ListDashboardsRequest
-	4,  // 10: pivox.api.v1.Dashboards.GetDashboard:input_type -> pivox.api.v1.GetDashboardRequest
-	5,  // 11: pivox.api.v1.Dashboards.CreateDashboard:input_type -> pivox.api.v1.CreateDashboardRequest
-	6,  // 12: pivox.api.v1.Dashboards.UpdateDashboard:input_type -> pivox.api.v1.UpdateDashboardRequest
-	7,  // 13: pivox.api.v1.Dashboards.DeleteDashboard:input_type -> pivox.api.v1.DeleteDashboardRequest
-	3,  // 14: pivox.api.v1.Dashboards.ListDashboards:output_type -> pivox.api.v1.ListDashboardsResponse
-	0,  // 15: pivox.api.v1.Dashboards.GetDashboard:output_type -> pivox.api.v1.Dashboard
-	0,  // 16: pivox.api.v1.Dashboards.CreateDashboard:output_type -> pivox.api.v1.Dashboard
-	0,  // 17: pivox.api.v1.Dashboards.UpdateDashboard:output_type -> pivox.api.v1.Dashboard
-	0,  // 18: pivox.api.v1.Dashboards.DeleteDashboard:output_type -> pivox.api.v1.Dashboard
-	14, // [14:19] is the sub-list for method output_type
-	9,  // [9:14] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	10, // 0: pivox.api.v1.Dashboard.grid_layout:type_name -> pivox.api.v1.GridLayout
+	2,  // 1: pivox.api.v1.Dashboard.variables:type_name -> pivox.api.v1.DashboardVariable
+	11, // 2: pivox.api.v1.Dashboard.create_time:type_name -> google.protobuf.Timestamp
+	11, // 3: pivox.api.v1.Dashboard.update_time:type_name -> google.protobuf.Timestamp
+	9,  // 4: pivox.api.v1.Dashboard.annotations:type_name -> pivox.api.v1.Dashboard.AnnotationsEntry
+	0,  // 5: pivox.api.v1.Dashboard.management_mode:type_name -> pivox.api.v1.Dashboard.ManagementMode
+	1,  // 6: pivox.api.v1.ListDashboardsResponse.dashboards:type_name -> pivox.api.v1.Dashboard
+	1,  // 7: pivox.api.v1.CreateDashboardRequest.dashboard:type_name -> pivox.api.v1.Dashboard
+	1,  // 8: pivox.api.v1.UpdateDashboardRequest.dashboard:type_name -> pivox.api.v1.Dashboard
+	12, // 9: pivox.api.v1.UpdateDashboardRequest.update_mask:type_name -> google.protobuf.FieldMask
+	3,  // 10: pivox.api.v1.Dashboards.ListDashboards:input_type -> pivox.api.v1.ListDashboardsRequest
+	5,  // 11: pivox.api.v1.Dashboards.GetDashboard:input_type -> pivox.api.v1.GetDashboardRequest
+	6,  // 12: pivox.api.v1.Dashboards.CreateDashboard:input_type -> pivox.api.v1.CreateDashboardRequest
+	7,  // 13: pivox.api.v1.Dashboards.UpdateDashboard:input_type -> pivox.api.v1.UpdateDashboardRequest
+	8,  // 14: pivox.api.v1.Dashboards.DeleteDashboard:input_type -> pivox.api.v1.DeleteDashboardRequest
+	4,  // 15: pivox.api.v1.Dashboards.ListDashboards:output_type -> pivox.api.v1.ListDashboardsResponse
+	1,  // 16: pivox.api.v1.Dashboards.GetDashboard:output_type -> pivox.api.v1.Dashboard
+	1,  // 17: pivox.api.v1.Dashboards.CreateDashboard:output_type -> pivox.api.v1.Dashboard
+	1,  // 18: pivox.api.v1.Dashboards.UpdateDashboard:output_type -> pivox.api.v1.Dashboard
+	1,  // 19: pivox.api.v1.Dashboards.DeleteDashboard:output_type -> pivox.api.v1.Dashboard
+	15, // [15:20] is the sub-list for method output_type
+	10, // [10:15] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_pivox_api_v1_dashboards_proto_init() }
@@ -812,13 +899,14 @@ func file_pivox_api_v1_dashboards_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pivox_api_v1_dashboards_proto_rawDesc), len(file_pivox_api_v1_dashboards_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_pivox_api_v1_dashboards_proto_goTypes,
 		DependencyIndexes: file_pivox_api_v1_dashboards_proto_depIdxs,
+		EnumInfos:         file_pivox_api_v1_dashboards_proto_enumTypes,
 		MessageInfos:      file_pivox_api_v1_dashboards_proto_msgTypes,
 	}.Build()
 	File_pivox_api_v1_dashboards_proto = out.File

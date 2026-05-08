@@ -44,9 +44,27 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// Manages custom dashboards within a space.
+// Manages dashboards at the organization and space scopes.
+//
+// Dashboards come in two flavors, distinguished by `Dashboard.management_mode`:
+//
+//   - SYSTEM_MANAGED — server-curated dashboards (e.g. the org-level
+//     Library, Activity, Members views). Listed and read by all flows;
+//     mutations are rejected.
+//   - USER_MANAGED — customer-owned dashboards. Full CRUD applies.
+//
+// In v1 every org-level dashboard is SYSTEM_MANAGED; every space-level
+// dashboard is USER_MANAGED. The mutation guard is data-driven, not
+// path-driven — Create/Update/Delete refuse a SYSTEM_MANAGED target
+// regardless of which URL the request came in on.
 type DashboardsClient interface {
-	// Lists dashboards in a space.
+	// Lists dashboards under a parent. The parent may be an organization
+	// (returns the system-curated catalog) or a space (returns
+	// user-managed dashboards).
+	//
+	// The `dashboards.read` permission gates the verb regardless of
+	// parent scope; the membership interceptor ahead of it enforces
+	// org-membership at org parent and space-membership at space parent.
 	ListDashboards(ctx context.Context, in *ListDashboardsRequest, opts ...grpc.CallOption) (*ListDashboardsResponse, error)
 	// Retrieves a dashboard by name.
 	GetDashboard(ctx context.Context, in *GetDashboardRequest, opts ...grpc.CallOption) (*Dashboard, error)
@@ -120,9 +138,27 @@ func (c *dashboardsClient) DeleteDashboard(ctx context.Context, in *DeleteDashbo
 // All implementations must embed UnimplementedDashboardsServer
 // for forward compatibility.
 //
-// Manages custom dashboards within a space.
+// Manages dashboards at the organization and space scopes.
+//
+// Dashboards come in two flavors, distinguished by `Dashboard.management_mode`:
+//
+//   - SYSTEM_MANAGED — server-curated dashboards (e.g. the org-level
+//     Library, Activity, Members views). Listed and read by all flows;
+//     mutations are rejected.
+//   - USER_MANAGED — customer-owned dashboards. Full CRUD applies.
+//
+// In v1 every org-level dashboard is SYSTEM_MANAGED; every space-level
+// dashboard is USER_MANAGED. The mutation guard is data-driven, not
+// path-driven — Create/Update/Delete refuse a SYSTEM_MANAGED target
+// regardless of which URL the request came in on.
 type DashboardsServer interface {
-	// Lists dashboards in a space.
+	// Lists dashboards under a parent. The parent may be an organization
+	// (returns the system-curated catalog) or a space (returns
+	// user-managed dashboards).
+	//
+	// The `dashboards.read` permission gates the verb regardless of
+	// parent scope; the membership interceptor ahead of it enforces
+	// org-membership at org parent and space-membership at space parent.
 	ListDashboards(context.Context, *ListDashboardsRequest) (*ListDashboardsResponse, error)
 	// Retrieves a dashboard by name.
 	GetDashboard(context.Context, *GetDashboardRequest) (*Dashboard, error)

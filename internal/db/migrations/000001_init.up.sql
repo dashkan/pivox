@@ -925,6 +925,13 @@ INSERT INTO permissions (permission_id, display_name, description) VALUES
   ('apiKeys.read', 'Read API Keys', 'View and list API keys'),
   ('apiKeys.update', 'Update API Key', 'Modify API keys'),
   ('apiKeys.delete', 'Delete API Key', 'Delete API keys'),
+  -- Dashboard management (org-level system catalog + space-level user
+  -- dashboards share one permission set; SYSTEM_MANAGED targets reject
+  -- mutation regardless of role via a data-driven handler guard, not IAM)
+  ('dashboards.read', 'Read Dashboards', 'View and list dashboards (covers both org-level system catalog and space-level user dashboards)'),
+  ('dashboards.create', 'Create Dashboard', 'Create user-managed dashboards in a space. Owner/admin only — dashboards are workspace structure, not day-to-day content (matches spaces.create tier).'),
+  ('dashboards.update', 'Update Dashboard', 'Modify a user-managed dashboard. SYSTEM_MANAGED dashboards reject mutation regardless of role.'),
+  ('dashboards.delete', 'Delete Dashboard', 'Delete a user-managed dashboard. SYSTEM_MANAGED dashboards reject deletion regardless of role.'),
   -- Domain management
   ('domains.create', 'Create Domain', 'Claim a DNS domain for the organization'),
   ('domains.read', 'Read Domains', 'View and list domains'),
