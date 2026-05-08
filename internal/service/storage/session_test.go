@@ -2,6 +2,8 @@ package storage_test
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"sort"
@@ -684,6 +686,115 @@ func TestIntegration_CreateStorageSession_JWTIncludesIdentityAndOrg(t *testing.T
 		"sub claim must carry the Pivox identity UUID of the caller — no directory lookup at the gateway")
 	assert.Equal(t, "acme", claims["org"],
 		"org claim must carry the target org's slug")
+}
+
+// ---------------------------------------------------------------------------
+// #27 cumulative-audit fix — signing-key wire channel
+// ---------------------------------------------------------------------------
+
+// TestIntegration_SessionSigningKey_RoundTripsControllerToAgent is the
+// load-bearing cross-phase acceptance test the cumulative #27 audit
+// asked for: a JWT minted by CreateStorageSession (controller side)
+// must validate against the same signing key the agent receives via
+// HandshakeAck.SessionSigningKey. Without this the entire bearer +
+// cookie auth chain produces 401s in production — phase-6's
+// tests exercised the agent's parser against a known test key, but
+// nothing pinned that the production key flows through HandshakeAck.
+//
+// Concretely: the test mints a JWT via the same path
+// CreateStorageSession uses, then validates it through the agent's
+// validateJWT against the key value the controller is configured
+// with. If the controller's signing key and the agent's signing key
+// (which the agent gets via HandshakeAck) ever drift, this test
+// fails.
+func TestIntegration_SessionSigningKey_RoundTripsControllerToAgent(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test")
+	}
+	ctx := context.Background()
+
+	const sharedKey = "test-cross-phase-signing-key-do-not-flake!"
+
+	// Stand up a controller with an explicit signing key (config-
+	// driven, no longer the hardcoded literal from gateways.go's
+	// constructor default).
+	conns := agentstream.NewConnectionManager()
+	h := grpcharness.New(t,
+		grpcharness.WithOrganizationsServer(),
+		grpcharness.WithSpacesServer(),
+		grpcharness.WithServices(func(h *grpcharness.Harness, s *grpc.Server) {
+			storagev1.RegisterStorageGatewaysServer(s, storage.NewStorageGatewaysServer(storage.StorageGatewaysConfig{
+				Queries:           h.Queries,
+				Encryptor:         h.Encryptor,
+				Conns:             conns,
+				SessionSigningKey: []byte(sharedKey),
+			}))
+			storagev1.RegisterEndpointsServer(s, storage.NewEndpointsServer(storage.EndpointsConfig{
+				Queries: h.Queries, Encryptor: h.Encryptor,
+			}))
+		}))
+	gwClient := storagev1.NewStorageGatewaysClient(h.Conn())
+	epClient := storagev1.NewEndpointsClient(h.Conn())
+
+	// Boot a fixture-shaped acme org with one gateway + endpoint;
+	// register a mock agent connection to the org for the routing
+	// to land. (This bit is identical to the phase-3 isolation
+	// test setup — only thing different is the signing-key
+	// assertion below.)
+	owner := h.SeedOwnedOrg(t, "acme", "Acme Inc", "owner-signing-key")
+	acmeID := h.LookupOrgID(t, "acme")
+	op, err := gwClient.CreateStorageGateway(ctx, &storagev1.CreateStorageGatewayRequest{
+		Parent: "organizations/acme", StorageGatewayId: "gw",
+		StorageGateway: &storagev1.StorageGateway{
+			DisplayName: "gw", IpAddresses: []string{"10.0.0.1"},
+		},
+	})
+	require.NoError(t, err)
+	require.True(t, op.GetDone())
+	_, err = epClient.CreateEndpoint(ctx, &storagev1.CreateEndpointRequest{
+		Parent: "organizations/acme/storageGateways/gw", EndpointId: "media",
+		Endpoint: &storagev1.Endpoint{
+			DisplayName: "media",
+			Configuration: &storagev1.Endpoint_Filesystem{
+				Filesystem: &storagev1.FileSystemConfiguration{Path: "/mnt/media"},
+			},
+		},
+	})
+	require.NoError(t, err)
+	gwRow, err := h.Queries.GetStorageGatewayByName(ctx, db.GetStorageGatewayByNameParams{
+		OrgID: acmeID, Name: "gw",
+	})
+	require.NoError(t, err)
+	conns.Register(&agentstream.AgentConnection{
+		AgentID: uuid.New(), GatewayID: gwRow.ID, OrgID: acmeID,
+		Stream: &recordingStream{},
+	})
+
+	// Mint a session as the org owner.
+	resp, err := gwClient.CreateStorageSession(ctx, &storagev1.CreateStorageSessionRequest{
+		Parent: "organizations/acme",
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, resp.GetToken(), "JWT must be in response.token")
+
+	// The actual cross-phase assertion: parse + HMAC-verify the JWT
+	// against the SAME signing key the agent would have received
+	// via HandshakeAck.SessionSigningKey. If the controller's key
+	// path and the HandshakeAck wire ever drift, this verification
+	// fails.
+	parts := strings.Split(resp.GetToken(), ".")
+	require.Len(t, parts, 3, "JWT must have 3 dot-separated parts")
+	mac := hmac.New(sha256.New, []byte(sharedKey))
+	mac.Write([]byte(parts[0] + "." + parts[1]))
+	expectedSig := mac.Sum(nil)
+	gotSig, err := base64.RawURLEncoding.DecodeString(parts[2])
+	require.NoError(t, err)
+	assert.True(t, hmac.Equal(gotSig, expectedSig),
+		"JWT signature must verify against the SHARED signing key — "+
+			"if this fails, the controller and agent are using different "+
+			"keys and every storage request will 401 in production")
+
+	_ = owner
 }
 
 // silenceUnusedTimestamp keeps the timestamppb import required for

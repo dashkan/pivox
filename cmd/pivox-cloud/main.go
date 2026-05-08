@@ -336,10 +336,18 @@ func serve(cmd *cobra.Command, args []string) error {
 	connMgr := agentstream.NewConnectionManager()
 	storageSessionMaxTTL, _ := f.GetDuration("storage-session-max-ttl")
 	storageSessionCookieDomain, _ := f.GetString("storage-session-cookie-domain")
+	// Session JWT signing key. Threaded into BOTH the controller's
+	// CreateStorageSession handler (for minting) AND the
+	// AgentService's HandshakeAck builder (for distribution to
+	// agents that validate the JWTs the controller mints). The
+	// two MUST be the same value; main.go is the single source of
+	// truth. Production key loading via KMS is tracked in #24.
+	storageSessionSigningKey := []byte("pivox-dev-session-signing-key-do-not-use-in-prod")
 	storagev1.RegisterStorageGatewaysServer(grpcServer, storage.NewStorageGatewaysServer(storage.StorageGatewaysConfig{
 		Queries: queries, Encryptor: enc, Conns: connMgr, AuditResolver: auditResolver,
-		MaxSessionTTL: storageSessionMaxTTL,
-		CookieDomain:  storageSessionCookieDomain,
+		MaxSessionTTL:     storageSessionMaxTTL,
+		CookieDomain:      storageSessionCookieDomain,
+		SessionSigningKey: storageSessionSigningKey,
 	}))
 	storagev1.RegisterAgentsServer(grpcServer, storage.NewAgentsServer(storage.AgentsConfig{Queries: queries}))
 	storagev1.RegisterEndpointsServer(grpcServer, storage.NewEndpointsServer(storage.EndpointsConfig{
@@ -426,6 +434,12 @@ func serve(cmd *cobra.Command, args []string) error {
 	)
 	agentv1.RegisterAgentServiceServer(serviceGRPCServer, storage.NewAgentServiceServer(storage.AgentServiceConfig{
 		Pool: pool, Queries: queries, Logger: logger, Conns: connMgr,
+		// Same signing key the StorageGatewaysServer uses to mint
+		// session JWTs. Stamped into HandshakeAck.session_signing_key
+		// so connected agents validate against the same value. If
+		// this drifts from storageSessionSigningKey above, every
+		// storage request 401s.
+		SessionSigningKey: storageSessionSigningKey,
 	}))
 	reflection.Register(serviceGRPCServer)
 

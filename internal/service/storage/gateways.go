@@ -82,6 +82,22 @@ type StorageGatewaysConfig struct {
 	// for self-hosted; SaaS deployments configure ".pivox.app" or
 	// equivalent).
 	CookieDomain string
+
+	// SessionSigningKey is the HMAC secret used to sign session
+	// JWTs minted by CreateStorageSession. Optional; zero-value
+	// falls back to a hardcoded dev literal (NOT FOR PRODUCTION).
+	//
+	// The same value MUST be threaded into AgentServiceConfig.
+	// SessionSigningKey so HandshakeAck.session_signing_key carries
+	// it to every connected agent. Without that wire, the
+	// controller signs with one key and the agent's validateJWT
+	// HMACs against another, and every storage request 401s. This
+	// cross-phase invariant is what the cumulative #27 audit
+	// caught and is now config-driven so main.go can declare the
+	// key once and pass it to both servers.
+	//
+	// Production key loading is tracked separately in #24 (KMS).
+	SessionSigningKey []byte
 }
 
 // NewStorageGatewaysServer constructs the server from cfg. Panics on
@@ -97,12 +113,19 @@ func NewStorageGatewaysServer(cfg StorageGatewaysConfig) *StorageGatewaysServer 
 	if maxTTL <= 0 {
 		maxTTL = defaultMaxSessionTTL
 	}
+	signingKey := cfg.SessionSigningKey
+	if len(signingKey) == 0 {
+		// Dev/test fallback. Production callers MUST pass the key
+		// explicitly so it can also be plumbed to AgentServiceConfig
+		// (the HandshakeAck wire). Tracked: #24.
+		signingKey = []byte("pivox-dev-session-signing-key-do-not-use-in-prod")
+	}
 	return &StorageGatewaysServer{
 		queries:           cfg.Queries,
 		encryptor:         cfg.Encryptor,
 		conns:             cfg.Conns,
 		audit:             cfg.AuditResolver,
-		sessionSigningKey: []byte("pivox-dev-session-signing-key-do-not-use-in-prod"), // TODO: load from key management system in prod
+		sessionSigningKey: signingKey,
 		maxSessionTTL:     maxTTL,
 		cookieDomain:      cfg.CookieDomain,
 	}

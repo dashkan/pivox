@@ -24,10 +24,12 @@ import (
 // storage gateway agents connecting to the control plane.
 type AgentServiceServer struct {
 	agentv1.UnimplementedAgentServiceServer
-	pool    db.TxBeginner
-	queries db.Querier
-	logger  *slog.Logger
-	conns   *agentstream.ConnectionManager
+	pool              db.TxBeginner
+	queries           db.Querier
+	logger            *slog.Logger
+	conns             *agentstream.ConnectionManager
+	sessionSigningKey []byte
+	corsOrigin        string
 }
 
 // AgentServiceConfig is the constructor input for AgentServiceServer.
@@ -46,6 +48,23 @@ type AgentServiceConfig struct {
 	// Conns tracks connected agents and routes outbound messages.
 	// Required.
 	Conns *agentstream.ConnectionManager
+
+	// SessionSigningKey is stamped into HandshakeAck.session_signing_key
+	// so connected agents can validate the session JWTs the
+	// controller's CreateStorageSession mints. MUST equal
+	// StorageGatewaysConfig.SessionSigningKey — main.go is
+	// responsible for declaring the key once and passing it to both
+	// servers. Optional only for tests; production callers should
+	// always provide it. Tracked: #27 cumulative-audit fix; #24
+	// (KMS-load).
+	SessionSigningKey []byte
+
+	// CORSOrigin is stamped into HandshakeAck.cors_origin so the
+	// agent's HTTP server can set the right Access-Control-Allow-
+	// Origin header. Optional; agent falls back to "*" when this
+	// field is empty AND the agent's own --cors-origin flag is
+	// also unset.
+	CORSOrigin string
 }
 
 // NewAgentServiceServer constructs the server from cfg. Panics on a
@@ -64,10 +83,12 @@ func NewAgentServiceServer(cfg AgentServiceConfig) *AgentServiceServer {
 		panic("storage: AgentServiceConfig.Conns is required")
 	}
 	return &AgentServiceServer{
-		pool:    cfg.Pool,
-		queries: cfg.Queries,
-		logger:  cfg.Logger,
-		conns:   cfg.Conns,
+		pool:              cfg.Pool,
+		queries:           cfg.Queries,
+		logger:            cfg.Logger,
+		conns:             cfg.Conns,
+		sessionSigningKey: cfg.SessionSigningKey,
+		corsOrigin:        cfg.CORSOrigin,
 	}
 }
 
@@ -221,6 +242,15 @@ func (s *AgentServiceServer) Connect(stream agentv1.AgentService_ConnectServer) 
 			HandshakeAck: &agentv1.HandshakeAck{
 				AgentName: fmt.Sprintf("agent-%s-%s", gateway.Name, hs.GetIpAddress()),
 				Endpoints: endpointConfigs,
+				// #27 cumulative-audit fix: ship the session
+				// signing key + CORS origin to the agent so the
+				// agent's validateJWT HMACs against the same key
+				// the controller's mintSessionJWT signs with.
+				// Without this wire the per-phase tests pass but
+				// production storage requests get 401 across the
+				// board.
+				SessionSigningKey: s.sessionSigningKey,
+				CorsOrigin:        s.corsOrigin,
 			},
 		},
 	}
