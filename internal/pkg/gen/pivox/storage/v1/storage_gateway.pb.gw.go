@@ -506,12 +506,21 @@ func request_StorageGateways_CreateStorageSession_0(ctx context.Context, marshal
 	var (
 		protoReq CreateStorageSessionRequest
 		metadata runtime.ServerMetadata
+		err      error
 	)
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	if req.Body != nil {
 		_, _ = io.Copy(io.Discard, req.Body)
+	}
+	val, ok := pathParams["parent"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "parent")
+	}
+	protoReq.Parent, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "parent", err)
 	}
 	msg, err := client.CreateStorageSession(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
@@ -521,9 +530,18 @@ func local_request_StorageGateways_CreateStorageSession_0(ctx context.Context, m
 	var (
 		protoReq CreateStorageSessionRequest
 		metadata runtime.ServerMetadata
+		err      error
 	)
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	val, ok := pathParams["parent"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "parent")
+	}
+	protoReq.Parent, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "parent", err)
 	}
 	msg, err := server.CreateStorageSession(ctx, &protoReq)
 	return msg, metadata, err
@@ -721,7 +739,7 @@ func RegisterStorageGatewaysHandlerServer(ctx context.Context, mux *runtime.Serv
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.storage.v1.StorageGateways/CreateStorageSession", runtime.WithHTTPPathPattern("/v1/storageSession"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/pivox.storage.v1.StorageGateways/CreateStorageSession", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*}/storageSession"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -932,7 +950,7 @@ func RegisterStorageGatewaysHandlerClient(ctx context.Context, mux *runtime.Serv
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.storage.v1.StorageGateways/CreateStorageSession", runtime.WithHTTPPathPattern("/v1/storageSession"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/pivox.storage.v1.StorageGateways/CreateStorageSession", runtime.WithHTTPPathPattern("/v1/{parent=organizations/*}/storageSession"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -958,7 +976,7 @@ var (
 	pattern_StorageGateways_GetInstallScript_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3}, []string{"v1", "organizations", "storageGateways", "name"}, "installScript"))
 	pattern_StorageGateways_GetUninstallScript_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3}, []string{"v1", "organizations", "storageGateways", "name"}, "uninstallScript"))
 	pattern_StorageGateways_UpgradeGateway_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 2, 2, 1, 0, 4, 4, 5, 3}, []string{"v1", "organizations", "storageGateways", "name"}, "upgrade"))
-	pattern_StorageGateways_CreateStorageSession_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1", "storageSession"}, ""))
+	pattern_StorageGateways_CreateStorageSession_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 2, 5, 2, 2, 3}, []string{"v1", "organizations", "parent", "storageSession"}, ""))
 )
 
 var (

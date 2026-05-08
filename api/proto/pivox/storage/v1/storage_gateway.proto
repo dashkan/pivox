@@ -150,21 +150,44 @@ service StorageGateways {
     option (pivox.permission.v1.required_permission) = "storage.gateways.upgrade";
   }
 
-  // Creates a storage session for the authenticated user. Computes
-  // access patterns based on the user's org and space memberships,
-  // pushes session grants to connected gateways, and returns a JWT
-  // cookie for browser-based storage access.
+  // Creates a storage session for the authenticated user, scoped to
+  // a single organization. The handler computes access patterns from
+  // the caller's space memberships within `parent`, pushes the
+  // SessionGrant to gateways belonging to that organization, and
+  // returns both a Set-Cookie JWT (browser flow) and the JWT in the
+  // response body (native-client flow, attached as
+  // `Authorization: Bearer`).
   //
-  // The response includes a Set-Cookie header (via gRPC metadata) with
-  // the session JWT scoped to .pivox.app domain.
+  // The session is per-(user, org) — a leaked token grants ONE
+  // organization, never the caller's full org graph.
+  //
+  // Security boundary: the RPC is `exempt = true`, so no per-RPC
+  // permission check runs; the membership interceptor enforces only
+  // that the caller has at least one org membership. The "caller is
+  // in `parent` specifically" check lives INSIDE the handler — if
+  // the caller is not a member of `parent`, the handler returns
+  // PermissionDenied. The pattern set is therefore the substantive
+  // security boundary: a non-member sees no patterns and is rejected
+  // before any token mints. Adding `storage.session.create` would be
+  // ceremony — the membership-derived pattern computation is the
+  // real check.
+  //
+  // (-- api-linter: core::0133::http-body=disabled
+  //     aip.dev/not-precedent: A storage session is an ephemeral
+  //     credential, not an AIP-style resource. The custom-action
+  //     framing fits better than AIP-133 Create. --)
+  // (-- api-linter: core::0133::request-unknown-fields=disabled
+  //     aip.dev/not-precedent: see above. --)
+  // (-- api-linter: core::0133::request-resource-field=disabled
+  //     aip.dev/not-precedent: see above. --)
+  // (-- api-linter: core::0133::response-message-name=disabled
+  //     aip.dev/not-precedent: see above. --)
   rpc CreateStorageSession(CreateStorageSessionRequest) returns (CreateStorageSessionResponse) {
     option (google.api.http) = {
-      post: "/v1/storageSession"
+      post: "/v1/{parent=organizations/*}/storageSession"
       body: "*"
     };
-    // No org parent — session is for the authenticated caller and
-    // computes their access patterns across all org memberships.
-    // Membership interceptor still requires authentication.
+    option (google.api.method_signature) = "parent";
     option (pivox.permission.v1.exempt) = true;
   }
 }
@@ -615,8 +638,21 @@ message UpgradeGatewayMetadata {
 // [CreateStorageSession][pivox.storage.v1.StorageGateways.CreateStorageSession]
 // method.
 message CreateStorageSessionRequest {
-  // Optional. Override session duration. Default: 1 hour.
-  google.protobuf.Duration ttl = 1 [(google.api.field_behavior) = OPTIONAL];
+  // Required. The organization this session is scoped to. Format:
+  // `organizations/{organization}`. The minted session can only
+  // access storage paths derived from the caller's memberships
+  // within this organization.
+  string parent = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "pivox.api/Organization"},
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. Override session duration. Default: 1 hour. Capped at
+  // the server-configured maximum (`StorageGatewaysConfig.MaxSessionTTL`,
+  // typically 8h); requests exceeding the cap are clamped, not
+  // rejected.
+  google.protobuf.Duration ttl = 2 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // The response returned from the
@@ -625,4 +661,10 @@ message CreateStorageSessionRequest {
 message CreateStorageSessionResponse {
   // The session expiry time.
   google.protobuf.Timestamp expiry = 1;
+
+  // The session JWT, also delivered as a Set-Cookie response header
+  // for browser flows. Native clients (macOS, Windows) read this
+  // value from the response body and attach it as
+  // `Authorization: Bearer <token>` on subsequent storage requests.
+  string token = 2;
 }

@@ -478,12 +478,15 @@ Asset reads go through Storage Gateways using session cookie auth. URLs are stab
 ```
 1. User authenticates with Pivox Cloud (Firebase ID token)
 
-2. Browser calls CreateStorageSession RPC on the Cloud Controller:
-   POST /v1/storageSession
+2. Browser calls CreateStorageSession RPC on the Cloud Controller,
+   scoped to the org the user is currently in:
+   POST /v1/{parent=organizations/*}/storageSession
 
 3. Cloud Controller:
    a. Verifies Firebase token, identifies user
-   b. Computes access patterns from user's org/project memberships:
+   b. Verifies the caller is a member of `parent` (else 403)
+   c. Computes access patterns from the user's space memberships
+      WITHIN the requested org:
       ["/local-corp/local/primary/news/*",
        "/local-corp/local/primary/sports/*"]
    c. Generates opaque session token (UUID)

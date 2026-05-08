@@ -419,6 +419,13 @@ func (s *StorageGatewaysServer) CreateStorageSession(ctx context.Context, req *s
 	patterns := []string{"/*"}
 
 	// Push SessionGrant to all connected gateways.
+	//
+	// TODO(#27 phase 3): the proto contract says "pushes to gateways
+	// in the target organization (NOT all gateways)." Today this still
+	// uses SendToAll because ConnectionManager has no SendToOrg yet.
+	// Phase 3 lands SendToOrg + the routing fix; until then,
+	// cross-org leakage of session tokens is the known gap that
+	// motivates the issue.
 	grant := &agentv1.ControlMessage{
 		Id: uuid.New().String(),
 		Message: &agentv1.ControlMessage_SessionGrant{

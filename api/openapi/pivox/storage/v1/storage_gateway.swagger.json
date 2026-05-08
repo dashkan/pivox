@@ -584,10 +584,10 @@
         ]
       }
     },
-    "/v1/storageSession": {
+    "/v1/organizations/{organization}/storageSession": {
       "post": {
-        "summary": "Creates a storage session for the authenticated user. Computes\naccess patterns based on the user's org and space memberships,\npushes session grants to connected gateways, and returns a JWT\ncookie for browser-based storage access.",
-        "description": "The response includes a Set-Cookie header (via gRPC metadata) with\nthe session JWT scoped to .pivox.app domain.",
+        "summary": "Creates a storage session for the authenticated user, scoped to\na single organization. The handler computes access patterns from\nthe caller's space memberships within `parent`, pushes the\nSessionGrant to gateways belonging to that organization, and\nreturns both a Set-Cookie JWT (browser flow) and the JWT in the\nresponse body (native-client flow, attached as\n`Authorization: Bearer`).",
+        "description": "The session is per-(user, org) — a leaked token grants ONE\norganization, never the caller's full org graph.\n\nSecurity boundary: the RPC is `exempt = true`, so no per-RPC\npermission check runs; the membership interceptor enforces only\nthat the caller has at least one org membership. The \"caller is\nin `parent` specifically\" check lives INSIDE the handler — if\nthe caller is not a member of `parent`, the handler returns\nPermissionDenied. The pattern set is therefore the substantive\nsecurity boundary: a non-member sees no patterns and is rejected\nbefore any token mints. Adding `storage.session.create` would be\nceremony — the membership-derived pattern computation is the\nreal check.",
         "operationId": "StorageGateways_CreateStorageSession",
         "responses": {
           "200": {
@@ -605,12 +605,17 @@
         },
         "parameters": [
           {
+            "name": "organization",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
             "name": "body",
-            "description": "The request sent to the\n[CreateStorageSession][pivox.storage.v1.StorageGateways.CreateStorageSession]\nmethod.",
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/v1CreateStorageSessionRequest"
+              "$ref": "#/definitions/StorageGatewaysCreateStorageSessionBody"
             }
           }
         ],
@@ -632,6 +637,16 @@
       ],
       "default": "CERT_STATE_UNSPECIFIED",
       "description": "TLS certificate lifecycle states.\n\n - CERT_STATE_UNSPECIFIED: Unspecified certificate state.\n - PENDING: The certificate is being provisioned.\n - CERT_ACTIVE: The certificate is active and valid.\n - EXPIRING: The certificate is approaching its expiration date.\n - EXPIRED: The certificate has expired."
+    },
+    "StorageGatewaysCreateStorageSessionBody": {
+      "type": "object",
+      "properties": {
+        "ttl": {
+          "type": "string",
+          "description": "Optional. Override session duration. Default: 1 hour. Capped at\nthe server-configured maximum (`StorageGatewaysConfig.MaxSessionTTL`,\ntypically 8h); requests exceeding the cap are clamped, not\nrejected."
+        }
+      },
+      "description": "The request sent to the\n[CreateStorageSession][pivox.storage.v1.StorageGateways.CreateStorageSession]\nmethod."
     },
     "StorageGatewaysRotateRegistrationTokenBody": {
       "type": "object",
@@ -736,16 +751,6 @@
       },
       "description": "Actor is a resolved reference to an identity. It is used flat on\nresources to expose audit fields (created_by, updated_by, deleted_by)\nper AIP-148, and can be reused at non-audit positions like assignee\nor approver.\n\nActor lives in `pivox.types` (unversioned — type definitions are\nshared infrastructure, not an API surface) so every domain package\n(pivox.api.v1, pivox.ai.v1, pivox.assets.v1, pivox.iam.v1,\npivox.storage.v1) can reference it without crossing into a peer\ndomain — the api-linter's foreign-type-reference rule (AIP-215)\nconsiders `pivox.types` a shared types namespace.\n\nResolution is performed server-side via the audit.Resolver, which\nbatches lookups against firebase_identities and caches recent\nresults. When the underlying identity is soft-deleted the resolver\nblanks out PII (display_name, email) and sets is_deleted=true while\npreserving the id so that historical references remain stable."
     },
-    "v1CreateStorageSessionRequest": {
-      "type": "object",
-      "properties": {
-        "ttl": {
-          "type": "string",
-          "description": "Optional. Override session duration. Default: 1 hour."
-        }
-      },
-      "description": "The request sent to the\n[CreateStorageSession][pivox.storage.v1.StorageGateways.CreateStorageSession]\nmethod."
-    },
     "v1CreateStorageSessionResponse": {
       "type": "object",
       "properties": {
@@ -753,6 +758,10 @@
           "type": "string",
           "format": "date-time",
           "description": "The session expiry time."
+        },
+        "token": {
+          "type": "string",
+          "description": "The session JWT, also delivered as a Set-Cookie response header\nfor browser flows. Native clients (macOS, Windows) read this\nvalue from the response body and attach it as\n`Authorization: Bearer \u003ctoken\u003e` on subsequent storage requests."
         }
       },
       "description": "The response returned from the\n[CreateStorageSession][pivox.storage.v1.StorageGateways.CreateStorageSession]\nmethod."

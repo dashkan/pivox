@@ -1457,8 +1457,16 @@ func (x *UpgradeGatewayMetadata) GetTargetVersion() string {
 // method.
 type CreateStorageSessionRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Optional. Override session duration. Default: 1 hour.
-	Ttl           *durationpb.Duration `protobuf:"bytes,1,opt,name=ttl,proto3" json:"ttl,omitempty"`
+	// Required. The organization this session is scoped to. Format:
+	// `organizations/{organization}`. The minted session can only
+	// access storage paths derived from the caller's memberships
+	// within this organization.
+	Parent string `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
+	// Optional. Override session duration. Default: 1 hour. Capped at
+	// the server-configured maximum (`StorageGatewaysConfig.MaxSessionTTL`,
+	// typically 8h); requests exceeding the cap are clamped, not
+	// rejected.
+	Ttl           *durationpb.Duration `protobuf:"bytes,2,opt,name=ttl,proto3" json:"ttl,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1493,6 +1501,13 @@ func (*CreateStorageSessionRequest) Descriptor() ([]byte, []int) {
 	return file_pivox_storage_v1_storage_gateway_proto_rawDescGZIP(), []int{17}
 }
 
+func (x *CreateStorageSessionRequest) GetParent() string {
+	if x != nil {
+		return x.Parent
+	}
+	return ""
+}
+
 func (x *CreateStorageSessionRequest) GetTtl() *durationpb.Duration {
 	if x != nil {
 		return x.Ttl
@@ -1506,7 +1521,12 @@ func (x *CreateStorageSessionRequest) GetTtl() *durationpb.Duration {
 type CreateStorageSessionResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The session expiry time.
-	Expiry        *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=expiry,proto3" json:"expiry,omitempty"`
+	Expiry *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=expiry,proto3" json:"expiry,omitempty"`
+	// The session JWT, also delivered as a Set-Cookie response header
+	// for browser flows. Native clients (macOS, Windows) read this
+	// value from the response body and attach it as
+	// `Authorization: Bearer <token>` on subsequent storage requests.
+	Token         string `protobuf:"bytes,2,opt,name=token,proto3" json:"token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1546,6 +1566,13 @@ func (x *CreateStorageSessionResponse) GetExpiry() *timestamppb.Timestamp {
 		return x.Expiry
 	}
 	return nil
+}
+
+func (x *CreateStorageSessionResponse) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
 }
 
 var File_pivox_storage_v1_storage_gateway_proto protoreflect.FileDescriptor
@@ -1669,11 +1696,14 @@ const file_pivox_storage_v1_storage_gateway_proto_rawDesc = "" +
 	"\tPREPARING\x10\x01\x12\x0f\n" +
 	"\vDOWNLOADING\x10\x02\x12\v\n" +
 	"\aROLLING\x10\x03\x12\b\n" +
-	"\x04DONE\x10\x04\"O\n" +
-	"\x1bCreateStorageSessionRequest\x120\n" +
-	"\x03ttl\x18\x01 \x01(\v2\x19.google.protobuf.DurationB\x03\xe0A\x01R\x03ttl\"R\n" +
+	"\x04DONE\x10\x04\"\x8d\x01\n" +
+	"\x1bCreateStorageSessionRequest\x12<\n" +
+	"\x06parent\x18\x01 \x01(\tB$\xe0A\x02\xfaA\x18\n" +
+	"\x16pivox.api/Organization\xbaH\x03\xc8\x01\x01R\x06parent\x120\n" +
+	"\x03ttl\x18\x02 \x01(\v2\x19.google.protobuf.DurationB\x03\xe0A\x01R\x03ttl\"h\n" +
 	"\x1cCreateStorageSessionResponse\x122\n" +
-	"\x06expiry\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\x06expiry2\xa2\x12\n" +
+	"\x06expiry\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\x06expiry\x12\x14\n" +
+	"\x05token\x18\x02 \x01(\tR\x05token2\xc4\x12\n" +
 	"\x0fStorageGateways\x12\xa4\x02\n" +
 	"\x14CreateStorageGateway\x12-.pivox.storage.v1.CreateStorageGatewayRequest\x1a\x1d.google.longrunning.Operation\"\xbd\x01\xcaA.\n" +
 	"\x0eStorageGateway\x12\x1cCreateStorageGatewayMetadata\xdaA)parent,storage_gateway,storage_gateway_id\x8a\xb5\x18\x17storage.gateways.create\x82\xd3\xe4\x93\x02?:\x0fstorage_gateway\",/v1/{parent=organizations/*}/storageGateways\x12\xb7\x01\n" +
@@ -1687,8 +1717,8 @@ const file_pivox_storage_v1_storage_gateway_proto_rawDesc = "" +
 	"\x10GetInstallScript\x12).pivox.storage.v1.GetInstallScriptRequest\x1a*.pivox.storage.v1.GetInstallScriptResponse\"b\xdaA\x04name\x8a\xb5\x18\x15storage.gateways.read\x82\xd3\xe4\x93\x02<\x12:/v1/{name=organizations/*/storageGateways/*}:installScript\x12\xd5\x01\n" +
 	"\x12GetUninstallScript\x12+.pivox.storage.v1.GetUninstallScriptRequest\x1a,.pivox.storage.v1.GetUninstallScriptResponse\"d\xdaA\x04name\x8a\xb5\x18\x15storage.gateways.read\x82\xd3\xe4\x93\x02>\x12</v1/{name=organizations/*/storageGateways/*}:uninstallScript\x12\xf7\x01\n" +
 	"\x0eUpgradeGateway\x12'.pivox.storage.v1.UpgradeGatewayRequest\x1a\x1d.google.longrunning.Operation\"\x9c\x01\xcaA(\n" +
-	"\x0eStorageGateway\x12\x16UpgradeGatewayMetadata\xdaA\x13name,target_version\x8a\xb5\x18\x18storage.gateways.upgrade\x82\xd3\xe4\x93\x029:\x01*\"4/v1/{name=organizations/*/storageGateways/*}:upgrade\x12\x98\x01\n" +
-	"\x14CreateStorageSession\x12-.pivox.storage.v1.CreateStorageSessionRequest\x1a..pivox.storage.v1.CreateStorageSessionResponse\"!\x90\xb5\x18\x01\x82\xd3\xe4\x93\x02\x17:\x01*\"\x12/v1/storageSession\x1a\x0f\xcaA\fapi.pivox.ioB\xd3\x01\n" +
+	"\x0eStorageGateway\x12\x16UpgradeGatewayMetadata\xdaA\x13name,target_version\x8a\xb5\x18\x18storage.gateways.upgrade\x82\xd3\xe4\x93\x029:\x01*\"4/v1/{name=organizations/*/storageGateways/*}:upgrade\x12\xba\x01\n" +
+	"\x14CreateStorageSession\x12-.pivox.storage.v1.CreateStorageSessionRequest\x1a..pivox.storage.v1.CreateStorageSessionResponse\"C\xdaA\x06parent\x90\xb5\x18\x01\x82\xd3\xe4\x93\x020:\x01*\"+/v1/{parent=organizations/*}/storageSession\x1a\x0f\xcaA\fapi.pivox.ioB\xd3\x01\n" +
 	"\x14com.pivox.storage.v1B\x13StorageGatewayProtoP\x01ZDgithub.com/dashkan/pivox/internal/pkg/gen/pivox/storage/v1;storagev1\xa2\x02\x03PSX\xaa\x02\x10Pivox.Storage.V1\xca\x02\x10Pivox\\Storage\\V1\xe2\x02\x1cPivox\\Storage\\V1\\GPBMetadata\xea\x02\x12Pivox::Storage::V1b\x06proto3"
 
 var (
