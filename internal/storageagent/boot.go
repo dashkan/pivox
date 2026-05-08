@@ -12,11 +12,11 @@ import (
 // adjacent (-wal, -shm).
 const agentDBFilename = "agent.db"
 
-// OpenSessionStateConfig is the constructor input for OpenSessionState.
-type OpenSessionStateConfig struct {
+// OpenAgentStateConfig is the constructor input for OpenAgentState.
+type OpenAgentStateConfig struct {
 	// StateDir is the filesystem path that holds the agent's local
-	// state DB (and, in later phases of #79, denied patterns and
-	// endpoints). Created if it does not exist. Required.
+	// state DB (sessions, denied patterns, and — once #79 phase 5
+	// lands — endpoints). Created if it does not exist. Required.
 	//
 	// IMPORTANT: this should NOT be the cache directory. Operators
 	// commonly run cache-cleanup scripts (`rm -rf <cache-dir>/*`),
@@ -29,40 +29,69 @@ type OpenSessionStateConfig struct {
 	Logger *slog.Logger
 }
 
-// OpenSessionState opens the agent's local state DB at
-// <StateDir>/agent.db, constructs a SessionStore with write-through
-// persistence, and reloads any persisted sessions from disk.
+// AgentState bundles the agent's in-memory stores along with the
+// underlying *Store handle that all writes flow through.
 //
-// Failure mode: log-and-continue. If MkdirAll, OpenStore, or
-// LoadFromStore fails, the function logs at slog.Error and returns an
-// in-memory-only SessionStore (with a nil Store). The controller is
-// the source of truth for active sessions and re-delivers them on
-// reconnect handshake — refusing to start the agent on local-state
-// failure would be strictly worse for availability. The trade-off is
-// that the operator loses crash resilience until the state-dir issue
-// is fixed; the loud Error log is the signal to act.
+// Sessions and Denied are always non-nil — they are constructed in
+// every code path, including the in-memory fallback. Store is nil
+// only on the log-and-continue failure path (state-dir or OpenStore
+// failure); Close on the nil Store is a no-op.
+type AgentState struct {
+	// Sessions is the agent's session store, wired through Store
+	// when non-nil. Always non-nil.
+	Sessions *SessionStore
+
+	// Denied is the agent's denied-patterns set, wired through Store
+	// when non-nil. Always non-nil.
+	Denied *DeniedPatterns
+
+	// Store is the underlying SQLite handle. May be nil if the state
+	// DB could not be opened — the caller's `defer state.Store.Close()`
+	// is still safe because (*Store)(nil).Close() is a no-op.
+	Store *Store
+}
+
+// OpenAgentState opens the agent's local state DB at
+// <StateDir>/agent.db and constructs the in-memory stores with
+// write-through persistence, reloading any persisted state from disk.
+//
+// Failure mode: log-and-continue. If MkdirAll or OpenStore fails, the
+// function logs at slog.Error and returns in-memory-only stores (with
+// AgentState.Store == nil). The controller is the source of truth and
+// re-delivers active sessions / denied patterns on the next reconnect
+// handshake — refusing to start the agent on local-state failure
+// would be strictly worse for availability. The operator loses crash
+// resilience until the state-dir issue is fixed; the loud Error log
+// is the signal to act.
+//
+// LoadFromStore failures (per-store) are also log-and-continue: the
+// Store handle stays attached so subsequent writes can still persist;
+// only the reload of prior state was lost.
 //
 // Caller responsibilities:
 //
-//   - Close the returned *Store on shutdown. Store may be nil; the
-//     returned Store handle's Close is nil-safe ((*Store)(nil).Close()
-//     is a no-op), so a plain `defer store.Close()` is fine — an
-//     explicit nil-check is belt-and-suspenders, not required.
-//   - Use the returned *SessionStore as the agent's session store; it
-//     is fully usable in either mode (in-memory-only or persistent).
-func OpenSessionState(ctx context.Context, cfg OpenSessionStateConfig) (*SessionStore, *Store) {
+//   - Close AgentState.Store on shutdown. Store may be nil; the
+//     handle's Close is nil-safe ((*Store)(nil).Close() is a no-op),
+//     so a plain `defer state.Store.Close()` is fine.
+//   - Use AgentState.Sessions and AgentState.Denied as the agent's
+//     in-memory stores; they are fully usable in either mode
+//     (in-memory-only or persistent).
+func OpenAgentState(ctx context.Context, cfg OpenAgentStateConfig) AgentState {
 	if cfg.StateDir == "" {
-		panic("storageagent: OpenSessionStateConfig.StateDir is required")
+		panic("storageagent: OpenAgentStateConfig.StateDir is required")
 	}
 	if cfg.Logger == nil {
-		panic("storageagent: OpenSessionStateConfig.Logger is required")
+		panic("storageagent: OpenAgentStateConfig.Logger is required")
 	}
 
 	if err := os.MkdirAll(cfg.StateDir, 0o755); err != nil {
 		cfg.Logger.Error(
 			"create agent state dir; falling back to in-memory only (no crash resilience)",
 			"dir", cfg.StateDir, "error", err)
-		return NewSessionStore(SessionStoreConfig{}), nil
+		return AgentState{
+			Sessions: NewSessionStore(SessionStoreConfig{}),
+			Denied:   NewDeniedPatterns(DeniedPatternsConfig{}),
+		}
 	}
 
 	dbPath := filepath.Join(cfg.StateDir, agentDBFilename)
@@ -71,7 +100,10 @@ func OpenSessionState(ctx context.Context, cfg OpenSessionStateConfig) (*Session
 		cfg.Logger.Error(
 			"open agent state DB; falling back to in-memory only (no crash resilience)",
 			"path", dbPath, "error", err)
-		return NewSessionStore(SessionStoreConfig{}), nil
+		return AgentState{
+			Sessions: NewSessionStore(SessionStoreConfig{}),
+			Denied:   NewDeniedPatterns(DeniedPatternsConfig{}),
+		}
 	}
 
 	sessions := NewSessionStore(SessionStoreConfig{Store: store})
@@ -80,9 +112,22 @@ func OpenSessionState(ctx context.Context, cfg OpenSessionStateConfig) (*Session
 		// We just couldn't reload prior state — the controller will
 		// redeliver active sessions on reconnect.
 		cfg.Logger.Error(
-			"reload sessions from agent state DB; serving with empty in-memory state",
+			"reload sessions from agent state DB; serving with empty in-memory sessions",
 			"path", dbPath, "error", err)
 	}
 
-	return sessions, store
+	denied := NewDeniedPatterns(DeniedPatternsConfig{Store: store})
+	if err := denied.LoadFromStore(ctx); err != nil {
+		// Same shape as sessions: keep Store attached, log loud, the
+		// controller resends the full denied set on reconnect.
+		cfg.Logger.Error(
+			"reload denied patterns from agent state DB; serving with empty in-memory denied set",
+			"path", dbPath, "error", err)
+	}
+
+	return AgentState{
+		Sessions: sessions,
+		Denied:   denied,
+		Store:    store,
+	}
 }

@@ -233,8 +233,14 @@ func (s *Stream) handleServerMessage(ctx context.Context, msg *agentv1.ControlMe
 			s.logger.Info("applied config update", "endpoints", len(update.GetEndpoints()))
 		}
 		if patterns := update.GetDeniedPatterns(); patterns != nil {
-			s.denied.Update(patterns)
-			s.logger.Info("updated denied patterns", "count", len(patterns))
+			if err := s.denied.Update(ctx, patterns); err != nil {
+				// Persistence failure: log and continue with the
+				// existing in-memory set. The controller will resend
+				// the full set on the next ConfigUpdate.
+				s.logger.Error("failed to apply denied patterns update", "error", err)
+			} else {
+				s.logger.Info("updated denied patterns", "count", len(patterns))
+			}
 		}
 	case *agentv1.ControlMessage_DrainRequest:
 		s.logger.Info("received drain request",

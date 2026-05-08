@@ -110,8 +110,15 @@ func Connect(ctx context.Context, addr string, useTLS bool, token string, cfg *C
 	}
 
 	if patterns := ack.GetDeniedPatterns(); len(patterns) > 0 {
-		cfg.Denied.Update(patterns)
-		logger.Info("loaded denied patterns", "count", len(patterns))
+		if err := cfg.Denied.Update(ctx, patterns); err != nil {
+			// Persistence failure on the initial-handshake denied set:
+			// log loud, leave whatever was reloaded from disk by
+			// LoadFromStore in place. The controller resends the full
+			// set on the next ConfigUpdate.
+			logger.Error("failed to apply initial denied patterns", "error", err)
+		} else {
+			logger.Info("loaded denied patterns", "count", len(patterns))
+		}
 	}
 
 	// Update HTTP server with signing key and CORS from handshake.

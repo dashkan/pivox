@@ -1,14 +1,17 @@
 package storageagent
 
 import (
+	"context"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewDeniedPatterns_Empty(t *testing.T) {
-	dp := NewDeniedPatterns()
+	t.Parallel()
+	dp := NewDeniedPatterns(DeniedPatternsConfig{})
 
 	assert.False(t, dp.IsDenied("/any/path"))
 	assert.False(t, dp.IsDenied(""))
@@ -16,16 +19,20 @@ func TestNewDeniedPatterns_Empty(t *testing.T) {
 }
 
 func TestIsDenied_Match(t *testing.T) {
-	dp := NewDeniedPatterns()
-	dp.Update([]string{"secret.txt", "*.key"})
+	t.Parallel()
+	ctx := context.Background()
+	dp := NewDeniedPatterns(DeniedPatternsConfig{})
+	require.NoError(t, dp.Update(ctx, []string{"secret.txt", "*.key"}))
 
 	assert.True(t, dp.IsDenied("secret.txt"))
 	assert.True(t, dp.IsDenied("server.key"))
 }
 
 func TestIsDenied_NoMatch(t *testing.T) {
-	dp := NewDeniedPatterns()
-	dp.Update([]string{"secret.txt", "*.key"})
+	t.Parallel()
+	ctx := context.Background()
+	dp := NewDeniedPatterns(DeniedPatternsConfig{})
+	require.NoError(t, dp.Update(ctx, []string{"secret.txt", "*.key"}))
 
 	assert.False(t, dp.IsDenied("public.txt"))
 	assert.False(t, dp.IsDenied("readme.md"))
@@ -33,13 +40,15 @@ func TestIsDenied_NoMatch(t *testing.T) {
 }
 
 func TestUpdate_Replace(t *testing.T) {
-	dp := NewDeniedPatterns()
+	t.Parallel()
+	ctx := context.Background()
+	dp := NewDeniedPatterns(DeniedPatternsConfig{})
 
-	dp.Update([]string{"old_pattern.txt"})
+	require.NoError(t, dp.Update(ctx, []string{"old_pattern.txt"}))
 	assert.True(t, dp.IsDenied("old_pattern.txt"))
 
 	// Replace with entirely new patterns.
-	dp.Update([]string{"new_pattern.txt"})
+	require.NoError(t, dp.Update(ctx, []string{"new_pattern.txt"}))
 
 	assert.False(t, dp.IsDenied("old_pattern.txt"),
 		"old pattern should no longer be denied after update")
@@ -48,8 +57,11 @@ func TestUpdate_Replace(t *testing.T) {
 }
 
 func TestIsDenied_GlobPatterns(t *testing.T) {
-	dp := NewDeniedPatterns()
-	dp.Update([]string{"*.tmp", "archive-*", "backup_???"})
+	t.Parallel()
+	ctx := context.Background()
+	dp := NewDeniedPatterns(DeniedPatternsConfig{})
+	require.NoError(t, dp.Update(ctx,
+		[]string{"*.tmp", "archive-*", "backup_???"}))
 
 	tests := []struct {
 		path    string
@@ -69,39 +81,40 @@ func TestIsDenied_GlobPatterns(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {
+			t.Parallel()
 			assert.Equal(t, tt.denied, dp.IsDenied(tt.path), tt.comment)
 		})
 	}
 }
 
 func TestDeniedConcurrentAccess(t *testing.T) {
-	dp := NewDeniedPatterns()
-	dp.Update([]string{"*.tmp", "secret.*"})
+	t.Parallel()
+	ctx := context.Background()
+	dp := NewDeniedPatterns(DeniedPatternsConfig{})
+	require.NoError(t, dp.Update(ctx, []string{"*.tmp", "secret.*"}))
 
 	var wg sync.WaitGroup
 	const goroutines = 100
 
 	// Concurrent reads.
 	for range goroutines {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			dp.IsDenied("file.tmp")
 			dp.IsDenied("public.txt")
-		}()
+		})
 	}
 
-	// Concurrent writes.
+	// Concurrent writes. Errors discarded — no Store attached so the
+	// only failure path can't fire. Same convention as
+	// TestSessionConcurrentAccess.
 	for i := range goroutines / 2 {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			if i%2 == 0 {
-				dp.Update([]string{"*.tmp", "secret.*"})
+				_ = dp.Update(ctx, []string{"*.tmp", "secret.*"})
 			} else {
-				dp.Update([]string{"*.log"})
+				_ = dp.Update(ctx, []string{"*.log"})
 			}
-		}(i)
+		})
 	}
 
 	wg.Wait()

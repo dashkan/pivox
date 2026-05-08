@@ -164,7 +164,7 @@ func TestHTTPAuth_ValidJWT_NoEndpoint_NotFound(t *testing.T) {
 func TestHTTPAuth_ValidJWT_DeniedPattern_NotFound(t *testing.T) {
 	srv, sessions, endpoints, denied := newTestHTTPServer(t)
 	setupEndpoint(t, endpoints, "media")
-	denied.Update([]string{"/media/file.txt"})
+	require.NoError(t, denied.Update(context.Background(), []string{"/media/file.txt"}))
 	require.NoError(t, sessions.Grant(context.Background(), "session-xyz", []string{"/media/*"}, time.Now().Add(time.Hour)))
 
 	w := httptest.NewRecorder()
@@ -176,7 +176,7 @@ func TestHTTPAuth_ValidJWT_DeniedPattern_NotFound(t *testing.T) {
 func TestHTTPAuth_ValidJWT_DeniedNoMatch_FallsThrough(t *testing.T) {
 	srv, sessions, endpoints, denied := newTestHTTPServer(t)
 	setupEndpoint(t, endpoints, "media")
-	denied.Update([]string{"/secret/*"}) // doesn't match /media/*
+	require.NoError(t, denied.Update(context.Background(), []string{"/secret/*"})) // doesn't match /media/*
 	require.NoError(t, sessions.Grant(context.Background(), "session-xyz", []string{"/media/*"}, time.Now().Add(time.Hour)))
 
 	w := httptest.NewRecorder()

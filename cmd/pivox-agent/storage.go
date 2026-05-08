@@ -86,26 +86,26 @@ func runStorage(cmd *cobra.Command, args []string) error {
 		"telemetry", telemetry,
 	)
 
-	// Open the agent's local state DB (sessions in this phase; denied
-	// patterns and endpoints in subsequent phases of #79) and reload
-	// any persisted sessions before the HTTP listener starts.
+	// Open the agent's local state DB (sessions + denied patterns in
+	// this phase; endpoints in #79 phase 5) and reload any persisted
+	// state before the HTTP listener starts.
 	//
 	// Boot uses a bounded, NOT signal-cancellable, context. A SIGTERM
-	// during boot must not cancel the LoadFromStore mid-iteration —
+	// during boot must not cancel a LoadFromStore mid-iteration —
 	// that would surface as a partial load (some rows in memory, the
 	// rest swallowed by the slog.Error path) which looks identical to
 	// corruption. Boot is "complete or fail," not "cancellable." 30s
 	// is generous against the busy_timeout (5s) and the realistic
-	// session-row count.
+	// row count.
 	//
-	// Failure mode: log-and-continue. OpenSessionState falls back to
-	// an in-memory-only SessionStore on any state-dir / DB / load
-	// error, having logged at slog.Error. The controller is the
-	// source of truth and re-delivers active sessions on reconnect
-	// handshake — refusing to start would be strictly worse for
-	// availability than serving with empty initial state.
+	// Failure mode: log-and-continue. OpenAgentState falls back to
+	// in-memory-only stores on any state-dir / DB / load error,
+	// having logged at slog.Error. The controller is the source of
+	// truth and re-delivers active sessions and denied patterns on
+	// reconnect handshake — refusing to start would be strictly
+	// worse for availability than serving with empty initial state.
 	bootCtx, bootCancel := context.WithTimeout(context.Background(), 30*time.Second)
-	sessions, sessionStore := agent.OpenSessionState(bootCtx, agent.OpenSessionStateConfig{
+	state := agent.OpenAgentState(bootCtx, agent.OpenAgentStateConfig{
 		StateDir: stateDir,
 		Logger:   logger,
 	})
@@ -113,7 +113,7 @@ func runStorage(cmd *cobra.Command, args []string) error {
 	defer func() {
 		// Store.Close is nil-safe (see persist.go) — the explicit
 		// guard here is belt-and-suspenders, not strictly required.
-		if err := sessionStore.Close(); err != nil {
+		if err := state.Store.Close(); err != nil {
 			logger.Warn("close agent state DB", "error", err)
 		}
 	}()
@@ -123,20 +123,19 @@ func runStorage(cmd *cobra.Command, args []string) error {
 	// reconnect loop. Boot has already completed by this point.
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
-	go sessions.StartCleanup(ctx, 1*time.Minute)
+	go state.Sessions.StartCleanup(ctx, 1*time.Minute)
 
 	memcacheMaxItems, _ := f.GetInt("memcache-max-items")
 	memcacheMaxItemMB, _ := f.GetInt("memcache-max-item-mb")
 	memcacheMaxItemBytes := memcacheMaxItemMB * 1024 * 1024 // 0 → constructor uses default (8 MB)
 	cache := agent.NewMemoryCache(memcacheMaxItems, memcacheMaxItemBytes)
 	endpoints := agent.NewEndpointStore(cache)
-	denied := agent.NewDeniedPatterns()
 
 	// Start the HTTP file server alongside the bidi connection.
 	httpServer := agent.NewHTTPServer(agent.Config{
-		Sessions:   sessions,
+		Sessions:   state.Sessions,
 		Endpoints:  endpoints,
-		Denied:     denied,
+		Denied:     state.Denied,
 		CORSOrigin: "*",
 		Logger:     logger,
 	})
@@ -150,9 +149,9 @@ func runStorage(cmd *cobra.Command, args []string) error {
 	}()
 
 	connectCfg := &agent.ConnectConfig{
-		Sessions:  sessions,
+		Sessions:  state.Sessions,
 		Endpoints: endpoints,
-		Denied:    denied,
+		Denied:    state.Denied,
 		HTTP:      httpServer,
 	}
 

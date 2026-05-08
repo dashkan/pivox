@@ -31,116 +31,166 @@ func captureLogger(t *testing.T) (*slog.Logger, *bytes.Buffer) {
 	})), &buf
 }
 
-func TestOpenSessionState_RequiresStateDir(t *testing.T) {
+func TestOpenAgentState_RequiresStateDir(t *testing.T) {
 	t.Parallel()
 	assert.PanicsWithValue(t,
-		"storageagent: OpenSessionStateConfig.StateDir is required",
+		"storageagent: OpenAgentStateConfig.StateDir is required",
 		func() {
-			_, _ = OpenSessionState(context.Background(), OpenSessionStateConfig{
+			_ = OpenAgentState(context.Background(), OpenAgentStateConfig{
 				Logger: silentLogger(),
 			})
 		})
 }
 
-func TestOpenSessionState_RequiresLogger(t *testing.T) {
+func TestOpenAgentState_RequiresLogger(t *testing.T) {
 	t.Parallel()
 	assert.PanicsWithValue(t,
-		"storageagent: OpenSessionStateConfig.Logger is required",
+		"storageagent: OpenAgentStateConfig.Logger is required",
 		func() {
-			_, _ = OpenSessionState(context.Background(), OpenSessionStateConfig{
+			_ = OpenAgentState(context.Background(), OpenAgentStateConfig{
 				StateDir: t.TempDir(),
 			})
 		})
 }
 
-// TestOpenSessionState_FreshDir_OK is the happy-path boot: a fresh
-// state dir, no pre-existing agent.db, returns a Store-attached
-// SessionStore and the Store handle (caller closes).
-func TestOpenSessionState_FreshDir_OK(t *testing.T) {
+// TestOpenAgentState_FreshDir_OK is the happy-path boot: a fresh state
+// dir, no pre-existing agent.db. All three references in the returned
+// AgentState are non-nil.
+func TestOpenAgentState_FreshDir_OK(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	sessions, store := OpenSessionState(context.Background(), OpenSessionStateConfig{
+	state := OpenAgentState(context.Background(), OpenAgentStateConfig{
 		StateDir: dir,
 		Logger:   silentLogger(),
 	})
-	require.NotNil(t, sessions)
-	require.NotNil(t, store, "fresh dir should produce a non-nil Store")
-	t.Cleanup(func() { _ = store.Close() })
+	require.NotNil(t, state.Sessions)
+	require.NotNil(t, state.Denied)
+	require.NotNil(t, state.Store, "fresh dir should produce a non-nil Store")
+	t.Cleanup(func() { _ = state.Store.Close() })
 
 	// Disk file actually appeared.
 	_, err := os.Stat(filepath.Join(dir, "agent.db"))
-	require.NoError(t, err, "agent.db should exist after OpenSessionState")
+	require.NoError(t, err, "agent.db should exist after OpenAgentState")
 }
 
-// TestOpenSessionState_CreatesMissingDir asserts that a non-existent
-// state dir is created (not an error). Operators set --state-dir to a
-// path that may not exist on first run.
-func TestOpenSessionState_CreatesMissingDir(t *testing.T) {
+// TestOpenAgentState_CreatesMissingDir asserts that a non-existent
+// state dir is created, not an error.
+func TestOpenAgentState_CreatesMissingDir(t *testing.T) {
 	t.Parallel()
 
 	missing := filepath.Join(t.TempDir(), "nested", "state")
-	sessions, store := OpenSessionState(context.Background(), OpenSessionStateConfig{
+	state := OpenAgentState(context.Background(), OpenAgentStateConfig{
 		StateDir: missing,
 		Logger:   silentLogger(),
 	})
-	require.NotNil(t, sessions)
-	require.NotNil(t, store)
-	t.Cleanup(func() { _ = store.Close() })
+	require.NotNil(t, state.Store)
+	t.Cleanup(func() { _ = state.Store.Close() })
 
 	st, err := os.Stat(missing)
 	require.NoError(t, err)
 	require.True(t, st.IsDir())
 }
 
-// TestOpenSessionState_RestartPreservesGrants is the load-bearing
-// phase 3 acceptance test: grant a session, close everything,
-// re-open, the session must authorize without a re-grant.
-func TestOpenSessionState_RestartPreservesGrants(t *testing.T) {
+// TestOpenAgentState_RestartPreservesGrantsAndDenied is the
+// load-bearing #79 acceptance test for phase 4: persist a session AND
+// a denied set, restart, both must be effective without controller
+// round-trip.
+func TestOpenAgentState_RestartPreservesGrantsAndDenied(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	dir := t.TempDir()
 
-	// First boot — grant and close.
+	// First boot — grant a session, set a denied pattern, close.
 	{
-		sessions, store := OpenSessionState(ctx, OpenSessionStateConfig{
+		state := OpenAgentState(ctx, OpenAgentStateConfig{
 			StateDir: dir,
 			Logger:   silentLogger(),
 		})
-		require.NotNil(t, store)
-		require.NoError(t, sessions.Grant(ctx, "boot-tok",
+		require.NotNil(t, state.Store)
+
+		require.NoError(t, state.Sessions.Grant(ctx, "boot-tok",
 			[]string{"/spaces/persisted/*"},
 			time.Now().Add(2*time.Hour)))
-		require.NoError(t, store.Close())
+		require.NoError(t, state.Denied.Update(ctx,
+			[]string{"/spaces/dead/*"}))
+
+		require.NoError(t, state.Store.Close())
 	}
 
-	// Second boot — same dir, no controller, must authorize.
-	sessions, store := OpenSessionState(ctx, OpenSessionStateConfig{
+	// Second boot — same dir, no controller touch. Both stores must
+	// be effective from the local DB.
+	state := OpenAgentState(ctx, OpenAgentStateConfig{
 		StateDir: dir,
 		Logger:   silentLogger(),
 	})
-	require.NotNil(t, store)
-	t.Cleanup(func() { _ = store.Close() })
+	require.NotNil(t, state.Store)
+	t.Cleanup(func() { _ = state.Store.Close() })
 
-	assert.True(t, sessions.Authorize("boot-tok", "/spaces/persisted/file.mp4"),
-		"session granted before restart must authorize on second boot "+
-			"without controller round-trip")
+	assert.True(t, state.Sessions.Authorize("boot-tok", "/spaces/persisted/file.mp4"),
+		"session granted before restart must authorize on second boot")
+	assert.True(t, state.Denied.IsDenied("/spaces/dead/file.mp4"),
+		"denied pattern set before restart must reject on second boot")
+	assert.False(t, state.Denied.IsDenied("/spaces/alive/file.mp4"),
+		"unrelated path must not be rejected")
 }
 
-// TestOpenSessionState_LoadFails_KeepsStoreAttached covers the boot
-// branch where OpenStore succeeds but LoadFromStore fails (e.g. a
-// previously-persisted row is corrupt). The contract: Store stays
-// attached so subsequent grants persist, the failure is logged at
-// Error level, and the agent still serves (controller will redeliver
-// active sessions on reconnect).
-func TestOpenSessionState_LoadFails_KeepsStoreAttached(t *testing.T) {
+// TestOpenAgentState_LoadDeniedFails_KeepsStoreAttached covers the
+// boot branch where OpenStore succeeds but DeniedPatterns.LoadFromStore
+// fails. The contract: Store stays attached (non-nil), the failure is
+// logged at Error level, and the agent boots regardless. Symmetry
+// note vs the LoadSessionsFails test: the corruption used here (column
+// rename) breaks Update too, so we cannot assert "Update still
+// persists" the way the Sessions test does — the Sessions test
+// corrupts a single row's JSON, leaving the column intact for fresh
+// inserts. The boot.go code path is structurally identical for the
+// two stores; this test exercises the denied branch end-to-end.
+func TestOpenAgentState_LoadDeniedFails_KeepsStoreAttached(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	dir := t.TempDir()
 
-	// Pre-seed the DB with a corrupt session row so that LoadFromStore
-	// fails on iteration. Use the lower-level Store API to inject the
-	// bad bytes, then close.
+	// Seed the DB and rename the `pattern` column out from under the
+	// `LoadDeniedPatterns` SELECT. CREATE TABLE IF NOT EXISTS in
+	// subsequent OpenStore is a no-op (table already exists), so the
+	// rename survives the reopen and SELECT pattern fails with
+	// "no such column".
+	{
+		seed, err := OpenStore(StoreConfig{Path: filepath.Join(dir, agentDBFilename)})
+		require.NoError(t, err)
+		_, err = seed.db.ExecContext(ctx,
+			`ALTER TABLE denied_patterns RENAME COLUMN pattern TO pattern_renamed`)
+		require.NoError(t, err)
+		require.NoError(t, seed.Close())
+	}
+
+	logger, buf := captureLogger(t)
+	state := OpenAgentState(ctx, OpenAgentStateConfig{
+		StateDir: dir,
+		Logger:   logger,
+	})
+	require.NotNil(t, state.Denied)
+	require.NotNil(t, state.Store,
+		"Store must stay attached on Denied LoadFromStore failure")
+	t.Cleanup(func() { _ = state.Store.Close() })
+
+	out := buf.String()
+	assert.Contains(t, out, "level=ERROR",
+		"denied-load failure must log at Error level")
+	assert.Contains(t, out, "reload denied patterns",
+		"log message must surface that the denied-patterns reload failed")
+}
+
+// TestOpenAgentState_LoadSessionsFails_KeepsStoreAttached covers the
+// boot branch where OpenStore succeeds but SessionStore.LoadFromStore
+// fails (corrupt JSON in patterns_json). Store stays attached so
+// subsequent Grant calls persist; the failure is logged at Error level.
+func TestOpenAgentState_LoadSessionsFails_KeepsStoreAttached(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	dir := t.TempDir()
+
+	// Seed a corrupt session row.
 	{
 		seed, err := OpenStore(StoreConfig{Path: filepath.Join(dir, agentDBFilename)})
 		require.NoError(t, err)
@@ -152,58 +202,55 @@ func TestOpenSessionState_LoadFails_KeepsStoreAttached(t *testing.T) {
 	}
 
 	logger, buf := captureLogger(t)
-	sessions, store := OpenSessionState(ctx, OpenSessionStateConfig{
+	state := OpenAgentState(ctx, OpenAgentStateConfig{
 		StateDir: dir,
 		Logger:   logger,
 	})
-	require.NotNil(t, sessions)
-	require.NotNil(t, store,
+	require.NotNil(t, state.Sessions)
+	require.NotNil(t, state.Store,
 		"Store must stay attached on LoadFromStore failure so subsequent grants persist")
-	t.Cleanup(func() { _ = store.Close() })
+	t.Cleanup(func() { _ = state.Store.Close() })
 
-	// Loud Error log surfaces the reload failure.
 	out := buf.String()
-	assert.Contains(t, out, "level=ERROR",
-		"LoadFromStore failure must log at Error level")
+	assert.Contains(t, out, "level=ERROR")
 	assert.Contains(t, out, "reload sessions",
 		"log message must surface the operation that failed")
 
-	// Subsequent Grant must still succeed — the Store handle is alive
-	// and SaveSession works regardless of LoadFromStore's outcome.
-	require.NoError(t, sessions.Grant(ctx, "fresh-tok",
+	require.NoError(t, state.Sessions.Grant(ctx, "fresh-tok",
 		[]string{"/f/*"}, time.Now().Add(time.Hour)),
 		"Grant must work against an attached Store after LoadFromStore failed")
-	assert.True(t, sessions.Authorize("fresh-tok", "/f/file"),
-		"newly granted session must authorize")
+	assert.True(t, state.Sessions.Authorize("fresh-tok", "/f/file"))
 }
 
-// TestOpenSessionState_BadDir_FallsBackToInMemory verifies the
-// log-and-continue contract: if MkdirAll fails (e.g. dir path points
-// to an existing file), the agent boots with an in-memory-only
-// SessionStore and a nil Store, having logged at Error level.
-func TestOpenSessionState_BadDir_FallsBackToInMemory(t *testing.T) {
+// TestOpenAgentState_BadDir_FallsBackToInMemory verifies the
+// log-and-continue contract: if MkdirAll fails (path points to an
+// existing file), AgentState.Store is nil and the in-memory stores
+// remain usable; an Error is logged.
+func TestOpenAgentState_BadDir_FallsBackToInMemory(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
-	// Create a regular file at the path we'll pass as StateDir.
-	// MkdirAll on a path whose parent is a file fails with ENOTDIR.
 	tmp := t.TempDir()
 	blockingFile := filepath.Join(tmp, "not-a-dir")
 	require.NoError(t, os.WriteFile(blockingFile, []byte("x"), 0o644))
 	stateDir := filepath.Join(blockingFile, "state")
 
 	logger, buf := captureLogger(t)
-	sessions, store := OpenSessionState(ctx, OpenSessionStateConfig{
+	state := OpenAgentState(ctx, OpenAgentStateConfig{
 		StateDir: stateDir,
 		Logger:   logger,
 	})
-	require.NotNil(t, sessions, "must return a usable in-memory SessionStore even on dir failure")
-	assert.Nil(t, store, "Store must be nil when state dir cannot be created")
+	require.NotNil(t, state.Sessions, "must return a usable in-memory SessionStore")
+	require.NotNil(t, state.Denied, "must return a usable in-memory DeniedPatterns")
+	assert.Nil(t, state.Store, "Store must be nil on state-dir failure")
 
-	// In-memory grant still works (no Store attached → no persist call).
-	require.NoError(t, sessions.Grant(ctx, "in-mem",
+	// In-memory writes still work (no Store attached → no persist call).
+	require.NoError(t, state.Sessions.Grant(ctx, "in-mem",
 		[]string{"/m/*"}, time.Now().Add(time.Hour)))
-	assert.True(t, sessions.Authorize("in-mem", "/m/file"))
+	assert.True(t, state.Sessions.Authorize("in-mem", "/m/file"))
+
+	require.NoError(t, state.Denied.Update(ctx, []string{"/d/*"}))
+	assert.True(t, state.Denied.IsDenied("/d/x"))
 
 	// Boot block logged the failure loud.
 	out := buf.String()
@@ -211,4 +258,8 @@ func TestOpenSessionState_BadDir_FallsBackToInMemory(t *testing.T) {
 		"state-dir failure must log at Error level")
 	assert.Contains(t, out, "in-memory only",
 		"log message must surface the fallback explicitly")
+
+	// Belt-and-suspenders nil Close.
+	assert.NotPanics(t, func() { _ = state.Store.Close() },
+		"(*Store)(nil).Close() must be a no-op")
 }

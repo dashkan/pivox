@@ -109,7 +109,7 @@ func newTestStream(bidi *mockBidiStream) *Stream {
 		Timeout:   2 * time.Second,
 		Sessions:  NewSessionStore(SessionStoreConfig{}),
 		Endpoints: NewEndpointStore(NewMemoryCache(10, 1024)),
-		Denied:    NewDeniedPatterns(),
+		Denied:    NewDeniedPatterns(DeniedPatternsConfig{}),
 		Logger:    slog.Default(),
 	})
 }
@@ -246,7 +246,7 @@ func TestHandshake_Timeout(t *testing.T) {
 		Timeout:   50 * time.Millisecond,
 		Sessions:  NewSessionStore(SessionStoreConfig{}),
 		Endpoints: NewEndpointStore(NewMemoryCache(10, 1024)),
-		Denied:    NewDeniedPatterns(),
+		Denied:    NewDeniedPatterns(DeniedPatternsConfig{}),
 		Logger:    slog.Default(),
 	})
 
@@ -348,7 +348,7 @@ func TestHandleServerMessage_SessionGrant(t *testing.T) {
 		Timeout:   time.Second,
 		Sessions:  sessions,
 		Endpoints: NewEndpointStore(NewMemoryCache(10, 1024)),
-		Denied:    NewDeniedPatterns(),
+		Denied:    NewDeniedPatterns(DeniedPatternsConfig{}),
 		Logger:    slog.Default(),
 	})
 
@@ -375,7 +375,7 @@ func TestHandleServerMessage_SessionRevoke(t *testing.T) {
 		Timeout:   time.Second,
 		Sessions:  sessions,
 		Endpoints: NewEndpointStore(NewMemoryCache(10, 1024)),
-		Denied:    NewDeniedPatterns(),
+		Denied:    NewDeniedPatterns(DeniedPatternsConfig{}),
 		Logger:    slog.Default(),
 	})
 
@@ -392,7 +392,7 @@ func TestHandleServerMessage_SessionRevoke(t *testing.T) {
 
 func TestHandleServerMessage_ConfigUpdate_DeniedPatterns(t *testing.T) {
 	bidi := newMockBidiStream()
-	denied := NewDeniedPatterns()
+	denied := NewDeniedPatterns(DeniedPatternsConfig{})
 	s := NewStream(StreamConfig{
 		Stream:    bidi,
 		Timeout:   time.Second,
@@ -423,7 +423,7 @@ func TestHandleServerMessage_ConfigUpdate_Endpoints(t *testing.T) {
 		Timeout:   time.Second,
 		Sessions:  NewSessionStore(SessionStoreConfig{}),
 		Endpoints: endpoints,
-		Denied:    NewDeniedPatterns(),
+		Denied:    NewDeniedPatterns(DeniedPatternsConfig{}),
 		Logger:    slog.Default(),
 	})
 
