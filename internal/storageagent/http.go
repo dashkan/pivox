@@ -96,14 +96,16 @@ func (s *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Authenticate via the pivox_session cookie. Every non-OPTIONS
+	// Authenticate via Authorization: Bearer <jwt> (native clients)
+	// OR the pivox_session cookie (browser flows). Every non-OPTIONS
 	// request must carry a valid JWT bound to a granted session.
-	cookie, err := r.Cookie("pivox_session")
+	jwt, err := extractJWT(r)
 	if err != nil {
+		s.logger.Debug("JWT extraction failed", "error", err)
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	claims, err := s.validateJWT(cookie.Value)
+	claims, err := s.validateJWT(jwt)
 	if err != nil {
 		s.logger.Debug("JWT validation failed", "error", err)
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -125,8 +127,65 @@ func (s *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Audit-attribution log: emit sub + org from the validated JWT
+	// claims so downstream operations (cache get, S3 fetch) and log
+	// aggregators can correlate this request with the caller and
+	// the org. Phase-5 mints these claims at the controller; the
+	// agent reads them here without re-authorizing — pattern
+	// enforcement above is the security boundary, sub/org are
+	// attribution metadata only.
+	//
+	// Missing or wrong-type sub/org claims do not block the
+	// request (verify-then-trust would be inverted by re-auth on
+	// audit metadata) but emit a Warn so a silent controller-side
+	// drift in claim shape surfaces in operator dashboards rather
+	// than producing empty `sub= org=` log entries forever.
+	sub, subOK := claims["sub"].(string)
+	org, orgOK := claims["org"].(string)
+	if !subOK || !orgOK {
+		s.logger.Warn("authorized request with missing audit claims",
+			"path", r.URL.Path,
+			"sub_present", subOK,
+			"org_present", orgOK)
+	}
+	s.logger.Info("authorized storage request",
+		"path", r.URL.Path, "sub", sub, "org", org)
+
 	// Proxy to the storage endpoint.
 	s.endpoints.ServeFile(w, r)
+}
+
+// extractJWT pulls the session JWT from the request, preferring the
+// Authorization: Bearer <jwt> header (native-client path) and
+// falling back to the pivox_session cookie (browser path). When
+// both are present, the Authorization header wins — Pivox's
+// precedence rule, not an HTTP-spec mandate (RFC 6750 leaves
+// dual-credential precedence undefined).
+//
+// The Bearer prefix parser is deliberately strict: case-sensitive
+// "Bearer " (capital B, single trailing space, no leading
+// whitespace), and the token portion must be non-empty. Lax prefix
+// parsing is where bypasses come from. A malformed Authorization
+// header is rejected outright rather than falling through to the
+// cookie path, so a client cannot bypass the strict parser by
+// also presenting a valid cookie.
+func extractJWT(r *http.Request) (string, error) {
+	if h := r.Header.Get("Authorization"); h != "" {
+		const prefix = "Bearer "
+		if !strings.HasPrefix(h, prefix) {
+			return "", fmt.Errorf("authorization header does not match strict %q prefix", prefix)
+		}
+		jwt := h[len(prefix):]
+		if jwt == "" {
+			return "", fmt.Errorf("authorization Bearer token is empty")
+		}
+		return jwt, nil
+	}
+	cookie, err := r.Cookie("pivox_session")
+	if err != nil {
+		return "", fmt.Errorf("no Authorization header and no pivox_session cookie")
+	}
+	return cookie.Value, nil
 }
 
 func (s *HTTPServer) setCORSHeaders(w http.ResponseWriter) {
