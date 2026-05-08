@@ -33,6 +33,7 @@ the cloud.`,
 	f := cmd.Flags()
 	f.String("token", envOrDefault("PIVOX_TOKEN", ""), "Registration token from the storage gateway")
 	f.String("cache-dir", envOrDefault("PIVOX_CACHE_DIR", "/var/lib/pivox/cache"), "Cache directory path")
+	f.String("state-dir", envOrDefault("PIVOX_STATE_DIR", "/var/lib/pivox/state"), "Agent state directory (sessions, denied patterns, endpoints). Persisted across restarts; do NOT colocate with --cache-dir or include in cache cleanup.")
 	f.Int("cache-size", envOrDefaultInt("PIVOX_CACHE_SIZE", 0), "Disk cache size in GB (0 = auto-detect, 80% of available disk)")
 	f.Int("memcache-max-items", envOrDefaultInt("PIVOX_MEMCACHE_MAX_ITEMS", 0), "In-memory cache: max items (0=default 100, hard max 100000)")
 	f.Int("memcache-max-item-mb", envOrDefaultInt("PIVOX_MEMCACHE_MAX_ITEM_MB", 0), "In-memory cache: max size of a single item in MB (0=default 8, hard max 64)")
@@ -54,6 +55,7 @@ func runStorage(cmd *cobra.Command, args []string) error {
 
 	token, _ := f.GetString("token")
 	cacheDir, _ := f.GetString("cache-dir")
+	stateDir, _ := f.GetString("state-dir")
 	cacheSize, _ := f.GetInt("cache-size")
 	port, _ := f.GetInt("port")
 	bind, _ := f.GetString("bind")
@@ -79,15 +81,48 @@ func runStorage(cmd *cobra.Command, args []string) error {
 		"server", cloudHost,
 		"bind", fmt.Sprintf("%s:%d", bind, port),
 		"cache_dir", cacheDir,
+		"state_dir", stateDir,
 		"cache_size_gb", cacheSize,
 		"telemetry", telemetry,
 	)
 
+	// Open the agent's local state DB (sessions in this phase; denied
+	// patterns and endpoints in subsequent phases of #79) and reload
+	// any persisted sessions before the HTTP listener starts.
+	//
+	// Boot uses a bounded, NOT signal-cancellable, context. A SIGTERM
+	// during boot must not cancel the LoadFromStore mid-iteration —
+	// that would surface as a partial load (some rows in memory, the
+	// rest swallowed by the slog.Error path) which looks identical to
+	// corruption. Boot is "complete or fail," not "cancellable." 30s
+	// is generous against the busy_timeout (5s) and the realistic
+	// session-row count.
+	//
+	// Failure mode: log-and-continue. OpenSessionState falls back to
+	// an in-memory-only SessionStore on any state-dir / DB / load
+	// error, having logged at slog.Error. The controller is the
+	// source of truth and re-delivers active sessions on reconnect
+	// handshake — refusing to start would be strictly worse for
+	// availability than serving with empty initial state.
+	bootCtx, bootCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	sessions, sessionStore := agent.OpenSessionState(bootCtx, agent.OpenSessionStateConfig{
+		StateDir: stateDir,
+		Logger:   logger,
+	})
+	bootCancel()
+	defer func() {
+		// Store.Close is nil-safe (see persist.go) — the explicit
+		// guard here is belt-and-suspenders, not strictly required.
+		if err := sessionStore.Close(); err != nil {
+			logger.Warn("close agent state DB", "error", err)
+		}
+	}()
+
+	// Operational context — cancellable on SIGINT/SIGTERM. Used for
+	// the cleanup goroutine, HTTP listener, and the control-plane
+	// reconnect loop. Boot has already completed by this point.
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
-
-	// Create stores.
-	sessions := agent.NewSessionStore(agent.SessionStoreConfig{})
 	go sessions.StartCleanup(ctx, 1*time.Minute)
 
 	memcacheMaxItems, _ := f.GetInt("memcache-max-items")
