@@ -48,7 +48,8 @@ SELECT
   sqlc.embed(assets),
   COALESCE(av.version_number, 0) AS latest_version_number,
   COALESCE(av.mime_type, '')     AS latest_version_mime_type,
-  e.name AS endpoint_slug
+  e.name AS endpoint_slug,
+  g.hostname AS gateway_hostname
 FROM assets
 LEFT JOIN (
   SELECT DISTINCT ON (asset_id)
@@ -57,6 +58,7 @@ LEFT JOIN (
   ORDER BY asset_id, version_number DESC
 ) av ON av.asset_id = assets.id
 LEFT JOIN storage_endpoints e ON e.id = assets.endpoint_id
+LEFT JOIN storage_gateways  g ON g.id = e.gateway_id
 WHERE assets.space_id = $1 AND assets.delete_time IS NULL
 ORDER BY assets.create_time DESC, assets.id DESC
 LIMIT $2 OFFSET $3;
@@ -88,7 +90,8 @@ SELECT
   spaces.name AS space_slug,
   COALESCE(av.version_number, 0) AS latest_version_number,
   COALESCE(av.mime_type, '')     AS latest_version_mime_type,
-  e.name AS endpoint_slug
+  e.name AS endpoint_slug,
+  g.hostname AS gateway_hostname
 FROM assets
 JOIN spaces ON assets.space_id = spaces.id
 LEFT JOIN (
@@ -98,6 +101,7 @@ LEFT JOIN (
   ORDER BY asset_id, version_number DESC
 ) av ON av.asset_id = assets.id
 LEFT JOIN storage_endpoints e ON e.id = assets.endpoint_id
+LEFT JOIN storage_gateways  g ON g.id = e.gateway_id
 WHERE spaces.org_id = $1
   AND assets.delete_time IS NULL
   AND spaces.delete_time IS NULL

@@ -427,13 +427,30 @@ Assets are served through Storage Gateways with:
 ### Storage Key Format
 
 ```
-assets/{asset_id}/v{version_number}/original.ext
-assets/{asset_id}/v{version_number}/thumb_sm.jpg
-assets/{asset_id}/v{version_number}/thumb_md.jpg
-assets/{asset_id}/v{version_number}/thumb_lg.jpg
-assets/{asset_id}/v{version_number}/proxy.mp4
-assets/{asset_id}/v{version_number}/preview.webp
+{org-slug}/{space-slug}/assets/{asset_id}/v{version_number}/original.ext
+{org-slug}/{space-slug}/assets/{asset_id}/v{version_number}/thumb_sm.webp
+{org-slug}/{space-slug}/assets/{asset_id}/v{version_number}/thumb_md.webp
+{org-slug}/{space-slug}/assets/{asset_id}/v{version_number}/thumb_lg.webp
+{org-slug}/{space-slug}/assets/{asset_id}/v{version_number}/proxy.mp4
+{org-slug}/{space-slug}/assets/{asset_id}/v{version_number}/preview.webp
+{org-slug}/{space-slug}/assets/{asset_id}/v{version_number}/poster.jpg
 ```
+
+**`{org-slug}/{space-slug}/` prefix** is structurally required by the
+session-pattern security model — see #83. The storage gateway is a
+stateless proxy with no DB access; per-space access is enforced
+exclusively by URL-path glob matching against session-granted
+patterns of shape `/{endpoint}/{org}/{space}/*`. A storage_key that
+doesn't start with `{org-slug}/{space-slug}/` is unauthorizable
+under any session grant.
+
+**WebP for thumbnails** (`thumb_sm/md/lg.webp`) — broadcast assets
+rely heavily on alpha (logos, lower-thirds, overlay graphics). WebP
+supports alpha in both lossy and lossless modes, ships ~25-30%
+smaller than JPEG at equivalent quality, and is natively decoded by
+macOS NSImage / SwiftUI (Big Sur+) and every modern browser. The
+rendition pipeline picks lossy vs lossless internally based on
+source-image properties; the URL contract doesn't vary.
 
 ---
 

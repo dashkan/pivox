@@ -437,3 +437,194 @@ func TestE2E_ListAssetsByOrg_PopulatesVersionAndEndpointColumns(t *testing.T) {
 	assert.Equal(t, "", rC.LatestVersionMimeType, "Case C: COALESCE sentinel '' when no asset_versions row exists")
 	assert.True(t, rC.EndpointSlug.Valid, "Case C: endpoint_slug populated even with no version (independent JOIN)")
 }
+
+// ============================================================================
+// thumbnail_url synthesis (Phase 6c)
+// ============================================================================
+
+// promoteToIngestedAsset takes a placeholder asset (created via the
+// real CreateAsset RPC) and DB-promotes it to a fully-ingested asset
+// bound to a storage endpoint, with a v1 asset_versions row. Used by
+// the thumbnail-URL e2e test as a stand-in for the InitiateUpload +
+// rendition-pipeline flow that hasn't shipped yet (#83 + the rendition
+// pipeline land separately).
+//
+// Returns the asset's UUID. The storage_key written to asset_versions
+// follows the locked Phase 6c layout: `{org}/{space}/assets/{id}/v1/
+// original.{ext}` per docs/assets.md:430-435 + the {org}/{space}/
+// prefix from #83.
+func promoteToIngestedAsset(
+	t *testing.T,
+	h *grpcharness.Harness,
+	spaceID uuid.UUID,
+	orgSlug, spaceSlug, assetSlug string,
+	endpointID uuid.UUID,
+	mediaType, contentType, ext string,
+) uuid.UUID {
+	t.Helper()
+	ctx := context.Background()
+	var assetID uuid.UUID
+	err := h.Pool.QueryRow(ctx, `
+		UPDATE assets
+		   SET endpoint_id = $1,
+		       media_type = $2::asset_media_type,
+		       content_type = $3,
+		       state = 'ACTIVE'
+		 WHERE space_id = $4 AND name = $5
+		 RETURNING id`,
+		endpointID, mediaType, contentType, spaceID, assetSlug,
+	).Scan(&assetID)
+	require.NoError(t, err, "promote asset to ingested state")
+
+	storageKey := fmt.Sprintf("%s/%s/assets/%s/v1/original.%s",
+		orgSlug, spaceSlug, assetID, ext)
+	_, err = h.Pool.Exec(ctx, `
+		INSERT INTO asset_versions (asset_id, version_number, mime_type, storage_key, size_bytes)
+		VALUES ($1, 1, $2, $3, 0)`,
+		assetID, contentType, storageKey,
+	)
+	require.NoError(t, err, "seed v1 asset_versions row")
+	return assetID
+}
+
+// seedThumbnailGateway inserts a storage_gateway + storage_endpoint
+// pair directly via SQL. Returns (gatewayHostname, endpointSlug,
+// endpointID). Hostname matches the dev seed flip
+// (10_storage_gateways.sql) so the e2e assertion shape parallels what
+// the dev Library would produce against rustfs through ngrok →
+// nginx /files/ → agent. Inline rather than via a fixture because
+// the thumbnail-URL test is the only consumer; promote to
+// internal/testutil/fixtures when a second consumer arrives.
+func seedThumbnailGateway(
+	t *testing.T,
+	h *grpcharness.Harness,
+	orgID uuid.UUID,
+) (gwHostname, endpointSlug string, endpointID uuid.UUID) {
+	t.Helper()
+	ctx := context.Background()
+	gwID := uuid.New()
+	endpointID = uuid.New()
+	gwHostname = "pivox.ngrok.app"
+	endpointSlug = "primary"
+
+	_, err := h.Pool.Exec(ctx, `
+		INSERT INTO storage_gateways (id, org_id, name, display_name, registration_token, hostname, state)
+		VALUES ($1, $2, 'gw-test', 'Test Gateway', 'tok-test', $3, 'ACTIVE')`,
+		gwID, orgID, gwHostname,
+	)
+	require.NoError(t, err, "seed storage_gateway")
+
+	_, err = h.Pool.Exec(ctx, `
+		INSERT INTO storage_endpoints (id, gateway_id, name, display_name, configuration, cache_enabled, cache_max_size_gb, cache_eviction)
+		VALUES ($1, $2, $3, 'Primary', '{"type":"s3"}'::jsonb, false, 0, 'LRU')`,
+		endpointID, gwID, endpointSlug,
+	)
+	require.NoError(t, err, "seed storage_endpoint")
+	return gwHostname, endpointSlug, endpointID
+}
+
+// lastSegment extracts the trailing path segment from an AIP resource
+// name. CreateAsset returns "organizations/{org}/spaces/{space}/assets/
+// {asset}"; the asset-row's `name` column is the leaf slug only.
+func lastSegment(name string) string {
+	idx := strings.LastIndex(name, "/")
+	if idx < 0 {
+		return name
+	}
+	return name[idx+1:]
+}
+
+// TestE2E_QueryDashboardData_ThumbnailURL_Synthesis exercises the
+// Phase 6c.2 thumbnail-URL composer end-to-end through
+// QueryDashboardData. Output shape:
+//
+//	https://{gw.hostname}/files/{endpointSlug}/{org}/{space}/assets/{id}/v{n}/thumb_md.webp
+//
+// Three rows in one org-scope query so per-row branching covers:
+//
+//   - IMAGE asset in alpha space → URL containing alpha's slug.
+//   - IMAGE asset in beta space  → URL containing beta's slug
+//     (verifies the org-scope synthesizer passes r.SpaceSlug per-row,
+//     not a single fixed space slug — pins the load-bearing
+//     `assetRowToStruct(viewFromOrgRow(r), orgSlug, r.SpaceSlug)`
+//     call site against future refactors).
+//   - VIDEO asset → empty thumbnail_url (renderer's
+//     IconConfigResolver chain falls through to iconField).
+//
+// The /files/ prefix is permanent — in dev nginx routes it to the
+// storage agent, in prod the gateway's edge proxy serves it at the
+// public hostname. Same prefix in both, different host (DECISION 1).
+func TestE2E_QueryDashboardData_ThumbnailURL_Synthesis(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	h := newQueryHarness(t)
+	fx := seedQueryFixture(t, h, "qd-thumb")
+
+	gwHostname, endpointSlug, endpointID := seedThumbnailGateway(t, h, fx.owner.Row.ID)
+
+	// IMAGE asset in alpha space → URL with alpha's space slug.
+	parentAlpha := "organizations/" + fx.owner.Slug + "/spaces/" + fx.alphaSpace.Slug
+	imgAlphaName := createPlaceholderAsset(t, h.Conn(), parentAlpha, "Image Alpha")
+	imgAlphaID := promoteToIngestedAsset(t, h,
+		fx.alphaSpace.Row.ID, fx.owner.Slug, fx.alphaSpace.Slug,
+		lastSegment(imgAlphaName), endpointID,
+		"IMAGE", "image/png", "png",
+	)
+
+	// IMAGE asset in beta space → URL with BETA's slug. If
+	// queryAssetsAtOrg ever stops passing r.SpaceSlug per-row and
+	// switches to a fixed slug, this assertion fires red.
+	parentBeta := "organizations/" + fx.owner.Slug + "/spaces/" + fx.betaSpace.Slug
+	imgBetaName := createPlaceholderAsset(t, h.Conn(), parentBeta, "Image Beta")
+	imgBetaID := promoteToIngestedAsset(t, h,
+		fx.betaSpace.Row.ID, fx.owner.Slug, fx.betaSpace.Slug,
+		lastSegment(imgBetaName), endpointID,
+		"IMAGE", "image/jpeg", "jpg",
+	)
+
+	// VIDEO asset in alpha → empty (non-image media type).
+	vidName := createPlaceholderAsset(t, h.Conn(), parentAlpha, "Video Asset")
+	_ = promoteToIngestedAsset(t, h,
+		fx.alphaSpace.Row.ID, fx.owner.Slug, fx.alphaSpace.Slug,
+		lastSegment(vidName), endpointID,
+		"VIDEO", "video/mp4", "mp4",
+	)
+
+	client := apiv1.NewDashboardsClient(h.Conn())
+	resp, err := client.QueryDashboardData(context.Background(), &apiv1.QueryDashboardDataRequest{
+		Parent: "organizations/" + fx.owner.Slug,
+		Query:  &apiv1.ResourceQuery{ResourceType: "pivox.assets/Asset"},
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.GetRows(), 3)
+
+	urlByDisplay := map[string]string{}
+	for _, row := range resp.GetRows() {
+		fields := row.GetFields()
+		dn := fields["display_name"].GetStringValue()
+		urlByDisplay[dn] = fields["thumbnail_url"].GetStringValue()
+	}
+
+	// Alpha row carries an alpha-stamped URL.
+	expectedAlpha := fmt.Sprintf(
+		"https://%s/files/%s/%s/%s/assets/%s/v1/thumb_md.webp",
+		gwHostname, endpointSlug, fx.owner.Slug, fx.alphaSpace.Slug, imgAlphaID,
+	)
+	assert.Equal(t, expectedAlpha, urlByDisplay["Image Alpha"],
+		"IMAGE asset in alpha must carry alpha-stamped URL")
+
+	// Beta row carries a beta-stamped URL — proves per-row SpaceSlug
+	// propagation through the org-scope synthesizer.
+	expectedBeta := fmt.Sprintf(
+		"https://%s/files/%s/%s/%s/assets/%s/v1/thumb_md.webp",
+		gwHostname, endpointSlug, fx.owner.Slug, fx.betaSpace.Slug, imgBetaID,
+	)
+	assert.Equal(t, expectedBeta, urlByDisplay["Image Beta"],
+		"IMAGE asset in beta must carry beta-stamped URL (per-row SpaceSlug)")
+
+	// VIDEO row falls through to the iconField path.
+	assert.Equal(t, "", urlByDisplay["Video Asset"],
+		"non-image asset must leave thumbnail_url empty")
+}

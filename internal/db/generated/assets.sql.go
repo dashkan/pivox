@@ -288,7 +288,8 @@ SELECT
   spaces.name AS space_slug,
   COALESCE(av.version_number, 0) AS latest_version_number,
   COALESCE(av.mime_type, '')     AS latest_version_mime_type,
-  e.name AS endpoint_slug
+  e.name AS endpoint_slug,
+  g.hostname AS gateway_hostname
 FROM assets
 JOIN spaces ON assets.space_id = spaces.id
 LEFT JOIN (
@@ -298,6 +299,7 @@ LEFT JOIN (
   ORDER BY asset_id, version_number DESC
 ) av ON av.asset_id = assets.id
 LEFT JOIN storage_endpoints e ON e.id = assets.endpoint_id
+LEFT JOIN storage_gateways  g ON g.id = e.gateway_id
 WHERE spaces.org_id = $1
   AND assets.delete_time IS NULL
   AND spaces.delete_time IS NULL
@@ -317,6 +319,7 @@ type ListAssetsByOrgRow struct {
 	LatestVersionNumber   int32       `json:"latest_version_number"`
 	LatestVersionMimeType string      `json:"latest_version_mime_type"`
 	EndpointSlug          pgtype.Text `json:"endpoint_slug"`
+	GatewayHostname       pgtype.Text `json:"gateway_hostname"`
 }
 
 // Lists every active asset across every space in an organization,
@@ -376,6 +379,7 @@ func (q *Queries) ListAssetsByOrg(ctx context.Context, arg ListAssetsByOrgParams
 			&i.LatestVersionNumber,
 			&i.LatestVersionMimeType,
 			&i.EndpointSlug,
+			&i.GatewayHostname,
 		); err != nil {
 			return nil, err
 		}
@@ -392,7 +396,8 @@ SELECT
   assets.id, assets.space_id, assets.endpoint_id, assets.name, assets.display_name, assets.import_path, assets.filename, assets.media_type, assets.content_type, assets.checksum_sha256, assets.size_bytes, assets.technical_metadata, assets.ai_description, assets.transcription, assets.duration_seconds, assets.width, assets.height, assets.annotations, assets.search_vector, assets.embedding, assets.state, assets.etag, assets.revision, assets.created_by, assets.updated_by, assets.deleted_by, assets.create_time, assets.update_time, assets.delete_time, assets.purge_time, assets.expire_time,
   COALESCE(av.version_number, 0) AS latest_version_number,
   COALESCE(av.mime_type, '')     AS latest_version_mime_type,
-  e.name AS endpoint_slug
+  e.name AS endpoint_slug,
+  g.hostname AS gateway_hostname
 FROM assets
 LEFT JOIN (
   SELECT DISTINCT ON (asset_id)
@@ -401,6 +406,7 @@ LEFT JOIN (
   ORDER BY asset_id, version_number DESC
 ) av ON av.asset_id = assets.id
 LEFT JOIN storage_endpoints e ON e.id = assets.endpoint_id
+LEFT JOIN storage_gateways  g ON g.id = e.gateway_id
 WHERE assets.space_id = $1 AND assets.delete_time IS NULL
 ORDER BY assets.create_time DESC, assets.id DESC
 LIMIT $2 OFFSET $3
@@ -417,6 +423,7 @@ type ListAssetsBySpaceRow struct {
 	LatestVersionNumber   int32       `json:"latest_version_number"`
 	LatestVersionMimeType string      `json:"latest_version_mime_type"`
 	EndpointSlug          pgtype.Text `json:"endpoint_slug"`
+	GatewayHostname       pgtype.Text `json:"gateway_hostname"`
 }
 
 // Tiebreaker on id DESC keeps pagination stable when multiple assets
@@ -485,6 +492,7 @@ func (q *Queries) ListAssetsBySpace(ctx context.Context, arg ListAssetsBySpacePa
 			&i.LatestVersionNumber,
 			&i.LatestVersionMimeType,
 			&i.EndpointSlug,
+			&i.GatewayHostname,
 		); err != nil {
 			return nil, err
 		}

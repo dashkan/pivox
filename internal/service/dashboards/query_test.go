@@ -32,19 +32,24 @@ import (
 // would only show up in production. These tests pin the per-field
 // mapping for both shapes.
 //
-// New-in-Phase-6c fields the synthesizer's URL composer reads:
+// Phase 6c fields the synthesizer's URL composer reads:
 //
-//   - VersionNumber (int32, sentinel 0 = no version exists)
-//   - MimeType      (string, sentinel "" = no version exists)
-//   - EndpointSlug  (string, sentinel "" = asset has no endpoint
+//   - AssetID         (UUID stringified — composer's URL path segment)
+//   - VersionNumber   (int32, sentinel 0 = no version exists)
+//   - MimeType        (string, sentinel "" — note ambiguity below)
+//   - EndpointSlug    (string, sentinel "" = asset has no endpoint
 //     bound; pgtype.Text Valid=false at the DB layer)
+//   - GatewayHostname (string, sentinel "" = endpoint's gateway has
+//     no hostname configured)
 //
-// Coverage matrix (one case per row, each variant exercises a
-// distinct nullability path):
+// Coverage matrix — one case per row, each variant exercising a
+// distinct nullability path:
 //
 //   - "fully populated" — all fields set, including the new ones.
 //   - "no version yet" — VersionNumber=0 sentinel, empty MimeType.
-//   - "no endpoint bound" — pgtype.Text{Valid:false} → EndpointSlug "".
+//   - "no endpoint bound" — pgtype.Text{Valid:false} on EndpointSlug.
+//   - "no gateway hostname" — endpoint bound but gateway lacks a
+//     hostname value; pgtype.Text{Valid:false} on GatewayHostname.
 
 func TestViewFromOrgRow_CopiesAllFields(t *testing.T) {
 	t.Parallel()
@@ -72,18 +77,21 @@ func TestViewFromOrgRow_CopiesAllFields(t *testing.T) {
 				LatestVersionNumber:   1,
 				LatestVersionMimeType: "image/png",
 				EndpointSlug:          pgtype.Text{String: "primary", Valid: true},
+				GatewayHostname:       pgtype.Text{String: "pivox.ngrok.app", Valid: true},
 			},
 			want: assetView{
-				NameSlug:      "logo-final",
-				DisplayName:   "Logo Final",
-				MediaType:     db.NullAssetMediaType{AssetMediaType: db.AssetMediaTypeIMAGE, Valid: true},
-				ContentType:   "image/png",
-				State:         db.AssetStateACTIVE,
-				SizeBytes:     245678,
-				CreateTime:    now,
-				VersionNumber: 1,
-				MimeType:      "image/png",
-				EndpointSlug:  "primary",
+				NameSlug:        "logo-final",
+				DisplayName:     "Logo Final",
+				MediaType:       db.NullAssetMediaType{AssetMediaType: db.AssetMediaTypeIMAGE, Valid: true},
+				ContentType:     "image/png",
+				State:           db.AssetStateACTIVE,
+				SizeBytes:       245678,
+				CreateTime:      now,
+				AssetID:         id.String(),
+				VersionNumber:   1,
+				MimeType:        "image/png",
+				EndpointSlug:    "primary",
+				GatewayHostname: "pivox.ngrok.app",
 			},
 		},
 		{
@@ -99,19 +107,21 @@ func TestViewFromOrgRow_CopiesAllFields(t *testing.T) {
 				LatestVersionNumber:   0,
 				LatestVersionMimeType: "",
 				EndpointSlug:          pgtype.Text{Valid: false},
+				GatewayHostname:       pgtype.Text{Valid: false},
 			},
 			want: assetView{
 				NameSlug:      "placeholder",
 				DisplayName:   "Placeholder Asset",
 				State:         db.AssetStatePLACEHOLDER,
 				CreateTime:    now,
+				AssetID:       id.String(),
 				VersionNumber: 0,
 				MimeType:      "",
 				EndpointSlug:  "",
 			},
 		},
 		{
-			name: "no endpoint bound — pgtype.Text invalid → empty slug",
+			name: "no endpoint bound — pgtype.Text invalid → empty slug + empty gateway",
 			in: db.ListAssetsByOrgRow{
 				Asset: db.Asset{
 					ID:          id,
@@ -126,6 +136,7 @@ func TestViewFromOrgRow_CopiesAllFields(t *testing.T) {
 				LatestVersionNumber:   1,
 				LatestVersionMimeType: "image/jpeg",
 				EndpointSlug:          pgtype.Text{Valid: false},
+				GatewayHostname:       pgtype.Text{Valid: false},
 			},
 			want: assetView{
 				NameSlug:      "orphan",
@@ -135,9 +146,42 @@ func TestViewFromOrgRow_CopiesAllFields(t *testing.T) {
 				State:         db.AssetStateACTIVE,
 				SizeBytes:     1000,
 				CreateTime:    now,
+				AssetID:       id.String(),
 				VersionNumber: 1,
 				MimeType:      "image/jpeg",
 				EndpointSlug:  "",
+			},
+		},
+		{
+			name: "no gateway hostname — endpoint bound but gateway hostname empty",
+			in: db.ListAssetsByOrgRow{
+				Asset: db.Asset{
+					ID:          id,
+					Name:        "endpoint-but-no-host",
+					DisplayName: "Endpoint Without Hostname",
+					MediaType:   db.NullAssetMediaType{AssetMediaType: db.AssetMediaTypeIMAGE, Valid: true},
+					ContentType: "image/png",
+					State:       db.AssetStateACTIVE,
+					SizeBytes:   500,
+					CreateTime:  now,
+				},
+				LatestVersionNumber:   1,
+				LatestVersionMimeType: "image/png",
+				EndpointSlug:          pgtype.Text{String: "primary", Valid: true},
+				GatewayHostname:       pgtype.Text{Valid: false},
+			},
+			want: assetView{
+				NameSlug:      "endpoint-but-no-host",
+				DisplayName:   "Endpoint Without Hostname",
+				MediaType:     db.NullAssetMediaType{AssetMediaType: db.AssetMediaTypeIMAGE, Valid: true},
+				ContentType:   "image/png",
+				State:         db.AssetStateACTIVE,
+				SizeBytes:     500,
+				CreateTime:    now,
+				AssetID:       id.String(),
+				VersionNumber: 1,
+				MimeType:      "image/png",
+				EndpointSlug:  "primary",
 			},
 		},
 	}
@@ -176,18 +220,21 @@ func TestViewFromSpaceRow_CopiesAllFields(t *testing.T) {
 				LatestVersionNumber:   1,
 				LatestVersionMimeType: "image/png",
 				EndpointSlug:          pgtype.Text{String: "primary", Valid: true},
+				GatewayHostname:       pgtype.Text{String: "pivox.ngrok.app", Valid: true},
 			},
 			want: assetView{
-				NameSlug:      "logo-final",
-				DisplayName:   "Logo Final",
-				MediaType:     db.NullAssetMediaType{AssetMediaType: db.AssetMediaTypeIMAGE, Valid: true},
-				ContentType:   "image/png",
-				State:         db.AssetStateACTIVE,
-				SizeBytes:     245678,
-				CreateTime:    now,
-				VersionNumber: 1,
-				MimeType:      "image/png",
-				EndpointSlug:  "primary",
+				NameSlug:        "logo-final",
+				DisplayName:     "Logo Final",
+				MediaType:       db.NullAssetMediaType{AssetMediaType: db.AssetMediaTypeIMAGE, Valid: true},
+				ContentType:     "image/png",
+				State:           db.AssetStateACTIVE,
+				SizeBytes:       245678,
+				CreateTime:      now,
+				AssetID:         id.String(),
+				VersionNumber:   1,
+				MimeType:        "image/png",
+				EndpointSlug:    "primary",
+				GatewayHostname: "pivox.ngrok.app",
 			},
 		},
 		{
@@ -203,19 +250,21 @@ func TestViewFromSpaceRow_CopiesAllFields(t *testing.T) {
 				LatestVersionNumber:   0,
 				LatestVersionMimeType: "",
 				EndpointSlug:          pgtype.Text{Valid: false},
+				GatewayHostname:       pgtype.Text{Valid: false},
 			},
 			want: assetView{
 				NameSlug:      "placeholder",
 				DisplayName:   "Placeholder Asset",
 				State:         db.AssetStatePLACEHOLDER,
 				CreateTime:    now,
+				AssetID:       id.String(),
 				VersionNumber: 0,
 				MimeType:      "",
 				EndpointSlug:  "",
 			},
 		},
 		{
-			name: "no endpoint bound — pgtype.Text invalid → empty slug",
+			name: "no endpoint bound — pgtype.Text invalid → empty slug + empty gateway",
 			in: db.ListAssetsBySpaceRow{
 				Asset: db.Asset{
 					ID:          id,
@@ -230,6 +279,7 @@ func TestViewFromSpaceRow_CopiesAllFields(t *testing.T) {
 				LatestVersionNumber:   1,
 				LatestVersionMimeType: "image/jpeg",
 				EndpointSlug:          pgtype.Text{Valid: false},
+				GatewayHostname:       pgtype.Text{Valid: false},
 			},
 			want: assetView{
 				NameSlug:      "orphan",
@@ -239,9 +289,42 @@ func TestViewFromSpaceRow_CopiesAllFields(t *testing.T) {
 				State:         db.AssetStateACTIVE,
 				SizeBytes:     1000,
 				CreateTime:    now,
+				AssetID:       id.String(),
 				VersionNumber: 1,
 				MimeType:      "image/jpeg",
 				EndpointSlug:  "",
+			},
+		},
+		{
+			name: "no gateway hostname — endpoint bound but gateway hostname empty",
+			in: db.ListAssetsBySpaceRow{
+				Asset: db.Asset{
+					ID:          id,
+					Name:        "endpoint-but-no-host",
+					DisplayName: "Endpoint Without Hostname",
+					MediaType:   db.NullAssetMediaType{AssetMediaType: db.AssetMediaTypeIMAGE, Valid: true},
+					ContentType: "image/png",
+					State:       db.AssetStateACTIVE,
+					SizeBytes:   500,
+					CreateTime:  now,
+				},
+				LatestVersionNumber:   1,
+				LatestVersionMimeType: "image/png",
+				EndpointSlug:          pgtype.Text{String: "primary", Valid: true},
+				GatewayHostname:       pgtype.Text{Valid: false},
+			},
+			want: assetView{
+				NameSlug:      "endpoint-but-no-host",
+				DisplayName:   "Endpoint Without Hostname",
+				MediaType:     db.NullAssetMediaType{AssetMediaType: db.AssetMediaTypeIMAGE, Valid: true},
+				ContentType:   "image/png",
+				State:         db.AssetStateACTIVE,
+				SizeBytes:     500,
+				CreateTime:    now,
+				AssetID:       id.String(),
+				VersionNumber: 1,
+				MimeType:      "image/png",
+				EndpointSlug:  "primary",
 			},
 		},
 	}
@@ -249,6 +332,130 @@ func TestViewFromSpaceRow_CopiesAllFields(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			got := viewFromSpaceRow(tc.in)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+// TestComposeStorageURL pins the composer's per-row decision logic
+// for thumbnail URL synthesis. Output shape:
+//
+//	https://{GatewayHostname}/files/{EndpointSlug}/{org}/{space}/assets/{AssetID}/v{VersionNumber}/thumb_md.webp
+//
+// Empty-string return on any of:
+//
+//   - VersionNumber == 0   (CHECK FIRST — only unambiguous "no version" signal)
+//   - EndpointSlug == ""
+//   - GatewayHostname == ""
+//   - !isImageShaped(v)    (media_type ∉ {IMAGE, GRAPHIC} AND
+//     content_type doesn't start with "image/")
+//
+// Coverage matrix exercises every gate plus the GRAPHIC enum and
+// content-type prefix-fallback paths so a future regression on any
+// gate surfaces as a single named failure.
+func TestComposeStorageURL(t *testing.T) {
+	t.Parallel()
+
+	const (
+		assetID    = "0192a000-0030-7000-8000-310001000001"
+		orgSlug    = "meridian-broad"
+		spaceSlug  = "corp-site"
+		gwHost     = "pivox.ngrok.app"
+		epSlug     = "meridian-hq-west"
+		expectedOK = "https://pivox.ngrok.app/files/meridian-hq-west/meridian-broad/corp-site/assets/0192a000-0030-7000-8000-310001000001/v1/thumb_md.webp"
+	)
+
+	base := assetView{
+		AssetID:         assetID,
+		VersionNumber:   1,
+		MimeType:        "image/png",
+		EndpointSlug:    epSlug,
+		GatewayHostname: gwHost,
+		MediaType:       db.NullAssetMediaType{AssetMediaType: db.AssetMediaTypeIMAGE, Valid: true},
+		ContentType:     "image/png",
+	}
+
+	with := func(mut func(*assetView)) assetView {
+		v := base
+		mut(&v)
+		return v
+	}
+
+	cases := []struct {
+		name string
+		in   assetView
+		want string
+	}{
+		{
+			name: "image asset, all fields populated",
+			in:   base,
+			want: expectedOK,
+		},
+		{
+			name: "VersionNumber == 0 — sentinel for no version exists",
+			in:   with(func(v *assetView) { v.VersionNumber = 0 }),
+			want: "",
+		},
+		{
+			name: "EndpointSlug empty — no endpoint bound",
+			in:   with(func(v *assetView) { v.EndpointSlug = "" }),
+			want: "",
+		},
+		{
+			name: "GatewayHostname empty — gateway hostname not configured",
+			in:   with(func(v *assetView) { v.GatewayHostname = "" }),
+			want: "",
+		},
+		{
+			name: "VIDEO media_type — non-image falls through to iconField path",
+			in: with(func(v *assetView) {
+				v.MediaType = db.NullAssetMediaType{AssetMediaType: db.AssetMediaTypeVIDEO, Valid: true}
+				v.ContentType = "video/mp4"
+				v.MimeType = "video/mp4"
+			}),
+			want: "",
+		},
+		{
+			name: "GRAPHIC media_type — qualifies via the {IMAGE, GRAPHIC} enum branch",
+			in: with(func(v *assetView) {
+				v.MediaType = db.NullAssetMediaType{AssetMediaType: db.AssetMediaTypeGRAPHIC, Valid: true}
+				v.ContentType = "image/svg+xml"
+				v.MimeType = "image/svg+xml"
+			}),
+			want: "https://pivox.ngrok.app/files/meridian-hq-west/meridian-broad/corp-site/assets/0192a000-0030-7000-8000-310001000001/v1/thumb_md.webp",
+		},
+		{
+			name: "NULL media_type + image/webp — content-type prefix fallback (asset …000009)",
+			in: with(func(v *assetView) {
+				v.MediaType = db.NullAssetMediaType{Valid: false}
+				v.ContentType = "image/webp"
+				v.MimeType = "image/webp"
+			}),
+			want: "https://pivox.ngrok.app/files/meridian-hq-west/meridian-broad/corp-site/assets/0192a000-0030-7000-8000-310001000001/v1/thumb_md.webp",
+		},
+		{
+			name: "empty content_type — neither enum nor prefix qualifies (asset …00000a)",
+			in: with(func(v *assetView) {
+				v.MediaType = db.NullAssetMediaType{Valid: false}
+				v.ContentType = ""
+				v.MimeType = ""
+			}),
+			want: "",
+		},
+		{
+			name: "DOCUMENT media_type with application/pdf — neither qualifies",
+			in: with(func(v *assetView) {
+				v.MediaType = db.NullAssetMediaType{AssetMediaType: db.AssetMediaTypeDOCUMENT, Valid: true}
+				v.ContentType = "application/pdf"
+				v.MimeType = "application/pdf"
+			}),
+			want: "",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := composeStorageURL(tc.in, orgSlug, spaceSlug)
 			assert.Equal(t, tc.want, got)
 		})
 	}
