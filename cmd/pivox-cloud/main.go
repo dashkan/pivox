@@ -14,7 +14,9 @@ import (
 	"buf.build/go/protovalidate"
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	pgxvector "github.com/pgvector/pgvector-go/pgx"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	sloghttp "github.com/samber/slog-http"
@@ -166,8 +168,21 @@ func serve(cmd *cobra.Command, args []string) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	// Database
-	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	// Database. Register pgvector types per-connection so the
+	// scanner can decode `vector` columns (currently `assets.embedding`).
+	// Without this, the first read of a row containing a `vector` column
+	// fails with "unsupported data type: <nil>" — the test infrastructure
+	// (internal/testutil/db.go) sets this up for tests but the
+	// production binary never did, so the gap is invisible until a
+	// non-test caller reads an asset row.
+	poolCfg, err := pgxpool.ParseConfig(cfg.DatabaseURL)
+	if err != nil {
+		return fmt.Errorf("parse pool config: %w", err)
+	}
+	poolCfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		return pgxvector.RegisterTypes(ctx, conn)
+	}
+	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {
 		return fmt.Errorf("connect to database: %w", err)
 	}

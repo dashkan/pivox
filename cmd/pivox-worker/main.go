@@ -21,7 +21,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	pgxvector "github.com/pgvector/pgvector-go/pgx"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	"github.com/riverqueue/river/rivermigrate"
@@ -100,7 +102,19 @@ func serve(cmd *cobra.Command, _ []string) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	pool, err := pgxpool.New(ctx, databaseURL)
+	// Register pgvector types per-connection so the scanner can
+	// decode `vector` columns (currently `assets.embedding`).
+	// Worker jobs that touch assets (purge, etc.) hit the same
+	// codec gap as the API server otherwise — see equivalent
+	// wiring in cmd/pivox-cloud/main.go.
+	poolCfg, err := pgxpool.ParseConfig(databaseURL)
+	if err != nil {
+		return fmt.Errorf("parse pool config: %w", err)
+	}
+	poolCfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		return pgxvector.RegisterTypes(ctx, conn)
+	}
+	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {
 		return fmt.Errorf("connect to database: %w", err)
 	}
