@@ -756,7 +756,16 @@ public struct Pivox_Storage_V1_CreateStorageSessionRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Optional. Override session duration. Default: 1 hour.
+  /// Required. The organization this session is scoped to. Format:
+  /// `organizations/{organization}`. The minted session can only
+  /// access storage paths derived from the caller's memberships
+  /// within this organization.
+  public var parent: String = String()
+
+  /// Optional. Override session duration. Default: 1 hour. Capped at
+  /// the server-configured maximum (`StorageGatewaysConfig.MaxSessionTTL`,
+  /// typically 8h); requests exceeding the cap are clamped, not
+  /// rejected.
   public var ttl: SwiftProtobuf.Google_Protobuf_Duration {
     get {_ttl ?? SwiftProtobuf.Google_Protobuf_Duration()}
     set {_ttl = newValue}
@@ -790,6 +799,21 @@ public struct Pivox_Storage_V1_CreateStorageSessionResponse: Sendable {
   public var hasExpiry: Bool {self._expiry != nil}
   /// Clears the value of `expiry`. Subsequent reads from it will return its default value.
   public mutating func clearExpiry() {self._expiry = nil}
+
+  /// The session JWT, also delivered as a Set-Cookie response header
+  /// for browser flows. Native clients (macOS, Windows) read this
+  /// value from the response body and attach it as
+  /// `Authorization: Bearer <token>` on subsequent storage requests.
+  ///
+  /// The JWT is HS256-signed and carries the following claims:
+  ///   - `token`: opaque session id (UUID); the storage agent looks
+  ///     up the session's pattern grants by this value.
+  ///   - `sub`: the caller's Pivox identity UUID. Lets gateway-side
+  ///     audit logs attribute requests without a directory lookup.
+  ///   - `org`: the target organization's slug; matches the SessionGrant
+  ///     routing scope.
+  ///   - `exp`: Unix-second expiry timestamp.
+  public var token: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1581,7 +1605,7 @@ extension Pivox_Storage_V1_UpgradeGatewayMetadata.UpgradeGatewayPhase: SwiftProt
 
 extension Pivox_Storage_V1_CreateStorageSessionRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CreateStorageSessionRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}ttl\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}parent\0\u{1}ttl\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1589,7 +1613,8 @@ extension Pivox_Storage_V1_CreateStorageSessionRequest: SwiftProtobuf.Message, S
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._ttl) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.parent) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._ttl) }()
       default: break
       }
     }
@@ -1600,13 +1625,17 @@ extension Pivox_Storage_V1_CreateStorageSessionRequest: SwiftProtobuf.Message, S
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.parent.isEmpty {
+      try visitor.visitSingularStringField(value: self.parent, fieldNumber: 1)
+    }
     try { if let v = self._ttl {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
     } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Pivox_Storage_V1_CreateStorageSessionRequest, rhs: Pivox_Storage_V1_CreateStorageSessionRequest) -> Bool {
+    if lhs.parent != rhs.parent {return false}
     if lhs._ttl != rhs._ttl {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1615,7 +1644,7 @@ extension Pivox_Storage_V1_CreateStorageSessionRequest: SwiftProtobuf.Message, S
 
 extension Pivox_Storage_V1_CreateStorageSessionResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CreateStorageSessionResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}expiry\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}expiry\0\u{1}token\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1624,6 +1653,7 @@ extension Pivox_Storage_V1_CreateStorageSessionResponse: SwiftProtobuf.Message, 
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularMessageField(value: &self._expiry) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.token) }()
       default: break
       }
     }
@@ -1637,11 +1667,15 @@ extension Pivox_Storage_V1_CreateStorageSessionResponse: SwiftProtobuf.Message, 
     try { if let v = self._expiry {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
     } }()
+    if !self.token.isEmpty {
+      try visitor.visitSingularStringField(value: self.token, fieldNumber: 2)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Pivox_Storage_V1_CreateStorageSessionResponse, rhs: Pivox_Storage_V1_CreateStorageSessionResponse) -> Bool {
     if lhs._expiry != rhs._expiry {return false}
+    if lhs.token != rhs.token {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

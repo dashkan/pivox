@@ -392,6 +392,8 @@ if(APPLE)
         tests/macos/DelegatedAuthTests.swift
         tests/macos/IconConfigResolverTests.swift
         tests/macos/ImageEditorBridgeTests.swift
+        tests/macos/StorageClientTests.swift
+        tests/macos/StorageServiceTests.swift
     )
     # Copy conversation fixture into the test bundle's Resources so
     # `Bundle(for:).url(forResource:)` can find it at test runtime.

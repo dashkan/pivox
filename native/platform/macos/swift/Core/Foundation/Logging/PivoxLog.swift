@@ -45,6 +45,11 @@ enum PivoxLog {
   /// Dashboards: client lifecycle, dashboard load failures,
   /// per-tile data-query errors, in-renderer action invocations.
   static let dashboards = Logger(subsystem: subsystem, category: "dashboards")
+
+  /// Storage: session-mint flow, JWT cache hits/misses, /files/
+  /// fetch lifecycle. Phase 6c.3 adds session minting + caching;
+  /// 6c.4 adds the bearer-attached fetch.
+  static let storage = Logger(subsystem: subsystem, category: "storage")
 }
 
 extension Logger {
