@@ -1,7 +1,9 @@
 .PHONY: build run test test-up test-down tidy lint lint-fix fmt generate \
-	air air-worker mocks dev log-pivox-app-macos run-app-macos build-app-macos ollama-serve \
+	air air-worker mocks dev log-pivox-app-macos run-app-macos build-app-macos \
+	configure-app-macos ollama-serve \
 	lint-proto proto-format proto-breaking proto-generate \
 	proto-generate-go proto-generate-native build-grpc-swift-2-plugin api-lint \
+	lint-icons \
 	db-up db-down db-migrate db-force db-seed db-clear db-drop db-create \
 	docker-up docker-down firebase-deploy clean-fn-revisions \
 	proxy-nginx proxy-nginx-stop proxy-nginx-reload proxy-ngrok \
@@ -11,6 +13,12 @@ DATABASE_URL ?= postgresql://localhost:5432/pivox?sslmode=disable
 DATABASE_NAME ?= pivox
 
 TOOL = go tool -modfile=./tools/go.mod
+
+# Native-build env. Both vars `?=` so a caller with direnv-loaded
+# values overrides; otherwise the Makefile bakes its own. Avoids
+# making subprocess shell state load-bearing for `make build-app-macos`.
+MACOSX_SDK ?= $(shell xcrun --show-sdk-path --sdk macosx)
+VCPKG_ROOT ?= $(HOME)/.vcpkg
 
 # Build
 
@@ -132,6 +140,15 @@ build-grpc-swift-2-plugin:
 api-lint:
 	$(TOOL) api-linter --proto-path=api/proto --config=api/proto/api-linter.yaml --set-exit-status api/proto/pivox/**/**/*.proto
 
+# lint-icons enforces the Icon-enum ↔ platform-map contract: every
+# value in api/proto/pivox/api/v1/icons.proto must have a matching
+# `case .X:` in each platform's icon map (today only the macOS SF
+# Symbol map at native/.../Dashboards/Icons/IconSymbol.swift; Windows
+# joins when that surface lands). Catches drift before it ships as a
+# silent UX gap (empty thumbnail, missing symbol, force-unwrap crash).
+lint-icons:
+	go run ./cmd/lint-icon-maps
+
 # Database
 
 db-up:
@@ -188,7 +205,20 @@ clean-fn-revisions:
 # Splitting the build location with -derivedDataPath produces a
 # .app that nothing else launches from, leaving stale binaries in
 # play.
+# configure-app-macos regenerates the Xcode project from CMakeLists.txt.
+# Required after CMakeLists.txt changes; safe to re-run idempotently.
+# CMAKE_TOOLCHAIN_FILE points at vcpkg so find_package(cmark-gfm)
+# resolves; CMAKE_OSX_SYSROOT is the active Xcode SDK so XCTest bundle
+# generation succeeds without depending on the caller's shell having
+# Xcode env loaded.
+configure-app-macos:
+	@cd native && cmake -G Xcode -B build-xcode -S . \
+		-DCMAKE_TOOLCHAIN_FILE=$(VCPKG_ROOT)/scripts/buildsystems/vcpkg.cmake \
+		-DCMAKE_OSX_SYSROOT=$(MACOSX_SDK)
+
 build-app-macos:
+	@test -f native/build-xcode/Pivox.xcodeproj/project.pbxproj \
+		|| $(MAKE) configure-app-macos
 	@xcodebuild build \
 		-project native/build-xcode/Pivox.xcodeproj \
 		-scheme Pivox \

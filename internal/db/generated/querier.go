@@ -63,8 +63,12 @@ type Querier interface {
 	CountArtifactVersionsByArtifact(ctx context.Context, artifactID uuid.UUID) (int64, error)
 	CountArtifactsByConversation(ctx context.Context, conversationID uuid.UUID) (int64, error)
 	CountAssetVersions(ctx context.Context, assetID uuid.UUID) (int64, error)
+	CountAssetsByOrg(ctx context.Context, orgID uuid.UUID) (int64, error)
 	CountAssetsBySpace(ctx context.Context, spaceID uuid.UUID) (int64, error)
 	CountConnectedStorageAgentsByGateway(ctx context.Context, gatewayID uuid.UUID) (int64, error)
+	// Companion to ListDashboardsBySpace for next_page_token computation:
+	// emit a token iff (offset + page_size) < count.
+	CountDashboardsBySpace(ctx context.Context, spaceID uuid.UUID) (int64, error)
 	CountFulfilledLineItems(ctx context.Context, requestID uuid.UUID) (int64, error)
 	CountLineItemsByRequest(ctx context.Context, requestID uuid.UUID) (int64, error)
 	CountMessagesByConversation(ctx context.Context, conversationID uuid.UUID) (int64, error)
@@ -105,6 +109,14 @@ type Querier interface {
 	// key (the `users/{user}` resource path segment). NOT NULL on the
 	// column; every conversation has a creator.
 	CreateConversation(ctx context.Context, arg CreateConversationParams) (AiConversation, error)
+	// Dashboards (USER_MANAGED, space-scoped) CRUD.
+	//
+	// The handler always re-marshals the full Dashboard proto into
+	// payload on every write; display_name and description are mirrored
+	// as scalar columns for AIP-160 filter / index use. management_mode
+	// is stored as a column so the SYSTEM_MANAGED-mutation guard can
+	// gate without unmarshaling JSONB on the hot path.
+	CreateDashboard(ctx context.Context, arg CreateDashboardParams) (Dashboard, error)
 	// Creates a new delegated auth session. The code and expiry are chosen by the
 	// server so we can control both TTL and the entropy source (crypto/rand).
 	CreateDelegatedAuthSession(ctx context.Context, arg CreateDelegatedAuthSessionParams) (DelegatedAuthSession, error)
@@ -269,6 +281,14 @@ type Querier interface {
 	// `created_by` against the path's user-uuid AND the caller's
 	// `pivox_user_id` claim before returning.
 	GetConversationByName(ctx context.Context, arg GetConversationByNameParams) (AiConversation, error)
+	// Returns the live (non-soft-deleted) dashboard with the given slug
+	// in the given space. Used by GetDashboard, UpdateDashboard's
+	// pre-read, and DeleteDashboard's pre-read.
+	GetDashboardByName(ctx context.Context, arg GetDashboardByNameParams) (Dashboard, error)
+	// SELECT ... FOR UPDATE variant for UpdateDashboard / DeleteDashboard,
+	// which need the row pinned for the duration of the surrounding tx
+	// so a concurrent mutation can't race the etag check.
+	GetDashboardByNameForUpdate(ctx context.Context, arg GetDashboardByNameForUpdateParams) (Dashboard, error)
 	// Returns the state of a session without mutating it. Used by pollers to
 	// distinguish "still pending" from "expired/unknown" after a failed consume.
 	GetDelegatedAuthSessionState(ctx context.Context, code uuid.UUID) (DelegatedAuthSessionState, error)
@@ -458,8 +478,25 @@ type Querier interface {
 	IsOnlyArtifactVersion(ctx context.Context, artifactID uuid.UUID) (bool, error)
 	ListAssetRenditions(ctx context.Context, versionID uuid.UUID) ([]AssetRendition, error)
 	ListAssetVersions(ctx context.Context, arg ListAssetVersionsParams) ([]AssetVersion, error)
+	// Lists every active asset across every space in an organization,
+	// with the space's slug attached so the caller can compose AIP
+	// resource names without an N+1 lookup. Used by
+	// Dashboards.QueryDashboardData at org-scoped parent so the system
+	// Library dashboard can render assets across spaces in one round
+	// trip. Soft-deleted spaces are skipped (their assets aren't
+	// surfaced) — same effect as `assets.space_id` referencing a row
+	// with a non-null `spaces.delete_time`.
+	ListAssetsByOrg(ctx context.Context, arg ListAssetsByOrgParams) ([]ListAssetsByOrgRow, error)
+	// Tiebreaker on id DESC keeps pagination stable when multiple assets
+	// share a create_time (concurrent ingest can collide on µs precision):
+	// without it, offset-based pagination can drop or duplicate rows.
 	ListAssetsBySpace(ctx context.Context, arg ListAssetsBySpaceParams) ([]Asset, error)
 	ListAssetsBySpaceWithDeleted(ctx context.Context, arg ListAssetsBySpaceWithDeletedParams) ([]Asset, error)
+	// Live dashboards in a space, newest-first. Pagination is offset-
+	// based for v1 — the catalog is small (≤ 100s of dashboards per
+	// space) and the surface won't grow until customers start
+	// composing them programmatically.
+	ListDashboardsBySpace(ctx context.Context, arg ListDashboardsBySpaceParams) ([]Dashboard, error)
 	// ListDomainsByOrg returns all domains for an org, oldest-first.
 	// 100-row LIMIT is a defensive backstop; the typical org has a
 	// handful of claimed domains.
@@ -635,6 +672,10 @@ type Querier interface {
 	SetAutoTitle(ctx context.Context, arg SetAutoTitleParams) (AiConversation, error)
 	SoftDeleteApiKey(ctx context.Context, arg SoftDeleteApiKeyParams) (ApiKey, error)
 	SoftDeleteAsset(ctx context.Context, arg SoftDeleteAssetParams) error
+	// Sets delete_time + deleted_by; row is no longer returned by
+	// GetDashboardByName / ListDashboardsBySpace. Hard delete is
+	// operator-only — no public RPC issues `DELETE FROM dashboards`.
+	SoftDeleteDashboardByName(ctx context.Context, arg SoftDeleteDashboardByNameParams) (Dashboard, error)
 	// SoftDeleteIdentity tombstones an identity: blanks PII, flips
 	// is_deleted, stamps delete_time. The row is preserved so any
 	// *_by audit field that points at this identity continues to
@@ -678,6 +719,12 @@ type Querier interface {
 	// raised here, never lowered — once a user has curated a title, that
 	// intent is sticky.
 	UpdateConversation(ctx context.Context, arg UpdateConversationParams) (AiConversation, error)
+	// Optimistic-concurrency update: if etag in the WHERE doesn't match,
+	// the UPDATE returns zero rows and the handler maps that to Aborted.
+	// The caller is expected to re-marshal the full Dashboard proto
+	// into @payload on every Update; this query does not partially
+	// patch JSONB.
+	UpdateDashboardByName(ctx context.Context, arg UpdateDashboardByNameParams) (Dashboard, error)
 	UpdateLineItem(ctx context.Context, arg UpdateLineItemParams) (AssetRequestLineItem, error)
 	UpdateLineItemState(ctx context.Context, arg UpdateLineItemStateParams) error
 	UpdateOperationMetadata(ctx context.Context, arg UpdateOperationMetadataParams) error

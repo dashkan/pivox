@@ -1,0 +1,114 @@
+// Copyright 2025 Pivox
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package pivox.api.v1;
+
+option go_package = "pivox/api/v1;apiv1";
+
+// Icon is a curated cross-platform semantic icon catalog. Renderers map
+// each value to a platform-native icon (SF Symbols on macOS, Fluent
+// System Icons on Windows, equivalent on the web). The enum is purely
+// semantic — variants like filled vs. outlined are chosen by the
+// renderer based on context.
+//
+// Numeric values are partitioned into thousand-blocks per category.
+// Within a category, values are sequential: enum numbers are wire
+// identifiers, not display order, so middle-of-category alphabetical
+// insertion isn't an invariant. Pre-prod freedom permits reordering
+// the source list (and renumbering) until the first paying customer
+// persists a row that references one of these values.
+//
+// New icons must be added in three places at once: this enum, the
+// macOS SF Symbol map, and the WinUI Fluent map. CI lint catches
+// drift.
+//
+// Categories (thousand-block ranges):
+//
+//   * File / content types   — 1xxx
+//   * Identity               — 2xxx
+//   * Actions                — 3xxx
+//   * Status                 — 4xxx
+//   * Navigation             — 5xxx
+enum Icon {
+  // Default value when no icon is specified. Renderers may pick an
+  // appropriate fallback.
+  ICON_UNSPECIFIED = 0;
+
+  // Generic document. (File / content types.)
+  ICON_DOCUMENT = 1000;
+  // A folder or container.
+  ICON_FOLDER = 1001;
+  // A photograph or raster image.
+  ICON_PHOTO = 1002;
+  // A video clip.
+  ICON_VIDEO = 1003;
+  // An audio clip.
+  ICON_AUDIO = 1004;
+  // Source code or a code snippet.
+  ICON_CODE = 1005;
+  // An archive (zip, tar, etc.).
+  ICON_ARCHIVE = 1006;
+
+  // A single person / individual user. (Identity.)
+  ICON_PERSON = 2000;
+  // A group of people.
+  ICON_PEOPLE = 2001;
+  // An organization, company, or team.
+  ICON_ORGANIZATION = 2002;
+
+  // Share an item. (Actions.)
+  ICON_SHARE = 3000;
+  // Move to trash / delete.
+  ICON_TRASH = 3001;
+  // A tag / label.
+  ICON_TAG = 3002;
+  // Pin an item to a position.
+  ICON_PIN = 3003;
+  // Mark an item as starred / favorite.
+  ICON_STAR = 3004;
+  // Download an item.
+  ICON_DOWNLOAD = 3005;
+  // Upload an item.
+  ICON_UPLOAD = 3006;
+  // Copy / duplicate an item.
+  ICON_COPY = 3007;
+  // Edit / modify an item.
+  ICON_EDIT = 3008;
+
+  // Success / completed indicator. (Status.)
+  ICON_CHECK = 4000;
+  // Close / dismiss / failure indicator.
+  ICON_X_MARK = 4001;
+  // Warning indicator.
+  ICON_WARNING = 4002;
+  // Informational indicator.
+  ICON_INFO = 4003;
+  // Locked state.
+  ICON_LOCK = 4004;
+  // Unlocked state.
+  ICON_UNLOCKED = 4005;
+
+  // Overflow / "more options" indicator (typically `…`). (Navigation.)
+  ICON_ELLIPSIS = 5000;
+  // Add / create.
+  ICON_PLUS = 5001;
+  // Remove / subtract.
+  ICON_MINUS = 5002;
+  // Settings / configuration.
+  ICON_SETTINGS = 5003;
+  // Search.
+  ICON_SEARCH = 5004;
+}

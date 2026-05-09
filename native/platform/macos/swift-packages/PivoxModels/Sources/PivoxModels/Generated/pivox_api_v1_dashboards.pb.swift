@@ -34,14 +34,15 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
   typealias Version = _2
 }
 
-/// A custom dashboard belonging to a space.
+/// A dashboard at the organization or space scope.
 public struct Pivox_Api_V1_Dashboard: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Immutable. The resource name of the dashboard.
-  /// Format: `organizations/{organization}/spaces/{space}/dashboards/{dashboard}`
+  /// Format: `organizations/{organization}/dashboards/{dashboard}` or
+  ///         `organizations/{organization}/spaces/{space}/dashboards/{dashboard}`.
   public var name: String = String()
 
   /// Required. A human-readable name for the dashboard.
@@ -92,6 +93,17 @@ public struct Pivox_Api_V1_Dashboard: Sendable {
   /// Optional. Free-form annotations for the dashboard.
   public var annotations: Dictionary<String,String> = [:]
 
+  /// Output only. Identifies whether this dashboard is server-curated
+  /// (SYSTEM_MANAGED) or customer-owned (USER_MANAGED). Mutations of
+  /// SYSTEM_MANAGED dashboards are rejected with FAILED_PRECONDITION
+  /// regardless of URL path.
+  ///
+  /// MAINTAINER: `OUTPUT_ONLY` is documentation, not enforcement. The
+  /// UpdateDashboard handler MUST reject any FieldMask path that names
+  /// this field with `INVALID_ARGUMENT`, otherwise a customer can flip
+  /// the management_mode and escape the SYSTEM_MANAGED mutation guard.
+  public var managementMode: Pivox_Api_V1_Dashboard.ManagementMode = .unspecified
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   /// The dashboard layout. Currently only grid layout is supported;
@@ -99,6 +111,55 @@ public struct Pivox_Api_V1_Dashboard: Sendable {
   public enum OneOf_Layout: Equatable, Sendable {
     /// A grid-based layout with positioned tiles.
     case gridLayout(Pivox_Api_V1_GridLayout)
+
+  }
+
+  /// Identifies who owns the lifecycle of a dashboard. SYSTEM_MANAGED
+  /// dashboards are server-curated and reject all mutations; USER_MANAGED
+  /// dashboards are owned by the customer and support full CRUD.
+  public enum ManagementMode: SwiftProtobuf.Enum, Swift.CaseIterable {
+    public typealias RawValue = Int
+
+    /// Default. Server handlers always populate this field on read,
+    /// so UNSPECIFIED on the wire indicates a server bug, not a
+    /// legitimate state.
+    case unspecified // = 0
+
+    /// Customer-owned. Full CRUD applies.
+    case userManaged // = 1
+
+    /// Server-curated. Mutations are rejected with FAILED_PRECONDITION.
+    case systemManaged // = 2
+    case UNRECOGNIZED(Int)
+
+    public init() {
+      self = .unspecified
+    }
+
+    public init?(rawValue: Int) {
+      switch rawValue {
+      case 0: self = .unspecified
+      case 1: self = .userManaged
+      case 2: self = .systemManaged
+      default: self = .UNRECOGNIZED(rawValue)
+      }
+    }
+
+    public var rawValue: Int {
+      switch self {
+      case .unspecified: return 0
+      case .userManaged: return 1
+      case .systemManaged: return 2
+      case .UNRECOGNIZED(let i): return i
+      }
+    }
+
+    // The compiler won't synthesize support with the UNRECOGNIZED case.
+    public static let allCases: [Pivox_Api_V1_Dashboard.ManagementMode] = [
+      .unspecified,
+      .userManaged,
+      .systemManaged,
+    ]
 
   }
 
@@ -137,8 +198,9 @@ public struct Pivox_Api_V1_ListDashboardsRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Required. The parent space.
-  /// Format: `organizations/{organization}/spaces/{space}`
+  /// Required. The parent organization or space.
+  /// Format: `organizations/{organization}` or
+  ///         `organizations/{organization}/spaces/{space}`.
   public var parent: String = String()
 
   /// Optional. Maximum number of dashboards to return.
@@ -304,13 +366,71 @@ public struct Pivox_Api_V1_DeleteDashboardRequest: Sendable {
   public init() {}
 }
 
+/// Request message for QueryDashboardData.
+public struct Pivox_Api_V1_QueryDashboardDataRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Required. The parent scope under which to resolve the query.
+  /// Format: `organizations/{organization}` (org-scoped) or
+  ///         `organizations/{organization}/spaces/{space}` (space-scoped).
+  public var parent: String = String()
+
+  /// Required. The query to resolve. v1 supports
+  /// `query.resource_type = "pivox.assets/Asset"` only; other resource
+  /// types return Unimplemented until per-type handlers land.
+  public var query: Pivox_Api_V1_ResourceQuery {
+    get {_query ?? Pivox_Api_V1_ResourceQuery()}
+    set {_query = newValue}
+  }
+  /// Returns true if `query` has been explicitly set.
+  public var hasQuery: Bool {self._query != nil}
+  /// Clears the value of `query`. Subsequent reads from it will return its default value.
+  public mutating func clearQuery() {self._query = nil}
+
+  /// Optional. Maximum number of rows to return per page.
+  public var pageSize: Int32 = 0
+
+  /// Optional. Page token from a previous QueryDashboardData call.
+  public var pageToken: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _query: Pivox_Api_V1_ResourceQuery? = nil
+}
+
+/// Response message for QueryDashboardData.
+public struct Pivox_Api_V1_QueryDashboardDataResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// The rows resolved by the query. Each row is a
+  /// `google.protobuf.Struct` whose fields correspond to the
+  /// resource's column-level data plus server-synthesized derived
+  /// fields (e.g. `icon` as the numeric `Icon` enum value, computed
+  /// per-row from the resource's content).
+  public var rows: [SwiftProtobuf.Google_Protobuf_Struct] = []
+
+  /// Token for the next page of rows. Empty when the response is
+  /// the last page.
+  public var nextPageToken: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate let _protobuf_package = "pivox.api.v1"
 
 extension Pivox_Api_V1_Dashboard: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".Dashboard"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{4}\u{2}display_name\0\u{1}description\0\u{3}grid_layout\0\u{1}variables\0\u{3}create_time\0\u{3}update_time\0\u{1}etag\0\u{1}annotations\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{4}\u{2}display_name\0\u{1}description\0\u{3}grid_layout\0\u{1}variables\0\u{3}create_time\0\u{3}update_time\0\u{1}etag\0\u{1}annotations\0\u{3}management_mode\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -339,6 +459,7 @@ extension Pivox_Api_V1_Dashboard: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       case 8: try { try decoder.decodeSingularMessageField(value: &self._updateTime) }()
       case 9: try { try decoder.decodeSingularStringField(value: &self.etag) }()
       case 10: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.annotations) }()
+      case 11: try { try decoder.decodeSingularEnumField(value: &self.managementMode) }()
       default: break
       }
     }
@@ -376,6 +497,9 @@ extension Pivox_Api_V1_Dashboard: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if !self.annotations.isEmpty {
       try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.annotations, fieldNumber: 10)
     }
+    if self.managementMode != .unspecified {
+      try visitor.visitSingularEnumField(value: self.managementMode, fieldNumber: 11)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -389,9 +513,14 @@ extension Pivox_Api_V1_Dashboard: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if lhs._updateTime != rhs._updateTime {return false}
     if lhs.etag != rhs.etag {return false}
     if lhs.annotations != rhs.annotations {return false}
+    if lhs.managementMode != rhs.managementMode {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
+}
+
+extension Pivox_Api_V1_Dashboard.ManagementMode: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MANAGEMENT_MODE_UNSPECIFIED\0\u{1}USER_MANAGED\0\u{1}SYSTEM_MANAGED\0")
 }
 
 extension Pivox_Api_V1_DashboardVariable: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -687,6 +816,90 @@ extension Pivox_Api_V1_DeleteDashboardRequest: SwiftProtobuf.Message, SwiftProto
     if lhs.name != rhs.name {return false}
     if lhs.validateOnly != rhs.validateOnly {return false}
     if lhs.etag != rhs.etag {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Pivox_Api_V1_QueryDashboardDataRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".QueryDashboardDataRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}parent\0\u{1}query\0\u{3}page_size\0\u{3}page_token\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.parent) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._query) }()
+      case 3: try { try decoder.decodeSingularInt32Field(value: &self.pageSize) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.pageToken) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.parent.isEmpty {
+      try visitor.visitSingularStringField(value: self.parent, fieldNumber: 1)
+    }
+    try { if let v = self._query {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    if self.pageSize != 0 {
+      try visitor.visitSingularInt32Field(value: self.pageSize, fieldNumber: 3)
+    }
+    if !self.pageToken.isEmpty {
+      try visitor.visitSingularStringField(value: self.pageToken, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Pivox_Api_V1_QueryDashboardDataRequest, rhs: Pivox_Api_V1_QueryDashboardDataRequest) -> Bool {
+    if lhs.parent != rhs.parent {return false}
+    if lhs._query != rhs._query {return false}
+    if lhs.pageSize != rhs.pageSize {return false}
+    if lhs.pageToken != rhs.pageToken {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Pivox_Api_V1_QueryDashboardDataResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".QueryDashboardDataResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}rows\0\u{3}next_page_token\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.rows) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.nextPageToken) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.rows.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.rows, fieldNumber: 1)
+    }
+    if !self.nextPageToken.isEmpty {
+      try visitor.visitSingularStringField(value: self.nextPageToken, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Pivox_Api_V1_QueryDashboardDataResponse, rhs: Pivox_Api_V1_QueryDashboardDataResponse) -> Bool {
+    if lhs.rows != rhs.rows {return false}
+    if lhs.nextPageToken != rhs.nextPageToken {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

@@ -27,6 +27,7 @@ var gatedServiceDescs = []*grpc.ServiceDesc{
 	&apiv1.TagValues_ServiceDesc,
 	&apiv1.TagBindings_ServiceDesc,
 	&apiv1.ApiKeys_ServiceDesc,
+	&apiv1.Dashboards_ServiceDesc,
 	&iamv1.Iam_ServiceDesc,
 	&assetsv1.Assets_ServiceDesc,
 	&assetsv1.Requests_ServiceDesc,

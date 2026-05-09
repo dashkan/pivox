@@ -393,6 +393,54 @@ CREATE INDEX idx_tag_bindings_tag_value ON tag_bindings (tag_value_id);
 CREATE INDEX idx_tag_bindings_origin ON tag_bindings (parent_resource, origin);
 
 -- ============================================================================
+-- dashboards (USER_MANAGED, space-scoped). SYSTEM_MANAGED dashboards
+-- (the org-level Library catalog) are virtual — generated from
+-- internal/dashboard/system at request time and have no DB row. The
+-- management_mode column carries forward as a guard for the day a
+-- SYSTEM_MANAGED row needs to be importable; for v1 every row this
+-- table holds is USER_MANAGED.
+--
+-- Storage shape: the full Dashboard proto is marshaled into the
+-- payload JSONB column on every write. display_name and description
+-- are mirrored as scalar columns for AIP-160 filter / index use
+-- (filterable fields per dashboards.proto are displayName and
+-- createTime). Read paths reconstruct the proto from payload and
+-- overlay the column-mirrored audit + timestamp fields.
+-- ============================================================================
+CREATE TABLE dashboards (
+    id              UUID PRIMARY KEY DEFAULT uuidv7(),
+    -- relationships
+    space_id        UUID NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
+    -- identity
+    name            TEXT NOT NULL, -- AIP slug, scoped per (space_id, name)
+    -- domain mirrors (filterable / indexable surface of the proto)
+    display_name    TEXT NOT NULL DEFAULT '',
+    description     TEXT NOT NULL DEFAULT '',
+    -- governance
+    management_mode TEXT NOT NULL DEFAULT 'USER_MANAGED'
+        CHECK (management_mode IN ('USER_MANAGED', 'SYSTEM_MANAGED')),
+    -- payload (full Dashboard proto marshaled)
+    payload         JSONB NOT NULL,
+    -- versioning
+    etag            TEXT NOT NULL DEFAULT md5(now()::text),
+    revision        INTEGER NOT NULL DEFAULT 1,
+    -- audit (FKs added below in the ALTER TABLE block — matches
+    -- the codebase convention so this table can be created before
+    -- the identities table)
+    created_by      UUID,
+    updated_by      UUID,
+    deleted_by      UUID,
+    -- timestamps
+    create_time     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    update_time     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    delete_time     TIMESTAMPTZ,
+    purge_time      TIMESTAMPTZ,
+    -- constraints
+    UNIQUE(space_id, name)
+);
+CREATE INDEX idx_dashboards_space ON dashboards (space_id, create_time DESC) WHERE delete_time IS NULL;
+
+-- ============================================================================
 -- api_keys
 -- ============================================================================
 CREATE TABLE api_keys (
@@ -524,6 +572,10 @@ ALTER TABLE api_keys
   ADD CONSTRAINT fk_api_keys_created_by FOREIGN KEY (created_by) REFERENCES identities(id),
   ADD CONSTRAINT fk_api_keys_updated_by FOREIGN KEY (updated_by) REFERENCES identities(id),
   ADD CONSTRAINT fk_api_keys_deleted_by FOREIGN KEY (deleted_by) REFERENCES identities(id);
+ALTER TABLE dashboards
+  ADD CONSTRAINT fk_dashboards_created_by FOREIGN KEY (created_by) REFERENCES identities(id),
+  ADD CONSTRAINT fk_dashboards_updated_by FOREIGN KEY (updated_by) REFERENCES identities(id),
+  ADD CONSTRAINT fk_dashboards_deleted_by FOREIGN KEY (deleted_by) REFERENCES identities(id);
 
 -- FK from operations.org_id → organizations(id), deferred for the
 -- same reason: `operations` is declared above `organizations` (so the
@@ -925,6 +977,13 @@ INSERT INTO permissions (permission_id, display_name, description) VALUES
   ('apiKeys.read', 'Read API Keys', 'View and list API keys'),
   ('apiKeys.update', 'Update API Key', 'Modify API keys'),
   ('apiKeys.delete', 'Delete API Key', 'Delete API keys'),
+  -- Dashboard management (org-level system catalog + space-level user
+  -- dashboards share one permission set; SYSTEM_MANAGED targets reject
+  -- mutation regardless of role via a data-driven handler guard, not IAM)
+  ('dashboards.read', 'Read Dashboards', 'View and list dashboards (covers both org-level system catalog and space-level user dashboards)'),
+  ('dashboards.create', 'Create Dashboard', 'Create user-managed dashboards in a space. Owner/admin only — dashboards are workspace structure, not day-to-day content (matches spaces.create tier).'),
+  ('dashboards.update', 'Update Dashboard', 'Modify a user-managed dashboard. SYSTEM_MANAGED dashboards reject mutation regardless of role.'),
+  ('dashboards.delete', 'Delete Dashboard', 'Delete a user-managed dashboard. SYSTEM_MANAGED dashboards reject deletion regardless of role.'),
   -- Domain management
   ('domains.create', 'Create Domain', 'Claim a DNS domain for the organization'),
   ('domains.read', 'Read Domains', 'View and list domains'),
@@ -1043,7 +1102,14 @@ CREATE TABLE assets (
       setweight(to_tsvector('english', coalesce(ai_description, '')), 'B') ||
       setweight(to_tsvector('english', coalesce(transcription, '')), 'C')
     ) STORED,
-    embedding           vector(768),
+    -- DEFAULT zero vector so the column never returns NULL via pgx's
+    -- row scanner. pgvector-go v0.3.0's `pgvector.Vector` (non-pointer)
+    -- panics in DecodeBinary on a 0-byte (NULL) payload; the right
+    -- semantic answer is `*pgvector.Vector` everywhere, but that's a
+    -- bigger churn. The DEFAULT keeps the schema honest about "always
+    -- present" and matches what internal/testutil/db.go has been doing
+    -- via post-migration ALTER for tests since pgvector landed.
+    embedding           vector(768) NOT NULL DEFAULT array_fill(0, ARRAY[768])::vector,
     -- state
     state               asset_state NOT NULL DEFAULT 'PLACEHOLDER',
     -- versioning

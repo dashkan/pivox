@@ -18,7 +18,9 @@ package pivox.api.v1;
 
 import "buf/validate/validate.proto";
 import "google/api/field_behavior.proto";
+import "google/type/color.proto";
 import "pivox/api/v1/data_sources.proto";
+import "pivox/api/v1/icons.proto";
 
 option go_package = "pivox/api/v1;apiv1";
 
@@ -87,8 +89,9 @@ message Widget {
     // An XY chart (line, bar, area, etc.).
     ChartWidget chart = 4;
 
-    // A data table.
-    TableWidget table = 5;
+    // A collection of resources rendered in one of several display
+    // modes (table, card grid, …).
+    CollectionWidget collection = 5;
 
     // A pie or donut chart.
     PieChartWidget pie_chart = 6;
@@ -164,22 +167,79 @@ message ChartWidget {
   repeated Threshold thresholds = 5 [(google.api.field_behavior) = OPTIONAL];
 }
 
-// TableWidget displays data in a tabular format.
-message TableWidget {
-  // Required. The data source for table rows.
+// CollectionWidget displays a collection of rows in one of several
+// display modes (table, card grid). The same data source feeds every
+// mode; switching modes is a presentation concern handled by the
+// client renderer.
+//
+// Naming note: the widget is mode-agnostic by design. New display
+// modes (e.g. a vertical list with leading icon and trailing detail)
+// get added to `DisplayMode` only when a concrete consumer plus a
+// renderer implementation land in the same change. Shipping an enum
+// value the renderer can't handle creates a silent downgrade; don't.
+message CollectionWidget {
+  // How the rows are visually arranged. The renderer picks layout
+  // primitives per mode (e.g. `Table` for TABLE, a card grid for CARD).
+  enum DisplayMode {
+    // Default; the renderer picks based on `supported_modes` (first
+    // entry) or falls back to TABLE.
+    DISPLAY_MODE_UNSPECIFIED = 0;
+    // Classic tabular rendering with sortable columns.
+    TABLE = 1;
+    // Card-grid rendering — each row becomes a card with thumbnail.
+    CARD = 2;
+  }
+
+  // Required. The data source for collection rows.
   DataSource data_source = 1 [
     (google.api.field_behavior) = REQUIRED,
     (buf.validate.field).required = true
   ];
 
   // Optional. Column definitions. If empty, columns are auto-detected.
-  repeated TableColumn columns = 2 [(google.api.field_behavior) = OPTIONAL];
+  repeated Column columns = 2 [(google.api.field_behavior) = OPTIONAL];
 
   // Optional. Number of rows per page. Defaults to server-chosen value.
   int32 rows_per_page = 3 [
     (google.api.field_behavior) = OPTIONAL,
     (buf.validate.field).int32.gte = 0
   ];
+
+  // Optional. The current display mode for the widget. If unset, the
+  // renderer treats this as DISPLAY_MODE_UNSPECIFIED and picks based
+  // on `supported_modes`.
+  DisplayMode display_mode = 4 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Modes the customer can switch between via the safe-edit
+  // UI. If empty, the widget is locked to `display_mode`. Modes not
+  // listed are not user-selectable even if the renderer can render
+  // them.
+  //
+  // Mode-selection matrix (worked examples):
+  //
+  //   display_mode=UNSPECIFIED, supported_modes=[]
+  //     → renderer picks TABLE (single mode, no toggle UI).
+  //
+  //   display_mode=UNSPECIFIED, supported_modes=[CARD, TABLE]
+  //     → renderer picks CARD (first listed); user can toggle to TABLE.
+  //
+  //   display_mode=CARD, supported_modes=[]
+  //     → locked to CARD; user cannot toggle.
+  //
+  //   display_mode=TABLE, supported_modes=[CARD, TABLE]
+  //     → starts at TABLE; user can toggle between TABLE and CARD.
+  repeated DisplayMode supported_modes = 5 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Per-row actions exposed by the renderer (e.g. "open",
+  // "share", "archive"). Populated by the server template per resource
+  // type.
+  repeated RowAction row_actions = 6 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. How to derive each row's leading icon / thumbnail.
+  IconConfig icon_config = 7 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Content displayed when the data source returns no rows.
+  EmptyState empty_state = 8 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // PieChartWidget displays data as a pie or donut chart.
@@ -262,8 +322,8 @@ message Threshold {
   // Required. The threshold value.
   double value = 1 [(google.api.field_behavior) = REQUIRED];
 
-  // Optional. The color to use when the threshold is triggered (CSS color).
-  string color = 2 [(google.api.field_behavior) = OPTIONAL];
+  // Optional. The color to use when the threshold is triggered.
+  google.type.Color color = 2 [(google.api.field_behavior) = OPTIONAL];
 
   // Optional. The direction relative to the threshold value.
   Direction direction = 3 [(google.api.field_behavior) = OPTIONAL];
@@ -283,8 +343,8 @@ message ChartDataSet {
   // Optional. The display label for this series.
   string label = 2 [(google.api.field_behavior) = OPTIONAL];
 
-  // Optional. The color for this series (CSS color).
-  string color = 3 [(google.api.field_behavior) = OPTIONAL];
+  // Optional. The color for this series.
+  google.type.Color color = 3 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // AxisConfig defines display properties for a chart axis.
@@ -314,8 +374,16 @@ message AxisConfig {
   double max = 4 [(google.api.field_behavior) = OPTIONAL];
 }
 
-// TableColumn defines a column in a TableWidget.
-message TableColumn {
+// Column defines a column in a CollectionWidget. The same column set
+// describes the data shape across every display mode (TABLE, CARD,
+// …) — TABLE renders columns as headers, CARD picks the marked
+// columns to surface on the card face, and so on.
+//
+// A column may participate in user-driven sorting and filtering even
+// if it is not visually rendered: a column with `visible = false,
+// filterable = true` exposes a filterable field that the customer can
+// query without the column ever appearing in TABLE mode.
+message Column {
   // Required. The field name from the data source.
   string field = 1 [
     (google.api.field_behavior) = REQUIRED,
@@ -327,4 +395,114 @@ message TableColumn {
 
   // Optional. Whether this column is visible. Defaults to true.
   bool visible = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Whether the customer can sort by this column.
+  bool sortable = 4 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Whether the customer can filter on this column. May be
+  // combined with `visible = false` to expose a filterable-but-hidden
+  // field.
+  bool filterable = 5 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// RowAction describes an action exposed on each row of a
+// CollectionWidget. The `key` is a well-known string the renderer
+// maps to a platform UI behavior (e.g. "open_detail" → push detail
+// sheet, "share" → present share dialog). The renderer owns the
+// dispatch table; the server only declares which actions are
+// available.
+message RowAction {
+  // Required. Well-known action key. Maps client-side to the actual
+  // behavior. Examples: "open_detail", "share", "archive", "delete".
+  //
+  // The pattern constraint keeps keys safe to use as renderer
+  // dispatch-table keys and prevents typos like "Open Detail" leaking
+  // into wire data.
+  string key = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).string = {
+      min_len: 1
+      pattern: "^[a-z][a-z0-9_]*$"
+    }
+  ];
+
+  // Optional. The display label shown in menus / buttons.
+  string label = 2 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Cross-platform semantic icon for this action.
+  Icon icon = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. If true, the renderer presents a confirmation prompt
+  // before executing this action.
+  bool requires_confirmation = 4 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// IconConfig describes how to derive the leading icon / thumbnail for
+// each row in a CollectionWidget. The four derivation paths
+// (`source_field` → `icon_field` → `initials_field` → `fallback_icon`)
+// are tried in order: the first one that produces a value wins.
+// `size` and `fallback_color` are presentation knobs that apply to
+// whichever derivation path resolves.
+message IconConfig {
+  // Display size hint for the leading icon. The renderer maps each
+  // bucket to a platform-appropriate point size.
+  enum IconSize {
+    // Default; renderer picks a context-appropriate size.
+    ICON_SIZE_UNSPECIFIED = 0;
+    // Compact size — typical for inline list rows.
+    SMALL = 1;
+    // Default mid-size — typical for card thumbnails.
+    MEDIUM = 2;
+    // Larger thumbnail emphasis.
+    LARGE = 3;
+    // Hero-size thumbnail; used for empty-state and primary tiles.
+    EXTRA_LARGE = 4;
+  }
+
+  // Optional. Name of the row field whose value is a thumbnail URL.
+  // When set and non-empty, the renderer fetches the image (subject to
+  // gateway-host bearer-token attachment).
+  string source_field = 1 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Name of the row field whose value is the numeric
+  // `Icon` enum value (e.g. `1002` for `ICON_PHOTO`). Encoded as the
+  // wire integer rather than the symbolic name so renaming an `Icon`
+  // value never silently breaks persisted dashboards. Server handlers
+  // synthesize this per row.
+  string icon_field = 2 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Name of the row field whose value is used to derive
+  // initials when no thumbnail or semantic icon is available
+  // (typically "display_name" or "name").
+  string initials_field = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. The static fallback icon used when none of
+  // `source_field` / `icon_field` / `initials_field` produces a value.
+  Icon fallback_icon = 4 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. The size hint for the leading icon — applies to whichever
+  // derivation path resolved.
+  IconSize size = 5 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Background color for the icon backplate. Renderer-honored
+  // when icon or initials are shown without a thumbnail.
+  google.type.Color fallback_color = 6 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// EmptyState is shown when a CollectionWidget's data source returns
+// zero rows. It is purely presentational — the renderer composes the
+// title, subtitle, icon, and primary action.
+message EmptyState {
+  // Optional. Headline shown above the subtitle.
+  string title = 1 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Secondary line of explanatory copy.
+  string subtitle = 2 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Cross-platform semantic icon shown above the title.
+  Icon icon = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. The primary call-to-action presented in the empty state
+  // (e.g. an "Upload" or "Invite" button).
+  RowAction primary_action = 4 [(google.api.field_behavior) = OPTIONAL];
 }

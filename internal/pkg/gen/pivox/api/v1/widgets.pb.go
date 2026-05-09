@@ -23,6 +23,7 @@ package apiv1
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
+	color "google.golang.org/genproto/googleapis/type/color"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -106,6 +107,61 @@ func (ChartWidget_ChartType) EnumDescriptor() ([]byte, []int) {
 	return file_pivox_api_v1_widgets_proto_rawDescGZIP(), []int{4, 0}
 }
 
+// How the rows are visually arranged. The renderer picks layout
+// primitives per mode (e.g. `Table` for TABLE, a card grid for CARD).
+type CollectionWidget_DisplayMode int32
+
+const (
+	// Default; the renderer picks based on `supported_modes` (first
+	// entry) or falls back to TABLE.
+	CollectionWidget_DISPLAY_MODE_UNSPECIFIED CollectionWidget_DisplayMode = 0
+	// Classic tabular rendering with sortable columns.
+	CollectionWidget_TABLE CollectionWidget_DisplayMode = 1
+	// Card-grid rendering — each row becomes a card with thumbnail.
+	CollectionWidget_CARD CollectionWidget_DisplayMode = 2
+)
+
+// Enum value maps for CollectionWidget_DisplayMode.
+var (
+	CollectionWidget_DisplayMode_name = map[int32]string{
+		0: "DISPLAY_MODE_UNSPECIFIED",
+		1: "TABLE",
+		2: "CARD",
+	}
+	CollectionWidget_DisplayMode_value = map[string]int32{
+		"DISPLAY_MODE_UNSPECIFIED": 0,
+		"TABLE":                    1,
+		"CARD":                     2,
+	}
+)
+
+func (x CollectionWidget_DisplayMode) Enum() *CollectionWidget_DisplayMode {
+	p := new(CollectionWidget_DisplayMode)
+	*p = x
+	return p
+}
+
+func (x CollectionWidget_DisplayMode) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (CollectionWidget_DisplayMode) Descriptor() protoreflect.EnumDescriptor {
+	return file_pivox_api_v1_widgets_proto_enumTypes[1].Descriptor()
+}
+
+func (CollectionWidget_DisplayMode) Type() protoreflect.EnumType {
+	return &file_pivox_api_v1_widgets_proto_enumTypes[1]
+}
+
+func (x CollectionWidget_DisplayMode) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use CollectionWidget_DisplayMode.Descriptor instead.
+func (CollectionWidget_DisplayMode) EnumDescriptor() ([]byte, []int) {
+	return file_pivox_api_v1_widgets_proto_rawDescGZIP(), []int{5, 0}
+}
+
 // Pie chart visualization types.
 type PieChartWidget_PieChartType int32
 
@@ -143,11 +199,11 @@ func (x PieChartWidget_PieChartType) String() string {
 }
 
 func (PieChartWidget_PieChartType) Descriptor() protoreflect.EnumDescriptor {
-	return file_pivox_api_v1_widgets_proto_enumTypes[1].Descriptor()
+	return file_pivox_api_v1_widgets_proto_enumTypes[2].Descriptor()
 }
 
 func (PieChartWidget_PieChartType) Type() protoreflect.EnumType {
-	return &file_pivox_api_v1_widgets_proto_enumTypes[1]
+	return &file_pivox_api_v1_widgets_proto_enumTypes[2]
 }
 
 func (x PieChartWidget_PieChartType) Number() protoreflect.EnumNumber {
@@ -196,11 +252,11 @@ func (x TextWidget_Format) String() string {
 }
 
 func (TextWidget_Format) Descriptor() protoreflect.EnumDescriptor {
-	return file_pivox_api_v1_widgets_proto_enumTypes[2].Descriptor()
+	return file_pivox_api_v1_widgets_proto_enumTypes[3].Descriptor()
 }
 
 func (TextWidget_Format) Type() protoreflect.EnumType {
-	return &file_pivox_api_v1_widgets_proto_enumTypes[2]
+	return &file_pivox_api_v1_widgets_proto_enumTypes[3]
 }
 
 func (x TextWidget_Format) Number() protoreflect.EnumNumber {
@@ -249,11 +305,11 @@ func (x Threshold_Direction) String() string {
 }
 
 func (Threshold_Direction) Descriptor() protoreflect.EnumDescriptor {
-	return file_pivox_api_v1_widgets_proto_enumTypes[3].Descriptor()
+	return file_pivox_api_v1_widgets_proto_enumTypes[4].Descriptor()
 }
 
 func (Threshold_Direction) Type() protoreflect.EnumType {
-	return &file_pivox_api_v1_widgets_proto_enumTypes[3]
+	return &file_pivox_api_v1_widgets_proto_enumTypes[4]
 }
 
 func (x Threshold_Direction) Number() protoreflect.EnumNumber {
@@ -302,11 +358,11 @@ func (x AxisConfig_Scale) String() string {
 }
 
 func (AxisConfig_Scale) Descriptor() protoreflect.EnumDescriptor {
-	return file_pivox_api_v1_widgets_proto_enumTypes[4].Descriptor()
+	return file_pivox_api_v1_widgets_proto_enumTypes[5].Descriptor()
 }
 
 func (AxisConfig_Scale) Type() protoreflect.EnumType {
-	return &file_pivox_api_v1_widgets_proto_enumTypes[4]
+	return &file_pivox_api_v1_widgets_proto_enumTypes[5]
 }
 
 func (x AxisConfig_Scale) Number() protoreflect.EnumNumber {
@@ -316,6 +372,68 @@ func (x AxisConfig_Scale) Number() protoreflect.EnumNumber {
 // Deprecated: Use AxisConfig_Scale.Descriptor instead.
 func (AxisConfig_Scale) EnumDescriptor() ([]byte, []int) {
 	return file_pivox_api_v1_widgets_proto_rawDescGZIP(), []int{11, 0}
+}
+
+// Display size hint for the leading icon. The renderer maps each
+// bucket to a platform-appropriate point size.
+type IconConfig_IconSize int32
+
+const (
+	// Default; renderer picks a context-appropriate size.
+	IconConfig_ICON_SIZE_UNSPECIFIED IconConfig_IconSize = 0
+	// Compact size — typical for inline list rows.
+	IconConfig_SMALL IconConfig_IconSize = 1
+	// Default mid-size — typical for card thumbnails.
+	IconConfig_MEDIUM IconConfig_IconSize = 2
+	// Larger thumbnail emphasis.
+	IconConfig_LARGE IconConfig_IconSize = 3
+	// Hero-size thumbnail; used for empty-state and primary tiles.
+	IconConfig_EXTRA_LARGE IconConfig_IconSize = 4
+)
+
+// Enum value maps for IconConfig_IconSize.
+var (
+	IconConfig_IconSize_name = map[int32]string{
+		0: "ICON_SIZE_UNSPECIFIED",
+		1: "SMALL",
+		2: "MEDIUM",
+		3: "LARGE",
+		4: "EXTRA_LARGE",
+	}
+	IconConfig_IconSize_value = map[string]int32{
+		"ICON_SIZE_UNSPECIFIED": 0,
+		"SMALL":                 1,
+		"MEDIUM":                2,
+		"LARGE":                 3,
+		"EXTRA_LARGE":           4,
+	}
+)
+
+func (x IconConfig_IconSize) Enum() *IconConfig_IconSize {
+	p := new(IconConfig_IconSize)
+	*p = x
+	return p
+}
+
+func (x IconConfig_IconSize) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (IconConfig_IconSize) Descriptor() protoreflect.EnumDescriptor {
+	return file_pivox_api_v1_widgets_proto_enumTypes[6].Descriptor()
+}
+
+func (IconConfig_IconSize) Type() protoreflect.EnumType {
+	return &file_pivox_api_v1_widgets_proto_enumTypes[6]
+}
+
+func (x IconConfig_IconSize) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use IconConfig_IconSize.Descriptor instead.
+func (IconConfig_IconSize) EnumDescriptor() ([]byte, []int) {
+	return file_pivox_api_v1_widgets_proto_rawDescGZIP(), []int{14, 0}
 }
 
 // GridLayout positions tiles on a column-based grid. Maps to react-grid-layout.
@@ -469,7 +587,7 @@ type Widget struct {
 	//
 	//	*Widget_Statistic
 	//	*Widget_Chart
-	//	*Widget_Table
+	//	*Widget_Collection
 	//	*Widget_PieChart
 	//	*Widget_Text
 	//	*Widget_SectionHeader
@@ -547,10 +665,10 @@ func (x *Widget) GetChart() *ChartWidget {
 	return nil
 }
 
-func (x *Widget) GetTable() *TableWidget {
+func (x *Widget) GetCollection() *CollectionWidget {
 	if x != nil {
-		if x, ok := x.Content.(*Widget_Table); ok {
-			return x.Table
+		if x, ok := x.Content.(*Widget_Collection); ok {
+			return x.Collection
 		}
 	}
 	return nil
@@ -597,9 +715,10 @@ type Widget_Chart struct {
 	Chart *ChartWidget `protobuf:"bytes,4,opt,name=chart,proto3,oneof"`
 }
 
-type Widget_Table struct {
-	// A data table.
-	Table *TableWidget `protobuf:"bytes,5,opt,name=table,proto3,oneof"`
+type Widget_Collection struct {
+	// A collection of resources rendered in one of several display
+	// modes (table, card grid, …).
+	Collection *CollectionWidget `protobuf:"bytes,5,opt,name=collection,proto3,oneof"`
 }
 
 type Widget_PieChart struct {
@@ -621,7 +740,7 @@ func (*Widget_Statistic) isWidget_Content() {}
 
 func (*Widget_Chart) isWidget_Content() {}
 
-func (*Widget_Table) isWidget_Content() {}
+func (*Widget_Collection) isWidget_Content() {}
 
 func (*Widget_PieChart) isWidget_Content() {}
 
@@ -784,33 +903,73 @@ func (x *ChartWidget) GetThresholds() []*Threshold {
 	return nil
 }
 
-// TableWidget displays data in a tabular format.
-type TableWidget struct {
+// CollectionWidget displays a collection of rows in one of several
+// display modes (table, card grid). The same data source feeds every
+// mode; switching modes is a presentation concern handled by the
+// client renderer.
+//
+// Naming note: the widget is mode-agnostic by design. New display
+// modes (e.g. a vertical list with leading icon and trailing detail)
+// get added to `DisplayMode` only when a concrete consumer plus a
+// renderer implementation land in the same change. Shipping an enum
+// value the renderer can't handle creates a silent downgrade; don't.
+type CollectionWidget struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Required. The data source for table rows.
+	// Required. The data source for collection rows.
 	DataSource *DataSource `protobuf:"bytes,1,opt,name=data_source,json=dataSource,proto3" json:"data_source,omitempty"`
 	// Optional. Column definitions. If empty, columns are auto-detected.
-	Columns []*TableColumn `protobuf:"bytes,2,rep,name=columns,proto3" json:"columns,omitempty"`
+	Columns []*Column `protobuf:"bytes,2,rep,name=columns,proto3" json:"columns,omitempty"`
 	// Optional. Number of rows per page. Defaults to server-chosen value.
-	RowsPerPage   int32 `protobuf:"varint,3,opt,name=rows_per_page,json=rowsPerPage,proto3" json:"rows_per_page,omitempty"`
+	RowsPerPage int32 `protobuf:"varint,3,opt,name=rows_per_page,json=rowsPerPage,proto3" json:"rows_per_page,omitempty"`
+	// Optional. The current display mode for the widget. If unset, the
+	// renderer treats this as DISPLAY_MODE_UNSPECIFIED and picks based
+	// on `supported_modes`.
+	DisplayMode CollectionWidget_DisplayMode `protobuf:"varint,4,opt,name=display_mode,json=displayMode,proto3,enum=pivox.api.v1.CollectionWidget_DisplayMode" json:"display_mode,omitempty"`
+	// Optional. Modes the customer can switch between via the safe-edit
+	// UI. If empty, the widget is locked to `display_mode`. Modes not
+	// listed are not user-selectable even if the renderer can render
+	// them.
+	//
+	// Mode-selection matrix (worked examples):
+	//
+	//	display_mode=UNSPECIFIED, supported_modes=[]
+	//	  → renderer picks TABLE (single mode, no toggle UI).
+	//
+	//	display_mode=UNSPECIFIED, supported_modes=[CARD, TABLE]
+	//	  → renderer picks CARD (first listed); user can toggle to TABLE.
+	//
+	//	display_mode=CARD, supported_modes=[]
+	//	  → locked to CARD; user cannot toggle.
+	//
+	//	display_mode=TABLE, supported_modes=[CARD, TABLE]
+	//	  → starts at TABLE; user can toggle between TABLE and CARD.
+	SupportedModes []CollectionWidget_DisplayMode `protobuf:"varint,5,rep,packed,name=supported_modes,json=supportedModes,proto3,enum=pivox.api.v1.CollectionWidget_DisplayMode" json:"supported_modes,omitempty"`
+	// Optional. Per-row actions exposed by the renderer (e.g. "open",
+	// "share", "archive"). Populated by the server template per resource
+	// type.
+	RowActions []*RowAction `protobuf:"bytes,6,rep,name=row_actions,json=rowActions,proto3" json:"row_actions,omitempty"`
+	// Optional. How to derive each row's leading icon / thumbnail.
+	IconConfig *IconConfig `protobuf:"bytes,7,opt,name=icon_config,json=iconConfig,proto3" json:"icon_config,omitempty"`
+	// Optional. Content displayed when the data source returns no rows.
+	EmptyState    *EmptyState `protobuf:"bytes,8,opt,name=empty_state,json=emptyState,proto3" json:"empty_state,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *TableWidget) Reset() {
-	*x = TableWidget{}
+func (x *CollectionWidget) Reset() {
+	*x = CollectionWidget{}
 	mi := &file_pivox_api_v1_widgets_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *TableWidget) String() string {
+func (x *CollectionWidget) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*TableWidget) ProtoMessage() {}
+func (*CollectionWidget) ProtoMessage() {}
 
-func (x *TableWidget) ProtoReflect() protoreflect.Message {
+func (x *CollectionWidget) ProtoReflect() protoreflect.Message {
 	mi := &file_pivox_api_v1_widgets_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -822,30 +981,65 @@ func (x *TableWidget) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use TableWidget.ProtoReflect.Descriptor instead.
-func (*TableWidget) Descriptor() ([]byte, []int) {
+// Deprecated: Use CollectionWidget.ProtoReflect.Descriptor instead.
+func (*CollectionWidget) Descriptor() ([]byte, []int) {
 	return file_pivox_api_v1_widgets_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *TableWidget) GetDataSource() *DataSource {
+func (x *CollectionWidget) GetDataSource() *DataSource {
 	if x != nil {
 		return x.DataSource
 	}
 	return nil
 }
 
-func (x *TableWidget) GetColumns() []*TableColumn {
+func (x *CollectionWidget) GetColumns() []*Column {
 	if x != nil {
 		return x.Columns
 	}
 	return nil
 }
 
-func (x *TableWidget) GetRowsPerPage() int32 {
+func (x *CollectionWidget) GetRowsPerPage() int32 {
 	if x != nil {
 		return x.RowsPerPage
 	}
 	return 0
+}
+
+func (x *CollectionWidget) GetDisplayMode() CollectionWidget_DisplayMode {
+	if x != nil {
+		return x.DisplayMode
+	}
+	return CollectionWidget_DISPLAY_MODE_UNSPECIFIED
+}
+
+func (x *CollectionWidget) GetSupportedModes() []CollectionWidget_DisplayMode {
+	if x != nil {
+		return x.SupportedModes
+	}
+	return nil
+}
+
+func (x *CollectionWidget) GetRowActions() []*RowAction {
+	if x != nil {
+		return x.RowActions
+	}
+	return nil
+}
+
+func (x *CollectionWidget) GetIconConfig() *IconConfig {
+	if x != nil {
+		return x.IconConfig
+	}
+	return nil
+}
+
+func (x *CollectionWidget) GetEmptyState() *EmptyState {
+	if x != nil {
+		return x.EmptyState
+	}
+	return nil
 }
 
 // PieChartWidget displays data as a pie or donut chart.
@@ -1036,8 +1230,8 @@ type Threshold struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The threshold value.
 	Value float64 `protobuf:"fixed64,1,opt,name=value,proto3" json:"value,omitempty"`
-	// Optional. The color to use when the threshold is triggered (CSS color).
-	Color string `protobuf:"bytes,2,opt,name=color,proto3" json:"color,omitempty"`
+	// Optional. The color to use when the threshold is triggered.
+	Color *color.Color `protobuf:"bytes,2,opt,name=color,proto3" json:"color,omitempty"`
 	// Optional. The direction relative to the threshold value.
 	Direction Threshold_Direction `protobuf:"varint,3,opt,name=direction,proto3,enum=pivox.api.v1.Threshold_Direction" json:"direction,omitempty"`
 	// Optional. A human-readable label for the threshold.
@@ -1083,11 +1277,11 @@ func (x *Threshold) GetValue() float64 {
 	return 0
 }
 
-func (x *Threshold) GetColor() string {
+func (x *Threshold) GetColor() *color.Color {
 	if x != nil {
 		return x.Color
 	}
-	return ""
+	return nil
 }
 
 func (x *Threshold) GetDirection() Threshold_Direction {
@@ -1111,8 +1305,8 @@ type ChartDataSet struct {
 	DataSource *DataSource `protobuf:"bytes,1,opt,name=data_source,json=dataSource,proto3" json:"data_source,omitempty"`
 	// Optional. The display label for this series.
 	Label string `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
-	// Optional. The color for this series (CSS color).
-	Color         string `protobuf:"bytes,3,opt,name=color,proto3" json:"color,omitempty"`
+	// Optional. The color for this series.
+	Color         *color.Color `protobuf:"bytes,3,opt,name=color,proto3" json:"color,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1161,11 +1355,11 @@ func (x *ChartDataSet) GetLabel() string {
 	return ""
 }
 
-func (x *ChartDataSet) GetColor() string {
+func (x *ChartDataSet) GetColor() *color.Color {
 	if x != nil {
 		return x.Color
 	}
-	return ""
+	return nil
 }
 
 // AxisConfig defines display properties for a chart axis.
@@ -1241,33 +1435,47 @@ func (x *AxisConfig) GetMax() float64 {
 	return 0
 }
 
-// TableColumn defines a column in a TableWidget.
-type TableColumn struct {
+// Column defines a column in a CollectionWidget. The same column set
+// describes the data shape across every display mode (TABLE, CARD,
+// …) — TABLE renders columns as headers, CARD picks the marked
+// columns to surface on the card face, and so on.
+//
+// A column may participate in user-driven sorting and filtering even
+// if it is not visually rendered: a column with `visible = false,
+// filterable = true` exposes a filterable field that the customer can
+// query without the column ever appearing in TABLE mode.
+type Column struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Required. The field name from the data source.
 	Field string `protobuf:"bytes,1,opt,name=field,proto3" json:"field,omitempty"`
 	// Optional. The display name for the column header.
 	DisplayName string `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
 	// Optional. Whether this column is visible. Defaults to true.
-	Visible       bool `protobuf:"varint,3,opt,name=visible,proto3" json:"visible,omitempty"`
+	Visible bool `protobuf:"varint,3,opt,name=visible,proto3" json:"visible,omitempty"`
+	// Optional. Whether the customer can sort by this column.
+	Sortable bool `protobuf:"varint,4,opt,name=sortable,proto3" json:"sortable,omitempty"`
+	// Optional. Whether the customer can filter on this column. May be
+	// combined with `visible = false` to expose a filterable-but-hidden
+	// field.
+	Filterable    bool `protobuf:"varint,5,opt,name=filterable,proto3" json:"filterable,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *TableColumn) Reset() {
-	*x = TableColumn{}
+func (x *Column) Reset() {
+	*x = Column{}
 	mi := &file_pivox_api_v1_widgets_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *TableColumn) String() string {
+func (x *Column) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*TableColumn) ProtoMessage() {}
+func (*Column) ProtoMessage() {}
 
-func (x *TableColumn) ProtoReflect() protoreflect.Message {
+func (x *Column) ProtoReflect() protoreflect.Message {
 	mi := &file_pivox_api_v1_widgets_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1279,37 +1487,318 @@ func (x *TableColumn) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use TableColumn.ProtoReflect.Descriptor instead.
-func (*TableColumn) Descriptor() ([]byte, []int) {
+// Deprecated: Use Column.ProtoReflect.Descriptor instead.
+func (*Column) Descriptor() ([]byte, []int) {
 	return file_pivox_api_v1_widgets_proto_rawDescGZIP(), []int{12}
 }
 
-func (x *TableColumn) GetField() string {
+func (x *Column) GetField() string {
 	if x != nil {
 		return x.Field
 	}
 	return ""
 }
 
-func (x *TableColumn) GetDisplayName() string {
+func (x *Column) GetDisplayName() string {
 	if x != nil {
 		return x.DisplayName
 	}
 	return ""
 }
 
-func (x *TableColumn) GetVisible() bool {
+func (x *Column) GetVisible() bool {
 	if x != nil {
 		return x.Visible
 	}
 	return false
 }
 
+func (x *Column) GetSortable() bool {
+	if x != nil {
+		return x.Sortable
+	}
+	return false
+}
+
+func (x *Column) GetFilterable() bool {
+	if x != nil {
+		return x.Filterable
+	}
+	return false
+}
+
+// RowAction describes an action exposed on each row of a
+// CollectionWidget. The `key` is a well-known string the renderer
+// maps to a platform UI behavior (e.g. "open_detail" → push detail
+// sheet, "share" → present share dialog). The renderer owns the
+// dispatch table; the server only declares which actions are
+// available.
+type RowAction struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Required. Well-known action key. Maps client-side to the actual
+	// behavior. Examples: "open_detail", "share", "archive", "delete".
+	//
+	// The pattern constraint keeps keys safe to use as renderer
+	// dispatch-table keys and prevents typos like "Open Detail" leaking
+	// into wire data.
+	Key string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	// Optional. The display label shown in menus / buttons.
+	Label string `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
+	// Optional. Cross-platform semantic icon for this action.
+	Icon Icon `protobuf:"varint,3,opt,name=icon,proto3,enum=pivox.api.v1.Icon" json:"icon,omitempty"`
+	// Optional. If true, the renderer presents a confirmation prompt
+	// before executing this action.
+	RequiresConfirmation bool `protobuf:"varint,4,opt,name=requires_confirmation,json=requiresConfirmation,proto3" json:"requires_confirmation,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *RowAction) Reset() {
+	*x = RowAction{}
+	mi := &file_pivox_api_v1_widgets_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RowAction) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RowAction) ProtoMessage() {}
+
+func (x *RowAction) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_api_v1_widgets_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RowAction.ProtoReflect.Descriptor instead.
+func (*RowAction) Descriptor() ([]byte, []int) {
+	return file_pivox_api_v1_widgets_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *RowAction) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *RowAction) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *RowAction) GetIcon() Icon {
+	if x != nil {
+		return x.Icon
+	}
+	return Icon_ICON_UNSPECIFIED
+}
+
+func (x *RowAction) GetRequiresConfirmation() bool {
+	if x != nil {
+		return x.RequiresConfirmation
+	}
+	return false
+}
+
+// IconConfig describes how to derive the leading icon / thumbnail for
+// each row in a CollectionWidget. The four derivation paths
+// (`source_field` → `icon_field` → `initials_field` → `fallback_icon`)
+// are tried in order: the first one that produces a value wins.
+// `size` and `fallback_color` are presentation knobs that apply to
+// whichever derivation path resolves.
+type IconConfig struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Optional. Name of the row field whose value is a thumbnail URL.
+	// When set and non-empty, the renderer fetches the image (subject to
+	// gateway-host bearer-token attachment).
+	SourceField string `protobuf:"bytes,1,opt,name=source_field,json=sourceField,proto3" json:"source_field,omitempty"`
+	// Optional. Name of the row field whose value is the numeric
+	// `Icon` enum value (e.g. `1002` for `ICON_PHOTO`). Encoded as the
+	// wire integer rather than the symbolic name so renaming an `Icon`
+	// value never silently breaks persisted dashboards. Server handlers
+	// synthesize this per row.
+	IconField string `protobuf:"bytes,2,opt,name=icon_field,json=iconField,proto3" json:"icon_field,omitempty"`
+	// Optional. Name of the row field whose value is used to derive
+	// initials when no thumbnail or semantic icon is available
+	// (typically "display_name" or "name").
+	InitialsField string `protobuf:"bytes,3,opt,name=initials_field,json=initialsField,proto3" json:"initials_field,omitempty"`
+	// Optional. The static fallback icon used when none of
+	// `source_field` / `icon_field` / `initials_field` produces a value.
+	FallbackIcon Icon `protobuf:"varint,4,opt,name=fallback_icon,json=fallbackIcon,proto3,enum=pivox.api.v1.Icon" json:"fallback_icon,omitempty"`
+	// Optional. The size hint for the leading icon — applies to whichever
+	// derivation path resolved.
+	Size IconConfig_IconSize `protobuf:"varint,5,opt,name=size,proto3,enum=pivox.api.v1.IconConfig_IconSize" json:"size,omitempty"`
+	// Optional. Background color for the icon backplate. Renderer-honored
+	// when icon or initials are shown without a thumbnail.
+	FallbackColor *color.Color `protobuf:"bytes,6,opt,name=fallback_color,json=fallbackColor,proto3" json:"fallback_color,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IconConfig) Reset() {
+	*x = IconConfig{}
+	mi := &file_pivox_api_v1_widgets_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IconConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IconConfig) ProtoMessage() {}
+
+func (x *IconConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_api_v1_widgets_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IconConfig.ProtoReflect.Descriptor instead.
+func (*IconConfig) Descriptor() ([]byte, []int) {
+	return file_pivox_api_v1_widgets_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *IconConfig) GetSourceField() string {
+	if x != nil {
+		return x.SourceField
+	}
+	return ""
+}
+
+func (x *IconConfig) GetIconField() string {
+	if x != nil {
+		return x.IconField
+	}
+	return ""
+}
+
+func (x *IconConfig) GetInitialsField() string {
+	if x != nil {
+		return x.InitialsField
+	}
+	return ""
+}
+
+func (x *IconConfig) GetFallbackIcon() Icon {
+	if x != nil {
+		return x.FallbackIcon
+	}
+	return Icon_ICON_UNSPECIFIED
+}
+
+func (x *IconConfig) GetSize() IconConfig_IconSize {
+	if x != nil {
+		return x.Size
+	}
+	return IconConfig_ICON_SIZE_UNSPECIFIED
+}
+
+func (x *IconConfig) GetFallbackColor() *color.Color {
+	if x != nil {
+		return x.FallbackColor
+	}
+	return nil
+}
+
+// EmptyState is shown when a CollectionWidget's data source returns
+// zero rows. It is purely presentational — the renderer composes the
+// title, subtitle, icon, and primary action.
+type EmptyState struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Optional. Headline shown above the subtitle.
+	Title string `protobuf:"bytes,1,opt,name=title,proto3" json:"title,omitempty"`
+	// Optional. Secondary line of explanatory copy.
+	Subtitle string `protobuf:"bytes,2,opt,name=subtitle,proto3" json:"subtitle,omitempty"`
+	// Optional. Cross-platform semantic icon shown above the title.
+	Icon Icon `protobuf:"varint,3,opt,name=icon,proto3,enum=pivox.api.v1.Icon" json:"icon,omitempty"`
+	// Optional. The primary call-to-action presented in the empty state
+	// (e.g. an "Upload" or "Invite" button).
+	PrimaryAction *RowAction `protobuf:"bytes,4,opt,name=primary_action,json=primaryAction,proto3" json:"primary_action,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EmptyState) Reset() {
+	*x = EmptyState{}
+	mi := &file_pivox_api_v1_widgets_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EmptyState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EmptyState) ProtoMessage() {}
+
+func (x *EmptyState) ProtoReflect() protoreflect.Message {
+	mi := &file_pivox_api_v1_widgets_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EmptyState.ProtoReflect.Descriptor instead.
+func (*EmptyState) Descriptor() ([]byte, []int) {
+	return file_pivox_api_v1_widgets_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *EmptyState) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *EmptyState) GetSubtitle() string {
+	if x != nil {
+		return x.Subtitle
+	}
+	return ""
+}
+
+func (x *EmptyState) GetIcon() Icon {
+	if x != nil {
+		return x.Icon
+	}
+	return Icon_ICON_UNSPECIFIED
+}
+
+func (x *EmptyState) GetPrimaryAction() *RowAction {
+	if x != nil {
+		return x.PrimaryAction
+	}
+	return nil
+}
+
 var File_pivox_api_v1_widgets_proto protoreflect.FileDescriptor
 
 const file_pivox_api_v1_widgets_proto_rawDesc = "" +
 	"\n" +
-	"\x1apivox/api/v1/widgets.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fpivox/api/v1/data_sources.proto\"c\n" +
+	"\x1apivox/api/v1/widgets.proto\x12\fpivox.api.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x17google/type/color.proto\x1a\x1fpivox/api/v1/data_sources.proto\x1a\x18pivox/api/v1/icons.proto\"c\n" +
 	"\n" +
 	"GridLayout\x12&\n" +
 	"\acolumns\x18\x01 \x01(\x05B\f\xe0A\x01\xbaH\x06\x1a\x04\x18\x18(\x00R\acolumns\x12-\n" +
@@ -1323,13 +1812,15 @@ const file_pivox_api_v1_widgets_proto_rawDesc = "" +
 	"\xe0A\x02\xbaH\x04\x1a\x02(\x01R\x05width\x12\"\n" +
 	"\x06height\x18\x04 \x01(\x05B\n" +
 	"\xe0A\x02\xbaH\x04\x1a\x02(\x01R\x06height\x121\n" +
-	"\x06widget\x18\x05 \x01(\v2\x14.pivox.api.v1.WidgetB\x03\xe0A\x02R\x06widget\"\xa3\x03\n" +
+	"\x06widget\x18\x05 \x01(\v2\x14.pivox.api.v1.WidgetB\x03\xe0A\x02R\x06widget\"\xb2\x03\n" +
 	"\x06Widget\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x01R\x02id\x12!\n" +
 	"\x05title\x18\x02 \x01(\tB\v\xe0A\x01\xbaH\x05r\x03\x18\x80\x02R\x05title\x12=\n" +
 	"\tstatistic\x18\x03 \x01(\v2\x1d.pivox.api.v1.StatisticWidgetH\x00R\tstatistic\x121\n" +
-	"\x05chart\x18\x04 \x01(\v2\x19.pivox.api.v1.ChartWidgetH\x00R\x05chart\x121\n" +
-	"\x05table\x18\x05 \x01(\v2\x19.pivox.api.v1.TableWidgetH\x00R\x05table\x12;\n" +
+	"\x05chart\x18\x04 \x01(\v2\x19.pivox.api.v1.ChartWidgetH\x00R\x05chart\x12@\n" +
+	"\n" +
+	"collection\x18\x05 \x01(\v2\x1e.pivox.api.v1.CollectionWidgetH\x00R\n" +
+	"collection\x12;\n" +
 	"\tpie_chart\x18\x06 \x01(\v2\x1c.pivox.api.v1.PieChartWidgetH\x00R\bpieChart\x12.\n" +
 	"\x04text\x18\a \x01(\v2\x18.pivox.api.v1.TextWidgetH\x00R\x04text\x12D\n" +
 	"\x0esection_header\x18\b \x01(\v2\x1b.pivox.api.v1.SectionHeaderH\x00R\rsectionHeaderB\t\n" +
@@ -1358,13 +1849,25 @@ const file_pivox_api_v1_widgets_proto_rawDesc = "" +
 	"\x04AREA\x10\x03\x12\x0f\n" +
 	"\vSTACKED_BAR\x10\x04\x12\x10\n" +
 	"\fSTACKED_AREA\x10\x05\x12\v\n" +
-	"\aSCATTER\x10\x06\"\xbd\x01\n" +
-	"\vTableWidget\x12D\n" +
+	"\aSCATTER\x10\x06\"\xec\x04\n" +
+	"\x10CollectionWidget\x12D\n" +
 	"\vdata_source\x18\x01 \x01(\v2\x18.pivox.api.v1.DataSourceB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\n" +
-	"dataSource\x128\n" +
-	"\acolumns\x18\x02 \x03(\v2\x19.pivox.api.v1.TableColumnB\x03\xe0A\x01R\acolumns\x12.\n" +
+	"dataSource\x123\n" +
+	"\acolumns\x18\x02 \x03(\v2\x14.pivox.api.v1.ColumnB\x03\xe0A\x01R\acolumns\x12.\n" +
 	"\rrows_per_page\x18\x03 \x01(\x05B\n" +
-	"\xe0A\x01\xbaH\x04\x1a\x02(\x00R\vrowsPerPage\"\xbc\x02\n" +
+	"\xe0A\x01\xbaH\x04\x1a\x02(\x00R\vrowsPerPage\x12R\n" +
+	"\fdisplay_mode\x18\x04 \x01(\x0e2*.pivox.api.v1.CollectionWidget.DisplayModeB\x03\xe0A\x01R\vdisplayMode\x12X\n" +
+	"\x0fsupported_modes\x18\x05 \x03(\x0e2*.pivox.api.v1.CollectionWidget.DisplayModeB\x03\xe0A\x01R\x0esupportedModes\x12=\n" +
+	"\vrow_actions\x18\x06 \x03(\v2\x17.pivox.api.v1.RowActionB\x03\xe0A\x01R\n" +
+	"rowActions\x12>\n" +
+	"\vicon_config\x18\a \x01(\v2\x18.pivox.api.v1.IconConfigB\x03\xe0A\x01R\n" +
+	"iconConfig\x12>\n" +
+	"\vempty_state\x18\b \x01(\v2\x18.pivox.api.v1.EmptyStateB\x03\xe0A\x01R\n" +
+	"emptyState\"@\n" +
+	"\vDisplayMode\x12\x1c\n" +
+	"\x18DISPLAY_MODE_UNSPECIFIED\x10\x00\x12\t\n" +
+	"\x05TABLE\x10\x01\x12\b\n" +
+	"\x04CARD\x10\x02\"\xbc\x02\n" +
 	"\x0ePieChartWidget\x12D\n" +
 	"\vdata_source\x18\x01 \x01(\v2\x18.pivox.api.v1.DataSourceB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\n" +
 	"dataSource\x12T\n" +
@@ -1389,21 +1892,21 @@ const file_pivox_api_v1_widgets_proto_rawDesc = "" +
 	"PLAIN_TEXT\x10\x02\"Z\n" +
 	"\rSectionHeader\x12\x1f\n" +
 	"\bsubtitle\x18\x01 \x01(\tB\x03\xe0A\x01R\bsubtitle\x12(\n" +
-	"\rdivider_below\x18\x02 \x01(\bB\x03\xe0A\x01R\fdividerBelow\"\xe0\x01\n" +
+	"\rdivider_below\x18\x02 \x01(\bB\x03\xe0A\x01R\fdividerBelow\"\xf4\x01\n" +
 	"\tThreshold\x12\x19\n" +
-	"\x05value\x18\x01 \x01(\x01B\x03\xe0A\x02R\x05value\x12\x19\n" +
-	"\x05color\x18\x02 \x01(\tB\x03\xe0A\x01R\x05color\x12D\n" +
+	"\x05value\x18\x01 \x01(\x01B\x03\xe0A\x02R\x05value\x12-\n" +
+	"\x05color\x18\x02 \x01(\v2\x12.google.type.ColorB\x03\xe0A\x01R\x05color\x12D\n" +
 	"\tdirection\x18\x03 \x01(\x0e2!.pivox.api.v1.Threshold.DirectionB\x03\xe0A\x01R\tdirection\x12\x19\n" +
 	"\x05label\x18\x04 \x01(\tB\x03\xe0A\x01R\x05label\"<\n" +
 	"\tDirection\x12\x19\n" +
 	"\x15DIRECTION_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ABOVE\x10\x01\x12\t\n" +
-	"\x05BELOW\x10\x02\"\x8a\x01\n" +
+	"\x05BELOW\x10\x02\"\x9e\x01\n" +
 	"\fChartDataSet\x12D\n" +
 	"\vdata_source\x18\x01 \x01(\v2\x18.pivox.api.v1.DataSourceB\t\xe0A\x02\xbaH\x03\xc8\x01\x01R\n" +
 	"dataSource\x12\x19\n" +
-	"\x05label\x18\x02 \x01(\tB\x03\xe0A\x01R\x05label\x12\x19\n" +
-	"\x05color\x18\x03 \x01(\tB\x03\xe0A\x01R\x05color\"\xc7\x01\n" +
+	"\x05label\x18\x02 \x01(\tB\x03\xe0A\x01R\x05label\x12-\n" +
+	"\x05color\x18\x03 \x01(\v2\x12.google.type.ColorB\x03\xe0A\x01R\x05color\"\xc7\x01\n" +
 	"\n" +
 	"AxisConfig\x12\x19\n" +
 	"\x05label\x18\x01 \x01(\tB\x03\xe0A\x01R\x05label\x129\n" +
@@ -1414,12 +1917,43 @@ const file_pivox_api_v1_widgets_proto_rawDesc = "" +
 	"\x11SCALE_UNSPECIFIED\x10\x00\x12\n" +
 	"\n" +
 	"\x06LINEAR\x10\x01\x12\t\n" +
-	"\x05LOG10\x10\x02\"v\n" +
-	"\vTableColumn\x12 \n" +
+	"\x05LOG10\x10\x02\"\xb7\x01\n" +
+	"\x06Column\x12 \n" +
 	"\x05field\x18\x01 \x01(\tB\n" +
 	"\xe0A\x02\xbaH\x04r\x02\x10\x01R\x05field\x12&\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\x03\xe0A\x01R\vdisplayName\x12\x1d\n" +
-	"\avisible\x18\x03 \x01(\bB\x03\xe0A\x01R\avisibleB\xb0\x01\n" +
+	"\avisible\x18\x03 \x01(\bB\x03\xe0A\x01R\avisible\x12\x1f\n" +
+	"\bsortable\x18\x04 \x01(\bB\x03\xe0A\x01R\bsortable\x12#\n" +
+	"\n" +
+	"filterable\x18\x05 \x01(\bB\x03\xe0A\x01R\n" +
+	"filterable\"\xbe\x01\n" +
+	"\tRowAction\x12/\n" +
+	"\x03key\x18\x01 \x01(\tB\x1d\xe0A\x02\xbaH\x17r\x15\x10\x012\x11^[a-z][a-z0-9_]*$R\x03key\x12\x19\n" +
+	"\x05label\x18\x02 \x01(\tB\x03\xe0A\x01R\x05label\x12+\n" +
+	"\x04icon\x18\x03 \x01(\x0e2\x12.pivox.api.v1.IconB\x03\xe0A\x01R\x04icon\x128\n" +
+	"\x15requires_confirmation\x18\x04 \x01(\bB\x03\xe0A\x01R\x14requiresConfirmation\"\x98\x03\n" +
+	"\n" +
+	"IconConfig\x12&\n" +
+	"\fsource_field\x18\x01 \x01(\tB\x03\xe0A\x01R\vsourceField\x12\"\n" +
+	"\n" +
+	"icon_field\x18\x02 \x01(\tB\x03\xe0A\x01R\ticonField\x12*\n" +
+	"\x0einitials_field\x18\x03 \x01(\tB\x03\xe0A\x01R\rinitialsField\x12<\n" +
+	"\rfallback_icon\x18\x04 \x01(\x0e2\x12.pivox.api.v1.IconB\x03\xe0A\x01R\ffallbackIcon\x12:\n" +
+	"\x04size\x18\x05 \x01(\x0e2!.pivox.api.v1.IconConfig.IconSizeB\x03\xe0A\x01R\x04size\x12>\n" +
+	"\x0efallback_color\x18\x06 \x01(\v2\x12.google.type.ColorB\x03\xe0A\x01R\rfallbackColor\"X\n" +
+	"\bIconSize\x12\x19\n" +
+	"\x15ICON_SIZE_UNSPECIFIED\x10\x00\x12\t\n" +
+	"\x05SMALL\x10\x01\x12\n" +
+	"\n" +
+	"\x06MEDIUM\x10\x02\x12\t\n" +
+	"\x05LARGE\x10\x03\x12\x0f\n" +
+	"\vEXTRA_LARGE\x10\x04\"\xba\x01\n" +
+	"\n" +
+	"EmptyState\x12\x19\n" +
+	"\x05title\x18\x01 \x01(\tB\x03\xe0A\x01R\x05title\x12\x1f\n" +
+	"\bsubtitle\x18\x02 \x01(\tB\x03\xe0A\x01R\bsubtitle\x12+\n" +
+	"\x04icon\x18\x03 \x01(\x0e2\x12.pivox.api.v1.IconB\x03\xe0A\x01R\x04icon\x12C\n" +
+	"\x0eprimary_action\x18\x04 \x01(\v2\x17.pivox.api.v1.RowActionB\x03\xe0A\x01R\rprimaryActionB\xb0\x01\n" +
 	"\x10com.pivox.api.v1B\fWidgetsProtoP\x01Z<github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1;apiv1\xa2\x02\x03PAX\xaa\x02\fPivox.Api.V1\xca\x02\fPivox\\Api\\V1\xe2\x02\x18Pivox\\Api\\V1\\GPBMetadata\xea\x02\x0ePivox::Api::V1b\x06proto3"
 
 var (
@@ -1434,58 +1968,78 @@ func file_pivox_api_v1_widgets_proto_rawDescGZIP() []byte {
 	return file_pivox_api_v1_widgets_proto_rawDescData
 }
 
-var file_pivox_api_v1_widgets_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_pivox_api_v1_widgets_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_pivox_api_v1_widgets_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
+var file_pivox_api_v1_widgets_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_pivox_api_v1_widgets_proto_goTypes = []any{
-	(ChartWidget_ChartType)(0),       // 0: pivox.api.v1.ChartWidget.ChartType
-	(PieChartWidget_PieChartType)(0), // 1: pivox.api.v1.PieChartWidget.PieChartType
-	(TextWidget_Format)(0),           // 2: pivox.api.v1.TextWidget.Format
-	(Threshold_Direction)(0),         // 3: pivox.api.v1.Threshold.Direction
-	(AxisConfig_Scale)(0),            // 4: pivox.api.v1.AxisConfig.Scale
-	(*GridLayout)(nil),               // 5: pivox.api.v1.GridLayout
-	(*Tile)(nil),                     // 6: pivox.api.v1.Tile
-	(*Widget)(nil),                   // 7: pivox.api.v1.Widget
-	(*StatisticWidget)(nil),          // 8: pivox.api.v1.StatisticWidget
-	(*ChartWidget)(nil),              // 9: pivox.api.v1.ChartWidget
-	(*TableWidget)(nil),              // 10: pivox.api.v1.TableWidget
-	(*PieChartWidget)(nil),           // 11: pivox.api.v1.PieChartWidget
-	(*TextWidget)(nil),               // 12: pivox.api.v1.TextWidget
-	(*SectionHeader)(nil),            // 13: pivox.api.v1.SectionHeader
-	(*Threshold)(nil),                // 14: pivox.api.v1.Threshold
-	(*ChartDataSet)(nil),             // 15: pivox.api.v1.ChartDataSet
-	(*AxisConfig)(nil),               // 16: pivox.api.v1.AxisConfig
-	(*TableColumn)(nil),              // 17: pivox.api.v1.TableColumn
-	(*DataSource)(nil),               // 18: pivox.api.v1.DataSource
+	(ChartWidget_ChartType)(0),        // 0: pivox.api.v1.ChartWidget.ChartType
+	(CollectionWidget_DisplayMode)(0), // 1: pivox.api.v1.CollectionWidget.DisplayMode
+	(PieChartWidget_PieChartType)(0),  // 2: pivox.api.v1.PieChartWidget.PieChartType
+	(TextWidget_Format)(0),            // 3: pivox.api.v1.TextWidget.Format
+	(Threshold_Direction)(0),          // 4: pivox.api.v1.Threshold.Direction
+	(AxisConfig_Scale)(0),             // 5: pivox.api.v1.AxisConfig.Scale
+	(IconConfig_IconSize)(0),          // 6: pivox.api.v1.IconConfig.IconSize
+	(*GridLayout)(nil),                // 7: pivox.api.v1.GridLayout
+	(*Tile)(nil),                      // 8: pivox.api.v1.Tile
+	(*Widget)(nil),                    // 9: pivox.api.v1.Widget
+	(*StatisticWidget)(nil),           // 10: pivox.api.v1.StatisticWidget
+	(*ChartWidget)(nil),               // 11: pivox.api.v1.ChartWidget
+	(*CollectionWidget)(nil),          // 12: pivox.api.v1.CollectionWidget
+	(*PieChartWidget)(nil),            // 13: pivox.api.v1.PieChartWidget
+	(*TextWidget)(nil),                // 14: pivox.api.v1.TextWidget
+	(*SectionHeader)(nil),             // 15: pivox.api.v1.SectionHeader
+	(*Threshold)(nil),                 // 16: pivox.api.v1.Threshold
+	(*ChartDataSet)(nil),              // 17: pivox.api.v1.ChartDataSet
+	(*AxisConfig)(nil),                // 18: pivox.api.v1.AxisConfig
+	(*Column)(nil),                    // 19: pivox.api.v1.Column
+	(*RowAction)(nil),                 // 20: pivox.api.v1.RowAction
+	(*IconConfig)(nil),                // 21: pivox.api.v1.IconConfig
+	(*EmptyState)(nil),                // 22: pivox.api.v1.EmptyState
+	(*DataSource)(nil),                // 23: pivox.api.v1.DataSource
+	(*color.Color)(nil),               // 24: google.type.Color
+	(Icon)(0),                         // 25: pivox.api.v1.Icon
 }
 var file_pivox_api_v1_widgets_proto_depIdxs = []int32{
-	6,  // 0: pivox.api.v1.GridLayout.tiles:type_name -> pivox.api.v1.Tile
-	7,  // 1: pivox.api.v1.Tile.widget:type_name -> pivox.api.v1.Widget
-	8,  // 2: pivox.api.v1.Widget.statistic:type_name -> pivox.api.v1.StatisticWidget
-	9,  // 3: pivox.api.v1.Widget.chart:type_name -> pivox.api.v1.ChartWidget
-	10, // 4: pivox.api.v1.Widget.table:type_name -> pivox.api.v1.TableWidget
-	11, // 5: pivox.api.v1.Widget.pie_chart:type_name -> pivox.api.v1.PieChartWidget
-	12, // 6: pivox.api.v1.Widget.text:type_name -> pivox.api.v1.TextWidget
-	13, // 7: pivox.api.v1.Widget.section_header:type_name -> pivox.api.v1.SectionHeader
-	18, // 8: pivox.api.v1.StatisticWidget.data_source:type_name -> pivox.api.v1.DataSource
-	14, // 9: pivox.api.v1.StatisticWidget.thresholds:type_name -> pivox.api.v1.Threshold
-	15, // 10: pivox.api.v1.ChartWidget.data_sets:type_name -> pivox.api.v1.ChartDataSet
+	8,  // 0: pivox.api.v1.GridLayout.tiles:type_name -> pivox.api.v1.Tile
+	9,  // 1: pivox.api.v1.Tile.widget:type_name -> pivox.api.v1.Widget
+	10, // 2: pivox.api.v1.Widget.statistic:type_name -> pivox.api.v1.StatisticWidget
+	11, // 3: pivox.api.v1.Widget.chart:type_name -> pivox.api.v1.ChartWidget
+	12, // 4: pivox.api.v1.Widget.collection:type_name -> pivox.api.v1.CollectionWidget
+	13, // 5: pivox.api.v1.Widget.pie_chart:type_name -> pivox.api.v1.PieChartWidget
+	14, // 6: pivox.api.v1.Widget.text:type_name -> pivox.api.v1.TextWidget
+	15, // 7: pivox.api.v1.Widget.section_header:type_name -> pivox.api.v1.SectionHeader
+	23, // 8: pivox.api.v1.StatisticWidget.data_source:type_name -> pivox.api.v1.DataSource
+	16, // 9: pivox.api.v1.StatisticWidget.thresholds:type_name -> pivox.api.v1.Threshold
+	17, // 10: pivox.api.v1.ChartWidget.data_sets:type_name -> pivox.api.v1.ChartDataSet
 	0,  // 11: pivox.api.v1.ChartWidget.chart_type:type_name -> pivox.api.v1.ChartWidget.ChartType
-	16, // 12: pivox.api.v1.ChartWidget.x_axis:type_name -> pivox.api.v1.AxisConfig
-	16, // 13: pivox.api.v1.ChartWidget.y_axis:type_name -> pivox.api.v1.AxisConfig
-	14, // 14: pivox.api.v1.ChartWidget.thresholds:type_name -> pivox.api.v1.Threshold
-	18, // 15: pivox.api.v1.TableWidget.data_source:type_name -> pivox.api.v1.DataSource
-	17, // 16: pivox.api.v1.TableWidget.columns:type_name -> pivox.api.v1.TableColumn
-	18, // 17: pivox.api.v1.PieChartWidget.data_source:type_name -> pivox.api.v1.DataSource
-	1,  // 18: pivox.api.v1.PieChartWidget.pie_chart_type:type_name -> pivox.api.v1.PieChartWidget.PieChartType
-	2,  // 19: pivox.api.v1.TextWidget.format:type_name -> pivox.api.v1.TextWidget.Format
-	3,  // 20: pivox.api.v1.Threshold.direction:type_name -> pivox.api.v1.Threshold.Direction
-	18, // 21: pivox.api.v1.ChartDataSet.data_source:type_name -> pivox.api.v1.DataSource
-	4,  // 22: pivox.api.v1.AxisConfig.scale:type_name -> pivox.api.v1.AxisConfig.Scale
-	23, // [23:23] is the sub-list for method output_type
-	23, // [23:23] is the sub-list for method input_type
-	23, // [23:23] is the sub-list for extension type_name
-	23, // [23:23] is the sub-list for extension extendee
-	0,  // [0:23] is the sub-list for field type_name
+	18, // 12: pivox.api.v1.ChartWidget.x_axis:type_name -> pivox.api.v1.AxisConfig
+	18, // 13: pivox.api.v1.ChartWidget.y_axis:type_name -> pivox.api.v1.AxisConfig
+	16, // 14: pivox.api.v1.ChartWidget.thresholds:type_name -> pivox.api.v1.Threshold
+	23, // 15: pivox.api.v1.CollectionWidget.data_source:type_name -> pivox.api.v1.DataSource
+	19, // 16: pivox.api.v1.CollectionWidget.columns:type_name -> pivox.api.v1.Column
+	1,  // 17: pivox.api.v1.CollectionWidget.display_mode:type_name -> pivox.api.v1.CollectionWidget.DisplayMode
+	1,  // 18: pivox.api.v1.CollectionWidget.supported_modes:type_name -> pivox.api.v1.CollectionWidget.DisplayMode
+	20, // 19: pivox.api.v1.CollectionWidget.row_actions:type_name -> pivox.api.v1.RowAction
+	21, // 20: pivox.api.v1.CollectionWidget.icon_config:type_name -> pivox.api.v1.IconConfig
+	22, // 21: pivox.api.v1.CollectionWidget.empty_state:type_name -> pivox.api.v1.EmptyState
+	23, // 22: pivox.api.v1.PieChartWidget.data_source:type_name -> pivox.api.v1.DataSource
+	2,  // 23: pivox.api.v1.PieChartWidget.pie_chart_type:type_name -> pivox.api.v1.PieChartWidget.PieChartType
+	3,  // 24: pivox.api.v1.TextWidget.format:type_name -> pivox.api.v1.TextWidget.Format
+	24, // 25: pivox.api.v1.Threshold.color:type_name -> google.type.Color
+	4,  // 26: pivox.api.v1.Threshold.direction:type_name -> pivox.api.v1.Threshold.Direction
+	23, // 27: pivox.api.v1.ChartDataSet.data_source:type_name -> pivox.api.v1.DataSource
+	24, // 28: pivox.api.v1.ChartDataSet.color:type_name -> google.type.Color
+	5,  // 29: pivox.api.v1.AxisConfig.scale:type_name -> pivox.api.v1.AxisConfig.Scale
+	25, // 30: pivox.api.v1.RowAction.icon:type_name -> pivox.api.v1.Icon
+	25, // 31: pivox.api.v1.IconConfig.fallback_icon:type_name -> pivox.api.v1.Icon
+	6,  // 32: pivox.api.v1.IconConfig.size:type_name -> pivox.api.v1.IconConfig.IconSize
+	24, // 33: pivox.api.v1.IconConfig.fallback_color:type_name -> google.type.Color
+	25, // 34: pivox.api.v1.EmptyState.icon:type_name -> pivox.api.v1.Icon
+	20, // 35: pivox.api.v1.EmptyState.primary_action:type_name -> pivox.api.v1.RowAction
+	36, // [36:36] is the sub-list for method output_type
+	36, // [36:36] is the sub-list for method input_type
+	36, // [36:36] is the sub-list for extension type_name
+	36, // [36:36] is the sub-list for extension extendee
+	0,  // [0:36] is the sub-list for field type_name
 }
 
 func init() { file_pivox_api_v1_widgets_proto_init() }
@@ -1494,10 +2048,11 @@ func file_pivox_api_v1_widgets_proto_init() {
 		return
 	}
 	file_pivox_api_v1_data_sources_proto_init()
+	file_pivox_api_v1_icons_proto_init()
 	file_pivox_api_v1_widgets_proto_msgTypes[2].OneofWrappers = []any{
 		(*Widget_Statistic)(nil),
 		(*Widget_Chart)(nil),
-		(*Widget_Table)(nil),
+		(*Widget_Collection)(nil),
 		(*Widget_PieChart)(nil),
 		(*Widget_Text)(nil),
 		(*Widget_SectionHeader)(nil),
@@ -1507,8 +2062,8 @@ func file_pivox_api_v1_widgets_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pivox_api_v1_widgets_proto_rawDesc), len(file_pivox_api_v1_widgets_proto_rawDesc)),
-			NumEnums:      5,
-			NumMessages:   13,
+			NumEnums:      7,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

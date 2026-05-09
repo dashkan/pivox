@@ -14,7 +14,9 @@ import (
 	"buf.build/go/protovalidate"
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	pgxvector "github.com/pgvector/pgvector-go/pgx"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	sloghttp "github.com/samber/slog-http"
@@ -36,6 +38,7 @@ import (
 	"github.com/dashkan/pivox/internal/permission"
 	"github.com/dashkan/pivox/internal/server"
 	"github.com/dashkan/pivox/internal/service/apikeys"
+	"github.com/dashkan/pivox/internal/service/dashboards"
 	"github.com/dashkan/pivox/internal/service/iam"
 	"github.com/dashkan/pivox/internal/service/operations"
 	"github.com/dashkan/pivox/internal/service/organizations"
@@ -167,8 +170,21 @@ func serve(cmd *cobra.Command, args []string) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	// Database
-	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	// Database. Register pgvector types per-connection so the
+	// scanner can decode `vector` columns (currently `assets.embedding`).
+	// Without this, the first read of a row containing a `vector` column
+	// fails with "unsupported data type: <nil>" — the test infrastructure
+	// (internal/testutil/db.go) sets this up for tests but the
+	// production binary never did, so the gap is invisible until a
+	// non-test caller reads an asset row.
+	poolCfg, err := pgxpool.ParseConfig(cfg.DatabaseURL)
+	if err != nil {
+		return fmt.Errorf("parse pool config: %w", err)
+	}
+	poolCfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		return pgxvector.RegisterTypes(ctx, conn)
+	}
+	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {
 		return fmt.Errorf("connect to database: %w", err)
 	}
@@ -321,6 +337,15 @@ func serve(cmd *cobra.Command, args []string) error {
 	}))
 	apiv1.RegisterApiKeysServer(grpcServer, apikeys.NewApiKeysServer(apikeys.Config{
 		Pool: pool, Queries: queries, Codec: appCodec, AuditResolver: auditResolver,
+	}))
+
+	// Dashboards: org-scoped SYSTEM_MANAGED reads via the in-memory
+	// system catalog (Phase 4a). Space-scoped USER_MANAGED CRUD
+	// lands in Phase 4b. NewServer panics on a registry/catalog
+	// regression, so this line doubles as a boot-time invariant
+	// check.
+	apiv1.RegisterDashboardsServer(grpcServer, dashboards.NewServer(dashboards.Config{
+		Pool: pool, Queries: queries, AuditResolver: auditResolver,
 	}))
 
 	// Iam service: cross-cutting IAM (role reads, permission catalog,
@@ -478,6 +503,7 @@ func serve(cmd *cobra.Command, args []string) error {
 		apiv1.RegisterTagValuesHandlerFromEndpoint,
 		apiv1.RegisterTagBindingsHandlerFromEndpoint,
 		apiv1.RegisterApiKeysHandlerFromEndpoint,
+		apiv1.RegisterDashboardsHandlerFromEndpoint,
 		storagev1.RegisterStorageGatewaysHandlerFromEndpoint,
 		storagev1.RegisterAgentsHandlerFromEndpoint,
 		storagev1.RegisterEndpointsHandlerFromEndpoint,

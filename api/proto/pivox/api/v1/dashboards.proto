@@ -22,25 +22,54 @@ import "google/api/client.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
 import "google/protobuf/field_mask.proto";
+import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
+import "pivox/api/v1/data_sources.proto";
 import "pivox/api/v1/widgets.proto";
+import "pivox/permission/v1/options.proto";
 
 option go_package = "pivox/api/v1;apiv1";
 
-// Manages custom dashboards within a space.
+// Manages dashboards at the organization and space scopes.
+//
+// Dashboards come in two flavors, distinguished by `Dashboard.management_mode`:
+//
+// * SYSTEM_MANAGED — server-curated dashboards (e.g. the org-level
+//   Library, Activity, Members views). Listed and read by all flows;
+//   mutations are rejected.
+// * USER_MANAGED — customer-owned dashboards. Full CRUD applies.
+//
+// In v1 every org-level dashboard is SYSTEM_MANAGED; every space-level
+// dashboard is USER_MANAGED. The mutation guard is data-driven, not
+// path-driven — Create/Update/Delete refuse a SYSTEM_MANAGED target
+// regardless of which URL the request came in on.
 service Dashboards {
   option (google.api.default_host) = "api.pivox.io";
 
-  // Lists dashboards in a space.
+  // Lists dashboards under a parent. The parent may be an organization
+  // (returns the system-curated catalog) or a space (returns
+  // user-managed dashboards).
+  //
+  // The `dashboards.read` permission gates the verb regardless of
+  // parent scope; the membership interceptor ahead of it enforces
+  // org-membership at org parent and space-membership at space parent.
   rpc ListDashboards(ListDashboardsRequest) returns (ListDashboardsResponse) {
-    option (google.api.http) = {get: "/v1/{parent=organizations/*/spaces/*}/dashboards"};
+    option (google.api.http) = {
+      get: "/v1/{parent=organizations/*}/dashboards"
+      additional_bindings: {get: "/v1/{parent=organizations/*/spaces/*}/dashboards"}
+    };
     option (google.api.method_signature) = "parent";
+    option (pivox.permission.v1.required_permission) = "dashboards.read";
   }
 
   // Retrieves a dashboard by name.
   rpc GetDashboard(GetDashboardRequest) returns (Dashboard) {
-    option (google.api.http) = {get: "/v1/{name=organizations/*/spaces/*/dashboards/*}"};
+    option (google.api.http) = {
+      get: "/v1/{name=organizations/*/dashboards/*}"
+      additional_bindings: {get: "/v1/{name=organizations/*/spaces/*/dashboards/*}"}
+    };
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "dashboards.read";
   }
 
   // Creates a new dashboard in a space.
@@ -50,6 +79,7 @@ service Dashboards {
       body: "dashboard"
     };
     option (google.api.method_signature) = "parent,dashboard,dashboard_id";
+    option (pivox.permission.v1.required_permission) = "dashboards.create";
   }
 
   // Updates an existing dashboard.
@@ -59,26 +89,73 @@ service Dashboards {
       body: "dashboard"
     };
     option (google.api.method_signature) = "dashboard,update_mask";
+    option (pivox.permission.v1.required_permission) = "dashboards.update";
+    option (pivox.permission.v1.scope_field) = "dashboard.name";
   }
 
   // Deletes a dashboard.
   rpc DeleteDashboard(DeleteDashboardRequest) returns (Dashboard) {
     option (google.api.http) = {delete: "/v1/{name=organizations/*/spaces/*/dashboards/*}"};
     option (google.api.method_signature) = "name";
+    option (pivox.permission.v1.required_permission) = "dashboards.delete";
+  }
+
+  // Resolves a `ResourceQuery` into rows of data for rendering inside
+  // a CollectionWidget. The handler dispatches per query.resource_type;
+  // v1 supports `pivox.assets/Asset` only.
+  //
+  // Each row is a `google.protobuf.Struct` whose fields mirror the
+  // CollectionWidget.columns / IconConfig contract documented on the
+  // widget itself: `name`, `display_name`, `media_type`, `state`,
+  // `size_bytes`, `create_time`, plus server-synthesized `icon` (the
+  // numeric `Icon` enum value derived from the asset's content type)
+  // and `thumbnail_url` (empty in v1; the per-row URL composition
+  // lands when the storage-gateway session work merges).
+  //
+  // Permission: dashboards.read gates the verb. Per-resource ListPermission
+  // (e.g. assets.assets.read) is checked at the handler layer once the
+  // role hierarchy diverges enough that the two permissions can be
+  // granted independently.
+  rpc QueryDashboardData(QueryDashboardDataRequest) returns (QueryDashboardDataResponse) {
+    option (google.api.http) = {
+      post: "/v1/{parent=organizations/*}:queryDashboardData"
+      body: "*"
+      additional_bindings: {
+        post: "/v1/{parent=organizations/*/spaces/*}:queryDashboardData"
+        body: "*"
+      }
+    };
+    option (pivox.permission.v1.required_permission) = "dashboards.read";
   }
 }
 
-// A custom dashboard belonging to a space.
+// A dashboard at the organization or space scope.
 message Dashboard {
   option (google.api.resource) = {
     type: "pivox.api/Dashboard"
+    pattern: "organizations/{organization}/dashboards/{dashboard}"
     pattern: "organizations/{organization}/spaces/{space}/dashboards/{dashboard}"
     plural: "dashboards"
     singular: "dashboard"
   };
 
+  // Identifies who owns the lifecycle of a dashboard. SYSTEM_MANAGED
+  // dashboards are server-curated and reject all mutations; USER_MANAGED
+  // dashboards are owned by the customer and support full CRUD.
+  enum ManagementMode {
+    // Default. Server handlers always populate this field on read,
+    // so UNSPECIFIED on the wire indicates a server bug, not a
+    // legitimate state.
+    MANAGEMENT_MODE_UNSPECIFIED = 0;
+    // Customer-owned. Full CRUD applies.
+    USER_MANAGED = 1;
+    // Server-curated. Mutations are rejected with FAILED_PRECONDITION.
+    SYSTEM_MANAGED = 2;
+  }
+
   // Immutable. The resource name of the dashboard.
-  // Format: `organizations/{organization}/spaces/{space}/dashboards/{dashboard}`
+  // Format: `organizations/{organization}/dashboards/{dashboard}` or
+  //         `organizations/{organization}/spaces/{space}/dashboards/{dashboard}`.
   string name = 1 [(google.api.field_behavior) = IDENTIFIER];
 
   // Required. A human-readable name for the dashboard.
@@ -117,6 +194,17 @@ message Dashboard {
 
   // Optional. Free-form annotations for the dashboard.
   map<string, string> annotations = 10 [(google.api.field_behavior) = OPTIONAL];
+
+  // Output only. Identifies whether this dashboard is server-curated
+  // (SYSTEM_MANAGED) or customer-owned (USER_MANAGED). Mutations of
+  // SYSTEM_MANAGED dashboards are rejected with FAILED_PRECONDITION
+  // regardless of URL path.
+  //
+  // MAINTAINER: `OUTPUT_ONLY` is documentation, not enforcement. The
+  // UpdateDashboard handler MUST reject any FieldMask path that names
+  // this field with `INVALID_ARGUMENT`, otherwise a customer can flip
+  // the management_mode and escape the SYSTEM_MANAGED mutation guard.
+  ManagementMode management_mode = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // A template variable that can be referenced in widget queries.
@@ -139,8 +227,9 @@ message DashboardVariable {
 
 // Request message for ListDashboards.
 message ListDashboardsRequest {
-  // Required. The parent space.
-  // Format: `organizations/{organization}/spaces/{space}`
+  // Required. The parent organization or space.
+  // Format: `organizations/{organization}` or
+  //         `organizations/{organization}/spaces/{space}`.
   string parent = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {child_type: "pivox.api/Dashboard"},
@@ -262,4 +351,49 @@ message DeleteDashboardRequest {
 
   // Optional. The etag for optimistic concurrency control.
   string etag = 3 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// Request message for QueryDashboardData.
+message QueryDashboardDataRequest {
+  // Required. The parent scope under which to resolve the query.
+  // Format: `organizations/{organization}` (org-scoped) or
+  //         `organizations/{organization}/spaces/{space}` (space-scoped).
+  string parent = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true
+  ];
+
+  // Required. The query to resolve. v1 supports
+  // `query.resource_type = "pivox.assets/Asset"` only; other resource
+  // types return Unimplemented until per-type handlers land.
+  ResourceQuery query = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (buf.validate.field).required = true
+  ];
+
+  // Optional. Maximum number of rows to return per page.
+  int32 page_size = 3 [
+    (google.api.field_behavior) = OPTIONAL,
+    (buf.validate.field).int32 = {
+      gte: 0
+      lte: 1000
+    }
+  ];
+
+  // Optional. Page token from a previous QueryDashboardData call.
+  string page_token = 4 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// Response message for QueryDashboardData.
+message QueryDashboardDataResponse {
+  // The rows resolved by the query. Each row is a
+  // `google.protobuf.Struct` whose fields correspond to the
+  // resource's column-level data plus server-synthesized derived
+  // fields (e.g. `icon` as the numeric `Icon` enum value, computed
+  // per-row from the resource's content).
+  repeated google.protobuf.Struct rows = 1;
+
+  // Token for the next page of rows. Empty when the response is
+  // the last page.
+  string next_page_token = 2;
 }

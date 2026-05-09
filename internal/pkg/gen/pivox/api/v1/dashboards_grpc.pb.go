@@ -33,20 +33,39 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Dashboards_ListDashboards_FullMethodName  = "/pivox.api.v1.Dashboards/ListDashboards"
-	Dashboards_GetDashboard_FullMethodName    = "/pivox.api.v1.Dashboards/GetDashboard"
-	Dashboards_CreateDashboard_FullMethodName = "/pivox.api.v1.Dashboards/CreateDashboard"
-	Dashboards_UpdateDashboard_FullMethodName = "/pivox.api.v1.Dashboards/UpdateDashboard"
-	Dashboards_DeleteDashboard_FullMethodName = "/pivox.api.v1.Dashboards/DeleteDashboard"
+	Dashboards_ListDashboards_FullMethodName     = "/pivox.api.v1.Dashboards/ListDashboards"
+	Dashboards_GetDashboard_FullMethodName       = "/pivox.api.v1.Dashboards/GetDashboard"
+	Dashboards_CreateDashboard_FullMethodName    = "/pivox.api.v1.Dashboards/CreateDashboard"
+	Dashboards_UpdateDashboard_FullMethodName    = "/pivox.api.v1.Dashboards/UpdateDashboard"
+	Dashboards_DeleteDashboard_FullMethodName    = "/pivox.api.v1.Dashboards/DeleteDashboard"
+	Dashboards_QueryDashboardData_FullMethodName = "/pivox.api.v1.Dashboards/QueryDashboardData"
 )
 
 // DashboardsClient is the client API for Dashboards service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// Manages custom dashboards within a space.
+// Manages dashboards at the organization and space scopes.
+//
+// Dashboards come in two flavors, distinguished by `Dashboard.management_mode`:
+//
+//   - SYSTEM_MANAGED — server-curated dashboards (e.g. the org-level
+//     Library, Activity, Members views). Listed and read by all flows;
+//     mutations are rejected.
+//   - USER_MANAGED — customer-owned dashboards. Full CRUD applies.
+//
+// In v1 every org-level dashboard is SYSTEM_MANAGED; every space-level
+// dashboard is USER_MANAGED. The mutation guard is data-driven, not
+// path-driven — Create/Update/Delete refuse a SYSTEM_MANAGED target
+// regardless of which URL the request came in on.
 type DashboardsClient interface {
-	// Lists dashboards in a space.
+	// Lists dashboards under a parent. The parent may be an organization
+	// (returns the system-curated catalog) or a space (returns
+	// user-managed dashboards).
+	//
+	// The `dashboards.read` permission gates the verb regardless of
+	// parent scope; the membership interceptor ahead of it enforces
+	// org-membership at org parent and space-membership at space parent.
 	ListDashboards(ctx context.Context, in *ListDashboardsRequest, opts ...grpc.CallOption) (*ListDashboardsResponse, error)
 	// Retrieves a dashboard by name.
 	GetDashboard(ctx context.Context, in *GetDashboardRequest, opts ...grpc.CallOption) (*Dashboard, error)
@@ -56,6 +75,23 @@ type DashboardsClient interface {
 	UpdateDashboard(ctx context.Context, in *UpdateDashboardRequest, opts ...grpc.CallOption) (*Dashboard, error)
 	// Deletes a dashboard.
 	DeleteDashboard(ctx context.Context, in *DeleteDashboardRequest, opts ...grpc.CallOption) (*Dashboard, error)
+	// Resolves a `ResourceQuery` into rows of data for rendering inside
+	// a CollectionWidget. The handler dispatches per query.resource_type;
+	// v1 supports `pivox.assets/Asset` only.
+	//
+	// Each row is a `google.protobuf.Struct` whose fields mirror the
+	// CollectionWidget.columns / IconConfig contract documented on the
+	// widget itself: `name`, `display_name`, `media_type`, `state`,
+	// `size_bytes`, `create_time`, plus server-synthesized `icon` (the
+	// numeric `Icon` enum value derived from the asset's content type)
+	// and `thumbnail_url` (empty in v1; the per-row URL composition
+	// lands when the storage-gateway session work merges).
+	//
+	// Permission: dashboards.read gates the verb. Per-resource ListPermission
+	// (e.g. assets.assets.read) is checked at the handler layer once the
+	// role hierarchy diverges enough that the two permissions can be
+	// granted independently.
+	QueryDashboardData(ctx context.Context, in *QueryDashboardDataRequest, opts ...grpc.CallOption) (*QueryDashboardDataResponse, error)
 }
 
 type dashboardsClient struct {
@@ -116,13 +152,41 @@ func (c *dashboardsClient) DeleteDashboard(ctx context.Context, in *DeleteDashbo
 	return out, nil
 }
 
+func (c *dashboardsClient) QueryDashboardData(ctx context.Context, in *QueryDashboardDataRequest, opts ...grpc.CallOption) (*QueryDashboardDataResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryDashboardDataResponse)
+	err := c.cc.Invoke(ctx, Dashboards_QueryDashboardData_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DashboardsServer is the server API for Dashboards service.
 // All implementations must embed UnimplementedDashboardsServer
 // for forward compatibility.
 //
-// Manages custom dashboards within a space.
+// Manages dashboards at the organization and space scopes.
+//
+// Dashboards come in two flavors, distinguished by `Dashboard.management_mode`:
+//
+//   - SYSTEM_MANAGED — server-curated dashboards (e.g. the org-level
+//     Library, Activity, Members views). Listed and read by all flows;
+//     mutations are rejected.
+//   - USER_MANAGED — customer-owned dashboards. Full CRUD applies.
+//
+// In v1 every org-level dashboard is SYSTEM_MANAGED; every space-level
+// dashboard is USER_MANAGED. The mutation guard is data-driven, not
+// path-driven — Create/Update/Delete refuse a SYSTEM_MANAGED target
+// regardless of which URL the request came in on.
 type DashboardsServer interface {
-	// Lists dashboards in a space.
+	// Lists dashboards under a parent. The parent may be an organization
+	// (returns the system-curated catalog) or a space (returns
+	// user-managed dashboards).
+	//
+	// The `dashboards.read` permission gates the verb regardless of
+	// parent scope; the membership interceptor ahead of it enforces
+	// org-membership at org parent and space-membership at space parent.
 	ListDashboards(context.Context, *ListDashboardsRequest) (*ListDashboardsResponse, error)
 	// Retrieves a dashboard by name.
 	GetDashboard(context.Context, *GetDashboardRequest) (*Dashboard, error)
@@ -132,6 +196,23 @@ type DashboardsServer interface {
 	UpdateDashboard(context.Context, *UpdateDashboardRequest) (*Dashboard, error)
 	// Deletes a dashboard.
 	DeleteDashboard(context.Context, *DeleteDashboardRequest) (*Dashboard, error)
+	// Resolves a `ResourceQuery` into rows of data for rendering inside
+	// a CollectionWidget. The handler dispatches per query.resource_type;
+	// v1 supports `pivox.assets/Asset` only.
+	//
+	// Each row is a `google.protobuf.Struct` whose fields mirror the
+	// CollectionWidget.columns / IconConfig contract documented on the
+	// widget itself: `name`, `display_name`, `media_type`, `state`,
+	// `size_bytes`, `create_time`, plus server-synthesized `icon` (the
+	// numeric `Icon` enum value derived from the asset's content type)
+	// and `thumbnail_url` (empty in v1; the per-row URL composition
+	// lands when the storage-gateway session work merges).
+	//
+	// Permission: dashboards.read gates the verb. Per-resource ListPermission
+	// (e.g. assets.assets.read) is checked at the handler layer once the
+	// role hierarchy diverges enough that the two permissions can be
+	// granted independently.
+	QueryDashboardData(context.Context, *QueryDashboardDataRequest) (*QueryDashboardDataResponse, error)
 	mustEmbedUnimplementedDashboardsServer()
 }
 
@@ -156,6 +237,9 @@ func (UnimplementedDashboardsServer) UpdateDashboard(context.Context, *UpdateDas
 }
 func (UnimplementedDashboardsServer) DeleteDashboard(context.Context, *DeleteDashboardRequest) (*Dashboard, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteDashboard not implemented")
+}
+func (UnimplementedDashboardsServer) QueryDashboardData(context.Context, *QueryDashboardDataRequest) (*QueryDashboardDataResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method QueryDashboardData not implemented")
 }
 func (UnimplementedDashboardsServer) mustEmbedUnimplementedDashboardsServer() {}
 func (UnimplementedDashboardsServer) testEmbeddedByValue()                    {}
@@ -268,6 +352,24 @@ func _Dashboards_DeleteDashboard_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Dashboards_QueryDashboardData_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryDashboardDataRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DashboardsServer).QueryDashboardData(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Dashboards_QueryDashboardData_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DashboardsServer).QueryDashboardData(ctx, req.(*QueryDashboardDataRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Dashboards_ServiceDesc is the grpc.ServiceDesc for Dashboards service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -294,6 +396,10 @@ var Dashboards_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteDashboard",
 			Handler:    _Dashboards_DeleteDashboard_Handler,
+		},
+		{
+			MethodName: "QueryDashboardData",
+			Handler:    _Dashboards_QueryDashboardData_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -65,6 +65,7 @@ var gatedServices = map[string]bool{
 	"pivox.api.v1.TagValues":           true,
 	"pivox.api.v1.TagBindings":         true,
 	"pivox.api.v1.ApiKeys":             true,
+	"pivox.api.v1.Dashboards":          true,
 	"pivox.iam.v1.Iam":                 true,
 	"pivox.assets.v1.Assets":           true,
 	"pivox.assets.v1.Requests":         true,

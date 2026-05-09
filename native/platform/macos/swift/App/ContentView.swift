@@ -33,7 +33,6 @@ enum AuthState {
 struct ContentView: View {
   @State private var selectedItem: SidebarItem?
   @State private var sidebarVisibility: NavigationSplitViewVisibility = .automatic
-  @State private var isImageEditing = false
   @State private var sidebarWidth: CGFloat
   @State private var aiToggleHovered = false
   /// Persisted chat panel width. Shared across float and push
@@ -383,10 +382,33 @@ struct ContentView: View {
       switch selectedItem {
       case .section(let section):
         if section == .library {
-          LibraryPlaceholderView(
-            isEditing: $isImageEditing,
-            sidebarVisibility: $sidebarVisibility
-          )
+          // Library is one call site of the generic DashboardView
+          // surface. Future system dashboards (Activity, Members)
+          // and customer USER_MANAGED dashboards instantiate the
+          // same view with a different name; this branch is the
+          // wire-up.
+          //
+          // Image-editor entry-point regression (issue #94): the
+          // previous LibraryPlaceholderView was the only UI surface
+          // that launched the image editor. Removed in this commit
+          // per pre-prod freedom — restoring the launcher + the
+          // crop-result destination is tracked separately so the
+          // user-facing functionality isn't silently lost.
+          if let orgID = orgs.current?.id {
+            // .id(orgID) forces SwiftUI to re-create the
+            // DashboardView (and its @State viewModel) when the
+            // user switches orgs while Library is selected. Without
+            // it, selectedItem doesn't change so SwiftUI keeps the
+            // old VM around — and the VM's `name` snapshot from
+            // construction would point at the previous org's
+            // library, fetching stale data. The .task(id:) on
+            // DashboardView is the belt-and-suspenders peer.
+            DashboardView(name: "organizations/\(orgID)/dashboards/library")
+              .id(orgID)
+          } else {
+            ProgressView("Loading organization…")
+              .frame(maxWidth: .infinity, maxHeight: .infinity)
+          }
         } else {
           VStack {
             Text(section.rawValue)
@@ -413,90 +435,6 @@ struct ContentView: View {
 }
 
 /// Temporary Library placeholder with image edit test.
-struct LibraryPlaceholderView: View {
-  @Binding var isEditing: Bool
-  @Binding var sidebarVisibility: NavigationSplitViewVisibility
-  @State private var selectedImage: NSImage?
-  @State private var showEditor = false
-  @State private var cropResult: String?
-  @State private var didAutoLoad = false
-
-  var body: some View {
-    if let image = selectedImage, showEditor {
-      // `.preferredColorScheme(.dark)` is scoped to ImageEditView
-      // so the editor renders dark without forcing
-      // `NSApp.keyWindow.appearance = .darkAqua` on the entire
-      // window. Window-level flips re-resolve every appearance-
-      // dependent surface (including the chat panel's
-      // `.thinMaterial`), causing the chat to re-render mid-drag
-      // and the resize handle's gesture state to reset. Scoping
-      // dark mode here keeps the rest of the window's appearance
-      // unchanged.
-      ImageEditView(
-        image: image,
-        isEditing: $isEditing,
-        sidebarVisibility: $sidebarVisibility,
-        onDone: { rect in
-          cropResult = "Crop: x=\(rect.x) y=\(rect.y) w=\(rect.width) h=\(rect.height)"
-          closeEditor()
-        },
-        onCancel: {
-          closeEditor()
-        }
-      )
-      .preferredColorScheme(.dark)
-    } else {
-      VStack(spacing: 16) {
-        Spacer()
-        Text("Library")
-          .font(.largeTitle)
-          .foregroundStyle(.secondary)
-
-        Button("Open Image to Edit") {
-          let panel = NSOpenPanel()
-          panel.allowedContentTypes = [.image]
-          panel.allowsMultipleSelection = false
-          if panel.runModal() == .OK, let url = panel.url,
-            let image = NSImage(contentsOf: url)
-          {
-            selectedImage = image
-            showEditor = true
-          }
-        }
-        .controlSize(.large)
-        .accessibilityIdentifier("library-open-image")
-
-        if let result = cropResult {
-          Text(result)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .padding(.top, 8)
-            .accessibilityIdentifier("library-crop-result")
-        }
-        Spacer()
-      }
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .onAppear {
-        guard !didAutoLoad else { return }
-        didAutoLoad = true
-        if let path = ProcessInfo.processInfo.environment["TEST_IMAGE_PATH"],
-          let image = NSImage(contentsOfFile: path)
-        {
-          selectedImage = image
-          showEditor = true
-        }
-      }
-    }
-  }
-
-  private func closeEditor() {
-    showEditor = false
-    selectedImage = nil
-    isEditing = false
-    sidebarVisibility = .automatic
-  }
-}
-
 /// Routes between login and registration. SSO is no longer a
 /// separate screen — `LoginView` resolves SSO-vs-password from the
 /// email after the first submit, so a single email entry handles
