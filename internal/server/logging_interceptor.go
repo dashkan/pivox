@@ -3,12 +3,13 @@ package server
 import (
 	"context"
 	"log/slog"
-	"strings"
 	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/dashkan/pivox/internal/apierr"
 )
 
 // LoggingUnaryInterceptor logs the outcome of every unary RPC: method,
@@ -80,28 +81,22 @@ func logRPC(logger *slog.Logger, method string, start time.Time, ctx context.Con
 		// rarely actionable. Demote to Debug.
 		logger.Debug("rpc", attrs...)
 	case codes.Internal, codes.Unknown, codes.Unavailable, codes.DataLoss:
-		// Server-side bugs. Always include the error detail.
-		logger.Error("rpc", append(attrs, "error", sanitizeLogString(st.Message()))...)
+		// Server-side bugs. Append the gRPC status message AND any
+		// pg-error fields recovered from the cause chain — the
+		// gRPC response is sanitized to "database error" by
+		// apierr.HandleResourceError, but the underlying
+		// *pgconn.PgError carries the schema/table/column/constraint
+		// the next debug session needs to start from.
+		errAttrs := append(attrs, "error", apierr.SanitizeLogString(st.Message()))
+		if cause := apierr.PgErrorLogAttrs(err); cause != nil {
+			errAttrs = append(errAttrs, cause...)
+		}
+		logger.Error("rpc", errAttrs...)
 	default:
 		// Client errors (InvalidArgument, NotFound, PermissionDenied,
 		// Unauthenticated, AlreadyExists, FailedPrecondition,
 		// OutOfRange, ResourceExhausted, Aborted) — warn so they
 		// surface in dashboards but don't drown out real errors.
-		logger.Warn("rpc", append(attrs, "error", sanitizeLogString(st.Message()))...)
+		logger.Warn("rpc", append(attrs, "error", apierr.SanitizeLogString(st.Message()))...)
 	}
-}
-
-// sanitizeLogString defangs newlines and carriage returns from
-// caller-controlled error strings before they're logged. The default
-// JSON slog handler escapes these on its own, but downstream log
-// pipelines (text-handler dev runs, regex-based parsers in Loki /
-// Datadog, raw stdout tailing) can be tricked into treating an
-// embedded newline as a record boundary — a classic log-injection
-// vector. Cheap defense-in-depth.
-func sanitizeLogString(s string) string {
-	if s == "" {
-		return s
-	}
-	r := strings.NewReplacer("\n", "\\n", "\r", "\\r")
-	return r.Replace(s)
 }

@@ -1,6 +1,7 @@
 package apierr
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -241,4 +242,187 @@ func TestHandleResourceError(t *testing.T) {
 			assert.Equal(t, tt.wantCode, st.Code())
 		})
 	}
+}
+
+// TestHandleResourceError_PreservesCauseOnInternal asserts that when
+// HandleResourceError falls through to the Internal-error response
+// (no typed mapping for the SQLSTATE), the original *pgconn.PgError
+// stays recoverable via errors.As. Without this the gRPC logging
+// interceptor sees only "database error" and a debug session has
+// nothing to start from. Verified by the pgvector NULL panic
+// surfacing as `error: "database error"` with zero diagnosable
+// detail until the session that motivated this commit.
+func TestHandleResourceError_PreservesCauseOnInternal(t *testing.T) {
+	pgErr := &pgconn.PgError{
+		Code:           "42P01",
+		Message:        `relation "dashboards" does not exist`,
+		SchemaName:     "public",
+		TableName:      "dashboards",
+		ColumnName:     "",
+		ConstraintName: "",
+	}
+
+	out := HandleResourceError(pgErr, "Dashboard", "dashboards/test")
+	require.Error(t, out)
+
+	// Response side: sanitized to Internal/"database error".
+	st, ok := status.FromError(out)
+	require.True(t, ok, "expected gRPC status error")
+	assert.Equal(t, codes.Internal, st.Code())
+	assert.Equal(t, "database error", st.Message())
+
+	// Log side: the original pgErr is recoverable via errors.As
+	// so the logging interceptor can decode it for structured
+	// fields.
+	var recovered *pgconn.PgError
+	require.True(t, errors.As(out, &recovered),
+		"original *pgconn.PgError should be recoverable via errors.As; "+
+			"if this fails the cause chain was dropped")
+	assert.Equal(t, "42P01", recovered.Code)
+	assert.Equal(t, "dashboards", recovered.TableName)
+}
+
+// TestHandleResourceError_PreservesCauseThroughWrap asserts the
+// cause stays recoverable when the original error is fmt.Errorf-
+// wrapped before reaching HandleResourceError (a common pattern
+// when handlers add context like "load asset: %w").
+func TestHandleResourceError_PreservesCauseThroughWrap(t *testing.T) {
+	pgErr := &pgconn.PgError{Code: "42703", Message: "column foo does not exist", TableName: "assets", ColumnName: "foo"}
+	wrapped := fmt.Errorf("load asset: %w", pgErr)
+
+	out := HandleResourceError(wrapped, "Asset", "assets/x")
+	require.Error(t, out)
+
+	var recovered *pgconn.PgError
+	require.True(t, errors.As(out, &recovered))
+	assert.Equal(t, "42703", recovered.Code)
+	assert.Equal(t, "foo", recovered.ColumnName)
+}
+
+// TestHandleResourceError_TypedCasesDontWrap documents that the
+// well-known SQLSTATE cases (NoRows, UniqueViolation,
+// FKViolation) DO NOT preserve the cause today — they map to
+// descriptive client-facing errors and the cost/benefit of
+// adding `db_constraint` to AlreadyExists logs is a separate
+// scope decision. If a future change wraps these too, the
+// assertion flips and that's deliberate; the test exists so the
+// scope boundary is recorded, not buried in commit history.
+func TestHandleResourceError_TypedCasesDontWrap(t *testing.T) {
+	uniqueViolation := &pgconn.PgError{
+		Code:           PgUniqueViolation,
+		Message:        "duplicate key value violates unique constraint",
+		ConstraintName: "users_email_key",
+	}
+	out := HandleResourceError(uniqueViolation, "User", "users/x")
+
+	var recovered *pgconn.PgError
+	assert.False(t, errors.As(out, &recovered),
+		"typed AlreadyExists case is intentionally not wrapped today; "+
+			"if you flipped this, update the comment above + "+
+			"PgErrorLogAttrs's docstring + the logging interceptor's "+
+			"Warn branch")
+}
+
+func TestPgErrorLogAttrs(t *testing.T) {
+	t.Run("decodes pg error from cause chain", func(t *testing.T) {
+		pgErr := &pgconn.PgError{
+			Code:           "42P01",
+			Message:        `relation "x" does not exist`,
+			SchemaName:     "public",
+			TableName:      "x",
+			ColumnName:     "",
+			ConstraintName: "",
+		}
+		// Wrap to mirror what HandleResourceError produces — the
+		// cause sits underneath a status error.
+		wrapped := HandleResourceError(pgErr, "X", "x/y")
+
+		attrs := PgErrorLogAttrs(wrapped)
+		require.NotNil(t, attrs, "PgErrorLogAttrs should decode the wrapped pgErr")
+
+		m := attrsToMap(t, attrs)
+		assert.Equal(t, "42P01", m["db_code"])
+		assert.Equal(t, `relation "x" does not exist`, m["db_message"])
+		assert.Equal(t, "public", m["db_schema"])
+		assert.Equal(t, "x", m["db_table"])
+		assert.Equal(t, "", m["db_column"])
+		assert.Equal(t, "", m["db_constraint"])
+	})
+
+	t.Run("returns nil for non-pg error", func(t *testing.T) {
+		assert.Nil(t, PgErrorLogAttrs(fmt.Errorf("plain error")))
+	})
+
+	t.Run("returns nil for nil error", func(t *testing.T) {
+		assert.Nil(t, PgErrorLogAttrs(nil))
+	})
+
+	t.Run("sanitizes db_message for log injection", func(t *testing.T) {
+		pgErr := &pgconn.PgError{
+			Code:    "XX000",
+			Message: "internal\nfake-log-line\rinjection",
+		}
+		wrapped := HandleResourceError(pgErr, "X", "x/y")
+
+		attrs := PgErrorLogAttrs(wrapped)
+		m := attrsToMap(t, attrs)
+		assert.Equal(t, `internal\nfake-log-line\rinjection`, m["db_message"],
+			"newlines and CRs in db_message must be escaped to defang "+
+				"log-injection in non-JSON downstream pipelines")
+	})
+
+	t.Run("does NOT surface Detail or Hint", func(t *testing.T) {
+		// Detail and Hint frequently leak input values verbatim
+		// (e.g., `Key (email)=(user@example.com) already exists.`).
+		// PgErrorLogAttrs intentionally excludes them so the default
+		// emission can't leak PII into prod logs.
+		pgErr := &pgconn.PgError{
+			Code:   "23505",
+			Detail: "Key (email)=(user@example.com) already exists.",
+			Hint:   "Use a different email",
+		}
+		// Use the Internal-fallthrough wrap directly; UniqueViolation
+		// would short-circuit to AlreadyExists.
+		wrapped := wrapWithCause(Internal("database error"), pgErr)
+
+		attrs := PgErrorLogAttrs(wrapped)
+		m := attrsToMap(t, attrs)
+		_, hasDetail := m["db_detail"]
+		_, hasHint := m["db_hint"]
+		assert.False(t, hasDetail, "db_detail must not be surfaced (PII risk)")
+		assert.False(t, hasHint, "db_hint must not be surfaced (PII risk)")
+	})
+}
+
+func TestSanitizeLogString(t *testing.T) {
+	t.Run("empty string passes through", func(t *testing.T) {
+		assert.Equal(t, "", SanitizeLogString(""))
+	})
+	t.Run("plain ASCII passes through", func(t *testing.T) {
+		assert.Equal(t, "hello world", SanitizeLogString("hello world"))
+	})
+	t.Run("LF escaped", func(t *testing.T) {
+		assert.Equal(t, `a\nb`, SanitizeLogString("a\nb"))
+	})
+	t.Run("CR escaped", func(t *testing.T) {
+		assert.Equal(t, `a\rb`, SanitizeLogString("a\rb"))
+	})
+	t.Run("CRLF escaped", func(t *testing.T) {
+		assert.Equal(t, `line1\r\nline2`, SanitizeLogString("line1\r\nline2"))
+	})
+}
+
+// attrsToMap turns a slog-variadic []any (key, value, key, value, ...)
+// into a map for assertion. Fails the test if the slice has an odd
+// length or a non-string key.
+func attrsToMap(t *testing.T, attrs []any) map[string]any {
+	t.Helper()
+	require.Equal(t, 0, len(attrs)%2, "attrs slice must have even length (key/value pairs)")
+	m := make(map[string]any, len(attrs)/2)
+	for i := 0; i < len(attrs); i += 2 {
+		key, ok := attrs[i].(string)
+		require.True(t, ok, "attr key at index %d must be string, got %T", i, attrs[i])
+		m[key] = attrs[i+1]
+	}
+	return m
 }

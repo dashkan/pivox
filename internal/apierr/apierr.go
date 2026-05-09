@@ -3,6 +3,7 @@ package apierr
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -191,7 +192,114 @@ func HandleResourceError(err error, resourceType, resourceName string) error {
 			return NotFound(resourceType, resourceName)
 		}
 	}
-	return Internal("database error")
+	// Unknown DB error → sanitize the response to "database error"
+	// (don't leak schema state to the gRPC client) but preserve the
+	// original cause on the error chain so the logging interceptor
+	// can recover the *pgconn.PgError via errors.As and emit code,
+	// table, column, constraint as structured slog attrs. Without
+	// this wrap the interceptor sees only the sanitized "database
+	// error" string and a debug session has nothing to start from
+	// (e.g., the pgvector NULL panic that ate ~30 minutes today
+	// surfaced as `error: "database error"` with zero diagnosable
+	// detail).
+	return wrapWithCause(Internal("database error"), err)
+}
+
+// statusErrorWithCause carries a gRPC status (sanitized response)
+// alongside the original error chain (rich detail for logs). It
+// satisfies grpc-go's GRPCStatus() interface so the framework
+// extracts the wrapped status when serializing the response, AND
+// implements Unwrap() so errors.Is/As walk through to the cause.
+//
+// Today the only consumer of the cause chain is
+// internal/server/logging_interceptor.go via PgErrorLogAttrs.
+// Future consumers (a /debug endpoint surfacing internal errors
+// to operators, structured error reporting to Sentry, etc.) get
+// the cause chain for free.
+type statusErrorWithCause struct {
+	st    *status.Status
+	cause error
+}
+
+func (e *statusErrorWithCause) Error() string              { return e.st.Err().Error() }
+func (e *statusErrorWithCause) GRPCStatus() *status.Status { return e.st }
+func (e *statusErrorWithCause) Unwrap() error              { return e.cause }
+
+// wrapWithCause attaches `cause` to the chain underneath an
+// existing gRPC status error. Panics if `statusErr` is not a
+// status error (programmer bug — the caller passed an unwrapped
+// error). Returns `statusErr` unchanged if `cause` is nil so
+// callers don't have to nil-check at every site.
+func wrapWithCause(statusErr error, cause error) error {
+	if cause == nil {
+		return statusErr
+	}
+	st, ok := status.FromError(statusErr)
+	if !ok {
+		// Construction-time bug: the apierr builders all return
+		// status errors, so this can only fire if a future
+		// builder forgets. Loud failure beats silent loss of
+		// status code.
+		panic(fmt.Sprintf("apierr.wrapWithCause: not a status error: %v", statusErr))
+	}
+	return &statusErrorWithCause{st: st, cause: cause}
+}
+
+// PgErrorLogAttrs returns slog-style key/value pairs decoded from
+// a *pgconn.PgError attached to the cause chain (typically by
+// HandleResourceError's Internal-fallthrough wrap). Returns nil
+// for non-DB causes or a nil error.
+//
+// Six fields surface: db_code, db_message, db_schema, db_table,
+// db_column, db_constraint. Detail and Hint are deliberately
+// excluded — they verbatim-leak input values
+// (e.g., "Key (email)=(user@example.com) already exists.") and
+// the Internal-fallthrough errors this targets (relation does
+// not exist, column does not exist, pgvector internal panics)
+// don't need them to diagnose. If a future debug case requires
+// Detail/Hint, surface as a separate, deliberately-scoped change
+// rather than expanding the default exposure.
+//
+// db_message is sanitized for log injection (newlines, CRs) via
+// SanitizeLogString. The remaining fields are SQLSTATE codes and
+// schema identifiers — never input-derived, so safe verbatim.
+func PgErrorLogAttrs(err error) []any {
+	if err == nil {
+		return nil
+	}
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) {
+		return nil
+	}
+	return []any{
+		"db_code", pgErr.Code,
+		"db_message", SanitizeLogString(pgErr.Message),
+		"db_schema", pgErr.SchemaName,
+		"db_table", pgErr.TableName,
+		"db_column", pgErr.ColumnName,
+		"db_constraint", pgErr.ConstraintName,
+	}
+}
+
+// SanitizeLogString defangs newlines and carriage returns from
+// caller-controlled error strings before they're logged. The
+// default JSON slog handler escapes these on its own, but
+// downstream log pipelines (text-handler dev runs, regex-based
+// parsers in Loki / Datadog, raw stdout tailing) can be tricked
+// into treating an embedded newline as a record boundary — a
+// classic log-injection vector. Cheap defense-in-depth.
+//
+// Lives in apierr because both apierr.PgErrorLogAttrs (decoding
+// a cause's pg-message field) and the gRPC logging interceptor
+// (sanitizing the gRPC status message) call it. Putting it here
+// keeps one implementation; previously a duplicate sat in
+// internal/server/logging_interceptor.go.
+func SanitizeLogString(s string) string {
+	if s == "" {
+		return s
+	}
+	r := strings.NewReplacer("\n", "\\n", "\r", "\\r")
+	return r.Replace(s)
 }
 
 func Aborted(resourceType, resourceName, reason string) error {
