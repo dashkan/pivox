@@ -1102,7 +1102,14 @@ CREATE TABLE assets (
       setweight(to_tsvector('english', coalesce(ai_description, '')), 'B') ||
       setweight(to_tsvector('english', coalesce(transcription, '')), 'C')
     ) STORED,
-    embedding           vector(768),
+    -- DEFAULT zero vector so the column never returns NULL via pgx's
+    -- row scanner. pgvector-go v0.3.0's `pgvector.Vector` (non-pointer)
+    -- panics in DecodeBinary on a 0-byte (NULL) payload; the right
+    -- semantic answer is `*pgvector.Vector` everywhere, but that's a
+    -- bigger churn. The DEFAULT keeps the schema honest about "always
+    -- present" and matches what internal/testutil/db.go has been doing
+    -- via post-migration ALTER for tests since pgvector landed.
+    embedding           vector(768) NOT NULL DEFAULT array_fill(0, ARRAY[768])::vector,
     -- state
     state               asset_state NOT NULL DEFAULT 'PLACEHOLDER',
     -- versioning
