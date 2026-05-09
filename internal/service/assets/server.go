@@ -195,6 +195,13 @@ func (s *AssetsServer) ListAssets(ctx context.Context, req *assetsv1.ListAssetsR
 		pageSize = 1000
 	}
 
+	// ListAssetsBySpace returns ListAssetsBySpaceRow (with embedded
+	// Asset + dashboard-only `latest_version_*` and `endpoint_slug`
+	// columns added in Phase 6c) — this RPC only needs the embedded
+	// Asset, so unwrap to []db.Asset before the downstream proto
+	// conversion. ListAssetsBySpaceWithDeleted still returns []db.Asset
+	// directly (deliberately not migrated; the show_deleted branch is
+	// out-of-scope for the dashboards synthesizer).
 	var rows []db.Asset
 	if req.GetShowDeleted() {
 		rows, err = s.queries.ListAssetsBySpaceWithDeleted(ctx, db.ListAssetsBySpaceWithDeletedParams{
@@ -203,11 +210,18 @@ func (s *AssetsServer) ListAssets(ctx context.Context, req *assetsv1.ListAssetsR
 			Offset:  0,
 		})
 	} else {
-		rows, err = s.queries.ListAssetsBySpace(ctx, db.ListAssetsBySpaceParams{
+		spaceRows, listErr := s.queries.ListAssetsBySpace(ctx, db.ListAssetsBySpaceParams{
 			SpaceID: spaceID,
 			Limit:   pageSize + 1,
 			Offset:  0,
 		})
+		err = listErr
+		if listErr == nil {
+			rows = make([]db.Asset, len(spaceRows))
+			for i, r := range spaceRows {
+				rows[i] = r.Asset
+			}
+		}
 	}
 	if err != nil {
 		return nil, apierr.Internal("database error")

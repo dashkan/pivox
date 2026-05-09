@@ -486,11 +486,34 @@ type Querier interface {
 	// trip. Soft-deleted spaces are skipped (their assets aren't
 	// surfaced) — same effect as `assets.space_id` referencing a row
 	// with a non-null `spaces.delete_time`.
+	//
+	// Latest-version + storage_endpoints columns mirror ListAssetsBySpace;
+	// same shape feeds the same synthesizer (Phase 6c). See
+	// ListAssetsBySpace for the LEFT-JOIN-derived-table rationale.
 	ListAssetsByOrg(ctx context.Context, arg ListAssetsByOrgParams) ([]ListAssetsByOrgRow, error)
 	// Tiebreaker on id DESC keeps pagination stable when multiple assets
 	// share a create_time (concurrent ingest can collide on µs precision):
 	// without it, offset-based pagination can drop or duplicate rows.
-	ListAssetsBySpace(ctx context.Context, arg ListAssetsBySpaceParams) ([]Asset, error)
+	//
+	// The right-side joins populate the `latest_version_*` and
+	// `endpoint_slug` columns the dashboards synthesizer needs to compose
+	// storage URLs (Phase 6c). Latest version is computed via DISTINCT ON
+	// in a derived table joined LEFT.
+	//
+	// Why COALESCE on the latest_version_* columns: sqlc v1.31's
+	// nullability inference looks at the underlying column's NOT NULL
+	// constraint and gets LEFT-JOIN-of-derived-table nullability wrong
+	// (asset_versions.version_number is NOT NULL, so sqlc types
+	// av.version_number as int32 even though the LEFT JOIN can yield
+	// NULL). Forcing a non-null shape via COALESCE with a sentinel
+	// (0 for version_number — real versions start at 1; '' for mime_type)
+	// avoids the runtime "scan NULL into int32" error on assets with no
+	// versions. The synthesizer treats `version_number == 0` as the "no
+	// version exists" signal — same semantics as a real LEFT JOIN NULL.
+	// endpoint_slug doesn't need this trick because it's a base-table
+	// column reference through a regular LEFT JOIN, which sqlc infers
+	// correctly as pgtype.Text.
+	ListAssetsBySpace(ctx context.Context, arg ListAssetsBySpaceParams) ([]ListAssetsBySpaceRow, error)
 	ListAssetsBySpaceWithDeleted(ctx context.Context, arg ListAssetsBySpaceWithDeletedParams) ([]Asset, error)
 	// Live dashboards in a space, newest-first. Pagination is offset-
 	// based for v1 — the catalog is small (≤ 100s of dashboards per

@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/dashkan/pivox/internal/apierr"
@@ -133,7 +134,7 @@ func (s *Server) queryAssetsAtSpace(ctx context.Context, orgSlug, spaceSlug stri
 		Rows: make([]*structpb.Struct, 0, len(rows)),
 	}
 	for _, r := range rows {
-		row, err := assetRowToStruct(viewFromAsset(r), orgSlug, spaceSlug)
+		row, err := assetRowToStruct(viewFromSpaceRow(r), orgSlug, spaceSlug)
 		if err != nil {
 			return nil, apierr.Internal("synthesize asset row")
 		}
@@ -147,51 +148,79 @@ func (s *Server) queryAssetsAtSpace(ctx context.Context, orgSlug, spaceSlug stri
 }
 
 // assetView is the minimal projection the synthesizer needs from an
-// Asset row. Both `db.Asset` (space-scope query) and
+// Asset row. Both `db.ListAssetsBySpaceRow` (space-scope query) and
 // `db.ListAssetsByOrgRow` (org-scope JOIN query) project into this
 // shape via tiny extractors.
 //
-// Why a separate view rather than passing `db.Asset` directly: the
+// Why a separate view rather than passing the row struct directly:
 // space-scope and org-scope queries return DIFFERENT struct types
-// (sqlc emits a per-query row struct for the JOIN). Forcing the
-// JOIN row through a `db.Asset` shim required a 30-line field copy
-// that silently dropped any column added to `assets` until someone
-// noticed a NULL in production. The view fixes the surface: the
-// synthesizer asks for what it actually uses, the extractors
-// project, and a missed field becomes a compile error rather than
-// silent data loss.
+// (the org-scope JOIN adds `space_slug`). Forcing both through a
+// shared view that hand-copies fields makes "did I forget a new
+// column" a compile error rather than silent data loss in
+// production.
+//
+// Phase 6c additions: VersionNumber, MimeType, EndpointSlug. These
+// feed the Phase 6c.2 URL composer (lands in the next sub-phase).
+// VersionNumber == 0 is the "no version exists" sentinel (real
+// versions start at 1 per the asset_versions monotonic-from-1
+// contract; ListAssetsBy* uses COALESCE to surface a sentinel
+// because sqlc v1.31 mistypes the LEFT-JOIN-derived nullable columns
+// as NOT NULL — see internal/db/queries/assets.sql for details).
+// Empty EndpointSlug means the asset has no storage endpoint bound
+// (also a "no URL" signal). The composer in 6c.2 reads these to
+// decide whether to emit a URL or fall through to the iconField
+// path.
 type assetView struct {
-	NameSlug    string
-	DisplayName string
-	MediaType   db.NullAssetMediaType
-	ContentType string
-	State       db.AssetState
-	SizeBytes   int64
-	CreateTime  time.Time
+	NameSlug      string
+	DisplayName   string
+	MediaType     db.NullAssetMediaType
+	ContentType   string
+	State         db.AssetState
+	SizeBytes     int64
+	CreateTime    time.Time
+	VersionNumber int32  // 0 = no version exists yet
+	MimeType      string // empty when VersionNumber == 0
+	EndpointSlug  string // empty when the asset has no endpoint bound
 }
 
-func viewFromAsset(a db.Asset) assetView {
+func viewFromSpaceRow(r db.ListAssetsBySpaceRow) assetView {
 	return assetView{
-		NameSlug:    a.Name,
-		DisplayName: a.DisplayName,
-		MediaType:   a.MediaType,
-		ContentType: a.ContentType,
-		State:       a.State,
-		SizeBytes:   a.SizeBytes,
-		CreateTime:  a.CreateTime,
+		NameSlug:      r.Asset.Name,
+		DisplayName:   r.Asset.DisplayName,
+		MediaType:     r.Asset.MediaType,
+		ContentType:   r.Asset.ContentType,
+		State:         r.Asset.State,
+		SizeBytes:     r.Asset.SizeBytes,
+		CreateTime:    r.Asset.CreateTime,
+		VersionNumber: r.LatestVersionNumber,
+		MimeType:      r.LatestVersionMimeType,
+		EndpointSlug:  textOrEmpty(r.EndpointSlug),
 	}
 }
 
 func viewFromOrgRow(r db.ListAssetsByOrgRow) assetView {
 	return assetView{
-		NameSlug:    r.Name,
-		DisplayName: r.DisplayName,
-		MediaType:   r.MediaType,
-		ContentType: r.ContentType,
-		State:       r.State,
-		SizeBytes:   r.SizeBytes,
-		CreateTime:  r.CreateTime,
+		NameSlug:      r.Asset.Name,
+		DisplayName:   r.Asset.DisplayName,
+		MediaType:     r.Asset.MediaType,
+		ContentType:   r.Asset.ContentType,
+		State:         r.Asset.State,
+		SizeBytes:     r.Asset.SizeBytes,
+		CreateTime:    r.Asset.CreateTime,
+		VersionNumber: r.LatestVersionNumber,
+		MimeType:      r.LatestVersionMimeType,
+		EndpointSlug:  textOrEmpty(r.EndpointSlug),
 	}
+}
+
+// textOrEmpty unwraps a pgtype.Text into a plain string, treating
+// NULL as "". Used by the assetView extractors for the
+// LEFT-JOIN-nullable endpoint_slug column.
+func textOrEmpty(t pgtype.Text) string {
+	if !t.Valid {
+		return ""
+	}
+	return t.String
 }
 
 // assetRowToStruct synthesizes a single row's worth of data from

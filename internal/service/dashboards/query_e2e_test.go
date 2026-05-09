@@ -17,13 +17,17 @@ package dashboards_test
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
+	db "github.com/dashkan/pivox/internal/db/generated"
 	apiv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/api/v1"
 	assetsv1 "github.com/dashkan/pivox/internal/pkg/gen/pivox/assets/v1"
 	"github.com/dashkan/pivox/internal/service/assets"
@@ -304,4 +308,132 @@ func TestE2E_QueryDashboardData_MissingQuery_InvalidArgument(t *testing.T) {
 		Parent: "organizations/" + fx.owner.Slug,
 	})
 	requireGRPCCode(t, err, codes.InvalidArgument)
+}
+
+// ============================================================================
+// sqlc query shape (Phase 6c)
+// ============================================================================
+
+// TestE2E_ListAssetsByOrg_PopulatesVersionAndEndpointColumns pins the
+// shape of ListAssetsByOrg's row after the Phase 6c LATERAL latest-
+// version + storage_endpoints LEFT JOIN. The synthesizer's URL
+// composer (lands in 6c.2) reads `LatestVersionNumber`,
+// `LatestVersionMimeType`, and `EndpointSlug` from this row; this test
+// verifies they're populated correctly across the three relevant
+// branches:
+//
+//   - asset with v1 + endpoint  → all three populated.
+//   - asset with v1, no endpoint → version columns populated,
+//     EndpointSlug pgtype.Text Valid=false.
+//   - asset with no version yet  → COALESCE sentinels (0, "") on the
+//     version columns; EndpointSlug Valid=true if endpoint is bound.
+//
+// Why the COALESCE sentinels rather than pgtype.Int4 / pgtype.Text:
+// sqlc v1.31 mistypes LEFT-JOIN-derived nullable columns as NOT NULL
+// (see internal/db/queries/assets.sql for details). The sentinels
+// (0 for version_number, "" for mime_type) are the workaround the
+// synthesizer's composer reads as "no version exists."
+func TestE2E_ListAssetsByOrg_PopulatesVersionAndEndpointColumns(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	h := newQueryHarness(t)
+	fx := seedQueryFixture(t, h, "qd-row-shape")
+	ctx := context.Background()
+
+	// Seed a gateway + endpoint for the "with endpoint" cases.
+	gwID := uuid.New()
+	endpointID := uuid.New()
+	const endpointSlug = "primary"
+	_, err := h.Pool.Exec(ctx, `
+		INSERT INTO storage_gateways (id, org_id, name, display_name, registration_token, hostname, state)
+		VALUES ($1, $2, 'gw-test', 'Test Gateway', 'tok-test', 'gw-test.storage.pivox.app', 'ACTIVE')`,
+		gwID, fx.owner.Row.ID,
+	)
+	require.NoError(t, err)
+	_, err = h.Pool.Exec(ctx, `
+		INSERT INTO storage_endpoints (id, gateway_id, name, display_name, configuration, cache_enabled, cache_max_size_gb, cache_eviction)
+		VALUES ($1, $2, $3, 'Primary', '{"type":"s3"}'::jsonb, false, 0, 'LRU')`,
+		endpointID, gwID, endpointSlug,
+	)
+	require.NoError(t, err)
+
+	parent := "organizations/" + fx.owner.Slug + "/spaces/" + fx.alphaSpace.Slug
+
+	// Case A: asset + v1 + endpoint → all three populated.
+	withEndpointName := createPlaceholderAsset(t, h.Conn(), parent, "Asset With Endpoint")
+	withEndpointSlug := withEndpointName[strings.LastIndex(withEndpointName, "/")+1:]
+	var withEndpointID uuid.UUID
+	require.NoError(t, h.Pool.QueryRow(ctx, `
+		UPDATE assets
+		   SET endpoint_id = $1, media_type = 'IMAGE'::asset_media_type, content_type = 'image/png', state = 'ACTIVE'
+		 WHERE space_id = $2 AND name = $3 RETURNING id`,
+		endpointID, fx.alphaSpace.Row.ID, withEndpointSlug,
+	).Scan(&withEndpointID))
+	_, err = h.Pool.Exec(ctx, `
+		INSERT INTO asset_versions (asset_id, version_number, mime_type, storage_key, size_bytes)
+		VALUES ($1, 1, 'image/png', 'meridian-broad/alpha/assets/x/v1/original.png', 0)`,
+		withEndpointID,
+	)
+	require.NoError(t, err)
+
+	// Case B: asset + v1 + NO endpoint → EndpointSlug Valid=false.
+	noEndpointName := createPlaceholderAsset(t, h.Conn(), parent, "Asset No Endpoint")
+	noEndpointSlug := noEndpointName[strings.LastIndex(noEndpointName, "/")+1:]
+	var noEndpointID uuid.UUID
+	require.NoError(t, h.Pool.QueryRow(ctx, `
+		UPDATE assets
+		   SET media_type = 'IMAGE'::asset_media_type, content_type = 'image/jpeg', state = 'ACTIVE'
+		 WHERE space_id = $1 AND name = $2 RETURNING id`,
+		fx.alphaSpace.Row.ID, noEndpointSlug,
+	).Scan(&noEndpointID))
+	_, err = h.Pool.Exec(ctx, `
+		INSERT INTO asset_versions (asset_id, version_number, mime_type, storage_key, size_bytes)
+		VALUES ($1, 1, 'image/jpeg', 'meridian-broad/alpha/assets/y/v1/original.jpg', 0)`,
+		noEndpointID,
+	)
+	require.NoError(t, err)
+
+	// Case C: asset PLACEHOLDER, no v1 row → version sentinels (0, "").
+	noVersionName := createPlaceholderAsset(t, h.Conn(), parent, "Asset No Version")
+	noVersionSlug := noVersionName[strings.LastIndex(noVersionName, "/")+1:]
+	var noVersionID uuid.UUID
+	require.NoError(t, h.Pool.QueryRow(ctx, `
+		UPDATE assets SET endpoint_id = $1 WHERE space_id = $2 AND name = $3 RETURNING id`,
+		endpointID, fx.alphaSpace.Row.ID, noVersionSlug,
+	).Scan(&noVersionID))
+
+	rows, err := h.Queries.ListAssetsByOrg(ctx, db.ListAssetsByOrgParams{
+		OrgID:  fx.owner.Row.ID,
+		Limit:  100,
+		Offset: 0,
+	})
+	require.NoError(t, err)
+
+	byID := map[uuid.UUID]db.ListAssetsByOrgRow{}
+	for _, r := range rows {
+		byID[r.Asset.ID] = r
+	}
+
+	// Case A.
+	rA, ok := byID[withEndpointID]
+	require.True(t, ok, "Case A asset must surface in ListAssetsByOrg")
+	assert.Equal(t, int32(1), rA.LatestVersionNumber, "Case A: version_number from latest asset_versions row")
+	assert.Equal(t, "image/png", rA.LatestVersionMimeType, "Case A: mime_type from latest version")
+	assert.Equal(t, pgtype.Text{String: endpointSlug, Valid: true}, rA.EndpointSlug, "Case A: endpoint_slug populated via JOIN")
+
+	// Case B.
+	rB, ok := byID[noEndpointID]
+	require.True(t, ok)
+	assert.Equal(t, int32(1), rB.LatestVersionNumber)
+	assert.Equal(t, "image/jpeg", rB.LatestVersionMimeType)
+	assert.False(t, rB.EndpointSlug.Valid, "Case B: endpoint_slug NULL when assets.endpoint_id is NULL")
+
+	// Case C.
+	rC, ok := byID[noVersionID]
+	require.True(t, ok)
+	assert.Equal(t, int32(0), rC.LatestVersionNumber, "Case C: COALESCE sentinel 0 when no asset_versions row exists")
+	assert.Equal(t, "", rC.LatestVersionMimeType, "Case C: COALESCE sentinel '' when no asset_versions row exists")
+	assert.True(t, rC.EndpointSlug.Valid, "Case C: endpoint_slug populated even with no version (independent JOIN)")
 }
