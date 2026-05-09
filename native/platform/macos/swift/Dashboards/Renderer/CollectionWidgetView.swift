@@ -73,6 +73,14 @@ struct CollectionWidgetView: View {
                 content
             }
         }
+        // Fill the available vertical space so tableMode's
+        // maxHeight: .infinity can actually claim the viewport.
+        // Without this, the body VStack is intrinsically sized
+        // and tableMode's flex request never propagates — the
+        // table collapses to its content height with empty space
+        // sitting awkwardly above (mainDetail's ZStack centers
+        // intrinsic-sized content by default).
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder
@@ -110,13 +118,26 @@ struct CollectionWidgetView: View {
                 }
             }
         }
+        // Fill the available vertical space so the ScrollView
+        // expands to the bottom of the viewport rather than
+        // shrinking to its content's intrinsic height. Without
+        // this, a short row set sits in the middle of the page
+        // and the table looks "floating" (issue surfaced in
+        // Phase 7 smoke).
+        .frame(maxHeight: .infinity)
     }
 
     @ViewBuilder
     private var tableHeader: some View {
         HStack(spacing: 12) {
-            // Empty leader column for the leading icon.
-            Color.clear.frame(width: 36)
+            // Empty leader column matching the icon column in tableRow.
+            // `Color` is a fill-available-space view in SwiftUI, so a
+            // bare `.frame(width: 36)` only bounds the width — height
+            // remains unconstrained, and the HStack stretches
+            // vertically inside any flex-height parent (which is
+            // exactly what the table now is). Bound height to a
+            // single point so the HStack sizes to its Text siblings.
+            Color.clear.frame(width: 36, height: 1)
             ForEach(visibleColumns, id: \.field) { column in
                 Text(columnHeader(column))
                     .font(.caption.weight(.semibold))
@@ -199,6 +220,12 @@ struct CollectionWidgetView: View {
             }
         }
         .pickerStyle(.segmented)
+        // .labelsHidden() drops the visual "Display mode" label
+        // (which macOS would otherwise render to the left of the
+        // segmented control and wrap to two lines under our
+        // narrow .frame(maxWidth: 120)). The label string stays
+        // attached for VoiceOver — it's hidden, not unset.
+        .labelsHidden()
         .frame(maxWidth: 120)
         .frame(maxWidth: .infinity, alignment: .trailing)
     }

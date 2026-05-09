@@ -112,6 +112,13 @@ struct DashboardView: View {
                 }
             }
         }
+        // Anchor to top-leading of the parent (mainDetail's ZStack
+        // has default .center alignment, which would vertically
+        // center an intrinsically-sized dashboardBody and produce
+        // the floating-table-header look). Filling both axes lets
+        // CollectionWidgetView's ScrollView claim the remaining
+        // height so the table fills the viewport.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     @ViewBuilder
