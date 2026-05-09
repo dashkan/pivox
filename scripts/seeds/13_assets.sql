@@ -29,6 +29,11 @@
 -- it and the column allows ''. When 6c seeds rustfs object keys,
 -- checksums become load-bearing for the gateway URL contract.
 
+-- created_by/updated_by intentionally NULL — smoke-fixture only;
+-- not pinned to an identity to avoid coupling the seed to a
+-- specific dev account. The Library renderer doesn't surface
+-- audit fields today; if a future column config does, replace
+-- with a real identity reference.
 INSERT INTO assets (
     id, space_id, endpoint_id, name, display_name, filename,
     media_type, content_type, size_bytes, state,

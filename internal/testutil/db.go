@@ -170,9 +170,14 @@ func initTemplateDB() {
 
 	// pgvector.Vector (non-pointer) panics on NULL — set a 768-dim
 	// zero default so the embedding column never returns NULL via
-	// pgx's row scanner. Production migrations don't do this; it's
-	// a test-side convenience for code that doesn't always supply
-	// embeddings.
+	// pgx's row scanner. As of init migration commit 4f25277, the
+	// production schema carries the same NOT NULL DEFAULT
+	// zero-vector at line ~1112 of 000001_init.up.sql, so this
+	// ALTER is now redundant — the test-vs-prod schema divergence
+	// it was compensating for is closed. Kept here until the
+	// follow-up cleanup formally removes it; safe because it
+	// re-applies an identical DEFAULT to what migrations already
+	// set.
 	if _, err := migPool.Exec(ctx, `ALTER TABLE assets ALTER COLUMN embedding SET DEFAULT (array_fill(0, ARRAY[768])::vector)`); err != nil {
 		templateInitErr = fmt.Errorf("set embedding default: %w", err)
 		return
