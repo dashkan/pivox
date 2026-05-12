@@ -8,7 +8,7 @@ This document defines how Pivox stores, accesses, and distributes media assets (
 
 1. **Cookie-based auth for reads, presigned URLs for uploads.** Asset reads go through Storage Gateways with session cookie auth — stable URLs enable CDN-style caching. Uploads use S3 presigned URLs for direct-to-storage writes. No component except the Cloud Controller holds long-lived storage credentials.
 
-2. **Project-scoped storage.** Every asset belongs to a project (org + workspace). Storage paths are partitioned by project. No cross-project access without explicit sharing.
+2. **Space-scoped storage.** Every asset belongs to a space (an org's isolated workspace). Storage paths are partitioned by `{org-slug}/{space-slug}/` and enforced at the gateway via session-pattern matching (#83). No cross-space access without explicit sharing.
 
 3. **Storage Gateways for on-prem.** A lightweight agent binary that acts as an S3 reverse proxy + cache. Installed by running a single script, scaled by running the same script on additional servers. Managed entirely from the Pivox Cloud UI — no manual YAML config, no credential distribution. Browsers and Electron hit the gateway directly on the LAN for fast, local asset access.
 
@@ -222,8 +222,6 @@ Endpoint: "primary"
       secret_access_key: (set via UI, never exposed in API responses)
 ```
 
-S3 endpoints require bucket versioning to be enabled. The agent verifies this during endpoint creation and fails with a clear error if versioning is not enabled.
-
 **Filesystem endpoint:**
 ```
 Endpoint: "nfs-media"
@@ -234,12 +232,9 @@ Endpoint: "nfs-media"
 
 Filesystem endpoints use a local or network-mounted path (NFS, CIFS, etc.). The path must be mounted on all agents in the gateway pool before adding the endpoint. During creation, the agent writes a marker file (`.pivox-endpoint-id`) and all other agents verify they can read it — confirming shared access to the same filesystem.
 
-Assets on filesystem endpoints are stored as immutable versioned files:
-```
-{path}/{org_id}/{project_id}/assets/{asset_id}/v1.ext
-```
-
 No credentials are needed — the agent accesses files using the `pivox` system user's permissions on the mount.
+
+See [Storage Key Format](#storage-key-format) below for the path layout used by both S3 and filesystem endpoints.
 
 The Cloud Controller pushes endpoint configuration to all connected agents via the bidi stream. Agents begin proxying and caching requests immediately.
 
@@ -387,7 +382,7 @@ Pivox supports two storage backend types:
 
 | Type | Examples | Notes |
 |---|---|---|
-| **S3-compatible** | AWS S3, rustfs, GCS (S3-compat mode) | Object storage with bucket versioning. Credentials managed via API. |
+| **S3-compatible** | AWS S3, rustfs, GCS (S3-compat mode) | Object storage. Credentials managed via API. |
 | **Filesystem** | NFS, CIFS, local disk | Mounted path on the agent server. No credentials — uses OS file permissions. |
 
 | Deployment | Typical Setup | Notes |
@@ -398,72 +393,24 @@ Pivox supports two storage backend types:
 
 The Storage Gateway proxies to either backend type transparently. Assets are immutable — each version is a new object (S3) or file (filesystem).
 
-### Bucket Layout — Project-Scoped
+### Storage Key Format
 
-Storage is partitioned by project. A project is scoped to an org and represents an isolated workspace (a show, a facility, a department).
+The canonical asset path layout is documented in
+[docs/assets.md § Storage Key Format](assets.md#storage-key-format).
+It applies to both S3 and filesystem endpoints — the path layout is
+backend-agnostic.
 
-```
-pivox-storage-{region}/
-  ├── {org_id}/
-  │    ├── {project_id}/
-  │    │    ├── templates/
-  │    │    │    ├── {template_id}/{version}/
-  │    │    │    │    ├── index.html
-  │    │    │    │    ├── style.css
-  │    │    │    │    ├── animation.js
-  │    │    │    │    └── assets/
-  │    │    │    └── ...
-  │    │    ├── media/
-  │    │    │    ├── images/{asset_id}.png
-  │    │    │    ├── video/{asset_id}.mxf
-  │    │    │    ├── audio/{asset_id}.wav
-  │    │    │    └── fonts/{asset_id}.woff2
-  │    │    ├── recordings/
-  │    │    │    ├── {channel_id}/{date}/{recording_id}.mp4
-  │    │    │    └── ...
-  │    │    └── exports/
-  │    │         └── ...
-  │    │
-  │    ├── {project_id_2}/
-  │    │    └── ...
-  │    │
-  │    └── _shared/                    # org-wide shared assets
-  │         ├── brand/                 # logos, fonts, brand kits
-  │         ├── templates/             # org-wide template library
-  │         └── media/                 # shared media library
-  │
-  └── {org_id_2}/
-       └── ...
-```
+Briefly: every asset version's source + renditions live under
+`{org-slug}/{space-slug}/assets/{asset_id}/v{n}/`. The
+`{org-slug}/{space-slug}/` prefix is structurally required by the
+session-pattern security model (#83) — a `storage_key` that doesn't
+start with this prefix is unauthorizable under any session grant
+because the storage gateway is a stateless proxy with no DB access
+and per-space access is enforced exclusively by URL-path glob
+matching against patterns of shape `/{endpoint}/{org}/{space}/*`.
 
-**Isolation guarantees:**
-- Presigned URLs are scoped to a specific object path — a URL for `org_a/project_1/media/image.png` cannot access `org_b/` or even `org_a/project_2/`
-- The backing IAM policy (cloud) or bucket policy (on-prem) enforces org-level isolation as a second layer
-- The Cloud Controller validates project membership before signing any URL
-
-### Asset Metadata
-
-Asset metadata lives in PostgreSQL in Pivox Cloud, not in S3. The database record maps an asset ID to its storage location:
-
-```
-asset {
-  id:              uuid
-  org_id:          uuid
-  project_id:      uuid
-  name:            "logo-cnn-hd"
-  type:            "image"
-  mime_type:       "image/png"
-  size_bytes:      245760
-  storage_path:    "org_abc/proj_123/media/images/abc123.png"
-  checksum_sha256: "e3b0c44298fc..."
-  created_at:      timestamp
-  updated_at:      timestamp
-  uploaded_by:     uuid
-  tags:            ["brand", "logo"]
-}
-```
-
-Storage paths are server-generated. Users never see or control physical storage paths.
+Storage paths are server-generated. Users never see or control
+physical storage paths.
 
 ---
 
@@ -546,12 +493,13 @@ Asset uploads use presigned PUT URLs. The client uploads directly to storage.
 
 ```
 1. Client: InitiateUpload RPC
-   { "name": "interview-bg.png", "type": "image", "project_id": "..." }
+   { "name": "interview-bg.png", "type": "image",
+     "parent": "organizations/{org}/spaces/{space}" }
 
 2. Cloud Controller:
    a. Validates permissions
    b. Creates asset record in DB (state: PENDING_UPLOAD)
-   c. Generates storage path: org_abc/proj_123/media/images/{id}.png
+   c. Generates storage path: {org-slug}/{space-slug}/assets/{id}/v1/original.png
    d. Signs presigned PUT URL
    e. Returns: { "asset_id": "...", "upload_url": "https://...", "expires_at": "..." }
 
@@ -611,7 +559,7 @@ Each agent in the gateway pool maintains a local disk cache. Cache configuration
 
 | Aspect | Behavior |
 |---|---|
-| **Cache key** | Storage path (org/project/type/file) — ignoring query parameters |
+| **Cache key** | Storage path (`{org-slug}/{space-slug}/assets/{id}/v{n}/<file>`) — ignoring query parameters |
 | **Eviction** | LRU/LFU with configurable disk budget |
 | **Integrity** | SHA-256 checksum verified on cache write and periodic read-back |
 | **Warm-up** | Asset cache manager pre-warms by pre-fetching look-ahead assets |
@@ -680,35 +628,34 @@ SDK (in engine): looks up asset in local manifest
 | Asset Type | Where Stored | Resolution |
 |---|---|---|
 | **Bundled** (in template directory) | Template's own `assets/` folder | Relative path — `./assets/background.png`. Local SSD. |
-| **External** (shared across templates) | Project storage | `pivox.assets.resolve('asset-id')` → SSD or gateway URL |
-| **Org-shared** (brand assets) | Org `_shared/` storage | `pivox.assets.resolve('org:brand-logo')` → SSD or gateway URL |
+| **External** (shared across templates) | Space storage | `pivox.assets.resolve('asset-id')` → SSD or gateway URL |
+| **Org-shared** (brand assets) | Org-shared storage (mechanism TBD; sharing layer is forward-looking) | `pivox.assets.resolve('org:brand-logo')` → SSD or gateway URL |
 
 ---
 
-## Project-Level Storage
+## Space-Level Storage
 
-### What Is a Project
+### What Is a Space
 
-A project is the primary organizational unit for storage:
+A space is the primary organizational unit for storage within an org:
 
-| Example | Project | Contents |
+| Example | Space | Contents |
 |---|---|---|
 | Newsroom | "Evening News" | Show templates, rundowns, recorded clips |
 | Sports | "NFL Sunday" | Sports templates, team logos, score feeds |
 | Elections | "Election Night 2026" | Election templates, candidate photos |
 | Facility-wide | "Shared Assets" | Common lower-thirds, bugs, brand packages |
 
-Projects are created by org admins. Every asset upload targets a specific project. Users see only the projects they have access to.
+Spaces are created by org admins. Every asset upload targets a specific space. Users see only the spaces they have access to (membership in `space_members` or org-wide grant).
 
 ### Storage Quotas
 
-Storage quotas are enforced at the project level:
+Storage quotas are enforced at the space level:
 
 ```yaml
-project:
-  id: "proj_123"
-  name: "Evening News"
-  org_id: "org_abc"
+space:
+  name: "organizations/{org}/spaces/evening-news"
+  display_name: "Evening News"
   storage:
     quota_gb: 500
     used_gb: 123.4
@@ -717,23 +664,23 @@ project:
     alert_threshold_pct: 80
 ```
 
-The Cloud Controller enforces quotas before signing upload URLs. Over-quota projects get a clear error.
+The Cloud Controller enforces quotas before signing upload URLs. Over-quota spaces get a clear error.
 
-### Cross-Project Asset Sharing
+### Cross-Space Asset Sharing
 
-Assets can be shared across projects within the same org without duplication:
+Assets can be shared across spaces within the same org without duplication:
 
 ```
 POST /api/v1/assets/{asset_id}/share
 {
-  "target_project_id": "proj_456",
+  "target_space": "organizations/{org}/spaces/{space}",
   "permission": "read"
 }
 ```
 
-This creates a reference — not a copy. The asset lives in its original project's storage. If the source asset is deleted, the reference breaks (referential integrity check warns before deletion).
+This creates a reference — not a copy. The asset lives in its original space's storage. If the source asset is deleted, the reference breaks (referential integrity check warns before deletion).
 
-Org-level shared assets (in `_shared/`) are readable by all projects in the org without explicit sharing.
+Org-level shared assets are readable by every space in the org without explicit sharing (mechanism TBD — sharing layer is forward-looking, not part of the 6c shipped surface).
 
 ---
 
@@ -743,7 +690,7 @@ Org-level shared assets (in `_shared/`) are readable by all projects in the org 
 
 | Layer | Enforcement |
 |---|---|
-| **API** | Firebase ID token + RBAC. User must have read/write permission for the target project. |
+| **API** | Firebase ID token + RBAC. User must have read/write permission for the target space. |
 | **Storage session** | Cookie-based JWT (HS256). Opaque token maps to path-scoped access patterns on the gateway. Revocable instantly via bidi. |
 | **Gateway (reads)** | Validates session cookie, glob-matches request path against authorized patterns. |
 | **Gateway (uploads)** | Validates presigned URL signature (for S3) or signed upload token (for filesystem). |
@@ -768,7 +715,7 @@ Storage sessions and agent messages are audited:
 
 - **Session creation** — logged when `CreateStorageSession` is called (user, org, access patterns granted)
 - **Agent bidi messages** — handshake, config updates, drain/upgrade commands, endpoint health logged to `storage_agent_audit` table (heartbeats and telemetry included, secrets redacted)
-- **Upload presigned URLs** — logged when generated (user, org, project, asset, operation, TTL)
+- **Upload presigned URLs** — logged when generated (user, org, space, asset, operation, TTL)
 
 ### Encryption
 

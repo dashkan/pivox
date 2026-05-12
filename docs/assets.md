@@ -2,7 +2,7 @@
 
 ## Overview
 
-The asset system manages media files (images, video, audio, documents) throughout their lifecycle — from upload and ingestion through versioning, search, and retention. Assets are project-scoped and stored on Storage Endpoints managed by Storage Gateways.
+The asset system manages media files (images, video, audio, documents) throughout their lifecycle — from upload and ingestion through versioning, search, and retention. Assets are space-scoped (an org's isolated workspace) and stored on Storage Endpoints managed by Storage Gateways.
 
 **Key design decisions:**
 
@@ -10,7 +10,7 @@ The asset system manages media files (images, video, audio, documents) throughou
 
 2. **Versions are ops chains, not duplicate blobs.** Upload versions store files. Edit versions store a crop operation + pointer to the source version. The gateway renders edits on demand from the source blob + ops chain. No duplicate storage for edits.
 
-3. **Immutable storage keys.** Each version has a unique storage key: `assets/{id}/v{n}/original.ext`. Eliminates cache invalidation — the URL changes when the content changes.
+3. **Immutable storage keys.** Each version has a unique storage key: `{org-slug}/{space-slug}/assets/{id}/v{n}/original.ext` (full layout below). Eliminates cache invalidation — the URL changes when the content changes.
 
 4. **Tag-based auto-categorization.** The ingestion pipeline extracts metadata and generates tags automatically. Tags have an `origin` field (USER, SYSTEM, AI) so re-ingestion can replace auto-generated tags without touching user-applied tags.
 
@@ -129,7 +129,7 @@ v4: rotation(90) + flip_horizontal → source: v3
 v5: revert → source: v1
 ```
 
-- Upload versions store files at `assets/{id}/v{n}/original.ext`
+- Upload versions store files at `{org-slug}/{space-slug}/assets/{id}/v{n}/original.ext` (see [Storage Key Format](#storage-key-format) below)
 - Edit versions store no files — the gateway renders from source blob + ops
 - Revert creates a new version number pointing to the old source
 - The UI walks the chain to find the original upload and replays edits client-side
@@ -388,7 +388,7 @@ Renditions (thumbnails, proxies, previews) are generated **on agents**, not the 
 1. User uploads file to agent (presigned URL or gateway PUT)
 2. Server sends `GenerateRenditions` command to agent via bidi
 3. Agent generates renditions locally (has direct storage access)
-4. Agent writes renditions to storage: `assets/{id}/v{n}/thumb_sm.jpg`, etc.
+4. Agent writes renditions to storage at the layout below (`{org-slug}/{space-slug}/assets/{id}/v{n}/thumb_sm.webp`, etc.)
 5. Agent reports `RenditionsComplete` with rendition metadata
 6. Server updates `asset_renditions` table
 
