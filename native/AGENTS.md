@@ -224,6 +224,89 @@ folder — non-CMake-managed dylibs there are cruft and can be deleted;
   Treat SwiftUI like JSX — fast for declarative composition, weak
   under heavy real-time updates.
 
+## Storage URL composition
+
+Storage URLs for `/files/`-prefixed asset reads are composed
+server-side by the dashboards synthesizer
+(`internal/service/dashboards/query.go`'s `composeStorageURL`) and
+emitted into the dashboard JSON. The native side does NOT compose
+URLs — it fetches the URL the server already supplied.
+
+Locked URL shape:
+
+```
+https://{gw.hostname}/files/{ep}/{org-slug}/{space-slug}/assets/{id}/v{n}/<file>
+```
+
+| Segment | Source |
+|---|---|
+| `gw.hostname` | `storage_gateways.hostname` (server-side; per-gateway data) |
+| `/files/` | Permanent prefix. Nginx routes to the agent in dev; gateway edge proxy routes in prod. Agent strips via `http.StripPrefix("/files")` before its path parser sees the request. |
+| `{ep}` | `storage_endpoints.name` for the endpoint the asset is bound to. |
+| `{org-slug}/{space-slug}/` | Structurally required by the session-pattern security model (#83) — agent enforces per-space access via URL-path glob matching. |
+| `assets/{id}/v{n}/<file>` | Per `docs/assets.md` Storage Key Format. `<file>` is `original.{ext}`, `thumb_{sm,md,lg}.webp`, `proxy.{ext}`, `preview.webp`, or `poster.jpg`. |
+
+When 6c.4's `AuthenticatedAsyncImage` fetches such a URL, it
+attaches `Authorization: Bearer <jwt>` where the JWT is minted by
+`Core/Storage/StorageService` (see below).
+
+## Core/Storage and Core/Foundation conventions
+
+`Core/Storage/` and `Core/Foundation/` together implement the
+bearer-attached-fetch surface that any feature (Dashboards today,
+ImageEditor / future Studio features tomorrow) consumes to read
+storage-agent-served assets. Layer rule applies in full: features
+depend on Core; Core does not depend on features.
+
+**`Core/Storage/StorageService`** — bearer-token authority for
+`*.storage.*` gateways. App-lifetime singleton, `@MainActor`-isolated.
+
+- `token(forOrg:)` — lazy mint per `(userID, orgID)` cache key.
+  Cache key includes user identity, NOT just org, so a fast
+  user-switch never lets user B inherit user A's token.
+- `invalidate(forOrg:)` — drops the cached entry for the current
+  user + supplied org. Called by `AuthenticatedAsyncImage` on a
+  401 response to force a re-mint on retry.
+- `reset()` — drops every cached session + tears down the gRPC
+  channel. Wired to `.userDidSignOut` notification in `init`.
+- Production `init()` wires `AuthService.shared.currentUser?.uid`
+  as the user-identity provider; a test `init(userIDProvider:,
+  stubMint:)` injects stubs.
+
+**`Core/Foundation/AuthenticatedAsyncImage`** — drop-in conceptual
+replacement for `AsyncImage` that attaches `Authorization: Bearer
+<jwt>` per request.
+
+- Takes `tokenProvider: (String) async throws -> String` and
+  `invalidateToken: (String) async -> Void` closures at init.
+- Does NOT import `StorageService`. Wiring at the use site
+  (`DashboardView` today) decides which service implements the
+  closures. **This is the layer-rule contract** — features that
+  use AuthenticatedAsyncImage pass their own closures in, so the
+  primitive stays consumable from any feature without coupling
+  Core to one.
+- Single-retry-on-401 contract: first 401 → invalidate + re-mint +
+  retry; second 401 → `.unauthorized` (no third fetch). The
+  testable load-state owner `AuthenticatedImageLoader` is extracted
+  from the View so behavioral coverage targets the loader, not the
+  SwiftUI render path. SwiftUI's `.task(id: url)` cancels the
+  in-flight load on URL change; the loader guards every phase
+  assignment with `Task.isCancelled` so URL-A's late-completing
+  fetch can't paint into URL-B's row under scroll recycling.
+
+**`Core/Foundation/AuthenticatedFetcher`** — the URL-task layer
+under AuthenticatedAsyncImage.
+
+- Protocol so view tests can stub. Production wires
+  `URLSessionAuthenticatedFetcher` (default `URLSession.shared` —
+  no custom session for this view; per-request `Authorization`
+  header, not per-session).
+- Maps HTTP outcomes into three categorical signals: 2xx +
+  decodable → `.ok(NSImage)`, 401 → `.unauthorized`, anything
+  else (non-401 4xx/5xx, network error, non-decodable bytes) →
+  `.failed`. The loader's state machine branches on the outcome
+  without re-parsing HTTP.
+
 ## Generated proto
 
 Every backend proto change requires `make proto-generate-native` from

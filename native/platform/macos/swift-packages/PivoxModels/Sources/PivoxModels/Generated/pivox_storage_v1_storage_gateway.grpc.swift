@@ -434,13 +434,38 @@ extension Pivox_Storage_V1_StorageGateways {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Creates a storage session for the authenticated user. Computes
-        /// > access patterns based on the user's org and space memberships,
-        /// > pushes session grants to connected gateways, and returns a JWT
-        /// > cookie for browser-based storage access.
+        /// > Creates a storage session for the authenticated user, scoped to
+        /// > a single organization. The handler computes access patterns from
+        /// > the caller's space memberships within `parent`, pushes the
+        /// > SessionGrant to gateways belonging to that organization, and
+        /// > returns both a Set-Cookie JWT (browser flow) and the JWT in the
+        /// > response body (native-client flow, attached as
+        /// > `Authorization: Bearer`).
         /// > 
-        /// > The response includes a Set-Cookie header (via gRPC metadata) with
-        /// > the session JWT scoped to .pivox.app domain.
+        /// > The session is per-(user, org) — a leaked token grants ONE
+        /// > organization, never the caller's full org graph.
+        /// > 
+        /// > Security boundary: the RPC is `exempt = true`, so no per-RPC
+        /// > permission check runs; the membership interceptor enforces only
+        /// > that the caller has at least one org membership. The "caller is
+        /// > in `parent` specifically" check lives INSIDE the handler — if
+        /// > the caller is not a member of `parent`, the handler returns
+        /// > PermissionDenied. The pattern set is therefore the substantive
+        /// > security boundary: a non-member sees no patterns and is rejected
+        /// > before any token mints. Adding `storage.session.create` would be
+        /// > ceremony — the membership-derived pattern computation is the
+        /// > real check.
+        /// > 
+        /// > (-- api-linter: core::0133::http-body=disabled
+        /// >     aip.dev/not-precedent: A storage session is an ephemeral
+        /// >     credential, not an AIP-style resource. The custom-action
+        /// >     framing fits better than AIP-133 Create. --)
+        /// > (-- api-linter: core::0133::request-unknown-fields=disabled
+        /// >     aip.dev/not-precedent: see above. --)
+        /// > (-- api-linter: core::0133::request-resource-field=disabled
+        /// >     aip.dev/not-precedent: see above. --)
+        /// > (-- api-linter: core::0133::response-message-name=disabled
+        /// >     aip.dev/not-precedent: see above. --)
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Pivox_Storage_V1_CreateStorageSessionRequest` message.
@@ -814,13 +839,38 @@ extension Pivox_Storage_V1_StorageGateways {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Creates a storage session for the authenticated user. Computes
-        /// > access patterns based on the user's org and space memberships,
-        /// > pushes session grants to connected gateways, and returns a JWT
-        /// > cookie for browser-based storage access.
+        /// > Creates a storage session for the authenticated user, scoped to
+        /// > a single organization. The handler computes access patterns from
+        /// > the caller's space memberships within `parent`, pushes the
+        /// > SessionGrant to gateways belonging to that organization, and
+        /// > returns both a Set-Cookie JWT (browser flow) and the JWT in the
+        /// > response body (native-client flow, attached as
+        /// > `Authorization: Bearer`).
         /// > 
-        /// > The response includes a Set-Cookie header (via gRPC metadata) with
-        /// > the session JWT scoped to .pivox.app domain.
+        /// > The session is per-(user, org) — a leaked token grants ONE
+        /// > organization, never the caller's full org graph.
+        /// > 
+        /// > Security boundary: the RPC is `exempt = true`, so no per-RPC
+        /// > permission check runs; the membership interceptor enforces only
+        /// > that the caller has at least one org membership. The "caller is
+        /// > in `parent` specifically" check lives INSIDE the handler — if
+        /// > the caller is not a member of `parent`, the handler returns
+        /// > PermissionDenied. The pattern set is therefore the substantive
+        /// > security boundary: a non-member sees no patterns and is rejected
+        /// > before any token mints. Adding `storage.session.create` would be
+        /// > ceremony — the membership-derived pattern computation is the
+        /// > real check.
+        /// > 
+        /// > (-- api-linter: core::0133::http-body=disabled
+        /// >     aip.dev/not-precedent: A storage session is an ephemeral
+        /// >     credential, not an AIP-style resource. The custom-action
+        /// >     framing fits better than AIP-133 Create. --)
+        /// > (-- api-linter: core::0133::request-unknown-fields=disabled
+        /// >     aip.dev/not-precedent: see above. --)
+        /// > (-- api-linter: core::0133::request-resource-field=disabled
+        /// >     aip.dev/not-precedent: see above. --)
+        /// > (-- api-linter: core::0133::response-message-name=disabled
+        /// >     aip.dev/not-precedent: see above. --)
         ///
         /// - Parameters:
         ///   - request: A request containing a single `Pivox_Storage_V1_CreateStorageSessionRequest` message.
@@ -1144,13 +1194,38 @@ extension Pivox_Storage_V1_StorageGateways.ClientProtocol {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Creates a storage session for the authenticated user. Computes
-    /// > access patterns based on the user's org and space memberships,
-    /// > pushes session grants to connected gateways, and returns a JWT
-    /// > cookie for browser-based storage access.
+    /// > Creates a storage session for the authenticated user, scoped to
+    /// > a single organization. The handler computes access patterns from
+    /// > the caller's space memberships within `parent`, pushes the
+    /// > SessionGrant to gateways belonging to that organization, and
+    /// > returns both a Set-Cookie JWT (browser flow) and the JWT in the
+    /// > response body (native-client flow, attached as
+    /// > `Authorization: Bearer`).
     /// > 
-    /// > The response includes a Set-Cookie header (via gRPC metadata) with
-    /// > the session JWT scoped to .pivox.app domain.
+    /// > The session is per-(user, org) — a leaked token grants ONE
+    /// > organization, never the caller's full org graph.
+    /// > 
+    /// > Security boundary: the RPC is `exempt = true`, so no per-RPC
+    /// > permission check runs; the membership interceptor enforces only
+    /// > that the caller has at least one org membership. The "caller is
+    /// > in `parent` specifically" check lives INSIDE the handler — if
+    /// > the caller is not a member of `parent`, the handler returns
+    /// > PermissionDenied. The pattern set is therefore the substantive
+    /// > security boundary: a non-member sees no patterns and is rejected
+    /// > before any token mints. Adding `storage.session.create` would be
+    /// > ceremony — the membership-derived pattern computation is the
+    /// > real check.
+    /// > 
+    /// > (-- api-linter: core::0133::http-body=disabled
+    /// >     aip.dev/not-precedent: A storage session is an ephemeral
+    /// >     credential, not an AIP-style resource. The custom-action
+    /// >     framing fits better than AIP-133 Create. --)
+    /// > (-- api-linter: core::0133::request-unknown-fields=disabled
+    /// >     aip.dev/not-precedent: see above. --)
+    /// > (-- api-linter: core::0133::request-resource-field=disabled
+    /// >     aip.dev/not-precedent: see above. --)
+    /// > (-- api-linter: core::0133::response-message-name=disabled
+    /// >     aip.dev/not-precedent: see above. --)
     ///
     /// - Parameters:
     ///   - request: A request containing a single `Pivox_Storage_V1_CreateStorageSessionRequest` message.
@@ -1504,13 +1579,38 @@ extension Pivox_Storage_V1_StorageGateways.ClientProtocol {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Creates a storage session for the authenticated user. Computes
-    /// > access patterns based on the user's org and space memberships,
-    /// > pushes session grants to connected gateways, and returns a JWT
-    /// > cookie for browser-based storage access.
+    /// > Creates a storage session for the authenticated user, scoped to
+    /// > a single organization. The handler computes access patterns from
+    /// > the caller's space memberships within `parent`, pushes the
+    /// > SessionGrant to gateways belonging to that organization, and
+    /// > returns both a Set-Cookie JWT (browser flow) and the JWT in the
+    /// > response body (native-client flow, attached as
+    /// > `Authorization: Bearer`).
     /// > 
-    /// > The response includes a Set-Cookie header (via gRPC metadata) with
-    /// > the session JWT scoped to .pivox.app domain.
+    /// > The session is per-(user, org) — a leaked token grants ONE
+    /// > organization, never the caller's full org graph.
+    /// > 
+    /// > Security boundary: the RPC is `exempt = true`, so no per-RPC
+    /// > permission check runs; the membership interceptor enforces only
+    /// > that the caller has at least one org membership. The "caller is
+    /// > in `parent` specifically" check lives INSIDE the handler — if
+    /// > the caller is not a member of `parent`, the handler returns
+    /// > PermissionDenied. The pattern set is therefore the substantive
+    /// > security boundary: a non-member sees no patterns and is rejected
+    /// > before any token mints. Adding `storage.session.create` would be
+    /// > ceremony — the membership-derived pattern computation is the
+    /// > real check.
+    /// > 
+    /// > (-- api-linter: core::0133::http-body=disabled
+    /// >     aip.dev/not-precedent: A storage session is an ephemeral
+    /// >     credential, not an AIP-style resource. The custom-action
+    /// >     framing fits better than AIP-133 Create. --)
+    /// > (-- api-linter: core::0133::request-unknown-fields=disabled
+    /// >     aip.dev/not-precedent: see above. --)
+    /// > (-- api-linter: core::0133::request-resource-field=disabled
+    /// >     aip.dev/not-precedent: see above. --)
+    /// > (-- api-linter: core::0133::response-message-name=disabled
+    /// >     aip.dev/not-precedent: see above. --)
     ///
     /// - Parameters:
     ///   - message: request message to send.

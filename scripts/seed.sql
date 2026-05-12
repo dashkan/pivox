@@ -15,5 +15,7 @@ BEGIN;
 \i scripts/seeds/11_local_corp.sql
 \i scripts/seeds/12_meridian_roles.sql
 \i scripts/seeds/13_assets.sql
+\i scripts/seeds/14_asset_versions.sql
+\i scripts/seeds/15_dev_user_membership.sql
 
 COMMIT;

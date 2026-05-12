@@ -77,13 +77,34 @@ func (s *HTTPServer) SetCORSOrigin(origin string) {
 }
 
 // ListenAndServe starts the HTTP server on the given address.
+//
+// Routing: requests under /files/ are auth-checked + proxied to the
+// configured storage endpoint via ServeHTTP. Anything outside
+// /files/ returns 404 from the mux directly. The /files/ prefix is
+// the public URL contract emitted by the dashboards composer
+// (Phase 6c.2) — same prefix in dev (nginx → loopback agent) and
+// prod (gateway edge proxy → agent on its public hostname). The
+// agent strips /files/ before its existing /{endpoint}/{key} parser
+// sees the request, so ServeHTTP's path-handling logic is unchanged.
 func (s *HTTPServer) ListenAndServe(addr string) error {
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("listen %s: %w", addr, err)
 	}
-	srv := &http.Server{Handler: s}
+	srv := &http.Server{Handler: s.muxedHandler()}
 	return srv.Serve(ln)
+}
+
+// muxedHandler wraps ServeHTTP behind a /files/ prefix-strip mux.
+// Extracted from ListenAndServe so unit tests can drive the mux
+// without binding a TCP listener.
+func (s *HTTPServer) muxedHandler() http.Handler {
+	mux := http.NewServeMux()
+	mux.Handle("/files/", http.StripPrefix("/files", s))
+	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "Not Found", http.StatusNotFound)
+	})
+	return mux
 }
 
 // ServeHTTP is the main request handler.

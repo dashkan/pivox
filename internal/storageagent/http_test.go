@@ -57,6 +57,71 @@ func makeJWT(claims map[string]any, key []byte) string {
 }
 
 // ---------------------------------------------------------------------------
+// /files/ prefix routing (Phase 6c.2)
+// ---------------------------------------------------------------------------
+
+// The agent's public URL contract is /files/{endpoint}/{key} —
+// permanent prefix shared between dev (nginx → loopback agent) and
+// prod (gateway edge proxy → public agent). The mux returned by
+// muxedHandler() strips /files/ before the existing ServeHTTP sees
+// the request, and 404s anything outside /files/. Tests drive the
+// mux directly via httptest.NewRecorder so we don't bind a TCP port
+// and don't need to drive a real session-grant + cache pipeline.
+
+func TestMuxedHandler_FilesPrefix_Stripped(t *testing.T) {
+	srv, _, _, _ := newTestHTTPServer(t)
+	mux := srv.muxedHandler()
+
+	// /files/ep1/some/key/path → after strip the agent sees
+	// /ep1/some/key/path. With no session granted, the agent
+	// rejects with 401 — that's a positive signal that the request
+	// reached ServeHTTP (the auth path runs only inside ServeHTTP,
+	// not in the mux). We're testing the routing/strip, not auth.
+	req := httptest.NewRequest(http.MethodGet, "/files/ep1/some/key/path", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusUnauthorized, rec.Code,
+		"/files/-prefixed request must reach ServeHTTP (auth-checked layer)")
+}
+
+func TestMuxedHandler_NoFilesPrefix_404(t *testing.T) {
+	srv, _, _, _ := newTestHTTPServer(t)
+	mux := srv.muxedHandler()
+
+	cases := []string{
+		"/",
+		"/ep1/some/key/path",
+		"/healthz",
+	}
+	for _, path := range cases {
+		t.Run(path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, req)
+			assert.Equal(t, http.StatusNotFound, rec.Code,
+				"requests outside /files/ must 404 from mux (not pass through to ServeHTTP)")
+		})
+	}
+}
+
+// /files (no trailing slash) is special-cased by net/http.ServeMux:
+// patterns ending in "/" auto-redirect canonical-path requests to
+// the slashed form (HTTP 307). Documenting the behavior here so a
+// future "let's manually 404 /files" change knows it'd be fighting
+// stdlib defaults — clients following the 307 land on /files/, hit
+// ServeHTTP, and 401 (no auth) which is the desired UX.
+func TestMuxedHandler_FilesNoTrailingSlash_Redirect(t *testing.T) {
+	srv, _, _, _ := newTestHTTPServer(t)
+	mux := srv.muxedHandler()
+
+	req := httptest.NewRequest(http.MethodGet, "/files", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusTemporaryRedirect, rec.Code)
+	assert.Equal(t, "/files/", rec.Header().Get("Location"))
+}
+
+// ---------------------------------------------------------------------------
 // Constructor
 // ---------------------------------------------------------------------------
 

@@ -101,6 +101,13 @@ struct DashboardView: View {
                     CollectionWidgetView(
                         widget: tile.widget.collection,
                         rows: rowsByTile[index] ?? [],
+                        orgID: orgSlugFromName,
+                        tokenProvider: { orgID in
+                            try await StorageService.shared.token(forOrg: orgID)
+                        },
+                        invalidateToken: { orgID in
+                            StorageService.shared.invalidate(forOrg: orgID)
+                        },
                         onAction: handleAction
                     )
                 } else {
@@ -149,6 +156,28 @@ struct DashboardView: View {
         // log + no-op so the renderer compiles + previews while
         // the action surface is read-only.
         PivoxLog.dashboards.info("Dashboard action invoked: \(action.key)")
+    }
+
+    /// Parse the org slug out of `name`. Dashboard names are of
+    /// shape `organizations/{org}/dashboards/{...}`; we need the
+    /// `{org}` segment to thread `StorageService.token(forOrg:)`
+    /// through the renderer chain.
+    ///
+    /// Strict: requires the full AIP shape (`organizations/<org>/
+    /// dashboards/<...>`), not just an `organizations/` prefix.
+    /// A malformed name returns "" — the composer's thumbnail URLs
+    /// would also be empty in that case (no scope), so the row
+    /// icons fall through to iconField via the IconConfigResolver
+    /// chain naturally.
+    private var orgSlugFromName: String {
+        let parts = name.split(separator: "/", omittingEmptySubsequences: false)
+        guard parts.count >= 4,
+            parts[0] == "organizations",
+            parts[2] == "dashboards"
+        else {
+            return ""
+        }
+        return String(parts[1])
     }
 }
 

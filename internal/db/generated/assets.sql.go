@@ -8,11 +8,9 @@ package db
 import (
 	"context"
 	"encoding/json"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/pgvector/pgvector-go"
 )
 
 const countAssetsByOrg = `-- name: CountAssetsByOrg :one
@@ -287,9 +285,21 @@ func (q *Queries) GetAssetNamesByIDs(ctx context.Context, ids []uuid.UUID) ([]Ge
 const listAssetsByOrg = `-- name: ListAssetsByOrg :many
 SELECT
   assets.id, assets.space_id, assets.endpoint_id, assets.name, assets.display_name, assets.import_path, assets.filename, assets.media_type, assets.content_type, assets.checksum_sha256, assets.size_bytes, assets.technical_metadata, assets.ai_description, assets.transcription, assets.duration_seconds, assets.width, assets.height, assets.annotations, assets.search_vector, assets.embedding, assets.state, assets.etag, assets.revision, assets.created_by, assets.updated_by, assets.deleted_by, assets.create_time, assets.update_time, assets.delete_time, assets.purge_time, assets.expire_time,
-  spaces.name AS space_slug
+  spaces.name AS space_slug,
+  COALESCE(av.version_number, 0) AS latest_version_number,
+  COALESCE(av.mime_type, '')     AS latest_version_mime_type,
+  e.name AS endpoint_slug,
+  g.hostname AS gateway_hostname
 FROM assets
 JOIN spaces ON assets.space_id = spaces.id
+LEFT JOIN (
+  SELECT DISTINCT ON (asset_id)
+    asset_id, version_number, mime_type
+  FROM asset_versions
+  ORDER BY asset_id, version_number DESC
+) av ON av.asset_id = assets.id
+LEFT JOIN storage_endpoints e ON e.id = assets.endpoint_id
+LEFT JOIN storage_gateways  g ON g.id = e.gateway_id
 WHERE spaces.org_id = $1
   AND assets.delete_time IS NULL
   AND spaces.delete_time IS NULL
@@ -304,38 +314,12 @@ type ListAssetsByOrgParams struct {
 }
 
 type ListAssetsByOrgRow struct {
-	ID                uuid.UUID          `json:"id"`
-	SpaceID           uuid.UUID          `json:"space_id"`
-	EndpointID        pgtype.UUID        `json:"endpoint_id"`
-	Name              string             `json:"name"`
-	DisplayName       string             `json:"display_name"`
-	ImportPath        string             `json:"import_path"`
-	Filename          string             `json:"filename"`
-	MediaType         NullAssetMediaType `json:"media_type"`
-	ContentType       string             `json:"content_type"`
-	ChecksumSha256    string             `json:"checksum_sha256"`
-	SizeBytes         int64              `json:"size_bytes"`
-	TechnicalMetadata json.RawMessage    `json:"technical_metadata"`
-	AiDescription     string             `json:"ai_description"`
-	Transcription     string             `json:"transcription"`
-	DurationSeconds   pgtype.Float8      `json:"duration_seconds"`
-	Width             pgtype.Int4        `json:"width"`
-	Height            pgtype.Int4        `json:"height"`
-	Annotations       json.RawMessage    `json:"annotations"`
-	SearchVector      interface{}        `json:"search_vector"`
-	Embedding         pgvector.Vector    `json:"embedding"`
-	State             AssetState         `json:"state"`
-	Etag              string             `json:"etag"`
-	Revision          int32              `json:"revision"`
-	CreatedBy         pgtype.UUID        `json:"created_by"`
-	UpdatedBy         pgtype.UUID        `json:"updated_by"`
-	DeletedBy         pgtype.UUID        `json:"deleted_by"`
-	CreateTime        time.Time          `json:"create_time"`
-	UpdateTime        time.Time          `json:"update_time"`
-	DeleteTime        pgtype.Timestamptz `json:"delete_time"`
-	PurgeTime         pgtype.Timestamptz `json:"purge_time"`
-	ExpireTime        pgtype.Timestamptz `json:"expire_time"`
-	SpaceSlug         string             `json:"space_slug"`
+	Asset                 Asset       `json:"asset"`
+	SpaceSlug             string      `json:"space_slug"`
+	LatestVersionNumber   int32       `json:"latest_version_number"`
+	LatestVersionMimeType string      `json:"latest_version_mime_type"`
+	EndpointSlug          pgtype.Text `json:"endpoint_slug"`
+	GatewayHostname       pgtype.Text `json:"gateway_hostname"`
 }
 
 // Lists every active asset across every space in an organization,
@@ -346,6 +330,10 @@ type ListAssetsByOrgRow struct {
 // trip. Soft-deleted spaces are skipped (their assets aren't
 // surfaced) — same effect as `assets.space_id` referencing a row
 // with a non-null `spaces.delete_time`.
+//
+// Latest-version + storage_endpoints columns mirror ListAssetsBySpace;
+// same shape feeds the same synthesizer (Phase 6c). See
+// ListAssetsBySpace for the LEFT-JOIN-derived-table rationale.
 func (q *Queries) ListAssetsByOrg(ctx context.Context, arg ListAssetsByOrgParams) ([]ListAssetsByOrgRow, error) {
 	rows, err := q.db.Query(ctx, listAssetsByOrg, arg.OrgID, arg.Limit, arg.Offset)
 	if err != nil {
@@ -356,38 +344,42 @@ func (q *Queries) ListAssetsByOrg(ctx context.Context, arg ListAssetsByOrgParams
 	for rows.Next() {
 		var i ListAssetsByOrgRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.SpaceID,
-			&i.EndpointID,
-			&i.Name,
-			&i.DisplayName,
-			&i.ImportPath,
-			&i.Filename,
-			&i.MediaType,
-			&i.ContentType,
-			&i.ChecksumSha256,
-			&i.SizeBytes,
-			&i.TechnicalMetadata,
-			&i.AiDescription,
-			&i.Transcription,
-			&i.DurationSeconds,
-			&i.Width,
-			&i.Height,
-			&i.Annotations,
-			&i.SearchVector,
-			&i.Embedding,
-			&i.State,
-			&i.Etag,
-			&i.Revision,
-			&i.CreatedBy,
-			&i.UpdatedBy,
-			&i.DeletedBy,
-			&i.CreateTime,
-			&i.UpdateTime,
-			&i.DeleteTime,
-			&i.PurgeTime,
-			&i.ExpireTime,
+			&i.Asset.ID,
+			&i.Asset.SpaceID,
+			&i.Asset.EndpointID,
+			&i.Asset.Name,
+			&i.Asset.DisplayName,
+			&i.Asset.ImportPath,
+			&i.Asset.Filename,
+			&i.Asset.MediaType,
+			&i.Asset.ContentType,
+			&i.Asset.ChecksumSha256,
+			&i.Asset.SizeBytes,
+			&i.Asset.TechnicalMetadata,
+			&i.Asset.AiDescription,
+			&i.Asset.Transcription,
+			&i.Asset.DurationSeconds,
+			&i.Asset.Width,
+			&i.Asset.Height,
+			&i.Asset.Annotations,
+			&i.Asset.SearchVector,
+			&i.Asset.Embedding,
+			&i.Asset.State,
+			&i.Asset.Etag,
+			&i.Asset.Revision,
+			&i.Asset.CreatedBy,
+			&i.Asset.UpdatedBy,
+			&i.Asset.DeletedBy,
+			&i.Asset.CreateTime,
+			&i.Asset.UpdateTime,
+			&i.Asset.DeleteTime,
+			&i.Asset.PurgeTime,
+			&i.Asset.ExpireTime,
 			&i.SpaceSlug,
+			&i.LatestVersionNumber,
+			&i.LatestVersionMimeType,
+			&i.EndpointSlug,
+			&i.GatewayHostname,
 		); err != nil {
 			return nil, err
 		}
@@ -400,9 +392,23 @@ func (q *Queries) ListAssetsByOrg(ctx context.Context, arg ListAssetsByOrgParams
 }
 
 const listAssetsBySpace = `-- name: ListAssetsBySpace :many
-SELECT id, space_id, endpoint_id, name, display_name, import_path, filename, media_type, content_type, checksum_sha256, size_bytes, technical_metadata, ai_description, transcription, duration_seconds, width, height, annotations, search_vector, embedding, state, etag, revision, created_by, updated_by, deleted_by, create_time, update_time, delete_time, purge_time, expire_time FROM assets
-WHERE space_id = $1 AND delete_time IS NULL
-ORDER BY create_time DESC, id DESC
+SELECT
+  assets.id, assets.space_id, assets.endpoint_id, assets.name, assets.display_name, assets.import_path, assets.filename, assets.media_type, assets.content_type, assets.checksum_sha256, assets.size_bytes, assets.technical_metadata, assets.ai_description, assets.transcription, assets.duration_seconds, assets.width, assets.height, assets.annotations, assets.search_vector, assets.embedding, assets.state, assets.etag, assets.revision, assets.created_by, assets.updated_by, assets.deleted_by, assets.create_time, assets.update_time, assets.delete_time, assets.purge_time, assets.expire_time,
+  COALESCE(av.version_number, 0) AS latest_version_number,
+  COALESCE(av.mime_type, '')     AS latest_version_mime_type,
+  e.name AS endpoint_slug,
+  g.hostname AS gateway_hostname
+FROM assets
+LEFT JOIN (
+  SELECT DISTINCT ON (asset_id)
+    asset_id, version_number, mime_type
+  FROM asset_versions
+  ORDER BY asset_id, version_number DESC
+) av ON av.asset_id = assets.id
+LEFT JOIN storage_endpoints e ON e.id = assets.endpoint_id
+LEFT JOIN storage_gateways  g ON g.id = e.gateway_id
+WHERE assets.space_id = $1 AND assets.delete_time IS NULL
+ORDER BY assets.create_time DESC, assets.id DESC
 LIMIT $2 OFFSET $3
 `
 
@@ -412,50 +418,81 @@ type ListAssetsBySpaceParams struct {
 	Offset  int32     `json:"offset"`
 }
 
+type ListAssetsBySpaceRow struct {
+	Asset                 Asset       `json:"asset"`
+	LatestVersionNumber   int32       `json:"latest_version_number"`
+	LatestVersionMimeType string      `json:"latest_version_mime_type"`
+	EndpointSlug          pgtype.Text `json:"endpoint_slug"`
+	GatewayHostname       pgtype.Text `json:"gateway_hostname"`
+}
+
 // Tiebreaker on id DESC keeps pagination stable when multiple assets
 // share a create_time (concurrent ingest can collide on µs precision):
 // without it, offset-based pagination can drop or duplicate rows.
-func (q *Queries) ListAssetsBySpace(ctx context.Context, arg ListAssetsBySpaceParams) ([]Asset, error) {
+//
+// The right-side joins populate the `latest_version_*` and
+// `endpoint_slug` columns the dashboards synthesizer needs to compose
+// storage URLs (Phase 6c). Latest version is computed via DISTINCT ON
+// in a derived table joined LEFT.
+//
+// Why COALESCE on the latest_version_* columns: sqlc v1.31's
+// nullability inference looks at the underlying column's NOT NULL
+// constraint and gets LEFT-JOIN-of-derived-table nullability wrong
+// (asset_versions.version_number is NOT NULL, so sqlc types
+// av.version_number as int32 even though the LEFT JOIN can yield
+// NULL). Forcing a non-null shape via COALESCE with a sentinel
+// (0 for version_number — real versions start at 1; ” for mime_type)
+// avoids the runtime "scan NULL into int32" error on assets with no
+// versions. The synthesizer treats `version_number == 0` as the "no
+// version exists" signal — same semantics as a real LEFT JOIN NULL.
+// endpoint_slug doesn't need this trick because it's a base-table
+// column reference through a regular LEFT JOIN, which sqlc infers
+// correctly as pgtype.Text.
+func (q *Queries) ListAssetsBySpace(ctx context.Context, arg ListAssetsBySpaceParams) ([]ListAssetsBySpaceRow, error) {
 	rows, err := q.db.Query(ctx, listAssetsBySpace, arg.SpaceID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Asset{}
+	items := []ListAssetsBySpaceRow{}
 	for rows.Next() {
-		var i Asset
+		var i ListAssetsBySpaceRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.SpaceID,
-			&i.EndpointID,
-			&i.Name,
-			&i.DisplayName,
-			&i.ImportPath,
-			&i.Filename,
-			&i.MediaType,
-			&i.ContentType,
-			&i.ChecksumSha256,
-			&i.SizeBytes,
-			&i.TechnicalMetadata,
-			&i.AiDescription,
-			&i.Transcription,
-			&i.DurationSeconds,
-			&i.Width,
-			&i.Height,
-			&i.Annotations,
-			&i.SearchVector,
-			&i.Embedding,
-			&i.State,
-			&i.Etag,
-			&i.Revision,
-			&i.CreatedBy,
-			&i.UpdatedBy,
-			&i.DeletedBy,
-			&i.CreateTime,
-			&i.UpdateTime,
-			&i.DeleteTime,
-			&i.PurgeTime,
-			&i.ExpireTime,
+			&i.Asset.ID,
+			&i.Asset.SpaceID,
+			&i.Asset.EndpointID,
+			&i.Asset.Name,
+			&i.Asset.DisplayName,
+			&i.Asset.ImportPath,
+			&i.Asset.Filename,
+			&i.Asset.MediaType,
+			&i.Asset.ContentType,
+			&i.Asset.ChecksumSha256,
+			&i.Asset.SizeBytes,
+			&i.Asset.TechnicalMetadata,
+			&i.Asset.AiDescription,
+			&i.Asset.Transcription,
+			&i.Asset.DurationSeconds,
+			&i.Asset.Width,
+			&i.Asset.Height,
+			&i.Asset.Annotations,
+			&i.Asset.SearchVector,
+			&i.Asset.Embedding,
+			&i.Asset.State,
+			&i.Asset.Etag,
+			&i.Asset.Revision,
+			&i.Asset.CreatedBy,
+			&i.Asset.UpdatedBy,
+			&i.Asset.DeletedBy,
+			&i.Asset.CreateTime,
+			&i.Asset.UpdateTime,
+			&i.Asset.DeleteTime,
+			&i.Asset.PurgeTime,
+			&i.Asset.ExpireTime,
+			&i.LatestVersionNumber,
+			&i.LatestVersionMimeType,
+			&i.EndpointSlug,
+			&i.GatewayHostname,
 		); err != nil {
 			return nil, err
 		}

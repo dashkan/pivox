@@ -16,10 +16,12 @@ package dashboards
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/dashkan/pivox/internal/apierr"
@@ -133,7 +135,7 @@ func (s *Server) queryAssetsAtSpace(ctx context.Context, orgSlug, spaceSlug stri
 		Rows: make([]*structpb.Struct, 0, len(rows)),
 	}
 	for _, r := range rows {
-		row, err := assetRowToStruct(viewFromAsset(r), orgSlug, spaceSlug)
+		row, err := assetRowToStruct(viewFromSpaceRow(r), orgSlug, spaceSlug)
 		if err != nil {
 			return nil, apierr.Internal("synthesize asset row")
 		}
@@ -147,51 +149,90 @@ func (s *Server) queryAssetsAtSpace(ctx context.Context, orgSlug, spaceSlug stri
 }
 
 // assetView is the minimal projection the synthesizer needs from an
-// Asset row. Both `db.Asset` (space-scope query) and
+// Asset row. Both `db.ListAssetsBySpaceRow` (space-scope query) and
 // `db.ListAssetsByOrgRow` (org-scope JOIN query) project into this
 // shape via tiny extractors.
 //
-// Why a separate view rather than passing `db.Asset` directly: the
+// Why a separate view rather than passing the row struct directly:
 // space-scope and org-scope queries return DIFFERENT struct types
-// (sqlc emits a per-query row struct for the JOIN). Forcing the
-// JOIN row through a `db.Asset` shim required a 30-line field copy
-// that silently dropped any column added to `assets` until someone
-// noticed a NULL in production. The view fixes the surface: the
-// synthesizer asks for what it actually uses, the extractors
-// project, and a missed field becomes a compile error rather than
-// silent data loss.
+// (the org-scope JOIN adds `space_slug`). Forcing both through a
+// shared view that hand-copies fields makes "did I forget a new
+// column" a compile error rather than silent data loss in
+// production.
+//
+// Phase 6c additions: VersionNumber, MimeType, EndpointSlug,
+// GatewayHostname, AssetID. These feed the Phase 6c.2 URL composer;
+// VersionNumber == 0 is the "no version exists" sentinel (real
+// versions start at 1 per the asset_versions monotonic-from-1
+// contract; ListAssetsBy* uses COALESCE to surface a sentinel
+// because sqlc v1.31 mistypes the LEFT-JOIN-derived nullable columns
+// as NOT NULL — see internal/db/queries/assets.sql for details).
+// Empty EndpointSlug means the asset has no storage endpoint bound;
+// empty GatewayHostname means the bound endpoint's gateway has no
+// hostname configured. Both are independent "no URL" signals.
+//
+// Sentinel ordering: composer MUST check VersionNumber == 0 FIRST.
+// MimeType == "" is ambiguous (could mean "no version exists" OR
+// "version exists but asset's content_type is genuinely empty" —
+// see asset …00000a in 13_assets.sql for the latter). Only
+// VersionNumber == 0 is the unambiguous "no version exists" signal.
 type assetView struct {
-	NameSlug    string
-	DisplayName string
-	MediaType   db.NullAssetMediaType
-	ContentType string
-	State       db.AssetState
-	SizeBytes   int64
-	CreateTime  time.Time
+	NameSlug        string
+	DisplayName     string
+	MediaType       db.NullAssetMediaType
+	ContentType     string
+	State           db.AssetState
+	SizeBytes       int64
+	CreateTime      time.Time
+	AssetID         string // UUID stringified; needed for storage URL path composition
+	VersionNumber   int32  // 0 = no version exists yet
+	MimeType        string // empty when VersionNumber == 0 (or genuinely empty content_type)
+	EndpointSlug    string // empty when the asset has no endpoint bound
+	GatewayHostname string // empty when no gateway hostname configured for the endpoint
 }
 
-func viewFromAsset(a db.Asset) assetView {
+func viewFromSpaceRow(r db.ListAssetsBySpaceRow) assetView {
 	return assetView{
-		NameSlug:    a.Name,
-		DisplayName: a.DisplayName,
-		MediaType:   a.MediaType,
-		ContentType: a.ContentType,
-		State:       a.State,
-		SizeBytes:   a.SizeBytes,
-		CreateTime:  a.CreateTime,
+		NameSlug:        r.Asset.Name,
+		DisplayName:     r.Asset.DisplayName,
+		MediaType:       r.Asset.MediaType,
+		ContentType:     r.Asset.ContentType,
+		State:           r.Asset.State,
+		SizeBytes:       r.Asset.SizeBytes,
+		CreateTime:      r.Asset.CreateTime,
+		AssetID:         r.Asset.ID.String(),
+		VersionNumber:   r.LatestVersionNumber,
+		MimeType:        r.LatestVersionMimeType,
+		EndpointSlug:    textOrEmpty(r.EndpointSlug),
+		GatewayHostname: textOrEmpty(r.GatewayHostname),
 	}
 }
 
 func viewFromOrgRow(r db.ListAssetsByOrgRow) assetView {
 	return assetView{
-		NameSlug:    r.Name,
-		DisplayName: r.DisplayName,
-		MediaType:   r.MediaType,
-		ContentType: r.ContentType,
-		State:       r.State,
-		SizeBytes:   r.SizeBytes,
-		CreateTime:  r.CreateTime,
+		NameSlug:        r.Asset.Name,
+		DisplayName:     r.Asset.DisplayName,
+		MediaType:       r.Asset.MediaType,
+		ContentType:     r.Asset.ContentType,
+		State:           r.Asset.State,
+		SizeBytes:       r.Asset.SizeBytes,
+		CreateTime:      r.Asset.CreateTime,
+		AssetID:         r.Asset.ID.String(),
+		VersionNumber:   r.LatestVersionNumber,
+		MimeType:        r.LatestVersionMimeType,
+		EndpointSlug:    textOrEmpty(r.EndpointSlug),
+		GatewayHostname: textOrEmpty(r.GatewayHostname),
 	}
+}
+
+// textOrEmpty unwraps a pgtype.Text into a plain string, treating
+// NULL as "". Used by the assetView extractors for the
+// LEFT-JOIN-nullable endpoint_slug column.
+func textOrEmpty(t pgtype.Text) string {
+	if !t.Valid {
+		return ""
+	}
+	return t.String
 }
 
 // assetRowToStruct synthesizes a single row's worth of data from
@@ -199,10 +240,10 @@ func viewFromOrgRow(r db.ListAssetsByOrgRow) assetView {
 // name. Fields mirror the Asset CollectionWidget's column set
 // (display_name, media_type, state, size_bytes, create_time) plus
 // the IconConfig contract's `icon` (numeric Icon enum value,
-// derived per content) and `thumbnail_url` (empty in v1;
-// storage-gateway URL composition lands when the session work
-// merges — explicit empty over field-omission keeps the row shape
-// stable across the v1 → storage-gateway transition).
+// derived per content) and `thumbnail_url` (composed via
+// composeStorageURL — empty when the row doesn't qualify for a
+// storage URL; the renderer's IconConfigResolver chain falls back
+// to iconField in that case).
 func assetRowToStruct(v assetView, orgSlug, spaceSlug string) (*structpb.Struct, error) {
 	mediaType := ""
 	if v.MediaType.Valid {
@@ -217,8 +258,79 @@ func assetRowToStruct(v assetView, orgSlug, spaceSlug string) (*structpb.Struct,
 		"size_bytes":    float64(v.SizeBytes), // structpb numbers are float64
 		"create_time":   v.CreateTime.UTC().Format(time.RFC3339Nano),
 		"icon":          float64(iconForAsset(v)),
-		"thumbnail_url": "",
+		"thumbnail_url": composeStorageURL(v, orgSlug, spaceSlug),
 	})
+}
+
+// composeStorageURL returns the customer-facing thumbnail URL for an
+// asset row, or "" when the row doesn't qualify. Output shape:
+//
+//	https://{GatewayHostname}/files/{EndpointSlug}/{org}/{space}/assets/{AssetID}/v{n}/thumb_md.webp
+//
+// The /files/ prefix is permanent: in dev nginx routes /files/ to
+// the storage agent on its loopback port; in prod the gateway's edge
+// proxy (or the agent itself bound to 443) serves /files/ at its
+// public hostname. Same prefix in both, different host. The agent
+// strips /files/ via http.StripPrefix before its existing
+// /{endpoint}/{key} parser sees the request.
+//
+// WebP for thumbnails: broadcast assets rely heavily on alpha (logos,
+// lower-thirds, overlay graphics). WebP supports alpha in both lossy
+// and lossless modes, ships smaller than equivalent-quality JPEG, is
+// natively decoded by macOS NSImage/SwiftUI (Big Sur+) and every
+// modern browser. Single extension keeps the composer purely
+// derivable from row data — the rendition pipeline (post-6c) picks
+// lossy vs lossless internally based on source-image properties; the
+// URL contract doesn't vary.
+//
+// Path-by-convention. The thumb_md.webp sibling is assumed to exist
+// for every IMAGE/GRAPHIC asset because Phase 6c hand-seeds rustfs
+// objects matching this layout. Once the on-agent rendition pipeline
+// lands, this composer must consult asset_renditions (or a readiness
+// flag on asset_versions) to suppress URLs for unready or failed
+// renditions — otherwise <img> tags 404 mid-ingest.
+//
+// Empty-string return logic — sentinel-ordering rule (per assetView
+// godoc): VersionNumber == 0 is the only unambiguous "no version"
+// signal and MUST be checked first. Subsequent checks for empty
+// EndpointSlug / GatewayHostname / non-image-shape can be evaluated
+// in any order — they're independent gates.
+func composeStorageURL(v assetView, orgSlug, spaceSlug string) string {
+	if v.VersionNumber == 0 {
+		return ""
+	}
+	if v.EndpointSlug == "" {
+		return ""
+	}
+	if v.GatewayHostname == "" {
+		return ""
+	}
+	if !isImageShaped(v) {
+		return ""
+	}
+	return fmt.Sprintf("https://%s/files/%s/%s/%s/assets/%s/v%d/thumb_md.webp",
+		v.GatewayHostname, v.EndpointSlug, orgSlug, spaceSlug,
+		v.AssetID, v.VersionNumber)
+}
+
+// isImageShaped is true iff the asset would render in an HTML <img>
+// tag (or SwiftUI AsyncImage / our AuthenticatedAsyncImage). Mirrors
+// the iconForAsset logic for the IMAGE-bucket — media_type is
+// authoritative when set, content_type prefix is the fallback for
+// rows that haven't been normalized into a media_type yet (asset
+// …000009 in the dev seed exercises this path).
+func isImageShaped(v assetView) bool {
+	if v.MediaType.Valid {
+		switch v.MediaType.AssetMediaType {
+		case db.AssetMediaTypeIMAGE, db.AssetMediaTypeGRAPHIC:
+			return true
+		}
+		// Other media_type enums (VIDEO, AUDIO, DOCUMENT) explicitly
+		// don't qualify even when the row's content_type happens to
+		// start with image/ — media_type is authoritative when set.
+		return false
+	}
+	return strings.HasPrefix(v.ContentType, "image/")
 }
 
 // iconForAsset maps an asset's media_type / content_type into the

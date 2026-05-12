@@ -37,17 +37,26 @@ struct CollectionWidgetView: View {
     let widget: Pivox_Api_V1_CollectionWidget
     let rows: [Google_Protobuf_Struct]
     let onAction: (Pivox_Api_V1_RowAction) -> Void
+    let orgID: String
+    let tokenProvider: StorageTokenProvider
+    let invalidateToken: StorageTokenInvalidator
 
     @State private var mode: Pivox_Api_V1_CollectionWidget.DisplayMode
 
     init(
         widget: Pivox_Api_V1_CollectionWidget,
         rows: [Google_Protobuf_Struct],
+        orgID: String,
+        tokenProvider: @escaping StorageTokenProvider,
+        invalidateToken: @escaping StorageTokenInvalidator,
         onAction: @escaping (Pivox_Api_V1_RowAction) -> Void = { _ in }
     ) {
         self.widget = widget
         self.rows = rows
         self.onAction = onAction
+        self.orgID = orgID
+        self.tokenProvider = tokenProvider
+        self.invalidateToken = invalidateToken
         // Initial mode: explicit display_mode wins; otherwise first
         // entry of supported_modes; ultimately TABLE per the proto's
         // unspecified-default contract.
@@ -152,7 +161,14 @@ struct CollectionWidgetView: View {
     @ViewBuilder
     private func tableRow(_ row: Google_Protobuf_Struct) -> some View {
         HStack(spacing: 12) {
-            RowIconView(row: row, config: widget.iconConfig, placement: .tableRow)
+            RowIconView(
+                row: row,
+                config: widget.iconConfig,
+                placement: .tableRow,
+                orgID: orgID,
+                tokenProvider: tokenProvider,
+                invalidateToken: invalidateToken
+            )
                 .frame(width: 36, alignment: .center)
             ForEach(visibleColumns, id: \.field) { column in
                 Text(stringValue(row, field: column.field))
@@ -184,7 +200,14 @@ struct CollectionWidgetView: View {
     @ViewBuilder
     private func cardForRow(_ row: Google_Protobuf_Struct) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            RowIconView(row: row, config: widget.iconConfig, placement: .cardThumbnail)
+            RowIconView(
+                row: row,
+                config: widget.iconConfig,
+                placement: .cardThumbnail,
+                orgID: orgID,
+                tokenProvider: tokenProvider,
+                invalidateToken: invalidateToken
+            )
                 .frame(maxWidth: .infinity)
             Text(stringValue(row, field: primaryDisplayField))
                 .font(.callout.weight(.medium))
@@ -326,22 +349,39 @@ struct CollectionWidgetView: View {
 #Preview("CARD mode — Asset library") {
     var widget = sampleAssetWidget()
     widget.displayMode = .card
-    return CollectionWidgetView(widget: widget, rows: sampleAssetRows())
-        .frame(width: 720, height: 480)
+    return CollectionWidgetView(
+        widget: widget,
+        rows: sampleAssetRows(),
+        orgID: "preview-org",
+        tokenProvider: { _ in "preview-token" },
+        invalidateToken: { _ in }
+    )
+    .frame(width: 720, height: 480)
 }
 
 #Preview("TABLE mode — Asset library") {
     var widget = sampleAssetWidget()
     widget.displayMode = .table
-    return CollectionWidgetView(widget: widget, rows: sampleAssetRows())
-        .frame(width: 720, height: 480)
+    return CollectionWidgetView(
+        widget: widget,
+        rows: sampleAssetRows(),
+        orgID: "preview-org",
+        tokenProvider: { _ in "preview-token" },
+        invalidateToken: { _ in }
+    )
+    .frame(width: 720, height: 480)
 }
 
 #Preview("Empty state") {
     let widget = sampleAssetWidget()
-    return CollectionWidgetView(widget: widget, rows: []) { action in
-        print("preview action: \(action.key)")
-    }
+    return CollectionWidgetView(
+        widget: widget,
+        rows: [],
+        orgID: "preview-org",
+        tokenProvider: { _ in "preview-token" },
+        invalidateToken: { _ in },
+        onAction: { action in print("preview action: \(action.key)") }
+    )
     .frame(width: 720, height: 480)
 }
 

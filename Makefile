@@ -31,7 +31,7 @@ run-server:
 	go run ./cmd/pivox-cloud serve
 
 run-agent:
-	go run ./cmd/pivox-agent storage --token dev-token-local
+	go run ./cmd/pivox-agent storage --token dev-token-local --port 8083
 
 run-worker:
 	go run ./cmd/pivox-worker
