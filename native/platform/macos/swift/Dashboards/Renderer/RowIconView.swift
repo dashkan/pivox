@@ -19,20 +19,31 @@ import SwiftUI
 /// Leading-icon view for a single `CollectionWidget` row. Wraps the
 /// pure `IconConfigResolver` with the SwiftUI rendering chain:
 ///
-///   - `.thumbnailURL(...)` is shown via `AsyncImage` for v1.
-///     Bearer-token-attached fetches against the storage gateway
-///     land in 6c (StorageService); until then `AsyncImage` uses
-///     URLSession's default unauthenticated path. If the URL is
-///     non-fetchable, the placeholder falls back to the icon path.
+///   - `.thumbnailURL(...)` is shown via `AuthenticatedAsyncImage`,
+///     which attaches `Authorization: Bearer <jwt>` to every
+///     `URLSession` request through the closure-injected
+///     `tokenProvider`. Auth-failed and net-failed both fall through
+///     to the iconField fallback the resolver computed.
 ///   - `.icon(...)` resolves through Phase 6a's
 ///     `Pivox_Api_V1_Icon.image` extension.
 ///
 /// Size scales with the supplied `IconConfig.size` bucket so a TABLE
 /// row's leading-icon column reads tighter than a CARD's hero image.
+///
+/// Layer-rule note: this view passes `tokenProvider` /
+/// `invalidateToken` as opaque closures to `AuthenticatedAsyncImage`
+/// (a Core/Foundation primitive). The wiring at the use site
+/// (DashboardView → CollectionWidgetView → here) decides which
+/// service implements them — production wires
+/// `StorageService.shared.token(forOrg:)`. Neither `RowIconView` nor
+/// `AuthenticatedAsyncImage` imports `StorageService` directly.
 struct RowIconView: View {
     let row: Google_Protobuf_Struct
     let config: Pivox_Api_V1_IconConfig
     let placement: Placement
+    let orgID: String
+    let tokenProvider: StorageTokenProvider
+    let invalidateToken: StorageTokenInvalidator
 
     /// `Placement` switches the rendered point size between the
     /// table-row "leading icon" form (compact) and the card-face
@@ -44,30 +55,47 @@ struct RowIconView: View {
         case cardThumbnail
     }
 
+    init(
+        row: Google_Protobuf_Struct,
+        config: Pivox_Api_V1_IconConfig,
+        placement: Placement,
+        orgID: String,
+        tokenProvider: @escaping StorageTokenProvider,
+        invalidateToken: @escaping StorageTokenInvalidator = { _ in }
+    ) {
+        self.row = row
+        self.config = config
+        self.placement = placement
+        self.orgID = orgID
+        self.tokenProvider = tokenProvider
+        self.invalidateToken = invalidateToken
+    }
+
     var body: some View {
         let resolved = IconConfigResolver.resolve(row: row, config: config)
         switch resolved {
         case .thumbnailURL(let urlString, let fallback):
             if let url = URL(string: urlString) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .empty:
-                        iconImage(fallback)
-                    case .success(let image):
+                AuthenticatedAsyncImage(
+                    url: url,
+                    orgID: orgID,
+                    tokenProvider: tokenProvider,
+                    invalidateToken: invalidateToken,
+                    content: { image in
                         image.resizable().aspectRatio(contentMode: .fill)
-                    case .failure:
-                        // URL fetch failed — fall back to the icon
-                        // the resolver computed for this row (the
-                        // iconField value, not the static fallback).
-                        // Without this distinction, every row would
-                        // render `IconConfig.fallbackIcon` whenever
-                        // gateway URLs aren't reachable (Phase 6c
-                        // ships the bearer-token fetch).
-                        iconImage(fallback)
-                    @unknown default:
+                    },
+                    placeholder: {
+                        // Both .loading and the terminal failure
+                        // states (.unauthorized / .failed) render
+                        // this — for a table row, "loading" briefly
+                        // showing the iconField is preferable to a
+                        // spinner that flickers in and out per
+                        // scroll cell. AuthenticatedAsyncImage's
+                        // .task(id: url) re-fires for new URLs so
+                        // the placeholder doesn't bleed across rows.
                         iconImage(fallback)
                     }
-                }
+                )
                 .frame(width: pointSize.width, height: pointSize.height)
                 .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
             } else {
@@ -113,19 +141,23 @@ struct RowIconView: View {
     }
 }
 
-#Preview("Table row — fallback icon") {
+// MARK: - Previews
+
+#Preview("Table row — fallback icon (no thumbnail URL)") {
     var config = Pivox_Api_V1_IconConfig()
     config.fallbackIcon = .document
 
     return RowIconView(
         row: Google_Protobuf_Struct(),
         config: config,
-        placement: .tableRow
+        placement: .tableRow,
+        orgID: "preview-org",
+        tokenProvider: { _ in "preview-token" }
     )
     .padding()
 }
 
-#Preview("Card thumbnail — icon resolved") {
+#Preview("Card thumbnail — icon resolved (no thumbnail URL)") {
     var config = Pivox_Api_V1_IconConfig()
     config.iconField = "icon"
     config.fallbackIcon = .document
@@ -135,6 +167,12 @@ struct RowIconView: View {
     v.numberValue = Double(Pivox_Api_V1_Icon.video.rawValue)
     row.fields["icon"] = v
 
-    return RowIconView(row: row, config: config, placement: .cardThumbnail)
-        .padding()
+    return RowIconView(
+        row: row,
+        config: config,
+        placement: .cardThumbnail,
+        orgID: "preview-org",
+        tokenProvider: { _ in "preview-token" }
+    )
+    .padding()
 }

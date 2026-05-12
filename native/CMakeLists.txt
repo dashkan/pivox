@@ -385,6 +385,8 @@ if(APPLE)
     find_package(XCTest REQUIRED)
 
     xctest_add_bundle(PivoxTests ${APP_TARGET}
+        tests/macos/AuthenticatedAsyncImageTests.swift
+        tests/macos/AuthenticatedFetcherTests.swift
         tests/macos/AuthServiceTests.swift
         tests/macos/AuthViewModelTests.swift
         tests/macos/CoreTests.swift

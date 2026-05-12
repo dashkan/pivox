@@ -56,7 +56,7 @@ DECLARE
     -- user record so the next sign-in's blocking-fn upsert hits ON
     -- CONFLICT (firebase_uid) and preserves the seeded row + owner
     -- binding. Sourced from `firebase auth:export` (see file header).
-    _ashkan_firebase_uid CONSTANT TEXT := '2YCxpX5nmQXT5fmjri30SA3ra8t2';
+    _ashkan_firebase_uid CONSTANT TEXT := 'ScQytJWi2ycF3jiiBlRazncbfQB3';
 BEGIN
     -- 0) Founder identity. Pre-seeded so the seed is single-pass —
     --    no need to interactively sign in before owner binding can
