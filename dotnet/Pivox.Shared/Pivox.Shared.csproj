@@ -13,4 +13,14 @@
     <IsAotCompatible>true</IsAotCompatible>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- JWT parsing for FirebaseIdentity. Microsoft.IdentityModel.JsonWebTokens
+         is the modern AOT-friendly replacement for the older
+         System.IdentityModel.Tokens.Jwt. We only construct JsonWebToken
+         from a string and read claims — no signature validation (Firebase
+         already signed it and we received it over TLS), no
+         reflection-heavy paths. -->
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.17.0" />
+  </ItemGroup>
+
 </Project>

@@ -56,7 +56,7 @@ commits) but the operating outcomes are:
 - See `winui.md` in this directory for the implementation prompt.
 - Strategic choice: Firebase C++ SDK wrapped in a C++/WinRT
   component, projected to C#. **Not P/Invoke.** `WindowsAuthService :
-  IAuthService` lives in PivoxApp.Windows and consumes the WinRT
+  IAuthService` lives in Pivox.WinUI and consumes the WinRT
   projection.
 
 ## Operating rules
@@ -165,8 +165,22 @@ dotnet/
   Pivox.slnx              solution file (XML format, .NET 9+)
   Pivox.Shared/           cross-platform contracts. No platform deps.
                           - Auth/IAuthService.cs   the auth contract
-                          - Auth/AuthSession.cs    POCO record returned
-                          - Auth/JwtClaims.cs      base64url JWT decoder
+                          - Auth/AuthSession.cs    record carrying
+                                                   IdToken + FirebaseIdentity
+                                                   + convenience accessors
+                                                   (PivoxUserId, Email, etc.)
+                                                   + Principal getter for
+                                                   ClaimsPrincipal-shaped
+                                                   consumers.
+                          - Auth/FirebaseIdentity.cs
+                                                   ClaimsIdentity subclass
+                                                   built from a JWT via
+                                                   Microsoft.IdentityModel.
+                                                   JsonWebTokens. Typed
+                                                   accessors for the claims
+                                                   we read. Both platforms
+                                                   converge on constructing
+                                                   `new FirebaseIdentity(jwt)`.
                           - CloudConfig.cs         backend URL + TLS,
                                                    reads PIVOX_GRPC_HOST
                                                    etc. Mirrors the
@@ -189,12 +203,12 @@ dotnet/
                           Cocoa SDK (FirebaseAuth + FirebaseCore + 9
                           embedded-only transitive xcframeworks).
                           Not consumed by Windows code.
-  PivoxApp/               macOS app. All-code NSWindow root, no
+  Pivox.MacOs/               macOS app. All-code NSWindow root, no
                           storyboard. Implements IAuthService against
                           the Firebase binding. Signs with the local
                           Apple Development cert + provisioning
                           profile from the SwiftUI Pivox build.
-  PivoxApp.Windows/       (future) WinUI 3 app. Will implement
+  Pivox.WinUI/       (future) WinUI 3 app. Will implement
                           IAuthService against a C++/WinRT Firebase
                           component.
   scripts/                build-time setup (fetch-firebase-sdk.sh).
@@ -207,10 +221,10 @@ Code may depend **downward**, never **upward**, never **sideways**.
 - `Pivox.Shared` depends on nothing in this directory.
 - `Pivox.Client` depends on `Pivox.Shared`.
 - `Firebase.Bindings` depends on nothing.
-- `PivoxApp` may depend on all of the above.
-- `PivoxApp.Windows` (future) depends on `Pivox.Shared` + `Pivox.Client`
+- `Pivox.MacOs` may depend on all of the above.
+- `Pivox.WinUI` (future) depends on `Pivox.Shared` + `Pivox.Client`
   + a Windows-specific binding/projection assembly. **Not** on
-  `Firebase.Bindings` (macOS-only) or `PivoxApp` (macOS-only).
+  `Firebase.Bindings` (macOS-only) or `Pivox.MacOs` (macOS-only).
 
 **No platform-specific types in `Pivox.Shared` or `Pivox.Client`.**
 That includes Firebase types, AppKit types, WinUI types, WinRT types.
@@ -223,9 +237,9 @@ implemented separately per platform.
 1. **Cross-platform code (logic, state, contracts, gRPC, view models)**
    → `Pivox.Shared` or `Pivox.Client`.
 2. **macOS implementation of a cross-platform interface, or a macOS-only
-   UI component** → `PivoxApp`.
+   UI component** → `Pivox.MacOs`.
 3. **Windows implementation of a cross-platform interface, or a
-   WinUI-only UI component** → `PivoxApp.Windows`.
+   WinUI-only UI component** → `Pivox.WinUI`.
 4. **C# binding of a third-party Cocoa SDK** → `Firebase.Bindings`
    (or a sibling binding project per SDK).
 
@@ -240,18 +254,18 @@ dotnet build Pivox.slnx
 
 # Release publish (NativeAOT, code-signed, provisioning-profile
 # embedded). Produces a static native binary, no Mono runtime.
-dotnet publish PivoxApp/PivoxApp.csproj -c Release -r osx-arm64
+dotnet publish Pivox.MacOs/Pivox.MacOs.csproj -c Release -r osx-arm64
 
 # Launch (Debug). Open the .app bundle.
-open PivoxApp/bin/Debug/net10.0-macos/osx-arm64/PivoxApp.app
+open Pivox.MacOs/bin/Debug/net10.0-macos/osx-arm64/Pivox.app
 ```
 
 Provisioning profile setup (one-time, per developer machine): copy
-the SwiftUI Pivox app's Xcode-generated profile into `PivoxApp/`:
+the SwiftUI Pivox app's Xcode-generated profile into `Pivox.MacOs/`:
 
 ```sh
 cp ../native/build-xcode/Debug/Pivox.app/Contents/embedded.provisionprofile \
-   PivoxApp/embedded.provisionprofile
+   Pivox.MacOs/embedded.provisionprofile
 ```
 
 Gitignored. Refresh when the upstream Xcode build refreshes it.
@@ -384,7 +398,7 @@ Verify after build:
 
 ```sh
 /usr/libexec/PlistBuddy -c "Print NSMainStoryboardFile" \
-  PivoxApp/bin/Debug/net10.0-macos/osx-arm64/PivoxApp.app/Contents/Info.plist
+  Pivox.MacOs/bin/Debug/net10.0-macos/osx-arm64/Pivox.app/Contents/Info.plist
 # Expected: 'NSMainStoryboardFile' Does Not Exist
 ```
 
@@ -393,7 +407,7 @@ Verify after build:
 No storyboard means building NSMenu in `AppDelegate.DidFinishLaunching`.
 Minimum-viable: Application menu (Quit) + Edit menu (Cut/Copy/Paste/
 Select All so NSTextField shortcuts work) + Window menu.
-`PivoxApp/AppDelegate.cs`'s `BuildMainMenu()` is the reference shape.
+`Pivox.MacOs/AppDelegate.cs`'s `BuildMainMenu()` is the reference shape.
 
 Selectors are standard Cocoa names dispatched up the responder chain
 (`terminate:`, `cut:`, `copy:`, `paste:`, `selectAll:`,
@@ -437,7 +451,7 @@ has been specified") on rebuild. The warning is **false** — our
 setup is valid:
 
 - `<CodesignProvision>Mac Team Provisioning Profile: app.pivox.native</CodesignProvision>`
-  is set in `PivoxApp.csproj`.
+  is set in `Pivox.MacOs.csproj`.
 - That exact profile is installed in
   `~/Library/Developer/Xcode/UserData/Provisioning Profiles/`.
 - The profile's `keychain-access-groups` is `FAENDBN66M.*` (wildcard
@@ -467,7 +481,7 @@ shared libs should do the same. Reflection-heavy patterns warn at
 build time instead of breaking host-app publish.
 
 Class libraries do **not** set `<PublishAot>` — that's executable-only.
-`PivoxApp.csproj` sets `<PublishAot>true</PublishAot>` (unconditional;
+`Pivox.MacOs.csproj` sets `<PublishAot>true</PublishAot>` (unconditional;
 AOT only triggers at publish time, not build).
 
 ## Tooling reference
@@ -618,7 +632,7 @@ security cms -D -i embedded.provisionprofile | grep -A1 ApplicationIdentifierPre
 ```
 
 ```xml
-<!-- PivoxApp.csproj -->
+<!-- Pivox.MacOs.csproj -->
 <EnableCodeSigning>true</EnableCodeSigning>
 <CodesignKey>Apple Development: name@example.com (CERTSUFFIX)</CodesignKey>
 <CodesignEntitlements>Entitlements.plist</CodesignEntitlements>

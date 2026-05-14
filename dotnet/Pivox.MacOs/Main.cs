@@ -1,5 +1,5 @@
 using AppKit;
-using PivoxApp;
+using Pivox;
 
 // All-code AppKit bootstrap. Without a storyboard or MainMenu nib,
 // NSApplicationMain has no mechanism to discover and instantiate

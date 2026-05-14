@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleName</key>
-	<string>PivoxApp</string>
+	<string>Pivox</string>
 	<!-- Matches the Swift app's BUNDLE_ID in GoogleService-Info.plist.
 	     Firebase API key is restricted to this bundle ID at the
 	     Google Cloud Console level — requests from other bundle IDs

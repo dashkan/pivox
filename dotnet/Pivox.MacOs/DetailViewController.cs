@@ -6,7 +6,7 @@ using Pivox.Api.V1;
 using Pivox.Client;
 using Pivox.Shared.Auth;
 
-namespace PivoxApp;
+namespace Pivox;
 
 /// <summary>
 /// Test harness for the cross-platform auth + gRPC stack:

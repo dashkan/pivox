@@ -5,7 +5,7 @@
 // Manual changes to this file may not be handled correctly.
 //
 
-namespace PivoxApp;
+namespace Pivox;
 
 [Register ("ViewController")]
 partial class ViewController {

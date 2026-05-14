@@ -1,6 +1,6 @@
 using ObjCRuntime;
 
-namespace PivoxApp;
+namespace Pivox;
 
 public partial class ViewController : NSViewController {
 	protected ViewController (NativeHandle handle) : base (handle)

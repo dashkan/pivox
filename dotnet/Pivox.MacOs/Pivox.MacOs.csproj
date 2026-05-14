@@ -7,6 +7,21 @@
     <SupportedOSPlatformVersion>26.0</SupportedOSPlatformVersion>
     <ValidateXcodeVersion>false</ValidateXcodeVersion>
 
+    <!-- Project identifier is Pivox.MacOs (matches csproj filename
+         + slnx entry + filesystem dir), but the OUTPUT assembly and
+         bundle drop the platform suffix so users see "Pivox.app",
+         not "Pivox.MacOs.app". The same pattern applies to the
+         WinUI side: Pivox.WinUI.csproj produces Pivox.exe. -->
+    <AssemblyName>Pivox</AssemblyName>
+
+    <!-- Root namespace is Pivox (no platform suffix) so types live
+         in `namespace Pivox` / `namespace Pivox.Auth` etc — matching
+         what the SwiftUI side does and what Pivox.WinUI will mirror.
+         Platform-specific class NAMES (MacOsAuthService,
+         WindowsAuthService) carry the disambiguation; the namespace
+         doesn't need to. -->
+    <RootNamespace>Pivox</RootNamespace>
+
     <!-- NativeAOT — produces a static native binary, no Mono runtime.
          Only triggers on `dotnet publish` (not `dotnet build`), so
          Debug build-and-run stays fast. NativeAOT manages its own

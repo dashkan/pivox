@@ -11,7 +11,7 @@ using Foundation;
 using ObjCRuntime;
 using Pivox.Shared.Auth;
 
-namespace PivoxApp.Auth;
+namespace Pivox.Auth;
 
 /// <summary>
 /// macOS implementation of <see cref="IAuthService"/>, wrapping the
@@ -178,11 +178,7 @@ public sealed class MacOsAuthService : IAuthService
     private static AuthSession BuildSession(NSString idToken)
     {
         var jwt = idToken.ToString();
-        return new AuthSession(
-            IdToken: jwt,
-            PivoxUserId: JwtClaims.ExtractPivoxUserId(jwt),
-            Email: FIRAuth.Auth.CurrentUser?.Email,
-            ExpiresAt: JwtClaims.ExtractExpiresAt(jwt));
+        return new AuthSession(jwt, new FirebaseIdentity(jwt));
     }
 
     private void SetCurrent(AuthSession? session)

@@ -2,5 +2,5 @@
   <Project Path="Firebase.Bindings/Firebase.Bindings.csproj" />
   <Project Path="Pivox.Client/Pivox.Client.csproj" />
   <Project Path="Pivox.Shared/Pivox.Shared.csproj" />
-  <Project Path="PivoxApp/PivoxApp.csproj" />
+  <Project Path="Pivox.MacOs/Pivox.MacOs.csproj" />
 </Solution>

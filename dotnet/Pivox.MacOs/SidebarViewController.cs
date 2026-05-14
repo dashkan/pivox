@@ -3,7 +3,7 @@ using CoreGraphics;
 using Foundation;
 using ObjCRuntime;
 
-namespace PivoxApp;
+namespace Pivox;
 
 /// <summary>
 /// Sidebar pane for the main split view. View hierarchy is built

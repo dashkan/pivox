@@ -4,9 +4,9 @@ using Foundation;
 using ObjCRuntime;
 using Pivox.Client;
 using Pivox.Shared.Auth;
-using PivoxApp.Auth;
+using Pivox.Auth;
 
-namespace PivoxApp;
+namespace Pivox;
 
 /// <summary>
 /// Builds the entire app UI in code. No storyboard, no xib.
