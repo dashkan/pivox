@@ -25,6 +25,18 @@ dotnet/**/embedded.provisionprofile
 # .NET tool cache for the fetch script.
 dotnet/.cache/
 
+# Firebase C++ SDK for Windows (~250 MB). Reproducible via
+# dotnet/scripts/fetch-firebase-cpp-sdk.ps1 which downloads the
+# official zip from dl.google.com/firebase/sdk/cpp/.
+dotnet/Pivox.Firebase.Native/firebase_cpp_sdk/
+
+# C++ NuGet packages (CppWinRT etc.) — restored by NuGet to
+# solution-level packages/ folder (packages.config model).
+dotnet/packages/
+
+# C++/WinRT generated files — produced at build time from .idl.
+dotnet/Pivox.Firebase.Native/Generated Files/
+
 # Rider local config.
 dotnet/.idea/
 
@@ -558,6 +570,8 @@ MANIFEST
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
+# WinUI app.manifest is needed — override the Python *.manifest rule above.
+!dotnet/Pivox.WinUI/app.manifest
 *.spec
 
 # Installer logs

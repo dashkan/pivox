@@ -1,0 +1,43 @@
+// FirebaseAuthBridge.idl — WinRT surface for Firebase C++ SDK Auth.
+//
+// Thin bridge: wraps firebase::auth::Auth calls and projects them as
+// IAsyncOperation<String> (JWT strings) + a state-change event.
+// No UI, no OAuth, no business logic — that lives in the C# adapter.
+
+namespace Pivox.Firebase.Native
+{
+    [default_interface]
+    runtimeclass FirebaseAuthBridge
+    {
+        FirebaseAuthBridge();
+
+        // Initialize the Firebase app + auth instance.  Must be called
+        // once before any other method.  Returns false if init fails.
+        Boolean Initialize();
+
+        // Email/password sign-in.  Returns the user's ID token JWT on
+        // success; throws winrt::hresult_error on failure.
+        Windows.Foundation.IAsyncOperation<String> SignInWithEmailAsync(
+            String email, String password);
+
+        // Sign in with an OAuth credential (e.g. Google id_token +
+        // access_token exchanged on the C# side).  Returns the ID
+        // token JWT.
+        Windows.Foundation.IAsyncOperation<String> SignInWithCredentialAsync(
+            String providerId, String idToken, String accessToken);
+
+        // Get the current user's ID token.  Firebase auto-refreshes
+        // when the token is close to expiry (~5 min).
+        Windows.Foundation.IAsyncOperation<String> GetIdTokenAsync(
+            Boolean forceRefresh);
+
+        void SignOut();
+
+        Boolean IsSignedIn{ get; };
+
+        // Fires when Firebase auth state changes.  Boolean payload:
+        // true = signed in, false = signed out.  Fires on Firebase's
+        // internal thread — C# subscriber marshals to UI thread.
+        event Windows.Foundation.TypedEventHandler<FirebaseAuthBridge, Boolean> AuthStateChanged;
+    }
+}

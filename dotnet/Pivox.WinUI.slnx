@@ -1,0 +1,16 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="ARM64" />
+    <Platform Name="x64" />
+  </Configurations>
+  <Project Path="Pivox.Client/Pivox.Client.csproj" />
+  <Project Path="Pivox.Firebase.Native/Pivox.Firebase.Native.vcxproj" Id="a1b2c3d4-e5f6-7890-abcd-ef1234567890" />
+  <Project Path="Pivox.Shared/Pivox.Shared.csproj" />
+  <Project Path="Pivox.WinUI/Pivox.WinUI.csproj">
+    <Platform Solution="*|Any CPU" Project="x64" />
+    <Platform Solution="*|ARM64" Project="ARM64" />
+    <Platform Solution="*|x64" Project="x64" />
+    <Deploy />
+  </Project>
+</Solution>

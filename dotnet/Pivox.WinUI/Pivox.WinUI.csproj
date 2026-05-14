@@ -1,0 +1,77 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <Platforms>x64;ARM64</Platforms>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <UseWinUI>true</UseWinUI>
+    <WinUISDKReferences>false</WinUISDKReferences>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Match Pivox.MacOs: project name carries the platform suffix,
+         but the output assembly drops it.  Users see "Pivox.exe". -->
+    <AssemblyName>Pivox</AssemblyName>
+
+    <!-- Root namespace matches macOS side — platform-specific types
+         are disambiguated by CLASS name (WindowsAuthService vs
+         MacOsAuthService), not namespace. -->
+    <RootNamespace>Pivox</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.1839" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.0.1" />
+    <PackageReference Include="Microsoft.Windows.CsWinRT" Version="2.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Manifest Include="app.manifest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\SplashScreen.scale-200.png" />
+    <Content Include="Assets\LockScreenLogo.scale-200.png" />
+    <Content Include="Assets\Square150x150Logo.scale-200.png" />
+    <Content Include="Assets\Square44x44Logo.scale-200.png" />
+    <Content Include="Assets\Square44x44Logo.targetsize-24_altform-unplated.png" />
+    <Content Include="Assets\StoreLogo.png" />
+    <Content Include="Assets\Wide310x150Logo.scale-200.png" />
+  </ItemGroup>
+
+  <!-- Cross-platform contracts — same libraries the macOS app uses. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Pivox.Shared\Pivox.Shared.csproj" />
+    <ProjectReference Include="..\Pivox.Client\Pivox.Client.csproj" />
+  </ItemGroup>
+
+  <!-- C++/WinRT component wrapping Firebase C++ SDK.
+       CsWinRT generates the C# projection from the .winmd at build. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Pivox.Firebase.Native\Pivox.Firebase.Native.vcxproj" />
+  </ItemGroup>
+
+  <!-- Tell CsWinRT to project our component namespace. -->
+  <PropertyGroup>
+    <CsWinRTIncludes>Pivox.Firebase.Native</CsWinRTIncludes>
+  </PropertyGroup>
+
+  <!-- MSIX packaging -->
+  <ItemGroup Condition="'$(DisableMsixProjectCapabilityAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
+    <ProjectCapability Include="Msix" />
+  </ItemGroup>
+  <PropertyGroup Condition="'$(DisableHasPackageAndPublishMenuAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
+    <HasPackageAndPublishMenu>true</HasPackageAndPublishMenu>
+  </PropertyGroup>
+
+  <!-- Publish settings -->
+  <PropertyGroup>
+    <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>
+    <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">True</PublishReadyToRun>
+    <PublishTrimmed Condition="'$(Configuration)' == 'Debug'">False</PublishTrimmed>
+    <PublishTrimmed Condition="'$(Configuration)' != 'Debug'">True</PublishTrimmed>
+    <SupportedOSPlatformVersion>10.0.26100.0</SupportedOSPlatformVersion>
+  </PropertyGroup>
+</Project>
