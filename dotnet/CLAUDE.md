@@ -199,11 +199,11 @@ dotnet/
                                                    NOT an Interceptor —
                                                    see "Bearer-token
                                                    attachment" below.
-  Firebase.Bindings/      macOS-only sharpie binding of the Firebase
+  Pivox.Firebase.Bindings/      macOS-only sharpie binding of the Firebase
                           Cocoa SDK (FirebaseAuth + FirebaseCore + 9
                           embedded-only transitive xcframeworks).
                           Not consumed by Windows code.
-  Pivox.MacOs/               macOS app. All-code NSWindow root, no
+  Pivox.macOS/               macOS app. All-code NSWindow root, no
                           storyboard. Implements IAuthService against
                           the Firebase binding. Signs with the local
                           Apple Development cert + provisioning
@@ -220,11 +220,11 @@ Code may depend **downward**, never **upward**, never **sideways**.
 
 - `Pivox.Shared` depends on nothing in this directory.
 - `Pivox.Client` depends on `Pivox.Shared`.
-- `Firebase.Bindings` depends on nothing.
-- `Pivox.MacOs` may depend on all of the above.
+- `Pivox.Firebase.Bindings` depends on nothing.
+- `Pivox.macOS` may depend on all of the above.
 - `Pivox.WinUI` (future) depends on `Pivox.Shared` + `Pivox.Client`
   + a Windows-specific binding/projection assembly. **Not** on
-  `Firebase.Bindings` (macOS-only) or `Pivox.MacOs` (macOS-only).
+  `Pivox.Firebase.Bindings` (macOS-only) or `Pivox.macOS` (macOS-only).
 
 **No platform-specific types in `Pivox.Shared` or `Pivox.Client`.**
 That includes Firebase types, AppKit types, WinUI types, WinRT types.
@@ -237,10 +237,10 @@ implemented separately per platform.
 1. **Cross-platform code (logic, state, contracts, gRPC, view models)**
    → `Pivox.Shared` or `Pivox.Client`.
 2. **macOS implementation of a cross-platform interface, or a macOS-only
-   UI component** → `Pivox.MacOs`.
+   UI component** → `Pivox.macOS`.
 3. **Windows implementation of a cross-platform interface, or a
    WinUI-only UI component** → `Pivox.WinUI`.
-4. **C# binding of a third-party Cocoa SDK** → `Firebase.Bindings`
+4. **C# binding of a third-party Cocoa SDK** → `Pivox.Firebase.Bindings`
    (or a sibling binding project per SDK).
 
 ## Build
@@ -254,18 +254,18 @@ dotnet build Pivox.slnx
 
 # Release publish (NativeAOT, code-signed, provisioning-profile
 # embedded). Produces a static native binary, no Mono runtime.
-dotnet publish Pivox.MacOs/Pivox.MacOs.csproj -c Release -r osx-arm64
+dotnet publish Pivox.macOS/Pivox.macOS.csproj -c Release -r osx-arm64
 
 # Launch (Debug). Open the .app bundle.
-open Pivox.MacOs/bin/Debug/net10.0-macos/osx-arm64/Pivox.app
+open Pivox.macOS/bin/Debug/net10.0-macos/osx-arm64/Pivox.app
 ```
 
 Provisioning profile setup (one-time, per developer machine): copy
-the SwiftUI Pivox app's Xcode-generated profile into `Pivox.MacOs/`:
+the SwiftUI Pivox app's Xcode-generated profile into `Pivox.macOS/`:
 
 ```sh
 cp ../native/build-xcode/Debug/Pivox.app/Contents/embedded.provisionprofile \
-   Pivox.MacOs/embedded.provisionprofile
+   Pivox.macOS/embedded.provisionprofile
 ```
 
 Gitignored. Refresh when the upstream Xcode build refreshes it.
@@ -398,7 +398,7 @@ Verify after build:
 
 ```sh
 /usr/libexec/PlistBuddy -c "Print NSMainStoryboardFile" \
-  Pivox.MacOs/bin/Debug/net10.0-macos/osx-arm64/Pivox.app/Contents/Info.plist
+  Pivox.macOS/bin/Debug/net10.0-macos/osx-arm64/Pivox.app/Contents/Info.plist
 # Expected: 'NSMainStoryboardFile' Does Not Exist
 ```
 
@@ -407,7 +407,7 @@ Verify after build:
 No storyboard means building NSMenu in `AppDelegate.DidFinishLaunching`.
 Minimum-viable: Application menu (Quit) + Edit menu (Cut/Copy/Paste/
 Select All so NSTextField shortcuts work) + Window menu.
-`Pivox.MacOs/AppDelegate.cs`'s `BuildMainMenu()` is the reference shape.
+`Pivox.macOS/AppDelegate.cs`'s `BuildMainMenu()` is the reference shape.
 
 Selectors are standard Cocoa names dispatched up the responder chain
 (`terminate:`, `cut:`, `copy:`, `paste:`, `selectAll:`,
@@ -451,7 +451,7 @@ has been specified") on rebuild. The warning is **false** — our
 setup is valid:
 
 - `<CodesignProvision>Mac Team Provisioning Profile: app.pivox.native</CodesignProvision>`
-  is set in `Pivox.MacOs.csproj`.
+  is set in `Pivox.macOS.csproj`.
 - That exact profile is installed in
   `~/Library/Developer/Xcode/UserData/Provisioning Profiles/`.
 - The profile's `keychain-access-groups` is `FAENDBN66M.*` (wildcard
@@ -481,7 +481,7 @@ shared libs should do the same. Reflection-heavy patterns warn at
 build time instead of breaking host-app publish.
 
 Class libraries do **not** set `<PublishAot>` — that's executable-only.
-`Pivox.MacOs.csproj` sets `<PublishAot>true</PublishAot>` (unconditional;
+`Pivox.macOS.csproj` sets `<PublishAot>true</PublishAot>` (unconditional;
 AOT only triggers at publish time, not build).
 
 ## Tooling reference
@@ -494,7 +494,7 @@ AOT only triggers at publish time, not build).
 
 ## Binding third-party Cocoa SDKs — the playbook
 
-Reference implementation: `Firebase.Bindings/` (FirebaseAuth +
+Reference implementation: `Pivox.Firebase.Bindings/` (FirebaseAuth +
 FirebaseCore + 9 embedded transitive xcframeworks). Sign-in works
 through the binding against the real Firebase backend with token
 persistence under NativeAOT.
@@ -632,7 +632,7 @@ security cms -D -i embedded.provisionprofile | grep -A1 ApplicationIdentifierPre
 ```
 
 ```xml
-<!-- Pivox.MacOs.csproj -->
+<!-- Pivox.macOS.csproj -->
 <EnableCodeSigning>true</EnableCodeSigning>
 <CodesignKey>Apple Development: name@example.com (CERTSUFFIX)</CodesignKey>
 <CodesignEntitlements>Entitlements.plist</CodesignEntitlements>

@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Pivox.Firebase.Bindings/Pivox.Firebase.Bindings.csproj" />
+  <Project Path="Pivox.Client/Pivox.Client.csproj" />
+  <Project Path="Pivox.Shared/Pivox.Shared.csproj" />
+  <Project Path="Pivox.macOS/Pivox.macOS.csproj" />
+</Solution>

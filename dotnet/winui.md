@@ -1,6 +1,6 @@
 # WinUI 3 Side — Implementation Record
 
-This documents the Windows-side companion to `Pivox.MacOs` (the
+This documents the Windows-side companion to `Pivox.macOS` (the
 macOS app). The macOS side is fully validated: all-code AppKit +
 Firebase Cocoa SDK + Google OAuth + persistent session + gRPC
 against pivox-cloud, all under NativeAOT. See `CLAUDE.md` in this
@@ -23,18 +23,15 @@ The Windows stack is proven. All validation checkpoints passed:
 
 ## Solution files
 
-Two `.slnx` files exist deliberately:
+Two `.slnx` files exist deliberately, one per platform:
 
-- **`Pivox.slnx`** — all projects (macOS + Windows + shared).
-  macOS-only projects (`Firebase.Bindings`, `Pivox.MacOs`) are
-  excluded from Debug builds. Used by Rider on macOS.
+- **`Pivox.macOS.slnx`** — macOS projects only (`Pivox.Shared`,
+  `Pivox.Client`, `Pivox.Firebase.Bindings`, `Pivox.macOS`). Used
+  by Rider on macOS. Build with `dotnet build`.
 - **`Pivox.WinUI.slnx`** — Windows projects only (`Pivox.Shared`,
   `Pivox.Client`, `Pivox.Firebase.Native`, `Pivox.WinUI`). Used
-  by Visual Studio on Windows.
-
-The split exists because `dotnet build` cannot handle vcxproj files
-(no `VCTargetsPath`). The Windows solution must be built with VS's
-MSBuild:
+  by Visual Studio on Windows. Must be built with VS's MSBuild
+  (`dotnet build` can't handle vcxproj — no `VCTargetsPath`):
 
 ```sh
 msbuild Pivox.WinUI.slnx -p:Configuration=Debug -p:Platform=x64
@@ -42,12 +39,15 @@ msbuild Pivox.WinUI.slnx -p:Configuration=Debug -p:Platform=x64
 
 Or just F5 / Ctrl+B in Visual Studio.
 
+The two solutions don't clobber each other — each is the entry
+point for its platform's tooling.
+
 ## Source layout
 
 ```
 dotnet/
-  Pivox.slnx                       all projects (macOS + Windows)
-  Pivox.WinUI.slnx                 Windows projects only (use this on Windows)
+  Pivox.macOS.slnx                 macOS solution (Rider / dotnet CLI)
+  Pivox.WinUI.slnx                 Windows solution (VS / MSBuild)
   Pivox.Firebase.Native/           C++/WinRT component (vcxproj)
     Pivox.Firebase.Native.vcxproj
     FirebaseAuthBridge.idl          WinRT surface definition
@@ -68,8 +68,8 @@ dotnet/
     Assets/                         Placeholder MSIX assets
   Pivox.Client/                    (existing — shared gRPC clients)
   Pivox.Shared/                    (existing — shared auth contracts)
-  Pivox.MacOs/                     (existing — macOS app)
-  Firebase.Bindings/               (existing — macOS Cocoa bindings;
+  Pivox.macOS/                     (existing — macOS app)
+  Pivox.Firebase.Bindings/         (existing — macOS Cocoa bindings;
                                     NOT consumed by Windows)
   scripts/
     fetch-firebase-sdk.sh           macOS Firebase xcframeworks
@@ -265,8 +265,8 @@ Same as the macOS side (see `CLAUDE.md`), extended:
   (only the Firebase C++ SDK).
 - `Pivox.WinUI` depends on `Pivox.Shared` + `Pivox.Client` +
   `Pivox.Firebase.Native`.
-- `Pivox.WinUI` does NOT reference `Firebase.Bindings` (macOS) or
-  `Pivox.MacOs`.
+- `Pivox.WinUI` does NOT reference `Pivox.Firebase.Bindings` (macOS)
+  or `Pivox.macOS`.
 
 No Firebase types cross `IAuthService`. The WinRT projection types
 stay inside `WindowsAuthService`; everything above sees

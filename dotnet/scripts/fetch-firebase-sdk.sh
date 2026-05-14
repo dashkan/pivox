@@ -2,7 +2,7 @@
 #
 # Downloads the Firebase iOS SDK release zip and extracts the
 # xcframeworks the FirebaseAuth binding needs into
-# Firebase.Bindings/Frameworks/. Idempotent.
+# Pivox.Firebase.Bindings/Frameworks/. Idempotent.
 #
 # We bind FirebaseAuth + FirebaseCore from C# and embed nine more
 # transitive xcframeworks for the linker. See
@@ -18,7 +18,7 @@ set -euo pipefail
 FIREBASE_VERSION="${FIREBASE_VERSION:-12.13.0}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-FRAMEWORKS_DIR="$ROOT/Firebase.Bindings/Frameworks"
+FRAMEWORKS_DIR="$ROOT/Pivox.Firebase.Bindings/Frameworks"
 TMP_DIR="$ROOT/.cache/firebase-sdk-$FIREBASE_VERSION"
 ZIP="$TMP_DIR/Firebase.zip"
 EXTRACTED="$TMP_DIR/Firebase"

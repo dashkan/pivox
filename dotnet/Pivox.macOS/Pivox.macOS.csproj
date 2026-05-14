@@ -7,10 +7,10 @@
     <SupportedOSPlatformVersion>26.0</SupportedOSPlatformVersion>
     <ValidateXcodeVersion>false</ValidateXcodeVersion>
 
-    <!-- Project identifier is Pivox.MacOs (matches csproj filename
+    <!-- Project identifier is Pivox.macOS (matches csproj filename
          + slnx entry + filesystem dir), but the OUTPUT assembly and
          bundle drop the platform suffix so users see "Pivox.app",
-         not "Pivox.MacOs.app". The same pattern applies to the
+         not "Pivox.macOS.app". The same pattern applies to the
          WinUI side: Pivox.WinUI.csproj produces Pivox.exe. -->
     <AssemblyName>Pivox</AssemblyName>
 
@@ -52,7 +52,7 @@
          11 transitive xcframeworks (FirebaseAuth, FirebaseCore,
          FirebaseInstallations, GoogleUtilities, GTMSessionFetcher,
          nanopb, FBLPromises, plus interop protocol declarations). -->
-    <ProjectReference Include="..\Firebase.Bindings\Firebase.Bindings.csproj" />
+    <ProjectReference Include="..\Pivox.Firebase.Bindings\Pivox.Firebase.Bindings.csproj" />
 
     <!-- Cross-platform contracts (IAuthService, AuthSession, JWT
          claim helpers). Same library Windows will consume. -->

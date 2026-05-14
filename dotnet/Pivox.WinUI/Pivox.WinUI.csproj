@@ -14,8 +14,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
 
-    <!-- Match Pivox.MacOs: project name carries the platform suffix,
-         but the output assembly drops it.  Users see "Pivox.exe". -->
+    <!-- Match Pivox.macOS: project name carries the platform suffix,
+         but the output assembly drops it. Users see "Pivox.exe". -->
     <AssemblyName>Pivox</AssemblyName>
 
     <!-- Root namespace matches macOS side — platform-specific types

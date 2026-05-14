@@ -12,7 +12,7 @@ namespace Pivox.Client;
 /// pre-attached so every call carries the user's Bearer token.
 ///
 /// One instance per process. Constructed by the platform app
-/// (Pivox.MacOs on macOS, future Pivox.WinUI) and passed wherever
+/// (Pivox.macOS on macOS, future Pivox.WinUI) and passed wherever
 /// gRPC access is needed.
 /// </summary>
 public sealed class PivoxClient : IDisposable

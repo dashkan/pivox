@@ -2,7 +2,7 @@
 
 # Firebase xcframeworks for macOS (~111 MB). Reproducible via
 # scripts/fetch-firebase-sdk.sh.
-Firebase.Bindings/Frameworks/
+Pivox.Firebase.Bindings/Frameworks/
 
 # Firebase C++ SDK for Windows (~250 MB). Reproducible via
 # scripts/fetch-firebase-cpp-sdk.ps1.
