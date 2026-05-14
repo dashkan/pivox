@@ -35,6 +35,11 @@
     <!-- Cross-platform contracts (IAuthService, AuthSession, JWT
          claim helpers). Same library Windows will consume. -->
     <ProjectReference Include="..\Pivox.Shared\Pivox.Shared.csproj" />
+
+    <!-- gRPC clients for pivox-cloud, generated from ../../api/proto/.
+         Same library Windows will consume — only the AuthService
+         implementation differs between platforms. -->
+    <ProjectReference Include="..\Pivox.Client\Pivox.Client.csproj" />
   </ItemGroup>
 
   <ItemGroup>

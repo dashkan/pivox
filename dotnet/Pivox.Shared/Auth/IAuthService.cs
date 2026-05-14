@@ -30,15 +30,10 @@ public interface IAuthService
     Task SignOutAsync(CancellationToken ct = default);
 
     /// <summary>
-    /// Returns a JWT that is guaranteed valid for at least
-    /// <paramref name="staleWindow"/> from now. Refreshes the underlying
-    /// Firebase token if the current one would expire within that window.
+    /// Returns the current user's Firebase ID token. The underlying
+    /// SDK auto-refreshes internally when the token is close to expiry
+    /// (default ~5 min) — callers don't need to reason about staleness.
     /// Throws <see cref="InvalidOperationException"/> if not signed in.
-    ///
-    /// Designed for the gRPC interceptor: pass e.g. 60s as the stale
-    /// window so the token doesn't expire mid-call.
     /// </summary>
-    Task<string> GetFreshIdTokenAsync(
-        TimeSpan staleWindow,
-        CancellationToken ct = default);
+    Task<string> GetIdTokenAsync(CancellationToken ct = default);
 }

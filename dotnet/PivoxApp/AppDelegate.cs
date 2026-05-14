@@ -2,6 +2,7 @@ using AppKit;
 using CoreGraphics;
 using Foundation;
 using ObjCRuntime;
+using Pivox.Client;
 using Pivox.Shared.Auth;
 using PivoxApp.Auth;
 
@@ -24,23 +25,28 @@ namespace PivoxApp;
 [Register("AppDelegate")]
 public sealed class AppDelegate : NSApplicationDelegate
 {
-	// Strong refs so neither window, controller, nor service gets
+	// Strong refs so window, controllers, and services don't get
 	// GC'd while the app is running.
 	private NSWindow? _window;
 	private NSSplitViewController? _splitVC;
 	private IAuthService? _auth;
+	private PivoxClient? _pivox;
 
 	public override void DidFinishLaunching(NSNotification notification)
 	{
 		NSApplication.SharedApplication.MainMenu = BuildMainMenu();
 
 		// Single auth service for the process — wraps FIRAuth + Google
-		// OAuth. Will be passed down to anything that needs auth (gRPC
-		// interceptor next).
+		// OAuth. Passed wherever auth is needed.
 		_auth = new MacOsAuthService();
 
+		// Single gRPC client. Auto-attaches Bearer tokens via the
+		// AuthInterceptor. Endpoint resolves from CloudConfig (defaults
+		// to pivox.ngrok.app; overridable via PIVOX_GRPC_HOST).
+		_pivox = new PivoxClient(_auth);
+
 		var sidebar = new SidebarViewController();
-		var detail = new DetailViewController(_auth);
+		var detail = new DetailViewController(_auth, _pivox);
 
 		_splitVC = new NSSplitViewController();
 		_splitVC.AddSplitViewItem(NSSplitViewItem.CreateSidebar(sidebar));

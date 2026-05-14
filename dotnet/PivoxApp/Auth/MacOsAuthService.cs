@@ -50,22 +50,27 @@ public sealed class MacOsAuthService : IAuthService
             FIRApp.Configure();
         }
 
-        // FIRAuth listener — fires on any auth-state change Firebase
-        // notices internally (token refresh, sign-out from another
-        // app, etc.). We snapshot Current here so consumers don't
-        // need to poll.
+        // FIRAuth restores the persisted user from Keychain synchronously
+        // during Configure. The listener below fires once on registration
+        // with the current state (Firebase's documented behavior) so it
+        // catches both the launch-time restored session AND subsequent
+        // changes — no separate restore-on-launch code needed.
         FIRAuth.Auth.AddAuthStateDidChangeListener((_, user) =>
         {
             if (user is null)
             {
+                Console.Error.WriteLine("[Auth] state change: signed out");
                 SetCurrent(null);
                 return;
             }
-            // We can't synchronously get the ID token, so just emit a
-            // bootstrap snapshot with empty token; consumers that need
-            // the token call GetFreshIdTokenAsync.
-            user.GetIDTokenWithCompletion((tok, _) =>
+            Console.Error.WriteLine($"[Auth] state change: uid={user.Uid}");
+            user.GetIDTokenWithCompletion((tok, err) =>
             {
+                if (err is not null)
+                {
+                    Console.Error.WriteLine($"[Auth] token fetch failed: {err.LocalizedDescription}");
+                    return;
+                }
                 if (tok is not null)
                 {
                     SetCurrent(BuildSession(tok));
@@ -109,31 +114,29 @@ public sealed class MacOsAuthService : IAuthService
         return Task.CompletedTask;
     }
 
-    public async Task<string> GetFreshIdTokenAsync(
-        TimeSpan staleWindow, CancellationToken ct = default)
+    public async Task<string> GetIdTokenAsync(CancellationToken ct = default)
     {
         var user = FIRAuth.Auth.CurrentUser
             ?? throw new InvalidOperationException("Not signed in.");
 
-        // Force refresh if expiring within the stale window.
-        var snapshot = _current;
-        var forceRefresh = snapshot is null
-            || snapshot.ExpiresAt - DateTimeOffset.UtcNow < staleWindow;
-
+        // FIRAuth's getIDToken: auto-refreshes if the token is close to
+        // expiry (default ~5 min). No need to second-guess it.
         var tcs = new TaskCompletionSource<(NSString?, NSError?)>();
-        user.GetIDTokenForcingRefresh(forceRefresh, (tok, err) => tcs.SetResult((tok, err)));
+        user.GetIDTokenWithCompletion((tok, err) => tcs.SetResult((tok, err)));
         var (token, error) = await tcs.Task.WaitAsync(ct);
 
         if (error is not null)
         {
             throw new InvalidOperationException(
-                $"Token refresh failed: {error.LocalizedDescription} (code {error.Code})");
+                $"Token fetch failed: {error.LocalizedDescription} (code {error.Code})");
         }
         if (token is null)
         {
-            throw new InvalidOperationException("Token refresh returned no token.");
+            throw new InvalidOperationException("Token fetch returned no token.");
         }
 
+        // Update the cached snapshot — Firebase may have rotated the
+        // token transparently (claims could change, expiry advanced).
         var session = BuildSession(token);
         SetCurrent(session);
         return session.IdToken;
