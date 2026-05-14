@@ -230,34 +230,37 @@ app lifetime; passed to `MainWindow`.
 
 ## Steal from the existing native/ Windows implementation
 
-**Important**: the Firebase C++ SDK is **already integrated and
-working** in the current `native/platform/windows/` C++/WinUI
-implementation. Don't write any of this from scratch — copy
-what's already there into `dotnet/PivoxApp.Windows/Firebase.Native/`
-and expose it via C++/WinRT projection.
+**Headline rule: `dotnet/` is fully self-contained. Nothing inside
+`dotnet/` may reference `../native/` at build time.**
 
-**The code must be brought OVER into the dotnet/ tree**, not
-referenced in place. `dotnet/` is a self-contained sibling to
-`native/`; cross-tree dependencies between them would break the
-strategic decision that the two stacks are parallel paths.
+The Firebase Auth C++ SDK is already integrated and working in
+`native/platform/windows/`. You COPY source files from there into
+`dotnet/PivoxApp.Windows/`, then build entirely within `dotnet/`.
+Reading `native/` source for guidance is fine; depending on `native/`
+artifacts (link paths, generated headers, SDK extraction, build
+outputs, configs) is not.
+
 `native/` continues to exist as the current Swift/CMake/WinUI-C++
-implementation; `dotnet/` is the .NET cross-platform alternative.
-After the WinUI work lands, the relevant files exist in BOTH places
-until/unless one stack is retired.
+implementation. `dotnet/` is the parallel .NET cross-platform
+alternative. After this work lands, the C++ Firebase glue files
+exist in BOTH trees — that's the point. The `dotnet/` copies are
+the new owners; they diverge from `native/` originals over time as
+each tree evolves.
 
 Source files to copy → destination:
 
-| Source (in `native/`, leave in place) | Destination (in `dotnet/`, the working copy) | What it gives you |
+| Source (in `native/`, read for reference, copy from) | Destination (in `dotnet/`, owned by dotnet) | What it gives you |
 |---|---|---|
 | `native/platform/windows/WinAuthService.{h,cpp}` | `dotnet/PivoxApp.Windows/Firebase.Native/WinAuthService.{h,cpp}` | Full Firebase C++ SDK integration: `firebase::App::Create`, `firebase::auth::Auth::SignInWithEmailAndPassword`, `SignInWithCredential` for OAuth providers, token retrieval, state listener wiring. Already handles `firebase::Future<T>` unwrapping. |
 | `native/platform/windows/shared/GoogleOAuth.{h,cpp}` | `dotnet/PivoxApp.Windows/Firebase.Native/GoogleOAuth.{h,cpp}` | Google OAuth flow on Windows — equivalent of macOS's PKCE + ASWebAuthenticationSession. URL building, callback handling, code exchange. |
 | `native/platform/windows/shared/OAuthPopup.{h,cpp}` | `dotnet/PivoxApp.Windows/Firebase.Native/OAuthPopup.{h,cpp}` | Windows-native popup container for the OAuth web view. Reuse instead of rewriting against WebAuthenticationBroker. |
-| `native/platform/windows/firebase_config.h` + the SDK extraction location + `google-services.json` | `dotnet/PivoxApp.Windows/Firebase.Native/` (config) + a fetched copy of the SDK | Linker flags, SDK include paths, Firebase config tied to the `pivox-cloud` project. |
+| `native/platform/windows/firebase_config.h` | `dotnet/PivoxApp.Windows/Firebase.Native/firebase_config.h` | Firebase SDK header config (project ID, etc). |
+| `google-services.json` (wherever it currently lives) | `dotnet/PivoxApp.Windows/google-services.json` | Firebase project config tied to `pivox-cloud`. Same file the existing C++ build uses; copy not symlink. |
+| Firebase C++ SDK extraction (currently somewhere under `native/`) | `dotnet/PivoxApp.Windows/Firebase.Native/firebase_cpp_sdk/` or `dotnet/scripts/fetch-firebase-cpp-sdk.{ps1,sh}` that downloads it | Headers + `.lib` files the .vcxproj links against. Gitignore the extracted SDK like we do for the macOS xcframeworks; the fetch script is the reproducible source. |
 
-The copies in `dotnet/` will diverge from `native/` over time —
-that's expected. The `dotnet/` tree owns its copies once they're
-brought over. Future updates to the Firebase C++ SDK or auth flow
-land in `dotnet/PivoxApp.Windows/` directly, not in `native/`.
+After the copy, every path the WinUI build touches should be inside
+`dotnet/`. The native/ tree continues to exist for the Swift+CMake
+implementation and is irrelevant to the dotnet build graph.
 
 **Strategy:**
 
@@ -274,18 +277,22 @@ land in `dotnet/PivoxApp.Windows/` directly, not in `native/`.
    component's resource directory. Same project as the macOS app
    (`pivox-cloud`).
 
-If `native/platform/windows/` uses CMake (per `native/CLAUDE.md`),
-two options for the dotnet/ tree:
+**No CMake in the dotnet/ tree.** The strategic decision is pure
+Visual Studio projects — `.csproj` for managed code, `.vcxproj` for
+the C++/WinRT component. CMake is one of the explicit costs of the
+current `native/` plan that `dotnet/` is paying to avoid; don't
+reintroduce it here.
 
-- **A. Convert the copied C++ code to MSBuild .vcxproj** — standard
-  for WinUI 3 + C++/WinRT integration. Port the Firebase SDK linker
-  config from CMake to .vcxproj.
-- **B. Keep CMake for the C++ side, produce a .lib/.dll, wrap with
-  a thin .vcxproj C++/WinRT shim** that links the CMake output.
+That means: the copied C++ files (WinAuthService, GoogleOAuth,
+OAuthPopup) compile inside `Pivox.Firebase.Native.vcxproj`, with
+Firebase SDK include paths + library references declared as
+MSBuild `<AdditionalIncludeDirectories>` + `<AdditionalLibraryDirectories>`
++ `<AdditionalDependencies>` in the project's PropertyGroups/ItemGroups.
 
-Option A is simpler unless the existing implementation has CMake-
-specific tooling that's hard to replicate. Read `native/CLAUDE.md`'s
-build section first to understand the current toolchain.
+Read `native/CLAUDE.md`'s build section as REFERENCE only — to
+understand which Firebase SDK extraction layout and which compile/link
+flags the existing CMake setup uses. Then translate those flag-sets
+into the `.vcxproj` equivalents. Don't carry CMake over.
 
 ## Firebase C++ SDK reference
 
