@@ -1,0 +1,23 @@
+# dotnet/ — cross-platform .NET clients
+
+# Firebase xcframeworks for macOS (~111 MB). Reproducible via
+# scripts/fetch-firebase-sdk.sh.
+Firebase.Bindings/Frameworks/
+
+# Firebase C++ SDK for Windows (~250 MB). Reproducible via
+# scripts/fetch-firebase-cpp-sdk.ps1.
+Pivox.Firebase.Native/firebase_cpp_sdk/
+
+# Developer-specific signed crypto material. Each developer copies
+# their own Xcode-generated profile from the SwiftUI Pivox build.
+**/embedded.provisionprofile
+
+# .NET tool cache for fetch scripts.
+.cache/
+
+# C++ NuGet packages (CppWinRT etc.) — restored by NuGet to
+# solution-level packages/ folder (packages.config model).
+packages/
+
+# C++/WinRT generated files — produced at build time from .idl.
+Pivox.Firebase.Native/Generated Files/

@@ -25,6 +25,10 @@ public sealed partial class MainWindow : Window
         _pivox = pivox;
         _dispatcher = DispatcherQueue.GetForCurrentThread();
 
+        // Extend the backdrop material through the title bar.
+        ExtendsContentIntoTitleBar = true;
+        SetTitleBar(AppTitleBar);
+
         _auth.CurrentChanged += OnAuthChanged;
 
         // If a session was already restored before we subscribed,

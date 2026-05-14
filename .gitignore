@@ -10,40 +10,14 @@ tmp/
 build-errors.log
 .envrc.*
 
-# ───── dotnet/ (cross-platform .NET clients) ──────────────────────
-# Firebase xcframeworks (~111 MB, 1394 files). Reproducible via
-# dotnet/scripts/fetch-firebase-sdk.sh which pulls the official
-# Firebase.zip release and extracts the 11 xcframeworks the binding
-# needs. See docs/dev/appkit-csharp.md.
-dotnet/Firebase.Bindings/Frameworks/
-
-# Developer-specific signed crypto material. Each developer copies
-# their own Xcode-generated profile or refreshes from the SwiftUI
-# Pivox app build at native/build-xcode/Debug/Pivox.app/Contents/.
-dotnet/**/embedded.provisionprofile
-
-# .NET tool cache for the fetch script.
-dotnet/.cache/
-
-# Firebase C++ SDK for Windows (~250 MB). Reproducible via
-# dotnet/scripts/fetch-firebase-cpp-sdk.ps1 which downloads the
-# official zip from dl.google.com/firebase/sdk/cpp/.
-dotnet/Pivox.Firebase.Native/firebase_cpp_sdk/
-
-# C++ NuGet packages (CppWinRT etc.) — restored by NuGet to
-# solution-level packages/ folder (packages.config model).
-dotnet/packages/
-
-# C++/WinRT generated files — produced at build time from .idl.
-dotnet/Pivox.Firebase.Native/Generated Files/
-
-# Rider local config.
-dotnet/.idea/
+# Downloaded SDKs
+native/third_party/
+*.profraw
 
 # ──────────────────────────────────────────────────────────────────
 
-# Created by https://www.toptal.com/developers/gitignore/api/c,go,c++,node,rust,cmake,linux,macos,swift,xcode,direnv,nextjs,python,windows,firebase,objective-c,visualstudio,jetbrains+all,visualstudiocode
-# Edit at https://www.toptal.com/developers/gitignore?templates=c,go,c++,node,rust,cmake,linux,macos,swift,xcode,direnv,nextjs,python,windows,firebase,objective-c,visualstudio,jetbrains+all,visualstudiocode
+# Created by https://www.toptal.com/developers/gitignore/api/c,go,c++,node,rust,cmake,linux,macos,swift,xcode,direnv,nextjs,python,windows,firebase,objective-c,visualstudio,jetbrains+all,visualstudiocode,certificates
+# Edit at https://www.toptal.com/developers/gitignore?templates=c,go,c++,node,rust,cmake,linux,macos,swift,xcode,direnv,nextjs,python,windows,firebase,objective-c,visualstudio,jetbrains+all,visualstudiocode,certificates
 
 ### C ###
 # Prerequisites
@@ -117,6 +91,14 @@ dkms.conf
 *.lai
 
 # Executables
+
+### certificates ###
+*.pem
+*.key
+*.crt
+*.cer
+*.der
+*.priv
 
 ### CMake ###
 CMakeLists.txt.user
@@ -321,7 +303,6 @@ Temporary Items
 /build
 
 # misc
-*.pem
 
 # debug
 npm-debug.log*
@@ -570,8 +551,6 @@ MANIFEST
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
-# WinUI app.manifest is needed — override the Python *.manifest rule above.
-!dotnet/Pivox.WinUI/app.manifest
 *.spec
 
 # Installer logs
@@ -1216,8 +1195,4 @@ FodyWeavers.xsd
 ### VisualStudio Patch ###
 # Additional files built by Visual Studio
 
-# End of https://www.toptal.com/developers/gitignore/api/c,go,c++,node,rust,cmake,linux,macos,swift,xcode,direnv,nextjs,python,windows,firebase,objective-c,visualstudio,jetbrains+all,visualstudiocode
-
-# Downloaded SDKs
-native/third_party/
-*.profraw
+# End of https://www.toptal.com/developers/gitignore/api/c,go,c++,node,rust,cmake,linux,macos,swift,xcode,direnv,nextjs,python,windows,firebase,objective-c,visualstudio,jetbrains+all,visualstudiocode,certificates

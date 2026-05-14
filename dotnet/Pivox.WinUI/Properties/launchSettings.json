@@ -2,9 +2,6 @@
   "profiles": {
     "Pivox.WinUI (Package)": {
       "commandName": "MsixPackage"
-    },
-    "Pivox.WinUI (Unpackaged)": {
-      "commandName": "Project"
     }
   }
 }

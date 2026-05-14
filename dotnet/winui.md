@@ -175,6 +175,50 @@ Deploy + launch from Visual Studio (F5). The app is MSIX-packaged;
 `Package.appxmanifest` identity is `app.pivox.native` to match the
 Firebase project's bundle-ID restriction.
 
+### NativeAOT publish
+
+The app publishes as a NativeAOT binary (11 MB, no JIT runtime).
+AOT only triggers during publish, not build — F5 stays fast.
+
+```sh
+# From VS: right-click project → Package and Publish → Create App Packages
+# From CLI (requires vswhere on PATH):
+msbuild Pivox.WinUI/Pivox.WinUI.csproj -t:Publish \
+  -p:Configuration=Release -p:Platform=x64 \
+  -p:RuntimeIdentifier=win-x64 -p:SelfContained=true
+```
+
+The published MSIX is signed with a self-signed dev cert. Each
+developer creates their own:
+
+```powershell
+# One-time setup (PowerShell):
+$cert = New-SelfSignedCertificate -Type Custom -Subject "CN=ashkan" `
+  -KeyUsage DigitalSignature -FriendlyName "Pivox Dev" `
+  -CertStoreLocation "Cert:\CurrentUser\My" `
+  -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}")
+
+# Trust it (admin PowerShell):
+Export-Certificate -Cert $cert -FilePath pivox-dev.cer
+Import-Certificate -FilePath pivox-dev.cer -CertStoreLocation "Cert:\LocalMachine\Root"
+```
+
+Update `PackageCertificateThumbprint` in `Pivox.WinUI.csproj` with
+your cert's thumbprint. The `.cer` file is gitignored.
+
+Sideload the MSIX:
+```powershell
+Add-AppxPackage -Path "AppPackages\Pivox.WinUI_<ver>_x64_Test\Pivox.WinUI_<ver>_x64.msix"
+```
+
+### C++ component: AppContainerApplication = false
+
+The vcxproj sets `AppContainerApplication=false`. This is
+intentional — `true` (the UWP runtime component template default)
+links against `_APP.dll` CRT variants that only exist inside MSIX
+containers, breaking unpackaged launch and complicating the deploy
+model. Desktop WinRT components don't need App Container isolation.
+
 ## Package versions
 
 | Package | Version | Where |

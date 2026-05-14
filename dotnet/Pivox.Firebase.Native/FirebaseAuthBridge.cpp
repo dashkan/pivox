@@ -30,8 +30,9 @@ namespace winrt::Pivox::Firebase::Native::implementation
         {
             m_auth->RemoveAuthStateListener(m_listener.get());
         }
-        // Firebase C++ SDK owns these — delete in reverse order.
-        if (m_auth) { delete m_auth; m_auth = nullptr; }
+        // Auth::GetAuth() returns a cached pointer owned by the App.
+        // Don't delete m_auth — the App destructor frees it.
+        m_auth = nullptr;
         if (m_app) { delete m_app; m_app = nullptr; }
     }
 
@@ -44,7 +45,7 @@ namespace winrt::Pivox::Firebase::Native::implementation
         options.set_project_id(pivox::firebase_config::kProjectId);
         options.set_storage_bucket(pivox::firebase_config::kStorageBucket);
         options.set_messaging_sender_id(pivox::firebase_config::kGcmSenderId);
-        options.set_app_id(pivox::firebase_config::kFirebaseClientId);
+        options.set_app_id(pivox::firebase_config::kAppId);
 
         m_app = ::firebase::App::Create(options);
         if (!m_app)

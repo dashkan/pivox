@@ -45,18 +45,11 @@ public sealed class WindowsAuthService : IAuthService
     {
         _bridge = new Firebase.Native.FirebaseAuthBridge();
 
-        if (!_bridge.Initialize())
-        {
-            throw new InvalidOperationException(
-                "Firebase C++ SDK initialization failed.  " +
-                "Verify firebase_config.h values and that the " +
-                "Firebase C++ SDK libs are present.");
-        }
-
-        // Wire the state listener.  Firebase fires once on
-        // registration with the current state (restores persisted
-        // session from Windows credential storage), then on every
-        // subsequent sign-in / sign-out / token refresh.
+        // Subscribe BEFORE Initialize.  Firebase's AddAuthStateListener
+        // fires synchronously with the current state on registration
+        // (restores persisted session from Windows credential storage).
+        // If we subscribed after Initialize, that initial fire would
+        // go to zero handlers and the restored session would be lost.
         _bridge.AuthStateChanged += async (_, signedIn) =>
         {
             if (!signedIn)
@@ -76,6 +69,14 @@ public sealed class WindowsAuthService : IAuthService
                     $"[Auth] token fetch on state change failed: {ex.Message}");
             }
         };
+
+        if (!_bridge.Initialize())
+        {
+            throw new InvalidOperationException(
+                "Firebase C++ SDK initialization failed.  " +
+                "Verify firebase_config.h values and that the " +
+                "Firebase C++ SDK libs are present.");
+        }
     }
 
     public AuthSession? Current => _current;
@@ -148,6 +149,7 @@ public sealed class WindowsAuthService : IAuthService
         var codeVerifier = GeneratePkceVerifier();
         var codeChallenge = GeneratePkceChallenge(codeVerifier);
 
+        var state = Guid.NewGuid().ToString("N");
         var authUrl =
             "https://accounts.google.com/o/oauth2/v2/auth"
             + "?client_id=" + Uri.EscapeDataString(GoogleClientID)
@@ -156,9 +158,9 @@ public sealed class WindowsAuthService : IAuthService
             + "&scope=" + Uri.EscapeDataString("openid email profile")
             + "&code_challenge=" + Uri.EscapeDataString(codeChallenge)
             + "&code_challenge_method=S256"
-            + "&state=" + Guid.NewGuid().ToString("N");
+            + "&state=" + Uri.EscapeDataString(state);
 
-        var authCode = await LaunchOAuthPopupAsync(authUrl, ct);
+        var authCode = await LaunchOAuthPopupAsync(authUrl, state, ct);
 
         // Exchange the auth code for tokens.
         var tokenResponse = await s_http.PostAsync(
@@ -195,14 +197,21 @@ public sealed class WindowsAuthService : IAuthService
     /// <c>ASWebAuthenticationSession</c> and native's <c>OAuthPopup</c>.
     /// </summary>
     private static Task<string> LaunchOAuthPopupAsync(
-        string authUrl, CancellationToken ct)
+        string authUrl, string expectedState, CancellationToken ct)
     {
         var tcs = new TaskCompletionSource<string>();
-        ct.Register(() => tcs.TrySetCanceled());
 
         var window = new Window { Title = "Sign In — Pivox" };
         var webView = new WebView2();
         var callbackFired = false;
+
+        // Cancellation closes the popup window, which triggers the
+        // Closed handler below → TrySetCanceled on the TCS.
+        ct.Register(() =>
+        {
+            if (!callbackFired)
+                window.DispatcherQueue.TryEnqueue(() => window.Close());
+        });
 
         webView.NavigationStarting += (_, args) =>
         {
@@ -219,8 +228,15 @@ public sealed class WindowsAuthService : IAuthService
             var query = HttpUtility.ParseQueryString(new Uri(uri).Query);
             var code = query["code"];
             var error = query["error"];
+            var returnedState = query["state"];
 
-            if (!string.IsNullOrEmpty(code))
+            // Validate the state parameter to prevent CSRF.
+            if (returnedState != expectedState)
+            {
+                tcs.TrySetException(new InvalidOperationException(
+                    "OAuth state mismatch — possible CSRF."));
+            }
+            else if (!string.IsNullOrEmpty(code))
             {
                 tcs.TrySetResult(code);
             }
