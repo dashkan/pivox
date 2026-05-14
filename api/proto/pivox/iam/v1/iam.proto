@@ -22,7 +22,6 @@ import "google/longrunning/operations.proto";
 import "google/protobuf/empty.proto";
 import "pivox/iam/v1/accounts.proto";
 import "pivox/iam/v1/groups.proto";
-import "pivox/iam/v1/members.proto";
 import "pivox/iam/v1/permissions.proto";
 import "pivox/iam/v1/roles.proto";
 import "pivox/iam/v1/users.proto";
