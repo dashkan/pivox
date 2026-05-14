@@ -194,6 +194,16 @@ app lifetime; passed to `MainWindow`.
 
 ## Architectural non-negotiables
 
+- **Port, don't rewrite.** The C++ Firebase Auth integration is
+  done in `native/platform/windows/WinAuthService.*` and the
+  Google OAuth flow is done in
+  `native/platform/windows/shared/GoogleOAuth.cpp`. The job is to
+  COPY that existing C++ code into `dotnet/PivoxApp.Windows/Firebase.Native/`
+  and WRAP it in a C++/WinRT component, not write new Firebase
+  code. The copies in `dotnet/` are owned by the dotnet tree; the
+  `native/` originals stay where they are. See the "Steal from the
+  existing native/ Windows implementation" section below.
+
 - **C++/WinRT, NOT P/Invoke.** The C++ SDK lives inside a WinRT
   component (`Pivox.Firebase.Native`). The C# side consumes it via
   WinRT projection, getting first-class C# types
@@ -218,26 +228,69 @@ app lifetime; passed to `MainWindow`.
   packaging tool for first runs. Production signing is a separate
   task (Authenticode + MSIX bundle).
 
-## Firebase C++ SDK setup notes
+## Steal from the existing native/ Windows implementation
 
-The Firebase C++ SDK distribution for Windows lives at
-https://firebase.google.com/docs/cpp/setup#windows-specific. Steps:
+**Important**: the Firebase C++ SDK is **already integrated and
+working** in the current `native/platform/windows/` C++/WinUI
+implementation. Don't write any of this from scratch — copy
+what's already there into `dotnet/PivoxApp.Windows/Firebase.Native/`
+and expose it via C++/WinRT projection.
 
-1. Download the SDK; extract under
-   `dotnet/PivoxApp.Windows/Firebase.Native/firebase_cpp_sdk/`.
-2. The Windows SDK is a set of `.lib` files plus headers — link
-   against `firebase_app.lib` + `firebase_auth.lib` for the modules
-   we need.
-3. Provide `google-services.json` (Windows equivalent of
-   `GoogleService-Info.plist`) at the project root. Get it from the
-   Firebase Console — same project as the macOS app
-   (`pivox-cloud`), Windows platform.
-4. Initialize Firebase once at app startup via
-   `firebase::App::Create(firebase::AppOptions::LoadFromJsonConfig(...), ...)`.
+**The code must be brought OVER into the dotnet/ tree**, not
+referenced in place. `dotnet/` is a self-contained sibling to
+`native/`; cross-tree dependencies between them would break the
+strategic decision that the two stacks are parallel paths.
+`native/` continues to exist as the current Swift/CMake/WinUI-C++
+implementation; `dotnet/` is the .NET cross-platform alternative.
+After the WinUI work lands, the relevant files exist in BOTH places
+until/unless one stack is retired.
 
-If `google-services.json` for Windows doesn't exist yet in the
-Firebase project, register a new Windows app under the same project
-in the Firebase Console first.
+Source files to copy → destination:
+
+| Source (in `native/`, leave in place) | Destination (in `dotnet/`, the working copy) | What it gives you |
+|---|---|---|
+| `native/platform/windows/WinAuthService.{h,cpp}` | `dotnet/PivoxApp.Windows/Firebase.Native/WinAuthService.{h,cpp}` | Full Firebase C++ SDK integration: `firebase::App::Create`, `firebase::auth::Auth::SignInWithEmailAndPassword`, `SignInWithCredential` for OAuth providers, token retrieval, state listener wiring. Already handles `firebase::Future<T>` unwrapping. |
+| `native/platform/windows/shared/GoogleOAuth.{h,cpp}` | `dotnet/PivoxApp.Windows/Firebase.Native/GoogleOAuth.{h,cpp}` | Google OAuth flow on Windows — equivalent of macOS's PKCE + ASWebAuthenticationSession. URL building, callback handling, code exchange. |
+| `native/platform/windows/shared/OAuthPopup.{h,cpp}` | `dotnet/PivoxApp.Windows/Firebase.Native/OAuthPopup.{h,cpp}` | Windows-native popup container for the OAuth web view. Reuse instead of rewriting against WebAuthenticationBroker. |
+| `native/platform/windows/firebase_config.h` + the SDK extraction location + `google-services.json` | `dotnet/PivoxApp.Windows/Firebase.Native/` (config) + a fetched copy of the SDK | Linker flags, SDK include paths, Firebase config tied to the `pivox-cloud` project. |
+
+The copies in `dotnet/` will diverge from `native/` over time —
+that's expected. The `dotnet/` tree owns its copies once they're
+brought over. Future updates to the Firebase C++ SDK or auth flow
+land in `dotnet/PivoxApp.Windows/` directly, not in `native/`.
+
+**Strategy:**
+
+1. **Copy the files** above into `dotnet/PivoxApp.Windows/Firebase.Native/`.
+2. **Wrap them in a C++/WinRT component** — `Pivox.Firebase.Native`
+   is a thin WinRT projection layer over the copied `WinAuthService`
+   class. Public methods on the WinRT runtime class become thin
+   forwarders to `WinAuthService` methods.
+3. **The existing `GoogleOAuth` + `OAuthPopup` code likely needs
+   no logic changes** — they don't depend on the surrounding
+   UWP/WinUI runtime model. Just compile them into the WinRT
+   component.
+4. **Reuse `google-services.json`** — copy it into the WinRT
+   component's resource directory. Same project as the macOS app
+   (`pivox-cloud`).
+
+If `native/platform/windows/` uses CMake (per `native/CLAUDE.md`),
+two options for the dotnet/ tree:
+
+- **A. Convert the copied C++ code to MSBuild .vcxproj** — standard
+  for WinUI 3 + C++/WinRT integration. Port the Firebase SDK linker
+  config from CMake to .vcxproj.
+- **B. Keep CMake for the C++ side, produce a .lib/.dll, wrap with
+  a thin .vcxproj C++/WinRT shim** that links the CMake output.
+
+Option A is simpler unless the existing implementation has CMake-
+specific tooling that's hard to replicate. Read `native/CLAUDE.md`'s
+build section first to understand the current toolchain.
+
+## Firebase C++ SDK reference
+
+Only relevant if you're starting from scratch (you're not — see
+above). For reference: https://firebase.google.com/docs/cpp/setup#windows-specific
 
 ## Validation checklist
 
@@ -286,12 +339,23 @@ Those come after the basic stack is proven.
 ## Reference reading order
 
 1. `dotnet/CLAUDE.md` — agent conventions for this directory
-2. `dotnet/PivoxApp/Auth/MacOsAuthService.cs` — behavior reference
-3. `dotnet/PivoxApp/DetailViewController.cs` — UI consumer pattern
-4. `dotnet/Pivox.Client/PivoxClient.cs` — how the gRPC client wires
-5. `dotnet/Pivox.Shared/Auth/IAuthService.cs` — the contract
-6. Firebase C++ SDK quickstart at
-   https://firebase.google.com/docs/cpp/setup#windows-specific
+2. `dotnet/Pivox.Shared/Auth/IAuthService.cs` — the contract you're
+   implementing on the Windows side
+3. **`native/platform/windows/WinAuthService.{h,cpp}` — the C++
+   Firebase code to port over. This already works. Don't rewrite.**
+4. **`native/platform/windows/shared/GoogleOAuth.{h,cpp}` and
+   `OAuthPopup.{h,cpp}` — the Google OAuth flow + popup to port over.**
+5. `dotnet/PivoxApp/Auth/MacOsAuthService.cs` — behavior reference
+   for the C# wrapper shape (sign-in flow, JWT extraction, event
+   firing)
+6. `dotnet/PivoxApp/DetailViewController.cs` — UI consumer pattern
+   to mirror in MainWindow.xaml.cs
+7. `dotnet/Pivox.Client/PivoxClient.cs` — how the gRPC client wires
+8. `native/CLAUDE.md` — for the existing Windows build toolchain
+   context (CMake + Firebase SDK setup that you're porting from)
+9. Firebase C++ SDK quickstart at
+   https://firebase.google.com/docs/cpp/setup#windows-specific —
+   reference only; existing code already integrates it
 
 ## When you're done
 
