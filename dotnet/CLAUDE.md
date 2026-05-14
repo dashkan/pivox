@@ -22,17 +22,169 @@ Defer to the Go backend's `CLAUDE.md` for cross-cutting rules
 (component naming, code-quality bar, TDD) that aren't restated here.
 Defer to `../native/CLAUDE.md` for the Swift-stack equivalent path.
 
+## Status — what's validated, what's not
+
+So a fresh session doesn't redo work that's already done. The
+strategic spike that established viability is captured in git
+history (search for "Spike: .NET-for-macOS" and the follow-on
+commits) but the operating outcomes are:
+
+**macOS — proven end-to-end:**
+
+- All-code AppKit (no storyboard, no xib): NSWindow + NSSplitViewController
+  + main menu, all in C#.
+- Firebase Cocoa SDK bound via objective-sharpie. Sign-in
+  (email/password + Google OAuth via ASWebAuthenticationSession +
+  PKCE) returns real Firebase JWTs and persists sessions to the
+  macOS Data Protection Keychain.
+- gRPC client (`Pivox.Client`) generated from `../api/proto/`,
+  Bearer-token attached via `CallCredentials`, calls pivox-cloud
+  successfully. 31 typed service clients available.
+- NativeAOT publish: ~12 MB total bundle, native ARM64 binary, no
+  Mono runtime, fast cold-start, signed with the SwiftUI app's
+  Apple Development cert + provisioning profile.
+
+**Cross-platform contracts ready:**
+
+- `Pivox.Shared` (auth contracts, JWT decoder, CloudConfig) and
+  `Pivox.Client` (gRPC clients) are plain `net10.0` libraries.
+  Both flagged `<IsAotCompatible>true</IsAotCompatible>`. The
+  Windows side consumes them as-is.
+
+**Windows — not yet implemented:**
+
+- See `winui.md` in this directory for the implementation prompt.
+- Strategic choice: Firebase C++ SDK wrapped in a C++/WinRT
+  component, projected to C#. **Not P/Invoke.** `WindowsAuthService :
+  IAuthService` lives in PivoxApp.Windows and consumes the WinRT
+  projection.
+
+## Operating rules
+
+These are the rules from working with this user. They are not
+suggestions; treating them as suggestions burns the user's time and
+gets you re-corrected. Internalize all of them before touching code.
+
+### Grounding
+
+- **No guessing AppKit / WinUI / .NET API names.** Always look them
+  up before writing — `microsoft_docs_search` MCP for C# signatures,
+  Apple docs for behavior, grep `Microsoft.macOS.dll` for binding
+  names. One doc lookup is ~3s; one compile-error iteration is
+  ~30-60s. The lookup wins economically every time.
+- **Swift / ObjC samples are first-class research material.** Apple
+  ships them; we translate them to C# via the rename rules below.
+  The C# sample-code corpus is small and irrelevant — translate
+  from the big corpus.
+- **Verify generated code before writing consumers of it.** When
+  consuming protoc / sharpie / bgen output, open the generated file
+  and read the actual namespace + type names. Namespace shadowing,
+  inner-class names, and binding generator quirks bite you only
+  when you guess at the shape.
+- **No third-party packages of dubious provenance for fundamental
+  types.** Generate from source we own rather than trust an unofficial
+  community port. Example: `buf/validate/validate.proto` is in
+  `api/proto/buf/` already; generate locally rather than depend on
+  `ProtoValidate` (third-party, unsigned port). For genuinely
+  official packages (Google.Api.CommonProtos, Google.LongRunning),
+  reference rather than regenerate.
+
+### No time estimates
+
+The user has explicitly banned them. "Tasks in AI take minutes vs
+days" — duration estimates are noise. Communicate work in:
+
+- **Order of operations** (this depends on that)
+- **Concrete deliverables** (what gets created/modified)
+- **Validation outcomes** (what passes/fails)
+
+Never "this should take ~30 minutes" or "~2 hours." Just say what's
+being done and what's done after it.
+
+### Phase boundaries
+
+- **Surface phase completion + audit recommendation + commit-ready
+  signal** at every phase boundary. Don't wait to be asked.
+- **Auto-spawn code-reviewer at phase boundaries** for substantive
+  diffs (auth, signing, security, schema, foundational layers).
+  Don't ask first.
+- **Commit only when explicitly told.** "Wait for the user to say
+  commit." Don't pre-emptively commit good-feeling work.
+
+### Honest reads
+
+- **Push back on flawed approaches.** Don't rubber-stamp. The user
+  wants honest engineering reads, not agreement.
+- **When the user pushes back, update the analysis honestly.** If
+  they correct you with ground truth, the right response is to
+  incorporate it and recompute — not to apologize-and-restate. A
+  ground-truth correction (e.g. "the current SwiftUI plan has been
+  a fucking PITA") is data; treat it as such.
+- **Acknowledge biases.** When you've just built something, your
+  read is biased toward it. Say so out loud when relevant.
+- **Don't pad summaries.** Bullet lists describing every step of a
+  small commit make 1-2 commit items look like multi-week work.
+  Match the shape of the work.
+
+### Git
+
+- **Stage explicit paths** (`git add path/...`). Never `git add -A`
+  or `git add .` — those can drag in conflict markers, secrets, or
+  unintended files.
+- **Never `git clean -fd`** without explicit confirmation. Has wiped
+  the user's `.envrc` files in the past (unrecoverable, no backups).
+- **Never `rm -rf bin obj`** while Rider is open. Rider's IB sync
+  watcher has eaten tracked files before. Use `dotnet clean`.
+- **Pre-prod freedom applies.** Drop proto fields outright (no
+  `reserved`), edit init migration directly, etc. — but DESTRUCTIVE
+  ops (force push, hard reset, db drop) need confirmation in the
+  current conversation.
+
+### Surfacing semantic choices
+
+- **At semantic forks** (codes, wire messages, error shapes, library
+  choice, framework choice), pause and offer options. Don't bury
+  the choice in the diff.
+- **Stop when stuck.** If the approach hits a wall, surface and
+  ask. No silent pivots on frameworks/packages/strategy — those
+  are user decisions.
+
+### When code is wrong
+
+- **Pushback on a shape = fix the shape**, not justify it in a
+  commit message. If the user calls a name "hacky" or a method
+  "kinda hacky," the work is to rename / restructure, not to
+  defend.
+- **"All X" / "every" / "no shortcuts" = honor literally.** Surface
+  constraints; never silently triage.
+
 ## Source layout
 
 ```
 dotnet/
   Pivox.slnx              solution file (XML format, .NET 9+)
   Pivox.Shared/           cross-platform contracts. No platform deps.
-                          IAuthService, AuthSession, JwtClaims, future
-                          view models / domain types.
-  Pivox.Client/           gRPC clients. Consumes ../api/*.proto via
-                          Grpc.Tools. Bearer-token auth provided via
-                          IAuthService from Pivox.Shared.
+                          - Auth/IAuthService.cs   the auth contract
+                          - Auth/AuthSession.cs    POCO record returned
+                          - Auth/JwtClaims.cs      base64url JWT decoder
+                          - CloudConfig.cs         backend URL + TLS,
+                                                   reads PIVOX_GRPC_HOST
+                                                   etc. Mirrors the
+                                                   Swift CloudConfig.swift.
+  Pivox.Client/           gRPC clients for pivox-cloud. Generates C#
+                          from ../api/proto/pivox/**/*.proto + buf/.
+                          - PivoxClient.cs         single client factory;
+                                                   typed service accessors
+                                                   (Iam, Organizations,
+                                                   Spaces, …) via the
+                                                   global:: qualifier.
+                          - Auth/AuthCallCredentials.cs
+                                                   gRPC CallCredentials
+                                                   that attaches Bearer
+                                                   tokens, async-correctly.
+                                                   NOT an Interceptor —
+                                                   see "Bearer-token
+                                                   attachment" below.
   Firebase.Bindings/      macOS-only sharpie binding of the Firebase
                           Cocoa SDK (FirebaseAuth + FirebaseCore + 9
                           embedded-only transitive xcframeworks).
@@ -507,21 +659,87 @@ client grows beyond spike, wire `Microsoft.Extensions.Logging` (the
 scoped loggers (`auth`, `chat`, etc.). Don't silently swallow errors
 in catch blocks.
 
-## Generated proto
+## Generated proto + gRPC client
 
-gRPC clients live in `Pivox.Client/`. Protos source from `../api/`
-via `Grpc.Tools` MSBuild integration:
+`Pivox.Client/` owns the C# gRPC surface. Protos source from
+`../api/proto/pivox/` (Pivox's own protos) plus
+`../api/proto/buf/` (for the `buf.validate.*` option types that
+field options reference). Vendored googleapis types come from
+NuGet (`Google.Api.CommonProtos`, `Google.LongRunning`) — we do
+NOT regenerate google.* protos.
 
 ```xml
 <ItemGroup>
-  <Protobuf Include="../../api/**/*.proto"
-            ProtoRoot="../../api"
-            GrpcServices="Client" />
+  <PackageReference Include="Google.Protobuf" Version="3.34.1" />
+  <PackageReference Include="Grpc.Net.Client" Version="2.80.0" />
+  <PackageReference Include="Grpc.Tools" Version="2.80.0">
+    <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    <PrivateAssets>all</PrivateAssets>
+  </PackageReference>
+  <PackageReference Include="Google.Api.CommonProtos" Version="2.17.0" />
+  <PackageReference Include="Google.LongRunning" Version="3.4.0" />
+</ItemGroup>
+
+<ItemGroup>
+  <Protobuf Include="../../api/proto/pivox/**/*.proto"
+            ProtoRoot="../../api/proto"
+            GrpcServices="Client"
+            AdditionalImportDirs="../../api/proto" />
+  <Protobuf Include="../../api/proto/buf/**/*.proto"
+            ProtoRoot="../../api/proto"
+            GrpcServices="None"
+            AdditionalImportDirs="../../api/proto" />
 </ItemGroup>
 ```
 
 Re-generate on backend proto changes by rebuilding `Pivox.Client`.
 Don't hand-edit generated C#.
+
+### Bearer-token attachment — CallCredentials, NOT Interceptor
+
+gRPC bearer-token attachment goes via
+`AuthCallCredentials.FromAuthService(IAuthService)` (in
+`Pivox.Client/Auth/`), composed with channel credentials:
+
+```csharp
+var callCredentials = AuthCallCredentials.FromAuthService(auth);
+options.Credentials = ChannelCredentials.Create(
+    ChannelCredentials.SecureSsl, callCredentials);
+```
+
+**Why CallCredentials and not a client `Interceptor`**: the gRPC
+client `Interceptor` API's metadata-attachment seam is synchronous.
+Any async token fetch (`await auth.GetIdTokenAsync()`) must be
+`.Result`-ed inside the interceptor, which deadlocks the main
+thread when the underlying SDK callback (FIRAuth's
+`getIDTokenWithCompletion:` on macOS) dispatches back to the main
+thread for resolution. `CallCredentials.FromInterceptor` accepts an
+async delegate — gRPC awaits it natively, no thread blocking.
+
+Bit history: the first cut of this used `Interceptor` and produced
+a hung UI on first RPC. Don't reintroduce that pattern.
+
+### Generated-namespace shadowing
+
+Generated proto namespaces (`Pivox.Iam.V1`, `Pivox.Api.V1`) contain
+nested service-stub classes whose names match the outer namespace
+segments — e.g. `Pivox.Iam.V1.Iam.IamClient`. Inside `Pivox.Client`,
+`Iam.IamClient` resolves to the namespace `Pivox.Iam`, not the
+nested class. Use the `global::` qualifier:
+
+```csharp
+public global::Pivox.Iam.V1.Iam.IamClient Iam => new(_channel);
+```
+
+`PivoxClient.cs` is the reference for this pattern.
+
+### Cloud endpoint config
+
+`Pivox.Shared/CloudConfig.cs` is the single source of truth for the
+backend URL + TLS choice. Mirrors `native/.../CloudConfig.swift` —
+same env var names (`PIVOX_GRPC_HOST`, `PIVOX_GRPC_PLAINTEXT`),
+same default (`pivox.ngrok.app:443` over TLS). One `.envrc` switches
+both stacks at the same backend.
 
 ## Naming
 
