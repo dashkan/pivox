@@ -246,19 +246,23 @@ public sealed class MacOsAuthService : IAuthService
     private Task<string> RunWebAuthSessionAsync(string authUrl, string callbackScheme)
     {
         var tcs = new TaskCompletionSource<string>();
+        // The (NSUrl, string callbackUrlScheme, completionHandler)
+        // overload is deprecated on macOS 14.4+; the replacement takes
+        // an ASWebAuthenticationSessionCallback factory result.
+        var schemeCallback = ASWebAuthenticationSessionCallback.Create(callbackScheme);
         _activeWebAuthSession = new ASWebAuthenticationSession(
             new NSUrl(authUrl),
-            callbackScheme,
-            (callback, error) =>
+            schemeCallback,
+            (callbackUrl, error) =>
             {
                 if (error is not null)
                 {
                     tcs.SetException(new InvalidOperationException(
                         $"OAuth web session failed: {error.LocalizedDescription} (code {error.Code})"));
                 }
-                else if (callback is not null)
+                else if (callbackUrl is not null)
                 {
-                    tcs.SetResult(callback.AbsoluteString!);
+                    tcs.SetResult(callbackUrl.AbsoluteString!);
                 }
                 else
                 {

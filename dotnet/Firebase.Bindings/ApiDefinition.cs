@@ -1170,19 +1170,16 @@ namespace FirebaseAuth {
 		[Export ("phoneNumber")]
 		string PhoneNumber { get; set; }
 
-		// @property (readonly, nonatomic, class) BOOL supportsSecureCoding;
-		[Static]
-		[Export ("supportsSecureCoding")]
-		bool SupportsSecureCoding { get; }
+		// SupportsSecureCoding (static) and EncodeWithCoder (instance)
+		// are inherited from FIRMultiFactorInfo — redeclaring them in
+		// this subclass would just produce CS0108/CS0114 hide warnings.
+		// Keep only the designated initializer (different on each
+		// subclass).
 
 		// -(instancetype _Nullable)initWithCoder:(NSCoder * _Nonnull)coder __attribute__((objc_designated_initializer));
 		[Export ("initWithCoder:")]
 		[DesignatedInitializer]
 		NativeHandle Constructor (NSCoder coder);
-
-		// -(void)encodeWithCoder:(NSCoder * _Nonnull)coder;
-		[Export ("encodeWithCoder:")]
-		void EncodeWithCoder (NSCoder coder);
 	}
 
 	// @interface FIRTOTPMultiFactorAssertion : FIRMultiFactorAssertion

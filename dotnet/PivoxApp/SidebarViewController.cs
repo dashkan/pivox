@@ -36,7 +36,9 @@ public sealed class SidebarViewController : NSViewController
 			DrawsBackground = false,
 			Selectable = false,
 			Alignment = NSTextAlignment.Center,
-			Font = NSFont.SystemFontOfSize(NSFont.SystemFontSize),
+			// NSFont.SystemFontOfSize is bound as nullable but Apple's
+			// contract guarantees non-null. Forgive at the boundary.
+			Font = NSFont.SystemFontOfSize(NSFont.SystemFontSize)!,
 			TranslatesAutoresizingMaskIntoConstraints = false,
 		};
 

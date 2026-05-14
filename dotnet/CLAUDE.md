@@ -429,6 +429,30 @@ Xcode and `lldb` need `com.apple.security.get-task-allow` to call
 
 Strip for production / store distribution.
 
+## Rule 9.5: Rider's MT7139 keychain-access-groups warning is false
+
+Rider's design-time analyzer raises MT7139 ("The app requests the
+entitlement 'keychain-access-groups', but no provisioning profile
+has been specified") on rebuild. The warning is **false** — our
+setup is valid:
+
+- `<CodesignProvision>Mac Team Provisioning Profile: app.pivox.native</CodesignProvision>`
+  is set in `PivoxApp.csproj`.
+- That exact profile is installed in
+  `~/Library/Developer/Xcode/UserData/Provisioning Profiles/`.
+- The profile's `keychain-access-groups` is `FAENDBN66M.*` (wildcard
+  for the team prefix), which permits our requested
+  `FAENDBN66M.app.pivox.native`.
+- `dotnet build` from CLI does NOT raise MT7139 — it correctly
+  detects and uses the profile.
+
+The warning appears to be a Rider-side analyzer bug: it runs
+entitlement validation at a phase that doesn't see `CodesignProvision`,
+or doesn't understand wildcard matching in profile entitlements.
+Don't chase it — Firebase Auth keychain persistence works correctly
+at runtime, the signed bundle is valid, and the published Release
+build has zero codesign issues.
+
 ## Rule 10: never `rm -rf obj` if Rider is open
 
 Rider's IB shim-sync watcher interprets directory removal as source

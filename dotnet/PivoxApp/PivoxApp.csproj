@@ -18,8 +18,15 @@
          provisioning profile the SwiftUI Pivox app uses (copied to
          this dir as embedded.provisionprofile). The profile authorizes
          the cert to claim keychain-access-groups on bundle ID
-         app.pivox.native for team FAENDBN66M. -->
+         app.pivox.native for team FAENDBN66M.
+
+         CodesignRequireProvisioningProfile=true is implicit when
+         CodesignProvision is set, but declaring it explicitly silences
+         Rider's design-time MT7139 warning (which doesn't fire on
+         dotnet build CLI — Rider's analyzer evaluates entitlements
+         slightly differently and benefits from the explicit hint). -->
     <EnableCodeSigning>true</EnableCodeSigning>
+    <CodesignRequireProvisioningProfile>true</CodesignRequireProvisioningProfile>
     <CodesignKey>Apple Development: ashkan.daie@gmail.com (T55ZHGSMZJ)</CodesignKey>
     <CodesignEntitlements>Entitlements.plist</CodesignEntitlements>
     <CodesignProvision>Mac Team Provisioning Profile: app.pivox.native</CodesignProvision>

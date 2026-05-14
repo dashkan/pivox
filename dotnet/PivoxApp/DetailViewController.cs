@@ -303,9 +303,11 @@ public sealed class DetailViewController : NSViewController
         DrawsBackground = false,
         Selectable = false,
         Alignment = NSTextAlignment.Center,
-        Font = bold
+        // NSFont.SystemFontOfSize is bound as nullable but Apple's
+        // contract guarantees non-null. Forgive at the boundary.
+        Font = (bold
             ? NSFont.SystemFontOfSize((nfloat)size, NSFontWeight.Bold)
-            : NSFont.SystemFontOfSize((nfloat)size),
+            : NSFont.SystemFontOfSize((nfloat)size))!,
         TextColor = secondary ? NSColor.SecondaryLabel : NSColor.Label,
         TranslatesAutoresizingMaskIntoConstraints = false,
     };
