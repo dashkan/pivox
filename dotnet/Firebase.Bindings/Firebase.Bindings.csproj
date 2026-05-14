@@ -1,0 +1,92 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-macos</TargetFramework>
+    <IsBindingProject>true</IsBindingProject>
+    <Nullable>enable</Nullable>
+    <SupportedOSPlatformVersion>26.0</SupportedOSPlatformVersion>
+    <!-- xcframeworks are directories, not single files. SDK embeds
+         them via NativeReference (copied into host app bundle's
+         Frameworks/), not as resources in the binding assembly. -->
+    <NoBindingEmbedding>true</NoBindingEmbedding>
+    <ValidateXcodeVersion>false</ValidateXcodeVersion>
+  </PropertyGroup>
+
+  <!--
+    Firebase Auth requires the following native frameworks at link
+    time. Of these we only emit C# bindings for FirebaseAuth +
+    FirebaseCore (those are the ones we call from C#). The rest are
+    embedded as static-archive native references so the linker can
+    resolve the symbols FirebaseAuth depends on.
+
+    Static-library distribution: each .xcframework's macOS slice is
+    a static .a archive (verified with `file`). Kind=Static + ForceLoad
+    so the linker pulls in ObjC class symbols that aren't directly
+    referenced from C#.
+  -->
+  <ItemGroup>
+    <NativeReference Include="Frameworks/FirebaseAuth.xcframework">
+      <Kind>Static</Kind>
+      <ForceLoad>True</ForceLoad>
+      <Frameworks>AppKit Foundation Security SystemConfiguration</Frameworks>
+      <LinkerFlags>-lz</LinkerFlags>
+    </NativeReference>
+    <NativeReference Include="Frameworks/FirebaseCore.xcframework">
+      <Kind>Static</Kind>
+      <ForceLoad>True</ForceLoad>
+    </NativeReference>
+    <NativeReference Include="Frameworks/FirebaseAuthInterop.xcframework">
+      <Kind>Static</Kind>
+    </NativeReference>
+    <NativeReference Include="Frameworks/FirebaseAppCheckInterop.xcframework">
+      <Kind>Static</Kind>
+    </NativeReference>
+    <NativeReference Include="Frameworks/FirebaseCoreExtension.xcframework">
+      <Kind>Static</Kind>
+    </NativeReference>
+    <NativeReference Include="Frameworks/FirebaseCoreInternal.xcframework">
+      <Kind>Static</Kind>
+    </NativeReference>
+    <NativeReference Include="Frameworks/FirebaseInstallations.xcframework">
+      <Kind>Static</Kind>
+    </NativeReference>
+    <NativeReference Include="Frameworks/GoogleUtilities.xcframework">
+      <Kind>Static</Kind>
+    </NativeReference>
+    <NativeReference Include="Frameworks/GTMSessionFetcher.xcframework">
+      <Kind>Static</Kind>
+    </NativeReference>
+    <NativeReference Include="Frameworks/nanopb.xcframework">
+      <Kind>Static</Kind>
+    </NativeReference>
+    <NativeReference Include="Frameworks/FBLPromises.xcframework">
+      <Kind>Static</Kind>
+    </NativeReference>
+  </ItemGroup>
+
+  <!-- Drive bgen explicitly. The binding-project SDK doesn't auto-detect
+       these item types from filename convention in net10.0-macos as it
+       used to in Xamarin.Mac. Must list them and exclude from default
+       Compile glob to avoid double-processing. -->
+  <ItemGroup>
+    <ObjcBindingApiDefinition Include="ApiDefinition.cs" />
+    <ObjcBindingCoreSource Include="StructsAndEnums.cs" />
+    <Compile Remove="ApiDefinition.cs" />
+    <Compile Remove="StructsAndEnums.cs" />
+  </ItemGroup>
+
+  <!-- Firebase README requires -ObjC and -lc++. -ObjC ensures all
+       ObjC classes are loaded even when only referenced by selector;
+       -lc++ links the C++ standard library that GoogleUtilities uses.
+
+       LinkWithSwiftSystemLibraries: FirebaseAuth's macOS slice has
+       internal Swift code (Data.zipped() for heartbeat compression,
+       Swift-bridged headers, etc.). Without Swift system libs on
+       the link line, the binary crashes with doesNotRecognizeSelector
+       when Firebase's Swift code dispatches into Swift runtime methods. -->
+  <PropertyGroup>
+    <LinkerExtraArgs>-ObjC -lc++</LinkerExtraArgs>
+    <LinkWithSwiftSystemLibraries>true</LinkWithSwiftSystemLibraries>
+  </PropertyGroup>
+
+</Project>

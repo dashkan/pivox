@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-macos</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>true</ImplicitUsings>
+    <SupportedOSPlatformVersion>26.0</SupportedOSPlatformVersion>
+    <ValidateXcodeVersion>false</ValidateXcodeVersion>
+
+    <!-- NativeAOT — produces a static native binary, no Mono runtime.
+         Only triggers on `dotnet publish` (not `dotnet build`), so
+         Debug build-and-run stays fast. NativeAOT manages its own
+         trimming; don't set TrimMode (the build warns when both
+         are set). -->
+    <PublishAot>true</PublishAot>
+
+    <!-- Sign with the local Apple Development cert + reuse the same
+         provisioning profile the SwiftUI Pivox app uses (copied to
+         this dir as embedded.provisionprofile). The profile authorizes
+         the cert to claim keychain-access-groups on bundle ID
+         app.pivox.native for team FAENDBN66M. -->
+    <EnableCodeSigning>true</EnableCodeSigning>
+    <CodesignKey>Apple Development: ashkan.daie@gmail.com (T55ZHGSMZJ)</CodesignKey>
+    <CodesignEntitlements>Entitlements.plist</CodesignEntitlements>
+    <CodesignProvision>Mac Team Provisioning Profile: app.pivox.native</CodesignProvision>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Firebase Auth + Core bindings. Binding project embeds the
+         11 transitive xcframeworks (FirebaseAuth, FirebaseCore,
+         FirebaseInstallations, GoogleUtilities, GTMSessionFetcher,
+         nanopb, FBLPromises, plus interop protocol declarations). -->
+    <ProjectReference Include="..\Firebase.Bindings\Firebase.Bindings.csproj" />
+
+    <!-- Cross-platform contracts (IAuthService, AuthSession, JWT
+         claim helpers). Same library Windows will consume. -->
+    <ProjectReference Include="..\Pivox.Shared\Pivox.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Firebase config — FIRApp.Configure() reads this from
+         the bundle's Resources/ at runtime. Same file the Swift app uses. -->
+    <BundleResource Include="GoogleService-Info.plist" />
+  </ItemGroup>
+</Project>

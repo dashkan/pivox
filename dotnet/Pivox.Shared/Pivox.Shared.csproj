@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- Surface AOT-unfriendly code at build time. Classlibs don't
+         get PublishAot (that's executable-only); IsAotCompatible
+         flips on the trimmer + AOT analyzers so reflection/dynamic
+         patterns warn here instead of breaking the host app's
+         `dotnet publish`. -->
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+</Project>

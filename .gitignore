@@ -10,6 +10,26 @@ tmp/
 build-errors.log
 .envrc.*
 
+# ───── dotnet/ (cross-platform .NET clients) ──────────────────────
+# Firebase xcframeworks (~111 MB, 1394 files). Reproducible via
+# dotnet/scripts/fetch-firebase-sdk.sh which pulls the official
+# Firebase.zip release and extracts the 11 xcframeworks the binding
+# needs. See docs/dev/appkit-csharp.md.
+dotnet/Firebase.Bindings/Frameworks/
+
+# Developer-specific signed crypto material. Each developer copies
+# their own Xcode-generated profile or refreshes from the SwiftUI
+# Pivox app build at native/build-xcode/Debug/Pivox.app/Contents/.
+dotnet/**/embedded.provisionprofile
+
+# .NET tool cache for the fetch script.
+dotnet/.cache/
+
+# Rider local config.
+dotnet/.idea/
+
+# ──────────────────────────────────────────────────────────────────
+
 # Created by https://www.toptal.com/developers/gitignore/api/c,go,c++,node,rust,cmake,linux,macos,swift,xcode,direnv,nextjs,python,windows,firebase,objective-c,visualstudio,jetbrains+all,visualstudiocode
 # Edit at https://www.toptal.com/developers/gitignore?templates=c,go,c++,node,rust,cmake,linux,macos,swift,xcode,direnv,nextjs,python,windows,firebase,objective-c,visualstudio,jetbrains+all,visualstudiocode
 
