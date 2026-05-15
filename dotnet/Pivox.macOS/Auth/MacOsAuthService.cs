@@ -115,11 +115,36 @@ public sealed class MacOsAuthService : IAuthService
                 return;
             }
             Console.Error.WriteLine($"[Auth] state change: uid={user.Uid}");
-            user.GetIDTokenWithCompletion((tok, err) =>
+            // Force a server round-trip on the token fetch. The
+            // FIRAuth listener fires `user != null` on app launch
+            // using the locally cached token; that JWT is
+            // cryptographically valid for ~1 hour after issue, so it
+            // looks fine to the SDK even if the account was disabled
+            // or deleted server-side. Only a forced refresh asks
+            // Firebase's servers to validate the session — if the
+            // server rejects (disabled, deleted, revoked refresh
+            // token), the completion fires with an error and we
+            // route to signed-out, putting the user on the Login
+            // screen instead of silently into the app.
+            //
+            // Mirrors WinUI's b47914c fix
+            // (WindowsAuthService.AuthStateChanged with
+            // _bridge.GetIdTokenAsync(true)). Cross-platform behavior
+            // is now identical: a launch with a stale-but-cached JWT
+            // never grants app access without server confirmation.
+            user.GetIDTokenForcingRefresh(true, (tok, err) =>
             {
                 if (err is not null)
                 {
-                    Console.Error.WriteLine($"[Auth] token fetch failed: {err.LocalizedDescription}");
+                    // Disabled / deleted / revoked / network-during-
+                    // refresh. Treat as signed out so the router
+                    // shows Login. The Console.Error log surfaces
+                    // the underlying Firebase reason for diagnostics.
+                    Console.Error.WriteLine(
+                        $"[Auth] forced token refresh failed: "
+                        + $"{err.LocalizedDescription} (code {err.Code}) "
+                        + "→ treating as signed out");
+                    SetCurrent(null);
                     return;
                 }
                 if (tok is not null)
