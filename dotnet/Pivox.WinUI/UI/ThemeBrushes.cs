@@ -24,7 +24,7 @@ public static class ThemeBrushes
         ThemeColor.Foreground          => ResourceBrush("TextFillColorPrimaryBrush"),
         ThemeColor.SecondaryForeground => ResourceBrush("TextFillColorSecondaryBrush"),
         ThemeColor.Border              => ResourceBrush("ControlStrokeColorDefaultBrush"),
-        ThemeColor.Destructive         => new SolidColorBrush(ColorFrom(0xE8, 0x3B, 0x3B)),
+        ThemeColor.Destructive         => ResourceBrush("SystemFillColorCriticalBrush"),
         ThemeColor.Background          => ResourceBrush("SolidBackgroundFillColorBaseBrush"),
         ThemeColor.Surface             => ResourceBrush("LayerFillColorDefaultBrush"),
         _ => throw new ArgumentOutOfRangeException(nameof(token), token, null),
@@ -56,7 +56,4 @@ public static class ThemeBrushes
             return b;
         return new SolidColorBrush(Colors.Magenta); // visible fallback
     }
-
-    private static Color ColorFrom(int r, int g, int b)
-        => Color.FromArgb(255, (byte)r, (byte)g, (byte)b);
 }
