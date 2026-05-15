@@ -1,18 +1,26 @@
 namespace Pivox.Shared;
 
 /// <summary>
-/// Single source of truth for the Pivox cloud gRPC endpoint and
-/// transport security. Mirrors the SwiftUI app's CloudConfig.swift
-/// — same env var names + semantics so one .envrc switches both
-/// stacks pointing at the same backend.
+/// Single source of truth for the Pivox cloud gRPC endpoint.
 ///
 /// Resolution order:
-///   1. <c>PIVOX_GRPC_HOST</c> env var, e.g. "localhost:50051"
-///      (host:port, NO scheme). <c>PIVOX_GRPC_PLAINTEXT=1</c>
-///      disables TLS — for local dev against a plaintext server.
-///   2. Default: <c>pivox.ngrok.app:443</c> over TLS. Matches the
-///      public tunnel the OAuth broker uses, so gRPC + REST +
-///      auth all point at the same backend.
+///   1. <c>PIVOX_GRPC_HOST</c> env var, e.g. "pivox.ngrok.app:443"
+///      (host:port, NO scheme).
+///   2. Default: <c>pivox.ngrok.app:443</c>. Matches the public
+///      tunnel the OAuth broker uses, so gRPC + REST + auth all
+///      point at the same backend.
+///
+/// Transport: TLS only. There is no plaintext deployment mode for
+/// the dotnet stack — broker callbacks carry id tokens, gRPC carries
+/// Firebase JWTs, neither can ever leave the device unencrypted.
+///
+/// Divergence from the SwiftUI <c>CloudConfig.swift</c>: the Swift
+/// side retains a <c>PIVOX_GRPC_PLAINTEXT</c> escape hatch for local
+/// development against a no-TLS gRPC server. The dotnet side
+/// deliberately doesn't — that path was never exercised here, and
+/// removing it shrinks the auth surface area. SwiftUI is on the
+/// retirement track; the parity was a transitional convenience that
+/// has expired.
 /// </summary>
 public static class CloudConfig
 {
@@ -26,23 +34,16 @@ public static class CloudConfig
         }
     }
 
-    /// <summary>True if the gRPC channel should use plaintext (no TLS).
-    /// ngrok terminates TLS on :443; local dev typically uses plaintext
-    /// on :50051.</summary>
-    public static bool UsePlaintext =>
-        Environment.GetEnvironmentVariable("PIVOX_GRPC_PLAINTEXT") == "1";
-
     /// <summary>
-    /// Composes the endpoint into a <see cref="Uri"/> for
-    /// <c>GrpcChannel.ForAddress</c>. Scheme follows <see cref="UsePlaintext"/>.
+    /// Composes the endpoint into an https:// <see cref="Uri"/> for
+    /// <c>GrpcChannel.ForAddress</c>. Always TLS.
     /// </summary>
     public static Uri GrpcUri
     {
         get
         {
             var (host, port) = ParsedEndpoint();
-            var scheme = UsePlaintext ? "http" : "https";
-            return new Uri($"{scheme}://{host}:{port}");
+            return new Uri($"https://{host}:{port}");
         }
     }
 
@@ -50,8 +51,7 @@ public static class CloudConfig
     /// Base URL for pivox-cloud's REST surface: SSO provider resolution,
     /// the OAuth/OIDC broker, etc. Derived from <see cref="GrpcEndpoint"/>'s
     /// host so a single <c>PIVOX_GRPC_HOST</c> override flips both gRPC
-    /// and REST. Always HTTPS in production — broker callbacks carry id
-    /// tokens; never plaintext.
+    /// and REST. Always HTTPS.
     /// </summary>
     public static string BrokerBaseUrl
     {

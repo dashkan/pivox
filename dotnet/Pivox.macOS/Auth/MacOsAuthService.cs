@@ -12,6 +12,7 @@ using Foundation;
 using ObjCRuntime;
 using Pivox.Shared;
 using Pivox.Shared.Auth;
+using Pivox.Shared.Http;
 
 namespace Pivox.Auth;
 
@@ -47,8 +48,6 @@ public sealed class MacOsAuthService : IAuthService
     // URL handler registration.
     private const string BrokerCallbackScheme = "pivox";
     private const string BrokerReturnUrl = "pivox://auth-complete";
-
-    private static readonly HttpClient s_http = new();
 
     // Strong refs so neither survives only on the stack.
     // `_activeWebAuthSession` is volatile because the completion
@@ -282,51 +281,9 @@ public sealed class MacOsAuthService : IAuthService
         }
     }
 
-    public async Task<string?> ResolveSsoProviderAsync(
+    public Task<string?> ResolveSsoProviderAsync(
         string email, CancellationToken ct = default)
-    {
-        var trimmed = email.Trim();
-        if (string.IsNullOrEmpty(trimmed)) return null;
-
-        // Pivox-cloud's resolveProvider is a JSON POST against the
-        // public broker — no auth header (pre-auth surface).
-        // See native AuthService.swift for the exact endpoint shape.
-        //
-        // Hand-build the body via JsonEncodedText.Encode (AOT-clean,
-        // single allocation) — JsonSerializer.Serialize<T>(...) on an
-        // anonymous type triggers IL2026/IL3050 warnings because the
-        // serializer needs reflection over an unannotated type. The
-        // request shape is one field; the source-gen ceremony isn't
-        // worth it.
-        var url = $"{CloudConfig.BrokerBaseUrl}/internal/v1/auth:resolveProvider";
-        var encoded = System.Text.Encodings.Web.JavaScriptEncoder.Default
-            .Encode(trimmed);
-        var body = $"{{\"email\":\"{encoded}\"}}";
-        using var req = new HttpRequestMessage(HttpMethod.Post, url)
-        {
-            Content = new StringContent(body, Encoding.UTF8, "application/json"),
-        };
-
-        using var resp = await s_http.SendAsync(req, ct);
-        switch ((int)resp.StatusCode)
-        {
-            case 200:
-                var payload = await resp.Content.ReadAsStringAsync(ct);
-                using (var doc = JsonDocument.Parse(payload))
-                {
-                    return doc.RootElement.TryGetProperty("provider_id", out var p)
-                        ? p.GetString()
-                        : null;
-                }
-            case 404:
-                // "No provider configured" — collapsed with "domain
-                // unknown" to avoid existence-probing.
-                return null;
-            default:
-                throw new InvalidOperationException(
-                    $"resolveProvider failed: HTTP {(int)resp.StatusCode}");
-        }
-    }
+        => SsoProviderResolver.ResolveAsync(email, ct);
 
     public Task SignOutAsync(CancellationToken ct = default)
     {
@@ -479,7 +436,7 @@ public sealed class MacOsAuthService : IAuthService
         var code = query["code"]
             ?? throw new InvalidOperationException("No 'code' in Google OAuth callback URL.");
 
-        var tokenResponse = await s_http.PostAsync(
+        var tokenResponse = await SharedHttp.Instance.PostAsync(
             "https://oauth2.googleapis.com/token",
             new FormUrlEncodedContent(new Dictionary<string, string>
             {

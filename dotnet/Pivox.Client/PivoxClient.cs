@@ -12,8 +12,11 @@ namespace Pivox.Client;
 /// pre-attached so every call carries the user's Bearer token.
 ///
 /// One instance per process. Constructed by the platform app
-/// (Pivox.macOS on macOS, future Pivox.WinUI) and passed wherever
+/// (Pivox.macOS on macOS, Pivox.WinUI on Windows) and passed wherever
 /// gRPC access is needed.
+///
+/// Transport: TLS only. The dotnet stack has no plaintext gRPC mode —
+/// see <see cref="CloudConfig"/> for the rationale.
 /// </summary>
 public sealed class PivoxClient : IDisposable
 {
@@ -25,56 +28,24 @@ public sealed class PivoxClient : IDisposable
     /// env var). Auth tokens come from <paramref name="auth"/>.
     /// </summary>
     public PivoxClient(IAuthService auth)
-        : this(CloudConfig.GrpcUri, CloudConfig.UsePlaintext, auth)
+        : this(CloudConfig.GrpcUri, auth)
     {
     }
 
-    public PivoxClient(Uri endpoint, bool usePlaintext, IAuthService auth)
+    public PivoxClient(Uri endpoint, IAuthService auth)
     {
         var callCredentials = AuthCallCredentials.FromAuthService(auth);
 
-        var options = new GrpcChannelOptions();
-
-        if (usePlaintext)
+        // TLS path — CallCredentials compose with SslCredentials so
+        // gRPC attaches them automatically on every call.
+        var options = new GrpcChannelOptions
         {
-            // Plaintext local dev — CallCredentials are normally blocked
-            // on insecure channels (the token would leak in plaintext).
-            // Allow them explicitly; safe because the network never
-            // leaves localhost in this config.
-            options.Credentials = ChannelCredentials.Insecure;
-            options.UnsafeUseInsecureChannelCallCredentials = true;
-
-            // Attach call credentials by wrapping every call. With insecure
-            // channels, gRPC won't auto-apply CallCredentials from the
-            // channel — we set them explicitly per call via DefaultCallOptions.
-            options.DisposeHttpClient = false;
-            ApplyCallCredentialsViaDefaultOptions(options, callCredentials);
-        }
-        else
-        {
-            // TLS path — CallCredentials compose with SslCredentials so
-            // gRPC attaches them automatically on every call.
-            options.Credentials = ChannelCredentials.Create(
+            Credentials = ChannelCredentials.Create(
                 ChannelCredentials.SecureSsl,
-                callCredentials);
-        }
+                callCredentials),
+        };
 
         _channel = GrpcChannel.ForAddress(endpoint, options);
-    }
-
-    private static void ApplyCallCredentialsViaDefaultOptions(
-        GrpcChannelOptions options, CallCredentials callCredentials)
-    {
-        // For insecure channels we can't compose CallCredentials with
-        // ChannelCredentials.Insecure. Stash them in DefaultCallOptions
-        // so every call inherits them.
-        options.DisposeHttpClient = false;
-        options.UnsafeUseInsecureChannelCallCredentials = true;
-        // Note: GrpcChannelOptions doesn't have a public DefaultCallOptions
-        // setter in net10.0. For insecure dev we rely on per-call attachment
-        // via CallOptions(credentials:) in typed clients. Leaving the hook
-        // here as a marker — if plaintext dev becomes a real path, wire
-        // CallOptions per service-client property below.
     }
 
     // ───── service surface ──────────────────────────────────────

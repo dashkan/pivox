@@ -1117,10 +1117,24 @@ public global::Pivox.Iam.V1.Iam.IamClient Iam => new(_channel);
 ### Cloud endpoint config
 
 `Pivox.Shared/CloudConfig.cs` is the single source of truth for the
-backend URL + TLS choice. Mirrors `native/.../CloudConfig.swift` —
-same env var names (`PIVOX_GRPC_HOST`, `PIVOX_GRPC_PLAINTEXT`),
-same default (`pivox.ngrok.app:443` over TLS). One `.envrc` switches
-both stacks at the same backend.
+backend URL. Defaults to `pivox.ngrok.app:443`; override host via the
+`PIVOX_GRPC_HOST` env var. **Always TLS** — there is no plaintext
+mode in the dotnet stack. The SwiftUI side retains a
+`PIVOX_GRPC_PLAINTEXT` escape hatch for local dev; the dotnet path
+deliberately doesn't (broker callbacks carry id tokens, gRPC carries
+Firebase JWTs — neither can leave the device unencrypted, and the
+plaintext path was never exercised on dotnet). One `.envrc`
+`PIVOX_GRPC_HOST` still switches both stacks against the same backend.
+
+### Shared HTTP client
+
+`Pivox.Shared/Http/SharedHttp.Instance` is the process-wide
+`HttpClient` for every plain-HTTP call (OAuth token exchange, SSO
+provider resolution, future broker REST surfaces). Don't construct
+new `HttpClient` instances — they fragment the connection pool and
+exhaust ephemeral ports under load. `IHttpClientFactory` is the
+heavier-weight alternative; we don't run DI so the static singleton
+is the right shape at this scale.
 
 ## Naming
 
