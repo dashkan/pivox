@@ -9,6 +9,7 @@
   <Project Path="Pivox.Native/Pivox.Native.csproj" />
   <Project Path="Pivox.Native.Tests/Pivox.Native.Tests.csproj" />
   <Project Path="Pivox.Shared/Pivox.Shared.csproj" />
+  <Project Path="Pivox.Shared.Tests/Pivox.Shared.Tests.csproj" />
   <Project Path="Pivox.WinUI/Pivox.WinUI.csproj">
     <Platform Solution="*|Any CPU" Project="x64" />
     <Platform Solution="*|ARM64" Project="ARM64" />

@@ -89,6 +89,8 @@ public sealed class PivoxClient : IDisposable
         => new(_channel);
     public global::Pivox.Api.V1.Spaces.SpacesClient Spaces
         => new(_channel);
+    public global::Pivox.Ai.V1.AiChat.AiChatClient Ai
+        => new(_channel);
 
     // Add more services here as features need them. Pivox.Client owns
     // every generated *Client class from pivox/**/*.proto.
